@@ -389,9 +389,15 @@ function ez_render_ops(PDO $pdo): never
     ez_page_start('Operations · Ezkart', 'ops-page');
     ez_brand_header('Operations');
     echo '<main class="ops-shell"><div class="ops-heading"><div><span class="eyebrow">LIVE TRANSACTION STATE</span>'
-        . '<h1>Checkout operations</h1></div><form method="post" action="/ops/logout">'
+        . '<h1>Checkout operations</h1></div><div class="ops-heading-actions">';
+    if (ez_mode() === 'sandbox') {
+        echo '<form method="post" action="/ops/test-checkout">'
+            . '<input type="hidden" name="csrf" value="' . ez_html(ez_admin_csrf()) . '">'
+            . '<button class="secondary-button" type="submit">Create sandbox checkout</button></form>';
+    }
+    echo '<form method="post" action="/ops/logout">'
         . '<input type="hidden" name="csrf" value="' . ez_html(ez_admin_csrf()) . '">'
-        . '<button class="text-button" type="submit">Sign out</button></form></div>'
+        . '<button class="text-button" type="submit">Sign out</button></form></div></div>'
         . '<section class="ops-panels"><article><span>Mode</span><strong>' . ez_html(strtoupper(ez_mode())) . '</strong></article>'
         . '<article><span>Orders</span><strong>' . count($sessions) . '</strong></article>'
         . '<article><span>Paid value</span><strong>Rp' . number_format((float) array_sum(array_map(

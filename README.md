@@ -39,6 +39,8 @@ php tests/run.php
 - Deduplicated `order.status`, `order.price`, and `order.waybill_id` webhooks.
 - Restricted operations dashboard, shipment retry, fund ledger, and webhook
   health.
+- One-click sandbox checkout launcher for end-to-end provider testing before
+  the Official ZERO handoff is connected.
 - Custom Code 128 shipping label designed for A5 portrait printing.
 - Sandbox/production separation and a disabled-by-default launch switch.
 

@@ -165,6 +165,47 @@ try {
         exit;
     }
 
+    if ($method === 'POST' && $path === '/ops/test-checkout') {
+        if (!ez_admin_authenticated()) {
+            ez_render_ops_login();
+        }
+        if (!ez_admin_verify_csrf((string) ($_POST['csrf'] ?? ''))) {
+            ez_render_error_page(403, 'The operations form expired. Please try again.');
+        }
+        if (ez_mode() !== 'sandbox') {
+            ez_render_error_page(403, 'Test checkouts can only be created in sandbox mode.');
+        }
+        $testReference = 'ZERO-TEST-' . gmdate('Ymd-His') . '-' . strtoupper(bin2hex(random_bytes(2)));
+        $testPayload = [
+            'merchant_order_reference' => $testReference,
+            'currency' => 'IDR',
+            'items' => [[
+                'sku' => 'ZERO-SANDBOX-001',
+                'name' => 'ZERO Sandbox Test Product',
+                'quantity' => 1,
+                'unit_price' => 100000,
+                'unit_weight_grams' => 1000,
+            ]],
+            'declared_totals' => [
+                'merchandise' => 100000,
+                'weight_grams' => 1000,
+            ],
+            'customer' => ['name' => '', 'email' => '', 'phone' => ''],
+            'return_urls' => [
+                'success' => 'https://zerofoods.id/order/success',
+                'cancel' => 'https://zerofoods.id/cart',
+            ],
+        ];
+        $testSession = ez_create_session(
+            $pdo,
+            'zerofoods',
+            $testPayload,
+            'sandbox-checkout-' . strtolower($testReference)
+        );
+        header('Location: ' . $testSession['checkout_url'], true, 303);
+        exit;
+    }
+
     if ($isApi) {
         ez_json(['ok' => false, 'error' => 'API route not found.'], 404);
     }

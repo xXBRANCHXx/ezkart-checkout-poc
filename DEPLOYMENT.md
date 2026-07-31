@@ -118,10 +118,12 @@ The return page never marks an order paid. Only the signed server callback can.
 3. Set `app_enabled` to `true`.
 4. Open `/api/v1/health`; confirm HTTP 200 and `"ok": true`.
 5. Open `/`; click each numbered API step to inspect the exact JSON.
-6. On the Official ZERO server, adapt
-   `examples/zero-create-session.php`.
-7. Configure the same private `zero_merchant_secret` on both servers.
-8. Click checkout on ZERO.
+6. Sign into `/ops` and click **Create sandbox checkout** to run the first
+   end-to-end test without changing the Official ZERO website.
+7. After that passes, adapt `examples/zero-create-session.php` on the Official
+   ZERO server and configure the same private `zero_merchant_secret` on both
+   servers.
+8. Click checkout on ZERO for the merchant-handoff test.
 9. Confirm the browser is redirected to `/c/cs_...` with no price or weight in
    the URL.
 10. Enter a Biteship-recognized district/postcode.
