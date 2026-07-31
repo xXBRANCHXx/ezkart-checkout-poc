@@ -1,0 +1,4 @@
+config.runtime.php
+.env
+*.log
+.DS_Store
