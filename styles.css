@@ -251,6 +251,10 @@ img { display: block; max-width: 100%; }
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+.whatsapp-icon {
+  background: #25d366;
+  box-shadow: 0 7px 15px rgba(37, 211, 102, .2);
+}
 .contact-copy { min-width: 0; display: block; }
 .contact-copy small {
   display: block;
