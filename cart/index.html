@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Demo sandbox checkout Ezkart: tambah produk, isi alamat, pilih pengiriman, dan selesaikan pembayaran melalui Duitku Sandbox."
+    />
+    <meta name="theme-color" content="#081424" />
+    <meta name="robots" content="index,follow" />
+    <link rel="canonical" href="https://ezkart.id/cart/" />
+    <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="cart.css" />
+    <title>Sandbox Checkout · Ezkart</title>
+  </head>
+  <body>
+    <a class="skip-link" href="#checkout">Lewati ke checkout</a>
+
+    <header class="checkout-header">
+      <a class="brand" href="../" aria-label="Kembali ke beranda Ezkart">
+        <img src="../assets/ezkart-logo.svg" alt="Ezkart" width="1020" height="420" />
+      </a>
+      <div class="header-actions">
+        <span class="sandbox-pill"><i aria-hidden="true"></i> Duitku Sandbox</span>
+        <button class="cart-shortcut" id="cart-shortcut" type="button" aria-label="Lihat keranjang">
+          Keranjang <b id="header-count">0</b>
+        </button>
+      </div>
+    </header>
+
+    <div class="sandbox-banner" role="note">
+      <span>Mode demonstrasi</span>
+      <p>Alur ini menggunakan transaksi sandbox. Tidak ada pesanan nyata atau pembayaran yang ditagihkan.</p>
+    </div>
+
+    <nav class="progress" aria-label="Tahapan checkout">
+      <ol>
+        <li class="active" data-progress="cart"><span>1</span><b>Keranjang</b></li>
+        <li data-progress="details"><span>2</span><b>Data pelanggan</b></li>
+        <li data-progress="payment"><span>3</span><b>Pengiriman & pembayaran</b></li>
+        <li data-progress="complete"><span>4</span><b>Selesai</b></li>
+      </ol>
+    </nav>
+
+    <main id="checkout" class="checkout-shell">
+      <section class="checkout-content">
+        <div class="step-panel active" data-panel="cart">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Toko Demo Ezkart</p>
+              <h1>Pilih produk favoritmu.</h1>
+              <p>Tambahkan satu atau beberapa produk untuk mencoba seluruh alur checkout.</p>
+            </div>
+            <span class="demo-label">Produk contoh</span>
+          </div>
+
+          <div class="product-grid" id="product-grid">
+            <article class="product-card" data-product-id="granola">
+              <div class="product-art art-granola" aria-hidden="true">
+                <span>OAT</span><i></i><b>250g</b>
+              </div>
+              <div class="product-copy">
+                <p>Pantry series</p>
+                <h2>Granola Madu Nusantara</h2>
+                <small>Oat panggang, madu lokal, dan kacang pilihan.</small>
+                <div><strong>Rp58.000</strong><button class="add-product" type="button">+ Tambah</button></div>
+              </div>
+            </article>
+
+            <article class="product-card" data-product-id="coffee">
+              <div class="product-art art-coffee" aria-hidden="true">
+                <span>BREW</span><i></i><b>500ml</b>
+              </div>
+              <div class="product-copy">
+                <p>Beverage series</p>
+                <h2>Kopi Susu Concentrate</h2>
+                <small>Konsentrat kopi arabika untuk lima gelas.</small>
+                <div><strong>Rp79.000</strong><button class="add-product" type="button">+ Tambah</button></div>
+              </div>
+            </article>
+
+            <article class="product-card" data-product-id="sambal">
+              <div class="product-art art-sambal" aria-hidden="true">
+                <span>HOT</span><i></i><b>180g</b>
+              </div>
+              <div class="product-copy">
+                <p>Kitchen series</p>
+                <h2>Sambal Roa Signature</h2>
+                <small>Sambal gurih berasap dengan ikan roa pilihan.</small>
+                <div><strong>Rp46.000</strong><button class="add-product" type="button">+ Tambah</button></div>
+              </div>
+            </article>
+          </div>
+        </div>
+
+        <div class="step-panel" data-panel="details">
+          <div class="section-heading compact">
+            <div>
+              <p class="eyebrow">Langkah 2 dari 4</p>
+              <h1>Mau dikirim ke mana?</h1>
+              <p>Data ini digunakan untuk menghubungi penerima dan menghitung ongkos kirim.</p>
+            </div>
+          </div>
+
+          <form id="customer-form" novalidate>
+            <fieldset>
+              <legend>Informasi penerima</legend>
+              <div class="field-grid">
+                <label>
+                  <span>Nama lengkap</span>
+                  <input name="fullName" autocomplete="name" placeholder="Contoh: Nadia Putri" required maxlength="100" />
+                  <small class="field-error"></small>
+                </label>
+                <label>
+                  <span>Nomor WhatsApp</span>
+                  <input name="phone" inputmode="tel" autocomplete="tel" placeholder="08xxxxxxxxxx" required maxlength="20" />
+                  <small class="field-error"></small>
+                </label>
+                <label class="full-field">
+                  <span>Email</span>
+                  <input name="email" type="email" autocomplete="email" placeholder="nama@email.com" required maxlength="120" />
+                  <small class="field-error"></small>
+                </label>
+              </div>
+            </fieldset>
+
+            <fieldset>
+              <legend>Alamat pengiriman</legend>
+              <div class="field-grid">
+                <label class="full-field">
+                  <span>Kecamatan / kota</span>
+                  <input
+                    name="location"
+                    list="location-options"
+                    autocomplete="address-level2"
+                    placeholder="Cari kecamatan atau kota"
+                    required
+                  />
+                  <datalist id="location-options">
+                    <option value="Kebayoran Baru, Jakarta Selatan"></option>
+                    <option value="Menteng, Jakarta Pusat"></option>
+                    <option value="Coblong, Kota Bandung"></option>
+                    <option value="Tegalsari, Kota Surabaya"></option>
+                    <option value="Depok, Kota Depok"></option>
+                    <option value="Sleman, DI Yogyakarta"></option>
+                    <option value="Denpasar Selatan, Bali"></option>
+                  </datalist>
+                  <small class="field-hint">Pilih lokasi untuk mendapatkan estimasi pengiriman sandbox.</small>
+                  <small class="field-error"></small>
+                </label>
+                <label class="full-field">
+                  <span>Alamat lengkap</span>
+                  <textarea name="address" autocomplete="street-address" placeholder="Nama jalan, nomor rumah, RT/RW, patokan" required maxlength="300"></textarea>
+                  <small class="field-error"></small>
+                </label>
+                <label>
+                  <span>Kode pos</span>
+                  <input name="postalCode" inputmode="numeric" autocomplete="postal-code" placeholder="12345" required maxlength="5" />
+                  <small class="field-error"></small>
+                </label>
+                <label>
+                  <span>Catatan kurir <em>(opsional)</em></span>
+                  <input name="note" placeholder="Contoh: titip di resepsionis" maxlength="120" />
+                </label>
+              </div>
+            </fieldset>
+
+            <div class="form-actions">
+              <button class="text-button" type="button" data-go="cart">← Kembali ke keranjang</button>
+              <button class="primary-button" type="submit">Dapatkan ongkir <span>→</span></button>
+            </div>
+          </form>
+        </div>
+
+        <div class="step-panel" data-panel="payment">
+          <div class="section-heading compact">
+            <div>
+              <p class="eyebrow">Langkah 3 dari 4</p>
+              <h1>Pilih pengiriman dan pembayaran.</h1>
+              <p>Ongkir dihitung dari tujuan dan berat keranjang. Pilihan pembayaran diproses oleh Duitku.</p>
+            </div>
+          </div>
+
+          <section class="choice-section" aria-labelledby="shipping-title">
+            <div class="choice-heading">
+              <div><span>01</span><h2 id="shipping-title">Layanan pengiriman</h2></div>
+              <p id="quote-location">Tujuan belum dipilih</p>
+            </div>
+            <div class="choice-list" id="shipping-options"></div>
+          </section>
+
+          <section class="choice-section locked" id="payment-section" aria-labelledby="payment-title">
+            <div class="choice-heading">
+              <div><span>02</span><h2 id="payment-title">Pembayaran Duitku</h2></div>
+              <span class="duitku-chip">Duitku Sandbox</span>
+            </div>
+            <p class="choice-intro">Pilih kelompok metode. Metode yang aktif untuk merchant akan ditampilkan pada halaman aman Duitku.</p>
+            <div class="payment-grid" id="payment-options">
+              <label class="payment-option">
+                <input type="radio" name="payment" value="QRIS & E-wallet" />
+                <span class="payment-icon qris-icon">QR</span>
+                <span><b>QRIS & E-wallet</b><small>Bayar dari aplikasi pilihanmu</small></span>
+                <i aria-hidden="true"></i>
+              </label>
+              <label class="payment-option">
+                <input type="radio" name="payment" value="Virtual Account" />
+                <span class="payment-icon bank-icon">VA</span>
+                <span><b>Virtual Account</b><small>Pilih bank di halaman Duitku</small></span>
+                <i aria-hidden="true"></i>
+              </label>
+              <label class="payment-option">
+                <input type="radio" name="payment" value="Kartu kredit / debit" />
+                <span class="payment-icon card-icon">••</span>
+                <span><b>Kartu kredit / debit</b><small>Visa, Mastercard, dan JCB</small></span>
+                <i aria-hidden="true"></i>
+              </label>
+            </div>
+          </section>
+
+          <div class="form-actions payment-actions">
+            <button class="text-button" type="button" data-go="details">← Ubah alamat</button>
+            <button class="primary-button" id="pay-button" type="button" disabled>
+              Bayar aman via Duitku <span>→</span>
+            </button>
+          </div>
+          <p class="secure-note"><span aria-hidden="true">◆</span> Ezkart tidak menerima nomor kartu, PIN, OTP, atau kredensial perbankan.</p>
+        </div>
+
+        <div class="step-panel" data-panel="complete">
+          <section class="success-card">
+            <div class="success-icon" aria-hidden="true">✓</div>
+            <p class="eyebrow">Pembayaran sandbox berhasil</p>
+            <h1>Terima kasih, <span id="success-name">pelanggan</span>.</h1>
+            <p>Konfirmasi pesanan telah dibuat. Pada transaksi nyata, merchant akan memproses pesanan setelah notifikasi pembayaran terverifikasi dari Duitku diterima.</p>
+            <div class="success-details">
+              <div><span>Nomor pesanan</span><b id="success-order">EZK-SBX-000000</b></div>
+              <div><span>Status</span><b class="paid-status">Dibayar</b></div>
+              <div><span>Total</span><b id="success-total">Rp0</b></div>
+              <div><span>Pembayaran</span><b id="success-payment">Duitku Sandbox</b></div>
+            </div>
+            <div class="success-actions">
+              <button class="primary-button" id="reset-demo" type="button">Ulangi demo</button>
+              <a class="text-button" href="../">Kembali ke Ezkart</a>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <aside class="cart-summary" id="cart-summary" aria-labelledby="summary-title">
+        <div class="summary-heading">
+          <div><p>Ringkasan</p><h2 id="summary-title">Pesananmu</h2></div>
+          <span id="summary-count">0 item</span>
+        </div>
+        <div class="empty-cart" id="empty-cart">
+          <span aria-hidden="true">＋</span>
+          <b>Keranjang masih kosong</b>
+          <p>Pilih produk untuk memulai demo checkout.</p>
+        </div>
+        <div class="cart-items" id="cart-items"></div>
+        <div class="summary-totals" id="summary-totals" hidden>
+          <div><span>Subtotal</span><b id="subtotal">Rp0</b></div>
+          <div><span>Pengiriman</span><b id="shipping-total">Belum dipilih</b></div>
+          <div class="grand-total"><span>Total</span><b id="grand-total">Rp0</b></div>
+          <small>Termasuk pajak. Tidak ada biaya platform untuk pelanggan.</small>
+        </div>
+        <button class="primary-button summary-button" id="checkout-button" type="button" disabled>
+          Lanjut ke checkout <span>→</span>
+        </button>
+        <div class="summary-trust"><span>✓</span><p><b>Checkout aman</b>Data pembayaran diproses di halaman Duitku.</p></div>
+      </aside>
+    </main>
+
+    <footer>
+      <img src="../assets/ezkart-logo.svg" alt="Ezkart" width="1020" height="420" />
+      <p>Sandbox checkout demonstration for merchant review. No real orders or charges.</p>
+      <a href="../docs/Ezkart-Customer-Checkout-Guide.pdf">Unduh panduan checkout (PDF) ↗</a>
+    </footer>
+
+    <dialog id="duitku-dialog" aria-labelledby="duitku-title">
+      <div class="dialog-browserbar"><i></i><i></i><i></i><span>app-sandbox.duitku.com</span></div>
+      <div class="dialog-body">
+        <div class="duitku-wordmark">DUITKU <span>SANDBOX</span></div>
+        <button class="dialog-close" id="dialog-close" type="button" aria-label="Tutup">×</button>
+        <p class="dialog-kicker">Pembayaran aman</p>
+        <h2 id="duitku-title">Selesaikan pembayaran</h2>
+        <p class="dialog-copy">Ini adalah simulasi halaman pembayaran Duitku untuk keperluan review sandbox. Tidak ada dana yang ditagihkan.</p>
+        <div class="dialog-summary">
+          <div><span>Merchant</span><b>Ezkart Demo Store</b></div>
+          <div><span>Metode</span><b id="dialog-method">—</b></div>
+          <div><span>Total</span><b id="dialog-total">Rp0</b></div>
+        </div>
+        <button class="duitku-pay" id="simulate-payment" type="button">Simulasikan pembayaran berhasil</button>
+        <button class="dialog-cancel" id="dialog-cancel" type="button">Kembali ke checkout</button>
+        <p class="dialog-security">🔒 PIN, OTP, dan kredensial pembayaran hanya dimasukkan di Duitku.</p>
+      </div>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="cart.js"></script>
+  </body>
+</html>

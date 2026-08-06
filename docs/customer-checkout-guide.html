@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ezkart Customer Checkout Guide</title>
+    <style>
+      @page { size: A4; margin: 0; }
+      * { box-sizing: border-box; }
+      :root { --ink:#081424; --soft:#5d6876; --paper:#f7f4ef; --coral:#ff3926; --orange:#ff6b08; --purple:#6c2bd9; --green:#0a8f62; --line:rgba(8,20,36,.14); }
+      body { margin:0; color:var(--ink); background:#ddd; font-family:Arial,Helvetica,sans-serif; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+      .page { width:210mm; height:297mm; margin:0 auto 10mm; padding:17mm 18mm 15mm; position:relative; overflow:hidden; background:var(--paper); page-break-after:always; }
+      .page:last-child { page-break-after:auto; }
+      .page::before { content:""; position:absolute; inset:0; z-index:0; background-image:linear-gradient(rgba(8,20,36,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(8,20,36,.025) 1px,transparent 1px); background-size:13mm 13mm; }
+      .page > * { position:relative; z-index:1; }
+      .header { display:flex; align-items:center; justify-content:space-between; padding-bottom:7mm; border-bottom:.3mm solid var(--line); }
+      .logo { font-size:24pt; font-weight:800; letter-spacing:-1.8pt; }
+      .logo span { color:var(--coral); }
+      .sandbox { padding:2.2mm 3.4mm; color:#6e5500; background:#fff1a9; border:.3mm solid #e4cc54; border-radius:20mm; font-size:6.5pt; font-weight:800; letter-spacing:.7pt; text-transform:uppercase; }
+      .eyebrow { margin:0 0 4mm; display:flex; align-items:center; gap:3mm; color:var(--coral); font-size:7pt; font-weight:800; letter-spacing:1.2pt; text-transform:uppercase; }
+      .eyebrow::before { content:""; width:8mm; height:.7mm; background:var(--coral); }
+      h1 { margin:0; font-size:39pt; line-height:.98; letter-spacing:-2.2pt; }
+      h2 { margin:0; font-size:24pt; line-height:1.02; letter-spacing:-1.2pt; }
+      h3 { margin:0; font-size:11pt; }
+      p { color:var(--soft); font-size:9pt; line-height:1.65; }
+      .page-number { position:absolute; right:18mm; bottom:10mm; color:#8a9098; font-size:7pt; font-weight:700; letter-spacing:.8pt; }
+      .cover { color:white; background:var(--ink); }
+      .cover::before { background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px); }
+      .cover .header { border-color:rgba(255,255,255,.16); }
+      .cover .logo { color:white; }
+      .cover-main { margin-top:25mm; display:grid; grid-template-columns:1.12fr .88fr; align-items:center; gap:14mm; }
+      .cover .eyebrow { color:#ff7c6f; }
+      .cover h1 { font-size:47pt; }
+      .cover h1 em { color:transparent; -webkit-text-stroke:.6mm white; font-style:normal; }
+      .cover-copy > p { max-width:95mm; margin:8mm 0 10mm; color:rgba(255,255,255,.63); font-size:10pt; }
+      .url { width:max-content; padding:3mm 4mm; color:white; background:linear-gradient(120deg,var(--orange),var(--coral),#ff075c); border-radius:2mm; font-size:9pt; font-weight:800; }
+      .flow-orbit { width:62mm; height:103mm; margin-left:auto; position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4mm; background:rgba(255,255,255,.06); border:.3mm solid rgba(255,255,255,.15); border-radius:30mm 30mm 8mm 8mm; }
+      .flow-orbit::before { content:""; position:absolute; width:77mm; height:77mm; border:.3mm dashed rgba(255,255,255,.18); border-radius:50%; }
+      .flow-node { width:46mm; padding:3.2mm; display:flex; align-items:center; gap:3mm; color:var(--ink); background:white; border-radius:2.5mm; box-shadow:0 4mm 10mm rgba(0,0,0,.18); font-size:7.5pt; font-weight:700; }
+      .flow-node b { width:7mm; height:7mm; display:grid; place-items:center; color:white; background:var(--coral); border-radius:50%; font-size:6pt; }
+      .flow-arrow { color:rgba(255,255,255,.45); font-size:12pt; }
+      .cover-note { position:absolute; left:18mm; right:18mm; bottom:20mm; padding-top:5mm; display:flex; justify-content:space-between; gap:12mm; border-top:.3mm solid rgba(255,255,255,.16); }
+      .cover-note div { flex:1; }
+      .cover-note b { display:block; margin-bottom:1.5mm; color:white; font-size:8pt; }
+      .cover-note span { color:rgba(255,255,255,.48); font-size:7pt; line-height:1.5; }
+      .cover .page-number { color:rgba(255,255,255,.4); }
+      .intro { margin:11mm 0 9mm; display:flex; align-items:flex-end; justify-content:space-between; gap:12mm; }
+      .intro > p { width:62mm; margin:0; }
+      .journey-grid { display:grid; grid-template-columns:1fr 1fr; gap:5mm; }
+      .journey-card { min-height:68mm; padding:6mm; background:#fffdf9; border:.3mm solid var(--line); border-radius:4mm; }
+      .journey-card-top { display:flex; align-items:center; justify-content:space-between; }
+      .step-badge { width:9mm; height:9mm; display:grid; place-items:center; color:white; background:var(--ink); border-radius:50%; font-size:7pt; font-weight:800; }
+      .step-tag { color:var(--coral); font-size:6pt; font-weight:800; letter-spacing:.8pt; text-transform:uppercase; }
+      .journey-card h3 { margin:3.5mm 0 1.5mm; font-size:14pt; letter-spacing:-.4pt; }
+      .journey-card > p { min-height:13mm; margin:0; font-size:7pt; line-height:1.45; }
+      .mini-ui { margin-top:3mm; padding:3mm; background:#f2efe9; border-radius:2.5mm; }
+      .product-line { display:grid; grid-template-columns:12mm 1fr auto; align-items:center; gap:3mm; }
+      .product-thumb { height:12mm; display:grid; place-items:center; color:white; background:#d49c6d; border-radius:2mm; font-size:5pt; font-weight:800; }
+      .product-line b { display:block; font-size:6.5pt; }
+      .product-line small { color:#888; font-size:5.5pt; }
+      .product-line strong { font-size:6.5pt; }
+      .fake-field { height:8mm; margin-top:2mm; padding:2.3mm; color:#838992; background:white; border:.3mm solid #d6d1ca; border-radius:2mm; font-size:5.5pt; }
+      .fake-field:first-child { margin-top:0; }
+      .quote-line { padding:2mm; display:grid; grid-template-columns:9mm 1fr auto; align-items:center; gap:2.5mm; background:white; border:.3mm solid var(--coral); border-radius:2mm; }
+      .quote-line + .quote-line { margin-top:2mm; border-color:#d6d1ca; }
+      .quote-line > span { width:8mm; height:8mm; display:grid; place-items:center; background:#eee; border-radius:1.5mm; font-size:4.5pt; font-weight:800; }
+      .quote-line b { font-size:6pt; }
+      .quote-line small { display:block; color:#8a9097; font-size:5pt; }
+      .quote-line strong { font-size:6pt; }
+      .duitku-ui { color:white; background:var(--purple); }
+      .duitku-ui .method { padding:1.5mm 2mm; display:flex; align-items:center; gap:2.5mm; background:rgba(255,255,255,.13); border:.3mm solid rgba(255,255,255,.2); border-radius:2mm; }
+      .duitku-ui .method + .method { margin-top:1.5mm; }
+      .duitku-ui .method span { width:6mm; height:6mm; display:grid; place-items:center; color:var(--purple); background:white; border-radius:1.2mm; font-size:4.5pt; font-weight:800; }
+      .duitku-ui .method b { font-size:6pt; }
+      .success-ui { text-align:center; }
+      .success-ui > span { width:12mm; height:12mm; margin:0 auto 3mm; display:grid; place-items:center; color:white; background:var(--green); border-radius:50%; font-size:7pt; }
+      .success-ui b { display:block; font-size:7pt; }
+      .success-ui small { color:#7b838d; font-size:5.5pt; }
+      .boundary { margin-top:11mm; display:grid; grid-template-columns:1fr 18mm 1fr; align-items:stretch; gap:5mm; }
+      .boundary-card { min-height:115mm; padding:8mm; border-radius:5mm; }
+      .boundary-card.ezkart { background:var(--ink); color:white; }
+      .boundary-card.duitku { color:white; background:var(--purple); }
+      .boundary-logo { font-size:17pt; font-weight:800; letter-spacing:-.7pt; }
+      .boundary-card > p { margin:3mm 0 7mm; color:rgba(255,255,255,.6); font-size:7.5pt; }
+      .boundary ul { margin:0; padding:0; display:grid; gap:3mm; list-style:none; }
+      .boundary li { padding:3mm 3mm 3mm 9mm; position:relative; background:rgba(255,255,255,.08); border-radius:2mm; color:rgba(255,255,255,.8); font-size:7pt; line-height:1.4; }
+      .boundary li::before { content:"✓"; position:absolute; left:3mm; color:#6be2b7; font-weight:800; }
+      .boundary-arrow { display:grid; place-items:center; color:var(--coral); font-size:25pt; font-weight:800; }
+      .privacy-note { margin-top:7mm; padding:5mm; display:flex; align-items:flex-start; gap:4mm; background:#fffdf9; border:.3mm solid var(--line); border-radius:3mm; }
+      .privacy-note span { width:9mm; height:9mm; display:grid; place-items:center; color:white; background:var(--green); border-radius:50%; font-size:6pt; }
+      .privacy-note b { display:block; margin-bottom:1mm; font-size:8pt; }
+      .privacy-note p { margin:0; font-size:7pt; }
+      .checklist { margin-top:9mm; display:grid; gap:3.5mm; }
+      .check { padding:4mm; display:grid; grid-template-columns:9mm 1fr auto; align-items:center; gap:4mm; background:#fffdf9; border:.3mm solid var(--line); border-radius:3mm; }
+      .check > span { width:8mm; height:8mm; display:grid; place-items:center; color:white; background:var(--green); border-radius:50%; font-size:6pt; }
+      .check b { display:block; margin-bottom:1mm; font-size:8pt; }
+      .check p { margin:0; font-size:6.5pt; }
+      .check > small { color:#7c848c; font-size:6pt; font-weight:700; text-transform:uppercase; }
+      .final-callout { margin-top:8mm; padding:7mm; display:flex; align-items:center; justify-content:space-between; gap:10mm; color:white; background:linear-gradient(120deg,var(--orange),var(--coral),#ff075c); border-radius:4mm; }
+      .final-callout h3 { margin-bottom:2mm; font-size:15pt; }
+      .final-callout p { margin:0; color:rgba(255,255,255,.75); font-size:7pt; }
+      .final-callout b { flex:none; padding:3mm 4mm; background:white; color:var(--ink); border-radius:2mm; font-size:8pt; }
+      @media print { body { background:none; } .page { margin:0; } }
+    </style>
+  </head>
+  <body>
+    <section class="page cover">
+      <header class="header"><div class="logo">ez<span>kart</span></div><span class="sandbox">Customer journey · Sandbox</span></header>
+      <div class="cover-main">
+        <div class="cover-copy">
+          <p class="eyebrow">Checkout overview</p>
+          <h1>From cart<br />to <em>paid.</em></h1>
+          <p>A clear view of how an Ezkart customer adds products, enters delivery details, chooses shipping, and completes payment securely through Duitku.</p>
+          <div class="url">ezkart.id/cart</div>
+        </div>
+        <div class="flow-orbit">
+          <div class="flow-node"><b>1</b> Add products</div><span class="flow-arrow">↓</span>
+          <div class="flow-node"><b>2</b> Delivery details</div><span class="flow-arrow">↓</span>
+          <div class="flow-node"><b>3</b> Shipping quote</div><span class="flow-arrow">↓</span>
+          <div class="flow-node"><b>4</b> Duitku payment</div>
+        </div>
+      </div>
+      <div class="cover-note">
+        <div><b>Purpose</b><span>Merchant onboarding and sandbox checkout review.</span></div>
+        <div><b>Customer promise</b><span>No banking credential is entered into or stored by Ezkart.</span></div>
+        <div><b>Demo status</b><span>Visible sandbox labels ensure no test is mistaken for a real charge.</span></div>
+      </div>
+      <span class="page-number">01 / 04</span>
+    </section>
+
+    <section class="page">
+      <header class="header"><div class="logo">ez<span>kart</span></div><span class="sandbox">Customer journey</span></header>
+      <div class="intro"><div><p class="eyebrow">Four simple steps</p><h2>The customer stays oriented from start to finish.</h2></div><p>Each step shows the current total and makes the next action explicit. Required information is validated before a shipping quote is created.</p></div>
+      <div class="journey-grid">
+        <article class="journey-card"><div class="journey-card-top"><span class="step-badge">1</span><span class="step-tag">Cart</span></div><h3>Add products</h3><p>The customer adds products, adjusts quantities, and reviews the subtotal before checkout.</p><div class="mini-ui"><div class="product-line"><span class="product-thumb">OAT</span><span><b>Granola Madu Nusantara</b><small>Qty 1 · 320 g</small></span><strong>Rp58.000</strong></div></div></article>
+        <article class="journey-card"><div class="journey-card-top"><span class="step-badge">2</span><span class="step-tag">Customer</span></div><h3>Enter delivery details</h3><p>Full name, WhatsApp number, email, location, street address, and postcode are collected.</p><div class="mini-ui"><div class="fake-field">Nadia Putri</div><div class="fake-field">Kebayoran Baru, Jakarta Selatan</div><div class="fake-field">Jl. Senopati No. 10 · 12190</div></div></article>
+        <article class="journey-card"><div class="journey-card-top"><span class="step-badge">3</span><span class="step-tag">Shipping</span></div><h3>Select a quoted service</h3><p>Available services show courier, service level, estimated arrival, and the quoted price.</p><div class="mini-ui"><div class="quote-line"><span>JNE</span><b>JNE REG<small>2–3 days</small></b><strong>Rp15.000</strong></div><div class="quote-line"><span>J&amp;T</span><b>J&amp;T EZ<small>2–4 days</small></b><strong>Rp13.500</strong></div></div></article>
+        <article class="journey-card"><div class="journey-card-top"><span class="step-badge">4</span><span class="step-tag">Duitku</span></div><h3>Pay securely</h3><p>The customer chooses an available Duitku method and pays on the secure provider page.</p><div class="mini-ui duitku-ui"><div class="method"><span>QR</span><b>QRIS &amp; E-wallet</b></div><div class="method"><span>VA</span><b>Virtual Account</b></div><div class="method"><span>••</span><b>Credit / debit card</b></div></div></article>
+      </div>
+      <span class="page-number">02 / 04</span>
+    </section>
+
+    <section class="page">
+      <header class="header"><div class="logo">ez<span>kart</span></div><span class="sandbox">Payment boundary</span></header>
+      <div class="intro"><div><p class="eyebrow">Clear responsibility</p><h2>Duitku receives what it needs to process payment.</h2></div><p>Product selection, delivery details, and shipping choice are completed before the secure payment handoff.</p></div>
+      <div class="boundary">
+        <article class="boundary-card ezkart"><div class="boundary-logo">Ezkart</div><p>Owns the shopping and delivery experience.</p><ul><li>Cart products and quantities</li><li>Customer contact and delivery address</li><li>Shipping service and quoted price</li><li>Order total and merchant reference</li><li>Order status shown to the customer</li></ul></article>
+        <div class="boundary-arrow">→</div>
+        <article class="boundary-card duitku"><div class="boundary-logo">DUITKU</div><p>Owns the secure payment experience.</p><ul><li>Merchant and order reference</li><li>Final amount to be paid</li><li>Short order description</li><li>Customer contact for the transaction</li><li>Callback and return destination</li></ul></article>
+      </div>
+      <div class="privacy-note"><span>✓</span><div><b>Sensitive credentials remain with the payment provider.</b><p>Ezkart never requests or stores the customer’s card number, PIN, OTP, banking password, or wallet credentials. Duitku returns the transaction result so Ezkart can update the order.</p></div></div>
+      <span class="page-number">03 / 04</span>
+    </section>
+
+    <section class="page">
+      <header class="header"><div class="logo">ez<span>kart</span></div><span class="sandbox">Completion</span></header>
+      <div class="intro"><div><p class="eyebrow">After payment</p><h2>A verified result completes the order.</h2></div><p>The customer sees a clear outcome while the merchant receives the reference needed to continue fulfilment.</p></div>
+      <div class="checklist">
+        <div class="check"><span>✓</span><div><b>Duitku processes the selected method</b><p>The customer completes all payment-specific actions on Duitku’s secure experience.</p></div><small>Provider</small></div>
+        <div class="check"><span>✓</span><div><b>Payment notification is verified</b><p>Ezkart treats the provider notification—not a browser action—as the authoritative payment result.</p></div><small>Server</small></div>
+        <div class="check"><span>✓</span><div><b>The customer receives confirmation</b><p>The success screen shows order reference, paid status, total, and selected payment group.</p></div><small>Customer</small></div>
+        <div class="check"><span>✓</span><div><b>The merchant can fulfil the order</b><p>With payment confirmed, the merchant can prepare the package and arrange delivery.</p></div><small>Merchant</small></div>
+      </div>
+      <div class="final-callout"><div><h3>Try the interactive sandbox checkout</h3><p>Add a product and follow the guided flow. No real order or charge will be created.</p></div><b>ezkart.id/cart</b></div>
+      <span class="page-number">04 / 04</span>
+    </section>
+  </body>
+</html>

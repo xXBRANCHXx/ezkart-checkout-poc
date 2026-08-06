@@ -74,6 +74,13 @@ img { display: block; max-width: 100%; }
   transition: color 180ms ease;
 }
 .site-header nav > a:hover { color: var(--coral); }
+.site-header nav > .demo-nav {
+  padding: 9px 13px;
+  color: white;
+  background: var(--ink);
+  border-radius: 999px;
+}
+.site-header nav > .demo-nav:hover { color: white; background: var(--coral); }
 .status-pill {
   display: inline-flex;
   align-items: center;
@@ -295,6 +302,24 @@ img { display: block; max-width: 100%; }
 }
 .text-link span { font-size: 18px; transition: transform 180ms ease; }
 .text-link:hover span { transform: translate(4px, 4px); }
+.checkout-demo-link {
+  max-width: 285px;
+  margin-top: 22px;
+  padding: 13px 15px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  color: white;
+  background: var(--ink);
+  border-radius: 12px;
+  text-decoration: none;
+  transition: background 180ms ease, transform 180ms ease;
+}
+.checkout-demo-link:hover { background: var(--coral); transform: translateY(-2px); }
+.checkout-demo-link span { display: block; font-size: 11px; font-weight: 800; }
+.checkout-demo-link small { margin-bottom: 2px; display: block; color: rgba(255,255,255,.5); font-size: 7px; letter-spacing: .1em; text-transform: uppercase; }
+.checkout-demo-link b { font-size: 20px; font-weight: 500; }
 
 .hero-visual { position: relative; min-height: 570px; display: grid; place-items: center; }
 .hero-visual::before {
