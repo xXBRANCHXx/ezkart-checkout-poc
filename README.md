@@ -5,8 +5,9 @@ Static coming-soon website for [ezkart.id](https://ezkart.id).
 The repository also includes a dependency-free sandbox commerce flow at
 [`/cart`](https://ezkart.id/cart/). It demonstrates product selection,
 customer and delivery details, location-based shipping quotes, Duitku payment
-selection, and a successful sandbox payment state. No real order or charge is
-created by the public demo.
+selection, and a provider-confirmed sandbox payment state. The cart hands off
+to the credentialed checkout service at `checkout.zerofoods.id`; merchant keys
+remain server-side and no real funds are charged.
 
 ## Hosting
 

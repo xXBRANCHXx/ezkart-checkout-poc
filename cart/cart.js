@@ -105,6 +105,38 @@
     if (change > 0) showToast(`${PRODUCTS[id].name} ditambahkan`);
   }
 
+  async function startDuitkuSandboxCheckout() {
+    if (!itemCount()) return;
+    const button = el("checkout-button");
+    const originalLabel = button.innerHTML;
+    button.disabled = true;
+    button.textContent = "Menghubungkan ke Duitku Sandbox…";
+    const body = new URLSearchParams();
+    Object.entries(state.cart).forEach(([id, quantity]) => {
+      body.set(`quantity[${id}]`, String(quantity));
+    });
+    try {
+      const response = await fetch("https://checkout.zerofoods.id/sandbox/cart", {
+        method: "POST",
+        headers: { Accept: "application/json" },
+        body,
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.error || `Duitku sandbox tidak tersedia (${response.status}).`);
+      }
+      const checkoutUrl = String(payload.checkout_url || "");
+      if (!checkoutUrl.startsWith("https://checkout.zerofoods.id/c/cs_")) {
+        throw new Error("Duitku tidak mengembalikan checkout URL yang valid.");
+      }
+      window.location.assign(checkoutUrl);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Tidak dapat membuka Duitku Sandbox.");
+      button.disabled = false;
+      button.innerHTML = originalLabel;
+    }
+  }
+
   function validateForm(form) {
     let valid = true;
     const values = Object.fromEntries(new FormData(form).entries());
@@ -203,9 +235,7 @@
     changeQuantity(id, button.dataset.quantity === "plus" ? 1 : -1);
   });
 
-  el("checkout-button").addEventListener("click", () => {
-    if (itemCount()) setStep("details");
-  });
+  el("checkout-button").addEventListener("click", startDuitkuSandboxCheckout);
 
   el("cart-shortcut").addEventListener("click", () => {
     if (state.step !== "cart") setStep("cart");
