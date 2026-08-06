@@ -114,6 +114,11 @@ try {
             (string) ($_SERVER['HTTP_ORIGIN'] ?? ''),
             (string) ($_SERVER['HTTP_REFERER'] ?? '')
         );
+        $requestOrigin = rtrim((string) ($_SERVER['HTTP_ORIGIN'] ?? ''), '/');
+        if (in_array($requestOrigin, ['https://ezkart.id', 'https://www.ezkart.id'], true)) {
+            header('Access-Control-Allow-Origin: ' . $requestOrigin);
+            header('Vary: Origin');
+        }
         ez_require_enabled();
         $pdo = ez_db();
         ez_ensure_schema($pdo);
@@ -132,6 +137,9 @@ try {
             $payload,
             'ezkart-public-sandbox-' . strtolower((string) $payload['merchant_order_reference'])
         );
+        if (str_contains(strtolower((string) ($_SERVER['HTTP_ACCEPT'] ?? '')), 'application/json')) {
+            ez_json($session, 201);
+        }
         header('Location: ' . $session['checkout_url'], true, 303);
         exit;
     }
