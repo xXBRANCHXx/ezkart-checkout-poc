@@ -5,9 +5,15 @@ Static coming-soon website for [ezkart.id](https://ezkart.id).
 The repository also includes a dependency-free sandbox commerce flow at
 [`/cart`](https://ezkart.id/cart/). It demonstrates product selection,
 customer and delivery details, location-based shipping quotes, Duitku payment
-selection, and a provider-confirmed sandbox payment state. The cart hands off
-to the credentialed checkout service at `checkout.zerofoods.id`; merchant keys
-remain server-side and no real funds are charged.
+selection, and a provider-confirmed sandbox payment state. The server-side PHP
+endpoint creates a real Duitku Sandbox invoice, redirects to Duitku's hosted
+payment page, verifies its signed callback, and displays the stored provider
+reference. Merchant keys remain server-side and no real funds are charged.
+
+Copy `config.example.php` to the ignored `config.runtime.php` on the server and
+set the project's Duitku Sandbox merchant code and merchant key. Alternatively,
+set `EZKART_DUITKU_MERCHANT_CODE` and `EZKART_DUITKU_MERCHANT_KEY` in the PHP
+environment.
 
 ## Hosting
 

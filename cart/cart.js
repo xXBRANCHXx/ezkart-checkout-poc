@@ -105,38 +105,6 @@
     if (change > 0) showToast(`${PRODUCTS[id].name} ditambahkan`);
   }
 
-  async function startDuitkuSandboxCheckout() {
-    if (!itemCount()) return;
-    const button = el("checkout-button");
-    const originalLabel = button.innerHTML;
-    button.disabled = true;
-    button.textContent = "Menghubungkan ke Duitku Sandbox…";
-    const body = new URLSearchParams();
-    Object.entries(state.cart).forEach(([id, quantity]) => {
-      body.set(`quantity[${id}]`, String(quantity));
-    });
-    try {
-      const response = await fetch("https://checkout.zerofoods.id/sandbox/cart", {
-        method: "POST",
-        headers: { Accept: "application/json" },
-        body,
-      });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(payload.error || `Duitku sandbox tidak tersedia (${response.status}).`);
-      }
-      const checkoutUrl = String(payload.checkout_url || "");
-      if (!checkoutUrl.startsWith("https://checkout.zerofoods.id/c/cs_")) {
-        throw new Error("Duitku tidak mengembalikan checkout URL yang valid.");
-      }
-      window.location.assign(checkoutUrl);
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : "Tidak dapat membuka Duitku Sandbox.");
-      button.disabled = false;
-      button.innerHTML = originalLabel;
-    }
-  }
-
   function validateForm(form) {
     let valid = true;
     const values = Object.fromEntries(new FormData(form).entries());
@@ -194,34 +162,40 @@
 
   function selectShipping(quote) {
     state.shipping = quote;
-    state.payment = null;
-    document.querySelectorAll('input[name="payment"]').forEach((input) => { input.checked = false; });
+    state.payment = "Duitku Sandbox";
     el("payment-section").classList.remove("locked");
-    el("pay-button").disabled = true;
+    el("pay-button").disabled = false;
     renderCart();
   }
 
-  function openDuitkuDialog() {
+  async function startDuitkuInvoice() {
     if (!state.shipping || !state.payment) return;
-    el("dialog-method").textContent = state.payment;
-    el("dialog-total").textContent = rupiah(total());
-    el("duitku-dialog").showModal();
-  }
-
-  function completePayment() {
-    el("simulate-payment").disabled = true;
-    el("simulate-payment").textContent = "Memverifikasi pembayaran…";
-    window.setTimeout(() => {
-      el("duitku-dialog").close();
-      el("simulate-payment").disabled = false;
-      el("simulate-payment").textContent = "Simulasikan pembayaran berhasil";
-      const reference = `EZK-SBX-${Date.now().toString().slice(-6)}`;
-      el("success-name").textContent = (state.customer.fullName || "pelanggan").split(" ")[0];
-      el("success-order").textContent = reference;
-      el("success-total").textContent = rupiah(total());
-      el("success-payment").textContent = `${state.payment} · Duitku Sandbox`;
-      setStep("complete");
-    }, 900);
+    const button = el("pay-button");
+    const originalLabel = button.innerHTML;
+    button.disabled = true;
+    button.textContent = "Membuat invoice Duitku…";
+    try {
+      const response = await fetch("api/start.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          cart: state.cart,
+          customer: state.customer,
+          shipping_id: state.shipping.id,
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || `Duitku error (${response.status}).`);
+      const paymentUrl = String(payload.payment_url || "");
+      if (!paymentUrl.startsWith("https://app-sandbox.duitku.com/")) {
+        throw new Error("Duitku tidak mengembalikan payment URL sandbox yang valid.");
+      }
+      window.location.assign(paymentUrl);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Tidak dapat membuat invoice Duitku.");
+      button.disabled = false;
+      button.innerHTML = originalLabel;
+    }
   }
 
   document.querySelectorAll(".add-product").forEach((button) => {
@@ -235,7 +209,9 @@
     changeQuantity(id, button.dataset.quantity === "plus" ? 1 : -1);
   });
 
-  el("checkout-button").addEventListener("click", startDuitkuSandboxCheckout);
+  el("checkout-button").addEventListener("click", () => {
+    if (itemCount()) setStep("details");
+  });
 
   el("cart-shortcut").addEventListener("click", () => {
     if (state.step !== "cart") setStep("cart");
@@ -258,20 +234,7 @@
     setStep("payment");
   });
 
-  document.querySelectorAll('input[name="payment"]').forEach((input) => {
-    input.addEventListener("change", () => {
-      state.payment = input.value;
-      el("pay-button").disabled = false;
-    });
-  });
-
-  el("pay-button").addEventListener("click", openDuitkuDialog);
-  el("dialog-close").addEventListener("click", () => el("duitku-dialog").close());
-  el("dialog-cancel").addEventListener("click", () => el("duitku-dialog").close());
-  el("simulate-payment").addEventListener("click", completePayment);
-  el("duitku-dialog").addEventListener("click", (event) => {
-    if (event.target === el("duitku-dialog")) el("duitku-dialog").close();
-  });
+  el("pay-button").addEventListener("click", startDuitkuInvoice);
 
   el("reset-demo").addEventListener("click", () => {
     state.cart = {};
@@ -279,7 +242,6 @@
     state.shipping = null;
     state.payment = null;
     el("customer-form").reset();
-    document.querySelectorAll('input[name="payment"]').forEach((input) => { input.checked = false; });
     renderCart();
     setStep("cart");
   });

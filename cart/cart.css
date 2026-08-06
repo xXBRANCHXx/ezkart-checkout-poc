@@ -277,6 +277,8 @@ input.invalid, textarea.invalid { border-color: #d63425; }
 .shipping-option:has(input:checked) > i, .payment-option:has(input:checked) > i { background: radial-gradient(circle, var(--coral) 0 42%, transparent 45%); border-color: var(--coral); }
 .duitku-chip { padding: 6px 8px; color: #6e5500; background: #fff3b7; border: 1px solid #ead777; border-radius: 6px; font-size: 8px; font-weight: 800; text-transform: uppercase; }
 .payment-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.duitku-handoff { grid-column: 1 / -1; cursor: default; }
+.duitku-handoff > i { display: grid; place-items: center; border: 0; font-style: normal; font-weight: 800; }
 .payment-option { min-height: 96px; padding: 13px; grid-template-columns: auto 1fr auto; }
 .payment-icon { width: 34px; height: 34px; color: white; border: 0; }
 .qris-icon { background: #171c28; }
@@ -321,6 +323,10 @@ dialog::backdrop { background: rgba(8,20,36,.65); backdrop-filter: blur(5px); }
 .dialog-security { margin: 8px 0 0; color: #7f858c; text-align: center; font-size: 7px; }
 .toast { position: fixed; z-index: 90; left: 50%; bottom: 25px; padding: 11px 16px; color: white; background: var(--ink); border-radius: 9px; box-shadow: 0 12px 35px rgba(8,20,36,.25); opacity: 0; pointer-events: none; transform: translate(-50%, 20px); transition: opacity 180ms ease, transform 180ms ease; font-size: 9px; font-weight: 700; }
 .toast.visible { opacity: 1; transform: translate(-50%, 0); }
+.return-shell { width: min(900px, calc(100% - 32px)); min-height: calc(100vh - 170px); margin: 55px auto; display: grid; place-items: center; }
+.return-card { width: 100%; }
+.pending-icon { background: #d29a00; }
+.return-shell.confirmed .pending-icon { background: var(--green); }
 
 footer { width: min(1320px, calc(100% - 64px)); margin: 0 auto; padding: 35px 0 45px; display: flex; align-items: center; gap: 30px; border-top: 1px solid var(--line); }
 footer img { width: 105px; }

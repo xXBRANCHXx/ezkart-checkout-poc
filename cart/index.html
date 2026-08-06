@@ -201,26 +201,13 @@
               <div><span>02</span><h2 id="payment-title">Pembayaran Duitku</h2></div>
               <span class="duitku-chip">Duitku Sandbox</span>
             </div>
-            <p class="choice-intro">Pilih kelompok metode. Metode yang aktif untuk merchant akan ditampilkan pada halaman aman Duitku.</p>
+            <p class="choice-intro">Kamu akan memilih metode pembayaran yang aktif langsung pada halaman aman Duitku Sandbox.</p>
             <div class="payment-grid" id="payment-options">
-              <label class="payment-option">
-                <input type="radio" name="payment" value="QRIS & E-wallet" />
+              <div class="payment-option duitku-handoff">
                 <span class="payment-icon qris-icon">QR</span>
-                <span><b>QRIS & E-wallet</b><small>Bayar dari aplikasi pilihanmu</small></span>
-                <i aria-hidden="true"></i>
-              </label>
-              <label class="payment-option">
-                <input type="radio" name="payment" value="Virtual Account" />
-                <span class="payment-icon bank-icon">VA</span>
-                <span><b>Virtual Account</b><small>Pilih bank di halaman Duitku</small></span>
-                <i aria-hidden="true"></i>
-              </label>
-              <label class="payment-option">
-                <input type="radio" name="payment" value="Kartu kredit / debit" />
-                <span class="payment-icon card-icon">••</span>
-                <span><b>Kartu kredit / debit</b><small>Visa, Mastercard, dan JCB</small></span>
-                <i aria-hidden="true"></i>
-              </label>
+                <span><b>Duitku Secure Checkout</b><small>QRIS, Virtual Account, kartu, dan metode aktif lainnya akan ditampilkan oleh Duitku.</small></span>
+                <i aria-hidden="true">→</i>
+              </div>
             </div>
           </section>
 
@@ -283,26 +270,7 @@
       <a href="../docs/Ezkart-Customer-Checkout-Guide.pdf">Unduh panduan checkout (PDF) ↗</a>
     </footer>
 
-    <dialog id="duitku-dialog" aria-labelledby="duitku-title">
-      <div class="dialog-browserbar"><i></i><i></i><i></i><span>app-sandbox.duitku.com</span></div>
-      <div class="dialog-body">
-        <div class="duitku-wordmark">DUITKU <span>SANDBOX</span></div>
-        <button class="dialog-close" id="dialog-close" type="button" aria-label="Tutup">×</button>
-        <p class="dialog-kicker">Pembayaran aman</p>
-        <h2 id="duitku-title">Selesaikan pembayaran</h2>
-        <p class="dialog-copy">Ini adalah simulasi halaman pembayaran Duitku untuk keperluan review sandbox. Tidak ada dana yang ditagihkan.</p>
-        <div class="dialog-summary">
-          <div><span>Merchant</span><b>Ezkart Demo Store</b></div>
-          <div><span>Metode</span><b id="dialog-method">—</b></div>
-          <div><span>Total</span><b id="dialog-total">Rp0</b></div>
-        </div>
-        <button class="duitku-pay" id="simulate-payment" type="button">Simulasikan pembayaran berhasil</button>
-        <button class="dialog-cancel" id="dialog-cancel" type="button">Kembali ke checkout</button>
-        <p class="dialog-security">🔒 PIN, OTP, dan kredensial pembayaran hanya dimasukkan di Duitku.</p>
-      </div>
-    </dialog>
-
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="cart.js"></script>
+    <script src="cart.js?v=duitku-live-1"></script>
   </body>
 </html>
