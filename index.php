@@ -106,6 +106,36 @@ try {
         exit;
     }
 
+    if ($path === '/sandbox/cart' && $method === 'POST') {
+        if (ez_mode() !== 'sandbox') {
+            ez_render_error_page(403, 'The public demo checkout is available only in sandbox mode.');
+        }
+        ez_require_sandbox_cart_origin(
+            (string) ($_SERVER['HTTP_ORIGIN'] ?? ''),
+            (string) ($_SERVER['HTTP_REFERER'] ?? '')
+        );
+        ez_require_enabled();
+        $pdo = ez_db();
+        ez_ensure_schema($pdo);
+        $rateLimit = $pdo->prepare(
+            'SELECT COUNT(*) FROM ezkart_checkout_sessions
+             WHERE merchant_slug = :merchant AND created_at >= DATE_SUB(UTC_TIMESTAMP(6), INTERVAL 1 MINUTE)'
+        );
+        $rateLimit->execute([':merchant' => 'ezkart-demo']);
+        if ((int) $rateLimit->fetchColumn() >= 30) {
+            ez_render_error_page(429, 'The sandbox demo is busy. Please wait one minute and try again.');
+        }
+        $payload = ez_sandbox_cart_payload($_POST);
+        $session = ez_create_session(
+            $pdo,
+            'ezkart-demo',
+            $payload,
+            'ezkart-public-sandbox-' . strtolower((string) $payload['merchant_order_reference'])
+        );
+        header('Location: ' . $session['checkout_url'], true, 303);
+        exit;
+    }
+
     ez_require_enabled();
     $pdo = ez_db();
     ez_ensure_schema($pdo);

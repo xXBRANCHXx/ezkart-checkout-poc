@@ -60,6 +60,29 @@ test('rejects malformed item data', static function (): void {
     ]]]));
 });
 
+test('builds a fixed-price public sandbox cart', static function (): void {
+    $payload = ez_sandbox_cart_payload([
+        'quantity' => ['granola' => '2', 'coffee' => '1', 'unknown' => '9'],
+    ], 'EZK-DEMO-TEST');
+    expect($payload['merchant_order_reference'] === 'EZK-DEMO-TEST');
+    expect(count($payload['items']) === 2);
+    expect($payload['declared_totals'] === ['merchandise' => 195000, 'weight_grams' => 1290]);
+});
+
+test('rejects empty or oversized public sandbox carts', static function (): void {
+    expectThrows(static fn () => ez_sandbox_cart_payload(['quantity' => []], 'EZK-DEMO-EMPTY'));
+    expectThrows(static fn () => ez_sandbox_cart_payload([
+        'quantity' => ['granola' => '9', 'coffee' => '1'],
+    ], 'EZK-DEMO-LARGE'));
+});
+
+test('accepts sandbox carts only from the Ezkart HTTPS origin', static function (): void {
+    ez_require_sandbox_cart_origin('https://ezkart.id');
+    ez_require_sandbox_cart_origin('', 'https://www.ezkart.id/cart/');
+    expectThrows(static fn () => ez_require_sandbox_cart_origin('https://attacker.example'));
+    expectThrows(static fn () => ez_require_sandbox_cart_origin('http://ezkart.id'));
+});
+
 test('signs, verifies, and expires quote tokens', static function (): void {
     $token = ez_signed_token(['session_id' => 'cs_test', 'expires_at' => 2000]);
     expect(ez_verify_token($token, 1999)['session_id'] === 'cs_test');

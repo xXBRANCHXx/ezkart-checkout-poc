@@ -94,6 +94,81 @@ function ez_item_totals(array $items): array
     ], ['merchandise' => 0, 'weight_grams' => 0]);
 }
 
+function ez_sandbox_cart_payload(array $request, ?string $reference = null): array
+{
+    $catalog = [
+        'granola' => [
+            'sku' => 'EZK-DEMO-GRANOLA',
+            'name' => 'Granola Madu Nusantara',
+            'unit_price' => 58000,
+            'unit_weight_grams' => 320,
+        ],
+        'coffee' => [
+            'sku' => 'EZK-DEMO-COFFEE',
+            'name' => 'Kopi Susu Concentrate',
+            'unit_price' => 79000,
+            'unit_weight_grams' => 650,
+        ],
+        'sambal' => [
+            'sku' => 'EZK-DEMO-SAMBAL',
+            'name' => 'Sambal Roa Signature',
+            'unit_price' => 46000,
+            'unit_weight_grams' => 260,
+        ],
+    ];
+    $quantities = is_array($request['quantity'] ?? null) ? $request['quantity'] : [];
+    $items = [];
+    $itemCount = 0;
+    foreach ($catalog as $id => $product) {
+        $rawQuantity = $quantities[$id] ?? 0;
+        if (filter_var($rawQuantity, FILTER_VALIDATE_INT) === false) {
+            throw new InvalidArgumentException('A sandbox cart quantity is invalid.');
+        }
+        $quantity = (int) $rawQuantity;
+        if ($quantity < 0 || $quantity > 9) {
+            throw new InvalidArgumentException('Sandbox cart quantities must be between 0 and 9.');
+        }
+        if ($quantity === 0) {
+            continue;
+        }
+        $items[] = $product + ['quantity' => $quantity];
+        $itemCount += $quantity;
+    }
+    if ($itemCount < 1 || $itemCount > 9) {
+        throw new InvalidArgumentException('Add between 1 and 9 products to the sandbox cart.');
+    }
+    $items = ez_normalize_items(['items' => $items]);
+    $totals = ez_item_totals($items);
+    $reference ??= 'EZK-DEMO-' . gmdate('Ymd-His') . '-' . strtoupper(bin2hex(random_bytes(2)));
+    return [
+        'merchant_order_reference' => $reference,
+        'currency' => 'IDR',
+        'items' => array_map(static fn (array $item): array => [
+            'sku' => $item['sku'],
+            'name' => $item['name'],
+            'quantity' => $item['quantity'],
+            'unit_price' => $item['unit_price'],
+            'unit_weight_grams' => $item['unit_weight_grams'],
+        ], $items),
+        'declared_totals' => $totals,
+        'customer' => ['name' => '', 'email' => '', 'phone' => ''],
+        'return_urls' => [
+            'success' => 'https://zerofoods.id',
+            'cancel' => 'https://zerofoods.id/cart',
+        ],
+    ];
+}
+
+function ez_require_sandbox_cart_origin(string $origin, string $referer = ''): void
+{
+    $source = trim($origin) !== '' ? trim($origin) : trim($referer);
+    $host = strtolower((string) parse_url($source, PHP_URL_HOST));
+    $scheme = strtolower((string) parse_url($source, PHP_URL_SCHEME));
+    if ($scheme !== 'https' || !in_array($host, ['ezkart.id', 'www.ezkart.id'], true)) {
+        throw new InvalidArgumentException('Start the sandbox checkout from ezkart.id/cart.');
+    }
+}
+
 function ez_session_response(array $session): array
 {
     $appUrl = rtrim(ez_config('app_url', 'https://checkout.zerofoods.id'), '/');
