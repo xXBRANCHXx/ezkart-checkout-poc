@@ -351,6 +351,14 @@ $catalogInventory = [
     <symbol id="icon-truck" viewBox="0 0 24 24"><path d="M3 6h11v11H3zM14 10h4l3 3v4h-7z"/><circle cx="7" cy="19" r="2"/><circle cx="18" cy="19" r="2"/></symbol>
     <symbol id="icon-map-pin" viewBox="0 0 24 24"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></symbol>
     <symbol id="icon-check-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12 2.5 2.5L16.5 8"/></symbol>
+    <symbol id="icon-mail" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/></symbol>
+    <symbol id="icon-smartphone" viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="20" rx="2"/><path d="M10 5h4M11 18h2"/></symbol>
+    <symbol id="icon-monitor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 22h8M12 18v4"/></symbol>
+    <symbol id="icon-credit-card" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h3"/></symbol>
+    <symbol id="icon-plug" viewBox="0 0 24 24"><path d="m8 12 8-8M14 3l7 7M5 15l4 4M3 21l5-5M11 10l3 3-5 5a2.1 2.1 0 0 1-3 0l-1-1a2.1 2.1 0 0 1 0-3l5-5Z"/></symbol>
+    <symbol id="icon-chevron-down" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></symbol>
+    <symbol id="icon-chevron-left" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+    <symbol id="icon-chevron-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
   </svg>
 
   <div class="app-shell">
@@ -366,14 +374,14 @@ $catalogInventory = [
         <a class="<?= $page === 'payments' ? 'active' : '' ?>" href="?page=payments"><?= ez_admin_icon('wallet') ?><span>Payments</span></a>
         <a class="<?= $page === 'reviews' ? 'active' : '' ?>" href="?page=reviews"><?= ez_admin_icon('star') ?><span>Reviews</span></a>
         <a class="<?= $page === 'messages' ? 'active' : '' ?>" href="?page=messages"><?= ez_admin_icon('message') ?><span>Messages</span><b><?= $metrics['pending_count'] ?></b></a>
-        <a class="<?= $page === 'integrations' ? 'active' : '' ?>" href="?page=integrations"><?= ez_admin_icon('grid') ?><span>Integrations</span></a>
+        <a class="<?= $page === 'integrations' ? 'active' : '' ?>" href="?page=integrations"><?= ez_admin_icon('plug') ?><span>Integrations</span></a>
         <a class="<?= $page === 'settings' ? 'active' : '' ?>" href="?page=settings"><?= ez_admin_icon('settings') ?><span>Settings</span></a>
       </nav>
       <section class="upgrade-card">
         <span class="upgrade-icon"><?= ez_admin_icon('rocket') ?></span><div><b>Unlock growth with<br>Premium Plan</b><p>Get advanced analytics,<br>automations &amp; more.</p></div>
         <a href="?page=analytics">Explore Analytics</a>
       </section>
-      <div class="store-switcher"><span class="store-icon"><?= ez_admin_icon('store') ?></span><div><b>Ezkart Sandbox</b><small>Midtrans Demo</small></div><span>⌄</span></div>
+      <div class="store-switcher"><span class="store-icon"><?= ez_admin_icon('store') ?></span><div><b>Ezkart Sandbox</b><small>Midtrans Demo</small></div><?= ez_admin_icon('chevron-down', 'chevron-icon') ?></div>
     </aside>
 
     <div class="workspace">
@@ -384,7 +392,7 @@ $catalogInventory = [
           <button class="icon-button" type="button" aria-label="Notifications"><?= ez_admin_icon('bell') ?><i><?= $metrics['pending_count'] ?></i></button>
           <button class="icon-button" type="button" aria-label="Messages"><?= ez_admin_icon('message') ?></button>
           <button class="icon-button" type="button" aria-label="Help"><?= ez_admin_icon('help') ?></button>
-          <div class="profile" id="account-menu"><span class="avatar">EA</span><div><b>Ezkart Admin</b><small>Sandbox operator</small></div><span>⌄</span></div>
+          <div class="profile" id="account-menu"><span class="avatar">EA</span><div><b>Ezkart Admin</b><small>Sandbox operator</small></div><?= ez_admin_icon('chevron-down', 'chevron-icon') ?></div>
           <form method="post" class="logout-form">
             <input type="hidden" name="action" value="logout"><input type="hidden" name="csrf_token" value="<?= ez_admin_escape($csrfToken) ?>">
             <button type="submit">Log out</button>
@@ -396,7 +404,7 @@ $catalogInventory = [
       <main class="dashboard page-canvas" id="overview">
         <section class="welcome-row">
           <div><h1>Welcome back <span class="welcome-mark"><?= ez_admin_icon('sparkles') ?></span></h1><p>Here is what is happening with your sandbox store today.</p></div>
-          <button class="date-button" type="button"><?= ez_admin_icon('calendar') ?><span><?= $dateRangeStart->format('M j') ?> – <?= $nowJakarta->format('M j, Y') ?></span><b>⌄</b></button>
+          <button class="date-button" type="button"><?= ez_admin_icon('calendar') ?><span><?= $dateRangeStart->format('M j') ?> – <?= $nowJakarta->format('M j, Y') ?></span><?= ez_admin_icon('chevron-down', 'chevron-icon') ?></button>
         </section>
 
         <section class="kpi-grid" aria-label="Store overview">
@@ -411,7 +419,7 @@ $catalogInventory = [
         <section class="dashboard-grid primary-grid">
           <article class="panel sales-panel" id="sales-overview">
             <header class="panel-header"><h2>Sales Overview</h2></header>
-            <div class="chart-controls"><div><button>Daily</button><button>Weekly</button><button class="active">Monthly</button></div><button>Compare: Previous Period⌄</button></div>
+            <div class="chart-controls"><div><button>Daily</button><button>Weekly</button><button class="active">Monthly</button></div><button class="compare-button">Compare: Previous Period <?= ez_admin_icon('chevron-down') ?></button></div>
             <div class="sales-chart">
               <div class="chart-y"><span><?= ez_admin_short_money($chartMaximum) ?></span><span><?= ez_admin_short_money($chartMaximum * .75) ?></span><span><?= ez_admin_short_money($chartMaximum * .5) ?></span><span><?= ez_admin_short_money($chartMaximum * .25) ?></span><span>Rp0</span></div>
               <svg viewBox="0 0 600 170" preserveAspectRatio="none" aria-label="Confirmed sales over the last six months"><defs><linearGradient id="sales-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff4d53" stop-opacity=".27"/><stop offset="1" stop-color="#ff4d53" stop-opacity=".01"/></linearGradient></defs><path class="area" d="<?= ez_admin_escape($chartArea) ?>"/><path class="line" d="<?= ez_admin_escape($chartLine) ?>"/></svg>
@@ -465,7 +473,7 @@ $catalogInventory = [
         <section class="dashboard-grid footer-grid">
           <article class="panel reviews-panel" id="customer-reviews"><header class="panel-header"><h2>Customer Reviews</h2><a href="?page=reviews">Open reviews</a></header><div class="review-body"><div><strong>4.8</strong><p class="review-stars"><?= str_repeat(ez_admin_icon('star'), 5) ?></p><small>Sandbox review preview</small></div><ul><?php foreach ([5 => 82, 4 => 12, 3 => 4, 2 => 1, 1 => 1] as $stars => $width): ?><li><span><?= $stars ?> <?= ez_admin_icon('star') ?></span><i><b style="width:<?= $metrics['paid_count'] > 0 ? $width : 0 ?>%"></b></i><small><?= $metrics['paid_count'] > 0 ? max(0, (int) round($metrics['paid_count'] * $width / 100)) : 0 ?></small></li><?php endforeach; ?></ul></div></article>
 
-          <article class="panel tasks-panel" id="upcoming-tasks"><header class="panel-header"><h2>Upcoming Tasks</h2></header><div class="tasks-content"><ul><li><input type="checkbox">Review sandbox payment status <time>Today</time></li><li><input type="checkbox">Update product descriptions <time>Tomorrow</time></li><li><input type="checkbox">Respond to customer inquiries <time>Aug 14</time></li><li><input type="checkbox">Analyze checkout conversion <time>Aug 15</time></li></ul><div class="mini-calendar"><header><button>‹</button><b><?= $nowJakarta->format('F Y') ?></b><button>›</button></header><div class="weekdays"><span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span></div><div class="days"><?php for ($day = 1; $day <= 31; $day++): ?><span class="<?= $day === (int) $nowJakarta->format('j') ? 'today' : '' ?>"><?= $day ?></span><?php endfor; ?></div></div></div></article>
+          <article class="panel tasks-panel" id="upcoming-tasks"><header class="panel-header"><h2>Upcoming Tasks</h2></header><div class="tasks-content"><ul><li><input type="checkbox">Review sandbox payment status <time>Today</time></li><li><input type="checkbox">Update product descriptions <time>Tomorrow</time></li><li><input type="checkbox">Respond to customer inquiries <time>Aug 14</time></li><li><input type="checkbox">Analyze checkout conversion <time>Aug 15</time></li></ul><div class="mini-calendar"><header><button type="button" aria-label="Previous month"><?= ez_admin_icon('chevron-left') ?></button><b><?= $nowJakarta->format('F Y') ?></b><button type="button" aria-label="Next month"><?= ez_admin_icon('chevron-right') ?></button></header><div class="weekdays"><span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span></div><div class="days"><?php for ($day = 1; $day <= 31; $day++): ?><span class="<?= $day === (int) $nowJakarta->format('j') ? 'today' : '' ?>"><?= $day ?></span><?php endfor; ?></div></div></div></article>
 
           <article class="panel payout-panel" id="payout-summary"><header class="panel-header"><h2>Payment Summary</h2><a href="?page=payments">View all payments</a></header><div class="payout-body"><small>Provider-confirmed Sandbox Volume</small><div><strong><?= ez_admin_money($metrics['paid_volume']) ?></strong><em class="positive"><?= ez_admin_icon('check-circle') ?> Verified</em><span>signed Midtrans notifications</span></div></div><footer><div><small>Environment</small><b>Midtrans Sandbox</b></div><div><small>Paid Orders</small><b><?= number_format($metrics['paid_count']) ?></b></div><a href="../">Open Checkout</a></footer></article>
         </section>

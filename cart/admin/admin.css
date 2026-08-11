@@ -623,3 +623,34 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .product-art img { width: 100%; height: 100%; display: block; object-fit: cover; }
 .fulfillment-stages i { width: 100% !important; }
 .fulfillment-stages i::after { width: var(--stage-progress, 100%); }
+
+/* Lighter Poppins hierarchy and consistent interface iconography */
+.dashboard-page b,
+.dashboard-page .primary-nav a,
+.dashboard-page button,
+.dashboard-page .action-button,
+.dashboard-page .panel-header a,
+.dashboard-page .status-badge,
+.dashboard-page .page-eyebrow,
+.dashboard-page .order-link,
+.dashboard-page .upgrade-card a,
+.dashboard-page .payout-panel footer a { font-weight: 500 !important; }
+.dashboard-page strong,
+.dashboard-page h1,
+.dashboard-page h2,
+.dashboard-page h3 { font-weight: 600 !important; }
+.dashboard-page .primary-nav a b,
+.dashboard-page .kpi-grid em,
+.dashboard-page .payout-body em,
+.dashboard-page .order-detail-inline span { font-weight: 500 !important; }
+.chevron-icon { width: 14px; height: 14px; color: #858c98; stroke-width: 1.8; }
+.store-switcher > .chevron-icon,
+.profile > .chevron-icon { justify-self: end; }
+.date-button > .chevron-icon { margin-left: auto; }
+.compare-button { display: inline-flex; align-items: center; gap: 5px; }
+.compare-button .icon { width: 12px; height: 12px; }
+.mini-calendar header button { display: grid; place-items: center; cursor: pointer; }
+.mini-calendar header button .icon { width: 13px; height: 13px; }
+.carrier-list article > span .icon,
+.channel-card li > span .icon { width: 18px; height: 18px; stroke-width: 1.8; }
+.integration-logo .icon { width: 23px; height: 23px; stroke-width: 1.8; }
