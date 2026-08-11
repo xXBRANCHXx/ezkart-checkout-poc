@@ -140,13 +140,16 @@
     const productPrices = { granola: 58000, coffee: 79000, sambal: 46000 };
     const productNames = { granola: "Granola Madu Nusantara", coffee: "Kopi Susu Concentrate", sambal: "Sambal Roa Signature" };
     const productImages = { granola: "assets/products/granola.webp", coffee: "assets/products/kopi-susu.webp", sambal: "assets/products/sambal-roa.webp" };
-    const sectionNames = { announcement: "Announcement", hero: "Hero", products: "Product collection", "image-story": "Image story", benefits: "Benefits", checkout: "Checkout", shipping: "Shipping" };
+    const sectionNames = { announcement: "Announcement", navigation: "Navigation", hero: "Hero", products: "Product collection", "image-story": "Image story", benefits: "Benefits", checkout: "Checkout", shipping: "Shipping" };
     const undoStack = [];
     const redoStack = [];
     const spacingState = new Map();
+    const inlineEditSnapshots = new WeakMap();
     let selectedSection = "announcement";
     let activeDevice = "desktop";
     let draggedSection = "";
+    let draggedImage = null;
+    let draggedImageSnapshot = null;
     let saveTimer;
     let zoom = 90;
 
@@ -229,12 +232,70 @@
       block.style.paddingLeft = `${values.left}px`;
     };
 
+    const editableContentSelector = [
+      ".sq-announcement>p",
+      ".sq-store-nav>b", ".sq-store-nav a", ".sq-store-nav div>button",
+      ".sq-hero-copy>span", ".sq-hero-copy>h1", ".sq-hero-copy>p", ".sq-hero-copy>div>button",
+      ".sq-product-section>header span", ".sq-product-section>header h2", ".sq-product-section>header>p",
+      ".sq-product-grid article small", ".sq-product-grid article h3", ".sq-product-grid article p", ".sq-product-grid article footer>button",
+      ".sq-image-story>article>span", ".sq-image-story>article>h2", ".sq-image-story>article>p", ".sq-image-story>article>button",
+      ".sq-benefit-row article b", ".sq-benefit-row article small",
+      ".sq-cart-section>div>span", ".sq-cart-section>div>h2", ".sq-cart-section>div>p", ".sq-cart-section aside>small", ".sq-cart-section aside>button",
+      ".sq-shipping-section>div>small", ".sq-shipping-section>div>h2", ".sq-shipping-section>div>p", ".sq-shipping-section li",
+      ".sq-generated-text>small", ".sq-generated-text>h2", ".sq-generated-text>p",
+      ".sq-generated-reviews b", ".sq-generated-reviews small",
+      ".sq-generated-faq>h2", ".sq-generated-faq summary", ".sq-generated-faq p",
+      ".sq-generated-spacer>span",
+    ].join(",");
+    const editableNodesFor = (block) => block ? [...block.querySelectorAll(editableContentSelector)].filter((node) => !node.closest(".sq-image-drag-handle")) : [];
+    const contentFieldLabel = (node, index) => {
+      const article = node.closest("article");
+      const group = article?.parentElement ? [...article.parentElement.children].filter((item) => item.matches("article")).indexOf(article) + 1 : 0;
+      const prefix = group > 0 && (node.closest(".sq-benefit-row") || node.closest(".sq-product-grid") || node.closest(".sq-generated-reviews")) ? `${group} · ` : "";
+      if (node.matches("h1,h2,h3")) return `${prefix}Heading`;
+      if (node.matches("button")) return `${prefix}Button label`;
+      if (node.matches("a")) return `${prefix}Navigation link`;
+      if (node.matches("summary")) return `${prefix}Question`;
+      if (node.matches("li")) return `${prefix}List item`;
+      if (node.matches("p")) return `${prefix}Paragraph`;
+      if (node.matches("b")) return `${prefix}Title`;
+      if (node.matches("small")) return `${prefix}Supporting text`;
+      return `${prefix}Text ${index + 1}`;
+    };
     const syncInspectorContent = () => {
-      const controls = sqStudio.querySelector(".sq-content-controls");
-      if (controls) controls.hidden = selectedSection !== "hero";
-      sqStudio.querySelectorAll("[data-sq-edit-content]").forEach((input) => {
-        const target = previewRoot?.querySelector(`[data-sq-content="${input.dataset.sqEditContent}"]`);
-        if (target) input.value = target.textContent.trim();
+      const block = previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`);
+      const fields = sqStudio.querySelector("[data-sq-content-fields]");
+      if (!fields) return;
+      fields.replaceChildren();
+      const nodes = editableNodesFor(block);
+      if (!nodes.length) {
+        const empty = document.createElement("p");
+        empty.className = "sq-content-empty";
+        empty.textContent = "This section has no text content. Its visual controls are available below.";
+        fields.append(empty);
+        return;
+      }
+      nodes.forEach((node, index) => {
+        if (!node.dataset.sqEditable) node.dataset.sqEditable = `copy-${index + 1}`;
+        const label = document.createElement("label");
+        const caption = document.createElement("span");
+        caption.textContent = contentFieldLabel(node, index);
+        const multiline = node.matches("h1,h2,h3,p,summary") || node.textContent.trim().length > 55;
+        const input = document.createElement(multiline ? "textarea" : "input");
+        input.value = node.textContent.trim();
+        input.dataset.sqContentField = node.dataset.sqEditable;
+        let before;
+        let remembered = false;
+        input.addEventListener("focus", () => { before = captureState(); remembered = false; });
+        input.addEventListener("input", () => {
+          if (!before) before = captureState();
+          node.textContent = input.value;
+          if (!remembered) { remember(before); remembered = true; }
+          markSqChanged();
+        });
+        input.addEventListener("change", () => { before = null; remembered = false; });
+        label.append(caption, input);
+        fields.append(label);
       });
     };
     const selectSqSection = (sectionId) => {
@@ -282,7 +343,10 @@
     };
     const bindSqInteractions = () => {
       sqStudio.querySelectorAll("[data-sq-layer]").forEach((layer) => {
-        layer.onclick = () => selectSqSection(layer.dataset.sectionId);
+        layer.onclick = () => {
+          selectSqSection(layer.dataset.sectionId);
+          previewRoot?.querySelector(`[data-section-id="${layer.dataset.sectionId}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+        };
         layer.ondragstart = (event) => { draggedSection = layer.dataset.sectionId; layer.classList.add("dragging"); event.dataTransfer.effectAllowed = "move"; };
         layer.ondragover = (event) => { event.preventDefault(); layer.classList.add("drag-over"); };
         layer.ondragleave = () => layer.classList.remove("drag-over");
@@ -297,26 +361,97 @@
         block.ondrop = (event) => { event.preventDefault(); block.classList.remove("drag-over"); const rect = block.getBoundingClientRect(); reorderSection(draggedSection, block.dataset.sectionId, event.clientY > rect.top + rect.height / 2); };
         block.ondragend = () => { block.classList.remove("dragging"); previewRoot.querySelectorAll(".drag-over").forEach((item) => item.classList.remove("drag-over")); };
       });
-      previewRoot?.querySelectorAll("[data-sq-content]").forEach((content) => {
-        content.contentEditable = "true";
-        content.spellcheck = true;
-        content.onfocus = () => { content.dataset.beforeEdit = content.textContent; };
-        content.oninput = () => {
-          const inspectorField = sqStudio.querySelector(`[data-sq-edit-content="${content.dataset.sqContent}"]`);
-          if (inspectorField) inspectorField.value = content.textContent.trim();
-          markSqChanged();
-        };
-        content.onblur = () => {
-          if (content.dataset.beforeEdit !== content.textContent) {
-            const snapshot = captureState();
-            const clone = document.createElement("div"); clone.innerHTML = snapshot.preview;
-            const oldTarget = clone.querySelector(`[data-sq-content="${content.dataset.sqContent}"]`);
-            if (oldTarget) oldTarget.textContent = content.dataset.beforeEdit || "";
-            snapshot.preview = clone.innerHTML;
-            remember(snapshot);
+      previewRoot?.querySelectorAll("[data-sq-image-list]").forEach((list) => {
+        [...list.children].filter((item) => item.matches("[data-sq-image-item]")).forEach((item) => {
+          item.draggable = true;
+          item.querySelectorAll("img").forEach((image) => { image.draggable = false; });
+          if (!item.matches("img") && !item.querySelector(".sq-image-drag-handle")) {
+            item.insertAdjacentHTML("afterbegin", `<span class="sq-image-drag-handle" aria-hidden="true">${iconMarkup("grip")}<small>Drag image</small></span>`);
           }
-          delete content.dataset.beforeEdit;
-        };
+          item.onclick = (event) => {
+            event.stopPropagation();
+            const section = item.closest("[data-section-id]");
+            if (section) selectSqSection(section.dataset.sectionId);
+            previewRoot.querySelectorAll(".sq-image-selected").forEach((image) => image.classList.remove("sq-image-selected"));
+            item.classList.add("sq-image-selected");
+          };
+          item.ondragstart = (event) => {
+            event.stopPropagation();
+            draggedImage = item;
+            draggedImageSnapshot = captureState();
+            item.classList.add("sq-image-dragging");
+            event.dataTransfer.effectAllowed = "move";
+            event.dataTransfer.setData("text/plain", item.dataset.productVisual || "image");
+          };
+          item.ondragover = (event) => {
+            if (!draggedImage || draggedImage.parentElement !== list) return;
+            event.preventDefault();
+            event.stopPropagation();
+            event.dataTransfer.dropEffect = "move";
+            item.classList.add("sq-image-drop-target");
+          };
+          item.ondragleave = (event) => { event.stopPropagation(); item.classList.remove("sq-image-drop-target"); };
+          item.ondrop = (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            item.classList.remove("sq-image-drop-target");
+            if (!draggedImage || draggedImage === item || draggedImage.parentElement !== list) return;
+            const items = [...list.children];
+            if (items.indexOf(draggedImage) < items.indexOf(item)) item.after(draggedImage);
+            else item.before(draggedImage);
+            if (draggedImageSnapshot) remember(draggedImageSnapshot);
+            updateProductView();
+            draggedImage.classList.add("sq-image-selected");
+            markSqChanged();
+          };
+          item.ondragend = (event) => {
+            event.stopPropagation();
+            item.classList.remove("sq-image-dragging");
+            list.querySelectorAll(".sq-image-drop-target").forEach((image) => image.classList.remove("sq-image-drop-target"));
+            draggedImage = null;
+            draggedImageSnapshot = null;
+          };
+          item.onkeydown = (event) => {
+            if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) return;
+            const moveBackward = event.key === "ArrowLeft" || event.key === "ArrowUp";
+            const sibling = moveBackward ? item.previousElementSibling : item.nextElementSibling;
+            if (!sibling?.matches("[data-sq-image-item]")) return;
+            event.preventDefault();
+            remember();
+            if (moveBackward) sibling.before(item); else sibling.after(item);
+            updateProductView();
+            item.focus();
+            markSqChanged();
+          };
+        });
+      });
+      previewRoot?.querySelectorAll("[data-sq-block]").forEach((block) => {
+        editableNodesFor(block).forEach((content, index) => {
+          if (!content.dataset.sqEditable) content.dataset.sqEditable = `copy-${index + 1}`;
+          content.contentEditable = "true";
+          content.spellcheck = true;
+          content.draggable = false;
+          const startInlineEdit = () => {
+            if (!inlineEditSnapshots.has(content)) inlineEditSnapshots.set(content, { state: captureState(), text: content.textContent, remembered: false });
+          };
+          content.onpointerdown = (event) => { event.stopPropagation(); startInlineEdit(); };
+          content.onclick = (event) => {
+            event.stopPropagation();
+            if (content.matches("a,button")) event.preventDefault();
+            selectSqSection(block.dataset.sectionId);
+          };
+          content.ondragstart = (event) => event.stopPropagation();
+          content.onfocus = startInlineEdit;
+          content.onbeforeinput = startInlineEdit;
+          content.oninput = () => {
+            const before = inlineEditSnapshots.get(content);
+            if (before && !before.remembered) { remember(before.state); before.remembered = true; }
+            const inspectorField = sqStudio.querySelector(`[data-sq-content-field="${content.dataset.sqEditable}"]`);
+            if (inspectorField) inspectorField.value = content.textContent.trim();
+            markSqChanged();
+          };
+          content.onblur = () => inlineEditSnapshots.delete(content);
+        });
       });
     };
 
@@ -418,12 +553,17 @@
       previewRoot?.querySelectorAll(".sq-hero-collage").forEach((collage) => {
         const visual = document.createElement("span");
         visual.dataset.productVisual = id;
+        visual.dataset.sqImageItem = "";
+        visual.draggable = true;
+        visual.tabIndex = 0;
+        visual.setAttribute("aria-label", `${name} image — drag to rearrange`);
         visual.innerHTML = `<span class="product-art"><img src="${imageUrl}" alt="${safeName}"></span>`;
         collage.append(visual);
       });
 
       updateProductView();
       bindSqInteractions();
+      syncInspectorContent();
       markSqChanged();
       quickProductForm.hidden = true;
       quickProductForm.reset();
@@ -455,17 +595,6 @@
       });
       input.addEventListener("change", () => { if (spacingSnapshot) remember(spacingSnapshot); spacingSnapshot = null; });
     });
-    sqStudio.querySelectorAll("[data-sq-edit-content]").forEach((input) => {
-      let before;
-      input.addEventListener("focus", () => { before = captureState(); });
-      input.addEventListener("input", () => {
-        const target = previewRoot?.querySelector(`[data-sq-content="${input.dataset.sqEditContent}"]`);
-        if (target) target.textContent = input.value;
-        markSqChanged();
-      });
-      input.addEventListener("change", () => { if (before) remember(before); before = null; });
-    });
-
     const replayAnimation = () => {
       const block = previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`);
       if (!block) return;
@@ -535,7 +664,7 @@
     const newBlockMarkup = (type, sectionId) => {
       const handle = `<button class="sq-block-handle" type="button" aria-label="Drag section">${iconMarkup("grip")}</button>`;
       if (type === "full-image") return `<section class="sq-page-block sq-generated-image" draggable="true" data-sq-block data-section-id="${sectionId}">${handle}<img src="${productImages.granola}" alt="Granola Madu Nusantara product story"></section>`;
-      if (type === "gallery") return `<section class="sq-page-block sq-generated-gallery" draggable="true" data-sq-block data-section-id="${sectionId}">${handle}<img src="${productImages.granola}" alt="Granola"><img src="${productImages.coffee}" alt="Kopi Susu"><img src="${productImages.sambal}" alt="Sambal Roa"></section>`;
+      if (type === "gallery") return `<section class="sq-page-block sq-generated-gallery" draggable="true" data-sq-block data-sq-image-list data-section-id="${sectionId}">${handle}<img draggable="true" tabindex="0" data-sq-image-item src="${productImages.granola}" alt="Granola — drag to rearrange"><img draggable="true" tabindex="0" data-sq-image-item src="${productImages.coffee}" alt="Kopi Susu — drag to rearrange"><img draggable="true" tabindex="0" data-sq-image-item src="${productImages.sambal}" alt="Sambal Roa — drag to rearrange"></section>`;
       if (type === "text") return `<section class="sq-page-block sq-generated-text" draggable="true" data-sq-block data-section-id="${sectionId}">${handle}<small>YOUR STORY</small><h2 contenteditable="true">A clear idea deserves room to breathe.</h2><p contenteditable="true">Write a concise product or brand story here. Every line remains editable directly on the page.</p></section>`;
       if (type === "testimonials") return `<section class="sq-page-block sq-generated-reviews" draggable="true" data-sq-block data-section-id="${sectionId}">${handle}<article><b>“Excellent flavor and beautifully packed.”</b><small>Sarah · verified buyer</small></article><article><b>“Checkout was easy and delivery was quick.”</b><small>Michael · verified buyer</small></article></section>`;
       if (type === "faq") return `<section class="sq-page-block sq-generated-faq" draggable="true" data-sq-block data-section-id="${sectionId}">${handle}<h2>Questions, answered.</h2><details open><summary>How does payment work?</summary><p>Customers complete a secure Midtrans checkout prepared by Ezkart.</p></details><details><summary>How is shipping calculated?</summary><p>Product weights, destination, courier, and service determine the live rate.</p></details></section>`;
@@ -604,10 +733,12 @@
     };
     const generateHtml = () => {
       const clone = previewRoot.cloneNode(true);
-      clone.querySelectorAll(".sq-block-handle, .section-hidden").forEach((node) => node.remove());
+      clone.querySelectorAll(".sq-block-handle, .sq-image-drag-handle, .section-hidden").forEach((node) => node.remove());
       clone.querySelectorAll("[data-product-card][hidden], [data-product-line][hidden], .sq-hero-collage > span[hidden]").forEach((node) => node.remove());
       clone.querySelectorAll("[data-section-id]").forEach((node) => { node.dataset.ezkartSection = node.dataset.sectionId; });
       clone.querySelectorAll("[draggable], [contenteditable], [data-sq-block], [data-section-id]").forEach((node) => { node.removeAttribute("draggable"); node.removeAttribute("contenteditable"); node.removeAttribute("data-sq-block"); node.removeAttribute("data-section-id"); node.classList.remove("selected", "dragging", "drag-over", "animating"); });
+      clone.querySelectorAll("[data-sq-image-list], [data-sq-image-item]").forEach((node) => { node.removeAttribute("data-sq-image-list"); node.removeAttribute("data-sq-image-item"); node.removeAttribute("tabindex"); node.classList.remove("sq-image-selected", "sq-image-dragging", "sq-image-drop-target"); });
+      clone.querySelectorAll("[data-sq-editable], [data-sq-content]").forEach((node) => { node.removeAttribute("data-sq-editable"); node.removeAttribute("data-sq-content"); });
       clone.querySelectorAll("img").forEach((image) => { image.src = new URL(image.getAttribute("src"), window.location.href).href; });
       clone.querySelectorAll("[data-product-card]").forEach((card) => { const button = card.querySelector("button"); if (button) { button.dataset.ezkartAdd = card.dataset.productCard; button.type = "button"; } });
       const checkout = clone.querySelector(".sq-cart-section aside>button"); if (checkout) checkout.dataset.ezkartCheckout = "";
