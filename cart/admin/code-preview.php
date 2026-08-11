@@ -17,7 +17,7 @@ header("Content-Security-Policy: default-src 'none'; img-src data: https:; media
 <body>
   <script>
     addEventListener('message', function (event) {
-      if (!event.data || event.data.type !== 'ezkart-render-code' || typeof event.data.html !== 'string') return;
+      if (event.source !== parent || !event.data || event.data.type !== 'ezkart-render-code' || typeof event.data.html !== 'string' || event.data.html.length > 250000) return;
       document.open();
       document.write('<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{min-height:100%}body{margin:0;font-family:Poppins,Arial,sans-serif;color:#24262b}*{box-sizing:border-box}</style></head><body>' + event.data.html + '</body></html>');
       document.close();

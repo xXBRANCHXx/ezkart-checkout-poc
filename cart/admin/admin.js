@@ -167,12 +167,14 @@
     let activeDevice = "desktop";
     let draggedSection = "";
     let draggedImage = null;
+    let draggedElementId = "";
     let draggedImageSnapshot = null;
     let saveTimer;
     let zoom = 90;
     let activeSiteKey = sqStudio.querySelector("[data-sq-site].active")?.dataset.siteUrl || "default";
     let baseSiteState = null;
-    const storageKeyFor = (site = activeSiteKey) => `ezkart:landing-builder:v2:${site}`;
+    const storageKeyFor = (site = activeSiteKey) => `ezkart:landing-builder:v3:${site}`;
+    const legacyStorageKeyFor = (site = activeSiteKey) => `ezkart:landing-builder:v2:${site}`;
 
     const openSqPanel = (name) => {
       sqStudio.querySelectorAll("[data-sq-tab]").forEach((button) => button.classList.toggle("active", button.dataset.sqTab === name));
@@ -194,13 +196,12 @@
       preview: previewSnapshotHtml(),
       previewClass: previewRoot?.className || "",
       previewStyle: previewRoot?.getAttribute("style") || "",
-      layers: layerList?.innerHTML || "",
       productPicker: sqStudio.querySelector(".sq-product-picker")?.innerHTML || "",
       products: selectedProducts(),
       selectedSection,
       spacing: JSON.stringify([...spacingState.entries()]),
       catalog: { prices: { ...productPrices }, names: { ...productNames }, images: { ...productImages } },
-      version: 2,
+      version: 3,
     });
     const updateHistoryButtons = () => {
       if (undoButton) undoButton.disabled = undoStack.length === 0;
@@ -323,6 +324,79 @@
     };
     const applyFluidLayouts = () => previewRoot?.querySelectorAll("[data-sq-fluid]").forEach(applyFluidSection);
     const elementTypeName = (element) => (element?.dataset.sqElementType || "element").replace(/-/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+    const heroPieceLayout = (base, role) => {
+      const headingHeight = Math.max(3, Math.round(base.height * .42));
+      const descriptionHeight = Math.max(2, Math.round(base.height * .22));
+      const descriptionY = base.y + 1 + headingHeight;
+      const actionY = Math.min(base.y + base.height - 2, descriptionY + descriptionHeight);
+      const actionWidth = Math.min(base.width, Math.max(3, Math.ceil(base.width * .44)));
+      const trustWidth = Math.max(1, base.width - actionWidth);
+      if (role === "eyebrow") return { x: base.x, y: base.y, width: base.width, height: 1 };
+      if (role === "heading") return { x: base.x, y: base.y + 1, width: base.width, height: headingHeight };
+      if (role === "text") return { x: base.x, y: descriptionY, width: base.width, height: descriptionHeight };
+      if (role === "button") return { x: base.x, y: actionY, width: actionWidth, height: 2 };
+      return { x: base.x + actionWidth, y: actionY, width: trustWidth, height: 2 };
+    };
+    const copyElementAttributes = (source, target) => {
+      [...source.attributes].forEach((attribute) => target.setAttribute(attribute.name, attribute.value));
+      return target;
+    };
+    const upgradeLegacyStructure = () => {
+      previewRoot?.querySelectorAll('.sq-store-nav > [data-sq-element-type="brand"]').forEach((brand) => {
+        if (brand.classList.contains("sq-site-logo")) return;
+        const logo = copyElementAttributes(brand, document.createElement("div"));
+        logo.className = `sq-site-logo ${brand.className}`.trim();
+        logo.dataset.sqElementType = "logo";
+        const image = document.createElement("img");
+        image.dataset.sqLogoImage = "";
+        image.alt = "";
+        image.hidden = true;
+        const text = document.createElement("b");
+        text.dataset.sqLogoText = "";
+        text.textContent = brand.textContent.trim() || "Your brand";
+        logo.replaceChildren(image, text);
+        brand.replaceWith(logo);
+      });
+      previewRoot?.querySelectorAll('.sq-hero > .sq-hero-copy[data-sq-element-type="copy"]').forEach((composite) => {
+        const section = composite.closest("[data-sq-fluid]");
+        if (!section) return;
+        const pieces = [
+          [composite.querySelector(":scope > span"), "eyebrow", "sq-hero-kicker"],
+          [composite.querySelector(":scope > h1"), "heading", "sq-hero-heading"],
+          [composite.querySelector(":scope > p"), "text", "sq-hero-description"],
+          [composite.querySelector(":scope > div > button, :scope > button"), "button", "sq-hero-action button-primary"],
+          [composite.querySelector(":scope > div > small, :scope > small"), "trust-note", "sq-hero-trust"],
+        ].filter(([node]) => node);
+        const isPanel = composite.classList.contains("sq-template-copy-overlay") || composite.closest(".sq-template-editorial");
+        if (isPanel) {
+          const panel = document.createElement("div");
+          panel.className = "sq-template-copy-panel";
+          panel.dataset.sqElement = "";
+          panel.dataset.sqElementType = "hero-panel";
+          ["desktop", "tablet", "mobile"].forEach((device) => setElementLayout(panel, parseElementLayout(composite, device), device));
+          composite.before(panel);
+        }
+        pieces.forEach(([node, type, className]) => {
+          node.className = `${node.className} ${className} ${isPanel ? "sq-template-overlay-piece" : ""}`.trim();
+          node.dataset.sqElement = "";
+          node.dataset.sqElementType = type;
+          if (type === "button") {
+            node.dataset.sqButtonRole ||= composite.dataset.sqButtonRole || "primary";
+            node.dataset.sqLinkType ||= inferredActionType(node);
+            node.dataset.sqLink ||= inferredActionTarget(node, node.dataset.sqLinkType);
+            node.dataset.sqNewTab ||= "false";
+          }
+          if (composite.dataset.sqElementAnimation) {
+            node.dataset.sqElementAnimation = composite.dataset.sqElementAnimation;
+            node.classList.add(`element-animation-${composite.dataset.sqElementAnimation}`);
+          }
+          ["desktop", "tablet", "mobile"].forEach((device) => setElementLayout(node, heroPieceLayout(parseElementLayout(composite, device), type === "trust-note" ? "trust" : type), device));
+          composite.before(node);
+        });
+        composite.remove();
+        section.classList.add("sq-hero-elements");
+      });
+    };
     const colorToHex = (value, fallback = "#ffffff") => {
       if (/^#[0-9a-f]{6}$/i.test(value || "")) return value.toLowerCase();
       const match = String(value || "").match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
@@ -370,6 +444,16 @@
       if (type === "phone") return href.replace(/^tel:/, "");
       return href;
     };
+    const safeActionTarget = (type, rawTarget) => {
+      const target = String(rawTarget || "").trim();
+      if (type === "section") return /^[a-z][a-z0-9_:.-]*$/i.test(target.replace(/^#/, "")) ? target.replace(/^#/, "") : "";
+      if (type === "email") return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(target) ? target : "";
+      if (type === "phone") return /^\+?[\d\s().-]{7,24}$/.test(target) ? target : "";
+      if (type !== "url") return target;
+      if (/^(https?:\/\/|\/(?!\/)|\.\.?\/)/i.test(target)) return target;
+      if (/^[a-z0-9.-]+\.[a-z]{2,}(?:[/:?#]|$)/i.test(target)) return `https://${target}`;
+      return "";
+    };
     const imageDefaults = { blur: 0, brightness: 100, contrast: 100, saturate: 100, grayscale: 0, opacity: 100 };
     const imageFilterValue = (image, name) => Number(image?.dataset[`sqFilter${name[0].toUpperCase()}${name.slice(1)}`] ?? imageDefaults[name]);
     const applySelectedImageFilters = (image = imageForElement()) => {
@@ -388,10 +472,11 @@
       }
       const layout = parseElementLayout(selectedElement);
       const type = sqStudio.querySelector(".sq-element-controls [data-sq-element-type]");
+      const isLogo = selectedElement.dataset.sqElementType === "logo";
       const action = actionForElement();
-      const image = imageForElement();
+      const image = isLogo ? null : imageForElement();
       const contentName = selectedContent?.matches("h1,h2,h3") ? "Heading" : selectedContent ? "Text" : "";
-      const contextualName = selectedAction && action ? "Button" : selectedImage && image ? "Image" : contentName || elementTypeName(selectedElement);
+      const contextualName = isLogo ? "Logo" : selectedAction && action ? "Button" : selectedImage && image ? "Image" : contentName || elementTypeName(selectedElement);
       if (type) type.textContent = contextualName;
       const context = sqStudio.querySelector("[data-sq-inspector-context]");
       const title = sqStudio.querySelector("[data-sq-inspector-title]");
@@ -433,6 +518,25 @@
         if (linkWrap) linkWrap.hidden = ["checkout", "none"].includes(linkType);
         if (linkLabel) linkLabel.textContent = ({ section: "Section ID", url: "Web address", email: "Email address", phone: "Phone number" })[linkType] || "Destination";
         if (newTab) { newTab.checked = action.dataset.sqNewTab === "true" || action.target === "_blank"; newTab.closest("label").hidden = linkType !== "url"; }
+        const checkoutTest = sqStudio.querySelector("[data-sq-checkout-test]");
+        if (checkoutTest) checkoutTest.hidden = linkType !== "checkout";
+      }
+      const logoControls = sqStudio.querySelector("[data-sq-logo-controls]");
+      if (logoControls) logoControls.hidden = !isLogo;
+      if (isLogo) {
+        const logoImage = selectedElement.querySelector("[data-sq-logo-image]");
+        const logoText = selectedElement.querySelector("[data-sq-logo-text]");
+        const source = sqStudio.querySelector("[data-sq-logo-src]");
+        const text = sqStudio.querySelector("[data-sq-logo-text-input]");
+        const alt = sqStudio.querySelector("[data-sq-logo-alt]");
+        const width = sqStudio.querySelector("[data-sq-logo-width]");
+        const widthOutput = sqStudio.querySelector("[data-sq-logo-width-output]");
+        const logoWidth = Number.parseInt(logoImage?.style.width || "140", 10) || 140;
+        if (source) source.value = logoImage?.getAttribute("src") || "";
+        if (text) text.value = logoText?.textContent.trim() || "";
+        if (alt) alt.value = logoImage?.getAttribute("alt") || "";
+        if (width) width.value = String(logoWidth);
+        if (widthOutput) widthOutput.textContent = `${logoWidth}px`;
       }
       const buttonRole = selectedElement.dataset.sqButtonRole || "primary";
       sqStudio.querySelectorAll("[data-sq-role-choice]").forEach((button) => button.classList.toggle("active", button.dataset.sqRoleChoice === buttonRole));
@@ -514,6 +618,7 @@
       removeSectionToolbar();
       previewRoot?.querySelectorAll(".sq-element-selected").forEach((item) => item.classList.remove("sq-element-selected"));
       element.classList.add("sq-element-selected");
+      sqStudio.querySelectorAll("[data-sq-element-layer]").forEach((layer) => layer.classList.toggle("active", layer.dataset.sqElementLayer === element.dataset.sqElementId));
       syncElementControls();
       requestAnimationFrame(refreshElementOverlay);
     };
@@ -529,6 +634,7 @@
       });
       selectedElement.after(copy);
       remember(snapshot);
+      rebuildLayerList();
       bindSqInteractions();
       selectSqElement(copy);
       markSqChanged();
@@ -544,6 +650,8 @@
       selectedContent = null;
       removeElementOverlay();
       applyFluidSection(section);
+      rebuildLayerList();
+      bindSqInteractions();
       syncElementControls();
       syncInspectorContent();
       markSqChanged();
@@ -620,7 +728,8 @@
 
     const editableContentSelector = [
       ".sq-announcement>p",
-      ".sq-store-nav>b", ".sq-store-nav a", ".sq-store-nav div>button",
+      ".sq-site-logo>b", ".sq-store-nav a", ".sq-store-nav div>button",
+      ".sq-hero-kicker", ".sq-hero-heading", ".sq-hero-description", ".sq-hero-action", ".sq-hero-trust",
       ".sq-hero-copy>span", ".sq-hero-copy>h1", ".sq-hero-copy>p", ".sq-hero-copy>div>button",
       ".sq-product-section>header span", ".sq-product-section>header h2", ".sq-product-section>header>p",
       ".sq-product-grid article small", ".sq-product-grid article h3", ".sq-product-grid article p", ".sq-product-grid article footer>button",
@@ -708,6 +817,7 @@
       sqStudio.classList.remove("inspector-closed");
       inspector?.classList.remove("collapsed");
       sqStudio.querySelectorAll("[data-sq-layer]").forEach((layer) => layer.classList.toggle("active", layer.dataset.sectionId === sectionId));
+      sqStudio.querySelectorAll("[data-sq-layer-group]").forEach((group) => group.classList.toggle("active", group.dataset.sectionId === sectionId));
       previewRoot?.querySelectorAll("[data-sq-block]").forEach((block) => block.classList.toggle("selected", block.dataset.sectionId === sectionId));
       const title = sqStudio.querySelector("[data-sq-inspector-title]");
       const layerTitle = sqStudio.querySelector(`[data-sq-layer][data-section-id="${sectionId}"] b`)?.textContent;
@@ -721,6 +831,7 @@
         previewRoot?.querySelectorAll(".sq-element-selected").forEach((item) => item.classList.remove("sq-element-selected"));
         removeElementOverlay();
       }
+      if (!selectedElement) sqStudio.querySelectorAll("[data-sq-element-layer]").forEach((layer) => layer.classList.remove("active"));
       const visibility = sqStudio.querySelector("[data-sq-visibility]");
       if (visibility) visibility.lastChild.textContent = block?.classList.contains("section-hidden") ? " Show" : " Hide";
       const animation = sqStudio.querySelector("[data-sq-animation]");
@@ -746,8 +857,8 @@
     const reorderSection = (dragId, targetId, placeAfter) => {
       if (!dragId || !targetId || dragId === targetId) return;
       remember();
-      const draggedLayer = layerList?.querySelector(`[data-section-id="${dragId}"]`);
-      const targetLayer = layerList?.querySelector(`[data-section-id="${targetId}"]`);
+      const draggedLayer = layerList?.querySelector(`[data-sq-layer-group][data-section-id="${dragId}"]`);
+      const targetLayer = layerList?.querySelector(`[data-sq-layer-group][data-section-id="${targetId}"]`);
       const draggedBlock = previewRoot?.querySelector(`[data-section-id="${dragId}"]`);
       const targetBlock = previewRoot?.querySelector(`[data-section-id="${targetId}"]`);
       if (!draggedLayer || !targetLayer || !draggedBlock || !targetBlock) return;
@@ -759,7 +870,7 @@
     const bindSqInteractions = () => {
       sqStudio.querySelectorAll("[data-sq-layer]").forEach((layer) => {
         layer.onclick = () => {
-          selectSqSection(layer.dataset.sectionId);
+          selectSqSection(layer.dataset.sectionId, true);
           previewRoot?.querySelector(`[data-section-id="${layer.dataset.sectionId}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
         };
         layer.ondragstart = (event) => { draggedSection = layer.dataset.sectionId; layer.classList.add("dragging"); event.dataTransfer.effectAllowed = "move"; };
@@ -767,6 +878,34 @@
         layer.ondragleave = () => layer.classList.remove("drag-over");
         layer.ondrop = (event) => { event.preventDefault(); layer.classList.remove("drag-over"); const rect = layer.getBoundingClientRect(); reorderSection(draggedSection, layer.dataset.sectionId, event.clientY > rect.top + rect.height / 2); };
         layer.ondragend = () => { layer.classList.remove("dragging"); sqStudio.querySelectorAll(".drag-over").forEach((item) => item.classList.remove("drag-over")); };
+      });
+      sqStudio.querySelectorAll("[data-sq-element-layer]").forEach((layer) => {
+        layer.onclick = (event) => {
+          event.stopPropagation();
+          const element = [...(previewRoot?.querySelectorAll("[data-sq-element]") || [])].find((candidate) => candidate.dataset.sqElementId === layer.dataset.sqElementLayer);
+          if (!element) return;
+          const section = element.closest("[data-section-id]");
+          if (section) selectSqSection(section.dataset.sectionId);
+          const action = element.matches("button,a") ? element : element.querySelector("button,a");
+          const image = element.matches("img") ? element : element.querySelector("img");
+          const content = section ? editableNodesFor(section).find((node) => node === element || element.contains(node)) : null;
+          selectSqElement(element, action, image, content);
+          element.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+        };
+        layer.ondragstart = (event) => { event.stopPropagation(); draggedElementId = layer.dataset.sqElementLayer; layer.classList.add("dragging"); event.dataTransfer.effectAllowed = "move"; };
+        layer.ondragover = (event) => { if (!draggedElementId) return; event.preventDefault(); event.stopPropagation(); layer.classList.add("drag-over"); };
+        layer.ondragleave = () => layer.classList.remove("drag-over");
+        layer.ondrop = (event) => {
+          event.preventDefault(); event.stopPropagation(); layer.classList.remove("drag-over");
+          const dragged = [...(previewRoot?.querySelectorAll("[data-sq-element]") || [])].find((candidate) => candidate.dataset.sqElementId === draggedElementId);
+          const target = [...(previewRoot?.querySelectorAll("[data-sq-element]") || [])].find((candidate) => candidate.dataset.sqElementId === layer.dataset.sqElementLayer);
+          if (!dragged || !target || dragged === target || dragged.parentElement !== target.parentElement) return;
+          remember();
+          const rect = layer.getBoundingClientRect();
+          target[event.clientY > rect.top + rect.height / 2 ? "after" : "before"](dragged);
+          rebuildLayerList(); bindSqInteractions(); selectSqElement(dragged); markSqChanged();
+        };
+        layer.ondragend = () => { draggedElementId = ""; layer.classList.remove("dragging"); sqStudio.querySelectorAll(".drag-over").forEach((item) => item.classList.remove("drag-over")); };
       });
       previewRoot?.querySelectorAll("[data-sq-block]").forEach((block) => {
         block.onclick = () => selectSqSection(block.dataset.sectionId);
@@ -922,7 +1061,8 @@
       previewRoot.innerHTML = state.preview;
       previewRoot.className = state.previewClass;
       if (state.previewStyle) previewRoot.setAttribute("style", state.previewStyle); else previewRoot.removeAttribute("style");
-      layerList.innerHTML = state.layers;
+      upgradeLegacyStructure();
+      rebuildLayerList();
       const productPicker = sqStudio.querySelector(".sq-product-picker");
       if (productPicker && typeof state.productPicker === "string") productPicker.innerHTML = state.productPicker;
       if (state.catalog) {
@@ -931,7 +1071,7 @@
         Object.assign(productImages, state.catalog.images || {});
       }
       sqStudio.querySelectorAll("[data-sq-product]").forEach(bindSqProductInput);
-      sqStudio.querySelectorAll("[data-sq-product]").forEach((input) => { input.checked = state.products.includes(input.value); });
+      sqStudio.querySelectorAll("[data-sq-product]").forEach((input) => { input.checked = (state.products || []).includes(input.value); });
       spacingState.clear();
       try { JSON.parse(state.spacing || "[]").forEach(([key, value]) => spacingState.set(key, value)); } catch (_) { spacingState.clear(); }
       bindSqInteractions();
@@ -1024,6 +1164,12 @@
       showToast(`${name} added to this page`);
     });
 
+    const fitZoomForDevice = (device = activeDevice) => {
+      const canvas = sqStudio.querySelector(".sq-canvas-scroll");
+      const targetWidth = { desktop: 1440, tablet: 768, mobile: 390 }[device] || 1440;
+      const availableWidth = Math.max(1, (canvas?.clientWidth || targetWidth) - 64);
+      return Math.max(60, Math.min(100, Math.floor((availableWidth / targetWidth) * 100)));
+    };
     sqStudio.querySelectorAll("[data-sq-device]").forEach((button) => button.addEventListener("click", () => {
       activeDevice = button.dataset.sqDevice;
       sqStudio.querySelectorAll("[data-sq-device]").forEach((item) => item.classList.toggle("active", item === button));
@@ -1032,12 +1178,15 @@
       const sizes = { desktop: "Desktop · 1440px", tablet: "Tablet · 768px", mobile: "Mobile · 390px" };
       const stageSize = sqStudio.querySelector("[data-sq-stage-size]");
       if (stageSize) stageSize.textContent = sizes[activeDevice];
+      setZoom(fitZoomForDevice(activeDevice));
       loadSpacingControls();
       applySpacing();
       applyFluidLayouts();
       syncElementControls();
       if (selectedElement) requestAnimationFrame(refreshElementOverlay);
     }));
+    deviceFrame?.addEventListener("transitionend", (event) => { if (event.propertyName === "width" && selectedElement?.isConnected) refreshElementOverlay(); });
+    window.addEventListener("resize", () => { if (selectedElement?.isConnected) requestAnimationFrame(refreshElementOverlay); });
 
     let spacingSnapshot;
     sqStudio.querySelectorAll("[data-sq-spacing]").forEach((input) => {
@@ -1072,6 +1221,7 @@
       if (!selectedElement?.isConnected) return;
       remember();
       selectedElement.classList.toggle("sq-element-hidden");
+      rebuildLayerList(); bindSqInteractions();
       syncElementControls();
       refreshElementOverlay();
       markSqChanged();
@@ -1168,6 +1318,12 @@
     sqStudio.querySelector("[data-sq-button-link]")?.addEventListener("input", applyActionSettings);
     sqStudio.querySelector("[data-sq-button-link]")?.addEventListener("change", finishActionEdit);
     sqStudio.querySelector("[data-sq-button-new-tab]")?.addEventListener("change", () => { startActionEdit(); applyActionSettings(); finishActionEdit(); });
+    sqStudio.querySelector("[data-sq-test-checkout]")?.addEventListener("click", () => {
+      const products = selectedProducts();
+      const url = new URL("../", window.location.href);
+      url.searchParams.set("products", products.join(","));
+      window.open(url.href, "_blank", "noopener");
+    });
 
     let imageControlSnapshot;
     const startImageEdit = () => { if (!imageControlSnapshot) imageControlSnapshot = captureState(); };
@@ -1228,6 +1384,63 @@
       image.style.filter = ""; image.style.objectFit = ""; image.style.objectPosition = "";
       syncElementControls(); markSqChanged();
     });
+    const selectedLogoParts = () => selectedElement?.dataset.sqElementType === "logo" ? {
+      image: selectedElement.querySelector("[data-sq-logo-image]"),
+      text: selectedElement.querySelector("[data-sq-logo-text]"),
+    } : null;
+    const setLogoSource = (source) => {
+      const logo = selectedLogoParts();
+      if (!logo?.image || !logo.text) return;
+      const value = String(source || "").trim();
+      if (value) logo.image.setAttribute("src", value); else logo.image.removeAttribute("src");
+      logo.image.hidden = !value;
+      logo.text.hidden = Boolean(value);
+      refreshElementOverlay();
+      syncElementControls();
+      markSqChanged();
+    };
+    let logoSnapshot;
+    const startLogoEdit = () => { if (!logoSnapshot) logoSnapshot = captureState(); };
+    const finishLogoEdit = () => { if (logoSnapshot) remember(logoSnapshot); logoSnapshot = null; };
+    sqStudio.querySelector("[data-sq-logo-upload]")?.addEventListener("change", (event) => {
+      const file = event.currentTarget.files?.[0];
+      if (!selectedLogoParts() || !file) return;
+      if (file.size > 4 * 1024 * 1024) { showToast("Choose a logo smaller than 4 MB"); event.currentTarget.value = ""; return; }
+      const snapshot = captureState();
+      const reader = new FileReader();
+      reader.onload = () => {
+        setLogoSource(String(reader.result || ""));
+        const logo = selectedLogoParts();
+        if (logo?.image && !logo.image.alt) logo.image.alt = `${logo.text?.textContent.trim() || "Brand"} logo`;
+        remember(snapshot);
+        showToast("Logo uploaded and added to the header");
+      };
+      reader.readAsDataURL(file);
+      event.currentTarget.value = "";
+    });
+    sqStudio.querySelector("[data-sq-logo-src]")?.addEventListener("focus", startLogoEdit);
+    sqStudio.querySelector("[data-sq-logo-src]")?.addEventListener("change", (event) => { setLogoSource(event.currentTarget.value); finishLogoEdit(); });
+    sqStudio.querySelector("[data-sq-logo-text-input]")?.addEventListener("focus", startLogoEdit);
+    sqStudio.querySelector("[data-sq-logo-text-input]")?.addEventListener("input", (event) => {
+      const logo = selectedLogoParts();
+      if (!logo?.text) return;
+      logo.text.textContent = event.currentTarget.value || "Your brand";
+      refreshElementOverlay(); markSqChanged();
+    });
+    sqStudio.querySelector("[data-sq-logo-text-input]")?.addEventListener("change", finishLogoEdit);
+    sqStudio.querySelector("[data-sq-logo-alt]")?.addEventListener("focus", startLogoEdit);
+    sqStudio.querySelector("[data-sq-logo-alt]")?.addEventListener("change", (event) => { const logo = selectedLogoParts(); if (logo?.image) logo.image.alt = event.currentTarget.value.trim(); finishLogoEdit(); markSqChanged(); });
+    sqStudio.querySelector("[data-sq-logo-width]")?.addEventListener("pointerdown", startLogoEdit);
+    sqStudio.querySelector("[data-sq-logo-width]")?.addEventListener("input", (event) => {
+      const logo = selectedLogoParts();
+      if (!logo?.image) return;
+      logo.image.style.width = `${event.currentTarget.value}px`;
+      const output = sqStudio.querySelector("[data-sq-logo-width-output]");
+      if (output) output.textContent = `${event.currentTarget.value}px`;
+      refreshElementOverlay(); markSqChanged();
+    });
+    sqStudio.querySelector("[data-sq-logo-width]")?.addEventListener("change", finishLogoEdit);
+    sqStudio.querySelector("[data-sq-logo-clear]")?.addEventListener("click", () => { if (!selectedLogoParts()) return; remember(); setLogoSource(""); showToast("Header switched to the brand name"); });
     sqStudio.querySelectorAll("[data-sq-role-choice]").forEach((button) => button.addEventListener("click", () => {
       if (!selectedElement?.isConnected) return;
       remember();
@@ -1301,26 +1514,44 @@
       if (!section || !elements.length || event.currentTarget.value === "custom") return;
       remember();
       const images = elements.filter((element) => ["image", "collage"].includes(element.dataset.sqElementType));
-      const copy = elements.find((element) => ["copy", "text", "brand", "collection-heading"].includes(element.dataset.sqElementType)) || elements[0];
+      const heroPieces = elements.filter((element) => ["eyebrow", "heading", "text", "button", "trust-note"].includes(element.dataset.sqElementType));
+      const panels = elements.filter((element) => element.dataset.sqElementType === "hero-panel");
+      const copy = elements.find((element) => ["copy", "text", "logo", "brand", "collection-heading"].includes(element.dataset.sqElementType)) || elements[0];
+      const placeHeroCopy = (region) => {
+        heroPieces.forEach((element) => {
+          const role = element.dataset.sqElementType === "trust-note" ? "trust" : element.dataset.sqElementType;
+          setElementLayout(element, heroPieceLayout(region, role));
+        });
+        panels.forEach((panel) => setElementLayout(panel, region));
+      };
       elements.forEach((element) => element.classList.remove("sq-element-hidden", "sq-single-image"));
       if (event.currentTarget.value === "text-only") {
-        images.forEach((element) => element.classList.add("sq-element-hidden"));
-        if (copy) setElementLayout(copy, { x: 2, y: 1, width: 10, height: Math.max(6, Number(section.dataset.sqRows || 12)) });
+        [...images, ...panels].forEach((element) => element.classList.add("sq-element-hidden"));
+        if (heroPieces.length) placeHeroCopy({ x: 2, y: 2, width: 10, height: Math.max(8, Number(section.dataset.sqRows || 12) - 2) });
+        else if (copy) setElementLayout(copy, { x: 2, y: 1, width: 10, height: Math.max(6, Number(section.dataset.sqRows || 12)) });
       } else if (event.currentTarget.value === "image-only") {
         elements.forEach((element) => element.classList.toggle("sq-element-hidden", !images.includes(element)));
         images.forEach((element, index) => setElementLayout(element, { x: 1, y: 1 + index * 6, width: 12, height: Math.max(6, Number(section.dataset.sqRows || 12)) }));
       } else if (event.currentTarget.value === "single-image") {
-        if (copy) setElementLayout(copy, { x: 1, y: 1, width: 6, height: 12 });
+        if (heroPieces.length) placeHeroCopy({ x: 1, y: 2, width: 6, height: 11 });
+        else if (copy) setElementLayout(copy, { x: 1, y: 1, width: 6, height: 12 });
         images.slice(0, 1).forEach((element) => { element.classList.add("sq-single-image"); setElementLayout(element, { x: 7, y: 1, width: 6, height: 12 }); });
         images.slice(1).forEach((element) => element.classList.add("sq-element-hidden"));
       } else if (event.currentTarget.value === "stacked") {
-        let row = 1;
-        elements.forEach((element) => { setElementLayout(element, { x: 1, y: row, width: 12, height: 6 }); row += 6; });
+        if (heroPieces.length) {
+          placeHeroCopy({ x: 1, y: 1, width: 12, height: 8 });
+          images.forEach((element, index) => setElementLayout(element, { x: 1, y: 9 + index * 8, width: 12, height: 8 }));
+        } else {
+          let row = 1;
+          elements.forEach((element) => { setElementLayout(element, { x: 1, y: row, width: 12, height: 6 }); row += 6; });
+        }
       } else {
-        if (copy) setElementLayout(copy, { x: 1, y: 1, width: 6, height: 12 });
+        if (heroPieces.length) placeHeroCopy({ x: 1, y: 2, width: 6, height: 11 });
+        else if (copy) setElementLayout(copy, { x: 1, y: 1, width: 6, height: 12 });
         images.forEach((element, index) => { setElementLayout(element, { x: 7, y: 1 + index * 6, width: 6, height: images.length > 1 ? 6 : 12 }); });
       }
       applyFluidSection(section);
+      rebuildLayerList(); bindSqInteractions();
       syncElementControls();
       refreshElementOverlay();
       markSqChanged();
@@ -1462,29 +1693,53 @@
     const makeTemplateMarkup = (config, key) => {
       const layout = templateHeroLayouts(config.mode);
       const overlay = config.mode.startsWith("bleed") || config.mode === "image-led";
-      const heroTextClass = overlay ? " sq-template-copy-overlay" : "";
+      const hasCopyPanel = overlay || config.mode === "editorial";
       const imagePosition = ["embun", "pulih"].includes(key) ? "center" : key === "sora" ? "center right" : "center";
-      const hero = `<section class="sq-page-block sq-hero sq-template-hero sq-template-${config.mode}" draggable="true" data-sq-block data-sq-fluid data-sq-rows="15" data-section-id="hero">${templateHandle("hero")}<div class="sq-template-media sq-free-image element-animation-scale hover-${config.hover}" data-sq-element data-sq-element-type="image" data-sq-element-animation="scale" data-sq-hover="${config.hover}" data-layout-desktop="${layout.image}" data-layout-tablet="${layout.tabletImage}" data-layout-mobile="1,1,12,15"><img src="${config.image}" alt="${escapeHtml(config.name)} campaign" style="object-position:${imagePosition}"></div><div class="sq-hero-copy sq-template-copy${heroTextClass} button-primary element-animation-${config.entrance}" data-sq-element data-sq-element-type="copy" data-sq-button-role="primary" data-sq-element-animation="${config.entrance}" data-sq-hover="none" data-layout-desktop="${layout.copy}" data-layout-tablet="${layout.tabletCopy}" data-layout-mobile="1,8,12,8"><span>${escapeHtml(config.kicker)}</span><h1>${escapeHtml(config.headline)}</h1><p>${escapeHtml(config.body)}</p><div><button type="button">${escapeHtml(config.cta)}</button><small>${iconMarkup("shield")} Secure checkout by Ezkart</small></div></div></section>`;
+      const parseLayoutString = (value) => { const [x, y, width, height] = value.split(",").map(Number); return { x, y, width, height }; };
+      const mobileCopy = "1,8,12,8";
+      const pieceAttributes = (role) => {
+        const desktop = heroPieceLayout(parseLayoutString(layout.copy), role);
+        const tablet = heroPieceLayout(parseLayoutString(layout.tabletCopy), role);
+        const mobile = heroPieceLayout(parseLayoutString(mobileCopy), role);
+        const format = (value) => `${value.x},${value.y},${value.width},${value.height}`;
+        return `data-layout-desktop="${format(desktop)}" data-layout-tablet="${format(tablet)}" data-layout-mobile="${format(mobile)}"`;
+      };
+      const overlayClass = overlay ? " sq-template-overlay-piece" : "";
+      const panel = hasCopyPanel ? `<div class="sq-template-copy-panel${overlay ? " sq-template-copy-panel-overlay" : ""}" data-sq-element data-sq-element-type="hero-panel" data-sq-hover="none" data-layout-desktop="${layout.copy}" data-layout-tablet="${layout.tabletCopy}" data-layout-mobile="${mobileCopy}"></div>` : "";
+      const hero = `<section class="sq-page-block sq-hero sq-hero-elements sq-template-hero sq-template-${config.mode}" draggable="true" data-sq-block data-sq-fluid data-sq-rows="15" data-section-id="hero">${templateHandle("hero")}<div class="sq-template-media sq-free-image element-animation-scale hover-${config.hover}" data-sq-element data-sq-element-type="image" data-sq-element-animation="scale" data-sq-hover="${config.hover}" data-layout-desktop="${layout.image}" data-layout-tablet="${layout.tabletImage}" data-layout-mobile="${overlay ? "1,1,12,15" : "1,1,12,7"}"><img src="${config.image}" alt="${escapeHtml(config.name)} campaign" style="object-position:${imagePosition}"></div>${panel}<span class="sq-hero-kicker sq-template-copy-piece${overlayClass} element-animation-${config.entrance}" data-sq-element data-sq-element-type="eyebrow" data-sq-element-animation="${config.entrance}" data-sq-hover="none" ${pieceAttributes("eyebrow")}>${escapeHtml(config.kicker)}</span><h1 class="sq-hero-heading sq-template-copy-piece${overlayClass} element-animation-${config.entrance}" data-sq-element data-sq-element-type="heading" data-sq-element-animation="${config.entrance}" data-sq-hover="none" ${pieceAttributes("heading")}>${escapeHtml(config.headline)}</h1><p class="sq-hero-description sq-template-copy-piece${overlayClass} element-animation-${config.entrance}" data-sq-element data-sq-element-type="text" data-sq-element-animation="${config.entrance}" data-sq-hover="none" ${pieceAttributes("text")}>${escapeHtml(config.body)}</p><button class="sq-hero-action sq-template-copy-piece${overlayClass} button-primary element-animation-${config.entrance}" type="button" data-sq-element data-sq-element-type="button" data-sq-button-role="primary" data-sq-link-type="checkout" data-sq-link="" data-sq-new-tab="false" data-sq-element-animation="${config.entrance}" data-sq-hover="none" ${pieceAttributes("button")}>${escapeHtml(config.cta)}</button><small class="sq-hero-trust sq-template-copy-piece${overlayClass} element-animation-${config.entrance}" data-sq-element data-sq-element-type="trust-note" data-sq-element-animation="${config.entrance}" data-sq-hover="none" ${pieceAttributes("trust")}>${iconMarkup("shield")} Secure checkout by Ezkart</small></section>`;
       const story = `<section class="sq-page-block sq-template-story" draggable="true" data-sq-block data-sq-fluid data-sq-rows="11" data-section-id="image-story">${templateHandle("story")}<div class="sq-template-story-copy element-animation-slide-left" data-sq-element data-sq-element-type="copy" data-sq-element-animation="slide-left" data-sq-hover="none" data-layout-desktop="1,2,8,9" data-layout-tablet="1,1,12,7" data-layout-mobile="1,1,12,7"><span>OUR POINT OF VIEW</span><h2>${escapeHtml(config.story)}</h2><p>${escapeHtml(config.storyBody)}</p><button class="button-tertiary" type="button">Read our story</button></div><aside class="sq-template-manifesto sq-surface-card element-animation-rise hover-lift" data-sq-element data-sq-element-type="content" data-sq-element-animation="rise" data-sq-hover="lift" data-layout-desktop="9,2,4,9" data-layout-tablet="1,8,12,4" data-layout-mobile="1,8,12,4"><strong>01</strong><b>Designed locally</b><small>Built for independent Indonesian brands and their customers.</small></aside></section>`;
       const benefits = `<section class="sq-page-block sq-benefit-row sq-template-benefits" draggable="true" data-sq-block data-sq-fluid data-sq-rows="6" data-section-id="benefits">${templateHandle("benefits")}<article class="element-animation-rise hover-lift" style="--element-delay:0ms" data-sq-element data-sq-element-type="benefit" data-sq-element-animation="rise" data-sq-hover="lift" data-layout-desktop="1,1,4,6" data-layout-tablet="1,1,4,6" data-layout-mobile="1,1,12,2">${iconMarkup("star")}<div><b>Thoughtful by default</b><small>Clear details and deliberate design</small></div></article><article class="element-animation-rise hover-lift" style="--element-delay:140ms" data-sq-element data-sq-element-type="benefit" data-sq-element-animation="rise" data-sq-hover="lift" data-layout-desktop="5,1,4,6" data-layout-tablet="5,1,4,6" data-layout-mobile="1,3,12,2">${iconMarkup("credit-card")}<div><b>Secure payment</b><small>Midtrans-ready checkout built in</small></div></article><article class="element-animation-rise hover-lift" style="--element-delay:280ms" data-sq-element data-sq-element-type="benefit" data-sq-element-animation="rise" data-sq-hover="lift" data-layout-desktop="9,1,4,6" data-layout-tablet="9,1,4,6" data-layout-mobile="1,5,12,2">${iconMarkup("truck")}<div><b>Delivery connected</b><small>Rates, couriers, and ETA included</small></div></article></section>`;
       const reviews = `<section class="sq-page-block sq-generated-reviews sq-template-proof" draggable="true" data-sq-block data-sq-fluid data-sq-rows="9" data-section-id="reviews">${templateHandle("reviews")}<div class="sq-template-proof-heading element-animation-fade" data-sq-element data-sq-element-type="copy" data-sq-element-animation="fade" data-sq-hover="none" data-layout-desktop="1,1,4,9" data-layout-tablet="1,1,12,3" data-layout-mobile="1,1,12,3"><small>Loved by customers</small><h2>Proof that feels human.</h2><p>Specific, credible social proof close to the buying decision.</p></div><article class="element-animation-rise hover-lift" data-sq-element data-sq-element-type="review" data-sq-element-animation="rise" data-sq-hover="lift" data-layout-desktop="5,1,4,9" data-layout-tablet="1,4,6,6" data-layout-mobile="1,4,12,5"><span>★★★★★</span><b>“The quality was obvious from the first use.”</b><small>Nadia · verified customer</small></article><article class="element-animation-rise hover-lift" style="--element-delay:140ms" data-sq-element data-sq-element-type="review" data-sq-element-animation="rise" data-sq-hover="lift" data-layout-desktop="9,1,4,9" data-layout-tablet="7,4,6,6" data-layout-mobile="1,9,12,5"><span>★★★★★</span><b>“Beautifully packed and genuinely easy to order.”</b><small>Raka · verified customer</small></article></section>`;
       const faq = `<section class="sq-page-block sq-generated-faq sq-template-faq" draggable="true" data-sq-block data-sq-fluid data-sq-rows="12" data-section-id="faq">${templateHandle("FAQ")}<h2 class="element-animation-fade" data-sq-element data-sq-element-type="heading" data-sq-element-animation="fade" data-sq-hover="none" data-layout-desktop="1,1,5,5" data-layout-tablet="1,1,12,3" data-layout-mobile="1,1,12,3">Everything you need to order confidently.</h2><details open data-sq-element data-sq-element-type="faq" data-layout-desktop="7,1,6,4" data-layout-tablet="1,4,12,3" data-layout-mobile="1,4,12,3"><summary>How does payment work?</summary><p>Checkout is secured by Midtrans and connected directly to this page.</p></details><details data-sq-element data-sq-element-type="faq" data-layout-desktop="7,5,6,4" data-layout-tablet="1,7,12,3" data-layout-mobile="1,7,12,3"><summary>When will my order arrive?</summary><p>Live courier options, price, and estimated delivery time appear at checkout.</p></details><details data-sq-element data-sq-element-type="faq" data-layout-desktop="7,9,6,4" data-layout-tablet="1,10,12,3" data-layout-mobile="1,10,12,3"><summary>Can I buy more than one item?</summary><p>Yes. Build a basket from any connected products and pay once.</p></details></section>`;
       const announcement = `<section class="sq-page-block sq-announcement" draggable="true" data-sq-block data-sq-fluid data-sq-rows="2" data-section-id="announcement">${templateHandle("announcement")}<p class="element-animation-fade" data-sq-element data-sq-element-type="text" data-sq-element-animation="fade" data-sq-hover="none" data-layout-desktop="1,1,12,2" data-layout-tablet="1,1,12,2" data-layout-mobile="1,1,12,2">${escapeHtml(config.announcement)}</p></section>`;
-      const navigation = `<nav class="sq-page-block sq-store-nav" draggable="true" data-sq-block data-sq-fluid data-sq-rows="2" data-section-id="navigation">${templateHandle("navigation")}<b class="element-animation-fade" data-sq-element data-sq-element-type="brand" data-sq-element-animation="fade" data-sq-hover="none" data-layout-desktop="1,1,4,2" data-layout-tablet="1,1,4,2" data-layout-mobile="1,1,6,2">${escapeHtml(config.brand)}</b><div class="button-secondary element-animation-fade" data-sq-element data-sq-element-type="navigation" data-sq-button-role="secondary" data-sq-element-animation="fade" data-sq-hover="none" data-layout-desktop="7,1,6,2" data-layout-tablet="6,1,7,2" data-layout-mobile="7,1,6,2"><a href="#products">Shop</a><a href="#story">Story</a><a href="#shipping">Delivery</a><button type="button">Buy now</button></div></nav>`;
-      let responsiveHero = overlay ? hero : hero.replace('data-layout-mobile="1,1,12,15"', 'data-layout-mobile="1,1,12,7"');
+      const navigation = `<nav class="sq-page-block sq-store-nav" draggable="true" data-sq-block data-sq-fluid data-sq-rows="2" data-section-id="navigation">${templateHandle("navigation")}<div class="sq-site-logo element-animation-fade" data-sq-element data-sq-element-type="logo" data-sq-element-animation="fade" data-sq-hover="none" data-layout-desktop="1,1,4,2" data-layout-tablet="1,1,5,2" data-layout-mobile="1,1,6,2"><img data-sq-logo-image alt="" hidden><b data-sq-logo-text>${escapeHtml(config.brand)}</b></div><div class="button-secondary element-animation-fade" data-sq-element data-sq-element-type="navigation" data-sq-button-role="secondary" data-sq-element-animation="fade" data-sq-hover="none" data-layout-desktop="7,1,6,2" data-layout-tablet="6,1,7,2" data-layout-mobile="7,1,6,2"><a href="#products">Shop</a><a href="#story">Story</a><a href="#shipping">Delivery</a><button type="button">Buy now</button></div></nav>`;
       const linkedStory = story.replace('<section class="', '<section id="story" class="').replace('sq-template-story-copy element-animation', 'sq-template-story-copy button-tertiary element-animation').replace('data-sq-element data-sq-element-type="copy"', 'data-sq-element data-sq-element-type="copy" data-sq-button-role="tertiary"').replace('<button class="button-tertiary"', '<button');
-      return `${announcement}${navigation}${responsiveHero}${linkedStory}${commerceSectionMarkup("products", "rise", config.hover)}${reviews}${benefits}${faq}${commerceSectionMarkup("checkout", config.entrance, "lift")}${commerceSectionMarkup("shipping", "fade", "none")}`;
+      return `${announcement}${navigation}${hero}${linkedStory}${commerceSectionMarkup("products", "rise", config.hover)}${reviews}${benefits}${faq}${commerceSectionMarkup("checkout", config.entrance, "lift")}${commerceSectionMarkup("shipping", "fade", "none")}`;
     };
     const layerDetails = {
       announcement: ["Announcement", "Promotional message", "message"], navigation: ["Navigation", "Brand, links, and button", "layout"], hero: ["Hero", "Image, copy, and motion", "layout"], products: ["Product collection", "Connected commerce grid", "box"], "image-story": ["Brand story", "Editorial content", "image"], reviews: ["Customer proof", "Conversion-focused reviews", "star"], benefits: ["Benefits", "Three trust points", "star"], faq: ["FAQ", "Purchase objections answered", "help"], checkout: ["Checkout", "Midtrans cart action", "credit-card"], shipping: ["Shipping", "Courier and ETA", "truck"],
     };
+    const elementLayerIcon = (type) => ({ image: "image", collage: "image", logo: "image", button: "play", checkout: "credit-card", "product-grid": "box", navigation: "layout", benefit: "star", review: "star", faq: "help", icon: "star", "custom-code": "code" })[type] || "message";
+    const elementLayerPreview = (element) => {
+      const image = element.querySelector("img");
+      if (image?.alt) return image.alt;
+      const text = element.textContent.replace(/\s+/g, " ").trim();
+      return text ? (text.length > 46 ? `${text.slice(0, 43)}…` : text) : "Visual element";
+    };
     const rebuildLayerList = () => {
       if (!layerList) return;
       layerList.replaceChildren(...[...(previewRoot?.querySelectorAll(":scope > [data-sq-block]") || [])].map((section) => {
-        const details = layerDetails[section.dataset.sectionId] || [elementTypeName(section), "Editable section", "layers"];
+        const sectionId = section.dataset.sectionId;
+        const detailKey = Object.keys(layerDetails).sort((a, b) => b.length - a.length).find((key) => sectionId === key || sectionId.startsWith(`${key}-`));
+        const details = layerDetails[detailKey] || [elementTypeName(section), "Editable section", "layers"];
+        const elements = [...section.querySelectorAll(":scope > [data-sq-element]")];
+        elements.forEach((element, index) => { if (!element.dataset.sqElementId) element.dataset.sqElementId = `element-${sectionId.replace(/[^a-z0-9-]/gi, "-")}-${index + 1}-${Date.now()}`; });
         const wrapper = document.createElement("div");
-        wrapper.innerHTML = `<button type="button" draggable="true" data-sq-layer data-section-id="${escapeHtml(section.dataset.sectionId)}">${iconMarkup("grip")}<span>${iconMarkup(details[2])}</span><div><b>${escapeHtml(details[0])}</b><small>${escapeHtml(details[1])}</small></div>${iconMarkup("chevron-right")}</button>`;
-        return wrapper.firstElementChild;
+        wrapper.className = `sq-layer-group${sectionId === selectedSection ? " active" : ""}${section.classList.contains("section-hidden") ? " section-hidden" : ""}`;
+        wrapper.dataset.sqLayerGroup = "";
+        wrapper.dataset.sectionId = sectionId;
+        wrapper.innerHTML = `<button type="button" draggable="true" data-sq-layer data-section-id="${escapeHtml(sectionId)}">${iconMarkup("grip")}<span>${iconMarkup(details[2])}</span><div><b>${escapeHtml(details[0])}</b><small>${elements.length} element${elements.length === 1 ? "" : "s"} · ${escapeHtml(details[1])}</small></div>${iconMarkup("chevron-right")}</button><div class="sq-layer-elements" aria-label="${escapeHtml(details[0])} elements">${elements.map((element) => `<button type="button" draggable="true" class="${element.classList.contains("sq-element-hidden") ? "element-hidden" : ""}" data-sq-element-layer="${escapeHtml(element.dataset.sqElementId)}"><span>${iconMarkup(elementLayerIcon(element.dataset.sqElementType))}</span><div><b>${escapeHtml(elementTypeName(element))}</b><small>${escapeHtml(elementLayerPreview(element))}</small></div>${iconMarkup("chevron-right")}</button>`).join("")}</div>`;
+        return wrapper;
       }));
     };
     const syncBrandControls = () => {
@@ -1573,6 +1828,7 @@
         setElementLayout(element, findOpenElementLayout(section, desired, device), device);
       });
       section.append(element);
+      rebuildLayerList();
       bindSqInteractions();
       applyFluidSection(section);
       selectSqElement(element);
@@ -1590,15 +1846,7 @@
       const newBlock = wrapper.firstElementChild;
       const selectedBlock = previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`);
       selectedBlock?.after(newBlock);
-      const layerTemplate = layerList?.querySelector("[data-sq-layer]")?.cloneNode(true);
-      if (layerTemplate) {
-        layerTemplate.dataset.sectionId = sectionId; layerTemplate.classList.remove("active", "section-hidden");
-        const title = layerTemplate.querySelector("b"); const subtitle = layerTemplate.querySelector("small");
-        if (title) title.textContent = ({ blank: "Blank canvas", "full-image": "Full image", gallery: "Image gallery", text: "Text story", testimonials: "Reviews", faq: "FAQ", spacer: "Spacer", products: "Product collection", checkout: "Checkout" })[type] || "Section";
-        if (subtitle) subtitle.textContent = "Added just now · draggable";
-        layerList.querySelector(`[data-section-id="${selectedSection}"]`)?.after(layerTemplate);
-      }
-      bindSqInteractions(); updateProductView(); selectSqSection(sectionId); openSqPanel("layers"); newBlock?.scrollIntoView({ behavior: "smooth", block: "center" }); markSqChanged();
+      rebuildLayerList(); bindSqInteractions(); updateProductView(); selectSqSection(sectionId); openSqPanel("layers"); newBlock?.scrollIntoView({ behavior: "smooth", block: "center" }); markSqChanged();
     }));
     sqStudio.querySelector("[data-sq-block-search]")?.addEventListener("input", (event) => {
       const query = normalize(event.currentTarget.value);
@@ -1606,31 +1854,58 @@
     });
 
     sqStudio.querySelector("[data-sq-duplicate]")?.addEventListener("click", () => {
-      const block = previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`); const layer = layerList?.querySelector(`[data-section-id="${selectedSection}"]`); if (!block || !layer) return;
-      remember(); const newId = `${selectedSection}-copy-${Date.now()}`; const blockCopy = block.cloneNode(true); const layerCopy = layer.cloneNode(true); blockCopy.querySelectorAll(".sq-section-toolbar, .sq-element-overlay").forEach((node) => node.remove()); blockCopy.dataset.sectionId = newId; layerCopy.dataset.sectionId = newId; blockCopy.classList.remove("selected"); layerCopy.classList.remove("active"); const title = layerCopy.querySelector("b"); if (title) title.textContent = `${title.textContent} copy`; block.after(blockCopy); layer.after(layerCopy); bindSqInteractions(); selectSqSection(newId, true); markSqChanged();
+      const block = previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`); if (!block) return;
+      remember(); const newId = `${selectedSection}-copy-${Date.now()}`; const blockCopy = block.cloneNode(true); blockCopy.querySelectorAll(".sq-section-toolbar, .sq-element-overlay").forEach((node) => node.remove()); blockCopy.dataset.sectionId = newId; blockCopy.classList.remove("selected"); blockCopy.querySelectorAll("[data-sq-element-id]").forEach((element, index) => { element.dataset.sqElementId = `element-${newId}-${index + 1}`; }); block.after(blockCopy); rebuildLayerList(); bindSqInteractions(); selectSqSection(newId, true); markSqChanged();
     });
     sqStudio.querySelector("[data-sq-visibility]")?.addEventListener("click", () => {
-      const block = previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`); const layer = layerList?.querySelector(`[data-section-id="${selectedSection}"]`); if (!block || !layer) return;
-      remember(); const hidden = !block.classList.contains("section-hidden"); block.classList.toggle("section-hidden", hidden); layer.classList.toggle("section-hidden", hidden); selectSqSection(selectedSection); markSqChanged();
+      const block = previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`); if (!block) return;
+      remember(); const hidden = !block.classList.contains("section-hidden"); block.classList.toggle("section-hidden", hidden); rebuildLayerList(); bindSqInteractions(); selectSqSection(selectedSection); markSqChanged();
     });
     const deleteSelectedSection = () => {
       if ((previewRoot?.querySelectorAll("[data-sq-block]").length || 0) <= 1) { showToast("A page needs at least one section"); return; }
-      const block = previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`); const layer = layerList?.querySelector(`[data-section-id="${selectedSection}"]`); if (!block || !layer) return;
-      remember(); const next = layer.nextElementSibling?.dataset.sectionId || layer.previousElementSibling?.dataset.sectionId; selectedElement = null; selectedAction = null; selectedImage = null; selectedContent = null; block.remove(); layer.remove(); bindSqInteractions(); if (next) selectSqSection(next, true); markSqChanged(); showToast("Section deleted — use Undo to restore it");
+      const block = previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`); const group = layerList?.querySelector(`[data-sq-layer-group][data-section-id="${selectedSection}"]`); if (!block || !group) return;
+      remember(); const next = group.nextElementSibling?.dataset.sectionId || group.previousElementSibling?.dataset.sectionId; selectedElement = null; selectedAction = null; selectedImage = null; selectedContent = null; block.remove(); rebuildLayerList(); bindSqInteractions(); if (next) selectSqSection(next, true); markSqChanged(); showToast("Section deleted — use Undo to restore it");
     };
     sqStudio.querySelector("[data-sq-delete]")?.addEventListener("click", deleteSelectedSection);
 
     const setZoom = (value) => {
-      zoom = Math.max(60, Math.min(100, value)); deviceFrame?.classList.remove("zoom-60", "zoom-70", "zoom-80", "zoom-90"); if (zoom < 100) deviceFrame?.classList.add(`zoom-${zoom}`); const output = sqStudio.querySelector("[data-sq-zoom]"); if (output) output.textContent = `${zoom}%`;
+      zoom = Math.max(60, Math.min(100, Math.round(value)));
+      deviceFrame?.classList.remove("zoom-60", "zoom-70", "zoom-80", "zoom-90");
+      if (deviceFrame) deviceFrame.style.zoom = zoom === 100 ? "" : String(zoom / 100);
+      const output = sqStudio.querySelector("[data-sq-zoom]"); if (output) output.textContent = `${zoom}%`;
     };
     sqStudio.querySelector("[data-sq-zoom-out]")?.addEventListener("click", () => setZoom(zoom - 10));
     sqStudio.querySelector("[data-sq-zoom-in]")?.addEventListener("click", () => setZoom(zoom + 10));
-    sqStudio.querySelector("[data-sq-fit]")?.addEventListener("click", () => setZoom(activeDevice === "desktop" ? 80 : activeDevice === "tablet" ? 90 : 100));
+    sqStudio.querySelector("[data-sq-fit]")?.addEventListener("click", () => setZoom(fitZoomForDevice(activeDevice)));
     sqStudio.querySelector("[data-sq-close-inspector]")?.addEventListener("click", () => { inspector?.classList.add("collapsed"); sqStudio.classList.add("inspector-closed"); });
-    sqStudio.querySelector("[data-sq-preview]")?.addEventListener("click", (event) => {
-      const enabled = !sqStudio.classList.contains("preview-mode"); sqStudio.classList.toggle("preview-mode", enabled); const label = event.currentTarget.querySelector("span"); if (label) label.textContent = enabled ? "Exit preview" : "Preview"; showToast(enabled ? "Full-canvas preview enabled — press Escape to exit" : "Editing tools restored");
+    const livePreviewDialog = document.getElementById("landing-preview-dialog");
+    const livePreviewFrame = livePreviewDialog?.querySelector("[data-sq-live-preview-frame]");
+    const livePreviewStage = livePreviewDialog?.querySelector("[data-sq-live-preview-stage]");
+    const setLivePreviewDevice = (device) => {
+      if (!livePreviewStage || !["desktop", "tablet", "mobile"].includes(device)) return;
+      livePreviewStage.dataset.previewDevice = device;
+      livePreviewDialog.querySelectorAll("[data-sq-preview-device]").forEach((button) => button.classList.toggle("active", button.dataset.sqPreviewDevice === device));
+    };
+    livePreviewDialog?.querySelectorAll("[data-sq-preview-device]").forEach((button) => button.addEventListener("click", () => setLivePreviewDevice(button.dataset.sqPreviewDevice)));
+    livePreviewDialog?.querySelector("[data-sq-preview-close]")?.addEventListener("click", () => livePreviewDialog.close());
+    livePreviewDialog?.addEventListener("click", (event) => { if (event.target === livePreviewDialog) livePreviewDialog.close(); });
+    livePreviewDialog?.querySelector("[data-sq-preview-new-tab]")?.addEventListener("click", () => {
+      const url = URL.createObjectURL(new Blob([generateHtml()], { type: "text/html" }));
+      window.open(url, "_blank", "noopener");
+      window.setTimeout(() => URL.revokeObjectURL(url), 60000);
     });
-    document.addEventListener("keydown", (event) => { if (event.key === "Escape" && sqStudio.classList.contains("preview-mode")) { sqStudio.classList.remove("preview-mode"); const label = sqStudio.querySelector("[data-sq-preview] span"); if (label) label.textContent = "Preview"; } });
+    sqStudio.querySelector("[data-sq-preview]")?.addEventListener("click", () => {
+      if (!livePreviewDialog || !livePreviewFrame) return;
+      const title = livePreviewDialog.querySelector("[data-sq-preview-title]");
+      if (title) title.textContent = document.querySelector("[data-current-site-name]")?.textContent || "Landing page";
+      const html = generateHtml();
+      setLivePreviewDevice(activeDevice);
+      livePreviewDialog.showModal();
+      requestAnimationFrame(() => {
+        livePreviewFrame.onload = () => livePreviewFrame.contentWindow?.postMessage({ type: "ezkart-render-page", html }, "*");
+        livePreviewFrame.src = `page-preview.php?render=${Date.now()}`;
+      });
+    });
     document.addEventListener("keydown", (event) => {
       if (event.target.closest("input,textarea,select,[contenteditable=true]")) return;
       if (event.key === "Escape" && selectedElement?.isConnected) { selectSqSection(selectedSection, true); return; }
@@ -1651,9 +1926,10 @@
 
     const exportDialog = document.getElementById("html-export-dialog");
     const collectExportCss = () => {
-      const tokens = [".sq-page-preview", ".sq-page-block", ".sq-announcement", ".sq-store-nav", ".sq-hero", ".sq-product", ".sq-image-story", ".sq-benefit", ".sq-cart", ".sq-shipping", ".sq-generated", ".sq-free", ".sq-template", ".sq-surface", ".sq-color", ".element-animation", ".hover-", ".button-", ".ez-fluid", "@keyframes sq", "@keyframes element", ".product-art", ".icon", ".svg-sprite"];
+      const tokens = [".sq-page-preview", ".sq-page-block", ".sq-announcement", ".sq-store-nav", ".sq-site-logo", ".sq-hero", ".sq-product", ".sq-image-story", ".sq-benefit", ".sq-cart", ".sq-shipping", ".sq-generated", ".sq-free", ".sq-template", ".sq-surface", ".sq-color", ".element-animation", ".hover-", ".button-", ".ez-fluid", "@keyframes sq", "@keyframes element", ".product-art", ".icon", ".svg-sprite"];
       const collect = (rules) => [...rules].map((rule) => {
-        if (rule.cssRules) { const nested = collect(rule.cssRules); return nested ? `${rule.conditionText ? `@media ${rule.conditionText}` : rule.cssText.slice(0, rule.cssText.indexOf("{"))}{${nested}}` : ""; }
+        if (rule.type === CSSRule.KEYFRAMES_RULE) return tokens.some((token) => rule.cssText.includes(token)) ? rule.cssText : "";
+        if (rule.cssRules && !rule.selectorText) { const nested = collect(rule.cssRules); return nested ? `${rule.conditionText ? `@media ${rule.conditionText}` : rule.cssText.slice(0, rule.cssText.indexOf("{"))}{${nested}}` : ""; }
         return tokens.some((token) => rule.cssText.includes(token)) ? rule.cssText : "";
       }).join("\n");
       return [...document.styleSheets].map((sheet) => { try { return collect(sheet.cssRules); } catch (_) { return ""; } }).join("\n");
@@ -1671,8 +1947,9 @@
       clone.querySelectorAll("[data-sq-image-list], [data-sq-image-item]").forEach((node) => { node.removeAttribute("data-sq-image-list"); node.removeAttribute("data-sq-image-item"); node.removeAttribute("tabindex"); node.classList.remove("sq-image-selected", "sq-image-dragging", "sq-image-drop-target"); });
       clone.querySelectorAll("[data-sq-editable], [data-sq-content]").forEach((node) => { node.removeAttribute("data-sq-editable"); node.removeAttribute("data-sq-content"); });
       clone.querySelectorAll("[data-sq-link-type]").forEach((action) => {
-        const type = action.dataset.sqLinkType || "none";
-        const target = action.dataset.sqLink || "";
+        let type = action.dataset.sqLinkType || "none";
+        const target = safeActionTarget(type, action.dataset.sqLink || "");
+        if (!["checkout", "none"].includes(type) && !target) type = "none";
         const newTab = action.dataset.sqNewTab === "true";
         let href = "";
         if (type === "section") href = `#${target.replace(/^#/, "") || "products"}`;
@@ -1696,17 +1973,18 @@
         ["sqElement", "sqElementId", "sqElementType", "sqElementAnimation", "sqHover", "sqSurface", "sqAlign", "sqButtonRole", "layoutDesktop", "layoutTablet", "layoutMobile"].forEach((key) => delete node.dataset[key]);
         node.classList.remove("sq-element-selected", "sq-element-animate");
       });
-      clone.querySelectorAll("img").forEach((image) => { image.src = new URL(image.getAttribute("src"), window.location.href).href; });
+      clone.querySelectorAll("img[src]").forEach((image) => { image.src = new URL(image.getAttribute("src"), window.location.href).href; });
       clone.querySelectorAll("[data-product-card]").forEach((card) => { const button = card.querySelector("button"); if (button) { button.dataset.ezkartAdd = card.dataset.productCard; button.type = "button"; } });
       const checkout = clone.querySelector(".sq-cart-section aside>button"); if (checkout) checkout.dataset.ezkartCheckout = "";
+      [clone, ...clone.querySelectorAll("*")].forEach((node) => [...node.attributes].forEach((attribute) => { if (attribute.name.startsWith("data-sq-")) node.removeAttribute(attribute.name); }));
       const pageName = document.querySelector("[data-current-site-name]")?.textContent || "Ezkart Landing Page";
       const sprite = document.querySelector(".svg-sprite")?.outerHTML || "";
-      const css = collectExportCss();
+      const css = `${collectExportCss()}\nhtml{scrollbar-width:none}html::-webkit-scrollbar{width:0;height:0}.sq-page-block,.sq-page-block:hover{outline-color:transparent!important}`;
       const spacingCssFor = (device) => [...spacingState.entries()].filter(([key]) => key.endsWith(`:${device}`)).map(([key, value]) => { const section = key.slice(0, -(device.length + 1)); return `[data-ezkart-section="${section}"]{padding:${value.top}px ${value.right}px ${value.bottom}px ${value.left}px!important}`; }).join("\n");
       const fluidCssFor = (device) => [...previewRoot.querySelectorAll("[data-sq-fluid]")].map((section) => `[data-ezkart-section="${section.dataset.sectionId}"]{--sq-fluid-row-height:${fluidRowHeight(section, device)}px}`).join("\n");
       const elementCssFor = (device) => [...previewRoot.querySelectorAll("[data-sq-element]")].map((element) => { const layout = parseElementLayout(element, device); return `[data-ezkart-element="${element.dataset.sqElementId}"]{grid-column:${layout.x}/span ${layout.width}!important;grid-row:${layout.y}/span ${layout.height}!important}`; }).join("\n");
       const responsiveSpacing = `${spacingCssFor("desktop")}\n${fluidCssFor("desktop")}\n${elementCssFor("desktop")}\n@media(max-width:900px){${spacingCssFor("tablet")}\n${fluidCssFor("tablet")}\n${elementCssFor("tablet")}}\n@media(max-width:600px){${spacingCssFor("mobile")}\n${fluidCssFor("mobile")}\n${elementCssFor("mobile")}}`;
-      const commerceScript = `<script>(()=>{const cart=new Set();document.querySelectorAll('[data-ezkart-add]').forEach(button=>button.addEventListener('click',()=>{const id=button.dataset.ezkartAdd;cart.has(id)?cart.delete(id):cart.add(id);button.textContent=cart.has(id)?'Added ✓':'Add to cart'}));const checkout=()=>{const products=[...cart];if(!products.length){alert('Add at least one product first.');return}location.href='/cart/?products='+encodeURIComponent(products.join(','))};document.querySelector('[data-ezkart-checkout]')?.addEventListener('click',checkout);document.querySelectorAll('[data-ezkart-action]').forEach(button=>button.addEventListener('click',()=>{const type=button.dataset.ezkartAction,target=button.dataset.ezkartTarget||'';if(type==='checkout'){checkout();return}if(type==='section'){document.getElementById(target.replace(/^#/,''))?.scrollIntoView({behavior:'smooth'});return}const href=type==='email'?'mailto:'+target:type==='phone'?'tel:'+target:target;if(type==='url'&&button.dataset.ezkartNewTab==='true')window.open(href,'_blank','noopener');else if(href)location.href=href}));const observer=new IntersectionObserver(entries=>entries.forEach(entry=>{if(entry.isIntersecting){entry.target.classList.add(entry.target.matches('[class*="element-animation-"]')?'sq-element-animate':'animating');observer.unobserve(entry.target)}}),{threshold:.12});document.querySelectorAll('[class*="animation-"],[class*="element-animation-"]').forEach(element=>observer.observe(element))})();<\/script>`;
+      const commerceScript = `<script>(()=>{const defaults=${JSON.stringify(selectedProducts())},cart=new Set();document.querySelectorAll('[data-ezkart-add]').forEach(button=>button.addEventListener('click',()=>{const id=button.dataset.ezkartAdd;cart.has(id)?cart.delete(id):cart.add(id);button.textContent=cart.has(id)?'Added ✓':'Add to cart'}));const checkout=()=>{const products=cart.size?[...cart]:defaults;if(!products.length){alert('This page has no connected products.');return}location.href='/cart/?products='+encodeURIComponent(products.join(','))};document.querySelector('[data-ezkart-checkout]')?.addEventListener('click',checkout);document.querySelectorAll('[data-ezkart-action]').forEach(button=>button.addEventListener('click',()=>{const type=button.dataset.ezkartAction,target=button.dataset.ezkartTarget||'';if(type==='checkout'){checkout();return}if(type==='section'){document.getElementById(target.replace(/^#/,''))?.scrollIntoView({behavior:'smooth'});return}const href=type==='email'?'mailto:'+target:type==='phone'?'tel:'+target:target;if(type==='url'&&button.dataset.ezkartNewTab==='true')window.open(href,'_blank','noopener');else if(href)location.href=href}));const observer=new IntersectionObserver(entries=>entries.forEach(entry=>{if(entry.isIntersecting){entry.target.classList.add(entry.target.matches('[class*="element-animation-"]')?'sq-element-animate':'animating');observer.unobserve(entry.target)}}),{threshold:.12});document.querySelectorAll('[class*="animation-"],[class*="element-animation-"]').forEach(element=>observer.observe(element))})();<\/script>`;
       const fontBase = new URL("assets/fonts/poppins-400.woff2", window.location.href).href;
       const fontBold = new URL("assets/fonts/poppins-600.woff2", window.location.href).href;
       return `<!doctype html>\n<html lang="id">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1">\n<title>${escapeHtml(pageName)}</title>\n<meta name="description" content="Shop selected Indonesian products with secure Midtrans checkout and Ezkart delivery.">\n<style>@font-face{font-family:Poppins;src:url('${fontBase}') format('woff2');font-weight:400}@font-face{font-family:Poppins;src:url('${fontBold}') format('woff2');font-weight:600}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:#fff;font-family:Poppins,Arial,sans-serif}.svg-sprite{width:0;height:0;position:absolute;overflow:hidden}@media(prefers-reduced-motion:reduce){*{animation:none!important;scroll-behavior:auto!important}}\n${css}\n${responsiveSpacing}\n</style>\n</head>\n<body>\n${sprite}\n${clone.outerHTML}\n${commerceScript}\n</body>\n</html>`;
@@ -1735,13 +2013,14 @@
       document.querySelectorAll("[data-current-site-name]").forEach((target) => { target.textContent = site.dataset.siteName; });
       document.querySelectorAll("[data-current-site-url]").forEach((target) => { target.textContent = site.dataset.siteUrl; });
       let state = null;
-      try { state = JSON.parse(localStorage.getItem(storageKeyFor()) || "null"); } catch (_) { state = null; }
+      try { state = JSON.parse(localStorage.getItem(storageKeyFor()) || localStorage.getItem(legacyStorageKeyFor()) || "null"); } catch (_) { state = null; }
       undoStack.length = 0; redoStack.length = 0; updateHistoryButtons();
-      restoreState(state?.version === 2 ? state : cloneBaseSiteState());
+      restoreState([2, 3].includes(state?.version) ? state : cloneBaseSiteState());
       showToast(`${site.dataset.siteName} loaded with its saved draft`);
     };
     const bindSiteButton = (site) => { site.onclick = () => loadSite(site); };
-    const siteRegistryKey = "ezkart:landing-builder:v2:sites";
+    const siteRegistryKey = "ezkart:landing-builder:v3:sites";
+    const legacySiteRegistryKey = "ezkart:landing-builder:v2:sites";
     const pageList = sqStudio.querySelector(".sq-page-list");
     const addSavedSiteButton = ({ name, url }) => {
       const sourceSite = pageList?.querySelector("[data-sq-site]");
@@ -1752,7 +2031,7 @@
       if (title) title.textContent = name; if (subtitle) subtitle.textContent = url; if (status) { status.textContent = "Draft"; status.className = "draft"; }
       pageList.append(site); bindSiteButton(site); return site;
     };
-    try { JSON.parse(localStorage.getItem(siteRegistryKey) || "[]").forEach(addSavedSiteButton); } catch (_) { /* built-in pages remain available */ }
+    try { JSON.parse(localStorage.getItem(siteRegistryKey) || localStorage.getItem(legacySiteRegistryKey) || "[]").forEach(addSavedSiteButton); } catch (_) { /* built-in pages remain available */ }
     sqStudio.querySelectorAll("[data-sq-site]").forEach(bindSiteButton);
 
     const newPageDialog = document.getElementById("page-creator-dialog");
@@ -1784,17 +2063,37 @@
       showToast(`${name} created with ${starters.length} products`); newPageForm.reset(); newPageSlugEdited = false;
     });
 
+    const syncCommerceStatus = async () => {
+      const status = sqStudio.querySelector("[data-sq-commerce-status]");
+      if (!status) return;
+      try {
+        const response = await fetch("../api/health.php", { headers: { Accept: "application/json" }, cache: "no-store" });
+        const payload = await response.json();
+        const ready = response.ok && payload.midtrans?.configured && payload.biteship?.configured && payload.biteship?.fulfillment_configured;
+        status.classList.toggle("ready", ready);
+        status.classList.toggle("warning", !ready);
+        status.lastChild.textContent = ready ? " Midtrans + Biteship test fulfillment ready" : " Complete sandbox payment, rates, and pickup setup";
+        status.title = ready ? "Checkout creates a Midtrans Sandbox payment and a Biteship test order after verified payment." : "Add Midtrans Sandbox credentials plus the Biteship test API key, postcode, pickup contact, and pickup address.";
+      } catch (_) {
+        status.classList.add("warning");
+        status.lastChild.textContent = " Sandbox status unavailable";
+      }
+    };
+
+    upgradeLegacyStructure();
+    rebuildLayerList();
     bindSqInteractions();
     updateProductView();
     selectSqSection("announcement");
     syncBrandControls();
+    syncCommerceStatus();
     baseSiteState = captureState();
     try {
-      const stored = JSON.parse(localStorage.getItem(storageKeyFor()) || "null");
-      if (stored?.version === 2) restoreState(stored);
+      const stored = JSON.parse(localStorage.getItem(storageKeyFor()) || localStorage.getItem(legacyStorageKeyFor()) || "null");
+      if ([2, 3].includes(stored?.version)) restoreState(stored);
     } catch (_) { /* start with the server-provided page */ }
     window.addEventListener("beforeunload", persistCurrentState);
-    setZoom(90);
+    setZoom(fitZoomForDevice());
   }
 
   const mapElement = document.getElementById("fulfillment-map");

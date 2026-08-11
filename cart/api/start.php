@@ -17,7 +17,8 @@ try {
 
     $checkout = ez_checkout_request($input);
     $credentials = ez_midtrans_credentials();
-    $orderId = 'EZK-MIDTRANS-' . gmdate('ymdHis') . '-' . strtoupper(bin2hex(random_bytes(2)));
+    ez_biteship_fulfillment_credentials();
+    $orderId = 'EZK-MIDTRANS-' . gmdate('ymdHis') . '-' . strtoupper(bin2hex(random_bytes(12)));
     $customer = $checkout['customer'];
     $nameParts = preg_split('/\s+/', $customer['name'], 2) ?: [$customer['name']];
     $firstName = mb_substr((string) ($nameParts[0] ?? ''), 0, 50);
@@ -60,6 +61,12 @@ try {
         'payment_type' => '',
         'fraud_status' => '',
         'status_message' => '',
+        'fulfillment_status' => 'AWAITING_PAYMENT',
+        'fulfillment_error' => '',
+        'biteship_order_id' => '',
+        'biteship_tracking_id' => '',
+        'biteship_waybill_id' => '',
+        'biteship_status' => '',
         'snap_token' => '',
         'snap_redirect_url' => '',
         'created_at' => gmdate(DATE_ATOM),
@@ -67,23 +74,48 @@ try {
     ];
     ez_save_order($order);
 
-    $transaction = ez_http_json(EZ_MIDTRANS_SNAP_SANDBOX_URL, $payload, [
-        'Accept: application/json',
-        'Content-Type: application/json',
-        'Authorization: Basic ' . base64_encode($credentials['server_key'] . ':'),
-        'X-Override-Notification: ' . $notificationUrl,
-    ]);
-    $snapToken = trim((string) ($transaction['token'] ?? ''));
-    $redirectUrl = trim((string) ($transaction['redirect_url'] ?? ''));
-    if ($snapToken === '' || !str_starts_with($redirectUrl, 'https://app.sandbox.midtrans.com/')) {
-        throw new RuntimeException('Midtrans did not create a valid Snap sandbox transaction.');
+    try {
+        $transaction = ez_http_json(EZ_MIDTRANS_SNAP_SANDBOX_URL, $payload, [
+            'Accept: application/json',
+            'Content-Type: application/json',
+            'Authorization: Basic ' . base64_encode($credentials['server_key'] . ':'),
+            'X-Override-Notification: ' . $notificationUrl,
+        ]);
+        $snapToken = trim((string) ($transaction['token'] ?? ''));
+        $redirectUrl = trim((string) ($transaction['redirect_url'] ?? ''));
+        if ($snapToken === '' || !str_starts_with($redirectUrl, 'https://app.sandbox.midtrans.com/')) {
+            throw new RuntimeException('Midtrans did not create a valid Snap sandbox transaction.');
+        }
+    } catch (Throwable $error) {
+        $stateLock = ez_lock_order_state($orderId);
+        try {
+            $failedOrder = ez_load_order($orderId);
+            if (strtoupper((string) ($failedOrder['status'] ?? '')) === 'CREATING') {
+                $failedOrder['status'] = 'FAILED';
+                $failedOrder['midtrans_status'] = 'create_failed';
+                $failedOrder['status_message'] = mb_substr($error->getMessage(), 0, 300);
+                $failedOrder['updated_at'] = gmdate(DATE_ATOM);
+                ez_save_order($failedOrder);
+            }
+        } finally {
+            ez_unlock_order_state($stateLock);
+        }
+        throw $error;
     }
 
-    $order['status'] = 'PENDING';
-    $order['snap_token'] = $snapToken;
-    $order['snap_redirect_url'] = $redirectUrl;
-    $order['updated_at'] = gmdate(DATE_ATOM);
-    ez_save_order($order);
+    $stateLock = ez_lock_order_state($orderId);
+    try {
+        $order = ez_load_order($orderId);
+        if (strtoupper((string) ($order['status'] ?? '')) === 'CREATING') {
+            $order['status'] = 'PENDING';
+        }
+        $order['snap_token'] = $snapToken;
+        $order['snap_redirect_url'] = $redirectUrl;
+        $order['updated_at'] = gmdate(DATE_ATOM);
+        ez_save_order($order);
+    } finally {
+        ez_unlock_order_state($stateLock);
+    }
     ez_api_json([
         'ok' => true,
         'order_id' => $orderId,

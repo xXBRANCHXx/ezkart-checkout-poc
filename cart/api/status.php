@@ -17,6 +17,9 @@ try {
         'midtrans_status' => $order['midtrans_status'],
         'payment_type' => $order['payment_type'],
         'customer_name' => $order['customer']['name'],
+        'fulfillment_status' => $order['fulfillment_status'] ?? 'AWAITING_PAYMENT',
+        'biteship_order_id' => $order['biteship_order_id'] ?? '',
+        'biteship_waybill_id' => $order['biteship_waybill_id'] ?? '',
     ]);
 } catch (InvalidArgumentException $error) {
     ez_api_json(['ok' => false, 'error' => 'Order not found.'], 404);

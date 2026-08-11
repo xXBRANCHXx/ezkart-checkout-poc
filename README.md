@@ -4,18 +4,25 @@ Static coming-soon website for [ezkart.id](https://ezkart.id).
 
 The repository also includes a dependency-free sandbox commerce flow at
 [`/cart`](https://ezkart.id/cart/). It demonstrates product selection,
-customer and delivery details, location-based shipping quotes, Midtrans Snap
+customer and delivery details, live Biteship test-mode shipping quotes, Midtrans Snap
 payment selection, and a provider-confirmed sandbox payment state. The
 server-side PHP endpoint creates a real Midtrans Sandbox Snap transaction, opens
-the Snap checkout popup, verifies its signed HTTP notification, and displays the
-stored Midtrans transaction reference. The Server Key remains server-side and no
-real funds are charged.
+the Snap checkout popup, verifies its signed HTTP notification, then creates an
+idempotent Biteship test order for the paid purchase. The Server Key remains
+server-side, Biteship test keys are enforced, no real funds are charged, and a
+staging courier does not perform a real pickup.
 
 Copy `config.example.php` to the ignored `config.runtime.php` on the server and
-set the project's Midtrans Sandbox Merchant ID, Client Key, and Server Key.
+set the project's Midtrans Sandbox Merchant ID, Client Key, and Server Key,
+plus a `biteship_test.` API key, the merchant's five-digit origin postcode,
+pickup contact name/phone, and complete pickup address.
 Alternatively, set `EZKART_MIDTRANS_MERCHANT_ID`,
-`EZKART_MIDTRANS_CLIENT_KEY`, and `EZKART_MIDTRANS_SERVER_KEY` in the PHP
-environment. Each Snap transaction overrides its notification destination to
+`EZKART_MIDTRANS_CLIENT_KEY`, `EZKART_MIDTRANS_SERVER_KEY`,
+`EZKART_BITESHIP_API_KEY`, `EZKART_BITESHIP_ORIGIN_POSTAL_CODE`,
+`EZKART_BITESHIP_ORIGIN_CONTACT_NAME`, `EZKART_BITESHIP_ORIGIN_CONTACT_PHONE`,
+and `EZKART_BITESHIP_ORIGIN_ADDRESS` in the PHP environment. Optional origin
+email/note/organization settings and `EZKART_BITESHIP_COURIERS` can also be set.
+Each Snap transaction overrides its notification destination to
 `https://ezkart.id/cart/api/callback.php`, so the callback does not depend on a
 Dashboard-wide notification setting.
 
@@ -28,7 +35,8 @@ The password-protected order dashboard is available at
 
 The dashboard reads the private JSON order store and displays order IDs,
 customers, line items, product subtotal, shipping charge, final total,
-shipping service, Midtrans reference/status, and signed-notification result. Its
+shipping service, Midtrans reference/status, Biteship fulfillment reference,
+and signed-notification result. Its
 “paid volume” is an aggregate of sandbox orders marked `PAID`; it is not a real
 wallet balance or withdrawable settlement amount.
 

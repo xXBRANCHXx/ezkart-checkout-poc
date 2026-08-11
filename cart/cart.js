@@ -7,12 +7,6 @@
     sambal: { name: "Sambal Roa Signature", price: 46000, weight: 260 },
   };
 
-  const SHIPPING = [
-    { id: "jne-reg", courier: "JNE", service: "REG", days: "2–3 hari", base: 15000 },
-    { id: "sicepat-reg", courier: "SiCepat", service: "REG", days: "1–3 hari", base: 17000 },
-    { id: "jnt-ez", courier: "J&T Express", service: "EZ", days: "2–4 hari", base: 13500 },
-  ];
-
   const state = {
     cart: {},
     customer: {},
@@ -39,6 +33,34 @@
   );
   const shippingPrice = () => state.shipping?.price || 0;
   const total = () => subtotal() + shippingPrice();
+  const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character]);
+  let midtransLoader = null;
+
+  function ensureMidtransSnap() {
+    if (window.snap && typeof window.snap.pay === "function") return Promise.resolve();
+    if (midtransLoader) return midtransLoader;
+    midtransLoader = (async () => {
+      const response = await fetch("api/checkout-config.php", { headers: { Accept: "application/json" }, cache: "no-store" });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.client_key || !String(payload.snap_url).startsWith("https://app.sandbox.midtrans.com/")) {
+        throw new Error(payload.error || "Midtrans Sandbox belum dikonfigurasi.");
+      }
+      await new Promise((resolve, reject) => {
+        const script = document.createElement("script");
+        script.src = payload.snap_url;
+        script.dataset.clientKey = payload.client_key;
+        script.async = true;
+        script.onload = resolve;
+        script.onerror = () => reject(new Error("Midtrans Snap tidak dapat dimuat."));
+        document.head.append(script);
+      });
+      if (!window.snap || typeof window.snap.pay !== "function") throw new Error("Midtrans Snap belum siap.");
+    })().catch((error) => {
+      midtransLoader = null;
+      throw error;
+    });
+    return midtransLoader;
+  }
 
   function showToast(message) {
     const toast = el("toast");
@@ -125,39 +147,47 @@
     return { valid, values };
   }
 
-  function locationMultiplier(location) {
-    const normalized = location.toLowerCase();
-    if (normalized.includes("jakarta") || normalized.includes("depok")) return 1;
-    if (normalized.includes("bandung")) return 1.22;
-    if (normalized.includes("surabaya")) return 1.52;
-    if (normalized.includes("yogyakarta") || normalized.includes("sleman")) return 1.38;
-    if (normalized.includes("bali") || normalized.includes("denpasar")) return 1.72;
-    return 1.3;
-  }
-
-  function buildShippingQuotes() {
-    const multiplier = locationMultiplier(state.customer.location || "");
-    const extraWeight = Math.max(0, Math.ceil(weight() / 1000) - 1) * 4500;
-    const quotes = SHIPPING.map((option) => ({
-      ...option,
-      price: Math.round((option.base * multiplier + extraWeight) / 500) * 500,
-    }));
-
+  async function buildShippingQuotes() {
+    state.shipping = null;
+    state.payment = null;
+    el("payment-section").classList.add("locked");
+    el("pay-button").disabled = true;
     el("quote-location").textContent = `${state.customer.location} · ${(weight() / 1000).toFixed(2)} kg`;
-    el("shipping-options").innerHTML = quotes.map((quote, index) => `
-      <label class="shipping-option">
-        <input type="radio" name="shipping" value="${quote.id}" ${index === 0 ? "checked" : ""} />
-        <span class="courier-mark">${quote.courier.slice(0, 3).toUpperCase()}</span>
-        <span><b>${quote.courier} ${quote.service}</b><small>Estimasi tiba ${quote.days}</small></span>
-        <strong>${rupiah(quote.price)}</strong>
-        <i aria-hidden="true"></i>
-      </label>
-    `).join("");
-
-    selectShipping(quotes[0]);
-    el("shipping-options").querySelectorAll("input").forEach((input) => {
-      input.addEventListener("change", () => selectShipping(quotes.find((quote) => quote.id === input.value)));
-    });
+    el("shipping-options").innerHTML = '<div class="quote-state"><span></span><b>Meminta tarif Biteship Test…</b><small>Tarif dihitung dari kode pos dan berat keranjang.</small></div>';
+    try {
+      const response = await fetch("api/rates.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ cart: state.cart, postal_code: state.customer.postalCode }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || `Biteship error (${response.status}).`);
+      const quotes = Array.isArray(payload.quotes) ? payload.quotes.filter((quote) => quote && quote.id && Number(quote.price) > 0) : [];
+      if (!quotes.length) throw new Error("Biteship tidak menemukan layanan untuk rute ini.");
+      const provider = el("shipping-provider");
+      if (provider) provider.textContent = payload.provider || "Biteship Test";
+      el("shipping-options").innerHTML = quotes.map((quote, index) => `
+        <label class="shipping-option">
+          <input type="radio" name="shipping" value="${escapeHtml(quote.id)}" ${index === 0 ? "checked" : ""} />
+          <span class="courier-mark">${escapeHtml(String(quote.courier).slice(0, 3).toUpperCase())}</span>
+          <span><b>${escapeHtml(quote.courier)} ${escapeHtml(quote.service)}</b><small>Estimasi tiba ${escapeHtml(quote.days)}</small></span>
+          <strong>${rupiah(Number(quote.price))}</strong>
+          <i aria-hidden="true"></i>
+        </label>
+      `).join("");
+      selectShipping(quotes[0]);
+      el("shipping-options").querySelectorAll("input").forEach((input) => {
+        input.addEventListener("change", () => selectShipping(quotes.find((quote) => quote.id === input.value)));
+      });
+      return true;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Tarif Biteship tidak tersedia.";
+      el("shipping-options").innerHTML = `<div class="quote-state error"><b>Tarif pengiriman belum tersedia</b><small>${escapeHtml(message)}</small><button type="button" data-retry-rates>Coba lagi</button></div>`;
+      el("shipping-options").querySelector("[data-retry-rates]")?.addEventListener("click", buildShippingQuotes);
+      showToast(message);
+      renderCart();
+      return false;
+    }
   }
 
   function selectShipping(quote) {
@@ -175,9 +205,7 @@
     button.disabled = true;
     button.textContent = "Membuka Midtrans Snap…";
     try {
-      if (!window.snap || typeof window.snap.pay !== "function") {
-        throw new Error("Midtrans Snap belum siap. Muat ulang halaman dan coba lagi.");
-      }
+      await ensureMidtransSnap();
       const response = await fetch("api/start.php", {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -241,7 +269,7 @@
     button.addEventListener("click", () => setStep(button.dataset.go));
   });
 
-  el("customer-form").addEventListener("submit", (event) => {
+  el("customer-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     const result = validateForm(event.currentTarget);
     if (!result.valid) {
@@ -249,8 +277,8 @@
       return;
     }
     state.customer = result.values;
-    buildShippingQuotes();
     setStep("payment");
+    await buildShippingQuotes();
   });
 
   el("pay-button").addEventListener("click", startMidtransSnap);
@@ -265,5 +293,10 @@
     setStep("cart");
   });
 
+  const requestedProducts = (new URLSearchParams(window.location.search).get("products") || "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter((id, index, values) => PRODUCTS[id] && values.indexOf(id) === index);
+  requestedProducts.forEach((id) => { state.cart[id] = 1; });
   renderCart();
 })();

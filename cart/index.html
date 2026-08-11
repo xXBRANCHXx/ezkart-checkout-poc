@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="Demo sandbox checkout Ezkart: tambah produk, isi alamat, pilih pengiriman, dan selesaikan pembayaran melalui Midtrans Snap Sandbox."
+      content="Demo sandbox checkout Ezkart: tambah produk, dapatkan tarif Biteship Test, dan selesaikan pembayaran melalui Midtrans Snap Sandbox."
     />
     <meta name="theme-color" content="#081424" />
     <meta name="robots" content="index,follow" />
@@ -37,7 +37,7 @@
 
     <div class="sandbox-banner" role="note">
       <span>Mode demonstrasi</span>
-      <p>Checkout Snap dan konfirmasi diproses oleh Midtrans Sandbox. Tidak ada dana nyata yang ditagihkan.</p>
+      <p>Ongkir berasal dari Biteship Test dan pembayaran diproses oleh Midtrans Sandbox. Tidak ada dana nyata yang ditagihkan.</p>
     </div>
 
     <nav class="progress" aria-label="Tahapan checkout">
@@ -191,7 +191,7 @@
           <section class="choice-section" aria-labelledby="shipping-title">
             <div class="choice-heading">
               <div><span>01</span><h2 id="shipping-title">Layanan pengiriman</h2></div>
-              <p id="quote-location">Tujuan belum dipilih</p>
+              <div class="quote-meta"><span id="shipping-provider">Biteship Test</span><p id="quote-location">Tujuan belum dipilih</p></div>
             </div>
             <div class="choice-list" id="shipping-options"></div>
           </section>
@@ -266,15 +266,11 @@
 
     <footer>
       <img src="../assets/ezkart-logo.svg" alt="Ezkart" width="1020" height="420" />
-      <p>Live Midtrans Snap Sandbox checkout for merchant review. No real funds are charged.</p>
+      <p>Biteship Test shipping and Midtrans Snap Sandbox checkout for merchant review. No real funds are charged.</p>
       <a href="../docs/Ezkart-Customer-Checkout-Guide.pdf">Unduh panduan checkout (PDF) ↗</a>
     </footer>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script
-      src="https://app.sandbox.midtrans.com/snap/snap.js"
-      data-client-key="Mid-client-OnwIRh8EQnPVyPlF"
-    ></script>
-    <script src="cart.js?v=midtrans-snap-1"></script>
+    <script src="cart.js?v=biteship-midtrans-3"></script>
   </body>
 </html>

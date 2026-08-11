@@ -275,6 +275,16 @@ input.invalid, textarea.invalid { border-color: #d63425; }
 .shipping-option > strong { font-size: 11px; }
 .shipping-option > i, .payment-option > i { width: 16px; height: 16px; border: 1px solid #bbb8b3; border-radius: 50%; }
 .shipping-option:has(input:checked) > i, .payment-option:has(input:checked) > i { background: radial-gradient(circle, var(--coral) 0 42%, transparent 45%); border-color: var(--coral); }
+.quote-meta { display: flex; align-items: flex-end; flex-direction: column; gap: 4px; }
+.quote-meta > span { padding: 4px 7px; color: #176a48; background: #e9f8f0; border: 1px solid #c7ead8; border-radius: 999px; font-size: 7px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.quote-meta > p { margin: 0; }
+.quote-state { min-height: 96px; padding: 20px; display: grid; place-items: center; align-content: center; gap: 5px; color: #5f6873; background: #fbfaf7; border: 1px dashed #cbc7c0; border-radius: 11px; text-align: center; }
+.quote-state > span { width: 18px; height: 18px; border: 2px solid #ded9d2; border-top-color: var(--coral); border-radius: 50%; animation: quote-spin .75s linear infinite; }
+.quote-state b { color: #2d333b; font-size: 10px; }
+.quote-state small { max-width: 420px; font-size: 8px; line-height: 1.55; }
+.quote-state.error { color: #8d4741; background: #fff7f5; border-color: #edc6c1; }
+.quote-state.error button { height: 32px; margin-top: 5px; padding: 0 13px; color: #fff; background: var(--coral); border: 0; border-radius: 7px; font: 600 8px Poppins, sans-serif; }
+@keyframes quote-spin { to { transform: rotate(360deg); } }
 .midtrans-chip { padding: 6px 8px; color: #6e5500; background: #fff3b7; border: 1px solid #ead777; border-radius: 6px; font-size: 8px; font-weight: 800; text-transform: uppercase; }
 .payment-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .midtrans-handoff { grid-column: 1 / -1; cursor: default; }
