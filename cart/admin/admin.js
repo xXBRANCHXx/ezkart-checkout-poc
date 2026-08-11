@@ -161,12 +161,18 @@
     const inlineEditSnapshots = new WeakMap();
     let selectedSection = "announcement";
     let selectedElement = null;
+    let selectedAction = null;
+    let selectedImage = null;
+    let selectedContent = null;
     let activeDevice = "desktop";
     let draggedSection = "";
     let draggedImage = null;
     let draggedImageSnapshot = null;
     let saveTimer;
     let zoom = 90;
+    let activeSiteKey = sqStudio.querySelector("[data-sq-site].active")?.dataset.siteUrl || "default";
+    let baseSiteState = null;
+    const storageKeyFor = (site = activeSiteKey) => `ezkart:landing-builder:v2:${site}`;
 
     const openSqPanel = (name) => {
       sqStudio.querySelectorAll("[data-sq-tab]").forEach((button) => button.classList.toggle("active", button.dataset.sqTab === name));
@@ -180,7 +186,8 @@
     const previewSnapshotHtml = () => {
       if (!previewRoot) return "";
       const clone = previewRoot.cloneNode(true);
-      clone.querySelectorAll(".sq-element-overlay").forEach((overlay) => overlay.remove());
+      clone.querySelectorAll(".sq-element-overlay, .sq-section-toolbar").forEach((overlay) => overlay.remove());
+      clone.querySelectorAll(".sq-element-selected, .sq-image-selected, .sq-element-animate").forEach((element) => element.classList.remove("sq-element-selected", "sq-image-selected", "sq-element-animate"));
       return clone.innerHTML;
     };
     const captureState = () => ({
@@ -192,6 +199,8 @@
       products: selectedProducts(),
       selectedSection,
       spacing: JSON.stringify([...spacingState.entries()]),
+      catalog: { prices: { ...productPrices }, names: { ...productNames }, images: { ...productImages } },
+      version: 2,
     });
     const updateHistoryButtons = () => {
       if (undoButton) undoButton.disabled = undoStack.length === 0;
@@ -203,11 +212,20 @@
       redoStack.length = 0;
       updateHistoryButtons();
     };
+    const persistCurrentState = () => {
+      try {
+        localStorage.setItem(storageKeyFor(), JSON.stringify(captureState()));
+        return true;
+      } catch (_) {
+        if (saveState) saveState.textContent = "Saved for this session";
+        return false;
+      }
+    };
     const markSqChanged = () => {
       if (!saveState) return;
       saveState.textContent = "Saving…";
       window.clearTimeout(saveTimer);
-      saveTimer = window.setTimeout(() => { saveState.textContent = "Saved just now"; }, 550);
+      saveTimer = window.setTimeout(() => { if (persistCurrentState()) saveState.textContent = "Saved just now"; }, 550);
     };
 
     const formatRupiah = (amount) => `Rp${new Intl.NumberFormat("id-ID").format(amount)}`;
@@ -318,14 +336,67 @@
       frame.onload = () => frame.contentWindow?.postMessage({ type: "ezkart-render-code", html: source }, "*");
       frame.src = `code-preview.php?render=${Date.now()}`;
     };
+    const actionForElement = (element = selectedElement) => {
+      if (selectedAction?.isConnected && element?.contains(selectedAction)) return selectedAction;
+      if (element?.matches("button,a")) return element;
+      return element?.querySelector("button,a") || null;
+    };
+    const imageForElement = (element = selectedElement) => {
+      if (selectedImage?.isConnected && element?.contains(selectedImage)) return selectedImage;
+      if (element?.matches("img")) return element;
+      return element?.querySelector("img") || null;
+    };
+    const inferredActionType = (action) => {
+      if (!action) return "none";
+      if (action.dataset.sqLinkType) return action.dataset.sqLinkType;
+      const href = action.getAttribute("href") || "";
+      if (href.startsWith("#")) return "section";
+      if (href.startsWith("mailto:")) return "email";
+      if (href.startsWith("tel:")) return "phone";
+      if (/checkout|buy now|secure checkout/i.test(action.textContent)) return "checkout";
+      return href ? "url" : "section";
+    };
+    const inferredActionTarget = (action, type = inferredActionType(action)) => {
+      if (!action) return "";
+      if (action.dataset.sqLink != null) return action.dataset.sqLink;
+      const href = action.getAttribute("href") || "";
+      if (type === "section") {
+        if (href) return href.replace(/^#/, "");
+        if (/story|made/i.test(action.textContent)) return "story";
+        if (/delivery|shipping/i.test(action.textContent)) return "shipping";
+        return "products";
+      }
+      if (type === "email") return href.replace(/^mailto:/, "");
+      if (type === "phone") return href.replace(/^tel:/, "");
+      return href;
+    };
+    const imageDefaults = { blur: 0, brightness: 100, contrast: 100, saturate: 100, grayscale: 0, opacity: 100 };
+    const imageFilterValue = (image, name) => Number(image?.dataset[`sqFilter${name[0].toUpperCase()}${name.slice(1)}`] ?? imageDefaults[name]);
+    const applySelectedImageFilters = (image = imageForElement()) => {
+      if (!image) return;
+      image.style.filter = `blur(${imageFilterValue(image, "blur")}px) brightness(${imageFilterValue(image, "brightness")}%) contrast(${imageFilterValue(image, "contrast")}%) saturate(${imageFilterValue(image, "saturate")}%) grayscale(${imageFilterValue(image, "grayscale")}%) opacity(${imageFilterValue(image, "opacity")}%)`;
+    };
     const syncElementControls = () => {
       const controls = sqStudio.querySelector("[data-sq-element-controls]");
       const valid = selectedElement?.isConnected && selectedElement.closest(`[data-section-id="${selectedSection}"]`);
       if (controls) controls.hidden = !valid;
-      if (!valid) return;
+      inspector?.classList.toggle("element-selected", Boolean(valid));
+      if (!valid) {
+        const context = sqStudio.querySelector("[data-sq-inspector-context]");
+        if (context) context.textContent = "Selected section";
+        return;
+      }
       const layout = parseElementLayout(selectedElement);
       const type = sqStudio.querySelector(".sq-element-controls [data-sq-element-type]");
-      if (type) type.textContent = elementTypeName(selectedElement);
+      const action = actionForElement();
+      const image = imageForElement();
+      const contentName = selectedContent?.matches("h1,h2,h3") ? "Heading" : selectedContent ? "Text" : "";
+      const contextualName = selectedAction && action ? "Button" : selectedImage && image ? "Image" : contentName || elementTypeName(selectedElement);
+      if (type) type.textContent = contextualName;
+      const context = sqStudio.querySelector("[data-sq-inspector-context]");
+      const title = sqStudio.querySelector("[data-sq-inspector-title]");
+      if (context) context.textContent = "Selected element";
+      if (title) title.textContent = contextualName;
       [["x", layout.x], ["y", layout.y], ["w", layout.width], ["h", layout.height]].forEach(([field, value]) => {
         const input = sqStudio.querySelector(`[data-sq-element-${field}]`);
         if (input) input.value = String(value);
@@ -345,8 +416,24 @@
       if (radiusInput) radiusInput.value = String(radius);
       if (radiusOutput) radiusOutput.textContent = `${radius}px`;
       const buttonControls = sqStudio.querySelector("[data-sq-element-button-controls]");
-      const hasButton = selectedElement.matches("button") || Boolean(selectedElement.querySelector("button"));
+      const hasButton = Boolean(action);
       if (buttonControls) buttonControls.hidden = !hasButton;
+      if (hasButton) {
+        const linkType = inferredActionType(action);
+        const link = inferredActionTarget(action, linkType);
+        const labelInput = sqStudio.querySelector("[data-sq-button-label]");
+        const typeInput = sqStudio.querySelector("[data-sq-button-link-type]");
+        const linkInput = sqStudio.querySelector("[data-sq-button-link]");
+        const linkWrap = sqStudio.querySelector("[data-sq-button-link-wrap]");
+        const linkLabel = sqStudio.querySelector("[data-sq-button-link-label]");
+        const newTab = sqStudio.querySelector("[data-sq-button-new-tab]");
+        if (labelInput) labelInput.value = action.textContent.trim();
+        if (typeInput) typeInput.value = linkType;
+        if (linkInput) linkInput.value = link;
+        if (linkWrap) linkWrap.hidden = ["checkout", "none"].includes(linkType);
+        if (linkLabel) linkLabel.textContent = ({ section: "Section ID", url: "Web address", email: "Email address", phone: "Phone number" })[linkType] || "Destination";
+        if (newTab) { newTab.checked = action.dataset.sqNewTab === "true" || action.target === "_blank"; newTab.closest("label").hidden = linkType !== "url"; }
+      }
       const buttonRole = selectedElement.dataset.sqButtonRole || "primary";
       sqStudio.querySelectorAll("[data-sq-role-choice]").forEach((button) => button.classList.toggle("active", button.dataset.sqRoleChoice === buttonRole));
       const animation = sqStudio.querySelector("[data-sq-element-animation-control]");
@@ -366,6 +453,35 @@
       if (codeControls) codeControls.hidden = !isCode;
       const codeInput = sqStudio.querySelector("[data-sq-code-input]");
       if (isCode && codeInput) codeInput.value = codeSourceFor(selectedElement);
+      const textControls = sqStudio.querySelector("[data-sq-element-text-controls]");
+      const textTarget = selectedContent?.isConnected && selectedElement.contains(selectedContent) && !selectedAction ? selectedContent : null;
+      if (textControls) textControls.hidden = !textTarget;
+      if (textTarget) {
+        const textInput = sqStudio.querySelector("[data-sq-element-text]");
+        const textLabel = sqStudio.querySelector("[data-sq-element-text-label]");
+        if (textInput) textInput.value = textTarget.textContent.trim();
+        if (textLabel) textLabel.textContent = textTarget.matches("h1,h2,h3") ? "Heading" : textTarget.matches("a") ? "Link label" : "Text content";
+      }
+      const imageControls = sqStudio.querySelector("[data-sq-image-controls]");
+      if (imageControls) imageControls.hidden = !image;
+      if (image) {
+        const srcInput = sqStudio.querySelector("[data-sq-image-src]");
+        const altInput = sqStudio.querySelector("[data-sq-image-alt]");
+        const fitInput = sqStudio.querySelector("[data-sq-image-fit]");
+        const positionInput = sqStudio.querySelector("[data-sq-image-position]");
+        if (srcInput) srcInput.value = image.getAttribute("src") || "";
+        if (altInput) altInput.value = image.getAttribute("alt") || "";
+        if (fitInput) fitInput.value = image.style.objectFit || getComputedStyle(image).objectFit || "cover";
+        const position = image.style.objectPosition || getComputedStyle(image).objectPosition || "center";
+        if (positionInput) positionInput.value = ["center", "top", "bottom", "left", "right"].includes(position) ? position : "center";
+        sqStudio.querySelectorAll("[data-sq-image-filter]").forEach((input) => {
+          const name = input.dataset.sqImageFilter;
+          const value = imageFilterValue(image, name);
+          input.value = String(value);
+          const output = sqStudio.querySelector(`[data-sq-image-output="${name}"]`);
+          if (output) output.textContent = `${value}${name === "blur" ? "px" : "%"}`;
+        });
+      }
     };
     const removeElementOverlay = () => previewRoot?.querySelectorAll(".sq-element-overlay").forEach((overlay) => overlay.remove());
     const refreshElementOverlay = () => {
@@ -389,9 +505,13 @@
       bindElementPointerControl(overlay.querySelector("[data-sq-element-move]"), false);
       bindElementPointerControl(overlay.querySelector("[data-sq-element-resize]"), true);
     };
-    const selectSqElement = (element) => {
+    const selectSqElement = (element, action = null, image = null, content = null) => {
       if (!element?.matches("[data-sq-element]")) return;
       selectedElement = element;
+      selectedAction = action?.matches?.("button,a") && element.contains(action) ? action : null;
+      selectedImage = image?.matches?.("img") && element.contains(image) ? image : null;
+      selectedContent = content?.matches?.("[data-sq-editable]") && element.contains(content) ? content : null;
+      removeSectionToolbar();
       previewRoot?.querySelectorAll(".sq-element-selected").forEach((item) => item.classList.remove("sq-element-selected"));
       element.classList.add("sq-element-selected");
       syncElementControls();
@@ -419,6 +539,9 @@
       const section = selectedElement.closest("[data-sq-fluid]");
       selectedElement.remove();
       selectedElement = null;
+      selectedAction = null;
+      selectedImage = null;
+      selectedContent = null;
       removeElementOverlay();
       applyFluidSection(section);
       syncElementControls();
@@ -512,6 +635,7 @@
       ".sq-free-heading>h2", ".sq-free-text>p", ".sq-free-button>button", ".sq-free-form>h3", ".sq-free-form>p",
       ".sq-template-story-copy>span", ".sq-template-story-copy>h2", ".sq-template-story-copy>p", ".sq-template-story-copy>button",
       ".sq-template-manifesto>b", ".sq-template-manifesto>small",
+      ".sq-template-proof-heading>small", ".sq-template-proof-heading>h2", ".sq-template-proof-heading>p",
     ].join(",");
     const editableNodesFor = (block) => block ? [...block.querySelectorAll(editableContentSelector)].filter((node) => !node.closest(".sq-image-drag-handle")) : [];
     const contentFieldLabel = (node, index) => {
@@ -564,7 +688,21 @@
         fields.append(label);
       });
     };
-    const selectSqSection = (sectionId) => {
+    const removeSectionToolbar = () => previewRoot?.querySelectorAll(".sq-section-toolbar").forEach((toolbar) => toolbar.remove());
+    const refreshSectionToolbar = () => {
+      removeSectionToolbar();
+      if (selectedElement?.isConnected) return;
+      const block = previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`);
+      if (!block) return;
+      const toolbar = document.createElement("div");
+      toolbar.className = "sq-section-toolbar";
+      toolbar.innerHTML = `<span>${iconMarkup("layers")} ${escapeHtml(sectionNames[selectedSection] || "Section")}</span><button type="button" data-sq-toolbar-duplicate>${iconMarkup("layers")} Duplicate</button><button type="button" data-sq-toolbar-delete>${iconMarkup("x")} Delete</button>`;
+      toolbar.onclick = (event) => event.stopPropagation();
+      toolbar.querySelector("[data-sq-toolbar-duplicate]").onclick = () => sqStudio.querySelector("[data-sq-duplicate]")?.click();
+      toolbar.querySelector("[data-sq-toolbar-delete]").onclick = () => sqStudio.querySelector("[data-sq-delete]")?.click();
+      block.append(toolbar);
+    };
+    const selectSqSection = (sectionId, focusSection = false) => {
       selectedSection = sectionId;
       sqStudio.classList.remove("mobile-panel-open");
       sqStudio.classList.remove("inspector-closed");
@@ -575,8 +713,11 @@
       const layerTitle = sqStudio.querySelector(`[data-sq-layer][data-section-id="${sectionId}"] b`)?.textContent;
       if (title) title.textContent = layerTitle || sectionNames[sectionId] || "Section";
       const block = previewRoot?.querySelector(`[data-section-id="${sectionId}"]`);
-      if (selectedElement && !block?.contains(selectedElement)) {
+      if (selectedElement && (focusSection || !block?.contains(selectedElement))) {
         selectedElement = null;
+        selectedAction = null;
+        selectedImage = null;
+        selectedContent = null;
         previewRoot?.querySelectorAll(".sq-element-selected").forEach((item) => item.classList.remove("sq-element-selected"));
         removeElementOverlay();
       }
@@ -599,6 +740,7 @@
       syncInspectorContent();
       syncElementControls();
       if (selectedElement) requestAnimationFrame(refreshElementOverlay);
+      else requestAnimationFrame(refreshSectionToolbar);
     };
 
     const reorderSection = (dragId, targetId, placeAfter) => {
@@ -642,12 +784,22 @@
           element.dataset.sqButtonRole = element.dataset.sqElementType === "navigation" ? "secondary" : "primary";
           element.classList.add(`button-${element.dataset.sqButtonRole}`);
         }
+        if (element.dataset.sqElementType !== "product-grid") {
+          const actions = element.matches("button,a") ? [element] : [...element.querySelectorAll("button,a")];
+          actions.forEach((action) => {
+            if (!action.dataset.sqLinkType) action.dataset.sqLinkType = inferredActionType(action);
+            if (action.dataset.sqLink == null) action.dataset.sqLink = inferredActionTarget(action, action.dataset.sqLinkType);
+            if (action.dataset.sqNewTab == null) action.dataset.sqNewTab = String(action.target === "_blank");
+          });
+        }
         element.draggable = false;
         element.onclick = (event) => {
           event.stopPropagation();
           const section = element.closest("[data-section-id]");
           if (section) selectSqSection(section.dataset.sectionId);
-          selectSqElement(element);
+          const action = event.target.closest?.("button,a");
+          const image = event.target.closest?.("img");
+          selectSqElement(element, action, image);
         };
       });
       previewRoot?.querySelectorAll("[data-sq-image-list]").forEach((list) => {
@@ -661,7 +813,7 @@
             event.stopPropagation();
             const section = item.closest("[data-section-id]");
             if (section) selectSqSection(section.dataset.sectionId);
-            selectSqElement(item.closest("[data-sq-element]"));
+            selectSqElement(item.closest("[data-sq-element]"), null, item.querySelector("img"));
             previewRoot.querySelectorAll(".sq-image-selected").forEach((image) => image.classList.remove("sq-image-selected"));
             item.classList.add("sq-image-selected");
           };
@@ -729,7 +881,7 @@
             event.stopPropagation();
             if (content.matches("a,button")) event.preventDefault();
             selectSqSection(block.dataset.sectionId);
-            selectSqElement(content.closest("[data-sq-element]"));
+            selectSqElement(content.closest("[data-sq-element]"), content.matches("button,a") ? content : null, null, content);
           };
           content.ondragstart = (event) => event.stopPropagation();
           content.onfocus = startInlineEdit;
@@ -764,16 +916,24 @@
     const restoreState = (state) => {
       if (!previewRoot || !layerList) return;
       selectedElement = null;
+      selectedAction = null;
+      selectedImage = null;
+      selectedContent = null;
       previewRoot.innerHTML = state.preview;
       previewRoot.className = state.previewClass;
       if (state.previewStyle) previewRoot.setAttribute("style", state.previewStyle); else previewRoot.removeAttribute("style");
       layerList.innerHTML = state.layers;
       const productPicker = sqStudio.querySelector(".sq-product-picker");
       if (productPicker && typeof state.productPicker === "string") productPicker.innerHTML = state.productPicker;
+      if (state.catalog) {
+        Object.assign(productPrices, state.catalog.prices || {});
+        Object.assign(productNames, state.catalog.names || {});
+        Object.assign(productImages, state.catalog.images || {});
+      }
       sqStudio.querySelectorAll("[data-sq-product]").forEach(bindSqProductInput);
       sqStudio.querySelectorAll("[data-sq-product]").forEach((input) => { input.checked = state.products.includes(input.value); });
       spacingState.clear();
-      JSON.parse(state.spacing || "[]").forEach(([key, value]) => spacingState.set(key, value));
+      try { JSON.parse(state.spacing || "[]").forEach(([key, value]) => spacingState.set(key, value)); } catch (_) { spacingState.clear(); }
       bindSqInteractions();
       updateProductView();
       selectSqSection(state.selectedSection || "hero");
@@ -956,6 +1116,117 @@
       ["color", "backgroundColor", "border", "borderColor", "borderRadius", "textAlign", "boxShadow", "backdropFilter"].forEach((property) => { selectedElement.style[property] = ""; });
       selectedElement.classList.remove("sq-surface-soft", "sq-surface-card", "sq-surface-outline", "sq-surface-glass");
       delete selectedElement.dataset.sqSurface; delete selectedElement.dataset.sqAlign; syncElementControls(); markSqChanged();
+    });
+    sqStudio.querySelector("[data-sq-select-section]")?.addEventListener("click", () => selectSqSection(selectedSection, true));
+
+    let textControlSnapshot;
+    sqStudio.querySelector("[data-sq-element-text]")?.addEventListener("focus", () => { textControlSnapshot = captureState(); });
+    sqStudio.querySelector("[data-sq-element-text]")?.addEventListener("input", (event) => {
+      if (!selectedContent?.isConnected) return;
+      selectedContent.textContent = event.currentTarget.value;
+      const sectionField = sqStudio.querySelector(`[data-sq-content-field="${selectedContent.dataset.sqEditable}"]`);
+      if (sectionField) sectionField.value = event.currentTarget.value;
+      refreshElementOverlay(); markSqChanged();
+    });
+    sqStudio.querySelector("[data-sq-element-text]")?.addEventListener("change", () => { if (textControlSnapshot) remember(textControlSnapshot); textControlSnapshot = null; });
+
+    let actionControlSnapshot;
+    const startActionEdit = () => { if (!actionControlSnapshot) actionControlSnapshot = captureState(); };
+    const finishActionEdit = () => { if (actionControlSnapshot) remember(actionControlSnapshot); actionControlSnapshot = null; syncInspectorContent(); };
+    const applyActionSettings = () => {
+      const action = actionForElement();
+      if (!action) return;
+      const type = sqStudio.querySelector("[data-sq-button-link-type]")?.value || "none";
+      const target = sqStudio.querySelector("[data-sq-button-link]")?.value.trim() || "";
+      const newTab = Boolean(sqStudio.querySelector("[data-sq-button-new-tab]")?.checked);
+      action.dataset.sqLinkType = type;
+      action.dataset.sqLink = target;
+      action.dataset.sqNewTab = String(newTab);
+      let href = "";
+      if (type === "section") href = `#${target.replace(/^#/, "") || "products"}`;
+      if (type === "url") href = target;
+      if (type === "email") href = `mailto:${target}`;
+      if (type === "phone") href = `tel:${target}`;
+      if (action.matches("a")) {
+        if (href) action.setAttribute("href", href); else action.removeAttribute("href");
+        if (newTab && type === "url") { action.target = "_blank"; action.rel = "noopener"; }
+        else { action.removeAttribute("target"); action.removeAttribute("rel"); }
+      }
+      syncElementControls();
+      markSqChanged();
+    };
+    sqStudio.querySelector("[data-sq-button-label]")?.addEventListener("focus", startActionEdit);
+    sqStudio.querySelector("[data-sq-button-label]")?.addEventListener("input", (event) => {
+      const action = actionForElement();
+      if (!action) return;
+      action.textContent = event.currentTarget.value;
+      markSqChanged();
+    });
+    sqStudio.querySelector("[data-sq-button-label]")?.addEventListener("change", finishActionEdit);
+    sqStudio.querySelector("[data-sq-button-link-type]")?.addEventListener("change", (event) => { startActionEdit(); applyActionSettings(); finishActionEdit(); });
+    sqStudio.querySelector("[data-sq-button-link]")?.addEventListener("focus", startActionEdit);
+    sqStudio.querySelector("[data-sq-button-link]")?.addEventListener("input", applyActionSettings);
+    sqStudio.querySelector("[data-sq-button-link]")?.addEventListener("change", finishActionEdit);
+    sqStudio.querySelector("[data-sq-button-new-tab]")?.addEventListener("change", () => { startActionEdit(); applyActionSettings(); finishActionEdit(); });
+
+    let imageControlSnapshot;
+    const startImageEdit = () => { if (!imageControlSnapshot) imageControlSnapshot = captureState(); };
+    const finishImageEdit = () => { if (imageControlSnapshot) remember(imageControlSnapshot); imageControlSnapshot = null; };
+    const updateImageTextSetting = (selector, attribute) => {
+      sqStudio.querySelector(selector)?.addEventListener("focus", startImageEdit);
+      sqStudio.querySelector(selector)?.addEventListener("change", (event) => {
+        const image = imageForElement();
+        if (!image) return;
+        image.setAttribute(attribute, event.currentTarget.value.trim());
+        finishImageEdit(); markSqChanged();
+      });
+    };
+    updateImageTextSetting("[data-sq-image-src]", "src");
+    updateImageTextSetting("[data-sq-image-alt]", "alt");
+    [["[data-sq-image-fit]", "objectFit"], ["[data-sq-image-position]", "objectPosition"]].forEach(([selector, property]) => {
+      sqStudio.querySelector(selector)?.addEventListener("change", (event) => {
+        const image = imageForElement();
+        if (!image) return;
+        remember(); image.style[property] = event.currentTarget.value; markSqChanged();
+      });
+    });
+    sqStudio.querySelectorAll("[data-sq-image-filter]").forEach((input) => {
+      input.addEventListener("pointerdown", startImageEdit);
+      input.addEventListener("focus", startImageEdit);
+      input.addEventListener("input", () => {
+        const image = imageForElement();
+        if (!image) return;
+        const name = input.dataset.sqImageFilter;
+        image.dataset[`sqFilter${name[0].toUpperCase()}${name.slice(1)}`] = input.value;
+        applySelectedImageFilters(image);
+        const output = sqStudio.querySelector(`[data-sq-image-output="${name}"]`);
+        if (output) output.textContent = `${input.value}${name === "blur" ? "px" : "%"}`;
+        markSqChanged();
+      });
+      input.addEventListener("change", finishImageEdit);
+    });
+    sqStudio.querySelector("[data-sq-image-upload]")?.addEventListener("change", (event) => {
+      const image = imageForElement();
+      const file = event.currentTarget.files?.[0];
+      if (!image || !file) return;
+      if (file.size > 8 * 1024 * 1024) { showToast("Choose an image smaller than 8 MB"); event.currentTarget.value = ""; return; }
+      const snapshot = captureState();
+      const reader = new FileReader();
+      reader.onload = () => {
+        image.src = String(reader.result || "");
+        image.alt = image.alt || file.name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ");
+        remember(snapshot); syncElementControls(); markSqChanged(); showToast("Image replaced — effects stay editable");
+      };
+      reader.readAsDataURL(file);
+      event.currentTarget.value = "";
+    });
+    sqStudio.querySelector("[data-sq-image-reset]")?.addEventListener("click", () => {
+      const image = imageForElement();
+      if (!image) return;
+      remember();
+      Object.keys(imageDefaults).forEach((name) => { delete image.dataset[`sqFilter${name[0].toUpperCase()}${name.slice(1)}`]; });
+      image.style.filter = ""; image.style.objectFit = ""; image.style.objectPosition = "";
+      syncElementControls(); markSqChanged();
     });
     sqStudio.querySelectorAll("[data-sq-role-choice]").forEach((button) => button.addEventListener("click", () => {
       if (!selectedElement?.isConnected) return;
@@ -1169,7 +1440,7 @@
       const source = previewRoot?.querySelector(`[data-section-id="${sectionId}"]`);
       if (!source) return "";
       const clone = source.cloneNode(true);
-      clone.querySelectorAll(".sq-element-overlay").forEach((node) => node.remove());
+      clone.querySelectorAll(".sq-element-overlay, .sq-section-toolbar").forEach((node) => node.remove());
       clone.classList.remove("selected", "section-hidden");
       clone.querySelectorAll(":scope > [data-sq-element]").forEach((element, index) => {
         [...element.classList].filter((name) => name.startsWith("element-animation-") || name.startsWith("hover-")).forEach((name) => element.classList.remove(name));
@@ -1196,14 +1467,16 @@
       const hero = `<section class="sq-page-block sq-hero sq-template-hero sq-template-${config.mode}" draggable="true" data-sq-block data-sq-fluid data-sq-rows="15" data-section-id="hero">${templateHandle("hero")}<div class="sq-template-media sq-free-image element-animation-scale hover-${config.hover}" data-sq-element data-sq-element-type="image" data-sq-element-animation="scale" data-sq-hover="${config.hover}" data-layout-desktop="${layout.image}" data-layout-tablet="${layout.tabletImage}" data-layout-mobile="1,1,12,15"><img src="${config.image}" alt="${escapeHtml(config.name)} campaign" style="object-position:${imagePosition}"></div><div class="sq-hero-copy sq-template-copy${heroTextClass} button-primary element-animation-${config.entrance}" data-sq-element data-sq-element-type="copy" data-sq-button-role="primary" data-sq-element-animation="${config.entrance}" data-sq-hover="none" data-layout-desktop="${layout.copy}" data-layout-tablet="${layout.tabletCopy}" data-layout-mobile="1,8,12,8"><span>${escapeHtml(config.kicker)}</span><h1>${escapeHtml(config.headline)}</h1><p>${escapeHtml(config.body)}</p><div><button type="button">${escapeHtml(config.cta)}</button><small>${iconMarkup("shield")} Secure checkout by Ezkart</small></div></div></section>`;
       const story = `<section class="sq-page-block sq-template-story" draggable="true" data-sq-block data-sq-fluid data-sq-rows="11" data-section-id="image-story">${templateHandle("story")}<div class="sq-template-story-copy element-animation-slide-left" data-sq-element data-sq-element-type="copy" data-sq-element-animation="slide-left" data-sq-hover="none" data-layout-desktop="1,2,8,9" data-layout-tablet="1,1,12,7" data-layout-mobile="1,1,12,7"><span>OUR POINT OF VIEW</span><h2>${escapeHtml(config.story)}</h2><p>${escapeHtml(config.storyBody)}</p><button class="button-tertiary" type="button">Read our story</button></div><aside class="sq-template-manifesto sq-surface-card element-animation-rise hover-lift" data-sq-element data-sq-element-type="content" data-sq-element-animation="rise" data-sq-hover="lift" data-layout-desktop="9,2,4,9" data-layout-tablet="1,8,12,4" data-layout-mobile="1,8,12,4"><strong>01</strong><b>Designed locally</b><small>Built for independent Indonesian brands and their customers.</small></aside></section>`;
       const benefits = `<section class="sq-page-block sq-benefit-row sq-template-benefits" draggable="true" data-sq-block data-sq-fluid data-sq-rows="6" data-section-id="benefits">${templateHandle("benefits")}<article class="element-animation-rise hover-lift" style="--element-delay:0ms" data-sq-element data-sq-element-type="benefit" data-sq-element-animation="rise" data-sq-hover="lift" data-layout-desktop="1,1,4,6" data-layout-tablet="1,1,4,6" data-layout-mobile="1,1,12,2">${iconMarkup("star")}<div><b>Thoughtful by default</b><small>Clear details and deliberate design</small></div></article><article class="element-animation-rise hover-lift" style="--element-delay:140ms" data-sq-element data-sq-element-type="benefit" data-sq-element-animation="rise" data-sq-hover="lift" data-layout-desktop="5,1,4,6" data-layout-tablet="5,1,4,6" data-layout-mobile="1,3,12,2">${iconMarkup("credit-card")}<div><b>Secure payment</b><small>Midtrans-ready checkout built in</small></div></article><article class="element-animation-rise hover-lift" style="--element-delay:280ms" data-sq-element data-sq-element-type="benefit" data-sq-element-animation="rise" data-sq-hover="lift" data-layout-desktop="9,1,4,6" data-layout-tablet="9,1,4,6" data-layout-mobile="1,5,12,2">${iconMarkup("truck")}<div><b>Delivery connected</b><small>Rates, couriers, and ETA included</small></div></article></section>`;
+      const reviews = `<section class="sq-page-block sq-generated-reviews sq-template-proof" draggable="true" data-sq-block data-sq-fluid data-sq-rows="9" data-section-id="reviews">${templateHandle("reviews")}<div class="sq-template-proof-heading element-animation-fade" data-sq-element data-sq-element-type="copy" data-sq-element-animation="fade" data-sq-hover="none" data-layout-desktop="1,1,4,9" data-layout-tablet="1,1,12,3" data-layout-mobile="1,1,12,3"><small>Loved by customers</small><h2>Proof that feels human.</h2><p>Specific, credible social proof close to the buying decision.</p></div><article class="element-animation-rise hover-lift" data-sq-element data-sq-element-type="review" data-sq-element-animation="rise" data-sq-hover="lift" data-layout-desktop="5,1,4,9" data-layout-tablet="1,4,6,6" data-layout-mobile="1,4,12,5"><span>★★★★★</span><b>“The quality was obvious from the first use.”</b><small>Nadia · verified customer</small></article><article class="element-animation-rise hover-lift" style="--element-delay:140ms" data-sq-element data-sq-element-type="review" data-sq-element-animation="rise" data-sq-hover="lift" data-layout-desktop="9,1,4,9" data-layout-tablet="7,4,6,6" data-layout-mobile="1,9,12,5"><span>★★★★★</span><b>“Beautifully packed and genuinely easy to order.”</b><small>Raka · verified customer</small></article></section>`;
+      const faq = `<section class="sq-page-block sq-generated-faq sq-template-faq" draggable="true" data-sq-block data-sq-fluid data-sq-rows="12" data-section-id="faq">${templateHandle("FAQ")}<h2 class="element-animation-fade" data-sq-element data-sq-element-type="heading" data-sq-element-animation="fade" data-sq-hover="none" data-layout-desktop="1,1,5,5" data-layout-tablet="1,1,12,3" data-layout-mobile="1,1,12,3">Everything you need to order confidently.</h2><details open data-sq-element data-sq-element-type="faq" data-layout-desktop="7,1,6,4" data-layout-tablet="1,4,12,3" data-layout-mobile="1,4,12,3"><summary>How does payment work?</summary><p>Checkout is secured by Midtrans and connected directly to this page.</p></details><details data-sq-element data-sq-element-type="faq" data-layout-desktop="7,5,6,4" data-layout-tablet="1,7,12,3" data-layout-mobile="1,7,12,3"><summary>When will my order arrive?</summary><p>Live courier options, price, and estimated delivery time appear at checkout.</p></details><details data-sq-element data-sq-element-type="faq" data-layout-desktop="7,9,6,4" data-layout-tablet="1,10,12,3" data-layout-mobile="1,10,12,3"><summary>Can I buy more than one item?</summary><p>Yes. Build a basket from any connected products and pay once.</p></details></section>`;
       const announcement = `<section class="sq-page-block sq-announcement" draggable="true" data-sq-block data-sq-fluid data-sq-rows="2" data-section-id="announcement">${templateHandle("announcement")}<p class="element-animation-fade" data-sq-element data-sq-element-type="text" data-sq-element-animation="fade" data-sq-hover="none" data-layout-desktop="1,1,12,2" data-layout-tablet="1,1,12,2" data-layout-mobile="1,1,12,2">${escapeHtml(config.announcement)}</p></section>`;
       const navigation = `<nav class="sq-page-block sq-store-nav" draggable="true" data-sq-block data-sq-fluid data-sq-rows="2" data-section-id="navigation">${templateHandle("navigation")}<b class="element-animation-fade" data-sq-element data-sq-element-type="brand" data-sq-element-animation="fade" data-sq-hover="none" data-layout-desktop="1,1,4,2" data-layout-tablet="1,1,4,2" data-layout-mobile="1,1,6,2">${escapeHtml(config.brand)}</b><div class="button-secondary element-animation-fade" data-sq-element data-sq-element-type="navigation" data-sq-button-role="secondary" data-sq-element-animation="fade" data-sq-hover="none" data-layout-desktop="7,1,6,2" data-layout-tablet="6,1,7,2" data-layout-mobile="7,1,6,2"><a href="#products">Shop</a><a href="#story">Story</a><a href="#shipping">Delivery</a><button type="button">Buy now</button></div></nav>`;
       let responsiveHero = overlay ? hero : hero.replace('data-layout-mobile="1,1,12,15"', 'data-layout-mobile="1,1,12,7"');
       const linkedStory = story.replace('<section class="', '<section id="story" class="').replace('sq-template-story-copy element-animation', 'sq-template-story-copy button-tertiary element-animation').replace('data-sq-element data-sq-element-type="copy"', 'data-sq-element data-sq-element-type="copy" data-sq-button-role="tertiary"').replace('<button class="button-tertiary"', '<button');
-      return `${announcement}${navigation}${responsiveHero}${linkedStory}${commerceSectionMarkup("products", "rise", config.hover)}${benefits}${commerceSectionMarkup("checkout", config.entrance, "lift")}${commerceSectionMarkup("shipping", "fade", "none")}`;
+      return `${announcement}${navigation}${responsiveHero}${linkedStory}${commerceSectionMarkup("products", "rise", config.hover)}${reviews}${benefits}${faq}${commerceSectionMarkup("checkout", config.entrance, "lift")}${commerceSectionMarkup("shipping", "fade", "none")}`;
     };
     const layerDetails = {
-      announcement: ["Announcement", "Promotional message", "message"], navigation: ["Navigation", "Brand, links, and button", "layout"], hero: ["Hero", "Image, copy, and motion", "layout"], products: ["Product collection", "Connected commerce grid", "box"], "image-story": ["Brand story", "Editorial content", "image"], benefits: ["Benefits", "Three trust points", "star"], checkout: ["Checkout", "Midtrans cart action", "credit-card"], shipping: ["Shipping", "Courier and ETA", "truck"],
+      announcement: ["Announcement", "Promotional message", "message"], navigation: ["Navigation", "Brand, links, and button", "layout"], hero: ["Hero", "Image, copy, and motion", "layout"], products: ["Product collection", "Connected commerce grid", "box"], "image-story": ["Brand story", "Editorial content", "image"], reviews: ["Customer proof", "Conversion-focused reviews", "star"], benefits: ["Benefits", "Three trust points", "star"], faq: ["FAQ", "Purchase objections answered", "help"], checkout: ["Checkout", "Midtrans cart action", "credit-card"], shipping: ["Shipping", "Courier and ETA", "truck"],
     };
     const rebuildLayerList = () => {
       if (!layerList) return;
@@ -1222,7 +1495,7 @@
     sqStudio.querySelectorAll("[data-sq-template]").forEach((button) => button.addEventListener("click", () => {
       const config = templateCatalog[button.dataset.sqTemplate];
       if (!config || !previewRoot) return;
-      remember(); selectedElement = null; removeElementOverlay();
+      remember(); selectedElement = null; selectedAction = null; selectedImage = null; selectedContent = null; removeElementOverlay(); removeSectionToolbar();
       previewRoot.innerHTML = makeTemplateMarkup(config, button.dataset.sqTemplate);
       previewRoot.className = `sq-page-preview radius-soft layout-rich template-${button.dataset.sqTemplate}`;
       previewRoot.setAttribute("style", `--site-accent:${config.accent};--site-page:${config.page};--site-ink:${config.ink};--site-surface:${config.surface};--button-primary-bg:${config.accent};--button-primary-fg:${config.mode === "image-led" ? "#171717" : "#ffffff"};--button-primary-border:${config.accent};--button-primary-radius:12px;--button-secondary-bg:${config.surface};--button-secondary-fg:${config.ink};--button-secondary-border:${config.ink};--button-secondary-radius:12px;--button-tertiary-bg:transparent;--button-tertiary-fg:${config.accent};--button-tertiary-border:transparent;--button-tertiary-radius:0px`);
@@ -1334,17 +1607,18 @@
 
     sqStudio.querySelector("[data-sq-duplicate]")?.addEventListener("click", () => {
       const block = previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`); const layer = layerList?.querySelector(`[data-section-id="${selectedSection}"]`); if (!block || !layer) return;
-      remember(); const newId = `${selectedSection}-copy-${Date.now()}`; const blockCopy = block.cloneNode(true); const layerCopy = layer.cloneNode(true); blockCopy.dataset.sectionId = newId; layerCopy.dataset.sectionId = newId; blockCopy.classList.remove("selected"); layerCopy.classList.remove("active"); const title = layerCopy.querySelector("b"); if (title) title.textContent = `${title.textContent} copy`; block.after(blockCopy); layer.after(layerCopy); bindSqInteractions(); selectSqSection(newId); markSqChanged();
+      remember(); const newId = `${selectedSection}-copy-${Date.now()}`; const blockCopy = block.cloneNode(true); const layerCopy = layer.cloneNode(true); blockCopy.querySelectorAll(".sq-section-toolbar, .sq-element-overlay").forEach((node) => node.remove()); blockCopy.dataset.sectionId = newId; layerCopy.dataset.sectionId = newId; blockCopy.classList.remove("selected"); layerCopy.classList.remove("active"); const title = layerCopy.querySelector("b"); if (title) title.textContent = `${title.textContent} copy`; block.after(blockCopy); layer.after(layerCopy); bindSqInteractions(); selectSqSection(newId, true); markSqChanged();
     });
     sqStudio.querySelector("[data-sq-visibility]")?.addEventListener("click", () => {
       const block = previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`); const layer = layerList?.querySelector(`[data-section-id="${selectedSection}"]`); if (!block || !layer) return;
       remember(); const hidden = !block.classList.contains("section-hidden"); block.classList.toggle("section-hidden", hidden); layer.classList.toggle("section-hidden", hidden); selectSqSection(selectedSection); markSqChanged();
     });
-    sqStudio.querySelector("[data-sq-delete]")?.addEventListener("click", () => {
+    const deleteSelectedSection = () => {
       if ((previewRoot?.querySelectorAll("[data-sq-block]").length || 0) <= 1) { showToast("A page needs at least one section"); return; }
       const block = previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`); const layer = layerList?.querySelector(`[data-section-id="${selectedSection}"]`); if (!block || !layer) return;
-      remember(); const next = layer.nextElementSibling?.dataset.sectionId || layer.previousElementSibling?.dataset.sectionId; block.remove(); layer.remove(); bindSqInteractions(); if (next) selectSqSection(next); markSqChanged(); showToast("Section removed — Undo is available");
-    });
+      remember(); const next = layer.nextElementSibling?.dataset.sectionId || layer.previousElementSibling?.dataset.sectionId; selectedElement = null; selectedAction = null; selectedImage = null; selectedContent = null; block.remove(); layer.remove(); bindSqInteractions(); if (next) selectSqSection(next, true); markSqChanged(); showToast("Section deleted — use Undo to restore it");
+    };
+    sqStudio.querySelector("[data-sq-delete]")?.addEventListener("click", deleteSelectedSection);
 
     const setZoom = (value) => {
       zoom = Math.max(60, Math.min(100, value)); deviceFrame?.classList.remove("zoom-60", "zoom-70", "zoom-80", "zoom-90"); if (zoom < 100) deviceFrame?.classList.add(`zoom-${zoom}`); const output = sqStudio.querySelector("[data-sq-zoom]"); if (output) output.textContent = `${zoom}%`;
@@ -1358,8 +1632,10 @@
     });
     document.addEventListener("keydown", (event) => { if (event.key === "Escape" && sqStudio.classList.contains("preview-mode")) { sqStudio.classList.remove("preview-mode"); const label = sqStudio.querySelector("[data-sq-preview] span"); if (label) label.textContent = "Preview"; } });
     document.addEventListener("keydown", (event) => {
-      if (!selectedElement?.isConnected || event.target.closest("input,textarea,select,[contenteditable=true]")) return;
-      if (event.key === "Delete" || event.key === "Backspace") { event.preventDefault(); deleteSelectedElement(); return; }
+      if (event.target.closest("input,textarea,select,[contenteditable=true]")) return;
+      if (event.key === "Escape" && selectedElement?.isConnected) { selectSqSection(selectedSection, true); return; }
+      if (event.key === "Delete" || event.key === "Backspace") { event.preventDefault(); if (selectedElement?.isConnected) deleteSelectedElement(); else deleteSelectedSection(); return; }
+      if (!selectedElement?.isConnected) return;
       const movements = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
       if (!movements[event.key]) return;
       event.preventDefault();
@@ -1388,12 +1664,31 @@
         const source = element.querySelector("template[data-sq-code-source]")?.innerHTML || "";
         const content = document.createElement("template"); content.innerHTML = source; element.replaceChildren(content.content.cloneNode(true));
       });
-      clone.querySelectorAll(".sq-block-handle, .sq-image-drag-handle, .sq-element-overlay, .section-hidden, .sq-element-hidden").forEach((node) => node.remove());
+      clone.querySelectorAll(".sq-block-handle, .sq-image-drag-handle, .sq-element-overlay, .sq-section-toolbar, .section-hidden, .sq-element-hidden").forEach((node) => node.remove());
       clone.querySelectorAll("[data-product-card][hidden], [data-product-line][hidden], .sq-hero-collage > span[hidden]").forEach((node) => node.remove());
       clone.querySelectorAll("[data-section-id]").forEach((node) => { node.dataset.ezkartSection = node.dataset.sectionId; });
       clone.querySelectorAll("[draggable], [contenteditable], [data-sq-block], [data-section-id]").forEach((node) => { node.removeAttribute("draggable"); node.removeAttribute("contenteditable"); node.removeAttribute("data-sq-block"); node.removeAttribute("data-section-id"); node.classList.remove("selected", "dragging", "drag-over", "animating"); });
       clone.querySelectorAll("[data-sq-image-list], [data-sq-image-item]").forEach((node) => { node.removeAttribute("data-sq-image-list"); node.removeAttribute("data-sq-image-item"); node.removeAttribute("tabindex"); node.classList.remove("sq-image-selected", "sq-image-dragging", "sq-image-drop-target"); });
       clone.querySelectorAll("[data-sq-editable], [data-sq-content]").forEach((node) => { node.removeAttribute("data-sq-editable"); node.removeAttribute("data-sq-content"); });
+      clone.querySelectorAll("[data-sq-link-type]").forEach((action) => {
+        const type = action.dataset.sqLinkType || "none";
+        const target = action.dataset.sqLink || "";
+        const newTab = action.dataset.sqNewTab === "true";
+        let href = "";
+        if (type === "section") href = `#${target.replace(/^#/, "") || "products"}`;
+        if (type === "url") href = target;
+        if (type === "email") href = `mailto:${target}`;
+        if (type === "phone") href = `tel:${target}`;
+        if (action.matches("a")) {
+          if (href) action.setAttribute("href", href); else action.removeAttribute("href");
+          if (newTab && type === "url") { action.target = "_blank"; action.rel = "noopener"; }
+        } else {
+          action.dataset.ezkartAction = type;
+          action.dataset.ezkartTarget = target;
+          action.dataset.ezkartNewTab = String(newTab);
+        }
+        delete action.dataset.sqLinkType; delete action.dataset.sqLink; delete action.dataset.sqNewTab;
+      });
       clone.querySelectorAll("[data-sq-fluid]").forEach((node) => { node.classList.add("ez-fluid-section"); node.removeAttribute("data-sq-fluid"); node.removeAttribute("data-sq-rows"); node.removeAttribute("data-sq-min-rows"); });
       clone.querySelectorAll("[data-sq-element]").forEach((node) => {
         node.classList.add("ez-fluid-element");
@@ -1411,7 +1706,7 @@
       const fluidCssFor = (device) => [...previewRoot.querySelectorAll("[data-sq-fluid]")].map((section) => `[data-ezkart-section="${section.dataset.sectionId}"]{--sq-fluid-row-height:${fluidRowHeight(section, device)}px}`).join("\n");
       const elementCssFor = (device) => [...previewRoot.querySelectorAll("[data-sq-element]")].map((element) => { const layout = parseElementLayout(element, device); return `[data-ezkart-element="${element.dataset.sqElementId}"]{grid-column:${layout.x}/span ${layout.width}!important;grid-row:${layout.y}/span ${layout.height}!important}`; }).join("\n");
       const responsiveSpacing = `${spacingCssFor("desktop")}\n${fluidCssFor("desktop")}\n${elementCssFor("desktop")}\n@media(max-width:900px){${spacingCssFor("tablet")}\n${fluidCssFor("tablet")}\n${elementCssFor("tablet")}}\n@media(max-width:600px){${spacingCssFor("mobile")}\n${fluidCssFor("mobile")}\n${elementCssFor("mobile")}}`;
-      const commerceScript = `<script>(()=>{const cart=new Set();document.querySelectorAll('[data-ezkart-add]').forEach(button=>button.addEventListener('click',()=>{const id=button.dataset.ezkartAdd;cart.has(id)?cart.delete(id):cart.add(id);button.textContent=cart.has(id)?'Added ✓':'Add to cart'}));document.querySelector('[data-ezkart-checkout]')?.addEventListener('click',()=>{const products=[...cart];if(!products.length){alert('Add at least one product first.');return}location.href='/cart/?products='+encodeURIComponent(products.join(','))});const observer=new IntersectionObserver(entries=>entries.forEach(entry=>{if(entry.isIntersecting){entry.target.classList.add(entry.target.matches('[class*="element-animation-"]')?'sq-element-animate':'animating');observer.unobserve(entry.target)}}),{threshold:.12});document.querySelectorAll('[class*="animation-"],[class*="element-animation-"]').forEach(element=>observer.observe(element))})();<\/script>`;
+      const commerceScript = `<script>(()=>{const cart=new Set();document.querySelectorAll('[data-ezkart-add]').forEach(button=>button.addEventListener('click',()=>{const id=button.dataset.ezkartAdd;cart.has(id)?cart.delete(id):cart.add(id);button.textContent=cart.has(id)?'Added ✓':'Add to cart'}));const checkout=()=>{const products=[...cart];if(!products.length){alert('Add at least one product first.');return}location.href='/cart/?products='+encodeURIComponent(products.join(','))};document.querySelector('[data-ezkart-checkout]')?.addEventListener('click',checkout);document.querySelectorAll('[data-ezkart-action]').forEach(button=>button.addEventListener('click',()=>{const type=button.dataset.ezkartAction,target=button.dataset.ezkartTarget||'';if(type==='checkout'){checkout();return}if(type==='section'){document.getElementById(target.replace(/^#/,''))?.scrollIntoView({behavior:'smooth'});return}const href=type==='email'?'mailto:'+target:type==='phone'?'tel:'+target:target;if(type==='url'&&button.dataset.ezkartNewTab==='true')window.open(href,'_blank','noopener');else if(href)location.href=href}));const observer=new IntersectionObserver(entries=>entries.forEach(entry=>{if(entry.isIntersecting){entry.target.classList.add(entry.target.matches('[class*="element-animation-"]')?'sq-element-animate':'animating');observer.unobserve(entry.target)}}),{threshold:.12});document.querySelectorAll('[class*="animation-"],[class*="element-animation-"]').forEach(element=>observer.observe(element))})();<\/script>`;
       const fontBase = new URL("assets/fonts/poppins-400.woff2", window.location.href).href;
       const fontBold = new URL("assets/fonts/poppins-600.woff2", window.location.href).href;
       return `<!doctype html>\n<html lang="id">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1">\n<title>${escapeHtml(pageName)}</title>\n<meta name="description" content="Shop selected Indonesian products with secure Midtrans checkout and Ezkart delivery.">\n<style>@font-face{font-family:Poppins;src:url('${fontBase}') format('woff2');font-weight:400}@font-face{font-family:Poppins;src:url('${fontBold}') format('woff2');font-weight:600}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:#fff;font-family:Poppins,Arial,sans-serif}.svg-sprite{width:0;height:0;position:absolute;overflow:hidden}@media(prefers-reduced-motion:reduce){*{animation:none!important;scroll-behavior:auto!important}}\n${css}\n${responsiveSpacing}\n</style>\n</head>\n<body>\n${sprite}\n${clone.outerHTML}\n${commerceScript}\n</body>\n</html>`;
@@ -1425,8 +1720,40 @@
     exportDialog?.querySelector("[data-sq-download-html]")?.addEventListener("click", () => {
       const html = exportDialog.querySelector("[data-sq-html-output]")?.value || generateHtml(); const url = URL.createObjectURL(new Blob([html], { type: "text/html" })); const link = document.createElement("a"); link.href = url; link.download = `${normalize(document.querySelector("[data-current-site-name]")?.textContent).replace(/[^a-z0-9]+/g, "-") || "ezkart-page"}.html`; link.click(); window.setTimeout(() => URL.revokeObjectURL(url), 1000); showToast("HTML file downloaded");
     });
-    sqStudio.querySelector("[data-sq-publish]")?.addEventListener("click", () => { if (saveState) saveState.textContent = "Published just now"; showToast("Page published with products, Midtrans, and shipping connected"); });
-    sqStudio.querySelectorAll("[data-sq-site]").forEach((site) => site.addEventListener("click", () => { sqStudio.querySelectorAll("[data-sq-site]").forEach((item) => item.classList.toggle("active", item === site)); document.querySelectorAll("[data-current-site-name]").forEach((target) => { target.textContent = site.dataset.siteName; }); document.querySelectorAll("[data-current-site-url]").forEach((target) => { target.textContent = site.dataset.siteUrl; }); showToast(`${site.dataset.siteName} loaded into the editor`); }));
+    sqStudio.querySelector("[data-sq-publish]")?.addEventListener("click", () => {
+      const saved = persistCurrentState();
+      try { localStorage.setItem(`${storageKeyFor()}:published`, new Date().toISOString()); } catch (_) { /* draft remains available in this tab */ }
+      if (saveState) saveState.textContent = saved ? "Published just now" : "Published for this session";
+      showToast("Published snapshot updated with checkout and responsive settings");
+    });
+    const cloneBaseSiteState = () => JSON.parse(JSON.stringify(baseSiteState || captureState()));
+    const loadSite = (site) => {
+      if (!site || site.classList.contains("active")) return;
+      persistCurrentState();
+      activeSiteKey = site.dataset.siteUrl || "default";
+      sqStudio.querySelectorAll("[data-sq-site]").forEach((item) => item.classList.toggle("active", item === site));
+      document.querySelectorAll("[data-current-site-name]").forEach((target) => { target.textContent = site.dataset.siteName; });
+      document.querySelectorAll("[data-current-site-url]").forEach((target) => { target.textContent = site.dataset.siteUrl; });
+      let state = null;
+      try { state = JSON.parse(localStorage.getItem(storageKeyFor()) || "null"); } catch (_) { state = null; }
+      undoStack.length = 0; redoStack.length = 0; updateHistoryButtons();
+      restoreState(state?.version === 2 ? state : cloneBaseSiteState());
+      showToast(`${site.dataset.siteName} loaded with its saved draft`);
+    };
+    const bindSiteButton = (site) => { site.onclick = () => loadSite(site); };
+    const siteRegistryKey = "ezkart:landing-builder:v2:sites";
+    const pageList = sqStudio.querySelector(".sq-page-list");
+    const addSavedSiteButton = ({ name, url }) => {
+      const sourceSite = pageList?.querySelector("[data-sq-site]");
+      if (!pageList || !sourceSite || !name || !url || pageList.querySelector(`[data-site-url="${CSS.escape(url)}"]`)) return null;
+      const site = sourceSite.cloneNode(true);
+      site.classList.remove("active"); site.dataset.siteName = name; site.dataset.siteUrl = url; site.dataset.customSite = "true";
+      const title = site.querySelector("b"); const subtitle = site.querySelector("small"); const status = site.querySelector("em");
+      if (title) title.textContent = name; if (subtitle) subtitle.textContent = url; if (status) { status.textContent = "Draft"; status.className = "draft"; }
+      pageList.append(site); bindSiteButton(site); return site;
+    };
+    try { JSON.parse(localStorage.getItem(siteRegistryKey) || "[]").forEach(addSavedSiteButton); } catch (_) { /* built-in pages remain available */ }
+    sqStudio.querySelectorAll("[data-sq-site]").forEach(bindSiteButton);
 
     const newPageDialog = document.getElementById("page-creator-dialog");
     sqStudio.querySelectorAll("[data-open-page-creator]").forEach((button) => button.addEventListener("click", () => newPageDialog?.showModal()));
@@ -1443,13 +1770,30 @@
       const starters = [...newPageForm.querySelectorAll('input[name="starter_products[]"]:checked')];
       if (!starters.length) { showToast("Select at least one starting product"); newPageForm.querySelector('input[name="starter_products[]"]')?.focus(); return; }
       if (!newPageForm.reportValidity()) return;
-      newPageDialog?.close(); showToast(`${newPageForm.elements.page_name.value} created with ${starters.length} products`); newPageForm.reset(); newPageSlugEdited = false;
+      const name = String(newPageForm.elements.page_name.value).trim();
+      const siteUrl = `${String(newPageForm.elements.slug.value).trim()}.ezkart.site`;
+      const site = addSavedSiteButton({ name, url: siteUrl });
+      if (!site) { showToast("A page with this URL already exists"); return; }
+      try {
+        const savedSites = [...sqStudio.querySelectorAll("[data-custom-site]")].map((item) => ({ name: item.dataset.siteName, url: item.dataset.siteUrl }));
+        localStorage.setItem(siteRegistryKey, JSON.stringify(savedSites));
+      } catch (_) { /* page remains available in this tab */ }
+      newPageDialog?.close(); loadSite(site);
+      sqStudio.querySelectorAll("[data-sq-product]").forEach((input) => { input.checked = starters.some((starter) => starter.value === input.value); });
+      updateProductView(); markSqChanged();
+      showToast(`${name} created with ${starters.length} products`); newPageForm.reset(); newPageSlugEdited = false;
     });
 
     bindSqInteractions();
     updateProductView();
     selectSqSection("announcement");
     syncBrandControls();
+    baseSiteState = captureState();
+    try {
+      const stored = JSON.parse(localStorage.getItem(storageKeyFor()) || "null");
+      if (stored?.version === 2) restoreState(stored);
+    } catch (_) { /* start with the server-provided page */ }
+    window.addEventListener("beforeunload", persistCurrentState);
     setZoom(90);
   }
 
