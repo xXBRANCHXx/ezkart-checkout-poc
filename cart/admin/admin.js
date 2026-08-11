@@ -128,344 +128,534 @@
     });
   });
 
-  const builderStudio = document.querySelector(".builder-studio");
-  if (builderStudio) {
-    const previewFrame = builderStudio.querySelector("[data-preview-frame]");
-    const landingPreview = builderStudio.querySelector(".landing-page-preview");
-    const autosave = builderStudio.querySelector(".autosave-state");
-    const autosaveStatus = builderStudio.querySelector("[data-autosave-status]");
-    let autosaveTimer;
-    const markBuilderChanged = () => {
-      if (!autosave || !autosaveStatus) return;
-      autosave.classList.add("saving");
-      autosaveStatus.textContent = "Saving changes…";
-      window.clearTimeout(autosaveTimer);
-      autosaveTimer = window.setTimeout(() => {
-        autosave.classList.remove("saving");
-        autosaveStatus.textContent = "Saved just now";
-      }, 650);
-    };
+  const sqStudio = document.querySelector(".sq-studio");
+  if (sqStudio) {
+    const previewRoot = sqStudio.querySelector("[data-sq-preview-root]");
+    const deviceFrame = sqStudio.querySelector("[data-sq-device-frame]");
+    const layerList = sqStudio.querySelector("[data-sq-layer-list]");
+    const inspector = sqStudio.querySelector(".sq-inspector");
+    const saveState = sqStudio.querySelector("[data-sq-save-state]");
+    const undoButton = sqStudio.querySelector("[data-sq-undo]");
+    const redoButton = sqStudio.querySelector("[data-sq-redo]");
+    const productPrices = { granola: 58000, coffee: 79000, sambal: 46000 };
+    const productNames = { granola: "Granola Madu Nusantara", coffee: "Kopi Susu Concentrate", sambal: "Sambal Roa Signature" };
+    const productImages = { granola: "assets/products/granola.webp", coffee: "assets/products/kopi-susu.webp", sambal: "assets/products/sambal-roa.webp" };
+    const sectionNames = { announcement: "Announcement", hero: "Hero", products: "Product collection", "image-story": "Image story", benefits: "Benefits", checkout: "Checkout", shipping: "Shipping" };
+    const undoStack = [];
+    const redoStack = [];
+    const spacingState = new Map();
+    let selectedSection = "announcement";
+    let activeDevice = "desktop";
+    let draggedSection = "";
+    let saveTimer;
+    let zoom = 90;
 
-    builderStudio.querySelectorAll("[data-preview-device]").forEach((button) => {
-      button.addEventListener("click", () => {
-        builderStudio.querySelectorAll("[data-preview-device]").forEach((item) => item.classList.remove("active"));
-        button.classList.add("active");
-        previewFrame?.classList.remove("device-tablet", "device-mobile");
-        if (button.dataset.previewDevice !== "desktop") previewFrame?.classList.add(`device-${button.dataset.previewDevice}`);
-      });
+    const openSqPanel = (name) => {
+      sqStudio.querySelectorAll("[data-sq-tab]").forEach((button) => button.classList.toggle("active", button.dataset.sqTab === name));
+      sqStudio.querySelectorAll("[data-sq-panel]").forEach((panel) => panel.classList.toggle("active", panel.dataset.sqPanel === name));
+      if (window.matchMedia("(max-width: 720px)").matches) sqStudio.classList.add("mobile-panel-open");
+    };
+    sqStudio.querySelectorAll("[data-sq-tab]").forEach((button) => button.addEventListener("click", () => openSqPanel(button.dataset.sqTab)));
+    sqStudio.querySelectorAll("[data-sq-open-panel]").forEach((button) => button.addEventListener("click", () => openSqPanel(button.dataset.sqOpenPanel)));
+
+    const selectedProducts = () => [...sqStudio.querySelectorAll("[data-sq-product]:checked")].map((input) => input.value);
+    const captureState = () => ({
+      preview: previewRoot?.innerHTML || "",
+      previewClass: previewRoot?.className || "",
+      layers: layerList?.innerHTML || "",
+      productPicker: sqStudio.querySelector(".sq-product-picker")?.innerHTML || "",
+      products: selectedProducts(),
+      selectedSection,
+      spacing: JSON.stringify([...spacingState.entries()]),
     });
-
-    let selectedBlockName = "announcement";
-    const selectBuilderBlock = (blockName) => {
-      selectedBlockName = blockName;
-      builderStudio.querySelectorAll("[data-builder-target]").forEach((button) => button.classList.toggle("active", button.dataset.builderTarget === blockName));
-      builderStudio.querySelectorAll("[data-preview-block]").forEach((block) => block.classList.toggle("selected-block", block.dataset.previewBlock === blockName));
-      const selectedButton = builderStudio.querySelector(`[data-builder-target="${blockName}"]`);
-      const inspectorTitle = builderStudio.querySelector("[data-inspector-title]");
-      if (inspectorTitle && selectedButton) inspectorTitle.textContent = selectedButton.querySelector("b")?.textContent || "Section";
-      const visibilityButton = builderStudio.querySelector("[data-toggle-section]");
-      const selectedPreview = builderStudio.querySelector(`[data-preview-block="${blockName}"]`);
-      if (visibilityButton) visibilityButton.textContent = selectedPreview?.classList.contains("section-hidden") ? "Show section" : "Hide section";
+    const updateHistoryButtons = () => {
+      if (undoButton) undoButton.disabled = undoStack.length === 0;
+      if (redoButton) redoButton.disabled = redoStack.length === 0;
     };
-    const bindOutlineButton = (button) => button.addEventListener("click", () => selectBuilderBlock(button.dataset.builderTarget));
-    const bindPreviewBlock = (block) => block.addEventListener("click", () => selectBuilderBlock(block.dataset.previewBlock));
-    builderStudio.querySelectorAll("[data-builder-target]").forEach(bindOutlineButton);
-    builderStudio.querySelectorAll("[data-preview-block]").forEach(bindPreviewBlock);
-
-    const builderFields = {
-      headline: builderStudio.querySelector("[data-preview-headline]"),
-      description: builderStudio.querySelector("[data-preview-description]"),
-      cta: builderStudio.querySelector("[data-preview-cta]"),
+    const remember = (snapshot = captureState()) => {
+      undoStack.push(snapshot);
+      if (undoStack.length > 40) undoStack.shift();
+      redoStack.length = 0;
+      updateHistoryButtons();
     };
-    builderStudio.querySelectorAll("[data-builder-field]").forEach((field) => {
-      field.addEventListener("input", () => {
-        const target = builderFields[field.dataset.builderField];
-        if (target) target.textContent = field.value;
-        if (field.dataset.builderField === "headline") {
-          const counter = builderStudio.querySelector("[data-headline-count]");
-          if (counter) counter.textContent = String(field.value.length);
+    const markSqChanged = () => {
+      if (!saveState) return;
+      saveState.textContent = "Saving…";
+      window.clearTimeout(saveTimer);
+      saveTimer = window.setTimeout(() => { saveState.textContent = "Saved just now"; }, 550);
+    };
+
+    const formatRupiah = (amount) => `Rp${new Intl.NumberFormat("id-ID").format(amount)}`;
+    const updateProductView = () => {
+      const products = selectedProducts();
+      [...(previewRoot?.classList || [])].filter((name) => name.startsWith("product-count-")).forEach((name) => previewRoot.classList.remove(name));
+      previewRoot?.classList.add(`product-count-${products.length}`);
+      sqStudio.querySelectorAll("[data-product-card]").forEach((card) => { card.hidden = !products.includes(card.dataset.productCard); });
+      sqStudio.querySelectorAll("[data-product-line]").forEach((line) => { line.hidden = !products.includes(line.dataset.productLine); });
+      const productVisuals = [...sqStudio.querySelectorAll("[data-product-visual]")];
+      productVisuals.forEach((visual) => { visual.hidden = true; visual.classList.remove("large"); });
+      productVisuals.filter((visual) => products.includes(visual.dataset.productVisual)).slice(0, 3).forEach((visual, index) => { visual.hidden = false; visual.classList.toggle("large", index === 0); });
+      const total = products.reduce((sum, product) => sum + (productPrices[product] || 0), 0);
+      const totalTarget = sqStudio.querySelector("[data-sq-basket-total]");
+      if (totalTarget) totalTarget.textContent = formatRupiah(total);
+      sqStudio.querySelectorAll("[data-sq-product-count], [data-sq-layer-product-count]").forEach((target) => { target.textContent = String(products.length); });
+    };
+
+    const spacingKey = (section = selectedSection, device = activeDevice) => `${section}:${device}`;
+    const defaultSpacing = () => {
+      if (selectedSection === "announcement") return activeDevice === "mobile" ? { top: 7, right: 12, bottom: 7, left: 12 } : { top: 8, right: 18, bottom: 8, left: 18 };
+      if (activeDevice === "mobile") return { top: 36, right: 22, bottom: 36, left: 22 };
+      if (activeDevice === "tablet") return { top: 52, right: 38, bottom: 52, left: 38 };
+      return { top: 70, right: 60, bottom: 70, left: 60 };
+    };
+    const readSpacing = () => spacingState.get(spacingKey()) || defaultSpacing();
+    const loadSpacingControls = () => {
+      const values = readSpacing();
+      sqStudio.querySelectorAll("[data-sq-spacing]").forEach((input) => {
+        input.value = String(values[input.dataset.sqSpacing]);
+        const output = sqStudio.querySelector(`[data-sq-spacing-output="${input.dataset.sqSpacing}"]`);
+        if (output) output.textContent = input.value;
+      });
+      const label = sqStudio.querySelector("[data-sq-spacing-device]");
+      if (label) label.textContent = activeDevice[0].toUpperCase() + activeDevice.slice(1);
+    };
+    const applySpacing = () => {
+      const block = previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`);
+      const values = readSpacing();
+      if (!block) return;
+      block.style.paddingTop = `${values.top}px`;
+      block.style.paddingRight = `${values.right}px`;
+      block.style.paddingBottom = `${values.bottom}px`;
+      block.style.paddingLeft = `${values.left}px`;
+    };
+
+    const syncInspectorContent = () => {
+      const controls = sqStudio.querySelector(".sq-content-controls");
+      if (controls) controls.hidden = selectedSection !== "hero";
+      sqStudio.querySelectorAll("[data-sq-edit-content]").forEach((input) => {
+        const target = previewRoot?.querySelector(`[data-sq-content="${input.dataset.sqEditContent}"]`);
+        if (target) input.value = target.textContent.trim();
+      });
+    };
+    const selectSqSection = (sectionId) => {
+      selectedSection = sectionId;
+      sqStudio.classList.remove("mobile-panel-open");
+      sqStudio.classList.remove("inspector-closed");
+      inspector?.classList.remove("collapsed");
+      sqStudio.querySelectorAll("[data-sq-layer]").forEach((layer) => layer.classList.toggle("active", layer.dataset.sectionId === sectionId));
+      previewRoot?.querySelectorAll("[data-sq-block]").forEach((block) => block.classList.toggle("selected", block.dataset.sectionId === sectionId));
+      const title = sqStudio.querySelector("[data-sq-inspector-title]");
+      const layerTitle = sqStudio.querySelector(`[data-sq-layer][data-section-id="${sectionId}"] b`)?.textContent;
+      if (title) title.textContent = layerTitle || sectionNames[sectionId] || "Section";
+      const block = previewRoot?.querySelector(`[data-section-id="${sectionId}"]`);
+      const visibility = sqStudio.querySelector("[data-sq-visibility]");
+      if (visibility) visibility.lastChild.textContent = block?.classList.contains("section-hidden") ? " Show" : " Hide";
+      const animation = sqStudio.querySelector("[data-sq-animation]");
+      if (animation) animation.value = block?.dataset.animation || "none";
+      const duration = parseInt(block?.style.getPropertyValue("--animation-duration") || "600", 10);
+      const delay = parseInt(block?.style.getPropertyValue("--animation-delay") || "0", 10);
+      const durationInput = sqStudio.querySelector("[data-sq-duration]");
+      const delayInput = sqStudio.querySelector("[data-sq-delay]");
+      if (durationInput) durationInput.value = String(duration);
+      if (delayInput) delayInput.value = String(delay);
+      const durationOutput = sqStudio.querySelector("[data-sq-duration-output]");
+      const delayOutput = sqStudio.querySelector("[data-sq-delay-output]");
+      if (durationOutput) durationOutput.textContent = `${duration}ms`;
+      if (delayOutput) delayOutput.textContent = `${delay}ms`;
+      loadSpacingControls();
+      if (spacingState.has(spacingKey())) applySpacing();
+      syncInspectorContent();
+    };
+
+    const reorderSection = (dragId, targetId, placeAfter) => {
+      if (!dragId || !targetId || dragId === targetId) return;
+      remember();
+      const draggedLayer = layerList?.querySelector(`[data-section-id="${dragId}"]`);
+      const targetLayer = layerList?.querySelector(`[data-section-id="${targetId}"]`);
+      const draggedBlock = previewRoot?.querySelector(`[data-section-id="${dragId}"]`);
+      const targetBlock = previewRoot?.querySelector(`[data-section-id="${targetId}"]`);
+      if (!draggedLayer || !targetLayer || !draggedBlock || !targetBlock) return;
+      targetLayer[placeAfter ? "after" : "before"](draggedLayer);
+      targetBlock[placeAfter ? "after" : "before"](draggedBlock);
+      selectSqSection(dragId);
+      markSqChanged();
+    };
+    const bindSqInteractions = () => {
+      sqStudio.querySelectorAll("[data-sq-layer]").forEach((layer) => {
+        layer.onclick = () => selectSqSection(layer.dataset.sectionId);
+        layer.ondragstart = (event) => { draggedSection = layer.dataset.sectionId; layer.classList.add("dragging"); event.dataTransfer.effectAllowed = "move"; };
+        layer.ondragover = (event) => { event.preventDefault(); layer.classList.add("drag-over"); };
+        layer.ondragleave = () => layer.classList.remove("drag-over");
+        layer.ondrop = (event) => { event.preventDefault(); layer.classList.remove("drag-over"); const rect = layer.getBoundingClientRect(); reorderSection(draggedSection, layer.dataset.sectionId, event.clientY > rect.top + rect.height / 2); };
+        layer.ondragend = () => { layer.classList.remove("dragging"); sqStudio.querySelectorAll(".drag-over").forEach((item) => item.classList.remove("drag-over")); };
+      });
+      previewRoot?.querySelectorAll("[data-sq-block]").forEach((block) => {
+        block.onclick = () => selectSqSection(block.dataset.sectionId);
+        block.ondragstart = (event) => { draggedSection = block.dataset.sectionId; block.classList.add("dragging"); event.dataTransfer.effectAllowed = "move"; };
+        block.ondragover = (event) => { event.preventDefault(); block.classList.add("drag-over"); };
+        block.ondragleave = () => block.classList.remove("drag-over");
+        block.ondrop = (event) => { event.preventDefault(); block.classList.remove("drag-over"); const rect = block.getBoundingClientRect(); reorderSection(draggedSection, block.dataset.sectionId, event.clientY > rect.top + rect.height / 2); };
+        block.ondragend = () => { block.classList.remove("dragging"); previewRoot.querySelectorAll(".drag-over").forEach((item) => item.classList.remove("drag-over")); };
+      });
+      previewRoot?.querySelectorAll("[data-sq-content]").forEach((content) => {
+        content.contentEditable = "true";
+        content.spellcheck = true;
+        content.onfocus = () => { content.dataset.beforeEdit = content.textContent; };
+        content.oninput = () => {
+          const inspectorField = sqStudio.querySelector(`[data-sq-edit-content="${content.dataset.sqContent}"]`);
+          if (inspectorField) inspectorField.value = content.textContent.trim();
+          markSqChanged();
+        };
+        content.onblur = () => {
+          if (content.dataset.beforeEdit !== content.textContent) {
+            const snapshot = captureState();
+            const clone = document.createElement("div"); clone.innerHTML = snapshot.preview;
+            const oldTarget = clone.querySelector(`[data-sq-content="${content.dataset.sqContent}"]`);
+            if (oldTarget) oldTarget.textContent = content.dataset.beforeEdit || "";
+            snapshot.preview = clone.innerHTML;
+            remember(snapshot);
+          }
+          delete content.dataset.beforeEdit;
+        };
+      });
+    };
+
+    const bindSqProductInput = (input) => {
+      input.onchange = () => {
+        if (selectedProducts().length === 0) {
+          input.checked = true;
+          showToast("Keep at least one product connected to the page");
+          return;
         }
-        markBuilderChanged();
-      });
-    });
-
-    const productSelect = builderStudio.querySelector("[data-builder-product]");
-    productSelect?.addEventListener("change", () => {
-      const option = productSelect.selectedOptions[0];
-      const image = builderStudio.querySelector(".preview-product-photo img");
-      const checkoutName = builderStudio.querySelector(".preview-checkout div b");
-      const checkoutPrice = builderStudio.querySelector(".preview-checkout > strong");
-      const ctaField = builderStudio.querySelector('[data-builder-field="cta"]');
-      if (image && option?.dataset.image) image.src = option.dataset.image;
-      if (checkoutName) checkoutName.textContent = option?.dataset.name || option?.textContent || "Product";
-      if (checkoutPrice) checkoutPrice.textContent = option?.dataset.price || "";
-      if (builderFields.cta && ctaField) builderFields.cta.textContent = `${ctaField.value} — ${option?.dataset.price || ""}`;
-      markBuilderChanged();
-    });
-
-    builderStudio.querySelectorAll("[data-theme-class]").forEach((button) => {
-      button.addEventListener("click", () => {
-        builderStudio.querySelectorAll("[data-theme-class]").forEach((item) => item.classList.remove("active"));
-        button.classList.add("active");
-        landingPreview?.classList.remove("theme-coral", "theme-forest", "theme-indigo", "theme-charcoal");
-        landingPreview?.classList.add(button.dataset.themeClass || "theme-coral");
-        markBuilderChanged();
-      });
-    });
-
-    builderStudio.querySelector("[data-corner-style]")?.addEventListener("change", (event) => {
-      landingPreview?.classList.remove("radius-soft", "radius-round", "radius-square");
-      landingPreview?.classList.add(event.currentTarget.value || "radius-soft");
-      markBuilderChanged();
-    });
-
-    const previewButton = builderStudio.querySelector("[data-preview-site]");
-    const setPreviewFocus = (enabled) => {
-      builderStudio.classList.toggle("preview-focus", enabled);
-      previewButton?.setAttribute("aria-pressed", String(enabled));
-      const label = previewButton?.querySelector("span");
-      if (label) label.textContent = enabled ? "Exit preview" : "Preview";
+        const previous = captureState();
+        previous.products = input.checked ? previous.products.filter((value) => value !== input.value) : [...previous.products, input.value];
+        remember(previous);
+        updateProductView();
+        markSqChanged();
+      };
     };
-    previewButton?.addEventListener("click", () => {
-      const enabled = !builderStudio.classList.contains("preview-focus");
-      setPreviewFocus(enabled);
-      if (enabled) builderStudio.scrollIntoView({ behavior: "smooth", block: "start" });
-      showToast(enabled ? "Focused preview enabled — press Escape to exit" : "Builder panels restored");
-    });
-    document.addEventListener("keydown", (event) => {
-      if (event.key === "Escape" && builderStudio.classList.contains("preview-focus")) setPreviewFocus(false);
-    });
 
-    builderStudio.querySelector("[data-duplicate-section]")?.addEventListener("click", () => {
-      const sourceOutline = builderStudio.querySelector(`[data-builder-target="${selectedBlockName}"]`);
-      const sourcePreview = builderStudio.querySelector(`[data-preview-block="${selectedBlockName}"]`);
-      if (!sourceOutline || !sourcePreview) return;
-      const key = `copy-${selectedBlockName.replace(/[^a-z0-9-]/gi, "-")}-${Date.now()}`;
-      const outlineCopy = sourceOutline.cloneNode(true);
-      const previewCopy = sourcePreview.cloneNode(true);
-      outlineCopy.dataset.builderTarget = key;
-      previewCopy.dataset.previewBlock = key;
-      outlineCopy.classList.remove("active", "section-hidden");
-      previewCopy.classList.remove("selected-block", "section-hidden");
-      const title = outlineCopy.querySelector("b");
-      const helper = outlineCopy.querySelector("small");
-      if (title) title.textContent = `${title.textContent} copy`;
-      if (helper) helper.textContent = "Duplicated · ready to edit";
-      sourceOutline.after(outlineCopy);
-      sourcePreview.after(previewCopy);
-      bindOutlineButton(outlineCopy);
-      bindPreviewBlock(previewCopy);
-      selectBuilderBlock(key);
-      showToast("Section duplicated and selected");
-      markBuilderChanged();
+    const restoreState = (state) => {
+      if (!previewRoot || !layerList) return;
+      previewRoot.innerHTML = state.preview;
+      previewRoot.className = state.previewClass;
+      layerList.innerHTML = state.layers;
+      const productPicker = sqStudio.querySelector(".sq-product-picker");
+      if (productPicker && typeof state.productPicker === "string") productPicker.innerHTML = state.productPicker;
+      sqStudio.querySelectorAll("[data-sq-product]").forEach(bindSqProductInput);
+      sqStudio.querySelectorAll("[data-sq-product]").forEach((input) => { input.checked = state.products.includes(input.value); });
+      spacingState.clear();
+      JSON.parse(state.spacing || "[]").forEach(([key, value]) => spacingState.set(key, value));
+      bindSqInteractions();
+      updateProductView();
+      selectSqSection(state.selectedSection || "hero");
+      markSqChanged();
+    };
+    undoButton?.addEventListener("click", () => {
+      if (!undoStack.length) return;
+      redoStack.push(captureState());
+      restoreState(undoStack.pop());
+      updateHistoryButtons();
+    });
+    redoButton?.addEventListener("click", () => {
+      if (!redoStack.length) return;
+      undoStack.push(captureState());
+      restoreState(redoStack.pop());
+      updateHistoryButtons();
     });
 
-    builderStudio.querySelector("[data-toggle-section]")?.addEventListener("click", (event) => {
-      const selectedOutline = builderStudio.querySelector(`[data-builder-target="${selectedBlockName}"]`);
-      const selectedPreview = builderStudio.querySelector(`[data-preview-block="${selectedBlockName}"]`);
-      if (!selectedOutline || !selectedPreview) return;
-      const hidden = !selectedPreview.classList.contains("section-hidden");
-      selectedOutline.classList.toggle("section-hidden", hidden);
-      selectedPreview.classList.toggle("section-hidden", hidden);
-      event.currentTarget.textContent = hidden ? "Show section" : "Hide section";
-      showToast(hidden ? "Section hidden from the published page" : "Section restored to the published page");
-      markBuilderChanged();
+    sqStudio.querySelectorAll("[data-sq-product]").forEach(bindSqProductInput);
+
+    const quickProductForm = sqStudio.querySelector("[data-sq-product-form]");
+    sqStudio.querySelector("[data-sq-show-product-form]")?.addEventListener("click", () => {
+      if (!quickProductForm) return;
+      quickProductForm.hidden = false;
+      quickProductForm.querySelector('input[name="name"]')?.focus();
+    });
+    sqStudio.querySelector("[data-sq-cancel-product]")?.addEventListener("click", () => {
+      if (!quickProductForm) return;
+      quickProductForm.hidden = true;
+      quickProductForm.reset();
+    });
+    quickProductForm?.addEventListener("submit", (event) => {
+      event.preventDefault();
+      if (!quickProductForm.reportValidity()) return;
+      const formData = new FormData(quickProductForm);
+      const name = String(formData.get("name") || "").trim();
+      const price = Math.max(1000, Math.round(Number(formData.get("price")) || 0));
+      const photo = String(formData.get("photo") || "granola");
+      if (!name || !price || !productImages[photo]) return;
+
+      remember();
+      const id = `custom-${Date.now()}`;
+      const imageUrl = productImages[photo];
+      const safeName = escapeHtml(name);
+      const safePrice = escapeHtml(formatRupiah(price));
+      productNames[id] = name;
+      productPrices[id] = price;
+      productImages[id] = imageUrl;
+
+      const picker = sqStudio.querySelector(".sq-product-picker");
+      if (picker) {
+        const label = document.createElement("label");
+        label.innerHTML = `<input type="checkbox" value="${id}" data-sq-product checked><span><span class="product-art"><img src="${imageUrl}" alt="${safeName}"></span><div><b>${safeName}</b><small>${safePrice} · New product</small></div><i>${iconMarkup("check-circle")}</i></span>`;
+        picker.append(label);
+        bindSqProductInput(label.querySelector("[data-sq-product]"));
+      }
+
+      previewRoot?.querySelectorAll("[data-sq-product-grid]").forEach((grid) => {
+        const card = document.createElement("article");
+        card.dataset.productCard = id;
+        card.innerHTML = `<span class="product-art"><img src="${imageUrl}" alt="${safeName}"></span><div><small>New product · ready to sell</small><h3>${safeName}</h3><p>Add product details, variants, weight, and inventory from the product catalog.</p><footer><b>${safePrice}</b><button type="button">Add to cart</button></footer></div>`;
+        grid.append(card);
+      });
+      previewRoot?.querySelectorAll("[data-sq-basket-lines]").forEach((basket) => {
+        const line = document.createElement("li");
+        line.dataset.productLine = id;
+        line.innerHTML = `<span>${safeName}</span><b>${safePrice}</b>`;
+        basket.append(line);
+      });
+      previewRoot?.querySelectorAll(".sq-hero-collage").forEach((collage) => {
+        const visual = document.createElement("span");
+        visual.dataset.productVisual = id;
+        visual.innerHTML = `<span class="product-art"><img src="${imageUrl}" alt="${safeName}"></span>`;
+        collage.append(visual);
+      });
+
+      updateProductView();
+      bindSqInteractions();
+      markSqChanged();
+      quickProductForm.hidden = true;
+      quickProductForm.reset();
+      showToast(`${name} added to this page`);
     });
 
-    builderStudio.querySelectorAll("[data-add-builder-block]").forEach((button) => {
-      button.addEventListener("click", () => {
-        const label = button.dataset.addBuilderBlock || "Section";
-        const key = `custom-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${Date.now()}`;
-        const outline = builderStudio.querySelector(".builder-outline");
-        const outlineTemplate = outline?.querySelector('[data-builder-target="benefits"]');
-        const outlineButton = outlineTemplate?.cloneNode(true);
-        if (outline && outlineButton) {
-          outlineButton.dataset.builderTarget = key;
-          const title = outlineButton.querySelector("b");
-          const description = outlineButton.querySelector("small");
-          if (title) title.textContent = label;
-          if (description) description.textContent = "New section · ready to edit";
-          outline.append(outlineButton);
-          bindOutlineButton(outlineButton);
-        }
+    sqStudio.querySelectorAll("[data-sq-device]").forEach((button) => button.addEventListener("click", () => {
+      activeDevice = button.dataset.sqDevice;
+      sqStudio.querySelectorAll("[data-sq-device]").forEach((item) => item.classList.toggle("active", item === button));
+      deviceFrame?.classList.remove("device-tablet", "device-mobile");
+      if (activeDevice !== "desktop") deviceFrame?.classList.add(`device-${activeDevice}`);
+      const sizes = { desktop: "Desktop · 1440px", tablet: "Tablet · 768px", mobile: "Mobile · 390px" };
+      const stageSize = sqStudio.querySelector("[data-sq-stage-size]");
+      if (stageSize) stageSize.textContent = sizes[activeDevice];
+      loadSpacingControls();
+      applySpacing();
+    }));
 
-        const previewSection = document.createElement("section");
-        previewSection.className = "preview-added-section";
-        previewSection.dataset.previewBlock = key;
-        const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-        icon.setAttribute("class", "icon");
-        icon.setAttribute("aria-hidden", "true");
-        const use = document.createElementNS("http://www.w3.org/2000/svg", "use");
-        use.setAttribute("href", "#icon-sparkles");
-        icon.append(use);
-        const content = document.createElement("span");
-        const heading = document.createElement("b");
-        const helper = document.createElement("small");
-        heading.textContent = label;
-        helper.textContent = "Select this section to customize its content and layout.";
-        content.append(heading, helper);
-        previewSection.append(icon, content);
-        landingPreview?.querySelector(".preview-checkout")?.before(previewSection);
-        bindPreviewBlock(previewSection);
-        selectBuilderBlock(key);
-        previewSection.scrollIntoView({ behavior: "smooth", block: "center" });
-        showToast(`${label} section added and selected`);
-        markBuilderChanged();
+    let spacingSnapshot;
+    sqStudio.querySelectorAll("[data-sq-spacing]").forEach((input) => {
+      input.addEventListener("pointerdown", () => { spacingSnapshot = captureState(); });
+      input.addEventListener("input", () => {
+        const values = { ...readSpacing(), [input.dataset.sqSpacing]: Number(input.value) };
+        if (sqStudio.querySelector("[data-sq-link-spacing]")?.checked) Object.keys(values).forEach((side) => { values[side] = Number(input.value); });
+        spacingState.set(spacingKey(), values);
+        loadSpacingControls();
+        applySpacing();
+        markSqChanged();
+      });
+      input.addEventListener("change", () => { if (spacingSnapshot) remember(spacingSnapshot); spacingSnapshot = null; });
+    });
+    sqStudio.querySelectorAll("[data-sq-edit-content]").forEach((input) => {
+      let before;
+      input.addEventListener("focus", () => { before = captureState(); });
+      input.addEventListener("input", () => {
+        const target = previewRoot?.querySelector(`[data-sq-content="${input.dataset.sqEditContent}"]`);
+        if (target) target.textContent = input.value;
+        markSqChanged();
+      });
+      input.addEventListener("change", () => { if (before) remember(before); before = null; });
+    });
+
+    const replayAnimation = () => {
+      const block = previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`);
+      if (!block) return;
+      block.classList.remove("animating");
+      void block.offsetWidth;
+      block.classList.add("animating");
+      window.setTimeout(() => block.classList.remove("animating"), 2700);
+    };
+    sqStudio.querySelector("[data-sq-animation]")?.addEventListener("change", (event) => {
+      remember();
+      const block = previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`);
+      if (!block) return;
+      block.classList.remove("animation-fade", "animation-slide-up", "animation-slide-left", "animation-scale");
+      block.dataset.animation = event.currentTarget.value;
+      if (event.currentTarget.value !== "none") block.classList.add(`animation-${event.currentTarget.value}`);
+      replayAnimation(); markSqChanged();
+    });
+    [["duration", "animation-duration", "ms"], ["delay", "animation-delay", "ms"]].forEach(([field, property, suffix]) => {
+      sqStudio.querySelector(`[data-sq-${field}]`)?.addEventListener("input", (event) => {
+        const block = previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`);
+        block?.style.setProperty(`--${property}`, `${event.currentTarget.value}${suffix}`);
+        const output = sqStudio.querySelector(`[data-sq-${field}-output]`);
+        if (output) output.textContent = `${event.currentTarget.value}${suffix}`;
+        replayAnimation(); markSqChanged();
       });
     });
-    builderStudio.querySelector("[data-publish-site]")?.addEventListener("click", () => {
-      if (autosaveStatus) autosaveStatus.textContent = "Published just now";
-      autosave?.classList.remove("saving");
-      showToast("Landing page published securely");
+    sqStudio.querySelector("[data-sq-easing]")?.addEventListener("change", (event) => {
+      previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`)?.style.setProperty("--animation-easing", event.currentTarget.value);
+      replayAnimation(); markSqChanged();
     });
+    sqStudio.querySelector("[data-sq-replay]")?.addEventListener("click", replayAnimation);
+
+    sqStudio.querySelector("[data-sq-content-width]")?.addEventListener("input", (event) => {
+      const block = previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`);
+      if (block) { block.style.width = `${event.currentTarget.value}px`; block.style.maxWidth = "100%"; block.style.marginInline = "auto"; }
+      const output = sqStudio.querySelector("[data-sq-width-output]");
+      if (output) output.textContent = `${event.currentTarget.value}px`;
+      markSqChanged();
+    });
+    sqStudio.querySelector("[data-sq-background]")?.addEventListener("change", (event) => {
+      remember();
+      const block = previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`);
+      block?.classList.remove("section-bg-light", "section-bg-white", "section-bg-dark", "section-bg-accent");
+      block?.classList.add(`section-bg-${event.currentTarget.value}`);
+      markSqChanged();
+    });
+
+    sqStudio.querySelectorAll("[data-sq-theme]").forEach((button) => button.addEventListener("click", () => {
+      remember();
+      sqStudio.querySelectorAll("[data-sq-theme]").forEach((item) => item.classList.toggle("active", item === button));
+      previewRoot?.classList.remove("theme-coral", "theme-forest", "theme-indigo", "theme-charcoal");
+      previewRoot?.classList.add(button.dataset.sqTheme);
+      markSqChanged();
+    }));
+    sqStudio.querySelector("[data-sq-radius]")?.addEventListener("change", (event) => {
+      remember(); previewRoot?.classList.remove("radius-soft", "radius-round", "radius-square"); previewRoot?.classList.add(event.currentTarget.value); markSqChanged();
+    });
+    sqStudio.querySelector("[data-sq-layout]")?.addEventListener("change", (event) => {
+      remember(); previewRoot?.classList.remove("layout-rich", "layout-editorial", "layout-image-only"); previewRoot?.classList.add(event.currentTarget.value); markSqChanged();
+    });
+    sqStudio.querySelector("[data-sq-font-size]")?.addEventListener("input", (event) => {
+      if (previewRoot) previewRoot.style.fontSize = `${event.currentTarget.value}px`;
+      const output = sqStudio.querySelector("[data-sq-font-output]"); if (output) output.textContent = `${event.currentTarget.value}px`; markSqChanged();
+    });
+
+    const iconMarkup = (name) => `<svg class="icon" aria-hidden="true"><use href="#icon-${name}"></use></svg>`;
+    const newBlockMarkup = (type, sectionId) => {
+      const handle = `<button class="sq-block-handle" type="button" aria-label="Drag section">${iconMarkup("grip")}</button>`;
+      if (type === "full-image") return `<section class="sq-page-block sq-generated-image" draggable="true" data-sq-block data-section-id="${sectionId}">${handle}<img src="${productImages.granola}" alt="Granola Madu Nusantara product story"></section>`;
+      if (type === "gallery") return `<section class="sq-page-block sq-generated-gallery" draggable="true" data-sq-block data-section-id="${sectionId}">${handle}<img src="${productImages.granola}" alt="Granola"><img src="${productImages.coffee}" alt="Kopi Susu"><img src="${productImages.sambal}" alt="Sambal Roa"></section>`;
+      if (type === "text") return `<section class="sq-page-block sq-generated-text" draggable="true" data-sq-block data-section-id="${sectionId}">${handle}<small>YOUR STORY</small><h2 contenteditable="true">A clear idea deserves room to breathe.</h2><p contenteditable="true">Write a concise product or brand story here. Every line remains editable directly on the page.</p></section>`;
+      if (type === "testimonials") return `<section class="sq-page-block sq-generated-reviews" draggable="true" data-sq-block data-section-id="${sectionId}">${handle}<article><b>“Excellent flavor and beautifully packed.”</b><small>Sarah · verified buyer</small></article><article><b>“Checkout was easy and delivery was quick.”</b><small>Michael · verified buyer</small></article></section>`;
+      if (type === "faq") return `<section class="sq-page-block sq-generated-faq" draggable="true" data-sq-block data-section-id="${sectionId}">${handle}<h2>Questions, answered.</h2><details open><summary>How does payment work?</summary><p>Customers complete a secure Midtrans checkout prepared by Ezkart.</p></details><details><summary>How is shipping calculated?</summary><p>Product weights, destination, courier, and service determine the live rate.</p></details></section>`;
+      if (type === "spacer") return `<section class="sq-page-block sq-generated-spacer" draggable="true" data-sq-block data-section-id="${sectionId}">${handle}<span>Responsive spacer · 80px</span></section>`;
+      const template = previewRoot?.querySelector(`[data-section-id="${type}"]`);
+      if (template) { const clone = template.cloneNode(true); clone.dataset.sectionId = sectionId; clone.removeAttribute("id"); clone.classList.remove("selected"); return clone.outerHTML; }
+      return `<section class="sq-page-block sq-generated-text" draggable="true" data-sq-block data-section-id="${sectionId}">${handle}<h2>New section</h2></section>`;
+    };
+    sqStudio.querySelectorAll("[data-sq-add-block]").forEach((button) => button.addEventListener("click", () => {
+      remember();
+      const type = button.dataset.sqAddBlock;
+      const sectionId = `${type}-${Date.now()}`;
+      const wrapper = document.createElement("div"); wrapper.innerHTML = newBlockMarkup(type, sectionId);
+      const newBlock = wrapper.firstElementChild;
+      const selectedBlock = previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`);
+      selectedBlock?.after(newBlock);
+      const layerTemplate = layerList?.querySelector("[data-sq-layer]")?.cloneNode(true);
+      if (layerTemplate) {
+        layerTemplate.dataset.sectionId = sectionId; layerTemplate.classList.remove("active", "section-hidden");
+        const title = layerTemplate.querySelector("b"); const subtitle = layerTemplate.querySelector("small");
+        if (title) title.textContent = ({ "full-image": "Full image", gallery: "Image gallery", text: "Text story", testimonials: "Reviews", faq: "FAQ", spacer: "Spacer", products: "Product collection", checkout: "Checkout" })[type] || "Section";
+        if (subtitle) subtitle.textContent = "Added just now · draggable";
+        layerList.querySelector(`[data-section-id="${selectedSection}"]`)?.after(layerTemplate);
+      }
+      bindSqInteractions(); updateProductView(); selectSqSection(sectionId); openSqPanel("layers"); newBlock?.scrollIntoView({ behavior: "smooth", block: "center" }); markSqChanged();
+    }));
+    sqStudio.querySelector("[data-sq-block-search]")?.addEventListener("input", (event) => {
+      const query = normalize(event.currentTarget.value);
+      sqStudio.querySelectorAll("[data-sq-add-block]").forEach((button) => { button.hidden = Boolean(query) && !normalize(button.dataset.search).includes(query); });
+    });
+
+    sqStudio.querySelector("[data-sq-duplicate]")?.addEventListener("click", () => {
+      const block = previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`); const layer = layerList?.querySelector(`[data-section-id="${selectedSection}"]`); if (!block || !layer) return;
+      remember(); const newId = `${selectedSection}-copy-${Date.now()}`; const blockCopy = block.cloneNode(true); const layerCopy = layer.cloneNode(true); blockCopy.dataset.sectionId = newId; layerCopy.dataset.sectionId = newId; blockCopy.classList.remove("selected"); layerCopy.classList.remove("active"); const title = layerCopy.querySelector("b"); if (title) title.textContent = `${title.textContent} copy`; block.after(blockCopy); layer.after(layerCopy); bindSqInteractions(); selectSqSection(newId); markSqChanged();
+    });
+    sqStudio.querySelector("[data-sq-visibility]")?.addEventListener("click", () => {
+      const block = previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`); const layer = layerList?.querySelector(`[data-section-id="${selectedSection}"]`); if (!block || !layer) return;
+      remember(); const hidden = !block.classList.contains("section-hidden"); block.classList.toggle("section-hidden", hidden); layer.classList.toggle("section-hidden", hidden); selectSqSection(selectedSection); markSqChanged();
+    });
+    sqStudio.querySelector("[data-sq-delete]")?.addEventListener("click", () => {
+      if ((previewRoot?.querySelectorAll("[data-sq-block]").length || 0) <= 1) { showToast("A page needs at least one section"); return; }
+      const block = previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`); const layer = layerList?.querySelector(`[data-section-id="${selectedSection}"]`); if (!block || !layer) return;
+      remember(); const next = layer.nextElementSibling?.dataset.sectionId || layer.previousElementSibling?.dataset.sectionId; block.remove(); layer.remove(); bindSqInteractions(); if (next) selectSqSection(next); markSqChanged(); showToast("Section removed — Undo is available");
+    });
+
+    const setZoom = (value) => {
+      zoom = Math.max(60, Math.min(100, value)); deviceFrame?.classList.remove("zoom-60", "zoom-70", "zoom-80", "zoom-90"); if (zoom < 100) deviceFrame?.classList.add(`zoom-${zoom}`); const output = sqStudio.querySelector("[data-sq-zoom]"); if (output) output.textContent = `${zoom}%`;
+    };
+    sqStudio.querySelector("[data-sq-zoom-out]")?.addEventListener("click", () => setZoom(zoom - 10));
+    sqStudio.querySelector("[data-sq-zoom-in]")?.addEventListener("click", () => setZoom(zoom + 10));
+    sqStudio.querySelector("[data-sq-fit]")?.addEventListener("click", () => setZoom(activeDevice === "desktop" ? 80 : activeDevice === "tablet" ? 90 : 100));
+    sqStudio.querySelector("[data-sq-close-inspector]")?.addEventListener("click", () => { inspector?.classList.add("collapsed"); sqStudio.classList.add("inspector-closed"); });
+    sqStudio.querySelector("[data-sq-preview]")?.addEventListener("click", (event) => {
+      const enabled = !sqStudio.classList.contains("preview-mode"); sqStudio.classList.toggle("preview-mode", enabled); const label = event.currentTarget.querySelector("span"); if (label) label.textContent = enabled ? "Exit preview" : "Preview"; showToast(enabled ? "Full-canvas preview enabled — press Escape to exit" : "Editing tools restored");
+    });
+    document.addEventListener("keydown", (event) => { if (event.key === "Escape" && sqStudio.classList.contains("preview-mode")) { sqStudio.classList.remove("preview-mode"); const label = sqStudio.querySelector("[data-sq-preview] span"); if (label) label.textContent = "Preview"; } });
+
+    const exportDialog = document.getElementById("html-export-dialog");
+    const collectExportCss = () => {
+      const tokens = [".sq-page-preview", ".sq-page-block", ".sq-announcement", ".sq-store-nav", ".sq-hero", ".sq-product", ".sq-image-story", ".sq-benefit", ".sq-cart", ".sq-shipping", ".sq-generated", "@keyframes sq", ".product-art", ".icon", ".svg-sprite"];
+      const collect = (rules) => [...rules].map((rule) => {
+        if (rule.cssRules) { const nested = collect(rule.cssRules); return nested ? `${rule.conditionText ? `@media ${rule.conditionText}` : rule.cssText.slice(0, rule.cssText.indexOf("{"))}{${nested}}` : ""; }
+        return tokens.some((token) => rule.cssText.includes(token)) ? rule.cssText : "";
+      }).join("\n");
+      return [...document.styleSheets].map((sheet) => { try { return collect(sheet.cssRules); } catch (_) { return ""; } }).join("\n");
+    };
+    const generateHtml = () => {
+      const clone = previewRoot.cloneNode(true);
+      clone.querySelectorAll(".sq-block-handle, .section-hidden").forEach((node) => node.remove());
+      clone.querySelectorAll("[data-product-card][hidden], [data-product-line][hidden], .sq-hero-collage > span[hidden]").forEach((node) => node.remove());
+      clone.querySelectorAll("[data-section-id]").forEach((node) => { node.dataset.ezkartSection = node.dataset.sectionId; });
+      clone.querySelectorAll("[draggable], [contenteditable], [data-sq-block], [data-section-id]").forEach((node) => { node.removeAttribute("draggable"); node.removeAttribute("contenteditable"); node.removeAttribute("data-sq-block"); node.removeAttribute("data-section-id"); node.classList.remove("selected", "dragging", "drag-over", "animating"); });
+      clone.querySelectorAll("img").forEach((image) => { image.src = new URL(image.getAttribute("src"), window.location.href).href; });
+      clone.querySelectorAll("[data-product-card]").forEach((card) => { const button = card.querySelector("button"); if (button) { button.dataset.ezkartAdd = card.dataset.productCard; button.type = "button"; } });
+      const checkout = clone.querySelector(".sq-cart-section aside>button"); if (checkout) checkout.dataset.ezkartCheckout = "";
+      const pageName = document.querySelector("[data-current-site-name]")?.textContent || "Ezkart Landing Page";
+      const sprite = document.querySelector(".svg-sprite")?.outerHTML || "";
+      const css = collectExportCss();
+      const spacingCssFor = (device) => [...spacingState.entries()].filter(([key]) => key.endsWith(`:${device}`)).map(([key, value]) => { const section = key.slice(0, -(device.length + 1)); return `[data-ezkart-section="${section}"]{padding:${value.top}px ${value.right}px ${value.bottom}px ${value.left}px!important}`; }).join("\n");
+      const responsiveSpacing = `${spacingCssFor("desktop")}\n@media(max-width:900px){${spacingCssFor("tablet")}}\n@media(max-width:600px){${spacingCssFor("mobile")}}`;
+      const commerceScript = `<script>(()=>{const cart=new Set();document.querySelectorAll('[data-ezkart-add]').forEach(button=>button.addEventListener('click',()=>{const id=button.dataset.ezkartAdd;cart.has(id)?cart.delete(id):cart.add(id);button.textContent=cart.has(id)?'Added ✓':'Add to cart'}));document.querySelector('[data-ezkart-checkout]')?.addEventListener('click',()=>{const products=[...cart];if(!products.length){alert('Add at least one product first.');return}location.href='/cart/?products='+encodeURIComponent(products.join(','))});const observer=new IntersectionObserver(entries=>entries.forEach(entry=>{if(entry.isIntersecting){entry.target.classList.add('animating');observer.unobserve(entry.target)}}),{threshold:.12});document.querySelectorAll('[class*="animation-"]').forEach(section=>observer.observe(section))})();<\/script>`;
+      const fontBase = new URL("assets/fonts/poppins-400.woff2", window.location.href).href;
+      const fontBold = new URL("assets/fonts/poppins-600.woff2", window.location.href).href;
+      return `<!doctype html>\n<html lang="id">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1">\n<title>${escapeHtml(pageName)}</title>\n<meta name="description" content="Shop selected Indonesian products with secure Midtrans checkout and Ezkart delivery.">\n<style>@font-face{font-family:Poppins;src:url('${fontBase}') format('woff2');font-weight:400}@font-face{font-family:Poppins;src:url('${fontBold}') format('woff2');font-weight:600}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:#fff;font-family:Poppins,Arial,sans-serif}.svg-sprite{width:0;height:0;position:absolute;overflow:hidden}@media(prefers-reduced-motion:reduce){*{animation:none!important;scroll-behavior:auto!important}}\n${css}\n${responsiveSpacing}\n</style>\n</head>\n<body>\n${sprite}\n${clone.outerHTML}\n${commerceScript}\n</body>\n</html>`;
+    };
+    sqStudio.querySelector("[data-sq-export]")?.addEventListener("click", () => {
+      const html = generateHtml(); const output = exportDialog?.querySelector("[data-sq-html-output]"); if (output) output.value = html; const size = exportDialog?.querySelector("[data-sq-html-size]"); if (size) size.textContent = `${new Blob([html]).size.toLocaleString("id-ID")} bytes · ready to host`; exportDialog?.showModal();
+    });
+    exportDialog?.querySelector("[data-sq-copy-html]")?.addEventListener("click", async () => {
+      const output = exportDialog.querySelector("[data-sq-html-output]"); try { await navigator.clipboard.writeText(output.value); showToast("Complete HTML copied"); } catch (_) { output.select(); document.execCommand("copy"); showToast("Complete HTML copied"); }
+    });
+    exportDialog?.querySelector("[data-sq-download-html]")?.addEventListener("click", () => {
+      const html = exportDialog.querySelector("[data-sq-html-output]")?.value || generateHtml(); const url = URL.createObjectURL(new Blob([html], { type: "text/html" })); const link = document.createElement("a"); link.href = url; link.download = `${normalize(document.querySelector("[data-current-site-name]")?.textContent).replace(/[^a-z0-9]+/g, "-") || "ezkart-page"}.html`; link.click(); window.setTimeout(() => URL.revokeObjectURL(url), 1000); showToast("HTML file downloaded");
+    });
+    sqStudio.querySelector("[data-sq-publish]")?.addEventListener("click", () => { if (saveState) saveState.textContent = "Published just now"; showToast("Page published with products, Midtrans, and shipping connected"); });
+    sqStudio.querySelectorAll("[data-sq-site]").forEach((site) => site.addEventListener("click", () => { sqStudio.querySelectorAll("[data-sq-site]").forEach((item) => item.classList.toggle("active", item === site)); document.querySelectorAll("[data-current-site-name]").forEach((target) => { target.textContent = site.dataset.siteName; }); document.querySelectorAll("[data-current-site-url]").forEach((target) => { target.textContent = site.dataset.siteUrl; }); showToast(`${site.dataset.siteName} loaded into the editor`); }));
+
+    const newPageDialog = document.getElementById("page-creator-dialog");
+    sqStudio.querySelectorAll("[data-open-page-creator]").forEach((button) => button.addEventListener("click", () => newPageDialog?.showModal()));
+    const newPageForm = newPageDialog?.querySelector("[data-page-creator-form]");
+    const newPageName = newPageForm?.elements.namedItem("page_name");
+    const newPageSlug = newPageForm?.elements.namedItem("slug");
+    let newPageSlugEdited = false;
+    const makePageSlug = (value) => normalize(value).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 48);
+    newPageSlug?.addEventListener("input", () => { newPageSlugEdited = true; newPageSlug.value = makePageSlug(newPageSlug.value); });
+    newPageName?.addEventListener("input", () => { if (!newPageSlugEdited && newPageSlug) newPageSlug.value = makePageSlug(newPageName.value); });
+    newPageForm?.addEventListener("submit", (event) => {
+      if (event.submitter?.value === "cancel") return;
+      event.preventDefault(); event.stopImmediatePropagation();
+      const starters = [...newPageForm.querySelectorAll('input[name="starter_products[]"]:checked')];
+      if (!starters.length) { showToast("Select at least one starting product"); newPageForm.querySelector('input[name="starter_products[]"]')?.focus(); return; }
+      if (!newPageForm.reportValidity()) return;
+      newPageDialog?.close(); showToast(`${newPageForm.elements.page_name.value} created with ${starters.length} products`); newPageForm.reset(); newPageSlugEdited = false;
+    });
+
+    bindSqInteractions();
+    updateProductView();
+    selectSqSection("announcement");
+    setZoom(90);
   }
-
-  const productCatalog = {
-    "Granola Madu Nusantara": { value: "granola", image: "assets/products/granola.webp", price: "Rp58.000", headline: "Start your morning with a better crunch.", description: "Honey-toasted granola made with local oats, cashews, and a warm touch of Nusantara spice." },
-    "Kopi Susu Concentrate": { value: "coffee", image: "assets/products/kopi-susu.webp", price: "Rp79.000", headline: "Cafe-quality kopi susu, ready in seconds.", description: "A rich, balanced concentrate for effortless iced coffee at home—just pour, mix, and enjoy." },
-    "Sambal Roa Signature": { value: "sambal", image: "assets/products/sambal-roa.webp", price: "Rp46.000", headline: "Smoky Manado heat for every meal.", description: "Small-batch sambal roa with deep smoke, bright chili, and the savory finish your table has been missing." },
-  };
-  const activateSite = (site, shouldScroll = true) => {
-      document.querySelectorAll("[data-site-select]").forEach((item) => item.classList.remove("active"));
-      site.classList.add("active");
-      document.querySelectorAll("[data-current-site-name]").forEach((target) => { target.textContent = site.dataset.siteName || "Landing page"; });
-      document.querySelectorAll("[data-current-site-url]").forEach((target) => { target.textContent = site.dataset.siteUrl || "ezkart.site"; });
-      const select = document.querySelector("[data-builder-product]");
-      const product = productCatalog[site.dataset.siteProduct];
-      if (select && product) {
-        select.value = product.value;
-        select.dispatchEvent(new Event("change", { bubbles: true }));
-      }
-      const headline = document.querySelector('[data-builder-field="headline"]');
-      const description = document.querySelector('[data-builder-field="description"]');
-      if (headline && site.dataset.siteHeadline) {
-        headline.value = site.dataset.siteHeadline;
-        headline.dispatchEvent(new Event("input", { bubbles: true }));
-      }
-      if (description && site.dataset.siteDescription) {
-        description.value = site.dataset.siteDescription;
-        description.dispatchEvent(new Event("input", { bubbles: true }));
-      }
-      if (shouldScroll) document.querySelector("#visual-builder")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
-  const bindSiteSelector = (site) => site.addEventListener("click", () => activateSite(site));
-  document.querySelectorAll("[data-site-select]").forEach(bindSiteSelector);
-
-  const domainForm = document.querySelector("[data-domain-form]");
-  domainForm?.addEventListener("submit", (event) => {
-    event.preventDefault();
-    const input = domainForm.querySelector("[data-domain-input]");
-    const feedback = domainForm.querySelector("[data-domain-feedback]");
-    const domain = normalize(input?.value).replace(/^https?:\/\//, "").replace(/\/.*$/, "").replace(/\.$/, "");
-    const valid = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i.test(domain);
-    feedback?.classList.remove("error", "success");
-    if (!valid) {
-      if (feedback) {
-        feedback.textContent = "Enter a valid domain such as shop.yourbrand.com.";
-        feedback.classList.add("error");
-      }
-      input?.setAttribute("aria-invalid", "true");
-      input?.focus();
-      return;
-    }
-    input?.removeAttribute("aria-invalid");
-    if (input) input.value = domain;
-    if (feedback) {
-      feedback.textContent = `${domain} is ready for a DNS check. No live settings were changed.`;
-      feedback.classList.add("success");
-    }
-    showToast("Domain format verified — DNS instructions prepared");
-  });
-
-  const seoTitle = document.querySelector("[data-seo-title]");
-  const seoDescription = document.querySelector("[data-seo-description]");
-  seoTitle?.addEventListener("input", () => {
-    const target = document.querySelector("[data-seo-preview-title]");
-    if (target) target.textContent = seoTitle.value || "Untitled landing page";
-  });
-  seoDescription?.addEventListener("input", () => {
-    const target = document.querySelector("[data-seo-preview-description]");
-    if (target) target.textContent = seoDescription.value || "Add a description to improve search visibility.";
-  });
-
-  const pageDialog = document.getElementById("page-creator-dialog");
-  document.querySelectorAll("[data-open-page-creator]").forEach((button) => button.addEventListener("click", () => {
-    if (typeof pageDialog?.showModal === "function") pageDialog.showModal();
-  }));
-  const pageCreatorForm = pageDialog?.querySelector("[data-page-creator-form]");
-  const pageNameField = pageCreatorForm?.elements.namedItem("page_name");
-  const slugField = pageCreatorForm?.elements.namedItem("slug");
-  let slugWasEdited = false;
-  const makeSlug = (value) => normalize(value).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 48);
-  slugField?.addEventListener("input", () => {
-    slugWasEdited = true;
-    slugField.value = makeSlug(slugField.value);
-  });
-  pageNameField?.addEventListener("input", () => {
-    if (!slugWasEdited && slugField) slugField.value = makeSlug(pageNameField.value);
-  });
-  pageCreatorForm?.addEventListener("submit", (event) => {
-    if (event.submitter?.value === "cancel") return;
-    event.preventDefault();
-    if (!pageCreatorForm.reportValidity()) return;
-    const pageName = String(pageNameField?.value || "New landing page");
-    const pageSlug = String(slugField?.value || makeSlug(pageName) || "new-page");
-    const productName = String(pageCreatorForm.elements.namedItem("product")?.value || "Granola Madu Nusantara");
-    const product = productCatalog[productName] || productCatalog["Granola Madu Nusantara"];
-    const list = document.querySelector(".site-list");
-    const template = list?.querySelector(".site-list-item:last-child");
-    const newSite = template?.cloneNode(true);
-    if (list && newSite) {
-      newSite.classList.remove("active");
-      newSite.dataset.siteName = pageName;
-      newSite.dataset.siteUrl = `${pageSlug}.ezkart.site`;
-      newSite.dataset.siteProduct = productName;
-      newSite.dataset.siteHeadline = product.headline;
-      newSite.dataset.siteDescription = product.description;
-      const thumbnail = newSite.querySelector(".site-thumbnail");
-      const image = thumbnail?.querySelector("img");
-      const state = thumbnail?.querySelector("i");
-      if (image) {
-        image.src = product.image;
-        image.alt = productName;
-      }
-      if (state) {
-        state.className = "draft";
-        state.textContent = "Draft";
-      }
-      const details = newSite.querySelector(":scope > span:nth-child(2)");
-      if (details) {
-        const name = details.querySelector("b");
-        const url = details.querySelector("small");
-        const updated = details.querySelector("em");
-        if (name) name.textContent = pageName;
-        if (url) url.textContent = `${pageSlug}.ezkart.site`;
-        if (updated) updated.textContent = "Created just now";
-      }
-      const metrics = newSite.querySelector(".site-metrics");
-      if (metrics) {
-        const visits = metrics.querySelector("b");
-        const conversion = metrics.querySelector("strong");
-        if (visits) visits.textContent = "—";
-        if (conversion) conversion.textContent = "Draft";
-      }
-      list.append(newSite);
-      bindSiteSelector(newSite);
-      const total = list.querySelectorAll("[data-site-select]").length;
-      const navBadge = document.querySelector('a[href="?page=sites"] b');
-      const statValue = document.querySelector(".page-stat-strip article:first-child strong");
-      const statDetail = document.querySelector(".page-stat-strip article:first-child p");
-      if (navBadge) navBadge.textContent = String(total);
-      if (statValue) statValue.textContent = String(total);
-      if (statDetail) statDetail.textContent = `2 live · ${Math.max(total - 2, 0)} drafts`;
-      activateSite(newSite, false);
-    }
-    pageDialog.close();
-    pageCreatorForm.reset();
-    slugWasEdited = false;
-    showToast(`${pageName} created as a safe draft`);
-    document.querySelector("#visual-builder")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  });
 
   const mapElement = document.getElementById("fulfillment-map");
   if (mapElement && window.L) {

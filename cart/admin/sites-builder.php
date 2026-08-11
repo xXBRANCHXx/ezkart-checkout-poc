@@ -1,0 +1,148 @@
+<?php
+declare(strict_types=1);
+?>
+<section class="sq-studio" id="visual-builder" aria-label="Landing page builder">
+  <header class="sq-commandbar">
+    <div class="sq-page-identity">
+      <a href="?page=dashboard" aria-label="Return to dashboard"><?= ez_admin_icon('chevron-left') ?></a>
+      <button type="button" data-sq-open-panel="pages"><span><small>Landing page</small><b data-current-site-name>Morning Ritual Store</b></span><?= ez_admin_icon('chevron-down') ?></button>
+      <span class="sq-live-state"><i></i> Live</span>
+    </div>
+    <div class="sq-history-tools" aria-label="Editing history">
+      <button type="button" data-sq-undo aria-label="Undo" disabled><?= ez_admin_icon('undo') ?></button>
+      <button type="button" data-sq-redo aria-label="Redo" disabled><?= ez_admin_icon('redo') ?></button>
+      <span data-sq-save-state>All changes saved</span>
+    </div>
+    <div class="sq-device-tools" aria-label="Responsive preview">
+      <button class="active" type="button" data-sq-device="desktop" aria-label="Desktop preview"><?= ez_admin_icon('monitor') ?></button>
+      <button type="button" data-sq-device="tablet" aria-label="Tablet preview"><?= ez_admin_icon('layout') ?></button>
+      <button type="button" data-sq-device="mobile" aria-label="Mobile preview"><?= ez_admin_icon('smartphone') ?></button>
+      <button type="button" data-sq-fit aria-label="Fit canvas to window"><?= ez_admin_icon('refund') ?></button>
+    </div>
+    <div class="sq-command-actions">
+      <button type="button" data-sq-preview><?= ez_admin_icon('eye') ?><span>Preview</span></button>
+      <button type="button" data-sq-export><?= ez_admin_icon('code') ?><span>Export HTML</span></button>
+      <button class="primary" type="button" data-sq-publish>Publish</button>
+    </div>
+  </header>
+
+  <div class="sq-editor-grid">
+    <aside class="sq-builder-sidebar">
+      <nav class="sq-tool-rail" aria-label="Builder tools">
+        <button class="active" type="button" data-sq-tab="layers" aria-label="Page layers"><?= ez_admin_icon('layers') ?><span>Layers</span></button>
+        <button type="button" data-sq-tab="add" aria-label="Add section"><?= ez_admin_icon('plus') ?><span>Add</span></button>
+        <button type="button" data-sq-tab="products" aria-label="Products"><?= ez_admin_icon('box') ?><span>Products</span><i data-sq-product-count>3</i></button>
+        <button type="button" data-sq-tab="design" aria-label="Site design"><?= ez_admin_icon('palette') ?><span>Design</span></button>
+        <button type="button" data-sq-tab="pages" aria-label="Pages and domains"><?= ez_admin_icon('globe') ?><span>Pages</span></button>
+      </nav>
+
+      <div class="sq-tool-panels">
+        <section class="sq-tool-panel active" data-sq-panel="layers">
+          <header><div><small>Page structure</small><h2>Layers</h2></div><button type="button" data-sq-open-panel="add" aria-label="Add section"><?= ez_admin_icon('plus') ?></button></header>
+          <p class="sq-panel-intro">Drag sections to reorder them. Click anything to edit it.</p>
+          <div class="sq-layer-list" data-sq-layer-list>
+            <button class="active" type="button" draggable="true" data-sq-layer data-section-id="announcement"><?= ez_admin_icon('grip') ?><span><?= ez_admin_icon('message') ?></span><div><b>Announcement</b><small>Free delivery offer</small></div><?= ez_admin_icon('chevron-right') ?></button>
+            <button type="button" draggable="true" data-sq-layer data-section-id="hero"><?= ez_admin_icon('grip') ?><span><?= ez_admin_icon('layout') ?></span><div><b>Hero</b><small>Headline, CTA, image</small></div><?= ez_admin_icon('chevron-right') ?></button>
+            <button type="button" draggable="true" data-sq-layer data-section-id="products"><?= ez_admin_icon('grip') ?><span><?= ez_admin_icon('box') ?></span><div><b>Product collection</b><small><i data-sq-layer-product-count>3</i> connected products</small></div><?= ez_admin_icon('chevron-right') ?></button>
+            <button type="button" draggable="true" data-sq-layer data-section-id="image-story"><?= ez_admin_icon('grip') ?><span><?= ez_admin_icon('image') ?></span><div><b>Image story</b><small>Full-bleed visual section</small></div><?= ez_admin_icon('chevron-right') ?></button>
+            <button type="button" draggable="true" data-sq-layer data-section-id="benefits"><?= ez_admin_icon('grip') ?><span><?= ez_admin_icon('star') ?></span><div><b>Benefits</b><small>Three trust points</small></div><?= ez_admin_icon('chevron-right') ?></button>
+            <button type="button" draggable="true" data-sq-layer data-section-id="checkout"><?= ez_admin_icon('grip') ?><span><?= ez_admin_icon('credit-card') ?></span><div><b>Checkout</b><small>Midtrans cart action</small></div><?= ez_admin_icon('chevron-right') ?></button>
+            <button type="button" draggable="true" data-sq-layer data-section-id="shipping"><?= ez_admin_icon('grip') ?><span><?= ez_admin_icon('truck') ?></span><div><b>Shipping</b><small>Courier and ETA</small></div><?= ez_admin_icon('chevron-right') ?></button>
+          </div>
+          <footer><span><?= ez_admin_icon('shield') ?> Autosaved and versioned</span></footer>
+        </section>
+
+        <section class="sq-tool-panel" data-sq-panel="add">
+          <header><div><small>Section library</small><h2>Add content</h2></div></header>
+          <label class="sq-panel-search"><?= ez_admin_icon('search') ?><input type="search" placeholder="Search sections" data-sq-block-search></label>
+          <div class="sq-block-group"><h3>Commerce</h3><div class="sq-block-grid">
+            <button type="button" data-sq-add-block="products" data-search="products shop collection"><?= ez_admin_icon('box') ?><b>Products</b><small>Multi-product grid</small></button>
+            <button type="button" data-sq-add-block="checkout" data-search="checkout payment midtrans"><?= ez_admin_icon('credit-card') ?><b>Checkout</b><small>Secure cart CTA</small></button>
+          </div></div>
+          <div class="sq-block-group"><h3>Image-led</h3><div class="sq-block-grid">
+            <button type="button" data-sq-add-block="full-image" data-search="image photo full bleed"><?= ez_admin_icon('image') ?><b>Full image</b><small>No text required</small></button>
+            <button type="button" data-sq-add-block="gallery" data-search="gallery images photos"><?= ez_admin_icon('layout') ?><b>Gallery</b><small>Editorial mosaic</small></button>
+          </div></div>
+          <div class="sq-block-group"><h3>Story &amp; trust</h3><div class="sq-block-grid">
+            <button type="button" data-sq-add-block="text" data-search="text story copy"><?= ez_admin_icon('message') ?><b>Text</b><small>Headline and body</small></button>
+            <button type="button" data-sq-add-block="testimonials" data-search="reviews testimonials trust"><?= ez_admin_icon('star') ?><b>Reviews</b><small>Social proof</small></button>
+            <button type="button" data-sq-add-block="faq" data-search="faq questions"><?= ez_admin_icon('help') ?><b>FAQ</b><small>Expandable answers</small></button>
+            <button type="button" data-sq-add-block="spacer" data-search="space spacer gap"><?= ez_admin_icon('layers') ?><b>Spacer</b><small>Responsive breathing room</small></button>
+          </div></div>
+        </section>
+
+        <section class="sq-tool-panel" data-sq-panel="products">
+          <header><div><small>Commerce source</small><h2>Products</h2></div><a href="?page=products">Manage</a></header>
+          <p class="sq-panel-intro">Use one product or the whole catalog. Ezkart keeps price, stock, Midtrans items, and shipping weights synchronized.</p>
+          <div class="sq-product-picker">
+            <label><input type="checkbox" value="granola" data-sq-product checked><span><?= ez_admin_product_art('Granola Madu Nusantara') ?><div><b>Granola Madu Nusantara</b><small>Rp58.000 · 48 in stock</small></div><i><?= ez_admin_icon('check-circle') ?></i></span></label>
+            <label><input type="checkbox" value="coffee" data-sq-product checked><span><?= ez_admin_product_art('Kopi Susu Concentrate') ?><div><b>Kopi Susu Concentrate</b><small>Rp79.000 · 31 in stock</small></div><i><?= ez_admin_icon('check-circle') ?></i></span></label>
+            <label><input type="checkbox" value="sambal" data-sq-product checked><span><?= ez_admin_product_art('Sambal Roa Signature') ?><div><b>Sambal Roa Signature</b><small>Rp46.000 · 64 in stock</small></div><i><?= ez_admin_icon('check-circle') ?></i></span></label>
+          </div>
+          <button class="sq-wide-button" type="button" data-sq-show-product-form><?= ez_admin_icon('plus') ?> Create another product</button>
+          <form class="sq-quick-product" data-sq-product-form hidden><label><span>Product name</span><input name="name" required maxlength="60" placeholder="New product"></label><label><span>Price (IDR)</span><input name="price" type="number" min="1000" step="500" value="49000" required></label><label><span>Sample photo</span><select name="photo"><option value="granola">Granola still life</option><option value="coffee">Kopi susu still life</option><option value="sambal">Sambal still life</option></select></label><div><button type="button" data-sq-cancel-product>Cancel</button><button type="submit">Add product</button></div></form>
+          <div class="sq-product-rule"><span><?= ez_admin_icon('check-circle') ?></span><p><b>At least one product</b><small>A landing page always needs something customers can purchase.</small></p></div>
+        </section>
+
+        <section class="sq-tool-panel" data-sq-panel="design">
+          <header><div><small>Global styles</small><h2>Site design</h2></div></header>
+          <div class="sq-control-section"><h3>Color theme</h3><div class="sq-theme-grid"><button class="active coral" type="button" data-sq-theme="theme-coral" aria-label="Coral theme"></button><button class="forest" type="button" data-sq-theme="theme-forest" aria-label="Forest theme"></button><button class="indigo" type="button" data-sq-theme="theme-indigo" aria-label="Indigo theme"></button><button class="charcoal" type="button" data-sq-theme="theme-charcoal" aria-label="Charcoal theme"></button></div></div>
+          <div class="sq-control-section"><label><span>Corner style</span><select data-sq-radius><option value="radius-soft">Soft · 16px</option><option value="radius-round">Rounded · 28px</option><option value="radius-square">Square · 4px</option></select></label><label><span>Page layout</span><select data-sq-layout><option value="layout-rich">Balanced commerce</option><option value="layout-editorial">Editorial images</option><option value="layout-image-only">Image-first / no default copy</option></select></label></div>
+          <div class="sq-control-section"><h3>Typography</h3><div class="sq-font-card"><span>Aa</span><div><b>Poppins</b><small>Headings and body · 4 weights</small></div></div><label><span>Base size</span><input type="range" min="13" max="20" value="16" data-sq-font-size><output data-sq-font-output>16px</output></label></div>
+        </section>
+
+        <section class="sq-tool-panel" data-sq-panel="pages">
+          <header><div><small>Website</small><h2>Pages &amp; hosting</h2></div><button type="button" data-open-page-creator aria-label="New landing page"><?= ez_admin_icon('plus') ?></button></header>
+          <div class="sq-page-list">
+            <button class="active" type="button" data-sq-site data-site-name="Morning Ritual Store" data-site-url="madu-nusantara.id"><span><?= ez_admin_product_art('Granola Madu Nusantara') ?></span><div><b>Morning Ritual Store</b><small>madu-nusantara.id</small></div><em>Live</em></button>
+            <button type="button" data-sq-site data-site-name="Kopi Susu at Home" data-site-url="kopisusu.ezkart.site"><span><?= ez_admin_product_art('Kopi Susu Concentrate') ?></span><div><b>Kopi Susu at Home</b><small>kopisusu.ezkart.site</small></div><em>Live</em></button>
+            <button type="button" data-sq-site data-site-name="Sambal Roa Launch" data-site-url="sambal-roa.ezkart.site"><span><?= ez_admin_product_art('Sambal Roa Signature') ?></span><div><b>Sambal Roa Launch</b><small>sambal-roa.ezkart.site</small></div><em class="draft">Draft</em></button>
+          </div>
+          <div class="sq-host-card"><span><?= ez_admin_icon('globe') ?></span><div><b>madu-nusantara.id</b><small>DNS verified · SSL auto-renewing</small></div><em>Healthy</em></div>
+          <div class="sq-host-card"><span><?= ez_admin_icon('shield') ?></span><div><b>Managed hosting</b><small>Global CDN · 99.99% uptime</small></div><em>Active</em></div>
+          <button class="sq-wide-button" type="button" data-toast="Domain manager opened">Manage domains &amp; SEO</button>
+        </section>
+      </div>
+    </aside>
+
+    <main class="sq-canvas-stage">
+      <div class="sq-canvas-meta"><span><?= ez_admin_icon('shield') ?><b data-current-site-url>madu-nusantara.id</b></span><div><button type="button" data-sq-zoom-out aria-label="Zoom out">−</button><output data-sq-zoom>80%</output><button type="button" data-sq-zoom-in aria-label="Zoom in">+</button></div></div>
+      <div class="sq-canvas-scroll">
+        <div class="sq-device-frame" data-sq-device-frame>
+          <article class="sq-page-preview theme-coral radius-soft layout-rich" data-sq-preview-root>
+            <section class="sq-page-block sq-announcement selected" draggable="true" data-sq-block data-section-id="announcement"><button class="sq-block-handle" type="button" aria-label="Drag announcement section"><?= ez_admin_icon('grip') ?></button><p>Free delivery across Java on orders above Rp150.000</p></section>
+            <nav class="sq-store-nav"><b>Morning Ritual</b><div><a href="#products">Shop</a><a href="#story">Our story</a><a href="#shipping">Delivery</a><button type="button">Buy now</button></div></nav>
+            <section class="sq-page-block sq-hero" draggable="true" data-sq-block data-section-id="hero"><button class="sq-block-handle" type="button" aria-label="Drag hero section"><?= ez_admin_icon('grip') ?></button><div class="sq-hero-copy"><span>Made in Indonesia · delivered nationwide</span><h1 data-sq-content="headline">Small-batch favorites for a better everyday ritual.</h1><p data-sq-content="description">Discover honest ingredients, thoughtful local production, and a secure checkout that takes care of payment and delivery.</p><div><button type="button" data-sq-content="cta">Shop the collection</button><small><?= ez_admin_icon('shield') ?> Secure checkout with Midtrans</small></div></div><div class="sq-hero-collage"><span class="large" data-product-visual="granola"><?= ez_admin_product_art('Granola Madu Nusantara') ?></span><span data-product-visual="coffee"><?= ez_admin_product_art('Kopi Susu Concentrate') ?></span><span data-product-visual="sambal"><?= ez_admin_product_art('Sambal Roa Signature') ?></span></div></section>
+            <section class="sq-page-block sq-product-section" id="products" draggable="true" data-sq-block data-section-id="products"><button class="sq-block-handle" type="button" aria-label="Drag product section"><?= ez_admin_icon('grip') ?></button><header><div><span>Shop the collection</span><h2>Pick one favorite—or build your whole basket.</h2></div><p>Every item stays synchronized with stock, Midtrans, and live shipping rates.</p></header><div class="sq-product-grid" data-sq-product-grid>
+              <article data-product-card="granola"><?= ez_admin_product_art('Granola Madu Nusantara') ?><div><small>Breakfast · 320 g</small><h3>Granola Madu Nusantara</h3><p>Honey-toasted oats, cashews, and warm local spice.</p><footer><b>Rp58.000</b><button type="button">Add to cart</button></footer></div></article>
+              <article data-product-card="coffee"><?= ez_admin_product_art('Kopi Susu Concentrate') ?><div><small>Drinks · 650 ml</small><h3>Kopi Susu Concentrate</h3><p>Rich café-style coffee, balanced and ready in seconds.</p><footer><b>Rp79.000</b><button type="button">Add to cart</button></footer></div></article>
+              <article data-product-card="sambal"><?= ez_admin_product_art('Sambal Roa Signature') ?><div><small>Pantry · 260 g</small><h3>Sambal Roa Signature</h3><p>Deep smoke, bright chili, and a savory Manado finish.</p><footer><b>Rp46.000</b><button type="button">Add to cart</button></footer></div></article>
+            </div></section>
+            <section class="sq-page-block sq-image-story" id="story" draggable="true" data-sq-block data-section-id="image-story"><button class="sq-block-handle" type="button" aria-label="Drag image story section"><?= ez_admin_icon('grip') ?></button><div><?= ez_admin_product_art('Granola Madu Nusantara') ?></div><article><span>Image-led storytelling</span><h2>Let the product fill the screen.</h2><p>Use photography as the complete section or pair it with a short story. Image-only layouts are always available, but never forced by default.</p><button type="button">See how it is made</button></article></section>
+            <section class="sq-page-block sq-benefit-row" draggable="true" data-sq-block data-section-id="benefits"><button class="sq-block-handle" type="button" aria-label="Drag benefits section"><?= ez_admin_icon('grip') ?></button><article><?= ez_admin_icon('star') ?><div><b>Real local ingredients</b><small>Clear sourcing and honest product details</small></div></article><article><?= ez_admin_icon('credit-card') ?><div><b>Secure payment</b><small>Item and customer data prepared for Midtrans</small></div></article><article><?= ez_admin_icon('truck') ?><div><b>Delivery arranged</b><small>Courier, live rate, and ETA at checkout</small></div></article></section>
+            <section class="sq-page-block sq-cart-section" draggable="true" data-sq-block data-section-id="checkout"><button class="sq-block-handle" type="button" aria-label="Drag checkout section"><?= ez_admin_icon('grip') ?></button><div><span>Your basket</span><h2>One checkout for every product on the page.</h2><p>Customers can combine products, choose quantities, and pay once. Ezkart sends the complete item list to Midtrans.</p></div><aside><small>Example basket</small><ul data-sq-basket-lines><li data-product-line="granola"><span>Granola Madu Nusantara</span><b>Rp58.000</b></li><li data-product-line="coffee"><span>Kopi Susu Concentrate</span><b>Rp79.000</b></li><li data-product-line="sambal"><span>Sambal Roa Signature</span><b>Rp46.000</b></li></ul><footer><span>Total</span><strong data-sq-basket-total>Rp183.000</strong></footer><button type="button">Continue to secure checkout</button><em><?= ez_admin_icon('shield') ?> Midtrans Sandbox · no real charge</em></aside></section>
+            <section class="sq-page-block sq-shipping-section" id="shipping" draggable="true" data-sq-block data-section-id="shipping"><button class="sq-block-handle" type="button" aria-label="Drag shipping section"><?= ez_admin_icon('grip') ?></button><span><?= ez_admin_icon('truck') ?></span><div><small>Ezkart fulfillment</small><h2>From page visit to delivered order.</h2><p>Address collection, product weights, courier quotes, payment state, and fulfillment stay connected in one flow.</p></div><ul><li>JNE REG</li><li>SiCepat REG</li><li>J&amp;T EZ</li></ul></section>
+          </article>
+        </div>
+      </div>
+      <footer class="sq-stage-footer"><span><i></i> Hosted preview</span><span data-sq-stage-size>Desktop · 1440px</span><span><?= ez_admin_icon('check-circle') ?> Midtrans + shipping connected</span></footer>
+    </main>
+
+    <aside class="sq-inspector">
+      <header><div><small>Selected section</small><h2 data-sq-inspector-title>Announcement</h2></div><button type="button" data-sq-close-inspector aria-label="Close inspector"><?= ez_admin_icon('x') ?></button></header>
+      <div class="sq-inspector-scroll">
+        <section class="sq-content-controls"><h3>Content</h3><label><span>Headline</span><textarea data-sq-edit-content="headline">Small-batch favorites for a better everyday ritual.</textarea></label><label><span>Description</span><textarea data-sq-edit-content="description">Discover honest ingredients, thoughtful local production, and a secure checkout that takes care of payment and delivery.</textarea></label><label><span>Button label</span><input value="Shop the collection" data-sq-edit-content="cta"></label></section>
+        <section><div class="sq-inspector-heading"><h3>Responsive spacing</h3><span data-sq-spacing-device>Desktop</span></div><label class="sq-link-spacing"><input type="checkbox" data-sq-link-spacing><span>Link all sides</span></label><div class="sq-spacing-grid"><label><span>Top</span><input type="range" min="0" max="160" value="8" data-sq-spacing="top"><output data-sq-spacing-output="top">8</output></label><label><span>Right</span><input type="range" min="0" max="160" value="16" data-sq-spacing="right"><output data-sq-spacing-output="right">16</output></label><label><span>Bottom</span><input type="range" min="0" max="160" value="8" data-sq-spacing="bottom"><output data-sq-spacing-output="bottom">8</output></label><label><span>Left</span><input type="range" min="0" max="160" value="16" data-sq-spacing="left"><output data-sq-spacing-output="left">16</output></label></div><p class="sq-field-note">Values are saved independently for desktop, tablet, and mobile.</p></section>
+        <section><h3>Entrance animation</h3><label><span>Effect</span><select data-sq-animation><option value="none">None</option><option value="fade">Fade in</option><option value="slide-up">Slide up</option><option value="slide-left">Slide from left</option><option value="scale">Soft scale</option></select></label><div class="sq-inline-controls"><label><span>Duration</span><input type="range" min="200" max="1600" step="100" value="600" data-sq-duration><output data-sq-duration-output>600ms</output></label><label><span>Delay</span><input type="range" min="0" max="1000" step="100" value="0" data-sq-delay><output data-sq-delay-output>0ms</output></label></div><label><span>Easing</span><select data-sq-easing><option value="ease-out">Smooth out</option><option value="ease-in-out">Smooth both</option><option value="cubic-bezier(.2,.8,.2,1)">Expressive</option><option value="linear">Linear</option></select></label><button class="sq-replay-button" type="button" data-sq-replay><?= ez_admin_icon('play') ?> Replay animation</button></section>
+        <section><h3>Section layout</h3><label><span>Content width</span><input type="range" min="720" max="1440" step="40" value="1200" data-sq-content-width><output data-sq-width-output>1200px</output></label><label><span>Background</span><select data-sq-background><option value="light">Warm white</option><option value="white">White</option><option value="dark">Charcoal</option><option value="accent">Brand accent</option></select></label></section>
+      </div>
+      <footer><button type="button" data-sq-duplicate><?= ez_admin_icon('layers') ?> Duplicate</button><button type="button" data-sq-visibility><?= ez_admin_icon('eye') ?> Hide</button><button class="danger" type="button" data-sq-delete aria-label="Delete selected section"><?= ez_admin_icon('x') ?></button></footer>
+    </aside>
+  </div>
+</section>
+
+<dialog class="sq-export-dialog" id="html-export-dialog">
+  <form method="dialog"><header><span><?= ez_admin_icon('code') ?></span><div><small>Production output</small><h2>Generated landing-page HTML</h2><p>Responsive structure, selected products, spacing, animations, SEO metadata, and checkout hooks are included.</p></div><button value="close" aria-label="Close HTML export"><?= ez_admin_icon('x') ?></button></header><div class="sq-export-summary"><span><?= ez_admin_icon('check-circle') ?> Semantic HTML</span><span><?= ez_admin_icon('check-circle') ?> Responsive CSS</span><span><?= ez_admin_icon('check-circle') ?> Animation CSS</span><span><?= ez_admin_icon('check-circle') ?> Commerce hooks</span></div><textarea readonly spellcheck="false" data-sq-html-output></textarea><footer><small data-sq-html-size>Ready to generate</small><button type="button" data-sq-copy-html>Copy HTML</button><button class="primary" type="button" data-sq-download-html><?= ez_admin_icon('download') ?> Download .html</button></footer></form>
+</dialog>
+
+<dialog class="page-creator-dialog" id="page-creator-dialog"><form method="dialog" data-page-creator-form><header><span><?= ez_admin_icon('layout') ?></span><div><small>Create a landing page</small><h2>Start with at least one product.</h2><p>You can connect as many products as you want and change the selection at any time.</p></div><button value="cancel" aria-label="Close"><?= ez_admin_icon('x') ?></button></header><section><label><span>Page name</span><input name="page_name" required maxlength="60" placeholder="Example: Ramadan Collection"></label><fieldset><legend>Starting products</legend><label><input type="checkbox" name="starter_products[]" value="granola" checked><span><?= ez_admin_icon('box') ?><b>Granola</b><small>Rp58.000</small></span></label><label><input type="checkbox" name="starter_products[]" value="coffee" checked><span><?= ez_admin_icon('coffee') ?><b>Kopi Susu</b><small>Rp79.000</small></span></label><label><input type="checkbox" name="starter_products[]" value="sambal"><span><?= ez_admin_icon('sambal') ?><b>Sambal Roa</b><small>Rp46.000</small></span></label></fieldset><label><span>Free Ezkart URL</span><div class="slug-field"><input name="slug" required pattern="[a-z0-9]+(?:-[a-z0-9]+)*" placeholder="ramadan-collection"><em>.ezkart.site</em></div></label></section><footer><button value="cancel">Cancel</button><button class="primary" value="default" data-create-page>Build full page</button></footer></form></dialog>
