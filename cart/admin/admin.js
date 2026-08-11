@@ -146,6 +146,7 @@
     const spacingState = new Map();
     const inlineEditSnapshots = new WeakMap();
     let selectedSection = "announcement";
+    let selectedElement = null;
     let activeDevice = "desktop";
     let draggedSection = "";
     let draggedImage = null;
@@ -162,8 +163,14 @@
     sqStudio.querySelectorAll("[data-sq-open-panel]").forEach((button) => button.addEventListener("click", () => openSqPanel(button.dataset.sqOpenPanel)));
 
     const selectedProducts = () => [...sqStudio.querySelectorAll("[data-sq-product]:checked")].map((input) => input.value);
+    const previewSnapshotHtml = () => {
+      if (!previewRoot) return "";
+      const clone = previewRoot.cloneNode(true);
+      clone.querySelectorAll(".sq-element-overlay").forEach((overlay) => overlay.remove());
+      return clone.innerHTML;
+    };
     const captureState = () => ({
-      preview: previewRoot?.innerHTML || "",
+      preview: previewSnapshotHtml(),
       previewClass: previewRoot?.className || "",
       layers: layerList?.innerHTML || "",
       productPicker: sqStudio.querySelector(".sq-product-picker")?.innerHTML || "",
@@ -202,6 +209,164 @@
       const totalTarget = sqStudio.querySelector("[data-sq-basket-total]");
       if (totalTarget) totalTarget.textContent = formatRupiah(total);
       sqStudio.querySelectorAll("[data-sq-product-count], [data-sq-layer-product-count]").forEach((target) => { target.textContent = String(products.length); });
+    };
+
+    const layoutKey = (device = activeDevice) => `layout${device[0].toUpperCase()}${device.slice(1)}`;
+    const parseElementLayout = (element, device = activeDevice) => {
+      const raw = element?.dataset[layoutKey(device)] || element?.dataset.layoutDesktop || "1,1,12,4";
+      const [x, y, width, height] = raw.split(",").map((value) => Number.parseInt(value, 10));
+      const safeWidth = Math.max(1, Math.min(12, width || 12));
+      return {
+        x: Math.max(1, Math.min(13 - safeWidth, x || 1)),
+        y: Math.max(1, y || 1),
+        width: safeWidth,
+        height: Math.max(1, height || 4),
+      };
+    };
+    const setElementLayout = (element, layout, device = activeDevice) => {
+      if (!element) return;
+      const width = Math.max(1, Math.min(12, Number(layout.width) || 1));
+      const normalized = {
+        x: Math.max(1, Math.min(13 - width, Number(layout.x) || 1)),
+        y: Math.max(1, Math.min(30, Number(layout.y) || 1)),
+        width,
+        height: Math.max(1, Math.min(30, Number(layout.height) || 1)),
+      };
+      element.dataset[layoutKey(device)] = `${normalized.x},${normalized.y},${normalized.width},${normalized.height}`;
+      if (device === activeDevice) {
+        element.style.gridColumn = `${normalized.x} / span ${normalized.width}`;
+        element.style.gridRow = `${normalized.y} / span ${normalized.height}`;
+      }
+      return normalized;
+    };
+    const fluidRowHeight = (section) => {
+      if (section?.classList.contains("sq-announcement")) return 10;
+      if (section?.classList.contains("sq-store-nav")) return 36;
+      if (section?.classList.contains("sq-benefit-row")) return activeDevice === "mobile" ? 34 : 22;
+      if (section?.classList.contains("sq-shipping-section")) return 22;
+      if (section?.classList.contains("sq-product-section")) return 28;
+      return 34;
+    };
+    const applyFluidSection = (section) => {
+      if (!section?.matches("[data-sq-fluid]")) return;
+      let rows = Number.parseInt(section.dataset.sqRows || "12", 10);
+      section.querySelectorAll(":scope > [data-sq-element]").forEach((element) => {
+        const layout = setElementLayout(element, parseElementLayout(element));
+        rows = Math.max(rows, layout.y + layout.height - 1);
+      });
+      section.style.setProperty("--sq-fluid-rows", String(rows));
+      section.style.setProperty("--sq-fluid-row-height", `${fluidRowHeight(section)}px`);
+    };
+    const applyFluidLayouts = () => previewRoot?.querySelectorAll("[data-sq-fluid]").forEach(applyFluidSection);
+    const elementTypeName = (element) => (element?.dataset.sqElementType || "element").replace(/-/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+    const syncElementControls = () => {
+      const controls = sqStudio.querySelector("[data-sq-element-controls]");
+      const valid = selectedElement?.isConnected && selectedElement.closest(`[data-section-id="${selectedSection}"]`);
+      if (controls) controls.hidden = !valid;
+      if (!valid) return;
+      const layout = parseElementLayout(selectedElement);
+      const type = sqStudio.querySelector(".sq-element-controls [data-sq-element-type]");
+      if (type) type.textContent = elementTypeName(selectedElement);
+      [["x", layout.x], ["y", layout.y], ["w", layout.width], ["h", layout.height]].forEach(([field, value]) => {
+        const input = sqStudio.querySelector(`[data-sq-element-${field}]`);
+        if (input) input.value = String(value);
+      });
+      const hideButton = sqStudio.querySelector("[data-sq-element-hide]");
+      if (hideButton) hideButton.lastChild.textContent = selectedElement.classList.contains("sq-element-hidden") ? " Show" : " Hide";
+    };
+    const removeElementOverlay = () => previewRoot?.querySelectorAll(".sq-element-overlay").forEach((overlay) => overlay.remove());
+    const refreshElementOverlay = () => {
+      removeElementOverlay();
+      if (!selectedElement?.isConnected) return;
+      const section = selectedElement.closest("[data-sq-fluid]");
+      if (!section) return;
+      const overlay = document.createElement("div");
+      overlay.className = "sq-element-overlay";
+      overlay.innerHTML = `<div class="sq-element-toolbar"><button type="button" data-sq-element-move aria-label="Move element">${iconMarkup("grip")}</button><span>${escapeHtml(elementTypeName(selectedElement))}</span><button type="button" data-sq-overlay-duplicate aria-label="Duplicate element">${iconMarkup("layers")}</button><button type="button" data-sq-overlay-delete aria-label="Delete element">${iconMarkup("x")}</button></div><button class="sq-element-resize" type="button" data-sq-element-resize aria-label="Resize element"></button>`;
+      section.append(overlay);
+      const sectionRect = section.getBoundingClientRect();
+      const elementRect = selectedElement.getBoundingClientRect();
+      overlay.style.left = `${elementRect.left - sectionRect.left}px`;
+      overlay.style.top = `${elementRect.top - sectionRect.top}px`;
+      overlay.style.width = `${elementRect.width}px`;
+      overlay.style.height = `${elementRect.height}px`;
+      overlay.querySelector("[data-sq-overlay-duplicate]").onclick = (event) => { event.stopPropagation(); duplicateSelectedElement(); };
+      overlay.querySelector("[data-sq-overlay-delete]").onclick = (event) => { event.stopPropagation(); deleteSelectedElement(); };
+      bindElementPointerControl(overlay.querySelector("[data-sq-element-move]"), false);
+      bindElementPointerControl(overlay.querySelector("[data-sq-element-resize]"), true);
+    };
+    const selectSqElement = (element) => {
+      if (!element?.matches("[data-sq-element]")) return;
+      selectedElement = element;
+      previewRoot?.querySelectorAll(".sq-element-selected").forEach((item) => item.classList.remove("sq-element-selected"));
+      element.classList.add("sq-element-selected");
+      syncElementControls();
+      requestAnimationFrame(refreshElementOverlay);
+    };
+    const duplicateSelectedElement = () => {
+      if (!selectedElement?.isConnected) return;
+      const snapshot = captureState();
+      const copy = selectedElement.cloneNode(true);
+      copy.classList.remove("sq-element-selected", "sq-element-hidden");
+      copy.dataset.sqElementId = `element-${Date.now()}`;
+      ["desktop", "tablet", "mobile"].forEach((device) => {
+        const layout = parseElementLayout(selectedElement, device);
+        setElementLayout(copy, { ...layout, x: Math.min(13 - layout.width, layout.x + 1), y: layout.y + 1 }, device);
+      });
+      selectedElement.after(copy);
+      remember(snapshot);
+      bindSqInteractions();
+      selectSqElement(copy);
+      markSqChanged();
+    };
+    const deleteSelectedElement = () => {
+      if (!selectedElement?.isConnected) return;
+      remember();
+      const section = selectedElement.closest("[data-sq-fluid]");
+      selectedElement.remove();
+      selectedElement = null;
+      removeElementOverlay();
+      applyFluidSection(section);
+      syncElementControls();
+      syncInspectorContent();
+      markSqChanged();
+      showToast("Element deleted — Undo is available");
+    };
+    const bindElementPointerControl = (handle, resizing) => {
+      if (!handle) return;
+      handle.onpointerdown = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (!selectedElement?.isConnected) return;
+        const section = selectedElement.closest("[data-sq-fluid]");
+        const startLayout = parseElementLayout(selectedElement);
+        const snapshot = captureState();
+        const startX = event.clientX;
+        const startY = event.clientY;
+        const rect = section.getBoundingClientRect();
+        const columnWidth = rect.width / 12;
+        const rowHeight = fluidRowHeight(section);
+        let changed = false;
+        const move = (pointerEvent) => {
+          const columns = Math.round((pointerEvent.clientX - startX) / columnWidth);
+          const rows = Math.round((pointerEvent.clientY - startY) / rowHeight);
+          const next = resizing
+            ? { ...startLayout, width: startLayout.width + columns, height: startLayout.height + rows }
+            : { ...startLayout, x: startLayout.x + columns, y: startLayout.y + rows };
+          setElementLayout(selectedElement, next);
+          applyFluidSection(section);
+          syncElementControls();
+          refreshElementOverlay();
+          changed = changed || columns !== 0 || rows !== 0;
+        };
+        const end = () => {
+          window.removeEventListener("pointermove", move);
+          window.removeEventListener("pointerup", end);
+          if (changed) { remember(snapshot); markSqChanged(); }
+        };
+        window.addEventListener("pointermove", move);
+        window.addEventListener("pointerup", end, { once: true });
+      };
     };
 
     const spacingKey = (section = selectedSection, device = activeDevice) => `${section}:${device}`;
@@ -246,6 +411,7 @@
       ".sq-generated-reviews b", ".sq-generated-reviews small",
       ".sq-generated-faq>h2", ".sq-generated-faq summary", ".sq-generated-faq p",
       ".sq-generated-spacer>span",
+      ".sq-free-heading>h2", ".sq-free-text>p", ".sq-free-button>button", ".sq-free-form>h3", ".sq-free-form>p",
     ].join(",");
     const editableNodesFor = (block) => block ? [...block.querySelectorAll(editableContentSelector)].filter((node) => !node.closest(".sq-image-drag-handle")) : [];
     const contentFieldLabel = (node, index) => {
@@ -309,6 +475,11 @@
       const layerTitle = sqStudio.querySelector(`[data-sq-layer][data-section-id="${sectionId}"] b`)?.textContent;
       if (title) title.textContent = layerTitle || sectionNames[sectionId] || "Section";
       const block = previewRoot?.querySelector(`[data-section-id="${sectionId}"]`);
+      if (selectedElement && !block?.contains(selectedElement)) {
+        selectedElement = null;
+        previewRoot?.querySelectorAll(".sq-element-selected").forEach((item) => item.classList.remove("sq-element-selected"));
+        removeElementOverlay();
+      }
       const visibility = sqStudio.querySelector("[data-sq-visibility]");
       if (visibility) visibility.lastChild.textContent = block?.classList.contains("section-hidden") ? " Show" : " Hide";
       const animation = sqStudio.querySelector("[data-sq-animation]");
@@ -326,6 +497,8 @@
       loadSpacingControls();
       if (spacingState.has(spacingKey())) applySpacing();
       syncInspectorContent();
+      syncElementControls();
+      if (selectedElement) requestAnimationFrame(refreshElementOverlay);
     };
 
     const reorderSection = (dragId, targetId, placeAfter) => {
@@ -361,6 +534,17 @@
         block.ondrop = (event) => { event.preventDefault(); block.classList.remove("drag-over"); const rect = block.getBoundingClientRect(); reorderSection(draggedSection, block.dataset.sectionId, event.clientY > rect.top + rect.height / 2); };
         block.ondragend = () => { block.classList.remove("dragging"); previewRoot.querySelectorAll(".drag-over").forEach((item) => item.classList.remove("drag-over")); };
       });
+      applyFluidLayouts();
+      previewRoot?.querySelectorAll("[data-sq-fluid] > [data-sq-element]").forEach((element, index) => {
+        if (!element.dataset.sqElementId) element.dataset.sqElementId = `element-${Date.now()}-${index}`;
+        element.draggable = false;
+        element.onclick = (event) => {
+          event.stopPropagation();
+          const section = element.closest("[data-section-id]");
+          if (section) selectSqSection(section.dataset.sectionId);
+          selectSqElement(element);
+        };
+      });
       previewRoot?.querySelectorAll("[data-sq-image-list]").forEach((list) => {
         [...list.children].filter((item) => item.matches("[data-sq-image-item]")).forEach((item) => {
           item.draggable = true;
@@ -372,6 +556,7 @@
             event.stopPropagation();
             const section = item.closest("[data-section-id]");
             if (section) selectSqSection(section.dataset.sectionId);
+            selectSqElement(item.closest("[data-sq-element]"));
             previewRoot.querySelectorAll(".sq-image-selected").forEach((image) => image.classList.remove("sq-image-selected"));
             item.classList.add("sq-image-selected");
           };
@@ -439,6 +624,7 @@
             event.stopPropagation();
             if (content.matches("a,button")) event.preventDefault();
             selectSqSection(block.dataset.sectionId);
+            selectSqElement(content.closest("[data-sq-element]"));
           };
           content.ondragstart = (event) => event.stopPropagation();
           content.onfocus = startInlineEdit;
@@ -472,6 +658,7 @@
 
     const restoreState = (state) => {
       if (!previewRoot || !layerList) return;
+      selectedElement = null;
       previewRoot.innerHTML = state.preview;
       previewRoot.className = state.previewClass;
       layerList.innerHTML = state.layers;
@@ -580,6 +767,9 @@
       if (stageSize) stageSize.textContent = sizes[activeDevice];
       loadSpacingControls();
       applySpacing();
+      applyFluidLayouts();
+      syncElementControls();
+      if (selectedElement) requestAnimationFrame(refreshElementOverlay);
     }));
 
     let spacingSnapshot;
@@ -594,6 +784,60 @@
         markSqChanged();
       });
       input.addEventListener("change", () => { if (spacingSnapshot) remember(spacingSnapshot); spacingSnapshot = null; });
+    });
+    let elementControlSnapshot;
+    sqStudio.querySelectorAll("[data-sq-element-x], [data-sq-element-y], [data-sq-element-w], [data-sq-element-h]").forEach((input) => {
+      input.addEventListener("focus", () => { elementControlSnapshot = captureState(); });
+      input.addEventListener("input", () => {
+        if (!selectedElement) return;
+        const layout = parseElementLayout(selectedElement);
+        const field = input.hasAttribute("data-sq-element-x") ? "x" : input.hasAttribute("data-sq-element-y") ? "y" : input.hasAttribute("data-sq-element-w") ? "width" : "height";
+        setElementLayout(selectedElement, { ...layout, [field]: Number(input.value) });
+        applyFluidSection(selectedElement.closest("[data-sq-fluid]"));
+        requestAnimationFrame(refreshElementOverlay);
+        markSqChanged();
+      });
+      input.addEventListener("change", () => { if (elementControlSnapshot) remember(elementControlSnapshot); elementControlSnapshot = null; });
+    });
+    sqStudio.querySelector("[data-sq-element-duplicate]")?.addEventListener("click", duplicateSelectedElement);
+    sqStudio.querySelector("[data-sq-element-delete]")?.addEventListener("click", deleteSelectedElement);
+    sqStudio.querySelector("[data-sq-element-hide]")?.addEventListener("click", () => {
+      if (!selectedElement?.isConnected) return;
+      remember();
+      selectedElement.classList.toggle("sq-element-hidden");
+      syncElementControls();
+      refreshElementOverlay();
+      markSqChanged();
+    });
+    sqStudio.querySelector("[data-sq-layout-preset]")?.addEventListener("change", (event) => {
+      const section = previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`);
+      const elements = [...(section?.querySelectorAll(":scope > [data-sq-element]") || [])];
+      if (!section || !elements.length || event.currentTarget.value === "custom") return;
+      remember();
+      const images = elements.filter((element) => ["image", "collage"].includes(element.dataset.sqElementType));
+      const copy = elements.find((element) => ["copy", "text", "brand", "collection-heading"].includes(element.dataset.sqElementType)) || elements[0];
+      elements.forEach((element) => element.classList.remove("sq-element-hidden", "sq-single-image"));
+      if (event.currentTarget.value === "text-only") {
+        images.forEach((element) => element.classList.add("sq-element-hidden"));
+        if (copy) setElementLayout(copy, { x: 2, y: 1, width: 10, height: Math.max(6, Number(section.dataset.sqRows || 12)) });
+      } else if (event.currentTarget.value === "image-only") {
+        elements.forEach((element) => element.classList.toggle("sq-element-hidden", !images.includes(element)));
+        images.forEach((element, index) => setElementLayout(element, { x: 1, y: 1 + index * 6, width: 12, height: Math.max(6, Number(section.dataset.sqRows || 12)) }));
+      } else if (event.currentTarget.value === "single-image") {
+        if (copy) setElementLayout(copy, { x: 1, y: 1, width: 6, height: 12 });
+        images.slice(0, 1).forEach((element) => { element.classList.add("sq-single-image"); setElementLayout(element, { x: 7, y: 1, width: 6, height: 12 }); });
+        images.slice(1).forEach((element) => element.classList.add("sq-element-hidden"));
+      } else if (event.currentTarget.value === "stacked") {
+        let row = 1;
+        elements.forEach((element) => { setElementLayout(element, { x: 1, y: row, width: 12, height: 6 }); row += 6; });
+      } else {
+        if (copy) setElementLayout(copy, { x: 1, y: 1, width: 6, height: 12 });
+        images.forEach((element, index) => { setElementLayout(element, { x: 7, y: 1 + index * 6, width: 6, height: images.length > 1 ? 6 : 12 }); });
+      }
+      applyFluidSection(section);
+      syncElementControls();
+      refreshElementOverlay();
+      markSqChanged();
     });
     const replayAnimation = () => {
       const block = previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`);
@@ -663,16 +907,70 @@
     const iconMarkup = (name) => `<svg class="icon" aria-hidden="true"><use href="#icon-${name}"></use></svg>`;
     const newBlockMarkup = (type, sectionId) => {
       const handle = `<button class="sq-block-handle" type="button" aria-label="Drag section">${iconMarkup("grip")}</button>`;
-      if (type === "full-image") return `<section class="sq-page-block sq-generated-image" draggable="true" data-sq-block data-section-id="${sectionId}">${handle}<img src="${productImages.granola}" alt="Granola Madu Nusantara product story"></section>`;
-      if (type === "gallery") return `<section class="sq-page-block sq-generated-gallery" draggable="true" data-sq-block data-sq-image-list data-section-id="${sectionId}">${handle}<img draggable="true" tabindex="0" data-sq-image-item src="${productImages.granola}" alt="Granola — drag to rearrange"><img draggable="true" tabindex="0" data-sq-image-item src="${productImages.coffee}" alt="Kopi Susu — drag to rearrange"><img draggable="true" tabindex="0" data-sq-image-item src="${productImages.sambal}" alt="Sambal Roa — drag to rearrange"></section>`;
-      if (type === "text") return `<section class="sq-page-block sq-generated-text" draggable="true" data-sq-block data-section-id="${sectionId}">${handle}<small>YOUR STORY</small><h2 contenteditable="true">A clear idea deserves room to breathe.</h2><p contenteditable="true">Write a concise product or brand story here. Every line remains editable directly on the page.</p></section>`;
-      if (type === "testimonials") return `<section class="sq-page-block sq-generated-reviews" draggable="true" data-sq-block data-section-id="${sectionId}">${handle}<article><b>“Excellent flavor and beautifully packed.”</b><small>Sarah · verified buyer</small></article><article><b>“Checkout was easy and delivery was quick.”</b><small>Michael · verified buyer</small></article></section>`;
-      if (type === "faq") return `<section class="sq-page-block sq-generated-faq" draggable="true" data-sq-block data-section-id="${sectionId}">${handle}<h2>Questions, answered.</h2><details open><summary>How does payment work?</summary><p>Customers complete a secure Midtrans checkout prepared by Ezkart.</p></details><details><summary>How is shipping calculated?</summary><p>Product weights, destination, courier, and service determine the live rate.</p></details></section>`;
-      if (type === "spacer") return `<section class="sq-page-block sq-generated-spacer" draggable="true" data-sq-block data-section-id="${sectionId}">${handle}<span>Responsive spacer · 80px</span></section>`;
+      if (type === "blank") return `<section class="sq-page-block sq-generated-blank" draggable="true" data-sq-block data-sq-fluid data-sq-rows="12" data-section-id="${sectionId}">${handle}</section>`;
+      if (type === "full-image") return `<section class="sq-page-block sq-generated-image" draggable="true" data-sq-block data-sq-fluid data-sq-rows="14" data-section-id="${sectionId}">${handle}<div class="sq-free-image" data-sq-element data-sq-element-type="image" data-layout-desktop="1,1,12,14" data-layout-tablet="1,1,12,14" data-layout-mobile="1,1,12,14"><img src="${productImages.granola}" alt="Granola Madu Nusantara product story"></div></section>`;
+      if (type === "gallery") return `<section class="sq-page-block sq-generated-gallery" draggable="true" data-sq-block data-sq-fluid data-sq-rows="12" data-section-id="${sectionId}">${handle}<div class="sq-free-image" data-sq-element data-sq-element-type="image" data-layout-desktop="1,1,6,12" data-layout-tablet="1,1,12,6" data-layout-mobile="1,1,12,6"><img src="${productImages.granola}" alt="Granola"></div><div class="sq-free-image" data-sq-element data-sq-element-type="image" data-layout-desktop="7,1,3,12" data-layout-tablet="1,7,6,6" data-layout-mobile="1,7,6,6"><img src="${productImages.coffee}" alt="Kopi Susu"></div><div class="sq-free-image" data-sq-element data-sq-element-type="image" data-layout-desktop="10,1,3,12" data-layout-tablet="7,7,6,6" data-layout-mobile="7,7,6,6"><img src="${productImages.sambal}" alt="Sambal Roa"></div></section>`;
+      if (type === "text") return `<section class="sq-page-block sq-generated-text" draggable="true" data-sq-block data-sq-fluid data-sq-rows="10" data-section-id="${sectionId}">${handle}<small data-sq-element data-sq-element-type="eyebrow" data-layout-desktop="2,1,10,2" data-layout-tablet="1,1,12,2" data-layout-mobile="1,1,12,2">YOUR STORY</small><h2 data-sq-element data-sq-element-type="heading" data-layout-desktop="2,3,10,4" data-layout-tablet="1,3,12,4" data-layout-mobile="1,3,12,4">A clear idea deserves room to breathe.</h2><p data-sq-element data-sq-element-type="text" data-layout-desktop="3,7,8,3" data-layout-tablet="1,7,12,3" data-layout-mobile="1,7,12,3">Write a concise product or brand story here. Every line remains editable directly on the page.</p></section>`;
+      if (type === "testimonials") return `<section class="sq-page-block sq-generated-reviews" draggable="true" data-sq-block data-sq-fluid data-sq-rows="8" data-section-id="${sectionId}">${handle}<article data-sq-element data-sq-element-type="review" data-layout-desktop="1,1,6,8" data-layout-tablet="1,1,6,8" data-layout-mobile="1,1,12,4"><b>“Excellent flavor and beautifully packed.”</b><small>Sarah · verified buyer</small></article><article data-sq-element data-sq-element-type="review" data-layout-desktop="7,1,6,8" data-layout-tablet="7,1,6,8" data-layout-mobile="1,5,12,4"><b>“Checkout was easy and delivery was quick.”</b><small>Michael · verified buyer</small></article></section>`;
+      if (type === "faq") return `<section class="sq-page-block sq-generated-faq" draggable="true" data-sq-block data-sq-fluid data-sq-rows="12" data-section-id="${sectionId}">${handle}<h2 data-sq-element data-sq-element-type="heading" data-layout-desktop="1,1,12,3" data-layout-tablet="1,1,12,3" data-layout-mobile="1,1,12,3">Questions, answered.</h2><details open data-sq-element data-sq-element-type="faq" data-layout-desktop="1,4,12,4" data-layout-tablet="1,4,12,4" data-layout-mobile="1,4,12,4"><summary>How does payment work?</summary><p>Customers complete a secure Midtrans checkout prepared by Ezkart.</p></details><details data-sq-element data-sq-element-type="faq" data-layout-desktop="1,8,12,4" data-layout-tablet="1,8,12,4" data-layout-mobile="1,8,12,4"><summary>How is shipping calculated?</summary><p>Product weights, destination, courier, and service determine the live rate.</p></details></section>`;
+      if (type === "spacer") return `<section class="sq-page-block sq-generated-spacer" draggable="true" data-sq-block data-sq-fluid data-sq-rows="3" data-section-id="${sectionId}">${handle}<span data-sq-element data-sq-element-type="spacer" data-layout-desktop="1,1,12,3" data-layout-tablet="1,1,12,3" data-layout-mobile="1,1,12,3">Responsive spacer · 80px</span></section>`;
       const template = previewRoot?.querySelector(`[data-section-id="${type}"]`);
-      if (template) { const clone = template.cloneNode(true); clone.dataset.sectionId = sectionId; clone.removeAttribute("id"); clone.classList.remove("selected"); return clone.outerHTML; }
+      if (template) { const clone = template.cloneNode(true); clone.querySelectorAll(".sq-element-overlay").forEach((overlay) => overlay.remove()); clone.dataset.sectionId = sectionId; clone.removeAttribute("id"); clone.classList.remove("selected"); return clone.outerHTML; }
       return `<section class="sq-page-block sq-generated-text" draggable="true" data-sq-block data-section-id="${sectionId}">${handle}<h2>New section</h2></section>`;
     };
+    const newElementMarkup = (type) => {
+      if (type === "heading") return `<div class="sq-free-element sq-free-heading" data-sq-element data-sq-element-type="heading"><h2>Write a powerful heading.</h2></div>`;
+      if (type === "text") return `<div class="sq-free-element sq-free-text" data-sq-element data-sq-element-type="text"><p>Add your story, product details, or supporting copy here.</p></div>`;
+      if (type === "button") return `<div class="sq-free-element sq-free-button" data-sq-element data-sq-element-type="button"><button type="button">Call to action</button></div>`;
+      if (type === "image") return `<div class="sq-free-element sq-free-image" data-sq-element data-sq-element-type="image"><img src="${productImages.granola}" alt="Product image"></div>`;
+      if (type === "divider") return `<div class="sq-free-element sq-free-divider" data-sq-element data-sq-element-type="divider"><span></span></div>`;
+      return `<div class="sq-free-element sq-free-form" data-sq-element data-sq-element-type="form"><h3>Stay in the loop.</h3><p>Get product news and special offers.</p><form><input type="email" placeholder="Email address" aria-label="Email address"><button type="button">Subscribe</button></form></div>`;
+    };
+    const ensureElementSection = (section) => {
+      if (!section || section.matches("[data-sq-fluid]")) return;
+      section.dataset.sqFluid = "";
+      section.dataset.sqRows = "12";
+      let row = 1;
+      [...section.children].filter((child) => !child.matches(".sq-block-handle,.sq-element-overlay")).forEach((child) => {
+        let element = child;
+        if (child.matches("img")) {
+          element = document.createElement("div");
+          element.className = "sq-free-image";
+          child.before(element);
+          element.append(child);
+        }
+        element.dataset.sqElement = "";
+        element.dataset.sqElementType ||= element.matches("img,.sq-free-image") ? "image" : "content";
+        ["desktop", "tablet", "mobile"].forEach((device) => setElementLayout(element, { x: 1, y: row, width: 12, height: 5 }, device));
+        row += 5;
+      });
+      section.dataset.sqRows = String(Math.max(12, row - 1));
+    };
+    sqStudio.querySelectorAll("[data-sq-add-element]").forEach((button) => button.addEventListener("click", () => {
+      const section = previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`);
+      if (!section) return;
+      remember();
+      ensureElementSection(section);
+      removeElementOverlay();
+      const wrapper = document.createElement("div");
+      wrapper.innerHTML = newElementMarkup(button.dataset.sqAddElement);
+      const element = wrapper.firstElementChild;
+      const currentElements = [...section.querySelectorAll(":scope > [data-sq-element]")];
+      const lastRow = currentElements.reduce((maximum, item) => { const layout = parseElementLayout(item); return Math.max(maximum, layout.y + layout.height); }, 1);
+      const height = button.dataset.sqAddElement === "divider" ? 1 : button.dataset.sqAddElement === "button" ? 2 : button.dataset.sqAddElement === "image" ? 8 : 4;
+      const width = button.dataset.sqAddElement === "divider" ? 10 : button.dataset.sqAddElement === "button" ? 4 : 8;
+      ["desktop", "tablet", "mobile"].forEach((device) => setElementLayout(element, { x: device === "mobile" ? 1 : 2, y: lastRow, width: device === "mobile" ? 12 : width, height }, device));
+      section.append(element);
+      section.dataset.sqRows = String(Math.max(Number(section.dataset.sqRows || 12), lastRow + height - 1));
+      bindSqInteractions();
+      applyFluidSection(section);
+      selectSqElement(element);
+      syncInspectorContent();
+      openSqPanel("layers");
+      element.scrollIntoView({ behavior: "smooth", block: "center" });
+      markSqChanged();
+      showToast(`${elementTypeName(element)} added — drag it anywhere in the section`);
+    }));
     sqStudio.querySelectorAll("[data-sq-add-block]").forEach((button) => button.addEventListener("click", () => {
       remember();
       const type = button.dataset.sqAddBlock;
@@ -685,7 +983,7 @@
       if (layerTemplate) {
         layerTemplate.dataset.sectionId = sectionId; layerTemplate.classList.remove("active", "section-hidden");
         const title = layerTemplate.querySelector("b"); const subtitle = layerTemplate.querySelector("small");
-        if (title) title.textContent = ({ "full-image": "Full image", gallery: "Image gallery", text: "Text story", testimonials: "Reviews", faq: "FAQ", spacer: "Spacer", products: "Product collection", checkout: "Checkout" })[type] || "Section";
+        if (title) title.textContent = ({ blank: "Blank canvas", "full-image": "Full image", gallery: "Image gallery", text: "Text story", testimonials: "Reviews", faq: "FAQ", spacer: "Spacer", products: "Product collection", checkout: "Checkout" })[type] || "Section";
         if (subtitle) subtitle.textContent = "Added just now · draggable";
         layerList.querySelector(`[data-section-id="${selectedSection}"]`)?.after(layerTemplate);
       }
@@ -693,7 +991,7 @@
     }));
     sqStudio.querySelector("[data-sq-block-search]")?.addEventListener("input", (event) => {
       const query = normalize(event.currentTarget.value);
-      sqStudio.querySelectorAll("[data-sq-add-block]").forEach((button) => { button.hidden = Boolean(query) && !normalize(button.dataset.search).includes(query); });
+      sqStudio.querySelectorAll("[data-sq-add-block], [data-sq-add-element]").forEach((button) => { button.hidden = Boolean(query) && !normalize(button.dataset.search).includes(query); });
     });
 
     sqStudio.querySelector("[data-sq-duplicate]")?.addEventListener("click", () => {
@@ -721,10 +1019,25 @@
       const enabled = !sqStudio.classList.contains("preview-mode"); sqStudio.classList.toggle("preview-mode", enabled); const label = event.currentTarget.querySelector("span"); if (label) label.textContent = enabled ? "Exit preview" : "Preview"; showToast(enabled ? "Full-canvas preview enabled — press Escape to exit" : "Editing tools restored");
     });
     document.addEventListener("keydown", (event) => { if (event.key === "Escape" && sqStudio.classList.contains("preview-mode")) { sqStudio.classList.remove("preview-mode"); const label = sqStudio.querySelector("[data-sq-preview] span"); if (label) label.textContent = "Preview"; } });
+    document.addEventListener("keydown", (event) => {
+      if (!selectedElement?.isConnected || event.target.closest("input,textarea,select,[contenteditable=true]")) return;
+      if (event.key === "Delete" || event.key === "Backspace") { event.preventDefault(); deleteSelectedElement(); return; }
+      const movements = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+      if (!movements[event.key]) return;
+      event.preventDefault();
+      remember();
+      const layout = parseElementLayout(selectedElement);
+      const [x, y] = movements[event.key];
+      setElementLayout(selectedElement, { ...layout, x: layout.x + x, y: layout.y + y });
+      applyFluidSection(selectedElement.closest("[data-sq-fluid]"));
+      syncElementControls();
+      refreshElementOverlay();
+      markSqChanged();
+    });
 
     const exportDialog = document.getElementById("html-export-dialog");
     const collectExportCss = () => {
-      const tokens = [".sq-page-preview", ".sq-page-block", ".sq-announcement", ".sq-store-nav", ".sq-hero", ".sq-product", ".sq-image-story", ".sq-benefit", ".sq-cart", ".sq-shipping", ".sq-generated", "@keyframes sq", ".product-art", ".icon", ".svg-sprite"];
+      const tokens = [".sq-page-preview", ".sq-page-block", ".sq-announcement", ".sq-store-nav", ".sq-hero", ".sq-product", ".sq-image-story", ".sq-benefit", ".sq-cart", ".sq-shipping", ".sq-generated", ".sq-free", ".ez-fluid", "@keyframes sq", ".product-art", ".icon", ".svg-sprite"];
       const collect = (rules) => [...rules].map((rule) => {
         if (rule.cssRules) { const nested = collect(rule.cssRules); return nested ? `${rule.conditionText ? `@media ${rule.conditionText}` : rule.cssText.slice(0, rule.cssText.indexOf("{"))}{${nested}}` : ""; }
         return tokens.some((token) => rule.cssText.includes(token)) ? rule.cssText : "";
@@ -733,12 +1046,19 @@
     };
     const generateHtml = () => {
       const clone = previewRoot.cloneNode(true);
-      clone.querySelectorAll(".sq-block-handle, .sq-image-drag-handle, .section-hidden").forEach((node) => node.remove());
+      clone.querySelectorAll(".sq-block-handle, .sq-image-drag-handle, .sq-element-overlay, .section-hidden, .sq-element-hidden").forEach((node) => node.remove());
       clone.querySelectorAll("[data-product-card][hidden], [data-product-line][hidden], .sq-hero-collage > span[hidden]").forEach((node) => node.remove());
       clone.querySelectorAll("[data-section-id]").forEach((node) => { node.dataset.ezkartSection = node.dataset.sectionId; });
       clone.querySelectorAll("[draggable], [contenteditable], [data-sq-block], [data-section-id]").forEach((node) => { node.removeAttribute("draggable"); node.removeAttribute("contenteditable"); node.removeAttribute("data-sq-block"); node.removeAttribute("data-section-id"); node.classList.remove("selected", "dragging", "drag-over", "animating"); });
       clone.querySelectorAll("[data-sq-image-list], [data-sq-image-item]").forEach((node) => { node.removeAttribute("data-sq-image-list"); node.removeAttribute("data-sq-image-item"); node.removeAttribute("tabindex"); node.classList.remove("sq-image-selected", "sq-image-dragging", "sq-image-drop-target"); });
       clone.querySelectorAll("[data-sq-editable], [data-sq-content]").forEach((node) => { node.removeAttribute("data-sq-editable"); node.removeAttribute("data-sq-content"); });
+      clone.querySelectorAll("[data-sq-fluid]").forEach((node) => { node.classList.add("ez-fluid-section"); node.removeAttribute("data-sq-fluid"); node.removeAttribute("data-sq-rows"); });
+      clone.querySelectorAll("[data-sq-element]").forEach((node) => {
+        node.classList.add("ez-fluid-element");
+        node.dataset.ezkartElement = node.dataset.sqElementId;
+        ["sqElement", "sqElementId", "sqElementType", "layoutDesktop", "layoutTablet", "layoutMobile"].forEach((key) => delete node.dataset[key]);
+        node.classList.remove("sq-element-selected");
+      });
       clone.querySelectorAll("img").forEach((image) => { image.src = new URL(image.getAttribute("src"), window.location.href).href; });
       clone.querySelectorAll("[data-product-card]").forEach((card) => { const button = card.querySelector("button"); if (button) { button.dataset.ezkartAdd = card.dataset.productCard; button.type = "button"; } });
       const checkout = clone.querySelector(".sq-cart-section aside>button"); if (checkout) checkout.dataset.ezkartCheckout = "";
@@ -746,7 +1066,8 @@
       const sprite = document.querySelector(".svg-sprite")?.outerHTML || "";
       const css = collectExportCss();
       const spacingCssFor = (device) => [...spacingState.entries()].filter(([key]) => key.endsWith(`:${device}`)).map(([key, value]) => { const section = key.slice(0, -(device.length + 1)); return `[data-ezkart-section="${section}"]{padding:${value.top}px ${value.right}px ${value.bottom}px ${value.left}px!important}`; }).join("\n");
-      const responsiveSpacing = `${spacingCssFor("desktop")}\n@media(max-width:900px){${spacingCssFor("tablet")}}\n@media(max-width:600px){${spacingCssFor("mobile")}}`;
+      const elementCssFor = (device) => [...previewRoot.querySelectorAll("[data-sq-element]")].map((element) => { const layout = parseElementLayout(element, device); return `[data-ezkart-element="${element.dataset.sqElementId}"]{grid-column:${layout.x}/span ${layout.width}!important;grid-row:${layout.y}/span ${layout.height}!important}`; }).join("\n");
+      const responsiveSpacing = `${spacingCssFor("desktop")}\n${elementCssFor("desktop")}\n@media(max-width:900px){${spacingCssFor("tablet")}\n${elementCssFor("tablet")}}\n@media(max-width:600px){${spacingCssFor("mobile")}\n${elementCssFor("mobile")}}`;
       const commerceScript = `<script>(()=>{const cart=new Set();document.querySelectorAll('[data-ezkart-add]').forEach(button=>button.addEventListener('click',()=>{const id=button.dataset.ezkartAdd;cart.has(id)?cart.delete(id):cart.add(id);button.textContent=cart.has(id)?'Added ✓':'Add to cart'}));document.querySelector('[data-ezkart-checkout]')?.addEventListener('click',()=>{const products=[...cart];if(!products.length){alert('Add at least one product first.');return}location.href='/cart/?products='+encodeURIComponent(products.join(','))});const observer=new IntersectionObserver(entries=>entries.forEach(entry=>{if(entry.isIntersecting){entry.target.classList.add('animating');observer.unobserve(entry.target)}}),{threshold:.12});document.querySelectorAll('[class*="animation-"]').forEach(section=>observer.observe(section))})();<\/script>`;
       const fontBase = new URL("assets/fonts/poppins-400.woff2", window.location.href).href;
       const fontBold = new URL("assets/fonts/poppins-600.woff2", window.location.href).href;
