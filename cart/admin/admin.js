@@ -254,6 +254,35 @@
       }
       return normalized;
     };
+    const layoutsOverlap = (first, second) => !(
+      first.x + first.width <= second.x ||
+      second.x + second.width <= first.x ||
+      first.y + first.height <= second.y ||
+      second.y + second.height <= first.y
+    );
+    const findOpenElementLayout = (section, desired, device = activeDevice) => {
+      const width = Math.max(1, Math.min(12, Number(desired.width) || 4));
+      const height = Math.max(1, Math.min(30, Number(desired.height) || 2));
+      const minimumRows = Math.max(1, Number.parseInt(section?.dataset.sqMinRows || section?.dataset.sqRows || "12", 10));
+      const occupied = [...(section?.querySelectorAll(":scope > [data-sq-element]") || [])]
+        .filter((element) => !element.classList.contains("sq-element-hidden"))
+        .map((element) => parseElementLayout(element, device));
+      const maximumOccupiedRow = occupied.reduce((maximum, layout) => Math.max(maximum, layout.y + layout.height - 1), minimumRows);
+      const preferredX = Math.max(1, Math.round((13 - width) / 2));
+      const preferredY = Math.max(1, Math.round((minimumRows - height) / 2) + 1);
+      const xCandidates = Array.from({ length: 13 - width }, (_, index) => index + 1)
+        .sort((a, b) => Math.abs(a - preferredX) - Math.abs(b - preferredX));
+      const rowsToSearch = Math.min(30 - height + 1, Math.max(minimumRows - height + 1, maximumOccupiedRow + 2));
+      const yCandidates = Array.from({ length: rowsToSearch }, (_, index) => index + 1)
+        .sort((a, b) => Math.abs(a - preferredY) - Math.abs(b - preferredY));
+      for (const y of yCandidates) {
+        for (const x of xCandidates) {
+          const candidate = { x, y, width, height };
+          if (!occupied.some((layout) => layoutsOverlap(candidate, layout))) return candidate;
+        }
+      }
+      return { x: preferredX, y: Math.min(30 - height + 1, maximumOccupiedRow + 1), width, height };
+    };
     const fluidRowHeight = (section, device = activeDevice) => {
       if (section?.classList.contains("sq-announcement")) return 10;
       if (section?.classList.contains("sq-store-nav")) return 36;
@@ -264,11 +293,13 @@
     };
     const applyFluidSection = (section) => {
       if (!section?.matches("[data-sq-fluid]")) return;
-      let rows = Number.parseInt(section.dataset.sqRows || "12", 10);
+      if (!section.dataset.sqMinRows) section.dataset.sqMinRows = section.dataset.sqRows || "12";
+      let rows = Number.parseInt(section.dataset.sqMinRows || "12", 10);
       section.querySelectorAll(":scope > [data-sq-element]").forEach((element) => {
         const layout = setElementLayout(element, parseElementLayout(element));
         rows = Math.max(rows, layout.y + layout.height - 1);
       });
+      section.dataset.sqRows = String(rows);
       section.style.setProperty("--sq-fluid-rows", String(rows));
       section.style.setProperty("--sq-fluid-row-height", `${fluidRowHeight(section)}px`);
     };
@@ -348,10 +379,11 @@
       section.append(overlay);
       const sectionRect = section.getBoundingClientRect();
       const elementRect = selectedElement.getBoundingClientRect();
-      overlay.style.left = `${elementRect.left - sectionRect.left}px`;
-      overlay.style.top = `${elementRect.top - sectionRect.top}px`;
-      overlay.style.width = `${elementRect.width}px`;
-      overlay.style.height = `${elementRect.height}px`;
+      const renderedScale = section.offsetWidth ? sectionRect.width / section.offsetWidth : 1;
+      overlay.style.left = `${(elementRect.left - sectionRect.left) / renderedScale}px`;
+      overlay.style.top = `${(elementRect.top - sectionRect.top) / renderedScale}px`;
+      overlay.style.width = `${elementRect.width / renderedScale}px`;
+      overlay.style.height = `${elementRect.height / renderedScale}px`;
       overlay.querySelector("[data-sq-overlay-duplicate]").onclick = (event) => { event.stopPropagation(); duplicateSelectedElement(); };
       overlay.querySelector("[data-sq-overlay-delete]").onclick = (event) => { event.stopPropagation(); deleteSelectedElement(); };
       bindElementPointerControl(overlay.querySelector("[data-sq-element-move]"), false);
@@ -373,7 +405,7 @@
       copy.dataset.sqElementId = `element-${Date.now()}`;
       ["desktop", "tablet", "mobile"].forEach((device) => {
         const layout = parseElementLayout(selectedElement, device);
-        setElementLayout(copy, { ...layout, x: Math.min(13 - layout.width, layout.x + 1), y: layout.y + 1 }, device);
+        setElementLayout(copy, findOpenElementLayout(selectedElement.closest("[data-sq-fluid]"), layout, device), device);
       });
       selectedElement.after(copy);
       remember(snapshot);
@@ -406,8 +438,12 @@
         const startX = event.clientX;
         const startY = event.clientY;
         const rect = section.getBoundingClientRect();
-        const columnWidth = rect.width / 12;
-        const rowHeight = fluidRowHeight(section);
+        const renderedScale = section.offsetWidth ? rect.width / section.offsetWidth : 1;
+        const computed = getComputedStyle(section);
+        const horizontalPadding = Number.parseFloat(computed.paddingLeft) + Number.parseFloat(computed.paddingRight);
+        const columnGap = Number.parseFloat(computed.columnGap) || 0;
+        const columnWidth = (((section.clientWidth - horizontalPadding - columnGap * 11) / 12) + columnGap) * renderedScale;
+        const rowHeight = fluidRowHeight(section) * renderedScale;
         let changed = false;
         const move = (pointerEvent) => {
           const columns = Math.round((pointerEvent.clientX - startX) / columnWidth);
@@ -1146,24 +1182,23 @@
       return clone.outerHTML;
     };
     const templateHeroLayouts = (mode) => {
-      if (mode === "split-left") return { copy: "7,2,6,11", image: "1,1,6,14", tabletCopy: "1,8,12,8", tabletImage: "1,1,12,7" };
-      if (mode === "split-right") return { copy: "1,2,6,11", image: "7,1,6,14", tabletCopy: "1,1,12,8", tabletImage: "1,9,12,7" };
-      if (mode === "editorial") return { copy: "7,3,6,9", image: "1,1,8,14", tabletCopy: "1,8,12,7", tabletImage: "1,1,12,8" };
-      if (mode === "image-led") return { copy: "2,8,9,6", image: "1,1,12,14", tabletCopy: "1,8,12,7", tabletImage: "1,1,12,14" };
-      return { copy: mode === "bleed-dark" ? "2,3,6,9" : "7,3,5,9", image: "1,1,12,14", tabletCopy: "1,8,12,7", tabletImage: "1,1,12,14" };
+      if (mode === "split-left") return { copy: "7,2,6,12", image: "1,1,6,15", tabletCopy: "1,8,12,8", tabletImage: "1,1,12,7" };
+      if (mode === "split-right") return { copy: "1,2,6,12", image: "7,1,6,15", tabletCopy: "1,1,12,8", tabletImage: "1,9,12,7" };
+      if (mode === "editorial") return { copy: "7,3,6,11", image: "1,1,8,15", tabletCopy: "1,8,12,8", tabletImage: "1,1,12,8" };
+      if (mode === "image-led") return { copy: "2,8,9,7", image: "1,1,12,15", tabletCopy: "1,8,12,8", tabletImage: "1,1,12,15" };
+      return { copy: mode === "bleed-dark" ? "2,3,6,11" : "7,3,5,11", image: "1,1,12,15", tabletCopy: "1,8,12,8", tabletImage: "1,1,12,15" };
     };
     const makeTemplateMarkup = (config, key) => {
       const layout = templateHeroLayouts(config.mode);
       const overlay = config.mode.startsWith("bleed") || config.mode === "image-led";
       const heroTextClass = overlay ? " sq-template-copy-overlay" : "";
       const imagePosition = ["embun", "pulih"].includes(key) ? "center" : key === "sora" ? "center right" : "center";
-      const hero = `<section class="sq-page-block sq-hero sq-template-hero sq-template-${config.mode}" draggable="true" data-sq-block data-sq-fluid data-sq-rows="14" data-section-id="hero">${templateHandle("hero")}<div class="sq-template-media sq-free-image element-animation-scale hover-${config.hover}" data-sq-element data-sq-element-type="image" data-sq-element-animation="scale" data-sq-hover="${config.hover}" data-layout-desktop="${layout.image}" data-layout-tablet="${layout.tabletImage}" data-layout-mobile="1,1,12,14"><img src="${config.image}" alt="${escapeHtml(config.name)} campaign" style="object-position:${imagePosition}"></div><div class="sq-hero-copy sq-template-copy${heroTextClass} button-primary element-animation-${config.entrance}" data-sq-element data-sq-element-type="copy" data-sq-button-role="primary" data-sq-element-animation="${config.entrance}" data-sq-hover="none" data-layout-desktop="${layout.copy}" data-layout-tablet="${layout.tabletCopy}" data-layout-mobile="1,8,12,7"><span>${escapeHtml(config.kicker)}</span><h1>${escapeHtml(config.headline)}</h1><p>${escapeHtml(config.body)}</p><div><button type="button">${escapeHtml(config.cta)}</button><small>${iconMarkup("shield")} Secure checkout by Ezkart</small></div></div></section>`;
-      const story = `<section class="sq-page-block sq-template-story" draggable="true" data-sq-block data-sq-fluid data-sq-rows="10" data-section-id="image-story">${templateHandle("story")}<div class="sq-template-story-copy element-animation-slide-left" data-sq-element data-sq-element-type="copy" data-sq-element-animation="slide-left" data-sq-hover="none" data-layout-desktop="1,2,8,8" data-layout-tablet="1,1,12,6" data-layout-mobile="1,1,12,6"><span>OUR POINT OF VIEW</span><h2>${escapeHtml(config.story)}</h2><p>${escapeHtml(config.storyBody)}</p><button class="button-tertiary" type="button">Read our story</button></div><aside class="sq-template-manifesto sq-surface-card element-animation-rise hover-lift" data-sq-element data-sq-element-type="content" data-sq-element-animation="rise" data-sq-hover="lift" data-layout-desktop="9,2,4,8" data-layout-tablet="1,7,12,4" data-layout-mobile="1,7,12,4"><strong>01</strong><b>Designed locally</b><small>Built for independent Indonesian brands and their customers.</small></aside></section>`;
+      const hero = `<section class="sq-page-block sq-hero sq-template-hero sq-template-${config.mode}" draggable="true" data-sq-block data-sq-fluid data-sq-rows="15" data-section-id="hero">${templateHandle("hero")}<div class="sq-template-media sq-free-image element-animation-scale hover-${config.hover}" data-sq-element data-sq-element-type="image" data-sq-element-animation="scale" data-sq-hover="${config.hover}" data-layout-desktop="${layout.image}" data-layout-tablet="${layout.tabletImage}" data-layout-mobile="1,1,12,15"><img src="${config.image}" alt="${escapeHtml(config.name)} campaign" style="object-position:${imagePosition}"></div><div class="sq-hero-copy sq-template-copy${heroTextClass} button-primary element-animation-${config.entrance}" data-sq-element data-sq-element-type="copy" data-sq-button-role="primary" data-sq-element-animation="${config.entrance}" data-sq-hover="none" data-layout-desktop="${layout.copy}" data-layout-tablet="${layout.tabletCopy}" data-layout-mobile="1,8,12,8"><span>${escapeHtml(config.kicker)}</span><h1>${escapeHtml(config.headline)}</h1><p>${escapeHtml(config.body)}</p><div><button type="button">${escapeHtml(config.cta)}</button><small>${iconMarkup("shield")} Secure checkout by Ezkart</small></div></div></section>`;
+      const story = `<section class="sq-page-block sq-template-story" draggable="true" data-sq-block data-sq-fluid data-sq-rows="11" data-section-id="image-story">${templateHandle("story")}<div class="sq-template-story-copy element-animation-slide-left" data-sq-element data-sq-element-type="copy" data-sq-element-animation="slide-left" data-sq-hover="none" data-layout-desktop="1,2,8,9" data-layout-tablet="1,1,12,7" data-layout-mobile="1,1,12,7"><span>OUR POINT OF VIEW</span><h2>${escapeHtml(config.story)}</h2><p>${escapeHtml(config.storyBody)}</p><button class="button-tertiary" type="button">Read our story</button></div><aside class="sq-template-manifesto sq-surface-card element-animation-rise hover-lift" data-sq-element data-sq-element-type="content" data-sq-element-animation="rise" data-sq-hover="lift" data-layout-desktop="9,2,4,9" data-layout-tablet="1,8,12,4" data-layout-mobile="1,8,12,4"><strong>01</strong><b>Designed locally</b><small>Built for independent Indonesian brands and their customers.</small></aside></section>`;
       const benefits = `<section class="sq-page-block sq-benefit-row sq-template-benefits" draggable="true" data-sq-block data-sq-fluid data-sq-rows="6" data-section-id="benefits">${templateHandle("benefits")}<article class="element-animation-rise hover-lift" style="--element-delay:0ms" data-sq-element data-sq-element-type="benefit" data-sq-element-animation="rise" data-sq-hover="lift" data-layout-desktop="1,1,4,6" data-layout-tablet="1,1,4,6" data-layout-mobile="1,1,12,2">${iconMarkup("star")}<div><b>Thoughtful by default</b><small>Clear details and deliberate design</small></div></article><article class="element-animation-rise hover-lift" style="--element-delay:140ms" data-sq-element data-sq-element-type="benefit" data-sq-element-animation="rise" data-sq-hover="lift" data-layout-desktop="5,1,4,6" data-layout-tablet="5,1,4,6" data-layout-mobile="1,3,12,2">${iconMarkup("credit-card")}<div><b>Secure payment</b><small>Midtrans-ready checkout built in</small></div></article><article class="element-animation-rise hover-lift" style="--element-delay:280ms" data-sq-element data-sq-element-type="benefit" data-sq-element-animation="rise" data-sq-hover="lift" data-layout-desktop="9,1,4,6" data-layout-tablet="9,1,4,6" data-layout-mobile="1,5,12,2">${iconMarkup("truck")}<div><b>Delivery connected</b><small>Rates, couriers, and ETA included</small></div></article></section>`;
       const announcement = `<section class="sq-page-block sq-announcement" draggable="true" data-sq-block data-sq-fluid data-sq-rows="2" data-section-id="announcement">${templateHandle("announcement")}<p class="element-animation-fade" data-sq-element data-sq-element-type="text" data-sq-element-animation="fade" data-sq-hover="none" data-layout-desktop="1,1,12,2" data-layout-tablet="1,1,12,2" data-layout-mobile="1,1,12,2">${escapeHtml(config.announcement)}</p></section>`;
       const navigation = `<nav class="sq-page-block sq-store-nav" draggable="true" data-sq-block data-sq-fluid data-sq-rows="2" data-section-id="navigation">${templateHandle("navigation")}<b class="element-animation-fade" data-sq-element data-sq-element-type="brand" data-sq-element-animation="fade" data-sq-hover="none" data-layout-desktop="1,1,4,2" data-layout-tablet="1,1,4,2" data-layout-mobile="1,1,6,2">${escapeHtml(config.brand)}</b><div class="button-secondary element-animation-fade" data-sq-element data-sq-element-type="navigation" data-sq-button-role="secondary" data-sq-element-animation="fade" data-sq-hover="none" data-layout-desktop="7,1,6,2" data-layout-tablet="6,1,7,2" data-layout-mobile="7,1,6,2"><a href="#products">Shop</a><a href="#story">Story</a><a href="#shipping">Delivery</a><button type="button">Buy now</button></div></nav>`;
-      let responsiveHero = overlay ? hero : hero.replace('data-layout-mobile="1,1,12,14"', 'data-layout-mobile="1,1,12,7"');
-      if (config.mode === "editorial") responsiveHero = responsiveHero.replace('data-layout-mobile="1,8,12,7"', 'data-layout-mobile="1,8,12,9"');
+      let responsiveHero = overlay ? hero : hero.replace('data-layout-mobile="1,1,12,15"', 'data-layout-mobile="1,1,12,7"');
       const linkedStory = story.replace('<section class="', '<section id="story" class="').replace('sq-template-story-copy element-animation', 'sq-template-story-copy button-tertiary element-animation').replace('data-sq-element data-sq-element-type="copy"', 'data-sq-element data-sq-element-type="copy" data-sq-button-role="tertiary"').replace('<button class="button-tertiary"', '<button');
       return `${announcement}${navigation}${responsiveHero}${linkedStory}${commerceSectionMarkup("products", "rise", config.hover)}${benefits}${commerceSectionMarkup("checkout", config.entrance, "lift")}${commerceSectionMarkup("shipping", "fade", "none")}`;
     };
@@ -1256,19 +1291,21 @@
       const wrapper = document.createElement("div");
       wrapper.innerHTML = newElementMarkup(button.dataset.sqAddElement);
       const element = wrapper.firstElementChild;
-      const currentElements = [...section.querySelectorAll(":scope > [data-sq-element]")];
-      const lastRow = currentElements.reduce((maximum, item) => { const layout = parseElementLayout(item); return Math.max(maximum, layout.y + layout.height); }, 1);
-      const height = button.dataset.sqAddElement === "divider" ? 1 : button.dataset.sqAddElement === "button" ? 2 : ["image", "html"].includes(button.dataset.sqAddElement) ? 8 : 4;
-      const width = button.dataset.sqAddElement === "divider" ? 10 : button.dataset.sqAddElement === "button" ? 4 : 8;
-      ["desktop", "tablet", "mobile"].forEach((device) => setElementLayout(element, { x: device === "mobile" ? 1 : 2, y: lastRow, width: device === "mobile" ? 12 : width, height }, device));
+      const dimensions = {
+        heading: { width: 6, height: 4 }, text: { width: 6, height: 3 }, button: { width: 3, height: 2 },
+        image: { width: 6, height: 8 }, divider: { width: 8, height: 1 }, form: { width: 6, height: 5 }, html: { width: 8, height: 8 },
+      }[button.dataset.sqAddElement] || { width: 6, height: 4 };
+      ["desktop", "tablet", "mobile"].forEach((device) => {
+        const desired = device === "mobile" ? { ...dimensions, width: 12 } : dimensions;
+        setElementLayout(element, findOpenElementLayout(section, desired, device), device);
+      });
       section.append(element);
-      section.dataset.sqRows = String(Math.max(Number(section.dataset.sqRows || 12), lastRow + height - 1));
       bindSqInteractions();
       applyFluidSection(section);
       selectSqElement(element);
       syncInspectorContent();
       openSqPanel("layers");
-      element.scrollIntoView({ behavior: "smooth", block: "center" });
+      element.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
       markSqChanged();
       showToast(`${elementTypeName(element)} added — drag it anywhere in the section`);
     }));
@@ -1357,7 +1394,7 @@
       clone.querySelectorAll("[draggable], [contenteditable], [data-sq-block], [data-section-id]").forEach((node) => { node.removeAttribute("draggable"); node.removeAttribute("contenteditable"); node.removeAttribute("data-sq-block"); node.removeAttribute("data-section-id"); node.classList.remove("selected", "dragging", "drag-over", "animating"); });
       clone.querySelectorAll("[data-sq-image-list], [data-sq-image-item]").forEach((node) => { node.removeAttribute("data-sq-image-list"); node.removeAttribute("data-sq-image-item"); node.removeAttribute("tabindex"); node.classList.remove("sq-image-selected", "sq-image-dragging", "sq-image-drop-target"); });
       clone.querySelectorAll("[data-sq-editable], [data-sq-content]").forEach((node) => { node.removeAttribute("data-sq-editable"); node.removeAttribute("data-sq-content"); });
-      clone.querySelectorAll("[data-sq-fluid]").forEach((node) => { node.classList.add("ez-fluid-section"); node.removeAttribute("data-sq-fluid"); node.removeAttribute("data-sq-rows"); });
+      clone.querySelectorAll("[data-sq-fluid]").forEach((node) => { node.classList.add("ez-fluid-section"); node.removeAttribute("data-sq-fluid"); node.removeAttribute("data-sq-rows"); node.removeAttribute("data-sq-min-rows"); });
       clone.querySelectorAll("[data-sq-element]").forEach((node) => {
         node.classList.add("ez-fluid-element");
         node.dataset.ezkartElement = node.dataset.sqElementId;
