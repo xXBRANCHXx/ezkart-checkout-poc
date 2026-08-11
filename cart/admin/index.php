@@ -6,7 +6,7 @@ require_once dirname(__DIR__) . '/api/bootstrap.php';
 header('Cache-Control: no-store');
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: DENY');
-header("Content-Security-Policy: default-src 'self'; img-src 'self' data: https://*.basemaps.cartocdn.com; style-src 'self'; script-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'");
+header("Content-Security-Policy: default-src 'self'; img-src 'self' data: https://*.basemaps.cartocdn.com; style-src 'self'; style-src-attr 'unsafe-inline'; script-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'");
 
 $isHttps = isset($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off';
 session_name('ezkart_sandbox_admin');
@@ -238,11 +238,11 @@ $statusTotal = max(1, $metrics['orders']);
 $paidEnd = round(($statusCounts['PAID'] / $statusTotal) * 100, 1);
 $pendingEnd = round((($statusCounts['PAID'] + $statusCounts['PENDING']) / $statusTotal) * 100, 1);
 $creatingEnd = round((($statusCounts['PAID'] + $statusCounts['PENDING'] + $statusCounts['CREATING']) / $statusTotal) * 100, 1);
-$allowedPages = ['dashboard', 'orders', 'products', 'customers', 'analytics', 'marketing', 'payments', 'reviews', 'messages', 'integrations', 'settings'];
+$allowedPages = ['dashboard', 'orders', 'products', 'sites', 'customers', 'analytics', 'marketing', 'payments', 'reviews', 'messages', 'integrations', 'settings'];
 $requestedPage = strtolower(trim((string) ($_GET['page'] ?? 'dashboard')));
 $page = in_array($requestedPage, $allowedPages, true) ? $requestedPage : 'dashboard';
 $pageTitles = [
-    'dashboard' => 'Dashboard', 'orders' => 'Orders', 'products' => 'Products',
+    'dashboard' => 'Dashboard', 'orders' => 'Orders', 'products' => 'Products', 'sites' => 'Landing Pages',
     'customers' => 'Customers', 'analytics' => 'Analytics', 'marketing' => 'Marketing',
     'payments' => 'Payments', 'reviews' => 'Reviews', 'messages' => 'Messages',
     'integrations' => 'Integrations', 'settings' => 'Settings',
@@ -292,7 +292,7 @@ $catalogInventory = [
   <meta name="robots" content="noindex,nofollow">
   <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
   <?php if ($authenticated): ?><link rel="stylesheet" href="assets/vendor/leaflet.css"><?php endif; ?>
-  <link rel="stylesheet" href="admin.css?v=4">
+  <link rel="stylesheet" href="admin.css?v=7">
   <title><?= $authenticated ? ez_admin_escape($pageTitles[$page]) : 'Admin Login' ?> · Ezkart</title>
 </head>
 <body class="<?= $authenticated ? 'dashboard-page' : 'login-page' ?>">
@@ -359,6 +359,14 @@ $catalogInventory = [
     <symbol id="icon-chevron-down" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></symbol>
     <symbol id="icon-chevron-left" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
     <symbol id="icon-chevron-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+    <symbol id="icon-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/></symbol>
+    <symbol id="icon-layout" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 9v12"/></symbol>
+    <symbol id="icon-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1.2 1.2M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1.2-1.2"/></symbol>
+    <symbol id="icon-shield" viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 5 3.4 8 8 9 4.6-1 8-4 8-9V6l-8-3Z"/><path d="m9 12 2 2 4-4"/></symbol>
+    <symbol id="icon-eye" viewBox="0 0 24 24"><path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6Z"/><circle cx="12" cy="12" r="2.5"/></symbol>
+    <symbol id="icon-palette" viewBox="0 0 24 24"><path d="M12 3a9 9 0 0 0 0 18h1.5a2 2 0 0 0 0-4H12a2 2 0 0 1 0-4h3a6 6 0 0 0 0-12h-3Z"/><circle cx="7.5" cy="10" r=".8"/><circle cx="9" cy="6.5" r=".8"/><circle cx="14" cy="6" r=".8"/></symbol>
+    <symbol id="icon-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="icon-x" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
   </svg>
 
   <div class="app-shell">
@@ -368,6 +376,7 @@ $catalogInventory = [
         <a class="<?= $page === 'dashboard' ? 'active' : '' ?>" href="?page=dashboard"><?= ez_admin_icon('grid') ?><span>Dashboard</span></a>
         <a class="<?= $page === 'orders' ? 'active' : '' ?>" href="?page=orders"><?= ez_admin_icon('cart') ?><span>Orders</span><b><?= $metrics['orders'] ?></b></a>
         <a class="<?= $page === 'products' ? 'active' : '' ?>" href="?page=products"><?= ez_admin_icon('box') ?><span>Products</span></a>
+        <a class="<?= $page === 'sites' ? 'active' : '' ?>" href="?page=sites"><?= ez_admin_icon('layout') ?><span>Landing Pages</span><b>3</b></a>
         <a class="<?= $page === 'customers' ? 'active' : '' ?>" href="?page=customers"><?= ez_admin_icon('users') ?><span>Customers</span></a>
         <a class="<?= $page === 'analytics' ? 'active' : '' ?>" href="?page=analytics"><?= ez_admin_icon('chart') ?><span>Analytics</span></a>
         <a class="<?= $page === 'marketing' ? 'active' : '' ?>" href="?page=marketing"><?= ez_admin_icon('send') ?><span>Marketing</span></a>
@@ -378,8 +387,8 @@ $catalogInventory = [
         <a class="<?= $page === 'settings' ? 'active' : '' ?>" href="?page=settings"><?= ez_admin_icon('settings') ?><span>Settings</span></a>
       </nav>
       <section class="upgrade-card">
-        <span class="upgrade-icon"><?= ez_admin_icon('rocket') ?></span><div><b>Unlock growth with<br>Premium Plan</b><p>Get advanced analytics,<br>automations &amp; more.</p></div>
-        <a href="?page=analytics">Explore Analytics</a>
+        <span class="upgrade-icon"><?= ez_admin_icon('globe') ?></span><div><b>Launch on your<br>own domain</b><p>Hosted pages, checkout,<br>payments &amp; shipping.</p></div>
+        <a href="?page=sites">Manage Landing Pages</a>
       </section>
       <div class="store-switcher"><span class="store-icon"><?= ez_admin_icon('store') ?></span><div><b>Ezkart Sandbox</b><small>Midtrans Demo</small></div><?= ez_admin_icon('chevron-down', 'chevron-icon') ?></div>
     </aside>
@@ -473,7 +482,7 @@ $catalogInventory = [
         <section class="dashboard-grid footer-grid">
           <article class="panel reviews-panel" id="customer-reviews"><header class="panel-header"><h2>Customer Reviews</h2><a href="?page=reviews">Open reviews</a></header><div class="review-body"><div><strong>4.8</strong><p class="review-stars"><?= str_repeat(ez_admin_icon('star'), 5) ?></p><small>Sandbox review preview</small></div><ul><?php foreach ([5 => 82, 4 => 12, 3 => 4, 2 => 1, 1 => 1] as $stars => $width): ?><li><span><?= $stars ?> <?= ez_admin_icon('star') ?></span><i><b style="width:<?= $metrics['paid_count'] > 0 ? $width : 0 ?>%"></b></i><small><?= $metrics['paid_count'] > 0 ? max(0, (int) round($metrics['paid_count'] * $width / 100)) : 0 ?></small></li><?php endforeach; ?></ul></div></article>
 
-          <article class="panel tasks-panel" id="upcoming-tasks"><header class="panel-header"><h2>Upcoming Tasks</h2></header><div class="tasks-content"><ul><li><input type="checkbox">Review sandbox payment status <time>Today</time></li><li><input type="checkbox">Update product descriptions <time>Tomorrow</time></li><li><input type="checkbox">Respond to customer inquiries <time>Aug 14</time></li><li><input type="checkbox">Analyze checkout conversion <time>Aug 15</time></li></ul><div class="mini-calendar"><header><button type="button" aria-label="Previous month"><?= ez_admin_icon('chevron-left') ?></button><b><?= $nowJakarta->format('F Y') ?></b><button type="button" aria-label="Next month"><?= ez_admin_icon('chevron-right') ?></button></header><div class="weekdays"><span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span></div><div class="days"><?php for ($day = 1; $day <= 31; $day++): ?><span class="<?= $day === (int) $nowJakarta->format('j') ? 'today' : '' ?>"><?= $day ?></span><?php endfor; ?></div></div></div></article>
+          <article class="panel storefront-panel"><header class="panel-header"><h2>Landing Page &amp; Domain</h2><a href="?page=sites">Open builder</a></header><div class="storefront-summary"><span class="storefront-preview"><?= ez_admin_product_art('Granola Madu Nusantara') ?><i>Live</i></span><div><small>Primary storefront</small><b>Granola Morning Ritual</b><p><?= ez_admin_icon('globe') ?> madu-nusantara.id</p><em><?= ez_admin_icon('shield') ?> SSL active</em></div></div><div class="storefront-pipeline"><span><?= ez_admin_icon('box') ?><small>Product</small></span><i></i><span><?= ez_admin_icon('layout') ?><small>Page</small></span><i></i><span><?= ez_admin_icon('credit-card') ?><small>Midtrans</small></span><i></i><span><?= ez_admin_icon('truck') ?><small>Shipping</small></span></div></article>
 
           <article class="panel payout-panel" id="payout-summary"><header class="panel-header"><h2>Payment Summary</h2><a href="?page=payments">View all payments</a></header><div class="payout-body"><small>Provider-confirmed Sandbox Volume</small><div><strong><?= ez_admin_money($metrics['paid_volume']) ?></strong><em class="positive"><?= ez_admin_icon('check-circle') ?> Verified</em><span>signed Midtrans notifications</span></div></div><footer><div><small>Environment</small><b>Midtrans Sandbox</b></div><div><small>Paid Orders</small><b><?= number_format($metrics['paid_count']) ?></b></div><a href="../">Open Checkout</a></footer></article>
         </section>
@@ -483,7 +492,7 @@ $catalogInventory = [
   </div>
   <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
   <script src="assets/vendor/leaflet.js"></script>
-  <script src="admin.js?v=4"></script>
+  <script src="admin.js?v=7"></script>
 <?php endif; ?>
 </body>
 </html>
