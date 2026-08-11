@@ -19,6 +19,19 @@ environment. Each Snap transaction overrides its notification destination to
 `https://ezkart.id/cart/api/callback.php`, so the callback does not depend on a
 Dashboard-wide notification setting.
 
+## Sandbox admin dashboard
+
+The password-protected order dashboard is available at
+[`/cart/admin/`](https://ezkart.id/cart/admin/). Set
+`sandbox_admin_password` in `config.runtime.php`, or set the
+`EZKART_SANDBOX_ADMIN_PASSWORD` environment variable, before opening it.
+
+The dashboard reads the private JSON order store and displays order IDs,
+customers, line items, product subtotal, shipping charge, final total,
+shipping service, Midtrans reference/status, and signed-notification result. Its
+“paid volume” is an aggregate of sandbox orders marked `PAID`; it is not a real
+wallet balance or withdrawable settlement amount.
+
 ## Hosting
 
 The site is dependency-free and can be served directly from the repository root. Point Hostinger's deployment at the `main` branch; no build command is required.
@@ -26,7 +39,7 @@ The site is dependency-free and can be served directly from the repository root.
 ## Local preview
 
 ```bash
-python3 -m http.server 4173
+php -S 127.0.0.1:4173
 ```
 
 Then visit `http://localhost:4173`.
