@@ -141,6 +141,20 @@
     const productNames = { granola: "Granola Madu Nusantara", coffee: "Kopi Susu Concentrate", sambal: "Sambal Roa Signature" };
     const productImages = { granola: "assets/products/granola.webp", coffee: "assets/products/kopi-susu.webp", sambal: "assets/products/sambal-roa.webp" };
     const sectionNames = { announcement: "Announcement", navigation: "Navigation", hero: "Hero", products: "Product collection", "image-story": "Image story", benefits: "Benefits", checkout: "Checkout", shipping: "Shipping" };
+    const templateCatalog = {
+      sora: { name: "Sora Modest", brand: "SORA", category: "Fashion", image: "assets/templates/fashion-terracotta.webp", accent: "#b54b36", page: "#f8f0e8", ink: "#30231f", surface: "#fffaf5", mode: "split-right", kicker: "MODERN MODEST WEAR", headline: "Made to move with your whole life.", body: "Considered silhouettes, breathable fabrics, and expressive color—designed in Jakarta for everyday confidence.", cta: "Explore the collection", story: "Quiet confidence, cut with intention.", storyBody: "Small production runs and thoughtful details make every piece feel personal.", announcement: "Complimentary nationwide delivery this week", entrance: "rise", hover: "lift" },
+      embun: { name: "Embun Botanics", brand: "EMBUN", category: "Beauty", image: "assets/templates/skincare-sage.webp", accent: "#5d7450", page: "#eef1e7", ink: "#263126", surface: "#f9fbf5", mode: "split-left", kicker: "BOTANICAL SKINCARE", headline: "A calmer ritual for resilient skin.", body: "High-performance tropical botanicals, transparent formulation, and a routine made to feel beautifully simple.", cta: "Find your ritual", story: "Rooted in plants. Refined by science.", storyBody: "Every formula balances proven actives with ingredients grown closer to home.", announcement: "Free skin consultation with every first order", entrance: "blur", hover: "glow" },
+      pulih: { name: "Ruang Pulih", brand: "PULIH", category: "Wellness", image: "assets/templates/wellness-bali.webp", accent: "#7b7656", page: "#f5f0e6", ink: "#282a24", surface: "#fffcf5", mode: "bleed-light", kicker: "MOVEMENT · BREATH · REST", headline: "Come back to yourself.", body: "Grounded classes, quiet rituals, and a caring community for strength that lasts beyond the studio.", cta: "View this week’s classes", story: "Wellness without performance.", storyBody: "Choose movement, guided rest, or a flexible membership that meets you where you are.", announcement: "First studio class is complimentary", entrance: "fade", hover: "scale" },
+      tanah: { name: "Tanah Studio", brand: "TANAH", category: "Homeware", image: "assets/templates/homeware-clay.webp", accent: "#9a5437", page: "#e9dfd2", ink: "#2c241e", surface: "#f7f1e8", mode: "bleed-dark", kicker: "OBJECTS FOR DAILY LIVING", headline: "Useful things, made slowly.", body: "Hand-shaped ceramics and tactile home objects created in small batches across the archipelago.", cta: "Shop the new firing", story: "The hand of the maker stays visible.", storyBody: "Natural variation is not a flaw—it is the quiet signature of a real object.", announcement: "New studio firing available now", entrance: "slide-left", hover: "image-zoom" },
+      senja: { name: "Kopi Senja", brand: "SENJA", category: "Coffee", image: "assets/products/kopi-susu.webp", accent: "#d28a3c", page: "#201a18", ink: "#fff4e7", surface: "#342824", mode: "editorial", kicker: "COFFEE FOR SLOWER HOURS", headline: "Deep flavor. Zero café queue.", body: "Small-batch concentrate brewed for effortless iced kopi susu at home.", cta: "Stock the fridge", story: "Brewed bold enough to stay balanced.", storyBody: "A café-style base tuned for milk, ice, and your preferred level of sweetness.", announcement: "Cold-brew bundle ships free today", entrance: "scale", hover: "glow" },
+      timur: { name: "Dapur Timur", brand: "TIMUR!", category: "Food", image: "assets/products/sambal-roa.webp", accent: "#ff442f", page: "#ffe7d0", ink: "#2f1611", surface: "#fff7ed", mode: "split-right", kicker: "SMOKE · CHILI · MANADO", headline: "Turn the whole table up.", body: "Savory smoked roa, bright chili, and the kind of heat that keeps you reaching back in.", cta: "Get the sambal", story: "Big flavor from a small jar.", storyBody: "Built from real fish, honest aromatics, and a recipe made for rice, noodles, eggs—everything.", announcement: "Bundle three jars and save 15%", entrance: "slide-right", hover: "tilt" },
+      pagi: { name: "Meja Pagi", brand: "PAGI", category: "Food", image: "assets/products/granola.webp", accent: "#ec8b25", page: "#fff5d8", ink: "#3c2c1d", surface: "#fffdf6", mode: "split-left", kicker: "BETTER EVERYDAY BREAKFAST", headline: "A brighter start, one bowl at a time.", body: "Toasty clusters, local honey, and generous nuts for mornings that deserve better than boring.", cta: "Build a breakfast box", story: "Real pantry ingredients. Serious crunch.", storyBody: "Made in small batches so every bag arrives fragrant, crisp, and ready for your morning ritual.", announcement: "Breakfast bundles delivered nationwide", entrance: "rise", hover: "lift" },
+      mono: { name: "Mono Catalog", brand: "MONO—01", category: "Minimal", image: "assets/templates/homeware-clay.webp", accent: "#111111", page: "#f4f4f1", ink: "#111111", surface: "#ffffff", mode: "editorial", kicker: "PERMANENT COLLECTION 01", headline: "Less noise. Better objects.", body: "An uncompromising catalog for products that earn their place in your everyday.", cta: "Browse all objects", story: "Designed to outlast the moment.", storyBody: "A restrained material palette and details that reward a closer look.", announcement: "Edition 01 is now available", entrance: "fade", hover: "scale" },
+      neon: { name: "Neon Drop", brand: "DROP//11", category: "Launch", image: "assets/products/kopi-susu.webp", accent: "#c6ff00", page: "#0e0e13", ink: "#f6f7ff", surface: "#1b1b24", mode: "bleed-dark", kicker: "LIMITED RELEASE · NO RESTOCK", headline: "Built to interrupt the scroll.", body: "A high-impact drop page for limited products, countdown energy, and a checkout that moves fast.", cta: "Enter the drop", story: "One release. One window.", storyBody: "Keep the story sharp, the imagery loud, and every path pointed toward checkout.", announcement: "Drop closes Sunday at 23:59 WIB", entrance: "flip", hover: "glow" },
+      kisah: { name: "Kisah Visual", brand: "KISAH", category: "Portfolio", image: "assets/templates/fashion-terracotta.webp", accent: "#6f4cff", page: "#f3f0ff", ink: "#1f1831", surface: "#ffffff", mode: "bleed-light", kicker: "PHOTOGRAPHY · DIRECTION · CAMPAIGNS", headline: "Images with something to say.", body: "A portfolio-first storefront for commissions, print drops, and visual work that deserves room to breathe.", cta: "View selected work", story: "Campaign thinking, human feeling.", storyBody: "From a first creative brief to the final frame, every decision serves the story.", announcement: "Now booking Q4 campaigns", entrance: "blur", hover: "image-zoom" },
+      kelas: { name: "Kelas Bertumbuh", brand: "BERTUMBUH", category: "Creator", image: "assets/templates/wellness-bali.webp", accent: "#405de6", page: "#eef3ff", ink: "#17203b", surface: "#ffffff", mode: "split-right", kicker: "LEARN · PRACTICE · GROW", headline: "A practical course for your next chapter.", body: "Structured lessons, a generous community, and clear momentum without the usual online-course overwhelm.", cta: "See the curriculum", story: "Progress you can actually feel.", storyBody: "Short lessons, useful exercises, and feedback loops designed around real schedules.", announcement: "Cohort enrollment is open", entrance: "slide-left", hover: "lift" },
+      kanvas: { name: "Kanvas", brand: "KANVAS", category: "Image-led", image: "assets/templates/skincare-sage.webp", accent: "#ffffff", page: "#171717", ink: "#ffffff", surface: "#242424", mode: "image-led", kicker: "A SINGLE IDEA, FULL BLEED", headline: "Let the image carry the feeling.", body: "A cinematic starting point for campaigns that lead with art direction and keep copy deliberately spare.", cta: "Discover the story", story: "A flexible canvas, not a locked collage.", storyBody: "Replace the image, delete the copy, add custom code, or rebuild the composition from zero.", announcement: "New visual story live now", entrance: "scale", hover: "image-zoom" },
+    };
     const undoStack = [];
     const redoStack = [];
     const spacingState = new Map();
@@ -172,6 +186,7 @@
     const captureState = () => ({
       preview: previewSnapshotHtml(),
       previewClass: previewRoot?.className || "",
+      previewStyle: previewRoot?.getAttribute("style") || "",
       layers: layerList?.innerHTML || "",
       productPicker: sqStudio.querySelector(".sq-product-picker")?.innerHTML || "",
       products: selectedProducts(),
@@ -239,10 +254,10 @@
       }
       return normalized;
     };
-    const fluidRowHeight = (section) => {
+    const fluidRowHeight = (section, device = activeDevice) => {
       if (section?.classList.contains("sq-announcement")) return 10;
       if (section?.classList.contains("sq-store-nav")) return 36;
-      if (section?.classList.contains("sq-benefit-row")) return activeDevice === "mobile" ? 34 : 22;
+      if (section?.classList.contains("sq-benefit-row")) return device === "mobile" ? 34 : 22;
       if (section?.classList.contains("sq-shipping-section")) return 22;
       if (section?.classList.contains("sq-product-section")) return 28;
       return 34;
@@ -259,6 +274,19 @@
     };
     const applyFluidLayouts = () => previewRoot?.querySelectorAll("[data-sq-fluid]").forEach(applyFluidSection);
     const elementTypeName = (element) => (element?.dataset.sqElementType || "element").replace(/-/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+    const colorToHex = (value, fallback = "#ffffff") => {
+      if (/^#[0-9a-f]{6}$/i.test(value || "")) return value.toLowerCase();
+      const match = String(value || "").match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+      return match ? `#${match.slice(1, 4).map((part) => Number(part).toString(16).padStart(2, "0")).join("")}` : fallback;
+    };
+    const codeSourceFor = (element) => element?.querySelector("template[data-sq-code-source]")?.innerHTML || "";
+    const renderCodeElement = (element) => {
+      const frame = element?.querySelector("iframe[data-sq-code-render]");
+      if (!frame) return;
+      const source = codeSourceFor(element);
+      frame.onload = () => frame.contentWindow?.postMessage({ type: "ezkart-render-code", html: source }, "*");
+      frame.src = `code-preview.php?render=${Date.now()}`;
+    };
     const syncElementControls = () => {
       const controls = sqStudio.querySelector("[data-sq-element-controls]");
       const valid = selectedElement?.isConnected && selectedElement.closest(`[data-section-id="${selectedSection}"]`);
@@ -273,6 +301,40 @@
       });
       const hideButton = sqStudio.querySelector("[data-sq-element-hide]");
       if (hideButton) hideButton.lastChild.textContent = selectedElement.classList.contains("sq-element-hidden") ? " Show" : " Hide";
+      const computed = getComputedStyle(selectedElement);
+      const colorFallbacks = { color: "#24262b", backgroundColor: "#ffffff", borderColor: "#e3e5e7" };
+      sqStudio.querySelectorAll("[data-sq-element-color]").forEach((input) => { input.value = colorToHex(computed[input.dataset.sqElementColor], colorFallbacks[input.dataset.sqElementColor]); });
+      const surface = sqStudio.querySelector("[data-sq-element-surface]");
+      if (surface) surface.value = selectedElement.dataset.sqSurface || "none";
+      const align = sqStudio.querySelector("[data-sq-element-align]");
+      if (align) align.value = selectedElement.dataset.sqAlign || "left";
+      const radius = Number.parseInt(selectedElement.style.borderRadius || "0", 10) || 0;
+      const radiusInput = sqStudio.querySelector("[data-sq-element-radius]");
+      const radiusOutput = sqStudio.querySelector("[data-sq-element-radius-output]");
+      if (radiusInput) radiusInput.value = String(radius);
+      if (radiusOutput) radiusOutput.textContent = `${radius}px`;
+      const buttonControls = sqStudio.querySelector("[data-sq-element-button-controls]");
+      const hasButton = selectedElement.matches("button") || Boolean(selectedElement.querySelector("button"));
+      if (buttonControls) buttonControls.hidden = !hasButton;
+      const buttonRole = selectedElement.dataset.sqButtonRole || "primary";
+      sqStudio.querySelectorAll("[data-sq-role-choice]").forEach((button) => button.classList.toggle("active", button.dataset.sqRoleChoice === buttonRole));
+      const animation = sqStudio.querySelector("[data-sq-element-animation-control]");
+      if (animation) animation.value = selectedElement.dataset.sqElementAnimation || "none";
+      sqStudio.querySelectorAll("[data-sq-entrance-preview]").forEach((button) => button.classList.toggle("active", button.dataset.sqEntrancePreview === (selectedElement.dataset.sqElementAnimation || "none")));
+      const duration = Number.parseInt(selectedElement.style.getPropertyValue("--element-duration") || "700", 10);
+      const delay = Number.parseInt(selectedElement.style.getPropertyValue("--element-delay") || "0", 10);
+      [["duration", duration], ["delay", delay]].forEach(([field, value]) => {
+        const input = sqStudio.querySelector(`[data-sq-element-${field}]`);
+        const output = sqStudio.querySelector(`[data-sq-element-${field}-output]`);
+        if (input) input.value = String(value);
+        if (output) output.textContent = `${value}ms`;
+      });
+      sqStudio.querySelectorAll("[data-sq-hover-choice]").forEach((button) => button.classList.toggle("active", button.dataset.sqHoverChoice === (selectedElement.dataset.sqHover || "none")));
+      const codeControls = sqStudio.querySelector("[data-sq-code-controls]");
+      const isCode = selectedElement.dataset.sqElementType === "custom-code";
+      if (codeControls) codeControls.hidden = !isCode;
+      const codeInput = sqStudio.querySelector("[data-sq-code-input]");
+      if (isCode && codeInput) codeInput.value = codeSourceFor(selectedElement);
     };
     const removeElementOverlay = () => previewRoot?.querySelectorAll(".sq-element-overlay").forEach((overlay) => overlay.remove());
     const refreshElementOverlay = () => {
@@ -412,6 +474,8 @@
       ".sq-generated-faq>h2", ".sq-generated-faq summary", ".sq-generated-faq p",
       ".sq-generated-spacer>span",
       ".sq-free-heading>h2", ".sq-free-text>p", ".sq-free-button>button", ".sq-free-form>h3", ".sq-free-form>p",
+      ".sq-template-story-copy>span", ".sq-template-story-copy>h2", ".sq-template-story-copy>p", ".sq-template-story-copy>button",
+      ".sq-template-manifesto>b", ".sq-template-manifesto>small",
     ].join(",");
     const editableNodesFor = (block) => block ? [...block.querySelectorAll(editableContentSelector)].filter((node) => !node.closest(".sq-image-drag-handle")) : [];
     const contentFieldLabel = (node, index) => {
@@ -535,8 +599,13 @@
         block.ondragend = () => { block.classList.remove("dragging"); previewRoot.querySelectorAll(".drag-over").forEach((item) => item.classList.remove("drag-over")); };
       });
       applyFluidLayouts();
+      previewRoot?.querySelectorAll(".sq-free-code").forEach(renderCodeElement);
       previewRoot?.querySelectorAll("[data-sq-fluid] > [data-sq-element]").forEach((element, index) => {
         if (!element.dataset.sqElementId) element.dataset.sqElementId = `element-${Date.now()}-${index}`;
+        if ((element.matches("button") || element.querySelector("button")) && !element.dataset.sqButtonRole) {
+          element.dataset.sqButtonRole = element.dataset.sqElementType === "navigation" ? "secondary" : "primary";
+          element.classList.add(`button-${element.dataset.sqButtonRole}`);
+        }
         element.draggable = false;
         element.onclick = (event) => {
           event.stopPropagation();
@@ -661,6 +730,7 @@
       selectedElement = null;
       previewRoot.innerHTML = state.preview;
       previewRoot.className = state.previewClass;
+      if (state.previewStyle) previewRoot.setAttribute("style", state.previewStyle); else previewRoot.removeAttribute("style");
       layerList.innerHTML = state.layers;
       const productPicker = sqStudio.querySelector(".sq-product-picker");
       if (productPicker && typeof state.productPicker === "string") productPicker.innerHTML = state.productPicker;
@@ -671,6 +741,7 @@
       bindSqInteractions();
       updateProductView();
       selectSqSection(state.selectedSection || "hero");
+      syncBrandControls();
       markSqChanged();
     };
     undoButton?.addEventListener("click", () => {
@@ -809,6 +880,114 @@
       refreshElementOverlay();
       markSqChanged();
     });
+    let elementStyleSnapshot;
+    const rememberElementStyle = () => { if (!elementStyleSnapshot) elementStyleSnapshot = captureState(); };
+    const finishElementStyle = () => { if (elementStyleSnapshot) remember(elementStyleSnapshot); elementStyleSnapshot = null; };
+    sqStudio.querySelectorAll("[data-sq-element-color]").forEach((input) => {
+      input.addEventListener("focus", rememberElementStyle);
+      input.addEventListener("input", () => {
+        if (!selectedElement?.isConnected) return;
+        const property = input.dataset.sqElementColor;
+        selectedElement.style[property] = input.value;
+        if (property === "color") selectedElement.classList.add("sq-color-override");
+        if (property === "borderColor" && getComputedStyle(selectedElement).borderStyle === "none") selectedElement.style.border = `1px solid ${input.value}`;
+        markSqChanged();
+      });
+      input.addEventListener("change", finishElementStyle);
+    });
+    sqStudio.querySelector("[data-sq-element-surface]")?.addEventListener("change", (event) => {
+      if (!selectedElement?.isConnected) return;
+      remember();
+      selectedElement.classList.remove("sq-surface-soft", "sq-surface-card", "sq-surface-outline", "sq-surface-glass");
+      selectedElement.classList.remove("sq-color-override");
+      selectedElement.dataset.sqSurface = event.currentTarget.value;
+      if (event.currentTarget.value !== "none") selectedElement.classList.add(`sq-surface-${event.currentTarget.value}`);
+      markSqChanged();
+    });
+    sqStudio.querySelector("[data-sq-element-align]")?.addEventListener("change", (event) => {
+      if (!selectedElement?.isConnected) return;
+      remember(); selectedElement.dataset.sqAlign = event.currentTarget.value; selectedElement.style.textAlign = event.currentTarget.value; markSqChanged();
+    });
+    sqStudio.querySelector("[data-sq-element-radius]")?.addEventListener("input", (event) => {
+      if (!selectedElement?.isConnected) return;
+      rememberElementStyle(); selectedElement.style.borderRadius = `${event.currentTarget.value}px`;
+      const output = sqStudio.querySelector("[data-sq-element-radius-output]"); if (output) output.textContent = `${event.currentTarget.value}px`; markSqChanged();
+    });
+    sqStudio.querySelector("[data-sq-element-radius]")?.addEventListener("change", finishElementStyle);
+    sqStudio.querySelector("[data-sq-element-style-reset]")?.addEventListener("click", () => {
+      if (!selectedElement?.isConnected) return;
+      remember();
+      ["color", "backgroundColor", "border", "borderColor", "borderRadius", "textAlign", "boxShadow", "backdropFilter"].forEach((property) => { selectedElement.style[property] = ""; });
+      selectedElement.classList.remove("sq-surface-soft", "sq-surface-card", "sq-surface-outline", "sq-surface-glass");
+      delete selectedElement.dataset.sqSurface; delete selectedElement.dataset.sqAlign; syncElementControls(); markSqChanged();
+    });
+    sqStudio.querySelectorAll("[data-sq-role-choice]").forEach((button) => button.addEventListener("click", () => {
+      if (!selectedElement?.isConnected) return;
+      remember();
+      selectedElement.classList.remove("button-primary", "button-secondary", "button-tertiary");
+      selectedElement.classList.add(`button-${button.dataset.sqRoleChoice}`);
+      selectedElement.dataset.sqButtonRole = button.dataset.sqRoleChoice;
+      syncElementControls(); markSqChanged();
+    }));
+    const replayElementAnimation = () => {
+      if (!selectedElement?.isConnected) return;
+      selectedElement.classList.remove("sq-element-animate"); void selectedElement.offsetWidth; selectedElement.classList.add("sq-element-animate");
+      window.setTimeout(() => selectedElement?.classList.remove("sq-element-animate"), 2400);
+    };
+    const replayVisibleTemplateAnimations = () => {
+      const stage = sqStudio.querySelector(".sq-canvas-scroll")?.getBoundingClientRect();
+      if (!stage) return;
+      previewRoot?.querySelectorAll('[class*="element-animation-"]').forEach((element) => {
+        const rect = element.getBoundingClientRect();
+        if (rect.bottom < stage.top || rect.top > stage.bottom) return;
+        element.classList.remove("sq-element-animate"); void element.offsetWidth; element.classList.add("sq-element-animate");
+        window.setTimeout(() => element.classList.remove("sq-element-animate"), 2400);
+      });
+    };
+    sqStudio.querySelector("[data-sq-element-animation-control]")?.addEventListener("change", (event) => {
+      if (!selectedElement?.isConnected) return;
+      remember();
+      [...selectedElement.classList].filter((name) => name.startsWith("element-animation-")).forEach((name) => selectedElement.classList.remove(name));
+      selectedElement.dataset.sqElementAnimation = event.currentTarget.value;
+      if (event.currentTarget.value !== "none") selectedElement.classList.add(`element-animation-${event.currentTarget.value}`);
+      replayElementAnimation(); markSqChanged();
+    });
+    sqStudio.querySelectorAll("[data-sq-entrance-preview]").forEach((button) => button.addEventListener("click", () => {
+      const select = sqStudio.querySelector("[data-sq-element-animation-control]");
+      if (!select) return;
+      select.value = button.dataset.sqEntrancePreview;
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+      syncElementControls();
+    }));
+    [["duration", "--element-duration"], ["delay", "--element-delay"]].forEach(([field, property]) => {
+      sqStudio.querySelector(`[data-sq-element-${field}]`)?.addEventListener("input", (event) => {
+        if (!selectedElement?.isConnected) return;
+        selectedElement.style.setProperty(property, `${event.currentTarget.value}ms`);
+        const output = sqStudio.querySelector(`[data-sq-element-${field}-output]`); if (output) output.textContent = `${event.currentTarget.value}ms`;
+        replayElementAnimation(); markSqChanged();
+      });
+    });
+    sqStudio.querySelectorAll("[data-sq-hover-choice]").forEach((button) => button.addEventListener("click", () => {
+      if (!selectedElement?.isConnected) return;
+      remember();
+      [...selectedElement.classList].filter((name) => name.startsWith("hover-")).forEach((name) => selectedElement.classList.remove(name));
+      selectedElement.dataset.sqHover = button.dataset.sqHoverChoice;
+      if (button.dataset.sqHoverChoice !== "none") selectedElement.classList.add(`hover-${button.dataset.sqHoverChoice}`);
+      syncElementControls(); markSqChanged();
+    }));
+    sqStudio.querySelector("[data-sq-element-replay]")?.addEventListener("click", replayElementAnimation);
+    let codeSnapshot;
+    const updateSelectedCode = () => {
+      if (selectedElement?.dataset.sqElementType !== "custom-code") return;
+      const source = selectedElement.querySelector("template[data-sq-code-source]");
+      const input = sqStudio.querySelector("[data-sq-code-input]");
+      if (!source || !input) return;
+      source.innerHTML = input.value;
+      renderCodeElement(selectedElement); markSqChanged();
+    };
+    sqStudio.querySelector("[data-sq-code-input]")?.addEventListener("focus", () => { codeSnapshot = captureState(); });
+    sqStudio.querySelector("[data-sq-code-input]")?.addEventListener("change", () => { updateSelectedCode(); if (codeSnapshot) remember(codeSnapshot); codeSnapshot = null; });
+    sqStudio.querySelector("[data-sq-run-code]")?.addEventListener("click", updateSelectedCode);
     sqStudio.querySelector("[data-sq-layout-preset]")?.addEventListener("change", (event) => {
       const section = previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`);
       const elements = [...(section?.querySelectorAll(":scope > [data-sq-element]") || [])];
@@ -886,11 +1065,55 @@
       markSqChanged();
     });
 
+    const brandVariable = { accent: "--site-accent", page: "--site-page", ink: "--site-ink", surface: "--site-surface" };
+    let globalStyleSnapshot;
+    const startGlobalStyleEdit = () => { if (!globalStyleSnapshot) globalStyleSnapshot = captureState(); };
+    const finishGlobalStyleEdit = () => { if (globalStyleSnapshot) remember(globalStyleSnapshot); globalStyleSnapshot = null; };
+    sqStudio.querySelectorAll("[data-sq-brand-color], [data-sq-button-color], [data-sq-button-radius]").forEach((input) => { input.addEventListener("focus", startGlobalStyleEdit); input.addEventListener("pointerdown", startGlobalStyleEdit); input.addEventListener("change", finishGlobalStyleEdit); });
+    sqStudio.querySelectorAll("[data-sq-brand-color]").forEach((input) => input.addEventListener("input", () => {
+      const key = input.dataset.sqBrandColor;
+      previewRoot?.style.setProperty(brandVariable[key], input.value);
+      if (key === "accent") previewRoot?.style.setProperty("--button-primary-bg", input.value);
+      sqStudio.querySelectorAll("[data-sq-theme]").forEach((button) => button.classList.remove("active"));
+      markSqChanged();
+    }));
+    const buttonDefaults = {
+      primary: { bg: "#f44b34", fg: "#ffffff", border: "#f44b34", radius: 10, treatment: "solid" },
+      secondary: { bg: "#ffffff", fg: "#24262b", border: "#24262b", radius: 10, treatment: "outline" },
+      tertiary: { bg: "#ffffff", fg: "#f44b34", border: "#ffffff", radius: 0, treatment: "text" },
+    };
+    const activeButtonRole = () => sqStudio.querySelector("[data-sq-button-style-role]")?.value || "primary";
+    const buttonValue = (role, field) => previewRoot?.style.getPropertyValue(`--button-${role}-${field}`).trim() || String(buttonDefaults[role][field]);
+    const buttonTreatment = (role) => [...(previewRoot?.classList || [])].find((name) => name.startsWith(`buttons-${role}-`))?.replace(`buttons-${role}-`, "") || buttonDefaults[role].treatment;
+    const applyButtonTreatment = (role, treatment) => {
+      [...(previewRoot?.classList || [])].filter((name) => name.startsWith(`buttons-${role}-`)).forEach((name) => previewRoot.classList.remove(name));
+      previewRoot?.classList.add(`buttons-${role}-${treatment}`);
+    };
+    const syncButtonSystemControls = () => {
+      const role = activeButtonRole();
+      sqStudio.querySelectorAll("[data-sq-button-color]").forEach((input) => { input.value = colorToHex(buttonValue(role, input.dataset.sqButtonColor), buttonDefaults[role][input.dataset.sqButtonColor]); });
+      const treatment = sqStudio.querySelector("[data-sq-button-treatment]"); if (treatment) treatment.value = buttonTreatment(role);
+      const radius = Number.parseInt(buttonValue(role, "radius"), 10) || 0;
+      const radiusInput = sqStudio.querySelector("[data-sq-button-radius]"); if (radiusInput) radiusInput.value = String(radius);
+      const radiusOutput = sqStudio.querySelector("[data-sq-button-radius-output]"); if (radiusOutput) radiusOutput.textContent = `${radius}px`;
+      const preview = sqStudio.querySelector("[data-sq-button-preview]"); if (preview) { preview.classList.remove("button-primary", "button-secondary", "button-tertiary"); preview.classList.add(`button-${role}`); }
+    };
+    sqStudio.querySelector("[data-sq-button-style-role]")?.addEventListener("change", syncButtonSystemControls);
+    sqStudio.querySelectorAll("[data-sq-button-color]").forEach((input) => input.addEventListener("input", () => {
+      previewRoot?.style.setProperty(`--button-${activeButtonRole()}-${input.dataset.sqButtonColor}`, input.value); markSqChanged();
+    }));
+    sqStudio.querySelector("[data-sq-button-treatment]")?.addEventListener("change", (event) => { remember(); applyButtonTreatment(activeButtonRole(), event.currentTarget.value); markSqChanged(); });
+    sqStudio.querySelector("[data-sq-button-radius]")?.addEventListener("input", (event) => {
+      previewRoot?.style.setProperty(`--button-${activeButtonRole()}-radius`, `${event.currentTarget.value}px`);
+      const output = sqStudio.querySelector("[data-sq-button-radius-output]"); if (output) output.textContent = `${event.currentTarget.value}px`; markSqChanged();
+    });
     sqStudio.querySelectorAll("[data-sq-theme]").forEach((button) => button.addEventListener("click", () => {
       remember();
       sqStudio.querySelectorAll("[data-sq-theme]").forEach((item) => item.classList.toggle("active", item === button));
       previewRoot?.classList.remove("theme-coral", "theme-forest", "theme-indigo", "theme-charcoal");
       previewRoot?.classList.add(button.dataset.sqTheme);
+      const colors = { "theme-coral": ["#f44b34", "#fffbf7", "#24262b", "#ffffff"], "theme-forest": ["#1c6b55", "#f1f5ef", "#17382e", "#ffffff"], "theme-indigo": ["#3f58a8", "#f1f3fb", "#1d2644", "#ffffff"], "theme-charcoal": ["#24262b", "#f4f4f2", "#24262b", "#ffffff"] }[button.dataset.sqTheme];
+      ["accent", "page", "ink", "surface"].forEach((key, index) => { previewRoot?.style.setProperty(brandVariable[key], colors[index]); const input = sqStudio.querySelector(`[data-sq-brand-color="${key}"]`); if (input) input.value = colors[index]; });
       markSqChanged();
     }));
     sqStudio.querySelector("[data-sq-radius]")?.addEventListener("change", (event) => {
@@ -905,6 +1128,83 @@
     });
 
     const iconMarkup = (name) => `<svg class="icon" aria-hidden="true"><use href="#icon-${name}"></use></svg>`;
+    const templateHandle = (label) => `<button class="sq-block-handle" type="button" aria-label="Drag ${escapeHtml(label)} section">${iconMarkup("grip")}</button>`;
+    const commerceSectionMarkup = (sectionId, animation = "rise", hover = "lift") => {
+      const source = previewRoot?.querySelector(`[data-section-id="${sectionId}"]`);
+      if (!source) return "";
+      const clone = source.cloneNode(true);
+      clone.querySelectorAll(".sq-element-overlay").forEach((node) => node.remove());
+      clone.classList.remove("selected", "section-hidden");
+      clone.querySelectorAll(":scope > [data-sq-element]").forEach((element, index) => {
+        [...element.classList].filter((name) => name.startsWith("element-animation-") || name.startsWith("hover-")).forEach((name) => element.classList.remove(name));
+        element.classList.add(`element-animation-${animation}`);
+        if (index > 0 && hover !== "none") element.classList.add(`hover-${hover}`);
+        element.dataset.sqElementAnimation = animation;
+        element.dataset.sqHover = index > 0 ? hover : "none";
+        element.style.setProperty("--element-delay", `${index * 120}ms`);
+      });
+      return clone.outerHTML;
+    };
+    const templateHeroLayouts = (mode) => {
+      if (mode === "split-left") return { copy: "7,2,6,11", image: "1,1,6,14", tabletCopy: "1,8,12,8", tabletImage: "1,1,12,7" };
+      if (mode === "split-right") return { copy: "1,2,6,11", image: "7,1,6,14", tabletCopy: "1,1,12,8", tabletImage: "1,9,12,7" };
+      if (mode === "editorial") return { copy: "7,3,6,9", image: "1,1,8,14", tabletCopy: "1,8,12,7", tabletImage: "1,1,12,8" };
+      if (mode === "image-led") return { copy: "2,8,9,6", image: "1,1,12,14", tabletCopy: "1,8,12,7", tabletImage: "1,1,12,14" };
+      return { copy: mode === "bleed-dark" ? "2,3,6,9" : "7,3,5,9", image: "1,1,12,14", tabletCopy: "1,8,12,7", tabletImage: "1,1,12,14" };
+    };
+    const makeTemplateMarkup = (config, key) => {
+      const layout = templateHeroLayouts(config.mode);
+      const overlay = config.mode.startsWith("bleed") || config.mode === "image-led";
+      const heroTextClass = overlay ? " sq-template-copy-overlay" : "";
+      const imagePosition = ["embun", "pulih"].includes(key) ? "center" : key === "sora" ? "center right" : "center";
+      const hero = `<section class="sq-page-block sq-hero sq-template-hero sq-template-${config.mode}" draggable="true" data-sq-block data-sq-fluid data-sq-rows="14" data-section-id="hero">${templateHandle("hero")}<div class="sq-template-media sq-free-image element-animation-scale hover-${config.hover}" data-sq-element data-sq-element-type="image" data-sq-element-animation="scale" data-sq-hover="${config.hover}" data-layout-desktop="${layout.image}" data-layout-tablet="${layout.tabletImage}" data-layout-mobile="1,1,12,14"><img src="${config.image}" alt="${escapeHtml(config.name)} campaign" style="object-position:${imagePosition}"></div><div class="sq-hero-copy sq-template-copy${heroTextClass} button-primary element-animation-${config.entrance}" data-sq-element data-sq-element-type="copy" data-sq-button-role="primary" data-sq-element-animation="${config.entrance}" data-sq-hover="none" data-layout-desktop="${layout.copy}" data-layout-tablet="${layout.tabletCopy}" data-layout-mobile="1,8,12,7"><span>${escapeHtml(config.kicker)}</span><h1>${escapeHtml(config.headline)}</h1><p>${escapeHtml(config.body)}</p><div><button type="button">${escapeHtml(config.cta)}</button><small>${iconMarkup("shield")} Secure checkout by Ezkart</small></div></div></section>`;
+      const story = `<section class="sq-page-block sq-template-story" draggable="true" data-sq-block data-sq-fluid data-sq-rows="10" data-section-id="image-story">${templateHandle("story")}<div class="sq-template-story-copy element-animation-slide-left" data-sq-element data-sq-element-type="copy" data-sq-element-animation="slide-left" data-sq-hover="none" data-layout-desktop="1,2,8,8" data-layout-tablet="1,1,12,6" data-layout-mobile="1,1,12,6"><span>OUR POINT OF VIEW</span><h2>${escapeHtml(config.story)}</h2><p>${escapeHtml(config.storyBody)}</p><button class="button-tertiary" type="button">Read our story</button></div><aside class="sq-template-manifesto sq-surface-card element-animation-rise hover-lift" data-sq-element data-sq-element-type="content" data-sq-element-animation="rise" data-sq-hover="lift" data-layout-desktop="9,2,4,8" data-layout-tablet="1,7,12,4" data-layout-mobile="1,7,12,4"><strong>01</strong><b>Designed locally</b><small>Built for independent Indonesian brands and their customers.</small></aside></section>`;
+      const benefits = `<section class="sq-page-block sq-benefit-row sq-template-benefits" draggable="true" data-sq-block data-sq-fluid data-sq-rows="6" data-section-id="benefits">${templateHandle("benefits")}<article class="element-animation-rise hover-lift" style="--element-delay:0ms" data-sq-element data-sq-element-type="benefit" data-sq-element-animation="rise" data-sq-hover="lift" data-layout-desktop="1,1,4,6" data-layout-tablet="1,1,4,6" data-layout-mobile="1,1,12,2">${iconMarkup("star")}<div><b>Thoughtful by default</b><small>Clear details and deliberate design</small></div></article><article class="element-animation-rise hover-lift" style="--element-delay:140ms" data-sq-element data-sq-element-type="benefit" data-sq-element-animation="rise" data-sq-hover="lift" data-layout-desktop="5,1,4,6" data-layout-tablet="5,1,4,6" data-layout-mobile="1,3,12,2">${iconMarkup("credit-card")}<div><b>Secure payment</b><small>Midtrans-ready checkout built in</small></div></article><article class="element-animation-rise hover-lift" style="--element-delay:280ms" data-sq-element data-sq-element-type="benefit" data-sq-element-animation="rise" data-sq-hover="lift" data-layout-desktop="9,1,4,6" data-layout-tablet="9,1,4,6" data-layout-mobile="1,5,12,2">${iconMarkup("truck")}<div><b>Delivery connected</b><small>Rates, couriers, and ETA included</small></div></article></section>`;
+      const announcement = `<section class="sq-page-block sq-announcement" draggable="true" data-sq-block data-sq-fluid data-sq-rows="2" data-section-id="announcement">${templateHandle("announcement")}<p class="element-animation-fade" data-sq-element data-sq-element-type="text" data-sq-element-animation="fade" data-sq-hover="none" data-layout-desktop="1,1,12,2" data-layout-tablet="1,1,12,2" data-layout-mobile="1,1,12,2">${escapeHtml(config.announcement)}</p></section>`;
+      const navigation = `<nav class="sq-page-block sq-store-nav" draggable="true" data-sq-block data-sq-fluid data-sq-rows="2" data-section-id="navigation">${templateHandle("navigation")}<b class="element-animation-fade" data-sq-element data-sq-element-type="brand" data-sq-element-animation="fade" data-sq-hover="none" data-layout-desktop="1,1,4,2" data-layout-tablet="1,1,4,2" data-layout-mobile="1,1,6,2">${escapeHtml(config.brand)}</b><div class="button-secondary element-animation-fade" data-sq-element data-sq-element-type="navigation" data-sq-button-role="secondary" data-sq-element-animation="fade" data-sq-hover="none" data-layout-desktop="7,1,6,2" data-layout-tablet="6,1,7,2" data-layout-mobile="7,1,6,2"><a href="#products">Shop</a><a href="#story">Story</a><a href="#shipping">Delivery</a><button type="button">Buy now</button></div></nav>`;
+      let responsiveHero = overlay ? hero : hero.replace('data-layout-mobile="1,1,12,14"', 'data-layout-mobile="1,1,12,7"');
+      if (config.mode === "editorial") responsiveHero = responsiveHero.replace('data-layout-mobile="1,8,12,7"', 'data-layout-mobile="1,8,12,9"');
+      const linkedStory = story.replace('<section class="', '<section id="story" class="').replace('sq-template-story-copy element-animation', 'sq-template-story-copy button-tertiary element-animation').replace('data-sq-element data-sq-element-type="copy"', 'data-sq-element data-sq-element-type="copy" data-sq-button-role="tertiary"').replace('<button class="button-tertiary"', '<button');
+      return `${announcement}${navigation}${responsiveHero}${linkedStory}${commerceSectionMarkup("products", "rise", config.hover)}${benefits}${commerceSectionMarkup("checkout", config.entrance, "lift")}${commerceSectionMarkup("shipping", "fade", "none")}`;
+    };
+    const layerDetails = {
+      announcement: ["Announcement", "Promotional message", "message"], navigation: ["Navigation", "Brand, links, and button", "layout"], hero: ["Hero", "Image, copy, and motion", "layout"], products: ["Product collection", "Connected commerce grid", "box"], "image-story": ["Brand story", "Editorial content", "image"], benefits: ["Benefits", "Three trust points", "star"], checkout: ["Checkout", "Midtrans cart action", "credit-card"], shipping: ["Shipping", "Courier and ETA", "truck"],
+    };
+    const rebuildLayerList = () => {
+      if (!layerList) return;
+      layerList.replaceChildren(...[...(previewRoot?.querySelectorAll(":scope > [data-sq-block]") || [])].map((section) => {
+        const details = layerDetails[section.dataset.sectionId] || [elementTypeName(section), "Editable section", "layers"];
+        const wrapper = document.createElement("div");
+        wrapper.innerHTML = `<button type="button" draggable="true" data-sq-layer data-section-id="${escapeHtml(section.dataset.sectionId)}">${iconMarkup("grip")}<span>${iconMarkup(details[2])}</span><div><b>${escapeHtml(details[0])}</b><small>${escapeHtml(details[1])}</small></div>${iconMarkup("chevron-right")}</button>`;
+        return wrapper.firstElementChild;
+      }));
+    };
+    const syncBrandControls = () => {
+      const computed = getComputedStyle(previewRoot);
+      ["accent", "page", "ink", "surface"].forEach((key) => { const input = sqStudio.querySelector(`[data-sq-brand-color="${key}"]`); if (input) input.value = colorToHex(computed.getPropertyValue(brandVariable[key]), input.value); });
+      syncButtonSystemControls();
+    };
+    sqStudio.querySelectorAll("[data-sq-template]").forEach((button) => button.addEventListener("click", () => {
+      const config = templateCatalog[button.dataset.sqTemplate];
+      if (!config || !previewRoot) return;
+      remember(); selectedElement = null; removeElementOverlay();
+      previewRoot.innerHTML = makeTemplateMarkup(config, button.dataset.sqTemplate);
+      previewRoot.className = `sq-page-preview radius-soft layout-rich template-${button.dataset.sqTemplate}`;
+      previewRoot.setAttribute("style", `--site-accent:${config.accent};--site-page:${config.page};--site-ink:${config.ink};--site-surface:${config.surface};--button-primary-bg:${config.accent};--button-primary-fg:${config.mode === "image-led" ? "#171717" : "#ffffff"};--button-primary-border:${config.accent};--button-primary-radius:12px;--button-secondary-bg:${config.surface};--button-secondary-fg:${config.ink};--button-secondary-border:${config.ink};--button-secondary-radius:12px;--button-tertiary-bg:transparent;--button-tertiary-fg:${config.accent};--button-tertiary-border:transparent;--button-tertiary-radius:0px`);
+      applyButtonTreatment("primary", "solid"); applyButtonTreatment("secondary", "outline"); applyButtonTreatment("tertiary", "text");
+      rebuildLayerList(); bindSqInteractions(); updateProductView(); selectSqSection("hero"); syncBrandControls();
+      sqStudio.querySelectorAll("[data-sq-template]").forEach((item) => item.classList.toggle("selected", item === button));
+      openSqPanel("layers"); sqStudio.querySelector(".sq-canvas-scroll")?.scrollTo({ top: 0, behavior: "smooth" }); markSqChanged();
+      window.setTimeout(replayVisibleTemplateAnimations, 180);
+      showToast(`${config.name} applied — every element remains editable`);
+    }));
+    let activeTemplateFilter = "all";
+    const filterTemplates = () => {
+      const query = normalize(sqStudio.querySelector("[data-sq-template-search]")?.value || "");
+      sqStudio.querySelectorAll("[data-sq-template]").forEach((button) => { const category = button.dataset.templateCategory || ""; const categoryMatch = activeTemplateFilter === "all" || category.split(" ").includes(activeTemplateFilter); button.hidden = !categoryMatch || (query && !normalize(button.dataset.search).includes(query)); });
+    };
+    sqStudio.querySelector("[data-sq-template-search]")?.addEventListener("input", filterTemplates);
+    sqStudio.querySelectorAll("[data-template-filter]").forEach((button) => button.addEventListener("click", () => { activeTemplateFilter = button.dataset.templateFilter; sqStudio.querySelectorAll("[data-template-filter]").forEach((item) => item.classList.toggle("active", item === button)); filterTemplates(); }));
     const newBlockMarkup = (type, sectionId) => {
       const handle = `<button class="sq-block-handle" type="button" aria-label="Drag section">${iconMarkup("grip")}</button>`;
       if (type === "blank") return `<section class="sq-page-block sq-generated-blank" draggable="true" data-sq-block data-sq-fluid data-sq-rows="12" data-section-id="${sectionId}">${handle}</section>`;
@@ -924,6 +1224,7 @@
       if (type === "button") return `<div class="sq-free-element sq-free-button" data-sq-element data-sq-element-type="button"><button type="button">Call to action</button></div>`;
       if (type === "image") return `<div class="sq-free-element sq-free-image" data-sq-element data-sq-element-type="image"><img src="${productImages.granola}" alt="Product image"></div>`;
       if (type === "divider") return `<div class="sq-free-element sq-free-divider" data-sq-element data-sq-element-type="divider"><span></span></div>`;
+      if (type === "html") return `<div class="sq-free-element sq-free-code" data-sq-element data-sq-element-type="custom-code"><iframe title="Custom code preview" sandbox="allow-scripts allow-forms" data-sq-code-render></iframe><template data-sq-code-source><style>.custom-promo{height:100%;padding:32px;display:grid;place-content:center;background:linear-gradient(135deg,#191923,#392d69);color:white;border-radius:18px;text-align:center}.custom-promo strong{font-size:28px}.custom-promo p{margin:8px 0 0;opacity:.72}</style><div class="custom-promo"><strong>Custom HTML block</strong><p>Add HTML, CSS, or JavaScript from the inspector.</p></div></template></div>`;
       return `<div class="sq-free-element sq-free-form" data-sq-element data-sq-element-type="form"><h3>Stay in the loop.</h3><p>Get product news and special offers.</p><form><input type="email" placeholder="Email address" aria-label="Email address"><button type="button">Subscribe</button></form></div>`;
     };
     const ensureElementSection = (section) => {
@@ -957,7 +1258,7 @@
       const element = wrapper.firstElementChild;
       const currentElements = [...section.querySelectorAll(":scope > [data-sq-element]")];
       const lastRow = currentElements.reduce((maximum, item) => { const layout = parseElementLayout(item); return Math.max(maximum, layout.y + layout.height); }, 1);
-      const height = button.dataset.sqAddElement === "divider" ? 1 : button.dataset.sqAddElement === "button" ? 2 : button.dataset.sqAddElement === "image" ? 8 : 4;
+      const height = button.dataset.sqAddElement === "divider" ? 1 : button.dataset.sqAddElement === "button" ? 2 : ["image", "html"].includes(button.dataset.sqAddElement) ? 8 : 4;
       const width = button.dataset.sqAddElement === "divider" ? 10 : button.dataset.sqAddElement === "button" ? 4 : 8;
       ["desktop", "tablet", "mobile"].forEach((device) => setElementLayout(element, { x: device === "mobile" ? 1 : 2, y: lastRow, width: device === "mobile" ? 12 : width, height }, device));
       section.append(element);
@@ -1037,7 +1338,7 @@
 
     const exportDialog = document.getElementById("html-export-dialog");
     const collectExportCss = () => {
-      const tokens = [".sq-page-preview", ".sq-page-block", ".sq-announcement", ".sq-store-nav", ".sq-hero", ".sq-product", ".sq-image-story", ".sq-benefit", ".sq-cart", ".sq-shipping", ".sq-generated", ".sq-free", ".ez-fluid", "@keyframes sq", ".product-art", ".icon", ".svg-sprite"];
+      const tokens = [".sq-page-preview", ".sq-page-block", ".sq-announcement", ".sq-store-nav", ".sq-hero", ".sq-product", ".sq-image-story", ".sq-benefit", ".sq-cart", ".sq-shipping", ".sq-generated", ".sq-free", ".sq-template", ".sq-surface", ".sq-color", ".element-animation", ".hover-", ".button-", ".ez-fluid", "@keyframes sq", "@keyframes element", ".product-art", ".icon", ".svg-sprite"];
       const collect = (rules) => [...rules].map((rule) => {
         if (rule.cssRules) { const nested = collect(rule.cssRules); return nested ? `${rule.conditionText ? `@media ${rule.conditionText}` : rule.cssText.slice(0, rule.cssText.indexOf("{"))}{${nested}}` : ""; }
         return tokens.some((token) => rule.cssText.includes(token)) ? rule.cssText : "";
@@ -1046,6 +1347,10 @@
     };
     const generateHtml = () => {
       const clone = previewRoot.cloneNode(true);
+      clone.querySelectorAll(".sq-free-code").forEach((element) => {
+        const source = element.querySelector("template[data-sq-code-source]")?.innerHTML || "";
+        const content = document.createElement("template"); content.innerHTML = source; element.replaceChildren(content.content.cloneNode(true));
+      });
       clone.querySelectorAll(".sq-block-handle, .sq-image-drag-handle, .sq-element-overlay, .section-hidden, .sq-element-hidden").forEach((node) => node.remove());
       clone.querySelectorAll("[data-product-card][hidden], [data-product-line][hidden], .sq-hero-collage > span[hidden]").forEach((node) => node.remove());
       clone.querySelectorAll("[data-section-id]").forEach((node) => { node.dataset.ezkartSection = node.dataset.sectionId; });
@@ -1056,8 +1361,8 @@
       clone.querySelectorAll("[data-sq-element]").forEach((node) => {
         node.classList.add("ez-fluid-element");
         node.dataset.ezkartElement = node.dataset.sqElementId;
-        ["sqElement", "sqElementId", "sqElementType", "layoutDesktop", "layoutTablet", "layoutMobile"].forEach((key) => delete node.dataset[key]);
-        node.classList.remove("sq-element-selected");
+        ["sqElement", "sqElementId", "sqElementType", "sqElementAnimation", "sqHover", "sqSurface", "sqAlign", "sqButtonRole", "layoutDesktop", "layoutTablet", "layoutMobile"].forEach((key) => delete node.dataset[key]);
+        node.classList.remove("sq-element-selected", "sq-element-animate");
       });
       clone.querySelectorAll("img").forEach((image) => { image.src = new URL(image.getAttribute("src"), window.location.href).href; });
       clone.querySelectorAll("[data-product-card]").forEach((card) => { const button = card.querySelector("button"); if (button) { button.dataset.ezkartAdd = card.dataset.productCard; button.type = "button"; } });
@@ -1066,9 +1371,10 @@
       const sprite = document.querySelector(".svg-sprite")?.outerHTML || "";
       const css = collectExportCss();
       const spacingCssFor = (device) => [...spacingState.entries()].filter(([key]) => key.endsWith(`:${device}`)).map(([key, value]) => { const section = key.slice(0, -(device.length + 1)); return `[data-ezkart-section="${section}"]{padding:${value.top}px ${value.right}px ${value.bottom}px ${value.left}px!important}`; }).join("\n");
+      const fluidCssFor = (device) => [...previewRoot.querySelectorAll("[data-sq-fluid]")].map((section) => `[data-ezkart-section="${section.dataset.sectionId}"]{--sq-fluid-row-height:${fluidRowHeight(section, device)}px}`).join("\n");
       const elementCssFor = (device) => [...previewRoot.querySelectorAll("[data-sq-element]")].map((element) => { const layout = parseElementLayout(element, device); return `[data-ezkart-element="${element.dataset.sqElementId}"]{grid-column:${layout.x}/span ${layout.width}!important;grid-row:${layout.y}/span ${layout.height}!important}`; }).join("\n");
-      const responsiveSpacing = `${spacingCssFor("desktop")}\n${elementCssFor("desktop")}\n@media(max-width:900px){${spacingCssFor("tablet")}\n${elementCssFor("tablet")}}\n@media(max-width:600px){${spacingCssFor("mobile")}\n${elementCssFor("mobile")}}`;
-      const commerceScript = `<script>(()=>{const cart=new Set();document.querySelectorAll('[data-ezkart-add]').forEach(button=>button.addEventListener('click',()=>{const id=button.dataset.ezkartAdd;cart.has(id)?cart.delete(id):cart.add(id);button.textContent=cart.has(id)?'Added ✓':'Add to cart'}));document.querySelector('[data-ezkart-checkout]')?.addEventListener('click',()=>{const products=[...cart];if(!products.length){alert('Add at least one product first.');return}location.href='/cart/?products='+encodeURIComponent(products.join(','))});const observer=new IntersectionObserver(entries=>entries.forEach(entry=>{if(entry.isIntersecting){entry.target.classList.add('animating');observer.unobserve(entry.target)}}),{threshold:.12});document.querySelectorAll('[class*="animation-"]').forEach(section=>observer.observe(section))})();<\/script>`;
+      const responsiveSpacing = `${spacingCssFor("desktop")}\n${fluidCssFor("desktop")}\n${elementCssFor("desktop")}\n@media(max-width:900px){${spacingCssFor("tablet")}\n${fluidCssFor("tablet")}\n${elementCssFor("tablet")}}\n@media(max-width:600px){${spacingCssFor("mobile")}\n${fluidCssFor("mobile")}\n${elementCssFor("mobile")}}`;
+      const commerceScript = `<script>(()=>{const cart=new Set();document.querySelectorAll('[data-ezkart-add]').forEach(button=>button.addEventListener('click',()=>{const id=button.dataset.ezkartAdd;cart.has(id)?cart.delete(id):cart.add(id);button.textContent=cart.has(id)?'Added ✓':'Add to cart'}));document.querySelector('[data-ezkart-checkout]')?.addEventListener('click',()=>{const products=[...cart];if(!products.length){alert('Add at least one product first.');return}location.href='/cart/?products='+encodeURIComponent(products.join(','))});const observer=new IntersectionObserver(entries=>entries.forEach(entry=>{if(entry.isIntersecting){entry.target.classList.add(entry.target.matches('[class*="element-animation-"]')?'sq-element-animate':'animating');observer.unobserve(entry.target)}}),{threshold:.12});document.querySelectorAll('[class*="animation-"],[class*="element-animation-"]').forEach(element=>observer.observe(element))})();<\/script>`;
       const fontBase = new URL("assets/fonts/poppins-400.woff2", window.location.href).href;
       const fontBold = new URL("assets/fonts/poppins-600.woff2", window.location.href).href;
       return `<!doctype html>\n<html lang="id">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1">\n<title>${escapeHtml(pageName)}</title>\n<meta name="description" content="Shop selected Indonesian products with secure Midtrans checkout and Ezkart delivery.">\n<style>@font-face{font-family:Poppins;src:url('${fontBase}') format('woff2');font-weight:400}@font-face{font-family:Poppins;src:url('${fontBold}') format('woff2');font-weight:600}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:#fff;font-family:Poppins,Arial,sans-serif}.svg-sprite{width:0;height:0;position:absolute;overflow:hidden}@media(prefers-reduced-motion:reduce){*{animation:none!important;scroll-behavior:auto!important}}\n${css}\n${responsiveSpacing}\n</style>\n</head>\n<body>\n${sprite}\n${clone.outerHTML}\n${commerceScript}\n</body>\n</html>`;
@@ -1106,6 +1412,7 @@
     bindSqInteractions();
     updateProductView();
     selectSqSection("announcement");
+    syncBrandControls();
     setZoom(90);
   }
 
