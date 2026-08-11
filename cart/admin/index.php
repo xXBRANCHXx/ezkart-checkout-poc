@@ -6,7 +6,7 @@ require_once dirname(__DIR__) . '/api/bootstrap.php';
 header('Cache-Control: no-store');
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: DENY');
-header("Content-Security-Policy: default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'");
+header("Content-Security-Policy: default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; frame-src https://www.openstreetmap.org; form-action 'self'; frame-ancestors 'none'; base-uri 'none'");
 
 $isHttps = isset($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off';
 session_name('ezkart_sandbox_admin');
@@ -61,6 +61,33 @@ function ez_admin_short_money(mixed $value): string
     if ($amount >= 1_000_000) return 'Rp' . number_format($amount / 1_000_000, 1, ',', '.') . ' jt';
     if ($amount >= 1_000) return 'Rp' . number_format($amount / 1_000, 0, ',', '.') . ' rb';
     return ez_admin_money($amount);
+}
+
+function ez_admin_product_art(string $name): string
+{
+    $normalized = mb_strtolower($name);
+    $type = str_contains($normalized, 'kopi')
+        ? 'coffee'
+        : (str_contains($normalized, 'sambal') ? 'sambal' : 'granola');
+    return '<span class="product-art product-' . $type . '">' . ez_admin_icon($type) . '</span>';
+}
+
+function ez_admin_location_coordinates(string $location): array
+{
+    $normalized = mb_strtolower($location);
+    foreach ([
+        'surabaya' => [-7.2575, 112.7521, 'Surabaya'],
+        'bandung' => [-6.9175, 107.6191, 'Bandung'],
+        'yogyakarta' => [-7.7956, 110.3695, 'Yogyakarta'],
+        'sleman' => [-7.7325, 110.4024, 'Sleman'],
+        'denpasar' => [-8.6705, 115.2126, 'Denpasar'],
+        'bali' => [-8.4095, 115.1889, 'Bali'],
+        'depok' => [-6.4025, 106.7942, 'Depok'],
+        'jakarta' => [-6.1754, 106.8272, 'Jakarta'],
+    ] as $needle => $coordinates) {
+        if (str_contains($normalized, $needle)) return $coordinates;
+    }
+    return [-6.1754, 106.8272, $location !== '' ? $location : 'Jakarta'];
 }
 
 function ez_admin_orders(): array
@@ -127,26 +154,43 @@ $metrics = [
     'failed_count' => 0,
 ];
 $productSales = [];
+$productActivity = [];
+$statusCounts = ['PAID' => 0, 'PENDING' => 0, 'CREATING' => 0, 'FAILED' => 0];
+$paidProductRevenue = 0;
+$paidShippingRevenue = 0;
+$pendingVolume = 0;
+$failedVolume = 0;
 foreach ($orders as $order) {
     $status = strtoupper((string) ($order['status'] ?? ''));
+    if (isset($statusCounts[$status])) $statusCounts[$status]++;
     if ($status === 'PAID') {
         $metrics['paid_count']++;
         $metrics['paid_volume'] += (int) ($order['total'] ?? 0);
+        $paidProductRevenue += max(0, (int) ($order['subtotal'] ?? 0));
+        $paidShippingRevenue += max(0, (int) ($order['shipping_price'] ?? 0));
     } elseif (in_array($status, ['CREATING', 'PENDING'], true)) {
         $metrics['pending_count']++;
+        $pendingVolume += max(0, (int) ($order['total'] ?? 0));
     } elseif ($status === 'FAILED') {
         $metrics['failed_count']++;
+        $failedVolume += max(0, (int) ($order['total'] ?? 0));
     }
     foreach ((array) ($order['items'] ?? []) as $item) {
         if (!is_array($item) || ($item['id'] ?? '') === 'EZK-SHIPPING') continue;
         $name = trim((string) ($item['name'] ?? 'Produk')) ?: 'Produk';
-        if (!isset($productSales[$name])) $productSales[$name] = ['quantity' => 0, 'sales' => 0];
         $quantity = max(0, (int) ($item['quantity'] ?? 0));
-        $productSales[$name]['quantity'] += $quantity;
-        $productSales[$name]['sales'] += $quantity * max(0, (int) ($item['price'] ?? 0));
+        if (!isset($productActivity[$name])) $productActivity[$name] = ['quantity' => 0, 'sales' => 0];
+        $productActivity[$name]['quantity'] += $quantity;
+        $productActivity[$name]['sales'] += $quantity * max(0, (int) ($item['price'] ?? 0));
+        if ($status === 'PAID') {
+            if (!isset($productSales[$name])) $productSales[$name] = ['quantity' => 0, 'sales' => 0];
+            $productSales[$name]['quantity'] += $quantity;
+            $productSales[$name]['sales'] += $quantity * max(0, (int) ($item['price'] ?? 0));
+        }
     }
 }
 uasort($productSales, static fn(array $left, array $right): int => $right['sales'] <=> $left['sales']);
+uasort($productActivity, static fn(array $left, array $right): int => $right['quantity'] <=> $left['quantity']);
 $displayOrders = array_slice($orders, 0, 7);
 $averageOrder = $metrics['paid_count'] > 0 ? (int) round($metrics['paid_volume'] / $metrics['paid_count']) : 0;
 $conversionRate = $metrics['orders'] > 0 ? min(99.9, round(($metrics['paid_count'] / $metrics['orders']) * 100, 1)) : 0;
@@ -157,8 +201,43 @@ $productDefaults = [
     'Sambal Roa Signature' => ['quantity' => 0, 'sales' => 0],
 ];
 $topProducts = array_slice($productSales !== [] ? $productSales : $productDefaults, 0, 5, true);
+$catalogProducts = array_slice($productActivity !== [] ? $productActivity : $productDefaults, 0, 3, true);
+$paidUnits = array_sum(array_column($productSales, 'quantity'));
 $nowJakarta = new DateTimeImmutable('now', new DateTimeZone('Asia/Jakarta'));
 $dateRangeStart = $nowJakarta->modify('-6 days');
+$salesMonths = [];
+for ($offset = 5; $offset >= 0; $offset--) {
+    $month = $nowJakarta->modify('-' . $offset . ' months')->modify('first day of this month');
+    $salesMonths[$month->format('Y-m')] = ['label' => $month->format('M'), 'value' => 0];
+}
+foreach ($orders as $order) {
+    if (strtoupper((string) ($order['status'] ?? '')) !== 'PAID') continue;
+    $timestamp = strtotime((string) ($order['created_at'] ?? ''));
+    if ($timestamp === false) continue;
+    $monthKey = (new DateTimeImmutable('@' . $timestamp))->setTimezone(new DateTimeZone('Asia/Jakarta'))->format('Y-m');
+    if (isset($salesMonths[$monthKey])) $salesMonths[$monthKey]['value'] += max(0, (int) ($order['total'] ?? 0));
+}
+$chartMaximum = max(1, ...array_column($salesMonths, 'value'));
+$chartPoints = [];
+$monthCount = max(1, count($salesMonths) - 1);
+foreach (array_values($salesMonths) as $index => $month) {
+    $x = round(($index / $monthCount) * 600, 1);
+    $y = round(160 - (($month['value'] / $chartMaximum) * 145), 1);
+    $chartPoints[] = $x . ' ' . $y;
+}
+$chartLine = 'M' . implode(' L', $chartPoints);
+$chartArea = $chartLine . ' L600 170 L0 170 Z';
+$latestCustomer = is_array($orders[0]['customer'] ?? null) ? $orders[0]['customer'] : [];
+[$mapLatitude, $mapLongitude, $mapLabel] = ez_admin_location_coordinates((string) ($latestCustomer['location'] ?? ''));
+$mapBounds = implode(',', [$mapLongitude - .07, $mapLatitude - .045, $mapLongitude + .07, $mapLatitude + .045]);
+$mapEmbedUrl = 'https://www.openstreetmap.org/export/embed.html?bbox=' . rawurlencode($mapBounds)
+    . '&layer=mapnik&marker=' . rawurlencode($mapLatitude . ',' . $mapLongitude);
+$mapSummaryTitle = $orders !== [] ? 'Latest destination' : 'Operations map';
+$mapSummaryMeta = $orders !== [] ? $mapLabel . ' · OpenStreetMap' : 'Jakarta default · OpenStreetMap';
+$statusTotal = max(1, $metrics['orders']);
+$paidEnd = round(($statusCounts['PAID'] / $statusTotal) * 100, 1);
+$pendingEnd = round((($statusCounts['PAID'] + $statusCounts['PENDING']) / $statusTotal) * 100, 1);
+$creatingEnd = round((($statusCounts['PAID'] + $statusCounts['PENDING'] + $statusCounts['CREATING']) / $statusTotal) * 100, 1);
 ?>
 <!doctype html>
 <html lang="id">
@@ -167,7 +246,7 @@ $dateRangeStart = $nowJakarta->modify('-6 days');
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="robots" content="noindex,nofollow">
   <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="admin.css?v=2">
+  <link rel="stylesheet" href="admin.css?v=3">
   <title><?= $authenticated ? 'Sandbox Orders' : 'Admin Login' ?> · Ezkart</title>
 </head>
 <body class="<?= $authenticated ? 'dashboard-page' : 'login-page' ?>">
@@ -217,6 +296,15 @@ $dateRangeStart = $nowJakarta->modify('-6 days');
     <symbol id="icon-money" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15 8.5c-.7-.5-1.5-.8-2.5-.8-1.4 0-2.5.7-2.5 1.8 0 2.8 5.2 1.3 5.2 4.3 0 1.2-1.1 2-2.7 2-.9 0-1.9-.3-2.7-.9M12.5 5.8v12.4"/></symbol>
     <symbol id="icon-refund" viewBox="0 0 24 24"><path d="M4 7v5h5M20 17v-5h-5"/><path d="M6.1 16.8A8 8 0 0 0 20 12M17.9 7.2A8 8 0 0 0 4 12"/></symbol>
     <symbol id="icon-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+    <symbol id="icon-sparkles" viewBox="0 0 24 24"><path d="m12 3 1.2 3.8L17 8l-3.8 1.2L12 13l-1.2-3.8L7 8l3.8-1.2L12 3ZM18.5 14l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2ZM5 13l.7 2.1 2.1.7-2.1.7L5 18.6l-.7-2.1-2.1-.7 2.1-.7L5 13Z"/></symbol>
+    <symbol id="icon-rocket" viewBox="0 0 24 24"><path d="M14 5c2.5-2.5 5.5-2.2 5.5-2.2s.3 3-2.2 5.5l-5.6 5.6-4.3-4.3L14 5Z"/><path d="m9 8-4.3.5-2 2 4.7 1.2M15.2 11.2l-.5 4.3-2 2-1.2-4.7M8.2 15.2c-1.6 1.6-4.8 1.6-4.8 1.6s0-3.2 1.6-4.8"/><circle cx="15.5" cy="6.8" r="1.4"/></symbol>
+    <symbol id="icon-store" viewBox="0 0 24 24"><path d="M4 10v10h16V10M3 4h18l-1 6a3 3 0 0 1-4 1.7A3 3 0 0 1 12 12a3 3 0 0 1-4-.3A3 3 0 0 1 4 10L3 4Z"/><path d="M9 20v-5h6v5"/></symbol>
+    <symbol id="icon-granola" viewBox="0 0 24 24"><path d="M4 10h16c0 6-3 10-8 10S4 16 4 10Z"/><path d="M7 10c.6-2 2-3 3.7-3 1.2 0 1.8.6 2.6.6 1 0 1.4-.8 2.6-.8 1.1 0 2 .7 2.4 2M8 5.5l1.2-1M14 5l1-1.5"/></symbol>
+    <symbol id="icon-coffee" viewBox="0 0 24 24"><path d="M5 9h12v6a5 5 0 0 1-5 5h-2a5 5 0 0 1-5-5V9Z"/><path d="M17 11h1.5a2.5 2.5 0 0 1 0 5H17M8 6c-1-1 .8-1.7 0-3M12 6c-1-1 .8-1.7 0-3"/></symbol>
+    <symbol id="icon-sambal" viewBox="0 0 24 24"><path d="M9 3h6v3H9zM8 6h8l1.5 3v10a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2V9L8 6Z"/><path d="M9 13c1-2 2-2.5 3-4 .2 1.7 2.8 2.4 2.8 5A2.8 2.8 0 0 1 12 17a2.8 2.8 0 0 1-3-3c0-.4 0-.7.1-1Z"/></symbol>
+    <symbol id="icon-truck" viewBox="0 0 24 24"><path d="M3 6h11v11H3zM14 10h4l3 3v4h-7z"/><circle cx="7" cy="19" r="2"/><circle cx="18" cy="19" r="2"/></symbol>
+    <symbol id="icon-map-pin" viewBox="0 0 24 24"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></symbol>
+    <symbol id="icon-check-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12 2.5 2.5L16.5 8"/></symbol>
   </svg>
 
   <div class="app-shell">
@@ -236,10 +324,10 @@ $dateRangeStart = $nowJakarta->modify('-6 days');
         <a href="#account-menu"><?= ez_admin_icon('settings') ?><span>Settings</span></a>
       </nav>
       <section class="upgrade-card">
-        <span>🚀</span><div><b>Unlock growth with<br>Premium Plan</b><p>Get advanced analytics,<br>automations &amp; more.</p></div>
+        <span class="upgrade-icon"><?= ez_admin_icon('rocket') ?></span><div><b>Unlock growth with<br>Premium Plan</b><p>Get advanced analytics,<br>automations &amp; more.</p></div>
         <a href="#payout-summary">Upgrade Now</a>
       </section>
-      <div class="store-switcher"><span>🛍️</span><div><b>Ezkart Sandbox</b><small>Midtrans Demo</small></div><span>⌄</span></div>
+      <div class="store-switcher"><span class="store-icon"><?= ez_admin_icon('store') ?></span><div><b>Ezkart Sandbox</b><small>Midtrans Demo</small></div><span>⌄</span></div>
     </aside>
 
     <div class="workspace">
@@ -250,7 +338,7 @@ $dateRangeStart = $nowJakarta->modify('-6 days');
           <button class="icon-button" type="button" aria-label="Notifications"><?= ez_admin_icon('bell') ?><i><?= $metrics['pending_count'] ?></i></button>
           <button class="icon-button" type="button" aria-label="Messages"><?= ez_admin_icon('message') ?></button>
           <button class="icon-button" type="button" aria-label="Help"><?= ez_admin_icon('help') ?></button>
-          <div class="profile" id="account-menu"><span class="avatar">JD</span><div><b>John Doe</b><small>Merchant</small></div><span>⌄</span></div>
+          <div class="profile" id="account-menu"><span class="avatar">EA</span><div><b>Ezkart Admin</b><small>Sandbox operator</small></div><span>⌄</span></div>
           <form method="post" class="logout-form">
             <input type="hidden" name="action" value="logout"><input type="hidden" name="csrf_token" value="<?= ez_admin_escape($csrfToken) ?>">
             <button type="submit">Log out</button>
@@ -260,17 +348,17 @@ $dateRangeStart = $nowJakarta->modify('-6 days');
 
       <main class="dashboard" id="overview">
         <section class="welcome-row">
-          <div><h1>Welcome back, John! <span>👋</span></h1><p>Here's what's happening with your store today.</p></div>
+          <div><h1>Welcome back <span class="welcome-mark"><?= ez_admin_icon('sparkles') ?></span></h1><p>Here is what is happening with your sandbox store today.</p></div>
           <a class="campaign-button" href="../">＋ <span>Create New Order</span></a>
           <button class="date-button" type="button"><?= ez_admin_icon('calendar') ?><span><?= $dateRangeStart->format('M j') ?> – <?= $nowJakarta->format('M j, Y') ?></span><b>⌄</b></button>
         </section>
 
         <section class="kpi-grid" aria-label="Store overview">
-          <article><span class="kpi-icon"><?= ez_admin_icon('money') ?></span><div><small>Total Sales</small><strong><?= ez_admin_short_money($metrics['paid_volume']) ?></strong><em class="positive">↑ <?= $metrics['paid_count'] > 0 ? '12.5%' : '0%' ?></em><p>Confirmed sandbox payments</p></div></article>
-          <article><span class="kpi-icon"><?= ez_admin_icon('cart') ?></span><div><small>Orders</small><strong><?= number_format($metrics['orders']) ?></strong><em class="positive">↑ <?= $metrics['orders'] > 0 ? '8.3%' : '0%' ?></em><p><?= $metrics['pending_count'] ?> awaiting completion</p></div></article>
+          <article><span class="kpi-icon"><?= ez_admin_icon('money') ?></span><div><small>Total Sales</small><strong><?= ez_admin_short_money($metrics['paid_volume']) ?></strong><em class="positive"><?= $metrics['paid_count'] ?> paid</em><p>Provider-confirmed sandbox payments</p></div></article>
+          <article><span class="kpi-icon"><?= ez_admin_icon('cart') ?></span><div><small>Orders</small><strong><?= number_format($metrics['orders']) ?></strong><em><?= $metrics['pending_count'] ?> open</em><p>All stored sandbox orders</p></div></article>
           <article><span class="kpi-icon"><?= ez_admin_icon('trend') ?></span><div><small>Conversion Rate</small><strong><?= number_format($conversionRate, 1) ?>%</strong><p>Paid orders / all orders</p></div></article>
-          <article><span class="kpi-icon"><?= ez_admin_icon('chart') ?></span><div><small>Average Order Value</small><strong><?= ez_admin_short_money($averageOrder) ?></strong><em class="positive">↑ <?= $averageOrder > 0 ? '5.2%' : '0%' ?></em><p>Across paid transactions</p></div></article>
-          <article><span class="kpi-icon"><?= ez_admin_icon('refund') ?></span><div><small>Failure Rate</small><strong><?= number_format($refundRate, 1) ?>%</strong><em class="negative"><?= $metrics['failed_count'] > 0 ? '↑' : '↓' ?> <?= number_format($refundRate, 1) ?>%</em><p>Failed or expired orders</p></div></article>
+          <article><span class="kpi-icon"><?= ez_admin_icon('chart') ?></span><div><small>Average Order Value</small><strong><?= ez_admin_short_money($averageOrder) ?></strong><p>Across paid transactions</p></div></article>
+          <article><span class="kpi-icon"><?= ez_admin_icon('refund') ?></span><div><small>Failure Rate</small><strong><?= number_format($refundRate, 1) ?>%</strong><em class="<?= $metrics['failed_count'] > 0 ? 'negative' : 'positive' ?>"><?= $metrics['failed_count'] ?> failed</em><p>Failed or expired orders</p></div></article>
           <article><span class="kpi-icon"><?= ez_admin_icon('wallet') ?></span><div><small>Sandbox Volume</small><strong><?= ez_admin_short_money($metrics['paid_volume']) ?></strong><p>Not a withdrawable balance</p></div></article>
         </section>
 
@@ -279,10 +367,10 @@ $dateRangeStart = $nowJakarta->modify('-6 days');
             <header class="panel-header"><h2>Sales Overview</h2></header>
             <div class="chart-controls"><div><button>Daily</button><button>Weekly</button><button class="active">Monthly</button></div><button>Compare: Previous Period⌄</button></div>
             <div class="sales-chart">
-              <div class="chart-y"><span><?= ez_admin_short_money(max(100000, $metrics['paid_volume'])) ?></span><span>75%</span><span>50%</span><span>25%</span><span>0</span></div>
-              <svg viewBox="0 0 600 170" preserveAspectRatio="none" aria-label="Sales trend"><defs><linearGradient id="sales-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff4d53" stop-opacity=".27"/><stop offset="1" stop-color="#ff4d53" stop-opacity=".01"/></linearGradient></defs><path class="area" d="M0 145 L24 132 L48 101 L72 79 L96 96 L120 85 L144 91 L168 82 L192 60 L216 81 L240 51 L264 61 L288 27 L312 17 L336 54 L360 46 L384 71 L408 73 L432 52 L456 69 L480 67 L504 47 L528 27 L552 9 L576 0 L600 0 L600 170 L0 170Z"/><path class="line" d="M0 145 L24 132 L48 101 L72 79 L96 96 L120 85 L144 91 L168 82 L192 60 L216 81 L240 51 L264 61 L288 27 L312 17 L336 54 L360 46 L384 71 L408 73 L432 52 L456 69 L480 67 L504 47 L528 27 L552 9 L576 0"/><circle cx="576" cy="0" r="5"/></svg>
-              <div class="chart-x"><span>Aug</span><span>Sep</span><span>Oct</span><span>Nov</span><span>Dec</span><span>Jan</span></div>
-              <div class="chart-tip"><small>This period</small><b><?= ez_admin_short_money($metrics['paid_volume']) ?></b></div>
+              <div class="chart-y"><span><?= ez_admin_short_money($chartMaximum) ?></span><span><?= ez_admin_short_money($chartMaximum * .75) ?></span><span><?= ez_admin_short_money($chartMaximum * .5) ?></span><span><?= ez_admin_short_money($chartMaximum * .25) ?></span><span>Rp0</span></div>
+              <svg viewBox="0 0 600 170" preserveAspectRatio="none" aria-label="Confirmed sales over the last six months"><defs><linearGradient id="sales-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff4d53" stop-opacity=".27"/><stop offset="1" stop-color="#ff4d53" stop-opacity=".01"/></linearGradient></defs><path class="area" d="<?= ez_admin_escape($chartArea) ?>"/><path class="line" d="<?= ez_admin_escape($chartLine) ?>"/></svg>
+              <div class="chart-x"><?php foreach ($salesMonths as $month): ?><span><?= ez_admin_escape($month['label']) ?></span><?php endforeach; ?></div>
+              <div class="chart-tip"><small>Current month</small><b><?= ez_admin_short_money(array_values($salesMonths)[5]['value']) ?></b></div>
             </div>
           </article>
 
@@ -292,10 +380,12 @@ $dateRangeStart = $nowJakarta->modify('-6 days');
               <?php foreach (array_slice($displayOrders, 0, 5) as $order):
                 $status = strtoupper((string) ($order['status'] ?? 'UNKNOWN'));
                 $customer = is_array($order['customer'] ?? null) ? $order['customer'] : [];
+                $shipping = is_array($order['shipping'] ?? null) ? $order['shipping'] : [];
                 $items = array_values(array_filter((array) ($order['items'] ?? []), static fn($item): bool => is_array($item) && ($item['id'] ?? '') !== 'EZK-SHIPPING'));
                 $firstItem = is_array($items[0] ?? null) ? $items[0] : [];
                 $searchText = mb_strtolower(implode(' ', [(string) ($order['order_id'] ?? ''), (string) ($customer['name'] ?? ''), (string) ($customer['email'] ?? ''), (string) ($firstItem['name'] ?? '')]));
-              ?><tr data-order-card data-status="<?= ez_admin_escape($status) ?>" data-search="<?= ez_admin_escape($searchText) ?>"><td><b>#<?= ez_admin_escape(str_replace('EZK-', '', (string) ($order['order_id'] ?? '—'))) ?></b></td><td><?= ez_admin_escape($customer['name'] ?? 'Guest customer') ?></td><td><span class="table-product"><i><?= str_contains(strtolower((string) ($firstItem['name'] ?? '')), 'kopi') ? '☕' : (str_contains(strtolower((string) ($firstItem['name'] ?? '')), 'sambal') ? '🌶️' : '🥣') ?></i><?= ez_admin_escape($firstItem['name'] ?? 'Mixed order') ?></span></td><td><span class="status-badge status-<?= ez_admin_escape(strtolower($status)) ?>"><?= ez_admin_escape(ez_admin_status_label($status)) ?></span></td><td><b><?= ez_admin_money($order['total'] ?? 0) ?></b></td><td><?= ez_admin_escape(ez_admin_time($order['created_at'] ?? '')) ?></td></tr><?php endforeach; ?>
+              ?><tr data-order-card data-status="<?= ez_admin_escape($status) ?>" data-search="<?= ez_admin_escape($searchText) ?>"><td><button class="order-link" type="button" data-order-toggle aria-expanded="false" title="View <?= ez_admin_escape($order['order_id'] ?? 'order') ?>">#<?= ez_admin_escape(str_replace('EZK-', '', (string) ($order['order_id'] ?? '—'))) ?></button></td><td><?= ez_admin_escape($customer['name'] ?? 'Guest customer') ?></td><td><span class="table-product"><?= ez_admin_product_art((string) ($firstItem['name'] ?? '')) ?><?= ez_admin_escape($firstItem['name'] ?? 'Mixed order') ?></span></td><td><span class="status-badge status-<?= ez_admin_escape(strtolower($status)) ?>"><?= ez_admin_escape(ez_admin_status_label($status)) ?></span></td><td><b><?= ez_admin_money($order['total'] ?? 0) ?></b></td><td><?= ez_admin_escape(ez_admin_time($order['created_at'] ?? '')) ?></td></tr>
+              <tr class="order-detail-row" hidden><td colspan="6"><div class="order-detail-inline"><section><span>Customer</span><b><?= ez_admin_escape($customer['name'] ?? 'Guest customer') ?></b><p><?= ez_admin_escape($customer['email'] ?? '—') ?><br><?= ez_admin_escape($customer['phone'] ?? '—') ?></p></section><section><span>Delivery</span><b><?= ez_admin_escape(trim((string) ($shipping['courier'] ?? '') . ' ' . (string) ($shipping['service'] ?? '')) ?: 'Not selected') ?></b><p><?= ez_admin_escape($customer['location'] ?? '—') ?><br><?= ez_admin_escape($customer['postalCode'] ?? '—') ?></p></section><section><span>Payment</span><b><?= ez_admin_escape(str_replace('_', ' ', (string) ($order['payment_type'] ?? 'Awaiting method'))) ?></b><p>Midtrans: <?= ez_admin_escape($order['midtrans_status'] ?? 'pending') ?><br><?= ez_admin_escape($order['midtrans_transaction_id'] ?? 'No transaction ID') ?></p></section><section><span>Price detail</span><b><?= ez_admin_money($order['total'] ?? 0) ?></b><p>Products <?= ez_admin_money($order['subtotal'] ?? 0) ?><br>Shipping <?= ez_admin_money($order['shipping_price'] ?? 0) ?></p></section></div></td></tr><?php endforeach; ?>
               <tr class="table-empty" <?= $displayOrders !== [] ? 'hidden' : '' ?>><td colspan="6"><b>No sandbox orders yet</b><span>Complete the demo checkout to see an order here.</span></td></tr>
               <tr class="filter-empty" id="empty-filter" hidden><td colspan="6">No orders match that search.</td></tr>
             </tbody></table></div>
@@ -303,7 +393,8 @@ $dateRangeStart = $nowJakarta->modify('-6 days');
 
           <article class="panel products-panel" id="top-products">
             <header class="panel-header"><h2>Top Selling Products</h2><a href="../">View all</a></header>
-            <ol><?php $rank = 0; foreach ($topProducts as $name => $sales): $rank++; ?><li><span class="rank"><?= $rank ?></span><i><?= str_contains(strtolower($name), 'kopi') ? '☕' : (str_contains(strtolower($name), 'sambal') ? '🌶️' : '🥣') ?></i><div><b><?= ez_admin_escape($name) ?></b><small><?= number_format($sales['quantity']) ?> sold</small></div><strong><?= ez_admin_short_money($sales['sales']) ?></strong></li><?php endforeach; ?></ol>
+            <ol><?php $rank = 0; foreach ($topProducts as $name => $sales): $rank++; ?><li><span class="rank"><?= $rank ?></span><?= ez_admin_product_art($name) ?><div><b><?= ez_admin_escape($name) ?></b><small><?= number_format($sales['quantity']) ?> sold</small></div><strong><?= ez_admin_short_money($sales['sales']) ?></strong></li><?php endforeach; ?></ol>
+            <footer class="products-summary"><div><small>Active catalog</small><b><?= count($productDefaults) ?> products</b></div><div><small>Paid units</small><b><?= number_format($paidUnits) ?></b></div></footer>
           </article>
         </section>
 
@@ -314,29 +405,29 @@ $dateRangeStart = $nowJakarta->modify('-6 days');
           </ul></article>
 
           <article class="panel revenue-panel"><header class="panel-header"><h2>Revenue Breakdown</h2><a href="#payout-summary">View Report</a></header><div class="revenue-rows">
-            <?php $subtotalRevenue = max(0, $metrics['paid_volume'] - ($metrics['paid_count'] * 15000)); $shippingRevenue = $metrics['paid_volume'] - $subtotalRevenue; foreach ([['Product Sales', $subtotalRevenue, 'orange'], ['Shipping Fees', $shippingRevenue, 'pink'], ['Taxes', 0, 'purple'], ['Discounts', 0, 'blue']] as $row): $percentage = $metrics['paid_volume'] > 0 ? round(($row[1] / $metrics['paid_volume']) * 100, 1) : 0; ?><div><span><b><?= $row[0] ?></b><em><?= ez_admin_money($row[1]) ?> <small><?= $percentage ?>%</small></em></span><i><b class="<?= $row[2] ?>" style="width:<?= min(100, max(2, $percentage)) ?>%"></b></i></div><?php endforeach; ?>
+            <?php $trackedVolume = max(1, $metrics['paid_volume'] + $pendingVolume + $failedVolume); foreach ([['Product Sales', $paidProductRevenue, 'orange'], ['Shipping Fees', $paidShippingRevenue, 'pink'], ['Pending Volume', $pendingVolume, 'purple'], ['Failed Volume', $failedVolume, 'blue']] as $row): $percentage = round(($row[1] / $trackedVolume) * 100, 1); ?><div><span><b><?= $row[0] ?></b><em><?= ez_admin_money($row[1]) ?> <small><?= $percentage ?>%</small></em></span><i><b class="<?= $row[2] ?>" style="width:<?= min(100, max(2, $percentage)) ?>%"></b></i></div><?php endforeach; ?>
             <footer><b>Total Revenue</b><strong><?= ez_admin_money($metrics['paid_volume']) ?></strong></footer>
           </div></article>
 
-          <article class="panel traffic-panel"><header class="panel-header"><h2>Traffic Sources</h2></header><div class="traffic-content"><div class="donut"><span><small>Total Visitors</small><b><?= number_format(max(0, $metrics['orders'] * 13)) ?></b></span></div><ul><li><i class="orange"></i>Direct <b>39.9%</b></li><li><i class="pink"></i>Search <b>25.2%</b></li><li><i class="purple"></i>Social Media <b>17.4%</b></li><li><i class="blue"></i>Referral <b>9.5%</b></li><li><i class="cyan"></i>Email <b>7.9%</b></li></ul></div></article>
+          <article class="panel traffic-panel"><header class="panel-header"><h2>Order Status</h2><a href="#recent-orders">View orders</a></header><div class="traffic-content"><div class="donut<?= $metrics['orders'] === 0 ? ' empty' : '' ?>" style="--paid-end:<?= $paidEnd ?>%;--pending-end:<?= $pendingEnd ?>%;--creating-end:<?= $creatingEnd ?>%"><span><small>Total Orders</small><b><?= number_format($metrics['orders']) ?></b></span></div><ul><li><i class="orange"></i>Paid <b><?= $statusCounts['PAID'] ?></b></li><li><i class="pink"></i>Pending <b><?= $statusCounts['PENDING'] ?></b></li><li><i class="purple"></i>Creating <b><?= $statusCounts['CREATING'] ?></b></li><li><i class="blue"></i>Failed <b><?= $statusCounts['FAILED'] ?></b></li></ul></div></article>
 
-          <article class="panel stock-panel"><header class="panel-header"><h2>Low Stock Alerts</h2><a href="../">View All</a></header><ul><li><i>🥣</i><div><b>Granola Madu</b><span><em style="width:35%"></em></span></div><small>15 left</small></li><li><i>🌶️</i><div><b>Sambal Roa</b><span><em style="width:22%"></em></span></div><small>18 left</small></li><li><i>☕</i><div><b>Kopi Susu</b><span><em style="width:50%"></em></span></div><small>22 left</small></li></ul></article>
+          <article class="panel stock-panel"><header class="panel-header"><h2>Catalog Activity</h2><a href="../">Open catalog</a></header><ul><?php foreach ($catalogProducts as $name => $sales): $activity = min(100, max(5, $sales['quantity'] * 12)); ?><li><?= ez_admin_product_art($name) ?><div><b><?= ez_admin_escape($name) ?></b><span><em style="width:<?= $activity ?>%"></em></span></div><small><?= number_format($sales['quantity']) ?> ordered</small></li><?php endforeach; ?></ul></article>
 
-          <article class="panel fulfillment-panel"><header class="panel-header"><h2>Order Fulfillment</h2><a href="#recent-orders">View Orders</a></header><div class="map"><svg viewBox="0 0 320 170" preserveAspectRatio="none"><path class="road" d="M-10 130C50 100 34 52 106 39S220 42 332 2M40 180C72 116 143 137 162 84S246 40 306 51M-6 39C62 59 113 16 178 25S256 120 331 109"/><path class="route" d="M28 143 72 111 122 124 164 73 210 86 249 44 292 65"/></svg><span class="pin one">●</span><span class="pin two">●</span><div><span class="truck">🚚</span><p>Shipped Orders<small>Today</small></p><strong><?= $metrics['paid_count'] ?></strong></div></div></article>
+          <article class="panel fulfillment-panel"><header class="panel-header"><h2>Order Fulfillment</h2><a href="https://www.openstreetmap.org/?mlat=<?= ez_admin_escape($mapLatitude) ?>&amp;mlon=<?= ez_admin_escape($mapLongitude) ?>#map=12/<?= ez_admin_escape($mapLatitude) ?>/<?= ez_admin_escape($mapLongitude) ?>" target="_blank" rel="noopener">Open map</a></header><div class="map"><iframe src="<?= ez_admin_escape($mapEmbedUrl) ?>" title="OpenStreetMap centered on <?= ez_admin_escape($mapLabel) ?>" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe><div class="map-summary"><span class="truck"><?= ez_admin_icon('truck') ?></span><p><?= ez_admin_escape($mapSummaryTitle) ?><small><?= ez_admin_escape($mapSummaryMeta) ?></small></p><strong><?= $metrics['paid_count'] ?><small>paid</small></strong></div></div></article>
         </section>
 
         <section class="dashboard-grid footer-grid">
-          <article class="panel reviews-panel" id="customer-reviews"><header class="panel-header"><h2>Customer Reviews</h2><a href="#customer-feed">View All</a></header><div class="review-body"><div><strong>4.8</strong><p>★★★★★</p><small>Based on <?= max(0, $metrics['paid_count']) ?> reviews</small></div><ul><?php foreach ([5 => 82, 4 => 12, 3 => 4, 2 => 1, 1 => 1] as $stars => $width): ?><li><span><?= $stars ?> ★</span><i><b style="width:<?= $metrics['paid_count'] > 0 ? $width : 0 ?>%"></b></i><small><?= $metrics['paid_count'] > 0 ? max(0, (int) round($metrics['paid_count'] * $width / 100)) : 0 ?></small></li><?php endforeach; ?></ul></div></article>
+          <article class="panel reviews-panel" id="customer-reviews"><header class="panel-header"><h2>Customer Reviews</h2><a href="#customer-feed">View activity</a></header><div class="review-body"><div><strong>4.8</strong><p class="review-stars"><?= str_repeat(ez_admin_icon('star'), 5) ?></p><small>Sandbox review preview</small></div><ul><?php foreach ([5 => 82, 4 => 12, 3 => 4, 2 => 1, 1 => 1] as $stars => $width): ?><li><span><?= $stars ?> <?= ez_admin_icon('star') ?></span><i><b style="width:<?= $metrics['paid_count'] > 0 ? $width : 0 ?>%"></b></i><small><?= $metrics['paid_count'] > 0 ? max(0, (int) round($metrics['paid_count'] * $width / 100)) : 0 ?></small></li><?php endforeach; ?></ul></div></article>
 
           <article class="panel tasks-panel" id="upcoming-tasks"><header class="panel-header"><h2>Upcoming Tasks</h2></header><div class="tasks-content"><ul><li><input type="checkbox">Review sandbox payment status <time>Today</time></li><li><input type="checkbox">Update product descriptions <time>Tomorrow</time></li><li><input type="checkbox">Respond to customer inquiries <time>Aug 14</time></li><li><input type="checkbox">Analyze checkout conversion <time>Aug 15</time></li></ul><div class="mini-calendar"><header><button>‹</button><b><?= $nowJakarta->format('F Y') ?></b><button>›</button></header><div class="weekdays"><span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span></div><div class="days"><?php for ($day = 1; $day <= 31; $day++): ?><span class="<?= $day === (int) $nowJakarta->format('j') ? 'today' : '' ?>"><?= $day ?></span><?php endfor; ?></div></div></div></article>
 
-          <article class="panel payout-panel" id="payout-summary"><header class="panel-header"><h2>Payout Summary</h2><a href="#recent-orders">View All Payments</a></header><div class="payout-body"><small>Confirmed Sandbox Volume</small><div><strong><?= ez_admin_money($metrics['paid_volume']) ?></strong><em class="positive">↑ 12.4%</em><span>vs last period</span></div></div><footer><div><small>Environment</small><b>Midtrans Sandbox</b></div><div><small>Paid Orders</small><b><?= number_format($metrics['paid_count']) ?></b></div><a href="../">Open Checkout</a></footer></article>
+          <article class="panel payout-panel" id="payout-summary"><header class="panel-header"><h2>Payment Summary</h2><a href="#recent-orders">View all payments</a></header><div class="payout-body"><small>Provider-confirmed Sandbox Volume</small><div><strong><?= ez_admin_money($metrics['paid_volume']) ?></strong><em class="positive"><?= ez_admin_icon('check-circle') ?> Verified</em><span>signed Midtrans notifications</span></div></div><footer><div><small>Environment</small><b>Midtrans Sandbox</b></div><div><small>Paid Orders</small><b><?= number_format($metrics['paid_count']) ?></b></div><a href="../">Open Checkout</a></footer></article>
         </section>
       </main>
     </div>
   </div>
   <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
-  <script src="admin.js?v=2"></script>
+  <script src="admin.js?v=3"></script>
 <?php endif; ?>
 </body>
 </html>

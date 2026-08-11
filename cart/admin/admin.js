@@ -16,6 +16,10 @@
       const matchesQuery = !query || (card.dataset.search || "").includes(query);
       const matchesStatus = selectedStatus === "all" || card.dataset.status === selectedStatus;
       card.hidden = !(matchesQuery && matchesStatus);
+      if (card.hidden && card.nextElementSibling?.classList.contains("order-detail-row")) {
+        card.nextElementSibling.hidden = true;
+        card.querySelector("[data-order-toggle]")?.setAttribute("aria-expanded", "false");
+      }
       if (!card.hidden) visible += 1;
     });
     empty.hidden = visible > 0 || cards.length === 0;
@@ -27,6 +31,19 @@
     if (search) search.value = globalSearch.value;
     filterOrders(globalSearch);
     if (globalSearch.value.trim()) document.getElementById("recent-orders")?.scrollIntoView({ block: "center" });
+  });
+
+  document.querySelectorAll("[data-order-toggle]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const detail = button.closest("tr")?.nextElementSibling;
+      if (!detail?.classList.contains("order-detail-row")) return;
+      const willOpen = detail.hidden;
+      document.querySelectorAll(".order-detail-row").forEach((row) => { row.hidden = true; });
+      document.querySelectorAll("[data-order-toggle]").forEach((toggle) => toggle.setAttribute("aria-expanded", "false"));
+      detail.hidden = !willOpen;
+      button.setAttribute("aria-expanded", String(willOpen));
+      if (willOpen) detail.scrollIntoView({ block: "nearest" });
+    });
   });
 
   document.addEventListener("keydown", (event) => {
