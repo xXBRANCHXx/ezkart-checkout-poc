@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-const EZ_DUITKU_SANDBOX_INVOICE_URL = 'https://api-sandbox.duitku.com/api/merchant/createInvoice';
+const EZ_MIDTRANS_SNAP_SANDBOX_URL = 'https://app.sandbox.midtrans.com/snap/v1/transactions';
 
 function ez_api_json(array $payload, int $status = 200): never
 {
@@ -50,14 +50,24 @@ function ez_config(string $key): string
     return is_string($value) ? trim($value) : '';
 }
 
-function ez_duitku_credentials(): array
+function ez_midtrans_credentials(): array
 {
-    $code = ez_config('duitku_merchant_code');
-    $key = ez_config('duitku_merchant_key');
-    if ($code === '' || $key === '' || str_contains(strtoupper($code), 'REPLACE')) {
-        throw new RuntimeException('Duitku Sandbox credentials are not configured on this server.');
+    $merchantId = ez_config('midtrans_merchant_id');
+    $clientKey = ez_config('midtrans_client_key');
+    $serverKey = ez_config('midtrans_server_key');
+    if (
+        $merchantId === '' || $clientKey === '' || $serverKey === ''
+        || str_contains(strtoupper($merchantId), 'REPLACE')
+        || str_contains(strtoupper($clientKey), 'REPLACE')
+        || str_contains(strtoupper($serverKey), 'REPLACE')
+    ) {
+        throw new RuntimeException('Midtrans Sandbox credentials are not configured on this server.');
     }
-    return ['code' => $code, 'key' => $key];
+    return [
+        'merchant_id' => $merchantId,
+        'client_key' => $clientKey,
+        'server_key' => $serverKey,
+    ];
 }
 
 function ez_catalog(): array
@@ -109,8 +119,9 @@ function ez_checkout_request(array $input): array
         if ($quantity === 0) continue;
         $lineTotal = $product['price'] * $quantity;
         $items[] = [
-            'name' => $product['name'],
-            'price' => $lineTotal,
+            'id' => $product['sku'],
+            'name' => mb_substr($product['name'], 0, 50),
+            'price' => $product['price'],
             'quantity' => $quantity,
         ];
         $subtotal += $lineTotal;
@@ -142,6 +153,7 @@ function ez_checkout_request(array $input): array
     $extraWeight = max(0, (int) ceil($weight / 1000) - 1) * 4500;
     $shippingPrice = (int) round(($shipping['base'] * ez_location_multiplier($location) + $extraWeight) / 500) * 500;
     $items[] = [
+        'id' => 'EZK-SHIPPING',
         'name' => mb_substr('Shipping - ' . $shipping['courier'] . ' ' . $shipping['service'], 0, 50),
         'price' => $shippingPrice,
         'quantity' => 1,
@@ -159,11 +171,11 @@ function ez_checkout_request(array $input): array
 
 function ez_order_directory(): string
 {
-    $configured = ez_config('duitku_order_storage');
+    $configured = ez_config('midtrans_order_storage');
     $documentRoot = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/');
     $path = $configured !== ''
         ? $configured
-        : (($documentRoot !== '' ? dirname($documentRoot) : sys_get_temp_dir()) . '/ezkart-duitku-orders');
+        : (($documentRoot !== '' ? dirname($documentRoot) : sys_get_temp_dir()) . '/ezkart-midtrans-orders');
     if (!is_dir($path) && !mkdir($path, 0700, true) && !is_dir($path)) {
         throw new RuntimeException('Unable to create secure order storage.');
     }
@@ -204,7 +216,7 @@ function ez_load_order(string $orderId): array
 function ez_http_json(string $url, array $payload, array $headers): array
 {
     $curl = curl_init($url);
-    if ($curl === false) throw new RuntimeException('Unable to start Duitku request.');
+    if ($curl === false) throw new RuntimeException('Unable to start Midtrans request.');
     curl_setopt_array($curl, [
         CURLOPT_POST => true,
         CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
@@ -217,11 +229,18 @@ function ez_http_json(string $url, array $payload, array $headers): array
     $body = curl_exec($curl);
     $status = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
     $error = curl_error($curl);
-    curl_close($curl);
     $decoded = is_string($body) ? json_decode($body, true) : null;
     if ($status < 200 || $status >= 300 || !is_array($decoded)) {
-        $message = is_array($decoded) ? (string) ($decoded['Message'] ?? $decoded['statusMessage'] ?? '') : '';
-        throw new RuntimeException($message !== '' ? $message : 'Duitku Sandbox request failed' . ($error !== '' ? ': ' . $error : '.'));
+        $message = '';
+        if (is_array($decoded)) {
+            $messages = $decoded['error_messages'] ?? null;
+            if (is_array($messages)) {
+                $message = implode(' ', array_map('strval', $messages));
+            } else {
+                $message = (string) ($decoded['status_message'] ?? $decoded['message'] ?? '');
+            }
+        }
+        throw new RuntimeException($message !== '' ? $message : 'Midtrans Sandbox request failed' . ($error !== '' ? ': ' . $error : '.'));
     }
     return $decoded;
 }

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="Demo sandbox checkout Ezkart: tambah produk, isi alamat, pilih pengiriman, dan selesaikan pembayaran melalui Duitku Sandbox."
+      content="Demo sandbox checkout Ezkart: tambah produk, isi alamat, pilih pengiriman, dan selesaikan pembayaran melalui Midtrans Snap Sandbox."
     />
     <meta name="theme-color" content="#081424" />
     <meta name="robots" content="index,follow" />
@@ -28,7 +28,7 @@
         <img src="../assets/ezkart-logo.svg" alt="Ezkart" width="1020" height="420" />
       </a>
       <div class="header-actions">
-        <span class="sandbox-pill"><i aria-hidden="true"></i> Duitku Sandbox</span>
+        <span class="sandbox-pill"><i aria-hidden="true"></i> Midtrans Sandbox</span>
         <button class="cart-shortcut" id="cart-shortcut" type="button" aria-label="Lihat keranjang">
           Keranjang <b id="header-count">0</b>
         </button>
@@ -37,7 +37,7 @@
 
     <div class="sandbox-banner" role="note">
       <span>Mode demonstrasi</span>
-      <p>Invoice dan konfirmasi diproses oleh Duitku Sandbox. Tidak ada dana nyata yang ditagihkan.</p>
+      <p>Checkout Snap dan konfirmasi diproses oleh Midtrans Sandbox. Tidak ada dana nyata yang ditagihkan.</p>
     </div>
 
     <nav class="progress" aria-label="Tahapan checkout">
@@ -184,7 +184,7 @@
             <div>
               <p class="eyebrow">Langkah 3 dari 4</p>
               <h1>Pilih pengiriman dan pembayaran.</h1>
-              <p>Ongkir dihitung dari tujuan dan berat keranjang. Pilihan pembayaran diproses oleh Duitku.</p>
+              <p>Ongkir dihitung dari tujuan dan berat keranjang. Pilihan pembayaran diproses oleh Midtrans Snap.</p>
             </div>
           </div>
 
@@ -198,14 +198,14 @@
 
           <section class="choice-section locked" id="payment-section" aria-labelledby="payment-title">
             <div class="choice-heading">
-              <div><span>02</span><h2 id="payment-title">Pembayaran Duitku</h2></div>
-              <span class="duitku-chip">Duitku Sandbox</span>
+              <div><span>02</span><h2 id="payment-title">Pembayaran Midtrans Snap</h2></div>
+              <span class="midtrans-chip">Midtrans Sandbox</span>
             </div>
-            <p class="choice-intro">Kamu akan memilih metode pembayaran yang aktif langsung pada halaman aman Duitku Sandbox.</p>
+            <p class="choice-intro">Kamu akan memilih metode pembayaran yang aktif langsung pada popup aman Midtrans Snap Sandbox.</p>
             <div class="payment-grid" id="payment-options">
-              <div class="payment-option duitku-handoff">
+              <div class="payment-option midtrans-handoff">
                 <span class="payment-icon qris-icon">QR</span>
-                <span><b>Duitku Secure Checkout</b><small>QRIS, Virtual Account, kartu, dan metode aktif lainnya akan ditampilkan oleh Duitku.</small></span>
+                <span><b>Midtrans Snap Checkout</b><small>QRIS, Virtual Account, kartu, dan metode aktif lainnya akan ditampilkan oleh Midtrans Snap.</small></span>
                 <i aria-hidden="true">→</i>
               </div>
             </div>
@@ -214,7 +214,7 @@
           <div class="form-actions payment-actions">
             <button class="text-button" type="button" data-go="details">← Ubah alamat</button>
             <button class="primary-button" id="pay-button" type="button" disabled>
-              Bayar aman via Duitku <span>→</span>
+              Bayar aman via Midtrans <span>→</span>
             </button>
           </div>
           <p class="secure-note"><span aria-hidden="true">◆</span> Ezkart tidak menerima nomor kartu, PIN, OTP, atau kredensial perbankan.</p>
@@ -225,12 +225,12 @@
             <div class="success-icon" aria-hidden="true">✓</div>
             <p class="eyebrow">Pembayaran sandbox berhasil</p>
             <h1>Terima kasih, <span id="success-name">pelanggan</span>.</h1>
-            <p>Konfirmasi pesanan telah dibuat. Pada transaksi nyata, merchant akan memproses pesanan setelah notifikasi pembayaran terverifikasi dari Duitku diterima.</p>
+            <p>Konfirmasi pesanan telah dibuat. Pada transaksi nyata, merchant akan memproses pesanan setelah notifikasi pembayaran terverifikasi dari Midtrans diterima.</p>
             <div class="success-details">
               <div><span>Nomor pesanan</span><b id="success-order">EZK-SBX-000000</b></div>
               <div><span>Status</span><b class="paid-status">Dibayar</b></div>
               <div><span>Total</span><b id="success-total">Rp0</b></div>
-              <div><span>Pembayaran</span><b id="success-payment">Duitku Sandbox</b></div>
+              <div><span>Pembayaran</span><b id="success-payment">Midtrans Snap Sandbox</b></div>
             </div>
             <div class="success-actions">
               <button class="primary-button" id="reset-demo" type="button">Ulangi demo</button>
@@ -248,7 +248,7 @@
         <div class="empty-cart" id="empty-cart">
           <span aria-hidden="true">＋</span>
           <b>Keranjang masih kosong</b>
-          <p>Pilih produk untuk memulai checkout Duitku Sandbox.</p>
+          <p>Pilih produk untuk memulai checkout Midtrans Sandbox.</p>
         </div>
         <div class="cart-items" id="cart-items"></div>
         <div class="summary-totals" id="summary-totals" hidden>
@@ -260,17 +260,21 @@
         <button class="primary-button summary-button" id="checkout-button" type="button" disabled>
           Lanjut ke checkout <span>→</span>
         </button>
-        <div class="summary-trust"><span>✓</span><p><b>Checkout aman</b>Kamu akan melanjutkan ke checkout server dan halaman pembayaran Duitku Sandbox.</p></div>
+        <div class="summary-trust"><span>✓</span><p><b>Checkout aman</b>Kamu akan melanjutkan ke checkout server dan popup pembayaran Midtrans Snap Sandbox.</p></div>
       </aside>
     </main>
 
     <footer>
       <img src="../assets/ezkart-logo.svg" alt="Ezkart" width="1020" height="420" />
-      <p>Live Duitku Sandbox checkout for merchant review. No real funds are charged.</p>
+      <p>Live Midtrans Snap Sandbox checkout for merchant review. No real funds are charged.</p>
       <a href="../docs/Ezkart-Customer-Checkout-Guide.pdf">Unduh panduan checkout (PDF) ↗</a>
     </footer>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="cart.js?v=duitku-live-1"></script>
+    <script
+      src="https://app.sandbox.midtrans.com/snap/snap.js"
+      data-client-key="Mid-client-OnwIRh8EQnPVyPlF"
+    ></script>
+    <script src="cart.js?v=midtrans-snap-1"></script>
   </body>
 </html>

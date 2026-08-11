@@ -4,16 +4,20 @@ Static coming-soon website for [ezkart.id](https://ezkart.id).
 
 The repository also includes a dependency-free sandbox commerce flow at
 [`/cart`](https://ezkart.id/cart/). It demonstrates product selection,
-customer and delivery details, location-based shipping quotes, Duitku payment
-selection, and a provider-confirmed sandbox payment state. The server-side PHP
-endpoint creates a real Duitku Sandbox invoice, redirects to Duitku's hosted
-payment page, verifies its signed callback, and displays the stored provider
-reference. Merchant keys remain server-side and no real funds are charged.
+customer and delivery details, location-based shipping quotes, Midtrans Snap
+payment selection, and a provider-confirmed sandbox payment state. The
+server-side PHP endpoint creates a real Midtrans Sandbox Snap transaction, opens
+the Snap checkout popup, verifies its signed HTTP notification, and displays the
+stored Midtrans transaction reference. The Server Key remains server-side and no
+real funds are charged.
 
 Copy `config.example.php` to the ignored `config.runtime.php` on the server and
-set the project's Duitku Sandbox merchant code and merchant key. Alternatively,
-set `EZKART_DUITKU_MERCHANT_CODE` and `EZKART_DUITKU_MERCHANT_KEY` in the PHP
-environment.
+set the project's Midtrans Sandbox Merchant ID, Client Key, and Server Key.
+Alternatively, set `EZKART_MIDTRANS_MERCHANT_ID`,
+`EZKART_MIDTRANS_CLIENT_KEY`, and `EZKART_MIDTRANS_SERVER_KEY` in the PHP
+environment. Each Snap transaction overrides its notification destination to
+`https://ezkart.id/cart/api/callback.php`, so the callback does not depend on a
+Dashboard-wide notification setting.
 
 ## Hosting
 

@@ -162,19 +162,22 @@
 
   function selectShipping(quote) {
     state.shipping = quote;
-    state.payment = "Duitku Sandbox";
+    state.payment = "Midtrans Snap Sandbox";
     el("payment-section").classList.remove("locked");
     el("pay-button").disabled = false;
     renderCart();
   }
 
-  async function startDuitkuInvoice() {
+  async function startMidtransSnap() {
     if (!state.shipping || !state.payment) return;
     const button = el("pay-button");
     const originalLabel = button.innerHTML;
     button.disabled = true;
-    button.textContent = "Membuat invoice Duitku…";
+    button.textContent = "Membuka Midtrans Snap…";
     try {
+      if (!window.snap || typeof window.snap.pay !== "function") {
+        throw new Error("Midtrans Snap belum siap. Muat ulang halaman dan coba lagi.");
+      }
       const response = await fetch("api/start.php", {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -185,14 +188,30 @@
         }),
       });
       const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload.error || `Duitku error (${response.status}).`);
-      const paymentUrl = String(payload.payment_url || "");
-      if (!paymentUrl.startsWith("https://app-sandbox.duitku.com/")) {
-        throw new Error("Duitku tidak mengembalikan payment URL sandbox yang valid.");
+      if (!response.ok) throw new Error(payload.error || `Midtrans error (${response.status}).`);
+      const snapToken = String(payload.snap_token || "");
+      const orderId = String(payload.order_id || "");
+      if (!snapToken || !/^EZK-MIDTRANS-[A-Z0-9-]+$/.test(orderId)) {
+        throw new Error("Midtrans tidak mengembalikan token Snap sandbox yang valid.");
       }
-      window.location.assign(paymentUrl);
+      const returnUrl = `return.php?order=${encodeURIComponent(orderId)}`;
+      button.textContent = "Menunggu pembayaran Midtrans…";
+      window.snap.pay(snapToken, {
+        onSuccess: () => window.location.assign(returnUrl),
+        onPending: () => window.location.assign(returnUrl),
+        onError: () => {
+          showToast("Pembayaran Midtrans tidak berhasil.");
+          button.disabled = false;
+          button.innerHTML = originalLabel;
+        },
+        onClose: () => {
+          showToast("Jendela pembayaran ditutup.");
+          button.disabled = false;
+          button.innerHTML = originalLabel;
+        },
+      });
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "Tidak dapat membuat invoice Duitku.");
+      showToast(error instanceof Error ? error.message : "Tidak dapat membuka Midtrans Snap.");
       button.disabled = false;
       button.innerHTML = originalLabel;
     }
@@ -234,7 +253,7 @@
     setStep("payment");
   });
 
-  el("pay-button").addEventListener("click", startDuitkuInvoice);
+  el("pay-button").addEventListener("click", startMidtransSnap);
 
   el("reset-demo").addEventListener("click", () => {
     state.cart = {};

@@ -67,11 +67,11 @@
       .quote-line b { font-size:6pt; }
       .quote-line small { display:block; color:#8a9097; font-size:5pt; }
       .quote-line strong { font-size:6pt; }
-      .duitku-ui { color:white; background:var(--purple); }
-      .duitku-ui .method { padding:1.5mm 2mm; display:flex; align-items:center; gap:2.5mm; background:rgba(255,255,255,.13); border:.3mm solid rgba(255,255,255,.2); border-radius:2mm; }
-      .duitku-ui .method + .method { margin-top:1.5mm; }
-      .duitku-ui .method span { width:6mm; height:6mm; display:grid; place-items:center; color:var(--purple); background:white; border-radius:1.2mm; font-size:4.5pt; font-weight:800; }
-      .duitku-ui .method b { font-size:6pt; }
+      .midtrans-ui { color:white; background:var(--purple); }
+      .midtrans-ui .method { padding:1.5mm 2mm; display:flex; align-items:center; gap:2.5mm; background:rgba(255,255,255,.13); border:.3mm solid rgba(255,255,255,.2); border-radius:2mm; }
+      .midtrans-ui .method + .method { margin-top:1.5mm; }
+      .midtrans-ui .method span { width:6mm; height:6mm; display:grid; place-items:center; color:var(--purple); background:white; border-radius:1.2mm; font-size:4.5pt; font-weight:800; }
+      .midtrans-ui .method b { font-size:6pt; }
       .success-ui { text-align:center; }
       .success-ui > span { width:12mm; height:12mm; margin:0 auto 3mm; display:grid; place-items:center; color:white; background:var(--green); border-radius:50%; font-size:7pt; }
       .success-ui b { display:block; font-size:7pt; }
@@ -79,7 +79,7 @@
       .boundary { margin-top:11mm; display:grid; grid-template-columns:1fr 18mm 1fr; align-items:stretch; gap:5mm; }
       .boundary-card { min-height:115mm; padding:8mm; border-radius:5mm; }
       .boundary-card.ezkart { background:var(--ink); color:white; }
-      .boundary-card.duitku { color:white; background:var(--purple); }
+      .boundary-card.midtrans { color:white; background:var(--purple); }
       .boundary-logo { font-size:17pt; font-weight:800; letter-spacing:-.7pt; }
       .boundary-card > p { margin:3mm 0 7mm; color:rgba(255,255,255,.6); font-size:7.5pt; }
       .boundary ul { margin:0; padding:0; display:grid; gap:3mm; list-style:none; }
@@ -110,14 +110,14 @@
         <div class="cover-copy">
           <p class="eyebrow">Checkout overview</p>
           <h1>From cart<br />to <em>paid.</em></h1>
-          <p>A clear view of how an Ezkart customer adds products, enters delivery details, chooses shipping, and completes payment securely through Duitku.</p>
+          <p>A clear view of how an Ezkart customer adds products, enters delivery details, chooses shipping, and completes payment securely through Midtrans Snap.</p>
           <div class="url">ezkart.id/cart</div>
         </div>
         <div class="flow-orbit">
           <div class="flow-node"><b>1</b> Add products</div><span class="flow-arrow">↓</span>
           <div class="flow-node"><b>2</b> Delivery details</div><span class="flow-arrow">↓</span>
           <div class="flow-node"><b>3</b> Shipping quote</div><span class="flow-arrow">↓</span>
-          <div class="flow-node"><b>4</b> Duitku payment</div>
+          <div class="flow-node"><b>4</b> Midtrans payment</div>
         </div>
       </div>
       <div class="cover-note">
@@ -135,20 +135,20 @@
         <article class="journey-card"><div class="journey-card-top"><span class="step-badge">1</span><span class="step-tag">Cart</span></div><h3>Add products</h3><p>The customer adds products, adjusts quantities, and reviews the subtotal before checkout.</p><div class="mini-ui"><div class="product-line"><span class="product-thumb">OAT</span><span><b>Granola Madu Nusantara</b><small>Qty 1 · 320 g</small></span><strong>Rp58.000</strong></div></div></article>
         <article class="journey-card"><div class="journey-card-top"><span class="step-badge">2</span><span class="step-tag">Customer</span></div><h3>Enter delivery details</h3><p>Full name, WhatsApp number, email, location, street address, and postcode are collected.</p><div class="mini-ui"><div class="fake-field">Nadia Putri</div><div class="fake-field">Kebayoran Baru, Jakarta Selatan</div><div class="fake-field">Jl. Senopati No. 10 · 12190</div></div></article>
         <article class="journey-card"><div class="journey-card-top"><span class="step-badge">3</span><span class="step-tag">Shipping</span></div><h3>Select a quoted service</h3><p>Available services show courier, service level, estimated arrival, and the quoted price.</p><div class="mini-ui"><div class="quote-line"><span>JNE</span><b>JNE REG<small>2–3 days</small></b><strong>Rp15.000</strong></div><div class="quote-line"><span>J&amp;T</span><b>J&amp;T EZ<small>2–4 days</small></b><strong>Rp13.500</strong></div></div></article>
-        <article class="journey-card"><div class="journey-card-top"><span class="step-badge">4</span><span class="step-tag">Duitku</span></div><h3>Pay securely</h3><p>The customer chooses an available Duitku method and pays on the secure provider page.</p><div class="mini-ui duitku-ui"><div class="method"><span>QR</span><b>QRIS &amp; E-wallet</b></div><div class="method"><span>VA</span><b>Virtual Account</b></div><div class="method"><span>••</span><b>Credit / debit card</b></div></div></article>
+        <article class="journey-card"><div class="journey-card-top"><span class="step-badge">4</span><span class="step-tag">Midtrans</span></div><h3>Pay securely</h3><p>The customer chooses an available method and pays in the secure Midtrans Snap checkout.</p><div class="mini-ui midtrans-ui"><div class="method"><span>QR</span><b>QRIS &amp; E-wallet</b></div><div class="method"><span>VA</span><b>Virtual Account</b></div><div class="method"><span>••</span><b>Credit / debit card</b></div></div></article>
       </div>
       <span class="page-number">02 / 04</span>
     </section>
 
     <section class="page">
       <header class="header"><div class="logo">ez<span>kart</span></div><span class="sandbox">Payment boundary</span></header>
-      <div class="intro"><div><p class="eyebrow">Clear responsibility</p><h2>Duitku receives what it needs to process payment.</h2></div><p>Product selection, delivery details, and shipping choice are completed before the secure payment handoff.</p></div>
+      <div class="intro"><div><p class="eyebrow">Clear responsibility</p><h2>Midtrans receives what it needs to process payment.</h2></div><p>Product selection, delivery details, and shipping choice are completed before the secure payment handoff.</p></div>
       <div class="boundary">
         <article class="boundary-card ezkart"><div class="boundary-logo">Ezkart</div><p>Owns the shopping and delivery experience.</p><ul><li>Cart products and quantities</li><li>Customer contact and delivery address</li><li>Shipping service and quoted price</li><li>Order total and merchant reference</li><li>Order status shown to the customer</li></ul></article>
         <div class="boundary-arrow">→</div>
-        <article class="boundary-card duitku"><div class="boundary-logo">DUITKU</div><p>Owns the secure payment experience.</p><ul><li>Merchant and order reference</li><li>Final amount to be paid</li><li>Short order description</li><li>Customer contact for the transaction</li><li>Callback and return destination</li></ul></article>
+        <article class="boundary-card midtrans"><div class="boundary-logo">MIDTRANS</div><p>Owns the secure Snap payment experience.</p><ul><li>Merchant and order reference</li><li>Final amount to be paid</li><li>Item and shipping details</li><li>Customer contact for the transaction</li><li>Notification and return destination</li></ul></article>
       </div>
-      <div class="privacy-note"><span>✓</span><div><b>Sensitive credentials remain with the payment provider.</b><p>Ezkart never requests or stores the customer’s card number, PIN, OTP, banking password, or wallet credentials. Duitku returns the transaction result so Ezkart can update the order.</p></div></div>
+      <div class="privacy-note"><span>✓</span><div><b>Sensitive credentials remain with the payment provider.</b><p>Ezkart never requests or stores the customer’s card number, PIN, OTP, banking password, or wallet credentials. Midtrans sends a signed notification so Ezkart can update the order.</p></div></div>
       <span class="page-number">03 / 04</span>
     </section>
 
@@ -156,7 +156,7 @@
       <header class="header"><div class="logo">ez<span>kart</span></div><span class="sandbox">Completion</span></header>
       <div class="intro"><div><p class="eyebrow">After payment</p><h2>A verified result completes the order.</h2></div><p>The customer sees a clear outcome while the merchant receives the reference needed to continue fulfilment.</p></div>
       <div class="checklist">
-        <div class="check"><span>✓</span><div><b>Duitku processes the selected method</b><p>The customer completes all payment-specific actions on Duitku’s secure experience.</p></div><small>Provider</small></div>
+        <div class="check"><span>✓</span><div><b>Midtrans processes the selected method</b><p>The customer completes all payment-specific actions in the Midtrans Snap experience.</p></div><small>Provider</small></div>
         <div class="check"><span>✓</span><div><b>Payment notification is verified</b><p>Ezkart treats the provider notification—not a browser action—as the authoritative payment result.</p></div><small>Server</small></div>
         <div class="check"><span>✓</span><div><b>The customer receives confirmation</b><p>The success screen shows order reference, paid status, total, and selected payment group.</p></div><small>Customer</small></div>
         <div class="check"><span>✓</span><div><b>The merchant can fulfil the order</b><p>With payment confirmed, the merchant can prepare the package and arrange delivery.</p></div><small>Merchant</small></div>

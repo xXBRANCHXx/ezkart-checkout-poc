@@ -13,13 +13,14 @@ try {
         'order_id' => $order['order_id'],
         'status' => $order['status'],
         'total' => $order['total'],
-        'duitku_reference' => $order['duitku_reference'],
-        'payment_code' => $order['payment_code'],
+        'midtrans_transaction_id' => $order['midtrans_transaction_id'],
+        'midtrans_status' => $order['midtrans_status'],
+        'payment_type' => $order['payment_type'],
         'customer_name' => $order['customer']['name'],
     ]);
 } catch (InvalidArgumentException $error) {
     ez_api_json(['ok' => false, 'error' => 'Order not found.'], 404);
 } catch (Throwable $error) {
-    error_log('Ezkart Duitku status error: ' . $error->getMessage());
+    error_log('Ezkart Midtrans status error: ' . $error->getMessage());
     ez_api_json(['ok' => false, 'error' => 'Unable to read payment status.'], 500);
 }

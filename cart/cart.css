@@ -275,10 +275,10 @@ input.invalid, textarea.invalid { border-color: #d63425; }
 .shipping-option > strong { font-size: 11px; }
 .shipping-option > i, .payment-option > i { width: 16px; height: 16px; border: 1px solid #bbb8b3; border-radius: 50%; }
 .shipping-option:has(input:checked) > i, .payment-option:has(input:checked) > i { background: radial-gradient(circle, var(--coral) 0 42%, transparent 45%); border-color: var(--coral); }
-.duitku-chip { padding: 6px 8px; color: #6e5500; background: #fff3b7; border: 1px solid #ead777; border-radius: 6px; font-size: 8px; font-weight: 800; text-transform: uppercase; }
+.midtrans-chip { padding: 6px 8px; color: #6e5500; background: #fff3b7; border: 1px solid #ead777; border-radius: 6px; font-size: 8px; font-weight: 800; text-transform: uppercase; }
 .payment-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.duitku-handoff { grid-column: 1 / -1; cursor: default; }
-.duitku-handoff > i { display: grid; place-items: center; border: 0; font-style: normal; font-weight: 800; }
+.midtrans-handoff { grid-column: 1 / -1; cursor: default; }
+.midtrans-handoff > i { display: grid; place-items: center; border: 0; font-style: normal; font-weight: 800; }
 .payment-option { min-height: 96px; padding: 13px; grid-template-columns: auto 1fr auto; }
 .payment-icon { width: 34px; height: 34px; color: white; border: 0; }
 .qris-icon { background: #171c28; }
@@ -307,8 +307,8 @@ dialog::backdrop { background: rgba(8,20,36,.65); backdrop-filter: blur(5px); }
 .dialog-browserbar > i { width: 7px; height: 7px; background: #bbc0c6; border-radius: 50%; }
 .dialog-browserbar > span { margin: 0 auto; padding: 4px 32px; color: #747b84; background: white; border-radius: 5px; font: 8px sans-serif; }
 .dialog-body { position: relative; padding: 30px; }
-.duitku-wordmark { margin-bottom: 27px; color: #6c2bd9; font-size: 17px; font-weight: 800; letter-spacing: -.04em; }
-.duitku-wordmark span { margin-left: 5px; padding: 3px 5px; color: #775f00; background: #fff3b7; border-radius: 4px; font-size: 7px; letter-spacing: .05em; vertical-align: middle; }
+.midtrans-wordmark { margin-bottom: 27px; color: #6c2bd9; font-size: 17px; font-weight: 800; letter-spacing: -.04em; }
+.midtrans-wordmark span { margin-left: 5px; padding: 3px 5px; color: #775f00; background: #fff3b7; border-radius: 4px; font-size: 7px; letter-spacing: .05em; vertical-align: middle; }
 .dialog-close { position: absolute; top: 20px; right: 20px; width: 30px; height: 30px; background: #f2f2f2; border: 0; border-radius: 50%; cursor: pointer; font-size: 20px; line-height: 1; }
 .dialog-kicker { margin: 0 0 5px; color: #6c2bd9; font-size: 8px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
 .dialog-body h2 { margin: 0; font-size: 27px; letter-spacing: -.04em; }
@@ -317,8 +317,8 @@ dialog::backdrop { background: rgba(8,20,36,.65); backdrop-filter: blur(5px); }
 .dialog-summary div { padding: 10px 0; display: flex; justify-content: space-between; gap: 15px; border-bottom: 1px solid #e0e3e6; font-size: 9px; }
 .dialog-summary div:last-child { border: 0; }
 .dialog-summary span { color: #777e87; }
-.duitku-pay { width: 100%; min-height: 48px; margin-top: 18px; color: white; background: #6c2bd9; border: 0; border-radius: 8px; cursor: pointer; font-size: 10px; font-weight: 800; }
-.duitku-pay:disabled { opacity: .6; }
+.midtrans-pay { width: 100%; min-height: 48px; margin-top: 18px; color: white; background: #6c2bd9; border: 0; border-radius: 8px; cursor: pointer; font-size: 10px; font-weight: 800; }
+.midtrans-pay:disabled { opacity: .6; }
 .dialog-cancel { width: 100%; padding: 12px; color: #707780; background: transparent; border: 0; cursor: pointer; font-size: 9px; font-weight: 700; }
 .dialog-security { margin: 8px 0 0; color: #7f858c; text-align: center; font-size: 7px; }
 .toast { position: fixed; z-index: 90; left: 50%; bottom: 25px; padding: 11px 16px; color: white; background: var(--ink); border-radius: 9px; box-shadow: 0 12px 35px rgba(8,20,36,.25); opacity: 0; pointer-events: none; transform: translate(-50%, 20px); transition: opacity 180ms ease, transform 180ms ease; font-size: 9px; font-weight: 700; }

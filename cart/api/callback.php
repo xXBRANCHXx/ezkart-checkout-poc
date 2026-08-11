@@ -7,35 +7,58 @@ try {
     if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
         ez_api_json(['ok' => false], 405);
     }
-    $credentials = ez_duitku_credentials();
-    $merchantCode = trim((string) ($_POST['merchantCode'] ?? ''));
-    $amount = trim((string) ($_POST['amount'] ?? ''));
-    $orderId = trim((string) ($_POST['merchantOrderId'] ?? ''));
-    $signature = strtolower(trim((string) ($_POST['signature'] ?? '')));
-    if ($merchantCode === '' || $amount === '' || $orderId === '' || $signature === '') {
-        throw new InvalidArgumentException('Missing callback parameters.');
+    $notification = json_decode((string) file_get_contents('php://input'), true);
+    if (!is_array($notification)) {
+        throw new InvalidArgumentException('Invalid notification body.');
     }
-    if (!hash_equals($credentials['code'], $merchantCode)) {
-        throw new InvalidArgumentException('Merchant code mismatch.');
+
+    $credentials = ez_midtrans_credentials();
+    $orderId = trim((string) ($notification['order_id'] ?? ''));
+    $statusCode = trim((string) ($notification['status_code'] ?? ''));
+    $grossAmount = trim((string) ($notification['gross_amount'] ?? ''));
+    $signature = strtolower(trim((string) ($notification['signature_key'] ?? '')));
+    if ($orderId === '' || $statusCode === '' || $grossAmount === '' || $signature === '') {
+        throw new InvalidArgumentException('Missing notification parameters.');
     }
-    $expected = hash_hmac('sha256', $merchantCode . $amount . $orderId, $credentials['key']);
+    $expected = hash('sha512', $orderId . $statusCode . $grossAmount . $credentials['server_key']);
     if (!hash_equals($expected, $signature)) {
-        throw new InvalidArgumentException('Invalid Duitku callback signature.');
+        throw new InvalidArgumentException('Invalid Midtrans notification signature.');
     }
+    $merchantId = trim((string) ($notification['merchant_id'] ?? ''));
+    if ($merchantId !== '' && !hash_equals($credentials['merchant_id'], $merchantId)) {
+        throw new InvalidArgumentException('Merchant ID mismatch.');
+    }
+
     $order = ez_load_order($orderId);
-    if ((int) $amount !== (int) $order['total']) {
-        throw new InvalidArgumentException('Callback amount mismatch.');
+    if ((int) round((float) $grossAmount) !== (int) $order['total']) {
+        throw new InvalidArgumentException('Notification amount mismatch.');
     }
-    $order['status'] = (string) ($_POST['resultCode'] ?? '') === '00' ? 'PAID' : 'FAILED';
-    $order['duitku_reference'] = mb_substr((string) ($_POST['reference'] ?? $order['duitku_reference']), 0, 160);
-    $order['payment_code'] = mb_substr((string) ($_POST['paymentCode'] ?? ''), 0, 20);
+    $transactionStatus = strtolower(trim((string) ($notification['transaction_status'] ?? '')));
+    $fraudStatus = strtolower(trim((string) ($notification['fraud_status'] ?? '')));
+    $success = $statusCode === '200' && ($fraudStatus === '' || $fraudStatus === 'accept');
+    $nextStatus = match ($transactionStatus) {
+        'capture', 'settlement' => $success ? 'PAID' : ($fraudStatus === 'challenge' ? 'PENDING' : 'FAILED'),
+        'pending', 'authorize' => 'PENDING',
+        'deny', 'cancel', 'expire', 'failure', 'refund', 'partial_refund', 'chargeback', 'partial_chargeback' => 'FAILED',
+        default => throw new InvalidArgumentException('Unsupported Midtrans transaction status.'),
+    };
+    if ((string) $order['status'] === 'PAID' && $nextStatus === 'PENDING') {
+        $nextStatus = 'PAID';
+    }
+
+    $order['status'] = $nextStatus;
+    $order['midtrans_transaction_id'] = mb_substr((string) ($notification['transaction_id'] ?? ''), 0, 160);
+    $order['midtrans_status'] = $transactionStatus;
+    $order['payment_type'] = mb_substr((string) ($notification['payment_type'] ?? ''), 0, 80);
+    $order['fraud_status'] = $fraudStatus;
+    $order['status_message'] = mb_substr((string) ($notification['status_message'] ?? ''), 0, 300);
     $order['updated_at'] = gmdate(DATE_ATOM);
     ez_save_order($order);
     ez_api_json(['ok' => true]);
 } catch (InvalidArgumentException $error) {
-    error_log('Ezkart Duitku callback rejected: ' . $error->getMessage());
+    error_log('Ezkart Midtrans callback rejected: ' . $error->getMessage());
     ez_api_json(['ok' => false], 400);
 } catch (Throwable $error) {
-    error_log('Ezkart Duitku callback error: ' . $error->getMessage());
+    error_log('Ezkart Midtrans callback error: ' . $error->getMessage());
     ez_api_json(['ok' => false], 500);
 }
