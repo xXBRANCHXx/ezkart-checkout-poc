@@ -6,7 +6,7 @@ require_once dirname(__DIR__) . '/api/bootstrap.php';
 header('Cache-Control: no-store');
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: DENY');
-header("Content-Security-Policy: default-src 'self'; img-src 'self' data: blob: https:; style-src 'self'; style-src-attr 'unsafe-inline'; script-src 'self'; connect-src 'self'; frame-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'");
+header("Content-Security-Policy: default-src 'self'; img-src 'self' data: https:; style-src 'self'; style-src-attr 'unsafe-inline'; script-src 'self'; connect-src 'self'; frame-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'");
 
 $isHttps = isset($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off';
 session_name('ezkart_sandbox_admin');
@@ -250,8 +250,6 @@ $creatingEnd = round((($statusCounts['PAID'] + $statusCounts['PENDING'] + $statu
 $allowedPages = ['dashboard', 'orders', 'products', 'sites', 'customers', 'analytics', 'marketing', 'payments', 'reviews', 'messages', 'integrations', 'settings'];
 $requestedPage = strtolower(trim((string) ($_GET['page'] ?? 'dashboard')));
 $page = in_array($requestedPage, $allowedPages, true) ? $requestedPage : 'dashboard';
-$requestedSite = trim((string) ($_GET['edit'] ?? ''));
-$siteEditor = $page === 'sites' && $requestedSite !== '' && strlen($requestedSite) <= 180;
 $pageTitles = [
     'dashboard' => 'Dashboard', 'orders' => 'Orders', 'products' => 'Products', 'sites' => 'Landing Pages',
     'customers' => 'Customers', 'analytics' => 'Analytics', 'marketing' => 'Marketing',
@@ -303,10 +301,10 @@ $catalogInventory = [
   <meta name="robots" content="noindex,nofollow">
   <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
   <?php if ($authenticated): ?><link rel="stylesheet" href="assets/vendor/leaflet.css"><?php endif; ?>
-  <link rel="stylesheet" href="admin.css?v=22">
+  <link rel="stylesheet" href="admin.css?v=20">
   <title><?= $authenticated ? ez_admin_escape($pageTitles[$page]) : 'Admin Login' ?> · Ezkart</title>
 </head>
-<body class="<?= $authenticated ? 'dashboard-page page-' . ez_admin_escape($page) . ($page === 'sites' ? ($siteEditor ? ' page-site-editor' : ' page-sites-library') : '') : 'login-page' ?>">
+<body class="<?= $authenticated ? 'dashboard-page page-' . ez_admin_escape($page) : 'login-page' ?>">
 <?php if (!$authenticated): ?>
   <main class="login-shell">
     <section class="login-card">
@@ -395,7 +393,7 @@ $catalogInventory = [
         <a class="<?= $page === 'dashboard' ? 'active' : '' ?>" href="?page=dashboard"><?= ez_admin_icon('grid') ?><span>Dashboard</span></a>
         <a class="<?= $page === 'orders' ? 'active' : '' ?>" href="?page=orders"><?= ez_admin_icon('cart') ?><span>Orders</span><b><?= $metrics['orders'] ?></b></a>
         <a class="<?= $page === 'products' ? 'active' : '' ?>" href="?page=products"><?= ez_admin_icon('box') ?><span>Products</span></a>
-        <a class="<?= $page === 'sites' ? 'active' : '' ?>" href="?page=sites"><?= ez_admin_icon('layout') ?><span>Landing Pages</span><b data-site-count>3</b></a>
+        <a class="<?= $page === 'sites' ? 'active' : '' ?>" href="?page=sites"><?= ez_admin_icon('layout') ?><span>Landing Pages</span><b>3</b></a>
         <a class="<?= $page === 'customers' ? 'active' : '' ?>" href="?page=customers"><?= ez_admin_icon('users') ?><span>Customers</span></a>
         <a class="<?= $page === 'analytics' ? 'active' : '' ?>" href="?page=analytics"><?= ez_admin_icon('chart') ?><span>Analytics</span></a>
         <a class="<?= $page === 'marketing' ? 'active' : '' ?>" href="?page=marketing"><?= ez_admin_icon('send') ?><span>Marketing</span></a>
@@ -511,7 +509,7 @@ $catalogInventory = [
   </div>
   <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
   <script src="assets/vendor/leaflet.js"></script>
-  <script src="admin.js?v=22"></script>
+  <script src="admin.js?v=20"></script>
 <?php endif; ?>
 </body>
 </html>

@@ -128,345 +128,6 @@
     });
   });
 
-  const landingSiteRegistryKey = "ezkart:landing-builder:v3:sites";
-  const landingLegacyRegistryKey = "ezkart:landing-builder:v2:sites";
-  const landingAdvancedModeKey = "ezkart:landing-builder:advanced-mode";
-  const productCatalogKey = "ezkart:catalog:v1";
-  const readCatalogProducts = () => {
-    try {
-      const value = JSON.parse(localStorage.getItem(productCatalogKey) || "[]");
-      return Array.isArray(value) ? value.filter((product) => product && /^custom-[a-z0-9]+$/i.test(product.id || "") && typeof product.name === "string") : [];
-    } catch (_) { return []; }
-  };
-  const writeCatalogProducts = (products) => {
-    try { localStorage.setItem(productCatalogKey, JSON.stringify(products)); return true; }
-    catch (_) { showToast("These images exceed this browser's catalog storage. Use fewer or simpler images."); return false; }
-  };
-  const hydrateCreatorCatalog = (form) => {
-    const fieldset = form?.querySelector("[data-creator-products]");
-    if (!fieldset) return;
-    readCatalogProducts().forEach((product) => {
-      if (fieldset.querySelector(`input[value="${CSS.escape(product.id)}"]`)) return;
-      const label = document.createElement("label");
-      label.dataset.sharedCatalogProduct = product.id;
-      label.innerHTML = `<input type="checkbox" name="starter_products[]" value="${product.id}"><span><span class="product-art"><img src="${product.image || product.images?.[0] || ""}" alt=""></span><b>${escapeHtml(product.name)}</b><small>${escapeHtml(formatCreatorPrice(product.price))} · ${escapeHtml(product.type || "product")}</small></span>`;
-      fieldset.append(label);
-    });
-  };
-  const readLandingSites = () => {
-    try {
-      const value = JSON.parse(localStorage.getItem(landingSiteRegistryKey) || localStorage.getItem(landingLegacyRegistryKey) || "[]");
-      return Array.isArray(value) ? value.filter((site) => site && typeof site.name === "string" && /^[a-z0-9-]+\.ezkart\.site$/i.test(site.url || "")) : [];
-    } catch (_) { return []; }
-  };
-  const writeLandingSites = (sites) => {
-    try { localStorage.setItem(landingSiteRegistryKey, JSON.stringify(sites)); return true; }
-    catch (_) { showToast("These images exceed this browser's draft storage. Use fewer or simpler images."); return false; }
-  };
-  const landingAdvancedMode = () => localStorage.getItem(landingAdvancedModeKey) === "true";
-  const updateLandingCountBadges = (count = 3 + readLandingSites().length) => document.querySelectorAll("[data-site-count]").forEach((badge) => { badge.textContent = String(count); });
-  const formatCreatorPrice = (amount) => `Rp${new Intl.NumberFormat("id-ID").format(amount)}`;
-  const compressCreatorProductImage = async (file) => {
-    if (!file || !file.type.startsWith("image/")) throw new Error("Choose a PNG, JPEG, WebP, or AVIF product photo.");
-    if (file.size > 2 * 1024 * 1024) throw new Error(`${file.name || "An image"} is larger than 2 MB.`);
-    const objectUrl = URL.createObjectURL(file);
-    try {
-      const image = new Image();
-      await new Promise((resolve, reject) => { image.onload = resolve; image.onerror = () => reject(new Error("That image could not be opened.")); image.src = objectUrl; });
-      const scale = Math.min(1, 640 / Math.max(image.naturalWidth, image.naturalHeight));
-      const canvas = document.createElement("canvas");
-      canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
-      canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
-      const context = canvas.getContext("2d");
-      context.fillStyle = "#ffffff"; context.fillRect(0, 0, canvas.width, canvas.height);
-      context.drawImage(image, 0, 0, canvas.width, canvas.height);
-      return canvas.toDataURL("image/jpeg", .72);
-    } finally { URL.revokeObjectURL(objectUrl); }
-  };
-  const setupCreatorProducts = (form) => {
-    if (!form) return { selected: () => [], reset: () => {} };
-    const composer = form.querySelector("[data-creator-product-form]");
-    const list = form.querySelector("[data-creator-custom-products]");
-    const name = form.querySelector("[data-creator-product-name]");
-    const price = form.querySelector("[data-creator-product-price]");
-    const type = form.querySelector("[data-creator-product-type]");
-    const weight = form.querySelector("[data-creator-product-weight]");
-    const image = form.querySelector("[data-creator-product-image]");
-    const imageRule = form.querySelector("[data-creator-image-rule]");
-    const physicalField = form.querySelector("[data-creator-physical-field]");
-    const digitalField = form.querySelector("[data-creator-digital-field]");
-    const digitalName = form.querySelector("[data-creator-digital-name]");
-    const subscriptionFields = form.querySelector("[data-creator-subscription-fields]");
-    const subscriptionInterval = form.querySelector("[data-creator-subscription-interval]");
-    const subscriptionUnit = form.querySelector("[data-creator-subscription-unit]");
-    const save = form.querySelector("[data-creator-product-save]");
-    let products = [];
-    const typeLabel = (value) => ({ physical: "Physical", digital: "Digital download", subscription: "Subscription" }[value] || "Product");
-    const clearError = () => composer?.querySelector(".creator-product-error")?.remove();
-    const showError = (message) => { clearError(); const error = document.createElement("p"); error.className = "creator-product-error"; error.textContent = message; composer?.append(error); };
-    const render = () => {
-      if (!list) return;
-      list.replaceChildren(); list.hidden = products.length === 0;
-      products.forEach((product) => {
-        const row = document.createElement("div"); row.className = "creator-custom-product";
-        const schedule = product.type === "subscription" ? ` · every ${product.subscription.interval} ${product.subscription.unit}${product.subscription.interval > 1 ? "s" : ""}` : "";
-        row.innerHTML = `<input type="checkbox" name="starter_products[]" value="${product.id}" checked hidden><img src="${product.image}" alt=""><div><b>${escapeHtml(product.name)}</b><small>${escapeHtml(formatCreatorPrice(product.price))} · ${escapeHtml(typeLabel(product.type))}${escapeHtml(schedule)} · ${product.images.length} image${product.images.length === 1 ? "" : "s"}</small></div><button type="button" aria-label="Remove ${escapeHtml(product.name)}">×</button>`;
-        row.querySelector("button").onclick = () => { products = products.filter((item) => item.id !== product.id); render(); };
-        list.append(row);
-      });
-    };
-    const syncProductType = () => {
-      const productType = String(type?.value || "physical");
-      if (physicalField) physicalField.hidden = productType !== "physical";
-      if (digitalField) digitalField.hidden = productType !== "digital";
-      if (subscriptionFields) subscriptionFields.hidden = productType !== "subscription";
-      if (imageRule) imageRule.textContent = `${productType === "physical" ? "Physical products need 3–9 images" : "Add 1–9 images"}. Every image must be 2 MB or smaller.`;
-    };
-    const resetComposer = () => { clearError(); if (name) name.value = ""; if (image) image.value = ""; if (price) price.value = "75000"; if (weight) weight.value = "500"; if (digitalName) digitalName.value = ""; if (type) type.value = "physical"; if (subscriptionInterval) subscriptionInterval.value = "1"; if (subscriptionUnit) subscriptionUnit.value = "month"; syncProductType(); if (composer) composer.hidden = true; };
-    form.querySelector("[data-creator-add-own]")?.addEventListener("click", () => { if (composer) composer.hidden = false; name?.focus(); });
-    form.querySelector("[data-creator-product-cancel]")?.addEventListener("click", resetComposer);
-    type?.addEventListener("change", syncProductType);
-    syncProductType();
-    save?.addEventListener("click", async () => {
-      clearError();
-      const productName = String(name?.value || "").trim();
-      const productPrice = Math.max(0, Math.round(Number(price?.value) || 0));
-      const productType = String(type?.value || "physical");
-      const files = [...(image?.files || [])];
-      const minimumImages = productType === "physical" ? 3 : 1;
-      const productWeight = Math.round(Number(weight?.value) || 0);
-      const interval = Math.round(Number(subscriptionInterval?.value) || 0);
-      const unit = String(subscriptionUnit?.value || "month");
-      if (!productName) { showError("Give the product a name."); name?.focus(); return; }
-      if (productPrice < 1000) { showError("Enter a price of at least Rp1.000."); price?.focus(); return; }
-      if (productType === "physical" && productWeight < 1) { showError("Physical products need a shipping weight."); weight?.focus(); return; }
-      if (productType === "subscription" && (interval < 1 || interval > 12)) { showError("Choose a billing interval from 1 to 12."); subscriptionInterval?.focus(); return; }
-      if (files.length < minimumImages || files.length > 9) { showError(`${typeLabel(productType)} products need ${minimumImages === 3 ? "3–9" : "1–9"} images.`); image?.focus(); return; }
-      const oversized = files.find((file) => file.size > 2 * 1024 * 1024);
-      if (oversized) { showError(`${oversized.name} is larger than 2 MB.`); image?.focus(); return; }
-      if (products.length >= 4) { showError("You can start with up to 4 custom products. Add more inside the editor."); return; }
-      save.disabled = true; save.textContent = `Preparing ${files.length} image${files.length === 1 ? "" : "s"}…`;
-      try {
-        const productImages = await Promise.all(files.map(compressCreatorProductImage));
-        const suffix = globalThis.crypto?.randomUUID?.().replace(/-/g, "").slice(0, 10) || `${Date.now()}`;
-        products.push({
-          id: `custom-${suffix}`,
-          name: productName,
-          price: productPrice,
-          type: productType,
-          images: productImages,
-          image: productImages[0],
-          ...(productType === "physical" ? { weightGrams: productWeight } : {}),
-          ...(productType === "digital" ? { digitalFileName: String(digitalName?.value || "").trim() } : {}),
-          ...(productType === "subscription" ? { subscription: { interval, unit } } : {}),
-        });
-        render(); resetComposer(); showToast(`${productName} is ready for this landing page`);
-      } catch (error) { showError(error instanceof Error ? error.message : "The product photo could not be prepared."); }
-      finally { save.disabled = false; save.textContent = "Add product"; }
-    });
-    return {
-      selected: (ids) => products.filter((product) => ids.includes(product.id)),
-      reset: () => { products = []; render(); resetComposer(); },
-    };
-  };
-  document.querySelectorAll("[data-creator-close]").forEach((button) => button.addEventListener("click", () => button.closest("dialog")?.close("cancel")));
-  updateLandingCountBadges();
-
-  const landingLibrary = document.querySelector("[data-landing-library]");
-  if (landingLibrary) {
-    const builtInCount = landingLibrary.querySelectorAll("[data-project-card]:not([data-custom-site])").length;
-    const grid = landingLibrary.querySelector("[data-project-grid]");
-    const dialog = document.getElementById("library-page-creator-dialog");
-    const form = dialog?.querySelector("[data-library-page-form]");
-    const advancedToggle = landingLibrary.querySelector("[data-advanced-mode]");
-    const makePageSlug = (value) => normalize(value).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 48);
-    let customSites = readLandingSites();
-    let slugEdited = false;
-    hydrateCreatorCatalog(form);
-    const creatorProducts = setupCreatorProducts(form);
-
-    const projectTone = (products = []) => products.includes("coffee") ? "coffee" : products.includes("sambal") ? "chili" : "gold";
-    const projectImage = (site) => {
-      if (site.customProducts?.[0]?.image) return site.customProducts[0].image;
-      const shared = readCatalogProducts().find((product) => (site.products || []).includes(product.id));
-      if (shared?.image || shared?.images?.[0]) return shared.image || shared.images[0];
-      if ((site.products || []).includes("coffee")) return "assets/products/kopi-susu.webp";
-      if ((site.products || []).includes("sambal")) return "assets/products/sambal-roa.webp";
-      return "assets/products/granola.webp";
-    };
-    const projectCard = (site) => {
-      const tone = projectTone(site.products);
-      const href = `?page=sites&edit=${encodeURIComponent(site.url)}`;
-      const card = document.createElement("article");
-      card.className = "landing-project-card";
-      card.dataset.projectCard = "";
-      card.dataset.customSite = "true";
-      card.dataset.siteName = site.name;
-      card.dataset.siteUrl = site.url;
-      card.innerHTML = `<a class="landing-project-preview tone-${tone}" href="${href}" aria-label="Edit ${escapeHtml(site.name)}"><span class="project-browser"><i></i><i></i><i></i><small>${escapeHtml(site.url)}</small></span><span class="project-mini-page"><span><b>${escapeHtml(site.name)}</b><em>Shop now</em></span><span class="product-art"><img src="${projectImage(site)}" alt="" loading="lazy"></span><i></i><i></i><i></i></span><span class="project-edit-hint">Open editor</span></a><div class="landing-project-details"><div><span class="project-status draft"><i></i>Draft</span><h2><a href="${href}">${escapeHtml(site.name)}</a></h2><p>Your saved custom storefront, ready for responsive editing.</p></div><button type="button" data-project-menu aria-label="Project actions"><svg class="icon" aria-hidden="true"><use href="#icon-settings"></use></svg></button></div><footer><span><svg class="icon" aria-hidden="true"><use href="#icon-globe"></use></svg>${escapeHtml(site.url)}</span><a href="${href}">Edit page <svg class="icon" aria-hidden="true"><use href="#icon-chevron-right"></use></svg></a></footer>`;
-      return card;
-    };
-    const closeProjectMenu = () => document.querySelector(".landing-project-menu")?.remove();
-    const bindProjectMenus = () => landingLibrary.querySelectorAll("[data-project-menu]").forEach((button) => {
-      button.onclick = (event) => {
-        event.stopPropagation(); closeProjectMenu();
-        const card = button.closest("[data-project-card]");
-        if (!card?.dataset.customSite) { showToast("Built-in projects stay available as starting points"); return; }
-        const menu = document.createElement("div");
-        menu.className = "landing-project-menu";
-        menu.innerHTML = '<button type="button">Delete project</button>';
-        const rect = button.getBoundingClientRect();
-        menu.style.left = `${Math.max(8, rect.right - 160)}px`; menu.style.top = `${rect.bottom + 5}px`;
-        menu.querySelector("button").onclick = () => {
-          if (!window.confirm(`Delete “${card.dataset.siteName}”? This removes its saved draft from this browser.`)) return;
-          const url = card.dataset.siteUrl;
-          customSites = customSites.filter((site) => site.url !== url);
-          writeLandingSites(customSites);
-          localStorage.removeItem(`ezkart:landing-builder:v3:${url}`);
-          localStorage.removeItem(`ezkart:landing-builder:v2:${url}`);
-          card.remove(); closeProjectMenu(); renderSummary(); showToast("Landing page deleted — one project space is available");
-        };
-        document.body.append(menu);
-      };
-    });
-    const renderSummary = () => {
-      const count = builtInCount + customSites.length;
-      const advanced = landingAdvancedMode();
-      const remaining = Math.max(0, 6 - count);
-      landingLibrary.querySelector("[data-library-count]").textContent = String(count);
-      landingLibrary.querySelector("[data-library-limit]").textContent = advanced ? "∞" : "6";
-      landingLibrary.querySelector("[data-library-progress]").style.width = advanced ? "100%" : `${Math.min(100, count / 6 * 100)}%`;
-      landingLibrary.querySelector("[data-library-cap-copy]").textContent = advanced ? "Advanced Mode is on. You can create more than 6 projects." : remaining ? `You can create ${remaining} more project${remaining === 1 ? "" : "s"}. Delete a draft to make space, or enable Advanced Mode.` : "Project limit reached. Delete one to return to 5, or enable Advanced Mode.";
-      const newCard = landingLibrary.querySelector("[data-library-create-card]");
-      newCard.disabled = !advanced && count >= 6;
-      landingLibrary.querySelector("[data-new-card-copy]").textContent = advanced ? "Advanced Mode · unlimited" : remaining ? `${remaining} project space${remaining === 1 ? "" : "s"} available` : "6-project limit reached";
-      updateLandingCountBadges(count);
-    };
-    const openCreator = () => {
-      if (!landingAdvancedMode() && builtInCount + customSites.length >= 6) { showToast("Delete a project or enable Advanced Mode to create another"); return; }
-      dialog?.showModal();
-    };
-    customSites.forEach((site) => grid?.insertBefore(projectCard(site), landingLibrary.querySelector("[data-library-create-card]")));
-    bindProjectMenus(); renderSummary();
-    landingLibrary.querySelectorAll("[data-library-create], [data-library-create-card]").forEach((button) => button.addEventListener("click", openCreator));
-    advancedToggle.checked = landingAdvancedMode();
-    advancedToggle.addEventListener("change", () => { localStorage.setItem(landingAdvancedModeKey, String(advancedToggle.checked)); renderSummary(); showToast(advancedToggle.checked ? "Advanced Mode enabled" : "Standard 6-project limit restored"); });
-    document.addEventListener("click", closeProjectMenu);
-    const nameInput = form?.elements.namedItem("page_name");
-    const slugInput = form?.elements.namedItem("slug");
-    slugInput?.addEventListener("input", () => { slugEdited = true; slugInput.value = makePageSlug(slugInput.value); });
-    nameInput?.addEventListener("input", () => { if (!slugEdited && slugInput) slugInput.value = makePageSlug(nameInput.value); });
-    form?.addEventListener("submit", (event) => {
-      if (event.submitter?.value === "cancel") return;
-      event.preventDefault();
-      const products = [...form.querySelectorAll('input[name="starter_products[]"]:checked')].map((input) => input.value);
-      if (!products.length) { showToast("Select at least one starting product"); return; }
-      if (!form.reportValidity()) return;
-      const site = { name: String(nameInput.value).trim(), url: `${makePageSlug(slugInput.value)}.ezkart.site`, products, customProducts: creatorProducts.selected(products) };
-      if (customSites.some((item) => item.url === site.url) || landingLibrary.querySelector(`[data-site-url="${CSS.escape(site.url)}"]`)) { showToast("A page with this URL already exists"); return; }
-      customSites.push(site);
-      if (!writeLandingSites(customSites)) { customSites.pop(); return; }
-      window.location.href = `?page=sites&edit=${encodeURIComponent(site.url)}`;
-    });
-    dialog?.addEventListener("close", () => { if (dialog.returnValue === "cancel") { form?.reset(); creatorProducts.reset(); slugEdited = false; } });
-  }
-
-  const productCatalogPage = document.querySelector("[data-product-catalog]");
-  if (productCatalogPage) {
-    const dialog = document.getElementById("product-creator-dialog");
-    const form = dialog?.querySelector("[data-catalog-product-form]");
-    const typeInput = form?.querySelector("[data-catalog-product-type]");
-    const imageRule = form?.querySelector("[data-catalog-image-rule]");
-    const errorTarget = form?.querySelector("[data-catalog-product-error]");
-    const inventory = document.querySelector("[data-product-inventory]");
-    const typeName = (type) => ({ physical: "Physical product", digital: "Digital product", subscription: "Subscription" }[type] || "Product");
-    const clearError = () => { if (errorTarget) { errorTarget.hidden = true; errorTarget.textContent = ""; } };
-    const showError = (message) => { if (errorTarget) { errorTarget.textContent = message; errorTarget.hidden = false; } };
-    const syncType = () => {
-      const type = String(typeInput?.value || "physical");
-      form?.querySelectorAll("[data-catalog-physical]").forEach((field) => { field.hidden = type !== "physical"; });
-      const digital = form?.querySelector("[data-catalog-digital]"); if (digital) digital.hidden = type !== "digital";
-      const subscription = form?.querySelector("[data-catalog-subscription]"); if (subscription) subscription.hidden = type !== "subscription";
-      if (imageRule) imageRule.textContent = `${type === "physical" ? "Physical products need 3–9 images" : "Products need 1–9 images"}. Maximum 2 MB each.`;
-      clearError();
-    };
-    const updateCatalogStats = (products) => {
-      const stats = document.querySelectorAll(".page-products .page-stat-strip article");
-      const physicalStock = products.filter((product) => product.type === "physical").reduce((sum, product) => sum + Math.max(0, Number(product.stock) || 0), 0);
-      if (stats[0]?.querySelector("strong")) stats[0].querySelector("strong").textContent = String(3 + products.length);
-      if (stats[1]?.querySelector("strong")) stats[1].querySelector("strong").textContent = String(108 + physicalStock);
-      if (stats[1]?.querySelector("p")) stats[1].querySelector("p").textContent = "Physical inventory only";
-    };
-    const renderCatalog = () => {
-      const products = readCatalogProducts();
-      productCatalogPage.querySelectorAll("[data-custom-product]").forEach((card) => card.remove());
-      inventory?.querySelectorAll("[data-custom-product]").forEach((row) => row.remove());
-      products.forEach((product) => {
-        const type = ["physical", "digital", "subscription"].includes(product.type) ? product.type : "physical";
-        const image = product.image || product.images?.[0] || "";
-        const availability = type === "physical" ? `${Math.max(0, Number(product.stock) || 0)} in stock` : type === "digital" ? "Digital delivery" : `Every ${product.subscription?.interval || 1} ${product.subscription?.unit || "month"}`;
-        const card = document.createElement("article");
-        card.className = "product-card"; card.dataset.customProduct = product.id;
-        card.innerHTML = `<span class="product-art"><img src="${image}" alt="${escapeHtml(product.name)}"><em>${product.images?.length || 1} image${(product.images?.length || 1) === 1 ? "" : "s"}</em></span><div class="product-card-body"><header><span class="product-card-type">${escapeHtml(product.category || typeName(type))}</span><em>Active</em></header><h2>${escapeHtml(product.name)}</h2><p>${escapeHtml(product.sku)}</p><div class="product-price"><strong>${escapeHtml(formatCreatorPrice(product.price))}</strong><small>${escapeHtml(availability)}</small></div><footer><div><small>Type</small><b>${escapeHtml(typeName(type))}</b></div><div><small>Revenue</small><b>Rp0</b></div><button class="product-delete" type="button">Delete</button></footer></div>`;
-        card.querySelector(".product-delete").addEventListener("click", () => {
-          if (!window.confirm(`Delete “${product.name}” from the catalog?`)) return;
-          const next = readCatalogProducts().filter((item) => item.id !== product.id);
-          if (writeCatalogProducts(next)) { renderCatalog(); showToast(`${product.name} deleted`); }
-        });
-        productCatalogPage.append(card);
-        if (inventory) {
-          const row = document.createElement("article"); row.dataset.customProduct = product.id;
-          row.innerHTML = `<span class="product-art"><img src="${image}" alt=""></span><div><b>${escapeHtml(product.name)}</b><small>${escapeHtml(product.sku)}</small></div><strong>${type === "physical" ? Math.max(0, Number(product.stock) || 0) : "∞"}</strong><span>${type === "physical" ? "15" : "—"}</span><em class="inventory-good">${type === "physical" ? "Healthy" : "Available"}</em>`;
-          inventory.append(row);
-        }
-      });
-      updateCatalogStats(products);
-    };
-    document.querySelectorAll("[data-open-product-creator]").forEach((button) => button.addEventListener("click", () => { clearError(); dialog?.showModal(); }));
-    dialog?.querySelectorAll("[data-catalog-close]").forEach((button) => button.addEventListener("click", () => dialog.close("cancel")));
-    dialog?.addEventListener("close", () => { if (dialog.returnValue === "cancel") { form?.reset(); syncType(); } });
-    typeInput?.addEventListener("change", syncType);
-    form?.addEventListener("submit", async (event) => {
-      event.preventDefault(); clearError();
-      if (!form.reportValidity()) return;
-      const values = new FormData(form);
-      const type = String(values.get("type") || "physical");
-      const files = [...(form.elements.images?.files || [])];
-      const minimum = type === "physical" ? 3 : 1;
-      if (files.length < minimum || files.length > 9) { showError(`${typeName(type)} requires ${minimum === 3 ? "3–9" : "1–9"} images.`); return; }
-      const oversized = files.find((file) => file.size > 2 * 1024 * 1024);
-      if (oversized) { showError(`${oversized.name} is larger than 2 MB.`); return; }
-      const weightGrams = Math.round(Number(values.get("weight")) || 0);
-      if (type === "physical" && weightGrams < 1) { showError("Physical products need a shipping weight."); return; }
-      const interval = Math.round(Number(values.get("interval")) || 1);
-      if (type === "subscription" && (interval < 1 || interval > 12)) { showError("Choose a billing interval from 1 to 12."); return; }
-      const submit = form.querySelector('button[type="submit"]'); submit.disabled = true; submit.textContent = "Preparing images…";
-      try {
-        const images = await Promise.all(files.map(compressCreatorProductImage));
-        const suffix = globalThis.crypto?.randomUUID?.().replace(/-/g, "").slice(0, 10) || String(Date.now());
-        const product = {
-          id: `custom-${suffix}`,
-          sku: `EZK-${type.slice(0, 3).toUpperCase()}-${suffix.toUpperCase()}`,
-          name: String(values.get("name") || "").trim(),
-          category: String(values.get("category") || "").trim(),
-          type,
-          price: Math.round(Number(values.get("price")) || 0),
-          images,
-          image: images[0],
-          ...(type === "physical" ? { stock: Math.max(0, Math.round(Number(values.get("stock")) || 0)), weightGrams } : {}),
-          ...(type === "digital" ? { digitalFileName: String(values.get("digital_name") || "").trim() } : {}),
-          ...(type === "subscription" ? { subscription: { interval, unit: String(values.get("unit") || "month") } } : {}),
-          createdAt: new Date().toISOString(),
-        };
-        const products = readCatalogProducts(); products.push(product);
-        if (!writeCatalogProducts(products)) return;
-        renderCatalog(); dialog.close("created"); form.reset(); syncType(); showToast(`${product.name} added to Products and Landing Pages`);
-      } catch (error) { showError(error instanceof Error ? error.message : "The product could not be created."); }
-      finally { submit.disabled = false; submit.textContent = "Create product"; }
-    });
-    syncType(); renderCatalog();
-  }
-
   const sqStudio = document.querySelector(".sq-studio");
   if (sqStudio) {
     const previewRoot = sqStudio.querySelector("[data-sq-preview-root]");
@@ -479,11 +140,6 @@
     const productPrices = { granola: 58000, coffee: 79000, sambal: 46000 };
     const productNames = { granola: "Granola Madu Nusantara", coffee: "Kopi Susu Concentrate", sambal: "Sambal Roa Signature" };
     const productImages = { granola: "assets/products/granola.webp", coffee: "assets/products/kopi-susu.webp", sambal: "assets/products/sambal-roa.webp" };
-    const productMeta = {
-      granola: { type: "physical", weightGrams: 320, images: ["assets/products/granola.webp"] },
-      coffee: { type: "physical", weightGrams: 650, images: ["assets/products/kopi-susu.webp"] },
-      sambal: { type: "physical", weightGrams: 260, images: ["assets/products/sambal-roa.webp"] },
-    };
     const sectionNames = { announcement: "Announcement", navigation: "Navigation", hero: "Hero", products: "Product collection", "image-story": "Image story", benefits: "Benefits", checkout: "Checkout", shipping: "Shipping" };
     const templateCatalog = {
       sora: { name: "Sora Modest", brand: "SORA", category: "Fashion", image: "assets/templates/fashion-terracotta.webp", accent: "#b54b36", page: "#f8f0e8", ink: "#30231f", surface: "#fffaf5", mode: "split-right", kicker: "MODERN MODEST WEAR", headline: "Made to move with your whole life.", body: "Considered silhouettes, breathable fabrics, and expressive color—designed in Jakarta for everyday confidence.", cta: "Explore the collection", story: "Quiet confidence, cut with intention.", storyBody: "Small production runs and thoughtful details make every piece feel personal.", announcement: "Complimentary nationwide delivery this week", entrance: "rise", hover: "lift" },
@@ -544,7 +200,7 @@
       products: selectedProducts(),
       selectedSection,
       spacing: JSON.stringify([...spacingState.entries()]),
-      catalog: { prices: { ...productPrices }, names: { ...productNames }, images: { ...productImages }, meta: JSON.parse(JSON.stringify(productMeta)) },
+      catalog: { prices: { ...productPrices }, names: { ...productNames }, images: { ...productImages } },
       version: 3,
     });
     const updateHistoryButtons = () => {
@@ -576,11 +232,8 @@
     const formatRupiah = (amount) => `Rp${new Intl.NumberFormat("id-ID").format(amount)}`;
     const updateProductView = () => {
       const products = selectedProducts();
-      const needsShipping = products.some((product) => (productMeta[product]?.type || "physical") === "physical");
       [...(previewRoot?.classList || [])].filter((name) => name.startsWith("product-count-")).forEach((name) => previewRoot.classList.remove(name));
       previewRoot?.classList.add(`product-count-${products.length}`);
-      previewRoot?.classList.toggle("products-need-shipping", needsShipping);
-      previewRoot?.querySelectorAll("[data-physical-only]").forEach((element) => { element.hidden = !needsShipping; });
       sqStudio.querySelectorAll("[data-product-card]").forEach((card) => { card.hidden = !products.includes(card.dataset.productCard); });
       sqStudio.querySelectorAll("[data-product-line]").forEach((line) => { line.hidden = !products.includes(line.dataset.productLine); });
       const productVisuals = [...sqStudio.querySelectorAll("[data-product-visual]")];
@@ -619,19 +272,6 @@
         element.style.gridRow = `${normalized.y} / span ${normalized.height}`;
       }
       return normalized;
-    };
-    const productSettingKey = (setting, device = activeDevice) => `sqProduct${setting}${device[0].toUpperCase()}${device.slice(1)}`;
-    const productGridSettings = (element, device = activeDevice) => ({
-      columns: element?.dataset[productSettingKey("Columns", device)] || "auto",
-      density: element?.dataset[productSettingKey("Density", device)] || "balanced",
-    });
-    const applyProductGridLayout = (element, device = activeDevice) => {
-      if (element?.dataset.sqElementType !== "product-grid") return;
-      const settings = productGridSettings(element, device);
-      element.classList.remove("product-layout-auto", "product-layout-fixed", "product-density-compact", "product-density-balanced", "product-density-showcase");
-      element.classList.add(settings.columns === "auto" ? "product-layout-auto" : "product-layout-fixed", `product-density-${settings.density}`);
-      if (settings.columns === "auto") element.style.removeProperty("--sq-product-columns");
-      else element.style.setProperty("--sq-product-columns", settings.columns);
     };
     const layoutsOverlap = (first, second) => !(
       first.x + first.width <= second.x ||
@@ -676,7 +316,6 @@
       let rows = Number.parseInt(section.dataset.sqMinRows || "12", 10);
       section.querySelectorAll(":scope > [data-sq-element]").forEach((element) => {
         const layout = setElementLayout(element, parseElementLayout(element));
-        applyProductGridLayout(element);
         rows = Math.max(rows, layout.y + layout.height - 1);
       });
       section.dataset.sqRows = String(rows);
@@ -829,16 +468,13 @@
       if (!valid) {
         const context = sqStudio.querySelector("[data-sq-inspector-context]");
         if (context) context.textContent = "Selected section";
-        const productControls = sqStudio.querySelector("[data-sq-product-layout-controls]");
-        if (productControls) productControls.hidden = true;
         return;
       }
       const layout = parseElementLayout(selectedElement);
       const type = sqStudio.querySelector(".sq-element-controls [data-sq-element-type]");
       const isLogo = selectedElement.dataset.sqElementType === "logo";
-      const isProductGrid = selectedElement.dataset.sqElementType === "product-grid";
-      const action = isProductGrid ? null : actionForElement();
-      const image = isLogo || isProductGrid ? null : imageForElement();
+      const action = actionForElement();
+      const image = isLogo ? null : imageForElement();
       const contentName = selectedContent?.matches("h1,h2,h3") ? "Heading" : selectedContent ? "Text" : "";
       const contextualName = isLogo ? "Logo" : selectedAction && action ? "Button" : selectedImage && image ? "Image" : contentName || elementTypeName(selectedElement);
       if (type) type.textContent = contextualName;
@@ -948,18 +584,7 @@
           input.value = String(value);
           const output = sqStudio.querySelector(`[data-sq-image-output="${name}"]`);
           if (output) output.textContent = `${value}${name === "blur" ? "px" : "%"}`;
-          });
-      }
-      const productControls = sqStudio.querySelector("[data-sq-product-layout-controls]");
-      if (productControls) productControls.hidden = !isProductGrid;
-      if (isProductGrid) {
-        const settings = productGridSettings(selectedElement);
-        const columns = sqStudio.querySelector("[data-sq-product-columns]");
-        const density = sqStudio.querySelector("[data-sq-product-density]");
-        const device = sqStudio.querySelector("[data-sq-product-layout-device]");
-        if (columns) columns.value = settings.columns;
-        if (density) density.value = settings.density;
-        if (device) device.textContent = activeDevice[0].toUpperCase() + activeDevice.slice(1);
+        });
       }
     };
     const removeElementOverlay = () => previewRoot?.querySelectorAll(".sq-element-overlay").forEach((overlay) => overlay.remove());
@@ -1381,52 +1006,6 @@
           };
         });
       });
-      previewRoot?.querySelectorAll("[data-sq-product-grid]").forEach((grid) => {
-        let draggedCard = null;
-        let productOrderSnapshot = null;
-        [...grid.querySelectorAll(":scope > [data-product-card]")].forEach((card) => {
-          card.draggable = true;
-          card.tabIndex = 0;
-          card.ondragstart = (event) => {
-            event.stopPropagation();
-            draggedCard = card;
-            productOrderSnapshot = captureState();
-            card.classList.add("sq-product-dragging");
-            event.dataTransfer.effectAllowed = "move";
-            event.dataTransfer.setData("text/plain", card.dataset.productCard || "product");
-          };
-          card.ondragover = (event) => {
-            if (!draggedCard || draggedCard === card) return;
-            event.preventDefault(); event.stopPropagation();
-            card.classList.add("sq-product-drop-target");
-          };
-          card.ondragleave = () => card.classList.remove("sq-product-drop-target");
-          card.ondrop = (event) => {
-            event.preventDefault(); event.stopPropagation();
-            card.classList.remove("sq-product-drop-target");
-            if (!draggedCard || draggedCard === card) return;
-            const cards = [...grid.children];
-            if (cards.indexOf(draggedCard) < cards.indexOf(card)) card.after(draggedCard); else card.before(draggedCard);
-            if (productOrderSnapshot) remember(productOrderSnapshot);
-            productOrderSnapshot = null;
-            markSqChanged();
-          };
-          card.ondragend = () => {
-            card.classList.remove("sq-product-dragging");
-            grid.querySelectorAll(".sq-product-drop-target").forEach((item) => item.classList.remove("sq-product-drop-target"));
-            draggedCard = null; productOrderSnapshot = null;
-          };
-          card.onkeydown = (event) => {
-            if (!(event.altKey && ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key))) return;
-            const backward = event.key === "ArrowLeft" || event.key === "ArrowUp";
-            const sibling = backward ? card.previousElementSibling : card.nextElementSibling;
-            if (!sibling?.matches("[data-product-card]")) return;
-            event.preventDefault(); remember();
-            if (backward) sibling.before(card); else sibling.after(card);
-            card.focus(); markSqChanged();
-          };
-        });
-      });
       previewRoot?.querySelectorAll("[data-sq-block]").forEach((block) => {
         editableNodesFor(block).forEach((content, index) => {
           if (!content.dataset.sqEditable) content.dataset.sqEditable = `copy-${index + 1}`;
@@ -1490,7 +1069,6 @@
         Object.assign(productPrices, state.catalog.prices || {});
         Object.assign(productNames, state.catalog.names || {});
         Object.assign(productImages, state.catalog.images || {});
-        Object.assign(productMeta, state.catalog.meta || {});
       }
       sqStudio.querySelectorAll("[data-sq-product]").forEach(bindSqProductInput);
       sqStudio.querySelectorAll("[data-sq-product]").forEach((input) => { input.checked = (state.products || []).includes(input.value); });
@@ -1517,50 +1095,6 @@
 
     sqStudio.querySelectorAll("[data-sq-product]").forEach(bindSqProductInput);
 
-    const installCustomProduct = (product, checked = true) => {
-      const id = String(product?.id || "").trim();
-      const name = String(product?.name || "").trim();
-      const price = Math.max(1000, Math.round(Number(product?.price) || 0));
-      const images = Array.isArray(product?.images) && product.images.length ? product.images.slice(0, 9) : [product?.image].filter(Boolean);
-      if (!id || !name || !price || !images.length) return null;
-      const type = ["physical", "digital", "subscription"].includes(product.type) ? product.type : "physical";
-      const typeName = { physical: "Physical product", digital: "Digital download", subscription: "Subscription" }[type];
-      const schedule = type === "subscription" ? ` · every ${product.subscription?.interval || 1} ${product.subscription?.unit || "month"}` : "";
-      const detail = type === "physical" ? `Ships at ${Math.max(1, Number(product.weightGrams) || 1)} g.` : type === "digital" ? `${product.digitalFileName || "Digital file"} · delivered after confirmed payment.` : "Recurring billing through Midtrans after merchant activation.";
-      const imageUrl = String(images[0]);
-      const safeName = escapeHtml(name);
-      const safePrice = escapeHtml(formatRupiah(price));
-      productNames[id] = name;
-      productPrices[id] = price;
-      productImages[id] = imageUrl;
-      productMeta[id] = { type, images, ...(type === "physical" ? { weightGrams: Math.max(1, Number(product.weightGrams) || 1) } : {}), ...(type === "digital" ? { digitalFileName: String(product.digitalFileName || "") } : {}), ...(type === "subscription" ? { subscription: { interval: Math.max(1, Number(product.subscription?.interval) || 1), unit: product.subscription?.unit || "month" } } : {}) };
-
-      const picker = sqStudio.querySelector(".sq-product-picker");
-      let input = picker?.querySelector(`[data-sq-product][value="${CSS.escape(id)}"]`);
-      if (picker && !input) {
-        const label = document.createElement("label");
-        label.innerHTML = `<input type="checkbox" value="${escapeHtml(id)}" data-sq-product${checked ? " checked" : ""}><span><span class="product-art"><img src="${imageUrl}" alt="${safeName}"></span><div><b>${safeName}</b><small>${safePrice} · ${typeName}</small></div><i>${iconMarkup("check-circle")}</i></span>`;
-        picker.append(label); input = label.querySelector("[data-sq-product]"); bindSqProductInput(input);
-      } else if (input && checked) input.checked = true;
-      previewRoot?.querySelectorAll("[data-sq-product-grid]").forEach((grid) => {
-        if (grid.querySelector(`[data-product-card="${CSS.escape(id)}"]`)) return;
-        const card = document.createElement("article");
-        card.dataset.productCard = id;
-        card.dataset.productType = type;
-        card.innerHTML = `<span class="product-art"><img src="${imageUrl}" alt="${safeName}">${images.length > 1 ? `<em class="sq-media-count">+${images.length - 1} photos</em>` : ""}</span><div><small>${typeName}${escapeHtml(schedule)}</small><h3>${safeName}</h3><p>${escapeHtml(detail)}</p><footer><b>${safePrice}</b><button type="button">${type === "subscription" ? "Subscribe" : "Add to cart"}</button></footer></div>`;
-        grid.append(card);
-      });
-      previewRoot?.querySelectorAll("[data-sq-basket-lines]").forEach((basket) => {
-        if (basket.querySelector(`[data-product-line="${CSS.escape(id)}"]`)) return;
-        const line = document.createElement("li"); line.dataset.productLine = id; line.innerHTML = `<span>${safeName}</span><b>${safePrice}</b>`; basket.append(line);
-      });
-      previewRoot?.querySelectorAll(".sq-hero-collage").forEach((collage) => {
-        if (collage.querySelector(`[data-product-visual="${CSS.escape(id)}"]`)) return;
-        const visual = document.createElement("span"); visual.dataset.productVisual = id; visual.dataset.sqImageItem = ""; visual.draggable = true; visual.tabIndex = 0; visual.setAttribute("aria-label", `${name} image — drag to rearrange`); visual.innerHTML = `<span class="product-art"><img src="${imageUrl}" alt="${safeName}"></span>`; collage.append(visual);
-      });
-      return input;
-    };
-
     const quickProductForm = sqStudio.querySelector("[data-sq-product-form]");
     sqStudio.querySelector("[data-sq-show-product-form]")?.addEventListener("click", () => {
       if (!quickProductForm) return;
@@ -1572,50 +1106,62 @@
       quickProductForm.hidden = true;
       quickProductForm.reset();
     });
-    const quickProductType = quickProductForm?.querySelector("[data-sq-quick-type]");
-    const syncQuickProductType = () => {
-      const type = String(quickProductType?.value || "physical");
-      const physical = quickProductForm?.querySelector("[data-sq-quick-physical]");
-      const digital = quickProductForm?.querySelector("[data-sq-quick-digital]");
-      const subscription = quickProductForm?.querySelector("[data-sq-quick-subscription]");
-      const rule = quickProductForm?.querySelector("[data-sq-quick-image-rule]");
-      if (physical) physical.hidden = type !== "physical";
-      if (digital) digital.hidden = type !== "digital";
-      if (subscription) subscription.hidden = type !== "subscription";
-      if (rule) rule.textContent = `${type === "physical" ? "Physical products need 3–9 images" : "Add 1–9 images"}, maximum 2 MB each.`;
-    };
-    quickProductType?.addEventListener("change", syncQuickProductType);
-    syncQuickProductType();
-    quickProductForm?.addEventListener("submit", async (event) => {
+    quickProductForm?.addEventListener("submit", (event) => {
       event.preventDefault();
       if (!quickProductForm.reportValidity()) return;
       const formData = new FormData(quickProductForm);
       const name = String(formData.get("name") || "").trim();
       const price = Math.max(1000, Math.round(Number(formData.get("price")) || 0));
-      const type = String(formData.get("type") || "physical");
-      const files = [...(quickProductForm.elements.images?.files || [])];
-      const minimum = type === "physical" ? 3 : 1;
-      const error = quickProductForm.querySelector("[data-sq-quick-error]");
-      const fail = (message) => { if (error) { error.textContent = message; error.hidden = false; } };
-      if (files.length < minimum || files.length > 9) { fail(`${type === "physical" ? "Physical products need 3–9" : "Products need 1–9"} images.`); return; }
-      const oversized = files.find((file) => file.size > 2 * 1024 * 1024);
-      if (oversized) { fail(`${oversized.name} is larger than 2 MB.`); return; }
-      const weightGrams = Math.round(Number(formData.get("weight")) || 0);
-      if (type === "physical" && weightGrams < 1) { fail("Physical products need a shipping weight."); return; }
-      const interval = Math.round(Number(formData.get("interval")) || 1);
-      if (type === "subscription" && (interval < 1 || interval > 12)) { fail("Choose a billing interval from 1 to 12."); return; }
-      const submit = quickProductForm.querySelector('button[type="submit"]');
-      if (submit) { submit.disabled = true; submit.textContent = "Preparing images…"; }
-      try {
-        const images = await Promise.all(files.map(compressCreatorProductImage));
-        const id = `custom-${globalThis.crypto?.randomUUID?.().replace(/-/g, "").slice(0, 10) || Date.now()}`;
-        remember();
-        installCustomProduct({ id, name, price, type, images, image: images[0], ...(type === "physical" ? { weightGrams } : {}), ...(type === "digital" ? { digitalFileName: String(formData.get("digital_name") || "").trim() } : {}), ...(type === "subscription" ? { subscription: { interval, unit: String(formData.get("unit") || "month") } } : {}) });
-        updateProductView(); bindSqInteractions(); syncInspectorContent(); markSqChanged();
-        quickProductForm.hidden = true; quickProductForm.reset(); syncQuickProductType();
-        showToast(`${name} added to this page`);
-      } catch (imageError) { fail(imageError instanceof Error ? imageError.message : "The product images could not be prepared."); }
-      finally { if (submit) { submit.disabled = false; submit.textContent = "Add product"; } }
+      const photo = String(formData.get("photo") || "granola");
+      if (!name || !price || !productImages[photo]) return;
+
+      remember();
+      const id = `custom-${Date.now()}`;
+      const imageUrl = productImages[photo];
+      const safeName = escapeHtml(name);
+      const safePrice = escapeHtml(formatRupiah(price));
+      productNames[id] = name;
+      productPrices[id] = price;
+      productImages[id] = imageUrl;
+
+      const picker = sqStudio.querySelector(".sq-product-picker");
+      if (picker) {
+        const label = document.createElement("label");
+        label.innerHTML = `<input type="checkbox" value="${id}" data-sq-product checked><span><span class="product-art"><img src="${imageUrl}" alt="${safeName}"></span><div><b>${safeName}</b><small>${safePrice} · New product</small></div><i>${iconMarkup("check-circle")}</i></span>`;
+        picker.append(label);
+        bindSqProductInput(label.querySelector("[data-sq-product]"));
+      }
+
+      previewRoot?.querySelectorAll("[data-sq-product-grid]").forEach((grid) => {
+        const card = document.createElement("article");
+        card.dataset.productCard = id;
+        card.innerHTML = `<span class="product-art"><img src="${imageUrl}" alt="${safeName}"></span><div><small>New product · ready to sell</small><h3>${safeName}</h3><p>Add product details, variants, weight, and inventory from the product catalog.</p><footer><b>${safePrice}</b><button type="button">Add to cart</button></footer></div>`;
+        grid.append(card);
+      });
+      previewRoot?.querySelectorAll("[data-sq-basket-lines]").forEach((basket) => {
+        const line = document.createElement("li");
+        line.dataset.productLine = id;
+        line.innerHTML = `<span>${safeName}</span><b>${safePrice}</b>`;
+        basket.append(line);
+      });
+      previewRoot?.querySelectorAll(".sq-hero-collage").forEach((collage) => {
+        const visual = document.createElement("span");
+        visual.dataset.productVisual = id;
+        visual.dataset.sqImageItem = "";
+        visual.draggable = true;
+        visual.tabIndex = 0;
+        visual.setAttribute("aria-label", `${name} image — drag to rearrange`);
+        visual.innerHTML = `<span class="product-art"><img src="${imageUrl}" alt="${safeName}"></span>`;
+        collage.append(visual);
+      });
+
+      updateProductView();
+      bindSqInteractions();
+      syncInspectorContent();
+      markSqChanged();
+      quickProductForm.hidden = true;
+      quickProductForm.reset();
+      showToast(`${name} added to this page`);
     });
 
     const fitZoomForDevice = (device = activeDevice) => {
@@ -1668,16 +1214,6 @@
         markSqChanged();
       });
       input.addEventListener("change", () => { if (elementControlSnapshot) remember(elementControlSnapshot); elementControlSnapshot = null; });
-    });
-    [["[data-sq-product-columns]", "Columns"], ["[data-sq-product-density]", "Density"]].forEach(([selector, setting]) => {
-      sqStudio.querySelector(selector)?.addEventListener("change", (event) => {
-        if (selectedElement?.dataset.sqElementType !== "product-grid") return;
-        remember();
-        selectedElement.dataset[productSettingKey(setting)] = event.currentTarget.value;
-        applyProductGridLayout(selectedElement);
-        refreshElementOverlay();
-        markSqChanged();
-      });
     });
     sqStudio.querySelector("[data-sq-element-duplicate]")?.addEventListener("click", duplicateSelectedElement);
     sqStudio.querySelector("[data-sq-element-delete]")?.addEventListener("click", deleteSelectedElement);
@@ -2447,14 +1983,7 @@
       const spacingCssFor = (device) => [...spacingState.entries()].filter(([key]) => key.endsWith(`:${device}`)).map(([key, value]) => { const section = key.slice(0, -(device.length + 1)); return `[data-ezkart-section="${section}"]{padding:${value.top}px ${value.right}px ${value.bottom}px ${value.left}px!important}`; }).join("\n");
       const fluidCssFor = (device) => [...previewRoot.querySelectorAll("[data-sq-fluid]")].map((section) => `[data-ezkart-section="${section.dataset.sectionId}"]{--sq-fluid-row-height:${fluidRowHeight(section, device)}px}`).join("\n");
       const elementCssFor = (device) => [...previewRoot.querySelectorAll("[data-sq-element]")].map((element) => { const layout = parseElementLayout(element, device); return `[data-ezkart-element="${element.dataset.sqElementId}"]{grid-column:${layout.x}/span ${layout.width}!important;grid-row:${layout.y}/span ${layout.height}!important}`; }).join("\n");
-      const productCssFor = (device) => [...previewRoot.querySelectorAll('[data-sq-element-type="product-grid"]')].map((element) => {
-        const settings = productGridSettings(element, device);
-        const density = { compact: ["150px", "clamp(96px,58cqw,175px)", "11px", "none"], balanced: ["220px", "clamp(120px,62cqw,250px)", "18px", "block"], showcase: ["310px", "clamp(180px,70cqw,360px)", "18px", "block"] }[settings.density] || ["220px", "clamp(120px,62cqw,250px)", "18px", "block"];
-        const columns = settings.columns === "auto" ? `repeat(auto-fit,minmax(min(100%,${density[0]}),1fr))` : `repeat(${settings.columns},minmax(0,1fr))`;
-        const id = `[data-ezkart-element="${element.dataset.sqElementId}"]`;
-        return `${id}{grid-template-columns:${columns}!important}${id} .product-art{height:${density[1]}!important}${id}>article>div{padding:${density[2]}!important}${id} p{display:${density[3]}}`;
-      }).join("\n");
-      const responsiveSpacing = `${spacingCssFor("desktop")}\n${fluidCssFor("desktop")}\n${elementCssFor("desktop")}\n${productCssFor("desktop")}\n@media(max-width:900px){${spacingCssFor("tablet")}\n${fluidCssFor("tablet")}\n${elementCssFor("tablet")}\n${productCssFor("tablet")}}\n@media(max-width:600px){${spacingCssFor("mobile")}\n${fluidCssFor("mobile")}\n${elementCssFor("mobile")}\n${productCssFor("mobile")}}`;
+      const responsiveSpacing = `${spacingCssFor("desktop")}\n${fluidCssFor("desktop")}\n${elementCssFor("desktop")}\n@media(max-width:900px){${spacingCssFor("tablet")}\n${fluidCssFor("tablet")}\n${elementCssFor("tablet")}}\n@media(max-width:600px){${spacingCssFor("mobile")}\n${fluidCssFor("mobile")}\n${elementCssFor("mobile")}}`;
       const commerceScript = `<script>(()=>{const defaults=${JSON.stringify(selectedProducts())},cart=new Set();document.querySelectorAll('[data-ezkart-add]').forEach(button=>button.addEventListener('click',()=>{const id=button.dataset.ezkartAdd;cart.has(id)?cart.delete(id):cart.add(id);button.textContent=cart.has(id)?'Added ✓':'Add to cart'}));const checkout=()=>{const products=cart.size?[...cart]:defaults;if(!products.length){alert('This page has no connected products.');return}location.href='/cart/?products='+encodeURIComponent(products.join(','))};document.querySelector('[data-ezkart-checkout]')?.addEventListener('click',checkout);document.querySelectorAll('[data-ezkart-action]').forEach(button=>button.addEventListener('click',()=>{const type=button.dataset.ezkartAction,target=button.dataset.ezkartTarget||'';if(type==='checkout'){checkout();return}if(type==='section'){document.getElementById(target.replace(/^#/,''))?.scrollIntoView({behavior:'smooth'});return}const href=type==='email'?'mailto:'+target:type==='phone'?'tel:'+target:target;if(type==='url'&&button.dataset.ezkartNewTab==='true')window.open(href,'_blank','noopener');else if(href)location.href=href}));const observer=new IntersectionObserver(entries=>entries.forEach(entry=>{if(entry.isIntersecting){entry.target.classList.add(entry.target.matches('[class*="element-animation-"]')?'sq-element-animate':'animating');observer.unobserve(entry.target)}}),{threshold:.12});document.querySelectorAll('[class*="animation-"],[class*="element-animation-"]').forEach(element=>observer.observe(element))})();<\/script>`;
       const fontBase = new URL("assets/fonts/poppins-400.woff2", window.location.href).href;
       const fontBold = new URL("assets/fonts/poppins-600.woff2", window.location.href).href;
@@ -2476,59 +2005,44 @@
       showToast("Published snapshot updated with checkout and responsive settings");
     });
     const cloneBaseSiteState = () => JSON.parse(JSON.stringify(baseSiteState || captureState()));
-    const loadSite = (site, force = false) => {
-      if (!site || (!force && site.classList.contains("active"))) return;
-      if (!force) persistCurrentState();
+    const loadSite = (site) => {
+      if (!site || site.classList.contains("active")) return;
+      persistCurrentState();
       activeSiteKey = site.dataset.siteUrl || "default";
       sqStudio.querySelectorAll("[data-sq-site]").forEach((item) => item.classList.toggle("active", item === site));
       document.querySelectorAll("[data-current-site-name]").forEach((target) => { target.textContent = site.dataset.siteName; });
       document.querySelectorAll("[data-current-site-url]").forEach((target) => { target.textContent = site.dataset.siteUrl; });
-      window.history.replaceState(null, "", `?page=sites&edit=${encodeURIComponent(site.dataset.siteUrl)}`);
       let state = null;
       try { state = JSON.parse(localStorage.getItem(storageKeyFor()) || localStorage.getItem(legacyStorageKeyFor()) || "null"); } catch (_) { state = null; }
       undoStack.length = 0; redoStack.length = 0; updateHistoryButtons();
       restoreState([2, 3].includes(state?.version) ? state : cloneBaseSiteState());
-      readCatalogProducts().forEach((product) => installCustomProduct(product, selectedProducts().includes(product.id)));
-      let customProducts = [];
-      try { customProducts = JSON.parse(site.dataset.siteCustomProducts || "[]"); } catch (_) { customProducts = []; }
-      customProducts.forEach((product) => installCustomProduct(product, true));
-      if (![2, 3].includes(state?.version) && site.dataset.siteProducts) {
-        const starters = site.dataset.siteProducts.split(",").filter(Boolean);
-        sqStudio.querySelectorAll("[data-sq-product]").forEach((input) => { input.checked = starters.includes(input.value); });
-        updateProductView(); markSqChanged();
-      }
       showToast(`${site.dataset.siteName} loaded with its saved draft`);
     };
     const bindSiteButton = (site) => { site.onclick = () => loadSite(site); };
+    const siteRegistryKey = "ezkart:landing-builder:v3:sites";
+    const legacySiteRegistryKey = "ezkart:landing-builder:v2:sites";
     const pageList = sqStudio.querySelector(".sq-page-list");
-    const addSavedSiteButton = ({ name, url, products = [], customProducts = [] }) => {
+    const addSavedSiteButton = ({ name, url }) => {
       const sourceSite = pageList?.querySelector("[data-sq-site]");
       if (!pageList || !sourceSite || !name || !url || pageList.querySelector(`[data-site-url="${CSS.escape(url)}"]`)) return null;
       const site = sourceSite.cloneNode(true);
-      site.classList.remove("active"); site.dataset.siteName = name; site.dataset.siteUrl = url; site.dataset.siteProducts = products.join(","); site.dataset.siteCustomProducts = JSON.stringify(customProducts); site.dataset.customSite = "true";
+      site.classList.remove("active"); site.dataset.siteName = name; site.dataset.siteUrl = url; site.dataset.customSite = "true";
       const title = site.querySelector("b"); const subtitle = site.querySelector("small"); const status = site.querySelector("em");
       if (title) title.textContent = name; if (subtitle) subtitle.textContent = url; if (status) { status.textContent = "Draft"; status.className = "draft"; }
       pageList.append(site); bindSiteButton(site); return site;
     };
-    readLandingSites().forEach(addSavedSiteButton);
-    updateLandingCountBadges(3 + readLandingSites().length);
+    try { JSON.parse(localStorage.getItem(siteRegistryKey) || localStorage.getItem(legacySiteRegistryKey) || "[]").forEach(addSavedSiteButton); } catch (_) { /* built-in pages remain available */ }
     sqStudio.querySelectorAll("[data-sq-site]").forEach(bindSiteButton);
 
     const newPageDialog = document.getElementById("page-creator-dialog");
-    sqStudio.querySelectorAll("[data-open-page-creator]").forEach((button) => button.addEventListener("click", () => {
-      if (!landingAdvancedMode() && sqStudio.querySelectorAll("[data-sq-site]").length >= 6) { showToast("The standard workspace supports 6 projects. Delete one or enable Advanced Mode from Landing Pages."); return; }
-      newPageDialog?.showModal();
-    }));
+    sqStudio.querySelectorAll("[data-open-page-creator]").forEach((button) => button.addEventListener("click", () => newPageDialog?.showModal()));
     const newPageForm = newPageDialog?.querySelector("[data-page-creator-form]");
     const newPageName = newPageForm?.elements.namedItem("page_name");
     const newPageSlug = newPageForm?.elements.namedItem("slug");
-    hydrateCreatorCatalog(newPageForm);
-    const newPageProducts = setupCreatorProducts(newPageForm);
     let newPageSlugEdited = false;
     const makePageSlug = (value) => normalize(value).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 48);
     newPageSlug?.addEventListener("input", () => { newPageSlugEdited = true; newPageSlug.value = makePageSlug(newPageSlug.value); });
     newPageName?.addEventListener("input", () => { if (!newPageSlugEdited && newPageSlug) newPageSlug.value = makePageSlug(newPageName.value); });
-    newPageDialog?.addEventListener("close", () => { if (newPageDialog.returnValue === "cancel") { newPageForm?.reset(); newPageProducts.reset(); newPageSlugEdited = false; } });
     newPageForm?.addEventListener("submit", (event) => {
       if (event.submitter?.value === "cancel") return;
       event.preventDefault(); event.stopImmediatePropagation();
@@ -2537,19 +2051,16 @@
       if (!newPageForm.reportValidity()) return;
       const name = String(newPageForm.elements.page_name.value).trim();
       const siteUrl = `${String(newPageForm.elements.slug.value).trim()}.ezkart.site`;
-      const starterIds = starters.map((starter) => starter.value);
-      const customProducts = newPageProducts.selected(starterIds);
-      const site = addSavedSiteButton({ name, url: siteUrl, products: starterIds, customProducts });
+      const site = addSavedSiteButton({ name, url: siteUrl });
       if (!site) { showToast("A page with this URL already exists"); return; }
       try {
-        const savedSites = [...sqStudio.querySelectorAll("[data-custom-site]")].map((item) => { let own = []; try { own = JSON.parse(item.dataset.siteCustomProducts || "[]"); } catch (_) { own = []; } return { name: item.dataset.siteName, url: item.dataset.siteUrl, products: item.dataset.siteProducts.split(",").filter(Boolean), customProducts: own }; });
-        writeLandingSites(savedSites);
+        const savedSites = [...sqStudio.querySelectorAll("[data-custom-site]")].map((item) => ({ name: item.dataset.siteName, url: item.dataset.siteUrl }));
+        localStorage.setItem(siteRegistryKey, JSON.stringify(savedSites));
       } catch (_) { /* page remains available in this tab */ }
       newPageDialog?.close(); loadSite(site);
       sqStudio.querySelectorAll("[data-sq-product]").forEach((input) => { input.checked = starters.some((starter) => starter.value === input.value); });
       updateProductView(); markSqChanged();
-      updateLandingCountBadges(3 + readLandingSites().length);
-      showToast(`${name} created with ${starters.length} products`); newPageForm.reset(); newPageProducts.reset(); newPageSlugEdited = false;
+      showToast(`${name} created with ${starters.length} products`); newPageForm.reset(); newPageSlugEdited = false;
     });
 
     const syncCommerceStatus = async () => {
@@ -2569,7 +2080,6 @@
       }
     };
 
-    readCatalogProducts().forEach((product) => installCustomProduct(product, false));
     upgradeLegacyStructure();
     rebuildLayerList();
     bindSqInteractions();
@@ -2578,15 +2088,10 @@
     syncBrandControls();
     syncCommerceStatus();
     baseSiteState = captureState();
-    const requestedSiteUrl = new URLSearchParams(window.location.search).get("edit") || "";
-    const requestedSiteButton = [...sqStudio.querySelectorAll("[data-sq-site]")].find((site) => site.dataset.siteUrl === requestedSiteUrl);
-    if (requestedSiteButton) loadSite(requestedSiteButton, true);
-    else {
-      try {
-        const stored = JSON.parse(localStorage.getItem(storageKeyFor()) || localStorage.getItem(legacyStorageKeyFor()) || "null");
-        if ([2, 3].includes(stored?.version)) restoreState(stored);
-      } catch (_) { /* start with the server-provided page */ }
-    }
+    try {
+      const stored = JSON.parse(localStorage.getItem(storageKeyFor()) || localStorage.getItem(legacyStorageKeyFor()) || "null");
+      if ([2, 3].includes(stored?.version)) restoreState(stored);
+    } catch (_) { /* start with the server-provided page */ }
     window.addEventListener("beforeunload", persistCurrentState);
     setZoom(fitZoomForDevice());
   }
