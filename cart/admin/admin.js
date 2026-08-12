@@ -128,6 +128,108 @@
     });
   });
 
+  const landingSiteRegistryKey = "ezkart:landing-builder:v3:sites";
+  const landingLegacyRegistryKey = "ezkart:landing-builder:v2:sites";
+  const landingAdvancedModeKey = "ezkart:landing-builder:advanced-mode";
+  const readLandingSites = () => {
+    try {
+      const value = JSON.parse(localStorage.getItem(landingSiteRegistryKey) || localStorage.getItem(landingLegacyRegistryKey) || "[]");
+      return Array.isArray(value) ? value.filter((site) => site && typeof site.name === "string" && /^[a-z0-9-]+\.ezkart\.site$/i.test(site.url || "")) : [];
+    } catch (_) { return []; }
+  };
+  const writeLandingSites = (sites) => localStorage.setItem(landingSiteRegistryKey, JSON.stringify(sites));
+  const landingAdvancedMode = () => localStorage.getItem(landingAdvancedModeKey) === "true";
+  const updateLandingCountBadges = (count = 3 + readLandingSites().length) => document.querySelectorAll("[data-site-count]").forEach((badge) => { badge.textContent = String(count); });
+  updateLandingCountBadges();
+
+  const landingLibrary = document.querySelector("[data-landing-library]");
+  if (landingLibrary) {
+    const builtInCount = landingLibrary.querySelectorAll("[data-project-card]:not([data-custom-site])").length;
+    const grid = landingLibrary.querySelector("[data-project-grid]");
+    const dialog = document.getElementById("library-page-creator-dialog");
+    const form = dialog?.querySelector("[data-library-page-form]");
+    const advancedToggle = landingLibrary.querySelector("[data-advanced-mode]");
+    const makePageSlug = (value) => normalize(value).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 48);
+    let customSites = readLandingSites();
+    let slugEdited = false;
+
+    const projectTone = (products = []) => products.includes("coffee") ? "coffee" : products.includes("sambal") ? "chili" : "gold";
+    const projectImage = (products = []) => products.includes("coffee") ? "assets/products/kopi-susu.webp" : products.includes("sambal") ? "assets/products/sambal-roa.webp" : "assets/products/granola.webp";
+    const projectCard = (site) => {
+      const tone = projectTone(site.products);
+      const href = `?page=sites&edit=${encodeURIComponent(site.url)}`;
+      const card = document.createElement("article");
+      card.className = "landing-project-card";
+      card.dataset.projectCard = "";
+      card.dataset.customSite = "true";
+      card.dataset.siteName = site.name;
+      card.dataset.siteUrl = site.url;
+      card.innerHTML = `<a class="landing-project-preview tone-${tone}" href="${href}" aria-label="Edit ${escapeHtml(site.name)}"><span class="project-browser"><i></i><i></i><i></i><small>${escapeHtml(site.url)}</small></span><span class="project-mini-page"><span><b>${escapeHtml(site.name)}</b><em>Shop now</em></span><span class="product-art"><img src="${projectImage(site.products)}" alt="" loading="lazy"></span><i></i><i></i><i></i></span><span class="project-edit-hint">Open editor</span></a><div class="landing-project-details"><div><span class="project-status draft"><i></i>Draft</span><h2><a href="${href}">${escapeHtml(site.name)}</a></h2><p>Your saved custom storefront, ready for responsive editing.</p></div><button type="button" data-project-menu aria-label="Project actions"><svg class="icon" aria-hidden="true"><use href="#icon-settings"></use></svg></button></div><footer><span><svg class="icon" aria-hidden="true"><use href="#icon-globe"></use></svg>${escapeHtml(site.url)}</span><a href="${href}">Edit page <svg class="icon" aria-hidden="true"><use href="#icon-chevron-right"></use></svg></a></footer>`;
+      return card;
+    };
+    const closeProjectMenu = () => document.querySelector(".landing-project-menu")?.remove();
+    const bindProjectMenus = () => landingLibrary.querySelectorAll("[data-project-menu]").forEach((button) => {
+      button.onclick = (event) => {
+        event.stopPropagation(); closeProjectMenu();
+        const card = button.closest("[data-project-card]");
+        if (!card?.dataset.customSite) { showToast("Built-in projects stay available as starting points"); return; }
+        const menu = document.createElement("div");
+        menu.className = "landing-project-menu";
+        menu.innerHTML = '<button type="button">Delete project</button>';
+        const rect = button.getBoundingClientRect();
+        menu.style.left = `${Math.max(8, rect.right - 160)}px`; menu.style.top = `${rect.bottom + 5}px`;
+        menu.querySelector("button").onclick = () => {
+          if (!window.confirm(`Delete “${card.dataset.siteName}”? This removes its saved draft from this browser.`)) return;
+          const url = card.dataset.siteUrl;
+          customSites = customSites.filter((site) => site.url !== url);
+          writeLandingSites(customSites);
+          localStorage.removeItem(`ezkart:landing-builder:v3:${url}`);
+          localStorage.removeItem(`ezkart:landing-builder:v2:${url}`);
+          card.remove(); closeProjectMenu(); renderSummary(); showToast("Landing page deleted — one project space is available");
+        };
+        document.body.append(menu);
+      };
+    });
+    const renderSummary = () => {
+      const count = builtInCount + customSites.length;
+      const advanced = landingAdvancedMode();
+      const remaining = Math.max(0, 6 - count);
+      landingLibrary.querySelector("[data-library-count]").textContent = String(count);
+      landingLibrary.querySelector("[data-library-limit]").textContent = advanced ? "∞" : "6";
+      landingLibrary.querySelector("[data-library-progress]").style.width = advanced ? "100%" : `${Math.min(100, count / 6 * 100)}%`;
+      landingLibrary.querySelector("[data-library-cap-copy]").textContent = advanced ? "Advanced Mode is on. You can create more than 6 projects." : remaining ? `You can create ${remaining} more project${remaining === 1 ? "" : "s"}. Delete a draft to make space, or enable Advanced Mode.` : "Project limit reached. Delete one to return to 5, or enable Advanced Mode.";
+      const newCard = landingLibrary.querySelector("[data-library-create-card]");
+      newCard.disabled = !advanced && count >= 6;
+      landingLibrary.querySelector("[data-new-card-copy]").textContent = advanced ? "Advanced Mode · unlimited" : remaining ? `${remaining} project space${remaining === 1 ? "" : "s"} available` : "6-project limit reached";
+      updateLandingCountBadges(count);
+    };
+    const openCreator = () => {
+      if (!landingAdvancedMode() && builtInCount + customSites.length >= 6) { showToast("Delete a project or enable Advanced Mode to create another"); return; }
+      dialog?.showModal();
+    };
+    customSites.forEach((site) => grid?.insertBefore(projectCard(site), landingLibrary.querySelector("[data-library-create-card]")));
+    bindProjectMenus(); renderSummary();
+    landingLibrary.querySelectorAll("[data-library-create], [data-library-create-card]").forEach((button) => button.addEventListener("click", openCreator));
+    advancedToggle.checked = landingAdvancedMode();
+    advancedToggle.addEventListener("change", () => { localStorage.setItem(landingAdvancedModeKey, String(advancedToggle.checked)); renderSummary(); showToast(advancedToggle.checked ? "Advanced Mode enabled" : "Standard 6-project limit restored"); });
+    document.addEventListener("click", closeProjectMenu);
+    const nameInput = form?.elements.namedItem("page_name");
+    const slugInput = form?.elements.namedItem("slug");
+    slugInput?.addEventListener("input", () => { slugEdited = true; slugInput.value = makePageSlug(slugInput.value); });
+    nameInput?.addEventListener("input", () => { if (!slugEdited && slugInput) slugInput.value = makePageSlug(nameInput.value); });
+    form?.addEventListener("submit", (event) => {
+      if (event.submitter?.value === "cancel") return;
+      event.preventDefault();
+      const products = [...form.querySelectorAll('input[name="starter_products[]"]:checked')].map((input) => input.value);
+      if (!products.length) { showToast("Select at least one starting product"); return; }
+      if (!form.reportValidity()) return;
+      const site = { name: String(nameInput.value).trim(), url: `${makePageSlug(slugInput.value)}.ezkart.site`, products };
+      if (customSites.some((item) => item.url === site.url) || landingLibrary.querySelector(`[data-site-url="${CSS.escape(site.url)}"]`)) { showToast("A page with this URL already exists"); return; }
+      customSites.push(site); writeLandingSites(customSites);
+      window.location.href = `?page=sites&edit=${encodeURIComponent(site.url)}`;
+    });
+  }
+
   const sqStudio = document.querySelector(".sq-studio");
   if (sqStudio) {
     const previewRoot = sqStudio.querySelector("[data-sq-preview-root]");
@@ -273,6 +375,19 @@
       }
       return normalized;
     };
+    const productSettingKey = (setting, device = activeDevice) => `sqProduct${setting}${device[0].toUpperCase()}${device.slice(1)}`;
+    const productGridSettings = (element, device = activeDevice) => ({
+      columns: element?.dataset[productSettingKey("Columns", device)] || "auto",
+      density: element?.dataset[productSettingKey("Density", device)] || "balanced",
+    });
+    const applyProductGridLayout = (element, device = activeDevice) => {
+      if (element?.dataset.sqElementType !== "product-grid") return;
+      const settings = productGridSettings(element, device);
+      element.classList.remove("product-layout-auto", "product-layout-fixed", "product-density-compact", "product-density-balanced", "product-density-showcase");
+      element.classList.add(settings.columns === "auto" ? "product-layout-auto" : "product-layout-fixed", `product-density-${settings.density}`);
+      if (settings.columns === "auto") element.style.removeProperty("--sq-product-columns");
+      else element.style.setProperty("--sq-product-columns", settings.columns);
+    };
     const layoutsOverlap = (first, second) => !(
       first.x + first.width <= second.x ||
       second.x + second.width <= first.x ||
@@ -316,6 +431,7 @@
       let rows = Number.parseInt(section.dataset.sqMinRows || "12", 10);
       section.querySelectorAll(":scope > [data-sq-element]").forEach((element) => {
         const layout = setElementLayout(element, parseElementLayout(element));
+        applyProductGridLayout(element);
         rows = Math.max(rows, layout.y + layout.height - 1);
       });
       section.dataset.sqRows = String(rows);
@@ -468,13 +584,16 @@
       if (!valid) {
         const context = sqStudio.querySelector("[data-sq-inspector-context]");
         if (context) context.textContent = "Selected section";
+        const productControls = sqStudio.querySelector("[data-sq-product-layout-controls]");
+        if (productControls) productControls.hidden = true;
         return;
       }
       const layout = parseElementLayout(selectedElement);
       const type = sqStudio.querySelector(".sq-element-controls [data-sq-element-type]");
       const isLogo = selectedElement.dataset.sqElementType === "logo";
-      const action = actionForElement();
-      const image = isLogo ? null : imageForElement();
+      const isProductGrid = selectedElement.dataset.sqElementType === "product-grid";
+      const action = isProductGrid ? null : actionForElement();
+      const image = isLogo || isProductGrid ? null : imageForElement();
       const contentName = selectedContent?.matches("h1,h2,h3") ? "Heading" : selectedContent ? "Text" : "";
       const contextualName = isLogo ? "Logo" : selectedAction && action ? "Button" : selectedImage && image ? "Image" : contentName || elementTypeName(selectedElement);
       if (type) type.textContent = contextualName;
@@ -584,7 +703,18 @@
           input.value = String(value);
           const output = sqStudio.querySelector(`[data-sq-image-output="${name}"]`);
           if (output) output.textContent = `${value}${name === "blur" ? "px" : "%"}`;
-        });
+          });
+      }
+      const productControls = sqStudio.querySelector("[data-sq-product-layout-controls]");
+      if (productControls) productControls.hidden = !isProductGrid;
+      if (isProductGrid) {
+        const settings = productGridSettings(selectedElement);
+        const columns = sqStudio.querySelector("[data-sq-product-columns]");
+        const density = sqStudio.querySelector("[data-sq-product-density]");
+        const device = sqStudio.querySelector("[data-sq-product-layout-device]");
+        if (columns) columns.value = settings.columns;
+        if (density) density.value = settings.density;
+        if (device) device.textContent = activeDevice[0].toUpperCase() + activeDevice.slice(1);
       }
     };
     const removeElementOverlay = () => previewRoot?.querySelectorAll(".sq-element-overlay").forEach((overlay) => overlay.remove());
@@ -1006,6 +1136,52 @@
           };
         });
       });
+      previewRoot?.querySelectorAll("[data-sq-product-grid]").forEach((grid) => {
+        let draggedCard = null;
+        let productOrderSnapshot = null;
+        [...grid.querySelectorAll(":scope > [data-product-card]")].forEach((card) => {
+          card.draggable = true;
+          card.tabIndex = 0;
+          card.ondragstart = (event) => {
+            event.stopPropagation();
+            draggedCard = card;
+            productOrderSnapshot = captureState();
+            card.classList.add("sq-product-dragging");
+            event.dataTransfer.effectAllowed = "move";
+            event.dataTransfer.setData("text/plain", card.dataset.productCard || "product");
+          };
+          card.ondragover = (event) => {
+            if (!draggedCard || draggedCard === card) return;
+            event.preventDefault(); event.stopPropagation();
+            card.classList.add("sq-product-drop-target");
+          };
+          card.ondragleave = () => card.classList.remove("sq-product-drop-target");
+          card.ondrop = (event) => {
+            event.preventDefault(); event.stopPropagation();
+            card.classList.remove("sq-product-drop-target");
+            if (!draggedCard || draggedCard === card) return;
+            const cards = [...grid.children];
+            if (cards.indexOf(draggedCard) < cards.indexOf(card)) card.after(draggedCard); else card.before(draggedCard);
+            if (productOrderSnapshot) remember(productOrderSnapshot);
+            productOrderSnapshot = null;
+            markSqChanged();
+          };
+          card.ondragend = () => {
+            card.classList.remove("sq-product-dragging");
+            grid.querySelectorAll(".sq-product-drop-target").forEach((item) => item.classList.remove("sq-product-drop-target"));
+            draggedCard = null; productOrderSnapshot = null;
+          };
+          card.onkeydown = (event) => {
+            if (!(event.altKey && ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key))) return;
+            const backward = event.key === "ArrowLeft" || event.key === "ArrowUp";
+            const sibling = backward ? card.previousElementSibling : card.nextElementSibling;
+            if (!sibling?.matches("[data-product-card]")) return;
+            event.preventDefault(); remember();
+            if (backward) sibling.before(card); else sibling.after(card);
+            card.focus(); markSqChanged();
+          };
+        });
+      });
       previewRoot?.querySelectorAll("[data-sq-block]").forEach((block) => {
         editableNodesFor(block).forEach((content, index) => {
           if (!content.dataset.sqEditable) content.dataset.sqEditable = `copy-${index + 1}`;
@@ -1214,6 +1390,16 @@
         markSqChanged();
       });
       input.addEventListener("change", () => { if (elementControlSnapshot) remember(elementControlSnapshot); elementControlSnapshot = null; });
+    });
+    [["[data-sq-product-columns]", "Columns"], ["[data-sq-product-density]", "Density"]].forEach(([selector, setting]) => {
+      sqStudio.querySelector(selector)?.addEventListener("change", (event) => {
+        if (selectedElement?.dataset.sqElementType !== "product-grid") return;
+        remember();
+        selectedElement.dataset[productSettingKey(setting)] = event.currentTarget.value;
+        applyProductGridLayout(selectedElement);
+        refreshElementOverlay();
+        markSqChanged();
+      });
     });
     sqStudio.querySelector("[data-sq-element-duplicate]")?.addEventListener("click", duplicateSelectedElement);
     sqStudio.querySelector("[data-sq-element-delete]")?.addEventListener("click", deleteSelectedElement);
@@ -1983,7 +2169,14 @@
       const spacingCssFor = (device) => [...spacingState.entries()].filter(([key]) => key.endsWith(`:${device}`)).map(([key, value]) => { const section = key.slice(0, -(device.length + 1)); return `[data-ezkart-section="${section}"]{padding:${value.top}px ${value.right}px ${value.bottom}px ${value.left}px!important}`; }).join("\n");
       const fluidCssFor = (device) => [...previewRoot.querySelectorAll("[data-sq-fluid]")].map((section) => `[data-ezkart-section="${section.dataset.sectionId}"]{--sq-fluid-row-height:${fluidRowHeight(section, device)}px}`).join("\n");
       const elementCssFor = (device) => [...previewRoot.querySelectorAll("[data-sq-element]")].map((element) => { const layout = parseElementLayout(element, device); return `[data-ezkart-element="${element.dataset.sqElementId}"]{grid-column:${layout.x}/span ${layout.width}!important;grid-row:${layout.y}/span ${layout.height}!important}`; }).join("\n");
-      const responsiveSpacing = `${spacingCssFor("desktop")}\n${fluidCssFor("desktop")}\n${elementCssFor("desktop")}\n@media(max-width:900px){${spacingCssFor("tablet")}\n${fluidCssFor("tablet")}\n${elementCssFor("tablet")}}\n@media(max-width:600px){${spacingCssFor("mobile")}\n${fluidCssFor("mobile")}\n${elementCssFor("mobile")}}`;
+      const productCssFor = (device) => [...previewRoot.querySelectorAll('[data-sq-element-type="product-grid"]')].map((element) => {
+        const settings = productGridSettings(element, device);
+        const density = { compact: ["150px", "clamp(96px,58cqw,175px)", "11px", "none"], balanced: ["220px", "clamp(120px,62cqw,250px)", "18px", "block"], showcase: ["310px", "clamp(180px,70cqw,360px)", "18px", "block"] }[settings.density] || ["220px", "clamp(120px,62cqw,250px)", "18px", "block"];
+        const columns = settings.columns === "auto" ? `repeat(auto-fit,minmax(min(100%,${density[0]}),1fr))` : `repeat(${settings.columns},minmax(0,1fr))`;
+        const id = `[data-ezkart-element="${element.dataset.sqElementId}"]`;
+        return `${id}{grid-template-columns:${columns}!important}${id} .product-art{height:${density[1]}!important}${id}>article>div{padding:${density[2]}!important}${id} p{display:${density[3]}}`;
+      }).join("\n");
+      const responsiveSpacing = `${spacingCssFor("desktop")}\n${fluidCssFor("desktop")}\n${elementCssFor("desktop")}\n${productCssFor("desktop")}\n@media(max-width:900px){${spacingCssFor("tablet")}\n${fluidCssFor("tablet")}\n${elementCssFor("tablet")}\n${productCssFor("tablet")}}\n@media(max-width:600px){${spacingCssFor("mobile")}\n${fluidCssFor("mobile")}\n${elementCssFor("mobile")}\n${productCssFor("mobile")}}`;
       const commerceScript = `<script>(()=>{const defaults=${JSON.stringify(selectedProducts())},cart=new Set();document.querySelectorAll('[data-ezkart-add]').forEach(button=>button.addEventListener('click',()=>{const id=button.dataset.ezkartAdd;cart.has(id)?cart.delete(id):cart.add(id);button.textContent=cart.has(id)?'Added ✓':'Add to cart'}));const checkout=()=>{const products=cart.size?[...cart]:defaults;if(!products.length){alert('This page has no connected products.');return}location.href='/cart/?products='+encodeURIComponent(products.join(','))};document.querySelector('[data-ezkart-checkout]')?.addEventListener('click',checkout);document.querySelectorAll('[data-ezkart-action]').forEach(button=>button.addEventListener('click',()=>{const type=button.dataset.ezkartAction,target=button.dataset.ezkartTarget||'';if(type==='checkout'){checkout();return}if(type==='section'){document.getElementById(target.replace(/^#/,''))?.scrollIntoView({behavior:'smooth'});return}const href=type==='email'?'mailto:'+target:type==='phone'?'tel:'+target:target;if(type==='url'&&button.dataset.ezkartNewTab==='true')window.open(href,'_blank','noopener');else if(href)location.href=href}));const observer=new IntersectionObserver(entries=>entries.forEach(entry=>{if(entry.isIntersecting){entry.target.classList.add(entry.target.matches('[class*="element-animation-"]')?'sq-element-animate':'animating');observer.unobserve(entry.target)}}),{threshold:.12});document.querySelectorAll('[class*="animation-"],[class*="element-animation-"]').forEach(element=>observer.observe(element))})();<\/script>`;
       const fontBase = new URL("assets/fonts/poppins-400.woff2", window.location.href).href;
       const fontBold = new URL("assets/fonts/poppins-600.woff2", window.location.href).href;
@@ -2005,37 +2198,45 @@
       showToast("Published snapshot updated with checkout and responsive settings");
     });
     const cloneBaseSiteState = () => JSON.parse(JSON.stringify(baseSiteState || captureState()));
-    const loadSite = (site) => {
-      if (!site || site.classList.contains("active")) return;
-      persistCurrentState();
+    const loadSite = (site, force = false) => {
+      if (!site || (!force && site.classList.contains("active"))) return;
+      if (!force) persistCurrentState();
       activeSiteKey = site.dataset.siteUrl || "default";
       sqStudio.querySelectorAll("[data-sq-site]").forEach((item) => item.classList.toggle("active", item === site));
       document.querySelectorAll("[data-current-site-name]").forEach((target) => { target.textContent = site.dataset.siteName; });
       document.querySelectorAll("[data-current-site-url]").forEach((target) => { target.textContent = site.dataset.siteUrl; });
+      window.history.replaceState(null, "", `?page=sites&edit=${encodeURIComponent(site.dataset.siteUrl)}`);
       let state = null;
       try { state = JSON.parse(localStorage.getItem(storageKeyFor()) || localStorage.getItem(legacyStorageKeyFor()) || "null"); } catch (_) { state = null; }
       undoStack.length = 0; redoStack.length = 0; updateHistoryButtons();
       restoreState([2, 3].includes(state?.version) ? state : cloneBaseSiteState());
+      if (![2, 3].includes(state?.version) && site.dataset.siteProducts) {
+        const starters = site.dataset.siteProducts.split(",").filter(Boolean);
+        sqStudio.querySelectorAll("[data-sq-product]").forEach((input) => { input.checked = starters.includes(input.value); });
+        updateProductView(); markSqChanged();
+      }
       showToast(`${site.dataset.siteName} loaded with its saved draft`);
     };
     const bindSiteButton = (site) => { site.onclick = () => loadSite(site); };
-    const siteRegistryKey = "ezkart:landing-builder:v3:sites";
-    const legacySiteRegistryKey = "ezkart:landing-builder:v2:sites";
     const pageList = sqStudio.querySelector(".sq-page-list");
-    const addSavedSiteButton = ({ name, url }) => {
+    const addSavedSiteButton = ({ name, url, products = [] }) => {
       const sourceSite = pageList?.querySelector("[data-sq-site]");
       if (!pageList || !sourceSite || !name || !url || pageList.querySelector(`[data-site-url="${CSS.escape(url)}"]`)) return null;
       const site = sourceSite.cloneNode(true);
-      site.classList.remove("active"); site.dataset.siteName = name; site.dataset.siteUrl = url; site.dataset.customSite = "true";
+      site.classList.remove("active"); site.dataset.siteName = name; site.dataset.siteUrl = url; site.dataset.siteProducts = products.join(","); site.dataset.customSite = "true";
       const title = site.querySelector("b"); const subtitle = site.querySelector("small"); const status = site.querySelector("em");
       if (title) title.textContent = name; if (subtitle) subtitle.textContent = url; if (status) { status.textContent = "Draft"; status.className = "draft"; }
       pageList.append(site); bindSiteButton(site); return site;
     };
-    try { JSON.parse(localStorage.getItem(siteRegistryKey) || localStorage.getItem(legacySiteRegistryKey) || "[]").forEach(addSavedSiteButton); } catch (_) { /* built-in pages remain available */ }
+    readLandingSites().forEach(addSavedSiteButton);
+    updateLandingCountBadges(3 + readLandingSites().length);
     sqStudio.querySelectorAll("[data-sq-site]").forEach(bindSiteButton);
 
     const newPageDialog = document.getElementById("page-creator-dialog");
-    sqStudio.querySelectorAll("[data-open-page-creator]").forEach((button) => button.addEventListener("click", () => newPageDialog?.showModal()));
+    sqStudio.querySelectorAll("[data-open-page-creator]").forEach((button) => button.addEventListener("click", () => {
+      if (!landingAdvancedMode() && sqStudio.querySelectorAll("[data-sq-site]").length >= 6) { showToast("The standard workspace supports 6 projects. Delete one or enable Advanced Mode from Landing Pages."); return; }
+      newPageDialog?.showModal();
+    }));
     const newPageForm = newPageDialog?.querySelector("[data-page-creator-form]");
     const newPageName = newPageForm?.elements.namedItem("page_name");
     const newPageSlug = newPageForm?.elements.namedItem("slug");
@@ -2051,15 +2252,16 @@
       if (!newPageForm.reportValidity()) return;
       const name = String(newPageForm.elements.page_name.value).trim();
       const siteUrl = `${String(newPageForm.elements.slug.value).trim()}.ezkart.site`;
-      const site = addSavedSiteButton({ name, url: siteUrl });
+      const site = addSavedSiteButton({ name, url: siteUrl, products: starters.map((starter) => starter.value) });
       if (!site) { showToast("A page with this URL already exists"); return; }
       try {
-        const savedSites = [...sqStudio.querySelectorAll("[data-custom-site]")].map((item) => ({ name: item.dataset.siteName, url: item.dataset.siteUrl }));
-        localStorage.setItem(siteRegistryKey, JSON.stringify(savedSites));
+        const savedSites = [...sqStudio.querySelectorAll("[data-custom-site]")].map((item) => ({ name: item.dataset.siteName, url: item.dataset.siteUrl, products: item.dataset.siteProducts.split(",").filter(Boolean) }));
+        writeLandingSites(savedSites);
       } catch (_) { /* page remains available in this tab */ }
       newPageDialog?.close(); loadSite(site);
       sqStudio.querySelectorAll("[data-sq-product]").forEach((input) => { input.checked = starters.some((starter) => starter.value === input.value); });
       updateProductView(); markSqChanged();
+      updateLandingCountBadges(3 + readLandingSites().length);
       showToast(`${name} created with ${starters.length} products`); newPageForm.reset(); newPageSlugEdited = false;
     });
 
@@ -2088,10 +2290,15 @@
     syncBrandControls();
     syncCommerceStatus();
     baseSiteState = captureState();
-    try {
-      const stored = JSON.parse(localStorage.getItem(storageKeyFor()) || localStorage.getItem(legacyStorageKeyFor()) || "null");
-      if ([2, 3].includes(stored?.version)) restoreState(stored);
-    } catch (_) { /* start with the server-provided page */ }
+    const requestedSiteUrl = new URLSearchParams(window.location.search).get("edit") || "";
+    const requestedSiteButton = [...sqStudio.querySelectorAll("[data-sq-site]")].find((site) => site.dataset.siteUrl === requestedSiteUrl);
+    if (requestedSiteButton) loadSite(requestedSiteButton, true);
+    else {
+      try {
+        const stored = JSON.parse(localStorage.getItem(storageKeyFor()) || localStorage.getItem(legacyStorageKeyFor()) || "null");
+        if ([2, 3].includes(stored?.version)) restoreState(stored);
+      } catch (_) { /* start with the server-provided page */ }
+    }
     window.addEventListener("beforeunload", persistCurrentState);
     setZoom(fitZoomForDevice());
   }
