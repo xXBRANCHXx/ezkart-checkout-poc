@@ -19,6 +19,16 @@ session_set_cookie_params([
 ]);
 session_start();
 
+function ez_admin_json(array $payload, int $status = 200): never
+{
+    http_response_code($status);
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+    header('X-Content-Type-Options: nosniff');
+    echo json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 function ez_admin_escape(mixed $value): string
 {
     return htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
@@ -111,6 +121,115 @@ function ez_admin_orders(): array
     return $orders;
 }
 
+function ez_admin_supabase_settings(): array
+{
+    $url = rtrim(ez_config('supabase_url'), '/');
+    $key = ez_config('supabase_publishable_key');
+    $configured = filter_var($url, FILTER_VALIDATE_URL) !== false
+        && str_starts_with($url, 'https://')
+        && $key !== ''
+        && !str_contains(strtoupper($key), 'REPLACE');
+    return ['url' => $url, 'key' => $key, 'configured' => $configured];
+}
+
+function ez_admin_allowed_emails(): array
+{
+    $emails = array_map(
+        static fn(string $email): string => strtolower(trim($email)),
+        explode(',', ez_config('admin_allowed_emails')),
+    );
+    return array_values(array_filter($emails, static fn(string $email): bool =>
+        filter_var($email, FILTER_VALIDATE_EMAIL) !== false
+        && !str_contains(strtoupper($email), 'REPLACE')
+    ));
+}
+
+function ez_admin_get_json(string $url, array $headers, string $service): array
+{
+    if (!function_exists('curl_init')) {
+        throw new RuntimeException('PHP cURL is required to contact ' . $service . '.');
+    }
+    $handle = curl_init($url);
+    if ($handle === false) throw new RuntimeException('Could not start the ' . $service . ' request.');
+    curl_setopt_array($handle, [
+        CURLOPT_HTTPHEADER => $headers,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_CONNECTTIMEOUT => 8,
+        CURLOPT_TIMEOUT => 15,
+        CURLOPT_SSL_VERIFYPEER => true,
+    ]);
+    $body = curl_exec($handle);
+    $status = (int) curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
+    $error = curl_error($handle);
+    $decoded = is_string($body) ? json_decode($body, true) : null;
+    if ($status < 200 || $status >= 300 || !is_array($decoded)) {
+        throw new RuntimeException($service . ' rejected the request' . ($error !== '' ? ': ' . $error : '.'));
+    }
+    return $decoded;
+}
+
+function ez_admin_token_expiration(string $accessToken): int
+{
+    $parts = explode('.', $accessToken);
+    if (count($parts) !== 3) return time() + 300;
+    $payload = strtr($parts[1], '-_', '+/');
+    $payload .= str_repeat('=', (4 - strlen($payload) % 4) % 4);
+    $decoded = json_decode((string) base64_decode($payload, true), true);
+    $expiration = is_array($decoded) ? (int) ($decoded['exp'] ?? 0) : 0;
+    return $expiration > time() ? $expiration : time() + 300;
+}
+
+function ez_admin_verify_supabase_user(string $accessToken): array
+{
+    if (strlen($accessToken) < 40 || strlen($accessToken) > 8192) {
+        throw new InvalidArgumentException('The Supabase access token is invalid.');
+    }
+    $settings = ez_admin_supabase_settings();
+    if (!$settings['configured']) {
+        throw new RuntimeException('Supabase login is not configured on this server.');
+    }
+    $user = ez_admin_get_json($settings['url'] . '/auth/v1/user', [
+        'Accept: application/json',
+        'apikey: ' . $settings['key'],
+        'Authorization: Bearer ' . $accessToken,
+    ], 'Supabase Auth');
+    $email = strtolower(trim((string) ($user['email'] ?? '')));
+    if (($user['id'] ?? '') === '' || filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+        throw new RuntimeException('Supabase did not return a valid user identity.');
+    }
+    if (($user['email_confirmed_at'] ?? $user['confirmed_at'] ?? '') === '') {
+        throw new RuntimeException('Sign in with a Google account whose email is verified.');
+    }
+    $allowedEmails = ez_admin_allowed_emails();
+    if ($allowedEmails === [] || !in_array($email, $allowedEmails, true)) {
+        throw new RuntimeException('This Google account is not authorized for the Ezkart admin.');
+    }
+    return $user;
+}
+
+function ez_admin_sync_cloudflare_user(string $accessToken): array
+{
+    $apiUrl = rtrim(ez_config('cloudflare_api_url'), '/');
+    if (filter_var($apiUrl, FILTER_VALIDATE_URL) === false) {
+        return ['ok' => false, 'message' => 'Cloudflare API URL is not configured.'];
+    }
+    try {
+        $result = ez_admin_get_json($apiUrl . '/v1/me', [
+            'Accept: application/json',
+            'Authorization: Bearer ' . $accessToken,
+        ], 'the Ezkart Cloudflare API');
+        $ok = ($result['ok'] ?? false) === true;
+        return [
+            'ok' => $ok,
+            'message' => $ok
+                ? 'D1 profile synchronized.'
+                : mb_substr((string) ($result['error'] ?? 'The D1 profile was not synchronized.'), 0, 220),
+        ];
+    } catch (Throwable $error) {
+        return ['ok' => false, 'message' => mb_substr($error->getMessage(), 0, 220)];
+    }
+}
+
 $csrfToken = $_SESSION['csrf_token'] ?? null;
 if (!is_string($csrfToken) || strlen($csrfToken) < 32) {
     $csrfToken = bin2hex(random_bytes(24));
@@ -119,6 +238,7 @@ if (!is_string($csrfToken) || strlen($csrfToken) < 32) {
 
 $adminPassword = ez_config('sandbox_admin_password');
 $adminConfigured = $adminPassword !== '' && !str_contains(strtoupper($adminPassword), 'REPLACE');
+$supabaseSettings = ez_admin_supabase_settings();
 $loginError = '';
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
@@ -140,16 +260,60 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
         if (hash_equals($adminPassword, $submittedPassword)) {
             session_regenerate_id(true);
             $_SESSION['authenticated'] = true;
+            $_SESSION['authentication_method'] = 'password';
+            unset(
+                $_SESSION['authenticated_until'],
+                $_SESSION['admin_user'],
+                $_SESSION['cloudflare_profile_sync'],
+            );
             $_SESSION['csrf_token'] = bin2hex(random_bytes(24));
             header('Location: ./', true, 303);
             exit;
         }
         usleep(350000);
         $loginError = 'Password admin tidak cocok.';
+    } elseif ((string) ($_POST['action'] ?? '') === 'supabase_login') {
+        try {
+            $accessToken = trim((string) ($_POST['access_token'] ?? ''));
+            $user = ez_admin_verify_supabase_user($accessToken);
+            $metadata = is_array($user['user_metadata'] ?? null) ? $user['user_metadata'] : [];
+            $email = strtolower(trim((string) $user['email']));
+            $name = trim((string) ($metadata['full_name'] ?? $metadata['name'] ?? ''));
+            session_regenerate_id(true);
+            $_SESSION['authenticated'] = true;
+            $_SESSION['authentication_method'] = 'supabase';
+            $_SESSION['authenticated_until'] = ez_admin_token_expiration($accessToken);
+            $_SESSION['admin_user'] = [
+                'id' => (string) $user['id'],
+                'email' => $email,
+                'name' => $name !== '' ? mb_substr($name, 0, 100) : $email,
+            ];
+            $_SESSION['cloudflare_profile_sync'] = ez_admin_sync_cloudflare_user($accessToken);
+            $_SESSION['csrf_token'] = bin2hex(random_bytes(24));
+            ez_admin_json(['ok' => true]);
+        } catch (Throwable $error) {
+            usleep(350000);
+            ez_admin_json(['ok' => false, 'error' => $error->getMessage()], 401);
+        }
     }
 }
 
-$authenticated = $adminConfigured && ($_SESSION['authenticated'] ?? false) === true;
+$authenticationMethod = (string) ($_SESSION['authentication_method'] ?? 'password');
+$sessionCurrent = $authenticationMethod !== 'supabase'
+    || (int) ($_SESSION['authenticated_until'] ?? 0) > time();
+$authenticated = ($_SESSION['authenticated'] ?? false) === true
+    && $sessionCurrent
+    && ($authenticationMethod === 'supabase' || $adminConfigured);
+$adminUser = is_array($_SESSION['admin_user'] ?? null) ? $_SESSION['admin_user'] : [];
+$profileSync = is_array($_SESSION['cloudflare_profile_sync'] ?? null)
+    ? $_SESSION['cloudflare_profile_sync']
+    : null;
+$adminDisplayName = trim((string) ($adminUser['name'] ?? '')) ?: 'Ezkart Admin';
+$adminDisplayEmail = trim((string) ($adminUser['email'] ?? '')) ?: 'Sandbox operator';
+$adminInitials = implode('', array_map(
+    static fn(string $part): string => mb_strtoupper(mb_substr($part, 0, 1)),
+    array_slice(preg_split('/\s+/', $adminDisplayName) ?: [], 0, 2),
+)) ?: 'EA';
 $orders = $authenticated ? ez_admin_orders() : [];
 $metrics = [
     'orders' => count($orders),
@@ -303,7 +467,7 @@ $catalogInventory = [
   <meta name="robots" content="noindex,nofollow">
   <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
   <?php if ($authenticated): ?><link rel="stylesheet" href="assets/vendor/leaflet.css"><?php endif; ?>
-  <link rel="stylesheet" href="admin.css?v=22">
+  <link rel="stylesheet" href="admin.css?v=23">
   <title><?= $authenticated ? ez_admin_escape($pageTitles[$page]) : 'Admin Login' ?> · Ezkart</title>
 </head>
 <body class="<?= $authenticated ? 'dashboard-page page-' . ez_admin_escape($page) . ($page === 'sites' ? ($siteEditor ? ' page-site-editor' : ' page-sites-library') : '') : 'login-page' ?>">
@@ -314,25 +478,35 @@ $catalogInventory = [
       <span class="environment-pill"><i></i> Midtrans Sandbox</span>
       <p class="eyebrow">Internal order monitor</p>
       <h1>Sandbox admin.</h1>
-      <?php if (!$adminConfigured): ?>
-        <div class="configuration-note" role="alert">
-          <b>Admin password belum dikonfigurasi.</b>
-          <p>Isi <code>sandbox_admin_password</code> di <code>config.runtime.php</code>, lalu muat ulang halaman ini.</p>
-        </div>
+      <p class="login-intro">Sign in with your approved Google account. Supabase verifies your identity; Ezkart stores no Google password or token.</p>
+      <?php if ($supabaseSettings['configured']): ?>
+        <button class="oauth-button" id="google-sign-in" type="button" data-supabase-url="<?= ez_admin_escape($supabaseSettings['url']) ?>" data-csrf-token="<?= ez_admin_escape($csrfToken) ?>">
+          <span class="google-mark" aria-hidden="true">G</span><span>Continue with Google</span><b>→</b>
+        </button>
+        <p class="auth-status" id="auth-status" role="status" aria-live="polite"></p>
       <?php else: ?>
-        <p class="login-intro">Masuk untuk melihat pesanan demo, status Midtrans, rincian harga, dan volume pembayaran sandbox.</p>
-        <?php if ($loginError !== ''): ?><p class="form-error" role="alert"><?= ez_admin_escape($loginError) ?></p><?php endif; ?>
-        <form method="post" autocomplete="off">
-          <input type="hidden" name="action" value="login">
-          <input type="hidden" name="csrf_token" value="<?= ez_admin_escape($csrfToken) ?>">
-          <label for="password">Password admin</label>
-          <input id="password" name="password" type="password" required autofocus autocomplete="current-password">
-          <button type="submit">Masuk ke dashboard <span>→</span></button>
-        </form>
+        <div class="configuration-note" role="alert">
+          <b>Google sign-in needs one server setting.</b>
+          <p>Add <code>supabase_url</code>, <code>supabase_publishable_key</code>, and <code>admin_allowed_emails</code> to the private <code>config.runtime.php</code>.</p>
+        </div>
+      <?php endif; ?>
+      <?php if ($loginError !== ''): ?><p class="form-error" role="alert"><?= ez_admin_escape($loginError) ?></p><?php endif; ?>
+      <?php if ($adminConfigured): ?>
+        <details class="password-fallback">
+          <summary>Use emergency admin password</summary>
+          <form method="post" autocomplete="off">
+            <input type="hidden" name="action" value="login">
+            <input type="hidden" name="csrf_token" value="<?= ez_admin_escape($csrfToken) ?>">
+            <label for="password">Admin password</label>
+            <input id="password" name="password" type="password" required autocomplete="current-password">
+            <button type="submit">Enter dashboard <span>→</span></button>
+          </form>
+        </details>
       <?php endif; ?>
       <a class="back-link" href="../">← Kembali ke checkout</a>
     </section>
   </main>
+  <script src="auth.js?v=1"></script>
 <?php else: ?>
   <svg class="svg-sprite" aria-hidden="true">
     <symbol id="icon-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></symbol>
@@ -420,13 +594,20 @@ $catalogInventory = [
           <button class="icon-button" type="button" aria-label="Notifications"><?= ez_admin_icon('bell') ?><i><?= $metrics['pending_count'] ?></i></button>
           <button class="icon-button" type="button" aria-label="Messages"><?= ez_admin_icon('message') ?></button>
           <button class="icon-button" type="button" aria-label="Help"><?= ez_admin_icon('help') ?></button>
-          <div class="profile" id="account-menu"><span class="avatar">EA</span><div><b>Ezkart Admin</b><small>Sandbox operator</small></div><?= ez_admin_icon('chevron-down', 'chevron-icon') ?></div>
+          <div class="profile" id="account-menu"><span class="avatar"><?= ez_admin_escape(mb_substr($adminInitials, 0, 2)) ?></span><div><b><?= ez_admin_escape($adminDisplayName) ?></b><small><?= ez_admin_escape($adminDisplayEmail) ?></small></div><?= ez_admin_icon('chevron-down', 'chevron-icon') ?></div>
           <form method="post" class="logout-form">
             <input type="hidden" name="action" value="logout"><input type="hidden" name="csrf_token" value="<?= ez_admin_escape($csrfToken) ?>">
             <button type="submit">Log out</button>
           </form>
         </div>
       </header>
+      <?php if ($authenticationMethod === 'supabase' && is_array($profileSync)): ?>
+        <div class="identity-sync <?= ($profileSync['ok'] ?? false) === true ? 'connected' : 'attention' ?>" role="status">
+          <?= ez_admin_icon(($profileSync['ok'] ?? false) === true ? 'check-circle' : 'help') ?>
+          <b>Google identity verified.</b>
+          <span><?= ez_admin_escape((string) ($profileSync['message'] ?? 'D1 profile status unavailable.')) ?></span>
+        </div>
+      <?php endif; ?>
 
       <?php if ($page === 'dashboard'): ?>
       <main class="dashboard page-canvas" id="overview">
@@ -511,7 +692,7 @@ $catalogInventory = [
   </div>
   <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
   <script src="assets/vendor/leaflet.js"></script>
-  <script src="admin.js?v=22"></script>
+  <script src="admin.js?v=23"></script>
 <?php endif; ?>
 </body>
 </html>

@@ -28,10 +28,15 @@ Dashboard-wide notification setting.
 
 ## Sandbox admin dashboard
 
-The password-protected order dashboard is available at
-[`/cart/admin/`](https://ezkart.id/cart/admin/). Set
-`sandbox_admin_password` in `config.runtime.php`, or set the
-`EZKART_SANDBOX_ADMIN_PASSWORD` environment variable, before opening it.
+The order dashboard is available at
+[`/cart/admin/`](https://ezkart.id/cart/admin/). Google sign-in is verified by
+Supabase on the server, then the same access token is sent to the matching
+Cloudflare Worker to create or refresh the safe D1 application profile. Set
+`supabase_url`, `supabase_publishable_key`, and `admin_allowed_emails` in the
+private `config.runtime.php`. The allowlist is required while this legacy
+dashboard still reads a shared sandbox order store. `sandbox_admin_password`
+remains an optional emergency fallback until every admin query is scoped by a
+D1 seller membership.
 
 The dashboard reads the private JSON order store and displays order IDs,
 customers, line items, product subtotal, shipping charge, final total,

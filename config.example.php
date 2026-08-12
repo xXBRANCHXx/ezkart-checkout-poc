@@ -9,6 +9,14 @@ return [
     // Cloudflare Worker rather than a PostgreSQL connection string.
     'deployment_environment' => 'test',
     'cloudflare_api_url' => 'https://api-test.ezkart.id',
+    // Supabase is used only to verify Google identity. The publishable/anon
+    // key is safe to use for client identification; never paste a service-role
+    // key here. Keep the Google client secret in Supabase itself.
+    'supabase_url' => 'https://rwxxjqvoidpkuqftgkjd.supabase.co',
+    'supabase_publishable_key' => 'REPLACE_WITH_SUPABASE_PUBLISHABLE_OR_ANON_KEY',
+    // Until seller membership controls every admin query, access to the legacy
+    // shared dashboard stays fail-closed behind this explicit email allowlist.
+    'admin_allowed_emails' => 'REPLACE_WITH_YOUR_GOOGLE_ACCOUNT_EMAIL',
     'midtrans_merchant_id' => 'REPLACE_WITH_SANDBOX_MERCHANT_ID',
     'midtrans_client_key' => 'REPLACE_WITH_SANDBOX_CLIENT_KEY',
     'midtrans_server_key' => 'REPLACE_WITH_SANDBOX_SERVER_KEY',

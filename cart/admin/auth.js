@@ -1,0 +1,69 @@
+(() => {
+  "use strict";
+
+  const button = document.getElementById("google-sign-in");
+  const status = document.getElementById("auth-status");
+  if (!button || !status) return;
+
+  const setStatus = (message, isError = false) => {
+    status.textContent = message;
+    status.classList.toggle("error", isError);
+  };
+
+  const cleanCallbackFragment = () => {
+    const callback = new URLSearchParams(window.location.hash.slice(1));
+    if (!window.location.hash) return callback;
+    window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
+    return callback;
+  };
+
+  const completeLogin = async (accessToken) => {
+    button.disabled = true;
+    setStatus("Verifying your Google account…");
+    const body = new URLSearchParams({
+      action: "supabase_login",
+      csrf_token: button.dataset.csrfToken || "",
+      access_token: accessToken,
+    });
+    const response = await fetch(window.location.pathname, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+      },
+      body,
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || result.ok !== true) {
+      throw new Error(result.error || "Ezkart could not verify this Google account.");
+    }
+    setStatus("Signed in. Opening your dashboard…");
+    window.location.replace("./");
+  };
+
+  const callback = cleanCallbackFragment();
+  const callbackError = callback.get("error_description") || callback.get("error");
+  const accessToken = callback.get("access_token");
+  if (callbackError) setStatus(callbackError, true);
+  if (accessToken) {
+    completeLogin(accessToken).catch((error) => {
+      button.disabled = false;
+      setStatus(error instanceof Error ? error.message : "Google sign-in failed.", true);
+    });
+  }
+
+  button.addEventListener("click", () => {
+    try {
+      const supabaseUrl = new URL(button.dataset.supabaseUrl || "");
+      const authorize = new URL("/auth/v1/authorize", supabaseUrl);
+      authorize.searchParams.set("provider", "google");
+      authorize.searchParams.set("redirect_to", `${window.location.origin}${window.location.pathname}`);
+      button.disabled = true;
+      setStatus("Opening Google…");
+      window.location.assign(authorize.toString());
+    } catch (_) {
+      setStatus("The Supabase URL on this server is invalid.", true);
+    }
+  });
+})();
