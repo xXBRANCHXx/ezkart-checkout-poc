@@ -44,6 +44,11 @@ wallet balance or withdrawable settlement amount.
 
 The site is dependency-free and can be served directly from the repository root. Point Hostinger's deployment at the `main` branch; no build command is required.
 
+Experimental seller and landing-builder work is deployed separately from
+`agent/ezkart-workbench`. See
+[`docs/workbench-deployment.md`](docs/workbench-deployment.md) for the branch,
+subdomain, acceptance-test, and promotion model.
+
 ## Local preview
 
 ```bash
