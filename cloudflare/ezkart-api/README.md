@@ -18,20 +18,23 @@ Cloudflare R2.
    `ezkart-test-public`, `ezkart-test-private`, `ezkart-production-public`, and
    `ezkart-production-private`. Leave all four private; the Worker will decide
    what may be served.
-3. Copy `wrangler.example.jsonc` to `wrangler.jsonc` and replace every `PASTE_`
-   value. The production D1 ID already matches the database shown in the
-   Cloudflare dashboard.
+3. Copy `wrangler.example.jsonc` to `wrangler.jsonc` and replace the test D1
+   database ID. The production D1 ID already matches the database shown in the
+   Cloudflare dashboard. The Worker verifies ES256 Supabase access tokens
+   against Supabase's public JWKS endpoint, so no Supabase API key is stored in
+   Cloudflare.
 4. Install the local deploy tool with `npm install`.
 5. Run `npm run db:migrate:test`, then `npm run deploy:test`.
-6. Open `https://api-test.ezkart.id/health`. All three checks must be `true`
-   and the table count must be 15 before connecting the test application.
+6. Open the `workers.dev` URL printed by `npm run deploy:test`, followed by
+   `/health`. All three checks must be `true` and the table count must be 16
+   before connecting the test application. A custom `api-test.ezkart.id`
+   hostname can be added later if the domain's DNS is managed by Cloudflare.
 7. Only after acceptance testing, run `npm run db:migrate:production` and
    `npm run deploy:production`.
 
-The Supabase publishable/anon key is intended for client identification and is
-not the database password. The Google client secret remains only inside the
-Supabase provider settings. Never place an R2 secret, Cloudflare API token,
-Supabase service-role key, access token, or refresh token in this repository.
+The Google client secret remains only inside the Supabase provider settings.
+Never place an R2 secret, Cloudflare API token, Supabase service-role key,
+access token, or refresh token in this repository.
 
 ## Current endpoints
 

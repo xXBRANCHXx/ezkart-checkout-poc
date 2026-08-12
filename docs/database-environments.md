@@ -22,7 +22,7 @@ Supabase access/refresh tokens, or a service-role key into D1.
 
 | Website | Git branch | Worker | D1 | R2 |
 | --- | --- | --- | --- | --- |
-| `test.ezkart.id` | `agent/ezkart-workbench` | `api-test.ezkart.id` | `ezkart_test_database` | `ezkart-test-public` + `ezkart-test-private` |
+| `test.ezkart.id` | `agent/ezkart-workbench` | `ezkart-api-test.*.workers.dev` initially; `api-test.ezkart.id` after DNS moves to Cloudflare | `ezkart_test_database` | `ezkart-test-public` + `ezkart-test-private` |
 | `ezkart.id` | `main` | `api.ezkart.id` | `ezkart_main_user_database` | `ezkart-production-public` + `ezkart-production-private` |
 
 Both environments may use the same Supabase Auth project so the free project
@@ -47,9 +47,13 @@ rows, R2 objects, Cloudflare bindings, or credentials.
    `ezkart-test-private`, `ezkart-production-public`, and
    `ezkart-production-private`.
 6. Copy `cloudflare/ezkart-api/wrangler.example.jsonc` to `wrangler.jsonc`,
-   insert the test D1 ID and the Supabase publishable/anon key, then deploy test.
+   insert the test D1 ID, then deploy test. The Worker verifies Supabase's ES256
+   signature through its public JWKS endpoint and needs no Supabase API key.
 7. Apply `cloudflare/ezkart-api/migrations/0001_core.sql` to test and confirm
-   `https://api-test.ezkart.id/health` reports all bindings and 16 tables.
+   the deployed test Worker's `/health` endpoint reports all bindings and 16
+   tables. The workbranch uses `workers.dev` while Hostinger manages the
+   `ezkart.id` DNS zone; do not move production nameservers just to add a test
+   Worker hostname.
 8. Connect the test frontend and run seller-isolation, catalog, builder, upload,
    checkout, callback, subscription, digital-access, review, and shipping tests.
 9. After approval, merge the application change into `main`, apply the same D1

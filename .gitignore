@@ -3,3 +3,4 @@ node_modules/
 .wrangler/
 .dev.vars
 .dev.vars.*
+cloudflare/ezkart-api/wrangler.jsonc

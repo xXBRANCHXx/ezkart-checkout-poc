@@ -20,8 +20,11 @@ function ez_database_configuration(): array
     $parts = parse_url($url);
     $host = strtolower((string) ($parts['host'] ?? ''));
     $scheme = strtolower((string) ($parts['scheme'] ?? ''));
-    $expectedHost = $environment === 'test' ? 'api-test.ezkart.id' : 'api.ezkart.id';
-    if ($scheme !== 'https' || !hash_equals($expectedHost, $host)) {
+    $validHost = $environment === 'test'
+        ? hash_equals('api-test.ezkart.id', $host)
+            || preg_match('/^ezkart-api-test\.[a-z0-9-]+\.workers\.dev$/', $host) === 1
+        : hash_equals('api.ezkart.id', $host);
+    if ($scheme !== 'https' || !$validHost) {
         throw new RuntimeException('Cloudflare API hostname does not match this deployment environment.');
     }
 

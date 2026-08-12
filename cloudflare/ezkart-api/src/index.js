@@ -20,19 +20,86 @@ const corsHeaders = (request, env) => {
   } : {};
 };
 
+const decodeBase64Url = (value) => {
+  const normalized = String(value || "").replace(/-/g, "+").replace(/_/g, "/");
+  const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+  const decoded = atob(padded);
+  return Uint8Array.from(decoded, (character) => character.charCodeAt(0));
+};
+
+const decodeJwtJson = (value) => JSON.parse(new TextDecoder().decode(decodeBase64Url(value)));
+
 async function authenticatedUser(request, env) {
   const authorization = request.headers.get("authorization") || "";
   if (!authorization.startsWith("Bearer ")) throw new Response("Missing access token", { status: 401 });
-  const authResponse = await fetch(`${String(env.SUPABASE_URL).replace(/\/$/, "")}/auth/v1/user`, {
-    headers: {
-      apikey: env.SUPABASE_PUBLISHABLE_KEY,
-      authorization,
-    },
+  const token = authorization.slice(7).trim();
+  const parts = token.split(".");
+  if (parts.length !== 3) throw new Response("Invalid access token", { status: 401 });
+
+  let header;
+  let claims;
+  try {
+    header = decodeJwtJson(parts[0]);
+    claims = decodeJwtJson(parts[1]);
+  } catch (_) {
+    throw new Response("Invalid access token", { status: 401 });
+  }
+  if (header.alg !== "ES256" || typeof header.kid !== "string" || header.kid === "") {
+    throw new Response("Unsupported access token signature", { status: 401 });
+  }
+
+  const supabaseUrl = String(env.SUPABASE_URL || "").replace(/\/$/, "");
+  const issuer = `${supabaseUrl}/auth/v1`;
+  const now = Math.floor(Date.now() / 1000);
+  const audience = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
+  if (
+    claims.iss !== issuer
+    || !audience.includes("authenticated")
+    || typeof claims.sub !== "string"
+    || claims.sub === ""
+    || !Number.isFinite(claims.exp)
+    || claims.exp <= now
+    || (Number.isFinite(claims.nbf) && claims.nbf > now + 30)
+  ) {
+    throw new Response("Invalid or expired access token", { status: 401 });
+  }
+
+  const jwksResponse = await fetch(`${issuer}/.well-known/jwks.json`, {
+    cf: { cacheEverything: true, cacheTtl: 600 },
+    headers: { accept: "application/json" },
   });
-  if (!authResponse.ok) throw new Response("Invalid or expired access token", { status: 401 });
-  const user = await authResponse.json();
-  if (!user?.id) throw new Response("Authentication response has no user ID", { status: 401 });
-  return user;
+  if (!jwksResponse.ok) throw new Response("Authentication keys are unavailable", { status: 503 });
+  const jwks = await jwksResponse.json();
+  const jwk = Array.isArray(jwks.keys)
+    ? jwks.keys.find((candidate) => candidate?.kid === header.kid && candidate?.alg === "ES256")
+    : null;
+  if (!jwk) throw new Response("Access token signing key was not found", { status: 401 });
+
+  let verified = false;
+  try {
+    const key = await crypto.subtle.importKey(
+      "jwk",
+      jwk,
+      { name: "ECDSA", namedCurve: "P-256" },
+      false,
+      ["verify"],
+    );
+    verified = await crypto.subtle.verify(
+      { name: "ECDSA", hash: "SHA-256" },
+      key,
+      decodeBase64Url(parts[2]),
+      new TextEncoder().encode(`${parts[0]}.${parts[1]}`),
+    );
+  } catch (_) {}
+  if (!verified) throw new Response("Invalid access token signature", { status: 401 });
+
+  return {
+    id: claims.sub,
+    email: typeof claims.email === "string" ? claims.email : "",
+    user_metadata: claims.user_metadata && typeof claims.user_metadata === "object"
+      ? claims.user_metadata
+      : {},
+  };
 }
 
 async function health(env) {
@@ -49,6 +116,7 @@ async function health(env) {
     ok: Object.values(checks).every(Boolean),
     environment: env.APP_ENVIRONMENT,
     auth_provider: "supabase",
+    auth_verification: "supabase-jwks-es256",
     structured_data: "cloudflare-d1",
     file_storage: "cloudflare-r2",
     checks,
