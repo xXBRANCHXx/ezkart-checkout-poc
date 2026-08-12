@@ -1,0 +1,16 @@
+{
+  "name": "@ezkart/cloudflare-api",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "wrangler deploy --dry-run --config wrangler.example.jsonc --env production",
+    "dev": "wrangler dev --env test",
+    "deploy:test": "wrangler deploy --env test",
+    "deploy:production": "wrangler deploy --env production",
+    "db:migrate:test": "wrangler d1 migrations apply DB --env test --remote",
+    "db:migrate:production": "wrangler d1 migrations apply DB --env production --remote"
+  },
+  "devDependencies": {
+    "wrangler": "^4.121.0"
+  }
+}

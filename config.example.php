@@ -5,12 +5,10 @@ declare(strict_types=1);
 // ignored by Git and must never be committed.
 return [
     // Each deployed website keeps a different ignored config.runtime.php.
-    // test.ezkart.id uses "test" plus its test Supabase project/branch ref.
-    // ezkart.id uses "production" plus its production Supabase project ref.
+    // Supabase is Auth-only. D1 and R2 are reached through the matching
+    // Cloudflare Worker rather than a PostgreSQL connection string.
     'deployment_environment' => 'test',
-    'supabase_url' => 'https://REPLACE_WITH_TEST_PROJECT_REF.supabase.co',
-    'supabase_anon_key' => 'REPLACE_WITH_TEST_ANON_KEY',
-    'supabase_expected_project_ref' => 'REPLACE_WITH_TEST_PROJECT_REF',
+    'cloudflare_api_url' => 'https://api-test.ezkart.id',
     'midtrans_merchant_id' => 'REPLACE_WITH_SANDBOX_MERCHANT_ID',
     'midtrans_client_key' => 'REPLACE_WITH_SANDBOX_CLIENT_KEY',
     'midtrans_server_key' => 'REPLACE_WITH_SANDBOX_SERVER_KEY',

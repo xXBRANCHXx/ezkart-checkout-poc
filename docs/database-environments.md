@@ -1,60 +1,72 @@
-# Database environments and safe branch merges
+# Supabase Auth, Cloudflare D1, and R2 environments
 
 ## The simple version
 
-Git stores the database **structure** in `supabase/migrations`. Hostinger stores each website's private **connection details** in its own ignored `config.runtime.php`.
+Supabase is Ezkart's identity provider. It handles Google OAuth and returns a
+stable `auth_user_id` plus a short-lived access token. It is not the commerce
+database and Ezkart does not use the PostgreSQL direct-connection string.
 
-That means a merge copies tables, rules, and application code. It does **not** copy the test database, production data, passwords, API keys, or Hostinger's branch connection.
+Cloudflare provides the application data plane:
 
-| Website | Git branch | Database | Runtime value |
-| --- | --- | --- | --- |
-| `test.ezkart.id` | `agent/ezkart-workbench` | Separate Supabase test branch/project | `deployment_environment = test` |
-| `ezkart.id` | `main` | Supabase production project | `deployment_environment = production` |
-| `admin.ezkart.id` | Executive Dashboard `main` | Read-only status sources later | No Ezkart commerce credentials in the browser |
+- A Worker validates the Supabase access token and applies seller permissions.
+- D1 stores structured, queryable records such as profiles, sellers, products,
+  page definitions, orders, payments, subscriptions, shipping, and reviews.
+- R2 stores file bodies such as images, published HTML, paid downloads, and
+  seller exports.
 
-## One-time connection checklist
+The D1 `app_users` row is a safe application profile linked by
+`auth_user_id`. It is not an Auth replica. Never copy passwords, Google tokens,
+Supabase access/refresh tokens, or a service-role key into D1.
 
-1. Create or identify a **test** Supabase branch/project and a separate **production** project.
-2. Apply `supabase/migrations/202608120001_seller_platform.sql` to test first.
-3. On `test.ezkart.id`, copy `config.example.php` to the ignored `config.runtime.php` and set the test URL, anon key, and exact test project ref.
-4. Open `https://test.ezkart.id/cart/api/health.php`. `database.configured` and `database.connected` must both be `true`, and `database.environment` must be `test`.
-5. Run seller isolation, product validation, upload, checkout, callback, subscription, digital-access, and physical-shipping acceptance tests.
-6. After approval, merge the workbranch into `main` and apply the same migration to production through Supabase's migration workflow.
-7. Configure `ezkart.id/config.runtime.php` with the production URL, key, exact production ref, and `deployment_environment = production`.
-8. Open `https://ezkart.id/cart/api/health.php` and confirm the production values.
+## Environment boundary
 
-The runtime guard refuses a mismatched Supabase project ref. It also refuses test database settings on the production hostname and production settings on the test hostname.
+| Website | Git branch | Worker | D1 | R2 |
+| --- | --- | --- | --- | --- |
+| `test.ezkart.id` | `agent/ezkart-workbench` | `api-test.ezkart.id` | `ezkart_test_database` | `ezkart-test-public` + `ezkart-test-private` |
+| `ezkart.id` | `main` | `api.ezkart.id` | `ezkart_main_user_database` | `ezkart-production-public` + `ezkart-production-private` |
 
-## Seller data map
+Both environments may use the same Supabase Auth project so the free project
+remains the canonical user directory. Their application data and files remain
+separate. A Git merge copies Worker code and migrations; it never copies D1
+rows, R2 objects, Cloudflare bindings, or credentials.
 
-All authoritative commerce records live in one Postgres schema. Every seller-owned table carries `seller_id`. Composite foreign keys include both `seller_id` and the related record ID, preventing a row owned by one seller from referencing another seller's row.
+## One-time setup
 
-- `sellers` → account root
-- `seller_memberships` → which signed-in users can manage it
-- `products` → physical, digital, or subscription catalog
-- `product_media` → 1–9 images; active physical products require 3–9
-- `landing_pages` and `page_versions` → saved builder pages and history
-- `customers`, `orders`, and `order_items` → purchases
-- `payment_transactions` → verified Midtrans state
-- `subscriptions` → recurring Midtrans schedule and state
-- `entitlements` → access to paid digital files or benefits
-- `shipments` → Biteship delivery for physical purchases only
-- `seller_events` → permanent activity history
+1. In Supabase Auth, enable Google and configure the Google client ID/secret.
+2. Add the Supabase callback URL shown on its Google provider page to Google.
+3. Add `https://test.ezkart.id/**` and `https://ezkart.id/**` to Supabase's
+   allowed redirect URLs. Keep the Google client secret only in Supabase.
+4. Keep the existing `ezkart_main_user_database` D1 database as production and
+   create `ezkart_test_database` for test.
+5. Create four private R2 buckets: `ezkart-test-public`,
+   `ezkart-test-private`, `ezkart-production-public`, and
+   `ezkart-production-private`.
+6. Copy `cloudflare/ezkart-api/wrangler.example.jsonc` to `wrangler.jsonc`,
+   insert the test D1 ID and the Supabase publishable/anon key, then deploy test.
+7. Apply `cloudflare/ezkart-api/migrations/0001_core.sql` to test and confirm
+   `https://api-test.ezkart.id/health` reports all bindings and 16 tables.
+8. Connect the test frontend and run seller-isolation, catalog, builder, upload,
+   checkout, callback, subscription, digital-access, review, and shipping tests.
+9. After approval, merge the application change into `main`, apply the same D1
+   migration to production, and deploy the production Worker.
 
-Row-level security checks signed-in membership. Storage paths begin with `seller_id`; product pictures and page pictures are public buckets, while paid downloads and seller exports are private buckets.
+## Data placement
 
-## Product rules enforced by the migration
+- Supabase Auth: sign-in method, canonical user ID, and active Auth session.
+- D1 `app_users`: safe profile fields needed by Ezkart.
+- D1 seller tables: all structured records and R2 object keys.
+- Public R2 binding: product images, page assets, and published HTML. The bucket
+  may remain private while the Worker serves approved objects.
+- Private R2 binding: paid downloads and exports. Access is customer-bound and
+  temporary.
 
-- Product type is exactly `physical`, `digital`, or `subscription`.
-- Weight and stock belong only to physical products.
-- A recurring interval belongs only to subscriptions.
-- Images are at most 2 MB each and sort positions are limited to 1–9.
-- An active physical product needs at least 3 images.
-- An active digital product or subscription needs at least 1 image.
-- Digital product files use private storage and temporary signed links.
+Orders and reviews belong in D1, not R2. A landing-page definition and publish
+state belong in D1; the generated HTML and images belong in R2.
 
-Draft products may remain incomplete while the seller is editing. The stricter image rule is checked when a product becomes active.
+## Current boundary
 
-## Important current boundary
-
-This migration and connection guard make the database ready and branch-safe. The current prototype UI still saves custom catalog and landing-page drafts in browser storage, and the sandbox checkout still writes private JSON order files. Those code paths must be migrated to authenticated server endpoints before the database becomes the live source of truth.
+The Worker scaffold, D1 migration, environment bindings, health endpoint, and
+authenticated `/v1/me` profile sync are prepared on the workbranch. The current
+prototype UI still saves custom catalog and landing-page drafts in browser
+storage, while sandbox checkout still writes private JSON order files. Those
+paths must move behind Worker routes before they become production-authoritative.

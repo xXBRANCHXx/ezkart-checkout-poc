@@ -1,0 +1,59 @@
+{
+  // Copy this file to wrangler.jsonc, replace every PASTE_ value, and keep
+  // wrangler.jsonc as the source of truth for Cloudflare bindings.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ezkart-api",
+  "main": "src/index.js",
+  "compatibility_date": "2026-08-11",
+  "observability": { "enabled": true },
+  "env": {
+    "test": {
+      "name": "ezkart-api-test",
+      "routes": [
+        { "pattern": "api-test.ezkart.id", "custom_domain": true }
+      ],
+      "vars": {
+        "APP_ENVIRONMENT": "test",
+        "ALLOWED_ORIGINS": "https://test.ezkart.id,http://127.0.0.1:4173",
+        "SUPABASE_URL": "https://rwxxjqvoidpkuqftgkjd.supabase.co",
+        "SUPABASE_PUBLISHABLE_KEY": "PASTE_SUPABASE_PUBLISHABLE_OR_ANON_KEY"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "ezkart_test_database",
+          "database_id": "PASTE_TEST_D1_DATABASE_ID",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "r2_buckets": [
+        { "binding": "PUBLIC_ASSETS", "bucket_name": "ezkart-test-public" },
+        { "binding": "PRIVATE_ASSETS", "bucket_name": "ezkart-test-private" }
+      ]
+    },
+    "production": {
+      "name": "ezkart-api-production",
+      "routes": [
+        { "pattern": "api.ezkart.id", "custom_domain": true }
+      ],
+      "vars": {
+        "APP_ENVIRONMENT": "production",
+        "ALLOWED_ORIGINS": "https://ezkart.id",
+        "SUPABASE_URL": "https://rwxxjqvoidpkuqftgkjd.supabase.co",
+        "SUPABASE_PUBLISHABLE_KEY": "PASTE_SUPABASE_PUBLISHABLE_OR_ANON_KEY"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "ezkart_main_user_database",
+          "database_id": "f8cf09d0-9ca0-4e43-8ae6-98bd6e95eb46",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "r2_buckets": [
+        { "binding": "PUBLIC_ASSETS", "bucket_name": "ezkart-production-public" },
+        { "binding": "PRIVATE_ASSETS", "bucket_name": "ezkart-production-private" }
+      ]
+    }
+  }
+}

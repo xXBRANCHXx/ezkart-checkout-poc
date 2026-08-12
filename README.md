@@ -49,6 +49,13 @@ Experimental seller and landing-builder work is deployed separately from
 [`docs/workbench-deployment.md`](docs/workbench-deployment.md) for the branch,
 subdomain, acceptance-test, and promotion model.
 
+Structured production data uses Cloudflare D1 and file bodies use Cloudflare
+R2 through an authenticated Worker. Supabase is used for Auth and Google OAuth
+only. The branch-safe scaffold and complete D1 migration are in
+[`cloudflare/ezkart-api`](cloudflare/ezkart-api); the environment model is
+documented in
+[`docs/database-environments.md`](docs/database-environments.md).
+
 ## Local preview
 
 ```bash

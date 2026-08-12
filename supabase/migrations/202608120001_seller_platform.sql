@@ -1,5 +1,8 @@
--- Ezkart seller platform schema
--- This migration is shared by test and production. Credentials and data are not.
+-- LEGACY DESIGN — DO NOT APPLY.
+-- Ezkart now uses Supabase for Auth only. Structured application data belongs
+-- in Cloudflare D1 and file bodies belong in R2. The active migration is:
+-- cloudflare/ezkart-api/migrations/0001_core.sql
+-- This file remains only as a historical record of the earlier design.
 
 create extension if not exists pgcrypto;
 
