@@ -114,10 +114,10 @@ function ez_orders_table(array $rows, string $tableId): void
             <button class="product-generate-variants" type="button" data-generate-variants><?= ez_admin_icon('layers') ?> Generate combinations</button>
             <div class="product-variant-empty" data-product-variant-empty><span><?= ez_admin_icon('box') ?></span><div><b>No combinations yet</b><p>Add option values, then generate the sellable variants for this product.</p></div></div>
             <div class="product-variant-table" data-product-variant-table hidden>
-              <header><span>Variant</span><span>Price</span><span data-variant-stock-heading>Stock</span><span>SKU</span><span>Photo</span><span></span></header>
+              <header><span>Variant</span><span>Price</span><span data-variant-stock-heading>Stock</span><span>SKU</span><span>Variant photo</span><span></span></header>
               <div data-product-variant-rows></div>
             </div>
-            <p class="product-variant-help">Every row remains part of this product. Remove combinations you do not sell—for example, keep “50 ml · Hazelnut” and “250 ml · Caramel” only.</p>
+            <p class="product-variant-help">Every row remains part of this product. Pick a gallery photo or upload a separate photo used only by that variant. Separate variant photos do not appear in the main gallery.</p>
           </div>
           <p class="product-no-variants" data-product-no-variants>No variants needed? The base price and stock below will be used.</p>
         </section>

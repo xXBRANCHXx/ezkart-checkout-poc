@@ -238,10 +238,11 @@
       setText("[data-product-live-price]", formatCreatorPrice(price));
       setText("[data-product-live-type]", typeName(currentType()));
       setText("[data-product-live-availability]", selectedVariant && currentType() === "physical" ? `${Math.max(0, Number(selectedVariant.stock) || 0)} available · shipping calculated at checkout` : previewAvailability());
-      if (liveImage && selectedImages.length) {
+      if (liveImage && (selectedImages.length || selectedVariant?.customImage?.url)) {
         const imageIndex = selectedVariant && Number.isInteger(selectedVariant.imageIndex) ? selectedVariant.imageIndex : 0;
-        const image = liveImage.querySelector("img"); if (image) image.src = selectedImages[imageIndex]?.url || selectedImages[0].url;
-        liveThumbs?.querySelectorAll("img").forEach((thumb, index) => thumb.classList.toggle("active", index === imageIndex));
+        const useCustomImage = Boolean(selectedVariant?.useCustomImage && selectedVariant.customImage?.url);
+        let image = liveImage.querySelector("img"); if (!image) { liveImage.replaceChildren(); image = document.createElement("img"); image.alt = "Product preview"; liveImage.append(image); } image.src = useCustomImage ? selectedVariant.customImage.url : selectedImages[imageIndex]?.url || selectedImages[0]?.url || "";
+        liveThumbs?.querySelectorAll("img").forEach((thumb, index) => thumb.classList.toggle("active", !useCustomImage && index === imageIndex));
       }
       if (descriptionCount) descriptionCount.textContent = String(descriptionInput?.value.length || 0);
     };
@@ -261,15 +262,20 @@
       if (!optionGroups || optionGroups.children.length >= 3) return;
       const row = document.createElement("div"); row.className = "product-option-group";
       row.innerHTML = `<label><span>Option name</span><input type="text" maxlength="24" placeholder="Size" value="${escapeHtml(name)}" data-option-name></label><label><span>Values</span><input type="text" maxlength="180" placeholder="50 ml, 250 ml" value="${escapeHtml(values)}" data-option-values></label><button type="button" aria-label="Remove option group">×</button>`;
-      row.querySelector("button").onclick = () => { row.remove(); variants = []; renderVariants(); };
+      row.querySelector("button").onclick = () => { row.remove(); variants.forEach((variant) => variant.customImage?.url && URL.revokeObjectURL(variant.customImage.url)); variants = []; renderVariants(); };
       optionGroups.append(row);
     };
-    const variantImageOptions = (selected = "") => `<option value="">Main image</option>${selectedImages.map((image, index) => `<option value="${index}"${String(index) === String(selected) ? " selected" : ""}>Image ${index + 1}</option>`).join("")}`;
+    const variantImageOptions = (variant) => {
+      const selected = variant.useCustomImage && variant.customImage ? "custom" : Number.isInteger(variant.imageIndex) ? String(variant.imageIndex) : "";
+      return `<option value=""${selected === "" ? " selected" : ""}>Main image</option>${selectedImages.map((image, index) => `<option value="${index}"${String(index) === selected ? " selected" : ""}>Gallery image ${index + 1}</option>`).join("")}${variant.customImage ? `<option value="custom"${selected === "custom" ? " selected" : ""}>Uploaded variant photo</option>` : ""}`;
+    };
     const syncLiveVariants = () => {
       if (!liveVariant || !liveVariantSelect) return;
+      const currentVariantId = liveVariantSelect.value;
       const show = Boolean(variantToggle?.checked && variants.length);
       liveVariant.hidden = !show; liveVariantSelect.replaceChildren();
       variants.forEach((variant) => { const option = document.createElement("option"); option.value = variant.id; option.textContent = variant.name; liveVariantSelect.append(option); });
+      if (variants.some((variant) => variant.id === currentVariantId)) liveVariantSelect.value = currentVariantId;
       updatePreview();
     };
     const renderVariants = () => {
@@ -279,13 +285,21 @@
       variantRows.replaceChildren();
       variants.forEach((variant, index) => {
         const row = document.createElement("div"); row.className = "product-variant-row"; row.dataset.variantId = variant.id;
-        row.innerHTML = `<b>${escapeHtml(variant.name)}</b><label><span>Price</span><input type="number" min="1000" step="500" value="${variant.price}" data-variant-price></label><label><span>Stock</span><input type="number" min="0" max="999999" value="${variant.stock}" data-variant-stock></label><label><span>SKU</span><input type="text" maxlength="48" value="${escapeHtml(variant.sku)}" data-variant-sku></label><label><span>Photo</span><select data-variant-image>${variantImageOptions(variant.imageIndex)}</select></label><button type="button" aria-label="Remove ${escapeHtml(variant.name)}">×</button>`;
+        row.innerHTML = `<b>${escapeHtml(variant.name)}</b><label><span>Price</span><input type="number" min="1000" step="500" value="${variant.price}" data-variant-price></label><label><span>Stock</span><input type="number" min="0" max="999999" value="${variant.stock}" data-variant-stock></label><label><span>SKU</span><input type="text" maxlength="48" value="${escapeHtml(variant.sku)}" data-variant-sku></label><div class="product-variant-photo"><select data-variant-image aria-label="Photo for ${escapeHtml(variant.name)}">${variantImageOptions(variant)}</select><label class="product-variant-upload"><input type="file" accept="image/png,image/jpeg,image/webp,image/avif" data-variant-photo-input><span>${variant.customImage ? `<img src="${variant.customImage.url}" alt=""><b>Replace</b>` : `<b>+ Upload</b>`}</span></label>${variant.customImage ? `<button type="button" data-variant-photo-clear aria-label="Remove uploaded photo">×</button>` : ""}</div><button type="button" data-variant-remove aria-label="Remove ${escapeHtml(variant.name)}">×</button>`;
         const stockLabel = row.querySelector("[data-variant-stock]")?.closest("label"); if (stockLabel) stockLabel.hidden = currentType() !== "physical";
         row.querySelector("[data-variant-price]").oninput = (event) => { variant.price = Math.max(0, Math.round(Number(event.target.value) || 0)); updatePreview(); };
         row.querySelector("[data-variant-stock]").oninput = (event) => { variant.stock = Math.max(0, Math.round(Number(event.target.value) || 0)); updatePreview(); };
         row.querySelector("[data-variant-sku]").oninput = (event) => { variant.sku = event.target.value.trim(); };
-        row.querySelector("[data-variant-image]").onchange = (event) => { variant.imageIndex = event.target.value === "" ? null : Number(event.target.value); updatePreview(); };
-        row.querySelector("button").onclick = () => { variants.splice(index, 1); renderVariants(); };
+        row.querySelector("[data-variant-image]").onchange = (event) => { variant.useCustomImage = event.target.value === "custom"; if (!variant.useCustomImage) variant.imageIndex = event.target.value === "" ? null : Number(event.target.value); updatePreview(); };
+        row.querySelector("[data-variant-photo-input]").onchange = (event) => {
+          const file = event.target.files?.[0]; event.target.value = ""; if (!file) return;
+          if (!["image/png", "image/jpeg", "image/webp", "image/avif"].includes(file.type)) { showError("Variant photos must be PNG, JPG, WebP, or AVIF."); return; }
+          if (file.size > 2 * 1024 * 1024) { showError(`${file.name} is larger than 2 MB.`); return; }
+          if (variant.customImage?.url) URL.revokeObjectURL(variant.customImage.url);
+          variant.customImage = { file, url: URL.createObjectURL(file) }; variant.useCustomImage = true; clearError(); renderVariants();
+        };
+        row.querySelector("[data-variant-photo-clear]")?.addEventListener("click", () => { if (variant.customImage?.url) URL.revokeObjectURL(variant.customImage.url); variant.customImage = null; variant.useCustomImage = false; renderVariants(); });
+        row.querySelector("[data-variant-remove]").onclick = () => { if (variant.customImage?.url) URL.revokeObjectURL(variant.customImage.url); variants.splice(index, 1); renderVariants(); };
         variantRows.append(row);
       });
       syncLiveVariants();
@@ -303,6 +317,7 @@
         const name = options.map((option) => option.value).join(" · ");
         return previous.get(name) || { id: globalThis.crypto?.randomUUID?.() || `variant-${Date.now()}-${index}`, name, options, price: basePrice, stock: baseStock, sku: `VAR-${String(index + 1).padStart(3, "0")}`, imageIndex: null };
       });
+      previous.forEach((variant, name) => { if (!variants.some((item) => item.name === name) && variant.customImage?.url) URL.revokeObjectURL(variant.customImage.url); });
       renderVariants();
     };
     variantToggle?.addEventListener("change", () => { if (variantBuilder) variantBuilder.hidden = !variantToggle.checked; if (noVariants) noVariants.hidden = variantToggle.checked; if (variantToggle.checked && optionGroups?.children.length === 0) { addOptionGroup("Size", "50 ml, 250 ml"); addOptionGroup("Flavor", "Hazelnut, Caramel"); } syncLiveVariants(); });
@@ -384,6 +399,7 @@
       formSubmitButtons.forEach((button) => { button.disabled = true; button.dataset.originalText = button.textContent; button.textContent = "Preparing images…"; });
       try {
         const images = await Promise.all(selectedImages.map((item) => compressCreatorProductImage(item.file)));
+        const variantImages = new Map(await Promise.all(variants.filter((variant) => variant.customImage?.file).map(async (variant) => [variant.id, await compressCreatorProductImage(variant.customImage.file)])));
         const suffix = globalThis.crypto?.randomUUID?.().replace(/-/g, "").slice(0, 10) || String(Date.now());
         const product = {
           id: `custom-${suffix}`, sku: `EZK-${type.slice(0, 3).toUpperCase()}-${suffix.toUpperCase()}`,
@@ -393,7 +409,7 @@
           ...(type === "physical" ? { stock: variantToggle?.checked ? variants.reduce((total, variant) => total + variant.stock, 0) : Math.max(0, Math.round(Number(productCreateForm.elements.stock.value) || 0)), weightGrams } : {}),
           ...(type === "digital" ? { digitalFileName: String(productCreateForm.elements.digital_name.value || "").trim() } : {}),
           ...(type === "subscription" ? { subscription: { interval, unit: String(productCreateForm.elements.unit.value || "month") } } : {}),
-          ...(variantToggle?.checked ? { options: [...(optionGroups?.children || [])].map((row) => ({ name: String(row.querySelector("[data-option-name]")?.value || "").trim(), values: optionValues(row.querySelector("[data-option-values]")) })).filter((group) => group.name && group.values.length), variants: variants.map((variant) => ({ ...variant, image: Number.isInteger(variant.imageIndex) ? images[variant.imageIndex] || images[0] : images[0] })) } : {}),
+          ...(variantToggle?.checked ? { options: [...(optionGroups?.children || [])].map((row) => ({ name: String(row.querySelector("[data-option-name]")?.value || "").trim(), values: optionValues(row.querySelector("[data-option-values]")) })).filter((group) => group.name && group.values.length), variants: variants.map(({ customImage, useCustomImage, ...variant }) => ({ ...variant, image: useCustomImage && variantImages.has(variant.id) ? variantImages.get(variant.id) : Number.isInteger(variant.imageIndex) ? images[variant.imageIndex] || images[0] : images[0], imageSource: useCustomImage && variantImages.has(variant.id) ? "variant-upload" : Number.isInteger(variant.imageIndex) ? `gallery-${variant.imageIndex + 1}` : "main" })) } : {}),
           createdAt: new Date().toISOString(),
         };
         const products = readCatalogProducts(); products.push(product);
@@ -403,7 +419,7 @@
       } catch (error) { showError(error instanceof Error ? error.message : "The product could not be created."); }
       finally { formSubmitButtons.forEach((button) => { button.disabled = false; button.textContent = button.dataset.originalText || "Create product"; }); }
     });
-    window.addEventListener("beforeunload", () => selectedImages.forEach((item) => URL.revokeObjectURL(item.url)));
+    window.addEventListener("beforeunload", () => { selectedImages.forEach((item) => URL.revokeObjectURL(item.url)); variants.forEach((variant) => variant.customImage?.url && URL.revokeObjectURL(variant.customImage.url)); });
     syncType(); renderImages(); updatePreview();
   }
   const setupCreatorProducts = (form) => {
