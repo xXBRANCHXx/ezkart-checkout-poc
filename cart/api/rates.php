@@ -19,7 +19,7 @@ try {
     $quotes = ez_biteship_quotes($cart, $postalCode);
     ez_api_json([
         'ok' => true,
-        'provider' => 'Biteship Test',
+        'provider' => ez_commerce_is_production() ? 'Biteship' : 'Biteship Test',
         'quotes' => $quotes,
     ]);
 } catch (InvalidArgumentException $error) {

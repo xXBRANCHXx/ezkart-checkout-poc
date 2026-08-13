@@ -20,7 +20,7 @@ if (preg_match('/^EZK-[A-Z0-9-]{8,70}$/', $orderId) !== 1) {
   <title>Status pembayaran Midtrans · Ezkart</title>
 </head>
 <body>
-  <header class="checkout-header"><a class="brand" href="../"><img src="../assets/ezkart-logo.svg" alt="Ezkart"></a><span class="sandbox-pill"><i></i> Midtrans Sandbox</span></header>
+  <header class="checkout-header"><a class="brand" href="../"><img src="../assets/ezkart-logo.svg" alt="Ezkart"></a><span class="sandbox-pill"><i></i> Pembayaran aman</span></header>
   <main class="return-shell" data-order="<?= htmlspecialchars($orderId, ENT_QUOTES, 'UTF-8') ?>">
     <section class="success-card return-card">
       <div class="success-icon pending-icon" id="return-icon">···</div>
@@ -54,17 +54,17 @@ if (preg_match('/^EZK-[A-Z0-9-]{8,70}$/', $orderId) !== 1) {
           document.getElementById('return-status').textContent = data.status;
           const fulfillment = document.getElementById('return-fulfillment');
           fulfillment.textContent = data.fulfillment_status === 'CONFIRMED'
-            ? (data.biteship_waybill_id || data.biteship_order_id || 'Order test dibuat')
+            ? (data.biteship_waybill_id || data.biteship_order_id || 'Pengiriman dibuat')
             : data.fulfillment_status === 'RETRY_REQUIRED' ? 'Menyinkronkan ulang' : 'Menunggu pembayaran';
           if (data.status === 'PAID') {
             shell.classList.add('confirmed');
             document.getElementById('return-icon').textContent = '✓';
             document.getElementById('return-title').textContent = 'Pembayaran dikonfirmasi Midtrans';
             if (data.fulfillment_status === 'CONFIRMED') {
-              document.getElementById('return-message').textContent = `Terima kasih, ${String(data.customer_name).split(' ')[0]}. Pembayaran terverifikasi dan order pengiriman Biteship Test sudah dibuat.`;
+              document.getElementById('return-message').textContent = `Terima kasih, ${String(data.customer_name).split(' ')[0]}. Pembayaran terverifikasi dan pengiriman Biteship sudah dibuat.`;
               return;
             }
-            document.getElementById('return-message').textContent = 'Pembayaran sudah aman. Ezkart sedang menyelesaikan handoff pengiriman ke Biteship Test.';
+            document.getElementById('return-message').textContent = 'Pembayaran sudah aman. Ezkart sedang menyelesaikan handoff pengiriman ke Biteship.';
           }
           if (data.status === 'FAILED') {
             document.getElementById('return-icon').textContent = '×';

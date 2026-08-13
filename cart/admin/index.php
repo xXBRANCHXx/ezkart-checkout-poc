@@ -9,7 +9,7 @@ header('X-Frame-Options: DENY');
 header("Content-Security-Policy: default-src 'self'; img-src 'self' data: blob: https:; style-src 'self'; style-src-attr 'unsafe-inline'; script-src 'self'; connect-src 'self'; frame-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'");
 
 $isHttps = isset($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off';
-session_name('ezkart_sandbox_admin');
+session_name('ezkart_admin');
 session_set_cookie_params([
     'lifetime' => 0,
     'path' => '/cart/admin',
@@ -325,6 +325,8 @@ $metrics = [
     'fulfillment_attention_count' => 0,
 ];
 $integrationStatus = ez_integration_status();
+$commerceEnvironment = (string) ($integrationStatus['environment'] ?? 'invalid');
+$commerceProduction = $commerceEnvironment === 'production';
 $productSales = [];
 $productActivity = [];
 $statusCounts = ['PAID' => 0, 'PENDING' => 0, 'CREATING' => 0, 'FAILED' => 0];
@@ -467,7 +469,7 @@ $catalogInventory = [
   <meta name="robots" content="noindex,nofollow">
   <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
   <?php if ($authenticated): ?><link rel="stylesheet" href="assets/vendor/leaflet.css"><?php endif; ?>
-  <link rel="stylesheet" href="admin.css?v=26">
+  <link rel="stylesheet" href="admin.css?v=27">
   <title><?= $authenticated ? ez_admin_escape($pageTitles[$page]) : 'Admin Login' ?> · Ezkart</title>
 </head>
 <body class="<?= $authenticated ? 'dashboard-page page-' . ez_admin_escape($page) . ($page === 'sites' ? ($siteEditor ? ' page-site-editor' : ' page-sites-library') : '') : 'login-page' ?>">
@@ -475,9 +477,9 @@ $catalogInventory = [
   <main class="login-shell">
     <section class="login-card">
       <a class="admin-brand" href="../../"><img src="../../assets/ezkart-logo.svg" alt="Ezkart"></a>
-      <span class="environment-pill"><i></i> Midtrans Sandbox</span>
+      <span class="environment-pill"><i></i> Midtrans <?= $commerceProduction ? 'Production' : 'Sandbox' ?></span>
       <p class="eyebrow">Internal order monitor</p>
-      <h1>Sandbox admin.</h1>
+      <h1><?= $commerceProduction ? 'Production' : 'Sandbox' ?> admin.</h1>
       <p class="login-intro">Sign in with your approved Google account. Supabase verifies your identity; Ezkart stores no Google password or token.</p>
       <?php if ($supabaseSettings['configured']): ?>
         <button class="oauth-button" id="google-sign-in" type="button" data-supabase-url="<?= ez_admin_escape($supabaseSettings['url']) ?>" data-csrf-token="<?= ez_admin_escape($csrfToken) ?>">
@@ -583,7 +585,7 @@ $catalogInventory = [
         <span class="upgrade-icon"><?= ez_admin_icon('globe') ?></span><div><b>Launch on your<br>own domain</b><p>Hosted pages, checkout,<br>payments &amp; shipping.</p></div>
         <a href="?page=sites">Manage Landing Pages</a>
       </section>
-      <div class="store-switcher"><span class="store-icon"><?= ez_admin_icon('store') ?></span><div><b>Ezkart Sandbox</b><small>Midtrans Demo</small></div><?= ez_admin_icon('chevron-down', 'chevron-icon') ?></div>
+      <div class="store-switcher"><span class="store-icon"><?= ez_admin_icon('store') ?></span><div><b>Ezkart <?= $commerceProduction ? 'Production' : 'Sandbox' ?></b><small>Midtrans <?= $commerceProduction ? 'Live' : 'Demo' ?></small></div><?= ez_admin_icon('chevron-down', 'chevron-icon') ?></div>
     </aside>
 
     <div class="workspace">
@@ -612,17 +614,17 @@ $catalogInventory = [
       <?php if ($page === 'dashboard'): ?>
       <main class="dashboard page-canvas" id="overview">
         <section class="welcome-row">
-          <div><h1>Welcome back <span class="welcome-mark"><?= ez_admin_icon('sparkles') ?></span></h1><p>Here is what is happening with your sandbox store today.</p></div>
+          <div><h1>Welcome back <span class="welcome-mark"><?= ez_admin_icon('sparkles') ?></span></h1><p>Here is what is happening with your store today.</p></div>
           <button class="date-button" type="button"><?= ez_admin_icon('calendar') ?><span><?= $dateRangeStart->format('M j') ?> – <?= $nowJakarta->format('M j, Y') ?></span><?= ez_admin_icon('chevron-down', 'chevron-icon') ?></button>
         </section>
 
         <section class="kpi-grid" aria-label="Store overview">
-          <article><span class="kpi-icon"><?= ez_admin_icon('money') ?></span><div><small>Total Sales</small><strong><?= ez_admin_short_money($metrics['paid_volume']) ?></strong><em class="positive"><?= $metrics['paid_count'] ?> paid</em><p>Provider-confirmed sandbox payments</p></div></article>
-          <article><span class="kpi-icon"><?= ez_admin_icon('cart') ?></span><div><small>Orders</small><strong><?= number_format($metrics['orders']) ?></strong><em><?= $metrics['pending_count'] ?> open</em><p>All stored sandbox orders</p></div></article>
+          <article><span class="kpi-icon"><?= ez_admin_icon('money') ?></span><div><small>Total Sales</small><strong><?= ez_admin_short_money($metrics['paid_volume']) ?></strong><em class="positive"><?= $metrics['paid_count'] ?> paid</em><p>Provider-confirmed payments</p></div></article>
+          <article><span class="kpi-icon"><?= ez_admin_icon('cart') ?></span><div><small>Orders</small><strong><?= number_format($metrics['orders']) ?></strong><em><?= $metrics['pending_count'] ?> open</em><p>All stored orders</p></div></article>
           <article><span class="kpi-icon"><?= ez_admin_icon('trend') ?></span><div><small>Conversion Rate</small><strong><?= number_format($conversionRate, 1) ?>%</strong><p>Paid orders / all orders</p></div></article>
           <article><span class="kpi-icon"><?= ez_admin_icon('chart') ?></span><div><small>Average Order Value</small><strong><?= ez_admin_short_money($averageOrder) ?></strong><p>Across paid transactions</p></div></article>
           <article><span class="kpi-icon"><?= ez_admin_icon('refund') ?></span><div><small>Failure Rate</small><strong><?= number_format($refundRate, 1) ?>%</strong><em class="<?= $metrics['failed_count'] > 0 ? 'negative' : 'positive' ?>"><?= $metrics['failed_count'] ?> failed</em><p>Failed or expired orders</p></div></article>
-          <article><span class="kpi-icon"><?= ez_admin_icon('wallet') ?></span><div><small>Sandbox Volume</small><strong><?= ez_admin_short_money($metrics['paid_volume']) ?></strong><p>Not a withdrawable balance</p></div></article>
+          <article><span class="kpi-icon"><?= ez_admin_icon('wallet') ?></span><div><small>Confirmed Volume</small><strong><?= ez_admin_short_money($metrics['paid_volume']) ?></strong><p>Settlement remains in Midtrans</p></div></article>
         </section>
 
         <section class="dashboard-grid primary-grid">
@@ -649,7 +651,7 @@ $catalogInventory = [
                 $searchText = mb_strtolower(implode(' ', [(string) ($order['order_id'] ?? ''), (string) ($customer['name'] ?? ''), (string) ($customer['email'] ?? ''), (string) ($firstItem['name'] ?? '')]));
               ?><tr data-order-card data-status="<?= ez_admin_escape($status) ?>" data-search="<?= ez_admin_escape($searchText) ?>"><td><button class="order-link" type="button" data-order-toggle aria-expanded="false" title="View <?= ez_admin_escape($order['order_id'] ?? 'order') ?>">#<?= ez_admin_escape(str_replace('EZK-', '', (string) ($order['order_id'] ?? '—'))) ?></button></td><td><?= ez_admin_escape($customer['name'] ?? 'Guest customer') ?></td><td><span class="table-product"><?= ez_admin_product_art((string) ($firstItem['name'] ?? '')) ?><?= ez_admin_escape($firstItem['name'] ?? 'Mixed order') ?></span></td><td><span class="status-badge status-<?= ez_admin_escape(strtolower($status)) ?>"><?= ez_admin_escape(ez_admin_status_label($status)) ?></span></td><td><b><?= ez_admin_money($order['total'] ?? 0) ?></b></td><td><?= ez_admin_escape(ez_admin_time($order['created_at'] ?? '')) ?></td></tr>
               <tr class="order-detail-row" hidden><td colspan="6"><div class="order-detail-inline"><section><span>Customer</span><b><?= ez_admin_escape($customer['name'] ?? 'Guest customer') ?></b><p><?= ez_admin_escape($customer['email'] ?? '—') ?><br><?= ez_admin_escape($customer['phone'] ?? '—') ?></p></section><section><span>Delivery</span><b><?= ez_admin_escape(trim((string) ($shipping['courier'] ?? '') . ' ' . (string) ($shipping['service'] ?? '')) ?: 'Not selected') ?></b><p><?= ez_admin_escape($customer['location'] ?? '—') ?><br>Biteship: <?= ez_admin_escape($order['biteship_order_id'] ?? ($order['fulfillment_status'] ?? 'awaiting payment')) ?></p></section><section><span>Payment</span><b><?= ez_admin_escape(str_replace('_', ' ', (string) ($order['payment_type'] ?? 'Awaiting method'))) ?></b><p>Midtrans: <?= ez_admin_escape($order['midtrans_status'] ?? 'pending') ?><br><?= ez_admin_escape($order['midtrans_transaction_id'] ?? 'No transaction ID') ?></p></section><section><span>Price detail</span><b><?= ez_admin_money($order['total'] ?? 0) ?></b><p>Products <?= ez_admin_money($order['subtotal'] ?? 0) ?><br>Shipping <?= ez_admin_money($order['shipping_price'] ?? 0) ?></p></section></div></td></tr><?php endforeach; ?>
-              <tr class="table-empty" <?= $displayOrders !== [] ? 'hidden' : '' ?>><td colspan="6"><b>No sandbox orders yet</b><span>Complete the demo checkout to see an order here.</span></td></tr>
+              <tr class="table-empty" <?= $displayOrders !== [] ? 'hidden' : '' ?>><td colspan="6"><b>No orders yet</b><span>Complete checkout to see an order here.</span></td></tr>
               <tr class="filter-empty" id="empty-filter" hidden><td colspan="6">No orders match that search.</td></tr>
             </tbody></table></div>
           </article>
@@ -684,7 +686,7 @@ $catalogInventory = [
 
           <article class="panel storefront-panel"><header class="panel-header"><h2>Landing Page &amp; Domain</h2><a href="?page=sites">Open builder</a></header><div class="storefront-summary"><span class="storefront-preview"><?= ez_admin_product_art('Granola Madu Nusantara') ?><i>Live</i></span><div><small>Primary storefront</small><b>Granola Morning Ritual</b><p><?= ez_admin_icon('globe') ?> madu-nusantara.id</p><em><?= ez_admin_icon('shield') ?> SSL active</em></div></div><div class="storefront-pipeline"><span><?= ez_admin_icon('box') ?><small>Product</small></span><i></i><span><?= ez_admin_icon('layout') ?><small>Page</small></span><i></i><span><?= ez_admin_icon('credit-card') ?><small>Midtrans</small></span><i></i><span><?= ez_admin_icon('truck') ?><small>Shipping</small></span></div></article>
 
-          <article class="panel payout-panel" id="payout-summary"><header class="panel-header"><h2>Payment Summary</h2><a href="?page=payments">View all payments</a></header><div class="payout-body"><small>Provider-confirmed Sandbox Volume</small><div><strong><?= ez_admin_money($metrics['paid_volume']) ?></strong><em class="positive"><?= ez_admin_icon('check-circle') ?> Verified</em><span>signed Midtrans notifications</span></div></div><footer><div><small>Environment</small><b>Midtrans Sandbox</b></div><div><small>Paid Orders</small><b><?= number_format($metrics['paid_count']) ?></b></div><a href="../">Open Checkout</a></footer></article>
+          <article class="panel payout-panel" id="payout-summary"><header class="panel-header"><h2>Payment Summary</h2><a href="?page=payments">View all payments</a></header><div class="payout-body"><small>Provider-confirmed Volume</small><div><strong><?= ez_admin_money($metrics['paid_volume']) ?></strong><em class="positive"><?= ez_admin_icon('check-circle') ?> Verified</em><span>signed Midtrans notifications</span></div></div><footer><div><small>Environment</small><b>Midtrans <?= $commerceProduction ? 'Production' : 'Sandbox' ?></b></div><div><small>Paid Orders</small><b><?= number_format($metrics['paid_count']) ?></b></div><a href="../">Open Checkout</a></footer></article>
         </section>
       </main>
       <?php else: require __DIR__ . '/pages.php'; endif; ?>
@@ -692,7 +694,7 @@ $catalogInventory = [
   </div>
   <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
   <script src="assets/vendor/leaflet.js"></script>
-  <script src="admin.js?v=26"></script>
+  <script src="admin.js?v=27"></script>
 <?php endif; ?>
 </body>
 </html>

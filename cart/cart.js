@@ -42,8 +42,10 @@
     midtransLoader = (async () => {
       const response = await fetch("api/checkout-config.php", { headers: { Accept: "application/json" }, cache: "no-store" });
       const payload = await response.json().catch(() => ({}));
-      if (!response.ok || !payload.client_key || !String(payload.snap_url).startsWith("https://app.sandbox.midtrans.com/")) {
-        throw new Error(payload.error || "Midtrans Sandbox belum dikonfigurasi.");
+      const snapUrl = String(payload.snap_url || "");
+      const expectedSnapUrl = payload.environment === "production" ? "https://app.midtrans.com/snap/snap.js" : "https://app.sandbox.midtrans.com/snap/snap.js";
+      if (!response.ok || !payload.client_key || snapUrl !== expectedSnapUrl) {
+        throw new Error(payload.error || "Midtrans belum dikonfigurasi.");
       }
       await new Promise((resolve, reject) => {
         const script = document.createElement("script");
@@ -153,7 +155,7 @@
     el("payment-section").classList.add("locked");
     el("pay-button").disabled = true;
     el("quote-location").textContent = `${state.customer.location} · ${(weight() / 1000).toFixed(2)} kg`;
-    el("shipping-options").innerHTML = '<div class="quote-state"><span></span><b>Meminta tarif Biteship Test…</b><small>Tarif dihitung dari kode pos dan berat keranjang.</small></div>';
+    el("shipping-options").innerHTML = '<div class="quote-state"><span></span><b>Meminta tarif Biteship…</b><small>Tarif dihitung dari kode pos dan berat keranjang.</small></div>';
     try {
       const response = await fetch("api/rates.php", {
         method: "POST",
@@ -165,7 +167,7 @@
       const quotes = Array.isArray(payload.quotes) ? payload.quotes.filter((quote) => quote && quote.id && Number(quote.price) > 0) : [];
       if (!quotes.length) throw new Error("Biteship tidak menemukan layanan untuk rute ini.");
       const provider = el("shipping-provider");
-      if (provider) provider.textContent = payload.provider || "Biteship Test";
+      if (provider) provider.textContent = payload.provider || "Biteship";
       el("shipping-options").innerHTML = quotes.map((quote, index) => `
         <label class="shipping-option">
           <input type="radio" name="shipping" value="${escapeHtml(quote.id)}" ${index === 0 ? "checked" : ""} />
@@ -192,7 +194,7 @@
 
   function selectShipping(quote) {
     state.shipping = quote;
-    state.payment = "Midtrans Snap Sandbox";
+    state.payment = "Midtrans Snap";
     el("payment-section").classList.remove("locked");
     el("pay-button").disabled = false;
     renderCart();
@@ -220,7 +222,7 @@
       const snapToken = String(payload.snap_token || "");
       const orderId = String(payload.order_id || "");
       if (!snapToken || !/^EZK-MIDTRANS-[A-Z0-9-]+$/.test(orderId)) {
-        throw new Error("Midtrans tidak mengembalikan token Snap sandbox yang valid.");
+        throw new Error("Midtrans tidak mengembalikan token Snap yang valid.");
       }
       const returnUrl = `return.php?order=${encodeURIComponent(orderId)}`;
       button.textContent = "Menunggu pembayaran Midtrans…";

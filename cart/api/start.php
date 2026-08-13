@@ -33,8 +33,9 @@ try {
         'postal_code' => $customer['postalCode'],
         'country_code' => 'IDN',
     ];
-    $notificationUrl = 'https://ezkart.id/cart/api/callback.php';
-    $returnUrl = 'https://ezkart.id/cart/return.php?order=' . rawurlencode($orderId);
+    $checkoutPublicUrl = ez_checkout_public_url();
+    $notificationUrl = $checkoutPublicUrl . '/cart/api/callback.php';
+    $returnUrl = $checkoutPublicUrl . '/cart/return.php?order=' . rawurlencode($orderId);
     $payload = [
         'transaction_details' => [
             'order_id' => $orderId,
@@ -75,16 +76,16 @@ try {
     ez_save_order($order);
 
     try {
-        $transaction = ez_http_json(EZ_MIDTRANS_SNAP_SANDBOX_URL, $payload, [
+        $transaction = ez_http_json(ez_midtrans_snap_api_url(), $payload, [
             'Accept: application/json',
             'Content-Type: application/json',
             'Authorization: Basic ' . base64_encode($credentials['server_key'] . ':'),
             'X-Override-Notification: ' . $notificationUrl,
-        ]);
+        ], 'Midtrans ' . ez_commerce_environment());
         $snapToken = trim((string) ($transaction['token'] ?? ''));
         $redirectUrl = trim((string) ($transaction['redirect_url'] ?? ''));
-        if ($snapToken === '' || !str_starts_with($redirectUrl, 'https://app.sandbox.midtrans.com/')) {
-            throw new RuntimeException('Midtrans did not create a valid Snap sandbox transaction.');
+        if ($snapToken === '' || !str_starts_with($redirectUrl, ez_commerce_is_production() ? 'https://app.midtrans.com/' : 'https://app.sandbox.midtrans.com/')) {
+            throw new RuntimeException('Midtrans did not create a valid Snap ' . ez_commerce_environment() . ' transaction.');
         }
     } catch (Throwable $error) {
         $stateLock = ez_lock_order_state($orderId);

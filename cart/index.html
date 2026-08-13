@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="Demo sandbox checkout Ezkart: tambah produk, dapatkan tarif Biteship Test, dan selesaikan pembayaran melalui Midtrans Snap Sandbox."
+      content="Checkout Ezkart: tambah produk, dapatkan tarif Biteship, dan selesaikan pembayaran melalui Midtrans Snap."
     />
     <meta name="theme-color" content="#081424" />
     <meta name="robots" content="index,follow" />
@@ -18,7 +18,7 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="cart.css" />
-    <title>Sandbox Checkout · Ezkart</title>
+    <title>Checkout · Ezkart</title>
   </head>
   <body>
     <a class="skip-link" href="#checkout">Lewati ke checkout</a>
@@ -28,7 +28,7 @@
         <img src="../assets/ezkart-logo.svg" alt="Ezkart" width="1020" height="420" />
       </a>
       <div class="header-actions">
-        <span class="sandbox-pill"><i aria-hidden="true"></i> Midtrans Sandbox</span>
+        <span class="sandbox-pill"><i aria-hidden="true"></i> Pembayaran aman</span>
         <button class="cart-shortcut" id="cart-shortcut" type="button" aria-label="Lihat keranjang">
           Keranjang <b id="header-count">0</b>
         </button>
@@ -36,8 +36,8 @@
     </header>
 
     <div class="sandbox-banner" role="note">
-      <span>Mode demonstrasi</span>
-      <p>Ongkir berasal dari Biteship Test dan pembayaran diproses oleh Midtrans Sandbox. Tidak ada dana nyata yang ditagihkan.</p>
+      <span>Mode produksi</span>
+      <p>Ini adalah checkout nyata. Ongkir dihitung oleh Biteship dan pembayaran akan ditagihkan melalui Midtrans.</p>
     </div>
 
     <nav class="progress" aria-label="Tahapan checkout">
@@ -152,7 +152,7 @@
                     <option value="Sleman, DI Yogyakarta"></option>
                     <option value="Denpasar Selatan, Bali"></option>
                   </datalist>
-                  <small class="field-hint">Pilih lokasi untuk mendapatkan estimasi pengiriman sandbox.</small>
+                  <small class="field-hint">Pilih lokasi untuk mendapatkan estimasi pengiriman.</small>
                   <small class="field-error"></small>
                 </label>
                 <label class="full-field">
@@ -191,7 +191,7 @@
           <section class="choice-section" aria-labelledby="shipping-title">
             <div class="choice-heading">
               <div><span>01</span><h2 id="shipping-title">Layanan pengiriman</h2></div>
-              <div class="quote-meta"><span id="shipping-provider">Biteship Test</span><p id="quote-location">Tujuan belum dipilih</p></div>
+              <div class="quote-meta"><span id="shipping-provider">Biteship</span><p id="quote-location">Tujuan belum dipilih</p></div>
             </div>
             <div class="choice-list" id="shipping-options"></div>
           </section>
@@ -199,9 +199,9 @@
           <section class="choice-section locked" id="payment-section" aria-labelledby="payment-title">
             <div class="choice-heading">
               <div><span>02</span><h2 id="payment-title">Pembayaran Midtrans Snap</h2></div>
-              <span class="midtrans-chip">Midtrans Sandbox</span>
+              <span class="midtrans-chip">Midtrans</span>
             </div>
-            <p class="choice-intro">Kamu akan memilih metode pembayaran yang aktif langsung pada popup aman Midtrans Snap Sandbox.</p>
+            <p class="choice-intro">Kamu akan memilih metode pembayaran yang aktif langsung pada popup aman Midtrans Snap.</p>
             <div class="payment-grid" id="payment-options">
               <div class="payment-option midtrans-handoff">
                 <span class="payment-icon qris-icon">QR</span>
@@ -223,7 +223,7 @@
         <div class="step-panel" data-panel="complete">
           <section class="success-card">
             <div class="success-icon" aria-hidden="true">✓</div>
-            <p class="eyebrow">Pembayaran sandbox berhasil</p>
+            <p class="eyebrow">Pembayaran berhasil</p>
             <h1>Terima kasih, <span id="success-name">pelanggan</span>.</h1>
             <p>Konfirmasi pesanan telah dibuat. Pada transaksi nyata, merchant akan memproses pesanan setelah notifikasi pembayaran terverifikasi dari Midtrans diterima.</p>
             <div class="success-details">
@@ -248,7 +248,7 @@
         <div class="empty-cart" id="empty-cart">
           <span aria-hidden="true">＋</span>
           <b>Keranjang masih kosong</b>
-          <p>Pilih produk untuk memulai checkout Midtrans Sandbox.</p>
+          <p>Pilih produk untuk memulai checkout Midtrans.</p>
         </div>
         <div class="cart-items" id="cart-items"></div>
         <div class="summary-totals" id="summary-totals" hidden>
@@ -260,17 +260,17 @@
         <button class="primary-button summary-button" id="checkout-button" type="button" disabled>
           Lanjut ke checkout <span>→</span>
         </button>
-        <div class="summary-trust"><span>✓</span><p><b>Checkout aman</b>Kamu akan melanjutkan ke checkout server dan popup pembayaran Midtrans Snap Sandbox.</p></div>
+        <div class="summary-trust"><span>✓</span><p><b>Checkout aman</b>Kamu akan melanjutkan ke checkout server dan popup pembayaran Midtrans Snap.</p></div>
       </aside>
     </main>
 
     <footer>
       <img src="../assets/ezkart-logo.svg" alt="Ezkart" width="1020" height="420" />
-      <p>Biteship Test shipping and Midtrans Snap Sandbox checkout for merchant review. No real funds are charged.</p>
+      <p>Pengiriman Biteship dan checkout aman melalui Midtrans Snap.</p>
       <a href="../docs/Ezkart-Customer-Checkout-Guide.pdf">Unduh panduan checkout (PDF) ↗</a>
     </footer>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="cart.js?v=biteship-midtrans-3"></script>
+    <script src="cart.js?v=biteship-midtrans-4"></script>
   </body>
 </html>

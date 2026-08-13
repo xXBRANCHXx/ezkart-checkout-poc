@@ -10,11 +10,11 @@ try {
     $credentials = ez_midtrans_credentials();
     ez_api_json([
         'ok' => true,
-        'environment' => 'sandbox',
-        'snap_url' => 'https://app.sandbox.midtrans.com/snap/snap.js',
+        'environment' => ez_commerce_environment(),
+        'snap_url' => ez_midtrans_snap_script_url(),
         'client_key' => $credentials['client_key'],
     ]);
 } catch (Throwable $error) {
     error_log('Ezkart checkout config error: ' . $error->getMessage());
-    ez_api_json(['ok' => false, 'error' => 'Midtrans Sandbox is not configured on this server.'], 503);
+    ez_api_json(['ok' => false, 'error' => 'Midtrans checkout is not configured on this server.'], 503);
 }

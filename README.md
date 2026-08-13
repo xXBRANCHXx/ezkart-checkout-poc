@@ -2,29 +2,32 @@
 
 Static coming-soon website for [ezkart.id](https://ezkart.id).
 
-The repository also includes a dependency-free sandbox commerce flow at
-[`/cart`](https://ezkart.id/cart/). It demonstrates product selection,
-customer and delivery details, live Biteship test-mode shipping quotes, Midtrans Snap
-payment selection, and a provider-confirmed sandbox payment state. The
-server-side PHP endpoint creates a real Midtrans Sandbox Snap transaction, opens
-the Snap checkout popup, verifies its signed HTTP notification, then creates an
-idempotent Biteship test order for the paid purchase. The Server Key remains
-server-side, Biteship test keys are enforced, no real funds are charged, and a
-staging courier does not perform a real pickup.
+The repository includes a dependency-free commerce flow at
+[`/cart`](https://ezkart.id/cart/). It handles product selection, customer and
+delivery details, Biteship shipping quotes, Midtrans Snap payment, signed
+payment notifications, and an idempotent Biteship order after payment.
 
 Copy `config.example.php` to the ignored `config.runtime.php` on the server and
-set the project's Midtrans Sandbox Merchant ID, Client Key, and Server Key,
-plus a `biteship_test.` API key, the merchant's five-digit origin postcode,
+set `commerce_environment` to `production`, set `checkout_public_url` to the
+exact deployed website, add the Midtrans Production Merchant ID, Client Key,
+and Server Key, plus a `biteship_live.` API key, the merchant's five-digit origin postcode,
 pickup contact name/phone, and complete pickup address.
-Alternatively, set `EZKART_MIDTRANS_MERCHANT_ID`,
+Alternatively, set `EZKART_COMMERCE_ENVIRONMENT`, `EZKART_CHECKOUT_PUBLIC_URL`, `EZKART_MIDTRANS_MERCHANT_ID`,
 `EZKART_MIDTRANS_CLIENT_KEY`, `EZKART_MIDTRANS_SERVER_KEY`,
 `EZKART_BITESHIP_API_KEY`, `EZKART_BITESHIP_ORIGIN_POSTAL_CODE`,
 `EZKART_BITESHIP_ORIGIN_CONTACT_NAME`, `EZKART_BITESHIP_ORIGIN_CONTACT_PHONE`,
 and `EZKART_BITESHIP_ORIGIN_ADDRESS` in the PHP environment. Optional origin
 email/note/organization settings and `EZKART_BITESHIP_COURIERS` can also be set.
-Each Snap transaction overrides its notification destination to
-`https://ezkart.id/cart/api/callback.php`, so the callback does not depend on a
-Dashboard-wide notification setting.
+Each Snap transaction overrides its notification destination using
+`checkout_public_url`, so test and production deployments cannot send callbacks
+to each other's order store. Production mode rejects Midtrans `SB-` keys and
+Biteship `biteship_test.` keys; sandbox mode rejects live keys.
+
+Production has real side effects: Midtrans charges customers and a successful
+payment creates a real Biteship shipment. Biteship requires the live Order API
+to be activated separately; having a `biteship_live.` key does not by itself
+prove that order creation is approved. Keep enough Biteship balance available
+and confirm the pickup address before accepting the first payment.
 
 ## Sandbox admin dashboard
 

@@ -2805,11 +2805,12 @@
         const ready = response.ok && payload.midtrans?.configured && payload.biteship?.configured && payload.biteship?.fulfillment_configured;
         status.classList.toggle("ready", ready);
         status.classList.toggle("warning", !ready);
-        status.lastChild.textContent = ready ? " Midtrans + Biteship test fulfillment ready" : " Complete sandbox payment, rates, and pickup setup";
-        status.title = ready ? "Checkout creates a Midtrans Sandbox payment and a Biteship test order after verified payment." : "Add Midtrans Sandbox credentials plus the Biteship test API key, postcode, pickup contact, and pickup address.";
+        const production = payload.commerce_environment === "production";
+        status.lastChild.textContent = ready ? ` Midtrans + Biteship ${production ? "production" : "sandbox"} ready` : ` Complete ${production ? "production" : "sandbox"} payment, rates, and pickup setup`;
+        status.title = ready ? `Checkout creates a Midtrans ${production ? "production" : "sandbox"} payment and a Biteship ${production ? "live" : "test"} order after verified payment.` : "Add matching Midtrans and Biteship credentials, postcode, pickup contact, and pickup address.";
       } catch (_) {
         status.classList.add("warning");
-        status.lastChild.textContent = " Sandbox status unavailable";
+        status.lastChild.textContent = " Commerce status unavailable";
       }
     };
 

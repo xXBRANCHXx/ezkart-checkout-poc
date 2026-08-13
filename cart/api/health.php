@@ -10,14 +10,16 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET') {
 
 $status = ez_integration_status();
 $database = ez_database_status();
+$commerceEnvironment = (string) ($status['environment'] ?? 'invalid');
 ez_api_json([
     'ok' => true,
-    'environment' => ez_config('deployment_environment') ?: 'sandbox',
+    'environment' => ez_config('deployment_environment') ?: 'unset',
+    'commerce_environment' => $commerceEnvironment,
     'database' => $database,
-    'midtrans' => ['configured' => $status['midtrans'], 'mode' => 'sandbox'],
+    'midtrans' => ['configured' => $status['midtrans'], 'mode' => $commerceEnvironment],
     'biteship' => [
         'configured' => $status['biteship'],
         'fulfillment_configured' => $status['biteship_fulfillment'],
-        'mode' => 'test',
+        'mode' => $commerceEnvironment,
     ],
 ]);
