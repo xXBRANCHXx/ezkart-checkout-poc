@@ -7,7 +7,7 @@ function ez_page_header(string $eyebrow, string $title, string $description, arr
     <header class="page-heading">
       <div><p class="page-eyebrow"><?= ez_admin_escape($eyebrow) ?></p><h1><?= ez_admin_escape($title) ?></h1><p><?= ez_admin_escape($description) ?></p></div>
       <?php if ($actions !== []): ?><div class="page-actions"><?php foreach ($actions as $action): ?>
-        <?php if (($action['href'] ?? '') !== ''): ?><a class="action-button <?= ez_admin_escape($action['style'] ?? '') ?>" href="<?= ez_admin_escape($action['href']) ?>"><?= ez_admin_escape($action['label']) ?></a>
+        <?php if (($action['href'] ?? '') !== ''): ?><a class="action-button <?= ez_admin_escape($action['style'] ?? '') ?>" href="<?= ez_admin_escape($action['href']) ?>"<?= !empty($action['new_tab']) ? ' target="_blank" rel="noopener"' : '' ?>><?= ez_admin_escape($action['label']) ?></a>
         <?php else: ?><button class="action-button <?= ez_admin_escape($action['style'] ?? '') ?>" type="button"<?= !empty($action['product_creator']) ? ' data-open-product-creator' : ' data-toast="' . ez_admin_escape($action['toast'] ?? 'Action completed') . '"' ?><?= !empty($action['page_creator']) ? ' data-open-page-creator' : '' ?>><?= ez_admin_escape($action['label']) ?></button><?php endif; ?>
       <?php endforeach; ?></div><?php endif; ?>
     </header>
@@ -62,9 +62,93 @@ function ez_orders_table(array $rows, string $tableId): void
     <article class="surface shipping-health"><header class="surface-header"><div><h2>Courier readiness</h2><p>Biteship test-rate availability from this server.</p></div></header><div class="carrier-list"><?php foreach (['JNE', 'SiCepat', 'J&amp;T Express'] as $courier): ?><article><span><?= ez_admin_icon('truck') ?></span><div><b><?= $courier ?></b><small><?= $integrationStatus['biteship'] ? 'Rates quoted live at checkout' : 'Add Biteship test credentials' ?></small></div><em class="<?= $integrationStatus['biteship'] ? 'connected' : '' ?>"><?= $integrationStatus['biteship'] ? 'Rates ready' : 'Setup required' ?></em></article><?php endforeach; ?></div><footer><small>Average quoted fee</small><strong><?= ez_admin_money($metrics['orders'] > 0 ? (int) round(array_sum(array_map(static fn($order): int => (int) ($order['shipping_price'] ?? 0), $orders)) / $metrics['orders']) : 0) ?></strong></footer></article>
   </section>
 
+<?php break; case 'product-new': ?>
+  <section class="product-editor" data-product-editor>
+    <header class="product-editor-header">
+      <div>
+        <a href="?page=products"><?= ez_admin_icon('chevron-left') ?> Products</a>
+        <p class="page-eyebrow">New catalog product</p>
+        <h1>Build the product customers will see.</h1>
+        <p>Add the details once and watch the storefront preview update as you work.</p>
+      </div>
+      <div class="product-editor-actions">
+        <span><i></i> Unsaved draft</span>
+        <a class="action-button" href="?page=products">Cancel</a>
+        <button class="action-button primary" type="submit" form="product-create-form">Create product</button>
+      </div>
+    </header>
+
+    <form class="product-editor-layout" id="product-create-form" data-product-create-form>
+      <div class="product-editor-main">
+        <section class="product-form-card">
+          <header><span>01</span><div><h2>Product details</h2><p>The basics used in your catalog, landing pages, and checkout.</p></div></header>
+          <div class="product-form-grid">
+            <label class="product-field-wide"><span>Product name</span><input name="name" required maxlength="70" placeholder="Example: Complete Freelance Guide" data-product-preview-name></label>
+            <label><span>Product type</span><select name="type" data-product-create-type><option value="physical">Physical product</option><option value="digital">Digital product</option><option value="subscription">Subscription</option></select></label>
+            <label><span>Category</span><input name="category" required maxlength="40" placeholder="Example: Books" data-product-preview-category></label>
+            <label class="product-field-wide"><span>Description</span><textarea name="description" maxlength="360" rows="4" placeholder="Tell customers what makes this product worth buying." data-product-preview-description></textarea><small><b data-description-count>0</b>/360 characters</small></label>
+          </div>
+        </section>
+
+        <section class="product-form-card product-media-card">
+          <header><span>02</span><div><h2>Product images</h2><p>Drag photos into the square or browse from your device.</p></div><em data-product-media-count>0 / 9</em></header>
+          <div class="product-media-workspace">
+            <label class="product-upload-dropzone" data-product-dropzone>
+              <input name="images" type="file" multiple accept="image/png,image/jpeg,image/webp,image/avif" data-product-media-input>
+              <span><?= ez_admin_icon('image') ?></span>
+              <strong>Drop images here</strong>
+              <p>or click to browse your files</p>
+              <small>PNG, JPEG, WebP or AVIF · maximum 2 MB each</small>
+            </label>
+            <div class="product-media-empty" data-product-media-empty><span><?= ez_admin_icon('layers') ?></span><p>Your uploaded images will appear here.</p></div>
+            <div class="product-media-gallery" data-product-media-gallery hidden></div>
+          </div>
+          <p class="product-media-rule" data-product-image-rule><?= ez_admin_icon('help') ?><span><b>Physical products need 3–9 images.</b> The first image becomes the main catalog photo. Use the arrows to change the order.</span></p>
+        </section>
+
+        <section class="product-form-card">
+          <header><span>03</span><div><h2>Price and availability</h2><p>Only physical products ask for inventory and shipping details.</p></div></header>
+          <div class="product-form-grid">
+            <label><span>Price (IDR)</span><input name="price" type="number" required min="1000" step="500" value="75000" data-product-preview-price></label>
+            <label data-product-physical><span>Stock</span><input name="stock" type="number" min="0" max="999999" value="10" data-product-preview-stock></label>
+            <label data-product-physical><span>Shipping weight (grams)</span><input name="weight" type="number" min="1" max="50000" value="500"></label>
+            <label data-product-digital hidden><span>Download filename</span><input name="digital_name" maxlength="100" placeholder="freelance-guide.pdf"><small>The protected file upload is connected separately.</small></label>
+            <div class="product-subscription-settings product-field-wide" data-product-subscription hidden>
+              <label><span>Bill every</span><input name="interval" type="number" min="1" max="12" value="1" data-product-preview-interval></label>
+              <label><span>Billing period</span><select name="unit" data-product-preview-unit><option value="month">Month</option><option value="week">Week</option><option value="day">Day</option></select></label>
+              <p>Recurring collection will use Midtrans after the subscription payment flow is activated.</p>
+            </div>
+          </div>
+        </section>
+
+        <p class="product-editor-error" data-product-create-error hidden></p>
+        <footer class="product-editor-footer"><a href="?page=products">Cancel</a><button class="action-button primary" type="submit">Create product</button></footer>
+      </div>
+
+      <aside class="product-preview-sidebar">
+        <div class="product-preview-label"><span>Live page preview</span><em>Updates as you type</em></div>
+        <article class="product-live-card">
+          <div class="product-live-image" data-product-live-image><span><?= ez_admin_icon('image') ?><small>Your main image</small></span></div>
+          <div class="product-live-thumbs" data-product-live-thumbs hidden></div>
+          <div class="product-live-copy">
+            <span data-product-live-type>Physical product</span>
+            <small data-product-live-category>PRODUCT CATEGORY</small>
+            <h2 data-product-live-name>Your product name</h2>
+            <p data-product-live-description>Add a clear description so customers immediately understand what they are buying.</p>
+            <strong data-product-live-price>Rp75.000</strong>
+            <em data-product-live-availability>10 available · shipping calculated at checkout</em>
+            <button type="button">Add to cart</button>
+            <footer><?= ez_admin_icon('shield') ?> Secure checkout powered by Ezkart</footer>
+          </div>
+        </article>
+        <p class="product-preview-note"><?= ez_admin_icon('eye') ?><span><b>This is a preview, not a published page.</b> The product becomes available to your landing-page builder after you create it.</span></p>
+      </aside>
+    </form>
+  </section>
+
 <?php break; case 'products': ?>
   <?php ez_page_header('Catalog management', 'Products', 'Manage photography, pricing, inventory, and merchandising for the complete Ezkart catalog.', [
-      ['label'=>'Preview storefront','href'=>'../'], ['label'=>'Create product','product_creator'=>true,'style'=>'primary'],
+      ['label'=>'Preview storefront','href'=>'../'], ['label'=>'Create product','href'=>'?page=product-new','new_tab'=>true,'style'=>'primary'],
   ]); ?>
   <?php ez_stat_strip([
       ['icon'=>'box','label'=>'Active products','value'=>(string) count($catalogInventory),'detail'=>'All visible in sandbox'],
@@ -75,23 +159,6 @@ function ez_orders_table(array $rows, string $tableId): void
   <section class="product-commerce-strip" aria-label="Product commerce connections"><article><span><?= ez_admin_icon('box') ?></span><div><small>Product data</small><b>Complete catalog record</b><p>Price, stock, weight, media, and fulfillment origin</p></div><em>Ready</em></article><i><?= ez_admin_icon('chevron-right') ?></i><article><span><?= ez_admin_icon('layout') ?></span><div><small>Sales surface</small><b>3 landing pages</b><p>Products can be bound to any hosted page</p></div><a href="?page=sites">Manage</a></article><i><?= ez_admin_icon('chevron-right') ?></i><article><span><?= ez_admin_icon('credit-card') ?></span><div><small>Checkout data</small><b><?= $integrationStatus['midtrans'] ? 'Midtrans mapped' : 'Midtrans setup required' ?></b><p>Item ID, name, quantity, price, and customer details</p></div><em class="<?= $integrationStatus['midtrans'] ? 'connected' : '' ?>"><?= $integrationStatus['midtrans'] ? 'Ready' : 'Setup' ?></em></article><i><?= ez_admin_icon('chevron-right') ?></i><article><span><?= ez_admin_icon('truck') ?></span><div><small>Delivery</small><b><?= $integrationStatus['biteship'] ? 'Biteship rates enabled' : 'Biteship setup required' ?></b><p>Weights and origin feed live courier quotes</p></div><em class="<?= $integrationStatus['biteship'] ? 'connected' : '' ?>"><?= $integrationStatus['biteship'] ? 'Ready' : 'Setup' ?></em></article></section>
   <section class="catalog-grid" data-product-catalog><?php foreach ($catalogInventory as $name => $product): $sales = $productActivity[$name] ?? ['quantity'=>0,'sales'=>0]; ?><article class="product-card"><?= ez_admin_product_art($name) ?><div class="product-card-body"><header><span><?= ez_admin_escape($product['category']) ?></span><em>Active</em></header><h2><?= ez_admin_escape($name) ?></h2><p><?= ez_admin_escape($product['sku']) ?></p><div class="product-price"><strong><?= ez_admin_money($product['price']) ?></strong><small><?= $product['stock'] ?> in stock</small></div><footer><div><small>Ordered</small><b><?= $sales['quantity'] ?> units</b></div><div><small>Revenue</small><b><?= ez_admin_short_money($sales['sales']) ?></b></div><button type="button" data-toast="Product editor opened">Edit</button></footer></div></article><?php endforeach; ?></section>
   <section class="page-grid product-ops-grid"><article class="surface"><header class="surface-header"><div><h2>Inventory control</h2><p>Availability, reorder points, and product health.</p></div><button type="button" data-toast="Inventory count prepared">Count inventory</button></header><div class="inventory-table" data-product-inventory><div class="inventory-head"><span>Product</span><span>Available</span><span>Reorder at</span><span>Health</span></div><?php foreach ($catalogInventory as $name => $product): ?><article><?= ez_admin_product_art($name) ?><div><b><?= ez_admin_escape($name) ?></b><small><?= ez_admin_escape($product['sku']) ?></small></div><strong><?= $product['stock'] ?></strong><span>15</span><em class="inventory-good">Healthy</em></article><?php endforeach; ?></div></article><aside class="surface merchandising-card"><header class="surface-header"><div><h2>Merchandising</h2><p>Storefront presentation score.</p></div></header><strong>94<small>/100</small></strong><ul><li><?= ez_admin_icon('check-circle') ?> Product photography complete</li><li><?= ez_admin_icon('check-circle') ?> Pricing published</li><li><?= ez_admin_icon('check-circle') ?> Type-aware fulfillment</li><li><?= ez_admin_icon('check-circle') ?> Descriptions optimized</li></ul><button type="button" data-toast="Merchandising checklist opened">Review storefront</button></aside></section>
-
-  <dialog class="page-creator-dialog product-creator-dialog" id="product-creator-dialog"><form data-catalog-product-form>
-    <header><span><?= ez_admin_icon('box') ?></span><div><small>Catalog product</small><h2>Create a real product record.</h2><p>It will appear here immediately and become available in the landing-page builder.</p></div><button type="button" data-catalog-close aria-label="Close"><?= ez_admin_icon('x') ?></button></header>
-    <section class="catalog-product-fields">
-      <label><span>Product name</span><input name="name" required maxlength="70" placeholder="Example: Complete Freelance Guide"></label>
-      <label><span>Product type</span><select name="type" data-catalog-product-type><option value="physical">Physical product</option><option value="digital">Digital product</option><option value="subscription">Subscription</option></select></label>
-      <label><span>Price (IDR)</span><input name="price" type="number" required min="1000" step="500" value="75000"></label>
-      <label><span>Category</span><input name="category" required maxlength="40" placeholder="Example: Books"></label>
-      <label data-catalog-physical><span>Stock</span><input name="stock" type="number" min="0" max="999999" value="10"></label>
-      <label data-catalog-physical><span>Shipping weight (grams)</span><input name="weight" type="number" min="1" max="50000" value="500"></label>
-      <label data-catalog-digital hidden><span>Download filename</span><input name="digital_name" maxlength="100" placeholder="freelance-guide.pdf"><small>The protected file is uploaded when server catalog storage is connected.</small></label>
-      <div class="catalog-subscription-fields" data-catalog-subscription hidden><label><span>Bill every</span><input name="interval" type="number" min="1" max="12" value="1"></label><label><span>Period</span><select name="unit"><option value="month">Month</option><option value="week">Week</option><option value="day">Day</option></select></label><p>Requires Midtrans recurring activation and a saved card or GoPay token.</p></div>
-      <label class="catalog-product-images"><span>Product images</span><input name="images" type="file" multiple required accept="image/png,image/jpeg,image/webp,image/avif"><small data-catalog-image-rule>Physical products need 3–9 images. Maximum 2 MB each.</small></label>
-      <p class="catalog-product-error" data-catalog-product-error hidden></p>
-    </section>
-    <footer><button type="button" data-catalog-close>Cancel</button><button class="primary" type="submit">Create product</button></footer>
-  </form></dialog>
 
 <?php break; case 'sites': require __DIR__ . ($siteEditor ? '/sites-builder.php' : '/sites-library.php'); break; case 'customers': ?>
   <?php $customerCount = count($customerProfiles); $customerSpend = array_sum(array_column($customerProfiles, 'spend')); ?>

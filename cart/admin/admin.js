@@ -183,6 +183,155 @@
       return canvas.toDataURL("image/jpeg", .72);
     } finally { URL.revokeObjectURL(objectUrl); }
   };
+  const productCreateForm = document.querySelector("[data-product-create-form]");
+  if (productCreateForm) {
+    const typeInput = productCreateForm.querySelector("[data-product-create-type]");
+    const mediaInput = productCreateForm.querySelector("[data-product-media-input]");
+    const dropzone = productCreateForm.querySelector("[data-product-dropzone]");
+    const gallery = productCreateForm.querySelector("[data-product-media-gallery]");
+    const mediaEmpty = productCreateForm.querySelector("[data-product-media-empty]");
+    const mediaCount = productCreateForm.querySelector("[data-product-media-count]");
+    const imageRule = productCreateForm.querySelector("[data-product-image-rule]");
+    const errorTarget = productCreateForm.querySelector("[data-product-create-error]");
+    const descriptionInput = productCreateForm.querySelector("[data-product-preview-description]");
+    const descriptionCount = productCreateForm.querySelector("[data-description-count]");
+    const liveImage = productCreateForm.querySelector("[data-product-live-image]");
+    const liveThumbs = productCreateForm.querySelector("[data-product-live-thumbs]");
+    const formSubmitButtons = document.querySelectorAll('[form="product-create-form"], #product-create-form button[type="submit"]');
+    let selectedImages = [];
+
+    const typeName = (type) => ({ physical: "Physical product", digital: "Digital product", subscription: "Subscription" }[type] || "Product");
+    const showError = (message) => { errorTarget.textContent = message; errorTarget.hidden = false; errorTarget.scrollIntoView({ behavior: "smooth", block: "center" }); };
+    const clearError = () => { errorTarget.hidden = true; errorTarget.textContent = ""; };
+    const setText = (selector, value) => { const target = productCreateForm.querySelector(selector); if (target) target.textContent = value; };
+    const currentType = () => String(typeInput?.value || "physical");
+    const previewAvailability = () => {
+      const type = currentType();
+      if (type === "digital") return "Available immediately after payment";
+      if (type === "subscription") {
+        const interval = Math.max(1, Math.round(Number(productCreateForm.elements.interval?.value) || 1));
+        const unit = String(productCreateForm.elements.unit?.value || "month");
+        return `Billed every ${interval} ${unit}${interval === 1 ? "" : "s"}`;
+      }
+      const stock = Math.max(0, Math.round(Number(productCreateForm.elements.stock?.value) || 0));
+      return `${stock} available · shipping calculated at checkout`;
+    };
+    const updatePreview = () => {
+      const name = String(productCreateForm.elements.name?.value || "").trim();
+      const category = String(productCreateForm.elements.category?.value || "").trim();
+      const description = String(productCreateForm.elements.description?.value || "").trim();
+      const price = Math.max(0, Math.round(Number(productCreateForm.elements.price?.value) || 0));
+      setText("[data-product-live-name]", name || "Your product name");
+      setText("[data-product-live-category]", (category || "Product category").toLocaleUpperCase("id-ID"));
+      setText("[data-product-live-description]", description || "Add a clear description so customers immediately understand what they are buying.");
+      setText("[data-product-live-price]", formatCreatorPrice(price));
+      setText("[data-product-live-type]", typeName(currentType()));
+      setText("[data-product-live-availability]", previewAvailability());
+      if (descriptionCount) descriptionCount.textContent = String(descriptionInput?.value.length || 0);
+    };
+    const syncType = () => {
+      const type = currentType();
+      productCreateForm.querySelectorAll("[data-product-physical]").forEach((field) => { field.hidden = type !== "physical"; });
+      const digital = productCreateForm.querySelector("[data-product-digital]"); if (digital) digital.hidden = type !== "digital";
+      const subscription = productCreateForm.querySelector("[data-product-subscription]"); if (subscription) subscription.hidden = type !== "subscription";
+      if (imageRule) imageRule.querySelector("span").innerHTML = type === "physical"
+        ? "<b>Physical products need 3–9 images.</b> The first image becomes the main catalog photo. Use the arrows to change the order."
+        : "<b>This product needs 1–9 images.</b> The first image becomes the main catalog photo. Use the arrows to change the order.";
+      clearError(); updatePreview();
+    };
+    const renderImages = () => {
+      if (mediaCount) mediaCount.textContent = `${selectedImages.length} / 9`;
+      if (gallery) { gallery.hidden = selectedImages.length === 0; gallery.replaceChildren(); }
+      if (mediaEmpty) mediaEmpty.hidden = selectedImages.length > 0;
+      selectedImages.forEach((item, index) => {
+        const tile = document.createElement("article");
+        tile.className = "product-media-tile";
+        tile.draggable = true;
+        tile.dataset.imageId = item.id;
+        tile.innerHTML = `<img src="${item.url}" alt=""><span>${index === 0 ? "Main image" : `Image ${index + 1}`}</span><div><button type="button" data-media-left aria-label="Move image left">←</button><button type="button" data-media-right aria-label="Move image right">→</button><button type="button" data-media-remove aria-label="Remove image">×</button></div>`;
+        tile.querySelector("[data-media-left]").disabled = index === 0;
+        tile.querySelector("[data-media-right]").disabled = index === selectedImages.length - 1;
+        tile.querySelector("[data-media-left]").onclick = () => { [selectedImages[index - 1], selectedImages[index]] = [selectedImages[index], selectedImages[index - 1]]; renderImages(); };
+        tile.querySelector("[data-media-right]").onclick = () => { [selectedImages[index + 1], selectedImages[index]] = [selectedImages[index], selectedImages[index + 1]]; renderImages(); };
+        tile.querySelector("[data-media-remove]").onclick = () => { URL.revokeObjectURL(item.url); selectedImages.splice(index, 1); renderImages(); };
+        tile.addEventListener("dragstart", (event) => { event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", item.id); });
+        tile.addEventListener("dragover", (event) => { event.preventDefault(); event.dataTransfer.dropEffect = "move"; });
+        tile.addEventListener("drop", (event) => {
+          event.preventDefault();
+          const source = selectedImages.findIndex((image) => image.id === event.dataTransfer.getData("text/plain"));
+          if (source < 0 || source === index) return;
+          const [moved] = selectedImages.splice(source, 1); selectedImages.splice(index, 0, moved); renderImages();
+        });
+        gallery?.append(tile);
+      });
+      if (liveImage) {
+        liveImage.replaceChildren();
+        if (selectedImages[0]) { const image = document.createElement("img"); image.src = selectedImages[0].url; image.alt = "Product preview"; liveImage.append(image); }
+        else liveImage.innerHTML = '<span><svg class="icon" aria-hidden="true"><use href="#icon-image"></use></svg><small>Your main image</small></span>';
+      }
+      if (liveThumbs) {
+        liveThumbs.hidden = selectedImages.length < 2; liveThumbs.replaceChildren();
+        selectedImages.slice(0, 5).forEach((item, index) => { const image = document.createElement("img"); image.src = item.url; image.alt = ""; if (index === 0) image.className = "active"; liveThumbs.append(image); });
+      }
+    };
+    const addImages = (files) => {
+      clearError();
+      const incoming = [...files];
+      const invalid = incoming.filter((file) => !["image/png", "image/jpeg", "image/webp", "image/avif"].includes(file.type));
+      const oversized = incoming.filter((file) => file.size > 2 * 1024 * 1024);
+      const rejected = new Set([...invalid, ...oversized]);
+      const remainingSpaces = Math.max(0, 9 - selectedImages.length);
+      const candidates = incoming.filter((file) => !rejected.has(file)).slice(0, remainingSpaces);
+      candidates.forEach((file) => selectedImages.push({ id: globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`, file, url: URL.createObjectURL(file) }));
+      if (mediaInput) mediaInput.value = "";
+      renderImages();
+      const messages = [];
+      if (invalid.length) messages.push(`${invalid.length} unsupported file${invalid.length === 1 ? " was" : "s were"} skipped`);
+      if (oversized.length) messages.push(`${oversized.map((file) => file.name).join(", ")} ${oversized.length === 1 ? "is" : "are"} larger than 2 MB`);
+      if (incoming.length - rejected.size > remainingSpaces) messages.push("the 9-image limit was reached");
+      if (messages.length) showError(`${messages.join("; ")}. Valid images were added.`);
+    };
+    mediaInput?.addEventListener("change", () => addImages([...(mediaInput.files || [])]));
+    ["dragenter", "dragover"].forEach((eventName) => dropzone?.addEventListener(eventName, (event) => { event.preventDefault(); dropzone.classList.add("is-dragging"); }));
+    ["dragleave", "drop"].forEach((eventName) => dropzone?.addEventListener(eventName, (event) => { event.preventDefault(); dropzone.classList.remove("is-dragging"); }));
+    dropzone?.addEventListener("drop", (event) => addImages([...(event.dataTransfer?.files || [])]));
+    productCreateForm.addEventListener("input", updatePreview);
+    productCreateForm.addEventListener("change", updatePreview);
+    typeInput?.addEventListener("change", syncType);
+    productCreateForm.addEventListener("submit", async (event) => {
+      event.preventDefault(); clearError();
+      if (!productCreateForm.reportValidity()) return;
+      const type = currentType();
+      const minimum = type === "physical" ? 3 : 1;
+      if (selectedImages.length < minimum || selectedImages.length > 9) { showError(`${typeName(type)} requires ${minimum === 3 ? "3–9" : "1–9"} images.`); return; }
+      const weightGrams = Math.round(Number(productCreateForm.elements.weight?.value) || 0);
+      if (type === "physical" && weightGrams < 1) { showError("Physical products need a shipping weight."); return; }
+      const interval = Math.round(Number(productCreateForm.elements.interval?.value) || 1);
+      if (type === "subscription" && (interval < 1 || interval > 12)) { showError("Choose a billing interval from 1 to 12."); return; }
+      formSubmitButtons.forEach((button) => { button.disabled = true; button.dataset.originalText = button.textContent; button.textContent = "Preparing images…"; });
+      try {
+        const images = await Promise.all(selectedImages.map((item) => compressCreatorProductImage(item.file)));
+        const suffix = globalThis.crypto?.randomUUID?.().replace(/-/g, "").slice(0, 10) || String(Date.now());
+        const product = {
+          id: `custom-${suffix}`, sku: `EZK-${type.slice(0, 3).toUpperCase()}-${suffix.toUpperCase()}`,
+          name: String(productCreateForm.elements.name.value).trim(), category: String(productCreateForm.elements.category.value).trim(),
+          description: String(productCreateForm.elements.description.value).trim(), type,
+          price: Math.round(Number(productCreateForm.elements.price.value) || 0), images, image: images[0],
+          ...(type === "physical" ? { stock: Math.max(0, Math.round(Number(productCreateForm.elements.stock.value) || 0)), weightGrams } : {}),
+          ...(type === "digital" ? { digitalFileName: String(productCreateForm.elements.digital_name.value || "").trim() } : {}),
+          ...(type === "subscription" ? { subscription: { interval, unit: String(productCreateForm.elements.unit.value || "month") } } : {}),
+          createdAt: new Date().toISOString(),
+        };
+        const products = readCatalogProducts(); products.push(product);
+        if (!writeCatalogProducts(products)) return;
+        window.opener?.postMessage({ type: "ezkart:catalog-product-created", productId: product.id }, window.location.origin);
+        window.location.href = "?page=products&created=1";
+      } catch (error) { showError(error instanceof Error ? error.message : "The product could not be created."); }
+      finally { formSubmitButtons.forEach((button) => { button.disabled = false; button.textContent = button.dataset.originalText || "Create product"; }); }
+    });
+    window.addEventListener("beforeunload", () => selectedImages.forEach((item) => URL.revokeObjectURL(item.url)));
+    syncType(); renderImages(); updatePreview();
+  }
   const setupCreatorProducts = (form) => {
     if (!form) return { selected: () => [], reset: () => {} };
     const composer = form.querySelector("[data-creator-product-form]");

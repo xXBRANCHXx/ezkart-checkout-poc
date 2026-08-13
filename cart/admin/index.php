@@ -411,13 +411,13 @@ $statusTotal = max(1, $metrics['orders']);
 $paidEnd = round(($statusCounts['PAID'] / $statusTotal) * 100, 1);
 $pendingEnd = round((($statusCounts['PAID'] + $statusCounts['PENDING']) / $statusTotal) * 100, 1);
 $creatingEnd = round((($statusCounts['PAID'] + $statusCounts['PENDING'] + $statusCounts['CREATING']) / $statusTotal) * 100, 1);
-$allowedPages = ['dashboard', 'orders', 'products', 'sites', 'customers', 'analytics', 'marketing', 'payments', 'reviews', 'messages', 'integrations', 'settings'];
+$allowedPages = ['dashboard', 'orders', 'products', 'product-new', 'sites', 'customers', 'analytics', 'marketing', 'payments', 'reviews', 'messages', 'integrations', 'settings'];
 $requestedPage = strtolower(trim((string) ($_GET['page'] ?? 'dashboard')));
 $page = in_array($requestedPage, $allowedPages, true) ? $requestedPage : 'dashboard';
 $requestedSite = trim((string) ($_GET['edit'] ?? ''));
 $siteEditor = $page === 'sites' && $requestedSite !== '' && strlen($requestedSite) <= 180;
 $pageTitles = [
-    'dashboard' => 'Dashboard', 'orders' => 'Orders', 'products' => 'Products', 'sites' => 'Landing Pages',
+    'dashboard' => 'Dashboard', 'orders' => 'Orders', 'products' => 'Products', 'product-new' => 'Create product', 'sites' => 'Landing Pages',
     'customers' => 'Customers', 'analytics' => 'Analytics', 'marketing' => 'Marketing',
     'payments' => 'Payments', 'reviews' => 'Reviews', 'messages' => 'Messages',
     'integrations' => 'Integrations', 'settings' => 'Settings',
@@ -467,7 +467,7 @@ $catalogInventory = [
   <meta name="robots" content="noindex,nofollow">
   <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
   <?php if ($authenticated): ?><link rel="stylesheet" href="assets/vendor/leaflet.css"><?php endif; ?>
-  <link rel="stylesheet" href="admin.css?v=23">
+  <link rel="stylesheet" href="admin.css?v=24">
   <title><?= $authenticated ? ez_admin_escape($pageTitles[$page]) : 'Admin Login' ?> · Ezkart</title>
 </head>
 <body class="<?= $authenticated ? 'dashboard-page page-' . ez_admin_escape($page) . ($page === 'sites' ? ($siteEditor ? ' page-site-editor' : ' page-sites-library') : '') : 'login-page' ?>">
@@ -568,7 +568,7 @@ $catalogInventory = [
       <nav class="primary-nav" aria-label="Main navigation">
         <a class="<?= $page === 'dashboard' ? 'active' : '' ?>" href="?page=dashboard"><?= ez_admin_icon('grid') ?><span>Dashboard</span></a>
         <a class="<?= $page === 'orders' ? 'active' : '' ?>" href="?page=orders"><?= ez_admin_icon('cart') ?><span>Orders</span><b><?= $metrics['orders'] ?></b></a>
-        <a class="<?= $page === 'products' ? 'active' : '' ?>" href="?page=products"><?= ez_admin_icon('box') ?><span>Products</span></a>
+        <a class="<?= in_array($page, ['products', 'product-new'], true) ? 'active' : '' ?>" href="?page=products"><?= ez_admin_icon('box') ?><span>Products</span></a>
         <a class="<?= $page === 'sites' ? 'active' : '' ?>" href="?page=sites"><?= ez_admin_icon('layout') ?><span>Landing Pages</span><b data-site-count>3</b></a>
         <a class="<?= $page === 'customers' ? 'active' : '' ?>" href="?page=customers"><?= ez_admin_icon('users') ?><span>Customers</span></a>
         <a class="<?= $page === 'analytics' ? 'active' : '' ?>" href="?page=analytics"><?= ez_admin_icon('chart') ?><span>Analytics</span></a>
@@ -692,7 +692,7 @@ $catalogInventory = [
   </div>
   <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
   <script src="assets/vendor/leaflet.js"></script>
-  <script src="admin.js?v=23"></script>
+  <script src="admin.js?v=24"></script>
 <?php endif; ?>
 </body>
 </html>
