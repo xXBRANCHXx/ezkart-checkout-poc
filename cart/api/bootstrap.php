@@ -64,13 +64,50 @@ function ez_config(string $key): string
     return is_string($value) ? trim($value) : '';
 }
 
+function ez_midtrans_key_environment(string $clientKey, string $serverKey): string
+{
+    $clientEnvironment = str_starts_with($clientKey, 'SB-Mid-client-')
+        ? 'sandbox'
+        : (str_starts_with($clientKey, 'Mid-client-') ? 'production' : '');
+    $serverEnvironment = str_starts_with($serverKey, 'SB-Mid-server-')
+        ? 'sandbox'
+        : (str_starts_with($serverKey, 'Mid-server-') ? 'production' : '');
+    if ($clientEnvironment === '' || $serverEnvironment === '') {
+        throw new RuntimeException('Midtrans keys are not recognized as Sandbox or Production keys.');
+    }
+    if ($clientEnvironment !== $serverEnvironment) {
+        throw new RuntimeException('Midtrans Client Key and Server Key are from different environments.');
+    }
+    return $clientEnvironment;
+}
+
 function ez_commerce_environment(): string
 {
-    $environment = strtolower(ez_config('commerce_environment'));
-    if (!in_array($environment, ['sandbox', 'production'], true)) {
-        throw new RuntimeException('commerce_environment must be sandbox or production.');
+    $detected = [];
+    $midtransClientKey = ez_config('midtrans_client_key');
+    $midtransServerKey = ez_config('midtrans_server_key');
+    $hasUsableMidtransKeys = $midtransClientKey !== '' && $midtransServerKey !== ''
+        && !str_contains(strtoupper($midtransClientKey . $midtransServerKey), 'REPLACE');
+    if ($hasUsableMidtransKeys) {
+        $detected[] = ez_midtrans_key_environment($midtransClientKey, $midtransServerKey);
     }
-    return $environment;
+
+    $biteshipKey = ez_config('biteship_api_key');
+    if ($biteshipKey !== '' && !str_contains(strtoupper($biteshipKey), 'REPLACE')) {
+        if (str_starts_with($biteshipKey, 'biteship_test.')) {
+            $detected[] = 'sandbox';
+        } elseif (str_starts_with($biteshipKey, 'biteship_live.')) {
+            $detected[] = 'production';
+        } else {
+            throw new RuntimeException('Biteship API key is not a recognized test or live key.');
+        }
+    }
+
+    $detected = array_values(array_unique($detected));
+    if (count($detected) > 1) {
+        throw new RuntimeException('Midtrans and Biteship credentials are from different environments.');
+    }
+    return $detected[0] ?? 'sandbox';
 }
 
 function ez_commerce_is_production(): bool
@@ -92,18 +129,18 @@ function ez_midtrans_snap_script_url(): string
 
 function ez_checkout_public_url(): string
 {
-    $url = rtrim(ez_config('checkout_public_url'), '/');
-    $parts = parse_url($url);
-    $host = strtolower((string) ($parts['host'] ?? ''));
-    if (
-        $url === '' || strtolower((string) ($parts['scheme'] ?? '')) !== 'https'
-        || !in_array($host, ['ezkart.id', 'www.ezkart.id', 'test.ezkart.id'], true)
-        || !in_array((string) ($parts['path'] ?? ''), ['', '/'], true)
-        || isset($parts['user']) || isset($parts['pass']) || isset($parts['query']) || isset($parts['fragment'])
-    ) {
-        throw new RuntimeException('checkout_public_url must be an approved HTTPS Ezkart website URL.');
+    $deployment = strtolower(ez_config('deployment_environment'));
+    $requestHost = strtolower(preg_replace('/:\d+$/', '', (string) ($_SERVER['HTTP_HOST'] ?? '')) ?? '');
+    $allowedHosts = $deployment === 'test'
+        ? ['test.ezkart.id']
+        : ($deployment === 'production' ? ['ezkart.id', 'www.ezkart.id'] : []);
+    $host = in_array($requestHost, $allowedHosts, true)
+        ? $requestHost
+        : ($deployment === 'test' ? 'test.ezkart.id' : ($deployment === 'production' ? 'ezkart.id' : ''));
+    if ($host === '') {
+        throw new RuntimeException('deployment_environment must be test or production before checkout can start.');
     }
-    return $url;
+    return 'https://' . $host;
 }
 
 function ez_midtrans_credentials(): array
@@ -120,12 +157,8 @@ function ez_midtrans_credentials(): array
     ) {
         throw new RuntimeException('Midtrans ' . $environment . ' credentials are not configured on this server.');
     }
-    $sandboxKeys = str_starts_with($clientKey, 'SB-') || str_starts_with($serverKey, 'SB-');
-    if ($environment === 'production' && $sandboxKeys) {
-        throw new RuntimeException('Production commerce cannot use Midtrans Sandbox keys.');
-    }
-    if ($environment === 'sandbox' && (!$sandboxKeys || !str_starts_with($clientKey, 'SB-') || !str_starts_with($serverKey, 'SB-'))) {
-        throw new RuntimeException('Sandbox commerce requires Midtrans Sandbox keys.');
+    if (ez_midtrans_key_environment($clientKey, $serverKey) !== $environment) {
+        throw new RuntimeException('Midtrans credentials do not match the inferred commerce environment.');
     }
     return [
         'merchant_id' => $merchantId,

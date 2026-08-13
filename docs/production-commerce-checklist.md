@@ -8,8 +8,6 @@ Production Midtrans and Biteship credentials stay in the ignored
 Use these values on the website that will accept real customer orders:
 
 ```php
-'commerce_environment' => 'production',
-'checkout_public_url' => 'https://ezkart.id',
 'midtrans_merchant_id' => 'YOUR_PRODUCTION_MERCHANT_ID',
 'midtrans_client_key' => 'YOUR_PRODUCTION_CLIENT_KEY',
 'midtrans_server_key' => 'YOUR_PRODUCTION_SERVER_KEY',
@@ -17,17 +15,18 @@ Use these values on the website that will accept real customer orders:
 ```
 
 Keep the existing Biteship origin postcode, contact, telephone, email, complete
-pickup address, organization, and courier list. Production mode will refuse
-Midtrans Sandbox keys and a Biteship test key.
+pickup address, organization, and courier list. Ezkart infers production mode
+from these key types and refuses mixed production and sandbox credentials. No
+additional environment field is needed.
 
 Leave `midtrans_order_storage` empty to let Ezkart automatically keep production
 and sandbox order files in separate private directories. If you specify a path,
 use a production-only directory that was never used for sandbox orders.
 
-If real transactions intentionally run on the workbench first, set
-`checkout_public_url` to `https://test.ezkart.id`. Its callback and return URLs
-will then stay on that deployment. Change it to `https://ezkart.id` in the
-production website's private runtime config after the code is merged.
+When real transactions run on the workbench, the existing
+`deployment_environment => test` setting keeps callback and return URLs on
+`https://test.ezkart.id`. After merge, `deployment_environment => production`
+keeps them on `https://ezkart.id`.
 
 ## Provider dashboards
 
@@ -44,7 +43,7 @@ production website's private runtime config after the code is merged.
 
 ## Safe first transaction
 
-1. Open `/cart/api/health.php`. It must report `commerce_environment` as
+1. Open `/cart/api/health.php`. It must infer `commerce_environment` as
    `production`, with Midtrans and Biteship configured.
 2. Request one shipping quote to a real deliverable address.
 3. Make one low-value real purchase you control.

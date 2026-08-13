@@ -7,21 +7,21 @@ The repository includes a dependency-free commerce flow at
 delivery details, Biteship shipping quotes, Midtrans Snap payment, signed
 payment notifications, and an idempotent Biteship order after payment.
 
-Copy `config.example.php` to the ignored `config.runtime.php` on the server and
-set `commerce_environment` to `production`, set `checkout_public_url` to the
-exact deployed website, add the Midtrans Production Merchant ID, Client Key,
-and Server Key, plus a `biteship_live.` API key, the merchant's five-digit origin postcode,
+In the server's existing ignored `config.runtime.php`, replace the Midtrans
+credentials with the Production Merchant ID, Client Key, and Server Key, plus
+a `biteship_live.` API key, the merchant's five-digit origin postcode,
 pickup contact name/phone, and complete pickup address.
-Alternatively, set `EZKART_COMMERCE_ENVIRONMENT`, `EZKART_CHECKOUT_PUBLIC_URL`, `EZKART_MIDTRANS_MERCHANT_ID`,
+Alternatively, set `EZKART_MIDTRANS_MERCHANT_ID`,
 `EZKART_MIDTRANS_CLIENT_KEY`, `EZKART_MIDTRANS_SERVER_KEY`,
 `EZKART_BITESHIP_API_KEY`, `EZKART_BITESHIP_ORIGIN_POSTAL_CODE`,
 `EZKART_BITESHIP_ORIGIN_CONTACT_NAME`, `EZKART_BITESHIP_ORIGIN_CONTACT_PHONE`,
 and `EZKART_BITESHIP_ORIGIN_ADDRESS` in the PHP environment. Optional origin
 email/note/organization settings and `EZKART_BITESHIP_COURIERS` can also be set.
-Each Snap transaction overrides its notification destination using
-`checkout_public_url`, so test and production deployments cannot send callbacks
-to each other's order store. Production mode rejects Midtrans `SB-` keys and
-Biteship `biteship_test.` keys; sandbox mode rejects live keys.
+The provider environment is inferred from the credentials: Midtrans `SB-` and
+`biteship_test.` keys select sandbox, while production Midtrans and
+`biteship_live.` keys select production. Conflicting key types fail closed.
+The existing `deployment_environment` chooses the callback website, so test and
+production deployments cannot send callbacks to each other's order store.
 
 Production has real side effects: Midtrans charges customers and a successful
 payment creates a real Biteship shipment. Biteship requires the live Order API
