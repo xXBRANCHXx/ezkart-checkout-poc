@@ -107,7 +107,23 @@ function ez_orders_table(array $rows, string $tableId): void
         </section>
 
         <section class="product-form-card">
-          <header><span>03</span><div><h2>Price and availability</h2><p>Only physical products ask for inventory and shipping details.</p></div></header>
+          <header><span>03</span><div><h2>Product variants</h2><p>Keep sizes, flavors, colors, or bundles inside this one product.</p></div><label class="product-variant-switch"><input type="checkbox" data-product-variant-toggle><i></i><b>Has variants</b></label></header>
+          <div class="product-variant-builder" data-product-variant-builder hidden>
+            <div class="product-option-heading"><div><b>Option groups</b><p>Enter values separated by commas. Example: 50 ml, 250 ml.</p></div><button type="button" data-add-option-group><?= ez_admin_icon('plus') ?> Add option</button></div>
+            <div class="product-option-groups" data-product-option-groups></div>
+            <button class="product-generate-variants" type="button" data-generate-variants><?= ez_admin_icon('layers') ?> Generate combinations</button>
+            <div class="product-variant-empty" data-product-variant-empty><span><?= ez_admin_icon('box') ?></span><div><b>No combinations yet</b><p>Add option values, then generate the sellable variants for this product.</p></div></div>
+            <div class="product-variant-table" data-product-variant-table hidden>
+              <header><span>Variant</span><span>Price</span><span data-variant-stock-heading>Stock</span><span>SKU</span><span>Photo</span><span></span></header>
+              <div data-product-variant-rows></div>
+            </div>
+            <p class="product-variant-help">Every row remains part of this product. Remove combinations you do not sell—for example, keep “50 ml · Hazelnut” and “250 ml · Caramel” only.</p>
+          </div>
+          <p class="product-no-variants" data-product-no-variants>No variants needed? The base price and stock below will be used.</p>
+        </section>
+
+        <section class="product-form-card">
+          <header><span>04</span><div><h2>Price and availability</h2><p>Used as the default when the product has no variants.</p></div></header>
           <div class="product-form-grid">
             <label><span>Price (IDR)</span><input name="price" type="number" required min="1000" step="500" value="75000" data-product-preview-price></label>
             <label data-product-physical><span>Stock</span><input name="stock" type="number" min="0" max="999999" value="10" data-product-preview-stock></label>
@@ -135,6 +151,7 @@ function ez_orders_table(array $rows, string $tableId): void
             <small data-product-live-category>PRODUCT CATEGORY</small>
             <h2 data-product-live-name>Your product name</h2>
             <p data-product-live-description>Add a clear description so customers immediately understand what they are buying.</p>
+            <label class="product-live-variant" data-product-live-variant hidden><span>Choose a variant</span><select data-product-live-variant-select></select></label>
             <strong data-product-live-price>Rp75.000</strong>
             <em data-product-live-availability>10 available · shipping calculated at checkout</em>
             <button type="button">Add to cart</button>

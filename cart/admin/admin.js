@@ -197,8 +197,18 @@
     const descriptionCount = productCreateForm.querySelector("[data-description-count]");
     const liveImage = productCreateForm.querySelector("[data-product-live-image]");
     const liveThumbs = productCreateForm.querySelector("[data-product-live-thumbs]");
+    const variantToggle = productCreateForm.querySelector("[data-product-variant-toggle]");
+    const variantBuilder = productCreateForm.querySelector("[data-product-variant-builder]");
+    const noVariants = productCreateForm.querySelector("[data-product-no-variants]");
+    const optionGroups = productCreateForm.querySelector("[data-product-option-groups]");
+    const variantTable = productCreateForm.querySelector("[data-product-variant-table]");
+    const variantEmpty = productCreateForm.querySelector("[data-product-variant-empty]");
+    const variantRows = productCreateForm.querySelector("[data-product-variant-rows]");
+    const liveVariant = productCreateForm.querySelector("[data-product-live-variant]");
+    const liveVariantSelect = productCreateForm.querySelector("[data-product-live-variant-select]");
     const formSubmitButtons = document.querySelectorAll('[form="product-create-form"], #product-create-form button[type="submit"]');
     let selectedImages = [];
+    let variants = [];
 
     const typeName = (type) => ({ physical: "Physical product", digital: "Digital product", subscription: "Subscription" }[type] || "Product");
     const showError = (message) => { errorTarget.textContent = message; errorTarget.hidden = false; errorTarget.scrollIntoView({ behavior: "smooth", block: "center" }); };
@@ -220,13 +230,19 @@
       const name = String(productCreateForm.elements.name?.value || "").trim();
       const category = String(productCreateForm.elements.category?.value || "").trim();
       const description = String(productCreateForm.elements.description?.value || "").trim();
-      const price = Math.max(0, Math.round(Number(productCreateForm.elements.price?.value) || 0));
+      const selectedVariant = variantToggle?.checked ? variants.find((variant) => variant.id === liveVariantSelect?.value) || variants[0] : null;
+      const price = selectedVariant ? Math.max(0, Math.round(Number(selectedVariant.price) || 0)) : Math.max(0, Math.round(Number(productCreateForm.elements.price?.value) || 0));
       setText("[data-product-live-name]", name || "Your product name");
       setText("[data-product-live-category]", (category || "Product category").toLocaleUpperCase("id-ID"));
       setText("[data-product-live-description]", description || "Add a clear description so customers immediately understand what they are buying.");
       setText("[data-product-live-price]", formatCreatorPrice(price));
       setText("[data-product-live-type]", typeName(currentType()));
-      setText("[data-product-live-availability]", previewAvailability());
+      setText("[data-product-live-availability]", selectedVariant && currentType() === "physical" ? `${Math.max(0, Number(selectedVariant.stock) || 0)} available · shipping calculated at checkout` : previewAvailability());
+      if (liveImage && selectedImages.length) {
+        const imageIndex = selectedVariant && Number.isInteger(selectedVariant.imageIndex) ? selectedVariant.imageIndex : 0;
+        const image = liveImage.querySelector("img"); if (image) image.src = selectedImages[imageIndex]?.url || selectedImages[0].url;
+        liveThumbs?.querySelectorAll("img").forEach((thumb, index) => thumb.classList.toggle("active", index === imageIndex));
+      }
       if (descriptionCount) descriptionCount.textContent = String(descriptionInput?.value.length || 0);
     };
     const syncType = () => {
@@ -234,11 +250,65 @@
       productCreateForm.querySelectorAll("[data-product-physical]").forEach((field) => { field.hidden = type !== "physical"; });
       const digital = productCreateForm.querySelector("[data-product-digital]"); if (digital) digital.hidden = type !== "digital";
       const subscription = productCreateForm.querySelector("[data-product-subscription]"); if (subscription) subscription.hidden = type !== "subscription";
+      if (variants.length) renderVariants();
       if (imageRule) imageRule.querySelector("span").innerHTML = type === "physical"
         ? "<b>Physical products need 3–9 images.</b> The first image becomes the main catalog photo. Use the arrows to change the order."
         : "<b>This product needs 1–9 images.</b> The first image becomes the main catalog photo. Use the arrows to change the order.";
       clearError(); updatePreview();
     };
+    const optionValues = (input) => String(input?.value || "").split(",").map((value) => value.trim()).filter(Boolean).filter((value, index, values) => values.indexOf(value) === index);
+    const addOptionGroup = (name = "", values = "") => {
+      if (!optionGroups || optionGroups.children.length >= 3) return;
+      const row = document.createElement("div"); row.className = "product-option-group";
+      row.innerHTML = `<label><span>Option name</span><input type="text" maxlength="24" placeholder="Size" value="${escapeHtml(name)}" data-option-name></label><label><span>Values</span><input type="text" maxlength="180" placeholder="50 ml, 250 ml" value="${escapeHtml(values)}" data-option-values></label><button type="button" aria-label="Remove option group">×</button>`;
+      row.querySelector("button").onclick = () => { row.remove(); variants = []; renderVariants(); };
+      optionGroups.append(row);
+    };
+    const variantImageOptions = (selected = "") => `<option value="">Main image</option>${selectedImages.map((image, index) => `<option value="${index}"${String(index) === String(selected) ? " selected" : ""}>Image ${index + 1}</option>`).join("")}`;
+    const syncLiveVariants = () => {
+      if (!liveVariant || !liveVariantSelect) return;
+      const show = Boolean(variantToggle?.checked && variants.length);
+      liveVariant.hidden = !show; liveVariantSelect.replaceChildren();
+      variants.forEach((variant) => { const option = document.createElement("option"); option.value = variant.id; option.textContent = variant.name; liveVariantSelect.append(option); });
+      updatePreview();
+    };
+    const renderVariants = () => {
+      if (variantTable) variantTable.hidden = variants.length === 0;
+      if (variantEmpty) variantEmpty.hidden = variants.length > 0;
+      if (!variantRows) return;
+      variantRows.replaceChildren();
+      variants.forEach((variant, index) => {
+        const row = document.createElement("div"); row.className = "product-variant-row"; row.dataset.variantId = variant.id;
+        row.innerHTML = `<b>${escapeHtml(variant.name)}</b><label><span>Price</span><input type="number" min="1000" step="500" value="${variant.price}" data-variant-price></label><label><span>Stock</span><input type="number" min="0" max="999999" value="${variant.stock}" data-variant-stock></label><label><span>SKU</span><input type="text" maxlength="48" value="${escapeHtml(variant.sku)}" data-variant-sku></label><label><span>Photo</span><select data-variant-image>${variantImageOptions(variant.imageIndex)}</select></label><button type="button" aria-label="Remove ${escapeHtml(variant.name)}">×</button>`;
+        const stockLabel = row.querySelector("[data-variant-stock]")?.closest("label"); if (stockLabel) stockLabel.hidden = currentType() !== "physical";
+        row.querySelector("[data-variant-price]").oninput = (event) => { variant.price = Math.max(0, Math.round(Number(event.target.value) || 0)); updatePreview(); };
+        row.querySelector("[data-variant-stock]").oninput = (event) => { variant.stock = Math.max(0, Math.round(Number(event.target.value) || 0)); updatePreview(); };
+        row.querySelector("[data-variant-sku]").oninput = (event) => { variant.sku = event.target.value.trim(); };
+        row.querySelector("[data-variant-image]").onchange = (event) => { variant.imageIndex = event.target.value === "" ? null : Number(event.target.value); updatePreview(); };
+        row.querySelector("button").onclick = () => { variants.splice(index, 1); renderVariants(); };
+        variantRows.append(row);
+      });
+      syncLiveVariants();
+    };
+    const generateVariants = () => {
+      clearError();
+      const groups = [...(optionGroups?.children || [])].map((row) => ({ name: String(row.querySelector("[data-option-name]")?.value || "").trim(), values: optionValues(row.querySelector("[data-option-values]")) })).filter((group) => group.name && group.values.length);
+      if (!groups.length) { showError("Add at least one option name and comma-separated values before generating variants."); return; }
+      const combinations = groups.reduce((list, group) => list.flatMap((combination) => group.values.map((value) => [...combination, { option: group.name, value }])), [[]]);
+      if (combinations.length > 100) { showError("These options create more than 100 variants. Reduce the values before continuing."); return; }
+      const previous = new Map(variants.map((variant) => [variant.name, variant]));
+      const basePrice = Math.max(1000, Math.round(Number(productCreateForm.elements.price?.value) || 0));
+      const baseStock = Math.max(0, Math.round(Number(productCreateForm.elements.stock?.value) || 0));
+      variants = combinations.map((options, index) => {
+        const name = options.map((option) => option.value).join(" · ");
+        return previous.get(name) || { id: globalThis.crypto?.randomUUID?.() || `variant-${Date.now()}-${index}`, name, options, price: basePrice, stock: baseStock, sku: `VAR-${String(index + 1).padStart(3, "0")}`, imageIndex: null };
+      });
+      renderVariants();
+    };
+    variantToggle?.addEventListener("change", () => { if (variantBuilder) variantBuilder.hidden = !variantToggle.checked; if (noVariants) noVariants.hidden = variantToggle.checked; if (variantToggle.checked && optionGroups?.children.length === 0) { addOptionGroup("Size", "50 ml, 250 ml"); addOptionGroup("Flavor", "Hazelnut, Caramel"); } syncLiveVariants(); });
+    productCreateForm.querySelector("[data-add-option-group]")?.addEventListener("click", () => addOptionGroup());
+    productCreateForm.querySelector("[data-generate-variants]")?.addEventListener("click", generateVariants);
+    liveVariantSelect?.addEventListener("change", updatePreview);
     const renderImages = () => {
       if (mediaCount) mediaCount.textContent = `${selectedImages.length} / 9`;
       if (gallery) { gallery.hidden = selectedImages.length === 0; gallery.replaceChildren(); }
@@ -273,6 +343,7 @@
         liveThumbs.hidden = selectedImages.length < 2; liveThumbs.replaceChildren();
         selectedImages.slice(0, 5).forEach((item, index) => { const image = document.createElement("img"); image.src = item.url; image.alt = ""; if (index === 0) image.className = "active"; liveThumbs.append(image); });
       }
+      if (variants.length) renderVariants();
     };
     const addImages = (files) => {
       clearError();
@@ -308,6 +379,8 @@
       if (type === "physical" && weightGrams < 1) { showError("Physical products need a shipping weight."); return; }
       const interval = Math.round(Number(productCreateForm.elements.interval?.value) || 1);
       if (type === "subscription" && (interval < 1 || interval > 12)) { showError("Choose a billing interval from 1 to 12."); return; }
+      if (variantToggle?.checked && variants.length === 0) { showError("Generate at least one product variant, or turn off Has variants."); return; }
+      if (variants.some((variant) => variant.price < 1000 || !variant.sku)) { showError("Every variant needs a price of at least Rp1.000 and a SKU."); return; }
       formSubmitButtons.forEach((button) => { button.disabled = true; button.dataset.originalText = button.textContent; button.textContent = "Preparing images…"; });
       try {
         const images = await Promise.all(selectedImages.map((item) => compressCreatorProductImage(item.file)));
@@ -316,10 +389,11 @@
           id: `custom-${suffix}`, sku: `EZK-${type.slice(0, 3).toUpperCase()}-${suffix.toUpperCase()}`,
           name: String(productCreateForm.elements.name.value).trim(), category: String(productCreateForm.elements.category.value).trim(),
           description: String(productCreateForm.elements.description.value).trim(), type,
-          price: Math.round(Number(productCreateForm.elements.price.value) || 0), images, image: images[0],
-          ...(type === "physical" ? { stock: Math.max(0, Math.round(Number(productCreateForm.elements.stock.value) || 0)), weightGrams } : {}),
+          price: variantToggle?.checked ? Math.min(...variants.map((variant) => variant.price)) : Math.round(Number(productCreateForm.elements.price.value) || 0), images, image: images[0],
+          ...(type === "physical" ? { stock: variantToggle?.checked ? variants.reduce((total, variant) => total + variant.stock, 0) : Math.max(0, Math.round(Number(productCreateForm.elements.stock.value) || 0)), weightGrams } : {}),
           ...(type === "digital" ? { digitalFileName: String(productCreateForm.elements.digital_name.value || "").trim() } : {}),
           ...(type === "subscription" ? { subscription: { interval, unit: String(productCreateForm.elements.unit.value || "month") } } : {}),
+          ...(variantToggle?.checked ? { options: [...(optionGroups?.children || [])].map((row) => ({ name: String(row.querySelector("[data-option-name]")?.value || "").trim(), values: optionValues(row.querySelector("[data-option-values]")) })).filter((group) => group.name && group.values.length), variants: variants.map((variant) => ({ ...variant, image: Number.isInteger(variant.imageIndex) ? images[variant.imageIndex] || images[0] : images[0] })) } : {}),
           createdAt: new Date().toISOString(),
         };
         const products = readCatalogProducts(); products.push(product);
@@ -1682,7 +1756,8 @@
       productNames[id] = name;
       productPrices[id] = price;
       productImages[id] = imageUrl;
-      productMeta[id] = { type, images, ...(type === "physical" ? { weightGrams: Math.max(1, Number(product.weightGrams) || 1) } : {}), ...(type === "digital" ? { digitalFileName: String(product.digitalFileName || "") } : {}), ...(type === "subscription" ? { subscription: { interval: Math.max(1, Number(product.subscription?.interval) || 1), unit: product.subscription?.unit || "month" } } : {}) };
+      const variants = Array.isArray(product.variants) ? product.variants.slice(0, 100) : [];
+      productMeta[id] = { type, images, ...(variants.length ? { options: Array.isArray(product.options) ? product.options : [], variants } : {}), ...(type === "physical" ? { weightGrams: Math.max(1, Number(product.weightGrams) || 1) } : {}), ...(type === "digital" ? { digitalFileName: String(product.digitalFileName || "") } : {}), ...(type === "subscription" ? { subscription: { interval: Math.max(1, Number(product.subscription?.interval) || 1), unit: product.subscription?.unit || "month" } } : {}) };
 
       const picker = sqStudio.querySelector(".sq-product-picker");
       let input = picker?.querySelector(`[data-sq-product][value="${CSS.escape(id)}"]`);
@@ -1696,7 +1771,11 @@
         const card = document.createElement("article");
         card.dataset.productCard = id;
         card.dataset.productType = type;
-        card.innerHTML = `<span class="product-art"><img src="${imageUrl}" alt="${safeName}">${images.length > 1 ? `<em class="sq-media-count">+${images.length - 1} photos</em>` : ""}</span><div><small>${typeName}${escapeHtml(schedule)}</small><h3>${safeName}</h3><p>${escapeHtml(detail)}</p><footer><b>${safePrice}</b><button type="button">${type === "subscription" ? "Subscribe" : "Add to cart"}</button></footer></div>`;
+        card.dataset.customCatalogProduct = "true";
+        const variantPicker = variants.length ? `<label class="sq-product-variant"><span>Choose a variant</span><select data-sq-variant-picker>${variants.map((variant) => `<option value="${escapeHtml(variant.id)}" data-price="${Math.max(1000, Number(variant.price) || price)}" data-image="${escapeHtml(variant.image || imageUrl)}">${escapeHtml(variant.name)}</option>`).join("")}</select></label>` : "";
+        card.innerHTML = `<span class="product-art"><img src="${imageUrl}" alt="${safeName}">${images.length > 1 ? `<em class="sq-media-count">+${images.length - 1} photos</em>` : ""}</span><div><small>${typeName}${escapeHtml(schedule)}</small><h3>${safeName}</h3><p>${escapeHtml(detail)}</p>${variantPicker}<footer><b>${safePrice}</b><button type="button">${type === "subscription" ? "Subscribe" : "Add to cart"}</button></footer></div>`;
+        const variantSelect = card.querySelector("[data-sq-variant-picker]");
+        variantSelect?.addEventListener("change", () => { const option = variantSelect.selectedOptions[0]; card.querySelector("footer b").textContent = formatRupiah(Number(option.dataset.price) || price); card.querySelector(".product-art img").src = option.dataset.image || imageUrl; });
         grid.append(card);
       });
       previewRoot?.querySelectorAll("[data-sq-basket-lines]").forEach((basket) => {
