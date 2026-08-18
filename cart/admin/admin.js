@@ -235,6 +235,7 @@
     let liveOptionSelection = {};
     let previewImageIndex = 0;
     let previewUsesVariantImage = true;
+    let previewAnimationId = 0;
     let previewDevice = "desktop";
     let draggingImageId = null;
     let draftTimer = 0;
@@ -269,7 +270,7 @@
       const stock = selectedVariant ? selectedVariant.stock : productCreateForm.elements.stock?.value;
       return `${Math.max(0, Math.round(Number(stock) || 0))} available · shipping calculated at checkout`;
     };
-    const updatePreview = (imageDirection = 0) => {
+    const updatePreview = (imageDirection = 0, swipeOffset = 0) => {
       const selectedVariant = selectedPreviewVariant();
       const name = String(productCreateForm.elements.name?.value || "").trim();
       const category = String(productCreateForm.elements.category?.value || "").trim();
@@ -286,20 +287,30 @@
       const variantIndex = previewUsesVariantImage && selectedVariant && Number.isInteger(selectedVariant.imageIndex) ? selectedVariant.imageIndex : previewImageIndex;
       const source = useCustom ? selectedVariant.customImage.url : selectedImages[variantIndex]?.url || selectedImages[0]?.url || "";
       if (liveImage) {
-        liveImage.replaceChildren();
-        if (source) { const image = document.createElement("img"); image.src = source; image.alt = name || "Product preview"; image.draggable = false; liveImage.append(image); if (imageDirection) image.animate([{ opacity: .35, transform: `translateX(${imageDirection * 18}px)` }, { opacity: 1, transform: "translateX(0)" }], { duration: 220, easing: "cubic-bezier(.2,.8,.2,1)" }); }
-        else liveImage.innerHTML = '<span><svg class="icon" aria-hidden="true"><use href="#icon-image"></use></svg><small>Your square main image</small></span>';
+        const animationId = ++previewAnimationId;
+        const existingImages = [...liveImage.querySelectorAll(":scope > img")]; const previous = existingImages.at(-1) || null;
+        liveImage.getAnimations({ subtree: true }).forEach((animation) => animation.cancel());
+        if (previous && existingImages.length > 1) liveImage.replaceChildren(previous);
+        if (source) {
+          const image = document.createElement("img"); image.src = source; image.alt = name || "Product preview"; image.draggable = false;
+          if (imageDirection && previous) {
+            liveImage.querySelector("span")?.remove(); image.className = "product-live-image-incoming"; liveImage.append(image);
+            const outgoing = previous.animate([{ transform: `translateX(${swipeOffset}px)` }, { transform: `translateX(${-imageDirection * 105}%)` }], { duration: 280, easing: "cubic-bezier(.22,.78,.2,1)", fill: "forwards" });
+            image.animate([{ transform: `translateX(${imageDirection * 105}%)` }, { transform: "translateX(0)" }], { duration: 280, easing: "cubic-bezier(.22,.78,.2,1)", fill: "forwards" });
+            outgoing.finished.catch(() => {}).then(() => { if (previewAnimationId !== animationId || !image.isConnected) return; image.className = ""; liveImage.replaceChildren(image); });
+          } else { liveImage.replaceChildren(image); }
+        } else liveImage.innerHTML = '<span><svg class="icon" aria-hidden="true"><use href="#icon-image"></use></svg><small>Your square main image</small></span>';
       }
       liveThumbs?.querySelectorAll("button").forEach((thumb, index) => thumb.classList.toggle("active", !useCustom && index === variantIndex));
       const canNavigateImages = selectedImages.length > 1;
       if (previewImagePrevious) previewImagePrevious.hidden = !canNavigateImages;
       if (previewImageNext) previewImageNext.hidden = !canNavigateImages;
     };
-    const navigatePreviewImage = (direction) => {
+    const navigatePreviewImage = (direction, swipeOffset = 0) => {
       if (selectedImages.length < 2) return;
       previewUsesVariantImage = false;
       previewImageIndex = (previewImageIndex + direction + selectedImages.length) % selectedImages.length;
-      updatePreview(direction);
+      updatePreview(direction, swipeOffset);
     };
 
     const syncLiveVariants = () => {
@@ -578,9 +589,24 @@
     previewImagePrevious?.addEventListener("click", () => navigatePreviewImage(-1));
     previewImageNext?.addEventListener("click", () => navigatePreviewImage(1));
     if (liveImageStage) {
-      let swipeStartX = null; let swipePointer = null;
-      liveImageStage.addEventListener("pointerdown", (event) => { if (event.button !== 0 || event.target.closest("button")) return; swipeStartX = event.clientX; swipePointer = event.pointerId; liveImageStage.classList.add("is-swiping"); liveImageStage.setPointerCapture?.(event.pointerId); });
-      const finishSwipe = (event) => { if (swipeStartX === null || (swipePointer !== null && event.pointerId !== swipePointer)) return; const distance = event.clientX - swipeStartX; swipeStartX = null; swipePointer = null; liveImageStage.classList.remove("is-swiping"); if (Math.abs(distance) >= 38) navigatePreviewImage(distance < 0 ? 1 : -1); };
+      let swipeStartX = null; let swipeStartY = null; let swipePointer = null; let swipeDistance = 0; let horizontalSwipe = false;
+      liveImageStage.addEventListener("pointerdown", (event) => { if (event.button !== 0 || event.target.closest("button")) return; swipeStartX = event.clientX; swipeStartY = event.clientY; swipePointer = event.pointerId; swipeDistance = 0; horizontalSwipe = false; liveImageStage.classList.add("is-swiping"); liveImageStage.setPointerCapture?.(event.pointerId); });
+      liveImageStage.addEventListener("pointermove", (event) => {
+        if (swipeStartX === null || (swipePointer !== null && event.pointerId !== swipePointer)) return;
+        const xDistance = event.clientX - swipeStartX; const yDistance = event.clientY - swipeStartY;
+        if (!horizontalSwipe && Math.abs(xDistance) > 7 && Math.abs(xDistance) > Math.abs(yDistance)) horizontalSwipe = true;
+        if (!horizontalSwipe) return;
+        swipeDistance = xDistance; const image = liveImage?.querySelector(":scope > img:last-of-type");
+        if (image) image.style.transform = `translateX(${xDistance}px)`;
+      });
+      const finishSwipe = (event) => {
+        if (swipeStartX === null || (swipePointer !== null && event.pointerId !== swipePointer)) return;
+        const image = liveImage?.querySelector(":scope > img:last-of-type"); const distance = swipeDistance;
+        swipeStartX = null; swipeStartY = null; swipePointer = null; swipeDistance = 0; liveImageStage.classList.remove("is-swiping");
+        if (horizontalSwipe && Math.abs(distance) >= 38) { if (image) image.style.transform = ""; navigatePreviewImage(distance < 0 ? 1 : -1, distance); }
+        else if (image) { const current = getComputedStyle(image).transform; image.style.transform = ""; image.animate([{ transform: current === "none" ? "translateX(0)" : current }, { transform: "translateX(0)" }], { duration: 180, easing: "cubic-bezier(.2,.8,.2,1)" }); }
+        horizontalSwipe = false;
+      };
       liveImageStage.addEventListener("pointerup", finishSwipe); liveImageStage.addEventListener("pointercancel", finishSwipe); liveImageStage.addEventListener("dragstart", (event) => event.preventDefault());
     }
     function syncPreviewDevice() {
