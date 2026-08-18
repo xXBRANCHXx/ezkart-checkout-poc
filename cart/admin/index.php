@@ -646,7 +646,7 @@ $catalogInventory = [
   <meta name="robots" content="noindex,nofollow">
   <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
   <?php if ($authenticated): ?><link rel="stylesheet" href="assets/vendor/leaflet.css"><?php endif; ?>
-  <link rel="stylesheet" href="admin.css?v=31">
+  <link rel="stylesheet" href="admin.css?v=32">
   <title><?= $authenticated ? ez_admin_escape($pageTitles[$page]) : 'Admin Login' ?> · Ezkart</title>
 </head>
 <body class="<?= $authenticated ? 'dashboard-page page-' . ez_admin_escape($page) . ($page === 'sites' ? ($siteEditor ? ' page-site-editor' : ' page-sites-library') : '') : 'login-page' ?>">
@@ -677,6 +677,15 @@ $catalogInventory = [
           <button class="email-resend-button" id="email-resend-button" type="button" disabled>Resend in 60s</button>
           <button class="email-change-button" id="email-change-button" type="button">Use another email</button>
         </section>
+        <section class="email-sent-panel email-success-panel" id="email-success-panel" aria-live="polite" hidden>
+          <span class="email-sent-icon email-success-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="m5 12 4.5 4.5L19 7"/></svg>
+          </span>
+          <p>Verification successful</p>
+          <strong>You&rsquo;re signed in.</strong>
+          <small>Your dashboard opened in the other tab. You may safely close this one.</small>
+          <a class="email-dashboard-link" href="./">Open dashboard in this tab</a>
+        </section>
         <p class="auth-status" id="auth-status" role="status" aria-live="polite"></p>
       <?php else: ?>
         <div class="configuration-note" role="alert">
@@ -700,7 +709,7 @@ $catalogInventory = [
       <a class="back-link" href="../">← Kembali ke checkout</a>
     </section>
   </main>
-  <script src="auth.js?v=4"></script>
+  <script src="auth.js?v=5"></script>
 <?php else: ?>
   <svg class="svg-sprite" aria-hidden="true">
     <symbol id="icon-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></symbol>

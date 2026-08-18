@@ -74,6 +74,11 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .login-card .email-resend-button:disabled { color: #8b909b; background: #eef0f3; cursor: wait; }
 .login-card .email-change-button { min-height: auto; margin: 12px auto 0; padding: 2px 7px; display: inline-block; color: #646b79; background: transparent; font-size: 10px; font-weight: 700; }
 .login-card .email-change-button:hover { color: var(--orange); background: transparent; }
+.email-success-panel { background: #f7fbf8; border-color: #c9e2d0; box-shadow: 0 8px 24px rgba(31,112,61,.07); }
+.email-success-icon { background: #21864a; box-shadow: 0 7px 18px rgba(33,134,74,.2); }
+.email-success-panel strong { font-size: 15px; }
+.login-card .email-dashboard-link { width: 100%; min-height: 43px; display: flex; align-items: center; justify-content: center; color: #fff; background: #081424; border-radius: 9px; font-size: 10px; font-weight: 800; text-decoration: none; }
+.login-card .email-dashboard-link:hover { background: #21864a; }
 .auth-status { min-height: 18px; margin: 10px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
 .auth-status.error { color: #9a241a; }
 .password-fallback { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }

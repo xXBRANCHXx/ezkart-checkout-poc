@@ -8,11 +8,17 @@
   const emailSentAddress = document.getElementById("email-sent-address");
   const emailResendButton = document.getElementById("email-resend-button");
   const emailChangeButton = document.getElementById("email-change-button");
+  const emailSuccessPanel = document.getElementById("email-success-panel");
+  const authDivider = document.querySelector(".auth-divider");
   const status = document.getElementById("auth-status");
   if (!button || !status) return;
 
   let lastEmail = "";
   let resendTimer = 0;
+  const authenticationSignalKey = "ezkart.admin.authentication";
+  const authenticationChannel = "BroadcastChannel" in window
+    ? new BroadcastChannel(authenticationSignalKey)
+    : null;
 
   const setStatus = (message, isError = false) => {
     status.textContent = message;
@@ -26,9 +32,44 @@
     return callback;
   };
 
+  const showEmailVerificationSuccess = () => {
+    if (!emailSentPanel || emailSentPanel.hidden || !emailSuccessPanel) return;
+    window.clearInterval(resendTimer);
+    emailSentPanel.hidden = true;
+    emailForm.hidden = true;
+    button.hidden = true;
+    if (authDivider) authDivider.hidden = true;
+    emailSuccessPanel.hidden = false;
+    setStatus("");
+    document.title = "Verification successful · Ezkart";
+  };
+
+  const announceAuthentication = () => {
+    const signal = { type: "authenticated", at: Date.now() };
+    authenticationChannel?.postMessage(signal);
+    try {
+      window.localStorage.setItem(authenticationSignalKey, JSON.stringify(signal));
+    } catch (_) {
+      // BroadcastChannel is the primary path; storage can be unavailable in private browsing.
+    }
+  };
+
+  authenticationChannel?.addEventListener("message", (event) => {
+    if (event.data?.type === "authenticated") showEmailVerificationSuccess();
+  });
+
+  window.addEventListener("storage", (event) => {
+    if (event.key !== authenticationSignalKey || !event.newValue) return;
+    try {
+      if (JSON.parse(event.newValue)?.type === "authenticated") showEmailVerificationSuccess();
+    } catch (_) {
+      // Ignore malformed data written by unrelated scripts or browser extensions.
+    }
+  });
+
   const completeLogin = async (accessToken, refreshToken) => {
     button.disabled = true;
-    setStatus("Verifying your Google account…");
+    setStatus("Verifying your account…");
     const body = new URLSearchParams({
       action: "supabase_login",
       csrf_token: button.dataset.csrfToken || "",
@@ -46,8 +87,9 @@
     });
     const result = await response.json().catch(() => ({}));
     if (!response.ok || result.ok !== true) {
-      throw new Error(result.error || "Ezkart could not verify this Google account.");
+      throw new Error(result.error || "Ezkart could not verify this account.");
     }
+    announceAuthentication();
     setStatus("Signed in. Opening your dashboard…");
     window.location.replace("./");
   };
