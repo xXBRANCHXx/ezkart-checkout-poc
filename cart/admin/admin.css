@@ -63,6 +63,17 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .login-card .email-auth-button { width: 100%; min-height: 51px; margin: 2px 0 0; justify-content: center; padding: 0 18px; white-space: nowrap; }
 .login-card .email-auth-button:hover { background: var(--orange); }
 .email-auth-button[disabled] { cursor: wait; opacity: .7; }
+.email-sent-panel { padding: 20px 18px 17px; text-align: center; background: linear-gradient(155deg, #fff9f5, #fff); border: 1px solid #f1d4c7; border-radius: 14px; box-shadow: 0 8px 24px rgba(72,38,22,.06); }
+.email-sent-icon { width: 44px; height: 44px; margin: 0 auto 12px; display: grid; place-items: center; color: #fff; background: linear-gradient(135deg, var(--orange), var(--pink)); border-radius: 50%; box-shadow: 0 7px 18px rgba(245,48,71,.22); }
+.email-sent-icon svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.email-sent-panel p { margin: 0; color: #686f7d; font-size: 11px; }
+.email-sent-panel strong { margin-top: 4px; display: block; overflow-wrap: anywhere; color: var(--ink); font-size: 13px; }
+.email-sent-panel small { margin: 10px auto 15px; display: block; max-width: 310px; color: #747b89; font-size: 10px; line-height: 1.55; }
+.login-card .email-resend-button { width: 100%; min-height: 43px; margin: 0; justify-content: center; color: #fff; background: #081424; border-radius: 9px; }
+.login-card .email-resend-button:hover:not(:disabled) { background: var(--orange); }
+.login-card .email-resend-button:disabled { color: #8b909b; background: #eef0f3; cursor: wait; }
+.login-card .email-change-button { min-height: auto; margin: 12px auto 0; padding: 2px 7px; display: inline-block; color: #646b79; background: transparent; font-size: 10px; font-weight: 700; }
+.login-card .email-change-button:hover { color: var(--orange); background: transparent; }
 .auth-status { min-height: 18px; margin: 10px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
 .auth-status.error { color: #9a241a; }
 .password-fallback { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }

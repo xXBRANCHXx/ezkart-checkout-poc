@@ -646,7 +646,7 @@ $catalogInventory = [
   <meta name="robots" content="noindex,nofollow">
   <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
   <?php if ($authenticated): ?><link rel="stylesheet" href="assets/vendor/leaflet.css"><?php endif; ?>
-  <link rel="stylesheet" href="admin.css?v=30">
+  <link rel="stylesheet" href="admin.css?v=31">
   <title><?= $authenticated ? ez_admin_escape($pageTitles[$page]) : 'Admin Login' ?> · Ezkart</title>
 </head>
 <body class="<?= $authenticated ? 'dashboard-page page-' . ez_admin_escape($page) . ($page === 'sites' ? ($siteEditor ? ' page-site-editor' : ' page-sites-library') : '') : 'login-page' ?>">
@@ -667,6 +667,16 @@ $catalogInventory = [
           <input id="email-sign-in" name="email" type="email" autocomplete="email" placeholder="Email address" required>
           <button class="email-auth-button" type="submit">Continue with email</button>
         </form>
+        <section class="email-sent-panel" id="email-sent-panel" aria-live="polite" hidden>
+          <span class="email-sent-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M4 6.5h16v11H4z"/><path d="m4.5 7 7.5 6 7.5-6"/></svg>
+          </span>
+          <p>Verification email sent to:</p>
+          <strong id="email-sent-address"></strong>
+          <small>Open the email and select the secure sign-in link. It can only be used once.</small>
+          <button class="email-resend-button" id="email-resend-button" type="button" disabled>Resend in 60s</button>
+          <button class="email-change-button" id="email-change-button" type="button">Use another email</button>
+        </section>
         <p class="auth-status" id="auth-status" role="status" aria-live="polite"></p>
       <?php else: ?>
         <div class="configuration-note" role="alert">
@@ -690,7 +700,7 @@ $catalogInventory = [
       <a class="back-link" href="../">← Kembali ke checkout</a>
     </section>
   </main>
-  <script src="auth.js?v=3"></script>
+  <script src="auth.js?v=4"></script>
 <?php else: ?>
   <svg class="svg-sprite" aria-hidden="true">
     <symbol id="icon-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></symbol>

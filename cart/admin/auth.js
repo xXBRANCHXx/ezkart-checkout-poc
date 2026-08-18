@@ -4,8 +4,15 @@
   const button = document.getElementById("google-sign-in");
   const emailForm = document.getElementById("email-sign-in-form");
   const emailInput = document.getElementById("email-sign-in");
+  const emailSentPanel = document.getElementById("email-sent-panel");
+  const emailSentAddress = document.getElementById("email-sent-address");
+  const emailResendButton = document.getElementById("email-resend-button");
+  const emailChangeButton = document.getElementById("email-change-button");
   const status = document.getElementById("auth-status");
   if (!button || !status) return;
+
+  let lastEmail = "";
+  let resendTimer = 0;
 
   const setStatus = (message, isError = false) => {
     status.textContent = message;
@@ -73,13 +80,37 @@
     }
   });
 
-  emailForm?.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const email = emailInput?.value.trim() || "";
+  const setEmailFormBusy = (busy) => {
     const submitButton = emailForm.querySelector("button[type='submit']");
-    button.disabled = true;
-    if (submitButton) submitButton.disabled = true;
-    setStatus("Sending your secure sign-in link…");
+    if (submitButton) submitButton.disabled = busy;
+    if (emailInput) emailInput.disabled = busy;
+  };
+
+  const startResendCountdown = () => {
+    window.clearInterval(resendTimer);
+    let remaining = 60;
+    emailResendButton.disabled = true;
+    emailResendButton.textContent = `Resend in ${remaining}s`;
+    resendTimer = window.setInterval(() => {
+      remaining -= 1;
+      if (remaining <= 0) {
+        window.clearInterval(resendTimer);
+        emailResendButton.disabled = false;
+        emailResendButton.textContent = "Resend verification email";
+        return;
+      }
+      emailResendButton.textContent = `Resend in ${remaining}s`;
+    }, 1000);
+  };
+
+  const sendEmailLogin = async (email, isResend = false) => {
+    setEmailFormBusy(true);
+    if (isResend) {
+      emailResendButton.disabled = true;
+      emailResendButton.textContent = "Sending…";
+    } else {
+      setStatus("Sending your secure sign-in link…");
+    }
     try {
       const body = new URLSearchParams({
         action: "email_login",
@@ -99,11 +130,41 @@
       if (!response.ok || result.ok !== true) {
         throw new Error(result.error || "Ezkart could not send the sign-in email.");
       }
-      setStatus(`Check ${email} for your secure sign-in link.`);
+      lastEmail = email;
+      emailForm.hidden = true;
+      emailSentAddress.textContent = email;
+      emailSentPanel.hidden = false;
+      button.disabled = false;
+      setStatus(isResend ? "A fresh verification email is on its way." : "");
+      startResendCountdown();
     } catch (error) {
       button.disabled = false;
-      if (submitButton) submitButton.disabled = false;
+      setEmailFormBusy(false);
+      if (isResend) {
+        emailResendButton.disabled = false;
+        emailResendButton.textContent = "Try resending again";
+      }
       setStatus(error instanceof Error ? error.message : "Email sign-in failed.", true);
     }
+  };
+
+  emailForm?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const email = emailInput?.value.trim() || "";
+    sendEmailLogin(email);
+  });
+
+  emailResendButton?.addEventListener("click", () => {
+    if (lastEmail) sendEmailLogin(lastEmail, true);
+  });
+
+  emailChangeButton?.addEventListener("click", () => {
+    window.clearInterval(resendTimer);
+    emailSentPanel.hidden = true;
+    emailForm.hidden = false;
+    setEmailFormBusy(false);
+    setStatus("");
+    emailInput?.focus();
+    emailInput?.select();
   });
 })();
