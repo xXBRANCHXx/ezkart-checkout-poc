@@ -1124,6 +1124,9 @@ button, a { -webkit-tap-highlight-color: transparent; }
 /* Product photos are borderless; only the intentional drag placeholder is outlined. */
 .product-media-tile,.product-media-tile:first-child{border:0;box-shadow:none}.product-live-image{border:0}.product-live-thumbs button,.product-live-thumbs button.active{border:0;box-shadow:none}.product-live-thumbs button.active{background:#f1eeff;transform:translateY(-1px)}.product-live-thumbs img,.product-variant-upload img,.product-variant-main-picker img{border:0}.product-media-drop-placeholder{border:2px dotted #8b79e8}.product-media-drag-ghost.product-media-tile{border:0}
 
+/* Soft corners keep the borderless photography from feeling harsh. */
+.product-media-tile,.product-media-tile:first-child,.product-media-tile>img{border-radius:15px}.product-media-drop-placeholder{border-radius:15px}.product-media-drag-ghost.product-media-tile,.product-media-drag-ghost>img{border-radius:15px}.product-live-image,.product-live-image>img{border-radius:12px}.product-live-thumbs button,.product-live-thumbs img{border-radius:9px}.product-variant-upload,.product-variant-upload img,.product-variant-main-picker img{border-radius:9px}
+
 .page-site-editor :is(.sq-commandbar, .sq-builder-sidebar, .sq-inspector, .sq-stage-footer, .sq-canvas-meta) small,
 .page-site-editor :is(.page-creator-dialog, .product-creator-dialog) small { font-size: 10px; }
 .page-site-editor :is(.sq-commandbar, .sq-builder-sidebar, .sq-inspector, .sq-stage-footer, .sq-canvas-meta) :is(p, b, input, select, textarea, button),
