@@ -1118,6 +1118,9 @@ button, a { -webkit-tap-highlight-color: transparent; }
 /* A quiet Ezkart price treatment: unboxed with one restrained brand accent. */
 .product-live-copy>strong{margin:10px 0 0;padding:0;display:flex;align-items:center;gap:8px;color:#252932;background:transparent;font-size:21px;letter-spacing:-.025em}.product-live-copy>strong:before{content:"";width:4px;height:22px;flex:0 0 auto;background:linear-gradient(180deg,#ff5a19,#f70a68);border-radius:99px}
 
+/* Product media stays predictable: every gallery position is an equal square. */
+.product-media-gallery{grid-template-columns:repeat(3,minmax(0,1fr));grid-auto-flow:row}.product-media-tile,.product-media-tile:first-child{min-height:0;aspect-ratio:1;grid-column:auto;grid-row:auto}.product-media-tile>img,.product-media-tile:first-child>img{min-height:0}.product-media-drop-placeholder{display:grid;place-items:center;overflow:hidden;background:linear-gradient(145deg,#f5f2ff,#ebe6ff);border:2px solid #7562e8;box-shadow:inset 0 0 0 4px #fff,0 7px 18px rgba(103,84,232,.14)}.product-media-drop-placeholder>*{opacity:0!important;pointer-events:none}.product-media-drop-placeholder:before{content:"";width:30px;height:30px;background:#6754e8;border:7px solid #ded8ff;border-radius:9px;box-shadow:0 4px 12px rgba(83,66,193,.2)}.product-media-drop-placeholder:after{content:"Drop position";position:absolute;left:8px;right:8px;bottom:10px;color:#5e50bc;font-size:8px;font-weight:700;text-align:center}.product-media-drag-ghost.product-media-tile{min-height:0;aspect-ratio:1}.product-media-drag-ghost>img{position:absolute;inset:0}
+
 .page-site-editor :is(.sq-commandbar, .sq-builder-sidebar, .sq-inspector, .sq-stage-footer, .sq-canvas-meta) small,
 .page-site-editor :is(.page-creator-dialog, .product-creator-dialog) small { font-size: 10px; }
 .page-site-editor :is(.sq-commandbar, .sq-builder-sidebar, .sq-inspector, .sq-stage-footer, .sq-canvas-meta) :is(p, b, input, select, textarea, button),

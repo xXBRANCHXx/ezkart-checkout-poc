@@ -232,6 +232,7 @@
     let liveOptionSelection = {};
     let previewImageIndex = 0;
     let previewDevice = "desktop";
+    let draggingImageId = null;
     let draftTimer = 0;
     let restoringDraft = true;
     const draftQuery = new URLSearchParams(window.location.search);
@@ -462,24 +463,31 @@
       if (event.button !== 0 || event.target.closest("button")) return;
       event.preventDefault();
       const rect = tile.getBoundingClientRect(); const ghost = tile.cloneNode(true); ghost.classList.add("product-media-drag-ghost");
-      ghost.style.width = `${rect.width}px`; ghost.style.height = `${rect.height}px`; document.body.append(ghost); tile.classList.add("is-dragging");
+      const squareSize = Math.max(86, Math.min(150, rect.width));
+      ghost.style.width = `${squareSize}px`; ghost.style.height = `${squareSize}px`; document.body.append(ghost);
+      const oldRects = galleryRects(); draggingImageId = item.id; renderImages(oldRects);
       let x = event.clientX; let y = event.clientY; let lastX = x; let lastTime = performance.now(); let velocity = 0;
-      const paint = () => { const tilt = Math.max(-8, Math.min(8, velocity * .15)); ghost.style.transform = `translate3d(${x - rect.width / 2}px, ${y - rect.height / 2}px, 0) rotate(${tilt}deg) scale(1.04)`; };
+      const paint = () => { const tilt = Math.max(-8, Math.min(8, velocity * .15)); ghost.style.transform = `translate3d(${x - squareSize / 2}px, ${y - squareSize / 2}px, 0) rotate(${tilt}deg) scale(1.04)`; };
       paint();
       const move = (moveEvent) => {
         const now = performance.now(); velocity = (moveEvent.clientX - lastX) / Math.max(1, now - lastTime); lastX = moveEvent.clientX; lastTime = now; x = moveEvent.clientX; y = moveEvent.clientY; paint();
         const target = document.elementsFromPoint(x, y).find((element) => element.classList?.contains("product-media-tile"));
         if (target?.dataset.imageId && target.dataset.imageId !== item.id) reorderImage(item.id, target.dataset.imageId);
       };
-      const end = () => { document.removeEventListener("pointermove", move); document.removeEventListener("pointerup", end); ghost.classList.add("is-dropping"); setTimeout(() => ghost.remove(), 180); gallery?.querySelector(`[data-image-id="${CSS.escape(item.id)}"]`)?.classList.remove("is-dragging"); };
+      const end = () => {
+        document.removeEventListener("pointermove", move); document.removeEventListener("pointerup", end);
+        const oldRects = galleryRects(); draggingImageId = null; renderImages(oldRects);
+        ghost.classList.add("is-dropping"); setTimeout(() => ghost.remove(), 180); markDraftChanged();
+      };
       document.addEventListener("pointermove", move); document.addEventListener("pointerup", end, { once: true });
     };
     const renderImages = (oldRects = null) => {
       if (mediaCount) mediaCount.textContent = `${selectedImages.length} / 9`;
-      if (gallery) { gallery.hidden = selectedImages.length === 0; gallery.replaceChildren(); }
+      if (gallery) { gallery.hidden = selectedImages.length === 0; gallery.classList.toggle("is-reordering", Boolean(draggingImageId)); gallery.replaceChildren(); }
       if (mediaEmpty) mediaEmpty.hidden = selectedImages.length > 0;
       selectedImages.forEach((item, index) => {
         const tile = document.createElement("article"); tile.className = "product-media-tile"; tile.dataset.imageId = item.id;
+        if (item.id === draggingImageId) tile.classList.add("product-media-drop-placeholder");
         tile.innerHTML = `<img src="${item.url}" alt=""><span>${index === 0 ? "Main image" : `Image ${index + 1}`}</span><div><button type="button" data-media-left aria-label="Move image left">←</button><button type="button" data-media-right aria-label="Move image right">→</button><button type="button" data-media-remove aria-label="Remove image">×</button></div>`;
         tile.querySelector("[data-media-left]").disabled = index === 0; tile.querySelector("[data-media-right]").disabled = index === selectedImages.length - 1;
         tile.querySelector("[data-media-left]").addEventListener("click", () => reorderImage(item.id, selectedImages[index - 1]?.id));
