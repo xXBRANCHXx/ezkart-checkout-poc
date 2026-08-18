@@ -208,7 +208,10 @@
     const errorTarget = q("[data-product-create-error]");
     const descriptionCount = q("[data-description-count]");
     const liveImage = q("[data-product-live-image]");
+    const liveImageStage = q("[data-product-live-image-stage]");
     const liveThumbs = q("[data-product-live-thumbs]");
+    const previewImagePrevious = q("[data-product-image-prev]");
+    const previewImageNext = q("[data-product-image-next]");
     const liveVariant = q("[data-product-live-variant]");
     const variantToggle = q("[data-product-variant-toggle]");
     const variantBuilder = q("[data-product-variant-builder]");
@@ -231,6 +234,7 @@
     let selectedVariantIds = new Set();
     let liveOptionSelection = {};
     let previewImageIndex = 0;
+    let previewUsesVariantImage = true;
     let previewDevice = "desktop";
     let draggingImageId = null;
     let draftTimer = 0;
@@ -265,7 +269,7 @@
       const stock = selectedVariant ? selectedVariant.stock : productCreateForm.elements.stock?.value;
       return `${Math.max(0, Math.round(Number(stock) || 0))} available · shipping calculated at checkout`;
     };
-    const updatePreview = () => {
+    const updatePreview = (imageDirection = 0) => {
       const selectedVariant = selectedPreviewVariant();
       const name = String(productCreateForm.elements.name?.value || "").trim();
       const category = String(productCreateForm.elements.category?.value || "").trim();
@@ -278,15 +282,24 @@
       setText("[data-product-live-type]", typeName(currentType()));
       setText("[data-product-live-availability]", previewAvailability(selectedVariant));
       if (descriptionCount) descriptionCount.textContent = String(productCreateForm.elements.description?.value.length || 0);
-      const useCustom = Boolean(selectedVariant?.useCustomImage && selectedVariant.customImage?.url);
-      const variantIndex = selectedVariant && Number.isInteger(selectedVariant.imageIndex) ? selectedVariant.imageIndex : previewImageIndex;
+      const useCustom = Boolean(previewUsesVariantImage && selectedVariant?.useCustomImage && selectedVariant.customImage?.url);
+      const variantIndex = previewUsesVariantImage && selectedVariant && Number.isInteger(selectedVariant.imageIndex) ? selectedVariant.imageIndex : previewImageIndex;
       const source = useCustom ? selectedVariant.customImage.url : selectedImages[variantIndex]?.url || selectedImages[0]?.url || "";
       if (liveImage) {
         liveImage.replaceChildren();
-        if (source) { const image = document.createElement("img"); image.src = source; image.alt = name || "Product preview"; liveImage.append(image); }
+        if (source) { const image = document.createElement("img"); image.src = source; image.alt = name || "Product preview"; image.draggable = false; liveImage.append(image); if (imageDirection) image.animate([{ opacity: .35, transform: `translateX(${imageDirection * 18}px)` }, { opacity: 1, transform: "translateX(0)" }], { duration: 220, easing: "cubic-bezier(.2,.8,.2,1)" }); }
         else liveImage.innerHTML = '<span><svg class="icon" aria-hidden="true"><use href="#icon-image"></use></svg><small>Your square main image</small></span>';
       }
       liveThumbs?.querySelectorAll("button").forEach((thumb, index) => thumb.classList.toggle("active", !useCustom && index === variantIndex));
+      const canNavigateImages = selectedImages.length > 1;
+      if (previewImagePrevious) previewImagePrevious.hidden = !canNavigateImages;
+      if (previewImageNext) previewImageNext.hidden = !canNavigateImages;
+    };
+    const navigatePreviewImage = (direction) => {
+      if (selectedImages.length < 2) return;
+      previewUsesVariantImage = false;
+      previewImageIndex = (previewImageIndex + direction + selectedImages.length) % selectedImages.length;
+      updatePreview(direction);
     };
 
     const syncLiveVariants = () => {
@@ -302,7 +315,7 @@
         if (!available.has(liveOptionSelection[group.name])) liveOptionSelection[group.name] = first.options?.find((option) => option.option === group.name)?.value || group.values[0];
         const section = document.createElement("section");
         section.innerHTML = `<span>${escapeHtml(group.name)}</span><div>${group.values.map((value) => `<button type="button" class="${liveOptionSelection[group.name] === value ? "active" : ""}" data-live-option-name="${escapeHtml(group.name)}" data-live-option-value="${escapeHtml(value)}">${escapeHtml(value)}</button>`).join("")}</div>`;
-        section.querySelectorAll("button").forEach((button) => button.addEventListener("click", () => { liveOptionSelection[button.dataset.liveOptionName] = button.dataset.liveOptionValue; syncLiveVariants(); }));
+        section.querySelectorAll("button").forEach((button) => button.addEventListener("click", () => { liveOptionSelection[button.dataset.liveOptionName] = button.dataset.liveOptionValue; previewUsesVariantImage = true; syncLiveVariants(); }));
         liveVariant.append(section);
       });
       updatePreview();
@@ -518,7 +531,7 @@
       });
       if (liveThumbs) {
         liveThumbs.hidden = selectedImages.length < 2; liveThumbs.replaceChildren();
-        selectedImages.forEach((item, index) => { const button = document.createElement("button"); button.type = "button"; button.innerHTML = `<img src="${item.url}" alt="Preview image ${index + 1}">`; button.addEventListener("click", () => { previewImageIndex = index; updatePreview(); }); liveThumbs.append(button); });
+        selectedImages.forEach((item, index) => { const button = document.createElement("button"); button.type = "button"; button.innerHTML = `<img src="${item.url}" alt="Preview image ${index + 1}">`; button.addEventListener("click", () => { const direction = index >= previewImageIndex ? 1 : -1; previewUsesVariantImage = false; previewImageIndex = index; updatePreview(direction); }); liveThumbs.append(button); });
       }
       if (!draggingImageId) { if (variants.length) renderVariants(); else updatePreview(); }
       animateGallery(oldRects);
@@ -562,6 +575,14 @@
     });
     q("[data-product-preview-device='desktop']")?.addEventListener("click", () => { previewDevice = "desktop"; syncPreviewDevice(); markDraftChanged(); });
     q("[data-product-preview-device='mobile']")?.addEventListener("click", () => { previewDevice = "mobile"; syncPreviewDevice(); markDraftChanged(); });
+    previewImagePrevious?.addEventListener("click", () => navigatePreviewImage(-1));
+    previewImageNext?.addEventListener("click", () => navigatePreviewImage(1));
+    if (liveImageStage) {
+      let swipeStartX = null; let swipePointer = null;
+      liveImageStage.addEventListener("pointerdown", (event) => { if (event.button !== 0 || event.target.closest("button")) return; swipeStartX = event.clientX; swipePointer = event.pointerId; liveImageStage.classList.add("is-swiping"); liveImageStage.setPointerCapture?.(event.pointerId); });
+      const finishSwipe = (event) => { if (swipeStartX === null || (swipePointer !== null && event.pointerId !== swipePointer)) return; const distance = event.clientX - swipeStartX; swipeStartX = null; swipePointer = null; liveImageStage.classList.remove("is-swiping"); if (Math.abs(distance) >= 38) navigatePreviewImage(distance < 0 ? 1 : -1); };
+      liveImageStage.addEventListener("pointerup", finishSwipe); liveImageStage.addEventListener("pointercancel", finishSwipe); liveImageStage.addEventListener("dragstart", (event) => event.preventDefault());
+    }
     function syncPreviewDevice() {
       previewViewport?.classList.toggle("preview-mobile", previewDevice === "mobile"); previewViewport?.classList.toggle("preview-desktop", previewDevice === "desktop");
       productCreateForm.querySelectorAll("[data-product-preview-device]").forEach((button) => button.classList.toggle("active", button.dataset.productPreviewDevice === previewDevice));
