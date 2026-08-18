@@ -132,6 +132,8 @@
   const landingLegacyRegistryKey = "ezkart:landing-builder:v2:sites";
   const landingAdvancedModeKey = "ezkart:landing-builder:advanced-mode";
   const productCatalogKey = "ezkart:catalog:v1";
+  const productDraftsKey = "ezkart:product-drafts:v1";
+  const activeProductDraftKey = "ezkart:product-editor:active-draft";
   const readCatalogProducts = () => {
     try {
       const value = JSON.parse(localStorage.getItem(productCatalogKey) || "[]");
@@ -141,6 +143,16 @@
   const writeCatalogProducts = (products) => {
     try { localStorage.setItem(productCatalogKey, JSON.stringify(products)); return true; }
     catch (_) { showToast("These images exceed this browser's catalog storage. Use fewer or simpler images."); return false; }
+  };
+  const readProductDrafts = () => {
+    try {
+      const value = JSON.parse(localStorage.getItem(productDraftsKey) || "[]");
+      return Array.isArray(value) ? value.filter((draft) => draft && typeof draft.id === "string") : [];
+    } catch (_) { return []; }
+  };
+  const writeProductDrafts = (drafts) => {
+    try { localStorage.setItem(productDraftsKey, JSON.stringify(drafts)); return true; }
+    catch (_) { showToast("Draft storage is full. Remove unused drafts or reduce the number of images."); return false; }
   };
   const hydrateCreatorCatalog = (form) => {
     const fieldset = form?.querySelector("[data-creator-products]");
@@ -185,37 +197,63 @@
   };
   const productCreateForm = document.querySelector("[data-product-create-form]");
   if (productCreateForm) {
-    const typeInput = productCreateForm.querySelector("[data-product-create-type]");
-    const mediaInput = productCreateForm.querySelector("[data-product-media-input]");
-    const dropzone = productCreateForm.querySelector("[data-product-dropzone]");
-    const gallery = productCreateForm.querySelector("[data-product-media-gallery]");
-    const mediaEmpty = productCreateForm.querySelector("[data-product-media-empty]");
-    const mediaCount = productCreateForm.querySelector("[data-product-media-count]");
-    const imageRule = productCreateForm.querySelector("[data-product-image-rule]");
-    const errorTarget = productCreateForm.querySelector("[data-product-create-error]");
-    const descriptionInput = productCreateForm.querySelector("[data-product-preview-description]");
-    const descriptionCount = productCreateForm.querySelector("[data-description-count]");
-    const liveImage = productCreateForm.querySelector("[data-product-live-image]");
-    const liveThumbs = productCreateForm.querySelector("[data-product-live-thumbs]");
-    const variantToggle = productCreateForm.querySelector("[data-product-variant-toggle]");
-    const variantBuilder = productCreateForm.querySelector("[data-product-variant-builder]");
-    const noVariants = productCreateForm.querySelector("[data-product-no-variants]");
-    const optionGroups = productCreateForm.querySelector("[data-product-option-groups]");
-    const variantTable = productCreateForm.querySelector("[data-product-variant-table]");
-    const variantEmpty = productCreateForm.querySelector("[data-product-variant-empty]");
-    const variantRows = productCreateForm.querySelector("[data-product-variant-rows]");
-    const liveVariant = productCreateForm.querySelector("[data-product-live-variant]");
-    const liveVariantSelect = productCreateForm.querySelector("[data-product-live-variant-select]");
-    const formSubmitButtons = document.querySelectorAll('[form="product-create-form"], #product-create-form button[type="submit"]');
+    const q = (selector) => productCreateForm.querySelector(selector);
+    const typeInput = q("[data-product-create-type]");
+    const mediaInput = q("[data-product-media-input]");
+    const dropzone = q("[data-product-dropzone]");
+    const gallery = q("[data-product-media-gallery]");
+    const mediaEmpty = q("[data-product-media-empty]");
+    const mediaCount = q("[data-product-media-count]");
+    const imageRule = q("[data-product-image-rule]");
+    const errorTarget = q("[data-product-create-error]");
+    const descriptionCount = q("[data-description-count]");
+    const liveImage = q("[data-product-live-image]");
+    const liveThumbs = q("[data-product-live-thumbs]");
+    const liveVariant = q("[data-product-live-variant]");
+    const variantToggle = q("[data-product-variant-toggle]");
+    const variantBuilder = q("[data-product-variant-builder]");
+    const noVariants = q("[data-product-no-variants]");
+    const optionGroups = q("[data-product-option-groups]");
+    const variantTable = q("[data-product-variant-table]");
+    const variantEmpty = q("[data-product-variant-empty]");
+    const variantRows = q("[data-product-variant-rows]");
+    const basePricingCard = q("[data-product-base-pricing]");
+    const filterChips = q("[data-variant-filter-chips]");
+    const selectedCount = q("[data-variant-selected-count]");
+    const selectAllVariants = q("[data-select-all-variants]");
+    const previewViewport = q("[data-product-preview-viewport]");
+    const draftStatus = document.querySelector("[data-product-draft-status]");
+    const saveDraftButton = document.querySelector("[data-save-product-draft]");
+    const submitButtons = document.querySelectorAll('[form="product-create-form"], #product-create-form button[type="submit"]');
+    const allowedImageTypes = ["image/png", "image/jpeg", "image/webp", "image/avif"];
     let selectedImages = [];
     let variants = [];
+    let selectedVariantIds = new Set();
+    let liveOptionSelection = {};
+    let previewImageIndex = 0;
+    let previewDevice = "desktop";
+    let draftTimer = 0;
+    let restoringDraft = true;
+    const draftQuery = new URLSearchParams(window.location.search);
+    let draftId = draftQuery.get("draft") || sessionStorage.getItem(activeProductDraftKey) || `draft-${globalThis.crypto?.randomUUID?.() || Date.now()}`;
+    if (draftQuery.get("new") === "1") draftId = `draft-${globalThis.crypto?.randomUUID?.() || Date.now()}`;
+    sessionStorage.setItem(activeProductDraftKey, draftId);
+    history.replaceState(null, "", `?page=product-new&draft=${encodeURIComponent(draftId)}`);
 
-    const typeName = (type) => ({ physical: "Physical product", digital: "Digital product", subscription: "Subscription" }[type] || "Product");
-    const showError = (message) => { errorTarget.textContent = message; errorTarget.hidden = false; errorTarget.scrollIntoView({ behavior: "smooth", block: "center" }); };
-    const clearError = () => { errorTarget.hidden = true; errorTarget.textContent = ""; };
-    const setText = (selector, value) => { const target = productCreateForm.querySelector(selector); if (target) target.textContent = value; };
     const currentType = () => String(typeInput?.value || "physical");
-    const previewAvailability = () => {
+    const typeName = (type) => ({ physical: "Physical product", digital: "Digital product", subscription: "Subscription" }[type] || "Product");
+    const setText = (selector, value) => { const target = q(selector); if (target) target.textContent = value; };
+    const showError = (message) => { if (!errorTarget) return; errorTarget.textContent = message; errorTarget.hidden = false; errorTarget.scrollIntoView({ behavior: "smooth", block: "center" }); };
+    const clearError = () => { if (!errorTarget) return; errorTarget.hidden = true; errorTarget.textContent = ""; };
+    const optionValues = (input) => String(input?.value || "").split(",").map((value) => value.trim()).filter(Boolean).filter((value, index, values) => values.indexOf(value) === index);
+    const optionSnapshot = () => [...(optionGroups?.children || [])].map((row) => ({ name: String(row.querySelector("[data-option-name]")?.value || "").trim(), values: optionValues(row.querySelector("[data-option-values]")) })).filter((group) => group.name && group.values.length);
+    const selectedPreviewVariant = () => {
+      if (!variantToggle?.checked || !variants.length) return null;
+      return variants.find((variant) => variant.options?.every((option) => liveOptionSelection[option.option] === option.value)) || variants[0];
+    };
+    const imageData = async (item) => item?.data || (item?.file ? compressCreatorProductImage(item.file) : "");
+
+    const previewAvailability = (selectedVariant) => {
       const type = currentType();
       if (type === "digital") return "Available immediately after payment";
       if (type === "subscription") {
@@ -223,205 +261,320 @@
         const unit = String(productCreateForm.elements.unit?.value || "month");
         return `Billed every ${interval} ${unit}${interval === 1 ? "" : "s"}`;
       }
-      const stock = Math.max(0, Math.round(Number(productCreateForm.elements.stock?.value) || 0));
-      return `${stock} available · shipping calculated at checkout`;
+      const stock = selectedVariant ? selectedVariant.stock : productCreateForm.elements.stock?.value;
+      return `${Math.max(0, Math.round(Number(stock) || 0))} available · shipping calculated at checkout`;
     };
     const updatePreview = () => {
+      const selectedVariant = selectedPreviewVariant();
       const name = String(productCreateForm.elements.name?.value || "").trim();
       const category = String(productCreateForm.elements.category?.value || "").trim();
       const description = String(productCreateForm.elements.description?.value || "").trim();
-      const selectedVariant = variantToggle?.checked ? variants.find((variant) => variant.id === liveVariantSelect?.value) || variants[0] : null;
-      const price = selectedVariant ? Math.max(0, Math.round(Number(selectedVariant.price) || 0)) : Math.max(0, Math.round(Number(productCreateForm.elements.price?.value) || 0));
+      const price = selectedVariant ? selectedVariant.price : productCreateForm.elements.price?.value;
       setText("[data-product-live-name]", name || "Your product name");
-      setText("[data-product-live-category]", (category || "Product category").toLocaleUpperCase("id-ID"));
+      setText("[data-product-live-category]", category || "Product category");
       setText("[data-product-live-description]", description || "Add a clear description so customers immediately understand what they are buying.");
-      setText("[data-product-live-price]", formatCreatorPrice(price));
+      setText("[data-product-live-price]", formatCreatorPrice(Math.max(0, Math.round(Number(price) || 0))));
       setText("[data-product-live-type]", typeName(currentType()));
-      setText("[data-product-live-availability]", selectedVariant && currentType() === "physical" ? `${Math.max(0, Number(selectedVariant.stock) || 0)} available · shipping calculated at checkout` : previewAvailability());
-      if (liveImage && (selectedImages.length || selectedVariant?.customImage?.url)) {
-        const imageIndex = selectedVariant && Number.isInteger(selectedVariant.imageIndex) ? selectedVariant.imageIndex : 0;
-        const useCustomImage = Boolean(selectedVariant?.useCustomImage && selectedVariant.customImage?.url);
-        let image = liveImage.querySelector("img"); if (!image) { liveImage.replaceChildren(); image = document.createElement("img"); image.alt = "Product preview"; liveImage.append(image); } image.src = useCustomImage ? selectedVariant.customImage.url : selectedImages[imageIndex]?.url || selectedImages[0]?.url || "";
-        liveThumbs?.querySelectorAll("img").forEach((thumb, index) => thumb.classList.toggle("active", !useCustomImage && index === imageIndex));
+      setText("[data-product-live-availability]", previewAvailability(selectedVariant));
+      if (descriptionCount) descriptionCount.textContent = String(productCreateForm.elements.description?.value.length || 0);
+      const useCustom = Boolean(selectedVariant?.useCustomImage && selectedVariant.customImage?.url);
+      const variantIndex = selectedVariant && Number.isInteger(selectedVariant.imageIndex) ? selectedVariant.imageIndex : previewImageIndex;
+      const source = useCustom ? selectedVariant.customImage.url : selectedImages[variantIndex]?.url || selectedImages[0]?.url || "";
+      if (liveImage) {
+        liveImage.replaceChildren();
+        if (source) { const image = document.createElement("img"); image.src = source; image.alt = name || "Product preview"; liveImage.append(image); }
+        else liveImage.innerHTML = '<span><svg class="icon" aria-hidden="true"><use href="#icon-image"></use></svg><small>Your square main image</small></span>';
       }
-      if (descriptionCount) descriptionCount.textContent = String(descriptionInput?.value.length || 0);
+      liveThumbs?.querySelectorAll("button").forEach((thumb, index) => thumb.classList.toggle("active", !useCustom && index === variantIndex));
     };
-    const syncType = () => {
-      const type = currentType();
-      productCreateForm.querySelectorAll("[data-product-physical]").forEach((field) => { field.hidden = type !== "physical"; });
-      const digital = productCreateForm.querySelector("[data-product-digital]"); if (digital) digital.hidden = type !== "digital";
-      const subscription = productCreateForm.querySelector("[data-product-subscription]"); if (subscription) subscription.hidden = type !== "subscription";
-      if (variants.length) renderVariants();
-      if (imageRule) imageRule.querySelector("span").innerHTML = type === "physical"
-        ? "<b>Physical products need 3–9 images.</b> The first image becomes the main catalog photo. Use the arrows to change the order."
-        : "<b>This product needs 1–9 images.</b> The first image becomes the main catalog photo. Use the arrows to change the order.";
-      clearError(); updatePreview();
+
+    const syncLiveVariants = () => {
+      if (!liveVariant) return;
+      const groups = optionSnapshot();
+      const show = Boolean(variantToggle?.checked && variants.length && groups.length);
+      liveVariant.hidden = !show;
+      liveVariant.replaceChildren();
+      if (!show) { updatePreview(); return; }
+      const first = variants[0];
+      groups.forEach((group) => {
+        const available = new Set(group.values);
+        if (!available.has(liveOptionSelection[group.name])) liveOptionSelection[group.name] = first.options?.find((option) => option.option === group.name)?.value || group.values[0];
+        const section = document.createElement("section");
+        section.innerHTML = `<span>${escapeHtml(group.name)}</span><div>${group.values.map((value) => `<button type="button" class="${liveOptionSelection[group.name] === value ? "active" : ""}" data-live-option-name="${escapeHtml(group.name)}" data-live-option-value="${escapeHtml(value)}">${escapeHtml(value)}</button>`).join("")}</div>`;
+        section.querySelectorAll("button").forEach((button) => button.addEventListener("click", () => { liveOptionSelection[button.dataset.liveOptionName] = button.dataset.liveOptionValue; syncLiveVariants(); }));
+        liveVariant.append(section);
+      });
+      updatePreview();
     };
-    const optionValues = (input) => String(input?.value || "").split(",").map((value) => value.trim()).filter(Boolean).filter((value, index, values) => values.indexOf(value) === index);
+
+    const markDraftChanged = () => {
+      if (restoringDraft) return;
+      if (draftStatus) { draftStatus.classList.add("is-saving"); draftStatus.innerHTML = "<i></i> Saving draft…"; }
+      window.clearTimeout(draftTimer);
+      draftTimer = window.setTimeout(() => saveDraft(false), 550);
+    };
+    const draftSnapshot = () => ({
+      id: draftId,
+      name: String(productCreateForm.elements.name?.value || "").trim(),
+      updatedAt: new Date().toISOString(),
+      fields: {
+        type: currentType(), category: String(productCreateForm.elements.category?.value || ""), description: String(productCreateForm.elements.description?.value || ""),
+        price: String(productCreateForm.elements.price?.value || ""), stock: String(productCreateForm.elements.stock?.value || ""), weight: String(productCreateForm.elements.weight?.value || ""),
+        digital_name: String(productCreateForm.elements.digital_name?.value || ""), interval: String(productCreateForm.elements.interval?.value || "1"), unit: String(productCreateForm.elements.unit?.value || "month"),
+      },
+      images: selectedImages.map((item) => ({ id: item.id, data: item.data || item.url })),
+      hasVariants: Boolean(variantToggle?.checked), options: optionSnapshot(),
+      variants: variants.map((variant) => ({ ...variant, customImage: variant.customImage ? { data: variant.customImage.data || variant.customImage.url } : null })),
+      previewDevice,
+    });
+    const saveDraft = (announce = true) => {
+      window.clearTimeout(draftTimer);
+      const drafts = readProductDrafts();
+      const snapshot = draftSnapshot();
+      const index = drafts.findIndex((draft) => draft.id === draftId);
+      if (index >= 0) drafts[index] = snapshot; else drafts.push(snapshot);
+      if (!writeProductDrafts(drafts)) return false;
+      if (draftStatus) { draftStatus.classList.remove("is-saving"); draftStatus.innerHTML = "<i></i> Saved just now"; }
+      if (announce) showToast("Product draft saved");
+      return true;
+    };
+
     const addOptionGroup = (name = "", values = "") => {
       if (!optionGroups || optionGroups.children.length >= 3) return;
       const row = document.createElement("div"); row.className = "product-option-group";
       row.innerHTML = `<label><span>Option name</span><input type="text" maxlength="24" placeholder="Size" value="${escapeHtml(name)}" data-option-name></label><label><span>Values</span><input type="text" maxlength="180" placeholder="50 ml, 250 ml" value="${escapeHtml(values)}" data-option-values></label><button type="button" aria-label="Remove option group">×</button>`;
-      row.querySelector("button").onclick = () => { row.remove(); variants.forEach((variant) => variant.customImage?.url && URL.revokeObjectURL(variant.customImage.url)); variants = []; renderVariants(); };
+      row.querySelector("button").addEventListener("click", () => { row.remove(); variants = []; selectedVariantIds.clear(); renderVariants(); markDraftChanged(); });
       optionGroups.append(row);
     };
-    const variantImageOptions = (variant) => {
-      const selected = variant.useCustomImage && variant.customImage ? "custom" : Number.isInteger(variant.imageIndex) ? String(variant.imageIndex) : "";
-      return `<option value=""${selected === "" ? " selected" : ""}>Main image</option>${selectedImages.map((image, index) => `<option value="${index}"${String(index) === selected ? " selected" : ""}>Gallery image ${index + 1}</option>`).join("")}${variant.customImage ? `<option value="custom"${selected === "custom" ? " selected" : ""}>Uploaded variant photo</option>` : ""}`;
+
+    const updateVariantSelection = () => {
+      variantRows?.querySelectorAll(".product-variant-row").forEach((row) => {
+        const selected = selectedVariantIds.has(row.dataset.variantId);
+        row.classList.toggle("selected", selected);
+        const checkbox = row.querySelector("[data-variant-select]"); if (checkbox) checkbox.checked = selected;
+      });
+      if (selectedCount) selectedCount.textContent = `${selectedVariantIds.size} selected`;
+      if (selectAllVariants) { selectAllVariants.checked = variants.length > 0 && selectedVariantIds.size === variants.length; selectAllVariants.indeterminate = selectedVariantIds.size > 0 && selectedVariantIds.size < variants.length; }
+      filterChips?.querySelectorAll("button").forEach((chip) => {
+        const matches = variants.filter((variant) => variant.options?.some((option) => option.option === chip.dataset.optionName && option.value === chip.dataset.optionValue));
+        chip.classList.toggle("active", matches.length > 0 && matches.every((variant) => selectedVariantIds.has(variant.id)));
+      });
     };
-    const syncLiveVariants = () => {
-      if (!liveVariant || !liveVariantSelect) return;
-      const currentVariantId = liveVariantSelect.value;
-      const show = Boolean(variantToggle?.checked && variants.length);
-      liveVariant.hidden = !show; liveVariantSelect.replaceChildren();
-      variants.forEach((variant) => { const option = document.createElement("option"); option.value = variant.id; option.textContent = variant.name; liveVariantSelect.append(option); });
-      if (variants.some((variant) => variant.id === currentVariantId)) liveVariantSelect.value = currentVariantId;
-      updatePreview();
+    const renderVariantFilters = () => {
+      if (!filterChips) return;
+      filterChips.replaceChildren();
+      optionSnapshot().forEach((group) => {
+        const section = document.createElement("section");
+        section.innerHTML = `<span>${escapeHtml(group.name)}</span><div>${group.values.map((value) => `<button type="button" data-option-name="${escapeHtml(group.name)}" data-option-value="${escapeHtml(value)}">All ${escapeHtml(value)}</button>`).join("")}</div>`;
+        section.querySelectorAll("button").forEach((chip) => chip.addEventListener("click", () => {
+          const matches = variants.filter((variant) => variant.options?.some((option) => option.option === chip.dataset.optionName && option.value === chip.dataset.optionValue));
+          const deselect = matches.length && matches.every((variant) => selectedVariantIds.has(variant.id));
+          matches.forEach((variant) => deselect ? selectedVariantIds.delete(variant.id) : selectedVariantIds.add(variant.id));
+          updateVariantSelection();
+        }));
+        filterChips.append(section);
+      });
+    };
+    const variantPhotoMarkup = (variant) => {
+      const currentSource = variant.useCustomImage && variant.customImage?.url ? variant.customImage.url : Number.isInteger(variant.imageIndex) ? selectedImages[variant.imageIndex]?.url : selectedImages[0]?.url;
+      const choices = selectedImages.length ? selectedImages.map((image, index) => `<button type="button" data-main-image-index="${index}"><img src="${image.url}" alt=""><span>${index === 0 ? "Main image" : `Image ${index + 1}`}</span></button>`).join("") : '<p>Upload main images first.</p>';
+      return `<div class="product-variant-photo"><label class="product-variant-upload"><input type="file" accept="image/png,image/jpeg,image/webp,image/avif" data-variant-photo-input><span>${currentSource ? `<img src="${currentSource}" alt=""><b>${variant.useCustomImage ? "Replace" : "Upload"}</b>` : '<svg class="icon" aria-hidden="true"><use href="#icon-image"></use></svg><b>Upload</b>'}</span></label><details class="product-variant-main-picker"><summary aria-label="Choose a photo from main images">⌄</summary><div>${choices}</div></details>${variant.useCustomImage ? '<button type="button" data-variant-photo-clear aria-label="Remove variant upload">×</button>' : ""}</div>`;
     };
     const renderVariants = () => {
       if (variantTable) variantTable.hidden = variants.length === 0;
       if (variantEmpty) variantEmpty.hidden = variants.length > 0;
       if (!variantRows) return;
+      selectedVariantIds = new Set([...selectedVariantIds].filter((id) => variants.some((variant) => variant.id === id)));
       variantRows.replaceChildren();
       variants.forEach((variant, index) => {
+        const physical = currentType() === "physical";
         const row = document.createElement("div"); row.className = "product-variant-row"; row.dataset.variantId = variant.id;
-        row.innerHTML = `<b>${escapeHtml(variant.name)}</b><label><span>Price</span><input type="number" min="1000" step="500" value="${variant.price}" data-variant-price></label><label><span>Stock</span><input type="number" min="0" max="999999" value="${variant.stock}" data-variant-stock></label><label><span>SKU</span><input type="text" maxlength="48" value="${escapeHtml(variant.sku)}" data-variant-sku></label><div class="product-variant-photo"><select data-variant-image aria-label="Photo for ${escapeHtml(variant.name)}">${variantImageOptions(variant)}</select><label class="product-variant-upload"><input type="file" accept="image/png,image/jpeg,image/webp,image/avif" data-variant-photo-input><span>${variant.customImage ? `<img src="${variant.customImage.url}" alt=""><b>Replace</b>` : `<b>+ Upload</b>`}</span></label>${variant.customImage ? `<button type="button" data-variant-photo-clear aria-label="Remove uploaded photo">×</button>` : ""}</div><button type="button" data-variant-remove aria-label="Remove ${escapeHtml(variant.name)}">×</button>`;
-        const stockLabel = row.querySelector("[data-variant-stock]")?.closest("label"); if (stockLabel) stockLabel.hidden = currentType() !== "physical";
-        row.querySelector("[data-variant-price]").oninput = (event) => { variant.price = Math.max(0, Math.round(Number(event.target.value) || 0)); updatePreview(); };
-        row.querySelector("[data-variant-stock]").oninput = (event) => { variant.stock = Math.max(0, Math.round(Number(event.target.value) || 0)); updatePreview(); };
-        row.querySelector("[data-variant-sku]").oninput = (event) => { variant.sku = event.target.value.trim(); };
-        row.querySelector("[data-variant-image]").onchange = (event) => { variant.useCustomImage = event.target.value === "custom"; if (!variant.useCustomImage) variant.imageIndex = event.target.value === "" ? null : Number(event.target.value); updatePreview(); };
-        row.querySelector("[data-variant-photo-input]").onchange = (event) => {
+        row.innerHTML = `<span><input type="checkbox" data-variant-select aria-label="Select ${escapeHtml(variant.name)}"></span><b>${escapeHtml(variant.name)}</b><label><span>Price</span><input type="number" min="1000" step="500" value="${variant.price}" data-variant-price></label><label ${physical ? "" : "hidden"}><span>Stock</span><input type="number" min="0" max="999999" value="${variant.stock}" data-variant-stock></label><label ${physical ? "" : "hidden"}><span>Weight</span><input type="number" min="1" max="50000" value="${variant.weightGrams || 500}" data-variant-weight></label><label><span>SKU</span><input type="text" maxlength="48" value="${escapeHtml(variant.sku)}" data-variant-sku></label>${variantPhotoMarkup(variant)}<button type="button" data-variant-remove aria-label="Remove ${escapeHtml(variant.name)}">×</button>`;
+        row.querySelector("[data-variant-select]").addEventListener("change", (event) => { event.target.checked ? selectedVariantIds.add(variant.id) : selectedVariantIds.delete(variant.id); updateVariantSelection(); });
+        row.querySelector("[data-variant-price]").addEventListener("input", (event) => { variant.price = Math.max(0, Math.round(Number(event.target.value) || 0)); updatePreview(); markDraftChanged(); });
+        row.querySelector("[data-variant-stock]").addEventListener("input", (event) => { variant.stock = Math.max(0, Math.round(Number(event.target.value) || 0)); updatePreview(); markDraftChanged(); });
+        row.querySelector("[data-variant-weight]").addEventListener("input", (event) => { variant.weightGrams = Math.max(0, Math.round(Number(event.target.value) || 0)); markDraftChanged(); });
+        row.querySelector("[data-variant-sku]").addEventListener("input", (event) => { variant.sku = event.target.value.trim(); markDraftChanged(); });
+        row.querySelectorAll("[data-main-image-index]").forEach((button) => button.addEventListener("click", () => { variant.imageIndex = Number(button.dataset.mainImageIndex); variant.useCustomImage = false; button.closest("details").open = false; renderVariants(); markDraftChanged(); }));
+        row.querySelector("[data-variant-photo-input]").addEventListener("change", async (event) => {
           const file = event.target.files?.[0]; event.target.value = ""; if (!file) return;
-          if (!["image/png", "image/jpeg", "image/webp", "image/avif"].includes(file.type)) { showError("Variant photos must be PNG, JPG, WebP, or AVIF."); return; }
-          if (file.size > 2 * 1024 * 1024) { showError(`${file.name} is larger than 2 MB.`); return; }
-          if (variant.customImage?.url) URL.revokeObjectURL(variant.customImage.url);
-          variant.customImage = { file, url: URL.createObjectURL(file) }; variant.useCustomImage = true; clearError(); renderVariants();
-        };
-        row.querySelector("[data-variant-photo-clear]")?.addEventListener("click", () => { if (variant.customImage?.url) URL.revokeObjectURL(variant.customImage.url); variant.customImage = null; variant.useCustomImage = false; renderVariants(); });
-        row.querySelector("[data-variant-remove]").onclick = () => { if (variant.customImage?.url) URL.revokeObjectURL(variant.customImage.url); variants.splice(index, 1); renderVariants(); };
+          if (!allowedImageTypes.includes(file.type) || file.size > 2 * 1024 * 1024) { showError("Variant photos must be PNG, JPG, WebP, or AVIF and no larger than 2 MB."); return; }
+          try { const data = await compressCreatorProductImage(file); variant.customImage = { data, url: data }; variant.useCustomImage = true; clearError(); renderVariants(); markDraftChanged(); }
+          catch (error) { showError(error instanceof Error ? error.message : "That variant image could not be added."); }
+        });
+        row.querySelector("[data-variant-photo-clear]")?.addEventListener("click", () => { variant.customImage = null; variant.useCustomImage = false; renderVariants(); markDraftChanged(); });
+        row.querySelector("[data-variant-remove]").addEventListener("click", () => { variants.splice(index, 1); selectedVariantIds.delete(variant.id); renderVariants(); markDraftChanged(); });
         variantRows.append(row);
       });
-      syncLiveVariants();
+      q("[data-variant-stock-heading]")?.toggleAttribute("hidden", currentType() !== "physical");
+      q("[data-variant-weight-heading]")?.toggleAttribute("hidden", currentType() !== "physical");
+      q("[data-product-variant-batch]")?.querySelectorAll("[data-batch-physical]").forEach((field) => { field.hidden = currentType() !== "physical"; });
+      renderVariantFilters(); updateVariantSelection(); syncLiveVariants();
     };
     const generateVariants = () => {
       clearError();
-      const groups = [...(optionGroups?.children || [])].map((row) => ({ name: String(row.querySelector("[data-option-name]")?.value || "").trim(), values: optionValues(row.querySelector("[data-option-values]")) })).filter((group) => group.name && group.values.length);
+      const groups = optionSnapshot();
       if (!groups.length) { showError("Add at least one option name and comma-separated values before generating variants."); return; }
       const combinations = groups.reduce((list, group) => list.flatMap((combination) => group.values.map((value) => [...combination, { option: group.name, value }])), [[]]);
       if (combinations.length > 100) { showError("These options create more than 100 variants. Reduce the values before continuing."); return; }
       const previous = new Map(variants.map((variant) => [variant.name, variant]));
-      const basePrice = Math.max(1000, Math.round(Number(productCreateForm.elements.price?.value) || 0));
-      const baseStock = Math.max(0, Math.round(Number(productCreateForm.elements.stock?.value) || 0));
+      const price = Math.max(1000, Math.round(Number(productCreateForm.elements.price?.value) || 75000));
+      const stock = Math.max(0, Math.round(Number(productCreateForm.elements.stock?.value) || 0));
+      const weightGrams = Math.max(1, Math.round(Number(productCreateForm.elements.weight?.value) || 500));
       variants = combinations.map((options, index) => {
         const name = options.map((option) => option.value).join(" · ");
-        return previous.get(name) || { id: globalThis.crypto?.randomUUID?.() || `variant-${Date.now()}-${index}`, name, options, price: basePrice, stock: baseStock, sku: `VAR-${String(index + 1).padStart(3, "0")}`, imageIndex: null };
+        return previous.get(name) || { id: globalThis.crypto?.randomUUID?.() || `variant-${Date.now()}-${index}`, name, options, price, stock, weightGrams, sku: `VAR-${String(index + 1).padStart(3, "0")}`, imageIndex: null, useCustomImage: false };
       });
-      previous.forEach((variant, name) => { if (!variants.some((item) => item.name === name) && variant.customImage?.url) URL.revokeObjectURL(variant.customImage.url); });
-      renderVariants();
+      renderVariants(); markDraftChanged();
     };
-    variantToggle?.addEventListener("change", () => { if (variantBuilder) variantBuilder.hidden = !variantToggle.checked; if (noVariants) noVariants.hidden = variantToggle.checked; if (variantToggle.checked && optionGroups?.children.length === 0) { addOptionGroup("Size", "50 ml, 250 ml"); addOptionGroup("Flavor", "Hazelnut, Caramel"); } syncLiveVariants(); });
-    productCreateForm.querySelector("[data-add-option-group]")?.addEventListener("click", () => addOptionGroup());
-    productCreateForm.querySelector("[data-generate-variants]")?.addEventListener("click", generateVariants);
-    liveVariantSelect?.addEventListener("change", updatePreview);
-    const renderImages = () => {
+
+    const syncVariantMode = () => {
+      const enabled = Boolean(variantToggle?.checked);
+      if (variantBuilder) variantBuilder.hidden = !enabled;
+      if (noVariants) noVariants.hidden = enabled;
+      if (basePricingCard) basePricingCard.hidden = enabled;
+      if (productCreateForm.elements.price) productCreateForm.elements.price.required = !enabled;
+      if (enabled && optionGroups?.children.length === 0) { addOptionGroup("Size", "50 ml, 250 ml"); addOptionGroup("Flavor", "Peach, Original"); }
+      syncLiveVariants(); markDraftChanged();
+    };
+    const syncType = () => {
+      const type = currentType();
+      productCreateForm.querySelectorAll("[data-product-physical]").forEach((field) => { field.hidden = type !== "physical"; });
+      const digital = q("[data-product-digital]"); if (digital) digital.hidden = type !== "digital";
+      const subscription = q("[data-product-subscription]"); if (subscription) subscription.hidden = type !== "subscription";
+      if (imageRule) imageRule.querySelector("span").innerHTML = type === "physical" ? "<b>Physical products need 3–9 images.</b> The first image becomes the main catalog photo." : "<b>This product needs 1–9 images.</b> The first image becomes the main catalog photo.";
+      if (variants.length) renderVariants();
+      updatePreview(); markDraftChanged();
+    };
+
+    const animateGallery = (oldRects) => requestAnimationFrame(() => gallery?.querySelectorAll(".product-media-tile").forEach((tile) => {
+      const old = oldRects?.get(tile.dataset.imageId); if (!old) return;
+      const next = tile.getBoundingClientRect(); const x = old.left - next.left; const y = old.top - next.top;
+      if (x || y) tile.animate([{ transform: `translate(${x}px, ${y}px)` }, { transform: "translate(0, 0)" }], { duration: 330, easing: "cubic-bezier(.2,.8,.2,1)" });
+    }));
+    const galleryRects = () => new Map([...gallery?.querySelectorAll(".product-media-tile") || []].map((tile) => [tile.dataset.imageId, tile.getBoundingClientRect()]));
+    const reorderImage = (sourceId, targetId) => {
+      const source = selectedImages.findIndex((item) => item.id === sourceId); const target = selectedImages.findIndex((item) => item.id === targetId);
+      if (source < 0 || target < 0 || source === target) return;
+      const oldRects = galleryRects(); const [moved] = selectedImages.splice(source, 1); selectedImages.splice(target, 0, moved); renderImages(oldRects); markDraftChanged();
+    };
+    const startMediaDrag = (event, item, tile) => {
+      if (event.button !== 0 || event.target.closest("button")) return;
+      event.preventDefault();
+      const rect = tile.getBoundingClientRect(); const ghost = tile.cloneNode(true); ghost.classList.add("product-media-drag-ghost");
+      ghost.style.width = `${rect.width}px`; ghost.style.height = `${rect.height}px`; document.body.append(ghost); tile.classList.add("is-dragging");
+      let x = event.clientX; let y = event.clientY; let lastX = x; let lastTime = performance.now(); let velocity = 0;
+      const paint = () => { const tilt = Math.max(-8, Math.min(8, velocity * .15)); ghost.style.transform = `translate3d(${x - rect.width / 2}px, ${y - rect.height / 2}px, 0) rotate(${tilt}deg) scale(1.04)`; };
+      paint();
+      const move = (moveEvent) => {
+        const now = performance.now(); velocity = (moveEvent.clientX - lastX) / Math.max(1, now - lastTime); lastX = moveEvent.clientX; lastTime = now; x = moveEvent.clientX; y = moveEvent.clientY; paint();
+        const target = document.elementsFromPoint(x, y).find((element) => element.classList?.contains("product-media-tile"));
+        if (target?.dataset.imageId && target.dataset.imageId !== item.id) reorderImage(item.id, target.dataset.imageId);
+      };
+      const end = () => { document.removeEventListener("pointermove", move); document.removeEventListener("pointerup", end); ghost.classList.add("is-dropping"); setTimeout(() => ghost.remove(), 180); gallery?.querySelector(`[data-image-id="${CSS.escape(item.id)}"]`)?.classList.remove("is-dragging"); };
+      document.addEventListener("pointermove", move); document.addEventListener("pointerup", end, { once: true });
+    };
+    const renderImages = (oldRects = null) => {
       if (mediaCount) mediaCount.textContent = `${selectedImages.length} / 9`;
       if (gallery) { gallery.hidden = selectedImages.length === 0; gallery.replaceChildren(); }
       if (mediaEmpty) mediaEmpty.hidden = selectedImages.length > 0;
       selectedImages.forEach((item, index) => {
-        const tile = document.createElement("article");
-        tile.className = "product-media-tile";
-        tile.draggable = true;
-        tile.dataset.imageId = item.id;
+        const tile = document.createElement("article"); tile.className = "product-media-tile"; tile.dataset.imageId = item.id;
         tile.innerHTML = `<img src="${item.url}" alt=""><span>${index === 0 ? "Main image" : `Image ${index + 1}`}</span><div><button type="button" data-media-left aria-label="Move image left">←</button><button type="button" data-media-right aria-label="Move image right">→</button><button type="button" data-media-remove aria-label="Remove image">×</button></div>`;
-        tile.querySelector("[data-media-left]").disabled = index === 0;
-        tile.querySelector("[data-media-right]").disabled = index === selectedImages.length - 1;
-        tile.querySelector("[data-media-left]").onclick = () => { [selectedImages[index - 1], selectedImages[index]] = [selectedImages[index], selectedImages[index - 1]]; renderImages(); };
-        tile.querySelector("[data-media-right]").onclick = () => { [selectedImages[index + 1], selectedImages[index]] = [selectedImages[index], selectedImages[index + 1]]; renderImages(); };
-        tile.querySelector("[data-media-remove]").onclick = () => { URL.revokeObjectURL(item.url); selectedImages.splice(index, 1); renderImages(); };
-        tile.addEventListener("dragstart", (event) => { event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", item.id); });
-        tile.addEventListener("dragover", (event) => { event.preventDefault(); event.dataTransfer.dropEffect = "move"; });
-        tile.addEventListener("drop", (event) => {
-          event.preventDefault();
-          const source = selectedImages.findIndex((image) => image.id === event.dataTransfer.getData("text/plain"));
-          if (source < 0 || source === index) return;
-          const [moved] = selectedImages.splice(source, 1); selectedImages.splice(index, 0, moved); renderImages();
-        });
-        gallery?.append(tile);
+        tile.querySelector("[data-media-left]").disabled = index === 0; tile.querySelector("[data-media-right]").disabled = index === selectedImages.length - 1;
+        tile.querySelector("[data-media-left]").addEventListener("click", () => reorderImage(item.id, selectedImages[index - 1]?.id));
+        tile.querySelector("[data-media-right]").addEventListener("click", () => reorderImage(item.id, selectedImages[index + 1]?.id));
+        tile.querySelector("[data-media-remove]").addEventListener("click", () => { selectedImages.splice(index, 1); previewImageIndex = Math.min(previewImageIndex, Math.max(0, selectedImages.length - 1)); renderImages(); markDraftChanged(); });
+        tile.addEventListener("pointerdown", (event) => startMediaDrag(event, item, tile)); gallery?.append(tile);
       });
-      if (liveImage) {
-        liveImage.replaceChildren();
-        if (selectedImages[0]) { const image = document.createElement("img"); image.src = selectedImages[0].url; image.alt = "Product preview"; liveImage.append(image); }
-        else liveImage.innerHTML = '<span><svg class="icon" aria-hidden="true"><use href="#icon-image"></use></svg><small>Your main image</small></span>';
-      }
       if (liveThumbs) {
         liveThumbs.hidden = selectedImages.length < 2; liveThumbs.replaceChildren();
-        selectedImages.slice(0, 5).forEach((item, index) => { const image = document.createElement("img"); image.src = item.url; image.alt = ""; if (index === 0) image.className = "active"; liveThumbs.append(image); });
+        selectedImages.forEach((item, index) => { const button = document.createElement("button"); button.type = "button"; button.innerHTML = `<img src="${item.url}" alt="Preview image ${index + 1}">`; button.addEventListener("click", () => { previewImageIndex = index; updatePreview(); }); liveThumbs.append(button); });
       }
-      if (variants.length) renderVariants();
+      if (variants.length) renderVariants(); else updatePreview();
+      animateGallery(oldRects);
     };
-    const addImages = (files) => {
-      clearError();
-      const incoming = [...files];
-      const invalid = incoming.filter((file) => !["image/png", "image/jpeg", "image/webp", "image/avif"].includes(file.type));
-      const oversized = incoming.filter((file) => file.size > 2 * 1024 * 1024);
-      const rejected = new Set([...invalid, ...oversized]);
-      const remainingSpaces = Math.max(0, 9 - selectedImages.length);
-      const candidates = incoming.filter((file) => !rejected.has(file)).slice(0, remainingSpaces);
-      candidates.forEach((file) => selectedImages.push({ id: globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`, file, url: URL.createObjectURL(file) }));
+    const addImages = async (files) => {
+      clearError(); const incoming = [...files];
+      const valid = incoming.filter((file) => allowedImageTypes.includes(file.type) && file.size <= 2 * 1024 * 1024).slice(0, Math.max(0, 9 - selectedImages.length));
+      try {
+        const data = await Promise.all(valid.map(compressCreatorProductImage));
+        data.forEach((url) => selectedImages.push({ id: globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`, data: url, url }));
+        renderImages(); markDraftChanged();
+      } catch (error) { showError(error instanceof Error ? error.message : "Those images could not be added."); }
       if (mediaInput) mediaInput.value = "";
-      renderImages();
-      const messages = [];
-      if (invalid.length) messages.push(`${invalid.length} unsupported file${invalid.length === 1 ? " was" : "s were"} skipped`);
-      if (oversized.length) messages.push(`${oversized.map((file) => file.name).join(", ")} ${oversized.length === 1 ? "is" : "are"} larger than 2 MB`);
-      if (incoming.length - rejected.size > remainingSpaces) messages.push("the 9-image limit was reached");
-      if (messages.length) showError(`${messages.join("; ")}. Valid images were added.`);
+      if (valid.length !== incoming.length) showError("Some images were skipped. Use PNG, JPG, WebP, or AVIF files under 2 MB, with no more than 9 images.");
     };
+
+    const restoreDraft = () => {
+      const draft = readProductDrafts().find((item) => item.id === draftId);
+      if (!draft) return;
+      productCreateForm.elements.name.value = draft.name || "";
+      Object.entries(draft.fields || {}).forEach(([name, value]) => { if (productCreateForm.elements[name]) productCreateForm.elements[name].value = value; });
+      selectedImages = (draft.images || []).filter((item) => item.data).map((item) => ({ id: item.id || `image-${Date.now()}-${Math.random()}`, data: item.data, url: item.data }));
+      variantToggle.checked = Boolean(draft.hasVariants);
+      optionGroups?.replaceChildren(); (draft.options || []).forEach((group) => addOptionGroup(group.name, (group.values || []).join(", ")));
+      variants = (draft.variants || []).map((variant) => ({ ...variant, weightGrams: variant.weightGrams || 500, customImage: variant.customImage?.data ? { data: variant.customImage.data, url: variant.customImage.data } : null }));
+      previewDevice = draft.previewDevice === "mobile" ? "mobile" : "desktop";
+      if (draftStatus) draftStatus.innerHTML = "<i></i> Draft restored";
+    };
+
+    variantToggle?.addEventListener("change", syncVariantMode);
+    q("[data-add-option-group]")?.addEventListener("click", () => { addOptionGroup(); markDraftChanged(); });
+    q("[data-generate-variants]")?.addEventListener("click", generateVariants);
+    selectAllVariants?.addEventListener("change", () => { selectedVariantIds = selectAllVariants.checked ? new Set(variants.map((variant) => variant.id)) : new Set(); updateVariantSelection(); });
+    q("[data-clear-variant-selection]")?.addEventListener("click", () => { selectedVariantIds.clear(); updateVariantSelection(); });
+    q("[data-apply-variant-batch]")?.addEventListener("click", () => {
+      if (!selectedVariantIds.size) { showError("Select at least one variant or use an All option filter first."); return; }
+      const price = q("[data-batch-price]").value; const stock = q("[data-batch-stock]").value; const weight = q("[data-batch-weight]").value;
+      if (price === "" && stock === "" && weight === "") { showError("Enter at least one batch value to apply."); return; }
+      variants.filter((variant) => selectedVariantIds.has(variant.id)).forEach((variant) => { if (price !== "") variant.price = Math.max(0, Math.round(Number(price) || 0)); if (stock !== "") variant.stock = Math.max(0, Math.round(Number(stock) || 0)); if (weight !== "") variant.weightGrams = Math.max(0, Math.round(Number(weight) || 0)); });
+      clearError(); renderVariants(); markDraftChanged(); showToast(`Updated ${selectedVariantIds.size} variants`);
+    });
+    q("[data-product-preview-device='desktop']")?.addEventListener("click", () => { previewDevice = "desktop"; syncPreviewDevice(); markDraftChanged(); });
+    q("[data-product-preview-device='mobile']")?.addEventListener("click", () => { previewDevice = "mobile"; syncPreviewDevice(); markDraftChanged(); });
+    function syncPreviewDevice() {
+      previewViewport?.classList.toggle("preview-mobile", previewDevice === "mobile"); previewViewport?.classList.toggle("preview-desktop", previewDevice === "desktop");
+      productCreateForm.querySelectorAll("[data-product-preview-device]").forEach((button) => button.classList.toggle("active", button.dataset.productPreviewDevice === previewDevice));
+    }
     mediaInput?.addEventListener("change", () => addImages([...(mediaInput.files || [])]));
-    ["dragenter", "dragover"].forEach((eventName) => dropzone?.addEventListener(eventName, (event) => { event.preventDefault(); dropzone.classList.add("is-dragging"); }));
-    ["dragleave", "drop"].forEach((eventName) => dropzone?.addEventListener(eventName, (event) => { event.preventDefault(); dropzone.classList.remove("is-dragging"); }));
+    ["dragenter", "dragover"].forEach((name) => dropzone?.addEventListener(name, (event) => { event.preventDefault(); dropzone.classList.add("is-dragging"); }));
+    ["dragleave", "drop"].forEach((name) => dropzone?.addEventListener(name, (event) => { event.preventDefault(); dropzone.classList.remove("is-dragging"); }));
     dropzone?.addEventListener("drop", (event) => addImages([...(event.dataTransfer?.files || [])]));
-    productCreateForm.addEventListener("input", updatePreview);
-    productCreateForm.addEventListener("change", updatePreview);
+    saveDraftButton?.addEventListener("click", () => saveDraft(true));
+    productCreateForm.addEventListener("input", () => { updatePreview(); markDraftChanged(); });
+    productCreateForm.addEventListener("change", () => { updatePreview(); markDraftChanged(); });
     typeInput?.addEventListener("change", syncType);
     productCreateForm.addEventListener("submit", async (event) => {
       event.preventDefault(); clearError();
       if (!productCreateForm.reportValidity()) return;
-      const type = currentType();
-      const minimum = type === "physical" ? 3 : 1;
+      const type = currentType(); const minimum = type === "physical" ? 3 : 1;
       if (selectedImages.length < minimum || selectedImages.length > 9) { showError(`${typeName(type)} requires ${minimum === 3 ? "3–9" : "1–9"} images.`); return; }
-      const weightGrams = Math.round(Number(productCreateForm.elements.weight?.value) || 0);
-      if (type === "physical" && weightGrams < 1) { showError("Physical products need a shipping weight."); return; }
-      const interval = Math.round(Number(productCreateForm.elements.interval?.value) || 1);
-      if (type === "subscription" && (interval < 1 || interval > 12)) { showError("Choose a billing interval from 1 to 12."); return; }
-      if (variantToggle?.checked && variants.length === 0) { showError("Generate at least one product variant, or turn off Has variants."); return; }
-      if (variants.some((variant) => variant.price < 1000 || !variant.sku)) { showError("Every variant needs a price of at least Rp1.000 and a SKU."); return; }
-      formSubmitButtons.forEach((button) => { button.disabled = true; button.dataset.originalText = button.textContent; button.textContent = "Preparing images…"; });
+      if (variantToggle.checked && !variants.length) { showError("Generate at least one variant, or turn off Has variants."); return; }
+      if (variants.some((variant) => variant.price < 1000 || !variant.sku || (type === "physical" && variant.weightGrams < 1))) { showError("Every variant needs a valid price, SKU, and shipping weight."); return; }
+      const interval = Math.max(1, Math.round(Number(productCreateForm.elements.interval?.value) || 1));
+      submitButtons.forEach((button) => { button.disabled = true; button.dataset.originalText = button.textContent; button.textContent = "Creating product…"; });
       try {
-        const images = await Promise.all(selectedImages.map((item) => compressCreatorProductImage(item.file)));
-        const variantImages = new Map(await Promise.all(variants.filter((variant) => variant.customImage?.file).map(async (variant) => [variant.id, await compressCreatorProductImage(variant.customImage.file)])));
+        const images = await Promise.all(selectedImages.map(imageData));
         const suffix = globalThis.crypto?.randomUUID?.().replace(/-/g, "").slice(0, 10) || String(Date.now());
         const product = {
-          id: `custom-${suffix}`, sku: `EZK-${type.slice(0, 3).toUpperCase()}-${suffix.toUpperCase()}`,
-          name: String(productCreateForm.elements.name.value).trim(), category: String(productCreateForm.elements.category.value).trim(),
-          description: String(productCreateForm.elements.description.value).trim(), type,
-          price: variantToggle?.checked ? Math.min(...variants.map((variant) => variant.price)) : Math.round(Number(productCreateForm.elements.price.value) || 0), images, image: images[0],
-          ...(type === "physical" ? { stock: variantToggle?.checked ? variants.reduce((total, variant) => total + variant.stock, 0) : Math.max(0, Math.round(Number(productCreateForm.elements.stock.value) || 0)), weightGrams } : {}),
+          id: `custom-${suffix}`, sku: `EZK-${type.slice(0, 3).toUpperCase()}-${suffix.toUpperCase()}`, name: String(productCreateForm.elements.name.value).trim(), category: String(productCreateForm.elements.category.value).trim(), description: String(productCreateForm.elements.description.value).trim(), type,
+          price: variantToggle.checked ? Math.min(...variants.map((variant) => variant.price)) : Math.round(Number(productCreateForm.elements.price.value) || 0), images, image: images[0],
+          ...(type === "physical" ? { stock: variantToggle.checked ? variants.reduce((total, variant) => total + variant.stock, 0) : Math.max(0, Math.round(Number(productCreateForm.elements.stock.value) || 0)), weightGrams: variantToggle.checked ? Math.max(...variants.map((variant) => variant.weightGrams)) : Math.max(1, Math.round(Number(productCreateForm.elements.weight.value) || 0)) } : {}),
           ...(type === "digital" ? { digitalFileName: String(productCreateForm.elements.digital_name.value || "").trim() } : {}),
           ...(type === "subscription" ? { subscription: { interval, unit: String(productCreateForm.elements.unit.value || "month") } } : {}),
-          ...(variantToggle?.checked ? { options: [...(optionGroups?.children || [])].map((row) => ({ name: String(row.querySelector("[data-option-name]")?.value || "").trim(), values: optionValues(row.querySelector("[data-option-values]")) })).filter((group) => group.name && group.values.length), variants: variants.map(({ customImage, useCustomImage, ...variant }) => ({ ...variant, image: useCustomImage && variantImages.has(variant.id) ? variantImages.get(variant.id) : Number.isInteger(variant.imageIndex) ? images[variant.imageIndex] || images[0] : images[0], imageSource: useCustomImage && variantImages.has(variant.id) ? "variant-upload" : Number.isInteger(variant.imageIndex) ? `gallery-${variant.imageIndex + 1}` : "main" })) } : {}),
-          createdAt: new Date().toISOString(),
+          ...(variantToggle.checked ? { options: optionSnapshot(), variants: variants.map(({ customImage, useCustomImage, ...variant }) => ({ ...variant, image: useCustomImage && customImage?.data ? customImage.data : Number.isInteger(variant.imageIndex) ? images[variant.imageIndex] || images[0] : images[0], imageSource: useCustomImage && customImage?.data ? "variant-upload" : Number.isInteger(variant.imageIndex) ? `gallery-${variant.imageIndex + 1}` : "main" })) } : {}), createdAt: new Date().toISOString(),
         };
-        const products = readCatalogProducts(); products.push(product);
-        if (!writeCatalogProducts(products)) return;
-        window.opener?.postMessage({ type: "ezkart:catalog-product-created", productId: product.id }, window.location.origin);
-        window.location.href = "?page=products&created=1";
+        const products = readCatalogProducts(); products.push(product); if (!writeCatalogProducts(products)) return;
+        writeProductDrafts(readProductDrafts().filter((draft) => draft.id !== draftId)); sessionStorage.removeItem(activeProductDraftKey);
+        window.opener?.postMessage({ type: "ezkart:catalog-product-created", productId: product.id }, window.location.origin); window.location.href = "?page=products&created=1";
       } catch (error) { showError(error instanceof Error ? error.message : "The product could not be created."); }
-      finally { formSubmitButtons.forEach((button) => { button.disabled = false; button.textContent = button.dataset.originalText || "Create product"; }); }
+      finally { submitButtons.forEach((button) => { button.disabled = false; button.textContent = button.dataset.originalText || "Create product"; }); }
     });
-    window.addEventListener("beforeunload", () => { selectedImages.forEach((item) => URL.revokeObjectURL(item.url)); variants.forEach((variant) => variant.customImage?.url && URL.revokeObjectURL(variant.customImage.url)); });
-    syncType(); renderImages(); updatePreview();
+
+    restoreDraft(); syncVariantMode(); syncType(); syncPreviewDevice(); renderImages(); restoringDraft = false; updatePreview();
   }
+
   const setupCreatorProducts = (form) => {
     if (!form) return { selected: () => [], reset: () => {} };
     const composer = form.querySelector("[data-creator-product-form]");
@@ -618,6 +771,8 @@
     const imageRule = form?.querySelector("[data-catalog-image-rule]");
     const errorTarget = form?.querySelector("[data-catalog-product-error]");
     const inventory = document.querySelector("[data-product-inventory]");
+    const draftsPanel = document.querySelector("[data-product-drafts-panel]");
+    const draftList = document.querySelector("[data-product-draft-list]");
     const typeName = (type) => ({ physical: "Physical product", digital: "Digital product", subscription: "Subscription" }[type] || "Product");
     const clearError = () => { if (errorTarget) { errorTarget.hidden = true; errorTarget.textContent = ""; } };
     const showError = (message) => { if (errorTarget) { errorTarget.textContent = message; errorTarget.hidden = false; } };
@@ -635,6 +790,24 @@
       if (stats[0]?.querySelector("strong")) stats[0].querySelector("strong").textContent = String(3 + products.length);
       if (stats[1]?.querySelector("strong")) stats[1].querySelector("strong").textContent = String(108 + physicalStock);
       if (stats[1]?.querySelector("p")) stats[1].querySelector("p").textContent = "Physical inventory only";
+    };
+    const renderDrafts = () => {
+      if (!draftsPanel || !draftList) return;
+      const drafts = readProductDrafts().sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")));
+      draftsPanel.hidden = drafts.length === 0; draftList.replaceChildren();
+      drafts.forEach((draft) => {
+        const card = document.createElement("article"); card.className = "product-draft-card";
+        const image = draft.images?.[0]?.data || "";
+        const when = draft.updatedAt ? new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(new Date(draft.updatedAt)) : "Recently saved";
+        card.innerHTML = `<span>${image ? `<img src="${image}" alt="">` : '<svg class="icon" aria-hidden="true"><use href="#icon-image"></use></svg>'}</span><div><b>${escapeHtml(draft.name || "Untitled product")}</b><small>${draft.hasVariants ? `${draft.variants?.length || 0} variants` : typeName(draft.fields?.type || "physical")} · ${escapeHtml(when)}</small></div><div><a href="?page=product-new&draft=${encodeURIComponent(draft.id)}">Continue</a><button type="button" aria-label="Delete ${escapeHtml(draft.name || "untitled product")} draft">×</button></div>`;
+        card.querySelector("button").addEventListener("click", () => {
+          if (!window.confirm(`Delete the “${draft.name || "Untitled product"}” draft?`)) return;
+          writeProductDrafts(readProductDrafts().filter((item) => item.id !== draft.id));
+          if (sessionStorage.getItem(activeProductDraftKey) === draft.id) sessionStorage.removeItem(activeProductDraftKey);
+          renderDrafts(); showToast("Product draft deleted");
+        });
+        draftList.append(card);
+      });
     };
     const renderCatalog = () => {
       const products = readCatalogProducts();
@@ -659,7 +832,7 @@
           inventory.append(row);
         }
       });
-      updateCatalogStats(products);
+      updateCatalogStats(products); renderDrafts();
     };
     document.querySelectorAll("[data-open-product-creator]").forEach((button) => button.addEventListener("click", () => { clearError(); dialog?.showModal(); }));
     dialog?.querySelectorAll("[data-catalog-close]").forEach((button) => button.addEventListener("click", () => dialog.close("cancel")));

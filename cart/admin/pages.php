@@ -72,8 +72,9 @@ function ez_orders_table(array $rows, string $tableId): void
         <p>Add the details once and watch the storefront preview update as you work.</p>
       </div>
       <div class="product-editor-actions">
-        <span><i></i> Unsaved draft</span>
+        <span data-product-draft-status><i></i> Draft autosaves</span>
         <a class="action-button" href="?page=products">Cancel</a>
+        <button class="action-button" type="button" data-save-product-draft>Save draft</button>
         <button class="action-button primary" type="submit" form="product-create-form">Create product</button>
       </div>
     </header>
@@ -114,15 +115,20 @@ function ez_orders_table(array $rows, string $tableId): void
             <button class="product-generate-variants" type="button" data-generate-variants><?= ez_admin_icon('layers') ?> Generate combinations</button>
             <div class="product-variant-empty" data-product-variant-empty><span><?= ez_admin_icon('box') ?></span><div><b>No combinations yet</b><p>Add option values, then generate the sellable variants for this product.</p></div></div>
             <div class="product-variant-table" data-product-variant-table hidden>
-              <header><span>Variant</span><span>Price</span><span data-variant-stock-heading>Stock</span><span>SKU</span><span>Variant photo</span><span></span></header>
+              <div class="product-variant-batch" data-product-variant-batch>
+                <div><b>Batch edit</b><p>Select every matching option—such as all 250 ml or all Peach—then update them together.</p></div>
+                <div class="variant-filter-chips" data-variant-filter-chips></div>
+                <div class="variant-batch-fields"><span data-variant-selected-count>0 selected</span><label><span>Price</span><input type="number" min="1000" step="500" placeholder="No change" data-batch-price></label><label data-batch-physical><span>Stock</span><input type="number" min="0" max="999999" placeholder="No change" data-batch-stock></label><label data-batch-physical><span>Weight (g)</span><input type="number" min="1" max="50000" placeholder="No change" data-batch-weight></label><button type="button" data-apply-variant-batch>Apply to selected</button><button type="button" data-clear-variant-selection>Clear</button></div>
+              </div>
+              <header><span><input type="checkbox" data-select-all-variants aria-label="Select all variants"></span><span>Variant</span><span>Price</span><span data-variant-stock-heading>Stock</span><span data-variant-weight-heading>Weight</span><span>SKU</span><span>Photo</span><span></span></header>
               <div data-product-variant-rows></div>
             </div>
-            <p class="product-variant-help">Every row remains part of this product. Pick a gallery photo or upload a separate photo used only by that variant. Separate variant photos do not appear in the main gallery.</p>
+            <p class="product-variant-help">Every row remains part of this product. Physical variants carry their own stock and shipping weight. Upload a square variant photo or choose one from the main gallery.</p>
           </div>
           <p class="product-no-variants" data-product-no-variants>No variants needed? The base price and stock below will be used.</p>
         </section>
 
-        <section class="product-form-card">
+        <section class="product-form-card" data-product-base-pricing>
           <header><span>04</span><div><h2>Price and availability</h2><p>Used as the default when the product has no variants.</p></div></header>
           <div class="product-form-grid">
             <label><span>Price (IDR)</span><input name="price" type="number" required min="1000" step="500" value="75000" data-product-preview-price></label>
@@ -142,22 +148,24 @@ function ez_orders_table(array $rows, string $tableId): void
       </div>
 
       <aside class="product-preview-sidebar">
-        <div class="product-preview-label"><span>Live page preview</span><em>Updates as you type</em></div>
-        <article class="product-live-card">
-          <div class="product-live-image" data-product-live-image><span><?= ez_admin_icon('image') ?><small>Your main image</small></span></div>
-          <div class="product-live-thumbs" data-product-live-thumbs hidden></div>
-          <div class="product-live-copy">
-            <span data-product-live-type>Physical product</span>
-            <small data-product-live-category>PRODUCT CATEGORY</small>
-            <h2 data-product-live-name>Your product name</h2>
-            <p data-product-live-description>Add a clear description so customers immediately understand what they are buying.</p>
-            <label class="product-live-variant" data-product-live-variant hidden><span>Choose a variant</span><select data-product-live-variant-select></select></label>
-            <strong data-product-live-price>Rp75.000</strong>
-            <em data-product-live-availability>10 available · shipping calculated at checkout</em>
-            <button type="button">Add to cart</button>
-            <footer><?= ez_admin_icon('shield') ?> Secure checkout powered by Ezkart</footer>
-          </div>
-        </article>
+        <div class="product-preview-label"><span>Storefront preview</span><div class="product-preview-devices" aria-label="Preview size"><button class="active" type="button" data-product-preview-device="desktop"><?= ez_admin_icon('monitor') ?> Desktop</button><button type="button" data-product-preview-device="mobile"><?= ez_admin_icon('smartphone') ?> Mobile</button></div></div>
+        <div class="product-preview-viewport preview-desktop" data-product-preview-viewport>
+          <article class="product-live-card">
+            <div class="product-live-commerce">
+              <div class="product-live-media"><div class="product-live-image" data-product-live-image><span><?= ez_admin_icon('image') ?><small>Your square main image</small></span></div><div class="product-live-thumbs" data-product-live-thumbs hidden></div></div>
+              <div class="product-live-copy">
+                <h2 data-product-live-name>Your product name</h2>
+                <strong data-product-live-price>Rp75.000</strong>
+                <em data-product-live-availability>10 available · shipping calculated at checkout</em>
+                <div class="product-live-options" data-product-live-variant hidden></div>
+                <button type="button">Add to cart</button>
+                <footer><?= ez_admin_icon('shield') ?> Secure checkout powered by Ezkart</footer>
+              </div>
+            </div>
+            <section class="product-live-reviews" data-product-live-reviews><header><div><span>Product reviews</span><b>No reviews yet</b></div><div><button type="button" data-review-prev aria-label="Previous review" disabled>←</button><button type="button" data-review-next aria-label="Next review" disabled>→</button></div></header><div class="product-review-track" data-review-track><article class="product-review-empty"><?= ez_admin_icon('star') ?><p>Reviews will appear here automatically after verified customers leave feedback.</p></article></div></section>
+            <section class="product-live-details"><h3>Product information</h3><dl><div><dt>Product type</dt><dd data-product-live-type>Physical product</dd></div><div><dt>Category</dt><dd data-product-live-category>Product category</dd></div></dl><div><h4>Product description</h4><p data-product-live-description>Add a clear description so customers immediately understand what they are buying.</p></div></section>
+          </article>
+        </div>
         <p class="product-preview-note"><?= ez_admin_icon('eye') ?><span><b>This is a preview, not a published page.</b> The product becomes available to your landing-page builder after you create it.</span></p>
       </aside>
     </form>
@@ -165,7 +173,7 @@ function ez_orders_table(array $rows, string $tableId): void
 
 <?php break; case 'products': ?>
   <?php ez_page_header('Catalog management', 'Products', 'Manage photography, pricing, inventory, and merchandising for the complete Ezkart catalog.', [
-      ['label'=>'Preview storefront','href'=>'../'], ['label'=>'Create product','href'=>'?page=product-new','new_tab'=>true,'style'=>'primary'],
+      ['label'=>'Preview storefront','href'=>'../'], ['label'=>'Create product','href'=>'?page=product-new&new=1','new_tab'=>true,'style'=>'primary'],
   ]); ?>
   <?php ez_stat_strip([
       ['icon'=>'box','label'=>'Active products','value'=>(string) count($catalogInventory),'detail'=>'All visible in sandbox'],
@@ -174,6 +182,7 @@ function ez_orders_table(array $rows, string $tableId): void
       ['icon'=>'trend','label'=>'Sell-through','value'=>$paidUnits > 0 ? number_format(($paidUnits / max(1, $paidUnits + array_sum(array_column($catalogInventory, 'stock')))) * 100, 1) . '%' : '0.0%','detail'=>'Paid units vs availability'],
   ]); ?>
   <section class="product-commerce-strip" aria-label="Product commerce connections"><article><span><?= ez_admin_icon('box') ?></span><div><small>Product data</small><b>Complete catalog record</b><p>Price, stock, weight, media, and fulfillment origin</p></div><em>Ready</em></article><i><?= ez_admin_icon('chevron-right') ?></i><article><span><?= ez_admin_icon('layout') ?></span><div><small>Sales surface</small><b>3 landing pages</b><p>Products can be bound to any hosted page</p></div><a href="?page=sites">Manage</a></article><i><?= ez_admin_icon('chevron-right') ?></i><article><span><?= ez_admin_icon('credit-card') ?></span><div><small>Checkout data</small><b><?= $integrationStatus['midtrans'] ? 'Midtrans mapped' : 'Midtrans setup required' ?></b><p>Item ID, name, quantity, price, and customer details</p></div><em class="<?= $integrationStatus['midtrans'] ? 'connected' : '' ?>"><?= $integrationStatus['midtrans'] ? 'Ready' : 'Setup' ?></em></article><i><?= ez_admin_icon('chevron-right') ?></i><article><span><?= ez_admin_icon('truck') ?></span><div><small>Delivery</small><b><?= $integrationStatus['biteship'] ? 'Biteship rates enabled' : 'Biteship setup required' ?></b><p>Weights and origin feed live courier quotes</p></div><em class="<?= $integrationStatus['biteship'] ? 'connected' : '' ?>"><?= $integrationStatus['biteship'] ? 'Ready' : 'Setup' ?></em></article></section>
+  <section class="surface product-drafts-panel" data-product-drafts-panel hidden><header class="surface-header"><div><h2>Product drafts</h2><p>Continue products that are not ready to publish yet.</p></div><a class="action-button" href="?page=product-new&new=1">New draft</a></header><div class="product-draft-list" data-product-draft-list></div></section>
   <section class="catalog-grid" data-product-catalog><?php foreach ($catalogInventory as $name => $product): $sales = $productActivity[$name] ?? ['quantity'=>0,'sales'=>0]; ?><article class="product-card"><?= ez_admin_product_art($name) ?><div class="product-card-body"><header><span><?= ez_admin_escape($product['category']) ?></span><em>Active</em></header><h2><?= ez_admin_escape($name) ?></h2><p><?= ez_admin_escape($product['sku']) ?></p><div class="product-price"><strong><?= ez_admin_money($product['price']) ?></strong><small><?= $product['stock'] ?> in stock</small></div><footer><div><small>Ordered</small><b><?= $sales['quantity'] ?> units</b></div><div><small>Revenue</small><b><?= ez_admin_short_money($sales['sales']) ?></b></div><button type="button" data-toast="Product editor opened">Edit</button></footer></div></article><?php endforeach; ?></section>
   <section class="page-grid product-ops-grid"><article class="surface"><header class="surface-header"><div><h2>Inventory control</h2><p>Availability, reorder points, and product health.</p></div><button type="button" data-toast="Inventory count prepared">Count inventory</button></header><div class="inventory-table" data-product-inventory><div class="inventory-head"><span>Product</span><span>Available</span><span>Reorder at</span><span>Health</span></div><?php foreach ($catalogInventory as $name => $product): ?><article><?= ez_admin_product_art($name) ?><div><b><?= ez_admin_escape($name) ?></b><small><?= ez_admin_escape($product['sku']) ?></small></div><strong><?= $product['stock'] ?></strong><span>15</span><em class="inventory-good">Healthy</em></article><?php endforeach; ?></div></article><aside class="surface merchandising-card"><header class="surface-header"><div><h2>Merchandising</h2><p>Storefront presentation score.</p></div></header><strong>94<small>/100</small></strong><ul><li><?= ez_admin_icon('check-circle') ?> Product photography complete</li><li><?= ez_admin_icon('check-circle') ?> Pricing published</li><li><?= ez_admin_icon('check-circle') ?> Type-aware fulfillment</li><li><?= ez_admin_icon('check-circle') ?> Descriptions optimized</li></ul><button type="button" data-toast="Merchandising checklist opened">Review storefront</button></aside></section>
 
