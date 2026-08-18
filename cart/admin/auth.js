@@ -17,13 +17,14 @@
     return callback;
   };
 
-  const completeLogin = async (accessToken) => {
+  const completeLogin = async (accessToken, refreshToken) => {
     button.disabled = true;
     setStatus("Verifying your Google account…");
     const body = new URLSearchParams({
       action: "supabase_login",
       csrf_token: button.dataset.csrfToken || "",
       access_token: accessToken,
+      refresh_token: refreshToken,
     });
     const response = await fetch(window.location.pathname, {
       method: "POST",
@@ -45,12 +46,15 @@
   const callback = cleanCallbackFragment();
   const callbackError = callback.get("error_description") || callback.get("error");
   const accessToken = callback.get("access_token");
+  const refreshToken = callback.get("refresh_token");
   if (callbackError) setStatus(callbackError, true);
-  if (accessToken) {
-    completeLogin(accessToken).catch((error) => {
+  if (accessToken && refreshToken) {
+    completeLogin(accessToken, refreshToken).catch((error) => {
       button.disabled = false;
       setStatus(error instanceof Error ? error.message : "Google sign-in failed.", true);
     });
+  } else if (accessToken) {
+    setStatus("Google sign-in did not return a persistent session. Please try again.", true);
   }
 
   button.addEventListener("click", () => {
