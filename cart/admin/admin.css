@@ -1115,6 +1115,9 @@ button, a { -webkit-tap-highlight-color: transparent; }
 @media(max-width:900px){.product-editor-layout{grid-template-columns:1fr}.product-preview-sidebar{position:static;order:0}.product-preview-viewport .product-live-card{display:block}.product-live-commerce{grid-template-columns:minmax(0,1fr) minmax(220px,.9fr)}.product-live-image{max-width:none}.product-draft-list{grid-template-columns:1fr}}
 @media(max-width:680px){.product-preview-viewport{padding:8px}.product-preview-viewport.preview-mobile{padding:12px}.product-live-commerce{grid-template-columns:1fr}.product-live-image{max-width:360px}.product-preview-label{align-items:flex-start;flex-direction:column}.product-variant-batch{min-width:760px}.product-draft-list{padding-inline:13px}.product-draft-card{grid-template-columns:48px minmax(0,1fr)}.product-draft-card>span{width:48px;height:48px}.product-draft-card>div:last-child{grid-column:1/-1;justify-content:flex-end}}
 
+/* A quiet Ezkart price treatment: unboxed with one restrained brand accent. */
+.product-live-copy>strong{margin:10px 0 0;padding:0;display:flex;align-items:center;gap:8px;color:#252932;background:transparent;font-size:21px;letter-spacing:-.025em}.product-live-copy>strong:before{content:"";width:4px;height:22px;flex:0 0 auto;background:linear-gradient(180deg,#ff5a19,#f70a68);border-radius:99px}
+
 .page-site-editor :is(.sq-commandbar, .sq-builder-sidebar, .sq-inspector, .sq-stage-footer, .sq-canvas-meta) small,
 .page-site-editor :is(.page-creator-dialog, .product-creator-dialog) small { font-size: 10px; }
 .page-site-editor :is(.sq-commandbar, .sq-builder-sidebar, .sq-inspector, .sq-stage-footer, .sq-canvas-meta) :is(p, b, input, select, textarea, button),
