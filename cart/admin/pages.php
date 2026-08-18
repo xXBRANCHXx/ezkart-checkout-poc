@@ -158,7 +158,7 @@ function ez_orders_table(array $rows, string $tableId): void
                 <strong data-product-live-price>Rp75.000</strong>
                 <em data-product-live-availability>10 available · shipping calculated at checkout</em>
                 <div class="product-live-options" data-product-live-variant hidden></div>
-                <button type="button">Add to cart</button>
+                <button type="button"><?= ez_admin_icon('plus') ?> Add to cart</button>
                 <footer><?= ez_admin_icon('shield') ?> Secure checkout powered by Ezkart</footer>
               </div>
             </div>
