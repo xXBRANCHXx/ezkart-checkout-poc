@@ -40,6 +40,7 @@
     button.hidden = true;
     if (authDivider) authDivider.hidden = true;
     emailSuccessPanel.hidden = false;
+    document.body.classList.add("verification-complete");
     setStatus("");
     document.title = "Verification successful · Ezkart";
   };
