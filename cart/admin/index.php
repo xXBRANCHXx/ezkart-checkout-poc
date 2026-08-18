@@ -487,8 +487,6 @@ $profileSync = is_array($_SESSION['cloudflare_profile_sync'] ?? null)
     : null;
 $adminDisplayName = trim((string) ($adminUser['name'] ?? '')) ?: 'Ezkart Admin';
 $adminDisplayEmail = trim((string) ($adminUser['email'] ?? '')) ?: 'Sandbox operator';
-$adminNameParts = preg_split('/\s+/', $adminDisplayName) ?: [];
-$adminFirstName = trim((string) ($adminNameParts[0] ?? '')) ?: 'there';
 $adminInitials = implode('', array_map(
     static fn(string $part): string => mb_strtoupper(mb_substr($part, 0, 1)),
     array_slice(preg_split('/\s+/', $adminDisplayName) ?: [], 0, 2),
@@ -564,17 +562,6 @@ $catalogProducts = array_slice($productActivity !== [] ? $productActivity : $pro
 $paidUnits = array_sum(array_column($productSales, 'quantity'));
 $nowJakarta = new DateTimeImmutable('now', new DateTimeZone('Asia/Jakarta'));
 $dateRangeStart = $nowJakarta->modify('-6 days');
-$dashboardHour = (int) $nowJakarta->format('G');
-$dashboardGreeting = $dashboardHour < 12 ? 'Good morning' : ($dashboardHour < 18 ? 'Good afternoon' : 'Good evening');
-$identityReady = $authenticationMethod === 'supabase';
-$catalogReady = count($productDefaults) > 0;
-$commerceReady = ($integrationStatus['midtrans'] ?? false) === true
-    && ($integrationStatus['biteship'] ?? false) === true
-    && ($integrationStatus['biteship_fulfillment'] ?? false) === true;
-$firstOrderReady = $metrics['orders'] > 0;
-$launchCompleted = (int) $identityReady + (int) $catalogReady + (int) $commerceReady + (int) $firstOrderReady;
-$launchProgress = (int) round(($launchCompleted / 4) * 100);
-$emptyDashboard = $metrics['orders'] === 0;
 $salesMonths = [];
 for ($offset = 5; $offset >= 0; $offset--) {
     $month = $nowJakarta->modify('-' . $offset . ' months')->modify('first day of this month');
@@ -659,7 +646,7 @@ $catalogInventory = [
   <meta name="robots" content="noindex,nofollow">
   <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
   <?php if ($authenticated): ?><link rel="stylesheet" href="assets/vendor/leaflet.css"><?php endif; ?>
-  <link rel="stylesheet" href="admin.css?v=35">
+  <link rel="stylesheet" href="admin.css?v=36">
   <title><?= $authenticated ? ez_admin_escape($pageTitles[$page]) : 'Admin Login' ?> · Ezkart</title>
 </head>
 <body class="<?= $authenticated ? 'dashboard-page page-' . ez_admin_escape($page) . ($page === 'sites' ? ($siteEditor ? ' page-site-editor' : ' page-sites-library') : '') : 'login-page' ?>">
@@ -816,70 +803,21 @@ $catalogInventory = [
           </form>
         </div>
       </header>
-      <?php if ($authenticationMethod === 'supabase' && is_array($profileSync) && ($profileSync['ok'] ?? false) !== true): ?>
-        <div class="identity-sync attention" role="status">
-          <?= ez_admin_icon('help') ?>
-          <b>Your account is verified, but profile sync needs attention.</b>
+      <?php if ($authenticationMethod === 'supabase' && is_array($profileSync)): ?>
+        <div class="identity-sync <?= ($profileSync['ok'] ?? false) === true ? 'connected' : 'attention' ?>" role="status">
+          <?= ez_admin_icon(($profileSync['ok'] ?? false) === true ? 'check-circle' : 'help') ?>
+          <b>Google identity verified.</b>
           <span><?= ez_admin_escape((string) ($profileSync['message'] ?? 'D1 profile status unavailable.')) ?></span>
         </div>
       <?php endif; ?>
 
       <?php if ($page === 'dashboard'): ?>
-      <main class="dashboard page-canvas<?= $emptyDashboard ? ' empty-dashboard' : '' ?>" id="overview">
+      <main class="dashboard page-canvas" id="overview">
         <section class="welcome-row">
-          <div><h1><?= ez_admin_escape($dashboardGreeting) ?>, <?= ez_admin_escape($adminFirstName) ?><span class="welcome-mark"><?= ez_admin_icon('sparkles') ?></span></h1><p><?= $emptyDashboard ? 'Let’s finish the last checks and get your store ready for its first customer.' : 'Here is what is happening with your store today.' ?></p></div>
-          <?php if ($emptyDashboard): ?>
-            <div class="welcome-actions"><a class="dashboard-action secondary" href="?page=sites"><?= ez_admin_icon('layout') ?> Edit storefront</a><a class="dashboard-action primary" href="../"><?= ez_admin_icon('eye') ?> Preview checkout</a></div>
-          <?php else: ?>
-            <button class="date-button" type="button"><?= ez_admin_icon('calendar') ?><span><?= $dateRangeStart->format('M j') ?> – <?= $nowJakarta->format('M j, Y') ?></span><?= ez_admin_icon('chevron-down', 'chevron-icon') ?></button>
-          <?php endif; ?>
+          <div><h1>Welcome back <span class="welcome-mark"><?= ez_admin_icon('sparkles') ?></span></h1><p>Here is what is happening with your store today.</p></div>
+          <button class="date-button" type="button"><?= ez_admin_icon('calendar') ?><span><?= $dateRangeStart->format('M j') ?> – <?= $nowJakarta->format('M j, Y') ?></span><?= ez_admin_icon('chevron-down', 'chevron-icon') ?></button>
         </section>
 
-        <?php if ($emptyDashboard): ?>
-        <section class="launch-hero panel" aria-labelledby="launch-heading">
-          <div class="launch-hero-copy">
-            <span class="launch-eyebrow"><?= ez_admin_icon('rocket') ?> Store launch</span>
-            <h2 id="launch-heading"><?= $launchCompleted >= 3 ? 'You’re almost ready for your first order.' : 'Let’s get your store ready to sell.' ?></h2>
-            <p>Your dashboard will switch to sales analytics automatically after the first checkout. Until then, use this workspace to finish setup and test the complete customer journey.</p>
-            <div><a class="dashboard-action light" href="../">Run a test checkout <span aria-hidden="true">→</span></a><a class="launch-text-link" href="?page=integrations">Review integrations</a></div>
-          </div>
-          <div class="launch-progress" style="--launch-progress: <?= $launchProgress ?>%" aria-label="<?= $launchProgress ?> percent of launch checklist complete">
-            <div><strong><?= $launchProgress ?>%</strong><span><?= $launchCompleted ?> of 4 ready</span></div>
-          </div>
-        </section>
-
-        <section class="launch-workspace-grid">
-          <article class="panel launch-checklist">
-            <header class="panel-header"><div><span>Launch checklist</span><h2>Complete your store setup</h2></div><b><?= $launchCompleted ?>/4 complete</b></header>
-            <ul>
-              <li class="<?= $identityReady ? 'complete' : 'attention' ?>"><span class="checklist-icon"><?= ez_admin_icon($identityReady ? 'check-circle' : 'help') ?></span><div><b>Secure account access</b><small><?= $identityReady ? 'Your approved email identity is verified.' : 'Connect your approved email identity.' ?></small></div><em><?= $identityReady ? 'Complete' : 'Review' ?></em></li>
-              <li class="<?= $catalogReady ? 'complete' : 'attention' ?>"><span class="checklist-icon"><?= ez_admin_icon($catalogReady ? 'check-circle' : 'box') ?></span><div><b>Review your product catalog</b><small><?= count($productDefaults) ?> products are available in this workspace.</small></div><a href="?page=products"><?= $catalogReady ? 'Review' : 'Add products' ?></a></li>
-              <li class="<?= $commerceReady ? 'complete' : 'attention' ?>"><span class="checklist-icon"><?= ez_admin_icon($commerceReady ? 'check-circle' : 'plug') ?></span><div><b>Connect payments and shipping</b><small><?= $commerceReady ? 'Midtrans and Biteship are ready for testing.' : 'Finish the Midtrans and Biteship connection.' ?></small></div><a href="?page=integrations"><?= $commerceReady ? 'Review' : 'Set up' ?></a></li>
-              <li class="attention"><span class="checklist-icon"><?= ez_admin_icon('cart') ?></span><div><b>Place your first test order</b><small>Confirm checkout, payment status, and fulfillment end to end.</small></div><a href="../">Start test</a></li>
-            </ul>
-          </article>
-
-          <article class="panel first-order-card">
-            <span class="first-order-icon"><?= ez_admin_icon('cart') ?></span>
-            <span class="card-kicker">Next milestone</span>
-            <h2>See the store as your customer does.</h2>
-            <p>Open checkout, choose a product, and complete a sandbox payment. Your first order will appear here automatically.</p>
-            <ol><li><span>1</span>Choose a product</li><li><span>2</span>Test payment</li><li><span>3</span>Confirm fulfillment</li></ol>
-            <a class="dashboard-action primary" href="../">Open customer checkout <span aria-hidden="true">→</span></a>
-          </article>
-
-          <article class="panel readiness-card">
-            <header class="panel-header"><div><span>System status</span><h2>Store readiness</h2></div><a href="?page=integrations">Manage</a></header>
-            <dl>
-              <div><dt><span class="readiness-icon"><?= ez_admin_icon('shield') ?></span><span>Account<small>Approved access</small></span></dt><dd class="<?= $identityReady ? 'ready' : 'needs-work' ?>"><?= $identityReady ? 'Ready' : 'Review' ?></dd></div>
-              <div><dt><span class="readiness-icon"><?= ez_admin_icon('credit-card') ?></span><span>Payments<small>Midtrans <?= $commerceProduction ? 'Production' : 'Sandbox' ?></small></span></dt><dd class="<?= ($integrationStatus['midtrans'] ?? false) ? 'ready' : 'needs-work' ?>"><?= ($integrationStatus['midtrans'] ?? false) ? 'Ready' : 'Set up' ?></dd></div>
-              <div><dt><span class="readiness-icon"><?= ez_admin_icon('truck') ?></span><span>Shipping<small>Biteship rates &amp; orders</small></span></dt><dd class="<?= (($integrationStatus['biteship'] ?? false) && ($integrationStatus['biteship_fulfillment'] ?? false)) ? 'ready' : 'needs-work' ?>"><?= (($integrationStatus['biteship'] ?? false) && ($integrationStatus['biteship_fulfillment'] ?? false)) ? 'Ready' : 'Set up' ?></dd></div>
-              <div><dt><span class="readiness-icon"><?= ez_admin_icon('box') ?></span><span>Catalog<small><?= count($productDefaults) ?> products available</small></span></dt><dd class="ready">Ready</dd></div>
-            </dl>
-            <footer><span class="environment-dot"></span><div><b>Ezkart <?= $commerceProduction ? 'Production' : 'Sandbox' ?></b><small>Midtrans <?= $commerceProduction ? 'Live payments' : 'demo payments' ?></small></div></footer>
-          </article>
-        </section>
-        <?php else: ?>
         <section class="kpi-grid" aria-label="Store overview">
           <article><span class="kpi-icon"><?= ez_admin_icon('money') ?></span><div><small>Total Sales</small><strong><?= ez_admin_short_money($metrics['paid_volume']) ?></strong><em class="positive"><?= $metrics['paid_count'] ?> paid</em><p>Provider-confirmed payments</p></div></article>
           <article><span class="kpi-icon"><?= ez_admin_icon('cart') ?></span><div><small>Orders</small><strong><?= number_format($metrics['orders']) ?></strong><em><?= $metrics['pending_count'] ?> open</em><p>All stored orders</p></div></article>
@@ -950,7 +888,6 @@ $catalogInventory = [
 
           <article class="panel payout-panel" id="payout-summary"><header class="panel-header"><h2>Payment Summary</h2><a href="?page=payments">View all payments</a></header><div class="payout-body"><small>Provider-confirmed Volume</small><div><strong><?= ez_admin_money($metrics['paid_volume']) ?></strong><em class="positive"><?= ez_admin_icon('check-circle') ?> Verified</em><span>signed Midtrans notifications</span></div></div><footer><div><small>Environment</small><b>Midtrans <?= $commerceProduction ? 'Production' : 'Sandbox' ?></b></div><div><small>Paid Orders</small><b><?= number_format($metrics['paid_count']) ?></b></div><a href="../">Open Checkout</a></footer></article>
         </section>
-        <?php endif; ?>
       </main>
       <?php else: require __DIR__ . '/pages.php'; endif; ?>
     </div>

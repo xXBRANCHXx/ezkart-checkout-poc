@@ -708,113 +708,8 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .integration-logo .icon { width: 23px; height: 23px; stroke-width: 1.8; }
 .storefront-panel{display:flex;flex-direction:column}.storefront-summary{margin:8px 18px 12px;display:grid;grid-template-columns:94px 1fr;align-items:center;gap:13px}.storefront-preview{width:94px;height:76px;position:relative;overflow:hidden;border-radius:11px}.storefront-preview>.product-art{width:100%;height:100%;border:0;border-radius:0}.storefront-preview>i{padding:4px 6px;position:absolute;left:7px;bottom:7px;color:#087c46;background:rgba(237,250,243,.94);border-radius:5px;font-size:7px;font-style:normal}.storefront-summary small,.storefront-summary b{display:block}.storefront-summary small{color:#868d99;font-size:8px}.storefront-summary b{margin-top:4px;font-size:11px}.storefront-summary p,.storefront-summary em{margin:5px 0 0;display:flex;align-items:center;gap:5px;color:#586f93;font-size:7px;font-style:normal}.storefront-summary em{color:#0c8b50}.storefront-summary .icon{width:12px}.storefront-pipeline{margin:auto 18px 18px;display:grid;grid-template-columns:1fr 10px 1fr 10px 1fr 10px 1fr;align-items:center;gap:3px}.storefront-pipeline>span{display:grid;justify-items:center;gap:4px;color:#ef4d38}.storefront-pipeline span>.icon{width:15px}.storefront-pipeline small{color:#747b88;font-size:6px}.storefront-pipeline>i{height:1px;background:#d8dde3}
 
-/* First-order dashboard: setup guidance replaces meaningless zero-state analytics. */
-.empty-dashboard .welcome-row { min-height: 86px; grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
-.empty-dashboard .welcome-row h1 { display: flex; align-items: center; flex-wrap: wrap; }
-.welcome-actions { display: flex; align-items: center; gap: 10px; }
-.dashboard-action { min-height: 42px; padding: 0 16px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid transparent; border-radius: 9px; font-size: 11px; font-weight: 600; line-height: 1; text-decoration: none; transition: transform .18s ease, box-shadow .18s ease, background .18s ease; }
-.dashboard-action:hover { transform: translateY(-1px); }
-.dashboard-action .icon { width: 16px; height: 16px; }
-.dashboard-action.primary { color: #fff; background: #111827; box-shadow: 0 7px 18px rgba(17,24,39,.12); }
-.dashboard-action.primary:hover { background: #f04428; box-shadow: 0 8px 20px rgba(240,68,40,.2); }
-.dashboard-action.secondary { color: #303744; background: #fff; border-color: #dfe3e9; }
-.dashboard-action.secondary:hover { border-color: #c8ced8; box-shadow: 0 5px 14px rgba(18,24,40,.07); }
-.dashboard-action.light { color: #151b28; background: #fff; box-shadow: 0 8px 22px rgba(0,0,0,.18); }
-.dashboard-action:focus-visible, .launch-text-link:focus-visible, .launch-checklist a:focus-visible { outline: 3px solid rgba(255,91,46,.28); outline-offset: 3px; }
-
-.launch-hero { min-height: 230px; padding: 30px 34px; position: relative; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1fr) 250px; align-items: center; gap: 34px; color: #fff; background: #111827; border: 0 !important; box-shadow: 0 16px 36px rgba(17,24,39,.14) !important; }
-.launch-hero::before { content: ""; width: 430px; height: 430px; position: absolute; right: -160px; top: -255px; background: radial-gradient(circle, rgba(255,82,38,.75), rgba(244,7,104,.17) 42%, transparent 68%); pointer-events: none; }
-.launch-hero::after { content: ""; width: 250px; height: 250px; position: absolute; left: 42%; bottom: -220px; background: rgba(255,255,255,.07); border-radius: 50%; pointer-events: none; }
-.launch-hero-copy { max-width: 700px; position: relative; z-index: 1; }
-.launch-eyebrow { display: inline-flex; align-items: center; gap: 8px; color: #ffb39d; font-size: 10px; font-weight: 600; letter-spacing: .11em; text-transform: uppercase; }
-.launch-eyebrow .icon { width: 16px; height: 16px; }
-.launch-hero h2 { max-width: 650px; margin: 13px 0 10px; font-size: clamp(25px, 2vw, 34px); line-height: 1.16; letter-spacing: -.035em; }
-.launch-hero p { max-width: 690px; margin: 0; color: #c9d0dc; font-size: 12px; line-height: 1.7; }
-.launch-hero-copy > div { margin-top: 22px; display: flex; align-items: center; gap: 18px; }
-.launch-text-link { color: #fff; font-size: 11px; font-weight: 500; text-underline-offset: 4px; }
-.launch-progress { width: 164px; height: 164px; position: relative; z-index: 1; justify-self: center; display: grid; place-items: center; background: conic-gradient(#ff6841 0 var(--launch-progress), rgba(255,255,255,.13) var(--launch-progress) 100%); border-radius: 50%; box-shadow: 0 0 0 12px rgba(255,255,255,.035); }
-.launch-progress::before { content: ""; width: 132px; height: 132px; position: absolute; background: #172030; border-radius: 50%; }
-.launch-progress > div { position: relative; display: grid; justify-items: center; }
-.launch-progress strong { font-size: 32px; line-height: 1; letter-spacing: -.04em; }
-.launch-progress span { margin-top: 8px; color: #aeb8c7; font-size: 10px; }
-
-.launch-workspace-grid { margin-top: 16px; display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(280px, .9fr) minmax(280px, .85fr); gap: 16px; }
-.launch-workspace-grid > .panel { min-height: 390px; }
-.launch-checklist .panel-header, .readiness-card .panel-header { min-height: 74px; padding: 0 22px; border-bottom: 1px solid #edf0f3; }
-.launch-checklist .panel-header > div > span, .readiness-card .panel-header > div > span { display: block; color: #8a919e; font-size: 9px; font-weight: 500; letter-spacing: .08em; text-transform: uppercase; }
-.launch-checklist .panel-header h2, .readiness-card .panel-header h2 { margin-top: 4px; font-size: 15px; }
-.launch-checklist .panel-header > b { padding: 6px 9px; color: #3b4351; background: #f2f4f7; border-radius: 999px; font-size: 9px; }
-.launch-checklist ul { margin: 0; padding: 8px 22px 14px; list-style: none; }
-.launch-checklist li { min-height: 70px; display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; align-items: center; gap: 12px; border-bottom: 1px solid #edf0f3; }
-.launch-checklist li:last-child { border-bottom: 0; }
-.checklist-icon { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 10px; }
-.checklist-icon .icon { width: 18px; height: 18px; }
-.launch-checklist li.complete .checklist-icon { color: #12834d; background: #eaf8f0; }
-.launch-checklist li.attention .checklist-icon { color: #ef4c2f; background: #fff1ed; }
-.launch-checklist li div b, .launch-checklist li div small { display: block; }
-.launch-checklist li div b { font-size: 11px; }
-.launch-checklist li div small { margin-top: 5px; color: #7b8390; font-size: 9px; line-height: 1.45; }
-.launch-checklist li em { color: #18814e; font-size: 9px; font-style: normal; }
-.launch-checklist li a { padding: 7px 2px; color: #ef4c2f; font-size: 9px; font-weight: 600; text-decoration: none; }
-
-.first-order-card { padding: 25px 24px; display: flex; flex-direction: column; align-items: flex-start; }
-.first-order-icon { width: 48px; height: 48px; display: grid; place-items: center; color: #f04c2e; background: #fff0ec; border-radius: 14px; }
-.first-order-icon .icon { width: 23px; height: 23px; }
-.card-kicker { margin-top: 20px; color: #ef4c2f; font-size: 9px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; }
-.first-order-card h2 { margin: 8px 0 9px; font-size: 18px; line-height: 1.35; letter-spacing: -.025em; }
-.first-order-card p { margin: 0; color: #747c89; font-size: 10px; line-height: 1.65; }
-.first-order-card ol { width: 100%; margin: 18px 0; padding: 0; display: grid; gap: 9px; list-style: none; }
-.first-order-card li { display: flex; align-items: center; gap: 9px; color: #4c5563; font-size: 10px; }
-.first-order-card li span { width: 22px; height: 22px; display: grid; place-items: center; color: #f04c2e; background: #fff3ef; border-radius: 50%; font-size: 9px; font-weight: 600; }
-.first-order-card .dashboard-action { width: 100%; margin-top: auto; }
-
-.readiness-card { display: flex; flex-direction: column; }
-.readiness-card .panel-header a { color: #ef4c2f; font-size: 10px; }
-.readiness-card dl { margin: 0; padding: 8px 20px; }
-.readiness-card dl > div { min-height: 62px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid #edf0f3; }
-.readiness-card dt { display: flex; align-items: center; gap: 10px; }
-.readiness-card dt > span:last-child, .readiness-card dt small { display: block; }
-.readiness-card dt > span:last-child { font-size: 10px; font-weight: 500; }
-.readiness-card dt small { margin-top: 4px; color: #858d99; font-size: 8px; font-weight: 400; }
-.readiness-icon { width: 34px; height: 34px; display: grid; place-items: center; color: #646d7a; background: #f4f6f8; border-radius: 9px; }
-.readiness-icon .icon { width: 17px; height: 17px; }
-.readiness-card dd { margin: 0; padding: 5px 8px; border-radius: 6px; font-size: 8px; font-weight: 600; }
-.readiness-card dd.ready { color: #117a49; background: #eaf8f0; }
-.readiness-card dd.needs-work { color: #a94324; background: #fff0ea; }
-.readiness-card footer { min-height: 65px; margin-top: auto; padding: 0 20px; display: flex; align-items: center; gap: 10px; background: #fafbfc; border-top: 1px solid #edf0f3; }
-.environment-dot { width: 9px; height: 9px; background: #18a05c; border: 2px solid #d9f4e5; border-radius: 50%; box-sizing: content-box; }
-.readiness-card footer b, .readiness-card footer small { display: block; }
-.readiness-card footer b { font-size: 10px; }
-.readiness-card footer small { margin-top: 3px; color: #858d99; font-size: 8px; }
-
-@media (max-width: 1320px) {
-  .launch-workspace-grid { grid-template-columns: 1.25fr 1fr; }
-  .readiness-card { grid-column: 1 / -1; min-height: 330px !important; }
-  .readiness-card dl { display: grid; grid-template-columns: 1fr 1fr; column-gap: 28px; }
-}
-@media (max-width: 760px) {
-  .empty-dashboard .welcome-row { min-height: 160px; grid-template-columns: 1fr; }
-  .welcome-actions { width: 100%; }
-  .welcome-actions .dashboard-action { flex: 1; }
-  .launch-hero { padding: 26px 22px; grid-template-columns: 1fr; }
-  .launch-progress { width: 130px; height: 130px; justify-self: start; }
-  .launch-progress::before { width: 104px; height: 104px; }
-  .launch-progress strong { font-size: 25px; }
-  .launch-workspace-grid { grid-template-columns: 1fr; }
-  .readiness-card { grid-column: auto; }
-  .readiness-card dl { display: block; }
-}
-@media (max-width: 480px) {
-  .welcome-actions { align-items: stretch; flex-direction: column; }
-  .launch-hero-copy > div { align-items: flex-start; flex-direction: column; }
-  .launch-checklist .panel-header { align-items: flex-start; flex-direction: column; justify-content: center; }
-  .launch-checklist li { grid-template-columns: 36px minmax(0, 1fr); padding: 10px 0; }
-  .launch-checklist li > a, .launch-checklist li > em { grid-column: 2; justify-self: start; }
-}
-
-/* Dashboard supporting copy: readable without changing the established headline scale. */
+/* Slightly larger supporting text; headings and prominent values stay unchanged. */
 .page-dashboard .primary-nav a { font-size: 13px; }
-.page-dashboard .primary-nav a b,
 .page-dashboard .profile small,
 .page-dashboard .kpi-grid em,
 .page-dashboard .chart-controls button,
@@ -845,8 +740,6 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .page-dashboard .storefront-pipeline small { font-size: 10px; }
 
 .page-dashboard .global-search input,
-.page-dashboard .profile b,
-.page-dashboard .logout-form button,
 .page-dashboard .panel-header a,
 .page-dashboard .kpi-grid small,
 .page-dashboard .kpi-grid p,
@@ -865,28 +758,6 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .page-dashboard .storefront-summary b,
 .page-dashboard .payout-body > small,
 .page-dashboard .payout-body em { font-size: 11px; }
-
-.page-dashboard .launch-eyebrow,
-.page-dashboard .launch-progress span,
-.page-dashboard .launch-text-link,
-.page-dashboard .launch-checklist .panel-header > div > span,
-.page-dashboard .readiness-card .panel-header > div > span,
-.page-dashboard .launch-checklist .panel-header > b,
-.page-dashboard .launch-checklist li div small,
-.page-dashboard .launch-checklist li em,
-.page-dashboard .launch-checklist li a,
-.page-dashboard .card-kicker,
-.page-dashboard .first-order-card p,
-.page-dashboard .first-order-card li,
-.page-dashboard .readiness-card dt > span:last-child,
-.page-dashboard .readiness-card dt small,
-.page-dashboard .readiness-card dd,
-.page-dashboard .readiness-card footer b,
-.page-dashboard .readiness-card footer small { font-size: 11px; }
-
-.page-dashboard .launch-hero p { font-size: 13px; }
-.page-dashboard .launch-checklist li div b,
-.page-dashboard .first-order-card .dashboard-action { font-size: 12px; }
 
 /* Landing page builder and managed hosting */
 .product-commerce-strip{margin-bottom:16px;padding:16px;display:grid;grid-template-columns:1fr 22px 1fr 22px 1fr 22px 1fr;align-items:center;gap:8px;background:#fff;border:1px solid #e2e6ec;border-radius:15px;box-shadow:0 3px 14px rgba(18,24,40,.05)}.product-commerce-strip>article{min-width:0;padding:5px;display:grid;grid-template-columns:38px 1fr auto;align-items:center;gap:10px}.product-commerce-strip article>span{width:38px;height:38px;display:grid;place-items:center;color:#ef4e39;background:#fff0ed;border-radius:10px}.product-commerce-strip article>span .icon{width:18px}.product-commerce-strip small,.product-commerce-strip b,.product-commerce-strip p{display:block}.product-commerce-strip small{color:#858c98;font-size:7px}.product-commerce-strip b{margin-top:4px;font-size:9px}.product-commerce-strip p{margin:4px 0 0;color:#8b919c;font-size:6px;line-height:1.5}.product-commerce-strip em,.product-commerce-strip a{color:#0b8d51;font-size:7px;font-style:normal;text-decoration:none}.product-commerce-strip a{color:#ef4e39}.product-commerce-strip>i{display:grid;place-items:center;color:#b0b5bd}.product-commerce-strip>i .icon{width:15px}
