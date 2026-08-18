@@ -209,6 +209,37 @@ function ez_admin_post_form_json(string $url, array $headers, array $fields, str
     return $decoded;
 }
 
+function ez_admin_post_json(string $url, array $headers, array $payload, string $service): array
+{
+    if (!function_exists('curl_init')) {
+        throw new RuntimeException('PHP cURL is required to contact ' . $service . '.');
+    }
+    $handle = curl_init($url);
+    if ($handle === false) throw new RuntimeException('Could not start the ' . $service . ' request.');
+    curl_setopt_array($handle, [
+        CURLOPT_HTTPHEADER => array_merge($headers, ['Content-Type: application/json']),
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_SLASHES),
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_CONNECTTIMEOUT => 8,
+        CURLOPT_TIMEOUT => 15,
+        CURLOPT_SSL_VERIFYPEER => true,
+    ]);
+    $body = curl_exec($handle);
+    $status = (int) curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
+    $error = curl_error($handle);
+    $decoded = is_string($body) ? json_decode($body, true) : null;
+    if ($status < 200 || $status >= 300 || !is_array($decoded)) {
+        $providerMessage = is_array($decoded)
+            ? trim((string) ($decoded['msg'] ?? $decoded['message'] ?? $decoded['error_description'] ?? ''))
+            : '';
+        throw new RuntimeException($providerMessage !== ''
+            ? mb_substr($providerMessage, 0, 220)
+            : $service . ' rejected the request' . ($error !== '' ? ': ' . $error : '.'));
+    }
+    return $decoded;
+}
+
 function ez_admin_token_expiration(string $accessToken): int
 {
     $parts = explode('.', $accessToken);
@@ -239,11 +270,11 @@ function ez_admin_verify_supabase_user(string $accessToken): array
         throw new RuntimeException('Supabase did not return a valid user identity.');
     }
     if (($user['email_confirmed_at'] ?? $user['confirmed_at'] ?? '') === '') {
-        throw new RuntimeException('Sign in with a Google account whose email is verified.');
+        throw new RuntimeException('Sign in with a verified email address.');
     }
     $allowedEmails = ez_admin_allowed_emails();
     if ($allowedEmails === [] || !in_array($email, $allowedEmails, true)) {
-        throw new RuntimeException('This Google account is not authorized for the Ezkart admin.');
+        throw new RuntimeException('This email address is not authorized for the Ezkart admin.');
     }
     return $user;
 }
@@ -373,6 +404,31 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
         }
         usleep(350000);
         $loginError = 'Password admin tidak cocok.';
+    } elseif ((string) ($_POST['action'] ?? '') === 'email_login') {
+        try {
+            $email = strtolower(trim((string) ($_POST['email'] ?? '')));
+            if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+                throw new InvalidArgumentException('Enter a valid email address.');
+            }
+            if (!in_array($email, ez_admin_allowed_emails(), true)) {
+                throw new RuntimeException('This email address is not authorized for the Ezkart admin.');
+            }
+            $settings = ez_admin_supabase_settings();
+            if (!$settings['configured']) {
+                throw new RuntimeException('Supabase login is not configured on this server.');
+            }
+            $redirectUrl = ez_checkout_public_url() . '/cart/admin/';
+            ez_admin_post_json(
+                $settings['url'] . '/auth/v1/otp?redirect_to=' . rawurlencode($redirectUrl),
+                ['Accept: application/json', 'apikey: ' . $settings['key']],
+                ['email' => $email, 'create_user' => true, 'data' => []],
+                'Supabase Auth',
+            );
+            ez_admin_json(['ok' => true]);
+        } catch (Throwable $error) {
+            usleep(350000);
+            ez_admin_json(['ok' => false, 'error' => $error->getMessage()], 400);
+        }
     } elseif ((string) ($_POST['action'] ?? '') === 'supabase_login') {
         try {
             $accessToken = trim((string) ($_POST['access_token'] ?? ''));
@@ -590,7 +646,7 @@ $catalogInventory = [
   <meta name="robots" content="noindex,nofollow">
   <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
   <?php if ($authenticated): ?><link rel="stylesheet" href="assets/vendor/leaflet.css"><?php endif; ?>
-  <link rel="stylesheet" href="admin.css?v=28">
+  <link rel="stylesheet" href="admin.css?v=29">
   <title><?= $authenticated ? ez_admin_escape($pageTitles[$page]) : 'Admin Login' ?> · Ezkart</title>
 </head>
 <body class="<?= $authenticated ? 'dashboard-page page-' . ez_admin_escape($page) . ($page === 'sites' ? ($siteEditor ? ' page-site-editor' : ' page-sites-library') : '') : 'login-page' ?>">
@@ -600,11 +656,17 @@ $catalogInventory = [
       <a class="admin-brand" href="../../"><img src="../../assets/ezkart-logo.svg" alt="Ezkart"></a>
       <p class="eyebrow">Internal order monitor</p>
       <h1><?= $commerceProduction ? 'Production' : 'Sandbox' ?> admin.</h1>
-      <p class="login-intro">Sign in with your approved Google account. Supabase verifies your identity; Ezkart keeps your session securely signed in on this device.</p>
+      <p class="login-intro">Sign in with Google or your approved email address. Supabase verifies your identity; Ezkart keeps your session securely signed in on this device.</p>
       <?php if ($supabaseSettings['configured']): ?>
         <button class="oauth-button" id="google-sign-in" type="button" data-supabase-url="<?= ez_admin_escape($supabaseSettings['url']) ?>" data-csrf-token="<?= ez_admin_escape($csrfToken) ?>">
           <img class="google-mark" src="assets/google-g.svg" alt=""><span>Continue with Google</span>
         </button>
+        <div class="auth-divider"><span>or</span></div>
+        <form class="email-auth-form" id="email-sign-in-form">
+          <label class="sr-only" for="email-sign-in">Email address</label>
+          <input id="email-sign-in" name="email" type="email" autocomplete="email" placeholder="Email address" required>
+          <button class="email-auth-button" type="submit">Continue with email</button>
+        </form>
         <p class="auth-status" id="auth-status" role="status" aria-live="polite"></p>
       <?php else: ?>
         <div class="configuration-note" role="alert">
@@ -628,7 +690,7 @@ $catalogInventory = [
       <a class="back-link" href="../">← Kembali ke checkout</a>
     </section>
   </main>
-  <script src="auth.js?v=2"></script>
+  <script src="auth.js?v=3"></script>
 <?php else: ?>
   <svg class="svg-sprite" aria-hidden="true">
     <symbol id="icon-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></symbol>

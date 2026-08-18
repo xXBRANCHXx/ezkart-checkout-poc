@@ -32,8 +32,8 @@ and confirm the pickup address before accepting the first payment.
 ## Sandbox admin dashboard
 
 The order dashboard is available at
-[`/cart/admin/`](https://ezkart.id/cart/admin/). Google sign-in is verified by
-Supabase on the server, then the same access token is sent to the matching
+[`/cart/admin/`](https://ezkart.id/cart/admin/). Google OAuth and passwordless
+email-link sign-in are verified by Supabase on the server, then the same access token is sent to the matching
 Cloudflare Worker to create or refresh the safe D1 application profile. Set
 `supabase_url`, `supabase_publishable_key`, and `admin_allowed_emails` in the
 private `config.runtime.php`. The allowlist is required while this legacy

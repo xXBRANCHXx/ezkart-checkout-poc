@@ -2,6 +2,8 @@
   "use strict";
 
   const button = document.getElementById("google-sign-in");
+  const emailForm = document.getElementById("email-sign-in-form");
+  const emailInput = document.getElementById("email-sign-in");
   const status = document.getElementById("auth-status");
   if (!button || !status) return;
 
@@ -68,6 +70,40 @@
       window.location.assign(authorize.toString());
     } catch (_) {
       setStatus("The Supabase URL on this server is invalid.", true);
+    }
+  });
+
+  emailForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const email = emailInput?.value.trim() || "";
+    const submitButton = emailForm.querySelector("button[type='submit']");
+    button.disabled = true;
+    if (submitButton) submitButton.disabled = true;
+    setStatus("Sending your secure sign-in link…");
+    try {
+      const body = new URLSearchParams({
+        action: "email_login",
+        csrf_token: button.dataset.csrfToken || "",
+        email,
+      });
+      const response = await fetch(window.location.pathname, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+        },
+        body,
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || result.ok !== true) {
+        throw new Error(result.error || "Ezkart could not send the sign-in email.");
+      }
+      setStatus(`Check ${email} for your secure sign-in link.`);
+    } catch (error) {
+      button.disabled = false;
+      if (submitButton) submitButton.disabled = false;
+      setStatus(error instanceof Error ? error.message : "Email sign-in failed.", true);
     }
   });
 })();
