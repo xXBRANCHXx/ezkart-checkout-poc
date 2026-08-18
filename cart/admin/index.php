@@ -252,7 +252,7 @@ function ez_admin_refresh_supabase_session(): bool
 {
     if (($_SESSION['authentication_method'] ?? '') !== 'supabase') return false;
     $refreshToken = trim((string) ($_SESSION['supabase_refresh_token'] ?? ''));
-    if (strlen($refreshToken) < 20 || strlen($refreshToken) > 8192) return false;
+    if ($refreshToken === '' || strlen($refreshToken) > 8192) return false;
 
     try {
         $settings = ez_admin_supabase_settings();
@@ -377,7 +377,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
         try {
             $accessToken = trim((string) ($_POST['access_token'] ?? ''));
             $refreshToken = trim((string) ($_POST['refresh_token'] ?? ''));
-            if (strlen($refreshToken) < 20 || strlen($refreshToken) > 8192) {
+            if ($refreshToken === '' || strlen($refreshToken) > 8192) {
                 throw new InvalidArgumentException('Supabase did not return a valid refresh token.');
             }
             $user = ez_admin_verify_supabase_user($accessToken);
@@ -590,7 +590,7 @@ $catalogInventory = [
   <meta name="robots" content="noindex,nofollow">
   <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
   <?php if ($authenticated): ?><link rel="stylesheet" href="assets/vendor/leaflet.css"><?php endif; ?>
-  <link rel="stylesheet" href="admin.css?v=27">
+  <link rel="stylesheet" href="admin.css?v=28">
   <title><?= $authenticated ? ez_admin_escape($pageTitles[$page]) : 'Admin Login' ?> · Ezkart</title>
 </head>
 <body class="<?= $authenticated ? 'dashboard-page page-' . ez_admin_escape($page) . ($page === 'sites' ? ($siteEditor ? ' page-site-editor' : ' page-sites-library') : '') : 'login-page' ?>">
@@ -598,13 +598,12 @@ $catalogInventory = [
   <main class="login-shell">
     <section class="login-card">
       <a class="admin-brand" href="../../"><img src="../../assets/ezkart-logo.svg" alt="Ezkart"></a>
-      <span class="environment-pill"><i></i> Midtrans <?= $commerceProduction ? 'Production' : 'Sandbox' ?></span>
       <p class="eyebrow">Internal order monitor</p>
       <h1><?= $commerceProduction ? 'Production' : 'Sandbox' ?> admin.</h1>
       <p class="login-intro">Sign in with your approved Google account. Supabase verifies your identity; Ezkart keeps your session securely signed in on this device.</p>
       <?php if ($supabaseSettings['configured']): ?>
         <button class="oauth-button" id="google-sign-in" type="button" data-supabase-url="<?= ez_admin_escape($supabaseSettings['url']) ?>" data-csrf-token="<?= ez_admin_escape($csrfToken) ?>">
-          <span class="google-mark" aria-hidden="true">G</span><span>Continue with Google</span><b>→</b>
+          <img class="google-mark" src="assets/google-g.svg" alt=""><span>Continue with Google</span>
         </button>
         <p class="auth-status" id="auth-status" role="status" aria-live="polite"></p>
       <?php else: ?>
