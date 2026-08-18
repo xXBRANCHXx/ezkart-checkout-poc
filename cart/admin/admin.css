@@ -77,10 +77,9 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .email-success-panel { background: #f7fbf8; border-color: #c9e2d0; box-shadow: 0 8px 24px rgba(31,112,61,.07); }
 .email-success-icon { background: #21864a; box-shadow: 0 7px 18px rgba(33,134,74,.2); }
 .email-success-panel strong { font-size: 15px; }
-.verification-complete .login-shell { width: min(100%, 430px); }
+.verification-complete .login-shell { width: min(100%, 520px); }
 .verification-complete .login-card { padding: 0; text-align: center; background: transparent; border: 0; border-radius: 0; box-shadow: none; }
-.verification-complete .login-card .admin-brand { margin: 0 auto 42px; display: table; }
-.verification-complete .login-card .admin-brand img { width: 146px; }
+.verification-complete .login-card .admin-brand { display: none; }
 .verification-complete .eyebrow,
 .verification-complete .login-card > h1,
 .verification-complete .login-intro,
@@ -89,11 +88,11 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .verification-complete .form-error,
 .verification-complete .auth-status { display: none; }
 .verification-complete .email-success-panel { padding: 0; background: transparent; border: 0; border-radius: 0; box-shadow: none; }
-.verification-complete .email-success-icon { width: 58px; height: 58px; margin-bottom: 20px; }
-.verification-complete .email-success-icon svg { width: 27px; height: 27px; stroke-width: 2; }
-.verification-complete .email-success-panel p { color: #667085; font-size: 12px; }
-.verification-complete .email-success-panel strong { margin-top: 6px; font-size: 24px; letter-spacing: -.03em; }
-.verification-complete .email-success-panel small { margin: 18px auto 0; color: #4f596b; font-size: 14px; line-height: 1.6; }
+.verification-complete .email-success-icon { width: 76px; height: 76px; margin-bottom: 28px; }
+.verification-complete .email-success-icon svg { width: 34px; height: 34px; stroke-width: 2; }
+.verification-complete .email-success-panel p { color: #667085; font-size: 14px; }
+.verification-complete .email-success-panel strong { margin-top: 16px; font-size: 32px; letter-spacing: -.035em; }
+.verification-complete .email-success-panel small { margin: 26px auto 0; color: #4f596b; font-size: 16px; line-height: 1.6; }
 .auth-status { min-height: 18px; margin: 10px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
 .auth-status.error { color: #9a241a; }
 .password-fallback { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
