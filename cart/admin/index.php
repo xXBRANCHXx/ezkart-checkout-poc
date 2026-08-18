@@ -894,7 +894,7 @@ $catalogInventory = [
   </div>
   <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
   <script src="assets/vendor/leaflet.js"></script>
-  <script src="admin.js?v=30"></script>
+  <script src="admin.js?v=31"></script>
 <?php endif; ?>
 </body>
 </html>

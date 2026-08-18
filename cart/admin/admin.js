@@ -451,13 +451,27 @@
     const animateGallery = (oldRects) => requestAnimationFrame(() => gallery?.querySelectorAll(".product-media-tile").forEach((tile) => {
       const old = oldRects?.get(tile.dataset.imageId); if (!old) return;
       const next = tile.getBoundingClientRect(); const x = old.left - next.left; const y = old.top - next.top;
-      if (x || y) tile.animate([{ transform: `translate(${x}px, ${y}px)` }, { transform: "translate(0, 0)" }], { duration: 330, easing: "cubic-bezier(.2,.8,.2,1)" });
+      if (x || y) tile.animate([{ transform: `translate(${x}px, ${y}px)` }, { transform: "translate(0, 0)" }], { duration: 260, easing: "cubic-bezier(.22,.82,.22,1)" });
     }));
     const galleryRects = () => new Map([...gallery?.querySelectorAll(".product-media-tile") || []].map((tile) => [tile.dataset.imageId, tile.getBoundingClientRect()]));
-    const reorderImage = (sourceId, targetId) => {
-      const source = selectedImages.findIndex((item) => item.id === sourceId); const target = selectedImages.findIndex((item) => item.id === targetId);
-      if (source < 0 || target < 0 || source === target) return;
-      const oldRects = galleryRects(); const [moved] = selectedImages.splice(source, 1); selectedImages.splice(target, 0, moved); renderImages(oldRects); markDraftChanged();
+    const reorderImageToIndex = (sourceId, target) => {
+      const source = selectedImages.findIndex((item) => item.id === sourceId);
+      if (source < 0 || target < 0 || target >= selectedImages.length || source === target) return;
+      const oldRects = galleryRects(); const [moved] = selectedImages.splice(source, 1); selectedImages.splice(target, 0, moved); renderImages(oldRects);
+      if (!draggingImageId) markDraftChanged();
+    };
+    const reorderImage = (sourceId, targetId) => reorderImageToIndex(sourceId, selectedImages.findIndex((item) => item.id === targetId));
+    const gallerySlotAtPoint = (x, y) => {
+      const tiles = [...gallery?.querySelectorAll(".product-media-tile") || []];
+      if (!tiles.length) return -1;
+      const galleryBox = gallery.getBoundingClientRect();
+      if (x < galleryBox.left || x > galleryBox.right || y < galleryBox.top || y > galleryBox.bottom) return -1;
+      const style = getComputedStyle(gallery); const columns = style.gridTemplateColumns.split(" ").filter(Boolean).length || 1;
+      const width = tiles[0].offsetWidth; const height = tiles[0].offsetHeight;
+      const columnGap = Number.parseFloat(style.columnGap) || 0; const rowGap = Number.parseFloat(style.rowGap) || 0;
+      const column = Math.max(0, Math.min(columns - 1, Math.round((x - galleryBox.left - width / 2) / (width + columnGap))));
+      const rows = Math.ceil(tiles.length / columns); const row = Math.max(0, Math.min(rows - 1, Math.round((y - galleryBox.top - height / 2) / (height + rowGap))));
+      return Math.min(tiles.length - 1, row * columns + column);
     };
     const startMediaDrag = (event, item, tile) => {
       if (event.button !== 0 || event.target.closest("button")) return;
@@ -473,8 +487,7 @@
       paint();
       const move = (moveEvent) => {
         const now = performance.now(); velocity = (moveEvent.clientX - lastX) / Math.max(1, now - lastTime); lastX = moveEvent.clientX; lastTime = now; x = moveEvent.clientX; y = moveEvent.clientY; paint();
-        const target = document.elementsFromPoint(x, y).find((element) => element.classList?.contains("product-media-tile"));
-        if (target?.dataset.imageId && target.dataset.imageId !== item.id) reorderImage(item.id, target.dataset.imageId);
+        const targetSlot = gallerySlotAtPoint(x, y); if (targetSlot >= 0) reorderImageToIndex(item.id, targetSlot);
       };
       const end = () => {
         document.removeEventListener("pointermove", move); document.removeEventListener("pointerup", end); document.removeEventListener("pointercancel", end);
@@ -507,7 +520,7 @@
         liveThumbs.hidden = selectedImages.length < 2; liveThumbs.replaceChildren();
         selectedImages.forEach((item, index) => { const button = document.createElement("button"); button.type = "button"; button.innerHTML = `<img src="${item.url}" alt="Preview image ${index + 1}">`; button.addEventListener("click", () => { previewImageIndex = index; updatePreview(); }); liveThumbs.append(button); });
       }
-      if (variants.length) renderVariants(); else updatePreview();
+      if (!draggingImageId) { if (variants.length) renderVariants(); else updatePreview(); }
       animateGallery(oldRects);
     };
     const addImages = async (files) => {
