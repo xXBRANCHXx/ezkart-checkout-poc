@@ -646,7 +646,7 @@ $catalogInventory = [
   <meta name="robots" content="noindex,nofollow">
   <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
   <?php if ($authenticated): ?><link rel="stylesheet" href="assets/vendor/leaflet.css"><?php endif; ?>
-  <link rel="stylesheet" href="admin.css?v=29">
+  <link rel="stylesheet" href="admin.css?v=30">
   <title><?= $authenticated ? ez_admin_escape($pageTitles[$page]) : 'Admin Login' ?> · Ezkart</title>
 </head>
 <body class="<?= $authenticated ? 'dashboard-page page-' . ez_admin_escape($page) . ($page === 'sites' ? ($siteEditor ? ' page-site-editor' : ' page-sites-library') : '') : 'login-page' ?>">
@@ -659,11 +659,11 @@ $catalogInventory = [
       <p class="login-intro">Sign in with Google or your approved email address. Supabase verifies your identity; Ezkart keeps your session securely signed in on this device.</p>
       <?php if ($supabaseSettings['configured']): ?>
         <button class="oauth-button" id="google-sign-in" type="button" data-supabase-url="<?= ez_admin_escape($supabaseSettings['url']) ?>" data-csrf-token="<?= ez_admin_escape($csrfToken) ?>">
-          <img class="google-mark" src="assets/google-g.svg" alt=""><span>Continue with Google</span>
+          <img class="google-mark" src="https://developers.google.com/static/identity/images/g-logo.png" alt=""><span>Continue with Google</span>
         </button>
         <div class="auth-divider"><span>or</span></div>
         <form class="email-auth-form" id="email-sign-in-form">
-          <label class="sr-only" for="email-sign-in">Email address</label>
+          <label class="email-auth-label" for="email-sign-in">Email address</label>
           <input id="email-sign-in" name="email" type="email" autocomplete="email" placeholder="Email address" required>
           <button class="email-auth-button" type="submit">Continue with email</button>
         </form>
