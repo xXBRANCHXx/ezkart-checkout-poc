@@ -6,7 +6,7 @@ Emails → Templates** in the Supabase dashboard.
 
 ## Magic Link
 
-- Subject: `Your secure Ezkart sign-in link`
+- Subject: `Sign in to Ezkart`
 - Body: [`magic-link.html`](magic-link.html)
 
 The template deliberately keeps Supabase's `{{ .ConfirmationURL }}` variable
