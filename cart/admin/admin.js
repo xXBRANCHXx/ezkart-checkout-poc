@@ -268,7 +268,7 @@
         return `Billed every ${interval} ${unit}${interval === 1 ? "" : "s"}`;
       }
       const stock = selectedVariant ? selectedVariant.stock : productCreateForm.elements.stock?.value;
-      return `${Math.max(0, Math.round(Number(stock) || 0))} available · shipping calculated at checkout`;
+      return `Stock: ${Math.max(0, Math.round(Number(stock) || 0))}`;
     };
     const updatePreview = (imageDirection = 0, swipeOffset = 0) => {
       const selectedVariant = selectedPreviewVariant();
