@@ -421,7 +421,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
             ez_admin_post_json(
                 $settings['url'] . '/auth/v1/otp?redirect_to=' . rawurlencode($redirectUrl),
                 ['Accept: application/json', 'apikey: ' . $settings['key']],
-                ['email' => $email, 'create_user' => true, 'data' => []],
+                ['email' => $email, 'create_user' => true],
                 'Supabase Auth',
             );
             ez_admin_json(['ok' => true]);
