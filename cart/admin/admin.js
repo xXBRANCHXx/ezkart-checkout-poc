@@ -464,7 +464,9 @@
       event.preventDefault();
       const rect = tile.getBoundingClientRect(); const ghost = tile.cloneNode(true); ghost.classList.add("product-media-drag-ghost");
       const squareSize = Math.max(86, Math.min(150, rect.width));
-      ghost.style.width = `${squareSize}px`; ghost.style.height = `${squareSize}px`; document.body.append(ghost);
+      ghost.style.width = `${squareSize}px`; ghost.style.height = `${squareSize}px`;
+      ghost.style.transform = `translate3d(${event.clientX - squareSize / 2}px, ${event.clientY - squareSize / 2}px, 0) rotate(0deg) scale(1.04)`;
+      document.body.append(ghost);
       const oldRects = galleryRects(); draggingImageId = item.id; renderImages(oldRects);
       let x = event.clientX; let y = event.clientY; let lastX = x; let lastTime = performance.now(); let velocity = 0;
       const paint = () => { const tilt = Math.max(-8, Math.min(8, velocity * .15)); ghost.style.transform = `translate3d(${x - squareSize / 2}px, ${y - squareSize / 2}px, 0) rotate(${tilt}deg) scale(1.04)`; };
@@ -475,11 +477,17 @@
         if (target?.dataset.imageId && target.dataset.imageId !== item.id) reorderImage(item.id, target.dataset.imageId);
       };
       const end = () => {
-        document.removeEventListener("pointermove", move); document.removeEventListener("pointerup", end);
-        const oldRects = galleryRects(); draggingImageId = null; renderImages(oldRects);
-        ghost.classList.add("is-dropping"); setTimeout(() => ghost.remove(), 180); markDraftChanged();
+        document.removeEventListener("pointermove", move); document.removeEventListener("pointerup", end); document.removeEventListener("pointercancel", end);
+        const placeholder = gallery?.querySelector(`[data-image-id="${CSS.escape(item.id)}"]`);
+        const target = placeholder?.getBoundingClientRect();
+        if (!target) { draggingImageId = null; renderImages(); ghost.remove(); markDraftChanged(); return; }
+        const scale = target.width / squareSize;
+        const settleX = target.left - (squareSize - target.width) / 2; const settleY = target.top - (squareSize - target.height) / 2;
+        ghost.classList.add("is-settling");
+        ghost.style.transform = `translate3d(${settleX}px, ${settleY}px, 0) rotate(0deg) scale(${scale})`;
+        window.setTimeout(() => { const oldRects = galleryRects(); draggingImageId = null; renderImages(oldRects); ghost.remove(); markDraftChanged(); }, 210);
       };
-      document.addEventListener("pointermove", move); document.addEventListener("pointerup", end, { once: true });
+      document.addEventListener("pointermove", move); document.addEventListener("pointerup", end, { once: true }); document.addEventListener("pointercancel", end, { once: true });
     };
     const renderImages = (oldRects = null) => {
       if (mediaCount) mediaCount.textContent = `${selectedImages.length} / 9`;
