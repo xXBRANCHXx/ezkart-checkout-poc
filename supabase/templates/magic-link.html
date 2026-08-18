@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="supported-color-schemes" content="light">
+  <title>Sign in to Ezkart</title>
+</head>
+<body style="margin:0;padding:0;background:#f6f3ed;color:#111426;font-family:Arial,Helvetica,sans-serif;-webkit-text-size-adjust:100%;">
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">
+    Your secure, one-time link to the Ezkart admin is ready.
+  </div>
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;background:#f6f3ed;">
+    <tr>
+      <td align="center" style="padding:40px 16px;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;max-width:600px;">
+          <tr>
+            <td style="padding:0 8px 18px;">
+              <img src="https://test.ezkart.id/assets/ezkart-logo-email.png" width="146" height="60" alt="Ezkart" style="display:block;width:146px;height:auto;border:0;outline:none;text-decoration:none;">
+            </td>
+          </tr>
+          <tr>
+            <td style="overflow:hidden;background:#fffdfa;border:1px solid #dedbd4;border-radius:22px;box-shadow:0 18px 45px rgba(17,20,38,.09);">
+              <div style="height:6px;background:#ff2f1f;font-size:0;line-height:0;">&nbsp;</div>
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                  <td style="padding:44px 46px 18px;">
+                    <p style="margin:0 0 13px;color:#f02b1f;font-size:12px;line-height:18px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;">Secure admin access</p>
+                    <h1 style="margin:0;color:#111426;font-size:34px;line-height:41px;font-weight:700;letter-spacing:-.7px;">Sign in to Ezkart</h1>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:0 46px;">
+                    <p style="margin:0 0 20px;color:#62677d;font-size:16px;line-height:26px;">We received a request to sign in to the Ezkart admin for:</p>
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 28px;">
+                      <tr>
+                        <td style="padding:14px 17px;background:#f2f3f7;border:1px solid #e0e2e9;border-radius:10px;color:#111426;font-size:15px;line-height:21px;font-weight:700;word-break:break-all;">{{ .Email }}</td>
+                      </tr>
+                    </table>
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 28px;">
+                      <tr>
+                        <td align="center" bgcolor="#0b1024" style="border-radius:10px;">
+                          <a href="{{ .ConfirmationURL }}" style="display:inline-block;padding:16px 26px;color:#ffffff;font-size:15px;line-height:20px;font-weight:700;text-decoration:none;border-radius:10px;">Sign in to Ezkart&nbsp;&nbsp;&rarr;</a>
+                        </td>
+                      </tr>
+                    </table>
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 26px;background:#fff8d9;border:1px solid #f0de7b;border-radius:12px;">
+                      <tr>
+                        <td width="42" valign="top" style="padding:16px 0 16px 17px;color:#aa7800;font-size:19px;line-height:22px;">&#128274;</td>
+                        <td style="padding:16px 17px 16px 0;">
+                          <p style="margin:0 0 3px;color:#715500;font-size:12px;line-height:17px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;">One-time sign-in link</p>
+                          <p style="margin:0;color:#756326;font-size:13px;line-height:20px;">For your security, this link expires shortly and can only be used once.</p>
+                        </td>
+                      </tr>
+                    </table>
+                    <p style="margin:0 0 6px;color:#72768a;font-size:13px;line-height:21px;">Button not working? <a href="{{ .ConfirmationURL }}" style="color:#d9271d;font-weight:700;text-decoration:underline;">Open the secure sign-in link</a>.</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:30px 46px 42px;">
+                    <div style="height:1px;background:#e7e4de;font-size:0;line-height:0;">&nbsp;</div>
+                    <p style="margin:22px 0 0;color:#8a8d9b;font-size:12px;line-height:20px;">If you didn&rsquo;t request this email, you can safely ignore it. No one can access your account without using this link.</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:22px 22px 0;color:#8b8d97;font-size:11px;line-height:18px;">
+              Ezkart &middot; Secure commerce operations<br>
+              <a href="mailto:support@ezkart.id" style="color:#6d7080;text-decoration:underline;">support@ezkart.id</a>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
