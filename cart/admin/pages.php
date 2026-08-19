@@ -136,9 +136,9 @@ function ez_orders_table(array $rows, string $tableId): void
             <label data-product-physical><span>Shipping weight (grams)</span><input name="weight" type="number" min="1" max="50000" value="500"></label>
             <label data-product-digital hidden><span>Download filename</span><input name="digital_name" maxlength="100" placeholder="freelance-guide.pdf"><small>The protected file upload is connected separately.</small></label>
             <div class="product-subscription-settings product-field-wide" data-product-subscription hidden>
-              <label><span>Bill every</span><input name="interval" type="number" min="1" max="12" value="1" data-product-preview-interval></label>
-              <label><span>Billing period</span><select name="unit" data-product-preview-unit><option value="month">Month</option><option value="week">Week</option><option value="day">Day</option></select></label>
-              <p>Recurring collection will use Midtrans after the subscription payment flow is activated.</p>
+              <label><span>Bill every</span><input name="interval" type="number" min="1" max="120" value="1" data-product-preview-interval></label>
+              <label><span>Billing period</span><select name="unit" data-product-preview-unit><option value="month">Month</option><option value="year">Year</option></select></label>
+              <p>Customers will be billed automatically on the schedule you choose.</p>
             </div>
           </div>
         </section>

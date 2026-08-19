@@ -662,15 +662,16 @@
         const physical = currentType() === "physical";
         const subscription = currentType() === "subscription";
         const row = document.createElement("div"); row.className = "product-variant-row"; row.dataset.variantId = variant.id;
-        const billingInterval = Math.max(1, Math.min(12, Math.round(Number(variant.billingInterval) || 1)));
-        const billingUnit = ["day", "week", "month"].includes(variant.billingUnit) ? variant.billingUnit : "month";
-        row.innerHTML = `<span><input type="checkbox" data-variant-select aria-label="Select ${escapeHtml(variant.name)}"></span><b title="${escapeHtml(variant.name)}">${escapeHtml(compactVariantName(variant.name))}</b><label><span>Price</span><input type="number" min="1000" step="500" value="${variant.price}" data-variant-price></label><label ${physical ? "" : "hidden"}><span>Stock</span><input type="number" min="0" max="999999" value="${variant.stock}" data-variant-stock></label><label ${physical ? "" : "hidden"}><span>Weight</span><input type="number" min="1" max="50000" value="${variant.weightGrams || 500}" data-variant-weight></label><label class="product-variant-billing" ${subscription ? "" : "hidden"}><span>Billing</span><span><input type="number" min="1" max="12" value="${billingInterval}" aria-label="Billing interval" data-variant-billing-interval><select aria-label="Billing period" data-variant-billing-unit><option value="month" ${billingUnit === "month" ? "selected" : ""}>Month</option><option value="week" ${billingUnit === "week" ? "selected" : ""}>Week</option><option value="day" ${billingUnit === "day" ? "selected" : ""}>Day</option></select></span></label><label><span>SKU</span><input type="text" maxlength="48" value="${escapeHtml(variant.sku)}" data-variant-sku></label>${variantPhotoMarkup(variant)}<button type="button" data-variant-remove aria-label="Remove ${escapeHtml(variant.name)}"><svg class="icon" aria-hidden="true"><use href="#icon-trash"></use></svg></button>`;
+        const billingUnit = ["month", "year"].includes(variant.billingUnit) ? variant.billingUnit : "month";
+        const billingMaximum = billingUnit === "year" ? 10 : 120;
+        const billingInterval = Math.max(1, Math.min(billingMaximum, Math.round(Number(variant.billingInterval) || 1)));
+        row.innerHTML = `<span><input type="checkbox" data-variant-select aria-label="Select ${escapeHtml(variant.name)}"></span><b title="${escapeHtml(variant.name)}">${escapeHtml(compactVariantName(variant.name))}</b><label><span>Price</span><input type="number" min="1000" step="500" value="${variant.price}" data-variant-price></label><label ${physical ? "" : "hidden"}><span>Stock</span><input type="number" min="0" max="999999" value="${variant.stock}" data-variant-stock></label><label ${physical ? "" : "hidden"}><span>Weight</span><input type="number" min="1" max="50000" value="${variant.weightGrams || 500}" data-variant-weight></label><label class="product-variant-billing" ${subscription ? "" : "hidden"}><span>Billing</span><span><input type="number" min="1" max="${billingMaximum}" value="${billingInterval}" aria-label="Billing interval" data-variant-billing-interval><select aria-label="Billing period" data-variant-billing-unit><option value="month" ${billingUnit === "month" ? "selected" : ""}>Month</option><option value="year" ${billingUnit === "year" ? "selected" : ""}>Year</option></select></span></label><label><span>SKU</span><input type="text" maxlength="48" value="${escapeHtml(variant.sku)}" data-variant-sku></label>${variantPhotoMarkup(variant)}<button type="button" data-variant-remove aria-label="Remove ${escapeHtml(variant.name)}"><svg class="icon" aria-hidden="true"><use href="#icon-trash"></use></svg></button>`;
         row.querySelector("[data-variant-select]").addEventListener("change", (event) => { event.target.checked ? selectedVariantIds.add(variant.id) : selectedVariantIds.delete(variant.id); updateVariantSelection(); });
         row.querySelector("[data-variant-price]").addEventListener("input", (event) => { variant.price = Math.max(0, Math.round(Number(event.target.value) || 0)); updatePreview(); markDraftChanged(); });
         row.querySelector("[data-variant-stock]").addEventListener("input", (event) => { variant.stock = Math.max(0, Math.round(Number(event.target.value) || 0)); updatePreview(); markDraftChanged(); });
         row.querySelector("[data-variant-weight]").addEventListener("input", (event) => { variant.weightGrams = Math.max(0, Math.round(Number(event.target.value) || 0)); markDraftChanged(); });
-        row.querySelector("[data-variant-billing-interval]")?.addEventListener("input", (event) => { variant.billingInterval = Math.max(1, Math.min(12, Math.round(Number(event.target.value) || 1))); updatePreview(); markDraftChanged(); });
-        row.querySelector("[data-variant-billing-unit]")?.addEventListener("change", (event) => { variant.billingUnit = event.target.value; updatePreview(); markDraftChanged(); });
+        row.querySelector("[data-variant-billing-interval]")?.addEventListener("input", (event) => { const maximum = variant.billingUnit === "year" ? 10 : 120; variant.billingInterval = Math.max(1, Math.min(maximum, Math.round(Number(event.target.value) || 1))); updatePreview(); markDraftChanged(); });
+        row.querySelector("[data-variant-billing-unit]")?.addEventListener("change", (event) => { variant.billingUnit = event.target.value; variant.billingInterval = Math.min(variant.billingInterval || 1, variant.billingUnit === "year" ? 10 : 120); renderVariants(); markDraftChanged(); });
         row.querySelector("[data-variant-sku]").addEventListener("input", (event) => { variant.sku = event.target.value.trim(); markDraftChanged(); });
         row.querySelectorAll("[data-main-image-index]").forEach((button) => button.addEventListener("click", () => { variant.imageIndex = Number(button.dataset.mainImageIndex); variant.useCustomImage = false; button.closest("details").open = false; renderVariants(); markDraftChanged(); }));
         const variantPhotoInput = row.querySelector("[data-variant-photo-input]");
@@ -716,8 +717,8 @@
       const price = Math.max(1000, Math.round(Number(productCreateForm.elements.price?.value) || 75000));
       const stock = Math.max(0, Math.round(Number(productCreateForm.elements.stock?.value) || 0));
       const weightGrams = Math.max(1, Math.round(Number(productCreateForm.elements.weight?.value) || 500));
-      const billingInterval = Math.max(1, Math.min(12, Math.round(Number(productCreateForm.elements.interval?.value) || 1)));
-      const billingUnit = ["day", "week", "month"].includes(productCreateForm.elements.unit?.value) ? productCreateForm.elements.unit.value : "month";
+      const billingUnit = ["month", "year"].includes(productCreateForm.elements.unit?.value) ? productCreateForm.elements.unit.value : "month";
+      const billingInterval = Math.max(1, Math.min(billingUnit === "year" ? 10 : 120, Math.round(Number(productCreateForm.elements.interval?.value) || 1)));
       variants = combinations.map((options, index) => {
         const name = options.map((option) => option.value).join(" · ");
         return previous.get(name) || { id: globalThis.crypto?.randomUUID?.() || `variant-${Date.now()}-${index}`, name, options, price, stock, weightGrams, billingInterval, billingUnit, sku: `${currentType() === "subscription" ? "PLAN" : "VAR"}-${String(index + 1).padStart(3, "0")}`, imageIndex: null, useCustomImage: false };
@@ -758,11 +759,19 @@
       }
       syncLiveVariants(); markDraftChanged();
     };
+    const syncBaseBillingLimit = () => {
+      const input = productCreateForm.elements.interval;
+      if (!input) return;
+      const maximum = productCreateForm.elements.unit?.value === "year" ? 10 : 120;
+      input.max = String(maximum);
+      if (Number(input.value) > maximum) input.value = String(maximum);
+    };
     const syncType = () => {
       const type = currentType();
       productCreateForm.querySelectorAll("[data-product-physical]").forEach((field) => { field.hidden = type !== "physical"; });
       const digital = q("[data-product-digital]"); if (digital) digital.hidden = type !== "digital";
       const subscription = q("[data-product-subscription]"); if (subscription) subscription.hidden = type !== "subscription";
+      syncBaseBillingLimit();
       if (imageRule) imageRule.querySelector("span").innerHTML = type === "physical" ? "<b>Physical products need 3–9 images.</b> The first image becomes the main catalog photo." : "<b>This product needs 1–9 images.</b> The first image becomes the main catalog photo.";
       if (type === "subscription") variants.forEach((variant) => { variant.billingInterval ||= Math.max(1, Math.round(Number(productCreateForm.elements.interval?.value) || 1)); variant.billingUnit ||= String(productCreateForm.elements.unit?.value || "month"); });
       syncVariantLanguage();
@@ -961,6 +970,7 @@
     productCreateForm.addEventListener("input", () => { updatePreview(); markDraftChanged(); });
     productCreateForm.addEventListener("change", () => { updatePreview(); markDraftChanged(); });
     typeInput?.addEventListener("change", syncType);
+    productCreateForm.elements.unit?.addEventListener("change", syncBaseBillingLimit);
     productCreateForm.addEventListener("submit", async (event) => {
       event.preventDefault(); clearError();
       if (!productCreateForm.reportValidity()) return;
@@ -969,7 +979,8 @@
       if (variantToggle.checked && !variants.length) { showError(type === "subscription" ? "Generate at least one plan, or turn off Has plans." : "Generate at least one variant, or turn off Has variants."); return; }
       if (variants.some((variant) => variant.price < 1000 || !variant.sku || (type === "physical" && variant.weightGrams < 1) || (type === "subscription" && (!variant.billingUnit || variant.billingInterval < 1)))) { showError(type === "subscription" ? "Every plan needs a valid price, SKU, and billing period." : "Every variant needs a valid price, SKU, and shipping weight."); return; }
       const firstPlan = type === "subscription" && variantToggle.checked ? variants[0] : null;
-      const interval = Math.max(1, Math.min(12, Math.round(Number(firstPlan?.billingInterval ?? productCreateForm.elements.interval?.value) || 1)));
+      const selectedBillingUnit = String(firstPlan?.billingUnit || productCreateForm.elements.unit.value || "month");
+      const interval = Math.max(1, Math.min(selectedBillingUnit === "year" ? 10 : 120, Math.round(Number(firstPlan?.billingInterval ?? productCreateForm.elements.interval?.value) || 1)));
       submitButtons.forEach((button) => { button.disabled = true; button.dataset.originalText = button.textContent; button.textContent = editingProduct ? "Publishing changes…" : "Creating product…"; });
       try {
         await ensureEditorMediaCloud();
@@ -980,7 +991,7 @@
           price: variantToggle.checked ? Math.min(...variants.map((variant) => variant.price)) : Math.round(Number(productCreateForm.elements.price.value) || 0), images, mediaIds: selectedImages.map((image) => image.cloudId), image: images[0],
           ...(type === "physical" ? { stock: variantToggle.checked ? variants.reduce((total, variant) => total + variant.stock, 0) : Math.max(0, Math.round(Number(productCreateForm.elements.stock.value) || 0)), weightGrams: variantToggle.checked ? Math.max(...variants.map((variant) => variant.weightGrams)) : Math.max(1, Math.round(Number(productCreateForm.elements.weight.value) || 0)) } : {}),
           ...(type === "digital" ? { digitalFileName: String(productCreateForm.elements.digital_name.value || "").trim() } : {}),
-          ...(type === "subscription" ? { subscription: { interval, unit: String(firstPlan?.billingUnit || productCreateForm.elements.unit.value || "month") } } : {}),
+          ...(type === "subscription" ? { subscription: { interval, unit: selectedBillingUnit } } : {}),
           ...(variantToggle.checked ? { options: optionSnapshot(), variants: variants.map(({ customImage, useCustomImage, ...variant }) => ({ ...variant, imageUploadId: useCustomImage ? customImage?.cloudId || null : null, image: useCustomImage && customImage?.data ? customImage.data : Number.isInteger(variant.imageIndex) ? images[variant.imageIndex] || images[0] : images[0], imageSource: useCustomImage && customImage?.data ? "variant-upload" : Number.isInteger(variant.imageIndex) ? `gallery-${variant.imageIndex + 1}` : "main" })) } : {}), createdAt: editingProduct?.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString(),
         };
         if (cloudEnabled) await saveCloudProduct(product);
@@ -1060,7 +1071,8 @@
       if (!productName) { showError("Give the product a name."); name?.focus(); return; }
       if (productPrice < 1000) { showError("Enter a price of at least Rp1.000."); price?.focus(); return; }
       if (productType === "physical" && productWeight < 1) { showError("Physical products need a shipping weight."); weight?.focus(); return; }
-      if (productType === "subscription" && (interval < 1 || interval > 12)) { showError("Choose a billing interval from 1 to 12."); subscriptionInterval?.focus(); return; }
+      const maximumInterval = unit === "year" ? 10 : 120;
+      if (productType === "subscription" && (interval < 1 || interval > maximumInterval)) { showError(`Choose a billing interval from 1 to ${maximumInterval} ${unit}s.`); subscriptionInterval?.focus(); return; }
       if (files.length < minimumImages || files.length > 9) { showError(`${typeLabel(productType)} products need ${minimumImages === 3 ? "3–9" : "1–9"} images.`); image?.focus(); return; }
       const oversized = files.find((file) => file.size > 2 * 1024 * 1024);
       if (oversized) { showError(`${oversized.name} is larger than 2 MB.`); image?.focus(); return; }
@@ -1332,7 +1344,9 @@
       const weightGrams = Math.round(Number(values.get("weight")) || 0);
       if (type === "physical" && weightGrams < 1) { showError("Physical products need a shipping weight."); return; }
       const interval = Math.round(Number(values.get("interval")) || 1);
-      if (type === "subscription" && (interval < 1 || interval > 12)) { showError("Choose a billing interval from 1 to 12."); return; }
+      const unit = String(values.get("unit") || "month");
+      const maximumInterval = unit === "year" ? 10 : 120;
+      if (type === "subscription" && (interval < 1 || interval > maximumInterval)) { showError(`Choose a billing interval from 1 to ${maximumInterval} ${unit}s.`); return; }
       const submit = form.querySelector('button[type="submit"]'); submit.disabled = true; submit.textContent = "Preparing images…";
       try {
         const images = await Promise.all(files.map(compressCreatorProductImage));
@@ -1348,7 +1362,7 @@
           image: images[0],
           ...(type === "physical" ? { stock: Math.max(0, Math.round(Number(values.get("stock")) || 0)), weightGrams } : {}),
           ...(type === "digital" ? { digitalFileName: String(values.get("digital_name") || "").trim() } : {}),
-          ...(type === "subscription" ? { subscription: { interval, unit: String(values.get("unit") || "month") } } : {}),
+          ...(type === "subscription" ? { subscription: { interval, unit } } : {}),
           createdAt: new Date().toISOString(),
         };
         if (cloudEnabled) await saveCloudProduct(product);
@@ -2424,7 +2438,7 @@
       const type = ["physical", "digital", "subscription"].includes(product.type) ? product.type : "physical";
       const typeName = { physical: "Physical product", digital: "Digital download", subscription: "Subscription" }[type];
       const schedule = type === "subscription" ? ` · every ${product.subscription?.interval || 1} ${product.subscription?.unit || "month"}` : "";
-      const detail = type === "physical" ? `Ships at ${Math.max(1, Number(product.weightGrams) || 1)} g.` : type === "digital" ? `${product.digitalFileName || "Digital file"} · delivered after confirmed payment.` : "Recurring billing through Midtrans after merchant activation.";
+      const detail = type === "physical" ? `Ships at ${Math.max(1, Number(product.weightGrams) || 1)} g.` : type === "digital" ? `${product.digitalFileName || "Digital file"} · delivered after confirmed payment.` : "Recurring billing on the selected schedule.";
       const imageUrl = String(images[0]);
       const safeName = escapeHtml(name);
       const safePrice = escapeHtml(formatRupiah(price));

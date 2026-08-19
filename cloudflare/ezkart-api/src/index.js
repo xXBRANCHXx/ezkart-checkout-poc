@@ -233,8 +233,8 @@ function shapeProduct(row, media = [], variants = []) {
     weightGrams: row.weight_grams === null ? null : Number(row.weight_grams),
     digitalFileName: row.digital_filename || "",
     subscription: row.type === "subscription" ? {
-      interval: Number(row.billing_interval_count || 1),
-      unit: row.billing_interval || "month",
+      interval: Number(metadata.subscription?.interval || row.billing_interval_count || 1),
+      unit: ["month", "year"].includes(metadata.subscription?.unit) ? metadata.subscription.unit : "month",
     } : null,
     options: Array.isArray(metadata.options) ? metadata.options : [],
     media: media.map((item) => ({
@@ -393,8 +393,8 @@ async function saveProduct(request, env, rawId) {
     price: Math.max(0, Math.round(Number(variant.price) || 0)),
     stock: Math.max(0, Math.round(Number(variant.stock) || 0)),
     weightGrams: Math.max(0, Math.round(Number(variant.weightGrams) || 0)),
-    billingUnit: type === "subscription" && ["day", "week", "month"].includes(variant.billingUnit) ? variant.billingUnit : null,
-    billingInterval: type === "subscription" ? Math.max(1, Math.min(12, Math.round(Number(variant.billingInterval) || 1))) : null,
+    billingUnit: type === "subscription" && ["month", "year"].includes(variant.billingUnit) ? variant.billingUnit : null,
+    billingInterval: type === "subscription" ? Math.max(1, Math.min(variant.billingUnit === "year" ? 10 : 120, Math.round(Number(variant.billingInterval) || 1))) : null,
     imageSource: /^gallery-[1-9]$/.test(String(variant.imageSource || "")) ? String(variant.imageSource) : variant.imageUploadId ? "variant-upload" : "main",
     imageUploadId: variant.imageUploadId ? cleanId(variant.imageUploadId, "Variant image ID") : null,
   }));
@@ -407,8 +407,10 @@ async function saveProduct(request, env, rawId) {
   const stock = type === "physical" ? (variants.length ? variants.reduce((sum, variant) => sum + variant.stock, 0) : Math.max(0, Math.round(Number(payload.stock) || 0))) : null;
   const weight = type === "physical" ? (variants.length ? Math.max(...variants.map((variant) => variant.weightGrams)) : Math.max(1, Math.round(Number(payload.weightGrams) || 0))) : null;
   const firstPlan = type === "subscription" && variants.length ? variants[0] : null;
-  const billingUnit = type === "subscription" ? (firstPlan?.billingUnit || (["day", "week", "month"].includes(payload.subscription?.unit) ? payload.subscription.unit : "month")) : null;
-  const billingInterval = type === "subscription" ? (firstPlan?.billingInterval || Math.max(1, Math.min(12, Math.round(Number(payload.subscription?.interval) || 1)))) : null;
+  const displayBillingUnit = type === "subscription" ? (firstPlan?.billingUnit || (["month", "year"].includes(payload.subscription?.unit) ? payload.subscription.unit : "month")) : null;
+  const displayBillingInterval = type === "subscription" ? (firstPlan?.billingInterval || Math.max(1, Math.min(displayBillingUnit === "year" ? 10 : 120, Math.round(Number(payload.subscription?.interval) || 1)))) : null;
+  const billingUnit = type === "subscription" ? "month" : null;
+  const billingInterval = type === "subscription" ? displayBillingInterval * (displayBillingUnit === "year" ? 12 : 1) : null;
   const digitalFilename = type === "digital" ? cleanText(payload.digitalFileName, 180) : null;
   const now = new Date().toISOString();
   const createdAt = existing?.created_at || now;
@@ -421,7 +423,7 @@ async function saveProduct(request, env, rawId) {
         stock_quantity = excluded.stock_quantity, weight_grams = excluded.weight_grams,
         billing_interval = excluded.billing_interval, billing_interval_count = excluded.billing_interval_count,
         digital_filename = excluded.digital_filename, metadata_json = excluded.metadata_json, updated_at = excluded.updated_at
-    `).bind(id, seller.id, type, title, description, sku, basePrice, stock, weight, billingUnit, billingInterval, digitalFilename, JSON.stringify({ category: cleanText(payload.category, 80), options }), createdAt, now),
+    `).bind(id, seller.id, type, title, description, sku, basePrice, stock, weight, billingUnit, billingInterval, digitalFilename, JSON.stringify({ category: cleanText(payload.category, 80), options, ...(type === "subscription" ? { subscription: { interval: displayBillingInterval, unit: displayBillingUnit } } : {}) }), createdAt, now),
     env.DB.prepare("DELETE FROM product_variants WHERE seller_id = ? AND product_id = ?").bind(seller.id, id),
     env.DB.prepare("DELETE FROM product_media WHERE seller_id = ? AND product_id = ?").bind(seller.id, id),
   ];
