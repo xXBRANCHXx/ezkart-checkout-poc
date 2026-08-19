@@ -154,7 +154,10 @@ function ez_orders_table(array $rows, string $tableId): void
             <div class="product-live-commerce">
               <div class="product-live-media"><div class="product-live-image-stage" data-product-live-image-stage><div class="product-live-image" data-product-live-image><span><?= ez_admin_icon('image') ?><small>Your square main image</small></span></div><button type="button" data-product-image-prev aria-label="Previous product image"><?= ez_admin_icon('chevron-left') ?></button><button type="button" data-product-image-next aria-label="Next product image"><?= ez_admin_icon('chevron-right') ?></button></div><div class="product-live-thumbs" data-product-live-thumbs hidden></div></div>
               <div class="product-live-copy">
-                <h2 data-product-live-name>Your product name</h2>
+                <div class="product-live-heading">
+                  <h2 data-product-live-name>Your product name</h2>
+                  <span class="product-live-rating" data-product-live-rating aria-label="Rating 5.0 out of 5"><?= ez_admin_icon('star') ?><b>5.0</b></span>
+                </div>
                 <strong data-product-live-price>Rp75.000</strong>
                 <em data-product-live-availability>Stock: 10</em>
                 <div class="product-live-options" data-product-live-variant hidden></div>
