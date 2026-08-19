@@ -128,12 +128,33 @@
     });
   });
 
-  const landingSiteRegistryKey = "ezkart:landing-builder:v3:sites";
-  const landingLegacyRegistryKey = "ezkart:landing-builder:v2:sites";
-  const landingAdvancedModeKey = "ezkart:landing-builder:advanced-mode";
-  const productCatalogKey = "ezkart:catalog:v1";
-  const productDraftsKey = "ezkart:product-drafts:v1";
-  const activeProductDraftKey = "ezkart:product-editor:active-draft";
+  const storageScope = document.body.dataset.adminStorageScope || "anonymous";
+  const mayMigrateLegacyStorage = document.body.dataset.adminMigrateLegacyStorage === "true";
+  const scopedStorageKey = (key) => `${key}:${storageScope}`;
+  const migrateLegacyStorage = (legacyKey, scopedKey, storage = localStorage) => {
+    if (!mayMigrateLegacyStorage || storage.getItem(scopedKey) !== null) return;
+    const legacyValue = storage.getItem(legacyKey);
+    if (legacyValue === null) return;
+    storage.setItem(scopedKey, legacyValue);
+    storage.removeItem(legacyKey);
+  };
+  const legacyLandingSiteRegistryKey = "ezkart:landing-builder:v3:sites";
+  const landingSiteRegistryKey = scopedStorageKey(legacyLandingSiteRegistryKey);
+  const landingLegacyRegistryKey = scopedStorageKey("ezkart:landing-builder:v2:sites");
+  const legacyLandingAdvancedModeKey = "ezkart:landing-builder:advanced-mode";
+  const landingAdvancedModeKey = scopedStorageKey(legacyLandingAdvancedModeKey);
+  const legacyProductCatalogKey = "ezkart:catalog:v1";
+  const productCatalogKey = scopedStorageKey(legacyProductCatalogKey);
+  const legacyProductDraftsKey = "ezkart:product-drafts:v1";
+  const productDraftsKey = scopedStorageKey(legacyProductDraftsKey);
+  const legacyActiveProductDraftKey = "ezkart:product-editor:active-draft";
+  const activeProductDraftKey = scopedStorageKey(legacyActiveProductDraftKey);
+  migrateLegacyStorage(legacyLandingSiteRegistryKey, landingSiteRegistryKey);
+  migrateLegacyStorage("ezkart:landing-builder:v2:sites", landingLegacyRegistryKey);
+  migrateLegacyStorage(legacyLandingAdvancedModeKey, landingAdvancedModeKey);
+  migrateLegacyStorage(legacyProductCatalogKey, productCatalogKey);
+  migrateLegacyStorage(legacyProductDraftsKey, productDraftsKey);
+  migrateLegacyStorage(legacyActiveProductDraftKey, activeProductDraftKey, sessionStorage);
   const readCatalogProducts = () => {
     try {
       const value = JSON.parse(localStorage.getItem(productCatalogKey) || "[]");
@@ -244,10 +265,14 @@
     let draftTimer = 0;
     let restoringDraft = true;
     const draftQuery = new URLSearchParams(window.location.search);
-    let draftId = draftQuery.get("draft") || sessionStorage.getItem(activeProductDraftKey) || `draft-${globalThis.crypto?.randomUUID?.() || Date.now()}`;
+    const requestedProductId = /^custom-[a-z0-9]+$/i.test(draftQuery.get("product") || "") ? draftQuery.get("product") : "";
+    const editingProduct = requestedProductId ? readCatalogProducts().find((product) => product.id === requestedProductId) || null : null;
+    let draftId = draftQuery.get("draft") || (editingProduct ? `edit-${editingProduct.id}` : sessionStorage.getItem(activeProductDraftKey)) || `draft-${globalThis.crypto?.randomUUID?.() || Date.now()}`;
     if (draftQuery.get("new") === "1") draftId = `draft-${globalThis.crypto?.randomUUID?.() || Date.now()}`;
     sessionStorage.setItem(activeProductDraftKey, draftId);
-    history.replaceState(null, "", `?page=product-new&draft=${encodeURIComponent(draftId)}`);
+    const editorQuery = new URLSearchParams({ page: "product-new", draft: draftId });
+    if (editingProduct) editorQuery.set("product", editingProduct.id);
+    history.replaceState(null, "", `?${editorQuery.toString()}`);
 
     const currentType = () => String(typeInput?.value || "physical");
     const typeName = (type) => ({ physical: "Physical product", digital: "Digital product", subscription: "Subscription" }[type] || "Product");
@@ -350,6 +375,7 @@
     };
     const draftSnapshot = () => ({
       id: draftId,
+      productId: editingProduct?.id || null,
       name: String(productCreateForm.elements.name?.value || "").trim(),
       updatedAt: new Date().toISOString(),
       fields: {
@@ -572,17 +598,43 @@
       setDropzoneState("idle");
     };
 
+    const productSnapshot = (product) => ({
+      id: draftId,
+      name: product.name || "",
+      fields: {
+        type: product.type || "physical", category: product.category || "", description: product.description || "",
+        price: String(product.price || ""), stock: String(product.stock ?? ""), weight: String(product.weightGrams ?? ""),
+        digital_name: product.digitalFileName || "", interval: String(product.subscription?.interval || 1), unit: product.subscription?.unit || "month",
+      },
+      images: (product.images || []).map((data, index) => ({ id: `saved-${index + 1}`, data })),
+      hasVariants: Array.isArray(product.variants) && product.variants.length > 0,
+      options: Array.isArray(product.options) ? product.options : [],
+      variants: (product.variants || []).map((variant) => {
+        const galleryMatch = /^gallery-(\d+)$/.exec(String(variant.imageSource || ""));
+        const useCustomImage = variant.imageSource === "variant-upload";
+        return {
+          ...variant,
+          imageIndex: galleryMatch ? Math.max(0, Number(galleryMatch[1]) - 1) : Number.isInteger(variant.imageIndex) ? variant.imageIndex : 0,
+          useCustomImage,
+          customImage: useCustomImage && variant.image ? { data: variant.image } : null,
+        };
+      }),
+      previewDevice: "desktop",
+    });
+    const restoreSnapshot = (snapshot, label) => {
+      productCreateForm.elements.name.value = snapshot.name || "";
+      Object.entries(snapshot.fields || {}).forEach(([name, value]) => { if (productCreateForm.elements[name]) productCreateForm.elements[name].value = value; });
+      selectedImages = (snapshot.images || []).filter((item) => item.data).map((item) => ({ id: item.id || `image-${Date.now()}-${Math.random()}`, data: item.data, url: item.data }));
+      variantToggle.checked = Boolean(snapshot.hasVariants);
+      optionGroups?.replaceChildren(); (snapshot.options || []).forEach((group) => addOptionGroup(group.name, (group.values || []).join(", ")));
+      variants = (snapshot.variants || []).map((variant) => ({ ...variant, weightGrams: variant.weightGrams || 500, customImage: variant.customImage?.data ? { data: variant.customImage.data, url: variant.customImage.data } : null }));
+      previewDevice = snapshot.previewDevice === "mobile" ? "mobile" : "desktop";
+      if (draftStatus) draftStatus.innerHTML = `<i></i> ${label}`;
+    };
     const restoreDraft = () => {
       const draft = readProductDrafts().find((item) => item.id === draftId);
-      if (!draft) return;
-      productCreateForm.elements.name.value = draft.name || "";
-      Object.entries(draft.fields || {}).forEach(([name, value]) => { if (productCreateForm.elements[name]) productCreateForm.elements[name].value = value; });
-      selectedImages = (draft.images || []).filter((item) => item.data).map((item) => ({ id: item.id || `image-${Date.now()}-${Math.random()}`, data: item.data, url: item.data }));
-      variantToggle.checked = Boolean(draft.hasVariants);
-      optionGroups?.replaceChildren(); (draft.options || []).forEach((group) => addOptionGroup(group.name, (group.values || []).join(", ")));
-      variants = (draft.variants || []).map((variant) => ({ ...variant, weightGrams: variant.weightGrams || 500, customImage: variant.customImage?.data ? { data: variant.customImage.data, url: variant.customImage.data } : null }));
-      previewDevice = draft.previewDevice === "mobile" ? "mobile" : "desktop";
-      if (draftStatus) draftStatus.innerHTML = "<i></i> Draft restored";
+      if (draft) { restoreSnapshot(draft, editingProduct ? "Unsaved edits restored" : "Draft restored"); return; }
+      if (editingProduct) restoreSnapshot(productSnapshot(editingProduct), "Product loaded");
     };
 
     variantToggle?.addEventListener("change", syncVariantMode);
@@ -653,23 +705,26 @@
       if (variantToggle.checked && !variants.length) { showError("Generate at least one variant, or turn off Has variants."); return; }
       if (variants.some((variant) => variant.price < 1000 || !variant.sku || (type === "physical" && variant.weightGrams < 1))) { showError("Every variant needs a valid price, SKU, and shipping weight."); return; }
       const interval = Math.max(1, Math.round(Number(productCreateForm.elements.interval?.value) || 1));
-      submitButtons.forEach((button) => { button.disabled = true; button.dataset.originalText = button.textContent; button.textContent = "Creating product…"; });
+      submitButtons.forEach((button) => { button.disabled = true; button.dataset.originalText = button.textContent; button.textContent = editingProduct ? "Saving changes…" : "Creating product…"; });
       try {
         const images = await Promise.all(selectedImages.map(imageData));
         const suffix = globalThis.crypto?.randomUUID?.().replace(/-/g, "").slice(0, 10) || String(Date.now());
         const product = {
-          id: `custom-${suffix}`, sku: `EZK-${type.slice(0, 3).toUpperCase()}-${suffix.toUpperCase()}`, name: String(productCreateForm.elements.name.value).trim(), category: String(productCreateForm.elements.category.value).trim(), description: String(productCreateForm.elements.description.value).trim(), type,
+          id: editingProduct?.id || `custom-${suffix}`, sku: editingProduct?.sku || `EZK-${type.slice(0, 3).toUpperCase()}-${suffix.toUpperCase()}`, name: String(productCreateForm.elements.name.value).trim(), category: String(productCreateForm.elements.category.value).trim(), description: String(productCreateForm.elements.description.value).trim(), type,
           price: variantToggle.checked ? Math.min(...variants.map((variant) => variant.price)) : Math.round(Number(productCreateForm.elements.price.value) || 0), images, image: images[0],
           ...(type === "physical" ? { stock: variantToggle.checked ? variants.reduce((total, variant) => total + variant.stock, 0) : Math.max(0, Math.round(Number(productCreateForm.elements.stock.value) || 0)), weightGrams: variantToggle.checked ? Math.max(...variants.map((variant) => variant.weightGrams)) : Math.max(1, Math.round(Number(productCreateForm.elements.weight.value) || 0)) } : {}),
           ...(type === "digital" ? { digitalFileName: String(productCreateForm.elements.digital_name.value || "").trim() } : {}),
           ...(type === "subscription" ? { subscription: { interval, unit: String(productCreateForm.elements.unit.value || "month") } } : {}),
-          ...(variantToggle.checked ? { options: optionSnapshot(), variants: variants.map(({ customImage, useCustomImage, ...variant }) => ({ ...variant, image: useCustomImage && customImage?.data ? customImage.data : Number.isInteger(variant.imageIndex) ? images[variant.imageIndex] || images[0] : images[0], imageSource: useCustomImage && customImage?.data ? "variant-upload" : Number.isInteger(variant.imageIndex) ? `gallery-${variant.imageIndex + 1}` : "main" })) } : {}), createdAt: new Date().toISOString(),
+          ...(variantToggle.checked ? { options: optionSnapshot(), variants: variants.map(({ customImage, useCustomImage, ...variant }) => ({ ...variant, image: useCustomImage && customImage?.data ? customImage.data : Number.isInteger(variant.imageIndex) ? images[variant.imageIndex] || images[0] : images[0], imageSource: useCustomImage && customImage?.data ? "variant-upload" : Number.isInteger(variant.imageIndex) ? `gallery-${variant.imageIndex + 1}` : "main" })) } : {}), createdAt: editingProduct?.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString(),
         };
-        const products = readCatalogProducts(); products.push(product); if (!writeCatalogProducts(products)) return;
+        const products = readCatalogProducts();
+        const productIndex = products.findIndex((item) => item.id === product.id);
+        if (productIndex >= 0) products[productIndex] = product; else products.push(product);
+        if (!writeCatalogProducts(products)) return;
         writeProductDrafts(readProductDrafts().filter((draft) => draft.id !== draftId)); sessionStorage.removeItem(activeProductDraftKey);
-        window.opener?.postMessage({ type: "ezkart:catalog-product-created", productId: product.id }, window.location.origin); window.location.href = "?page=products&created=1";
+        window.opener?.postMessage({ type: editingProduct ? "ezkart:catalog-product-updated" : "ezkart:catalog-product-created", productId: product.id }, window.location.origin); window.location.href = `?page=products&${editingProduct ? "updated" : "created"}=1`;
       } catch (error) { showError(error instanceof Error ? error.message : "The product could not be created."); }
-      finally { submitButtons.forEach((button) => { button.disabled = false; button.textContent = button.dataset.originalText || "Create product"; }); }
+      finally { submitButtons.forEach((button) => { button.disabled = false; button.textContent = button.dataset.originalText || (editingProduct ? "Save changes" : "Create product"); }); }
     });
 
     restoreDraft(); syncVariantMode(); syncType(); syncPreviewDevice(); renderImages(); restoringDraft = false; updatePreview();
@@ -886,9 +941,11 @@
     };
     const updateCatalogStats = (products) => {
       const stats = document.querySelectorAll(".page-products .page-stat-strip article");
+      const demoProductCount = Math.max(0, Number(productCatalogPage.dataset.demoProductCount) || 0);
+      const demoStock = Math.max(0, Number(productCatalogPage.dataset.demoStock) || 0);
       const physicalStock = products.filter((product) => product.type === "physical").reduce((sum, product) => sum + Math.max(0, Number(product.stock) || 0), 0);
-      if (stats[0]?.querySelector("strong")) stats[0].querySelector("strong").textContent = String(3 + products.length);
-      if (stats[1]?.querySelector("strong")) stats[1].querySelector("strong").textContent = String(108 + physicalStock);
+      if (stats[0]?.querySelector("strong")) stats[0].querySelector("strong").textContent = String(demoProductCount + products.length);
+      if (stats[1]?.querySelector("strong")) stats[1].querySelector("strong").textContent = String(demoStock + physicalStock);
       if (stats[1]?.querySelector("p")) stats[1].querySelector("p").textContent = "Physical inventory only";
     };
     const renderDrafts = () => {
@@ -899,7 +956,9 @@
         const card = document.createElement("article"); card.className = "product-draft-card";
         const image = draft.images?.[0]?.data || "";
         const when = draft.updatedAt ? new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(new Date(draft.updatedAt)) : "Recently saved";
-        card.innerHTML = `<span>${image ? `<img src="${image}" alt="">` : '<svg class="icon" aria-hidden="true"><use href="#icon-image"></use></svg>'}</span><div><b>${escapeHtml(draft.name || "Untitled product")}</b><small>${draft.hasVariants ? `${draft.variants?.length || 0} variants` : typeName(draft.fields?.type || "physical")} · ${escapeHtml(when)}</small></div><div><a href="?page=product-new&draft=${encodeURIComponent(draft.id)}">Continue</a><button type="button" aria-label="Delete ${escapeHtml(draft.name || "untitled product")} draft">×</button></div>`;
+        const continueQuery = new URLSearchParams({ page: "product-new", draft: draft.id });
+        if (/^custom-[a-z0-9]+$/i.test(draft.productId || "")) continueQuery.set("product", draft.productId);
+        card.innerHTML = `<span>${image ? `<img src="${image}" alt="">` : '<svg class="icon" aria-hidden="true"><use href="#icon-image"></use></svg>'}</span><div><b>${escapeHtml(draft.name || "Untitled product")}</b><small>${draft.hasVariants ? `${draft.variants?.length || 0} variants` : typeName(draft.fields?.type || "physical")} · ${escapeHtml(when)}</small></div><div><a href="?${continueQuery.toString().replaceAll("&", "&amp;")}">Continue</a><button type="button" aria-label="Delete ${escapeHtml(draft.name || "untitled product")} draft">×</button></div>`;
         card.querySelector("button").addEventListener("click", () => {
           if (!window.confirm(`Delete the “${draft.name || "Untitled product"}” draft?`)) return;
           writeProductDrafts(readProductDrafts().filter((item) => item.id !== draft.id));
@@ -912,6 +971,7 @@
     const renderCatalog = () => {
       const products = readCatalogProducts();
       productCatalogPage.querySelectorAll("[data-custom-product]").forEach((card) => card.remove());
+      productCatalogPage.querySelectorAll("[data-catalog-empty]").forEach((message) => message.remove());
       inventory?.querySelectorAll("[data-custom-product]").forEach((row) => row.remove());
       products.forEach((product) => {
         const type = ["physical", "digital", "subscription"].includes(product.type) ? product.type : "physical";
@@ -919,7 +979,7 @@
         const availability = type === "physical" ? `${Math.max(0, Number(product.stock) || 0)} in stock` : type === "digital" ? "Digital delivery" : `Every ${product.subscription?.interval || 1} ${product.subscription?.unit || "month"}`;
         const card = document.createElement("article");
         card.className = "product-card"; card.dataset.customProduct = product.id;
-        card.innerHTML = `<span class="product-art"><img src="${image}" alt="${escapeHtml(product.name)}"><em>${product.images?.length || 1} image${(product.images?.length || 1) === 1 ? "" : "s"}</em></span><div class="product-card-body"><header><span class="product-card-type">${escapeHtml(product.category || typeName(type))}</span><em>Active</em></header><h2>${escapeHtml(product.name)}</h2><p>${escapeHtml(product.sku)}</p><div class="product-price"><strong>${escapeHtml(formatCreatorPrice(product.price))}</strong><small>${escapeHtml(availability)}</small></div><footer><div><small>Type</small><b>${escapeHtml(typeName(type))}</b></div><div><small>Revenue</small><b>Rp0</b></div><button class="product-delete" type="button">Delete</button></footer></div>`;
+        card.innerHTML = `<span class="product-art"><img src="${image}" alt="${escapeHtml(product.name)}"><em>${product.images?.length || 1} image${(product.images?.length || 1) === 1 ? "" : "s"}</em></span><div class="product-card-body"><header><span class="product-card-type">${escapeHtml(product.category || typeName(type))}</span><em>Active</em></header><h2>${escapeHtml(product.name)}</h2><p>${escapeHtml(product.sku)}</p><div class="product-price"><strong>${escapeHtml(formatCreatorPrice(product.price))}</strong><small>${escapeHtml(availability)}</small></div><footer><div><small>Type</small><b>${escapeHtml(typeName(type))}</b></div><div><small>Revenue</small><b>Rp0</b></div><div class="product-card-actions"><a href="?page=product-new&amp;product=${encodeURIComponent(product.id)}">Edit</a><button class="product-delete" type="button">Delete</button></div></footer></div>`;
         card.querySelector(".product-delete").addEventListener("click", () => {
           if (!window.confirm(`Delete “${product.name}” from the catalog?`)) return;
           const next = readCatalogProducts().filter((item) => item.id !== product.id);
@@ -932,6 +992,12 @@
           inventory.append(row);
         }
       });
+      if ((Number(productCatalogPage.dataset.demoProductCount) || 0) + products.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "catalog-empty-note"; empty.dataset.catalogEmpty = "true";
+        empty.innerHTML = '<b>Your catalog is empty.</b><span>Create your first product to start building this store.</span><a href="?page=product-new&amp;new=1">Create product</a>';
+        productCatalogPage.append(empty);
+      }
       updateCatalogStats(products); renderDrafts();
     };
     document.querySelectorAll("[data-open-product-creator]").forEach((button) => button.addEventListener("click", () => { clearError(); dialog?.showModal(); }));

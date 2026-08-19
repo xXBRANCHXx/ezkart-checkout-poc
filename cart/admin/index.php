@@ -757,6 +757,10 @@ $adminInitials = implode('', array_map(
     static fn(string $part): string => mb_strtoupper(mb_substr($part, 0, 1)),
     array_slice(preg_split('/\s+/', $adminDisplayName) ?: [], 0, 2),
 )) ?: 'EA';
+$adminStorageIdentity = $authenticationMethod === 'supabase'
+    ? (string) ($adminUser['id'] ?? '')
+    : 'legacy-password-owner';
+$adminStorageScope = substr(hash('sha256', $deployment . '|' . $adminStorageIdentity), 0, 24);
 $orders = $legacyDataAccess ? ez_admin_orders() : [];
 $metrics = [
     'orders' => count($orders),
@@ -898,11 +902,11 @@ foreach ($orders as $order) {
 }
 uasort($customerProfiles, static fn(array $left, array $right): int => $right['spend'] <=> $left['spend']);
 arsort($paymentMethods);
-$catalogInventory = [
+$catalogInventory = $legacyDataAccess ? [
     'Granola Madu Nusantara' => ['sku' => 'EZK-DEMO-GRANOLA', 'price' => 58000, 'stock' => 46, 'category' => 'Breakfast'],
     'Kopi Susu Concentrate' => ['sku' => 'EZK-DEMO-COFFEE', 'price' => 79000, 'stock' => 28, 'category' => 'Beverage'],
     'Sambal Roa Signature' => ['sku' => 'EZK-DEMO-SAMBAL', 'price' => 46000, 'stock' => 34, 'category' => 'Condiment'],
-];
+] : [];
 ?>
 <!doctype html>
 <html lang="id">
@@ -912,10 +916,10 @@ $catalogInventory = [
   <meta name="robots" content="noindex,nofollow">
   <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
   <?php if ($authenticated): ?><link rel="stylesheet" href="assets/vendor/leaflet.css"><?php endif; ?>
-  <link rel="stylesheet" href="admin.css?v=64">
+  <link rel="stylesheet" href="admin.css?v=65">
   <title><?= $authenticated ? ez_admin_escape($pageTitles[$page]) : 'Admin Login' ?> · Ezkart</title>
 </head>
-<body class="<?= $authenticated ? 'dashboard-page page-' . ez_admin_escape($page) . ($page === 'sites' ? ($siteEditor ? ' page-site-editor' : ' page-sites-library') : '') : 'login-page' ?>">
+<body class="<?= $authenticated ? 'dashboard-page page-' . ez_admin_escape($page) . ($page === 'sites' ? ($siteEditor ? ' page-site-editor' : ' page-sites-library') : '') : 'login-page' ?>" data-admin-storage-scope="<?= ez_admin_escape($adminStorageScope) ?>" data-admin-migrate-legacy-storage="<?= $legacyDataAccess ? 'true' : 'false' ?>">
 <?php if (!$authenticated): ?>
   <main class="login-shell">
     <section class="login-card">
@@ -1165,7 +1169,7 @@ $catalogInventory = [
   </div>
   <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
   <script src="assets/vendor/leaflet.js"></script>
-  <script src="admin.js?v=38"></script>
+  <script src="admin.js?v=39"></script>
 <?php endif; ?>
 </body>
 </html>

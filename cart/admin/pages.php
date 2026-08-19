@@ -63,19 +63,20 @@ function ez_orders_table(array $rows, string $tableId): void
   </section>
 
 <?php break; case 'product-new': ?>
+  <?php $editingProduct = preg_match('/^custom-[a-z0-9]+$/i', (string) ($_GET['product'] ?? '')) === 1; ?>
   <section class="product-editor" data-product-editor>
     <header class="product-editor-header">
       <div>
         <a href="?page=products"><?= ez_admin_icon('chevron-left') ?> Products</a>
-        <p class="page-eyebrow">New catalog product</p>
-        <h1>Build the product customers will see.</h1>
-        <p>Add the details once and watch the storefront preview update as you work.</p>
+        <p class="page-eyebrow"><?= $editingProduct ? 'Edit catalog product' : 'New catalog product' ?></p>
+        <h1><?= $editingProduct ? 'Refine the product customers will see.' : 'Build the product customers will see.' ?></h1>
+        <p><?= $editingProduct ? 'Update the details and watch the storefront preview respond as you work.' : 'Add the details once and watch the storefront preview update as you work.' ?></p>
       </div>
       <div class="product-editor-actions">
         <span data-product-draft-status><i></i> Draft autosaves</span>
         <a class="action-button" href="?page=products">Cancel</a>
         <button class="action-button" type="button" data-save-product-draft>Save draft</button>
-        <button class="action-button primary" type="submit" form="product-create-form">Create product</button>
+        <button class="action-button primary" type="submit" form="product-create-form"><?= $editingProduct ? 'Save changes' : 'Create product' ?></button>
       </div>
     </header>
 
@@ -144,7 +145,7 @@ function ez_orders_table(array $rows, string $tableId): void
         </section>
 
         <p class="product-editor-error" data-product-create-error hidden></p>
-        <footer class="product-editor-footer"><a href="?page=products">Cancel</a><button class="action-button primary" type="submit">Create product</button></footer>
+        <footer class="product-editor-footer"><a href="?page=products">Cancel</a><button class="action-button primary" type="submit"><?= $editingProduct ? 'Save changes' : 'Create product' ?></button></footer>
       </div>
 
       <aside class="product-preview-sidebar">
@@ -186,7 +187,7 @@ function ez_orders_table(array $rows, string $tableId): void
   ]); ?>
   <section class="product-commerce-strip" aria-label="Product commerce connections"><article><span><?= ez_admin_icon('box') ?></span><div><small>Product data</small><b>Complete catalog record</b><p>Price, stock, weight, media, and fulfillment origin</p></div><em>Ready</em></article><i><?= ez_admin_icon('chevron-right') ?></i><article><span><?= ez_admin_icon('layout') ?></span><div><small>Sales surface</small><b>3 landing pages</b><p>Products can be bound to any hosted page</p></div><a href="?page=sites">Manage</a></article><i><?= ez_admin_icon('chevron-right') ?></i><article><span><?= ez_admin_icon('credit-card') ?></span><div><small>Checkout data</small><b><?= $integrationStatus['midtrans'] ? 'Midtrans mapped' : 'Midtrans setup required' ?></b><p>Item ID, name, quantity, price, and customer details</p></div><em class="<?= $integrationStatus['midtrans'] ? 'connected' : '' ?>"><?= $integrationStatus['midtrans'] ? 'Ready' : 'Setup' ?></em></article><i><?= ez_admin_icon('chevron-right') ?></i><article><span><?= ez_admin_icon('truck') ?></span><div><small>Delivery</small><b><?= $integrationStatus['biteship'] ? 'Biteship rates enabled' : 'Biteship setup required' ?></b><p>Weights and origin feed live courier quotes</p></div><em class="<?= $integrationStatus['biteship'] ? 'connected' : '' ?>"><?= $integrationStatus['biteship'] ? 'Ready' : 'Setup' ?></em></article></section>
   <section class="surface product-drafts-panel" data-product-drafts-panel hidden><header class="surface-header"><div><h2>Product drafts</h2><p>Continue products that are not ready to publish yet.</p></div><a class="action-button" href="?page=product-new&new=1">New draft</a></header><div class="product-draft-list" data-product-draft-list></div></section>
-  <section class="catalog-grid" data-product-catalog><?php foreach ($catalogInventory as $name => $product): $sales = $productActivity[$name] ?? ['quantity'=>0,'sales'=>0]; ?><article class="product-card"><?= ez_admin_product_art($name) ?><div class="product-card-body"><header><span><?= ez_admin_escape($product['category']) ?></span><em>Active</em></header><h2><?= ez_admin_escape($name) ?></h2><p><?= ez_admin_escape($product['sku']) ?></p><div class="product-price"><strong><?= ez_admin_money($product['price']) ?></strong><small><?= $product['stock'] ?> in stock</small></div><footer><div><small>Ordered</small><b><?= $sales['quantity'] ?> units</b></div><div><small>Revenue</small><b><?= ez_admin_short_money($sales['sales']) ?></b></div><button type="button" data-toast="Product editor opened">Edit</button></footer></div></article><?php endforeach; ?></section>
+  <section class="catalog-grid" data-product-catalog data-demo-product-count="<?= count($catalogInventory) ?>" data-demo-stock="<?= array_sum(array_column($catalogInventory, 'stock')) ?>"><?php foreach ($catalogInventory as $name => $product): $sales = $productActivity[$name] ?? ['quantity'=>0,'sales'=>0]; ?><article class="product-card"><?= ez_admin_product_art($name) ?><div class="product-card-body"><header><span><?= ez_admin_escape($product['category']) ?></span><em>Active</em></header><h2><?= ez_admin_escape($name) ?></h2><p><?= ez_admin_escape($product['sku']) ?></p><div class="product-price"><strong><?= ez_admin_money($product['price']) ?></strong><small><?= $product['stock'] ?> in stock</small></div><footer><div><small>Ordered</small><b><?= $sales['quantity'] ?> units</b></div><div><small>Revenue</small><b><?= ez_admin_short_money($sales['sales']) ?></b></div><button type="button" data-toast="Demo products are read-only">Demo</button></footer></div></article><?php endforeach; ?></section>
   <section class="page-grid product-ops-grid"><article class="surface"><header class="surface-header"><div><h2>Inventory control</h2><p>Availability, reorder points, and product health.</p></div><button type="button" data-toast="Inventory count prepared">Count inventory</button></header><div class="inventory-table" data-product-inventory><div class="inventory-head"><span>Product</span><span>Available</span><span>Reorder at</span><span>Health</span></div><?php foreach ($catalogInventory as $name => $product): ?><article><?= ez_admin_product_art($name) ?><div><b><?= ez_admin_escape($name) ?></b><small><?= ez_admin_escape($product['sku']) ?></small></div><strong><?= $product['stock'] ?></strong><span>15</span><em class="inventory-good">Healthy</em></article><?php endforeach; ?></div></article><aside class="surface merchandising-card"><header class="surface-header"><div><h2>Merchandising</h2><p>Storefront presentation score.</p></div></header><strong>94<small>/100</small></strong><ul><li><?= ez_admin_icon('check-circle') ?> Product photography complete</li><li><?= ez_admin_icon('check-circle') ?> Pricing published</li><li><?= ez_admin_icon('check-circle') ?> Type-aware fulfillment</li><li><?= ez_admin_icon('check-circle') ?> Descriptions optimized</li></ul><button type="button" data-toast="Merchandising checklist opened">Review storefront</button></aside></section>
 
 <?php break; case 'sites': require __DIR__ . ($siteEditor ? '/sites-builder.php' : '/sites-library.php'); break; case 'customers': ?>
