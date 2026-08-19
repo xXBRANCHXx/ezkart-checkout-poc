@@ -252,6 +252,8 @@ function shapeProduct(row, media = [], variants = []) {
       price: Number(variant.price_amount || 0),
       stock: variant.stock_quantity === null ? 0 : Number(variant.stock_quantity),
       weightGrams: variant.weight_grams === null ? null : Number(variant.weight_grams),
+      billingUnit: variant.billing_interval || null,
+      billingInterval: variant.billing_interval_count === null ? null : Number(variant.billing_interval_count),
       imageSource: variant.image_source || "main",
       imageUploadId: variant.image_upload_id || null,
       imagePath: variant.image_upload_id ? mediaPath(variant.image_upload_id) : null,
@@ -385,25 +387,28 @@ async function saveProduct(request, env, rawId) {
   const rawVariants = Array.isArray(payload.variants) ? payload.variants.slice(0, 100) : [];
   const variants = rawVariants.map((variant, index) => ({
     id: cleanId(variant.id || `variant-${crypto.randomUUID()}`, "Variant ID"),
-    name: cleanText(variant.name, 120) || `Variant ${index + 1}`,
+    name: cleanText(variant.name, 120) || `${type === "subscription" ? "Plan" : "Variant"} ${index + 1}`,
     options: Array.isArray(variant.options) ? variant.options.slice(0, 3).map((option) => ({ option: cleanText(option?.option, 20), value: cleanText(option?.value, 60) })) : [],
     sku: cleanText(variant.sku, 80),
     price: Math.max(0, Math.round(Number(variant.price) || 0)),
     stock: Math.max(0, Math.round(Number(variant.stock) || 0)),
     weightGrams: Math.max(0, Math.round(Number(variant.weightGrams) || 0)),
+    billingUnit: type === "subscription" && ["day", "week", "month"].includes(variant.billingUnit) ? variant.billingUnit : null,
+    billingInterval: type === "subscription" ? Math.max(1, Math.min(12, Math.round(Number(variant.billingInterval) || 1))) : null,
     imageSource: /^gallery-[1-9]$/.test(String(variant.imageSource || "")) ? String(variant.imageSource) : variant.imageUploadId ? "variant-upload" : "main",
     imageUploadId: variant.imageUploadId ? cleanId(variant.imageUploadId, "Variant image ID") : null,
   }));
-  if (variants.some((variant) => !variant.sku || variant.price < 1000 || (type === "physical" && variant.weightGrams < 1))) {
-    throw new Response("Every variant needs a valid price, SKU, and shipping weight", { status: 400 });
+  if (variants.some((variant) => !variant.sku || variant.price < 1000 || (type === "physical" && variant.weightGrams < 1) || (type === "subscription" && (!variant.billingUnit || variant.billingInterval < 1)))) {
+    throw new Response(type === "subscription" ? "Every plan needs a valid price, SKU, and billing period" : "Every variant needs a valid price, SKU, and shipping weight", { status: 400 });
   }
-  if (new Set(variants.map((variant) => variant.sku.toLowerCase())).size !== variants.length) throw new Response("Variant SKUs must be unique", { status: 400 });
+  if (new Set(variants.map((variant) => variant.sku.toLowerCase())).size !== variants.length) throw new Response(type === "subscription" ? "Plan SKUs must be unique" : "Variant SKUs must be unique", { status: 400 });
   const uploadMap = await ownedUploads(env, seller.id, [...imageIds, ...variants.map((variant) => variant.imageUploadId)]);
   const basePrice = variants.length ? Math.min(...variants.map((variant) => variant.price)) : Math.max(0, Math.round(Number(payload.price) || 0));
   const stock = type === "physical" ? (variants.length ? variants.reduce((sum, variant) => sum + variant.stock, 0) : Math.max(0, Math.round(Number(payload.stock) || 0))) : null;
   const weight = type === "physical" ? (variants.length ? Math.max(...variants.map((variant) => variant.weightGrams)) : Math.max(1, Math.round(Number(payload.weightGrams) || 0))) : null;
-  const billingUnit = type === "subscription" && ["day", "week", "month"].includes(payload.subscription?.unit) ? payload.subscription.unit : null;
-  const billingInterval = type === "subscription" ? Math.max(1, Math.min(12, Math.round(Number(payload.subscription?.interval) || 1))) : null;
+  const firstPlan = type === "subscription" && variants.length ? variants[0] : null;
+  const billingUnit = type === "subscription" ? (firstPlan?.billingUnit || (["day", "week", "month"].includes(payload.subscription?.unit) ? payload.subscription.unit : "month")) : null;
+  const billingInterval = type === "subscription" ? (firstPlan?.billingInterval || Math.max(1, Math.min(12, Math.round(Number(payload.subscription?.interval) || 1)))) : null;
   const digitalFilename = type === "digital" ? cleanText(payload.digitalFileName, 180) : null;
   const now = new Date().toISOString();
   const createdAt = existing?.created_at || now;
@@ -428,9 +433,9 @@ async function saveProduct(request, env, rawId) {
     `).bind(mediaId, seller.id, id, media.r2_key, media.mime_type, media.size_bytes, index + 1, index === 0 ? title : `${title} image ${index + 1}`, now));
   });
   variants.forEach((variant, index) => statements.push(env.DB.prepare(`
-    INSERT INTO product_variants (id, seller_id, product_id, name, options_json, sku, price_amount, stock_quantity, weight_grams, image_source, image_upload_id, sort_order, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).bind(variant.id, seller.id, id, variant.name, JSON.stringify(variant.options), variant.sku, variant.price, type === "physical" ? variant.stock : null, type === "physical" ? variant.weightGrams : null, variant.imageSource, variant.imageUploadId, index + 1, now, now)));
+    INSERT INTO product_variants (id, seller_id, product_id, name, options_json, sku, price_amount, stock_quantity, weight_grams, billing_interval, billing_interval_count, image_source, image_upload_id, sort_order, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).bind(variant.id, seller.id, id, variant.name, JSON.stringify(variant.options), variant.sku, variant.price, type === "physical" ? variant.stock : null, type === "physical" ? variant.weightGrams : null, variant.billingUnit, variant.billingInterval, variant.imageSource, variant.imageUploadId, index + 1, now, now)));
   statements.push(env.DB.prepare(`
     INSERT INTO seller_events (id, seller_id, actor_auth_user_id, event_type, entity_type, entity_id, payload_json, created_at)
     VALUES (?, ?, ?, ?, 'product', ?, ?, ?)
@@ -533,9 +538,9 @@ async function duplicateProduct(request, env, productId) {
       const variantIdSuffix = crypto.randomUUID().replaceAll("-", "");
       const imageUploadId = variant.image_upload_id ? mediaCopies.get(variant.image_upload_id)?.id || null : null;
       statements.push(env.DB.prepare(`
-        INSERT INTO product_variants (id, seller_id, product_id, name, options_json, sku, price_amount, stock_quantity, weight_grams, image_source, image_upload_id, sort_order, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).bind(`variant-${variantIdSuffix}`, seller.id, copyId, variant.name, variant.options_json, duplicatedValue(variant.sku, skuSuffix, 80), variant.price_amount, variant.stock_quantity, variant.weight_grams, variant.image_source, imageUploadId, index + 1, now, now));
+        INSERT INTO product_variants (id, seller_id, product_id, name, options_json, sku, price_amount, stock_quantity, weight_grams, billing_interval, billing_interval_count, image_source, image_upload_id, sort_order, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(`variant-${variantIdSuffix}`, seller.id, copyId, variant.name, variant.options_json, duplicatedValue(variant.sku, skuSuffix, 80), variant.price_amount, variant.stock_quantity, variant.weight_grams, variant.billing_interval, variant.billing_interval_count, variant.image_source, imageUploadId, index + 1, now, now));
     });
     statements.push(env.DB.prepare(`
       INSERT INTO seller_events (id, seller_id, actor_auth_user_id, event_type, entity_type, entity_id, payload_json, created_at)

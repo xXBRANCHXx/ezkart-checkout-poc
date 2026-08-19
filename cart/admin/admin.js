@@ -462,8 +462,8 @@
       const type = currentType();
       if (type === "digital") return "Available immediately after payment";
       if (type === "subscription") {
-        const interval = Math.max(1, Math.round(Number(productCreateForm.elements.interval?.value) || 1));
-        const unit = String(productCreateForm.elements.unit?.value || "month");
+        const interval = Math.max(1, Math.round(Number(selectedVariant?.billingInterval ?? productCreateForm.elements.interval?.value) || 1));
+        const unit = String(selectedVariant?.billingUnit || productCreateForm.elements.unit?.value || "month");
         return `Billed every ${interval} ${unit}${interval === 1 ? "" : "s"}`;
       }
       const stock = selectedVariant ? selectedVariant.stock : productCreateForm.elements.stock?.value;
@@ -563,7 +563,7 @@
       for (const variant of variants) {
         if (!variant.useCustomImage || !variant.customImage || variant.customImage.cloudId) continue;
         const source = variant.customImage.data || variant.customImage.url;
-        if (!String(source || "").startsWith("data:image/")) throw new Error("A variant image could not be prepared for cloud storage.");
+        if (!String(source || "").startsWith("data:image/")) throw new Error(`A ${currentType() === "subscription" ? "plan" : "variant"} image could not be prepared for cloud storage.`);
         variant.customImage.cloudId = (await uploadCloudImage(source)).id;
       }
     };
@@ -628,12 +628,13 @@
     const variantPhotoMarkup = (variant) => {
       const currentSource = variant.useCustomImage && variant.customImage?.url ? variant.customImage.url : Number.isInteger(variant.imageIndex) ? selectedImages[variant.imageIndex]?.url : selectedImages[0]?.url;
       const choices = selectedImages.length ? selectedImages.map((image, index) => `<button type="button" data-main-image-index="${index}"><img src="${image.url}" alt=""><span>${index === 0 ? "Main image" : `Image ${index + 1}`}</span></button>`).join("") : '<p>Upload main images first.</p>';
-      return `<div class="product-variant-photo"><div class="product-variant-photo-source"><label class="product-variant-upload" data-variant-photo-dropzone aria-label="Upload or drop a variant photo"><input type="file" accept="image/png,image/jpeg,image/webp,image/avif" data-variant-photo-input><span>${currentSource ? `<img src="${currentSource}" alt=""><b>${variant.useCustomImage ? "Replace" : "Upload"}</b>` : '<svg class="icon" aria-hidden="true"><use href="#icon-image"></use></svg><b>Upload</b>'}</span></label><details class="product-variant-main-picker"><summary aria-label="Choose a photo from main images"><svg class="icon" aria-hidden="true"><use href="#icon-chevron-down"></use></svg></summary><div>${choices}</div></details></div>${variant.useCustomImage ? '<button type="button" data-variant-photo-clear aria-label="Remove variant upload">×</button>' : ""}</div>`;
+      const itemName = currentType() === "subscription" ? "plan" : "variant";
+      return `<div class="product-variant-photo"><div class="product-variant-photo-source"><label class="product-variant-upload" data-variant-photo-dropzone aria-label="Upload or drop a ${itemName} photo"><input type="file" accept="image/png,image/jpeg,image/webp,image/avif" data-variant-photo-input><span>${currentSource ? `<img src="${currentSource}" alt=""><b>${variant.useCustomImage ? "Replace" : "Upload"}</b>` : '<svg class="icon" aria-hidden="true"><use href="#icon-image"></use></svg><b>Upload</b>'}</span></label><details class="product-variant-main-picker"><summary aria-label="Choose a photo from main images"><svg class="icon" aria-hidden="true"><use href="#icon-chevron-down"></use></svg></summary><div>${choices}</div></details></div>${variant.useCustomImage ? `<button type="button" data-variant-photo-clear aria-label="Remove ${itemName} upload">×</button>` : ""}</div>`;
     };
     const applyVariantPhoto = async (variant, file, dropTarget) => {
       if (!file) return;
       if (!allowedImageTypes.includes(file.type) || file.size > 2 * 1024 * 1024) {
-        showError("Variant photos must be PNG, JPG, WebP, or AVIF and no larger than 2 MB.");
+        showError(`${currentType() === "subscription" ? "Plan" : "Variant"} photos must be PNG, JPG, WebP, or AVIF and no larger than 2 MB.`);
         return;
       }
       dropTarget?.classList.remove("is-drop-ready");
@@ -645,23 +646,31 @@
         clearError(); renderVariants(); markDraftChanged();
       } catch (error) {
         dropTarget?.classList.remove("is-uploading");
-        showError(error instanceof Error ? error.message : "That variant image could not be added.");
+        showError(error instanceof Error ? error.message : `That ${currentType() === "subscription" ? "plan" : "variant"} image could not be added.`);
       }
     };
     const renderVariants = () => {
       if (variantTable) variantTable.hidden = variants.length === 0;
+      variantTable?.classList.toggle("is-physical", currentType() === "physical");
+      variantTable?.classList.toggle("is-digital", currentType() === "digital");
+      variantTable?.classList.toggle("is-subscription", currentType() === "subscription");
       if (variantEmpty) variantEmpty.hidden = variants.length > 0;
       if (!variantRows) return;
       selectedVariantIds = new Set([...selectedVariantIds].filter((id) => variants.some((variant) => variant.id === id)));
       variantRows.replaceChildren();
       variants.forEach((variant, index) => {
         const physical = currentType() === "physical";
+        const subscription = currentType() === "subscription";
         const row = document.createElement("div"); row.className = "product-variant-row"; row.dataset.variantId = variant.id;
-        row.innerHTML = `<span><input type="checkbox" data-variant-select aria-label="Select ${escapeHtml(variant.name)}"></span><b title="${escapeHtml(variant.name)}">${escapeHtml(compactVariantName(variant.name))}</b><label><span>Price</span><input type="number" min="1000" step="500" value="${variant.price}" data-variant-price></label><label ${physical ? "" : "hidden"}><span>Stock</span><input type="number" min="0" max="999999" value="${variant.stock}" data-variant-stock></label><label ${physical ? "" : "hidden"}><span>Weight</span><input type="number" min="1" max="50000" value="${variant.weightGrams || 500}" data-variant-weight></label><label><span>SKU</span><input type="text" maxlength="48" value="${escapeHtml(variant.sku)}" data-variant-sku></label>${variantPhotoMarkup(variant)}<button type="button" data-variant-remove aria-label="Remove ${escapeHtml(variant.name)}"><svg class="icon" aria-hidden="true"><use href="#icon-trash"></use></svg></button>`;
+        const billingInterval = Math.max(1, Math.min(12, Math.round(Number(variant.billingInterval) || 1)));
+        const billingUnit = ["day", "week", "month"].includes(variant.billingUnit) ? variant.billingUnit : "month";
+        row.innerHTML = `<span><input type="checkbox" data-variant-select aria-label="Select ${escapeHtml(variant.name)}"></span><b title="${escapeHtml(variant.name)}">${escapeHtml(compactVariantName(variant.name))}</b><label><span>Price</span><input type="number" min="1000" step="500" value="${variant.price}" data-variant-price></label><label ${physical ? "" : "hidden"}><span>Stock</span><input type="number" min="0" max="999999" value="${variant.stock}" data-variant-stock></label><label ${physical ? "" : "hidden"}><span>Weight</span><input type="number" min="1" max="50000" value="${variant.weightGrams || 500}" data-variant-weight></label><label class="product-variant-billing" ${subscription ? "" : "hidden"}><span>Billing</span><span><input type="number" min="1" max="12" value="${billingInterval}" aria-label="Billing interval" data-variant-billing-interval><select aria-label="Billing period" data-variant-billing-unit><option value="month" ${billingUnit === "month" ? "selected" : ""}>Month</option><option value="week" ${billingUnit === "week" ? "selected" : ""}>Week</option><option value="day" ${billingUnit === "day" ? "selected" : ""}>Day</option></select></span></label><label><span>SKU</span><input type="text" maxlength="48" value="${escapeHtml(variant.sku)}" data-variant-sku></label>${variantPhotoMarkup(variant)}<button type="button" data-variant-remove aria-label="Remove ${escapeHtml(variant.name)}"><svg class="icon" aria-hidden="true"><use href="#icon-trash"></use></svg></button>`;
         row.querySelector("[data-variant-select]").addEventListener("change", (event) => { event.target.checked ? selectedVariantIds.add(variant.id) : selectedVariantIds.delete(variant.id); updateVariantSelection(); });
         row.querySelector("[data-variant-price]").addEventListener("input", (event) => { variant.price = Math.max(0, Math.round(Number(event.target.value) || 0)); updatePreview(); markDraftChanged(); });
         row.querySelector("[data-variant-stock]").addEventListener("input", (event) => { variant.stock = Math.max(0, Math.round(Number(event.target.value) || 0)); updatePreview(); markDraftChanged(); });
         row.querySelector("[data-variant-weight]").addEventListener("input", (event) => { variant.weightGrams = Math.max(0, Math.round(Number(event.target.value) || 0)); markDraftChanged(); });
+        row.querySelector("[data-variant-billing-interval]")?.addEventListener("input", (event) => { variant.billingInterval = Math.max(1, Math.min(12, Math.round(Number(event.target.value) || 1))); updatePreview(); markDraftChanged(); });
+        row.querySelector("[data-variant-billing-unit]")?.addEventListener("change", (event) => { variant.billingUnit = event.target.value; updatePreview(); markDraftChanged(); });
         row.querySelector("[data-variant-sku]").addEventListener("input", (event) => { variant.sku = event.target.value.trim(); markDraftChanged(); });
         row.querySelectorAll("[data-main-image-index]").forEach((button) => button.addEventListener("click", () => { variant.imageIndex = Number(button.dataset.mainImageIndex); variant.useCustomImage = false; button.closest("details").open = false; renderVariants(); markDraftChanged(); }));
         const variantPhotoInput = row.querySelector("[data-variant-photo-input]");
@@ -693,24 +702,48 @@
       });
       q("[data-variant-stock-heading]")?.toggleAttribute("hidden", currentType() !== "physical");
       q("[data-variant-weight-heading]")?.toggleAttribute("hidden", currentType() !== "physical");
+      q("[data-variant-billing-heading]")?.toggleAttribute("hidden", currentType() !== "subscription");
       q("[data-product-variant-batch]")?.querySelectorAll("[data-batch-physical]").forEach((field) => { field.hidden = currentType() !== "physical"; });
       renderVariantFilters(); updateVariantSelection(); syncLiveVariants();
     };
     const generateVariants = () => {
       clearError();
       const groups = optionSnapshot();
-      if (!groups.length) { showError("Add at least one option name and comma-separated values before generating variants."); return; }
+      if (!groups.length) { showError(currentType() === "subscription" ? "Add at least one plan option and comma-separated values before generating plans." : "Add at least one option name and comma-separated values before generating variants."); return; }
       const combinations = groups.reduce((list, group) => list.flatMap((combination) => group.values.map((value) => [...combination, { option: group.name, value }])), [[]]);
-      if (combinations.length > 100) { showError("These options create more than 100 variants. Reduce the values before continuing."); return; }
+      if (combinations.length > 100) { showError(`These options create more than 100 ${currentType() === "subscription" ? "plans" : "variants"}. Reduce the values before continuing.`); return; }
       const previous = new Map(variants.map((variant) => [variant.name, variant]));
       const price = Math.max(1000, Math.round(Number(productCreateForm.elements.price?.value) || 75000));
       const stock = Math.max(0, Math.round(Number(productCreateForm.elements.stock?.value) || 0));
       const weightGrams = Math.max(1, Math.round(Number(productCreateForm.elements.weight?.value) || 500));
+      const billingInterval = Math.max(1, Math.min(12, Math.round(Number(productCreateForm.elements.interval?.value) || 1)));
+      const billingUnit = ["day", "week", "month"].includes(productCreateForm.elements.unit?.value) ? productCreateForm.elements.unit.value : "month";
       variants = combinations.map((options, index) => {
         const name = options.map((option) => option.value).join(" · ");
-        return previous.get(name) || { id: globalThis.crypto?.randomUUID?.() || `variant-${Date.now()}-${index}`, name, options, price, stock, weightGrams, sku: `VAR-${String(index + 1).padStart(3, "0")}`, imageIndex: null, useCustomImage: false };
+        return previous.get(name) || { id: globalThis.crypto?.randomUUID?.() || `variant-${Date.now()}-${index}`, name, options, price, stock, weightGrams, billingInterval, billingUnit, sku: `${currentType() === "subscription" ? "PLAN" : "VAR"}-${String(index + 1).padStart(3, "0")}`, imageIndex: null, useCustomImage: false };
       });
       renderVariants(); markDraftChanged();
+    };
+
+    const syncVariantLanguage = () => {
+      const subscription = currentType() === "subscription";
+      setText("[data-variant-section-title]", subscription ? "Subscription plans" : "Product variants");
+      setText("[data-variant-section-description]", subscription ? "Create the plans customers can choose and set each billing schedule." : "Keep sizes, flavors, colors, or bundles inside this one product.");
+      setText("[data-variant-toggle-label]", subscription ? "Has plans" : "Has variants");
+      setText("[data-variant-options-title]", subscription ? "Plan options" : "Option groups");
+      setText("[data-variant-options-description]", subscription ? "Enter plan names or tiers separated by commas. Example: Basic, Pro." : "Enter values separated by commas. Example: 50 ml, 250 ml.");
+      setText("[data-generate-variants-label]", subscription ? "Generate plans" : "Generate combinations");
+      setText("[data-variant-empty-title]", subscription ? "No plans yet" : "No combinations yet");
+      setText("[data-variant-empty-description]", subscription ? "Add plan options, then generate the plans customers can choose." : "Add option values, then generate the sellable variants for this product.");
+      setText("[data-variant-batch-description]", subscription ? "Select matching plans, then update their pricing together." : "Select every matching option—such as all 250 ml or all Peach—then update them together.");
+      setText("[data-variant-column-title]", subscription ? "Plan" : "Variant");
+      setText("[data-variant-help]", subscription ? "Every plan can have its own price, billing period, SKU, and image." : "Every row remains part of this product. Physical variants carry their own stock and shipping weight. Upload a square variant photo or choose one from the main gallery.");
+      setText("[data-product-no-variants]", subscription ? "Only one plan? The price and billing period below will be used." : "No variants needed? The base price and stock below will be used.");
+      setText("[data-base-pricing-title]", subscription ? "Price and billing" : "Price and availability");
+      setText("[data-base-pricing-description]", subscription ? "Used when this subscription has one plan." : "Used as the default when the product has no variants.");
+      setText("[data-product-live-action-label]", subscription ? "Get started" : "Add to cart");
+      q("[data-product-live-action-icon]")?.toggleAttribute("hidden", subscription);
+      selectAllVariants?.setAttribute("aria-label", subscription ? "Select all plans" : "Select all variants");
     };
 
     const syncVariantMode = () => {
@@ -719,7 +752,10 @@
       if (noVariants) noVariants.hidden = enabled;
       if (basePricingCard) basePricingCard.hidden = enabled;
       if (productCreateForm.elements.price) productCreateForm.elements.price.required = !enabled;
-      if (enabled && optionGroups?.children.length === 0) { addOptionGroup("Size", "50 ml, 250 ml"); addOptionGroup("Flavor", "Peach, Original"); }
+      if (enabled && optionGroups?.children.length === 0) {
+        if (currentType() === "subscription") addOptionGroup("Plan", "Basic, Pro");
+        else { addOptionGroup("Size", "50 ml, 250 ml"); addOptionGroup("Flavor", "Peach, Original"); }
+      }
       syncLiveVariants(); markDraftChanged();
     };
     const syncType = () => {
@@ -728,6 +764,8 @@
       const digital = q("[data-product-digital]"); if (digital) digital.hidden = type !== "digital";
       const subscription = q("[data-product-subscription]"); if (subscription) subscription.hidden = type !== "subscription";
       if (imageRule) imageRule.querySelector("span").innerHTML = type === "physical" ? "<b>Physical products need 3–9 images.</b> The first image becomes the main catalog photo." : "<b>This product needs 1–9 images.</b> The first image becomes the main catalog photo.";
+      if (type === "subscription") variants.forEach((variant) => { variant.billingInterval ||= Math.max(1, Math.round(Number(productCreateForm.elements.interval?.value) || 1)); variant.billingUnit ||= String(productCreateForm.elements.unit?.value || "month"); });
+      syncVariantLanguage();
       if (variants.length) renderVariants();
       updatePreview(); markDraftChanged();
     };
@@ -838,6 +876,8 @@
         const useCustomImage = variant.imageSource === "variant-upload";
         return {
           ...variant,
+          billingInterval: variant.billingInterval || product.subscription?.interval || 1,
+          billingUnit: variant.billingUnit || product.subscription?.unit || "month",
           imageIndex: galleryMatch ? Math.max(0, Number(galleryMatch[1]) - 1) : Number.isInteger(variant.imageIndex) ? variant.imageIndex : 0,
           useCustomImage,
           customImage: useCustomImage && variant.image ? { cloudId: variant.imageUploadId || null, data: variant.image } : null,
@@ -851,7 +891,7 @@
       selectedImages = (snapshot.images || []).filter((item) => item.data).map((item) => ({ id: item.id || `image-${Date.now()}-${Math.random()}`, cloudId: item.cloudId || null, data: item.data, url: item.data }));
       variantToggle.checked = Boolean(snapshot.hasVariants);
       optionGroups?.replaceChildren(); (snapshot.options || []).forEach((group) => addOptionGroup(group.name, (group.values || []).join(", ")));
-      variants = (snapshot.variants || []).map((variant) => ({ ...variant, weightGrams: variant.weightGrams || 500, customImage: variant.customImage?.data ? { cloudId: variant.customImage.cloudId || null, data: variant.customImage.data, url: variant.customImage.data } : null }));
+      variants = (snapshot.variants || []).map((variant) => ({ ...variant, weightGrams: variant.weightGrams || 500, billingInterval: variant.billingInterval || Number(snapshot.fields?.interval) || 1, billingUnit: variant.billingUnit || snapshot.fields?.unit || "month", customImage: variant.customImage?.data ? { cloudId: variant.customImage.cloudId || null, data: variant.customImage.data, url: variant.customImage.data } : null }));
       previewDevice = snapshot.previewDevice === "mobile" ? "mobile" : "desktop";
       if (draftStatus) draftStatus.innerHTML = `<i></i> ${label}`;
     };
@@ -867,11 +907,11 @@
     selectAllVariants?.addEventListener("change", () => { selectedVariantIds = selectAllVariants.checked ? new Set(variants.map((variant) => variant.id)) : new Set(); updateVariantSelection(); });
     q("[data-clear-variant-selection]")?.addEventListener("click", () => { selectedVariantIds.clear(); updateVariantSelection(); });
     q("[data-apply-variant-batch]")?.addEventListener("click", () => {
-      if (!selectedVariantIds.size) { showError("Select at least one variant or use an All option filter first."); return; }
+      if (!selectedVariantIds.size) { showError(`Select at least one ${currentType() === "subscription" ? "plan" : "variant"} or use an All option filter first.`); return; }
       const price = q("[data-batch-price]").value; const stock = q("[data-batch-stock]").value; const weight = q("[data-batch-weight]").value;
       if (price === "" && stock === "" && weight === "") { showError("Enter at least one batch value to apply."); return; }
       variants.filter((variant) => selectedVariantIds.has(variant.id)).forEach((variant) => { if (price !== "") variant.price = Math.max(0, Math.round(Number(price) || 0)); if (stock !== "") variant.stock = Math.max(0, Math.round(Number(stock) || 0)); if (weight !== "") variant.weightGrams = Math.max(0, Math.round(Number(weight) || 0)); });
-      clearError(); renderVariants(); markDraftChanged(); showToast(`Updated ${selectedVariantIds.size} variants`);
+      clearError(); renderVariants(); markDraftChanged(); showToast(`Updated ${selectedVariantIds.size} ${currentType() === "subscription" ? "plans" : "variants"}`);
     });
     q("[data-product-preview-device='desktop']")?.addEventListener("click", () => { previewDevice = "desktop"; syncPreviewDevice(); markDraftChanged(); });
     q("[data-product-preview-device='mobile']")?.addEventListener("click", () => { previewDevice = "mobile"; syncPreviewDevice(); markDraftChanged(); });
@@ -926,10 +966,11 @@
       if (!productCreateForm.reportValidity()) return;
       const type = currentType(); const minimum = type === "physical" ? 3 : 1;
       if (selectedImages.length < minimum || selectedImages.length > 9) { showError(`${typeName(type)} requires ${minimum === 3 ? "3–9" : "1–9"} images.`); return; }
-      if (variantToggle.checked && !variants.length) { showError("Generate at least one variant, or turn off Has variants."); return; }
-      if (variants.some((variant) => variant.price < 1000 || !variant.sku || (type === "physical" && variant.weightGrams < 1))) { showError("Every variant needs a valid price, SKU, and shipping weight."); return; }
-      const interval = Math.max(1, Math.round(Number(productCreateForm.elements.interval?.value) || 1));
-      submitButtons.forEach((button) => { button.disabled = true; button.dataset.originalText = button.textContent; button.textContent = editingProduct ? "Saving changes…" : "Creating product…"; });
+      if (variantToggle.checked && !variants.length) { showError(type === "subscription" ? "Generate at least one plan, or turn off Has plans." : "Generate at least one variant, or turn off Has variants."); return; }
+      if (variants.some((variant) => variant.price < 1000 || !variant.sku || (type === "physical" && variant.weightGrams < 1) || (type === "subscription" && (!variant.billingUnit || variant.billingInterval < 1)))) { showError(type === "subscription" ? "Every plan needs a valid price, SKU, and billing period." : "Every variant needs a valid price, SKU, and shipping weight."); return; }
+      const firstPlan = type === "subscription" && variantToggle.checked ? variants[0] : null;
+      const interval = Math.max(1, Math.min(12, Math.round(Number(firstPlan?.billingInterval ?? productCreateForm.elements.interval?.value) || 1)));
+      submitButtons.forEach((button) => { button.disabled = true; button.dataset.originalText = button.textContent; button.textContent = editingProduct ? "Publishing changes…" : "Creating product…"; });
       try {
         await ensureEditorMediaCloud();
         const images = await Promise.all(selectedImages.map(imageData));
@@ -939,7 +980,7 @@
           price: variantToggle.checked ? Math.min(...variants.map((variant) => variant.price)) : Math.round(Number(productCreateForm.elements.price.value) || 0), images, mediaIds: selectedImages.map((image) => image.cloudId), image: images[0],
           ...(type === "physical" ? { stock: variantToggle.checked ? variants.reduce((total, variant) => total + variant.stock, 0) : Math.max(0, Math.round(Number(productCreateForm.elements.stock.value) || 0)), weightGrams: variantToggle.checked ? Math.max(...variants.map((variant) => variant.weightGrams)) : Math.max(1, Math.round(Number(productCreateForm.elements.weight.value) || 0)) } : {}),
           ...(type === "digital" ? { digitalFileName: String(productCreateForm.elements.digital_name.value || "").trim() } : {}),
-          ...(type === "subscription" ? { subscription: { interval, unit: String(productCreateForm.elements.unit.value || "month") } } : {}),
+          ...(type === "subscription" ? { subscription: { interval, unit: String(firstPlan?.billingUnit || productCreateForm.elements.unit.value || "month") } } : {}),
           ...(variantToggle.checked ? { options: optionSnapshot(), variants: variants.map(({ customImage, useCustomImage, ...variant }) => ({ ...variant, imageUploadId: useCustomImage ? customImage?.cloudId || null : null, image: useCustomImage && customImage?.data ? customImage.data : Number.isInteger(variant.imageIndex) ? images[variant.imageIndex] || images[0] : images[0], imageSource: useCustomImage && customImage?.data ? "variant-upload" : Number.isInteger(variant.imageIndex) ? `gallery-${variant.imageIndex + 1}` : "main" })) } : {}), createdAt: editingProduct?.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString(),
         };
         if (cloudEnabled) await saveCloudProduct(product);
@@ -956,7 +997,7 @@
         removeLocalDraft(draftId); sessionStorage.removeItem(activeProductDraftKey);
         window.opener?.postMessage({ type: editingProduct ? "ezkart:catalog-product-updated" : "ezkart:catalog-product-created", productId: product.id }, window.location.origin); window.location.href = `?page=products&${editingProduct ? "updated" : "created"}=1`;
       } catch (error) { showError(error instanceof Error ? error.message : "The product could not be created."); }
-      finally { submitButtons.forEach((button) => { button.disabled = false; button.textContent = button.dataset.originalText || (editingProduct ? "Save changes" : "Create product"); }); }
+      finally { submitButtons.forEach((button) => { button.disabled = false; button.textContent = button.dataset.originalText || (editingProduct ? "Publish changes" : "Create product"); }); }
     });
 
     restoreDraft(); syncVariantMode(); syncType(); syncPreviewDevice(); renderImages(); restoringDraft = false; updatePreview();

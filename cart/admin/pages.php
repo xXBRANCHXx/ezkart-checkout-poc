@@ -75,7 +75,7 @@ function ez_orders_table(array $rows, string $tableId): void
         <span data-product-draft-status><i></i> Draft autosaves</span>
         <a class="action-button" href="?page=products">Cancel</a>
         <button class="action-button" type="button" data-save-product-draft>Save draft</button>
-        <button class="action-button primary" type="submit" form="product-create-form"><?= $editingProduct ? 'Save changes' : 'Create product' ?></button>
+        <button class="action-button primary" type="submit" form="product-create-form"><?= $editingProduct ? 'Publish changes' : 'Create product' ?></button>
       </div>
     </header>
 
@@ -108,28 +108,28 @@ function ez_orders_table(array $rows, string $tableId): void
         </section>
 
         <section class="product-form-card">
-          <header><span>03</span><div><h2>Product variants</h2><p>Keep sizes, flavors, colors, or bundles inside this one product.</p></div><label class="product-variant-switch"><input type="checkbox" data-product-variant-toggle><i></i><b>Has variants</b></label></header>
+          <header><span>03</span><div><h2 data-variant-section-title>Product variants</h2><p data-variant-section-description>Keep sizes, flavors, colors, or bundles inside this one product.</p></div><label class="product-variant-switch"><input type="checkbox" data-product-variant-toggle><i></i><b data-variant-toggle-label>Has variants</b></label></header>
           <div class="product-variant-builder" data-product-variant-builder hidden>
-            <div class="product-option-heading"><div><b>Option groups</b><p>Enter values separated by commas. Example: 50 ml, 250 ml.</p></div><button type="button" data-add-option-group><?= ez_admin_icon('plus') ?> Add option</button></div>
+            <div class="product-option-heading"><div><b data-variant-options-title>Option groups</b><p data-variant-options-description>Enter values separated by commas. Example: 50 ml, 250 ml.</p></div><button type="button" data-add-option-group><?= ez_admin_icon('plus') ?> Add option</button></div>
             <div class="product-option-groups" data-product-option-groups></div>
-            <button class="product-generate-variants" type="button" data-generate-variants><?= ez_admin_icon('layers') ?> Generate combinations</button>
-            <div class="product-variant-empty" data-product-variant-empty><span><?= ez_admin_icon('box') ?></span><div><b>No combinations yet</b><p>Add option values, then generate the sellable variants for this product.</p></div></div>
+            <button class="product-generate-variants" type="button" data-generate-variants><?= ez_admin_icon('layers') ?> <span data-generate-variants-label>Generate combinations</span></button>
+            <div class="product-variant-empty" data-product-variant-empty><span><?= ez_admin_icon('box') ?></span><div><b data-variant-empty-title>No combinations yet</b><p data-variant-empty-description>Add option values, then generate the sellable variants for this product.</p></div></div>
             <div class="product-variant-table" data-product-variant-table hidden>
               <div class="product-variant-batch" data-product-variant-batch>
-                <div><b>Batch edit</b><p>Select every matching option—such as all 250 ml or all Peach—then update them together.</p></div>
+                <div><b>Batch edit</b><p data-variant-batch-description>Select every matching option—such as all 250 ml or all Peach—then update them together.</p></div>
                 <div class="variant-filter-chips" data-variant-filter-chips></div>
                 <div class="variant-batch-fields"><span data-variant-selected-count>0 selected</span><label><span>Price</span><input type="number" min="1000" step="500" placeholder="No change" data-batch-price></label><label data-batch-physical><span>Stock</span><input type="number" min="0" max="999999" placeholder="No change" data-batch-stock></label><label data-batch-physical><span>Weight (g)</span><input type="number" min="1" max="50000" placeholder="No change" data-batch-weight></label><button type="button" data-apply-variant-batch>Apply to selected</button><button type="button" data-clear-variant-selection>Clear</button></div>
               </div>
-              <header><span><input type="checkbox" data-select-all-variants aria-label="Select all variants"></span><span>Variant</span><span>Price</span><span data-variant-stock-heading>Stock</span><span data-variant-weight-heading>Weight</span><span>SKU</span><span>Photo</span><span></span></header>
+              <header><span><input type="checkbox" data-select-all-variants aria-label="Select all variants"></span><span data-variant-column-title>Variant</span><span>Price</span><span data-variant-stock-heading>Stock</span><span data-variant-weight-heading>Weight</span><span data-variant-billing-heading hidden>Billing</span><span>SKU</span><span>Photo</span><span></span></header>
               <div data-product-variant-rows></div>
             </div>
-            <p class="product-variant-help">Every row remains part of this product. Physical variants carry their own stock and shipping weight. Upload a square variant photo or choose one from the main gallery.</p>
+            <p class="product-variant-help" data-variant-help>Every row remains part of this product. Physical variants carry their own stock and shipping weight. Upload a square variant photo or choose one from the main gallery.</p>
           </div>
           <p class="product-no-variants" data-product-no-variants>No variants needed? The base price and stock below will be used.</p>
         </section>
 
         <section class="product-form-card" data-product-base-pricing>
-          <header><span>04</span><div><h2>Price and availability</h2><p>Used as the default when the product has no variants.</p></div></header>
+          <header><span>04</span><div><h2 data-base-pricing-title>Price and availability</h2><p data-base-pricing-description>Used as the default when the product has no variants.</p></div></header>
           <div class="product-form-grid">
             <label><span>Price (IDR)</span><input name="price" type="number" required min="1000" step="500" value="75000" data-product-preview-price></label>
             <label data-product-physical><span>Stock</span><input name="stock" type="number" min="0" max="999999" value="10" data-product-preview-stock></label>
@@ -144,7 +144,7 @@ function ez_orders_table(array $rows, string $tableId): void
         </section>
 
         <p class="product-editor-error" data-product-create-error hidden></p>
-        <footer class="product-editor-footer"><a href="?page=products">Cancel</a><button class="action-button primary" type="submit"><?= $editingProduct ? 'Save changes' : 'Create product' ?></button></footer>
+        <footer class="product-editor-footer"><a href="?page=products">Cancel</a><button class="action-button primary" type="submit"><?= $editingProduct ? 'Publish changes' : 'Create product' ?></button></footer>
       </div>
 
       <aside class="product-preview-sidebar">
@@ -161,7 +161,7 @@ function ez_orders_table(array $rows, string $tableId): void
                 <strong data-product-live-price>Rp75.000</strong>
                 <em data-product-live-availability>Stock: 10</em>
                 <div class="product-live-options" data-product-live-variant hidden></div>
-                <button type="button"><?= ez_admin_icon('plus') ?> Add to cart</button>
+                <button type="button" data-product-live-action><span data-product-live-action-icon><?= ez_admin_icon('plus') ?></span><span data-product-live-action-label>Add to cart</span></button>
                 <footer><?= ez_admin_icon('shield') ?> Secure checkout powered by Ezkart</footer>
               </div>
             </div>
