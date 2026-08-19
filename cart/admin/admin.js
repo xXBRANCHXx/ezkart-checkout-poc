@@ -324,14 +324,18 @@
   };
   const migrateLegacyCloudData = async () => {
     if (!cloudEnabled || cloudLoadError) return;
+    let migrated = 0;
+    let failed = 0;
     for (const product of readLocalCatalogProducts()) {
       if (cloudCatalogProducts.some((item) => item.id === product.id)) { removeLocalProduct(product.id); continue; }
-      try { await saveCloudProduct(product); } catch (_) { /* Keep the local copy until a later successful retry. */ }
+      try { await saveCloudProduct(product); migrated += 1; } catch (_) { failed += 1; }
     }
     for (const draft of readLocalProductDrafts()) {
       if (cloudProductDrafts.some((item) => item.id === draft.id)) { removeLocalDraft(draft.id); continue; }
-      try { await saveCloudDraft(draft); } catch (_) { /* Keep the local copy until a later successful retry. */ }
+      try { await saveCloudDraft(draft); migrated += 1; } catch (_) { failed += 1; }
     }
+    if (migrated > 0) showToast(`${migrated} browser-saved item${migrated === 1 ? "" : "s"} moved to cloud storage`);
+    if (failed > 0) showToast(`${failed} item${failed === 1 ? "" : "s"} could not move to cloud yet; the browser copy was kept`);
   };
   if (cloudLoadError) showToast(`Cloud storage unavailable: ${cloudLoadError}`);
   else window.setTimeout(() => { void migrateLegacyCloudData(); }, 600);
