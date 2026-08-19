@@ -58,7 +58,9 @@ session_set_cookie_params([
     'samesite' => 'Lax',
 ]);
 session_start();
-if (isset($_COOKIE[session_name()])) {
+
+function ez_admin_renew_session_cookie(bool $isHttps): void
+{
     setcookie(session_name(), session_id(), [
         'expires' => time() + EZ_ADMIN_SESSION_LIFETIME,
         'path' => '/cart/admin',
@@ -66,6 +68,10 @@ if (isset($_COOKIE[session_name()])) {
         'httponly' => true,
         'samesite' => 'Lax',
     ]);
+}
+
+if (isset($_COOKIE[session_name()])) {
+    ez_admin_renew_session_cookie($isHttps);
 }
 
 final class EzAdminAuthProviderException extends RuntimeException
@@ -273,36 +279,6 @@ function ez_admin_get_json(string $url, array $headers, string $service): array
     return $decoded;
 }
 
-function ez_admin_post_form_json(string $url, array $headers, array $fields, string $service): array
-{
-    if (!function_exists('curl_init')) {
-        throw new RuntimeException('PHP cURL is required to contact ' . $service . '.');
-    }
-    $handle = curl_init($url);
-    if ($handle === false) throw new RuntimeException('Could not start the ' . $service . ' request.');
-    curl_setopt_array($handle, [
-        CURLOPT_HTTPHEADER => array_merge($headers, ['Content-Type: application/x-www-form-urlencoded']),
-        CURLOPT_POST => true,
-        CURLOPT_POSTFIELDS => http_build_query($fields, '', '&', PHP_QUERY_RFC3986),
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_CONNECTTIMEOUT => 8,
-        CURLOPT_TIMEOUT => 15,
-        CURLOPT_SSL_VERIFYPEER => true,
-    ]);
-    $body = curl_exec($handle);
-    $status = (int) curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
-    $error = curl_error($handle);
-    $decoded = is_string($body) ? json_decode($body, true) : null;
-    if ($status < 200 || $status >= 300 || !is_array($decoded)) {
-        $fallback = $service . ' rejected the request' . ($error !== '' ? ': ' . $error : '.');
-        throw new EzAdminAuthProviderException(
-            is_array($decoded) ? ez_admin_auth_error_message($decoded, $fallback) : $fallback,
-            $status,
-        );
-    }
-    return $decoded;
-}
-
 function ez_admin_post_json(string $url, array $headers, array $payload, string $service): array
 {
     if (!function_exists('curl_init')) {
@@ -414,7 +390,7 @@ function ez_admin_refresh_supabase_session(): string
     try {
         $settings = ez_admin_supabase_settings();
         if (!$settings['configured']) return 'temporary';
-        $tokens = ez_admin_post_form_json(
+        $tokens = ez_admin_post_json(
             $settings['url'] . '/auth/v1/token?grant_type=refresh_token',
             ['Accept: application/json', 'apikey: ' . $settings['key']],
             ['refresh_token' => $refreshToken],
@@ -613,6 +589,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'GET' && (string) ($_GET['auth_callba
         $accessToken = trim((string) ($tokens['access_token'] ?? ''));
         $user = ez_admin_verify_supabase_user($accessToken);
         session_regenerate_id(true);
+        ez_admin_renew_session_cookie($isHttps);
         ez_admin_store_supabase_session($tokens, $user, true);
         $_SESSION['cloudflare_profile_sync'] = ez_admin_sync_cloudflare_user($accessToken);
         $_SESSION['csrf_token'] = bin2hex(random_bytes(24));
@@ -643,6 +620,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && !isset($_GET['cloud'])) {
                 throw new RuntimeException('Supabase login is not configured on this server.');
             }
             session_regenerate_id(true);
+            ez_admin_renew_session_cookie($isHttps);
             $flowId = bin2hex(random_bytes(16));
             $verifier = ez_admin_base64url(random_bytes(64));
             $challenge = ez_admin_base64url(hash('sha256', $verifier, true));
@@ -687,6 +665,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && !isset($_GET['cloud'])) {
         $submittedPassword = (string) ($_POST['password'] ?? '');
         if (hash_equals($adminPassword, $submittedPassword)) {
             session_regenerate_id(true);
+            ez_admin_renew_session_cookie($isHttps);
             $_SESSION['authenticated'] = true;
             $_SESSION['authentication_method'] = 'password';
             unset(
@@ -738,6 +717,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && !isset($_GET['cloud'])) {
             }
             $user = ez_admin_verify_supabase_user($accessToken);
             session_regenerate_id(true);
+            ez_admin_renew_session_cookie($isHttps);
             ez_admin_store_supabase_session([
                 'access_token' => $accessToken,
                 'refresh_token' => $refreshToken,
