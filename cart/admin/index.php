@@ -6,6 +6,8 @@ require_once dirname(__DIR__) . '/api/bootstrap.php';
 header('Cache-Control: no-store');
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: DENY');
+header('Referrer-Policy: no-referrer');
+header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
 header("Content-Security-Policy: default-src 'self'; img-src 'self' data: blob: https:; style-src 'self'; style-src-attr 'unsafe-inline'; script-src 'self'; connect-src 'self'; frame-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'");
 
 const EZ_ADMIN_SESSION_LIFETIME = 60 * 60 * 24 * 30;
@@ -38,6 +40,9 @@ if ($resolvedSessionDirectory === false || !is_writable($resolvedSessionDirector
 $forwardedProtocol = strtolower(trim(explode(',', (string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? ''))[0]));
 $isHttps = (isset($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off')
     || $forwardedProtocol === 'https';
+if ($isHttps) {
+    header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
+}
 ini_set('session.use_strict_mode', '1');
 ini_set('session.use_only_cookies', '1');
 ini_set('session.gc_maxlifetime', (string) EZ_ADMIN_SESSION_LIFETIME);
@@ -50,7 +55,7 @@ session_set_cookie_params([
     'path' => '/cart/admin',
     'secure' => $isHttps,
     'httponly' => true,
-    'samesite' => 'Strict',
+    'samesite' => 'Lax',
 ]);
 session_start();
 if (isset($_COOKIE[session_name()])) {
@@ -59,8 +64,16 @@ if (isset($_COOKIE[session_name()])) {
         'path' => '/cart/admin',
         'secure' => $isHttps,
         'httponly' => true,
-        'samesite' => 'Strict',
+        'samesite' => 'Lax',
     ]);
+}
+
+final class EzAdminAuthProviderException extends RuntimeException
+{
+    public function __construct(string $message, public readonly int $providerStatus)
+    {
+        parent::__construct($message);
+    }
 }
 
 function ez_admin_json(array $payload, int $status = 200): never
@@ -76,6 +89,23 @@ function ez_admin_json(array $payload, int $status = 200): never
 function ez_admin_escape(mixed $value): string
 {
     return htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+}
+
+function ez_admin_base64url(string $value): string
+{
+    return rtrim(strtr(base64_encode($value), '+/', '-_'), '=');
+}
+
+function ez_admin_auth_error_message(array $decoded, string $fallback): string
+{
+    $message = trim((string) ($decoded['msg'] ?? $decoded['message'] ?? $decoded['error_description'] ?? ''));
+    return $message !== '' ? mb_substr($message, 0, 220) : $fallback;
+}
+
+function ez_admin_log_auth_error(string $operation, Throwable $error): void
+{
+    $message = preg_replace('/[\r\n]+/', ' ', $error->getMessage()) ?: 'Unknown provider error';
+    error_log('Ezkart Auth ' . $operation . ': ' . mb_substr($message, 0, 220));
 }
 
 function ez_admin_money(mixed $value): string
@@ -188,6 +218,33 @@ function ez_admin_allowed_emails(): array
     ));
 }
 
+function ez_admin_auth_mode(): string
+{
+    $configured = strtolower(ez_config('admin_auth_mode'));
+    if (in_array($configured, ['allowlist', 'open_beta', 'open'], true)) return $configured;
+    return strtolower(ez_config('deployment_environment')) === 'test' ? 'open_beta' : 'allowlist';
+}
+
+function ez_admin_email_has_legacy_access(string $email): bool
+{
+    return in_array(strtolower(trim($email)), ez_admin_allowed_emails(), true);
+}
+
+function ez_admin_user_has_google_identity(array $user): bool
+{
+    $appMetadata = is_array($user['app_metadata'] ?? null) ? $user['app_metadata'] : [];
+    $providers = is_array($appMetadata['providers'] ?? null) ? $appMetadata['providers'] : [];
+    $providers[] = (string) ($appMetadata['provider'] ?? '');
+    foreach ($providers as $provider) {
+        if (strtolower((string) $provider) === 'google') return true;
+    }
+    $identities = is_array($user['identities'] ?? null) ? $user['identities'] : [];
+    foreach ($identities as $identity) {
+        if (is_array($identity) && strtolower((string) ($identity['provider'] ?? '')) === 'google') return true;
+    }
+    return false;
+}
+
 function ez_admin_get_json(string $url, array $headers, string $service): array
 {
     if (!function_exists('curl_init')) {
@@ -207,7 +264,11 @@ function ez_admin_get_json(string $url, array $headers, string $service): array
     $error = curl_error($handle);
     $decoded = is_string($body) ? json_decode($body, true) : null;
     if ($status < 200 || $status >= 300 || !is_array($decoded)) {
-        throw new RuntimeException($service . ' rejected the request' . ($error !== '' ? ': ' . $error : '.'));
+        $fallback = $service . ' rejected the request' . ($error !== '' ? ': ' . $error : '.');
+        throw new EzAdminAuthProviderException(
+            is_array($decoded) ? ez_admin_auth_error_message($decoded, $fallback) : $fallback,
+            $status,
+        );
     }
     return $decoded;
 }
@@ -233,7 +294,11 @@ function ez_admin_post_form_json(string $url, array $headers, array $fields, str
     $error = curl_error($handle);
     $decoded = is_string($body) ? json_decode($body, true) : null;
     if ($status < 200 || $status >= 300 || !is_array($decoded)) {
-        throw new RuntimeException($service . ' rejected the request' . ($error !== '' ? ': ' . $error : '.'));
+        $fallback = $service . ' rejected the request' . ($error !== '' ? ': ' . $error : '.');
+        throw new EzAdminAuthProviderException(
+            is_array($decoded) ? ez_admin_auth_error_message($decoded, $fallback) : $fallback,
+            $status,
+        );
     }
     return $decoded;
 }
@@ -259,12 +324,11 @@ function ez_admin_post_json(string $url, array $headers, array $payload, string 
     $error = curl_error($handle);
     $decoded = is_string($body) ? json_decode($body, true) : null;
     if ($status < 200 || $status >= 300 || !is_array($decoded)) {
-        $providerMessage = is_array($decoded)
-            ? trim((string) ($decoded['msg'] ?? $decoded['message'] ?? $decoded['error_description'] ?? ''))
-            : '';
-        throw new RuntimeException($providerMessage !== ''
-            ? mb_substr($providerMessage, 0, 220)
-            : $service . ' rejected the request' . ($error !== '' ? ': ' . $error : '.'));
+        $fallback = $service . ' rejected the request' . ($error !== '' ? ': ' . $error : '.');
+        throw new EzAdminAuthProviderException(
+            is_array($decoded) ? ez_admin_auth_error_message($decoded, $fallback) : $fallback,
+            $status,
+        );
     }
     return $decoded;
 }
@@ -301,22 +365,55 @@ function ez_admin_verify_supabase_user(string $accessToken): array
     if (($user['email_confirmed_at'] ?? $user['confirmed_at'] ?? '') === '') {
         throw new RuntimeException('Sign in with a verified email address.');
     }
-    $allowedEmails = ez_admin_allowed_emails();
-    if ($allowedEmails === [] || !in_array($email, $allowedEmails, true)) {
+    $legacyAccess = ez_admin_email_has_legacy_access($email);
+    if (ez_admin_auth_mode() === 'allowlist' && !$legacyAccess) {
         throw new RuntimeException('This email address is not authorized for the Ezkart admin.');
+    }
+    if (ez_admin_auth_mode() !== 'allowlist' && !$legacyAccess && !ez_admin_user_has_google_identity($user)) {
+        throw new RuntimeException('Use a verified Google account to join the Ezkart beta.');
     }
     return $user;
 }
 
-function ez_admin_refresh_supabase_session(): bool
+function ez_admin_store_supabase_session(array $tokens, array $user, bool $newSignIn): void
 {
-    if (($_SESSION['authentication_method'] ?? '') !== 'supabase') return false;
+    $accessToken = trim((string) ($tokens['access_token'] ?? ''));
+    $refreshToken = trim((string) ($tokens['refresh_token'] ?? ''));
+    if (strlen($accessToken) < 40 || strlen($accessToken) > 8192) {
+        throw new InvalidArgumentException('Supabase did not return a valid access token.');
+    }
+    if ($refreshToken === '' || strlen($refreshToken) > 8192) {
+        throw new InvalidArgumentException('Supabase did not return a valid refresh token.');
+    }
+    $metadata = is_array($user['user_metadata'] ?? null) ? $user['user_metadata'] : [];
+    $email = strtolower(trim((string) ($user['email'] ?? '')));
+    $name = trim((string) ($metadata['full_name'] ?? $metadata['name'] ?? ''));
+
+    $_SESSION['authenticated'] = true;
+    $_SESSION['authentication_method'] = 'supabase';
+    $_SESSION['authenticated_until'] = ez_admin_token_expiration($accessToken);
+    $_SESSION['supabase_access_token'] = $accessToken;
+    $_SESSION['supabase_refresh_token'] = $refreshToken;
+    $_SESSION['legacy_data_access'] = ez_admin_email_has_legacy_access($email);
+    if ($newSignIn || (int) ($_SESSION['signed_in_at'] ?? 0) <= 0) {
+        $_SESSION['signed_in_at'] = time();
+    }
+    $_SESSION['admin_user'] = [
+        'id' => (string) ($user['id'] ?? ''),
+        'email' => $email,
+        'name' => $name !== '' ? mb_substr($name, 0, 100) : $email,
+    ];
+}
+
+function ez_admin_refresh_supabase_session(): string
+{
+    if (($_SESSION['authentication_method'] ?? '') !== 'supabase') return 'invalid';
     $refreshToken = trim((string) ($_SESSION['supabase_refresh_token'] ?? ''));
-    if ($refreshToken === '' || strlen($refreshToken) > 8192) return false;
+    if ($refreshToken === '' || strlen($refreshToken) > 8192) return 'invalid';
 
     try {
         $settings = ez_admin_supabase_settings();
-        if (!$settings['configured']) return false;
+        if (!$settings['configured']) return 'temporary';
         $tokens = ez_admin_post_form_json(
             $settings['url'] . '/auth/v1/token?grant_type=refresh_token',
             ['Accept: application/json', 'apikey: ' . $settings['key']],
@@ -325,23 +422,55 @@ function ez_admin_refresh_supabase_session(): bool
         );
         $accessToken = trim((string) ($tokens['access_token'] ?? ''));
         $nextRefreshToken = trim((string) ($tokens['refresh_token'] ?? ''));
+        $tokens['refresh_token'] = $nextRefreshToken !== '' ? $nextRefreshToken : $refreshToken;
         $user = ez_admin_verify_supabase_user($accessToken);
-        $metadata = is_array($user['user_metadata'] ?? null) ? $user['user_metadata'] : [];
-        $email = strtolower(trim((string) $user['email']));
-        $name = trim((string) ($metadata['full_name'] ?? $metadata['name'] ?? ''));
+        ez_admin_store_supabase_session($tokens, $user, false);
+        return 'refreshed';
+    } catch (Throwable $error) {
+        ez_admin_log_auth_error('refresh failed', $error);
+        if ($error instanceof EzAdminAuthProviderException) {
+            return in_array($error->providerStatus, [400, 401, 403], true) ? 'invalid' : 'temporary';
+        }
+        if ($error instanceof InvalidArgumentException) return 'invalid';
+        $message = strtolower($error->getMessage());
+        return str_contains($message, 'not authorized')
+            || str_contains($message, 'verified email')
+            || str_contains($message, 'google account')
+            ? 'invalid'
+            : 'temporary';
+    }
+}
 
-        $_SESSION['authenticated'] = true;
-        $_SESSION['authenticated_until'] = ez_admin_token_expiration($accessToken);
-        $_SESSION['supabase_access_token'] = $accessToken;
-        $_SESSION['supabase_refresh_token'] = $nextRefreshToken !== '' ? $nextRefreshToken : $refreshToken;
-        $_SESSION['admin_user'] = [
-            'id' => (string) $user['id'],
-            'email' => $email,
-            'name' => $name !== '' ? mb_substr($name, 0, 100) : $email,
-        ];
-        return true;
-    } catch (Throwable) {
-        return false;
+function ez_admin_revoke_supabase_session(): void
+{
+    if (($_SESSION['authentication_method'] ?? '') !== 'supabase') return;
+    $accessToken = trim((string) ($_SESSION['supabase_access_token'] ?? ''));
+    $settings = ez_admin_supabase_settings();
+    if (!$settings['configured'] || strlen($accessToken) < 40 || strlen($accessToken) > 8192) return;
+    if (!function_exists('curl_init')) return;
+
+    $handle = curl_init($settings['url'] . '/auth/v1/logout?scope=local');
+    if ($handle === false) return;
+    curl_setopt_array($handle, [
+        CURLOPT_HTTPHEADER => [
+            'Accept: application/json',
+            'apikey: ' . $settings['key'],
+            'Authorization: Bearer ' . $accessToken,
+        ],
+        CURLOPT_POST => true,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_CONNECTTIMEOUT => 5,
+        CURLOPT_TIMEOUT => 10,
+        CURLOPT_SSL_VERIFYPEER => true,
+    ]);
+    curl_exec($handle);
+    $status = (int) curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
+    $error = curl_error($handle);
+    if (!in_array($status, [200, 204, 401], true)) {
+        ez_admin_log_auth_error(
+            'logout revocation failed',
+            new EzAdminAuthProviderException($error !== '' ? $error : 'Unexpected provider response.', $status),
+        );
     }
 }
 
@@ -355,6 +484,8 @@ function ez_admin_clear_authentication(): void
         $_SESSION['supabase_refresh_token'],
         $_SESSION['admin_user'],
         $_SESSION['cloudflare_profile_sync'],
+        $_SESSION['legacy_data_access'],
+        $_SESSION['signed_in_at'],
         $_SESSION['last_activity_at'],
     );
 }
@@ -391,14 +522,100 @@ if (!is_string($csrfToken) || strlen($csrfToken) < 32) {
 $adminPassword = ez_config('sandbox_admin_password');
 $adminConfigured = $adminPassword !== '' && !str_contains(strtoupper($adminPassword), 'REPLACE');
 $supabaseSettings = ez_admin_supabase_settings();
-$loginError = '';
+$loginError = trim((string) ($_SESSION['auth_flash_error'] ?? ''));
+unset($_SESSION['auth_flash_error']);
+
+$oauthFlows = is_array($_SESSION['oauth_flows'] ?? null) ? $_SESSION['oauth_flows'] : [];
+foreach ($oauthFlows as $flowId => $flow) {
+    if (!is_array($flow) || (int) ($flow['expires_at'] ?? 0) <= time()) unset($oauthFlows[$flowId]);
+}
+$_SESSION['oauth_flows'] = $oauthFlows;
+
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'GET' && (string) ($_GET['auth_callback'] ?? '') === '1') {
+    $flowId = strtolower(trim((string) ($_GET['flow'] ?? '')));
+    $code = trim((string) ($_GET['code'] ?? ''));
+    $providerError = trim((string) ($_GET['error_description'] ?? $_GET['error'] ?? ''));
+    $flow = preg_match('/^[a-f0-9]{32}$/', $flowId) === 1 && is_array($oauthFlows[$flowId] ?? null)
+        ? $oauthFlows[$flowId]
+        : null;
+    unset($_SESSION['oauth_flows'][$flowId]);
+
+    try {
+        if ($providerError !== '') throw new RuntimeException('Google sign-in was cancelled or denied.');
+        if ($flow === null || (int) ($flow['expires_at'] ?? 0) <= time()) {
+            throw new RuntimeException('This Google sign-in request expired. Please start again.');
+        }
+        $verifier = (string) ($flow['verifier'] ?? '');
+        if ($code === '' || strlen($code) > 512 || strlen($verifier) < 43 || strlen($verifier) > 128) {
+            throw new RuntimeException('The Google sign-in response was invalid. Please start again.');
+        }
+        if (!$supabaseSettings['configured']) {
+            throw new RuntimeException('Supabase login is not configured on this server.');
+        }
+        $tokens = ez_admin_post_json(
+            $supabaseSettings['url'] . '/auth/v1/token?grant_type=pkce',
+            ['Accept: application/json', 'apikey: ' . $supabaseSettings['key']],
+            ['auth_code' => $code, 'code_verifier' => $verifier],
+            'Supabase Auth',
+        );
+        $accessToken = trim((string) ($tokens['access_token'] ?? ''));
+        $user = ez_admin_verify_supabase_user($accessToken);
+        session_regenerate_id(true);
+        ez_admin_store_supabase_session($tokens, $user, true);
+        $_SESSION['cloudflare_profile_sync'] = ez_admin_sync_cloudflare_user($accessToken);
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(24));
+        unset($_SESSION['oauth_flows']);
+        header('Location: ./', true, 303);
+        exit;
+    } catch (Throwable $error) {
+        ez_admin_log_auth_error('PKCE callback failed', $error);
+        $message = $error->getMessage();
+        $_SESSION['auth_flash_error'] = str_contains(strtolower($message), 'not authorized')
+            ? 'This account is not permitted for this Ezkart environment.'
+            : (str_starts_with($message, 'This Google sign-in') || str_starts_with($message, 'Google sign-in')
+                ? $message
+                : 'Google sign-in could not be completed. Please try again.');
+        header('Location: ./', true, 303);
+        exit;
+    }
+}
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
     $submittedToken = (string) ($_POST['csrf_token'] ?? '');
     if (!hash_equals($csrfToken, $submittedToken)) {
         http_response_code(400);
         $loginError = 'Permintaan tidak valid. Muat ulang halaman dan coba lagi.';
+    } elseif ((string) ($_POST['action'] ?? '') === 'google_oauth_start') {
+        try {
+            if (!$supabaseSettings['configured']) {
+                throw new RuntimeException('Supabase login is not configured on this server.');
+            }
+            session_regenerate_id(true);
+            $flowId = bin2hex(random_bytes(16));
+            $verifier = ez_admin_base64url(random_bytes(64));
+            $challenge = ez_admin_base64url(hash('sha256', $verifier, true));
+            $callbackUrl = ez_checkout_public_url() . '/cart/admin/?' . http_build_query([
+                'auth_callback' => '1',
+                'flow' => $flowId,
+            ], '', '&', PHP_QUERY_RFC3986);
+            $_SESSION['oauth_flows'] = [
+                $flowId => ['verifier' => $verifier, 'expires_at' => time() + 600],
+            ];
+            $_SESSION['csrf_token'] = bin2hex(random_bytes(24));
+            $authorizeUrl = $supabaseSettings['url'] . '/auth/v1/authorize?' . http_build_query([
+                'provider' => 'google',
+                'redirect_to' => $callbackUrl,
+                'code_challenge' => $challenge,
+                'code_challenge_method' => 's256',
+            ], '', '&', PHP_QUERY_RFC3986);
+            header('Location: ' . $authorizeUrl, true, 303);
+            exit;
+        } catch (Throwable $error) {
+            ez_admin_log_auth_error('start failed', $error);
+            $loginError = 'Google sign-in could not be started. Please try again.';
+        }
     } elseif ((string) ($_POST['action'] ?? '') === 'logout') {
+        ez_admin_revoke_supabase_session();
         $_SESSION = [];
         if (ini_get('session.use_cookies')) {
             $params = session_get_cookie_params();
@@ -408,7 +625,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
                 'domain' => $params['domain'],
                 'secure' => $params['secure'],
                 'httponly' => $params['httponly'],
-                'samesite' => 'Strict',
+                'samesite' => 'Lax',
             ]);
         }
         session_destroy();
@@ -426,6 +643,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
                 $_SESSION['supabase_refresh_token'],
                 $_SESSION['admin_user'],
                 $_SESSION['cloudflare_profile_sync'],
+                $_SESSION['legacy_data_access'],
+                $_SESSION['signed_in_at'],
             );
             $_SESSION['csrf_token'] = bin2hex(random_bytes(24));
             header('Location: ./', true, 303);
@@ -466,20 +685,11 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
                 throw new InvalidArgumentException('Supabase did not return a valid refresh token.');
             }
             $user = ez_admin_verify_supabase_user($accessToken);
-            $metadata = is_array($user['user_metadata'] ?? null) ? $user['user_metadata'] : [];
-            $email = strtolower(trim((string) $user['email']));
-            $name = trim((string) ($metadata['full_name'] ?? $metadata['name'] ?? ''));
             session_regenerate_id(true);
-            $_SESSION['authenticated'] = true;
-            $_SESSION['authentication_method'] = 'supabase';
-            $_SESSION['authenticated_until'] = ez_admin_token_expiration($accessToken);
-            $_SESSION['supabase_access_token'] = $accessToken;
-            $_SESSION['supabase_refresh_token'] = $refreshToken;
-            $_SESSION['admin_user'] = [
-                'id' => (string) $user['id'],
-                'email' => $email,
-                'name' => $name !== '' ? mb_substr($name, 0, 100) : $email,
-            ];
+            ez_admin_store_supabase_session([
+                'access_token' => $accessToken,
+                'refresh_token' => $refreshToken,
+            ], $user, true);
             $_SESSION['cloudflare_profile_sync'] = ez_admin_sync_cloudflare_user($accessToken);
             $_SESSION['csrf_token'] = bin2hex(random_bytes(24));
             ez_admin_json(['ok' => true]);
@@ -491,15 +701,38 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
 }
 
 $authenticationMethod = (string) ($_SESSION['authentication_method'] ?? 'password');
+$existingUser = is_array($_SESSION['admin_user'] ?? null) ? $_SESSION['admin_user'] : [];
+if (
+    $authenticationMethod === 'supabase'
+    && ($_SESSION['authenticated'] ?? false) === true
+    && !array_key_exists('legacy_data_access', $_SESSION)
+) {
+    $_SESSION['legacy_data_access'] = ez_admin_email_has_legacy_access(
+        (string) ($existingUser['email'] ?? ''),
+    );
+}
+$signedInAt = (int) ($_SESSION['signed_in_at'] ?? 0);
+if ($authenticationMethod === 'supabase' && ($_SESSION['authenticated'] ?? false) === true && $signedInAt <= 0) {
+    $signedInAt = time();
+    $_SESSION['signed_in_at'] = $signedInAt;
+}
+if ($authenticationMethod === 'supabase' && $signedInAt > 0 && $signedInAt + EZ_ADMIN_SESSION_LIFETIME <= time()) {
+    ez_admin_revoke_supabase_session();
+    ez_admin_clear_authentication();
+    $loginError = 'For your security, please sign in again after 30 days.';
+}
+$authenticationMethod = (string) ($_SESSION['authentication_method'] ?? 'password');
 $supabaseExpiration = (int) ($_SESSION['authenticated_until'] ?? 0);
 $supabaseSessionNeedsRefresh = $authenticationMethod === 'supabase'
-    && $supabaseExpiration <= time() + 60;
-if (
-    $supabaseSessionNeedsRefresh
-    && !ez_admin_refresh_supabase_session()
-    && $supabaseExpiration <= time()
-) {
-    ez_admin_clear_authentication();
+    && $supabaseExpiration <= time() + 300;
+if ($supabaseSessionNeedsRefresh) {
+    $refreshResult = ez_admin_refresh_supabase_session();
+    if ($refreshResult === 'invalid') {
+        ez_admin_clear_authentication();
+        $loginError = 'Your secure session ended. Continue with Google to sign in again.';
+    } elseif ($refreshResult === 'temporary' && $supabaseExpiration <= time()) {
+        $loginError = 'Ezkart could not refresh your session just now. Reload this page in a moment—your sign-in has been preserved.';
+    }
 }
 $authenticationMethod = (string) ($_SESSION['authentication_method'] ?? 'password');
 $sessionCurrent = $authenticationMethod !== 'supabase'
@@ -507,6 +740,10 @@ $sessionCurrent = $authenticationMethod !== 'supabase'
 $authenticated = ($_SESSION['authenticated'] ?? false) === true
     && $sessionCurrent
     && ($authenticationMethod === 'supabase' || $adminConfigured);
+$legacyDataAccess = $authenticated && (
+    $authenticationMethod === 'password'
+    || ($_SESSION['legacy_data_access'] ?? false) === true
+);
 if ($authenticated) {
     $_SESSION['last_activity_at'] = time();
 }
@@ -520,7 +757,7 @@ $adminInitials = implode('', array_map(
     static fn(string $part): string => mb_strtoupper(mb_substr($part, 0, 1)),
     array_slice(preg_split('/\s+/', $adminDisplayName) ?: [], 0, 2),
 )) ?: 'EA';
-$orders = $authenticated ? ez_admin_orders() : [];
+$orders = $legacyDataAccess ? ez_admin_orders() : [];
 $metrics = [
     'orders' => count($orders),
     'paid_count' => 0,
@@ -675,7 +912,7 @@ $catalogInventory = [
   <meta name="robots" content="noindex,nofollow">
   <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
   <?php if ($authenticated): ?><link rel="stylesheet" href="assets/vendor/leaflet.css"><?php endif; ?>
-  <link rel="stylesheet" href="admin.css?v=63">
+  <link rel="stylesheet" href="admin.css?v=64">
   <title><?= $authenticated ? ez_admin_escape($pageTitles[$page]) : 'Admin Login' ?> · Ezkart</title>
 </head>
 <body class="<?= $authenticated ? 'dashboard-page page-' . ez_admin_escape($page) . ($page === 'sites' ? ($siteEditor ? ' page-site-editor' : ' page-sites-library') : '') : 'login-page' ?>">
@@ -685,11 +922,15 @@ $catalogInventory = [
       <a class="admin-brand" href="../../"><img src="../../assets/ezkart-logo.svg" alt="Ezkart"></a>
       <p class="eyebrow">Internal order monitor</p>
       <h1><?= $commerceProduction ? 'Production' : 'Sandbox' ?> admin.</h1>
-      <p class="login-intro">Sign in with Google or your approved email address. Supabase verifies your identity; Ezkart keeps your session securely signed in on this device.</p>
+      <p class="login-intro">Sign in with a verified Google account. Store owners can also use their approved email link. Ezkart keeps this device signed in for up to 30 days.</p>
       <?php if ($supabaseSettings['configured']): ?>
-        <button class="oauth-button" id="google-sign-in" type="button" data-supabase-url="<?= ez_admin_escape($supabaseSettings['url']) ?>" data-csrf-token="<?= ez_admin_escape($csrfToken) ?>">
-          <img class="google-mark" src="https://developers.google.com/static/identity/images/g-logo.png" alt=""><span>Continue with Google</span>
-        </button>
+        <form class="oauth-form" id="google-sign-in-form" method="post">
+          <input type="hidden" name="action" value="google_oauth_start">
+          <input type="hidden" name="csrf_token" value="<?= ez_admin_escape($csrfToken) ?>">
+          <button class="oauth-button" id="google-sign-in" type="submit" data-csrf-token="<?= ez_admin_escape($csrfToken) ?>">
+            <img class="google-mark" src="https://developers.google.com/static/identity/images/g-logo.png" alt=""><span>Continue with Google</span>
+          </button>
+        </form>
         <div class="auth-divider"><span>or</span></div>
         <form class="email-auth-form" id="email-sign-in-form">
           <label class="email-auth-label" for="email-sign-in">Email address</label>
@@ -718,7 +959,7 @@ $catalogInventory = [
       <?php else: ?>
         <div class="configuration-note" role="alert">
           <b>Google sign-in needs one server setting.</b>
-          <p>Add <code>supabase_url</code>, <code>supabase_publishable_key</code>, and <code>admin_allowed_emails</code> to the private <code>config.runtime.php</code>.</p>
+          <p>Add <code>supabase_url</code> and <code>supabase_publishable_key</code> to the private <code>config.runtime.php</code>.</p>
         </div>
       <?php endif; ?>
       <?php if ($loginError !== ''): ?><p class="form-error" role="alert"><?= ez_admin_escape($loginError) ?></p><?php endif; ?>
@@ -737,7 +978,7 @@ $catalogInventory = [
       <a class="back-link" href="../">← Kembali ke checkout</a>
     </section>
   </main>
-  <script src="auth.js?v=6"></script>
+  <script src="auth.js?v=7"></script>
 <?php else: ?>
   <svg class="svg-sprite" aria-hidden="true">
     <symbol id="icon-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></symbol>

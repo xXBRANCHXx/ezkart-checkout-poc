@@ -40,7 +40,9 @@ access token, or refresh token in this repository.
 
 - `GET /health` checks D1 and both R2 bindings without exposing credentials.
 - `GET /v1/me` validates a Supabase bearer token, creates or refreshes the
-  corresponding D1 profile record, and returns the safe account profile.
+  corresponding D1 profile, provisions an idempotent personal seller and owner
+  membership when the account has none, and returns only that account's safe
+  profile and seller memberships.
 
 Product, page, order, review, upload, payment, and download routes should be
 added behind the same token validation and seller-membership checks.

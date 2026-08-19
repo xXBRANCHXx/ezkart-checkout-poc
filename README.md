@@ -35,21 +35,28 @@ The order dashboard is available at
 [`/cart/admin/`](https://ezkart.id/cart/admin/). Google OAuth and passwordless
 email-link sign-in are verified by Supabase on the server, then the same access token is sent to the matching
 Cloudflare Worker to create or refresh the safe D1 application profile. Set
-`supabase_url`, `supabase_publishable_key`, and `admin_allowed_emails` in the
-private `config.runtime.php`. The allowlist is required while this legacy
-dashboard still reads a shared sandbox order store. `sandbox_admin_password`
-remains an optional emergency fallback until every admin query is scoped by a
-D1 seller membership. Google sessions use a rolling 30-day HTTP-only cookie
-and a private, environment-specific session directory outside the public web
-root. The Supabase access and refresh tokens remain in that server-side PHP
-session, are rotated automatically, and are never stored in browser-readable
-storage. `admin_session_storage` may override the private directory with an
-absolute server path when required by the host.
+`supabase_url` and `supabase_publishable_key` in the private
+`config.runtime.php`. Test defaults to `admin_auth_mode=open_beta`, allowing
+any verified Google account to enter an isolated beta workspace. The optional
+`admin_allowed_emails` list grants legacy shared-order access and passwordless
+email login only to store owners; it is not a beta-user list.
+`sandbox_admin_password` remains an optional emergency fallback until every
+admin query is scoped by a D1 seller membership. Google sign-in uses a
+server-side PKCE exchange and an
+HTTP-only cookie with an absolute 30-day reauthentication limit. Sessions live
+in a private, environment-specific directory outside the public web root. The
+Supabase access and rotating refresh tokens remain in that server-side PHP
+session and are never stored in browser-readable storage. A temporary provider
+failure preserves the refresh token for a later retry, while logout revokes the
+current Supabase session whenever the provider is reachable.
+`admin_session_storage` may override the private directory with an absolute
+server path when required by the host.
 
-The dashboard reads the private JSON order store and displays order IDs,
+Privileged legacy accounts can read the private JSON order store and display order IDs,
 customers, line items, product subtotal, shipping charge, final total,
 shipping service, Midtrans reference/status, Biteship fulfillment reference,
-and signed-notification result. Its
+and signed-notification result. Other beta accounts receive an empty order view
+and cannot read the shared records. The dashboard's
 “paid volume” is an aggregate of sandbox orders marked `PAID`; it is not a real
 wallet balance or withdrawable settlement amount.
 

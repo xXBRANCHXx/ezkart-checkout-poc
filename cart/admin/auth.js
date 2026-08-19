@@ -2,6 +2,7 @@
   "use strict";
 
   const button = document.getElementById("google-sign-in");
+  const googleForm = document.getElementById("google-sign-in-form");
   const emailForm = document.getElementById("email-sign-in-form");
   const emailInput = document.getElementById("email-sign-in");
   const emailSentPanel = document.getElementById("email-sent-panel");
@@ -109,18 +110,9 @@
     setStatus("Google sign-in did not return a persistent session. Please try again.", true);
   }
 
-  button.addEventListener("click", () => {
-    try {
-      const supabaseUrl = new URL(button.dataset.supabaseUrl || "");
-      const authorize = new URL("/auth/v1/authorize", supabaseUrl);
-      authorize.searchParams.set("provider", "google");
-      authorize.searchParams.set("redirect_to", `${window.location.origin}${window.location.pathname}`);
-      button.disabled = true;
-      setStatus("Opening Google…");
-      window.location.assign(authorize.toString());
-    } catch (_) {
-      setStatus("The Supabase URL on this server is invalid.", true);
-    }
+  googleForm?.addEventListener("submit", () => {
+    button.disabled = true;
+    setStatus("Opening Google…");
   });
 
   const setEmailFormBusy = (busy) => {

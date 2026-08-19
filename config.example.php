@@ -14,9 +14,13 @@ return [
     // key here. Keep the Google client secret in Supabase itself.
     'supabase_url' => 'https://rwxxjqvoidpkuqftgkjd.supabase.co',
     'supabase_publishable_key' => 'REPLACE_WITH_SUPABASE_PUBLISHABLE_OR_ANON_KEY',
-    // Until seller membership controls every admin query, access to the legacy
-    // shared dashboard stays fail-closed behind this explicit email allowlist.
-    'admin_allowed_emails' => 'REPLACE_WITH_YOUR_GOOGLE_ACCOUNT_EMAIL',
+    // Test defaults to open_beta; production defaults to allowlist unless this
+    // is explicitly changed to open after the data-isolation review.
+    'admin_auth_mode' => 'open_beta',
+    // Optional privileged accounts that may read the legacy shared sandbox
+    // order store and use passwordless email. Other verified Google users get
+    // an isolated beta workspace and cannot read those legacy records.
+    'admin_allowed_emails' => 'REPLACE_WITH_OWNER_GOOGLE_ACCOUNT_EMAIL',
     // Optional absolute path outside the public web root. When omitted, Ezkart
     // creates a private, environment-specific sibling of the document root.
     'admin_session_storage' => '',

@@ -34,11 +34,15 @@ rows, R2 objects, Cloudflare bindings, or credentials.
 
 1. In Supabase Auth, enable Google and configure the Google client ID/secret.
 2. Add the Supabase callback URL shown on its Google provider page to Google.
-3. Add `https://test.ezkart.id/**` and `https://ezkart.id/**` to Supabase's
-   allowed redirect URLs. Keep the Google client secret only in Supabase.
-   Add the Supabase URL, publishable/anon key, and an explicit admin email
-   allowlist to each website's private `config.runtime.php`; never use the
-   service-role key. The workbranch admin exchanges the OAuth response for a
+3. Add `https://test.ezkart.id/cart/admin/**` and
+   `https://ezkart.id/cart/admin/**` to Supabase's allowed redirect URLs. The
+   Ezkart callback performs a server-side PKCE code exchange; the Google client
+   secret remains only in Supabase.
+   Add the Supabase URL and publishable/anon key to each website's private
+   `config.runtime.php`; never use the service-role key. Test uses
+   `admin_auth_mode=open_beta`; production must explicitly select `open` after
+   its isolation review. `admin_allowed_emails` is an optional legacy-data
+   privilege list, not a registration list. The workbranch admin exchanges the OAuth response for a
    server-verified PHP session. Supabase access and rotating refresh tokens
    remain only in Ezkart's private server-side session directory; they are
    never stored in browser-readable storage or D1.

@@ -147,7 +147,47 @@ async function currentUser(request, env) {
     now,
   ).run();
   const profile = await env.DB.prepare("SELECT id, auth_user_id, email, display_name, avatar_url, locale, created_at, updated_at FROM app_users WHERE auth_user_id = ?").bind(user.id).first();
-  return profile;
+  let memberships = await env.DB.prepare(`
+    SELECT s.id, s.slug, s.name, s.plan, s.status, sm.role
+    FROM seller_memberships sm
+    JOIN sellers s ON s.id = sm.seller_id
+    WHERE sm.auth_user_id = ? AND s.status = 'active'
+    ORDER BY sm.created_at ASC
+  `).bind(user.id).all();
+
+  if (!Array.isArray(memberships.results) || memberships.results.length === 0) {
+    const displayName = String(metadata.full_name || metadata.name || "").trim();
+    const emailName = String(user.email || "").split("@")[0].trim();
+    const sellerName = (displayName || emailName || "My Ezkart Store").slice(0, 120);
+    const slugBase = sellerName.toLowerCase().normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 40) || "store";
+    const stableSuffix = String(user.id).replace(/[^a-zA-Z0-9]/g, "").slice(0, 10).toLowerCase();
+    const sellerId = `seller_${user.id}`;
+    const sellerSlug = `${slugBase}-${stableSuffix || "account"}`;
+    await env.DB.batch([
+      env.DB.prepare(`
+        INSERT OR IGNORE INTO sellers (id, slug, name, plan, status, settings_json, created_at, updated_at)
+        VALUES (?, ?, ?, 'standard', 'active', '{}', ?, ?)
+      `).bind(sellerId, sellerSlug, sellerName, now, now),
+      env.DB.prepare(`
+        INSERT OR IGNORE INTO seller_memberships (seller_id, auth_user_id, role, created_at)
+        VALUES (?, ?, 'owner', ?)
+      `).bind(sellerId, user.id, now),
+    ]);
+    memberships = await env.DB.prepare(`
+      SELECT s.id, s.slug, s.name, s.plan, s.status, sm.role
+      FROM seller_memberships sm
+      JOIN sellers s ON s.id = sm.seller_id
+      WHERE sm.auth_user_id = ? AND s.status = 'active'
+      ORDER BY sm.created_at ASC
+    `).bind(user.id).all();
+  }
+
+  const sellers = Array.isArray(memberships.results) ? memberships.results : [];
+  return { ...profile, sellers, active_seller: sellers[0] || null };
 }
 
 export default {
