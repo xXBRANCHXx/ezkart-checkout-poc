@@ -201,6 +201,8 @@
     const typeInput = q("[data-product-create-type]");
     const mediaInput = q("[data-product-media-input]");
     const dropzone = q("[data-product-dropzone]");
+    const dropzoneTitle = q("[data-product-drop-title]");
+    const dropzoneHint = q("[data-product-drop-hint]");
     const gallery = q("[data-product-media-gallery]");
     const mediaEmpty = q("[data-product-media-empty]");
     const mediaCount = q("[data-product-media-count]");
@@ -259,6 +261,12 @@
       return variants.find((variant) => variant.options?.every((option) => liveOptionSelection[option.option] === option.value)) || variants[0];
     };
     const imageData = async (item) => item?.data || (item?.file ? compressCreatorProductImage(item.file) : "");
+    const setDropzoneState = (state = "idle") => {
+      if (!dropzone) return;
+      dropzone.classList.toggle("is-dragging", state === "ready"); dropzone.classList.toggle("is-uploading", state === "uploading");
+      if (dropzoneTitle) dropzoneTitle.textContent = state === "ready" ? "Release to upload" : state === "uploading" ? "Preparing your images…" : "Drop images here";
+      if (dropzoneHint) dropzoneHint.textContent = state === "ready" ? "They’re ready—drop them right here" : state === "uploading" ? "Optimizing them for a fast storefront" : "or click to browse your files";
+    };
 
     const previewAvailability = (selectedVariant) => {
       const type = currentType();
@@ -550,6 +558,8 @@
     };
     const addImages = async (files) => {
       clearError(); const incoming = [...files];
+      if (!incoming.length) { setDropzoneState("idle"); return; }
+      setDropzoneState("uploading");
       const valid = incoming.filter((file) => allowedImageTypes.includes(file.type) && file.size <= 2 * 1024 * 1024).slice(0, Math.max(0, 9 - selectedImages.length));
       try {
         const data = await Promise.all(valid.map(compressCreatorProductImage));
@@ -558,6 +568,7 @@
       } catch (error) { showError(error instanceof Error ? error.message : "Those images could not be added."); }
       if (mediaInput) mediaInput.value = "";
       if (valid.length !== incoming.length) showError("Some images were skipped. Use PNG, JPG, WebP, or AVIF files under 2 MB, with no more than 9 images.");
+      setDropzoneState("idle");
     };
 
     const restoreDraft = () => {
@@ -615,9 +626,11 @@
       productCreateForm.querySelectorAll("[data-product-preview-device]").forEach((button) => button.classList.toggle("active", button.dataset.productPreviewDevice === previewDevice));
     }
     mediaInput?.addEventListener("change", () => addImages([...(mediaInput.files || [])]));
-    ["dragenter", "dragover"].forEach((name) => dropzone?.addEventListener(name, (event) => { event.preventDefault(); dropzone.classList.add("is-dragging"); }));
-    ["dragleave", "drop"].forEach((name) => dropzone?.addEventListener(name, (event) => { event.preventDefault(); dropzone.classList.remove("is-dragging"); }));
-    dropzone?.addEventListener("drop", (event) => addImages([...(event.dataTransfer?.files || [])]));
+    let dropzoneDragDepth = 0;
+    dropzone?.addEventListener("dragenter", (event) => { event.preventDefault(); dropzoneDragDepth += 1; setDropzoneState("ready"); });
+    dropzone?.addEventListener("dragover", (event) => { event.preventDefault(); if (event.dataTransfer) event.dataTransfer.dropEffect = "copy"; setDropzoneState("ready"); });
+    dropzone?.addEventListener("dragleave", (event) => { event.preventDefault(); dropzoneDragDepth = Math.max(0, dropzoneDragDepth - 1); if (dropzoneDragDepth === 0) setDropzoneState("idle"); });
+    dropzone?.addEventListener("drop", (event) => { event.preventDefault(); dropzoneDragDepth = 0; addImages([...(event.dataTransfer?.files || [])]); });
     saveDraftButton?.addEventListener("click", () => saveDraft(true));
     productCreateForm.addEventListener("input", () => { updatePreview(); markDraftChanged(); });
     productCreateForm.addEventListener("change", () => { updatePreview(); markDraftChanged(); });

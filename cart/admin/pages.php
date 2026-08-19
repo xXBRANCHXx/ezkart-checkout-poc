@@ -97,8 +97,8 @@ function ez_orders_table(array $rows, string $tableId): void
             <label class="product-upload-dropzone" data-product-dropzone>
               <input name="images" type="file" multiple accept="image/png,image/jpeg,image/webp,image/avif" data-product-media-input>
               <span><?= ez_admin_icon('image') ?></span>
-              <strong>Drop images here</strong>
-              <p>or click to browse your files</p>
+              <strong data-product-drop-title>Drop images here</strong>
+              <p data-product-drop-hint>or click to browse your files</p>
               <small>PNG, JPEG, WebP or AVIF · maximum 2 MB each</small>
             </label>
             <div class="product-media-empty" data-product-media-empty><span><?= ez_admin_icon('layers') ?></span><p>Your uploaded images will appear here.</p></div>
