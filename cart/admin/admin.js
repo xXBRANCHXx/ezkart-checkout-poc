@@ -628,7 +628,25 @@
     const variantPhotoMarkup = (variant) => {
       const currentSource = variant.useCustomImage && variant.customImage?.url ? variant.customImage.url : Number.isInteger(variant.imageIndex) ? selectedImages[variant.imageIndex]?.url : selectedImages[0]?.url;
       const choices = selectedImages.length ? selectedImages.map((image, index) => `<button type="button" data-main-image-index="${index}"><img src="${image.url}" alt=""><span>${index === 0 ? "Main image" : `Image ${index + 1}`}</span></button>`).join("") : '<p>Upload main images first.</p>';
-      return `<div class="product-variant-photo"><div class="product-variant-photo-source"><label class="product-variant-upload"><input type="file" accept="image/png,image/jpeg,image/webp,image/avif" data-variant-photo-input><span>${currentSource ? `<img src="${currentSource}" alt=""><b>${variant.useCustomImage ? "Replace" : "Upload"}</b>` : '<svg class="icon" aria-hidden="true"><use href="#icon-image"></use></svg><b>Upload</b>'}</span></label><details class="product-variant-main-picker"><summary aria-label="Choose a photo from main images"><svg class="icon" aria-hidden="true"><use href="#icon-chevron-down"></use></svg></summary><div>${choices}</div></details></div>${variant.useCustomImage ? '<button type="button" data-variant-photo-clear aria-label="Remove variant upload">×</button>' : ""}</div>`;
+      return `<div class="product-variant-photo"><div class="product-variant-photo-source"><label class="product-variant-upload" data-variant-photo-dropzone aria-label="Upload or drop a variant photo"><input type="file" accept="image/png,image/jpeg,image/webp,image/avif" data-variant-photo-input><span>${currentSource ? `<img src="${currentSource}" alt=""><b>${variant.useCustomImage ? "Replace" : "Upload"}</b>` : '<svg class="icon" aria-hidden="true"><use href="#icon-image"></use></svg><b>Upload</b>'}</span></label><details class="product-variant-main-picker"><summary aria-label="Choose a photo from main images"><svg class="icon" aria-hidden="true"><use href="#icon-chevron-down"></use></svg></summary><div>${choices}</div></details></div>${variant.useCustomImage ? '<button type="button" data-variant-photo-clear aria-label="Remove variant upload">×</button>' : ""}</div>`;
+    };
+    const applyVariantPhoto = async (variant, file, dropTarget) => {
+      if (!file) return;
+      if (!allowedImageTypes.includes(file.type) || file.size > 2 * 1024 * 1024) {
+        showError("Variant photos must be PNG, JPG, WebP, or AVIF and no larger than 2 MB.");
+        return;
+      }
+      dropTarget?.classList.remove("is-drop-ready");
+      dropTarget?.classList.add("is-uploading");
+      try {
+        const data = await compressCreatorProductImage(file);
+        variant.customImage = { data, url: data };
+        variant.useCustomImage = true;
+        clearError(); renderVariants(); markDraftChanged();
+      } catch (error) {
+        dropTarget?.classList.remove("is-uploading");
+        showError(error instanceof Error ? error.message : "That variant image could not be added.");
+      }
     };
     const renderVariants = () => {
       if (variantTable) variantTable.hidden = variants.length === 0;
@@ -646,11 +664,28 @@
         row.querySelector("[data-variant-weight]").addEventListener("input", (event) => { variant.weightGrams = Math.max(0, Math.round(Number(event.target.value) || 0)); markDraftChanged(); });
         row.querySelector("[data-variant-sku]").addEventListener("input", (event) => { variant.sku = event.target.value.trim(); markDraftChanged(); });
         row.querySelectorAll("[data-main-image-index]").forEach((button) => button.addEventListener("click", () => { variant.imageIndex = Number(button.dataset.mainImageIndex); variant.useCustomImage = false; button.closest("details").open = false; renderVariants(); markDraftChanged(); }));
-        row.querySelector("[data-variant-photo-input]").addEventListener("change", async (event) => {
+        const variantPhotoInput = row.querySelector("[data-variant-photo-input]");
+        const variantPhotoDropzone = row.querySelector("[data-variant-photo-dropzone]");
+        variantPhotoInput.addEventListener("change", async (event) => {
           const file = event.target.files?.[0]; event.target.value = ""; if (!file) return;
-          if (!allowedImageTypes.includes(file.type) || file.size > 2 * 1024 * 1024) { showError("Variant photos must be PNG, JPG, WebP, or AVIF and no larger than 2 MB."); return; }
-          try { const data = await compressCreatorProductImage(file); variant.customImage = { data, url: data }; variant.useCustomImage = true; clearError(); renderVariants(); markDraftChanged(); }
-          catch (error) { showError(error instanceof Error ? error.message : "That variant image could not be added."); }
+          await applyVariantPhoto(variant, file, variantPhotoDropzone);
+        });
+        let variantPhotoDragDepth = 0;
+        variantPhotoDropzone.addEventListener("dragenter", (event) => {
+          if (![...(event.dataTransfer?.types || [])].includes("Files")) return;
+          event.preventDefault(); event.stopPropagation(); variantPhotoDragDepth += 1; variantPhotoDropzone.classList.add("is-drop-ready");
+        });
+        variantPhotoDropzone.addEventListener("dragover", (event) => {
+          if (![...(event.dataTransfer?.types || [])].includes("Files")) return;
+          event.preventDefault(); event.stopPropagation(); if (event.dataTransfer) event.dataTransfer.dropEffect = "copy"; variantPhotoDropzone.classList.add("is-drop-ready");
+        });
+        variantPhotoDropzone.addEventListener("dragleave", (event) => {
+          event.preventDefault(); event.stopPropagation(); variantPhotoDragDepth = Math.max(0, variantPhotoDragDepth - 1); if (variantPhotoDragDepth === 0) variantPhotoDropzone.classList.remove("is-drop-ready");
+        });
+        variantPhotoDropzone.addEventListener("drop", (event) => {
+          event.preventDefault(); event.stopPropagation(); variantPhotoDragDepth = 0; variantPhotoDropzone.classList.remove("is-drop-ready");
+          const file = event.dataTransfer?.files?.[0];
+          if (file) void applyVariantPhoto(variant, file, variantPhotoDropzone);
         });
         row.querySelector("[data-variant-photo-clear]")?.addEventListener("click", () => { variant.customImage = null; variant.useCustomImage = false; renderVariants(); markDraftChanged(); });
         row.querySelector("[data-variant-remove]").addEventListener("click", () => { variants.splice(index, 1); selectedVariantIds.delete(variant.id); renderVariants(); markDraftChanged(); });
@@ -1128,6 +1163,22 @@
     const typeName = (type) => ({ physical: "Physical product", digital: "Digital product", subscription: "Subscription" }[type] || "Product");
     const clearError = () => { if (errorTarget) { errorTarget.hidden = true; errorTarget.textContent = ""; } };
     const showError = (message) => { if (errorTarget) { errorTarget.textContent = message; errorTarget.hidden = false; } };
+    const duplicateLocalProduct = (product) => {
+      const copy = structuredClone(product);
+      const suffix = globalThis.crypto?.randomUUID?.().replaceAll("-", "").slice(0, 10) || String(Date.now());
+      const skuSuffix = `COPY-${suffix.toUpperCase()}`;
+      const withSuffix = (value, maximum = 80) => `${String(value || "EZK").slice(0, Math.max(1, maximum - skuSuffix.length - 1))}-${skuSuffix}`;
+      copy.id = `custom-${suffix}`;
+      copy.name = `${String(product.name || "Product").slice(0, 153)} (Copy)`;
+      copy.sku = withSuffix(product.sku);
+      copy.variants = (Array.isArray(product.variants) ? product.variants : []).map((variant) => ({
+        ...variant,
+        id: `variant-${globalThis.crypto?.randomUUID?.().replaceAll("-", "") || `${Date.now()}${Math.random().toString(16).slice(2)}`}`,
+        sku: withSuffix(variant.sku),
+      }));
+      copy.createdAt = new Date().toISOString(); copy.updatedAt = copy.createdAt;
+      return copy;
+    };
     const syncType = () => {
       const type = String(typeInput?.value || "physical");
       form?.querySelectorAll("[data-catalog-physical]").forEach((field) => { field.hidden = type !== "physical"; });
@@ -1181,7 +1232,23 @@
         const availability = type === "physical" ? `${Math.max(0, Number(product.stock) || 0)} in stock` : type === "digital" ? "Digital delivery" : `Every ${product.subscription?.interval || 1} ${product.subscription?.unit || "month"}`;
         const card = document.createElement("article");
         card.className = "product-card"; card.dataset.customProduct = product.id;
-        card.innerHTML = `<span class="product-art"><img src="${image}" alt="${escapeHtml(product.name)}"><em>${product.images?.length || 1} image${(product.images?.length || 1) === 1 ? "" : "s"}</em></span><div class="product-card-body"><header><span class="product-card-type">${escapeHtml(product.category || typeName(type))}</span><em>Active</em></header><h2>${escapeHtml(product.name)}</h2><p>${escapeHtml(product.sku)}</p><div class="product-price"><strong>${escapeHtml(formatCreatorPrice(product.price))}</strong><small>${escapeHtml(availability)}</small></div><footer><div><small>Type</small><b>${escapeHtml(typeName(type))}</b></div><div><small>Revenue</small><b>Rp0</b></div><div class="product-card-actions"><a href="?page=product-new&amp;product=${encodeURIComponent(product.id)}">Edit</a><button class="product-delete" type="button">Delete</button></div></footer></div>`;
+        card.innerHTML = `<span class="product-art"><img src="${image}" alt="${escapeHtml(product.name)}"><em>${product.images?.length || 1} image${(product.images?.length || 1) === 1 ? "" : "s"}</em></span><div class="product-card-body"><header><span class="product-card-type">${escapeHtml(product.category || typeName(type))}</span><em>Active</em></header><h2>${escapeHtml(product.name)}</h2><p>${escapeHtml(product.sku)}</p><div class="product-price"><strong>${escapeHtml(formatCreatorPrice(product.price))}</strong><small>${escapeHtml(availability)}</small></div><footer><div><small>Type</small><b>${escapeHtml(typeName(type))}</b></div><div><small>Revenue</small><b>Rp0</b></div><div class="product-card-actions"><a href="?page=product-new&amp;product=${encodeURIComponent(product.id)}">Edit</a><button class="product-duplicate" type="button">Duplicate</button><button class="product-delete" type="button">Delete</button></div></footer></div>`;
+        card.querySelector(".product-duplicate").addEventListener("click", () => {
+          const duplicateButton = card.querySelector(".product-duplicate");
+          const duplicate = async () => {
+            duplicateButton.disabled = true; duplicateButton.textContent = "Duplicating…";
+            let copy;
+            if (cloudEnabled) {
+              const result = await cloudRequest("POST", `/v1/products/${encodeURIComponent(product.id)}/duplicate`, {});
+              copy = replaceCloudProduct(result.product);
+            } else {
+              copy = duplicateLocalProduct(product);
+              if (!writeCatalogProducts([copy, ...readLocalCatalogProducts()])) throw new Error("The product copy could not be saved.");
+            }
+            renderCatalog(); showToast(`${product.name} duplicated`);
+          };
+          void duplicate().catch((error) => { duplicateButton.disabled = false; duplicateButton.textContent = "Duplicate"; showToast(error instanceof Error ? error.message : "The product could not be duplicated."); });
+        });
         card.querySelector(".product-delete").addEventListener("click", () => {
           if (!window.confirm(`Delete “${product.name}” from the catalog?`)) return;
           const remove = async () => {

@@ -68,7 +68,6 @@ function ez_orders_table(array $rows, string $tableId): void
     <header class="product-editor-header">
       <div>
         <a href="?page=products"><?= ez_admin_icon('chevron-left') ?> Products</a>
-        <p class="page-eyebrow"><?= $editingProduct ? 'Edit catalog product' : 'New catalog product' ?></p>
         <h1><?= $editingProduct ? 'Refine the product customers will see.' : 'Build the product customers will see.' ?></h1>
         <p><?= $editingProduct ? 'Update the details and watch the storefront preview respond as you work.' : 'Add the details once and watch the storefront preview update as you work.' ?></p>
       </div>

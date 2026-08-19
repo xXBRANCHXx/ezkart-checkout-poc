@@ -455,6 +455,103 @@ async function deleteProduct(request, env, productId) {
   ]);
 }
 
+const duplicatedValue = (value, suffix, maximum) => {
+  const ending = `-${suffix}`;
+  const base = String(value || "").trim() || "EZK";
+  return `${base.slice(0, Math.max(1, maximum - ending.length))}${ending}`;
+};
+
+async function duplicateProduct(request, env, productId) {
+  const { seller, authUserId } = await sellerContext(request, env);
+  const sourceId = cleanId(productId, "Product ID");
+  const [product, mediaResult, variantsResult] = await Promise.all([
+    env.DB.prepare("SELECT * FROM products WHERE seller_id = ? AND id = ? AND status != 'archived'").bind(seller.id, sourceId).first(),
+    env.DB.prepare("SELECT * FROM product_media WHERE seller_id = ? AND product_id = ? ORDER BY sort_order").bind(seller.id, sourceId).all(),
+    env.DB.prepare("SELECT * FROM product_variants WHERE seller_id = ? AND product_id = ? ORDER BY sort_order").bind(seller.id, sourceId).all(),
+  ]);
+  if (!product) throw new Response("Product not found", { status: 404 });
+
+  const sourceMedia = Array.isArray(mediaResult.results) ? mediaResult.results : [];
+  const sourceVariants = Array.isArray(variantsResult.results) ? variantsResult.results : [];
+  const sourceUploadIds = [...new Set([
+    ...sourceMedia.map((media) => media.id),
+    ...sourceVariants.map((variant) => variant.image_upload_id),
+  ].filter(Boolean))];
+  const uploads = await ownedUploads(env, seller.id, sourceUploadIds);
+  const mediaCopies = new Map();
+  const copiedR2Keys = [];
+  const now = new Date().toISOString();
+  let persisted = false;
+
+  try {
+    for (const sourceUploadId of sourceUploadIds) {
+      const sourceUpload = uploads.get(sourceUploadId);
+      const sourceObject = await env.PUBLIC_ASSETS.get(sourceUpload.r2_key);
+      if (!sourceObject) throw new Response("A product image file could not be copied", { status: 404 });
+      const mediaId = `media_${crypto.randomUUID().replaceAll("-", "")}`;
+      const extension = imageTypes.get(sourceUpload.mime_type) || "jpg";
+      const r2Key = `sellers/${seller.id}/products/${mediaId}.${extension}`;
+      await env.PUBLIC_ASSETS.put(r2Key, await sourceObject.arrayBuffer(), {
+        httpMetadata: {
+          ...sourceObject.httpMetadata,
+          contentType: sourceUpload.mime_type,
+          cacheControl: "private, max-age=3600",
+        },
+        customMetadata: { sellerId: seller.id, mediaId },
+      });
+      copiedR2Keys.push(r2Key);
+      mediaCopies.set(sourceUploadId, { ...sourceUpload, id: mediaId, r2_key: r2Key });
+    }
+
+    const productIdSuffix = crypto.randomUUID().replaceAll("-", "");
+    const copyId = `custom-${productIdSuffix}`;
+    const skuSuffix = `COPY-${productIdSuffix.slice(0, 8).toUpperCase()}`;
+    const copyTitleSuffix = " (Copy)";
+    const copyTitle = `${String(product.title || "Product").slice(0, 160 - copyTitleSuffix.length)}${copyTitleSuffix}`;
+    const copySku = duplicatedValue(product.sku, skuSuffix, 80);
+    const statements = [
+      env.DB.prepare(`
+        INSERT INTO products (id, seller_id, type, status, title, description, sku, currency, price_amount, stock_quantity, weight_grams, billing_interval, billing_interval_count, digital_filename, metadata_json, created_at, updated_at)
+        VALUES (?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(copyId, seller.id, product.type, copyTitle, product.description, copySku, product.currency, product.price_amount, product.stock_quantity, product.weight_grams, product.billing_interval, product.billing_interval_count, product.digital_filename, product.metadata_json, now, now),
+    ];
+
+    mediaCopies.forEach((copy) => {
+      statements.push(env.DB.prepare(`
+        INSERT INTO media_uploads (id, seller_id, r2_key, mime_type, size_bytes, created_by_auth_user_id, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).bind(copy.id, seller.id, copy.r2_key, copy.mime_type, copy.size_bytes, authUserId, now));
+    });
+    sourceMedia.forEach((media) => {
+      const copy = mediaCopies.get(media.id);
+      statements.push(env.DB.prepare(`
+        INSERT INTO product_media (id, seller_id, product_id, r2_key, mime_type, size_bytes, sort_order, alt_text, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(copy.id, seller.id, copyId, copy.r2_key, copy.mime_type, copy.size_bytes, media.sort_order, media.sort_order === 1 ? copyTitle : `${copyTitle} image ${media.sort_order}`, now));
+    });
+    sourceVariants.forEach((variant, index) => {
+      const variantIdSuffix = crypto.randomUUID().replaceAll("-", "");
+      const imageUploadId = variant.image_upload_id ? mediaCopies.get(variant.image_upload_id)?.id || null : null;
+      statements.push(env.DB.prepare(`
+        INSERT INTO product_variants (id, seller_id, product_id, name, options_json, sku, price_amount, stock_quantity, weight_grams, image_source, image_upload_id, sort_order, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(`variant-${variantIdSuffix}`, seller.id, copyId, variant.name, variant.options_json, duplicatedValue(variant.sku, skuSuffix, 80), variant.price_amount, variant.stock_quantity, variant.weight_grams, variant.image_source, imageUploadId, index + 1, now, now));
+    });
+    statements.push(env.DB.prepare(`
+      INSERT INTO seller_events (id, seller_id, actor_auth_user_id, event_type, entity_type, entity_id, payload_json, created_at)
+      VALUES (?, ?, ?, 'product.duplicated', 'product', ?, ?, ?)
+    `).bind(`event_${crypto.randomUUID()}`, seller.id, authUserId, copyId, JSON.stringify({ source_product_id: sourceId, title: copyTitle }), now));
+
+    await env.DB.batch(statements);
+    persisted = true;
+    const result = await catalog(request, env);
+    return result.products.find((candidate) => candidate.id === copyId);
+  } catch (error) {
+    if (!persisted) await Promise.allSettled(copiedR2Keys.map((key) => env.PUBLIC_ASSETS.delete(key)));
+    throw error;
+  }
+}
+
 async function saveDraft(request, env, draftId) {
   const { seller, authUserId } = await sellerContext(request, env);
   const id = cleanId(draftId, "Draft ID");
@@ -501,6 +598,8 @@ export default {
       if (request.method === "POST" && url.pathname === "/v1/media") return json({ ok: true, media: await uploadMedia(request, env) }, 201, cors);
       const mediaMatch = /^\/v1\/media\/([a-zA-Z0-9_-]+)$/.exec(url.pathname);
       if (request.method === "GET" && mediaMatch) return await serveMedia(request, env, cleanId(mediaMatch[1], "Image ID"));
+      const productDuplicateMatch = /^\/v1\/products\/([a-zA-Z0-9_-]+)\/duplicate$/.exec(url.pathname);
+      if (request.method === "POST" && productDuplicateMatch) return json({ ok: true, product: await duplicateProduct(request, env, productDuplicateMatch[1]) }, 201, cors);
       const productMatch = /^\/v1\/products\/([a-zA-Z0-9_-]+)$/.exec(url.pathname);
       if (["PUT", "POST"].includes(request.method) && productMatch) return json({ ok: true, product: await saveProduct(request, env, productMatch[1]) }, 200, cors);
       if (request.method === "DELETE" && productMatch) { await deleteProduct(request, env, productMatch[1]); return json({ ok: true }, 200, cors); }
