@@ -190,6 +190,305 @@ async function currentUser(request, env) {
   return { ...profile, sellers, active_seller: sellers[0] || null };
 }
 
+const parseJson = (value, fallback) => {
+  try { return JSON.parse(String(value || "")); } catch (_) { return fallback; }
+};
+
+const cleanText = (value, maximum = 160) => String(value || "").trim().slice(0, maximum);
+const cleanId = (value, label = "ID") => {
+  const id = String(value || "").trim();
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{2,95}$/.test(id)) throw new Response(`${label} is invalid`, { status: 400 });
+  return id;
+};
+
+async function requestJson(request, maximumBytes = 350000) {
+  const contentLength = Number(request.headers.get("content-length") || 0);
+  if (contentLength > maximumBytes) throw new Response("Request body is too large", { status: 413 });
+  let body;
+  try { body = await request.json(); } catch (_) { throw new Response("Request body must be valid JSON", { status: 400 }); }
+  if (!body || typeof body !== "object" || Array.isArray(body)) throw new Response("Request body must be an object", { status: 400 });
+  return body;
+}
+
+async function sellerContext(request, env) {
+  const profile = await currentUser(request, env);
+  if (!profile.active_seller?.id) throw new Response("No active seller is available", { status: 403 });
+  return { profile, seller: profile.active_seller, authUserId: profile.auth_user_id };
+}
+
+const mediaPath = (id) => `/v1/media/${encodeURIComponent(id)}`;
+
+function shapeProduct(row, media = [], variants = []) {
+  const metadata = parseJson(row.metadata_json, {});
+  return {
+    id: row.id,
+    sku: row.sku || "",
+    name: row.title,
+    category: cleanText(metadata.category, 80),
+    description: row.description || "",
+    type: row.type,
+    status: row.status,
+    price: Number(row.price_amount || 0),
+    stock: row.stock_quantity === null ? null : Number(row.stock_quantity),
+    weightGrams: row.weight_grams === null ? null : Number(row.weight_grams),
+    digitalFileName: row.digital_filename || "",
+    subscription: row.type === "subscription" ? {
+      interval: Number(row.billing_interval_count || 1),
+      unit: row.billing_interval || "month",
+    } : null,
+    options: Array.isArray(metadata.options) ? metadata.options : [],
+    media: media.map((item) => ({
+      id: item.id,
+      path: mediaPath(item.id),
+      mimeType: item.mime_type,
+      sortOrder: Number(item.sort_order),
+      alt: item.alt_text || "",
+    })),
+    variants: variants.map((variant) => ({
+      id: variant.id,
+      name: variant.name,
+      options: parseJson(variant.options_json, []),
+      sku: variant.sku,
+      price: Number(variant.price_amount || 0),
+      stock: variant.stock_quantity === null ? 0 : Number(variant.stock_quantity),
+      weightGrams: variant.weight_grams === null ? null : Number(variant.weight_grams),
+      imageSource: variant.image_source || "main",
+      imageUploadId: variant.image_upload_id || null,
+      imagePath: variant.image_upload_id ? mediaPath(variant.image_upload_id) : null,
+    })),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+async function catalog(request, env) {
+  const { seller } = await sellerContext(request, env);
+  const [productsResult, mediaResult, variantsResult, draftsResult] = await env.DB.batch([
+    env.DB.prepare("SELECT * FROM products WHERE seller_id = ? AND status != 'archived' ORDER BY updated_at DESC").bind(seller.id),
+    env.DB.prepare(`
+      SELECT pm.id, pm.product_id, pm.mime_type, pm.sort_order, pm.alt_text
+      FROM product_media pm
+      WHERE pm.seller_id = ?
+      ORDER BY pm.product_id, pm.sort_order
+    `).bind(seller.id),
+    env.DB.prepare("SELECT * FROM product_variants WHERE seller_id = ? ORDER BY product_id, sort_order").bind(seller.id),
+    env.DB.prepare("SELECT id, product_id, title, snapshot_json, created_at, updated_at FROM product_drafts WHERE seller_id = ? ORDER BY updated_at DESC").bind(seller.id),
+  ]);
+  const media = Array.isArray(mediaResult.results) ? mediaResult.results : [];
+  const variants = Array.isArray(variantsResult.results) ? variantsResult.results : [];
+  const products = (Array.isArray(productsResult.results) ? productsResult.results : []).map((row) => shapeProduct(
+    row,
+    media.filter((item) => item.product_id === row.id),
+    variants.filter((item) => item.product_id === row.id),
+  ));
+  const drafts = (Array.isArray(draftsResult.results) ? draftsResult.results : []).map((row) => ({
+    ...parseJson(row.snapshot_json, {}),
+    id: row.id,
+    productId: row.product_id || null,
+    name: row.title || "",
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }));
+  return { products, drafts };
+}
+
+const imageTypes = new Map([
+  ["image/jpeg", "jpg"], ["image/png", "png"], ["image/webp", "webp"], ["image/avif", "avif"],
+]);
+
+function decodeImageDataUrl(value) {
+  const match = /^data:(image\/(?:jpeg|png|webp|avif));base64,([a-zA-Z0-9+/=\s]+)$/.exec(String(value || ""));
+  if (!match || !imageTypes.has(match[1])) throw new Response("Image must be a JPEG, PNG, WebP, or AVIF data URL", { status: 400 });
+  const encoded = match[2].replace(/\s/g, "");
+  if (encoded.length > 2800000) throw new Response("Image is larger than 2 MB", { status: 413 });
+  let bytes;
+  try {
+    const decoded = atob(encoded);
+    bytes = Uint8Array.from(decoded, (character) => character.charCodeAt(0));
+  } catch (_) { throw new Response("Image encoding is invalid", { status: 400 }); }
+  if (bytes.byteLength < 1 || bytes.byteLength > 2097152) throw new Response("Image must be between 1 byte and 2 MB", { status: 413 });
+  return { bytes, mimeType: match[1], extension: imageTypes.get(match[1]) };
+}
+
+async function uploadMedia(request, env) {
+  const { seller, authUserId } = await sellerContext(request, env);
+  const payload = await requestJson(request, 2900000);
+  const image = decodeImageDataUrl(payload.dataUrl);
+  const id = `media_${crypto.randomUUID().replaceAll("-", "")}`;
+  const r2Key = `sellers/${seller.id}/products/${id}.${image.extension}`;
+  const now = new Date().toISOString();
+  await env.PUBLIC_ASSETS.put(r2Key, image.bytes, {
+    httpMetadata: { contentType: image.mimeType, cacheControl: "private, max-age=3600" },
+    customMetadata: { sellerId: seller.id, mediaId: id },
+  });
+  try {
+    await env.DB.prepare(`
+      INSERT INTO media_uploads (id, seller_id, r2_key, mime_type, size_bytes, created_by_auth_user_id, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).bind(id, seller.id, r2Key, image.mimeType, image.bytes.byteLength, authUserId, now).run();
+  } catch (error) {
+    await env.PUBLIC_ASSETS.delete(r2Key);
+    throw error;
+  }
+  return { id, path: mediaPath(id), mimeType: image.mimeType, sizeBytes: image.bytes.byteLength };
+}
+
+async function serveMedia(request, env, mediaId) {
+  const { seller } = await sellerContext(request, env);
+  const media = await env.DB.prepare("SELECT r2_key, mime_type FROM media_uploads WHERE seller_id = ? AND id = ?").bind(seller.id, mediaId).first();
+  if (!media) throw new Response("Image not found", { status: 404 });
+  const object = await env.PUBLIC_ASSETS.get(media.r2_key);
+  if (!object) throw new Response("Image file not found", { status: 404 });
+  const headers = new Headers({
+    "content-type": media.mime_type,
+    "cache-control": "private, max-age=3600",
+    "x-content-type-options": "nosniff",
+  });
+  if (object.httpEtag) headers.set("etag", object.httpEtag);
+  return new Response(object.body, { status: 200, headers });
+}
+
+async function ownedUploads(env, sellerId, ids) {
+  const unique = [...new Set(ids.filter(Boolean))];
+  if (!unique.length) return new Map();
+  const results = await env.DB.batch(unique.map((id) => env.DB.prepare(
+    "SELECT id, r2_key, mime_type, size_bytes FROM media_uploads WHERE seller_id = ? AND id = ?",
+  ).bind(sellerId, id)));
+  const rows = results.map((result) => result.results?.[0]).filter(Boolean);
+  if (rows.length !== unique.length) throw new Response("One or more images do not belong to this seller", { status: 400 });
+  return new Map(rows.map((row) => [row.id, row]));
+}
+
+function normalizedOptions(value) {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 3).map((group) => ({
+    name: cleanText(group?.name, 20),
+    values: Array.isArray(group?.values) ? group.values.slice(0, 50).map((item) => cleanText(item, 60)).filter(Boolean) : [],
+  })).filter((group) => group.name && group.values.length);
+}
+
+async function saveProduct(request, env, rawId) {
+  const { seller, authUserId } = await sellerContext(request, env);
+  const payload = await requestJson(request, 500000);
+  const id = cleanId(rawId || payload.id, "Product ID");
+  const existing = await env.DB.prepare("SELECT seller_id, created_at FROM products WHERE id = ?").bind(id).first();
+  if (existing && existing.seller_id !== seller.id) throw new Response("Product not found", { status: 404 });
+  const type = ["physical", "digital", "subscription"].includes(payload.type) ? payload.type : "physical";
+  const title = cleanText(payload.name, 160);
+  if (title.length < 2) throw new Response("Product name must contain at least 2 characters", { status: 400 });
+  const description = cleanText(payload.description, 10000);
+  const sku = cleanText(payload.sku, 80) || `EZK-${id.slice(-12).toUpperCase()}`;
+  const options = normalizedOptions(payload.options);
+  const imageIds = Array.isArray(payload.imageUploadIds) ? payload.imageUploadIds.slice(0, 9).map((item) => cleanId(item, "Image ID")) : [];
+  const minimumImages = type === "physical" ? 3 : 1;
+  if (imageIds.length < minimumImages || imageIds.length > 9) throw new Response(`This product requires ${minimumImages}–9 images`, { status: 400 });
+  const rawVariants = Array.isArray(payload.variants) ? payload.variants.slice(0, 100) : [];
+  const variants = rawVariants.map((variant, index) => ({
+    id: cleanId(variant.id || `variant-${crypto.randomUUID()}`, "Variant ID"),
+    name: cleanText(variant.name, 120) || `Variant ${index + 1}`,
+    options: Array.isArray(variant.options) ? variant.options.slice(0, 3).map((option) => ({ option: cleanText(option?.option, 20), value: cleanText(option?.value, 60) })) : [],
+    sku: cleanText(variant.sku, 80),
+    price: Math.max(0, Math.round(Number(variant.price) || 0)),
+    stock: Math.max(0, Math.round(Number(variant.stock) || 0)),
+    weightGrams: Math.max(0, Math.round(Number(variant.weightGrams) || 0)),
+    imageSource: /^gallery-[1-9]$/.test(String(variant.imageSource || "")) ? String(variant.imageSource) : variant.imageUploadId ? "variant-upload" : "main",
+    imageUploadId: variant.imageUploadId ? cleanId(variant.imageUploadId, "Variant image ID") : null,
+  }));
+  if (variants.some((variant) => !variant.sku || variant.price < 1000 || (type === "physical" && variant.weightGrams < 1))) {
+    throw new Response("Every variant needs a valid price, SKU, and shipping weight", { status: 400 });
+  }
+  if (new Set(variants.map((variant) => variant.sku.toLowerCase())).size !== variants.length) throw new Response("Variant SKUs must be unique", { status: 400 });
+  const uploadMap = await ownedUploads(env, seller.id, [...imageIds, ...variants.map((variant) => variant.imageUploadId)]);
+  const basePrice = variants.length ? Math.min(...variants.map((variant) => variant.price)) : Math.max(0, Math.round(Number(payload.price) || 0));
+  const stock = type === "physical" ? (variants.length ? variants.reduce((sum, variant) => sum + variant.stock, 0) : Math.max(0, Math.round(Number(payload.stock) || 0))) : null;
+  const weight = type === "physical" ? (variants.length ? Math.max(...variants.map((variant) => variant.weightGrams)) : Math.max(1, Math.round(Number(payload.weightGrams) || 0))) : null;
+  const billingUnit = type === "subscription" && ["day", "week", "month"].includes(payload.subscription?.unit) ? payload.subscription.unit : null;
+  const billingInterval = type === "subscription" ? Math.max(1, Math.min(12, Math.round(Number(payload.subscription?.interval) || 1))) : null;
+  const digitalFilename = type === "digital" ? cleanText(payload.digitalFileName, 180) : null;
+  const now = new Date().toISOString();
+  const createdAt = existing?.created_at || now;
+  const statements = [
+    env.DB.prepare(`
+      INSERT INTO products (id, seller_id, type, status, title, description, sku, currency, price_amount, stock_quantity, weight_grams, billing_interval, billing_interval_count, digital_filename, metadata_json, created_at, updated_at)
+      VALUES (?, ?, ?, 'active', ?, ?, ?, 'IDR', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET type = excluded.type, status = 'active', title = excluded.title,
+        description = excluded.description, sku = excluded.sku, price_amount = excluded.price_amount,
+        stock_quantity = excluded.stock_quantity, weight_grams = excluded.weight_grams,
+        billing_interval = excluded.billing_interval, billing_interval_count = excluded.billing_interval_count,
+        digital_filename = excluded.digital_filename, metadata_json = excluded.metadata_json, updated_at = excluded.updated_at
+    `).bind(id, seller.id, type, title, description, sku, basePrice, stock, weight, billingUnit, billingInterval, digitalFilename, JSON.stringify({ category: cleanText(payload.category, 80), options }), createdAt, now),
+    env.DB.prepare("DELETE FROM product_variants WHERE seller_id = ? AND product_id = ?").bind(seller.id, id),
+    env.DB.prepare("DELETE FROM product_media WHERE seller_id = ? AND product_id = ?").bind(seller.id, id),
+  ];
+  imageIds.forEach((mediaId, index) => {
+    const media = uploadMap.get(mediaId);
+    statements.push(env.DB.prepare(`
+      INSERT INTO product_media (id, seller_id, product_id, r2_key, mime_type, size_bytes, sort_order, alt_text, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(mediaId, seller.id, id, media.r2_key, media.mime_type, media.size_bytes, index + 1, index === 0 ? title : `${title} image ${index + 1}`, now));
+  });
+  variants.forEach((variant, index) => statements.push(env.DB.prepare(`
+    INSERT INTO product_variants (id, seller_id, product_id, name, options_json, sku, price_amount, stock_quantity, weight_grams, image_source, image_upload_id, sort_order, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).bind(variant.id, seller.id, id, variant.name, JSON.stringify(variant.options), variant.sku, variant.price, type === "physical" ? variant.stock : null, type === "physical" ? variant.weightGrams : null, variant.imageSource, variant.imageUploadId, index + 1, now, now)));
+  statements.push(env.DB.prepare(`
+    INSERT INTO seller_events (id, seller_id, actor_auth_user_id, event_type, entity_type, entity_id, payload_json, created_at)
+    VALUES (?, ?, ?, ?, 'product', ?, ?, ?)
+  `).bind(`event_${crypto.randomUUID()}`, seller.id, authUserId, existing ? "product.updated" : "product.created", id, JSON.stringify({ title, variants: variants.length, images: imageIds.length }), now));
+  await env.DB.batch(statements);
+  const result = await catalog(request, env);
+  return result.products.find((product) => product.id === id);
+}
+
+async function deleteProduct(request, env, productId) {
+  const { seller, authUserId } = await sellerContext(request, env);
+  const id = cleanId(productId, "Product ID");
+  const existing = await env.DB.prepare("SELECT id FROM products WHERE seller_id = ? AND id = ?").bind(seller.id, id).first();
+  if (!existing) throw new Response("Product not found", { status: 404 });
+  const now = new Date().toISOString();
+  await env.DB.batch([
+    env.DB.prepare("DELETE FROM products WHERE seller_id = ? AND id = ?").bind(seller.id, id),
+    env.DB.prepare(`
+      INSERT INTO seller_events (id, seller_id, actor_auth_user_id, event_type, entity_type, entity_id, payload_json, created_at)
+      VALUES (?, ?, ?, 'product.deleted', 'product', ?, '{}', ?)
+    `).bind(`event_${crypto.randomUUID()}`, seller.id, authUserId, id, now),
+  ]);
+}
+
+async function saveDraft(request, env, draftId) {
+  const { seller, authUserId } = await sellerContext(request, env);
+  const id = cleanId(draftId, "Draft ID");
+  const payload = await requestJson(request, 500000);
+  const existing = await env.DB.prepare("SELECT seller_id, created_at FROM product_drafts WHERE id = ?").bind(id).first();
+  if (existing && existing.seller_id !== seller.id) throw new Response("Draft not found", { status: 404 });
+  const productId = payload.productId ? cleanId(payload.productId, "Product ID") : null;
+  if (productId) {
+    const product = await env.DB.prepare("SELECT id FROM products WHERE seller_id = ? AND id = ?").bind(seller.id, productId).first();
+    if (!product) throw new Response("Draft product not found", { status: 400 });
+  }
+  const snapshot = payload.snapshot && typeof payload.snapshot === "object" && !Array.isArray(payload.snapshot) ? payload.snapshot : {};
+  const serialized = JSON.stringify(snapshot);
+  if (serialized.length > 400000) throw new Response("Draft is too large", { status: 413 });
+  const referencedMedia = [
+    ...(Array.isArray(snapshot.images) ? snapshot.images.map((item) => item?.cloudId) : []),
+    ...(Array.isArray(snapshot.variants) ? snapshot.variants.map((item) => item?.customImage?.cloudId) : []),
+  ].filter(Boolean).map((mediaId) => cleanId(mediaId, "Draft image ID"));
+  await ownedUploads(env, seller.id, referencedMedia);
+  const now = new Date().toISOString();
+  await env.DB.prepare(`
+    INSERT INTO product_drafts (id, seller_id, product_id, title, snapshot_json, created_by_auth_user_id, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET product_id = excluded.product_id, title = excluded.title,
+      snapshot_json = excluded.snapshot_json, updated_at = excluded.updated_at
+  `).bind(id, seller.id, productId, cleanText(payload.title, 160), serialized, authUserId, existing?.created_at || now, now).run();
+  return { id, updatedAt: now };
+}
+
+async function deleteDraft(request, env, draftId) {
+  const { seller } = await sellerContext(request, env);
+  await env.DB.prepare("DELETE FROM product_drafts WHERE seller_id = ? AND id = ?").bind(seller.id, cleanId(draftId, "Draft ID")).run();
+}
+
 export default {
   async fetch(request, env) {
     const cors = corsHeaders(request, env);
@@ -198,6 +497,16 @@ export default {
     try {
       if (request.method === "GET" && url.pathname === "/health") return json(await health(env), 200, cors);
       if (request.method === "GET" && url.pathname === "/v1/me") return json({ ok: true, user: await currentUser(request, env) }, 200, cors);
+      if (request.method === "GET" && url.pathname === "/v1/catalog") return json({ ok: true, ...(await catalog(request, env)) }, 200, cors);
+      if (request.method === "POST" && url.pathname === "/v1/media") return json({ ok: true, media: await uploadMedia(request, env) }, 201, cors);
+      const mediaMatch = /^\/v1\/media\/([a-zA-Z0-9_-]+)$/.exec(url.pathname);
+      if (request.method === "GET" && mediaMatch) return await serveMedia(request, env, cleanId(mediaMatch[1], "Image ID"));
+      const productMatch = /^\/v1\/products\/([a-zA-Z0-9_-]+)$/.exec(url.pathname);
+      if (["PUT", "POST"].includes(request.method) && productMatch) return json({ ok: true, product: await saveProduct(request, env, productMatch[1]) }, 200, cors);
+      if (request.method === "DELETE" && productMatch) { await deleteProduct(request, env, productMatch[1]); return json({ ok: true }, 200, cors); }
+      const draftMatch = /^\/v1\/drafts\/([a-zA-Z0-9_-]+)$/.exec(url.pathname);
+      if (["PUT", "POST"].includes(request.method) && draftMatch) return json({ ok: true, draft: await saveDraft(request, env, draftMatch[1]) }, 200, cors);
+      if (request.method === "DELETE" && draftMatch) { await deleteDraft(request, env, draftMatch[1]); return json({ ok: true }, 200, cors); }
       return json({ ok: false, error: "Not found" }, 404, cors);
     } catch (error) {
       if (error instanceof Response) return json({ ok: false, error: await error.text() }, error.status, cors);

@@ -82,7 +82,7 @@ function ez_database_status(): array
         && ($checks['d1'] ?? false) === true
         && ($checks['public_r2'] ?? false) === true
         && ($checks['private_r2'] ?? false) === true
-        && (int) ($payload['table_count'] ?? 0) >= 16;
+        && (int) ($payload['table_count'] ?? 0) >= 19;
 
     return [
         'configured' => true,

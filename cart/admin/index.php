@@ -513,6 +513,58 @@ function ez_admin_sync_cloudflare_user(string $accessToken): array
     }
 }
 
+function ez_admin_proxy_cloud_request(string $accessToken, string $path, string $method): never
+{
+    $allowedPath = preg_match('#^/v1/(?:catalog|media(?:/[a-zA-Z0-9_-]+)?|products/[a-zA-Z0-9_-]+|drafts/[a-zA-Z0-9_-]+)$#', $path) === 1;
+    if (!$allowedPath || str_contains($path, '?') || str_contains($path, '#')) {
+        ez_admin_json(['ok' => false, 'error' => 'Cloud data path is not allowed.'], 400);
+    }
+    if (!in_array($method, ['GET', 'POST', 'PUT', 'DELETE'], true)) {
+        ez_admin_json(['ok' => false, 'error' => 'Method not allowed.'], 405);
+    }
+    $apiUrl = rtrim(ez_config('cloudflare_api_url'), '/');
+    if (filter_var($apiUrl, FILTER_VALIDATE_URL) === false || !function_exists('curl_init')) {
+        ez_admin_json(['ok' => false, 'error' => 'Cloud product storage is unavailable.'], 503);
+    }
+    $contentLength = max(0, (int) ($_SERVER['CONTENT_LENGTH'] ?? 0));
+    if ($contentLength > 3_200_000) {
+        ez_admin_json(['ok' => false, 'error' => 'Upload is larger than the 2 MB image limit.'], 413);
+    }
+    $body = in_array($method, ['POST', 'PUT'], true) ? file_get_contents('php://input') : '';
+    if (!is_string($body) || strlen($body) > 3_200_000) {
+        ez_admin_json(['ok' => false, 'error' => 'Cloud request body is too large.'], 413);
+    }
+
+    $handle = curl_init($apiUrl . $path);
+    if ($handle === false) ez_admin_json(['ok' => false, 'error' => 'Cloud request could not start.'], 503);
+    $headers = ['Accept: application/json', 'Authorization: Bearer ' . $accessToken];
+    if ($body !== '') $headers[] = 'Content-Type: application/json';
+    curl_setopt_array($handle, [
+        CURLOPT_CUSTOMREQUEST => $method,
+        CURLOPT_HTTPHEADER => $headers,
+        CURLOPT_POSTFIELDS => $body !== '' ? $body : null,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_CONNECTTIMEOUT => 8,
+        CURLOPT_TIMEOUT => 40,
+        CURLOPT_SSL_VERIFYPEER => true,
+        CURLOPT_FOLLOWLOCATION => false,
+    ]);
+    $responseBody = curl_exec($handle);
+    $status = (int) curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
+    $contentType = trim((string) curl_getinfo($handle, CURLINFO_CONTENT_TYPE));
+    $error = curl_error($handle);
+    if (!is_string($responseBody)) {
+        ez_admin_log_auth_error('Cloud data proxy failed', new RuntimeException($error !== '' ? $error : 'Empty Worker response.'));
+        ez_admin_json(['ok' => false, 'error' => 'Cloud product storage could not be reached.'], 503);
+    }
+    http_response_code($status > 0 ? $status : 502);
+    header('Content-Type: ' . ($contentType !== '' ? $contentType : 'application/json; charset=utf-8'));
+    header('Cache-Control: ' . (str_starts_with($contentType, 'image/') ? 'private, max-age=3600' : 'private, no-store'));
+    header('X-Content-Type-Options: nosniff');
+    echo $responseBody;
+    exit;
+}
+
 $csrfToken = $_SESSION['csrf_token'] ?? null;
 if (!is_string($csrfToken) || strlen($csrfToken) < 32) {
     $csrfToken = bin2hex(random_bytes(24));
@@ -580,7 +632,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'GET' && (string) ($_GET['auth_callba
     }
 }
 
-if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && !isset($_GET['cloud'])) {
     $submittedToken = (string) ($_POST['csrf_token'] ?? '');
     if (!hash_equals($csrfToken, $submittedToken)) {
         http_response_code(400);
@@ -746,6 +798,24 @@ $legacyDataAccess = $authenticated && (
 );
 if ($authenticated) {
     $_SESSION['last_activity_at'] = time();
+}
+$cloudPath = trim((string) ($_GET['cloud'] ?? ''));
+if ($cloudPath !== '') {
+    if (!$authenticated || $authenticationMethod !== 'supabase') {
+        ez_admin_json(['ok' => false, 'error' => 'Sign in with Google to use cloud product storage.'], 401);
+    }
+    $cloudMethod = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
+    if (in_array($cloudMethod, ['POST', 'PUT', 'DELETE'], true)) {
+        $cloudCsrf = (string) ($_SERVER['HTTP_X_EZKART_CSRF'] ?? '');
+        if (!hash_equals($csrfToken, $cloudCsrf)) {
+            ez_admin_json(['ok' => false, 'error' => 'The cloud save request expired. Reload and try again.'], 403);
+        }
+    }
+    ez_admin_proxy_cloud_request(
+        (string) ($_SESSION['supabase_access_token'] ?? ''),
+        $cloudPath,
+        $cloudMethod,
+    );
 }
 $adminUser = is_array($_SESSION['admin_user'] ?? null) ? $_SESSION['admin_user'] : [];
 $profileSync = is_array($_SESSION['cloudflare_profile_sync'] ?? null)
@@ -919,7 +989,7 @@ $catalogInventory = $legacyDataAccess ? [
   <link rel="stylesheet" href="admin.css?v=65">
   <title><?= $authenticated ? ez_admin_escape($pageTitles[$page]) : 'Admin Login' ?> · Ezkart</title>
 </head>
-<body class="<?= $authenticated ? 'dashboard-page page-' . ez_admin_escape($page) . ($page === 'sites' ? ($siteEditor ? ' page-site-editor' : ' page-sites-library') : '') : 'login-page' ?>" data-admin-storage-scope="<?= ez_admin_escape($adminStorageScope) ?>" data-admin-migrate-legacy-storage="<?= $legacyDataAccess ? 'true' : 'false' ?>">
+<body class="<?= $authenticated ? 'dashboard-page page-' . ez_admin_escape($page) . ($page === 'sites' ? ($siteEditor ? ' page-site-editor' : ' page-sites-library') : '') : 'login-page' ?>" data-admin-storage-scope="<?= ez_admin_escape($adminStorageScope) ?>" data-admin-migrate-legacy-storage="<?= $legacyDataAccess ? 'true' : 'false' ?>" data-admin-cloud-enabled="<?= $authenticated && $authenticationMethod === 'supabase' ? 'true' : 'false' ?>" data-admin-csrf-token="<?= ez_admin_escape($csrfToken) ?>">
 <?php if (!$authenticated): ?>
   <main class="login-shell">
     <section class="login-card">
@@ -1169,7 +1239,7 @@ $catalogInventory = $legacyDataAccess ? [
   </div>
   <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
   <script src="assets/vendor/leaflet.js"></script>
-  <script src="admin.js?v=39"></script>
+  <script src="admin.js?v=40"></script>
 <?php endif; ?>
 </body>
 </html>

@@ -1,4 +1,4 @@
-(() => {
+(async () => {
   "use strict";
 
   const normalize = (value) => String(value || "").trim().toLocaleLowerCase("id-ID");
@@ -128,6 +128,67 @@
     });
   });
 
+  const cloudEnabled = document.body.dataset.adminCloudEnabled === "true";
+  const cloudCsrfToken = document.body.dataset.adminCsrfToken || "";
+  const cloudUrl = (path) => `./?cloud=${encodeURIComponent(path)}`;
+  const cloudMediaUrl = (id) => cloudUrl(`/v1/media/${encodeURIComponent(id)}`);
+  const cloudRequest = async (method, path, payload = null) => {
+    if (!cloudEnabled) throw new Error("Sign in with Google to use cloud product storage.");
+    const response = await fetch(cloudUrl(path), {
+      method,
+      credentials: "same-origin",
+      headers: {
+        Accept: "application/json",
+        ...(payload ? { "Content-Type": "application/json" } : {}),
+        ...(method === "GET" ? {} : { "X-Ezkart-Csrf": cloudCsrfToken }),
+      },
+      body: payload ? JSON.stringify(payload) : null,
+      cache: "no-store",
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || result.ok !== true) throw new Error(String(result.error || `Cloud storage returned ${response.status}.`));
+    return result;
+  };
+  const normalizeCloudProduct = (product) => {
+    const media = Array.isArray(product?.media) ? product.media : [];
+    const images = media.map((item) => cloudMediaUrl(item.id));
+    return {
+      ...product,
+      mediaIds: media.map((item) => item.id),
+      images,
+      image: images[0] || "",
+      variants: (Array.isArray(product?.variants) ? product.variants : []).map((variant) => ({
+        ...variant,
+        image: variant.imageUploadId ? cloudMediaUrl(variant.imageUploadId) : null,
+      })),
+    };
+  };
+  const normalizeCloudDraft = (draft) => ({
+    ...draft,
+    images: (Array.isArray(draft?.images) ? draft.images : []).map((item) => ({
+      ...item,
+      data: item.cloudId ? cloudMediaUrl(item.cloudId) : item.data || "",
+    })),
+    variants: (Array.isArray(draft?.variants) ? draft.variants : []).map((variant) => ({
+      ...variant,
+      customImage: variant.customImage?.cloudId
+        ? { ...variant.customImage, data: cloudMediaUrl(variant.customImage.cloudId) }
+        : variant.customImage || null,
+    })),
+  });
+  let cloudCatalogProducts = [];
+  let cloudProductDrafts = [];
+  let cloudLoadError = "";
+  if (cloudEnabled) {
+    try {
+      const catalog = await cloudRequest("GET", "/v1/catalog");
+      cloudCatalogProducts = (Array.isArray(catalog.products) ? catalog.products : []).map(normalizeCloudProduct);
+      cloudProductDrafts = (Array.isArray(catalog.drafts) ? catalog.drafts : []).map(normalizeCloudDraft);
+    } catch (error) {
+      cloudLoadError = error instanceof Error ? error.message : "Cloud product storage could not be loaded.";
+    }
+  }
+
   const storageScope = document.body.dataset.adminStorageScope || "anonymous";
   const mayMigrateLegacyStorage = document.body.dataset.adminMigrateLegacyStorage === "true";
   const scopedStorageKey = (key) => `${key}:${storageScope}`;
@@ -155,26 +216,125 @@
   migrateLegacyStorage(legacyProductCatalogKey, productCatalogKey);
   migrateLegacyStorage(legacyProductDraftsKey, productDraftsKey);
   migrateLegacyStorage(legacyActiveProductDraftKey, activeProductDraftKey, sessionStorage);
-  const readCatalogProducts = () => {
+  const readLocalCatalogProducts = () => {
     try {
       const value = JSON.parse(localStorage.getItem(productCatalogKey) || "[]");
       return Array.isArray(value) ? value.filter((product) => product && /^custom-[a-z0-9]+$/i.test(product.id || "") && typeof product.name === "string") : [];
     } catch (_) { return []; }
   };
+  const readCatalogProducts = () => {
+    const products = [...cloudCatalogProducts];
+    readLocalCatalogProducts().forEach((product) => { if (!products.some((item) => item.id === product.id)) products.push(product); });
+    return products;
+  };
   const writeCatalogProducts = (products) => {
     try { localStorage.setItem(productCatalogKey, JSON.stringify(products)); return true; }
     catch (_) { showToast("These images exceed this browser's catalog storage. Use fewer or simpler images."); return false; }
   };
-  const readProductDrafts = () => {
+  const readLocalProductDrafts = () => {
     try {
       const value = JSON.parse(localStorage.getItem(productDraftsKey) || "[]");
       return Array.isArray(value) ? value.filter((draft) => draft && typeof draft.id === "string") : [];
     } catch (_) { return []; }
   };
+  const readProductDrafts = () => {
+    const drafts = [...cloudProductDrafts];
+    readLocalProductDrafts().forEach((draft) => { if (!drafts.some((item) => item.id === draft.id)) drafts.push(draft); });
+    return drafts;
+  };
   const writeProductDrafts = (drafts) => {
     try { localStorage.setItem(productDraftsKey, JSON.stringify(drafts)); return true; }
     catch (_) { showToast("Draft storage is full. Remove unused drafts or reduce the number of images."); return false; }
   };
+  const uploadCloudImage = async (dataUrl) => {
+    const result = await cloudRequest("POST", "/v1/media", { dataUrl });
+    return result.media;
+  };
+  const replaceCloudProduct = (product) => {
+    const normalized = normalizeCloudProduct(product);
+    const index = cloudCatalogProducts.findIndex((item) => item.id === normalized.id);
+    if (index >= 0) cloudCatalogProducts[index] = normalized; else cloudCatalogProducts.unshift(normalized);
+    return normalized;
+  };
+  const removeLocalProduct = (productId) => writeCatalogProducts(readLocalCatalogProducts().filter((item) => item.id !== productId));
+  const removeLocalDraft = (draftId) => writeProductDrafts(readLocalProductDrafts().filter((item) => item.id !== draftId));
+  const cloudProductPayload = async (product) => {
+    const imageValues = Array.isArray(product.images) ? product.images : [];
+    const imageUploadIds = [];
+    for (let index = 0; index < imageValues.length; index += 1) {
+      const existingId = product.mediaIds?.[index];
+      if (existingId) { imageUploadIds.push(existingId); continue; }
+      const source = typeof imageValues[index] === "string" ? imageValues[index] : imageValues[index]?.data;
+      if (!String(source || "").startsWith("data:image/")) throw new Error("A product image is not ready for cloud upload.");
+      imageUploadIds.push((await uploadCloudImage(source)).id);
+    }
+    const variants = [];
+    for (const variant of Array.isArray(product.variants) ? product.variants : []) {
+      let imageUploadId = variant.imageUploadId || null;
+      if (!imageUploadId && variant.imageSource === "variant-upload" && String(variant.image || "").startsWith("data:image/")) {
+        imageUploadId = (await uploadCloudImage(variant.image)).id;
+      }
+      variants.push({ ...variant, imageUploadId });
+    }
+    return { ...product, imageUploadIds, variants };
+  };
+  const saveCloudProduct = async (product) => {
+    const payload = await cloudProductPayload(product);
+    const result = await cloudRequest("PUT", `/v1/products/${encodeURIComponent(product.id)}`, payload);
+    const saved = replaceCloudProduct(result.product);
+    removeLocalProduct(product.id);
+    document.dispatchEvent(new CustomEvent("ezkart:cloud-catalog-changed", { detail: { product: saved } }));
+    return saved;
+  };
+  const cloudifyDraftSnapshot = async (snapshot) => {
+    const next = structuredClone(snapshot);
+    next.images = [];
+    for (const image of Array.isArray(snapshot.images) ? snapshot.images : []) {
+      let cloudId = image.cloudId || null;
+      if (!cloudId && String(image.data || "").startsWith("data:image/")) cloudId = (await uploadCloudImage(image.data)).id;
+      if (!cloudId) throw new Error("A draft image is not ready for cloud upload.");
+      next.images.push({ id: image.id, cloudId });
+    }
+    next.variants = [];
+    for (const variant of Array.isArray(snapshot.variants) ? snapshot.variants : []) {
+      let customImage = variant.customImage || null;
+      if (customImage) {
+        let cloudId = customImage.cloudId || null;
+        if (!cloudId && String(customImage.data || "").startsWith("data:image/")) cloudId = (await uploadCloudImage(customImage.data)).id;
+        if (!cloudId) throw new Error("A variant draft image is not ready for cloud upload.");
+        customImage = { cloudId };
+      }
+      next.variants.push({ ...variant, customImage });
+    }
+    return next;
+  };
+  const saveCloudDraft = async (snapshot) => {
+    const cloudSnapshot = await cloudifyDraftSnapshot(snapshot);
+    const result = await cloudRequest("PUT", `/v1/drafts/${encodeURIComponent(snapshot.id)}`, {
+      productId: snapshot.productId || null,
+      title: snapshot.name || "",
+      snapshot: cloudSnapshot,
+    });
+    const normalized = normalizeCloudDraft({ ...cloudSnapshot, ...result.draft, name: snapshot.name || "" });
+    const index = cloudProductDrafts.findIndex((item) => item.id === snapshot.id);
+    if (index >= 0) cloudProductDrafts[index] = normalized; else cloudProductDrafts.unshift(normalized);
+    removeLocalDraft(snapshot.id);
+    document.dispatchEvent(new CustomEvent("ezkart:cloud-drafts-changed"));
+    return normalized;
+  };
+  const migrateLegacyCloudData = async () => {
+    if (!cloudEnabled || cloudLoadError) return;
+    for (const product of readLocalCatalogProducts()) {
+      if (cloudCatalogProducts.some((item) => item.id === product.id)) { removeLocalProduct(product.id); continue; }
+      try { await saveCloudProduct(product); } catch (_) { /* Keep the local copy until a later successful retry. */ }
+    }
+    for (const draft of readLocalProductDrafts()) {
+      if (cloudProductDrafts.some((item) => item.id === draft.id)) { removeLocalDraft(draft.id); continue; }
+      try { await saveCloudDraft(draft); } catch (_) { /* Keep the local copy until a later successful retry. */ }
+    }
+  };
+  if (cloudLoadError) showToast(`Cloud storage unavailable: ${cloudLoadError}`);
+  else window.setTimeout(() => { void migrateLegacyCloudData(); }, 600);
   const hydrateCreatorCatalog = (form) => {
     const fieldset = form?.querySelector("[data-creator-products]");
     if (!fieldset) return;
@@ -375,7 +535,7 @@
     };
     const draftSnapshot = () => ({
       id: draftId,
-      productId: editingProduct?.id || null,
+      productId: editingProduct && cloudCatalogProducts.some((product) => product.id === editingProduct.id) ? editingProduct.id : null,
       name: String(productCreateForm.elements.name?.value || "").trim(),
       updatedAt: new Date().toISOString(),
       fields: {
@@ -383,21 +543,46 @@
         price: String(productCreateForm.elements.price?.value || ""), stock: String(productCreateForm.elements.stock?.value || ""), weight: String(productCreateForm.elements.weight?.value || ""),
         digital_name: String(productCreateForm.elements.digital_name?.value || ""), interval: String(productCreateForm.elements.interval?.value || "1"), unit: String(productCreateForm.elements.unit?.value || "month"),
       },
-      images: selectedImages.map((item) => ({ id: item.id, data: item.data || item.url })),
+      images: selectedImages.map((item) => ({ id: item.id, cloudId: item.cloudId || null, data: item.cloudId ? undefined : item.data || item.url })),
       hasVariants: Boolean(variantToggle?.checked), options: optionSnapshot(),
-      variants: variants.map((variant) => ({ ...variant, customImage: variant.customImage ? { data: variant.customImage.data || variant.customImage.url } : null })),
+      variants: variants.map((variant) => ({ ...variant, customImage: variant.customImage ? { cloudId: variant.customImage.cloudId || null, data: variant.customImage.cloudId ? undefined : variant.customImage.data || variant.customImage.url } : null })),
       previewDevice,
     });
+    const ensureEditorMediaCloud = async () => {
+      if (!cloudEnabled) return;
+      for (const image of selectedImages) {
+        if (image.cloudId) continue;
+        const source = image.data || image.url;
+        if (!String(source || "").startsWith("data:image/")) throw new Error("A product image could not be prepared for cloud storage.");
+        image.cloudId = (await uploadCloudImage(source)).id;
+      }
+      for (const variant of variants) {
+        if (!variant.useCustomImage || !variant.customImage || variant.customImage.cloudId) continue;
+        const source = variant.customImage.data || variant.customImage.url;
+        if (!String(source || "").startsWith("data:image/")) throw new Error("A variant image could not be prepared for cloud storage.");
+        variant.customImage.cloudId = (await uploadCloudImage(source)).id;
+      }
+    };
+    let draftSavePromise = Promise.resolve();
     const saveDraft = (announce = true) => {
       window.clearTimeout(draftTimer);
-      const drafts = readProductDrafts();
-      const snapshot = draftSnapshot();
-      const index = drafts.findIndex((draft) => draft.id === draftId);
-      if (index >= 0) drafts[index] = snapshot; else drafts.push(snapshot);
-      if (!writeProductDrafts(drafts)) return false;
-      if (draftStatus) { draftStatus.classList.remove("is-saving"); draftStatus.innerHTML = "<i></i> Saved just now"; }
-      if (announce) showToast("Product draft saved");
-      return true;
+      draftSavePromise = draftSavePromise.then(async () => {
+        await ensureEditorMediaCloud();
+        const snapshot = draftSnapshot();
+        if (cloudEnabled) await saveCloudDraft(snapshot);
+        else {
+          const drafts = readLocalProductDrafts();
+          const index = drafts.findIndex((draft) => draft.id === draftId);
+          if (index >= 0) drafts[index] = snapshot; else drafts.push(snapshot);
+          if (!writeProductDrafts(drafts)) throw new Error("Draft storage is full.");
+        }
+        if (draftStatus) { draftStatus.classList.remove("is-saving"); draftStatus.innerHTML = "<i></i> Saved to cloud"; }
+        if (announce) showToast(cloudEnabled ? "Product draft saved to cloud" : "Product draft saved");
+      }).catch((error) => {
+        if (draftStatus) { draftStatus.classList.remove("is-saving"); draftStatus.innerHTML = "<i></i> Cloud save needs attention"; }
+        showError(error instanceof Error ? error.message : "The draft could not be saved to cloud.");
+      });
+      return draftSavePromise;
     };
 
     const addOptionGroup = (name = "", values = "") => {
@@ -606,7 +791,7 @@
         price: String(product.price || ""), stock: String(product.stock ?? ""), weight: String(product.weightGrams ?? ""),
         digital_name: product.digitalFileName || "", interval: String(product.subscription?.interval || 1), unit: product.subscription?.unit || "month",
       },
-      images: (product.images || []).map((data, index) => ({ id: `saved-${index + 1}`, data })),
+      images: (product.images || []).map((data, index) => ({ id: `saved-${index + 1}`, cloudId: product.mediaIds?.[index] || null, data })),
       hasVariants: Array.isArray(product.variants) && product.variants.length > 0,
       options: Array.isArray(product.options) ? product.options : [],
       variants: (product.variants || []).map((variant) => {
@@ -616,7 +801,7 @@
           ...variant,
           imageIndex: galleryMatch ? Math.max(0, Number(galleryMatch[1]) - 1) : Number.isInteger(variant.imageIndex) ? variant.imageIndex : 0,
           useCustomImage,
-          customImage: useCustomImage && variant.image ? { data: variant.image } : null,
+          customImage: useCustomImage && variant.image ? { cloudId: variant.imageUploadId || null, data: variant.image } : null,
         };
       }),
       previewDevice: "desktop",
@@ -624,10 +809,10 @@
     const restoreSnapshot = (snapshot, label) => {
       productCreateForm.elements.name.value = snapshot.name || "";
       Object.entries(snapshot.fields || {}).forEach(([name, value]) => { if (productCreateForm.elements[name]) productCreateForm.elements[name].value = value; });
-      selectedImages = (snapshot.images || []).filter((item) => item.data).map((item) => ({ id: item.id || `image-${Date.now()}-${Math.random()}`, data: item.data, url: item.data }));
+      selectedImages = (snapshot.images || []).filter((item) => item.data).map((item) => ({ id: item.id || `image-${Date.now()}-${Math.random()}`, cloudId: item.cloudId || null, data: item.data, url: item.data }));
       variantToggle.checked = Boolean(snapshot.hasVariants);
       optionGroups?.replaceChildren(); (snapshot.options || []).forEach((group) => addOptionGroup(group.name, (group.values || []).join(", ")));
-      variants = (snapshot.variants || []).map((variant) => ({ ...variant, weightGrams: variant.weightGrams || 500, customImage: variant.customImage?.data ? { data: variant.customImage.data, url: variant.customImage.data } : null }));
+      variants = (snapshot.variants || []).map((variant) => ({ ...variant, weightGrams: variant.weightGrams || 500, customImage: variant.customImage?.data ? { cloudId: variant.customImage.cloudId || null, data: variant.customImage.data, url: variant.customImage.data } : null }));
       previewDevice = snapshot.previewDevice === "mobile" ? "mobile" : "desktop";
       if (draftStatus) draftStatus.innerHTML = `<i></i> ${label}`;
     };
@@ -693,7 +878,7 @@
     dropzone?.addEventListener("dragover", (event) => { event.preventDefault(); if (event.dataTransfer) event.dataTransfer.dropEffect = "copy"; setDropzoneState("ready"); });
     dropzone?.addEventListener("dragleave", (event) => { event.preventDefault(); dropzoneDragDepth = Math.max(0, dropzoneDragDepth - 1); if (dropzoneDragDepth === 0) setDropzoneState("idle"); });
     dropzone?.addEventListener("drop", (event) => { event.preventDefault(); dropzoneDragDepth = 0; addImages([...(event.dataTransfer?.files || [])]); });
-    saveDraftButton?.addEventListener("click", () => saveDraft(true));
+    saveDraftButton?.addEventListener("click", () => { void saveDraft(true); });
     productCreateForm.addEventListener("input", () => { updatePreview(); markDraftChanged(); });
     productCreateForm.addEventListener("change", () => { updatePreview(); markDraftChanged(); });
     typeInput?.addEventListener("change", syncType);
@@ -707,21 +892,29 @@
       const interval = Math.max(1, Math.round(Number(productCreateForm.elements.interval?.value) || 1));
       submitButtons.forEach((button) => { button.disabled = true; button.dataset.originalText = button.textContent; button.textContent = editingProduct ? "Saving changes…" : "Creating product…"; });
       try {
+        await ensureEditorMediaCloud();
         const images = await Promise.all(selectedImages.map(imageData));
         const suffix = globalThis.crypto?.randomUUID?.().replace(/-/g, "").slice(0, 10) || String(Date.now());
         const product = {
           id: editingProduct?.id || `custom-${suffix}`, sku: editingProduct?.sku || `EZK-${type.slice(0, 3).toUpperCase()}-${suffix.toUpperCase()}`, name: String(productCreateForm.elements.name.value).trim(), category: String(productCreateForm.elements.category.value).trim(), description: String(productCreateForm.elements.description.value).trim(), type,
-          price: variantToggle.checked ? Math.min(...variants.map((variant) => variant.price)) : Math.round(Number(productCreateForm.elements.price.value) || 0), images, image: images[0],
+          price: variantToggle.checked ? Math.min(...variants.map((variant) => variant.price)) : Math.round(Number(productCreateForm.elements.price.value) || 0), images, mediaIds: selectedImages.map((image) => image.cloudId), image: images[0],
           ...(type === "physical" ? { stock: variantToggle.checked ? variants.reduce((total, variant) => total + variant.stock, 0) : Math.max(0, Math.round(Number(productCreateForm.elements.stock.value) || 0)), weightGrams: variantToggle.checked ? Math.max(...variants.map((variant) => variant.weightGrams)) : Math.max(1, Math.round(Number(productCreateForm.elements.weight.value) || 0)) } : {}),
           ...(type === "digital" ? { digitalFileName: String(productCreateForm.elements.digital_name.value || "").trim() } : {}),
           ...(type === "subscription" ? { subscription: { interval, unit: String(productCreateForm.elements.unit.value || "month") } } : {}),
-          ...(variantToggle.checked ? { options: optionSnapshot(), variants: variants.map(({ customImage, useCustomImage, ...variant }) => ({ ...variant, image: useCustomImage && customImage?.data ? customImage.data : Number.isInteger(variant.imageIndex) ? images[variant.imageIndex] || images[0] : images[0], imageSource: useCustomImage && customImage?.data ? "variant-upload" : Number.isInteger(variant.imageIndex) ? `gallery-${variant.imageIndex + 1}` : "main" })) } : {}), createdAt: editingProduct?.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString(),
+          ...(variantToggle.checked ? { options: optionSnapshot(), variants: variants.map(({ customImage, useCustomImage, ...variant }) => ({ ...variant, imageUploadId: useCustomImage ? customImage?.cloudId || null : null, image: useCustomImage && customImage?.data ? customImage.data : Number.isInteger(variant.imageIndex) ? images[variant.imageIndex] || images[0] : images[0], imageSource: useCustomImage && customImage?.data ? "variant-upload" : Number.isInteger(variant.imageIndex) ? `gallery-${variant.imageIndex + 1}` : "main" })) } : {}), createdAt: editingProduct?.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString(),
         };
-        const products = readCatalogProducts();
-        const productIndex = products.findIndex((item) => item.id === product.id);
-        if (productIndex >= 0) products[productIndex] = product; else products.push(product);
-        if (!writeCatalogProducts(products)) return;
-        writeProductDrafts(readProductDrafts().filter((draft) => draft.id !== draftId)); sessionStorage.removeItem(activeProductDraftKey);
+        if (cloudEnabled) await saveCloudProduct(product);
+        else {
+          const products = readLocalCatalogProducts();
+          const productIndex = products.findIndex((item) => item.id === product.id);
+          if (productIndex >= 0) products[productIndex] = product; else products.push(product);
+          if (!writeCatalogProducts(products)) return;
+        }
+        if (cloudEnabled) {
+          await cloudRequest("DELETE", `/v1/drafts/${encodeURIComponent(draftId)}`).catch(() => {});
+          cloudProductDrafts = cloudProductDrafts.filter((draft) => draft.id !== draftId);
+        }
+        removeLocalDraft(draftId); sessionStorage.removeItem(activeProductDraftKey);
         window.opener?.postMessage({ type: editingProduct ? "ezkart:catalog-product-updated" : "ezkart:catalog-product-created", productId: product.id }, window.location.origin); window.location.href = `?page=products&${editingProduct ? "updated" : "created"}=1`;
       } catch (error) { showError(error instanceof Error ? error.message : "The product could not be created."); }
       finally { submitButtons.forEach((button) => { button.disabled = false; button.textContent = button.dataset.originalText || (editingProduct ? "Save changes" : "Create product"); }); }
@@ -961,9 +1154,14 @@
         card.innerHTML = `<span>${image ? `<img src="${image}" alt="">` : '<svg class="icon" aria-hidden="true"><use href="#icon-image"></use></svg>'}</span><div><b>${escapeHtml(draft.name || "Untitled product")}</b><small>${draft.hasVariants ? `${draft.variants?.length || 0} variants` : typeName(draft.fields?.type || "physical")} · ${escapeHtml(when)}</small></div><div><a href="?${continueQuery.toString().replaceAll("&", "&amp;")}">Continue</a><button type="button" aria-label="Delete ${escapeHtml(draft.name || "untitled product")} draft">×</button></div>`;
         card.querySelector("button").addEventListener("click", () => {
           if (!window.confirm(`Delete the “${draft.name || "Untitled product"}” draft?`)) return;
-          writeProductDrafts(readProductDrafts().filter((item) => item.id !== draft.id));
-          if (sessionStorage.getItem(activeProductDraftKey) === draft.id) sessionStorage.removeItem(activeProductDraftKey);
-          renderDrafts(); showToast("Product draft deleted");
+          const remove = async () => {
+            if (cloudEnabled && cloudProductDrafts.some((item) => item.id === draft.id)) await cloudRequest("DELETE", `/v1/drafts/${encodeURIComponent(draft.id)}`);
+            cloudProductDrafts = cloudProductDrafts.filter((item) => item.id !== draft.id);
+            removeLocalDraft(draft.id);
+            if (sessionStorage.getItem(activeProductDraftKey) === draft.id) sessionStorage.removeItem(activeProductDraftKey);
+            renderDrafts(); showToast("Product draft deleted");
+          };
+          void remove().catch((error) => showError(error instanceof Error ? error.message : "The draft could not be deleted."));
         });
         draftList.append(card);
       });
@@ -982,8 +1180,13 @@
         card.innerHTML = `<span class="product-art"><img src="${image}" alt="${escapeHtml(product.name)}"><em>${product.images?.length || 1} image${(product.images?.length || 1) === 1 ? "" : "s"}</em></span><div class="product-card-body"><header><span class="product-card-type">${escapeHtml(product.category || typeName(type))}</span><em>Active</em></header><h2>${escapeHtml(product.name)}</h2><p>${escapeHtml(product.sku)}</p><div class="product-price"><strong>${escapeHtml(formatCreatorPrice(product.price))}</strong><small>${escapeHtml(availability)}</small></div><footer><div><small>Type</small><b>${escapeHtml(typeName(type))}</b></div><div><small>Revenue</small><b>Rp0</b></div><div class="product-card-actions"><a href="?page=product-new&amp;product=${encodeURIComponent(product.id)}">Edit</a><button class="product-delete" type="button">Delete</button></div></footer></div>`;
         card.querySelector(".product-delete").addEventListener("click", () => {
           if (!window.confirm(`Delete “${product.name}” from the catalog?`)) return;
-          const next = readCatalogProducts().filter((item) => item.id !== product.id);
-          if (writeCatalogProducts(next)) { renderCatalog(); showToast(`${product.name} deleted`); }
+          const remove = async () => {
+            if (cloudEnabled && cloudCatalogProducts.some((item) => item.id === product.id)) await cloudRequest("DELETE", `/v1/products/${encodeURIComponent(product.id)}`);
+            cloudCatalogProducts = cloudCatalogProducts.filter((item) => item.id !== product.id);
+            removeLocalProduct(product.id);
+            renderCatalog(); showToast(`${product.name} deleted`);
+          };
+          void remove().catch((error) => showError(error instanceof Error ? error.message : "The product could not be deleted."));
         });
         productCatalogPage.append(card);
         if (inventory) {
@@ -1036,12 +1239,17 @@
           ...(type === "subscription" ? { subscription: { interval, unit: String(values.get("unit") || "month") } } : {}),
           createdAt: new Date().toISOString(),
         };
-        const products = readCatalogProducts(); products.push(product);
-        if (!writeCatalogProducts(products)) return;
+        if (cloudEnabled) await saveCloudProduct(product);
+        else {
+          const products = readLocalCatalogProducts(); products.push(product);
+          if (!writeCatalogProducts(products)) return;
+        }
         renderCatalog(); dialog.close("created"); form.reset(); syncType(); showToast(`${product.name} added to Products and Landing Pages`);
       } catch (error) { showError(error instanceof Error ? error.message : "The product could not be created."); }
       finally { submit.disabled = false; submit.textContent = "Create product"; }
     });
+    document.addEventListener("ezkart:cloud-catalog-changed", renderCatalog);
+    document.addEventListener("ezkart:cloud-drafts-changed", renderDrafts);
     syncType(); renderCatalog();
   }
 

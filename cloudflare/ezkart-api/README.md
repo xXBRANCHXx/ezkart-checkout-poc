@@ -43,6 +43,14 @@ access token, or refresh token in this repository.
   corresponding D1 profile, provisions an idempotent personal seller and owner
   membership when the account has none, and returns only that account's safe
   profile and seller memberships.
+- `GET /v1/catalog` returns only the active seller's products and drafts.
+- `POST /v1/media` validates and stores a seller-scoped product image in R2.
+- `GET /v1/media/:id` streams an image only after authenticating its seller.
+- `PUT|DELETE /v1/products/:id` stores or removes a seller-scoped product,
+  gallery, and variant set in D1.
+- `PUT|DELETE /v1/drafts/:id` stores or removes a seller-scoped editor draft.
 
-Product, page, order, review, upload, payment, and download routes should be
-added behind the same token validation and seller-membership checks.
+The Hostinger admin proxies these calls with its server-side Supabase session,
+so access and refresh tokens are never placed in page markup or browser storage.
+Page, order, review, payment, and download routes still need to move behind the
+same token validation and seller-membership checks.
