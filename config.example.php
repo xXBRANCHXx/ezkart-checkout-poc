@@ -17,6 +17,9 @@ return [
     // Until seller membership controls every admin query, access to the legacy
     // shared dashboard stays fail-closed behind this explicit email allowlist.
     'admin_allowed_emails' => 'REPLACE_WITH_YOUR_GOOGLE_ACCOUNT_EMAIL',
+    // Optional absolute path outside the public web root. When omitted, Ezkart
+    // creates a private, environment-specific sibling of the document root.
+    'admin_session_storage' => '',
     'midtrans_merchant_id' => 'REPLACE_WITH_SANDBOX_MERCHANT_ID',
     'midtrans_client_key' => 'REPLACE_WITH_SANDBOX_CLIENT_KEY',
     'midtrans_server_key' => 'REPLACE_WITH_SANDBOX_SERVER_KEY',

@@ -39,9 +39,12 @@ Cloudflare Worker to create or refresh the safe D1 application profile. Set
 private `config.runtime.php`. The allowlist is required while this legacy
 dashboard still reads a shared sandbox order store. `sandbox_admin_password`
 remains an optional emergency fallback until every admin query is scoped by a
-D1 seller membership. Google sessions use a rolling 30-day HTTP-only cookie;
-the Supabase access and refresh tokens remain in the server-side PHP session,
-are rotated automatically, and are never stored in browser-readable storage.
+D1 seller membership. Google sessions use a rolling 30-day HTTP-only cookie
+and a private, environment-specific session directory outside the public web
+root. The Supabase access and refresh tokens remain in that server-side PHP
+session, are rotated automatically, and are never stored in browser-readable
+storage. `admin_session_storage` may override the private directory with an
+absolute server path when required by the host.
 
 The dashboard reads the private JSON order store and displays order IDs,
 customers, line items, product subtotal, shipping charge, final total,

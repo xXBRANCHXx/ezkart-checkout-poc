@@ -10,11 +10,40 @@ header("Content-Security-Policy: default-src 'self'; img-src 'self' data: blob: 
 
 const EZ_ADMIN_SESSION_LIFETIME = 60 * 60 * 24 * 30;
 
+$deployment = strtolower(ez_config('deployment_environment'));
+$sessionEnvironment = in_array($deployment, ['test', 'production'], true) ? $deployment : 'local';
+$configuredSessionDirectory = ez_config('admin_session_storage');
+$documentRoot = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/');
+$sessionDirectory = $configuredSessionDirectory !== ''
+    ? $configuredSessionDirectory
+    : (($documentRoot !== '' ? dirname($documentRoot) : sys_get_temp_dir())
+        . '/ezkart-admin-sessions-' . $sessionEnvironment);
+if (
+    str_contains($sessionDirectory, "\0")
+    || !str_starts_with($sessionDirectory, DIRECTORY_SEPARATOR)
+    || (!is_dir($sessionDirectory) && !@mkdir($sessionDirectory, 0700, true) && !is_dir($sessionDirectory))
+) {
+    error_log('Ezkart admin session storage could not be initialized.');
+    http_response_code(503);
+    exit('Ezkart sign-in is temporarily unavailable.');
+}
+$resolvedSessionDirectory = realpath($sessionDirectory);
+if ($resolvedSessionDirectory === false || !is_writable($resolvedSessionDirectory)) {
+    error_log('Ezkart admin session storage is not writable.');
+    http_response_code(503);
+    exit('Ezkart sign-in is temporarily unavailable.');
+}
+@chmod($resolvedSessionDirectory, 0700);
+
 $forwardedProtocol = strtolower(trim(explode(',', (string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? ''))[0]));
 $isHttps = (isset($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off')
     || $forwardedProtocol === 'https';
 ini_set('session.use_strict_mode', '1');
+ini_set('session.use_only_cookies', '1');
 ini_set('session.gc_maxlifetime', (string) EZ_ADMIN_SESSION_LIFETIME);
+ini_set('session.gc_probability', '1');
+ini_set('session.gc_divisor', '100');
+session_save_path($resolvedSessionDirectory);
 session_name('ezkart_admin');
 session_set_cookie_params([
     'lifetime' => EZ_ADMIN_SESSION_LIFETIME,

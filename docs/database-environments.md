@@ -38,9 +38,10 @@ rows, R2 objects, Cloudflare bindings, or credentials.
    allowed redirect URLs. Keep the Google client secret only in Supabase.
    Add the Supabase URL, publishable/anon key, and an explicit admin email
    allowlist to each website's private `config.runtime.php`; never use the
-   service-role key. The workbranch admin exchanges the OAuth fragment for a
-   short-lived, server-verified PHP session and does not persist the Supabase
-   access or refresh token.
+   service-role key. The workbranch admin exchanges the OAuth response for a
+   server-verified PHP session. Supabase access and rotating refresh tokens
+   remain only in Ezkart's private server-side session directory; they are
+   never stored in browser-readable storage or D1.
 4. Keep the existing `ezkart_main_user_database` D1 database as production and
    create `ezkart_test_database` for test.
 5. Create four private R2 buckets: `ezkart-test-public`,
