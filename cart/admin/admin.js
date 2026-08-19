@@ -227,6 +227,7 @@
     const selectedCount = q("[data-variant-selected-count]");
     const selectAllVariants = q("[data-select-all-variants]");
     const previewViewport = q("[data-product-preview-viewport]");
+    const previewCard = previewViewport?.querySelector(".product-live-card");
     const draftStatus = document.querySelector("[data-product-draft-status]");
     const saveDraftButton = document.querySelector("[data-save-product-draft]");
     const submitButtons = document.querySelectorAll('[form="product-create-form"], #product-create-form button[type="submit"]');
@@ -621,10 +622,19 @@
       };
       liveImageStage.addEventListener("pointerup", finishSwipe); liveImageStage.addEventListener("pointercancel", finishSwipe); liveImageStage.addEventListener("dragstart", (event) => event.preventDefault());
     }
+    const syncDesktopPreviewScale = () => {
+      if (!previewViewport || !previewCard) return;
+      if (previewDevice !== "desktop") { previewCard.style.removeProperty("--desktop-preview-scale"); return; }
+      const viewportStyle = getComputedStyle(previewViewport);
+      const availableWidth = previewViewport.clientWidth - parseFloat(viewportStyle.paddingLeft) - parseFloat(viewportStyle.paddingRight);
+      previewCard.style.setProperty("--desktop-preview-scale", String(Math.min(1, Math.max(.3, availableWidth / 1000))));
+    };
     function syncPreviewDevice() {
       previewViewport?.classList.toggle("preview-mobile", previewDevice === "mobile"); previewViewport?.classList.toggle("preview-desktop", previewDevice === "desktop");
       productCreateForm.querySelectorAll("[data-product-preview-device]").forEach((button) => button.classList.toggle("active", button.dataset.productPreviewDevice === previewDevice));
+      requestAnimationFrame(syncDesktopPreviewScale);
     }
+    window.addEventListener("resize", syncDesktopPreviewScale);
     mediaInput?.addEventListener("change", () => addImages([...(mediaInput.files || [])]));
     let dropzoneDragDepth = 0;
     dropzone?.addEventListener("dragenter", (event) => { event.preventDefault(); dropzoneDragDepth += 1; setDropzoneState("ready"); });
