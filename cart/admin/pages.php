@@ -152,7 +152,7 @@ function ez_orders_table(array $rows, string $tableId): void
         <div class="product-preview-viewport preview-desktop" data-product-preview-viewport>
           <article class="product-live-card">
             <div class="product-live-commerce">
-              <div class="product-live-media"><div class="product-live-image-stage" data-product-live-image-stage><div class="product-live-image" data-product-live-image><span><?= ez_admin_icon('image') ?><small>Your square main image</small></span></div><button type="button" data-product-image-prev aria-label="Previous product image"><?= ez_admin_icon('chevron-left') ?></button><button type="button" data-product-image-next aria-label="Next product image"><?= ez_admin_icon('chevron-right') ?></button></div><div class="product-live-thumbs" data-product-live-thumbs hidden></div></div>
+              <div class="product-live-media"><div class="product-live-image-stage" data-product-live-image-stage><div class="product-live-image" data-product-live-image><span><?= ez_admin_icon('image') ?><small>Your square main image</small></span></div><button type="button" data-product-image-prev aria-label="Previous product image"><?= ez_admin_icon('chevron-left') ?></button><button type="button" data-product-image-next aria-label="Next product image"><?= ez_admin_icon('chevron-right') ?></button><span class="product-live-rating product-live-rating-desktop" aria-label="Rating 5.0 out of 5"><?= ez_admin_icon('star') ?><b>5.0</b></span></div><div class="product-live-thumbs" data-product-live-thumbs hidden></div></div>
               <div class="product-live-copy">
                 <div class="product-live-heading">
                   <h2 data-product-live-name>Your product name</h2>
