@@ -411,6 +411,9 @@
     const categoryResults = q("[data-product-category-results]");
     const categorySuggestions = q("[data-product-category-suggestions]");
     const categoryConfirm = q("[data-product-category-confirm]");
+    const productTypePicker = q("[data-product-type-picker]");
+    const productTypeTrigger = q("[data-product-type-trigger]");
+    const productTypeMenu = q("[data-product-type-menu]");
     const mediaInput = q("[data-product-media-input]");
     const dropzone = q("[data-product-dropzone]");
     const dropzoneTitle = q("[data-product-drop-title]");
@@ -468,6 +471,21 @@
 
     const currentType = () => String(typeInput?.value || "physical");
     const typeName = (type) => ({ physical: "Physical product", digital: "Digital product", subscription: "Subscription" }[type] || "Product");
+    const productTypeMeta = {
+      physical: { label: "Physical product", description: "Stock, weight, and delivery", icon: "box" },
+      digital: { label: "Digital product", description: "Protected file delivery", icon: "download" },
+      subscription: { label: "Subscription", description: "Recurring plans and billing", icon: "calendar" },
+    };
+    const setProductTypeMenu = (open) => {
+      if (!productTypeMenu || !productTypeTrigger) return;
+      productTypeMenu.hidden = !open; productTypeTrigger.setAttribute("aria-expanded", String(open)); productTypePicker?.classList.toggle("is-open", open);
+    };
+    const syncProductTypePicker = () => {
+      const value = currentType(); const meta = productTypeMeta[value] || productTypeMeta.physical;
+      setText("[data-product-type-value]", meta.label); setText("[data-product-type-description]", meta.description);
+      productTypeTrigger?.querySelector(".product-type-trigger-icon use")?.setAttribute("href", `#icon-${meta.icon}`);
+      productTypeMenu?.querySelectorAll("[data-product-type-option]").forEach((button) => button.setAttribute("aria-selected", String(button.dataset.productTypeOption === value)));
+    };
     const setText = (selector, value) => { const target = q(selector); if (target) target.textContent = value; };
     const showError = (message) => { if (!errorTarget) return; errorTarget.textContent = message; errorTarget.hidden = false; errorTarget.scrollIntoView({ behavior: "smooth", block: "center" }); };
     const clearError = () => { if (!errorTarget) return; errorTarget.hidden = true; errorTarget.textContent = ""; };
@@ -651,6 +669,22 @@
     q("[data-product-category-dialog]")?.querySelectorAll("[data-product-category-close]").forEach((button) => button.addEventListener("click", closeCategoryDialog));
     categorySearch?.addEventListener("input", renderCategorySearchResults);
     document.addEventListener("keydown", (event) => { if (event.key === "Escape" && categoryDialog && !categoryDialog.hidden) closeCategoryDialog(); });
+    productTypeTrigger?.addEventListener("click", () => {
+      const opening = Boolean(productTypeMenu?.hidden); setProductTypeMenu(opening);
+      if (opening) window.setTimeout(() => productTypeMenu?.querySelector('[aria-selected="true"]')?.focus(), 0);
+    });
+    productTypeMenu?.querySelectorAll("[data-product-type-option]").forEach((button) => button.addEventListener("click", () => {
+      if (!typeInput) return;
+      typeInput.value = button.dataset.productTypeOption || "physical"; setProductTypeMenu(false); syncProductTypePicker(); typeInput.dispatchEvent(new Event("change", { bubbles: true })); productTypeTrigger?.focus();
+    }));
+    productTypeMenu?.addEventListener("keydown", (event) => {
+      if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+      event.preventDefault(); const options = [...productTypeMenu.querySelectorAll("[data-product-type-option]")]; const index = options.indexOf(document.activeElement);
+      const next = event.key === "Home" ? 0 : event.key === "End" ? options.length - 1 : (index + (event.key === "ArrowDown" ? 1 : -1) + options.length) % options.length; options[next]?.focus();
+    });
+    productTypeTrigger?.addEventListener("keydown", (event) => { if (!['ArrowDown', 'ArrowUp'].includes(event.key)) return; event.preventDefault(); setProductTypeMenu(true); const options = [...productTypeMenu.querySelectorAll("[data-product-type-option]")]; (event.key === "ArrowDown" ? options[0] : options.at(-1))?.focus(); });
+    document.addEventListener("pointerdown", (event) => { if (productTypePicker && !productTypePicker.contains(event.target)) setProductTypeMenu(false); });
+    document.addEventListener("keydown", (event) => { if (event.key === "Escape" && productTypeMenu && !productTypeMenu.hidden) { setProductTypeMenu(false); productTypeTrigger?.focus(); } });
 
     const previewAvailability = (selectedVariant) => {
       const type = currentType();
@@ -1177,7 +1211,7 @@
     productCreateForm.addEventListener("input", (event) => { updatePreview(); markDraftChanged(); if (event.target === productCreateForm.elements.name && categoryDialog && !categoryDialog.hidden) renderCategorySuggestions(); });
     productCreateForm.addEventListener("change", () => { updatePreview(); markDraftChanged(); });
     typeInput?.addEventListener("change", () => {
-      syncType();
+      syncType(); syncProductTypePicker(); setProductTypeMenu(false);
       const value = String(categoryInput?.value || "").trim();
       const knownCategory = Object.keys(categoryCatalog).flatMap((type) => categoryEntries(type)).some((entry) => entry.path === value);
       if (knownCategory && !currentCategoryEntry() && categoryInput) categoryInput.value = "";
@@ -1225,7 +1259,7 @@
       finally { submitButtons.forEach((button) => { button.disabled = false; button.textContent = button.dataset.originalText || (editingProduct ? "Publish changes" : "Create product"); }); }
     });
 
-    restoreDraft(); syncVariantMode(); syncType(); syncCategoryField(); syncPreviewDevice(); renderImages(); restoringDraft = false; updatePreview();
+    restoreDraft(); syncVariantMode(); syncType(); syncProductTypePicker(); syncCategoryField(); syncPreviewDevice(); renderImages(); restoringDraft = false; updatePreview();
   }
 
   const setupCreatorProducts = (form) => {
