@@ -511,10 +511,21 @@ function ez_admin_proxy_cloud_request(string $accessToken, string $path, string 
         ez_admin_json(['ok' => false, 'error' => 'Cloud request body is too large.'], 413);
     }
 
+    $isMediaRequest = $method === 'GET'
+        && preg_match('#^/v1/media/[a-zA-Z0-9_-]+$#', $path) === 1;
     $handle = curl_init($apiUrl . $path);
     if ($handle === false) ez_admin_json(['ok' => false, 'error' => 'Cloud request could not start.'], 503);
     $headers = ['Accept: application/json', 'Authorization: Bearer ' . $accessToken];
     if ($body !== '') $headers[] = 'Content-Type: application/json';
+    if ($isMediaRequest) {
+        foreach (['HTTP_IF_NONE_MATCH' => 'If-None-Match', 'HTTP_IF_MODIFIED_SINCE' => 'If-Modified-Since'] as $serverKey => $headerName) {
+            $conditionalValue = trim((string) ($_SERVER[$serverKey] ?? ''));
+            if ($conditionalValue !== '' && strlen($conditionalValue) <= 512 && !preg_match('/[\r\n]/', $conditionalValue)) {
+                $headers[] = $headerName . ': ' . $conditionalValue;
+            }
+        }
+    }
+    $upstreamHeaders = [];
     curl_setopt_array($handle, [
         CURLOPT_CUSTOMREQUEST => $method,
         CURLOPT_HTTPHEADER => $headers,
@@ -524,6 +535,17 @@ function ez_admin_proxy_cloud_request(string $accessToken, string $path, string 
         CURLOPT_TIMEOUT => 40,
         CURLOPT_SSL_VERIFYPEER => true,
         CURLOPT_FOLLOWLOCATION => false,
+        CURLOPT_HEADERFUNCTION => static function ($curl, string $line) use (&$upstreamHeaders): int {
+            $length = strlen($line);
+            $separator = strpos($line, ':');
+            if ($separator !== false) {
+                $name = strtolower(trim(substr($line, 0, $separator)));
+                if (in_array($name, ['etag', 'last-modified'], true)) {
+                    $upstreamHeaders[$name] = trim(substr($line, $separator + 1));
+                }
+            }
+            return $length;
+        },
     ]);
     $responseBody = curl_exec($handle);
     $status = (int) curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
@@ -534,8 +556,16 @@ function ez_admin_proxy_cloud_request(string $accessToken, string $path, string 
         ez_admin_json(['ok' => false, 'error' => 'Cloud product storage could not be reached.'], 503);
     }
     http_response_code($status > 0 ? $status : 502);
+    if ($isMediaRequest && in_array($status, [200, 304], true)) {
+        header('Cache-Control: private, max-age=31536000, immutable');
+        foreach (['etag' => 'ETag', 'last-modified' => 'Last-Modified'] as $key => $headerName) {
+            if (($upstreamHeaders[$key] ?? '') !== '') header($headerName . ': ' . $upstreamHeaders[$key]);
+        }
+        if ($status === 304) exit;
+    } else {
+        header('Cache-Control: private, no-store');
+    }
     header('Content-Type: ' . ($contentType !== '' ? $contentType : 'application/json; charset=utf-8'));
-    header('Cache-Control: ' . (str_starts_with($contentType, 'image/') ? 'private, max-age=3600' : 'private, no-store'));
     header('X-Content-Type-Options: nosniff');
     echo $responseBody;
     exit;
@@ -966,7 +996,7 @@ $catalogInventory = $legacyDataAccess ? [
   <meta name="robots" content="noindex,nofollow">
   <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
   <?php if ($authenticated): ?><link rel="stylesheet" href="assets/vendor/leaflet.css"><?php endif; ?>
-  <link rel="stylesheet" href="admin.css?v=67">
+  <link rel="stylesheet" href="admin.css?v=68">
   <title><?= $authenticated ? ez_admin_escape($pageTitles[$page]) : 'Admin Login' ?> · Ezkart</title>
 </head>
 <body class="<?= $authenticated ? 'dashboard-page page-' . ez_admin_escape($page) . ($page === 'sites' ? ($siteEditor ? ' page-site-editor' : ' page-sites-library') : '') : 'login-page' ?>" data-admin-storage-scope="<?= ez_admin_escape($adminStorageScope) ?>" data-admin-migrate-legacy-storage="<?= $legacyDataAccess ? 'true' : 'false' ?>" data-admin-cloud-enabled="<?= $authenticated && $authenticationMethod === 'supabase' ? 'true' : 'false' ?>" data-admin-csrf-token="<?= ez_admin_escape($csrfToken) ?>">
@@ -982,7 +1012,12 @@ $catalogInventory = $legacyDataAccess ? [
           <input type="hidden" name="action" value="google_oauth_start">
           <input type="hidden" name="csrf_token" value="<?= ez_admin_escape($csrfToken) ?>">
           <button class="oauth-button" id="google-sign-in" type="submit" data-csrf-token="<?= ez_admin_escape($csrfToken) ?>">
-            <img class="google-mark" src="https://developers.google.com/static/identity/images/g-logo.png" alt=""><span>Continue with Google</span>
+            <svg class="google-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path fill="#4285f4" d="M21.6 12.23c0-.71-.06-1.4-.18-2.05H12v3.87h5.38a4.6 4.6 0 0 1-2 3.02v2.52h3.24c1.9-1.75 2.98-4.32 2.98-7.36Z"/>
+              <path fill="#34a853" d="M12 22c2.7 0 4.96-.9 6.62-2.41l-3.24-2.52c-.9.6-2.05.96-3.38.96-2.6 0-4.8-1.76-5.6-4.12H3.05v2.6A10 10 0 0 0 12 22Z"/>
+              <path fill="#fbbc05" d="M6.4 13.91a6.02 6.02 0 0 1 0-3.82v-2.6H3.05a10 10 0 0 0 0 9.02l3.35-2.6Z"/>
+              <path fill="#ea4335" d="M12 5.97c1.47 0 2.79.5 3.82 1.5l2.87-2.88A9.62 9.62 0 0 0 12 2a10 10 0 0 0-8.95 5.49l3.35 2.6c.8-2.36 3-4.12 5.6-4.12Z"/>
+            </svg><span>Continue with Google</span>
           </button>
         </form>
         <div class="auth-divider"><span>or</span></div>

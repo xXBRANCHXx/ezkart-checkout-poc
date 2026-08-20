@@ -3,6 +3,8 @@ const json = (payload, status = 200, headers = {}) => new Response(JSON.stringif
   headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...headers },
 });
 
+const immutableImageCacheControl = "private, max-age=31536000, immutable";
+
 const allowedOrigin = (request, env) => {
   const origin = request.headers.get("origin") || "";
   const allowed = String(env.ALLOWED_ORIGINS || "").split(",").map((item) => item.trim()).filter(Boolean);
@@ -320,7 +322,7 @@ async function uploadMedia(request, env) {
   const r2Key = `sellers/${seller.id}/products/${id}.${image.extension}`;
   const now = new Date().toISOString();
   await env.PUBLIC_ASSETS.put(r2Key, image.bytes, {
-    httpMetadata: { contentType: image.mimeType, cacheControl: "private, max-age=3600" },
+    httpMetadata: { contentType: image.mimeType, cacheControl: immutableImageCacheControl },
     customMetadata: { sellerId: seller.id, mediaId: id },
   });
   try {
@@ -343,10 +345,16 @@ async function serveMedia(request, env, mediaId) {
   if (!object) throw new Response("Image file not found", { status: 404 });
   const headers = new Headers({
     "content-type": media.mime_type,
-    "cache-control": "private, max-age=3600",
+    "cache-control": immutableImageCacheControl,
     "x-content-type-options": "nosniff",
   });
   if (object.httpEtag) headers.set("etag", object.httpEtag);
+  const requestedEtags = String(request.headers.get("if-none-match") || "")
+    .split(",")
+    .map((value) => value.trim());
+  if (object.httpEtag && (requestedEtags.includes(object.httpEtag) || requestedEtags.includes("*"))) {
+    return new Response(null, { status: 304, headers });
+  }
   return new Response(object.body, { status: 200, headers });
 }
 
@@ -502,7 +510,7 @@ async function duplicateProduct(request, env, productId) {
         httpMetadata: {
           ...sourceObject.httpMetadata,
           contentType: sourceUpload.mime_type,
-          cacheControl: "private, max-age=3600",
+          cacheControl: immutableImageCacheControl,
         },
         customMetadata: { sellerId: seller.id, mediaId },
       });
