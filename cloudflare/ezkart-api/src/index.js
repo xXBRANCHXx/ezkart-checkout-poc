@@ -214,9 +214,21 @@ async function requestJson(request, maximumBytes = 350000) {
 }
 
 async function sellerContext(request, env) {
-  const profile = await currentUser(request, env);
-  if (!profile.active_seller?.id) throw new Response("No active seller is available", { status: 403 });
-  return { profile, seller: profile.active_seller, authUserId: profile.auth_user_id };
+  const user = await authenticatedUser(request, env);
+  let seller = await env.DB.prepare(`
+    SELECT s.id, s.slug, s.name, s.plan, s.status, sm.role
+    FROM seller_memberships sm
+    JOIN sellers s ON s.id = sm.seller_id
+    WHERE sm.auth_user_id = ? AND s.status = 'active'
+    ORDER BY sm.created_at ASC
+    LIMIT 1
+  `).bind(user.id).first();
+  if (!seller) {
+    const profile = await currentUser(request, env);
+    seller = profile.active_seller || null;
+  }
+  if (!seller?.id) throw new Response("No active seller is available", { status: 403 });
+  return { seller, authUserId: user.id };
 }
 
 const mediaPath = (id) => `/v1/media/${encodeURIComponent(id)}`;
