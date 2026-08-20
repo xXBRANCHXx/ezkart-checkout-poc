@@ -91,6 +91,11 @@
     if (!response.ok || result.ok !== true) {
       throw new Error(result.error || "Ezkart could not verify this account.");
     }
+    if (result.mfa_required === true) {
+      setStatus("Account verified. Opening two-step verification…");
+      window.location.replace(result.redirect || "?mfa=1");
+      return;
+    }
     announceAuthentication();
     setStatus("Signed in. Opening your dashboard…");
     window.location.replace("./");

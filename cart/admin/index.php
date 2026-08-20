@@ -114,6 +114,22 @@ function ez_admin_log_auth_error(string $operation, Throwable $error): void
     error_log('Ezkart Auth ' . $operation . ': ' . mb_substr($message, 0, 220));
 }
 
+function ez_admin_mfa_settings_error(Throwable $error): string
+{
+    if ($error instanceof InvalidArgumentException) return $error->getMessage();
+    if ($error instanceof EzAdminAuthProviderException) {
+        $message = strtolower($error->getMessage());
+        if (str_contains($message, 'disabled')) {
+            return 'Authenticator verification is not enabled for this Ezkart environment yet.';
+        }
+        if (str_contains($message, 'totp') && (str_contains($message, 'invalid') || str_contains($message, 'expired'))) {
+            return 'That authenticator code was not accepted. Wait for a new code and try again.';
+        }
+        return 'The authentication service could not complete that change. Please try again.';
+    }
+    return mb_substr($error->getMessage(), 0, 220);
+}
+
 function ez_admin_money(mixed $value): string
 {
     return 'Rp' . number_format((int) $value, 0, ',', '.');
@@ -309,6 +325,74 @@ function ez_admin_post_json(string $url, array $headers, array $payload, string 
     return $decoded;
 }
 
+function ez_admin_auth_request(string $method, string $path, string $accessToken, ?array $payload = null): array
+{
+    $settings = ez_admin_supabase_settings();
+    if (!$settings['configured']) throw new RuntimeException('Supabase login is not configured on this server.');
+    if (strlen($accessToken) < 40 || strlen($accessToken) > 8192) {
+        throw new InvalidArgumentException('The Supabase access token is invalid.');
+    }
+    if (!preg_match('#^/auth/v1/(?:factors(?:/[a-f0-9-]{36}(?:/(?:challenge|verify))?)?)$#i', $path)) {
+        throw new InvalidArgumentException('The authentication request path is invalid.');
+    }
+    $handle = curl_init($settings['url'] . $path);
+    if ($handle === false) throw new RuntimeException('Could not start the Supabase Auth request.');
+    $headers = [
+        'Accept: application/json',
+        'Content-Type: application/json',
+        'apikey: ' . $settings['key'],
+        'Authorization: Bearer ' . $accessToken,
+    ];
+    $options = [
+        CURLOPT_CUSTOMREQUEST => strtoupper($method),
+        CURLOPT_HTTPHEADER => $headers,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_CONNECTTIMEOUT => 8,
+        CURLOPT_TIMEOUT => 15,
+        CURLOPT_SSL_VERIFYPEER => true,
+    ];
+    if ($payload !== null) $options[CURLOPT_POSTFIELDS] = json_encode($payload, JSON_UNESCAPED_SLASHES);
+    curl_setopt_array($handle, $options);
+    $body = curl_exec($handle);
+    $status = (int) curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
+    $error = curl_error($handle);
+    $decoded = is_string($body) && trim($body) !== '' ? json_decode($body, true) : [];
+    if ($status < 200 || $status >= 300 || !is_array($decoded)) {
+        $fallback = 'Supabase Auth rejected the request' . ($error !== '' ? ': ' . $error : '.');
+        throw new EzAdminAuthProviderException(
+            is_array($decoded) ? ez_admin_auth_error_message($decoded, $fallback) : $fallback,
+            $status,
+        );
+    }
+    return $decoded;
+}
+
+function ez_admin_token_claims(string $accessToken): array
+{
+    $parts = explode('.', $accessToken);
+    if (count($parts) !== 3) return [];
+    $payload = strtr($parts[1], '-_', '+/');
+    $payload .= str_repeat('=', (4 - strlen($payload) % 4) % 4);
+    $decoded = json_decode((string) base64_decode($payload, true), true);
+    return is_array($decoded) ? $decoded : [];
+}
+
+function ez_admin_token_aal(string $accessToken): string
+{
+    $aal = strtolower((string) (ez_admin_token_claims($accessToken)['aal'] ?? 'aal1'));
+    return in_array($aal, ['aal1', 'aal2'], true) ? $aal : 'aal1';
+}
+
+function ez_admin_totp_factors(array $user, ?string $status = null): array
+{
+    $factors = is_array($user['factors'] ?? null) ? $user['factors'] : [];
+    return array_values(array_filter($factors, static function (mixed $factor) use ($status): bool {
+        if (!is_array($factor) || strtolower((string) ($factor['factor_type'] ?? '')) !== 'totp') return false;
+        if (preg_match('/^[a-f0-9-]{36}$/i', (string) ($factor['id'] ?? '')) !== 1) return false;
+        return $status === null || strtolower((string) ($factor['status'] ?? '')) === $status;
+    }));
+}
+
 function ez_admin_token_expiration(string $accessToken): int
 {
     $parts = explode('.', $accessToken);
@@ -370,6 +454,13 @@ function ez_admin_store_supabase_session(array $tokens, array $user, bool $newSi
     $_SESSION['authenticated_until'] = ez_admin_token_expiration($accessToken);
     $_SESSION['supabase_access_token'] = $accessToken;
     $_SESSION['supabase_refresh_token'] = $refreshToken;
+    $_SESSION['mfa_enabled'] = ez_admin_totp_factors($user, 'verified') !== [];
+    $_SESSION['mfa_aal'] = ez_admin_token_aal($accessToken);
+    $_SESSION['mfa_factors'] = array_map(static fn(array $factor): array => [
+        'id' => (string) $factor['id'],
+        'status' => strtolower((string) ($factor['status'] ?? '')),
+        'friendly_name' => mb_substr(trim((string) ($factor['friendly_name'] ?? 'Authenticator app')), 0, 80),
+    ], ez_admin_totp_factors($user));
     $_SESSION['legacy_data_access'] = ez_admin_email_has_legacy_access($email);
     if ($newSignIn || (int) ($_SESSION['signed_in_at'] ?? 0) <= 0) {
         $_SESSION['signed_in_at'] = time();
@@ -379,6 +470,48 @@ function ez_admin_store_supabase_session(array $tokens, array $user, bool $newSi
         'email' => $email,
         'name' => $name !== '' ? mb_substr($name, 0, 100) : $email,
     ];
+    unset($_SESSION['pending_mfa']);
+}
+
+function ez_admin_begin_pending_mfa(array $tokens, array $user): bool
+{
+    $accessToken = trim((string) ($tokens['access_token'] ?? ''));
+    $refreshToken = trim((string) ($tokens['refresh_token'] ?? ''));
+    $factors = ez_admin_totp_factors($user, 'verified');
+    if ($factors === [] || ez_admin_token_aal($accessToken) === 'aal2') return false;
+    if (strlen($accessToken) < 40 || strlen($accessToken) > 8192 || $refreshToken === '' || strlen($refreshToken) > 8192) {
+        throw new InvalidArgumentException('Supabase did not return a valid MFA session.');
+    }
+    ez_admin_clear_authentication();
+    $_SESSION['pending_mfa'] = [
+        'access_token' => $accessToken,
+        'refresh_token' => $refreshToken,
+        'factor_id' => (string) $factors[0]['id'],
+        'email' => strtolower(trim((string) ($user['email'] ?? ''))),
+        'expires_at' => time() + 600,
+    ];
+    return true;
+}
+
+function ez_admin_begin_pending_mfa_from_session(): bool
+{
+    if (($_SESSION['mfa_enabled'] ?? false) !== true || ($_SESSION['mfa_aal'] ?? 'aal1') === 'aal2') return false;
+    $factors = is_array($_SESSION['mfa_factors'] ?? null) ? $_SESSION['mfa_factors'] : [];
+    $factor = array_values(array_filter($factors, static fn(mixed $item): bool =>
+        is_array($item)
+        && ($item['status'] ?? '') === 'verified'
+        && preg_match('/^[a-f0-9-]{36}$/i', (string) ($item['id'] ?? '')) === 1
+    ))[0] ?? null;
+    if (!is_array($factor)) return false;
+    $tokens = [
+        'access_token' => (string) ($_SESSION['supabase_access_token'] ?? ''),
+        'refresh_token' => (string) ($_SESSION['supabase_refresh_token'] ?? ''),
+    ];
+    $user = [
+        'email' => (string) (($_SESSION['admin_user'] ?? [])['email'] ?? ''),
+        'factors' => [['id' => $factor['id'], 'factor_type' => 'totp', 'status' => 'verified']],
+    ];
+    return ez_admin_begin_pending_mfa($tokens, $user);
 }
 
 function ez_admin_refresh_supabase_session(): string
@@ -458,6 +591,10 @@ function ez_admin_clear_authentication(): void
         $_SESSION['authenticated_until'],
         $_SESSION['supabase_access_token'],
         $_SESSION['supabase_refresh_token'],
+        $_SESSION['mfa_enabled'],
+        $_SESSION['mfa_aal'],
+        $_SESSION['mfa_factors'],
+        $_SESSION['mfa_setup'],
         $_SESSION['admin_user'],
         $_SESSION['cloudflare_profile_sync'],
         $_SESSION['legacy_data_access'],
@@ -588,6 +725,12 @@ foreach ($oauthFlows as $flowId => $flow) {
     if (!is_array($flow) || (int) ($flow['expires_at'] ?? 0) <= time()) unset($oauthFlows[$flowId]);
 }
 $_SESSION['oauth_flows'] = $oauthFlows;
+$pendingMfa = is_array($_SESSION['pending_mfa'] ?? null) ? $_SESSION['pending_mfa'] : null;
+if ($pendingMfa !== null && (int) ($pendingMfa['expires_at'] ?? 0) <= time()) {
+    unset($_SESSION['pending_mfa']);
+    $pendingMfa = null;
+    if ($loginError === '') $loginError = 'That verification session expired. Sign in again to continue.';
+}
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'GET' && (string) ($_GET['auth_callback'] ?? '') === '1') {
     $flowId = strtolower(trim((string) ($_GET['flow'] ?? '')));
@@ -620,10 +763,14 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'GET' && (string) ($_GET['auth_callba
         $user = ez_admin_verify_supabase_user($accessToken);
         session_regenerate_id(true);
         ez_admin_renew_session_cookie($isHttps);
-        ez_admin_store_supabase_session($tokens, $user, true);
-        $_SESSION['cloudflare_profile_sync'] = ez_admin_sync_cloudflare_user($accessToken);
         $_SESSION['csrf_token'] = bin2hex(random_bytes(24));
         unset($_SESSION['oauth_flows']);
+        if (ez_admin_begin_pending_mfa($tokens, $user)) {
+            header('Location: ?mfa=1', true, 303);
+            exit;
+        }
+        ez_admin_store_supabase_session($tokens, $user, true);
+        $_SESSION['cloudflare_profile_sync'] = ez_admin_sync_cloudflare_user($accessToken);
         header('Location: ./', true, 303);
         exit;
     } catch (Throwable $error) {
@@ -641,10 +788,147 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'GET' && (string) ($_GET['auth_callba
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && !isset($_GET['cloud'])) {
     $submittedToken = (string) ($_POST['csrf_token'] ?? '');
+    $submittedAction = (string) ($_POST['action'] ?? '');
     if (!hash_equals($csrfToken, $submittedToken)) {
         http_response_code(400);
         $loginError = 'Permintaan tidak valid. Muat ulang halaman dan coba lagi.';
-    } elseif ((string) ($_POST['action'] ?? '') === 'google_oauth_start') {
+    } elseif ($submittedAction === 'mfa_verify_login') {
+        try {
+            $pendingMfa = is_array($_SESSION['pending_mfa'] ?? null) ? $_SESSION['pending_mfa'] : null;
+            if ($pendingMfa === null || (int) ($pendingMfa['expires_at'] ?? 0) <= time()) {
+                throw new RuntimeException('That verification session expired. Sign in again to continue.');
+            }
+            $code = preg_replace('/\D+/', '', (string) ($_POST['code'] ?? ''));
+            if (preg_match('/^\d{6}$/', $code) !== 1) throw new InvalidArgumentException('Enter the six-digit code from your authenticator app.');
+            $factorId = (string) ($pendingMfa['factor_id'] ?? '');
+            $accessToken = (string) ($pendingMfa['access_token'] ?? '');
+            $challenge = ez_admin_auth_request('POST', '/auth/v1/factors/' . $factorId . '/challenge', $accessToken);
+            $challengeId = (string) ($challenge['id'] ?? '');
+            if (preg_match('/^[a-f0-9-]{36}$/i', $challengeId) !== 1) throw new RuntimeException('The verification challenge could not be created.');
+            $tokens = ez_admin_auth_request('POST', '/auth/v1/factors/' . $factorId . '/verify', $accessToken, [
+                'challenge_id' => $challengeId,
+                'code' => $code,
+            ]);
+            $nextAccessToken = (string) ($tokens['access_token'] ?? '');
+            if (ez_admin_token_aal($nextAccessToken) !== 'aal2') throw new RuntimeException('Two-step verification was not completed.');
+            $user = ez_admin_verify_supabase_user($nextAccessToken);
+            session_regenerate_id(true);
+            ez_admin_renew_session_cookie($isHttps);
+            ez_admin_store_supabase_session($tokens, $user, true);
+            $_SESSION['cloudflare_profile_sync'] = ez_admin_sync_cloudflare_user($nextAccessToken);
+            $_SESSION['csrf_token'] = bin2hex(random_bytes(24));
+            header('Location: ./', true, 303);
+            exit;
+        } catch (Throwable $error) {
+            ez_admin_log_auth_error('MFA login verification failed', $error);
+            usleep(350000);
+            $loginError = $error instanceof InvalidArgumentException
+                ? $error->getMessage()
+                : 'That code was not accepted. Check your authenticator app and try again.';
+        }
+    } elseif ($submittedAction === 'mfa_cancel_login') {
+        unset($_SESSION['pending_mfa']);
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(24));
+        header('Location: ./', true, 303);
+        exit;
+    } elseif (in_array($submittedAction, ['mfa_enroll_start', 'mfa_enroll_verify', 'mfa_enroll_cancel', 'mfa_disable'], true)) {
+        try {
+            if (($_SESSION['authenticated'] ?? false) !== true || ($_SESSION['authentication_method'] ?? '') !== 'supabase') {
+                throw new RuntimeException('Sign in with your approved account before changing two-step verification.');
+            }
+            $accessToken = (string) ($_SESSION['supabase_access_token'] ?? '');
+            $user = ez_admin_verify_supabase_user($accessToken);
+            if ($submittedAction === 'mfa_enroll_start') {
+                if (ez_admin_totp_factors($user, 'verified') !== []) throw new RuntimeException('Two-step verification is already enabled.');
+                foreach (ez_admin_totp_factors($user, 'unverified') as $factor) {
+                    ez_admin_auth_request('DELETE', '/auth/v1/factors/' . $factor['id'], $accessToken);
+                }
+                $enrollment = ez_admin_auth_request('POST', '/auth/v1/factors', $accessToken, [
+                    'factor_type' => 'totp',
+                    'friendly_name' => 'Ezkart authenticator',
+                ]);
+                $factorId = (string) ($enrollment['id'] ?? '');
+                $totp = is_array($enrollment['totp'] ?? null) ? $enrollment['totp'] : [];
+                $qrCode = trim((string) ($totp['qr_code'] ?? ''));
+                if (preg_match('/^[a-f0-9-]{36}$/i', $factorId) !== 1 || $qrCode === '' || trim((string) ($totp['secret'] ?? '')) === '') {
+                    throw new RuntimeException('Supabase did not return a complete authenticator setup.');
+                }
+                if (str_starts_with($qrCode, '<svg')) $qrCode = 'data:image/svg+xml;base64,' . base64_encode($qrCode);
+                if (!str_starts_with($qrCode, 'data:image/svg+xml')) throw new RuntimeException('Supabase returned an invalid authenticator QR code.');
+                $_SESSION['mfa_setup'] = [
+                    'factor_id' => $factorId,
+                    'qr_code' => $qrCode,
+                    'secret' => mb_substr(trim((string) $totp['secret']), 0, 160),
+                    'expires_at' => time() + 900,
+                ];
+                $_SESSION['security_flash'] = ['type' => 'info', 'message' => 'Scan the QR code, then enter the six-digit code to finish setup.'];
+            } elseif ($submittedAction === 'mfa_enroll_verify') {
+                $setup = is_array($_SESSION['mfa_setup'] ?? null) ? $_SESSION['mfa_setup'] : null;
+                if ($setup === null || (int) ($setup['expires_at'] ?? 0) <= time()) throw new RuntimeException('That setup expired. Start two-step verification again.');
+                $code = preg_replace('/\D+/', '', (string) ($_POST['code'] ?? ''));
+                if (preg_match('/^\d{6}$/', $code) !== 1) throw new InvalidArgumentException('Enter the six-digit code from your authenticator app.');
+                $factorId = (string) $setup['factor_id'];
+                $challenge = ez_admin_auth_request('POST', '/auth/v1/factors/' . $factorId . '/challenge', $accessToken);
+                $challengeId = (string) ($challenge['id'] ?? '');
+                if (preg_match('/^[a-f0-9-]{36}$/i', $challengeId) !== 1) throw new RuntimeException('The verification challenge could not be created.');
+                $tokens = ez_admin_auth_request('POST', '/auth/v1/factors/' . $factorId . '/verify', $accessToken, [
+                    'challenge_id' => $challengeId,
+                    'code' => $code,
+                ]);
+                $nextAccessToken = (string) ($tokens['access_token'] ?? '');
+                if (ez_admin_token_aal($nextAccessToken) !== 'aal2') throw new RuntimeException('Two-step verification was not completed.');
+                $verifiedUser = ez_admin_verify_supabase_user($nextAccessToken);
+                session_regenerate_id(true);
+                ez_admin_renew_session_cookie($isHttps);
+                ez_admin_store_supabase_session($tokens, $verifiedUser, false);
+                $_SESSION['cloudflare_profile_sync'] = ez_admin_sync_cloudflare_user($nextAccessToken);
+                unset($_SESSION['mfa_setup']);
+                $_SESSION['security_flash'] = ['type' => 'success', 'message' => 'Two-step verification is now protecting this account.'];
+            } elseif ($submittedAction === 'mfa_enroll_cancel') {
+                $setup = is_array($_SESSION['mfa_setup'] ?? null) ? $_SESSION['mfa_setup'] : null;
+                if (is_array($setup) && preg_match('/^[a-f0-9-]{36}$/i', (string) ($setup['factor_id'] ?? '')) === 1) {
+                    ez_admin_auth_request('DELETE', '/auth/v1/factors/' . $setup['factor_id'], $accessToken);
+                }
+                unset($_SESSION['mfa_setup']);
+                $_SESSION['security_flash'] = ['type' => 'info', 'message' => 'Two-step setup was cancelled.'];
+            } else {
+                $verifiedFactors = ez_admin_totp_factors($user, 'verified');
+                if ($verifiedFactors === []) throw new RuntimeException('Two-step verification is not enabled.');
+                $code = preg_replace('/\D+/', '', (string) ($_POST['code'] ?? ''));
+                if (preg_match('/^\d{6}$/', $code) !== 1) throw new InvalidArgumentException('Enter your current six-digit authenticator code to turn off two-step verification.');
+                $factorId = (string) $verifiedFactors[0]['id'];
+                $challenge = ez_admin_auth_request('POST', '/auth/v1/factors/' . $factorId . '/challenge', $accessToken);
+                $challengeId = (string) ($challenge['id'] ?? '');
+                if (preg_match('/^[a-f0-9-]{36}$/i', $challengeId) !== 1) throw new RuntimeException('The verification challenge could not be created.');
+                $tokens = ez_admin_auth_request('POST', '/auth/v1/factors/' . $factorId . '/verify', $accessToken, [
+                    'challenge_id' => $challengeId,
+                    'code' => $code,
+                ]);
+                $nextAccessToken = (string) ($tokens['access_token'] ?? '');
+                if (ez_admin_token_aal($nextAccessToken) !== 'aal2') throw new RuntimeException('The authenticator code was not accepted.');
+                foreach (ez_admin_totp_factors($user) as $factor) {
+                    ez_admin_auth_request('DELETE', '/auth/v1/factors/' . $factor['id'], $nextAccessToken);
+                }
+                $updatedUser = ez_admin_verify_supabase_user($nextAccessToken);
+                session_regenerate_id(true);
+                ez_admin_renew_session_cookie($isHttps);
+                ez_admin_store_supabase_session($tokens, $updatedUser, false);
+                unset($_SESSION['mfa_setup']);
+                $_SESSION['security_flash'] = ['type' => 'success', 'message' => 'Two-step verification has been turned off.'];
+            }
+            $_SESSION['csrf_token'] = bin2hex(random_bytes(24));
+            header('Location: ?page=settings#security', true, 303);
+            exit;
+        } catch (Throwable $error) {
+            ez_admin_log_auth_error('MFA settings change failed', $error);
+            $_SESSION['security_flash'] = [
+                'type' => 'error',
+                'message' => ez_admin_mfa_settings_error($error),
+            ];
+            header('Location: ?page=settings#security', true, 303);
+            exit;
+        }
+    } elseif ($submittedAction === 'google_oauth_start') {
         try {
             if (!$supabaseSettings['configured']) {
                 throw new RuntimeException('Supabase login is not configured on this server.');
@@ -748,10 +1032,15 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && !isset($_GET['cloud'])) {
             $user = ez_admin_verify_supabase_user($accessToken);
             session_regenerate_id(true);
             ez_admin_renew_session_cookie($isHttps);
-            ez_admin_store_supabase_session([
+            $tokens = [
                 'access_token' => $accessToken,
                 'refresh_token' => $refreshToken,
-            ], $user, true);
+            ];
+            if (ez_admin_begin_pending_mfa($tokens, $user)) {
+                $_SESSION['csrf_token'] = bin2hex(random_bytes(24));
+                ez_admin_json(['ok' => true, 'mfa_required' => true, 'redirect' => '?mfa=1']);
+            }
+            ez_admin_store_supabase_session($tokens, $user, true);
             $_SESSION['cloudflare_profile_sync'] = ez_admin_sync_cloudflare_user($accessToken);
             $_SESSION['csrf_token'] = bin2hex(random_bytes(24));
             ez_admin_json(['ok' => true]);
@@ -792,6 +1081,8 @@ if ($supabaseSessionNeedsRefresh) {
     if ($refreshResult === 'invalid') {
         ez_admin_clear_authentication();
         $loginError = 'Your secure session ended. Continue with Google to sign in again.';
+    } elseif ($refreshResult === 'refreshed' && ez_admin_begin_pending_mfa_from_session()) {
+        $loginError = 'Enter your authenticator code to continue.';
     } elseif ($refreshResult === 'temporary' && $supabaseExpiration <= time()) {
         $loginError = 'Ezkart could not refresh your session just now. Reload this page in a moment—your sign-in has been preserved.';
     }
@@ -802,6 +1093,7 @@ $sessionCurrent = $authenticationMethod !== 'supabase'
 $authenticated = ($_SESSION['authenticated'] ?? false) === true
     && $sessionCurrent
     && ($authenticationMethod === 'supabase' || $adminConfigured);
+$pendingMfa = is_array($_SESSION['pending_mfa'] ?? null) ? $_SESSION['pending_mfa'] : null;
 $legacyDataAccess = $authenticated && (
     $authenticationMethod === 'password'
     || ($_SESSION['legacy_data_access'] ?? false) === true
@@ -816,6 +1108,9 @@ if ($cloudPath !== '') {
     }
     $cloudMethod = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
     if (in_array($cloudMethod, ['POST', 'PUT', 'DELETE'], true)) {
+        if (($_SESSION['mfa_enabled'] ?? false) === true && ($_SESSION['mfa_aal'] ?? 'aal1') !== 'aal2') {
+            ez_admin_json(['ok' => false, 'error' => 'Enter your authenticator code before changing protected store data.'], 403);
+        }
         $cloudCsrf = (string) ($_SERVER['HTTP_X_EZKART_CSRF'] ?? '');
         if (!hash_equals($csrfToken, $cloudCsrf)) {
             ez_admin_json(['ok' => false, 'error' => 'The cloud save request expired. Reload and try again.'], 403);
@@ -830,6 +1125,15 @@ if ($cloudPath !== '') {
     );
 }
 $adminUser = is_array($_SESSION['admin_user'] ?? null) ? $_SESSION['admin_user'] : [];
+$mfaEnabled = $authenticated && $authenticationMethod === 'supabase' && ($_SESSION['mfa_enabled'] ?? false) === true;
+$mfaAal2 = $mfaEnabled && ($_SESSION['mfa_aal'] ?? 'aal1') === 'aal2';
+$mfaSetup = is_array($_SESSION['mfa_setup'] ?? null) ? $_SESSION['mfa_setup'] : null;
+if ($mfaSetup !== null && (int) ($mfaSetup['expires_at'] ?? 0) <= time()) {
+    unset($_SESSION['mfa_setup']);
+    $mfaSetup = null;
+}
+$securityFlash = is_array($_SESSION['security_flash'] ?? null) ? $_SESSION['security_flash'] : null;
+unset($_SESSION['security_flash']);
 $profileSync = is_array($_SESSION['cloudflare_profile_sync'] ?? null)
     ? $_SESSION['cloudflare_profile_sync']
     : null;
@@ -1001,12 +1305,33 @@ $catalogInventory = $legacyDataAccess ? [
   <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
   <?php if ($authenticated && $authenticationMethod === 'supabase' && $cloudMediaBase !== ''): ?><link rel="preconnect" href="<?= ez_admin_escape($cloudMediaBase) ?>"><?php endif; ?>
   <?php if ($authenticated): ?><link rel="stylesheet" href="assets/vendor/leaflet.css"><?php endif; ?>
-  <link rel="stylesheet" href="admin.css?v=68">
-  <title><?= $authenticated ? ez_admin_escape($pageTitles[$page]) : 'Admin Login' ?> · Ezkart</title>
+  <link rel="stylesheet" href="admin.css?v=69">
+  <title><?= $authenticated ? ez_admin_escape($pageTitles[$page]) : ($pendingMfa !== null ? 'Two-step verification' : 'Admin Login') ?> · Ezkart</title>
 </head>
 <body class="<?= $authenticated ? 'dashboard-page page-' . ez_admin_escape($page) . ($page === 'sites' ? ($siteEditor ? ' page-site-editor' : ' page-sites-library') : '') : 'login-page' ?>" data-admin-storage-scope="<?= ez_admin_escape($adminStorageScope) ?>" data-admin-migrate-legacy-storage="<?= $legacyDataAccess ? 'true' : 'false' ?>" data-admin-cloud-enabled="<?= $authenticated && $authenticationMethod === 'supabase' ? 'true' : 'false' ?>" data-admin-cloud-media-base="<?= $authenticated && $authenticationMethod === 'supabase' ? ez_admin_escape($cloudMediaBase) : '' ?>" data-admin-csrf-token="<?= ez_admin_escape($csrfToken) ?>">
 <?php if (!$authenticated): ?>
   <main class="login-shell">
+    <?php if ($pendingMfa !== null): ?>
+    <section class="login-card mfa-login-card">
+      <a class="admin-brand" href="../../"><img src="../../assets/ezkart-logo.svg" alt="Ezkart"></a>
+      <p class="eyebrow">Two-step verification</p>
+      <h1>Confirm it&rsquo;s you.</h1>
+      <p class="login-intro">Open your authenticator app and enter the six-digit code for <strong><?= ez_admin_escape((string) ($pendingMfa['email'] ?? 'your Ezkart account')) ?></strong>.</p>
+      <form class="mfa-login-form" method="post" autocomplete="off">
+        <input type="hidden" name="action" value="mfa_verify_login">
+        <input type="hidden" name="csrf_token" value="<?= ez_admin_escape($csrfToken) ?>">
+        <label for="mfa-login-code">Authenticator code</label>
+        <input id="mfa-login-code" name="code" type="text" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="one-time-code" placeholder="000000" autofocus required>
+        <button type="submit">Verify and continue</button>
+      </form>
+      <?php if ($loginError !== ''): ?><p class="form-error" role="alert"><?= ez_admin_escape($loginError) ?></p><?php endif; ?>
+      <form method="post" class="mfa-cancel-form">
+        <input type="hidden" name="action" value="mfa_cancel_login">
+        <input type="hidden" name="csrf_token" value="<?= ez_admin_escape($csrfToken) ?>">
+        <button type="submit">Use another sign-in method</button>
+      </form>
+    </section>
+    <?php else: ?>
     <section class="login-card">
       <a class="admin-brand" href="../../"><img src="../../assets/ezkart-logo.svg" alt="Ezkart"></a>
       <p class="eyebrow">Internal order monitor</p>
@@ -1071,8 +1396,9 @@ $catalogInventory = $legacyDataAccess ? [
       <?php endif; ?>
       <a class="back-link" href="../">← Kembali ke checkout</a>
     </section>
+    <?php endif; ?>
   </main>
-  <script src="auth.js?v=7"></script>
+  <?php if ($pendingMfa === null): ?><script src="auth.js?v=8"></script><?php endif; ?>
 <?php else: ?>
   <svg class="svg-sprite" aria-hidden="true">
     <symbol id="icon-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></symbol>

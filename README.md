@@ -52,6 +52,13 @@ current Supabase session whenever the provider is reachable.
 `admin_session_storage` may override the private directory with an absolute
 server path when required by the host.
 
+Seller accounts can enable authenticator-app two-step verification from Admin
+Settings. Enrollment, challenge, and verification use Supabase TOTP MFA through
+the server-side session. Once enabled, a new Google or approved email sign-in
+must reach `aal2` before the dashboard opens; the verified device can then keep
+its Ezkart session for up to 30 days. State-changing cloud requests also fail
+closed if an enrolled session has not reached `aal2`.
+
 Privileged legacy accounts can read the private JSON order store and display order IDs,
 customers, line items, product subtotal, shipping charge, final total,
 shipping service, Midtrans reference/status, Biteship fulfillment reference,
