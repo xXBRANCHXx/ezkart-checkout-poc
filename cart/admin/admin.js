@@ -130,8 +130,12 @@
 
   const cloudEnabled = document.body.dataset.adminCloudEnabled === "true";
   const cloudCsrfToken = document.body.dataset.adminCsrfToken || "";
+  const cloudMediaBase = String(document.body.dataset.adminCloudMediaBase || "").replace(/\/$/, "");
   const cloudUrl = (path) => `./?cloud=${encodeURIComponent(path)}`;
-  const cloudMediaUrl = (id) => cloudUrl(`/v1/media/${encodeURIComponent(id)}`);
+  const cloudPrivateMediaUrl = (id) => cloudUrl(`/v1/media/${encodeURIComponent(id)}`);
+  const cloudMediaUrl = (id) => cloudMediaBase
+    ? `${cloudMediaBase}/v1/public/media/${encodeURIComponent(id)}`
+    : cloudPrivateMediaUrl(id);
   const cloudRequest = async (method, path, payload = null) => {
     if (!cloudEnabled) throw new Error("Sign in with Google to use cloud product storage.");
     const response = await fetch(cloudUrl(path), {
@@ -167,12 +171,12 @@
     ...draft,
     images: (Array.isArray(draft?.images) ? draft.images : []).map((item) => ({
       ...item,
-      data: item.cloudId ? cloudMediaUrl(item.cloudId) : item.data || "",
+      data: item.cloudId ? cloudPrivateMediaUrl(item.cloudId) : item.data || "",
     })),
     variants: (Array.isArray(draft?.variants) ? draft.variants : []).map((variant) => ({
       ...variant,
       customImage: variant.customImage?.cloudId
-        ? { ...variant.customImage, data: cloudMediaUrl(variant.customImage.cloudId) }
+        ? { ...variant.customImage, data: cloudPrivateMediaUrl(variant.customImage.cloudId) }
         : variant.customImage || null,
     })),
   });

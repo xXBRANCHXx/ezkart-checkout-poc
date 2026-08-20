@@ -3,7 +3,8 @@ const json = (payload, status = 200, headers = {}) => new Response(JSON.stringif
   headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...headers },
 });
 
-const immutableImageCacheControl = "private, max-age=31536000, immutable";
+const privateImmutableImageCacheControl = "private, max-age=31536000, immutable";
+const publicImmutableImageCacheControl = "public, max-age=31536000, immutable";
 
 const allowedOrigin = (request, env) => {
   const origin = request.headers.get("origin") || "";
@@ -322,7 +323,7 @@ async function uploadMedia(request, env) {
   const r2Key = `sellers/${seller.id}/products/${id}.${image.extension}`;
   const now = new Date().toISOString();
   await env.PUBLIC_ASSETS.put(r2Key, image.bytes, {
-    httpMetadata: { contentType: image.mimeType, cacheControl: immutableImageCacheControl },
+    httpMetadata: { contentType: image.mimeType, cacheControl: publicImmutableImageCacheControl },
     customMetadata: { sellerId: seller.id, mediaId: id },
   });
   try {
@@ -338,14 +339,20 @@ async function uploadMedia(request, env) {
 }
 
 async function serveMedia(request, env, mediaId) {
-  const { seller } = await sellerContext(request, env);
-  const media = await env.DB.prepare("SELECT r2_key, mime_type FROM media_uploads WHERE seller_id = ? AND id = ?").bind(seller.id, mediaId).first();
+  const user = await authenticatedUser(request, env);
+  const media = await env.DB.prepare(`
+    SELECT mu.r2_key, mu.mime_type
+    FROM media_uploads mu
+    JOIN seller_memberships sm ON sm.seller_id = mu.seller_id
+    WHERE mu.id = ? AND sm.auth_user_id = ?
+    LIMIT 1
+  `).bind(mediaId, user.id).first();
   if (!media) throw new Response("Image not found", { status: 404 });
   const object = await env.PUBLIC_ASSETS.get(media.r2_key);
   if (!object) throw new Response("Image file not found", { status: 404 });
   const headers = new Headers({
     "content-type": media.mime_type,
-    "cache-control": immutableImageCacheControl,
+    "cache-control": privateImmutableImageCacheControl,
     "x-content-type-options": "nosniff",
   });
   if (object.httpEtag) headers.set("etag", object.httpEtag);
@@ -356,6 +363,58 @@ async function serveMedia(request, env, mediaId) {
     return new Response(null, { status: 304, headers });
   }
   return new Response(object.body, { status: 200, headers });
+}
+
+const etagMatches = (request, etag) => {
+  if (!etag) return false;
+  return String(request.headers.get("if-none-match") || "")
+    .split(",")
+    .map((value) => value.trim())
+    .some((value) => value === etag || value === "*");
+};
+
+async function servePublicMedia(request, env, context, mediaId) {
+  const cache = caches.default;
+  const cached = await cache.match(request);
+  if (cached) {
+    const cachedEtag = cached.headers.get("etag") || "";
+    if (etagMatches(request, cachedEtag)) return new Response(null, { status: 304, headers: cached.headers });
+    return cached;
+  }
+
+  const media = await env.DB.prepare(`
+    SELECT mu.r2_key, mu.mime_type
+    FROM media_uploads mu
+    WHERE mu.id = ? AND (
+      EXISTS (
+        SELECT 1
+        FROM product_media pm
+        JOIN products p ON p.seller_id = pm.seller_id AND p.id = pm.product_id
+        WHERE pm.id = mu.id AND p.status = 'active'
+      )
+      OR EXISTS (
+        SELECT 1
+        FROM product_variants pv
+        JOIN products p ON p.seller_id = pv.seller_id AND p.id = pv.product_id
+        WHERE pv.image_upload_id = mu.id AND p.status = 'active'
+      )
+    )
+    LIMIT 1
+  `).bind(mediaId).first();
+  if (!media) throw new Response("Image not found", { status: 404 });
+  const object = await env.PUBLIC_ASSETS.get(media.r2_key);
+  if (!object) throw new Response("Image file not found", { status: 404 });
+  const headers = new Headers({
+    "content-type": media.mime_type,
+    "cache-control": publicImmutableImageCacheControl,
+    "cross-origin-resource-policy": "cross-origin",
+    "x-content-type-options": "nosniff",
+  });
+  if (object.httpEtag) headers.set("etag", object.httpEtag);
+  if (etagMatches(request, object.httpEtag)) return new Response(null, { status: 304, headers });
+  const response = new Response(object.body, { status: 200, headers });
+  context.waitUntil(cache.put(request, response.clone()));
+  return response;
 }
 
 async function ownedUploads(env, sellerId, ids) {
@@ -510,7 +569,7 @@ async function duplicateProduct(request, env, productId) {
         httpMetadata: {
           ...sourceObject.httpMetadata,
           contentType: sourceUpload.mime_type,
-          cacheControl: immutableImageCacheControl,
+          cacheControl: publicImmutableImageCacheControl,
         },
         customMetadata: { sellerId: seller.id, mediaId },
       });
@@ -602,7 +661,7 @@ async function deleteDraft(request, env, draftId) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, context) {
     const cors = corsHeaders(request, env);
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
     const url = new URL(request.url);
@@ -611,6 +670,8 @@ export default {
       if (request.method === "GET" && url.pathname === "/v1/me") return json({ ok: true, user: await currentUser(request, env) }, 200, cors);
       if (request.method === "GET" && url.pathname === "/v1/catalog") return json({ ok: true, ...(await catalog(request, env)) }, 200, cors);
       if (request.method === "POST" && url.pathname === "/v1/media") return json({ ok: true, media: await uploadMedia(request, env) }, 201, cors);
+      const publicMediaMatch = /^\/v1\/public\/media\/([a-zA-Z0-9_-]+)$/.exec(url.pathname);
+      if (request.method === "GET" && publicMediaMatch) return await servePublicMedia(request, env, context, cleanId(publicMediaMatch[1], "Image ID"));
       const mediaMatch = /^\/v1\/media\/([a-zA-Z0-9_-]+)$/.exec(url.pathname);
       if (request.method === "GET" && mediaMatch) return await serveMedia(request, env, cleanId(mediaMatch[1], "Image ID"));
       const productDuplicateMatch = /^\/v1\/products\/([a-zA-Z0-9_-]+)\/duplicate$/.exec(url.pathname);

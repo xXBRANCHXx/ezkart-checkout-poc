@@ -821,8 +821,10 @@ if ($cloudPath !== '') {
             ez_admin_json(['ok' => false, 'error' => 'The cloud save request expired. Reload and try again.'], 403);
         }
     }
+    $cloudAccessToken = (string) ($_SESSION['supabase_access_token'] ?? '');
+    session_write_close();
     ez_admin_proxy_cloud_request(
-        (string) ($_SESSION['supabase_access_token'] ?? ''),
+        $cloudAccessToken,
         $cloudPath,
         $cloudMethod,
     );
@@ -999,7 +1001,7 @@ $catalogInventory = $legacyDataAccess ? [
   <link rel="stylesheet" href="admin.css?v=68">
   <title><?= $authenticated ? ez_admin_escape($pageTitles[$page]) : 'Admin Login' ?> · Ezkart</title>
 </head>
-<body class="<?= $authenticated ? 'dashboard-page page-' . ez_admin_escape($page) . ($page === 'sites' ? ($siteEditor ? ' page-site-editor' : ' page-sites-library') : '') : 'login-page' ?>" data-admin-storage-scope="<?= ez_admin_escape($adminStorageScope) ?>" data-admin-migrate-legacy-storage="<?= $legacyDataAccess ? 'true' : 'false' ?>" data-admin-cloud-enabled="<?= $authenticated && $authenticationMethod === 'supabase' ? 'true' : 'false' ?>" data-admin-csrf-token="<?= ez_admin_escape($csrfToken) ?>">
+<body class="<?= $authenticated ? 'dashboard-page page-' . ez_admin_escape($page) . ($page === 'sites' ? ($siteEditor ? ' page-site-editor' : ' page-sites-library') : '') : 'login-page' ?>" data-admin-storage-scope="<?= ez_admin_escape($adminStorageScope) ?>" data-admin-migrate-legacy-storage="<?= $legacyDataAccess ? 'true' : 'false' ?>" data-admin-cloud-enabled="<?= $authenticated && $authenticationMethod === 'supabase' ? 'true' : 'false' ?>" data-admin-cloud-media-base="<?= $authenticated && $authenticationMethod === 'supabase' ? ez_admin_escape(rtrim(ez_config('cloudflare_api_url'), '/')) : '' ?>" data-admin-csrf-token="<?= ez_admin_escape($csrfToken) ?>">
 <?php if (!$authenticated): ?>
   <main class="login-shell">
     <section class="login-card">
@@ -1254,7 +1256,7 @@ $catalogInventory = $legacyDataAccess ? [
   </div>
   <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
   <script src="assets/vendor/leaflet.js"></script>
-  <script src="admin.js?v=45"></script>
+  <script src="admin.js?v=46"></script>
 <?php endif; ?>
 </body>
 </html>
