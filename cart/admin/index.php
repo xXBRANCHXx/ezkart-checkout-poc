@@ -393,6 +393,28 @@ function ez_admin_totp_factors(array $user, ?string $status = null): array
     }));
 }
 
+function ez_admin_totp_qr_data_uri(string $qrCode): string
+{
+    $qrCode = trim($qrCode);
+    if ($qrCode === '' || strlen($qrCode) > 200_000) {
+        throw new RuntimeException('Supabase returned an invalid authenticator QR code.');
+    }
+    $svgStart = stripos($qrCode, '<svg');
+    $svgEnd = strripos($qrCode, '</svg>');
+    if ($svgStart === false || $svgEnd === false || $svgEnd <= $svgStart) {
+        throw new RuntimeException('Supabase returned an invalid authenticator QR code.');
+    }
+    $svg = substr($qrCode, $svgStart, $svgEnd + 6 - $svgStart);
+    if (
+        preg_match('/<(?:script|foreignObject|iframe|object|embed)\b/i', $svg) === 1
+        || preg_match('/\bon[a-z]+\s*=/i', $svg) === 1
+        || preg_match('/\b(?:href|xlink:href)\s*=\s*["\']\s*(?:https?:|data:|javascript:)/i', $svg) === 1
+    ) {
+        throw new RuntimeException('Supabase returned an unsafe authenticator QR code.');
+    }
+    return 'data:image/svg+xml;base64,' . base64_encode($svg);
+}
+
 function ez_admin_token_expiration(string $accessToken): int
 {
     $parts = explode('.', $accessToken);
@@ -853,11 +875,9 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && !isset($_GET['cloud'])) {
                 if (preg_match('/^[a-f0-9-]{36}$/i', $factorId) !== 1 || $qrCode === '' || trim((string) ($totp['secret'] ?? '')) === '') {
                     throw new RuntimeException('Supabase did not return a complete authenticator setup.');
                 }
-                if (str_starts_with($qrCode, '<svg')) $qrCode = 'data:image/svg+xml;base64,' . base64_encode($qrCode);
-                if (!str_starts_with($qrCode, 'data:image/svg+xml')) throw new RuntimeException('Supabase returned an invalid authenticator QR code.');
                 $_SESSION['mfa_setup'] = [
                     'factor_id' => $factorId,
-                    'qr_code' => $qrCode,
+                    'qr_code' => ez_admin_totp_qr_data_uri($qrCode),
                     'secret' => mb_substr(trim((string) $totp['secret']), 0, 160),
                     'expires_at' => time() + 900,
                 ];
