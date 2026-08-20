@@ -86,7 +86,7 @@ function ez_orders_table(array $rows, string $tableId): void
           <div class="product-form-grid">
             <label class="product-field-wide"><span>Product name</span><input name="name" required maxlength="70" placeholder="Example: Complete Freelance Guide" data-product-preview-name></label>
             <label><span>Product type</span><select name="type" data-product-create-type><option value="physical">Physical product</option><option value="digital">Digital product</option><option value="subscription">Subscription</option></select></label>
-            <label><span>Category</span><input name="category" required maxlength="40" placeholder="Example: Books" data-product-preview-category></label>
+            <label class="product-category-field"><span>Category</span><input name="category" type="hidden" maxlength="80" data-product-preview-category><button class="product-category-trigger" type="button" data-product-category-open aria-haspopup="dialog" aria-required="true"><span class="product-category-trigger-icon"><?= ez_admin_icon('layers') ?></span><span class="product-category-trigger-copy"><b data-product-category-value>Choose a category</b><small data-product-category-path>Search or browse the catalog</small></span><?= ez_admin_icon('chevron-right') ?></button><small class="product-category-field-note" data-product-category-note>Categories improve discovery and unlock the right product fields.</small></label>
             <label class="product-field-wide"><span>Description</span><textarea name="description" maxlength="360" rows="4" placeholder="Tell customers what makes this product worth buying." data-product-preview-description></textarea><small><b data-description-count>0</b>/360 characters</small></label>
           </div>
         </section>
@@ -171,6 +171,22 @@ function ez_orders_table(array $rows, string $tableId): void
         </div>
         <p class="product-preview-note"><?= ez_admin_icon('eye') ?><span><b>This is a preview, not a published page.</b> The product becomes available to your landing-page builder after you create it.</span></p>
       </aside>
+
+      <div class="product-category-dialog" data-product-category-dialog hidden>
+        <button class="product-category-backdrop" type="button" data-product-category-close aria-label="Close category chooser"></button>
+        <section role="dialog" aria-modal="true" aria-labelledby="product-category-title">
+          <header><div><span>PRODUCT CATEGORY</span><h2 id="product-category-title">Where should customers find this?</h2><p>Choose the closest match. Ezkart uses it for discovery, filters, and relevant product fields.</p></div><button type="button" data-product-category-close aria-label="Close category chooser">×</button></header>
+          <label class="product-category-search"><?= ez_admin_icon('search') ?><input type="search" autocomplete="off" placeholder="Search categories, such as syrup or skincare" data-product-category-search></label>
+          <div class="product-category-suggestions" data-product-category-suggestions></div>
+          <div class="product-category-search-results" data-product-category-results hidden></div>
+          <div class="product-category-browser" data-product-category-browser>
+            <section><header><b>Department</b><small>1</small></header><div data-product-category-level="0"></div></section>
+            <section><header><b>Category</b><small>2</small></header><div data-product-category-level="1"></div></section>
+            <section><header><b>Specific category</b><small>3</small></header><div data-product-category-level="2"></div></section>
+          </div>
+          <footer><div><small>Selected category</small><b data-product-category-selection>Nothing selected yet</b></div><button type="button" data-product-category-confirm disabled>Use this category</button></footer>
+        </section>
+      </div>
     </form>
   </section>
 

@@ -404,6 +404,13 @@
   if (productCreateForm) {
     const q = (selector) => productCreateForm.querySelector(selector);
     const typeInput = q("[data-product-create-type]");
+    const categoryInput = productCreateForm.elements.category;
+    const categoryDialog = q("[data-product-category-dialog]");
+    const categorySearch = q("[data-product-category-search]");
+    const categoryBrowser = q("[data-product-category-browser]");
+    const categoryResults = q("[data-product-category-results]");
+    const categorySuggestions = q("[data-product-category-suggestions]");
+    const categoryConfirm = q("[data-product-category-confirm]");
     const mediaInput = q("[data-product-media-input]");
     const dropzone = q("[data-product-dropzone]");
     const dropzoneTitle = q("[data-product-drop-title]");
@@ -466,6 +473,70 @@
     const clearError = () => { if (!errorTarget) return; errorTarget.hidden = true; errorTarget.textContent = ""; };
     const optionValues = (input) => String(input?.value || "").split(",").map((value) => value.trim()).filter(Boolean).filter((value, index, values) => values.indexOf(value) === index);
     const compactVariantName = (name) => { const characters = [...String(name || "")]; return characters.length > 20 ? `${characters.slice(0, 19).join("")}…` : characters.join(""); };
+    const categoryCatalog = {
+      physical: [
+        ["Food & Beverages", [
+          ["Breakfast & Pantry", [["Granola & Cereal", "granola cereal oats muesli breakfast"], ["Spreads & Honey", "honey jam spread nut butter"], ["Baking Supplies", "baking flour sugar yeast cake"]]],
+          ["Beverages", [["Coffee", "coffee kopi cold brew beans concentrate"], ["Tea", "tea matcha herbal leaves"], ["Syrups & Concentrates", "syrup concentrate cordial stevia drink flavor"], ["Juice & Soft Drinks", "juice soda soft drink water"]]],
+          ["Snacks", [["Chips & Crackers", "chips crisps crackers snack"], ["Nuts & Dried Fruit", "nuts dried fruit trail mix"], ["Sweets & Chocolate", "candy sweets chocolate dessert"]]],
+          ["Cooking & Condiments", [["Sambal & Chili Sauce", "sambal chili sauce roa spicy condiment"], ["Sauces & Seasonings", "sauce seasoning spice salt pepper"], ["Oils & Vinegar", "oil vinegar cooking"]]],
+          ["Fresh & Prepared Food", [["Bakery", "bread pastry bakery cake"], ["Ready-to-Eat Meals", "meal ready food lunch dinner"], ["Frozen Food", "frozen food meat dumpling"]]],
+        ]],
+        ["Beauty & Personal Care", [
+          ["Skincare", [["Facial Care", "face serum cleanser moisturizer acne"], ["Body Care", "body lotion scrub care"], ["Sun Care", "sunscreen sunblock spf"]]],
+          ["Hair Care", [["Shampoo & Conditioner", "shampoo conditioner hair"], ["Styling & Treatment", "hair styling treatment mask oil"]]],
+          ["Makeup", [["Face Makeup", "foundation powder blush makeup"], ["Lip Makeup", "lipstick lip tint balm"], ["Eye Makeup", "mascara eyeliner eyeshadow"]]],
+          ["Personal Care", [["Bath & Body", "soap bath deodorant body"], ["Oral Care", "toothpaste toothbrush mouth"], ["Fragrance", "perfume fragrance cologne"]]],
+        ]],
+        ["Fashion", [
+          ["Women's Fashion", [["Tops", "women shirt blouse top"], ["Bottoms", "women pants skirt shorts"], ["Dresses & Modest Wear", "dress hijab modest abaya"], ["Shoes", "women shoes sandals heels"], ["Bags & Accessories", "women bag accessory wallet"]]],
+          ["Men's Fashion", [["Tops", "men shirt tshirt top"], ["Bottoms", "men pants shorts"], ["Outerwear", "jacket coat outerwear"], ["Shoes", "men shoes sneakers sandals"], ["Bags & Accessories", "men bag wallet belt"]]],
+          ["Kids' Fashion", [["Clothing", "kids baby clothing"], ["Shoes", "kids shoes"], ["Accessories", "kids accessory"]]],
+        ]],
+        ["Home & Living", [
+          ["Kitchen & Dining", [["Cookware", "pan pot cookware kitchen"], ["Drinkware", "cup mug bottle drinkware"], ["Storage & Organization", "container storage organizer"]]],
+          ["Home Decor", [["Decorative Objects", "decor ornament vase candle"], ["Lighting", "lamp lighting"], ["Textiles", "rug curtain cushion textile"]]],
+          ["Furniture", [["Living Room", "sofa table living furniture"], ["Bedroom", "bed mattress bedroom"], ["Office", "desk chair office"]]],
+          ["Household Supplies", [["Cleaning", "cleaning mop detergent"], ["Laundry", "laundry wash"], ["Home Organization", "organizer shelf storage"]]],
+        ]],
+        ["Electronics", [
+          ["Phones & Accessories", [["Smartphones", "phone smartphone mobile"], ["Cases & Protection", "phone case screen protector"], ["Chargers & Cables", "charger cable power bank"]]],
+          ["Computers & Accessories", [["Laptops & Computers", "laptop computer pc"], ["Components & Storage", "ssd ram component drive"], ["Keyboards & Mice", "keyboard mouse peripheral"]]],
+          ["Audio & Cameras", [["Headphones & Speakers", "headphone earbud speaker audio"], ["Cameras", "camera photo video"], ["Camera Accessories", "tripod lens camera accessory"]]],
+          ["Home Appliances", [["Kitchen Appliances", "blender cooker kitchen appliance"], ["Cooling & Air Care", "fan air purifier cooling"], ["Cleaning Appliances", "vacuum cleaning appliance"]]],
+        ]],
+        ["Health & Wellness", [
+          ["Nutrition", [["Vitamins & Supplements", "vitamin supplement health"], ["Healthy Foods", "healthy organic food"], ["Sports Nutrition", "protein sports nutrition"]]],
+          ["Fitness", [["Exercise Equipment", "fitness gym equipment"], ["Yoga & Recovery", "yoga massage recovery"], ["Fitness Wearables", "fitness tracker wearable"]]],
+          ["Personal Health", [["First Aid", "first aid medical"], ["Health Monitoring", "thermometer monitor health"], ["Mobility & Support", "support brace mobility"]]],
+        ]],
+        ["Baby & Kids", [["Baby Care", [["Diapers & Hygiene", "diaper baby hygiene"], ["Bath & Skincare", "baby bath skincare"]]], ["Feeding", [["Bottles & Accessories", "baby bottle feeding"], ["Baby Food", "baby food formula"]]], ["Toys & Learning", [["Learning Toys", "educational learning toy"], ["Games & Play", "game toy play"]]]]],
+        ["Sports & Outdoors", [["Sports Equipment", [["Team Sports", "football basketball sports"], ["Racket Sports", "badminton tennis racket"]]], ["Outdoor & Travel", [["Camping & Hiking", "camping hiking outdoor"], ["Travel Gear", "travel luggage gear"]]], ["Sportswear", [["Activewear", "activewear sports clothing"], ["Sports Shoes", "sports shoes running"]]]]],
+        ["Automotive & Motorcycles", [["Car Accessories", [["Interior Accessories", "car interior accessory"], ["Car Care", "car care wash"]]], ["Motorcycle Accessories", [["Rider Gear", "helmet rider motorcycle"], ["Motorcycle Care", "motorcycle care"]]], ["Parts & Tools", [["Replacement Parts", "vehicle replacement part"], ["Tools & Equipment", "automotive tool"]]]]],
+        ["Books & Stationery", [["Books", [["Fiction", "book novel fiction"], ["Non-fiction", "book guide nonfiction"], ["Children's Books", "children kids book"]]], ["Office & School", [["Writing Supplies", "pen pencil writing"], ["Paper & Notebooks", "paper notebook journal"]]], ["Art & Craft", [["Art Supplies", "paint canvas art"], ["Craft Supplies", "craft diy"]]]]],
+        ["Pet Supplies", [["Food & Treats", [["Cat Food", "cat food treat"], ["Dog Food", "dog food treat"], ["Other Pet Food", "pet food"]]], ["Care & Grooming", [["Grooming", "pet grooming"], ["Health & Hygiene", "pet health hygiene"]]], ["Pet Accessories", [["Beds & Habitats", "pet bed cage habitat"], ["Toys & Walking", "pet toy leash collar"]]]]],
+      ],
+      digital: [
+        ["Learning & Education", [["Books & Guides", [["E-books", "ebook book guide pdf"], ["Templates & Workbooks", "workbook template planner"]]], ["Online Learning", [["Courses", "course class lesson"], ["Tutorials & Workshops", "tutorial workshop training"]]]]],
+        ["Creative Assets", [["Design", [["Design Templates", "canva design template"], ["Fonts & Graphics", "font icon graphic illustration"]]], ["Photo & Video", [["Stock Photography", "photo stock image"], ["Video Assets", "video footage preset lut"]]], ["Music & Audio", [["Music & Sound", "music audio sound effect"], ["Audio Presets", "audio preset sample"]]]]],
+        ["Software & Tools", [["Apps & Software", [["Business Software", "software business app"], ["Creator Tools", "creator editing tool"], ["Productivity Tools", "productivity app tool"]]], ["Licenses & Keys", [["Software Licenses", "license key software"], ["Plugins & Extensions", "plugin extension addon"]]]]],
+        ["Digital Access", [["Vouchers", [["Gift Cards", "gift card voucher"], ["Service Vouchers", "service voucher coupon"]]], ["Events & Membership", [["Event Tickets", "event ticket pass"], ["Membership Access", "membership access community"]]]]],
+      ],
+      subscription: [
+        ["Software Plans", [["Business Software", [["Commerce & Operations", "commerce operations business software"], ["Finance & Administration", "finance accounting admin software"]]], ["Creator Tools", [["Design & Editing", "design editing creator"], ["Publishing & Analytics", "publishing analytics creator"]]], ["Productivity Apps", [["Personal Productivity", "productivity task notes"], ["Team Collaboration", "team collaboration project"]]]]],
+        ["Content Memberships", [["Learning", [["Courses & Coaching", "course coaching learning"], ["Resource Libraries", "resource library learning"]]], ["Communities", [["Professional Communities", "professional community"], ["Interest Communities", "membership club community"]]], ["Premium Content", [["Newsletters & Publications", "newsletter publication"], ["Video & Audio Content", "video audio podcast content"]]]]],
+        ["Services & Retainers", [["Business Services", [["Consulting", "consulting advisory"], ["Marketing Services", "marketing service retainer"]]], ["Creative Services", [["Design Retainers", "design creative retainer"], ["Content Production", "content production service"]]], ["Support & Maintenance", [["Technical Support", "technical support maintenance"], ["Managed Services", "managed service"]]]]],
+        ["Recurring Goods", [["Food & Beverage Boxes", [["Coffee & Tea", "coffee tea subscription box"], ["Snacks & Pantry", "snack pantry food box"]]], ["Beauty & Wellness Boxes", [["Beauty Boxes", "beauty skincare box"], ["Wellness Boxes", "wellness health box"]]], ["Other Subscription Boxes", [["Hobby Boxes", "hobby collectible box"], ["Custom Recurring Box", "custom recurring subscription box"]]]]],
+      ],
+    };
+    const categoryPath = (parts) => parts.join(" > ");
+    const categoryLeaf = (path) => String(path || "").split(" > ").at(-1) || "";
+    const categoryKey = (path) => normalizeCategoryText(path).replaceAll(" ", "-");
+    const categoryEntries = (type = currentType()) => (categoryCatalog[type] || []).flatMap(([department, groups]) => groups.flatMap(([group, leaves]) => leaves.map(([leaf, keywords]) => ({ department, group, leaf, path: categoryPath([department, group, leaf]), keywords }))));
+    const normalizeCategoryText = (value) => String(value || "").toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, " ").trim();
+    let categoryPending = "";
+    let categoryDepartment = "";
+    let categoryGroup = "";
     const optionSnapshot = () => [...(optionGroups?.children || [])].map((row) => ({ name: String(row.querySelector("[data-option-name]")?.value || "").trim(), values: optionValues(row.querySelector("[data-option-values]")) })).filter((group) => group.name && group.values.length);
     const selectedPreviewVariant = () => {
       if (!variantToggle?.checked || !variants.length) return null;
@@ -478,6 +549,108 @@
       if (dropzoneTitle) dropzoneTitle.textContent = state === "ready" ? "Release to upload" : state === "uploading" ? "Preparing your images…" : "Drop images here";
       if (dropzoneHint) dropzoneHint.textContent = state === "ready" ? "They’re ready—drop them right here" : state === "uploading" ? "Optimizing them for a fast storefront" : "or click to browse your files";
     };
+
+    const currentCategoryEntry = () => categoryEntries().find((entry) => entry.path === String(categoryInput?.value || "").trim()) || null;
+    const syncCategoryField = () => {
+      const value = String(categoryInput?.value || "").trim();
+      const entry = currentCategoryEntry();
+      const trigger = q("[data-product-category-open]");
+      const valueTarget = q("[data-product-category-value]");
+      const pathTarget = q("[data-product-category-path]");
+      const noteTarget = q("[data-product-category-note]");
+      trigger?.classList.toggle("has-value", Boolean(value));
+      trigger?.classList.toggle("is-legacy", Boolean(value && !entry));
+      if (valueTarget) valueTarget.textContent = entry?.leaf || value || "Choose a category";
+      if (pathTarget) pathTarget.textContent = entry ? `${entry.department} · ${entry.group}` : value ? "Current custom category" : "Search or browse the catalog";
+      if (noteTarget) noteTarget.textContent = entry ? "Structured category selected." : value ? "Choose a structured category to improve discovery and product setup." : "Categories improve discovery and unlock the right product fields.";
+    };
+    const scoreCategoryEntry = (entry) => {
+      const source = normalizeCategoryText(`${productCreateForm.elements.name?.value || ""} ${productCreateForm.elements.description?.value || ""}`);
+      if (!source) return 0;
+      const tokens = source.split(" ").filter((token) => token.length > 2);
+      const labels = normalizeCategoryText(`${entry.department} ${entry.group} ${entry.leaf}`);
+      const keywords = normalizeCategoryText(entry.keywords);
+      return tokens.reduce((score, token) => score + (keywords.includes(token) ? 5 : 0) + (labels.includes(token) ? 3 : 0), 0);
+    };
+    const suggestedCategories = () => categoryEntries().map((entry, index) => ({ entry, score: scoreCategoryEntry(entry), index })).sort((a, b) => b.score - a.score || a.index - b.index).slice(0, 3).map(({ entry }) => entry);
+    const choosePendingCategory = (entry) => {
+      categoryPending = entry.path; categoryDepartment = entry.department; categoryGroup = entry.group;
+      renderCategoryBrowser(); renderCategorySearchResults();
+    };
+    const categoryChoiceButton = (entry, compact = false) => {
+      const button = document.createElement("button");
+      button.type = "button"; button.className = "product-category-choice";
+      button.classList.toggle("selected", categoryPending === entry.path);
+      button.innerHTML = `<span><b>${escapeHtml(entry.leaf)}</b><small>${escapeHtml(compact ? `${entry.department} · ${entry.group}` : entry.path.replaceAll(" > ", " · "))}</small></span><span aria-hidden="true">${categoryPending === entry.path ? "✓" : "›"}</span>`;
+      button.addEventListener("click", () => choosePendingCategory(entry));
+      button.addEventListener("dblclick", () => { choosePendingCategory(entry); confirmCategorySelection(); });
+      return button;
+    };
+    const renderCategorySuggestions = () => {
+      if (!categorySuggestions) return;
+      const suggestions = suggestedCategories();
+      const hasName = Boolean(String(productCreateForm.elements.name?.value || "").trim());
+      categorySuggestions.replaceChildren();
+      const header = document.createElement("header"); header.innerHTML = `<b>${hasName ? "Suggested from the product name" : `Popular for ${escapeHtml(typeName(currentType()).toLowerCase())}s`}</b><small>Choose one or browse below</small>`; categorySuggestions.append(header);
+      const list = document.createElement("div"); suggestions.forEach((entry) => list.append(categoryChoiceButton(entry, true))); categorySuggestions.append(list);
+    };
+    function renderCategoryBrowser() {
+      const roots = categoryCatalog[currentType()] || [];
+      if (!roots.some(([label]) => label === categoryDepartment)) categoryDepartment = roots[0]?.[0] || "";
+      const root = roots.find(([label]) => label === categoryDepartment);
+      if (!root?.[1].some(([label]) => label === categoryGroup)) categoryGroup = root?.[1]?.[0]?.[0] || "";
+      const group = root?.[1].find(([label]) => label === categoryGroup);
+      const departmentLevel = q('[data-product-category-level="0"]');
+      const groupLevel = q('[data-product-category-level="1"]');
+      const leafLevel = q('[data-product-category-level="2"]');
+      departmentLevel?.replaceChildren(); groupLevel?.replaceChildren(); leafLevel?.replaceChildren();
+      roots.forEach(([label]) => {
+        const button = document.createElement("button"); button.type = "button"; button.classList.toggle("active", label === categoryDepartment); button.innerHTML = `<span>${escapeHtml(label)}</span><span aria-hidden="true">›</span>`;
+        button.addEventListener("click", () => { categoryDepartment = label; categoryGroup = ""; renderCategoryBrowser(); }); departmentLevel?.append(button);
+      });
+      (root?.[1] || []).forEach(([label]) => {
+        const button = document.createElement("button"); button.type = "button"; button.classList.toggle("active", label === categoryGroup); button.innerHTML = `<span>${escapeHtml(label)}</span><span aria-hidden="true">›</span>`;
+        button.addEventListener("click", () => { categoryGroup = label; renderCategoryBrowser(); }); groupLevel?.append(button);
+      });
+      (group?.[1] || []).forEach(([leaf]) => {
+        const entry = { department: categoryDepartment, group: categoryGroup, leaf, path: categoryPath([categoryDepartment, categoryGroup, leaf]) };
+        const button = document.createElement("button"); button.type = "button"; button.classList.toggle("selected", entry.path === categoryPending); button.innerHTML = `<span>${escapeHtml(leaf)}</span><span aria-hidden="true">${entry.path === categoryPending ? "✓" : ""}</span>`;
+        button.addEventListener("click", () => choosePendingCategory(entry)); button.addEventListener("dblclick", () => { choosePendingCategory(entry); confirmCategorySelection(); }); leafLevel?.append(button);
+      });
+      const selection = q("[data-product-category-selection]"); if (selection) selection.textContent = categoryPending || "Nothing selected yet";
+      if (categoryConfirm) categoryConfirm.disabled = !categoryPending;
+    }
+    function renderCategorySearchResults() {
+      if (!categorySearch || !categoryResults || !categoryBrowser || !categorySuggestions) return;
+      const query = normalizeCategoryText(categorySearch.value);
+      const searching = Boolean(query);
+      categoryResults.hidden = !searching; categoryBrowser.hidden = searching; categorySuggestions.hidden = searching;
+      if (!searching) { categoryResults.replaceChildren(); return; }
+      const matches = categoryEntries().filter((entry) => normalizeCategoryText(`${entry.path} ${entry.keywords}`).includes(query) || query.split(" ").every((token) => normalizeCategoryText(`${entry.path} ${entry.keywords}`).includes(token))).slice(0, 12);
+      categoryResults.replaceChildren();
+      if (!matches.length) { const empty = document.createElement("div"); empty.className = "product-category-empty"; empty.innerHTML = `<b>No category matches “${escapeHtml(categorySearch.value.trim())}”</b><span>Try a broader product word, such as coffee, clothing, or software.</span>`; categoryResults.append(empty); return; }
+      const header = document.createElement("header"); header.innerHTML = `<b>${matches.length} matching categor${matches.length === 1 ? "y" : "ies"}</b><small>Searches the full category path</small>`; categoryResults.append(header);
+      const list = document.createElement("div"); matches.forEach((entry) => list.append(categoryChoiceButton(entry))); categoryResults.append(list);
+    }
+    const openCategoryDialog = () => {
+      if (!categoryDialog) return;
+      const current = currentCategoryEntry(); const suggestion = suggestedCategories()[0];
+      categoryPending = current?.path || ""; categoryDepartment = current?.department || suggestion?.department || ""; categoryGroup = current?.group || suggestion?.group || "";
+      if (categorySearch) categorySearch.value = "";
+      renderCategorySuggestions(); renderCategoryBrowser(); renderCategorySearchResults();
+      categoryDialog.hidden = false; document.documentElement.classList.add("category-dialog-open"); window.setTimeout(() => categorySearch?.focus(), 30);
+    };
+    const closeCategoryDialog = () => { if (categoryDialog) categoryDialog.hidden = true; document.documentElement.classList.remove("category-dialog-open"); q("[data-product-category-open]")?.focus(); };
+    function confirmCategorySelection() {
+      if (!categoryPending || !categoryInput) return;
+      categoryInput.value = categoryPending; syncCategoryField(); clearError(); closeCategoryDialog();
+      categoryInput.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+    q("[data-product-category-open]")?.addEventListener("click", openCategoryDialog);
+    q("[data-product-category-confirm]")?.addEventListener("click", confirmCategorySelection);
+    q("[data-product-category-dialog]")?.querySelectorAll("[data-product-category-close]").forEach((button) => button.addEventListener("click", closeCategoryDialog));
+    categorySearch?.addEventListener("input", renderCategorySearchResults);
+    document.addEventListener("keydown", (event) => { if (event.key === "Escape" && categoryDialog && !categoryDialog.hidden) closeCategoryDialog(); });
 
     const previewAvailability = (selectedVariant) => {
       const type = currentType();
@@ -497,7 +670,7 @@
       const description = String(productCreateForm.elements.description?.value || "").trim();
       const price = selectedVariant ? selectedVariant.price : productCreateForm.elements.price?.value;
       setText("[data-product-live-name]", name || "Your product name");
-      setText("[data-product-live-category]", category || "Product category");
+      setText("[data-product-live-category]", categoryLeaf(category) || "Product category");
       setText("[data-product-live-description]", description || "Add a clear description so customers immediately understand what they are buying.");
       setText("[data-product-live-price]", formatCreatorPrice(Math.max(0, Math.round(Number(price) || 0))));
       setText("[data-product-live-type]", typeName(currentType()));
@@ -1001,13 +1174,20 @@
     dropzone?.addEventListener("dragleave", (event) => { event.preventDefault(); dropzoneDragDepth = Math.max(0, dropzoneDragDepth - 1); if (dropzoneDragDepth === 0) setDropzoneState("idle"); });
     dropzone?.addEventListener("drop", (event) => { event.preventDefault(); dropzoneDragDepth = 0; addImages([...(event.dataTransfer?.files || [])]); });
     saveDraftButton?.addEventListener("click", () => { void saveDraft(true); });
-    productCreateForm.addEventListener("input", () => { updatePreview(); markDraftChanged(); });
+    productCreateForm.addEventListener("input", (event) => { updatePreview(); markDraftChanged(); if (event.target === productCreateForm.elements.name && categoryDialog && !categoryDialog.hidden) renderCategorySuggestions(); });
     productCreateForm.addEventListener("change", () => { updatePreview(); markDraftChanged(); });
-    typeInput?.addEventListener("change", syncType);
+    typeInput?.addEventListener("change", () => {
+      syncType();
+      const value = String(categoryInput?.value || "").trim();
+      const knownCategory = Object.keys(categoryCatalog).flatMap((type) => categoryEntries(type)).some((entry) => entry.path === value);
+      if (knownCategory && !currentCategoryEntry() && categoryInput) categoryInput.value = "";
+      syncCategoryField();
+    });
     productCreateForm.elements.unit?.addEventListener("change", syncBaseBillingLimit);
     productCreateForm.addEventListener("submit", async (event) => {
       event.preventDefault(); clearError();
       if (!productCreateForm.reportValidity()) return;
+      if (!String(categoryInput?.value || "").trim()) { showError("Choose the product category that best matches what you are selling."); openCategoryDialog(); return; }
       const type = currentType(); const minimum = type === "physical" ? 3 : 1;
       if (selectedImages.length < minimum || selectedImages.length > 9) { showError(`${typeName(type)} requires ${minimum === 3 ? "3–9" : "1–9"} images.`); return; }
       if (variantToggle.checked && !variants.length) { showError(type === "subscription" ? "Generate at least one plan, or turn off Has plans." : "Generate at least one variant, or turn off Has variants."); return; }
@@ -1021,7 +1201,7 @@
         const images = await Promise.all(selectedImages.map(imageData));
         const suffix = globalThis.crypto?.randomUUID?.().replace(/-/g, "").slice(0, 10) || String(Date.now());
         const product = {
-          id: editingProduct?.id || `custom-${suffix}`, sku: editingProduct?.sku || `EZK-${type.slice(0, 3).toUpperCase()}-${suffix.toUpperCase()}`, name: String(productCreateForm.elements.name.value).trim(), category: String(productCreateForm.elements.category.value).trim(), description: String(productCreateForm.elements.description.value).trim(), type,
+          id: editingProduct?.id || `custom-${suffix}`, sku: editingProduct?.sku || `EZK-${type.slice(0, 3).toUpperCase()}-${suffix.toUpperCase()}`, name: String(productCreateForm.elements.name.value).trim(), category: String(productCreateForm.elements.category.value).trim(), categoryKey: currentCategoryEntry() ? categoryKey(productCreateForm.elements.category.value) : "", description: String(productCreateForm.elements.description.value).trim(), type,
           price: variantToggle.checked ? Math.min(...variants.map((variant) => variant.price)) : Math.round(Number(productCreateForm.elements.price.value) || 0), images, mediaIds: selectedImages.map((image) => image.cloudId), image: images[0],
           ...(type === "physical" ? { stock: variantToggle.checked ? variants.reduce((total, variant) => total + variant.stock, 0) : Math.max(0, Math.round(Number(productCreateForm.elements.stock.value) || 0)), weightGrams: variantToggle.checked ? Math.max(...variants.map((variant) => variant.weightGrams)) : Math.max(1, Math.round(Number(productCreateForm.elements.weight.value) || 0)) } : {}),
           ...(type === "digital" ? { digitalFileName: String(productCreateForm.elements.digital_name.value || "").trim() } : {}),
@@ -1045,7 +1225,7 @@
       finally { submitButtons.forEach((button) => { button.disabled = false; button.textContent = button.dataset.originalText || (editingProduct ? "Publish changes" : "Create product"); }); }
     });
 
-    restoreDraft(); syncVariantMode(); syncType(); syncPreviewDevice(); renderImages(); restoringDraft = false; updatePreview();
+    restoreDraft(); syncVariantMode(); syncType(); syncCategoryField(); syncPreviewDevice(); renderImages(); restoringDraft = false; updatePreview();
   }
 
   const setupCreatorProducts = (form) => {
@@ -1319,7 +1499,7 @@
         const availability = type === "physical" ? `${Math.max(0, Number(product.stock) || 0)} in stock` : type === "digital" ? "Digital delivery" : `Every ${product.subscription?.interval || 1} ${product.subscription?.unit || "month"}`;
         const card = document.createElement("article");
         card.className = "product-card"; card.dataset.customProduct = product.id;
-        card.innerHTML = `<span class="product-art"><img src="${image}" alt="${escapeHtml(product.name)}" loading="lazy" decoding="async"><em>${product.images?.length || 1} image${(product.images?.length || 1) === 1 ? "" : "s"}</em></span><div class="product-card-body"><header><span class="product-card-type">${escapeHtml(product.category || typeName(type))}</span><em>Active</em></header><h2>${escapeHtml(product.name)}</h2><p>${escapeHtml(product.sku)}</p><div class="product-price"><strong>${escapeHtml(formatCreatorPrice(product.price))}</strong><small>${escapeHtml(availability)}</small></div><footer><div><small>Type</small><b>${escapeHtml(typeName(type))}</b></div><div><small>Revenue</small><b>Rp0</b></div><div class="product-card-actions"><a href="?page=product-new&amp;product=${encodeURIComponent(product.id)}">Edit</a><button class="product-duplicate" type="button">Duplicate</button><button class="product-delete" type="button">Delete</button></div></footer></div>`;
+        card.innerHTML = `<span class="product-art"><img src="${image}" alt="${escapeHtml(product.name)}" loading="lazy" decoding="async"><em>${product.images?.length || 1} image${(product.images?.length || 1) === 1 ? "" : "s"}</em></span><div class="product-card-body"><header><span class="product-card-type">${escapeHtml(String(product.category || typeName(type)).split(" > ").at(-1))}</span><em>Active</em></header><h2>${escapeHtml(product.name)}</h2><p>${escapeHtml(product.sku)}</p><div class="product-price"><strong>${escapeHtml(formatCreatorPrice(product.price))}</strong><small>${escapeHtml(availability)}</small></div><footer><div><small>Type</small><b>${escapeHtml(typeName(type))}</b></div><div><small>Revenue</small><b>Rp0</b></div><div class="product-card-actions"><a href="?page=product-new&amp;product=${encodeURIComponent(product.id)}">Edit</a><button class="product-duplicate" type="button">Duplicate</button><button class="product-delete" type="button">Delete</button></div></footer></div>`;
         card.querySelector(".product-duplicate").addEventListener("click", () => {
           const duplicateButton = card.querySelector(".product-duplicate");
           const duplicate = async () => {

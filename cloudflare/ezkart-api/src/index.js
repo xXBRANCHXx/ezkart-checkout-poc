@@ -240,6 +240,7 @@ function shapeProduct(row, media = [], variants = []) {
     sku: row.sku || "",
     name: row.title,
     category: cleanText(metadata.category, 80),
+    categoryKey: cleanText(metadata.categoryKey, 120),
     description: row.description || "",
     type: row.type,
     status: row.status,
@@ -502,7 +503,7 @@ async function saveProduct(request, env, rawId) {
         stock_quantity = excluded.stock_quantity, weight_grams = excluded.weight_grams,
         billing_interval = excluded.billing_interval, billing_interval_count = excluded.billing_interval_count,
         digital_filename = excluded.digital_filename, metadata_json = excluded.metadata_json, updated_at = excluded.updated_at
-    `).bind(id, seller.id, type, title, description, sku, basePrice, stock, weight, billingUnit, billingInterval, digitalFilename, JSON.stringify({ category: cleanText(payload.category, 80), options, ...(type === "subscription" ? { subscription: { interval: displayBillingInterval, unit: displayBillingUnit } } : {}) }), createdAt, now),
+    `).bind(id, seller.id, type, title, description, sku, basePrice, stock, weight, billingUnit, billingInterval, digitalFilename, JSON.stringify({ category: cleanText(payload.category, 80), categoryKey: cleanText(payload.categoryKey, 120), options, ...(type === "subscription" ? { subscription: { interval: displayBillingInterval, unit: displayBillingUnit } } : {}) }), createdAt, now),
     env.DB.prepare("DELETE FROM product_variants WHERE seller_id = ? AND product_id = ?").bind(seller.id, id),
     env.DB.prepare("DELETE FROM product_media WHERE seller_id = ? AND product_id = ?").bind(seller.id, id),
   ];
