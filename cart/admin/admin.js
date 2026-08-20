@@ -346,7 +346,7 @@
       if (fieldset.querySelector(`input[value="${CSS.escape(product.id)}"]`)) return;
       const label = document.createElement("label");
       label.dataset.sharedCatalogProduct = product.id;
-      label.innerHTML = `<input type="checkbox" name="starter_products[]" value="${product.id}"><span><span class="product-art"><img src="${product.image || product.images?.[0] || ""}" alt=""></span><b>${escapeHtml(product.name)}</b><small>${escapeHtml(formatCreatorPrice(product.price))} · ${escapeHtml(product.type || "product")}</small></span>`;
+      label.innerHTML = `<input type="checkbox" name="starter_products[]" value="${product.id}"><span><span class="product-art"><img src="${product.image || product.images?.[0] || ""}" alt="" loading="lazy" decoding="async"></span><b>${escapeHtml(product.name)}</b><small>${escapeHtml(formatCreatorPrice(product.price))} · ${escapeHtml(product.type || "product")}</small></span>`;
       fieldset.append(label);
     });
   };
@@ -1041,7 +1041,7 @@
       products.forEach((product) => {
         const row = document.createElement("div"); row.className = "creator-custom-product";
         const schedule = product.type === "subscription" ? ` · every ${product.subscription.interval} ${product.subscription.unit}${product.subscription.interval > 1 ? "s" : ""}` : "";
-        row.innerHTML = `<input type="checkbox" name="starter_products[]" value="${product.id}" checked hidden><img src="${product.image}" alt=""><div><b>${escapeHtml(product.name)}</b><small>${escapeHtml(formatCreatorPrice(product.price))} · ${escapeHtml(typeLabel(product.type))}${escapeHtml(schedule)} · ${product.images.length} image${product.images.length === 1 ? "" : "s"}</small></div><button type="button" aria-label="Remove ${escapeHtml(product.name)}">×</button>`;
+        row.innerHTML = `<input type="checkbox" name="starter_products[]" value="${product.id}" checked hidden><img src="${product.image}" alt="" loading="lazy" decoding="async"><div><b>${escapeHtml(product.name)}</b><small>${escapeHtml(formatCreatorPrice(product.price))} · ${escapeHtml(typeLabel(product.type))}${escapeHtml(schedule)} · ${product.images.length} image${product.images.length === 1 ? "" : "s"}</small></div><button type="button" aria-label="Remove ${escapeHtml(product.name)}">×</button>`;
         row.querySelector("button").onclick = () => { products = products.filter((item) => item.id !== product.id); render(); };
         list.append(row);
       });
@@ -1259,7 +1259,7 @@
         const when = draft.updatedAt ? new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(new Date(draft.updatedAt)) : "Recently saved";
         const continueQuery = new URLSearchParams({ page: "product-new", draft: draft.id });
         if (/^custom-[a-z0-9]+$/i.test(draft.productId || "")) continueQuery.set("product", draft.productId);
-        card.innerHTML = `<span>${image ? `<img src="${image}" alt="">` : '<svg class="icon" aria-hidden="true"><use href="#icon-image"></use></svg>'}</span><div><b>${escapeHtml(draft.name || "Untitled product")}</b><small>${draft.hasVariants ? `${draft.variants?.length || 0} variants` : typeName(draft.fields?.type || "physical")} · ${escapeHtml(when)}</small></div><div><a href="?${continueQuery.toString().replaceAll("&", "&amp;")}">Continue</a><button type="button" aria-label="Delete ${escapeHtml(draft.name || "untitled product")} draft">×</button></div>`;
+        card.innerHTML = `<span>${image ? `<img src="${image}" alt="" loading="lazy" decoding="async">` : '<svg class="icon" aria-hidden="true"><use href="#icon-image"></use></svg>'}</span><div><b>${escapeHtml(draft.name || "Untitled product")}</b><small>${draft.hasVariants ? `${draft.variants?.length || 0} variants` : typeName(draft.fields?.type || "physical")} · ${escapeHtml(when)}</small></div><div><a href="?${continueQuery.toString().replaceAll("&", "&amp;")}">Continue</a><button type="button" aria-label="Delete ${escapeHtml(draft.name || "untitled product")} draft">×</button></div>`;
         card.querySelector("button").addEventListener("click", () => {
           if (!window.confirm(`Delete the “${draft.name || "Untitled product"}” draft?`)) return;
           const remove = async () => {
@@ -1285,7 +1285,7 @@
         const availability = type === "physical" ? `${Math.max(0, Number(product.stock) || 0)} in stock` : type === "digital" ? "Digital delivery" : `Every ${product.subscription?.interval || 1} ${product.subscription?.unit || "month"}`;
         const card = document.createElement("article");
         card.className = "product-card"; card.dataset.customProduct = product.id;
-        card.innerHTML = `<span class="product-art"><img src="${image}" alt="${escapeHtml(product.name)}"><em>${product.images?.length || 1} image${(product.images?.length || 1) === 1 ? "" : "s"}</em></span><div class="product-card-body"><header><span class="product-card-type">${escapeHtml(product.category || typeName(type))}</span><em>Active</em></header><h2>${escapeHtml(product.name)}</h2><p>${escapeHtml(product.sku)}</p><div class="product-price"><strong>${escapeHtml(formatCreatorPrice(product.price))}</strong><small>${escapeHtml(availability)}</small></div><footer><div><small>Type</small><b>${escapeHtml(typeName(type))}</b></div><div><small>Revenue</small><b>Rp0</b></div><div class="product-card-actions"><a href="?page=product-new&amp;product=${encodeURIComponent(product.id)}">Edit</a><button class="product-duplicate" type="button">Duplicate</button><button class="product-delete" type="button">Delete</button></div></footer></div>`;
+        card.innerHTML = `<span class="product-art"><img src="${image}" alt="${escapeHtml(product.name)}" loading="lazy" decoding="async"><em>${product.images?.length || 1} image${(product.images?.length || 1) === 1 ? "" : "s"}</em></span><div class="product-card-body"><header><span class="product-card-type">${escapeHtml(product.category || typeName(type))}</span><em>Active</em></header><h2>${escapeHtml(product.name)}</h2><p>${escapeHtml(product.sku)}</p><div class="product-price"><strong>${escapeHtml(formatCreatorPrice(product.price))}</strong><small>${escapeHtml(availability)}</small></div><footer><div><small>Type</small><b>${escapeHtml(typeName(type))}</b></div><div><small>Revenue</small><b>Rp0</b></div><div class="product-card-actions"><a href="?page=product-new&amp;product=${encodeURIComponent(product.id)}">Edit</a><button class="product-duplicate" type="button">Duplicate</button><button class="product-delete" type="button">Delete</button></div></footer></div>`;
         card.querySelector(".product-duplicate").addEventListener("click", () => {
           const duplicateButton = card.querySelector(".product-duplicate");
           const duplicate = async () => {
@@ -1315,7 +1315,7 @@
         productCatalogPage.append(card);
         if (inventory) {
           const row = document.createElement("article"); row.dataset.customProduct = product.id;
-          row.innerHTML = `<span class="product-art"><img src="${image}" alt=""></span><div><b>${escapeHtml(product.name)}</b><small>${escapeHtml(product.sku)}</small></div><strong>${type === "physical" ? Math.max(0, Number(product.stock) || 0) : "∞"}</strong><span>${type === "physical" ? "15" : "—"}</span><em class="inventory-good">${type === "physical" ? "Healthy" : "Available"}</em>`;
+          row.innerHTML = `<span class="product-art"><img src="${image}" alt="" loading="lazy" decoding="async"></span><div><b>${escapeHtml(product.name)}</b><small>${escapeHtml(product.sku)}</small></div><strong>${type === "physical" ? Math.max(0, Number(product.stock) || 0) : "∞"}</strong><span>${type === "physical" ? "15" : "—"}</span><em class="inventory-good">${type === "physical" ? "Healthy" : "Available"}</em>`;
           inventory.append(row);
         }
       });
