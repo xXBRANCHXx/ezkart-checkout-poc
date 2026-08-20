@@ -393,26 +393,40 @@ function ez_admin_totp_factors(array $user, ?string $status = null): array
     }));
 }
 
-function ez_admin_totp_qr_data_uri(string $qrCode): string
+function ez_admin_totp_qr_data_uri(string $qrCode): ?string
 {
     $qrCode = trim($qrCode);
     if ($qrCode === '' || strlen($qrCode) > 200_000) {
-        throw new RuntimeException('Supabase returned an invalid authenticator QR code.');
+        return null;
     }
-    $svgStart = stripos($qrCode, '<svg');
-    $svgEnd = strripos($qrCode, '</svg>');
-    if ($svgStart === false || $svgEnd === false || $svgEnd <= $svgStart) {
-        throw new RuntimeException('Supabase returned an invalid authenticator QR code.');
+    $candidates = [$qrCode, rawurldecode($qrCode)];
+    if (preg_match('#^data:image/svg\+xml(?P<meta>(?:;[^,]*)?),(?P<payload>.*)$#is', $qrCode, $dataUrl) === 1) {
+        $payload = (string) ($dataUrl['payload'] ?? '');
+        $candidates[] = str_contains(strtolower((string) ($dataUrl['meta'] ?? '')), ';base64')
+            ? (string) base64_decode(preg_replace('/\s+/', '', $payload) ?: '', true)
+            : rawurldecode($payload);
     }
-    $svg = substr($qrCode, $svgStart, $svgEnd + 6 - $svgStart);
-    if (
-        preg_match('/<(?:script|foreignObject|iframe|object|embed)\b/i', $svg) === 1
-        || preg_match('/\bon[a-z]+\s*=/i', $svg) === 1
-        || preg_match('/\b(?:href|xlink:href)\s*=\s*["\']\s*(?:https?:|data:|javascript:)/i', $svg) === 1
-    ) {
-        throw new RuntimeException('Supabase returned an unsafe authenticator QR code.');
+    $compact = preg_replace('/\s+/', '', $qrCode) ?: '';
+    $decodedBase64 = base64_decode($compact, true);
+    if (is_string($decodedBase64)) $candidates[] = $decodedBase64;
+
+    foreach (array_unique($candidates) as $candidate) {
+        if (!is_string($candidate) || $candidate === '' || strlen($candidate) > 200_000) continue;
+        $svgStart = stripos($candidate, '<svg');
+        $svgEnd = strripos($candidate, '</svg>');
+        if ($svgStart === false || $svgEnd === false || $svgEnd <= $svgStart) continue;
+        $svg = substr($candidate, $svgStart, $svgEnd + 6 - $svgStart);
+        if (
+            preg_match('/<(?:script|foreignObject|iframe|object|embed)\b/i', $svg) === 1
+            || preg_match('/\bon[a-z]+\s*=/i', $svg) === 1
+            || preg_match('/\b(?:href|xlink:href)\s*=\s*["\']\s*(?:https?:|data:|javascript:)/i', $svg) === 1
+        ) {
+            throw new RuntimeException('Supabase returned an unsafe authenticator QR code.');
+        }
+        return 'data:image/svg+xml;base64,' . base64_encode($svg);
     }
-    return 'data:image/svg+xml;base64,' . base64_encode($svg);
+    error_log('Ezkart Auth could not normalize the TOTP QR image; length=' . strlen($qrCode) . ', fingerprint=' . substr(hash('sha256', $qrCode), 0, 12));
+    return null;
 }
 
 function ez_admin_token_expiration(string $accessToken): int
@@ -877,7 +891,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && !isset($_GET['cloud'])) {
                 }
                 $_SESSION['mfa_setup'] = [
                     'factor_id' => $factorId,
-                    'qr_code' => ez_admin_totp_qr_data_uri($qrCode),
+                    'qr_code' => ez_admin_totp_qr_data_uri($qrCode) ?? '',
                     'secret' => mb_substr(trim((string) $totp['secret']), 0, 160),
                     'expires_at' => time() + 900,
                 ];
@@ -1325,7 +1339,7 @@ $catalogInventory = $legacyDataAccess ? [
   <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
   <?php if ($authenticated && $authenticationMethod === 'supabase' && $cloudMediaBase !== ''): ?><link rel="preconnect" href="<?= ez_admin_escape($cloudMediaBase) ?>"><?php endif; ?>
   <?php if ($authenticated): ?><link rel="stylesheet" href="assets/vendor/leaflet.css"><?php endif; ?>
-  <link rel="stylesheet" href="admin.css?v=69">
+  <link rel="stylesheet" href="admin.css?v=70">
   <title><?= $authenticated ? ez_admin_escape($pageTitles[$page]) : ($pendingMfa !== null ? 'Two-step verification' : 'Admin Login') ?> · Ezkart</title>
 </head>
 <body class="<?= $authenticated ? 'dashboard-page page-' . ez_admin_escape($page) . ($page === 'sites' ? ($siteEditor ? ' page-site-editor' : ' page-sites-library') : '') : 'login-page' ?>" data-admin-storage-scope="<?= ez_admin_escape($adminStorageScope) ?>" data-admin-migrate-legacy-storage="<?= $legacyDataAccess ? 'true' : 'false' ?>" data-admin-cloud-enabled="<?= $authenticated && $authenticationMethod === 'supabase' ? 'true' : 'false' ?>" data-admin-cloud-media-base="<?= $authenticated && $authenticationMethod === 'supabase' ? ez_admin_escape($cloudMediaBase) : '' ?>" data-admin-csrf-token="<?= ez_admin_escape($csrfToken) ?>">

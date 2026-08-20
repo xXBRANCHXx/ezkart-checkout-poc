@@ -275,7 +275,7 @@ function ez_orders_table(array $rows, string $tableId): void
         <?php if ($mfaSetup !== null): ?>
           <div class="mfa-setup-panel">
             <div class="mfa-setup-copy"><span>Authenticator setup</span><h3>Scan, then confirm.</h3><p>Scan this QR code with Google Authenticator, 1Password, Authy, or another authenticator app. Keep access to that app; losing it requires an account recovery reset.</p><small>Can&rsquo;t scan it? Enter this setup key manually:</small><code><?= ez_admin_escape((string) ($mfaSetup['secret'] ?? '')) ?></code></div>
-            <img class="mfa-qr" src="<?= ez_admin_escape((string) ($mfaSetup['qr_code'] ?? '')) ?>" alt="Authenticator setup QR code" width="184" height="184">
+            <?php if ((string) ($mfaSetup['qr_code'] ?? '') !== ''): ?><img class="mfa-qr" src="<?= ez_admin_escape((string) $mfaSetup['qr_code']) ?>" alt="Authenticator setup QR code" width="184" height="184"><?php else: ?><div class="mfa-qr mfa-qr-fallback"><span>QR unavailable</span><small>Use the setup key shown here.</small></div><?php endif; ?>
             <form class="mfa-confirm-form" method="post" autocomplete="off">
               <input type="hidden" name="action" value="mfa_enroll_verify"><input type="hidden" name="csrf_token" value="<?= ez_admin_escape($csrfToken) ?>">
               <label for="mfa-setup-code"><span>Six-digit code</span><input id="mfa-setup-code" name="code" type="text" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="one-time-code" placeholder="000000" required></label>
