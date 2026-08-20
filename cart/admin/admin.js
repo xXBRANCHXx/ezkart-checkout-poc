@@ -472,9 +472,9 @@
     const currentType = () => String(typeInput?.value || "physical");
     const typeName = (type) => ({ physical: "Physical product", digital: "Digital product", subscription: "Subscription" }[type] || "Product");
     const productTypeMeta = {
-      physical: { label: "Physical product", description: "Stock, weight, and delivery", icon: "box" },
-      digital: { label: "Digital product", description: "Protected file delivery", icon: "download" },
-      subscription: { label: "Subscription", description: "Recurring plans and billing", icon: "calendar" },
+      physical: { label: "Physical product", description: "Stock, weight, and delivery" },
+      digital: { label: "Digital product", description: "Protected file delivery" },
+      subscription: { label: "Subscription", description: "Recurring plans and billing" },
     };
     const setProductTypeMenu = (open) => {
       if (!productTypeMenu || !productTypeTrigger) return;
@@ -483,7 +483,6 @@
     const syncProductTypePicker = () => {
       const value = currentType(); const meta = productTypeMeta[value] || productTypeMeta.physical;
       setText("[data-product-type-value]", meta.label); setText("[data-product-type-description]", meta.description);
-      productTypeTrigger?.querySelector(".product-type-trigger-icon use")?.setAttribute("href", `#icon-${meta.icon}`);
       productTypeMenu?.querySelectorAll("[data-product-type-option]").forEach((button) => button.setAttribute("aria-selected", String(button.dataset.productTypeOption === value)));
     };
     const setText = (selector, value) => { const target = q(selector); if (target) target.textContent = value; };
