@@ -424,6 +424,7 @@
     let selectedImages = [];
     let variants = [];
     let selectedVariantIds = new Set();
+    let activeVariantFilters = new Map();
     let liveOptionSelection = {};
     let previewImageIndex = 0;
     let previewUsesVariantImage = true;
@@ -597,34 +598,45 @@
       if (!optionGroups || optionGroups.children.length >= 3) return;
       const row = document.createElement("div"); row.className = "product-option-group";
       row.innerHTML = `<label><span>Option name</span><input type="text" maxlength="20" placeholder="Size" value="${escapeHtml(name)}" data-option-name></label><label><span>Values</span><input type="text" maxlength="180" placeholder="50 ml, 250 ml" value="${escapeHtml(values)}" data-option-values></label><button type="button" aria-label="Remove option group">×</button>`;
-      row.querySelector("button").addEventListener("click", () => { row.remove(); variants = []; selectedVariantIds.clear(); renderVariants(); markDraftChanged(); });
+      row.querySelector("button").addEventListener("click", () => { row.remove(); variants = []; selectedVariantIds.clear(); activeVariantFilters.clear(); renderVariants(); markDraftChanged(); });
       optionGroups.append(row);
     };
 
+    const variantMatchesFilters = (variant) => [...activeVariantFilters].every(([optionName, optionValue]) => variant.options?.some((option) => option.option === optionName && option.value === optionValue));
+    const selectFilteredVariants = () => {
+      selectedVariantIds = activeVariantFilters.size ? new Set(variants.filter(variantMatchesFilters).map((variant) => variant.id)) : new Set();
+      updateVariantSelection();
+    };
     const updateVariantSelection = () => {
       variantRows?.querySelectorAll(".product-variant-row").forEach((row) => {
         const selected = selectedVariantIds.has(row.dataset.variantId);
         row.classList.toggle("selected", selected);
         const checkbox = row.querySelector("[data-variant-select]"); if (checkbox) checkbox.checked = selected;
       });
-      if (selectedCount) selectedCount.textContent = `${selectedVariantIds.size} selected`;
+      if (selectedCount) {
+        const filterLabel = [...activeVariantFilters.values()].join(" · ");
+        selectedCount.textContent = filterLabel ? `${filterLabel} · ${selectedVariantIds.size} selected` : `${selectedVariantIds.size} selected`;
+      }
       if (selectAllVariants) { selectAllVariants.checked = variants.length > 0 && selectedVariantIds.size === variants.length; selectAllVariants.indeterminate = selectedVariantIds.size > 0 && selectedVariantIds.size < variants.length; }
       filterChips?.querySelectorAll("button").forEach((chip) => {
-        const matches = variants.filter((variant) => variant.options?.some((option) => option.option === chip.dataset.optionName && option.value === chip.dataset.optionValue));
-        chip.classList.toggle("active", matches.length > 0 && matches.every((variant) => selectedVariantIds.has(variant.id)));
+        chip.classList.toggle("active", activeVariantFilters.get(chip.dataset.optionName) === chip.dataset.optionValue);
       });
     };
     const renderVariantFilters = () => {
       if (!filterChips) return;
       filterChips.replaceChildren();
-      optionSnapshot().forEach((group) => {
+      const groups = optionSnapshot();
+      const validFilters = new Map(groups.map((group) => [group.name, new Set(group.values)]));
+      activeVariantFilters = new Map([...activeVariantFilters].filter(([optionName, optionValue]) => validFilters.get(optionName)?.has(optionValue)));
+      groups.forEach((group) => {
         const section = document.createElement("section");
-        section.innerHTML = `<span>${escapeHtml(group.name)}</span><div>${group.values.map((value) => `<button type="button" data-option-name="${escapeHtml(group.name)}" data-option-value="${escapeHtml(value)}">All ${escapeHtml(value)}</button>`).join("")}</div>`;
+        section.innerHTML = `<span>${escapeHtml(group.name)}</span><div>${group.values.map((value) => `<button type="button" data-option-name="${escapeHtml(group.name)}" data-option-value="${escapeHtml(value)}">${escapeHtml(value)}</button>`).join("")}</div>`;
         section.querySelectorAll("button").forEach((chip) => chip.addEventListener("click", () => {
-          const matches = variants.filter((variant) => variant.options?.some((option) => option.option === chip.dataset.optionName && option.value === chip.dataset.optionValue));
-          const deselect = matches.length && matches.every((variant) => selectedVariantIds.has(variant.id));
-          matches.forEach((variant) => deselect ? selectedVariantIds.delete(variant.id) : selectedVariantIds.add(variant.id));
-          updateVariantSelection();
+          const optionName = chip.dataset.optionName;
+          const optionValue = chip.dataset.optionValue;
+          if (activeVariantFilters.get(optionName) === optionValue) activeVariantFilters.delete(optionName);
+          else activeVariantFilters.set(optionName, optionValue);
+          selectFilteredVariants();
         }));
         filterChips.append(section);
       });
@@ -670,7 +682,7 @@
         const billingMaximum = billingUnit === "year" ? 10 : 120;
         const billingInterval = Math.max(1, Math.min(billingMaximum, Math.round(Number(variant.billingInterval) || 1)));
         row.innerHTML = `<span><input type="checkbox" data-variant-select aria-label="Select ${escapeHtml(variant.name)}"></span><b title="${escapeHtml(variant.name)}">${escapeHtml(compactVariantName(variant.name))}</b><label><span>Price</span><input type="number" min="1000" step="500" value="${variant.price}" data-variant-price></label><label ${physical ? "" : "hidden"}><span>Stock</span><input type="number" min="0" max="999999" value="${variant.stock}" data-variant-stock></label><label ${physical ? "" : "hidden"}><span>Weight</span><input type="number" min="1" max="50000" value="${variant.weightGrams || 500}" data-variant-weight></label><label class="product-variant-billing" ${subscription ? "" : "hidden"}><span>Billing</span><span><input type="number" min="1" max="${billingMaximum}" value="${billingInterval}" aria-label="Billing interval" data-variant-billing-interval><select aria-label="Billing period" data-variant-billing-unit><option value="month" ${billingUnit === "month" ? "selected" : ""}>Month</option><option value="year" ${billingUnit === "year" ? "selected" : ""}>Year</option></select></span></label><label><span>SKU</span><input type="text" maxlength="48" value="${escapeHtml(variant.sku)}" data-variant-sku></label>${variantPhotoMarkup(variant)}<button type="button" data-variant-remove aria-label="Remove ${escapeHtml(variant.name)}"><svg class="icon" aria-hidden="true"><use href="#icon-trash"></use></svg></button>`;
-        row.querySelector("[data-variant-select]").addEventListener("change", (event) => { event.target.checked ? selectedVariantIds.add(variant.id) : selectedVariantIds.delete(variant.id); updateVariantSelection(); });
+        row.querySelector("[data-variant-select]").addEventListener("change", (event) => { activeVariantFilters.clear(); event.target.checked ? selectedVariantIds.add(variant.id) : selectedVariantIds.delete(variant.id); updateVariantSelection(); });
         row.querySelector("[data-variant-price]").addEventListener("input", (event) => { variant.price = Math.max(0, Math.round(Number(event.target.value) || 0)); updatePreview(); markDraftChanged(); });
         row.querySelector("[data-variant-stock]").addEventListener("input", (event) => { variant.stock = Math.max(0, Math.round(Number(event.target.value) || 0)); updatePreview(); markDraftChanged(); });
         row.querySelector("[data-variant-weight]").addEventListener("input", (event) => { variant.weightGrams = Math.max(0, Math.round(Number(event.target.value) || 0)); markDraftChanged(); });
@@ -727,6 +739,8 @@
         const name = options.map((option) => option.value).join(" · ");
         return previous.get(name) || { id: globalThis.crypto?.randomUUID?.() || `variant-${Date.now()}-${index}`, name, options, price, stock, weightGrams, billingInterval, billingUnit, sku: `${currentType() === "subscription" ? "PLAN" : "VAR"}-${String(index + 1).padStart(3, "0")}`, imageIndex: null, useCustomImage: false };
       });
+      activeVariantFilters.clear();
+      selectedVariantIds.clear();
       renderVariants(); markDraftChanged();
     };
 
@@ -740,7 +754,7 @@
       setText("[data-generate-variants-label]", subscription ? "Generate plans" : "Generate combinations");
       setText("[data-variant-empty-title]", subscription ? "No plans yet" : "No combinations yet");
       setText("[data-variant-empty-description]", subscription ? "Add plan options, then generate the plans customers can choose." : "Add option values, then generate the sellable variants for this product.");
-      setText("[data-variant-batch-description]", subscription ? "Select matching plans, then update their pricing together." : "Select every matching option—such as all 250 ml or all Peach—then update them together.");
+      setText("[data-variant-batch-description]", subscription ? "Combine plan filters to update only the matching plans." : "Combine option filters—such as 50 ml and Drops—to update only the matching variants.");
       setText("[data-variant-column-title]", subscription ? "Plan" : "Variant");
       setText("[data-variant-help]", subscription ? "Every plan can have its own price, billing period, SKU, and image." : "Every row remains part of this product. Physical variants carry their own stock and shipping weight. Upload a square variant photo or choose one from the main gallery.");
       setText("[data-product-no-variants]", subscription ? "Only one plan? The price and billing period below will be used." : "No variants needed? The base price and stock below will be used.");
@@ -917,10 +931,10 @@
     variantToggle?.addEventListener("change", syncVariantMode);
     q("[data-add-option-group]")?.addEventListener("click", () => { addOptionGroup(); markDraftChanged(); });
     q("[data-generate-variants]")?.addEventListener("click", generateVariants);
-    selectAllVariants?.addEventListener("change", () => { selectedVariantIds = selectAllVariants.checked ? new Set(variants.map((variant) => variant.id)) : new Set(); updateVariantSelection(); });
-    q("[data-clear-variant-selection]")?.addEventListener("click", () => { selectedVariantIds.clear(); updateVariantSelection(); });
+    selectAllVariants?.addEventListener("change", () => { activeVariantFilters.clear(); selectedVariantIds = selectAllVariants.checked ? new Set(variants.map((variant) => variant.id)) : new Set(); updateVariantSelection(); });
+    q("[data-clear-variant-selection]")?.addEventListener("click", () => { activeVariantFilters.clear(); selectedVariantIds.clear(); updateVariantSelection(); });
     q("[data-apply-variant-batch]")?.addEventListener("click", () => {
-      if (!selectedVariantIds.size) { showError(`Select at least one ${currentType() === "subscription" ? "plan" : "variant"} or use an All option filter first.`); return; }
+      if (!selectedVariantIds.size) { showError(`Select at least one ${currentType() === "subscription" ? "plan" : "variant"} or use an option filter first.`); return; }
       const price = q("[data-batch-price]").value; const stock = q("[data-batch-stock]").value; const weight = q("[data-batch-weight]").value;
       if (price === "" && stock === "" && weight === "") { showError("Enter at least one batch value to apply."); return; }
       variants.filter((variant) => selectedVariantIds.has(variant.id)).forEach((variant) => { if (price !== "") variant.price = Math.max(0, Math.round(Number(price) || 0)); if (stock !== "") variant.stock = Math.max(0, Math.round(Number(stock) || 0)); if (weight !== "") variant.weightGrams = Math.max(0, Math.round(Number(weight) || 0)); });

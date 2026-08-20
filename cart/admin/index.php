@@ -1259,7 +1259,7 @@ $catalogInventory = $legacyDataAccess ? [
   </div>
   <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
   <script src="assets/vendor/leaflet.js"></script>
-  <script src="admin.js?v=46"></script>
+  <script src="admin.js?v=47"></script>
 <?php endif; ?>
 </body>
 </html>
