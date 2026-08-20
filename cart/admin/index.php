@@ -400,6 +400,13 @@ function ez_admin_totp_qr_data_uri(string $qrCode): ?string
         return null;
     }
     $candidates = [$qrCode, rawurldecode($qrCode)];
+    $binaryCandidates = [];
+    if (preg_match('#^data:image/png(?P<meta>(?:;[^,]*)?),(?P<payload>.*)$#is', $qrCode, $pngDataUrl) === 1) {
+        $payload = (string) ($pngDataUrl['payload'] ?? '');
+        $binaryCandidates[] = str_contains(strtolower((string) ($pngDataUrl['meta'] ?? '')), ';base64')
+            ? (string) base64_decode(preg_replace('/\s+/', '', $payload) ?: '', true)
+            : rawurldecode($payload);
+    }
     if (preg_match('#^data:image/svg\+xml(?P<meta>(?:;[^,]*)?),(?P<payload>.*)$#is', $qrCode, $dataUrl) === 1) {
         $payload = (string) ($dataUrl['payload'] ?? '');
         $candidates[] = str_contains(strtolower((string) ($dataUrl['meta'] ?? '')), ';base64')
@@ -408,7 +415,20 @@ function ez_admin_totp_qr_data_uri(string $qrCode): ?string
     }
     $compact = preg_replace('/\s+/', '', $qrCode) ?: '';
     $decodedBase64 = base64_decode($compact, true);
-    if (is_string($decodedBase64)) $candidates[] = $decodedBase64;
+    if (is_string($decodedBase64)) {
+        $candidates[] = $decodedBase64;
+        $binaryCandidates[] = $decodedBase64;
+    }
+
+    foreach ($binaryCandidates as $png) {
+        if (!is_string($png) || strlen($png) < 33 || strlen($png) > 200_000) continue;
+        if (substr($png, 0, 8) !== "\x89PNG\r\n\x1a\n" || substr($png, 12, 4) !== 'IHDR') continue;
+        $dimensions = unpack('Nwidth/Nheight', substr($png, 16, 8));
+        $width = (int) ($dimensions['width'] ?? 0);
+        $height = (int) ($dimensions['height'] ?? 0);
+        if ($width <= 0 || $height <= 0 || $width > 2048 || $height > 2048) continue;
+        return 'data:image/png;base64,' . base64_encode($png);
+    }
 
     foreach (array_unique($candidates) as $candidate) {
         if (!is_string($candidate) || $candidate === '' || strlen($candidate) > 200_000) continue;
@@ -886,13 +906,19 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && !isset($_GET['cloud'])) {
                 $factorId = (string) ($enrollment['id'] ?? '');
                 $totp = is_array($enrollment['totp'] ?? null) ? $enrollment['totp'] : [];
                 $qrCode = trim((string) ($totp['qr_code'] ?? ''));
-                if (preg_match('/^[a-f0-9-]{36}$/i', $factorId) !== 1 || $qrCode === '' || trim((string) ($totp['secret'] ?? '')) === '') {
+                $secret = strtoupper((string) preg_replace('/\s+/', '', trim((string) ($totp['secret'] ?? ''))));
+                if (preg_match('/^[a-f0-9-]{36}$/i', $factorId) !== 1 || preg_match('/^[A-Z2-7]{16,160}$/', $secret) !== 1) {
                     throw new RuntimeException('Supabase did not return a complete authenticator setup.');
                 }
+                $accountLabel = trim((string) ($user['email'] ?? '')) ?: 'Ezkart account';
+                $totpUri = 'otpauth://totp/' . rawurlencode('Ezkart:' . $accountLabel)
+                    . '?secret=' . rawurlencode($secret)
+                    . '&issuer=Ezkart&algorithm=SHA1&digits=6&period=30';
                 $_SESSION['mfa_setup'] = [
                     'factor_id' => $factorId,
                     'qr_code' => ez_admin_totp_qr_data_uri($qrCode) ?? '',
-                    'secret' => mb_substr(trim((string) $totp['secret']), 0, 160),
+                    'qr_uri' => $totpUri,
+                    'secret' => $secret,
                     'expires_at' => time() + 900,
                 ];
                 $_SESSION['security_flash'] = ['type' => 'info', 'message' => 'Scan the QR code, then enter the six-digit code to finish setup.'];
@@ -1339,7 +1365,7 @@ $catalogInventory = $legacyDataAccess ? [
   <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
   <?php if ($authenticated && $authenticationMethod === 'supabase' && $cloudMediaBase !== ''): ?><link rel="preconnect" href="<?= ez_admin_escape($cloudMediaBase) ?>"><?php endif; ?>
   <?php if ($authenticated): ?><link rel="stylesheet" href="assets/vendor/leaflet.css"><?php endif; ?>
-  <link rel="stylesheet" href="admin.css?v=70">
+  <link rel="stylesheet" href="admin.css?v=71">
   <title><?= $authenticated ? ez_admin_escape($pageTitles[$page]) : ($pendingMfa !== null ? 'Two-step verification' : 'Admin Login') ?> · Ezkart</title>
 </head>
 <body class="<?= $authenticated ? 'dashboard-page page-' . ez_admin_escape($page) . ($page === 'sites' ? ($siteEditor ? ' page-site-editor' : ' page-sites-library') : '') : 'login-page' ?>" data-admin-storage-scope="<?= ez_admin_escape($adminStorageScope) ?>" data-admin-migrate-legacy-storage="<?= $legacyDataAccess ? 'true' : 'false' ?>" data-admin-cloud-enabled="<?= $authenticated && $authenticationMethod === 'supabase' ? 'true' : 'false' ?>" data-admin-cloud-media-base="<?= $authenticated && $authenticationMethod === 'supabase' ? ez_admin_escape($cloudMediaBase) : '' ?>" data-admin-csrf-token="<?= ez_admin_escape($csrfToken) ?>">
@@ -1619,7 +1645,8 @@ $catalogInventory = $legacyDataAccess ? [
   </div>
   <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
   <script src="assets/vendor/leaflet.js"></script>
-  <script src="admin.js?v=47"></script>
+  <?php if ($page === 'settings' && $mfaSetup !== null): ?><script src="assets/vendor/qrcode-generator.min.js"></script><?php endif; ?>
+  <script src="admin.js?v=48"></script>
 <?php endif; ?>
 </body>
 </html>

@@ -6,6 +6,22 @@
     "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#039;", '"': "&quot;",
   })[character]);
 
+  const mfaQr = document.querySelector("[data-mfa-qr-uri]");
+  if (mfaQr && typeof window.qrcode === "function") {
+    try {
+      const uri = String(mfaQr.dataset.mfaQrUri || "");
+      if (!uri.startsWith("otpauth://totp/") || uri.length > 2048) throw new Error("Invalid authenticator URI");
+      const qr = window.qrcode(0, "M");
+      qr.addData(uri, "Byte");
+      qr.make();
+      mfaQr.innerHTML = qr.createSvgTag({ cellSize: 4, margin: 16, scalable: true });
+      mfaQr.classList.remove("mfa-qr-fallback");
+      mfaQr.classList.add("is-rendered");
+    } catch (_) {
+      mfaQr.innerHTML = "<span>QR unavailable</span><small>Use the setup key shown here.</small>";
+    }
+  }
+
   const search = document.getElementById("order-search");
   const globalSearch = document.getElementById("global-search");
   const status = document.getElementById("status-filter");
