@@ -562,7 +562,7 @@
       trigger?.classList.toggle("is-legacy", Boolean(value && !entry));
       if (valueTarget) valueTarget.textContent = entry?.leaf || value || "Choose a category";
       if (pathTarget) pathTarget.textContent = entry ? `${entry.department} · ${entry.group}` : value ? "Current custom category" : "Search or browse the catalog";
-      if (noteTarget) noteTarget.textContent = entry ? "Structured category selected." : value ? "Choose a structured category to improve discovery and product setup." : "Categories improve discovery and unlock the right product fields.";
+      if (noteTarget) noteTarget.textContent = entry ? "Structured category selected." : value ? "Choose a structured category to improve discovery and product setup." : "Categories keep product discovery and filtering consistent.";
     };
     const scoreCategoryEntry = (entry) => {
       const source = normalizeCategoryText(`${productCreateForm.elements.name?.value || ""} ${productCreateForm.elements.description?.value || ""}`);
