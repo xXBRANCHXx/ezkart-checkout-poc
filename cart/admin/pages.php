@@ -175,7 +175,7 @@ function ez_orders_table(array $rows, string $tableId): void
       <div class="product-category-dialog" data-product-category-dialog hidden>
         <button class="product-category-backdrop" type="button" data-product-category-close aria-label="Close category chooser"></button>
         <section role="dialog" aria-modal="true" aria-labelledby="product-category-title">
-          <header><div><span>PRODUCT CATEGORY</span><h2 id="product-category-title">Where should customers find this?</h2><p>Choose the closest match to keep discovery, filters, and catalog organization accurate.</p></div><button type="button" data-product-category-close aria-label="Close category chooser">×</button></header>
+          <header><div><h2 id="product-category-title">Where should customers find this?</h2><p>Choose the closest match to keep discovery, filters, and catalog organization accurate.</p></div><button type="button" data-product-category-close aria-label="Close category chooser">×</button></header>
           <label class="product-category-search"><?= ez_admin_icon('search') ?><input type="search" autocomplete="off" placeholder="Search categories, such as syrup or skincare" data-product-category-search></label>
           <div class="product-category-suggestions" data-product-category-suggestions></div>
           <div class="product-category-search-results" data-product-category-results hidden></div>
