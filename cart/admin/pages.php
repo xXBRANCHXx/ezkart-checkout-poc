@@ -204,7 +204,13 @@ function ez_orders_table(array $rows, string $tableId): void
   <section class="product-commerce-strip" aria-label="Product commerce connections"><article><span><?= ez_admin_icon('box') ?></span><div><small>Product data</small><b>Complete catalog record</b><p>Price, stock, weight, media, and fulfillment origin</p></div><em>Ready</em></article><i><?= ez_admin_icon('chevron-right') ?></i><article><span><?= ez_admin_icon('layout') ?></span><div><small>Sales surface</small><b>3 landing pages</b><p>Products can be bound to any hosted page</p></div><a href="?page=sites">Manage</a></article><i><?= ez_admin_icon('chevron-right') ?></i><article><span><?= ez_admin_icon('credit-card') ?></span><div><small>Checkout data</small><b><?= $integrationStatus['midtrans'] ? 'Midtrans mapped' : 'Midtrans setup required' ?></b><p>Item ID, name, quantity, price, and customer details</p></div><em class="<?= $integrationStatus['midtrans'] ? 'connected' : '' ?>"><?= $integrationStatus['midtrans'] ? 'Ready' : 'Setup' ?></em></article><i><?= ez_admin_icon('chevron-right') ?></i><article><span><?= ez_admin_icon('truck') ?></span><div><small>Delivery</small><b><?= $integrationStatus['biteship'] ? 'Biteship rates enabled' : 'Biteship setup required' ?></b><p>Weights and origin feed live courier quotes</p></div><em class="<?= $integrationStatus['biteship'] ? 'connected' : '' ?>"><?= $integrationStatus['biteship'] ? 'Ready' : 'Setup' ?></em></article></section>
   <section class="surface product-drafts-panel" data-product-drafts-panel hidden><header class="surface-header"><div><h2>Product drafts</h2><p>Continue products that are not ready to publish yet.</p></div><a class="action-button" href="?page=product-new&new=1">New draft</a></header><div class="product-draft-list" data-product-draft-list></div></section>
   <section class="product-catalog-controls" data-product-catalog-controls>
-    <div><strong><span data-product-count>0</span> products</strong><p>Published products in this store</p></div>
+    <div class="product-catalog-summary">
+      <div><strong><span data-product-count>0</span> <span data-product-count-noun>products</span></strong><p data-product-count-detail>Active products in this store</p></div>
+      <nav class="product-catalog-filters" aria-label="Product status">
+        <button type="button" data-product-filter="all" aria-pressed="false">All</button>
+        <button type="button" data-product-filter="active" aria-pressed="true">Active</button>
+      </nav>
+    </div>
     <div class="product-catalog-control-actions">
       <div class="product-catalog-sort" data-product-sort-picker>
         <button type="button" data-product-sort-trigger aria-haspopup="listbox" aria-expanded="false"><span data-product-sort-label>Newest first</span><?= ez_admin_icon('chevron-down') ?></button>

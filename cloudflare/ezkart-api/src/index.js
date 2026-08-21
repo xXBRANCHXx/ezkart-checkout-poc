@@ -282,7 +282,7 @@ function shapeProduct(row, media = [], variants = []) {
 async function catalog(request, env) {
   const { seller } = await sellerContext(request, env);
   const [productsResult, mediaResult, variantsResult, draftsResult] = await env.DB.batch([
-    env.DB.prepare("SELECT * FROM products WHERE seller_id = ? AND status != 'archived' ORDER BY updated_at DESC").bind(seller.id),
+    env.DB.prepare("SELECT * FROM products WHERE seller_id = ? AND status IN ('active', 'archived') ORDER BY updated_at DESC").bind(seller.id),
     env.DB.prepare(`
       SELECT pm.id, pm.product_id, pm.mime_type, pm.sort_order, pm.alt_text
       FROM product_media pm
@@ -542,6 +542,26 @@ async function deleteProduct(request, env, productId) {
   ]);
 }
 
+async function setProductStatus(request, env, productId) {
+  const { seller, authUserId } = await sellerContext(request, env);
+  const id = cleanId(productId, "Product ID");
+  const payload = await requestJson(request, 2000);
+  const status = ["active", "archived"].includes(payload.status) ? payload.status : null;
+  if (!status) throw new Response("Product status must be active or archived", { status: 400 });
+  const existing = await env.DB.prepare("SELECT id, status FROM products WHERE seller_id = ? AND id = ?").bind(seller.id, id).first();
+  if (!existing) throw new Response("Product not found", { status: 404 });
+  const now = new Date().toISOString();
+  await env.DB.batch([
+    env.DB.prepare("UPDATE products SET status = ?, updated_at = ? WHERE seller_id = ? AND id = ?").bind(status, now, seller.id, id),
+    env.DB.prepare(`
+      INSERT INTO seller_events (id, seller_id, actor_auth_user_id, event_type, entity_type, entity_id, payload_json, created_at)
+      VALUES (?, ?, ?, ?, 'product', ?, ?, ?)
+    `).bind(`event_${crypto.randomUUID()}`, seller.id, authUserId, status === "archived" ? "product.archived" : "product.restored", id, JSON.stringify({ previousStatus: existing.status, status }), now),
+  ]);
+  const result = await catalog(request, env);
+  return result.products.find((product) => product.id === id);
+}
+
 const duplicatedValue = (value, suffix, maximum) => {
   const ending = `-${suffix}`;
   const base = String(value || "").trim() || "EZK";
@@ -552,7 +572,7 @@ async function duplicateProduct(request, env, productId) {
   const { seller, authUserId } = await sellerContext(request, env);
   const sourceId = cleanId(productId, "Product ID");
   const [product, mediaResult, variantsResult] = await Promise.all([
-    env.DB.prepare("SELECT * FROM products WHERE seller_id = ? AND id = ? AND status != 'archived'").bind(seller.id, sourceId).first(),
+    env.DB.prepare("SELECT * FROM products WHERE seller_id = ? AND id = ?").bind(seller.id, sourceId).first(),
     env.DB.prepare("SELECT * FROM product_media WHERE seller_id = ? AND product_id = ? ORDER BY sort_order").bind(seller.id, sourceId).all(),
     env.DB.prepare("SELECT * FROM product_variants WHERE seller_id = ? AND product_id = ? ORDER BY sort_order").bind(seller.id, sourceId).all(),
   ]);
@@ -689,6 +709,8 @@ export default {
       if (request.method === "GET" && mediaMatch) return await serveMedia(request, env, cleanId(mediaMatch[1], "Image ID"));
       const productDuplicateMatch = /^\/v1\/products\/([a-zA-Z0-9_-]+)\/duplicate$/.exec(url.pathname);
       if (request.method === "POST" && productDuplicateMatch) return json({ ok: true, product: await duplicateProduct(request, env, productDuplicateMatch[1]) }, 201, cors);
+      const productStatusMatch = /^\/v1\/products\/([a-zA-Z0-9_-]+)\/status$/.exec(url.pathname);
+      if (request.method === "PATCH" && productStatusMatch) return json({ ok: true, product: await setProductStatus(request, env, productStatusMatch[1]) }, 200, cors);
       const productMatch = /^\/v1\/products\/([a-zA-Z0-9_-]+)$/.exec(url.pathname);
       if (["PUT", "POST"].includes(request.method) && productMatch) return json({ ok: true, product: await saveProduct(request, env, productMatch[1]) }, 200, cors);
       if (request.method === "DELETE" && productMatch) { await deleteProduct(request, env, productMatch[1]); return json({ ok: true }, 200, cors); }

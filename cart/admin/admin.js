@@ -171,7 +171,8 @@
   };
   const normalizeCloudProduct = (product) => {
     const media = Array.isArray(product?.media) ? product.media : [];
-    const images = media.map((item) => cloudMediaUrl(item.id));
+    const productMediaUrl = product?.status === "archived" ? cloudPrivateMediaUrl : cloudMediaUrl;
+    const images = media.map((item) => productMediaUrl(item.id));
     return {
       ...product,
       mediaIds: media.map((item) => item.id),
@@ -179,7 +180,7 @@
       image: images[0] || "",
       variants: (Array.isArray(product?.variants) ? product.variants : []).map((variant) => ({
         ...variant,
-        image: variant.imageUploadId ? cloudMediaUrl(variant.imageUploadId) : null,
+        image: variant.imageUploadId ? productMediaUrl(variant.imageUploadId) : null,
       })),
     };
   };
@@ -242,10 +243,10 @@
       return Array.isArray(value) ? value.filter((product) => product && /^custom-[a-z0-9]+$/i.test(product.id || "") && typeof product.name === "string") : [];
     } catch (_) { return []; }
   };
-  const readCatalogProducts = () => {
+  const readCatalogProducts = ({ includeArchived = false } = {}) => {
     const products = [...cloudCatalogProducts];
     readLocalCatalogProducts().forEach((product) => { if (!products.some((item) => item.id === product.id)) products.push(product); });
-    return products;
+    return includeArchived ? products : products.filter((product) => product.status !== "archived");
   };
   const writeCatalogProducts = (products) => {
     try { localStorage.setItem(productCatalogKey, JSON.stringify(products)); return true; }
@@ -461,7 +462,7 @@
     let restoringDraft = true;
     const draftQuery = new URLSearchParams(window.location.search);
     const requestedProductId = /^custom-[a-z0-9]+$/i.test(draftQuery.get("product") || "") ? draftQuery.get("product") : "";
-    const editingProduct = requestedProductId ? readCatalogProducts().find((product) => product.id === requestedProductId) || null : null;
+    const editingProduct = requestedProductId ? readCatalogProducts({ includeArchived: true }).find((product) => product.id === requestedProductId) || null : null;
     let draftId = draftQuery.get("draft") || (editingProduct ? `edit-${editingProduct.id}` : sessionStorage.getItem(activeProductDraftKey)) || `draft-${globalThis.crypto?.randomUUID?.() || Date.now()}`;
     if (draftQuery.get("new") === "1") draftId = `draft-${globalThis.crypto?.randomUUID?.() || Date.now()}`;
     sessionStorage.setItem(activeProductDraftKey, draftId);
@@ -1465,12 +1466,17 @@
     const sortPicker = document.querySelector("[data-product-sort-picker]");
     const sortTrigger = document.querySelector("[data-product-sort-trigger]");
     const sortMenu = document.querySelector("[data-product-sort-menu]");
+    const catalogCountNoun = document.querySelector("[data-product-count-noun]");
+    const catalogCountDetail = document.querySelector("[data-product-count-detail]");
     const catalogViewKey = scopedStorageKey("ezkart:product-catalog:view");
     const catalogSortKey = scopedStorageKey("ezkart:product-catalog:sort");
+    const catalogFilterKey = scopedStorageKey("ezkart:product-catalog:filter");
     const storedCatalogView = localStorage.getItem(catalogViewKey);
     const storedCatalogSort = localStorage.getItem(catalogSortKey);
+    const storedCatalogFilter = localStorage.getItem(catalogFilterKey);
     let catalogView = ["grid", "list"].includes(storedCatalogView) ? storedCatalogView : "grid";
     let catalogSort = ["newest", "updated", "name", "price-high", "price-low"].includes(storedCatalogSort) ? storedCatalogSort : "newest";
+    let catalogFilter = ["all", "active"].includes(storedCatalogFilter) ? storedCatalogFilter : "active";
     const sortLabels = { newest: "Newest first", updated: "Recently updated", name: "Name A–Z", "price-high": "Highest price", "price-low": "Lowest price" };
     const typeName = (type) => ({ physical: "Physical product", digital: "Digital product", subscription: "Subscription" }[type] || "Product");
     const clearError = () => { if (errorTarget) { errorTarget.hidden = true; errorTarget.textContent = ""; } };
@@ -1484,6 +1490,10 @@
       productCatalogPage.classList.toggle("catalog-view-list", catalogView === "list");
       catalogControls?.querySelectorAll("[data-product-view]").forEach((button) => {
         const active = button.dataset.productView === catalogView;
+        button.classList.toggle("active", active); button.setAttribute("aria-pressed", String(active));
+      });
+      catalogControls?.querySelectorAll("[data-product-filter]").forEach((button) => {
+        const active = button.dataset.productFilter === catalogFilter;
         button.classList.toggle("active", active); button.setAttribute("aria-pressed", String(active));
       });
       const label = document.querySelector("[data-product-sort-label]"); if (label) label.textContent = sortLabels[catalogSort] || sortLabels.newest;
@@ -1507,6 +1517,7 @@
       copy.id = `custom-${suffix}`;
       copy.name = `${String(product.name || "Product").slice(0, 153)} (Copy)`;
       copy.sku = withSuffix(product.sku);
+      copy.status = "active";
       copy.variants = (Array.isArray(product.variants) ? product.variants : []).map((variant) => ({
         ...variant,
         id: `variant-${globalThis.crypto?.randomUUID?.().replaceAll("-", "") || `${Date.now()}${Math.random().toString(16).slice(2)}`}`,
@@ -1523,14 +1534,17 @@
       if (imageRule) imageRule.textContent = `${type === "physical" ? "Physical products need 3–9 images" : "Products need 1–9 images"}. Maximum 2 MB each.`;
       clearError();
     };
-    const updateCatalogStats = (products) => {
+    const updateCatalogStats = (allProducts, visibleProducts) => {
       const stats = document.querySelectorAll(".page-products .page-stat-strip article");
-      const physicalStock = products.filter((product) => product.type === "physical").reduce((sum, product) => sum + Math.max(0, Number(product.stock) || 0), 0);
-      if (stats[0]?.querySelector("strong")) stats[0].querySelector("strong").textContent = String(products.length);
+      const activeProducts = allProducts.filter((product) => product.status !== "archived");
+      const physicalStock = activeProducts.filter((product) => product.type === "physical").reduce((sum, product) => sum + Math.max(0, Number(product.stock) || 0), 0);
+      if (stats[0]?.querySelector("strong")) stats[0].querySelector("strong").textContent = String(activeProducts.length);
       if (stats[0]?.querySelector("p")) stats[0].querySelector("p").textContent = "Published in this store";
       if (stats[1]?.querySelector("strong")) stats[1].querySelector("strong").textContent = String(physicalStock);
       if (stats[1]?.querySelector("p")) stats[1].querySelector("p").textContent = "Physical inventory only";
-      if (catalogCount) catalogCount.textContent = String(products.length);
+      if (catalogCount) catalogCount.textContent = String(visibleProducts.length);
+      if (catalogCountNoun) catalogCountNoun.textContent = visibleProducts.length === 1 ? "product" : "products";
+      if (catalogCountDetail) catalogCountDetail.textContent = catalogFilter === "active" ? "Active products in this store" : "All products, including archived";
     };
     const renderDrafts = () => {
       if (!draftsPanel || !draftList) return;
@@ -1557,24 +1571,62 @@
         draftList.append(card);
       });
     };
+    const closeProductActionMenus = (except = null) => {
+      productCatalogPage.querySelectorAll("[data-product-action-menu]").forEach((menu) => {
+        if (menu === except) return;
+        menu.hidden = true;
+        menu.closest(".product-more")?.querySelector("[data-product-more]")?.setAttribute("aria-expanded", "false");
+      });
+    };
+    const setCatalogProductStatus = async (product, status) => {
+      if (cloudEnabled && cloudCatalogProducts.some((item) => item.id === product.id)) {
+        const result = await cloudRequest("PATCH", `/v1/products/${encodeURIComponent(product.id)}/status`, { status });
+        return replaceCloudProduct(result.product);
+      }
+      const localProducts = readLocalCatalogProducts();
+      const index = localProducts.findIndex((item) => item.id === product.id);
+      if (index < 0) throw new Error("The product could not be found.");
+      localProducts[index] = { ...localProducts[index], status, updatedAt: new Date().toISOString() };
+      if (!writeCatalogProducts(localProducts)) throw new Error("The product status could not be saved.");
+      return localProducts[index];
+    };
     const renderCatalog = () => {
-      const products = sortCatalogProducts(readCatalogProducts());
+      const allProducts = sortCatalogProducts(readCatalogProducts({ includeArchived: true }));
+      const products = catalogFilter === "active" ? allProducts.filter((product) => product.status !== "archived") : allProducts;
       productCatalogPage.querySelectorAll("[data-custom-product]").forEach((card) => card.remove());
       productCatalogPage.querySelectorAll("[data-catalog-empty]").forEach((message) => message.remove());
       inventory?.querySelectorAll("[data-custom-product]").forEach((row) => row.remove());
       products.forEach((product, productIndex) => {
         const type = ["physical", "digital", "subscription"].includes(product.type) ? product.type : "physical";
+        const archived = product.status === "archived";
         const image = product.image || product.images?.[0] || "";
         const availability = type === "physical" ? `${Math.max(0, Number(product.stock) || 0)} in stock` : type === "digital" ? "Digital delivery" : `Every ${product.subscription?.interval || 1} ${product.subscription?.unit || "month"}`;
         const card = document.createElement("article");
-        card.className = "product-card"; card.dataset.customProduct = product.id;
+        card.className = `product-card${archived ? " is-archived" : ""}`; card.dataset.customProduct = product.id; card.dataset.productStatus = archived ? "archived" : "active";
         card.dataset.searchRow = normalize([product.name, product.sku, product.category, typeName(type)].join(" "));
         const imageMarkup = image ? `<img src="${image}" alt="${escapeHtml(product.name)}" loading="${productIndex < 6 ? "eager" : "lazy"}" fetchpriority="${productIndex < 2 ? "high" : "auto"}" decoding="async">` : '<svg class="icon" aria-hidden="true"><use href="#icon-image"></use></svg>';
-        card.innerHTML = `<span class="product-art">${imageMarkup}<em>${product.images?.length || 1} image${(product.images?.length || 1) === 1 ? "" : "s"}</em></span><div class="product-card-body"><div class="product-card-identity"><header><span class="product-card-type">${escapeHtml(String(product.category || typeName(type)).split(" > ").at(-1))}</span><em>Active</em></header><h2>${escapeHtml(product.name)}</h2><p>${escapeHtml(product.sku)}</p></div><div class="product-card-commerce"><strong>${escapeHtml(formatCreatorPrice(product.price))}</strong><small>${escapeHtml(availability)}</small></div><div class="product-card-meta"><div><small>Type</small><b>${escapeHtml(typeName(type))}</b></div><div><small>Revenue</small><b>Rp0</b></div></div><footer class="product-card-actions"><a href="?page=product-new&amp;product=${encodeURIComponent(product.id)}">Edit</a><button class="product-duplicate" type="button">Duplicate</button><button class="product-delete" type="button">Delete</button></footer></div>`;
+        card.innerHTML = `<span class="product-art">${imageMarkup}<em>${product.images?.length || 1} image${(product.images?.length || 1) === 1 ? "" : "s"}</em></span><div class="product-card-body"><div class="product-card-identity"><header><span class="product-card-type">${escapeHtml(String(product.category || typeName(type)).split(" > ").at(-1))}</span><em>${archived ? "Archived" : "Active"}</em></header><h2>${escapeHtml(product.name)}</h2><p>${escapeHtml(product.sku)}</p></div><div class="product-card-commerce"><strong>${escapeHtml(formatCreatorPrice(product.price))}</strong><small>${escapeHtml(availability)}</small></div><div class="product-card-meta"><div><small>Type</small><b>${escapeHtml(typeName(type))}</b></div><div><small>Revenue</small><b>Rp0</b></div></div><footer class="product-card-actions"><a class="product-edit-icon" href="?page=product-new&amp;product=${encodeURIComponent(product.id)}" aria-label="Edit ${escapeHtml(product.name)}" title="Edit"><svg class="icon" aria-hidden="true"><use href="#icon-pencil"></use></svg></a><div class="product-more"><button type="button" data-product-more aria-label="More actions for ${escapeHtml(product.name)}" title="More actions" aria-haspopup="menu" aria-expanded="false"><svg class="icon" aria-hidden="true"><use href="#icon-more-horizontal"></use></svg></button><div class="product-action-menu" data-product-action-menu role="menu" hidden><button class="product-duplicate" type="button" role="menuitem"><svg class="icon" aria-hidden="true"><use href="#icon-copy"></use></svg><span>Duplicate</span></button><button class="product-archive" type="button" role="menuitem"><svg class="icon" aria-hidden="true"><use href="#icon-${archived ? "eye" : "eye-off"}"></use></svg><span>${archived ? "Restore" : "Archive"}</span></button><button class="product-delete" type="button" role="menuitem"><svg class="icon" aria-hidden="true"><use href="#icon-trash"></use></svg><span>Delete</span></button></div></div></footer></div>`;
+        const moreTrigger = card.querySelector("[data-product-more]");
+        const actionMenu = card.querySelector("[data-product-action-menu]");
+        moreTrigger.addEventListener("click", (event) => {
+          event.stopPropagation();
+          const opening = actionMenu.hidden;
+          closeProductActionMenus(actionMenu);
+          actionMenu.hidden = !opening; moreTrigger.setAttribute("aria-expanded", String(opening));
+        });
+        actionMenu.addEventListener("keydown", (event) => {
+          const options = [...actionMenu.querySelectorAll('[role="menuitem"]')];
+          if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+          event.preventDefault();
+          const index = options.indexOf(document.activeElement);
+          const next = event.key === "Home" ? 0 : event.key === "End" ? options.length - 1 : (index + (event.key === "ArrowDown" ? 1 : -1) + options.length) % options.length;
+          options[next]?.focus();
+        });
         card.querySelector(".product-duplicate").addEventListener("click", () => {
           const duplicateButton = card.querySelector(".product-duplicate");
+          const duplicateLabel = duplicateButton.querySelector("span");
           const duplicate = async () => {
-            duplicateButton.disabled = true; duplicateButton.textContent = "Duplicating…";
+            duplicateButton.disabled = true; duplicateLabel.textContent = "Duplicating…";
             let copy;
             if (cloudEnabled) {
               const result = await cloudRequest("POST", `/v1/products/${encodeURIComponent(product.id)}/duplicate`, {});
@@ -1585,7 +1637,15 @@
             }
             renderCatalog(); showToast(`${product.name} duplicated`);
           };
-          void duplicate().catch((error) => { duplicateButton.disabled = false; duplicateButton.textContent = "Duplicate"; showToast(error instanceof Error ? error.message : "The product could not be duplicated."); });
+          void duplicate().catch((error) => { duplicateButton.disabled = false; duplicateLabel.textContent = "Duplicate"; showToast(error instanceof Error ? error.message : "The product could not be duplicated."); });
+        });
+        card.querySelector(".product-archive").addEventListener("click", () => {
+          const nextStatus = archived ? "active" : "archived";
+          const archiveButton = card.querySelector(".product-archive");
+          archiveButton.disabled = true;
+          void setCatalogProductStatus(product, nextStatus)
+            .then(() => { renderCatalog(); showToast(`${product.name} ${archived ? "restored" : "archived"}`); })
+            .catch((error) => { archiveButton.disabled = false; showToast(error instanceof Error ? error.message : "The product status could not be changed."); });
         });
         card.querySelector(".product-delete").addEventListener("click", () => {
           if (!window.confirm(`Delete “${product.name}” from the catalog?`)) return;
@@ -1598,7 +1658,7 @@
           void remove().catch((error) => showError(error instanceof Error ? error.message : "The product could not be deleted."));
         });
         productCatalogPage.append(card);
-        if (inventory) {
+        if (inventory && !archived) {
           const row = document.createElement("article"); row.dataset.customProduct = product.id;
           row.innerHTML = `<span class="product-art"><img src="${image}" alt="" loading="lazy" decoding="async"></span><div><b>${escapeHtml(product.name)}</b><small>${escapeHtml(product.sku)}</small></div><strong>${type === "physical" ? Math.max(0, Number(product.stock) || 0) : "∞"}</strong><span>${type === "physical" ? "15" : "—"}</span><em class="inventory-good">${type === "physical" ? "Healthy" : "Available"}</em>`;
           inventory.append(row);
@@ -1607,11 +1667,20 @@
       if (products.length === 0) {
         const empty = document.createElement("div");
         empty.className = "catalog-empty-note"; empty.dataset.catalogEmpty = "true";
-        empty.innerHTML = '<b>Your catalog is empty.</b><span>Create your first product to start building this store.</span><a href="?page=product-new&amp;new=1">Create product</a>';
+        if (catalogFilter === "active" && allProducts.length > 0) {
+          empty.innerHTML = '<b>No active products.</b><span>Your archived products are still available under All.</span><button type="button" data-view-all-products>View all products</button>';
+          empty.querySelector("[data-view-all-products]").addEventListener("click", () => { catalogFilter = "all"; localStorage.setItem(catalogFilterKey, catalogFilter); renderCatalog(); });
+        } else {
+          empty.innerHTML = '<b>Your catalog is empty.</b><span>Create your first product to start building this store.</span><a href="?page=product-new&amp;new=1">Create product</a>';
+        }
         productCatalogPage.append(empty);
       }
-      updateCatalogStats(products); syncCatalogControls(); renderDrafts();
+      updateCatalogStats(allProducts, products); syncCatalogControls(); renderDrafts();
     };
+    catalogControls?.querySelectorAll("[data-product-filter]").forEach((button) => button.addEventListener("click", () => {
+      catalogFilter = button.dataset.productFilter === "all" ? "all" : "active";
+      localStorage.setItem(catalogFilterKey, catalogFilter); renderCatalog();
+    }));
     catalogControls?.querySelectorAll("[data-product-view]").forEach((button) => button.addEventListener("click", () => {
       catalogView = button.dataset.productView === "list" ? "list" : "grid";
       localStorage.setItem(catalogViewKey, catalogView); syncCatalogControls();
@@ -1629,8 +1698,16 @@
       event.preventDefault(); const options = [...sortMenu.querySelectorAll("[data-product-sort-option]")]; const index = options.indexOf(document.activeElement);
       const next = event.key === "Home" ? 0 : event.key === "End" ? options.length - 1 : (index + (event.key === "ArrowDown" ? 1 : -1) + options.length) % options.length; options[next]?.focus();
     });
-    document.addEventListener("pointerdown", (event) => { if (sortPicker && !sortPicker.contains(event.target)) setSortMenu(false); });
-    document.addEventListener("keydown", (event) => { if (event.key === "Escape" && sortMenu && !sortMenu.hidden) { setSortMenu(false); sortTrigger?.focus(); } });
+    document.addEventListener("pointerdown", (event) => {
+      if (sortPicker && !sortPicker.contains(event.target)) setSortMenu(false);
+      if (!event.target.closest?.(".product-more")) closeProductActionMenus();
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape") return;
+      if (sortMenu && !sortMenu.hidden) { setSortMenu(false); sortTrigger?.focus(); }
+      const openProductMenu = productCatalogPage.querySelector("[data-product-action-menu]:not([hidden])");
+      if (openProductMenu) { const trigger = openProductMenu.closest(".product-more")?.querySelector("[data-product-more]"); closeProductActionMenus(); trigger?.focus(); }
+    });
     document.querySelectorAll("[data-open-product-creator]").forEach((button) => button.addEventListener("click", () => { clearError(); dialog?.showModal(); }));
     dialog?.querySelectorAll("[data-catalog-close]").forEach((button) => button.addEventListener("click", () => dialog.close("cancel")));
     dialog?.addEventListener("close", () => { if (dialog.returnValue === "cancel") { form?.reset(); syncType(); } });
