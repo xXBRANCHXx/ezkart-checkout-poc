@@ -455,8 +455,6 @@
     const noVariants = q("[data-product-no-variants]");
     const optionGroups = q("[data-product-option-groups]");
     const addOptionButton = q("[data-add-option-group]");
-    const optionImages = q("[data-product-option-images]");
-    const optionImageList = q("[data-option-image-list]");
     const variantTable = q("[data-product-variant-table]");
     const variantEmpty = q("[data-product-variant-empty]");
     const variantRows = q("[data-product-variant-rows]");
@@ -944,8 +942,8 @@
         : selectedImages[0]?.url;
     const firstOptionPhotoMarkup = (variant) => {
       const currentSource = variantImageSource(variant);
-      const choices = selectedImages.length ? selectedImages.map((image, index) => `<button type="button" data-main-image-index="${index}"><img src="${image.url}" alt=""><span>${index === 0 ? "Main image" : `Image ${index + 1}`}</span></button>`).join("") : '<p>Upload main images first.</p>';
-      return `<div class="product-variant-photo"><div class="product-variant-photo-source"><label class="product-variant-upload" data-variant-photo-dropzone aria-label="Upload or drop an option image"><input type="file" accept="image/png,image/jpeg,image/webp,image/avif" data-variant-photo-input><span>${currentSource ? `<img src="${currentSource}" alt=""><b>${variant?.useCustomImage ? "Replace" : "Upload"}</b>` : '<svg class="icon" aria-hidden="true"><use href="#icon-image"></use></svg><b>Upload</b>'}</span></label><details class="product-variant-main-picker"><summary aria-label="Choose a photo from main images"><svg class="icon" aria-hidden="true"><use href="#icon-chevron-down"></use></svg></summary><div>${choices}</div></details></div>${variant?.useCustomImage ? '<button type="button" data-variant-photo-clear aria-label="Remove option upload">×</button>' : ""}</div>`;
+      const choices = selectedImages.length ? selectedImages.map((image, index) => `<button type="button" data-main-image-index="${index}"><img src="${escapeHtml(image.url)}" alt=""><span>${index === 0 ? "Main image" : `Image ${index + 1}`}</span></button>`).join("") : '<p>Upload main images first.</p>';
+      return `<div class="product-variant-photo"><div class="product-variant-photo-source"><label class="product-variant-upload" data-variant-photo-dropzone aria-label="Upload or drop an option image"><input type="file" accept="image/png,image/jpeg,image/webp,image/avif" data-variant-photo-input><span>${currentSource ? `<img src="${escapeHtml(currentSource)}" alt=""><b>${variant?.useCustomImage ? "Replace" : "Upload"}</b>` : '<svg class="icon" aria-hidden="true"><use href="#icon-image"></use></svg><b>Upload</b>'}</span></label><details class="product-variant-main-picker"><summary aria-label="Choose a photo from main images"><svg class="icon" aria-hidden="true"><use href="#icon-chevron-down"></use></svg></summary><div>${choices}</div></details></div>${variant?.useCustomImage ? '<button type="button" data-variant-photo-clear aria-label="Remove option upload">×</button>' : ""}</div>`;
     };
     const applyFirstOptionPhoto = async (value, file, dropTarget) => {
       if (!file) return;
@@ -964,63 +962,22 @@
         showError(error instanceof Error ? error.message : "That option image could not be added.");
       }
     };
-    const renderFirstOptionImages = () => {
-      if (!optionImages || !optionImageList) return;
-      const group = optionSnapshot()[0];
-      const values = group?.values.filter((value) => firstOptionMatches(value).length) || [];
-      optionImages.hidden = !variants.length || !group || !values.length;
-      optionImageList.replaceChildren();
-      if (optionImages.hidden) return;
-      setText("[data-option-images-title]", `${group.name} images`);
-      setText("[data-option-images-description]", `One small image per ${group.name.toLowerCase()} value. Every matching combination shares it.`);
-      values.forEach((value) => {
-        const matches = firstOptionMatches(value);
-        const variant = matches[0];
-        const card = document.createElement("article");
-        card.className = "product-option-image-card";
-        card.innerHTML = `${firstOptionPhotoMarkup(variant)}<div><b>${escapeHtml(value)}</b><small>Shared by ${matches.length} combination${matches.length === 1 ? "" : "s"}</small></div>`;
-        card.querySelectorAll("[data-main-image-index]").forEach((button) => button.addEventListener("click", () => {
-          setFirstOptionImage(value, { imageIndex: Number(button.dataset.mainImageIndex) });
-          button.closest("details").open = false; renderVariants(); markDraftChanged();
-        }));
-        const input = card.querySelector("[data-variant-photo-input]");
-        const dropzone = card.querySelector("[data-variant-photo-dropzone]");
-        input.addEventListener("change", async (event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) await applyFirstOptionPhoto(value, file, dropzone); });
+    const bindFirstOptionPhotoControls = (container, value) => {
+      container.querySelectorAll("[data-main-image-index]").forEach((button) => button.addEventListener("click", () => {
+        setFirstOptionImage(value, { imageIndex: Number(button.dataset.mainImageIndex) });
+        button.closest("details").open = false; renderVariants(); markDraftChanged();
+      }));
+      const input = container.querySelector("[data-variant-photo-input]");
+      const dropzone = container.querySelector("[data-variant-photo-dropzone]");
+      input?.addEventListener("change", async (event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) await applyFirstOptionPhoto(value, file, dropzone); });
+      if (dropzone) {
         let dragDepth = 0;
         dropzone.addEventListener("dragenter", (event) => { if (![...(event.dataTransfer?.types || [])].includes("Files")) return; event.preventDefault(); event.stopPropagation(); dragDepth += 1; dropzone.classList.add("is-drop-ready"); });
         dropzone.addEventListener("dragover", (event) => { if (![...(event.dataTransfer?.types || [])].includes("Files")) return; event.preventDefault(); event.stopPropagation(); if (event.dataTransfer) event.dataTransfer.dropEffect = "copy"; dropzone.classList.add("is-drop-ready"); });
         dropzone.addEventListener("dragleave", (event) => { event.preventDefault(); event.stopPropagation(); dragDepth = Math.max(0, dragDepth - 1); if (!dragDepth) dropzone.classList.remove("is-drop-ready"); });
         dropzone.addEventListener("drop", (event) => { event.preventDefault(); event.stopPropagation(); dragDepth = 0; dropzone.classList.remove("is-drop-ready"); const file = event.dataTransfer?.files?.[0]; if (file) void applyFirstOptionPhoto(value, file, dropzone); });
-        card.querySelector("[data-variant-photo-clear]")?.addEventListener("click", () => { setFirstOptionImage(value); renderVariants(); markDraftChanged(); });
-        optionImageList.append(card);
-      });
-      if (group.values.length < 30) {
-        const addCard = document.createElement("article");
-        addCard.className = "product-option-image-add";
-        const singularName = group.name.replace(/s$/i, "") || "option";
-        addCard.innerHTML = `<button type="button" data-add-first-option-value><span>+</span> Add ${escapeHtml(singularName.toLowerCase())}</button>`;
-        addCard.querySelector("button").addEventListener("click", () => {
-          addCard.innerHTML = `<form><label><span>New ${escapeHtml(singularName.toLowerCase())}</span><input type="text" maxlength="60" autocomplete="off" placeholder="Enter a name" required></label><div><button type="submit">Add</button><button type="button" data-cancel-option-add>Cancel</button></div></form>`;
-          const form = addCard.querySelector("form");
-          const input = form.querySelector("input");
-          input.focus();
-          form.addEventListener("submit", (event) => {
-            event.preventDefault();
-            const value = input.value.trim();
-            const valuesInput = optionGroups?.firstElementChild?.querySelector("[data-option-values]");
-            const currentValues = rawOptionValues(valuesInput);
-            if (!value) return;
-            if (currentValues.some((item) => item.localeCompare(value, undefined, { sensitivity: "base" }) === 0)) { showError(`${value} is already in ${group.name}.`); return; }
-            if (currentValues.length >= 30) { showError(`${group.name} can have up to 30 values.`); return; }
-            valuesInput.value = [...currentValues, value].join(", ");
-            updateOptionValueCount(optionGroups.firstElementChild);
-            generateVariants();
-          });
-          form.querySelector("[data-cancel-option-add]").addEventListener("click", renderFirstOptionImages);
-          input.addEventListener("keydown", (event) => { if (event.key === "Escape") renderFirstOptionImages(); });
-        });
-        optionImageList.append(addCard);
       }
+      container.querySelector("[data-variant-photo-clear]")?.addEventListener("click", () => { setFirstOptionImage(value); renderVariants(); markDraftChanged(); });
     };
     const renderVariants = () => {
       normalizeFirstOptionImages();
@@ -1072,9 +1029,8 @@
         group.dataset.variantGroup = groupValue;
         const groupCell = document.createElement("div");
         groupCell.className = "product-variant-group-cell";
-        const groupImage = variantImageSource(groupVariants[0]);
         const groupItemLabel = currentType() === "subscription" ? "plan" : "variant";
-        groupCell.innerHTML = `<input type="checkbox" data-variant-group-select aria-label="Select all ${escapeHtml(groupValue)} combinations"><span class="product-variant-group-image">${groupImage ? `<img src="${escapeHtml(groupImage)}" alt="">` : '<svg class="icon" aria-hidden="true"><use href="#icon-image"></use></svg>'}</span><span class="product-variant-group-copy"><b title="${escapeHtml(groupValue)}">${escapeHtml(groupValue)}</b><small>${groupVariants.length} ${groupItemLabel}${groupVariants.length === 1 ? "" : "s"}</small></span>`;
+        groupCell.innerHTML = `<input type="checkbox" data-variant-group-select aria-label="Select all ${escapeHtml(groupValue)} combinations">${firstOptionPhotoMarkup(groupVariants[0])}<span class="product-variant-group-copy"><b title="${escapeHtml(groupValue)}">${escapeHtml(groupValue)}</b><small>${groupVariants.length} ${groupItemLabel}${groupVariants.length === 1 ? "" : "s"}</small></span>`;
         const groupRows = document.createElement("div");
         groupRows.className = "product-variant-group-rows";
         groupVariants.forEach((variant) => attachVariantRow(variant, groupRows));
@@ -1083,9 +1039,36 @@
           groupVariants.forEach((variant) => event.target.checked ? selectedVariantIds.add(variant.id) : selectedVariantIds.delete(variant.id));
           updateVariantSelection();
         });
+        bindFirstOptionPhotoControls(groupCell, groupValue);
         group.append(groupCell, groupRows);
         variantRows.append(group);
       });
+      if (firstGroup && firstGroup.values.length < 30) {
+        const addGroup = document.createElement("section");
+        addGroup.className = "product-variant-add-group";
+        const singularName = firstGroup.name.replace(/s$/i, "") || "option";
+        addGroup.innerHTML = `<button type="button" data-add-group-value><span>+</span> Add ${escapeHtml(singularName.toLowerCase())}</button>`;
+        addGroup.querySelector("button").addEventListener("click", () => {
+          addGroup.innerHTML = `<form><label><span>New ${escapeHtml(singularName.toLowerCase())}</span><input type="text" maxlength="60" autocomplete="off" placeholder="Enter a name" required></label><div><button type="submit">Add</button><button type="button" data-cancel-group-add>Cancel</button></div></form>`;
+          const form = addGroup.querySelector("form");
+          const input = form.querySelector("input");
+          input.focus();
+          form.addEventListener("submit", (event) => {
+            event.preventDefault();
+            const value = input.value.trim();
+            const valuesInput = optionGroups?.firstElementChild?.querySelector("[data-option-values]");
+            const currentValues = rawOptionValues(valuesInput);
+            if (!value) return;
+            if (currentValues.some((item) => item.localeCompare(value, undefined, { sensitivity: "base" }) === 0)) { showError(`${value} is already in ${firstGroup.name}.`); return; }
+            valuesInput.value = [...currentValues, value].join(", ");
+            updateOptionValueCount(optionGroups.firstElementChild);
+            generateVariants();
+          });
+          form.querySelector("[data-cancel-group-add]").addEventListener("click", renderVariants);
+          input.addEventListener("keydown", (event) => { if (event.key === "Escape") renderVariants(); });
+        });
+        variantRows.append(addGroup);
+      }
       setText("[data-variant-group-heading]", firstGroup?.name || (currentType() === "subscription" ? "Plan" : "Option"));
       setText("[data-variant-column-title]", remainingGroups.map((group) => group.name).join(" / ") || (currentType() === "subscription" ? "Plan details" : "Variant details"));
       q("[data-variant-stock-heading]")?.toggleAttribute("hidden", currentType() !== "physical");
@@ -1093,7 +1076,7 @@
       q("[data-variant-billing-heading]")?.toggleAttribute("hidden", currentType() !== "subscription");
       q("[data-product-variant-batch]")?.querySelectorAll("[data-batch-physical]").forEach((field) => { field.hidden = currentType() !== "physical"; });
       setText("[data-generate-variants-label]", variants.length ? (currentType() === "subscription" ? "Update plans" : "Update combinations") : (currentType() === "subscription" ? "Generate plans" : "Generate combinations"));
-      renderFirstOptionImages(); renderVariantFilters(); updateVariantSelection(); syncLiveVariants();
+      renderVariantFilters(); updateVariantSelection(); syncLiveVariants();
     };
     const generateVariants = () => {
       clearError();

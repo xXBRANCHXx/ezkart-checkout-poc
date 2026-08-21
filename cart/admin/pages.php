@@ -113,10 +113,6 @@ function ez_orders_table(array $rows, string $tableId): void
             <div class="product-option-heading"><div><b data-variant-options-title>Option groups</b><p data-variant-options-description>Enter values separated by commas. Example: 50 ml, 250 ml.</p></div><button type="button" data-add-option-group><?= ez_admin_icon('plus') ?> Add option</button></div>
             <div class="product-option-groups" data-product-option-groups></div>
             <button class="product-generate-variants" type="button" data-generate-variants><?= ez_admin_icon('layers') ?> <span data-generate-variants-label>Generate combinations</span></button>
-            <section class="product-option-images" data-product-option-images hidden>
-              <header><div><b data-option-images-title>Flavor images</b><p data-option-images-description>One small image per flavor. Every matching combination shares it.</p></div><small>Optimized for fast loading</small></header>
-              <div data-option-image-list></div>
-            </section>
             <div class="product-variant-empty" data-product-variant-empty><span><?= ez_admin_icon('box') ?></span><div><b data-variant-empty-title>No combinations yet</b><p data-variant-empty-description>Add option values, then generate the sellable variants for this product.</p></div></div>
             <div class="product-variant-table" data-product-variant-table hidden>
               <div class="product-variant-batch" data-product-variant-batch>
