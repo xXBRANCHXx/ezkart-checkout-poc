@@ -577,18 +577,19 @@
     let categoryDepartment = "";
     let categoryGroup = "";
     const optionSnapshot = () => [...(optionGroups?.children || [])].map((row) => ({ name: String(row.querySelector("[data-option-name]")?.value || "").trim(), values: optionValues(row.querySelector("[data-option-values]")) })).filter((group) => group.name && group.values.length);
+    const visibleVariants = () => variants.filter((variant) => !variant.hidden);
     const selectedPreviewVariant = () => {
-      if (!variantToggle?.checked || !variants.length) return null;
+      if (!variantToggle?.checked || !visibleVariants().length) return null;
       const groups = optionSnapshot();
       if (!groups.length || groups.some((group) => !group.values.includes(liveOptionSelection[group.name]))) return null;
-      return variants.find((variant) => variant.options?.every((option) => liveOptionSelection[option.option] === option.value)) || null;
+      return visibleVariants().find((variant) => variant.options?.every((option) => liveOptionSelection[option.option] === option.value)) || null;
     };
     const selectedPreviewImageVariant = () => {
-      if (!variantToggle?.checked || !variants.length) return null;
+      if (!variantToggle?.checked || !visibleVariants().length) return null;
       const firstGroup = optionSnapshot()[0];
       const firstValue = firstGroup ? liveOptionSelection[firstGroup.name] : "";
       if (!firstGroup || !firstGroup.values.includes(firstValue)) return null;
-      return variants.find((variant) => variant.options?.some((option) => option.option === firstGroup.name && option.value === firstValue)) || null;
+      return visibleVariants().find((variant) => variant.options?.some((option) => option.option === firstGroup.name && option.value === firstValue)) || null;
     };
     const imageData = async (item) => item?.data || (item?.file ? compressCreatorProductImage(item.file) : "");
     const setDropzoneState = (state = "idle") => {
@@ -774,11 +775,12 @@
     const syncLiveVariants = () => {
       if (!liveVariant) return;
       const groups = optionSnapshot();
-      const show = Boolean(variantToggle?.checked && variants.length && groups.length);
+      const storefrontVariants = visibleVariants();
+      const show = Boolean(variantToggle?.checked && storefrontVariants.length && groups.length);
       liveVariant.hidden = !show;
       liveVariant.replaceChildren();
       if (!show) { updatePreview(); return; }
-      const availableValuesFor = (targetGroup) => new Set(variants.filter((variant) => groups.every((group) => {
+      const availableValuesFor = (targetGroup) => new Set(storefrontVariants.filter((variant) => groups.every((group) => {
         if (group.name === targetGroup.name) return true;
         const selectedValue = liveOptionSelection[group.name];
         return !selectedValue || variant.options?.some((option) => option.option === group.name && option.value === selectedValue);
@@ -881,7 +883,7 @@
 
     const variantMatchesFilters = (variant) => [...activeVariantFilters].every(([optionName, optionValue]) => variant.options?.some((option) => option.option === optionName && option.value === optionValue));
     const selectFilteredVariants = () => {
-      selectedVariantIds = activeVariantFilters.size ? new Set(variants.filter(variantMatchesFilters).map((variant) => variant.id)) : new Set();
+      selectedVariantIds = activeVariantFilters.size ? new Set(visibleVariants().filter(variantMatchesFilters).map((variant) => variant.id)) : new Set();
       updateVariantSelection();
     };
     const updateVariantSelection = () => {
@@ -891,7 +893,7 @@
         const checkbox = row.querySelector("[data-variant-select]"); if (checkbox) checkbox.checked = selected;
       });
       variantRows?.querySelectorAll("[data-variant-group]").forEach((group) => {
-        const ids = [...group.querySelectorAll(".product-variant-row")].map((row) => row.dataset.variantId).filter(Boolean);
+        const ids = [...group.querySelectorAll(".product-variant-row:not(.is-hidden)")].map((row) => row.dataset.variantId).filter(Boolean);
         const selectedInGroup = ids.filter((id) => selectedVariantIds.has(id)).length;
         const checkbox = group.querySelector("[data-variant-group-select]");
         if (checkbox) {
@@ -904,7 +906,8 @@
         const filterLabel = [...activeVariantFilters.values()].join(" · ");
         selectedCount.textContent = filterLabel ? `${filterLabel} · ${selectedVariantIds.size} selected` : `${selectedVariantIds.size} selected`;
       }
-      if (selectAllVariants) { selectAllVariants.checked = variants.length > 0 && selectedVariantIds.size === variants.length; selectAllVariants.indeterminate = selectedVariantIds.size > 0 && selectedVariantIds.size < variants.length; }
+      const selectableVariants = visibleVariants();
+      if (selectAllVariants) { selectAllVariants.checked = selectableVariants.length > 0 && selectedVariantIds.size === selectableVariants.length; selectAllVariants.indeterminate = selectedVariantIds.size > 0 && selectedVariantIds.size < selectableVariants.length; }
       filterChips?.querySelectorAll("button").forEach((chip) => {
         chip.classList.toggle("active", activeVariantFilters.get(chip.dataset.optionName) === chip.dataset.optionValue);
       });
@@ -1004,7 +1007,7 @@
       variantTable?.classList.toggle("is-subscription", currentType() === "subscription");
       if (variantEmpty) variantEmpty.hidden = variants.length > 0;
       if (!variantRows) return;
-      selectedVariantIds = new Set([...selectedVariantIds].filter((id) => variants.some((variant) => variant.id === id)));
+      selectedVariantIds = new Set([...selectedVariantIds].filter((id) => variants.some((variant) => variant.id === id && !variant.hidden)));
       variantRows.replaceChildren();
       const optionGroupsSnapshot = optionSnapshot();
       const firstGroup = optionGroupsSnapshot[0];
@@ -1024,11 +1027,12 @@
       const attachVariantRow = (variant, groupRows) => {
         const physical = currentType() === "physical";
         const subscription = currentType() === "subscription";
-        const row = document.createElement("div"); row.className = "product-variant-row"; row.dataset.variantId = variant.id;
+        const row = document.createElement("div"); row.className = `product-variant-row${variant.hidden ? " is-hidden" : ""}`; row.dataset.variantId = variant.id;
         const billingUnit = ["month", "year"].includes(variant.billingUnit) ? variant.billingUnit : "month";
         const billingMaximum = billingUnit === "year" ? 10 : 120;
         const billingInterval = Math.max(1, Math.min(billingMaximum, Math.round(Number(variant.billingInterval) || 1)));
-        row.innerHTML = `<label class="product-variant-subvariant" title="${escapeHtml(variant.name)}"><input type="checkbox" data-variant-select aria-label="Select ${escapeHtml(variant.name)}"><b>${escapeHtml(compactVariantName(variantChildName(variant)))}</b></label><label><span>Price</span><input type="number" min="1000" step="500" value="${variant.price}" data-variant-price></label><label ${physical ? "" : "hidden"}><span>Stock</span><input type="number" min="0" max="999999" value="${variant.stock}" data-variant-stock></label><label ${physical ? "" : "hidden"}><span>Weight</span><input type="number" min="1" max="50000" value="${variant.weightGrams || 500}" data-variant-weight></label><label class="product-variant-billing" ${subscription ? "" : "hidden"}><span>Billing</span><span><input type="number" min="1" max="${billingMaximum}" value="${billingInterval}" aria-label="Billing interval" data-variant-billing-interval><select aria-label="Billing period" data-variant-billing-unit><option value="month" ${billingUnit === "month" ? "selected" : ""}>Month</option><option value="year" ${billingUnit === "year" ? "selected" : ""}>Year</option></select></span></label><label><span>SKU</span><input type="text" maxlength="48" value="${escapeHtml(variant.sku)}" data-variant-sku></label><button type="button" data-variant-remove aria-label="Remove ${escapeHtml(variant.name)}"><svg class="icon" aria-hidden="true"><use href="#icon-trash"></use></svg></button>`;
+        row.innerHTML = `<label class="product-variant-subvariant" title="${escapeHtml(variant.name)}"><input type="checkbox" data-variant-select aria-label="Select ${escapeHtml(variant.name)}"><b>${escapeHtml(compactVariantName(variantChildName(variant)))}</b></label><label><span>Price</span><input type="number" min="1000" step="500" value="${variant.price}" data-variant-price></label><label ${physical ? "" : "hidden"}><span>Stock</span><input type="number" min="0" max="999999" value="${variant.stock}" data-variant-stock></label><label ${physical ? "" : "hidden"}><span>Weight</span><input type="number" min="1" max="50000" value="${variant.weightGrams || 500}" data-variant-weight></label><label class="product-variant-billing" ${subscription ? "" : "hidden"}><span>Billing</span><span><input type="number" min="1" max="${billingMaximum}" value="${billingInterval}" aria-label="Billing interval" data-variant-billing-interval><select aria-label="Billing period" data-variant-billing-unit><option value="month" ${billingUnit === "month" ? "selected" : ""}>Month</option><option value="year" ${billingUnit === "year" ? "selected" : ""}>Year</option></select></span></label><label><span>SKU</span><input type="text" maxlength="48" value="${escapeHtml(variant.sku)}" data-variant-sku></label><button type="button" data-variant-visibility aria-label="${variant.hidden ? "Show" : "Hide"} ${escapeHtml(variant.name)}" title="${variant.hidden ? "Show variant" : "Hide variant"}"><svg class="icon" aria-hidden="true"><use href="#icon-${variant.hidden ? "eye" : "eye-off"}"></use></svg></button>`;
+        if (variant.hidden) row.querySelectorAll("input, select").forEach((control) => { control.disabled = true; });
         row.querySelector("[data-variant-select]").addEventListener("change", (event) => { activeVariantFilters.clear(); event.target.checked ? selectedVariantIds.add(variant.id) : selectedVariantIds.delete(variant.id); updateVariantSelection(); });
         row.querySelector("[data-variant-price]").addEventListener("input", (event) => { variant.price = Math.max(0, Math.round(Number(event.target.value) || 0)); updatePreview(); markDraftChanged(); });
         row.querySelector("[data-variant-stock]").addEventListener("input", (event) => { variant.stock = Math.max(0, Math.round(Number(event.target.value) || 0)); updatePreview(); markDraftChanged(); });
@@ -1036,7 +1040,11 @@
         row.querySelector("[data-variant-billing-interval]")?.addEventListener("input", (event) => { const maximum = variant.billingUnit === "year" ? 10 : 120; variant.billingInterval = Math.max(1, Math.min(maximum, Math.round(Number(event.target.value) || 1))); updatePreview(); markDraftChanged(); });
         row.querySelector("[data-variant-billing-unit]")?.addEventListener("change", (event) => { variant.billingUnit = event.target.value; variant.billingInterval = Math.min(variant.billingInterval || 1, variant.billingUnit === "year" ? 10 : 120); renderVariants(); markDraftChanged(); });
         row.querySelector("[data-variant-sku]").addEventListener("input", (event) => { variant.sku = event.target.value.trim(); markDraftChanged(); });
-        row.querySelector("[data-variant-remove]").addEventListener("click", () => { const index = variants.findIndex((item) => item.id === variant.id); if (index >= 0) variants.splice(index, 1); selectedVariantIds.delete(variant.id); renderVariants(); markDraftChanged(); });
+        row.querySelector("[data-variant-visibility]").addEventListener("click", () => {
+          variant.hidden = !variant.hidden;
+          selectedVariantIds.delete(variant.id);
+          renderVariants(); markDraftChanged(); showToast(variant.hidden ? `${variant.name} hidden` : `${variant.name} visible again`);
+        });
         groupRows.append(row);
       };
       groupedVariants.forEach((groupVariants, groupValue) => {
@@ -1053,7 +1061,7 @@
         groupVariants.forEach((variant) => attachVariantRow(variant, groupRows));
         groupCell.querySelector("[data-variant-group-select]").addEventListener("change", (event) => {
           activeVariantFilters.clear();
-          groupVariants.forEach((variant) => event.target.checked ? selectedVariantIds.add(variant.id) : selectedVariantIds.delete(variant.id));
+          groupVariants.filter((variant) => !variant.hidden).forEach((variant) => event.target.checked ? selectedVariantIds.add(variant.id) : selectedVariantIds.delete(variant.id));
           updateVariantSelection();
         });
         groupCell.querySelector("[data-variant-group-remove]").addEventListener("click", () => {
@@ -1348,7 +1356,7 @@
     variantToggle?.addEventListener("change", syncVariantMode);
     addOptionButton?.addEventListener("click", () => { addOptionGroup(); markDraftChanged(); });
     q("[data-generate-variants]")?.addEventListener("click", generateVariants);
-    selectAllVariants?.addEventListener("change", () => { activeVariantFilters.clear(); selectedVariantIds = selectAllVariants.checked ? new Set(variants.map((variant) => variant.id)) : new Set(); updateVariantSelection(); });
+    selectAllVariants?.addEventListener("change", () => { activeVariantFilters.clear(); selectedVariantIds = selectAllVariants.checked ? new Set(visibleVariants().map((variant) => variant.id)) : new Set(); updateVariantSelection(); });
     q("[data-clear-variant-selection]")?.addEventListener("click", () => { activeVariantFilters.clear(); selectedVariantIds.clear(); updateVariantSelection(); });
     q("[data-apply-variant-batch]")?.addEventListener("click", () => {
       if (!selectedVariantIds.size) { showError(`Select at least one ${currentType() === "subscription" ? "plan" : "variant"} or use an option filter first.`); return; }
@@ -1421,8 +1429,10 @@
       if (overLimit) { showError("Each option group can have up to 30 unique values."); overLimit.querySelector("[data-option-values]")?.focus(); return; }
       if (selectedImages.length < minimum || selectedImages.length > 9) { showError(`${typeName(type)} requires ${minimum === 3 ? "3–9" : "1–9"} images.`); return; }
       if (variantToggle.checked && !variants.length) { showError(type === "subscription" ? "Generate at least one plan, or turn off Has plans." : "Generate at least one variant, or turn off Has variants."); return; }
+      const sellableVariants = visibleVariants();
+      if (variantToggle.checked && !sellableVariants.length) { showError(type === "subscription" ? "Show at least one plan before publishing." : "Show at least one variant before publishing."); return; }
       if (variants.some((variant) => variant.price < 1000 || !variant.sku || (type === "physical" && variant.weightGrams < 1) || (type === "subscription" && (!variant.billingUnit || variant.billingInterval < 1)))) { showError(type === "subscription" ? "Every plan needs a valid price, SKU, and billing period." : "Every variant needs a valid price, SKU, and shipping weight."); return; }
-      const firstPlan = type === "subscription" && variantToggle.checked ? variants[0] : null;
+      const firstPlan = type === "subscription" && variantToggle.checked ? sellableVariants[0] : null;
       const selectedBillingUnit = String(firstPlan?.billingUnit || productCreateForm.elements.unit.value || "month");
       const interval = Math.max(1, Math.min(selectedBillingUnit === "year" ? 10 : 120, Math.round(Number(firstPlan?.billingInterval ?? productCreateForm.elements.interval?.value) || 1)));
       submitButtons.forEach((button) => { button.disabled = true; button.dataset.originalText = button.textContent; button.textContent = editingProduct ? "Publishing changes…" : "Creating product…"; });
@@ -1432,8 +1442,8 @@
         const suffix = globalThis.crypto?.randomUUID?.().replace(/-/g, "").slice(0, 10) || String(Date.now());
         const product = {
           id: editingProduct?.id || `custom-${suffix}`, sku: editingProduct?.sku || `EZK-${type.slice(0, 3).toUpperCase()}-${suffix.toUpperCase()}`, name: String(productCreateForm.elements.name.value).trim(), category: String(productCreateForm.elements.category.value).trim(), categoryKey: currentCategoryEntry() ? categoryKey(productCreateForm.elements.category.value) : "", description: String(productCreateForm.elements.description.value).trim(), type,
-          price: variantToggle.checked ? Math.min(...variants.map((variant) => variant.price)) : Math.round(Number(productCreateForm.elements.price.value) || 0), images, mediaIds: selectedImages.map((image) => image.cloudId), image: images[0],
-          ...(type === "physical" ? { stock: variantToggle.checked ? variants.reduce((total, variant) => total + variant.stock, 0) : Math.max(0, Math.round(Number(productCreateForm.elements.stock.value) || 0)), weightGrams: variantToggle.checked ? Math.max(...variants.map((variant) => variant.weightGrams)) : Math.max(1, Math.round(Number(productCreateForm.elements.weight.value) || 0)) } : {}),
+          price: variantToggle.checked ? Math.min(...sellableVariants.map((variant) => variant.price)) : Math.round(Number(productCreateForm.elements.price.value) || 0), images, mediaIds: selectedImages.map((image) => image.cloudId), image: images[0],
+          ...(type === "physical" ? { stock: variantToggle.checked ? sellableVariants.reduce((total, variant) => total + variant.stock, 0) : Math.max(0, Math.round(Number(productCreateForm.elements.stock.value) || 0)), weightGrams: variantToggle.checked ? Math.max(...sellableVariants.map((variant) => variant.weightGrams)) : Math.max(1, Math.round(Number(productCreateForm.elements.weight.value) || 0)) } : {}),
           ...(type === "digital" ? { digitalFileName: String(productCreateForm.elements.digital_name.value || "").trim() } : {}),
           ...(type === "subscription" ? { subscription: { interval, unit: selectedBillingUnit } } : {}),
           ...(variantToggle.checked ? { options: optionSnapshot(), variants: variants.map(({ customImage, useCustomImage, ...variant }) => ({ ...variant, imageUploadId: useCustomImage ? customImage?.cloudId || null : null, image: useCustomImage && customImage?.data ? customImage.data : Number.isInteger(variant.imageIndex) ? images[variant.imageIndex] || images[0] : images[0], imageSource: useCustomImage && customImage?.data ? "variant-upload" : Number.isInteger(variant.imageIndex) ? `gallery-${variant.imageIndex + 1}` : "main" })) } : {}), createdAt: editingProduct?.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString(),
@@ -3030,7 +3040,7 @@
       productNames[id] = name;
       productPrices[id] = price;
       productImages[id] = imageUrl;
-      const variants = Array.isArray(product.variants) ? product.variants.slice(0, 100) : [];
+      const variants = Array.isArray(product.variants) ? product.variants.filter((variant) => !variant.hidden).slice(0, 100) : [];
       productMeta[id] = { type, images, ...(variants.length ? { options: Array.isArray(product.options) ? product.options : [], variants } : {}), ...(type === "physical" ? { weightGrams: Math.max(1, Number(product.weightGrams) || 1) } : {}), ...(type === "digital" ? { digitalFileName: String(product.digitalFileName || "") } : {}), ...(type === "subscription" ? { subscription: { interval: Math.max(1, Number(product.subscription?.interval) || 1), unit: product.subscription?.unit || "month" } } : {}) };
 
       const picker = sqStudio.querySelector(".sq-product-picker");

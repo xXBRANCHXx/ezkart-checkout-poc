@@ -260,20 +260,24 @@ function shapeProduct(row, media = [], variants = [], performance = {}) {
       sortOrder: Number(item.sort_order),
       alt: item.alt_text || "",
     })),
-    variants: variants.map((variant) => ({
-      id: variant.id,
-      name: variant.name,
-      options: parseJson(variant.options_json, []),
-      sku: variant.sku,
-      price: Number(variant.price_amount || 0),
-      stock: variant.stock_quantity === null ? 0 : Number(variant.stock_quantity),
-      weightGrams: variant.weight_grams === null ? null : Number(variant.weight_grams),
-      billingUnit: variant.billing_interval || null,
-      billingInterval: variant.billing_interval_count === null ? null : Number(variant.billing_interval_count),
-      imageSource: variant.image_source || "main",
-      imageUploadId: variant.image_upload_id || null,
-      imagePath: variant.image_upload_id ? mediaPath(variant.image_upload_id) : null,
-    })),
+    variants: variants.map((variant) => {
+      const storedOptions = parseJson(variant.options_json, []);
+      return {
+        id: variant.id,
+        name: variant.name,
+        options: Array.isArray(storedOptions) ? storedOptions : Array.isArray(storedOptions.values) ? storedOptions.values : [],
+        hidden: !Array.isArray(storedOptions) && Boolean(storedOptions.hidden),
+        sku: variant.sku,
+        price: Number(variant.price_amount || 0),
+        stock: variant.stock_quantity === null ? 0 : Number(variant.stock_quantity),
+        weightGrams: variant.weight_grams === null ? null : Number(variant.weight_grams),
+        billingUnit: variant.billing_interval || null,
+        billingInterval: variant.billing_interval_count === null ? null : Number(variant.billing_interval_count),
+        imageSource: variant.image_source || "main",
+        imageUploadId: variant.image_upload_id || null,
+        imagePath: variant.image_upload_id ? mediaPath(variant.image_upload_id) : null,
+      };
+    }),
     rating: Number(performance.review_count || 0) > 0 ? Number(performance.rating_average || 0) : null,
     reviewCount: Math.max(0, Number(performance.review_count || 0)),
     soldCount: Math.max(0, Number(performance.sold_count || 0)),
@@ -499,6 +503,7 @@ async function saveProduct(request, env, rawId) {
     weightGrams: Math.max(0, Math.round(Number(variant.weightGrams) || 0)),
     billingUnit: type === "subscription" && ["month", "year"].includes(variant.billingUnit) ? variant.billingUnit : null,
     billingInterval: type === "subscription" ? Math.max(1, Math.min(variant.billingUnit === "year" ? 10 : 120, Math.round(Number(variant.billingInterval) || 1))) : null,
+    hidden: Boolean(variant.hidden),
     imageSource: /^gallery-[1-9]$/.test(String(variant.imageSource || "")) ? String(variant.imageSource) : variant.imageUploadId ? "variant-upload" : "main",
     imageUploadId: variant.imageUploadId ? cleanId(variant.imageUploadId, "Variant image ID") : null,
   }));
@@ -522,10 +527,12 @@ async function saveProduct(request, env, rawId) {
   }
   if (new Set(variants.map((variant) => variant.sku.toLowerCase())).size !== variants.length) throw new Response(type === "subscription" ? "Plan SKUs must be unique" : "Variant SKUs must be unique", { status: 400 });
   const uploadMap = await ownedUploads(env, seller.id, [...imageIds, ...variants.map((variant) => variant.imageUploadId)]);
-  const basePrice = variants.length ? Math.min(...variants.map((variant) => variant.price)) : Math.max(0, Math.round(Number(payload.price) || 0));
-  const stock = type === "physical" ? (variants.length ? variants.reduce((sum, variant) => sum + variant.stock, 0) : Math.max(0, Math.round(Number(payload.stock) || 0))) : null;
-  const weight = type === "physical" ? (variants.length ? Math.max(...variants.map((variant) => variant.weightGrams)) : Math.max(1, Math.round(Number(payload.weightGrams) || 0))) : null;
-  const firstPlan = type === "subscription" && variants.length ? variants[0] : null;
+  const sellableVariants = variants.filter((variant) => !variant.hidden);
+  if (variants.length && !sellableVariants.length) throw new Response(type === "subscription" ? "At least one plan must be visible" : "At least one variant must be visible", { status: 400 });
+  const basePrice = sellableVariants.length ? Math.min(...sellableVariants.map((variant) => variant.price)) : Math.max(0, Math.round(Number(payload.price) || 0));
+  const stock = type === "physical" ? (variants.length ? sellableVariants.reduce((sum, variant) => sum + variant.stock, 0) : Math.max(0, Math.round(Number(payload.stock) || 0))) : null;
+  const weight = type === "physical" ? (sellableVariants.length ? Math.max(...sellableVariants.map((variant) => variant.weightGrams)) : Math.max(1, Math.round(Number(payload.weightGrams) || 0))) : null;
+  const firstPlan = type === "subscription" && sellableVariants.length ? sellableVariants[0] : null;
   const displayBillingUnit = type === "subscription" ? (firstPlan?.billingUnit || (["month", "year"].includes(payload.subscription?.unit) ? payload.subscription.unit : "month")) : null;
   const displayBillingInterval = type === "subscription" ? (firstPlan?.billingInterval || Math.max(1, Math.min(displayBillingUnit === "year" ? 10 : 120, Math.round(Number(payload.subscription?.interval) || 1)))) : null;
   const billingUnit = type === "subscription" ? "month" : null;
@@ -556,7 +563,7 @@ async function saveProduct(request, env, rawId) {
   variants.forEach((variant, index) => statements.push(env.DB.prepare(`
     INSERT INTO product_variants (id, seller_id, product_id, name, options_json, sku, price_amount, stock_quantity, weight_grams, billing_interval, billing_interval_count, image_source, image_upload_id, sort_order, created_at, updated_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).bind(variant.id, seller.id, id, variant.name, JSON.stringify(variant.options), variant.sku, variant.price, type === "physical" ? variant.stock : null, type === "physical" ? variant.weightGrams : null, variant.billingUnit, variant.billingInterval, variant.imageSource, variant.imageUploadId, index + 1, now, now)));
+  `).bind(variant.id, seller.id, id, variant.name, JSON.stringify({ values: variant.options, hidden: variant.hidden }), variant.sku, variant.price, type === "physical" ? variant.stock : null, type === "physical" ? variant.weightGrams : null, variant.billingUnit, variant.billingInterval, variant.imageSource, variant.imageUploadId, index + 1, now, now)));
   statements.push(env.DB.prepare(`
     INSERT INTO seller_events (id, seller_id, actor_auth_user_id, event_type, entity_type, entity_id, payload_json, created_at)
     VALUES (?, ?, ?, ?, 'product', ?, ?, ?)
