@@ -233,7 +233,7 @@ async function sellerContext(request, env) {
 
 const mediaPath = (id) => `/v1/media/${encodeURIComponent(id)}`;
 
-function shapeProduct(row, media = [], variants = []) {
+function shapeProduct(row, media = [], variants = [], performance = {}) {
   const metadata = parseJson(row.metadata_json, {});
   return {
     id: row.id,
@@ -274,6 +274,9 @@ function shapeProduct(row, media = [], variants = []) {
       imageUploadId: variant.image_upload_id || null,
       imagePath: variant.image_upload_id ? mediaPath(variant.image_upload_id) : null,
     })),
+    rating: Number(performance.review_count || 0) > 0 ? Number(performance.rating_average || 0) : null,
+    reviewCount: Math.max(0, Number(performance.review_count || 0)),
+    soldCount: Math.max(0, Number(performance.sold_count || 0)),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -281,7 +284,7 @@ function shapeProduct(row, media = [], variants = []) {
 
 async function catalog(request, env) {
   const { seller } = await sellerContext(request, env);
-  const [productsResult, mediaResult, variantsResult, draftsResult] = await env.DB.batch([
+  const [productsResult, mediaResult, variantsResult, draftsResult, salesResult, reviewsResult] = await env.DB.batch([
     env.DB.prepare("SELECT * FROM products WHERE seller_id = ? AND status IN ('active', 'archived') ORDER BY updated_at DESC").bind(seller.id),
     env.DB.prepare(`
       SELECT pm.id, pm.product_id, pm.mime_type, pm.sort_order, pm.alt_text
@@ -291,13 +294,29 @@ async function catalog(request, env) {
     `).bind(seller.id),
     env.DB.prepare("SELECT * FROM product_variants WHERE seller_id = ? ORDER BY product_id, sort_order").bind(seller.id),
     env.DB.prepare("SELECT id, product_id, title, snapshot_json, created_at, updated_at FROM product_drafts WHERE seller_id = ? ORDER BY updated_at DESC").bind(seller.id),
+    env.DB.prepare(`
+      SELECT oi.product_id, SUM(oi.quantity) AS sold_count
+      FROM order_items oi
+      JOIN orders o ON o.seller_id = oi.seller_id AND o.id = oi.order_id
+      WHERE oi.seller_id = ? AND o.status = 'paid' AND oi.product_id IS NOT NULL
+      GROUP BY oi.product_id
+    `).bind(seller.id),
+    env.DB.prepare(`
+      SELECT product_id, AVG(rating) AS rating_average, COUNT(*) AS review_count
+      FROM product_reviews
+      WHERE seller_id = ? AND status = 'published'
+      GROUP BY product_id
+    `).bind(seller.id),
   ]);
   const media = Array.isArray(mediaResult.results) ? mediaResult.results : [];
   const variants = Array.isArray(variantsResult.results) ? variantsResult.results : [];
+  const sales = new Map((Array.isArray(salesResult.results) ? salesResult.results : []).map((item) => [item.product_id, item]));
+  const reviews = new Map((Array.isArray(reviewsResult.results) ? reviewsResult.results : []).map((item) => [item.product_id, item]));
   const products = (Array.isArray(productsResult.results) ? productsResult.results : []).map((row) => shapeProduct(
     row,
     media.filter((item) => item.product_id === row.id),
     variants.filter((item) => item.product_id === row.id),
+    { ...sales.get(row.id), ...reviews.get(row.id) },
   ));
   const drafts = (Array.isArray(draftsResult.results) ? draftsResult.results : []).map((row) => ({
     ...parseJson(row.snapshot_json, {}),
