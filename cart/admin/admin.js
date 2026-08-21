@@ -778,11 +778,19 @@
       liveVariant.hidden = !show;
       liveVariant.replaceChildren();
       if (!show) { updatePreview(); return; }
+      const availableValuesFor = (targetGroup) => new Set(variants.filter((variant) => groups.every((group) => {
+        if (group.name === targetGroup.name) return true;
+        const selectedValue = liveOptionSelection[group.name];
+        return !selectedValue || variant.options?.some((option) => option.option === group.name && option.value === selectedValue);
+      })).map((variant) => variant.options?.find((option) => option.option === targetGroup.name)?.value).filter(Boolean));
       groups.forEach((group) => {
-        const available = new Set(group.values);
-        if (!available.has(liveOptionSelection[group.name])) delete liveOptionSelection[group.name];
+        if (!group.values.includes(liveOptionSelection[group.name]) || !availableValuesFor(group).has(liveOptionSelection[group.name])) delete liveOptionSelection[group.name];
+      });
+      groups.forEach((group) => {
+        const available = availableValuesFor(group);
+        const visibleValues = group.values.filter((value) => available.has(value));
         const section = document.createElement("section");
-        section.innerHTML = `<span>${escapeHtml(group.name)}</span><div>${group.values.map((value) => `<button type="button" class="${liveOptionSelection[group.name] === value ? "active" : ""}" data-live-option-name="${escapeHtml(group.name)}" data-live-option-value="${escapeHtml(value)}">${escapeHtml(value)}</button>`).join("")}</div>`;
+        section.innerHTML = `<span>${escapeHtml(group.name)}</span><div>${visibleValues.map((value) => `<button type="button" class="${liveOptionSelection[group.name] === value ? "active" : ""}" data-live-option-name="${escapeHtml(group.name)}" data-live-option-value="${escapeHtml(value)}">${escapeHtml(value)}</button>`).join("")}</div>`;
         section.querySelectorAll("button").forEach((button) => button.addEventListener("click", () => { liveOptionSelection[button.dataset.liveOptionName] = button.dataset.liveOptionValue; previewUsesVariantImage = true; syncLiveVariants(); }));
         liveVariant.append(section);
       });
@@ -1039,7 +1047,7 @@
         const groupCell = document.createElement("div");
         groupCell.className = "product-variant-group-cell";
         const groupItemLabel = currentType() === "subscription" ? "plan" : "variant";
-        groupCell.innerHTML = `<input type="checkbox" data-variant-group-select aria-label="Select all ${escapeHtml(groupValue)} combinations">${firstOptionPhotoMarkup(groupVariants[0])}<span class="product-variant-group-copy"><b title="${escapeHtml(groupValue)}">${escapeHtml(groupValue)}</b><small>${groupVariants.length} ${groupItemLabel}${groupVariants.length === 1 ? "" : "s"}</small></span>`;
+        groupCell.innerHTML = `<input type="checkbox" data-variant-group-select aria-label="Select all ${escapeHtml(groupValue)} combinations">${firstOptionPhotoMarkup(groupVariants[0])}<span class="product-variant-group-copy"><b title="${escapeHtml(groupValue)}">${escapeHtml(groupValue)}</b><small>${groupVariants.length} ${groupItemLabel}${groupVariants.length === 1 ? "" : "s"}</small></span><button type="button" class="product-variant-group-remove" data-variant-group-remove aria-label="Delete ${escapeHtml(groupValue)} and its ${groupVariants.length} ${groupItemLabel}${groupVariants.length === 1 ? "" : "s"}"><svg class="icon" aria-hidden="true"><use href="#icon-trash"></use></svg></button>`;
         const groupRows = document.createElement("div");
         groupRows.className = "product-variant-group-rows";
         groupVariants.forEach((variant) => attachVariantRow(variant, groupRows));
@@ -1047,6 +1055,20 @@
           activeVariantFilters.clear();
           groupVariants.forEach((variant) => event.target.checked ? selectedVariantIds.add(variant.id) : selectedVariantIds.delete(variant.id));
           updateVariantSelection();
+        });
+        groupCell.querySelector("[data-variant-group-remove]").addEventListener("click", () => {
+          if (!window.confirm(`Delete “${groupValue}” and its ${groupVariants.length} ${groupItemLabel}${groupVariants.length === 1 ? "" : "s"}?`)) return;
+          const firstGroupRow = optionGroups?.firstElementChild;
+          const valuesInput = firstGroupRow?.querySelector("[data-option-values]");
+          const remainingValues = rawOptionValues(valuesInput).filter((value) => value.localeCompare(groupValue, undefined, { sensitivity: "base" }) !== 0);
+          if (valuesInput) valuesInput.value = remainingValues.join(", ");
+          const removedVariantIds = new Set(groupVariants.map((variant) => variant.id));
+          variants = variants.filter((variant) => !removedVariantIds.has(variant.id));
+          groupVariants.forEach((variant) => selectedVariantIds.delete(variant.id));
+          activeVariantFilters.delete(firstGroup?.name);
+          if (firstGroup && liveOptionSelection[firstGroup.name] === groupValue) delete liveOptionSelection[firstGroup.name];
+          if (firstGroupRow) updateOptionValueCount(firstGroupRow);
+          renderVariants(); markDraftChanged(); showToast(`${groupValue} deleted`);
         });
         bindFirstOptionPhotoControls(groupCell, groupValue);
         group.append(groupCell, groupRows);
