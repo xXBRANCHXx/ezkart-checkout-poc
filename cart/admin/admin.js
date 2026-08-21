@@ -579,7 +579,16 @@
     const optionSnapshot = () => [...(optionGroups?.children || [])].map((row) => ({ name: String(row.querySelector("[data-option-name]")?.value || "").trim(), values: optionValues(row.querySelector("[data-option-values]")) })).filter((group) => group.name && group.values.length);
     const selectedPreviewVariant = () => {
       if (!variantToggle?.checked || !variants.length) return null;
-      return variants.find((variant) => variant.options?.every((option) => liveOptionSelection[option.option] === option.value)) || variants[0];
+      const groups = optionSnapshot();
+      if (!groups.length || groups.some((group) => !group.values.includes(liveOptionSelection[group.name]))) return null;
+      return variants.find((variant) => variant.options?.every((option) => liveOptionSelection[option.option] === option.value)) || null;
+    };
+    const selectedPreviewImageVariant = () => {
+      if (!variantToggle?.checked || !variants.length) return null;
+      const firstGroup = optionSnapshot()[0];
+      const firstValue = firstGroup ? liveOptionSelection[firstGroup.name] : "";
+      if (!firstGroup || !firstGroup.values.includes(firstValue)) return null;
+      return variants.find((variant) => variant.options?.some((option) => option.option === firstGroup.name && option.value === firstValue)) || null;
     };
     const imageData = async (item) => item?.data || (item?.file ? compressCreatorProductImage(item.file) : "");
     const setDropzoneState = (state = "idle") => {
@@ -720,6 +729,7 @@
     };
     const updatePreview = (imageDirection = 0, swipeOffset = 0) => {
       const selectedVariant = selectedPreviewVariant();
+      const selectedImageVariant = selectedPreviewImageVariant();
       const name = String(productCreateForm.elements.name?.value || "").trim();
       const category = String(productCreateForm.elements.category?.value || "").trim();
       const description = String(productCreateForm.elements.description?.value || "").trim();
@@ -731,9 +741,9 @@
       setText("[data-product-live-type]", typeName(currentType()));
       setText("[data-product-live-availability]", previewAvailability(selectedVariant));
       if (descriptionCount) descriptionCount.textContent = String(productCreateForm.elements.description?.value.length || 0);
-      const useCustom = Boolean(previewUsesVariantImage && selectedVariant?.useCustomImage && selectedVariant.customImage?.url);
-      const variantIndex = previewUsesVariantImage && selectedVariant && Number.isInteger(selectedVariant.imageIndex) ? selectedVariant.imageIndex : previewImageIndex;
-      const source = useCustom ? selectedVariant.customImage.url : selectedImages[variantIndex]?.url || selectedImages[0]?.url || "";
+      const useCustom = Boolean(previewUsesVariantImage && selectedImageVariant?.useCustomImage && selectedImageVariant.customImage?.url);
+      const variantIndex = previewUsesVariantImage && selectedImageVariant && Number.isInteger(selectedImageVariant.imageIndex) ? selectedImageVariant.imageIndex : previewImageIndex;
+      const source = useCustom ? selectedImageVariant.customImage.url : selectedImages[variantIndex]?.url || selectedImages[0]?.url || "";
       if (liveImage) {
         const animationId = ++previewAnimationId;
         const existingImages = [...liveImage.querySelectorAll(":scope > img")]; const previous = existingImages.at(-1) || null;
@@ -768,10 +778,9 @@
       liveVariant.hidden = !show;
       liveVariant.replaceChildren();
       if (!show) { updatePreview(); return; }
-      const first = variants[0];
       groups.forEach((group) => {
         const available = new Set(group.values);
-        if (!available.has(liveOptionSelection[group.name])) liveOptionSelection[group.name] = first.options?.find((option) => option.option === group.name)?.value || group.values[0];
+        if (!available.has(liveOptionSelection[group.name])) delete liveOptionSelection[group.name];
         const section = document.createElement("section");
         section.innerHTML = `<span>${escapeHtml(group.name)}</span><div>${group.values.map((value) => `<button type="button" class="${liveOptionSelection[group.name] === value ? "active" : ""}" data-live-option-name="${escapeHtml(group.name)}" data-live-option-value="${escapeHtml(value)}">${escapeHtml(value)}</button>`).join("")}</div>`;
         section.querySelectorAll("button").forEach((button) => button.addEventListener("click", () => { liveOptionSelection[button.dataset.liveOptionName] = button.dataset.liveOptionValue; previewUsesVariantImage = true; syncLiveVariants(); }));
