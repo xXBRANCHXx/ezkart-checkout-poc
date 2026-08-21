@@ -1049,23 +1049,26 @@
         const singularName = firstGroup.name.replace(/s$/i, "") || "option";
         addGroup.innerHTML = `<button type="button" data-add-group-value><span>+</span> Add ${escapeHtml(singularName.toLowerCase())}</button>`;
         addGroup.querySelector("button").addEventListener("click", () => {
-          addGroup.innerHTML = `<form><label><span>New ${escapeHtml(singularName.toLowerCase())}</span><input type="text" maxlength="60" autocomplete="off" placeholder="Enter a name" required></label><div><button type="submit">Add</button><button type="button" data-cancel-group-add>Cancel</button></div></form>`;
-          const form = addGroup.querySelector("form");
-          const input = form.querySelector("input");
+          addGroup.innerHTML = `<div class="product-variant-add-form" role="group" aria-label="Add ${escapeHtml(singularName.toLowerCase())}"><label><span>New ${escapeHtml(singularName.toLowerCase())}</span><input type="text" maxlength="60" autocomplete="off" placeholder="Enter a name"></label><div><button type="button" data-confirm-group-add>Add ${escapeHtml(singularName.toLowerCase())}</button><button type="button" data-cancel-group-add>Cancel</button></div></div>`;
+          const editor = addGroup.querySelector(".product-variant-add-form");
+          const input = editor.querySelector("input");
           input.focus();
-          form.addEventListener("submit", (event) => {
-            event.preventDefault();
+          const addValue = () => {
             const value = input.value.trim();
             const valuesInput = optionGroups?.firstElementChild?.querySelector("[data-option-values]");
             const currentValues = rawOptionValues(valuesInput);
-            if (!value) return;
+            if (!value) { input.focus(); return; }
             if (currentValues.some((item) => item.localeCompare(value, undefined, { sensitivity: "base" }) === 0)) { showError(`${value} is already in ${firstGroup.name}.`); return; }
             valuesInput.value = [...currentValues, value].join(", ");
             updateOptionValueCount(optionGroups.firstElementChild);
             generateVariants();
+          };
+          editor.querySelector("[data-confirm-group-add]").addEventListener("click", addValue);
+          editor.querySelector("[data-cancel-group-add]").addEventListener("click", renderVariants);
+          input.addEventListener("keydown", (event) => {
+            if (event.key === "Enter") { event.preventDefault(); addValue(); }
+            if (event.key === "Escape") { event.preventDefault(); renderVariants(); }
           });
-          form.querySelector("[data-cancel-group-add]").addEventListener("click", renderVariants);
-          input.addEventListener("keydown", (event) => { if (event.key === "Escape") renderVariants(); });
         });
         variantRows.append(addGroup);
       }
@@ -1142,7 +1145,6 @@
     const syncVariantMode = () => {
       const enabled = Boolean(variantToggle?.checked);
       if (variantBuilder) variantBuilder.hidden = !enabled;
-      if (optionImages && !enabled) optionImages.hidden = true;
       if (noVariants) noVariants.hidden = enabled;
       if (basePricingCard) basePricingCard.hidden = enabled;
       if (productCreateForm.elements.price) productCreateForm.elements.price.required = !enabled;
