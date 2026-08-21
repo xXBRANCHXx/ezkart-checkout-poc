@@ -401,6 +401,25 @@
       return canvas.toDataURL("image/jpeg", .72);
     } finally { URL.revokeObjectURL(objectUrl); }
   };
+  const compressCreatorVariantImage = async (file) => {
+    if (!file || !file.type.startsWith("image/")) throw new Error("Choose a PNG, JPEG, WebP, or AVIF variant photo.");
+    if (file.size > 2 * 1024 * 1024) throw new Error(`${file.name || "An image"} is larger than 2 MB.`);
+    const objectUrl = URL.createObjectURL(file);
+    try {
+      const image = new Image();
+      await new Promise((resolve, reject) => { image.onload = resolve; image.onerror = () => reject(new Error("That image could not be opened.")); image.src = objectUrl; });
+      const sourceSize = Math.min(image.naturalWidth, image.naturalHeight);
+      const sourceX = Math.max(0, Math.round((image.naturalWidth - sourceSize) / 2));
+      const sourceY = Math.max(0, Math.round((image.naturalHeight - sourceSize) / 2));
+      const outputSize = Math.max(1, Math.min(480, sourceSize));
+      const canvas = document.createElement("canvas");
+      canvas.width = outputSize; canvas.height = outputSize;
+      const context = canvas.getContext("2d");
+      context.fillStyle = "#ffffff"; context.fillRect(0, 0, outputSize, outputSize);
+      context.drawImage(image, sourceX, sourceY, sourceSize, sourceSize, 0, 0, outputSize, outputSize);
+      return canvas.toDataURL("image/jpeg", .68);
+    } finally { URL.revokeObjectURL(objectUrl); }
+  };
   const productCreateForm = document.querySelector("[data-product-create-form]");
   if (productCreateForm) {
     const q = (selector) => productCreateForm.querySelector(selector);
@@ -435,6 +454,9 @@
     const variantBuilder = q("[data-product-variant-builder]");
     const noVariants = q("[data-product-no-variants]");
     const optionGroups = q("[data-product-option-groups]");
+    const addOptionButton = q("[data-add-option-group]");
+    const optionImages = q("[data-product-option-images]");
+    const optionImageList = q("[data-option-image-list]");
     const variantTable = q("[data-product-variant-table]");
     const variantEmpty = q("[data-product-variant-empty]");
     const variantRows = q("[data-product-variant-rows]");
@@ -489,7 +511,8 @@
     const setText = (selector, value) => { const target = q(selector); if (target) target.textContent = value; };
     const showError = (message) => { if (!errorTarget) return; errorTarget.textContent = message; errorTarget.hidden = false; errorTarget.scrollIntoView({ behavior: "smooth", block: "center" }); };
     const clearError = () => { if (!errorTarget) return; errorTarget.hidden = true; errorTarget.textContent = ""; };
-    const optionValues = (input) => String(input?.value || "").split(",").map((value) => value.trim()).filter(Boolean).filter((value, index, values) => values.indexOf(value) === index);
+    const rawOptionValues = (input) => String(input?.value || "").split(",").map((value) => value.trim()).filter(Boolean).filter((value, index, values) => values.indexOf(value) === index);
+    const optionValues = (input) => rawOptionValues(input).slice(0, 30);
     const compactVariantName = (name) => { const characters = [...String(name || "")]; return characters.length > 20 ? `${characters.slice(0, 19).join("")}…` : characters.join(""); };
     const categoryCatalog = {
       physical: [
@@ -817,12 +840,28 @@
       return draftSavePromise;
     };
 
+    const syncOptionGroupLimit = () => {
+      if (!addOptionButton || !optionGroups) return;
+      const full = optionGroups.children.length >= 3;
+      addOptionButton.disabled = full;
+      addOptionButton.title = full ? "Products can have up to 3 option groups" : "Add another option group";
+    };
+    const updateOptionValueCount = (row) => {
+      const count = rawOptionValues(row.querySelector("[data-option-values]")).length;
+      const target = row.querySelector("[data-option-value-count]");
+      if (target) target.textContent = `${Math.min(count, 30)}/30 values`;
+      row.classList.toggle("is-over-limit", count > 30);
+    };
     const addOptionGroup = (name = "", values = "") => {
       if (!optionGroups || optionGroups.children.length >= 3) return;
+      const first = optionGroups.children.length === 0;
       const row = document.createElement("div"); row.className = "product-option-group";
-      row.innerHTML = `<label><span>Option name</span><input type="text" maxlength="20" placeholder="Size" value="${escapeHtml(name)}" data-option-name></label><label><span>Values</span><input type="text" maxlength="180" placeholder="50 ml, 250 ml" value="${escapeHtml(values)}" data-option-values></label><button type="button" aria-label="Remove option group">×</button>`;
-      row.querySelector("button").addEventListener("click", () => { row.remove(); variants = []; selectedVariantIds.clear(); activeVariantFilters.clear(); renderVariants(); markDraftChanged(); });
+      row.innerHTML = `<label><span>Option name</span><input type="text" maxlength="20" placeholder="${first ? "Flavor" : "Size"}" value="${escapeHtml(name)}" data-option-name></label><label><span>Values <small data-option-value-count>0/30 values</small></span><input type="text" maxlength="1800" placeholder="${first ? "Peach, Original" : "50 ml, 250 ml"}" value="${escapeHtml(values)}" data-option-values></label><button type="button" aria-label="Remove option group">×</button>`;
+      row.querySelector("[data-option-values]").addEventListener("input", () => updateOptionValueCount(row));
+      row.querySelector("button").addEventListener("click", () => { row.remove(); variants = []; selectedVariantIds.clear(); activeVariantFilters.clear(); renderVariants(); syncOptionGroupLimit(); markDraftChanged(); });
       optionGroups.append(row);
+      updateOptionValueCount(row);
+      syncOptionGroupLimit();
     };
 
     const variantMatchesFilters = (variant) => [...activeVariantFilters].every(([optionName, optionValue]) => variant.options?.some((option) => option.option === optionName && option.value === optionValue));
@@ -864,31 +903,85 @@
         filterChips.append(section);
       });
     };
-    const variantPhotoMarkup = (variant) => {
-      const currentSource = variant.useCustomImage && variant.customImage?.url ? variant.customImage.url : Number.isInteger(variant.imageIndex) ? selectedImages[variant.imageIndex]?.url : selectedImages[0]?.url;
-      const choices = selectedImages.length ? selectedImages.map((image, index) => `<button type="button" data-main-image-index="${index}"><img src="${image.url}" alt=""><span>${index === 0 ? "Main image" : `Image ${index + 1}`}</span></button>`).join("") : '<p>Upload main images first.</p>';
-      const itemName = currentType() === "subscription" ? "plan" : "variant";
-      return `<div class="product-variant-photo"><div class="product-variant-photo-source"><label class="product-variant-upload" data-variant-photo-dropzone aria-label="Upload or drop a ${itemName} photo"><input type="file" accept="image/png,image/jpeg,image/webp,image/avif" data-variant-photo-input><span>${currentSource ? `<img src="${currentSource}" alt=""><b>${variant.useCustomImage ? "Replace" : "Upload"}</b>` : '<svg class="icon" aria-hidden="true"><use href="#icon-image"></use></svg><b>Upload</b>'}</span></label><details class="product-variant-main-picker"><summary aria-label="Choose a photo from main images"><svg class="icon" aria-hidden="true"><use href="#icon-chevron-down"></use></svg></summary><div>${choices}</div></details></div>${variant.useCustomImage ? `<button type="button" data-variant-photo-clear aria-label="Remove ${itemName} upload">×</button>` : ""}</div>`;
+    const firstOptionMatches = (value) => {
+      const group = optionSnapshot()[0];
+      if (!group) return [];
+      return variants.filter((variant) => variant.options?.some((option) => option.option === group.name && option.value === value));
     };
-    const applyVariantPhoto = async (variant, file, dropTarget) => {
+    const normalizeFirstOptionImages = () => {
+      const group = optionSnapshot()[0];
+      if (!group) return;
+      group.values.forEach((value) => {
+        const matches = firstOptionMatches(value);
+        const source = matches.find((variant) => variant.useCustomImage && variant.customImage) || matches.find((variant) => Number.isInteger(variant.imageIndex)) || matches[0];
+        if (!source) return;
+        const customImage = source.useCustomImage && source.customImage ? source.customImage : null;
+        const imageIndex = Number.isInteger(source.imageIndex) ? source.imageIndex : null;
+        matches.forEach((variant) => { variant.customImage = customImage; variant.useCustomImage = Boolean(customImage); variant.imageIndex = imageIndex; });
+      });
+    };
+    const setFirstOptionImage = (value, { customImage = null, imageIndex = null } = {}) => {
+      firstOptionMatches(value).forEach((variant) => {
+        variant.customImage = customImage;
+        variant.useCustomImage = Boolean(customImage);
+        variant.imageIndex = Number.isInteger(imageIndex) ? imageIndex : null;
+      });
+    };
+    const firstOptionPhotoMarkup = (variant) => {
+      const currentSource = variant?.useCustomImage && variant.customImage?.url ? variant.customImage.url : Number.isInteger(variant?.imageIndex) ? selectedImages[variant.imageIndex]?.url : selectedImages[0]?.url;
+      const choices = selectedImages.length ? selectedImages.map((image, index) => `<button type="button" data-main-image-index="${index}"><img src="${image.url}" alt=""><span>${index === 0 ? "Main image" : `Image ${index + 1}`}</span></button>`).join("") : '<p>Upload main images first.</p>';
+      return `<div class="product-variant-photo"><div class="product-variant-photo-source"><label class="product-variant-upload" data-variant-photo-dropzone aria-label="Upload or drop an option image"><input type="file" accept="image/png,image/jpeg,image/webp,image/avif" data-variant-photo-input><span>${currentSource ? `<img src="${currentSource}" alt=""><b>${variant?.useCustomImage ? "Replace" : "Upload"}</b>` : '<svg class="icon" aria-hidden="true"><use href="#icon-image"></use></svg><b>Upload</b>'}</span></label><details class="product-variant-main-picker"><summary aria-label="Choose a photo from main images"><svg class="icon" aria-hidden="true"><use href="#icon-chevron-down"></use></svg></summary><div>${choices}</div></details></div>${variant?.useCustomImage ? '<button type="button" data-variant-photo-clear aria-label="Remove option upload">×</button>' : ""}</div>`;
+    };
+    const applyFirstOptionPhoto = async (value, file, dropTarget) => {
       if (!file) return;
       if (!allowedImageTypes.includes(file.type) || file.size > 2 * 1024 * 1024) {
-        showError(`${currentType() === "subscription" ? "Plan" : "Variant"} photos must be PNG, JPG, WebP, or AVIF and no larger than 2 MB.`);
+        showError("Option photos must be PNG, JPG, WebP, or AVIF and no larger than 2 MB.");
         return;
       }
       dropTarget?.classList.remove("is-drop-ready");
       dropTarget?.classList.add("is-uploading");
       try {
-        const data = await compressCreatorProductImage(file);
-        variant.customImage = { data, url: data };
-        variant.useCustomImage = true;
+        const data = await compressCreatorVariantImage(file);
+        setFirstOptionImage(value, { customImage: { data, url: data } });
         clearError(); renderVariants(); markDraftChanged();
       } catch (error) {
         dropTarget?.classList.remove("is-uploading");
-        showError(error instanceof Error ? error.message : `That ${currentType() === "subscription" ? "plan" : "variant"} image could not be added.`);
+        showError(error instanceof Error ? error.message : "That option image could not be added.");
       }
     };
+    const renderFirstOptionImages = () => {
+      if (!optionImages || !optionImageList) return;
+      const group = optionSnapshot()[0];
+      const values = group?.values.filter((value) => firstOptionMatches(value).length) || [];
+      optionImages.hidden = !variants.length || !group || !values.length;
+      optionImageList.replaceChildren();
+      if (optionImages.hidden) return;
+      setText("[data-option-images-title]", `${group.name} images`);
+      setText("[data-option-images-description]", `One small image per ${group.name.toLowerCase()} value. Every matching combination shares it.`);
+      values.forEach((value) => {
+        const matches = firstOptionMatches(value);
+        const variant = matches[0];
+        const card = document.createElement("article");
+        card.className = "product-option-image-card";
+        card.innerHTML = `${firstOptionPhotoMarkup(variant)}<div><b>${escapeHtml(value)}</b><small>Shared by ${matches.length} combination${matches.length === 1 ? "" : "s"}</small></div>`;
+        card.querySelectorAll("[data-main-image-index]").forEach((button) => button.addEventListener("click", () => {
+          setFirstOptionImage(value, { imageIndex: Number(button.dataset.mainImageIndex) });
+          button.closest("details").open = false; renderVariants(); markDraftChanged();
+        }));
+        const input = card.querySelector("[data-variant-photo-input]");
+        const dropzone = card.querySelector("[data-variant-photo-dropzone]");
+        input.addEventListener("change", async (event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) await applyFirstOptionPhoto(value, file, dropzone); });
+        let dragDepth = 0;
+        dropzone.addEventListener("dragenter", (event) => { if (![...(event.dataTransfer?.types || [])].includes("Files")) return; event.preventDefault(); event.stopPropagation(); dragDepth += 1; dropzone.classList.add("is-drop-ready"); });
+        dropzone.addEventListener("dragover", (event) => { if (![...(event.dataTransfer?.types || [])].includes("Files")) return; event.preventDefault(); event.stopPropagation(); if (event.dataTransfer) event.dataTransfer.dropEffect = "copy"; dropzone.classList.add("is-drop-ready"); });
+        dropzone.addEventListener("dragleave", (event) => { event.preventDefault(); event.stopPropagation(); dragDepth = Math.max(0, dragDepth - 1); if (!dragDepth) dropzone.classList.remove("is-drop-ready"); });
+        dropzone.addEventListener("drop", (event) => { event.preventDefault(); event.stopPropagation(); dragDepth = 0; dropzone.classList.remove("is-drop-ready"); const file = event.dataTransfer?.files?.[0]; if (file) void applyFirstOptionPhoto(value, file, dropzone); });
+        card.querySelector("[data-variant-photo-clear]")?.addEventListener("click", () => { setFirstOptionImage(value); renderVariants(); markDraftChanged(); });
+        optionImageList.append(card);
+      });
+    };
     const renderVariants = () => {
+      normalizeFirstOptionImages();
       if (variantTable) variantTable.hidden = variants.length === 0;
       variantTable?.classList.toggle("is-physical", currentType() === "physical");
       variantTable?.classList.toggle("is-digital", currentType() === "digital");
@@ -904,7 +997,7 @@
         const billingUnit = ["month", "year"].includes(variant.billingUnit) ? variant.billingUnit : "month";
         const billingMaximum = billingUnit === "year" ? 10 : 120;
         const billingInterval = Math.max(1, Math.min(billingMaximum, Math.round(Number(variant.billingInterval) || 1)));
-        row.innerHTML = `<span><input type="checkbox" data-variant-select aria-label="Select ${escapeHtml(variant.name)}"></span><b title="${escapeHtml(variant.name)}">${escapeHtml(compactVariantName(variant.name))}</b><label><span>Price</span><input type="number" min="1000" step="500" value="${variant.price}" data-variant-price></label><label ${physical ? "" : "hidden"}><span>Stock</span><input type="number" min="0" max="999999" value="${variant.stock}" data-variant-stock></label><label ${physical ? "" : "hidden"}><span>Weight</span><input type="number" min="1" max="50000" value="${variant.weightGrams || 500}" data-variant-weight></label><label class="product-variant-billing" ${subscription ? "" : "hidden"}><span>Billing</span><span><input type="number" min="1" max="${billingMaximum}" value="${billingInterval}" aria-label="Billing interval" data-variant-billing-interval><select aria-label="Billing period" data-variant-billing-unit><option value="month" ${billingUnit === "month" ? "selected" : ""}>Month</option><option value="year" ${billingUnit === "year" ? "selected" : ""}>Year</option></select></span></label><label><span>SKU</span><input type="text" maxlength="48" value="${escapeHtml(variant.sku)}" data-variant-sku></label>${variantPhotoMarkup(variant)}<button type="button" data-variant-remove aria-label="Remove ${escapeHtml(variant.name)}"><svg class="icon" aria-hidden="true"><use href="#icon-trash"></use></svg></button>`;
+        row.innerHTML = `<span><input type="checkbox" data-variant-select aria-label="Select ${escapeHtml(variant.name)}"></span><b title="${escapeHtml(variant.name)}">${escapeHtml(compactVariantName(variant.name))}</b><label><span>Price</span><input type="number" min="1000" step="500" value="${variant.price}" data-variant-price></label><label ${physical ? "" : "hidden"}><span>Stock</span><input type="number" min="0" max="999999" value="${variant.stock}" data-variant-stock></label><label ${physical ? "" : "hidden"}><span>Weight</span><input type="number" min="1" max="50000" value="${variant.weightGrams || 500}" data-variant-weight></label><label class="product-variant-billing" ${subscription ? "" : "hidden"}><span>Billing</span><span><input type="number" min="1" max="${billingMaximum}" value="${billingInterval}" aria-label="Billing interval" data-variant-billing-interval><select aria-label="Billing period" data-variant-billing-unit><option value="month" ${billingUnit === "month" ? "selected" : ""}>Month</option><option value="year" ${billingUnit === "year" ? "selected" : ""}>Year</option></select></span></label><label><span>SKU</span><input type="text" maxlength="48" value="${escapeHtml(variant.sku)}" data-variant-sku></label><button type="button" data-variant-remove aria-label="Remove ${escapeHtml(variant.name)}"><svg class="icon" aria-hidden="true"><use href="#icon-trash"></use></svg></button>`;
         row.querySelector("[data-variant-select]").addEventListener("change", (event) => { activeVariantFilters.clear(); event.target.checked ? selectedVariantIds.add(variant.id) : selectedVariantIds.delete(variant.id); updateVariantSelection(); });
         row.querySelector("[data-variant-price]").addEventListener("input", (event) => { variant.price = Math.max(0, Math.round(Number(event.target.value) || 0)); updatePreview(); markDraftChanged(); });
         row.querySelector("[data-variant-stock]").addEventListener("input", (event) => { variant.stock = Math.max(0, Math.round(Number(event.target.value) || 0)); updatePreview(); markDraftChanged(); });
@@ -912,31 +1005,6 @@
         row.querySelector("[data-variant-billing-interval]")?.addEventListener("input", (event) => { const maximum = variant.billingUnit === "year" ? 10 : 120; variant.billingInterval = Math.max(1, Math.min(maximum, Math.round(Number(event.target.value) || 1))); updatePreview(); markDraftChanged(); });
         row.querySelector("[data-variant-billing-unit]")?.addEventListener("change", (event) => { variant.billingUnit = event.target.value; variant.billingInterval = Math.min(variant.billingInterval || 1, variant.billingUnit === "year" ? 10 : 120); renderVariants(); markDraftChanged(); });
         row.querySelector("[data-variant-sku]").addEventListener("input", (event) => { variant.sku = event.target.value.trim(); markDraftChanged(); });
-        row.querySelectorAll("[data-main-image-index]").forEach((button) => button.addEventListener("click", () => { variant.imageIndex = Number(button.dataset.mainImageIndex); variant.useCustomImage = false; button.closest("details").open = false; renderVariants(); markDraftChanged(); }));
-        const variantPhotoInput = row.querySelector("[data-variant-photo-input]");
-        const variantPhotoDropzone = row.querySelector("[data-variant-photo-dropzone]");
-        variantPhotoInput.addEventListener("change", async (event) => {
-          const file = event.target.files?.[0]; event.target.value = ""; if (!file) return;
-          await applyVariantPhoto(variant, file, variantPhotoDropzone);
-        });
-        let variantPhotoDragDepth = 0;
-        variantPhotoDropzone.addEventListener("dragenter", (event) => {
-          if (![...(event.dataTransfer?.types || [])].includes("Files")) return;
-          event.preventDefault(); event.stopPropagation(); variantPhotoDragDepth += 1; variantPhotoDropzone.classList.add("is-drop-ready");
-        });
-        variantPhotoDropzone.addEventListener("dragover", (event) => {
-          if (![...(event.dataTransfer?.types || [])].includes("Files")) return;
-          event.preventDefault(); event.stopPropagation(); if (event.dataTransfer) event.dataTransfer.dropEffect = "copy"; variantPhotoDropzone.classList.add("is-drop-ready");
-        });
-        variantPhotoDropzone.addEventListener("dragleave", (event) => {
-          event.preventDefault(); event.stopPropagation(); variantPhotoDragDepth = Math.max(0, variantPhotoDragDepth - 1); if (variantPhotoDragDepth === 0) variantPhotoDropzone.classList.remove("is-drop-ready");
-        });
-        variantPhotoDropzone.addEventListener("drop", (event) => {
-          event.preventDefault(); event.stopPropagation(); variantPhotoDragDepth = 0; variantPhotoDropzone.classList.remove("is-drop-ready");
-          const file = event.dataTransfer?.files?.[0];
-          if (file) void applyVariantPhoto(variant, file, variantPhotoDropzone);
-        });
-        row.querySelector("[data-variant-photo-clear]")?.addEventListener("click", () => { variant.customImage = null; variant.useCustomImage = false; renderVariants(); markDraftChanged(); });
         row.querySelector("[data-variant-remove]").addEventListener("click", () => { variants.splice(index, 1); selectedVariantIds.delete(variant.id); renderVariants(); markDraftChanged(); });
         variantRows.append(row);
       });
@@ -944,10 +1012,12 @@
       q("[data-variant-weight-heading]")?.toggleAttribute("hidden", currentType() !== "physical");
       q("[data-variant-billing-heading]")?.toggleAttribute("hidden", currentType() !== "subscription");
       q("[data-product-variant-batch]")?.querySelectorAll("[data-batch-physical]").forEach((field) => { field.hidden = currentType() !== "physical"; });
-      renderVariantFilters(); updateVariantSelection(); syncLiveVariants();
+      renderFirstOptionImages(); renderVariantFilters(); updateVariantSelection(); syncLiveVariants();
     };
     const generateVariants = () => {
       clearError();
+      const overLimit = [...(optionGroups?.children || [])].find((row) => rawOptionValues(row.querySelector("[data-option-values]")).length > 30);
+      if (overLimit) { showError("Each option group can have up to 30 unique values."); overLimit.querySelector("[data-option-values]")?.focus(); return; }
       const groups = optionSnapshot();
       if (!groups.length) { showError(currentType() === "subscription" ? "Add at least one plan option and comma-separated values before generating plans." : "Add at least one option name and comma-separated values before generating variants."); return; }
       const combinations = groups.reduce((list, group) => list.flatMap((combination) => group.values.map((value) => [...combination, { option: group.name, value }])), [[]]);
@@ -973,13 +1043,13 @@
       setText("[data-variant-section-description]", subscription ? "Create the plans customers can choose and set each billing schedule." : "Keep sizes, flavors, colors, or bundles inside this one product.");
       setText("[data-variant-toggle-label]", subscription ? "Has plans" : "Has variants");
       setText("[data-variant-options-title]", subscription ? "Plan options" : "Option groups");
-      setText("[data-variant-options-description]", subscription ? "Enter plan names or tiers separated by commas. Example: Basic, Pro." : "Enter values separated by commas. Example: 50 ml, 250 ml.");
+      setText("[data-variant-options-description]", subscription ? "Up to 3 option groups and 30 values each. The first group controls plan images." : "Up to 3 option groups and 30 values each. The first group controls variant images.");
       setText("[data-generate-variants-label]", subscription ? "Generate plans" : "Generate combinations");
       setText("[data-variant-empty-title]", subscription ? "No plans yet" : "No combinations yet");
       setText("[data-variant-empty-description]", subscription ? "Add plan options, then generate the plans customers can choose." : "Add option values, then generate the sellable variants for this product.");
       setText("[data-variant-batch-description]", subscription ? "Combine plan filters to update only the matching plans." : "Combine option filters—such as 50 ml and Drops—to update only the matching variants.");
       setText("[data-variant-column-title]", subscription ? "Plan" : "Variant");
-      setText("[data-variant-help]", subscription ? "Every plan can have its own price, billing period, SKU, and image." : "Every row remains part of this product. Physical variants carry their own stock and shipping weight. Upload a square variant photo or choose one from the main gallery.");
+      setText("[data-variant-help]", subscription ? "Every plan has its own price, billing period, and SKU. Images are shared by the first option group." : "Every row remains part of this product. Physical variants carry their own stock and shipping weight. Images are shared by the first option group.");
       setText("[data-product-no-variants]", subscription ? "Only one plan? The price and billing period below will be used." : "No variants needed? The base price and stock below will be used.");
       setText("[data-base-pricing-title]", subscription ? "Price and billing" : "Price and availability");
       setText("[data-base-pricing-description]", subscription ? "Used when this subscription has one plan." : "Used as the default when the product has no variants.");
@@ -991,12 +1061,13 @@
     const syncVariantMode = () => {
       const enabled = Boolean(variantToggle?.checked);
       if (variantBuilder) variantBuilder.hidden = !enabled;
+      if (optionImages && !enabled) optionImages.hidden = true;
       if (noVariants) noVariants.hidden = enabled;
       if (basePricingCard) basePricingCard.hidden = enabled;
       if (productCreateForm.elements.price) productCreateForm.elements.price.required = !enabled;
       if (enabled && optionGroups?.children.length === 0) {
         if (currentType() === "subscription") addOptionGroup("Plan", "Basic, Pro");
-        else { addOptionGroup("Size", "50 ml, 250 ml"); addOptionGroup("Flavor", "Peach, Original"); }
+        else { addOptionGroup("Flavor", "Peach, Original"); addOptionGroup("Size", "50 ml, 250 ml"); }
       }
       syncLiveVariants(); markDraftChanged();
     };
@@ -1140,8 +1211,17 @@
       Object.entries(snapshot.fields || {}).forEach(([name, value]) => { if (productCreateForm.elements[name]) productCreateForm.elements[name].value = value; });
       selectedImages = (snapshot.images || []).filter((item) => item.data).map((item) => ({ id: item.id || `image-${Date.now()}-${Math.random()}`, cloudId: item.cloudId || null, data: item.data, url: item.data }));
       variantToggle.checked = Boolean(snapshot.hasVariants);
-      optionGroups?.replaceChildren(); (snapshot.options || []).forEach((group) => addOptionGroup(group.name, (group.values || []).join(", ")));
-      variants = (snapshot.variants || []).map((variant) => ({ ...variant, weightGrams: variant.weightGrams || 500, billingInterval: variant.billingInterval || Number(snapshot.fields?.interval) || 1, billingUnit: variant.billingUnit || snapshot.fields?.unit || "month", customImage: variant.customImage?.data ? { cloudId: variant.customImage.cloudId || null, data: variant.customImage.data, url: variant.customImage.data } : null }));
+      const restoredOptions = [...(snapshot.options || [])];
+      if (String(snapshot.fields?.type || "physical") !== "subscription") {
+        const flavorIndex = restoredOptions.findIndex((group) => /^flavou?r$/i.test(String(group?.name || "").trim()));
+        if (flavorIndex > 0) restoredOptions.unshift(restoredOptions.splice(flavorIndex, 1)[0]);
+      }
+      optionGroups?.replaceChildren(); restoredOptions.forEach((group) => addOptionGroup(group.name, (group.values || []).join(", ")));
+      const optionOrder = new Map(restoredOptions.map((group, index) => [group.name, index]));
+      variants = (snapshot.variants || []).map((variant) => {
+        const options = [...(variant.options || [])].sort((a, b) => (optionOrder.get(a.option) ?? 99) - (optionOrder.get(b.option) ?? 99));
+        return { ...variant, name: options.map((option) => option.value).join(" · ") || variant.name, options, weightGrams: variant.weightGrams || 500, billingInterval: variant.billingInterval || Number(snapshot.fields?.interval) || 1, billingUnit: variant.billingUnit || snapshot.fields?.unit || "month", customImage: variant.customImage?.data ? { cloudId: variant.customImage.cloudId || null, data: variant.customImage.data, url: variant.customImage.data } : null };
+      });
       previewDevice = snapshot.previewDevice === "mobile" ? "mobile" : "desktop";
       if (draftStatus) draftStatus.innerHTML = `<i></i> ${label}`;
     };
@@ -1152,7 +1232,7 @@
     };
 
     variantToggle?.addEventListener("change", syncVariantMode);
-    q("[data-add-option-group]")?.addEventListener("click", () => { addOptionGroup(); markDraftChanged(); });
+    addOptionButton?.addEventListener("click", () => { addOptionGroup(); markDraftChanged(); });
     q("[data-generate-variants]")?.addEventListener("click", generateVariants);
     selectAllVariants?.addEventListener("change", () => { activeVariantFilters.clear(); selectedVariantIds = selectAllVariants.checked ? new Set(variants.map((variant) => variant.id)) : new Set(); updateVariantSelection(); });
     q("[data-clear-variant-selection]")?.addEventListener("click", () => { activeVariantFilters.clear(); selectedVariantIds.clear(); updateVariantSelection(); });
@@ -1223,6 +1303,8 @@
       if (!productCreateForm.reportValidity()) return;
       if (!String(categoryInput?.value || "").trim()) { showError("Choose the product category that best matches what you are selling."); openCategoryDialog(); return; }
       const type = currentType(); const minimum = type === "physical" ? 3 : 1;
+      const overLimit = [...(optionGroups?.children || [])].find((row) => rawOptionValues(row.querySelector("[data-option-values]")).length > 30);
+      if (overLimit) { showError("Each option group can have up to 30 unique values."); overLimit.querySelector("[data-option-values]")?.focus(); return; }
       if (selectedImages.length < minimum || selectedImages.length > 9) { showError(`${typeName(type)} requires ${minimum === 3 ? "3–9" : "1–9"} images.`); return; }
       if (variantToggle.checked && !variants.length) { showError(type === "subscription" ? "Generate at least one plan, or turn off Has plans." : "Generate at least one variant, or turn off Has variants."); return; }
       if (variants.some((variant) => variant.price < 1000 || !variant.sku || (type === "physical" && variant.weightGrams < 1) || (type === "subscription" && (!variant.billingUnit || variant.billingInterval < 1)))) { showError(type === "subscription" ? "Every plan needs a valid price, SKU, and billing period." : "Every variant needs a valid price, SKU, and shipping weight."); return; }

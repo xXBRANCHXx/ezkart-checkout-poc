@@ -113,6 +113,10 @@ function ez_orders_table(array $rows, string $tableId): void
             <div class="product-option-heading"><div><b data-variant-options-title>Option groups</b><p data-variant-options-description>Enter values separated by commas. Example: 50 ml, 250 ml.</p></div><button type="button" data-add-option-group><?= ez_admin_icon('plus') ?> Add option</button></div>
             <div class="product-option-groups" data-product-option-groups></div>
             <button class="product-generate-variants" type="button" data-generate-variants><?= ez_admin_icon('layers') ?> <span data-generate-variants-label>Generate combinations</span></button>
+            <section class="product-option-images" data-product-option-images hidden>
+              <header><div><b data-option-images-title>Flavor images</b><p data-option-images-description>One small image per flavor. Every matching combination shares it.</p></div><small>Optimized for fast loading</small></header>
+              <div data-option-image-list></div>
+            </section>
             <div class="product-variant-empty" data-product-variant-empty><span><?= ez_admin_icon('box') ?></span><div><b data-variant-empty-title>No combinations yet</b><p data-variant-empty-description>Add option values, then generate the sellable variants for this product.</p></div></div>
             <div class="product-variant-table" data-product-variant-table hidden>
               <div class="product-variant-batch" data-product-variant-batch>
@@ -120,10 +124,10 @@ function ez_orders_table(array $rows, string $tableId): void
                 <div class="variant-filter-chips" data-variant-filter-chips></div>
                 <div class="variant-batch-fields"><span data-variant-selected-count>0 selected</span><label><span>Price</span><input type="number" min="1000" step="500" placeholder="No change" data-batch-price></label><label data-batch-physical><span>Stock</span><input type="number" min="0" max="999999" placeholder="No change" data-batch-stock></label><label data-batch-physical><span>Weight (g)</span><input type="number" min="1" max="50000" placeholder="No change" data-batch-weight></label><button type="button" data-apply-variant-batch>Apply to selected</button><button type="button" data-clear-variant-selection>Clear</button></div>
               </div>
-              <header><span><input type="checkbox" data-select-all-variants aria-label="Select all variants"></span><span data-variant-column-title>Variant</span><span>Price</span><span data-variant-stock-heading>Stock</span><span data-variant-weight-heading>Weight</span><span data-variant-billing-heading hidden>Billing</span><span>SKU</span><span>Photo</span><span></span></header>
+              <header><span><input type="checkbox" data-select-all-variants aria-label="Select all variants"></span><span data-variant-column-title>Variant</span><span>Price</span><span data-variant-stock-heading>Stock</span><span data-variant-weight-heading>Weight</span><span data-variant-billing-heading hidden>Billing</span><span>SKU</span><span></span></header>
               <div data-product-variant-rows></div>
             </div>
-            <p class="product-variant-help" data-variant-help>Every row remains part of this product. Physical variants carry their own stock and shipping weight. Upload a square variant photo or choose one from the main gallery.</p>
+            <p class="product-variant-help" data-variant-help>Every row remains part of this product. Physical variants carry their own stock and shipping weight. Images are shared by the first option group.</p>
           </div>
           <p class="product-no-variants" data-product-no-variants>No variants needed? The base price and stock below will be used.</p>
         </section>

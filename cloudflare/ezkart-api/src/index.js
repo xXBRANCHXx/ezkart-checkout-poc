@@ -464,7 +464,7 @@ function normalizedOptions(value) {
   if (!Array.isArray(value)) return [];
   return value.slice(0, 3).map((group) => ({
     name: cleanText(group?.name, 20),
-    values: Array.isArray(group?.values) ? group.values.slice(0, 50).map((item) => cleanText(item, 60)).filter(Boolean) : [],
+    values: Array.isArray(group?.values) ? [...new Set(group.values.map((item) => cleanText(item, 60)).filter(Boolean))].slice(0, 30) : [],
   })).filter((group) => group.name && group.values.length);
 }
 
@@ -479,11 +479,16 @@ async function saveProduct(request, env, rawId) {
   if (title.length < 2) throw new Response("Product name must contain at least 2 characters", { status: 400 });
   const description = cleanText(payload.description, 10000);
   const sku = cleanText(payload.sku, 80) || `EZK-${id.slice(-12).toUpperCase()}`;
+  if (Array.isArray(payload.options) && payload.options.length > 3) throw new Response("Products can have up to 3 option groups", { status: 400 });
+  if (Array.isArray(payload.options) && payload.options.some((group) => Array.isArray(group?.values) && new Set(group.values.map((item) => cleanText(item, 60)).filter(Boolean)).size > 30)) {
+    throw new Response("Each option group can have up to 30 unique values", { status: 400 });
+  }
   const options = normalizedOptions(payload.options);
   const imageIds = Array.isArray(payload.imageUploadIds) ? payload.imageUploadIds.slice(0, 9).map((item) => cleanId(item, "Image ID")) : [];
   const minimumImages = type === "physical" ? 3 : 1;
   if (imageIds.length < minimumImages || imageIds.length > 9) throw new Response(`This product requires ${minimumImages}–9 images`, { status: 400 });
-  const rawVariants = Array.isArray(payload.variants) ? payload.variants.slice(0, 100) : [];
+  if (Array.isArray(payload.variants) && payload.variants.length > 100) throw new Response("Products can have up to 100 generated combinations", { status: 400 });
+  const rawVariants = Array.isArray(payload.variants) ? payload.variants : [];
   const variants = rawVariants.map((variant, index) => ({
     id: cleanId(variant.id || `variant-${crypto.randomUUID()}`, "Variant ID"),
     name: cleanText(variant.name, 120) || `${type === "subscription" ? "Plan" : "Variant"} ${index + 1}`,
@@ -497,6 +502,21 @@ async function saveProduct(request, env, rawId) {
     imageSource: /^gallery-[1-9]$/.test(String(variant.imageSource || "")) ? String(variant.imageSource) : variant.imageUploadId ? "variant-upload" : "main",
     imageUploadId: variant.imageUploadId ? cleanId(variant.imageUploadId, "Variant image ID") : null,
   }));
+  const firstOptionName = options[0]?.name;
+  if (firstOptionName) {
+    const sharedImages = new Map();
+    variants.forEach((variant) => {
+      const value = variant.options.find((option) => option.option === firstOptionName)?.value;
+      if (!value) return;
+      const current = sharedImages.get(value);
+      if (!current || (!current.imageUploadId && variant.imageUploadId)) sharedImages.set(value, { imageSource: variant.imageSource, imageUploadId: variant.imageUploadId });
+    });
+    variants.forEach((variant) => {
+      const value = variant.options.find((option) => option.option === firstOptionName)?.value;
+      const shared = value ? sharedImages.get(value) : null;
+      if (shared) { variant.imageSource = shared.imageSource; variant.imageUploadId = shared.imageUploadId; }
+    });
+  }
   if (variants.some((variant) => !variant.sku || variant.price < 1000 || (type === "physical" && variant.weightGrams < 1) || (type === "subscription" && (!variant.billingUnit || variant.billingInterval < 1)))) {
     throw new Response(type === "subscription" ? "Every plan needs a valid price, SKU, and billing period" : "Every variant needs a valid price, SKU, and shipping weight", { status: 400 });
   }
@@ -690,6 +710,11 @@ async function saveDraft(request, env, draftId) {
     if (!product) throw new Response("Draft product not found", { status: 400 });
   }
   const snapshot = payload.snapshot && typeof payload.snapshot === "object" && !Array.isArray(payload.snapshot) ? payload.snapshot : {};
+  if (Array.isArray(snapshot.options) && snapshot.options.length > 3) throw new Response("Product drafts can have up to 3 option groups", { status: 400 });
+  if (Array.isArray(snapshot.options) && snapshot.options.some((group) => Array.isArray(group?.values) && new Set(group.values.map((item) => cleanText(item, 60)).filter(Boolean)).size > 30)) {
+    throw new Response("Each draft option group can have up to 30 unique values", { status: 400 });
+  }
+  if (Array.isArray(snapshot.variants) && snapshot.variants.length > 100) throw new Response("Product drafts can have up to 100 generated combinations", { status: 400 });
   const serialized = JSON.stringify(snapshot);
   if (serialized.length > 400000) throw new Response("Draft is too large", { status: 413 });
   const referencedMedia = [
