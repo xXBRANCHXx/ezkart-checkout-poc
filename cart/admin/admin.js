@@ -1460,9 +1460,45 @@
     const inventory = document.querySelector("[data-product-inventory]");
     const draftsPanel = document.querySelector("[data-product-drafts-panel]");
     const draftList = document.querySelector("[data-product-draft-list]");
+    const catalogControls = document.querySelector("[data-product-catalog-controls]");
+    const catalogCount = document.querySelector("[data-product-count]");
+    const sortPicker = document.querySelector("[data-product-sort-picker]");
+    const sortTrigger = document.querySelector("[data-product-sort-trigger]");
+    const sortMenu = document.querySelector("[data-product-sort-menu]");
+    const catalogViewKey = scopedStorageKey("ezkart:product-catalog:view");
+    const catalogSortKey = scopedStorageKey("ezkart:product-catalog:sort");
+    const storedCatalogView = localStorage.getItem(catalogViewKey);
+    const storedCatalogSort = localStorage.getItem(catalogSortKey);
+    let catalogView = ["grid", "list"].includes(storedCatalogView) ? storedCatalogView : "grid";
+    let catalogSort = ["newest", "updated", "name", "price-high", "price-low"].includes(storedCatalogSort) ? storedCatalogSort : "newest";
+    const sortLabels = { newest: "Newest first", updated: "Recently updated", name: "Name A–Z", "price-high": "Highest price", "price-low": "Lowest price" };
     const typeName = (type) => ({ physical: "Physical product", digital: "Digital product", subscription: "Subscription" }[type] || "Product");
     const clearError = () => { if (errorTarget) { errorTarget.hidden = true; errorTarget.textContent = ""; } };
     const showError = (message) => { if (errorTarget) { errorTarget.textContent = message; errorTarget.hidden = false; } };
+    const setSortMenu = (open) => {
+      if (!sortMenu || !sortTrigger) return;
+      sortMenu.hidden = !open; sortTrigger.setAttribute("aria-expanded", String(open)); sortPicker?.classList.toggle("is-open", open);
+    };
+    const syncCatalogControls = () => {
+      productCatalogPage.classList.toggle("catalog-view-grid", catalogView === "grid");
+      productCatalogPage.classList.toggle("catalog-view-list", catalogView === "list");
+      catalogControls?.querySelectorAll("[data-product-view]").forEach((button) => {
+        const active = button.dataset.productView === catalogView;
+        button.classList.toggle("active", active); button.setAttribute("aria-pressed", String(active));
+      });
+      const label = document.querySelector("[data-product-sort-label]"); if (label) label.textContent = sortLabels[catalogSort] || sortLabels.newest;
+      sortMenu?.querySelectorAll("[data-product-sort-option]").forEach((button) => button.setAttribute("aria-selected", String(button.dataset.productSortOption === catalogSort)));
+    };
+    const sortCatalogProducts = (products) => {
+      const timestamp = (product, field) => Number.isFinite(Date.parse(String(product?.[field] || ""))) ? Date.parse(String(product[field])) : 0;
+      return [...products].sort((left, right) => {
+        if (catalogSort === "updated") return timestamp(right, "updatedAt") - timestamp(left, "updatedAt") || timestamp(right, "createdAt") - timestamp(left, "createdAt");
+        if (catalogSort === "name") return String(left.name || "").localeCompare(String(right.name || ""), undefined, { sensitivity: "base" });
+        if (catalogSort === "price-high") return (Number(right.price) || 0) - (Number(left.price) || 0);
+        if (catalogSort === "price-low") return (Number(left.price) || 0) - (Number(right.price) || 0);
+        return timestamp(right, "createdAt") - timestamp(left, "createdAt") || timestamp(right, "updatedAt") - timestamp(left, "updatedAt");
+      });
+    };
     const duplicateLocalProduct = (product) => {
       const copy = structuredClone(product);
       const suffix = globalThis.crypto?.randomUUID?.().replaceAll("-", "").slice(0, 10) || String(Date.now());
@@ -1489,12 +1525,12 @@
     };
     const updateCatalogStats = (products) => {
       const stats = document.querySelectorAll(".page-products .page-stat-strip article");
-      const demoProductCount = Math.max(0, Number(productCatalogPage.dataset.demoProductCount) || 0);
-      const demoStock = Math.max(0, Number(productCatalogPage.dataset.demoStock) || 0);
       const physicalStock = products.filter((product) => product.type === "physical").reduce((sum, product) => sum + Math.max(0, Number(product.stock) || 0), 0);
-      if (stats[0]?.querySelector("strong")) stats[0].querySelector("strong").textContent = String(demoProductCount + products.length);
-      if (stats[1]?.querySelector("strong")) stats[1].querySelector("strong").textContent = String(demoStock + physicalStock);
+      if (stats[0]?.querySelector("strong")) stats[0].querySelector("strong").textContent = String(products.length);
+      if (stats[0]?.querySelector("p")) stats[0].querySelector("p").textContent = "Published in this store";
+      if (stats[1]?.querySelector("strong")) stats[1].querySelector("strong").textContent = String(physicalStock);
       if (stats[1]?.querySelector("p")) stats[1].querySelector("p").textContent = "Physical inventory only";
+      if (catalogCount) catalogCount.textContent = String(products.length);
     };
     const renderDrafts = () => {
       if (!draftsPanel || !draftList) return;
@@ -1522,17 +1558,19 @@
       });
     };
     const renderCatalog = () => {
-      const products = readCatalogProducts();
+      const products = sortCatalogProducts(readCatalogProducts());
       productCatalogPage.querySelectorAll("[data-custom-product]").forEach((card) => card.remove());
       productCatalogPage.querySelectorAll("[data-catalog-empty]").forEach((message) => message.remove());
       inventory?.querySelectorAll("[data-custom-product]").forEach((row) => row.remove());
-      products.forEach((product) => {
+      products.forEach((product, productIndex) => {
         const type = ["physical", "digital", "subscription"].includes(product.type) ? product.type : "physical";
         const image = product.image || product.images?.[0] || "";
         const availability = type === "physical" ? `${Math.max(0, Number(product.stock) || 0)} in stock` : type === "digital" ? "Digital delivery" : `Every ${product.subscription?.interval || 1} ${product.subscription?.unit || "month"}`;
         const card = document.createElement("article");
         card.className = "product-card"; card.dataset.customProduct = product.id;
-        card.innerHTML = `<span class="product-art"><img src="${image}" alt="${escapeHtml(product.name)}" loading="lazy" decoding="async"><em>${product.images?.length || 1} image${(product.images?.length || 1) === 1 ? "" : "s"}</em></span><div class="product-card-body"><header><span class="product-card-type">${escapeHtml(String(product.category || typeName(type)).split(" > ").at(-1))}</span><em>Active</em></header><h2>${escapeHtml(product.name)}</h2><p>${escapeHtml(product.sku)}</p><div class="product-price"><strong>${escapeHtml(formatCreatorPrice(product.price))}</strong><small>${escapeHtml(availability)}</small></div><footer><div><small>Type</small><b>${escapeHtml(typeName(type))}</b></div><div><small>Revenue</small><b>Rp0</b></div><div class="product-card-actions"><a href="?page=product-new&amp;product=${encodeURIComponent(product.id)}">Edit</a><button class="product-duplicate" type="button">Duplicate</button><button class="product-delete" type="button">Delete</button></div></footer></div>`;
+        card.dataset.searchRow = normalize([product.name, product.sku, product.category, typeName(type)].join(" "));
+        const imageMarkup = image ? `<img src="${image}" alt="${escapeHtml(product.name)}" loading="${productIndex < 6 ? "eager" : "lazy"}" fetchpriority="${productIndex < 2 ? "high" : "auto"}" decoding="async">` : '<svg class="icon" aria-hidden="true"><use href="#icon-image"></use></svg>';
+        card.innerHTML = `<span class="product-art">${imageMarkup}<em>${product.images?.length || 1} image${(product.images?.length || 1) === 1 ? "" : "s"}</em></span><div class="product-card-body"><div class="product-card-identity"><header><span class="product-card-type">${escapeHtml(String(product.category || typeName(type)).split(" > ").at(-1))}</span><em>Active</em></header><h2>${escapeHtml(product.name)}</h2><p>${escapeHtml(product.sku)}</p></div><div class="product-card-commerce"><strong>${escapeHtml(formatCreatorPrice(product.price))}</strong><small>${escapeHtml(availability)}</small></div><div class="product-card-meta"><div><small>Type</small><b>${escapeHtml(typeName(type))}</b></div><div><small>Revenue</small><b>Rp0</b></div></div><footer class="product-card-actions"><a href="?page=product-new&amp;product=${encodeURIComponent(product.id)}">Edit</a><button class="product-duplicate" type="button">Duplicate</button><button class="product-delete" type="button">Delete</button></footer></div>`;
         card.querySelector(".product-duplicate").addEventListener("click", () => {
           const duplicateButton = card.querySelector(".product-duplicate");
           const duplicate = async () => {
@@ -1566,14 +1604,33 @@
           inventory.append(row);
         }
       });
-      if ((Number(productCatalogPage.dataset.demoProductCount) || 0) + products.length === 0) {
+      if (products.length === 0) {
         const empty = document.createElement("div");
         empty.className = "catalog-empty-note"; empty.dataset.catalogEmpty = "true";
         empty.innerHTML = '<b>Your catalog is empty.</b><span>Create your first product to start building this store.</span><a href="?page=product-new&amp;new=1">Create product</a>';
         productCatalogPage.append(empty);
       }
-      updateCatalogStats(products); renderDrafts();
+      updateCatalogStats(products); syncCatalogControls(); renderDrafts();
     };
+    catalogControls?.querySelectorAll("[data-product-view]").forEach((button) => button.addEventListener("click", () => {
+      catalogView = button.dataset.productView === "list" ? "list" : "grid";
+      localStorage.setItem(catalogViewKey, catalogView); syncCatalogControls();
+    }));
+    sortTrigger?.addEventListener("click", () => {
+      const opening = Boolean(sortMenu?.hidden); setSortMenu(opening);
+      if (opening) window.setTimeout(() => sortMenu?.querySelector('[aria-selected="true"]')?.focus(), 0);
+    });
+    sortMenu?.querySelectorAll("[data-product-sort-option]").forEach((button) => button.addEventListener("click", () => {
+      catalogSort = button.dataset.productSortOption || "newest";
+      localStorage.setItem(catalogSortKey, catalogSort); setSortMenu(false); renderCatalog(); sortTrigger?.focus();
+    }));
+    sortMenu?.addEventListener("keydown", (event) => {
+      if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+      event.preventDefault(); const options = [...sortMenu.querySelectorAll("[data-product-sort-option]")]; const index = options.indexOf(document.activeElement);
+      const next = event.key === "Home" ? 0 : event.key === "End" ? options.length - 1 : (index + (event.key === "ArrowDown" ? 1 : -1) + options.length) % options.length; options[next]?.focus();
+    });
+    document.addEventListener("pointerdown", (event) => { if (sortPicker && !sortPicker.contains(event.target)) setSortMenu(false); });
+    document.addEventListener("keydown", (event) => { if (event.key === "Escape" && sortMenu && !sortMenu.hidden) { setSortMenu(false); sortTrigger?.focus(); } });
     document.querySelectorAll("[data-open-product-creator]").forEach((button) => button.addEventListener("click", () => { clearError(); dialog?.showModal(); }));
     dialog?.querySelectorAll("[data-catalog-close]").forEach((button) => button.addEventListener("click", () => dialog.close("cancel")));
     dialog?.addEventListener("close", () => { if (dialog.returnValue === "cancel") { form?.reset(); syncType(); } });
