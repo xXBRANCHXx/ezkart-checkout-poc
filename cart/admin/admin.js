@@ -1043,7 +1043,7 @@
         row.querySelector("[data-variant-visibility]").addEventListener("click", () => {
           variant.hidden = !variant.hidden;
           selectedVariantIds.delete(variant.id);
-          renderVariants(); markDraftChanged(); showToast(variant.hidden ? `${variant.name} hidden` : `${variant.name} visible again`);
+          renderVariants(); markDraftChanged();
         });
         groupRows.append(row);
       };
