@@ -979,6 +979,33 @@
         card.querySelector("[data-variant-photo-clear]")?.addEventListener("click", () => { setFirstOptionImage(value); renderVariants(); markDraftChanged(); });
         optionImageList.append(card);
       });
+      if (group.values.length < 30) {
+        const addCard = document.createElement("article");
+        addCard.className = "product-option-image-add";
+        const singularName = group.name.replace(/s$/i, "") || "option";
+        addCard.innerHTML = `<button type="button" data-add-first-option-value><span>+</span> Add ${escapeHtml(singularName.toLowerCase())}</button>`;
+        addCard.querySelector("button").addEventListener("click", () => {
+          addCard.innerHTML = `<form><label><span>New ${escapeHtml(singularName.toLowerCase())}</span><input type="text" maxlength="60" autocomplete="off" placeholder="Enter a name" required></label><div><button type="submit">Add</button><button type="button" data-cancel-option-add>Cancel</button></div></form>`;
+          const form = addCard.querySelector("form");
+          const input = form.querySelector("input");
+          input.focus();
+          form.addEventListener("submit", (event) => {
+            event.preventDefault();
+            const value = input.value.trim();
+            const valuesInput = optionGroups?.firstElementChild?.querySelector("[data-option-values]");
+            const currentValues = rawOptionValues(valuesInput);
+            if (!value) return;
+            if (currentValues.some((item) => item.localeCompare(value, undefined, { sensitivity: "base" }) === 0)) { showError(`${value} is already in ${group.name}.`); return; }
+            if (currentValues.length >= 30) { showError(`${group.name} can have up to 30 values.`); return; }
+            valuesInput.value = [...currentValues, value].join(", ");
+            updateOptionValueCount(optionGroups.firstElementChild);
+            generateVariants();
+          });
+          form.querySelector("[data-cancel-option-add]").addEventListener("click", renderFirstOptionImages);
+          input.addEventListener("keydown", (event) => { if (event.key === "Escape") renderFirstOptionImages(); });
+        });
+        optionImageList.append(addCard);
+      }
     };
     const renderVariants = () => {
       normalizeFirstOptionImages();
@@ -1012,6 +1039,7 @@
       q("[data-variant-weight-heading]")?.toggleAttribute("hidden", currentType() !== "physical");
       q("[data-variant-billing-heading]")?.toggleAttribute("hidden", currentType() !== "subscription");
       q("[data-product-variant-batch]")?.querySelectorAll("[data-batch-physical]").forEach((field) => { field.hidden = currentType() !== "physical"; });
+      setText("[data-generate-variants-label]", variants.length ? (currentType() === "subscription" ? "Update plans" : "Update combinations") : (currentType() === "subscription" ? "Generate plans" : "Generate combinations"));
       renderFirstOptionImages(); renderVariantFilters(); updateVariantSelection(); syncLiveVariants();
     };
     const generateVariants = () => {
@@ -1023,6 +1051,17 @@
       const combinations = groups.reduce((list, group) => list.flatMap((combination) => group.values.map((value) => [...combination, { option: group.name, value }])), [[]]);
       if (combinations.length > 100) { showError(`These options create more than 100 ${currentType() === "subscription" ? "plans" : "variants"}. Reduce the values before continuing.`); return; }
       const previous = new Map(variants.map((variant) => [variant.name, variant]));
+      const previousIds = new Set(variants.map((variant) => variant.id));
+      const combinationNames = new Set(combinations.map((options) => options.map((option) => option.value).join(" · ")));
+      const usedSkus = new Set([...previous].filter(([name]) => combinationNames.has(name)).map(([, variant]) => String(variant.sku || "").toLowerCase()).filter(Boolean));
+      let nextSkuNumber = 1;
+      const allocateSku = () => {
+        const prefix = currentType() === "subscription" ? "PLAN" : "VAR";
+        let candidate = "";
+        do { candidate = `${prefix}-${String(nextSkuNumber).padStart(3, "0")}`; nextSkuNumber += 1; } while (usedSkus.has(candidate.toLowerCase()));
+        usedSkus.add(candidate.toLowerCase());
+        return candidate;
+      };
       const price = Math.max(1000, Math.round(Number(productCreateForm.elements.price?.value) || 75000));
       const stock = Math.max(0, Math.round(Number(productCreateForm.elements.stock?.value) || 0));
       const weightGrams = Math.max(1, Math.round(Number(productCreateForm.elements.weight?.value) || 500));
@@ -1030,11 +1069,16 @@
       const billingInterval = Math.max(1, Math.min(billingUnit === "year" ? 10 : 120, Math.round(Number(productCreateForm.elements.interval?.value) || 1)));
       variants = combinations.map((options, index) => {
         const name = options.map((option) => option.value).join(" · ");
-        return previous.get(name) || { id: globalThis.crypto?.randomUUID?.() || `variant-${Date.now()}-${index}`, name, options, price, stock, weightGrams, billingInterval, billingUnit, sku: `${currentType() === "subscription" ? "PLAN" : "VAR"}-${String(index + 1).padStart(3, "0")}`, imageIndex: null, useCustomImage: false };
+        const existing = previous.get(name);
+        return existing ? { ...existing, name, options } : { id: globalThis.crypto?.randomUUID?.() || `variant-${Date.now()}-${index}`, name, options, price, stock, weightGrams, billingInterval, billingUnit, sku: allocateSku(), imageIndex: null, useCustomImage: false };
       });
       activeVariantFilters.clear();
       selectedVariantIds.clear();
       renderVariants(); markDraftChanged();
+      if (previous.size) {
+        const added = variants.filter((variant) => !previousIds.has(variant.id)).length;
+        showToast(added ? `Added ${added} new combination${added === 1 ? "" : "s"}; existing details were preserved` : "Combinations updated; existing details were preserved");
+      }
     };
 
     const syncVariantLanguage = () => {
