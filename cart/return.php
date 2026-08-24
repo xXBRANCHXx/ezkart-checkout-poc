@@ -54,17 +54,19 @@ if (preg_match('/^EZK-[A-Z0-9-]{8,70}$/', $orderId) !== 1) {
           document.getElementById('return-status').textContent = data.status;
           const fulfillment = document.getElementById('return-fulfillment');
           fulfillment.textContent = data.fulfillment_status === 'CONFIRMED'
-            ? (data.biteship_waybill_id || data.biteship_order_id || 'Pengiriman dibuat')
-            : data.fulfillment_status === 'RETRY_REQUIRED' ? 'Menyinkronkan ulang' : 'Menunggu pembayaran';
+            ? (data.biteship_waybill_id || data.biteship_order_id || 'Penjemputan diatur')
+            : data.fulfillment_status === 'AWAITING_PICKUP_ARRANGEMENT' ? 'Menunggu penjual mengatur penjemputan'
+            : data.fulfillment_status === 'AWAITING_ACCEPTANCE' ? 'Menunggu konfirmasi penjual'
+            : data.fulfillment_status === 'RETRY_REQUIRED' ? 'Perlu dicoba lagi' : 'Menunggu pembayaran';
           if (data.status === 'PAID') {
             shell.classList.add('confirmed');
             document.getElementById('return-icon').textContent = '✓';
             document.getElementById('return-title').textContent = 'Pembayaran dikonfirmasi Midtrans';
             if (data.fulfillment_status === 'CONFIRMED') {
-              document.getElementById('return-message').textContent = `Terima kasih, ${String(data.customer_name).split(' ')[0]}. Pembayaran terverifikasi dan pengiriman Biteship sudah dibuat.`;
+              document.getElementById('return-message').textContent = `Terima kasih, ${String(data.customer_name).split(' ')[0]}. Pembayaran terverifikasi dan penjemputan sudah diatur.`;
               return;
             }
-            document.getElementById('return-message').textContent = 'Pembayaran sudah aman. Ezkart sedang menyelesaikan handoff pengiriman ke Biteship.';
+            document.getElementById('return-message').textContent = 'Pembayaran sudah aman. Penjual akan mengonfirmasi pesanan sebelum mengatur penjemputan.';
           }
           if (data.status === 'FAILED') {
             document.getElementById('return-icon').textContent = '×';

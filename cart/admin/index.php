@@ -1184,6 +1184,36 @@ if ($cloudPath !== '') {
         $cloudMethod,
     );
 }
+if (
+    ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST'
+    && in_array((string) ($_POST['action'] ?? ''), ['accept_order', 'arrange_pickup'], true)
+) {
+    if (!$authenticated) {
+        http_response_code(401);
+        exit('Authentication required.');
+    }
+    if (!hash_equals($csrfToken, (string) ($_POST['csrf_token'] ?? ''))) {
+        http_response_code(403);
+        exit('This order action expired. Reload the page and try again.');
+    }
+    $orderId = trim((string) ($_POST['order_id'] ?? ''));
+    try {
+        if (preg_match('/^EZK-[A-Z0-9-]{8,70}$/', $orderId) !== 1) {
+            throw new InvalidArgumentException('Invalid order reference.');
+        }
+        if ((string) $_POST['action'] === 'accept_order') {
+            ez_accept_paid_order($orderId);
+            $_SESSION['order_flash'] = ['type' => 'success', 'message' => 'Order accepted. Arrange pickup when the package is ready.'];
+        } else {
+            ez_arrange_paid_order_pickup($orderId);
+            $_SESSION['order_flash'] = ['type' => 'success', 'message' => 'Pickup arranged with Biteship.'];
+        }
+    } catch (Throwable $error) {
+        $_SESSION['order_flash'] = ['type' => 'error', 'message' => mb_substr($error->getMessage(), 0, 240)];
+    }
+    header('Location: ?page=orders', true, 303);
+    exit;
+}
 $adminUser = is_array($_SESSION['admin_user'] ?? null) ? $_SESSION['admin_user'] : [];
 $mfaEnabled = $authenticated && $authenticationMethod === 'supabase' && ($_SESSION['mfa_enabled'] ?? false) === true;
 $mfaAal2 = $mfaEnabled && ($_SESSION['mfa_aal'] ?? 'aal1') === 'aal2';
@@ -1208,6 +1238,8 @@ $adminStorageIdentity = $authenticationMethod === 'supabase'
     : 'legacy-password-owner';
 $adminStorageScope = substr(hash('sha256', $deployment . '|' . $adminStorageIdentity), 0, 24);
 $orders = $legacyDataAccess ? ez_admin_orders() : [];
+$orderFlash = is_array($_SESSION['order_flash'] ?? null) ? $_SESSION['order_flash'] : null;
+unset($_SESSION['order_flash']);
 $metrics = [
     'orders' => count($orders),
     'paid_count' => 0,

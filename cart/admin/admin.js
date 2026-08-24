@@ -4075,7 +4075,7 @@
         status.classList.toggle("warning", !ready);
         const production = payload.commerce_environment === "production";
         status.lastChild.textContent = ready ? ` Midtrans + Biteship ${production ? "production" : "sandbox"} ready` : ` Complete ${production ? "production" : "sandbox"} payment, rates, and pickup setup`;
-        status.title = ready ? `Checkout creates a Midtrans ${production ? "production" : "sandbox"} payment and a Biteship ${production ? "live" : "test"} order after verified payment.` : "Add matching Midtrans and Biteship credentials, postcode, pickup contact, and pickup address.";
+        status.title = ready ? `Checkout creates a Midtrans ${production ? "production" : "sandbox"} payment. Biteship pickup is created only after the merchant accepts the order and selects Arrange pickup.` : "Add matching Midtrans and Biteship credentials, postcode, pickup contact, and pickup address.";
       } catch (_) {
         status.classList.add("warning");
         status.lastChild.textContent = " Commerce status unavailable";

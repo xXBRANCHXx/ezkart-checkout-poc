@@ -5,7 +5,7 @@ Static coming-soon website for [ezkart.id](https://ezkart.id).
 The repository includes a dependency-free commerce flow at
 [`/cart`](https://ezkart.id/cart/). It handles product selection, customer and
 delivery details, Biteship shipping quotes, Midtrans Snap payment, signed
-payment notifications, and an idempotent Biteship order after payment.
+payment notifications, and an idempotent Biteship pickup only after the merchant accepts the paid order and chooses Arrange pickup.
 
 In the server's existing ignored `config.runtime.php`, replace the Midtrans
 credentials with the Production Merchant ID, Client Key, and Server Key, plus

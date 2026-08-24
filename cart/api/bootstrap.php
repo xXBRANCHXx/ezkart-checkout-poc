@@ -586,7 +586,37 @@ function ez_unlock_order_state($lock): void
     fclose($lock);
 }
 
-function ez_fulfill_paid_order(string $orderId): array
+function ez_fulfillment_deadline(array $order, ?int $paidAt = null): string
+{
+    $paidAt ??= time();
+    $preorderDays = max(0, min(30, (int) ($order['preorder_days'] ?? 0)));
+    $seconds = $preorderDays >= 5 ? $preorderDays * 86400 : 48 * 3600;
+    return gmdate(DATE_ATOM, $paidAt + $seconds);
+}
+
+function ez_accept_paid_order(string $orderId): array
+{
+    $lock = ez_lock_order_state($orderId);
+    try {
+        $order = ez_load_order($orderId);
+        if (strtoupper((string) ($order['status'] ?? '')) !== 'PAID') {
+            throw new InvalidArgumentException('Only paid orders can be accepted.');
+        }
+        if (trim((string) ($order['biteship_order_id'] ?? '')) !== '') return $order;
+        if (trim((string) ($order['accepted_at'] ?? '')) === '') {
+            $order['accepted_at'] = gmdate(DATE_ATOM);
+        }
+        $order['fulfillment_status'] = 'AWAITING_PICKUP_ARRANGEMENT';
+        $order['fulfillment_error'] = '';
+        $order['updated_at'] = gmdate(DATE_ATOM);
+        ez_save_order($order);
+        return $order;
+    } finally {
+        ez_unlock_order_state($lock);
+    }
+}
+
+function ez_arrange_paid_order_pickup(string $orderId): array
 {
     $lock = ez_lock_order_state($orderId);
     try {
@@ -595,6 +625,9 @@ function ez_fulfill_paid_order(string $orderId): array
         if (trim((string) ($order['biteship_order_id'] ?? '')) !== '') {
             $order['fulfillment_status'] = 'CONFIRMED';
             return $order;
+        }
+        if (trim((string) ($order['accepted_at'] ?? '')) === '') {
+            throw new RuntimeException('Accept this order before arranging pickup.');
         }
         $order['fulfillment_status'] = 'CREATING';
         $order['fulfillment_error'] = '';

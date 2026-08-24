@@ -48,9 +48,10 @@ keeps them on `https://ezkart.id`.
 2. Request one shipping quote to a real deliverable address.
 3. Make one low-value real purchase you control.
 4. Confirm the signed Midtrans callback marks it paid exactly once.
-5. Confirm one—and only one—Biteship order is created with the expected pickup,
+5. Confirm payment leaves the order awaiting merchant acceptance and creates no Biteship order.
+6. Accept the order, choose **Arrange pickup**, and confirm one—and only one—Biteship order is created with the expected pickup,
    recipient, courier, weight, price, and reference.
-6. Cancel the shipment in the provider dashboard if it was only a launch test.
+7. Cancel the shipment in the provider dashboard if it was only a launch test.
 
 Do not accept public orders if the health endpoint is not green or the live
 Biteship Order API is still awaiting activation.

@@ -54,16 +54,22 @@ try {
         $order['payment_type'] = mb_substr((string) ($notification['payment_type'] ?? ''), 0, 80);
         $order['fraud_status'] = $fraudStatus;
         $order['status_message'] = mb_substr((string) ($notification['status_message'] ?? ''), 0, 300);
-        if ($nextStatus !== 'PAID' && trim((string) ($order['biteship_order_id'] ?? '')) === '') {
+        if ($nextStatus === 'PAID' && trim((string) ($order['biteship_order_id'] ?? '')) === '') {
+            if (trim((string) ($order['paid_at'] ?? '')) === '') {
+                $paidTimestamp = time();
+                $order['paid_at'] = gmdate(DATE_ATOM, $paidTimestamp);
+                $order['fulfillment_deadline_at'] = ez_fulfillment_deadline($order, $paidTimestamp);
+            }
+            if (trim((string) ($order['accepted_at'] ?? '')) === '') {
+                $order['fulfillment_status'] = 'AWAITING_ACCEPTANCE';
+            }
+        } elseif ($nextStatus !== 'PAID' && trim((string) ($order['biteship_order_id'] ?? '')) === '') {
             $order['fulfillment_status'] = 'AWAITING_PAYMENT';
         }
         $order['updated_at'] = gmdate(DATE_ATOM);
         ez_save_order($order);
     } finally {
         ez_unlock_order_state($stateLock);
-    }
-    if ($nextStatus === 'PAID') {
-        ez_fulfill_paid_order($orderId);
     }
     ez_api_json(['ok' => true]);
 } catch (InvalidArgumentException $error) {

@@ -17,7 +17,7 @@ try {
 
     $checkout = ez_checkout_request($input);
     $credentials = ez_midtrans_credentials();
-    ez_biteship_fulfillment_credentials();
+    ez_biteship_credentials();
     $orderId = 'EZK-MIDTRANS-' . gmdate('ymdHis') . '-' . strtoupper(bin2hex(random_bytes(12)));
     $customer = $checkout['customer'];
     $nameParts = preg_split('/\s+/', $customer['name'], 2) ?: [$customer['name']];
@@ -63,6 +63,9 @@ try {
         'fraud_status' => '',
         'status_message' => '',
         'fulfillment_status' => 'AWAITING_PAYMENT',
+        'paid_at' => '',
+        'accepted_at' => '',
+        'fulfillment_deadline_at' => '',
         'fulfillment_error' => '',
         'biteship_order_id' => '',
         'biteship_tracking_id' => '',
