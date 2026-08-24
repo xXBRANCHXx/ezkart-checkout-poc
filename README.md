@@ -15,7 +15,9 @@ Alternatively, set `EZKART_MIDTRANS_MERCHANT_ID`,
 `EZKART_MIDTRANS_CLIENT_KEY`, `EZKART_MIDTRANS_SERVER_KEY`,
 `EZKART_BITESHIP_API_KEY`, `EZKART_BITESHIP_ORIGIN_POSTAL_CODE`,
 `EZKART_BITESHIP_ORIGIN_CONTACT_NAME`, `EZKART_BITESHIP_ORIGIN_CONTACT_PHONE`,
-and `EZKART_BITESHIP_ORIGIN_ADDRESS` in the PHP environment. Optional origin
+`EZKART_BITESHIP_ORIGIN_ADDRESS`, and a private random
+`EZKART_BITESHIP_WEBHOOK_TOKEN` of at least 32 characters in the PHP
+environment. Optional origin
 email/note/organization settings and `EZKART_BITESHIP_COURIERS` can also be set.
 The provider environment is inferred from the credentials: Midtrans `SB-` and
 `biteship_test.` keys select sandbox, while production Midtrans and
@@ -28,6 +30,12 @@ payment creates a real Biteship shipment. Biteship requires the live Order API
 to be activated separately; having a `biteship_live.` key does not by itself
 prove that order creation is approved. Keep enough Biteship balance available
 and confirm the pickup address before accepting the first payment.
+
+Configure Biteship's `order.status`, `order.price`, and `order.waybill_id`
+webhooks to POST to `/cart/api/biteship-webhook.php`. Protect the endpoint with
+the same webhook token using a Bearer authorization value, HTTP Basic password,
+or `X-Ezkart-Webhook-Token` header. Shipment updates are matched to the private
+Ezkart order by the Biteship order ID and replay safely.
 
 ## Sandbox admin dashboard
 

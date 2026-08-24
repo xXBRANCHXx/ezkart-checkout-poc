@@ -20,6 +20,7 @@ ez_api_json([
     'biteship' => [
         'configured' => $status['biteship'],
         'fulfillment_configured' => $status['biteship_fulfillment'],
+        'webhook_configured' => ez_biteship_webhook_configured(),
         'mode' => $commerceEnvironment,
     ],
 ]);

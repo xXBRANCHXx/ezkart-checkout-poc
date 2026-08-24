@@ -28,9 +28,13 @@ return [
     'midtrans_client_key' => 'REPLACE_WITH_SANDBOX_CLIENT_KEY',
     'midtrans_server_key' => 'REPLACE_WITH_SANDBOX_SERVER_KEY',
     'biteship_api_key' => 'biteship_test.REPLACE_WITH_TEST_API_KEY',
+    // Use a separate random value of at least 32 characters to authenticate
+    // Biteship webhook deliveries. Never reuse the API key here.
+    'biteship_webhook_token' => 'REPLACE_WITH_A_RANDOM_WEBHOOK_SECRET',
     'biteship_origin_postal_code' => '12345',
     // Biteship needs a pickup contact and full address before it can create the
-    // test shipment after Midtrans confirms payment.
+    // test shipment after the merchant accepts the paid order and explicitly
+    // chooses Arrange pickup.
     'biteship_origin_contact_name' => 'REPLACE_WITH_PICKUP_CONTACT_NAME',
     'biteship_origin_contact_phone' => 'REPLACE_WITH_PICKUP_PHONE',
     'biteship_origin_contact_email' => '',

@@ -214,6 +214,36 @@ function ez_biteship_fulfillment_credentials(): array
     ];
 }
 
+function ez_biteship_webhook_configured(): bool
+{
+    $token = ez_config('biteship_webhook_token');
+    return strlen($token) >= 32 && !str_contains(strtoupper($token), 'REPLACE');
+}
+
+function ez_biteship_webhook_authorized(): bool
+{
+    $expected = ez_config('biteship_webhook_token');
+    if (!ez_biteship_webhook_configured()) return false;
+
+    $authorization = trim((string) (
+        $_SERVER['HTTP_AUTHORIZATION']
+        ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION']
+        ?? ''
+    ));
+    $provided = trim((string) ($_SERVER['HTTP_X_EZKART_WEBHOOK_TOKEN'] ?? ''));
+    if ($provided === '' && preg_match('/^Bearer\s+(.+)$/i', $authorization, $matches) === 1) {
+        $provided = trim((string) $matches[1]);
+    }
+    if ($provided === '' && preg_match('/^Basic\s+(.+)$/i', $authorization, $matches) === 1) {
+        $decoded = base64_decode((string) $matches[1], true);
+        if (is_string($decoded)) {
+            [$username, $password] = array_pad(explode(':', $decoded, 2), 2, '');
+            $provided = $password !== '' ? $password : $username;
+        }
+    }
+    return $provided !== '' && hash_equals($expected, $provided);
+}
+
 function ez_integration_status(): array
 {
     try {
@@ -321,7 +351,7 @@ function ez_biteship_quotes(array $cart, string $destinationPostalCode): array
     ], [
         'Accept: application/json',
         'Content-Type: application/json',
-        'Authorization: ' . $credentials['api_key'],
+        'Authorization: Bearer ' . $credentials['api_key'],
     ], ez_commerce_is_production() ? 'Biteship production' : 'Biteship test-mode');
     $pricing = is_array($response['pricing'] ?? null) ? $response['pricing'] : [];
     $quotes = ez_normalize_biteship_quotes($pricing);
@@ -492,7 +522,7 @@ function ez_create_biteship_order(array $order): array
         $response = ez_http_json(EZ_BITESHIP_ORDERS_URL, $payload, [
             'Accept: application/json',
             'Content-Type: application/json',
-            'Authorization: ' . $credentials['api_key'],
+            'Authorization: Bearer ' . $credentials['api_key'],
         ], ez_commerce_is_production() ? 'Biteship production order' : 'Biteship test-mode order');
     } catch (EzProviderException $error) {
         $duplicate = $error->providerPayload;
@@ -564,6 +594,70 @@ function ez_load_order(string $orderId): array
         throw new RuntimeException('Stored order is invalid.');
     }
     return $order;
+}
+
+function ez_find_order_id_by_biteship_id(string $biteshipOrderId): string
+{
+    $biteshipOrderId = trim($biteshipOrderId);
+    if ($biteshipOrderId === '' || strlen($biteshipOrderId) > 160) return '';
+    $paths = glob(ez_order_directory() . '/*.json') ?: [];
+    foreach ($paths as $path) {
+        if (!is_file($path)) continue;
+        $order = json_decode((string) file_get_contents($path), true);
+        if (!is_array($order)) continue;
+        if (hash_equals((string) ($order['biteship_order_id'] ?? ''), $biteshipOrderId)) {
+            $orderId = (string) ($order['order_id'] ?? '');
+            return preg_match('/^EZK-[A-Z0-9-]{8,70}$/', $orderId) === 1 ? $orderId : '';
+        }
+    }
+    return '';
+}
+
+function ez_apply_biteship_webhook(array $payload): bool
+{
+    $event = strtolower(trim((string) ($payload['event'] ?? '')));
+    if (!in_array($event, ['order.status', 'order.price', 'order.waybill_id'], true)) {
+        throw new InvalidArgumentException('Unsupported Biteship webhook event.');
+    }
+    $biteshipOrderId = trim((string) ($payload['order_id'] ?? ''));
+    $orderId = ez_find_order_id_by_biteship_id($biteshipOrderId);
+    if ($orderId === '') return false;
+
+    $lock = ez_lock_order_state($orderId);
+    try {
+        $order = ez_load_order($orderId);
+        if (!hash_equals((string) ($order['biteship_order_id'] ?? ''), $biteshipOrderId)) return false;
+
+        $status = strtolower(trim((string) ($payload['status'] ?? '')));
+        if ($status !== '' && preg_match('/^[a-z0-9_-]{2,80}$/', $status) === 1) {
+            $order['biteship_status'] = $status;
+            $order['fulfillment_status'] = match ($status) {
+                'delivered' => 'DELIVERED',
+                'cancelled', 'canceled' => 'CANCELLED',
+                'picked', 'picked_up', 'courier_picked_up' => 'IN_TRANSIT',
+                default => strtoupper($status),
+            };
+        }
+        $trackingId = mb_substr(trim((string) ($payload['courier_tracking_id'] ?? '')), 0, 160);
+        $waybillId = mb_substr(trim((string) ($payload['courier_waybill_id'] ?? '')), 0, 160);
+        if ($trackingId !== '') $order['biteship_tracking_id'] = $trackingId;
+        if ($waybillId !== '') $order['biteship_waybill_id'] = $waybillId;
+        if ($event === 'order.price') {
+            $actualPrice = max(0, (int) ($payload['price'] ?? $payload['shippment_fee'] ?? 0));
+            if ($actualPrice > 0) {
+                $order['biteship_actual_price'] = $actualPrice;
+                $order['biteship_price_difference'] = $actualPrice - (int) ($order['shipping_price'] ?? 0);
+            }
+        }
+        $order['biteship_last_event'] = $event;
+        $order['biteship_last_event_hash'] = hash('sha256', json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?: '');
+        $order['biteship_updated_at'] = gmdate(DATE_ATOM);
+        $order['updated_at'] = gmdate(DATE_ATOM);
+        ez_save_order($order);
+        return true;
+    } finally {
+        ez_unlock_order_state($lock);
+    }
 }
 
 /** @return resource */
