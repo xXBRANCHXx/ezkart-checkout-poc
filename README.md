@@ -4,32 +4,31 @@ Static coming-soon website for [ezkart.id](https://ezkart.id).
 
 The repository includes a dependency-free commerce flow at
 [`/cart`](https://ezkart.id/cart/). It handles product selection, customer and
-delivery details, Biteship shipping quotes, Midtrans Snap payment, signed
-payment notifications, and an idempotent Biteship pickup only after the merchant accepts the paid order and chooses Arrange pickup.
+delivery details, shipping quotes, signed provider notifications, merchant
+acceptance, and an idempotent Biteship pickup after the merchant chooses
+Arrange pickup.
 
-In the server's existing ignored `config.runtime.php`, replace the Midtrans
-credentials with the Production Merchant ID, Client Key, and Server Key, plus
-a `biteship_live.` API key, the merchant's five-digit origin postcode,
-pickup contact name/phone, and complete pickup address.
-Alternatively, set `EZKART_MIDTRANS_MERCHANT_ID`,
-`EZKART_MIDTRANS_CLIENT_KEY`, `EZKART_MIDTRANS_SERVER_KEY`,
-`EZKART_BITESHIP_API_KEY`, `EZKART_BITESHIP_ORIGIN_POSTAL_CODE`,
-`EZKART_BITESHIP_ORIGIN_CONTACT_NAME`, `EZKART_BITESHIP_ORIGIN_CONTACT_PHONE`,
-`EZKART_BITESHIP_ORIGIN_ADDRESS`, and a private random
-`EZKART_BITESHIP_WEBHOOK_TOKEN` of at least 32 characters in the PHP
-environment. Optional origin
-email/note/organization settings and `EZKART_BITESHIP_COURIERS` can also be set.
-The provider environment is inferred from the credentials: Midtrans `SB-` and
-`biteship_test.` keys select sandbox, while production Midtrans and
-`biteship_live.` keys select production. Conflicting key types fail closed.
-The existing `deployment_environment` chooses the callback website, so test and
-production deployments cannot send callbacks to each other's order store.
+## Payment-provider decision
 
-Production has real side effects: Midtrans charges customers and a successful
-payment creates a real Biteship shipment. Biteship requires the live Order API
-to be activated separately; having a `biteship_live.` key does not by itself
-prove that order creation is approved. Keep enough Biteship balance available
-and confirm the pickup address before accepting the first payment.
+Ezkart is awaiting CV approval before completing DOKU merchant onboarding.
+DOKU is the production payment-provider target, and a verified merchant
+disbursement flow is a hard release requirement. Midtrans has been rejected for
+production because the evaluated setup did not provide the merchant
+disbursement flow Ezkart requires.
+
+The existing Midtrans adapter is legacy sandbox scaffolding only. Do not add
+production Midtrans credentials, treat Midtrans health as launch readiness, or
+promote that adapter to production. Replace it atomically with the DOKU payment,
+callback, refund, reconciliation, and merchant-disbursement flow after CV
+approval and DOKU onboarding. The authoritative machine-readable status is in
+[`project.metadata.json`](project.metadata.json).
+
+Biteship remains the production shipping target and can be configured
+independently once payment/shipping environment inference is decoupled from the
+legacy sandbox adapter. Biteship requires the live Order API to be activated
+separately; having a `biteship_live.` key does not by itself prove that order
+creation is approved. Keep enough Biteship balance available and confirm the
+pickup address before arranging the first real pickup.
 
 Configure Biteship's `order.status`, `order.price`, and `order.waybill_id`
 webhooks to POST to `/cart/api/biteship-webhook.php`. Protect the endpoint with
@@ -69,7 +68,7 @@ closed if an enrolled session has not reached `aal2`.
 
 Privileged legacy accounts can read the private JSON order store and display order IDs,
 customers, line items, product subtotal, shipping charge, final total,
-shipping service, Midtrans reference/status, Biteship fulfillment reference,
+shipping service, legacy sandbox payment reference/status, Biteship fulfillment reference,
 and signed-notification result. Other beta accounts receive an empty order view
 and cannot read the shared records. The dashboard's
 “paid volume” is an aggregate of sandbox orders marked `PAID`; it is not a real

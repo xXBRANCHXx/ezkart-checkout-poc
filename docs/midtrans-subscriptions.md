@@ -1,5 +1,11 @@
 # Midtrans subscriptions in Ezkart
 
+> **Historical sandbox design only.** Midtrans was rejected for Ezkart
+> production on 24 August 2026 because the evaluated setup did not provide the
+> merchant disbursement flow Ezkart requires. DOKU is the production target
+> after CV approval and merchant onboarding. Do not use this document as a
+> production implementation plan.
+
 Ezkart treats `physical`, `digital`, and `subscription` as different fulfillment types. Only physical products have shipping weight or request Biteship rates. Digital products are released after a verified payment. Subscription products store a billing interval and use Midtrans recurring billing after the merchant account is activated for it.
 
 ## Required Midtrans flow

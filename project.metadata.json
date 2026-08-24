@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-08-24T00:00:00+07:00",
+  "legalEntity": {
+    "type": "CV",
+    "name": "Ezkart",
+    "status": "awaiting_approval"
+  },
+  "commerce": {
+    "paymentProvider": {
+      "productionTarget": "DOKU",
+      "status": "blocked_pending_cv_approval_and_doku_onboarding",
+      "merchantDisbursementRequired": true
+    },
+    "midtrans": {
+      "productionStatus": "rejected",
+      "allowedUse": "legacy_sandbox_only",
+      "reason": "The evaluated Midtrans setup did not provide the merchant disbursement flow required by Ezkart."
+    },
+    "shippingProvider": {
+      "productionTarget": "Biteship",
+      "status": "approved_configuration_pending"
+    }
+  },
+  "releaseGates": [
+    "Ezkart CV approval",
+    "DOKU merchant onboarding",
+    "DOKU payment integration",
+    "Verified merchant disbursement test",
+    "End-to-end payment, acceptance, pickup, and cancellation test"
+  ]
+}
