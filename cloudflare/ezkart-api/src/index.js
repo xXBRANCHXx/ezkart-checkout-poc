@@ -5,6 +5,8 @@ const json = (payload, status = 200, headers = {}) => new Response(JSON.stringif
 
 const privateImmutableImageCacheControl = "private, max-age=31536000, immutable";
 const publicImmutableImageCacheControl = "public, max-age=31536000, immutable";
+const maximumProductsPerSeller = 10;
+const abandonedUploadGraceMilliseconds = 24 * 60 * 60 * 1000;
 
 const allowedOrigin = (request, env) => {
   const origin = request.headers.get("origin") || "";
@@ -453,15 +455,101 @@ async function servePublicMedia(request, env, context, mediaId) {
   return response;
 }
 
-async function ownedUploads(env, sellerId, ids) {
+async function existingUploads(env, sellerId, ids) {
   const unique = [...new Set(ids.filter(Boolean))];
   if (!unique.length) return new Map();
   const results = await env.DB.batch(unique.map((id) => env.DB.prepare(
-    "SELECT id, r2_key, mime_type, size_bytes FROM media_uploads WHERE seller_id = ? AND id = ?",
+    `SELECT id, r2_key, mime_type, size_bytes, created_by_auth_user_id, created_at
+     FROM media_uploads
+     WHERE seller_id = ? AND id = ?`,
   ).bind(sellerId, id)));
   const rows = results.map((result) => result.results?.[0]).filter(Boolean);
-  if (rows.length !== unique.length) throw new Response("One or more images do not belong to this seller", { status: 400 });
   return new Map(rows.map((row) => [row.id, row]));
+}
+
+async function ownedUploads(env, sellerId, ids) {
+  const unique = [...new Set(ids.filter(Boolean))];
+  const uploads = await existingUploads(env, sellerId, unique);
+  if (uploads.size !== unique.length) throw new Response("One or more images do not belong to this seller", { status: 400 });
+  return uploads;
+}
+
+async function assertProductCapacity(env, sellerId) {
+  const result = await env.DB.prepare("SELECT COUNT(*) AS count FROM products WHERE seller_id = ?").bind(sellerId).first();
+  if (Number(result?.count || 0) >= maximumProductsPerSeller) {
+    throw new Response(`This store can have up to ${maximumProductsPerSeller} products. Delete a product before creating another one.`, { status: 409 });
+  }
+}
+
+async function productMediaIds(env, sellerId, productId) {
+  const [galleryResult, variantResult, draftResult] = await env.DB.batch([
+    env.DB.prepare("SELECT id FROM product_media WHERE seller_id = ? AND product_id = ?").bind(sellerId, productId),
+    env.DB.prepare("SELECT image_upload_id AS id FROM product_variants WHERE seller_id = ? AND product_id = ? AND image_upload_id IS NOT NULL").bind(sellerId, productId),
+    env.DB.prepare("SELECT snapshot_json FROM product_drafts WHERE seller_id = ? AND product_id = ?").bind(sellerId, productId),
+  ]);
+  const ids = [
+    ...(Array.isArray(galleryResult.results) ? galleryResult.results.map((row) => row.id) : []),
+    ...(Array.isArray(variantResult.results) ? variantResult.results.map((row) => row.id) : []),
+  ];
+  (Array.isArray(draftResult.results) ? draftResult.results : []).forEach((row) => {
+    const snapshot = parseJson(row.snapshot_json, {});
+    (Array.isArray(snapshot.images) ? snapshot.images : []).forEach((image) => ids.push(image?.cloudId));
+    (Array.isArray(snapshot.variants) ? snapshot.variants : []).forEach((variant) => ids.push(variant?.customImage?.cloudId));
+  });
+  return [...new Set(ids.filter(Boolean))];
+}
+
+async function cleanupUnusedMedia(env, sellerId, ids) {
+  const candidates = [...new Set((Array.isArray(ids) ? ids : []).filter(Boolean))];
+  if (!candidates.length) return 0;
+  const uploads = await existingUploads(env, sellerId, candidates);
+  let removed = 0;
+  for (const mediaId of candidates) {
+    const upload = uploads.get(mediaId);
+    if (!upload) continue;
+    try {
+      const result = await env.DB.prepare(`
+        DELETE FROM media_uploads
+        WHERE seller_id = ? AND id = ?
+          AND NOT EXISTS (SELECT 1 FROM product_media WHERE seller_id = ? AND id = ?)
+          AND NOT EXISTS (SELECT 1 FROM product_variants WHERE seller_id = ? AND image_upload_id = ?)
+          AND NOT EXISTS (SELECT 1 FROM product_drafts WHERE seller_id = ? AND instr(snapshot_json, ?) > 0)
+      `).bind(sellerId, mediaId, sellerId, mediaId, sellerId, mediaId, sellerId, mediaId).run();
+      if (Number(result.meta?.changes || 0) < 1) continue;
+      try {
+        await env.PUBLIC_ASSETS.delete(upload.r2_key);
+        removed += 1;
+      } catch (error) {
+        await env.DB.prepare(`
+          INSERT OR IGNORE INTO media_uploads (id, seller_id, r2_key, mime_type, size_bytes, created_by_auth_user_id, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `).bind(upload.id, sellerId, upload.r2_key, upload.mime_type, upload.size_bytes, upload.created_by_auth_user_id, upload.created_at).run();
+        console.error("Could not delete an unused product image", { mediaId, error });
+      }
+    } catch (error) {
+      console.error("Could not clean an unused product image", { mediaId, error });
+    }
+  }
+  return removed;
+}
+
+async function cleanupAbandonedMedia(env) {
+  const cutoff = new Date(Date.now() - abandonedUploadGraceMilliseconds).toISOString();
+  const result = await env.DB.prepare(`
+    SELECT id, seller_id
+    FROM media_uploads
+    WHERE created_at < ?
+    ORDER BY created_at ASC
+    LIMIT 50
+  `).bind(cutoff).all();
+  const bySeller = new Map();
+  (Array.isArray(result.results) ? result.results : []).forEach((row) => {
+    if (!bySeller.has(row.seller_id)) bySeller.set(row.seller_id, []);
+    bySeller.get(row.seller_id).push(row.id);
+  });
+  let removed = 0;
+  for (const [sellerId, ids] of bySeller) removed += await cleanupUnusedMedia(env, sellerId, ids);
+  return removed;
 }
 
 function normalizedOptions(value) {
@@ -478,6 +566,7 @@ async function saveProduct(request, env, rawId) {
   const id = cleanId(rawId || payload.id, "Product ID");
   const existing = await env.DB.prepare("SELECT seller_id, created_at FROM products WHERE id = ?").bind(id).first();
   if (existing && existing.seller_id !== seller.id) throw new Response("Product not found", { status: 404 });
+  if (!existing) await assertProductCapacity(env, seller.id);
   const type = ["physical", "digital", "subscription"].includes(payload.type) ? payload.type : "physical";
   const title = cleanText(payload.name, 160);
   if (title.length < 2) throw new Response("Product name must contain at least 2 characters", { status: 400 });
@@ -526,7 +615,9 @@ async function saveProduct(request, env, rawId) {
     throw new Response(type === "subscription" ? "Every plan needs a valid price, SKU, and billing period" : "Every variant needs a valid price, SKU, and shipping weight", { status: 400 });
   }
   if (new Set(variants.map((variant) => variant.sku.toLowerCase())).size !== variants.length) throw new Response(type === "subscription" ? "Plan SKUs must be unique" : "Variant SKUs must be unique", { status: 400 });
+  const requestedMediaIds = [...imageIds, ...rawVariants.map((variant) => variant?.imageUploadId).filter(Boolean)];
   const uploadMap = await ownedUploads(env, seller.id, [...imageIds, ...variants.map((variant) => variant.imageUploadId)]);
+  const replacedMediaIds = existing ? await productMediaIds(env, seller.id, id) : [];
   const sellableVariants = variants.filter((variant) => !variant.hidden);
   if (variants.length && !sellableVariants.length) throw new Response(type === "subscription" ? "At least one plan must be visible" : "At least one variant must be visible", { status: 400 });
   const basePrice = sellableVariants.length ? Math.min(...sellableVariants.map((variant) => variant.price)) : Math.max(0, Math.round(Number(payload.price) || 0));
@@ -569,6 +660,7 @@ async function saveProduct(request, env, rawId) {
     VALUES (?, ?, ?, ?, 'product', ?, ?, ?)
   `).bind(`event_${crypto.randomUUID()}`, seller.id, authUserId, existing ? "product.updated" : "product.created", id, JSON.stringify({ title, variants: variants.length, images: imageIds.length }), now));
   await env.DB.batch(statements);
+  await cleanupUnusedMedia(env, seller.id, [...replacedMediaIds, ...requestedMediaIds]);
   const result = await catalog(request, env);
   return result.products.find((product) => product.id === id);
 }
@@ -578,6 +670,7 @@ async function deleteProduct(request, env, productId) {
   const id = cleanId(productId, "Product ID");
   const existing = await env.DB.prepare("SELECT id FROM products WHERE seller_id = ? AND id = ?").bind(seller.id, id).first();
   if (!existing) throw new Response("Product not found", { status: 404 });
+  const removedMediaIds = await productMediaIds(env, seller.id, id);
   const now = new Date().toISOString();
   await env.DB.batch([
     env.DB.prepare("DELETE FROM products WHERE seller_id = ? AND id = ?").bind(seller.id, id),
@@ -586,6 +679,7 @@ async function deleteProduct(request, env, productId) {
       VALUES (?, ?, ?, 'product.deleted', 'product', ?, '{}', ?)
     `).bind(`event_${crypto.randomUUID()}`, seller.id, authUserId, id, now),
   ]);
+  await cleanupUnusedMedia(env, seller.id, removedMediaIds);
 }
 
 async function setProductStatus(request, env, productId) {
@@ -623,6 +717,7 @@ async function duplicateProduct(request, env, productId) {
     env.DB.prepare("SELECT * FROM product_variants WHERE seller_id = ? AND product_id = ? ORDER BY sort_order").bind(seller.id, sourceId).all(),
   ]);
   if (!product) throw new Response("Product not found", { status: 404 });
+  await assertProductCapacity(env, seller.id);
 
   const sourceMedia = Array.isArray(mediaResult.results) ? mediaResult.results : [];
   const sourceVariants = Array.isArray(variantsResult.results) ? variantsResult.results : [];
@@ -701,6 +796,7 @@ async function duplicateProduct(request, env, productId) {
     return result.products.find((candidate) => candidate.id === copyId);
   } catch (error) {
     if (!persisted) await Promise.allSettled(copiedR2Keys.map((key) => env.PUBLIC_ASSETS.delete(key)));
+    if (!persisted) await cleanupUnusedMedia(env, seller.id, [...mediaCopies.values()].map((media) => media.id));
     throw error;
   }
 }
@@ -709,7 +805,7 @@ async function saveDraft(request, env, draftId) {
   const { seller, authUserId } = await sellerContext(request, env);
   const id = cleanId(draftId, "Draft ID");
   const payload = await requestJson(request, 500000);
-  const existing = await env.DB.prepare("SELECT seller_id, created_at FROM product_drafts WHERE id = ?").bind(id).first();
+  const existing = await env.DB.prepare("SELECT seller_id, snapshot_json, created_at FROM product_drafts WHERE id = ?").bind(id).first();
   if (existing && existing.seller_id !== seller.id) throw new Response("Draft not found", { status: 404 });
   const productId = payload.productId ? cleanId(payload.productId, "Product ID") : null;
   if (productId) {
@@ -728,6 +824,11 @@ async function saveDraft(request, env, draftId) {
     ...(Array.isArray(snapshot.images) ? snapshot.images.map((item) => item?.cloudId) : []),
     ...(Array.isArray(snapshot.variants) ? snapshot.variants.map((item) => item?.customImage?.cloudId) : []),
   ].filter(Boolean).map((mediaId) => cleanId(mediaId, "Draft image ID"));
+  const previousSnapshot = parseJson(existing?.snapshot_json, {});
+  const previousMedia = [
+    ...(Array.isArray(previousSnapshot.images) ? previousSnapshot.images.map((item) => item?.cloudId) : []),
+    ...(Array.isArray(previousSnapshot.variants) ? previousSnapshot.variants.map((item) => item?.customImage?.cloudId) : []),
+  ].filter(Boolean);
   await ownedUploads(env, seller.id, referencedMedia);
   const now = new Date().toISOString();
   await env.DB.prepare(`
@@ -736,12 +837,21 @@ async function saveDraft(request, env, draftId) {
     ON CONFLICT(id) DO UPDATE SET product_id = excluded.product_id, title = excluded.title,
       snapshot_json = excluded.snapshot_json, updated_at = excluded.updated_at
   `).bind(id, seller.id, productId, cleanText(payload.title, 160), serialized, authUserId, existing?.created_at || now, now).run();
+  await cleanupUnusedMedia(env, seller.id, previousMedia);
   return { id, updatedAt: now };
 }
 
 async function deleteDraft(request, env, draftId) {
   const { seller } = await sellerContext(request, env);
-  await env.DB.prepare("DELETE FROM product_drafts WHERE seller_id = ? AND id = ?").bind(seller.id, cleanId(draftId, "Draft ID")).run();
+  const id = cleanId(draftId, "Draft ID");
+  const existing = await env.DB.prepare("SELECT snapshot_json FROM product_drafts WHERE seller_id = ? AND id = ?").bind(seller.id, id).first();
+  const snapshot = parseJson(existing?.snapshot_json, {});
+  const removedMedia = [
+    ...(Array.isArray(snapshot.images) ? snapshot.images.map((item) => item?.cloudId) : []),
+    ...(Array.isArray(snapshot.variants) ? snapshot.variants.map((item) => item?.customImage?.cloudId) : []),
+  ].filter(Boolean);
+  await env.DB.prepare("DELETE FROM product_drafts WHERE seller_id = ? AND id = ?").bind(seller.id, id).run();
+  await cleanupUnusedMedia(env, seller.id, removedMedia);
 }
 
 export default {
@@ -771,8 +881,15 @@ export default {
       return json({ ok: false, error: "Not found" }, 404, cors);
     } catch (error) {
       if (error instanceof Response) return json({ ok: false, error: await error.text() }, error.status, cors);
+      const failure = `${error?.message || error || ""} ${error?.cause?.message || ""}`;
+      if (failure.includes("seller_product_limit")) {
+        return json({ ok: false, error: `This store can have up to ${maximumProductsPerSeller} products. Delete a product before creating another one.` }, 409, cors);
+      }
       console.error("Ezkart Worker request failed", error);
       return json({ ok: false, error: "The API could not complete this request." }, 500, cors);
     }
+  },
+  async scheduled(_controller, env, context) {
+    context.waitUntil(cleanupAbandonedMedia(env));
   },
 };
