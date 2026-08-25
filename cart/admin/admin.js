@@ -383,7 +383,10 @@
   const hydrateCreatorCatalog = (form) => {
     const fieldset = form?.querySelector("[data-creator-products]");
     if (!fieldset) return;
-    readCatalogProducts().forEach((product) => {
+    const products = readCatalogProducts();
+    const empty = fieldset.querySelector("[data-creator-products-empty]");
+    if (empty) empty.hidden = products.length > 0;
+    products.forEach((product) => {
       if (fieldset.querySelector(`input[value="${CSS.escape(product.id)}"]`)) return;
       const label = document.createElement("label");
       label.dataset.sharedCatalogProduct = product.id;
@@ -1613,7 +1616,6 @@
     let customSites = readLandingSites();
     let slugEdited = false;
     hydrateCreatorCatalog(form);
-    const creatorProducts = setupCreatorProducts(form);
 
     const projectTone = (products = []) => products.includes("coffee") ? "coffee" : products.includes("sambal") ? "chili" : "gold";
     const projectImage = (site) => {
@@ -1692,14 +1694,14 @@
       const products = [...form.querySelectorAll('input[name="starter_products[]"]:checked')].map((input) => input.value);
       if (!products.length) { showToast("Select at least one starting product"); return; }
       if (!form.reportValidity()) return;
-      const site = { name: String(nameInput.value).trim(), url: `${makePageSlug(slugInput.value)}.ezkart.site`, products, customProducts: creatorProducts.selected(products) };
+      const site = { name: String(nameInput.value).trim(), url: `${makePageSlug(slugInput.value)}.ezkart.site`, products, customProducts: [] };
       if (customSites.some((item) => item.url === site.url) || landingLibrary.querySelector(`[data-site-url="${CSS.escape(site.url)}"]`)) { showToast("A page with this URL already exists"); return; }
       try {
         await saveCloudLandingPage(site, { status: "draft" });
         window.location.href = `?page=sites&edit=${encodeURIComponent(site.url)}`;
       } catch (error) { showToast(error instanceof Error ? error.message : "The landing page could not be created."); }
     });
-    dialog?.addEventListener("close", () => { if (dialog.returnValue === "cancel") { form?.reset(); creatorProducts.reset(); slugEdited = false; } });
+    dialog?.addEventListener("close", () => { if (dialog.returnValue === "cancel") { form?.reset(); slugEdited = false; } });
   }
 
   const productCatalogPage = document.querySelector("[data-product-catalog]");
@@ -3103,6 +3105,8 @@
         label.innerHTML = `<input type="checkbox" value="${escapeHtml(id)}" data-sq-product${checked ? " checked" : ""}><span><span class="product-art"><img src="${imageUrl}" alt="${safeName}"></span><div><b>${safeName}</b><small>${safePrice} · ${typeName}</small></div><i>${iconMarkup("check-circle")}</i></span>`;
         picker.append(label); input = label.querySelector("[data-sq-product]"); bindSqProductInput(input);
       } else if (input && checked) input.checked = true;
+      const empty = picker?.querySelector("[data-sq-products-empty]");
+      if (empty) empty.hidden = Boolean(picker.querySelector("[data-sq-product]"));
       previewRoot?.querySelectorAll("[data-sq-product-grid]").forEach((grid) => {
         if (grid.querySelector(`[data-product-card="${CSS.escape(id)}"]`)) return;
         const card = document.createElement("article");
@@ -4095,12 +4099,11 @@
     const newPageName = newPageForm?.elements.namedItem("page_name");
     const newPageSlug = newPageForm?.elements.namedItem("slug");
     hydrateCreatorCatalog(newPageForm);
-    const newPageProducts = setupCreatorProducts(newPageForm);
     let newPageSlugEdited = false;
     const makePageSlug = (value) => normalize(value).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 48);
     newPageSlug?.addEventListener("input", () => { newPageSlugEdited = true; newPageSlug.value = makePageSlug(newPageSlug.value); });
     newPageName?.addEventListener("input", () => { if (!newPageSlugEdited && newPageSlug) newPageSlug.value = makePageSlug(newPageName.value); });
-    newPageDialog?.addEventListener("close", () => { if (newPageDialog.returnValue === "cancel") { newPageForm?.reset(); newPageProducts.reset(); newPageSlugEdited = false; } });
+    newPageDialog?.addEventListener("close", () => { if (newPageDialog.returnValue === "cancel") { newPageForm?.reset(); newPageSlugEdited = false; } });
     newPageForm?.addEventListener("submit", async (event) => {
       if (event.submitter?.value === "cancel") return;
       event.preventDefault(); event.stopImmediatePropagation();
@@ -4110,7 +4113,7 @@
       const name = String(newPageForm.elements.page_name.value).trim();
       const siteUrl = `${String(newPageForm.elements.slug.value).trim()}.ezkart.site`;
       const starterIds = starters.map((starter) => starter.value);
-      const customProducts = newPageProducts.selected(starterIds);
+      const customProducts = [];
       if (readLandingSites().some((page) => page.url === siteUrl)) { showToast("A page with this URL already exists"); return; }
       let savedPage;
       try { savedPage = await saveCloudLandingPage({ name, url: siteUrl, products: starterIds, customProducts }, { status: "draft" }); }
@@ -4121,7 +4124,7 @@
       sqStudio.querySelectorAll("[data-sq-product]").forEach((input) => { input.checked = starters.some((starter) => starter.value === input.value); });
       updateProductView(); markSqChanged();
       updateLandingCountBadges();
-      showToast(`${name} created with ${starters.length} products`); newPageForm.reset(); newPageProducts.reset(); newPageSlugEdited = false;
+      showToast(`${name} created with ${starters.length} products`); newPageForm.reset(); newPageSlugEdited = false;
     });
 
     const syncCommerceStatus = async () => {
