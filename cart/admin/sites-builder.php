@@ -46,11 +46,12 @@ declare(strict_types=1);
         </section>
 
         <section class="sq-tool-panel sq-template-panel" data-sq-panel="templates">
-          <header><div><small>Complete websites</small><h2>Template gallery</h2></div><span class="sq-template-total">12 designs</span></header>
+          <header><div><small>Complete websites</small><h2>Template gallery</h2></div><span class="sq-template-total">13 designs</span></header>
           <p class="sq-panel-intro">Start with a complete branded page. Every section, image, color, button, and animation stays editable.</p>
           <label class="sq-panel-search"><?= ez_admin_icon('search') ?><input type="search" placeholder="Search style or industry" data-sq-template-search></label>
           <div class="sq-template-filters" aria-label="Template categories"><button class="active" type="button" data-template-filter="all">All</button><button type="button" data-template-filter="shop">Shop</button><button type="button" data-template-filter="services">Services</button><button type="button" data-template-filter="editorial">Editorial</button></div>
           <div class="sq-template-grid">
+            <button type="button" data-sq-template="gallery" data-template-category="shop editorial" data-search="gallery catalog modern minimal multi product home retail general"><span style="--template-image:url('/landing-templates/gallery/assets/collection-hero.png')"><i>Catalog</i><em>New template</em></span><b>Gallery</b><small>Modern multi-product catalog</small></button>
             <button type="button" data-sq-template="sora" data-template-category="shop editorial" data-search="fashion modest warm editorial sora"><span style="--template-image:url('assets/templates/fashion-terracotta.webp')"><i>Fashion</i><em>Live motion</em></span><b>Sora Modest</b><small>Warm editorial fashion</small></button>
             <button type="button" data-sq-template="embun" data-template-category="shop" data-search="beauty skincare botanical green embun"><span style="--template-image:url('assets/templates/skincare-sage.webp')"><i>Beauty</i><em>Live motion</em></span><b>Embun Botanics</b><small>Botanical product launch</small></button>
             <button type="button" data-sq-template="pulih" data-template-category="services editorial" data-search="wellness yoga studio calm bali pulih"><span style="--template-image:url('assets/templates/wellness-bali.webp')"><i>Wellness</i><em>Live motion</em></span><b>Ruang Pulih</b><small>Wellness &amp; membership</small></button>

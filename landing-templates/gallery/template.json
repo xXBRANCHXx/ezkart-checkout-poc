@@ -1,0 +1,38 @@
+{
+  "id": "gallery",
+  "name": "Gallery",
+  "version": "0.1.0",
+  "status": "visual-prototype",
+  "position": 1,
+  "category": "multi-product-catalog",
+  "description": "A disciplined, image-led catalog template for merchants with one or more physical products.",
+  "demoContent": {
+    "kind": "fictional",
+    "replaceOnApply": true
+  },
+  "catalog": {
+    "minimumProducts": 1,
+    "recommendedProducts": 8,
+    "supportsMissingSecondaryMedia": true,
+    "supportsLongTitles": true,
+    "supportsUnavailableProducts": true
+  },
+  "optionalData": [
+    "collections",
+    "materials",
+    "customerProjects",
+    "pickup",
+    "consultation",
+    "storeLocation",
+    "newsletter"
+  ],
+  "interactions": [
+    "catalog-filter",
+    "grid-density",
+    "quick-view",
+    "catalog-search",
+    "cart-preview",
+    "material-notes"
+  ],
+  "assetBudgetMb": 25
+}

@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Gallery — a modern multi-product catalog template for Ezkart.">
+  <meta name="theme-color" content="#efeee8">
+  <title>Gallery — Ezkart Template 01</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="script.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to catalog</a>
+
+  <aside class="preview-strip" aria-label="Template preview notice">
+    <span>GALLERY / EZKART TEMPLATE 01</span>
+    <span>FICTIONAL DEMO CATALOG — REPLACED ON APPLY</span>
+  </aside>
+
+  <header class="site-header">
+    <button class="menu-button" type="button" data-menu-toggle aria-expanded="false" aria-controls="mobile-menu">Menu</button>
+    <a class="brand" href="#top" aria-label="Sable home">SABLE</a>
+    <nav class="desktop-nav" aria-label="Primary navigation">
+      <a href="#catalog">Shop</a>
+      <a href="#collections">Collections</a>
+      <a href="#story">About</a>
+    </nav>
+    <div class="header-actions">
+      <button type="button" data-search-open>Search</button>
+      <button type="button" data-cart-open>Cart <span data-cart-count>0</span></button>
+    </div>
+  </header>
+
+  <nav class="mobile-menu" id="mobile-menu" aria-label="Mobile navigation" hidden>
+    <a href="#catalog">Shop</a>
+    <a href="#collections">Collections</a>
+    <a href="#story">About</a>
+    <button type="button" data-search-open>Search</button>
+  </nav>
+
+  <main id="main">
+    <section class="hero" id="top" aria-labelledby="hero-title">
+      <img src="assets/collection-hero.png" width="1536" height="1024" alt="A fictional collection of contemporary furniture and home objects in a sunlit gallery" fetchpriority="high">
+      <div class="hero-shade" aria-hidden="true"></div>
+      <div class="hero-copy">
+        <p>Edition 01 / Everyday Forms</p>
+        <h1 id="hero-title">Objects<br>for living.</h1>
+        <div class="hero-foot">
+          <p>A fictional catalog showing how Gallery gives real merchant products room to lead.</p>
+          <a href="#catalog">View the collection <span aria-hidden="true">↘</span></a>
+        </div>
+      </div>
+      <p class="hero-index" aria-hidden="true">01—08</p>
+    </section>
+
+    <section class="collection-index" id="collections" aria-label="Shop by collection">
+      <a href="#catalog" data-filter-link="Seating"><span>01</span><strong>Seating</strong><span>2 pieces</span></a>
+      <a href="#catalog" data-filter-link="Lighting"><span>02</span><strong>Lighting</strong><span>1 piece</span></a>
+      <a href="#catalog" data-filter-link="Tables"><span>03</span><strong>Tables</strong><span>1 piece</span></a>
+      <a href="#catalog" data-filter-link="Objects"><span>04</span><strong>Objects</strong><span>4 pieces</span></a>
+    </section>
+
+    <section class="intro" id="story" aria-labelledby="intro-title">
+      <p class="section-index">G / 01</p>
+      <h2 id="intro-title">Useful things,<br>clearly considered.</h2>
+      <div>
+        <p>Gallery is a flexible catalog template for merchants who want their products—not interface decoration—to set the tone.</p>
+        <p>This preview uses an imaginary design shop. When applied, every title, price, image, collection, and availability state comes from the merchant’s Ezkart catalog.</p>
+      </div>
+    </section>
+
+    <section class="catalog" id="catalog" aria-labelledby="catalog-title">
+      <header class="catalog-toolbar">
+        <div>
+          <p class="section-index">G / 02</p>
+          <h2 id="catalog-title">The collection</h2>
+        </div>
+        <div class="filter-bar" aria-label="Filter products">
+          <button type="button" class="is-active" data-filter="All" aria-pressed="true">All <span>8</span></button>
+          <button type="button" data-filter="Seating" aria-pressed="false">Seating <span>2</span></button>
+          <button type="button" data-filter="Lighting" aria-pressed="false">Lighting <span>1</span></button>
+          <button type="button" data-filter="Tables" aria-pressed="false">Tables <span>1</span></button>
+          <button type="button" data-filter="Objects" aria-pressed="false">Objects <span>4</span></button>
+        </div>
+        <div class="density-control" aria-label="Product grid density">
+          <span>View</span>
+          <button type="button" data-density="roomy" class="is-active" aria-pressed="true" aria-label="Roomy grid">Ⅱ</button>
+          <button type="button" data-density="compact" aria-pressed="false" aria-label="Compact grid">Ⅳ</button>
+        </div>
+      </header>
+
+      <div class="product-grid" data-product-grid aria-live="polite">
+        <article class="product-card" data-category="Seating">
+          <button class="product-open" type="button" data-product="Arc Chair" data-price="Rp8.400.000" data-material="Powder-coated steel / wool blend" data-asset="one" data-position="tl" aria-label="Quick view Arc Chair">
+            <span class="product-media quadrant tl"><img src="assets/catalog-one.png" width="1254" height="1254" alt="Fictional cobalt-blue Arc Chair" loading="lazy"></span>
+            <span class="quick-label">Quick view</span>
+          </button>
+          <div class="product-meta"><div><h3>Arc Chair</h3><p>Sable blue</p></div><strong>Rp8.400.000</strong></div>
+        </article>
+
+        <article class="product-card" data-category="Tables">
+          <button class="product-open" type="button" data-product="Fold Table 02" data-price="Rp4.250.000" data-material="Folded steel / powder coat" data-asset="one" data-position="tr" aria-label="Quick view Fold Table 02">
+            <span class="product-media quadrant tr"><img src="assets/catalog-one.png" width="1254" height="1254" alt="Fictional red Fold Table 02" loading="lazy"></span>
+            <span class="quick-label">Quick view</span>
+          </button>
+          <div class="product-meta"><div><h3>Fold Table 02</h3><p>Vermilion</p></div><strong>Rp4.250.000</strong></div>
+        </article>
+
+        <article class="product-card" data-category="Lighting">
+          <button class="product-open" type="button" data-product="Pleat Light" data-price="Rp3.100.000" data-material="Folded paper / blackened steel" data-asset="one" data-position="bl" aria-label="Quick view Pleat Light">
+            <span class="product-media quadrant bl"><img src="assets/catalog-one.png" width="1254" height="1254" alt="Fictional ivory Pleat Light" loading="lazy"></span>
+            <span class="quick-label">Quick view</span>
+          </button>
+          <div class="product-meta"><div><h3>Pleat Light</h3><p>Warm ivory</p></div><strong>Rp3.100.000</strong></div>
+        </article>
+
+        <article class="product-card" data-category="Objects">
+          <button class="product-open" type="button" data-product="Fin Vessel" data-price="Rp1.450.000" data-material="Hand-finished stoneware" data-asset="one" data-position="br" aria-label="Quick view Fin Vessel">
+            <span class="product-media quadrant br"><img src="assets/catalog-one.png" width="1254" height="1254" alt="Fictional matte-black Fin Vessel" loading="lazy"></span>
+            <span class="quick-label">Quick view</span>
+          </button>
+          <div class="product-meta"><div><h3>Fin Vessel</h3><p>Charcoal</p></div><strong>Rp1.450.000</strong></div>
+        </article>
+
+        <article class="product-card" data-category="Objects">
+          <button class="product-open" type="button" data-product="Inset Tray" data-price="Rp980.000" data-material="Brushed aluminum / enamel" data-asset="two" data-position="tl" aria-label="Quick view Inset Tray">
+            <span class="product-media quadrant tl"><img src="assets/catalog-two.png" width="1254" height="1254" alt="Fictional brushed-aluminum Inset Tray" loading="lazy"></span>
+            <span class="quick-label">Quick view</span>
+          </button>
+          <div class="product-meta"><div><h3>Inset Tray</h3><p>Aluminum / blue</p></div><strong>Rp980.000</strong></div>
+        </article>
+
+        <article class="product-card" data-category="Objects">
+          <button class="product-open" type="button" data-product="Noon Clock" data-price="Rp1.200.000" data-material="Mineral composite / aluminum" data-asset="two" data-position="tr" aria-label="Quick view Noon Clock">
+            <span class="product-media quadrant tr"><img src="assets/catalog-two.png" width="1254" height="1254" alt="Fictional ivory Noon Clock" loading="lazy"></span>
+            <span class="quick-label">Quick view</span>
+          </button>
+          <div class="product-meta"><div><h3>Noon Clock</h3><p>Ivory / red</p></div><strong>Rp1.200.000</strong></div>
+        </article>
+
+        <article class="product-card" data-category="Seating">
+          <button class="product-open" type="button" data-product="Cross Step" data-price="Rp2.650.000" data-material="Blackened ash / lacquered steel" data-asset="two" data-position="bl" aria-label="Quick view Cross Step">
+            <span class="product-media quadrant bl"><img src="assets/catalog-two.png" width="1254" height="1254" alt="Fictional black Cross Step" loading="lazy"></span>
+            <span class="quick-label">Quick view</span>
+          </button>
+          <div class="product-meta"><div><h3>Cross Step</h3><p>Black ash / blue</p></div><strong>Rp2.650.000</strong></div>
+        </article>
+
+        <article class="product-card" data-category="Objects">
+          <button class="product-open" type="button" data-product="Counterweight Pair" data-price="Rp1.100.000" data-material="Cast aluminum / powder coat" data-asset="two" data-position="br" aria-label="Quick view Counterweight Pair">
+            <span class="product-media quadrant br"><img src="assets/catalog-two.png" width="1254" height="1254" alt="Fictional red Counterweight candleholders" loading="lazy"></span>
+            <span class="quick-label">Quick view</span>
+          </button>
+          <div class="product-meta"><div><h3>Counterweight Pair</h3><p>Vermilion</p></div><strong>Rp1.100.000</strong></div>
+        </article>
+      </div>
+      <p class="catalog-status" data-catalog-status>Showing 8 fictional demo products</p>
+    </section>
+
+    <section class="editorial" aria-labelledby="editorial-title">
+      <div class="editorial-image"><img src="assets/collection-hero.png" width="1536" height="1024" alt="Detail crop of the fictional Sable collection" loading="lazy"></div>
+      <div class="editorial-copy">
+        <p class="section-index">G / 03</p>
+        <h2 id="editorial-title">A room is a collection of decisions.</h2>
+        <p>Use the editorial feature to explain one collection, maker, material, or idea. It changes pace without hiding the route back to a real product.</p>
+        <a href="#catalog">Shop selected objects →</a>
+      </div>
+    </section>
+
+    <section class="principle" aria-labelledby="principle-title">
+      <p class="section-index">G / 04</p>
+      <h2 id="principle-title">Less interface.<br>More object.</h2>
+      <p>Disciplined grids. Useful indexing. Product photography at a scale that makes detail legible.</p>
+    </section>
+
+    <section class="material-index" aria-labelledby="material-title">
+      <header>
+        <p class="section-index">G / 05</p>
+        <h2 id="material-title">Material index</h2>
+      </header>
+      <div class="material-list">
+        <button type="button" data-material-note="A structural material shown here in powder-coated and brushed finishes."><span>01</span><strong>Metal</strong><span>4 objects</span><span>+</span></button>
+        <button type="button" data-material-note="Used where warmth, grain, and repairable surfaces matter."><span>02</span><strong>Wood</strong><span>1 object</span><span>+</span></button>
+        <button type="button" data-material-note="A tactile surface for vessels and small functional objects."><span>03</span><strong>Ceramic</strong><span>1 object</span><span>+</span></button>
+        <button type="button" data-material-note="Lightweight folded material used to soften and distribute light."><span>04</span><strong>Paper</strong><span>1 object</span><span>+</span></button>
+        <p class="material-note" data-material-output>Select a material to reveal the merchant’s real product note.</p>
+      </div>
+    </section>
+
+    <section class="projects" aria-labelledby="projects-title">
+      <div>
+        <p class="section-index">G / 06</p>
+        <h2 id="projects-title">Customer projects</h2>
+      </div>
+      <div class="projects-empty">
+        <strong>No projects yet.</strong>
+        <p>When a merchant has real customer photos or reviews, they appear here. Until then, Gallery keeps the empty state composed and honest.</p>
+      </div>
+    </section>
+
+    <section class="services" aria-label="Merchant services">
+      <article><span>01</span><h3>Delivery</h3><p>Connect this block to the merchant’s real delivery regions, courier options, and timing.</p></article>
+      <article><span>02</span><h3>Pickup</h3><p>Show store pickup only when the applied merchant actually supports it.</p></article>
+      <article><span>03</span><h3>Consultation</h3><p>Use for sizing, styling, specification, or another real pre-purchase service.</p></article>
+    </section>
+
+    <section class="newsletter" aria-labelledby="newsletter-title">
+      <p class="section-index">G / 07</p>
+      <div>
+        <h2 id="newsletter-title">New objects,<br>occasionally.</h2>
+        <p>A quiet signup area with an honest reason to subscribe.</p>
+      </div>
+      <form data-newsletter-form>
+        <label for="email">Email address</label>
+        <div><input id="email" name="email" type="email" autocomplete="email" placeholder="you@example.com" required><button type="submit">Subscribe →</button></div>
+        <p data-newsletter-status aria-live="polite"></p>
+      </form>
+    </section>
+
+    <section class="contact" aria-labelledby="contact-title">
+      <div>
+        <p class="section-index">G / 08</p>
+        <h2 id="contact-title">Visit / contact</h2>
+      </div>
+      <address>Fictional preview address<br>Jakarta, Indonesia<br><a href="mailto:hello@example.com">hello@example.com</a></address>
+      <p>Mon—Sat<br>10:00—18:00</p>
+      <p>Address, hours, and contact details are replaced with the merchant’s real information.</p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <a class="footer-brand" href="#top">SABLE</a>
+    <nav aria-label="Footer shop links"><strong>Shop</strong><a href="#catalog">All products</a><a href="#collections">Collections</a><a href="#catalog">New objects</a></nav>
+    <nav aria-label="Footer information links"><strong>Information</strong><a href="#story">About</a><button type="button" data-search-open>Search</button><button type="button" data-cart-open>Cart</button></nav>
+    <div><strong>Template</strong><p>Gallery / Ezkart 01<br>Fictional preview content</p></div>
+    <p class="copyright">© <span data-year></span> Demo merchant</p>
+  </footer>
+
+  <dialog class="quick-view" data-quick-view aria-labelledby="quick-title">
+    <form method="dialog" class="dialog-close-row"><button value="close" aria-label="Close quick view">Close ×</button></form>
+    <div class="quick-layout">
+      <div class="quick-media quadrant tl" data-quick-media><img src="assets/catalog-one.png" width="1254" height="1254" alt="" data-quick-image></div>
+      <div class="quick-copy">
+        <p>Fictional demo product</p>
+        <h2 id="quick-title" data-quick-name>Arc Chair</h2>
+        <strong data-quick-price>Rp8.400.000</strong>
+        <dl><div><dt>Material</dt><dd data-quick-material>Powder-coated steel / wool blend</dd></div><div><dt>Availability</dt><dd>In stock</dd></div></dl>
+        <button type="button" class="add-button" data-add-product>Add to cart</button>
+        <p class="demo-note">Demo interaction. Applied templates connect this action to the real Ezkart product.</p>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog class="search-dialog" data-search-dialog aria-labelledby="search-title">
+    <form method="dialog" class="dialog-close-row"><button value="close" aria-label="Close search">Close ×</button></form>
+    <h2 id="search-title">Search the catalog</h2>
+    <label for="search-input">Product name or category</label>
+    <input id="search-input" type="search" placeholder="Try “chair”" data-search-input>
+    <div class="search-results" data-search-results aria-live="polite">Start typing to filter the fictional demo catalog.</div>
+  </dialog>
+
+  <dialog class="cart-dialog" data-cart-dialog aria-labelledby="cart-title">
+    <form method="dialog" class="dialog-close-row"><button value="close" aria-label="Close cart">Close ×</button></form>
+    <h2 id="cart-title">Cart</h2>
+    <div data-cart-content><p>Your cart is empty.</p></div>
+    <button class="checkout-button" type="button" disabled data-checkout>Checkout</button>
+    <p class="demo-note">Preview only. Applied templates use the merchant’s real checkout.</p>
+  </dialog>
+
+  <p class="cart-toast" data-cart-toast role="status" aria-live="polite"></p>
+</body>
+</html>
