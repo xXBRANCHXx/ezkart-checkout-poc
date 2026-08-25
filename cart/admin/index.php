@@ -684,7 +684,7 @@ function ez_admin_sync_cloudflare_user(string $accessToken): array
 
 function ez_admin_proxy_cloud_request(string $accessToken, string $path, string $method): never
 {
-    $allowedPath = preg_match('#^/v1/(?:catalog|media(?:/[a-zA-Z0-9_-]+)?|products/[a-zA-Z0-9_-]+(?:/duplicate)?|drafts/[a-zA-Z0-9_-]+)$#', $path) === 1;
+    $allowedPath = preg_match('#^/v1/(?:catalog|media(?:/[a-zA-Z0-9_-]+)?|products/[a-zA-Z0-9_-]+(?:/duplicate)?|drafts/[a-zA-Z0-9_-]+|landing-pages(?:/[a-z0-9-]+)?)$#', $path) === 1;
     if (!$allowedPath || str_contains($path, '?') || str_contains($path, '#')) {
         ez_admin_json(['ok' => false, 'error' => 'Cloud data path is not allowed.'], 400);
     }
@@ -696,12 +696,14 @@ function ez_admin_proxy_cloud_request(string $accessToken, string $path, string 
         ez_admin_json(['ok' => false, 'error' => 'Cloud product storage is unavailable.'], 503);
     }
     $contentLength = max(0, (int) ($_SERVER['CONTENT_LENGTH'] ?? 0));
-    if ($contentLength > 3_200_000) {
-        ez_admin_json(['ok' => false, 'error' => 'Upload is larger than the 2 MB image limit.'], 413);
+    $isLandingPageRequest = preg_match('#^/v1/landing-pages/[a-z0-9-]+$#', $path) === 1;
+    $maximumBodyBytes = $isLandingPageRequest ? 16_000_000 : 3_200_000;
+    if ($contentLength > $maximumBodyBytes) {
+        ez_admin_json(['ok' => false, 'error' => $isLandingPageRequest ? 'Landing page project is too large.' : 'Upload is larger than the 2 MB image limit.'], 413);
     }
     $body = in_array($method, ['POST', 'PUT'], true) ? file_get_contents('php://input') : '';
-    if (!is_string($body) || strlen($body) > 3_200_000) {
-        ez_admin_json(['ok' => false, 'error' => 'Cloud request body is too large.'], 413);
+    if (!is_string($body) || strlen($body) > $maximumBodyBytes) {
+        ez_admin_json(['ok' => false, 'error' => $isLandingPageRequest ? 'Landing page project is too large.' : 'Cloud request body is too large.'], 413);
     }
 
     $isMediaRequest = $method === 'GET'
@@ -1164,7 +1166,7 @@ if ($authenticated) {
 $cloudPath = trim((string) ($_GET['cloud'] ?? ''));
 if ($cloudPath !== '') {
     if (!$authenticated || $authenticationMethod !== 'supabase') {
-        ez_admin_json(['ok' => false, 'error' => 'Sign in with Google to use cloud product storage.'], 401);
+        ez_admin_json(['ok' => false, 'error' => 'Sign in with Google to use Ezkart cloud storage.'], 401);
     }
     $cloudMethod = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
     if (in_array($cloudMethod, ['POST', 'PUT', 'DELETE'], true)) {
@@ -1562,7 +1564,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
         <a class="<?= $page === 'dashboard' ? 'active' : '' ?>" href="?page=dashboard"><?= ez_admin_icon('grid') ?><span>Dashboard</span></a>
         <a class="<?= $page === 'orders' ? 'active' : '' ?>" href="?page=orders"><?= ez_admin_icon('cart') ?><span>Orders</span><b><?= $metrics['orders'] ?></b></a>
         <a class="<?= in_array($page, ['products', 'product-new'], true) ? 'active' : '' ?>" href="?page=products"><?= ez_admin_icon('box') ?><span>Products</span></a>
-        <a class="<?= $page === 'sites' ? 'active' : '' ?>" href="?page=sites"><?= ez_admin_icon('layout') ?><span>Landing Pages</span><b data-site-count>3</b></a>
+        <a class="<?= $page === 'sites' ? 'active' : '' ?>" href="?page=sites"><?= ez_admin_icon('layout') ?><span>Landing Pages</span><b data-site-count>0</b></a>
         <a class="<?= $page === 'customers' ? 'active' : '' ?>" href="?page=customers"><?= ez_admin_icon('users') ?><span>Customers</span></a>
         <a class="<?= $page === 'analytics' ? 'active' : '' ?>" href="?page=analytics"><?= ez_admin_icon('chart') ?><span>Analytics</span></a>
         <a class="<?= $page === 'marketing' ? 'active' : '' ?>" href="?page=marketing"><?= ez_admin_icon('send') ?><span>Marketing</span></a>
@@ -1675,7 +1677,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
         <section class="dashboard-grid footer-grid">
           <article class="panel reviews-panel" id="customer-reviews"><header class="panel-header"><h2>Customer Reviews</h2><a href="?page=reviews">Open reviews</a></header><div class="review-body"><div><strong>4.8</strong><p class="review-stars"><?= str_repeat(ez_admin_icon('star'), 5) ?></p><small>Sandbox review preview</small></div><ul><?php foreach ([5 => 82, 4 => 12, 3 => 4, 2 => 1, 1 => 1] as $stars => $width): ?><li><span><?= $stars ?> <?= ez_admin_icon('star') ?></span><i><b style="width:<?= $metrics['paid_count'] > 0 ? $width : 0 ?>%"></b></i><small><?= $metrics['paid_count'] > 0 ? max(0, (int) round($metrics['paid_count'] * $width / 100)) : 0 ?></small></li><?php endforeach; ?></ul></div></article>
 
-          <article class="panel storefront-panel"><header class="panel-header"><h2>Landing Page &amp; Domain</h2><a href="?page=sites">Open builder</a></header><div class="storefront-summary"><span class="storefront-preview"><?= ez_admin_product_art('Granola Madu Nusantara') ?><i>Live</i></span><div><small>Primary storefront</small><b>Granola Morning Ritual</b><p><?= ez_admin_icon('globe') ?> madu-nusantara.id</p><em><?= ez_admin_icon('shield') ?> SSL active</em></div></div><div class="storefront-pipeline"><span><?= ez_admin_icon('box') ?><small>Product</small></span><i></i><span><?= ez_admin_icon('layout') ?><small>Page</small></span><i></i><span><?= ez_admin_icon('credit-card') ?><small>Payment</small></span><i></i><span><?= ez_admin_icon('truck') ?><small>Shipping</small></span></div></article>
+          <article class="panel storefront-panel"><header class="panel-header"><h2>Landing Page &amp; Domain</h2><a href="?page=sites">Create page</a></header><div class="storefront-summary"><span class="storefront-preview"><?= ez_admin_icon('layout') ?><i>Empty</i></span><div><small>Hosted storefront</small><b data-landing-page-summary>No landing pages</b><p><?= ez_admin_icon('globe') ?> Create your first Ezkart site</p><em><?= ez_admin_icon('shield') ?> R2 cloud storage ready</em></div></div><div class="storefront-pipeline"><span><?= ez_admin_icon('box') ?><small>Product</small></span><i></i><span><?= ez_admin_icon('layout') ?><small>Page</small></span><i></i><span><?= ez_admin_icon('credit-card') ?><small>Payment</small></span><i></i><span><?= ez_admin_icon('truck') ?><small>Shipping</small></span></div></article>
 
           <article class="panel payout-panel" id="payout-summary"><header class="panel-header"><h2>Payment Summary</h2><a href="?page=payments">View all payments</a></header><div class="payout-body"><small>Provider-confirmed Volume</small><div><strong><?= ez_admin_money($metrics['paid_volume']) ?></strong><em class="positive"><?= ez_admin_icon('check-circle') ?> Verified</em><span>signed sandbox notifications</span></div></div><footer><div><small>Environment</small><b><?= $commerceProduction ? 'DOKU pending' : 'Legacy sandbox' ?></b></div><div><small>Paid Orders</small><b><?= number_format($metrics['paid_count']) ?></b></div><a href="../">Open Checkout</a></footer></article>
         </section>

@@ -197,9 +197,17 @@
         : variant.customImage || null,
     })),
   });
+  const normalizeCloudLandingPage = (page) => ({
+    ...page,
+    products: Array.isArray(page?.products) ? page.products : [],
+    customProducts: Array.isArray(page?.customProducts) ? page.customProducts : [],
+    status: page?.status === "published" ? "published" : "draft",
+  });
   let cloudCatalogProducts = [];
   let cloudProductDrafts = [];
+  let cloudLandingPages = [];
   let cloudLoadError = "";
+  let cloudLandingLoadError = "";
   if (cloudEnabled) {
     try {
       const catalog = await cloudRequest("GET", "/v1/catalog");
@@ -207,6 +215,12 @@
       cloudProductDrafts = (Array.isArray(catalog.drafts) ? catalog.drafts : []).map(normalizeCloudDraft);
     } catch (error) {
       cloudLoadError = error instanceof Error ? error.message : "Cloud product storage could not be loaded.";
+    }
+    try {
+      const landingPages = await cloudRequest("GET", "/v1/landing-pages");
+      cloudLandingPages = (Array.isArray(landingPages.pages) ? landingPages.pages : []).map(normalizeCloudLandingPage);
+    } catch (error) {
+      cloudLandingLoadError = error instanceof Error ? error.message : "Cloud landing-page storage could not be loaded.";
     }
   }
 
@@ -220,23 +234,21 @@
     storage.setItem(scopedKey, legacyValue);
     storage.removeItem(legacyKey);
   };
-  const legacyLandingSiteRegistryKey = "ezkart:landing-builder:v3:sites";
-  const landingSiteRegistryKey = scopedStorageKey(legacyLandingSiteRegistryKey);
-  const landingLegacyRegistryKey = scopedStorageKey("ezkart:landing-builder:v2:sites");
-  const legacyLandingAdvancedModeKey = "ezkart:landing-builder:advanced-mode";
-  const landingAdvancedModeKey = scopedStorageKey(legacyLandingAdvancedModeKey);
   const legacyProductCatalogKey = "ezkart:catalog:v1";
   const productCatalogKey = scopedStorageKey(legacyProductCatalogKey);
   const legacyProductDraftsKey = "ezkart:product-drafts:v1";
   const productDraftsKey = scopedStorageKey(legacyProductDraftsKey);
   const legacyActiveProductDraftKey = "ezkart:product-editor:active-draft";
   const activeProductDraftKey = scopedStorageKey(legacyActiveProductDraftKey);
-  migrateLegacyStorage(legacyLandingSiteRegistryKey, landingSiteRegistryKey);
-  migrateLegacyStorage("ezkart:landing-builder:v2:sites", landingLegacyRegistryKey);
-  migrateLegacyStorage(legacyLandingAdvancedModeKey, landingAdvancedModeKey);
   migrateLegacyStorage(legacyProductCatalogKey, productCatalogKey);
   migrateLegacyStorage(legacyProductDraftsKey, productDraftsKey);
   migrateLegacyStorage(legacyActiveProductDraftKey, activeProductDraftKey, sessionStorage);
+  for (let index = localStorage.length - 1; index >= 0; index -= 1) {
+    const key = localStorage.key(index) || "";
+    if (key.startsWith("ezkart:landing-builder:advanced-mode") || key.startsWith("ezkart:landing-builder:v2:") || key.startsWith("ezkart:landing-builder:v3:")) {
+      localStorage.removeItem(key);
+    }
+  }
   const readLocalCatalogProducts = () => {
     try {
       const value = JSON.parse(localStorage.getItem(productCatalogKey) || "[]");
@@ -367,6 +379,7 @@
   };
   if (cloudLoadError) showToast(`Cloud storage unavailable: ${cloudLoadError}`);
   else window.setTimeout(() => { void migrateLegacyCloudData(); }, 600);
+  if (cloudLandingLoadError) window.setTimeout(() => showToast(`Landing-page storage unavailable: ${cloudLandingLoadError}`), cloudLoadError ? 2500 : 0);
   const hydrateCreatorCatalog = (form) => {
     const fieldset = form?.querySelector("[data-creator-products]");
     if (!fieldset) return;
@@ -378,18 +391,44 @@
       fieldset.append(label);
     });
   };
-  const readLandingSites = () => {
-    try {
-      const value = JSON.parse(localStorage.getItem(landingSiteRegistryKey) || localStorage.getItem(landingLegacyRegistryKey) || "[]");
-      return Array.isArray(value) ? value.filter((site) => site && typeof site.name === "string" && /^[a-z0-9-]+\.ezkart\.site$/i.test(site.url || "")) : [];
-    } catch (_) { return []; }
+  const readLandingSites = () => [...cloudLandingPages];
+  const landingPageId = (url) => String(url || "").toLowerCase().replace(/\.ezkart\.site$/, "");
+  const replaceCloudLandingPage = (page) => {
+    const normalized = normalizeCloudLandingPage(page);
+    const index = cloudLandingPages.findIndex((item) => item.id === normalized.id);
+    if (index >= 0) cloudLandingPages[index] = { ...cloudLandingPages[index], ...normalized };
+    else cloudLandingPages.unshift(normalized);
+    return normalized;
   };
-  const writeLandingSites = (sites) => {
-    try { localStorage.setItem(landingSiteRegistryKey, JSON.stringify(sites)); return true; }
-    catch (_) { showToast("These images exceed this browser's draft storage. Use fewer or simpler images."); return false; }
+  const saveCloudLandingPage = async (site, changes = {}) => {
+    if (!cloudEnabled) throw new Error("Sign in with Google to save landing pages to Ezkart cloud storage.");
+    const id = landingPageId(site?.url || site?.id);
+    const result = await cloudRequest("PUT", `/v1/landing-pages/${encodeURIComponent(id)}`, {
+      name: site.name,
+      products: Array.isArray(site.products) ? site.products : [],
+      customProducts: Array.isArray(site.customProducts) ? site.customProducts : [],
+      ...changes,
+    });
+    const saved = replaceCloudLandingPage(result.page);
+    document.dispatchEvent(new CustomEvent("ezkart:cloud-landing-pages-changed", { detail: { page: saved } }));
+    return saved;
   };
-  const landingAdvancedMode = () => localStorage.getItem(landingAdvancedModeKey) === "true";
-  const updateLandingCountBadges = (count = 3 + readLandingSites().length) => document.querySelectorAll("[data-site-count]").forEach((badge) => { badge.textContent = String(count); });
+  const loadCloudLandingPage = async (url) => {
+    if (!cloudEnabled) throw new Error("Sign in with Google to load landing pages from Ezkart cloud storage.");
+    const result = await cloudRequest("GET", `/v1/landing-pages/${encodeURIComponent(landingPageId(url))}`);
+    return replaceCloudLandingPage(result.page);
+  };
+  const deleteCloudLandingPage = async (url) => {
+    if (!cloudEnabled) throw new Error("Sign in with Google to delete landing pages from Ezkart cloud storage.");
+    const id = landingPageId(url);
+    await cloudRequest("DELETE", `/v1/landing-pages/${encodeURIComponent(id)}`);
+    cloudLandingPages = cloudLandingPages.filter((page) => page.id !== id);
+    document.dispatchEvent(new CustomEvent("ezkart:cloud-landing-pages-changed"));
+  };
+  const updateLandingCountBadges = (count = readLandingSites().length) => {
+    document.querySelectorAll("[data-site-count]").forEach((badge) => { badge.textContent = String(count); });
+    document.querySelectorAll("[data-landing-page-summary]").forEach((target) => { target.textContent = count ? `${count} landing page${count === 1 ? "" : "s"}` : "No landing pages"; });
+  };
   const formatCreatorPrice = (amount) => `Rp${new Intl.NumberFormat("id-ID").format(amount)}`;
   const compressCreatorProductImage = async (file) => {
     if (!file || !file.type.startsWith("image/")) throw new Error("Choose a PNG, JPEG, WebP, or AVIF product photo.");
@@ -1567,11 +1606,9 @@
 
   const landingLibrary = document.querySelector("[data-landing-library]");
   if (landingLibrary) {
-    const builtInCount = landingLibrary.querySelectorAll("[data-project-card]:not([data-custom-site])").length;
     const grid = landingLibrary.querySelector("[data-project-grid]");
     const dialog = document.getElementById("library-page-creator-dialog");
     const form = dialog?.querySelector("[data-library-page-form]");
-    const advancedToggle = landingLibrary.querySelector("[data-advanced-mode]");
     const makePageSlug = (value) => normalize(value).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 48);
     let customSites = readLandingSites();
     let slugEdited = false;
@@ -1596,7 +1633,8 @@
       card.dataset.customSite = "true";
       card.dataset.siteName = site.name;
       card.dataset.siteUrl = site.url;
-      card.innerHTML = `<a class="landing-project-preview tone-${tone}" href="${href}" aria-label="Edit ${escapeHtml(site.name)}"><span class="project-browser"><i></i><i></i><i></i><small>${escapeHtml(site.url)}</small></span><span class="project-mini-page"><span><b>${escapeHtml(site.name)}</b><em>Shop now</em></span><span class="product-art"><img src="${projectImage(site)}" alt="" loading="lazy"></span><i></i><i></i><i></i></span><span class="project-edit-hint">Open editor</span></a><div class="landing-project-details"><div><span class="project-status draft"><i></i>Draft</span><h2><a href="${href}">${escapeHtml(site.name)}</a></h2><p>Your saved custom storefront, ready for responsive editing.</p></div><button type="button" data-project-menu aria-label="Project actions"><svg class="icon" aria-hidden="true"><use href="#icon-settings"></use></svg></button></div><footer><span><svg class="icon" aria-hidden="true"><use href="#icon-globe"></use></svg>${escapeHtml(site.url)}</span><a href="${href}">Edit page <svg class="icon" aria-hidden="true"><use href="#icon-chevron-right"></use></svg></a></footer>`;
+      const published = site.status === "published";
+      card.innerHTML = `<a class="landing-project-preview tone-${tone}" href="${href}" aria-label="Edit ${escapeHtml(site.name)}"><span class="project-browser"><i></i><i></i><i></i><small>${escapeHtml(site.url)}</small></span><span class="project-mini-page"><span><b>${escapeHtml(site.name)}</b><em>Shop now</em></span><span class="product-art"><img src="${projectImage(site)}" alt="" loading="lazy"></span><i></i><i></i><i></i></span><span class="project-edit-hint">Open editor</span></a><div class="landing-project-details"><div><span class="project-status ${published ? "live" : "draft"}"><i></i>${published ? "Published" : "Draft"}</span><h2><a href="${href}">${escapeHtml(site.name)}</a></h2><p>Your R2-backed storefront project, ready for responsive editing.</p></div><button type="button" data-project-menu aria-label="Project actions"><svg class="icon" aria-hidden="true"><use href="#icon-settings"></use></svg></button></div><footer><span><svg class="icon" aria-hidden="true"><use href="#icon-globe"></use></svg>${escapeHtml(site.url)}</span><a href="${href}">Edit page <svg class="icon" aria-hidden="true"><use href="#icon-chevron-right"></use></svg></a></footer>`;
       return card;
     };
     const closeProjectMenu = () => document.querySelector(".landing-project-menu")?.remove();
@@ -1610,46 +1648,45 @@
         menu.innerHTML = '<button type="button">Delete project</button>';
         const rect = button.getBoundingClientRect();
         menu.style.left = `${Math.max(8, rect.right - 160)}px`; menu.style.top = `${rect.bottom + 5}px`;
-        menu.querySelector("button").onclick = () => {
-          if (!window.confirm(`Delete “${card.dataset.siteName}”? This removes its saved draft from this browser.`)) return;
+        menu.querySelector("button").onclick = async () => {
+          if (!window.confirm(`Delete “${card.dataset.siteName}”? This permanently removes its project from Ezkart cloud storage.`)) return;
           const url = card.dataset.siteUrl;
-          customSites = customSites.filter((site) => site.url !== url);
-          writeLandingSites(customSites);
-          localStorage.removeItem(`ezkart:landing-builder:v3:${url}`);
-          localStorage.removeItem(`ezkart:landing-builder:v2:${url}`);
-          card.remove(); closeProjectMenu(); renderSummary(); showToast("Landing page deleted — one project space is available");
+          try {
+            await deleteCloudLandingPage(url);
+            customSites = readLandingSites();
+            card.remove(); closeProjectMenu(); renderSummary(); showToast("Landing page deleted from cloud storage");
+          } catch (error) { showToast(error instanceof Error ? error.message : "The landing page could not be deleted."); }
         };
         document.body.append(menu);
       };
     });
     const renderSummary = () => {
-      const count = builtInCount + customSites.length;
-      const advanced = landingAdvancedMode();
+      const count = customSites.length;
       const remaining = Math.max(0, 6 - count);
       landingLibrary.querySelector("[data-library-count]").textContent = String(count);
-      landingLibrary.querySelector("[data-library-limit]").textContent = advanced ? "∞" : "6";
-      landingLibrary.querySelector("[data-library-progress]").style.width = advanced ? "100%" : `${Math.min(100, count / 6 * 100)}%`;
-      landingLibrary.querySelector("[data-library-cap-copy]").textContent = advanced ? "Advanced Mode is on. You can create more than 6 projects." : remaining ? `You can create ${remaining} more project${remaining === 1 ? "" : "s"}. Delete a draft to make space, or enable Advanced Mode.` : "Project limit reached. Delete one to return to 5, or enable Advanced Mode.";
+      landingLibrary.querySelector("[data-library-limit]").textContent = "6";
+      landingLibrary.querySelector("[data-library-progress]").style.width = `${Math.min(100, count / 6 * 100)}%`;
+      landingLibrary.querySelector("[data-library-cap-copy]").textContent = remaining ? `You can create ${remaining} more project${remaining === 1 ? "" : "s"}.` : "Project limit reached. Delete a project to make space.";
       const newCard = landingLibrary.querySelector("[data-library-create-card]");
-      newCard.disabled = !advanced && count >= 6;
-      landingLibrary.querySelector("[data-new-card-copy]").textContent = advanced ? "Advanced Mode · unlimited" : remaining ? `${remaining} project space${remaining === 1 ? "" : "s"} available` : "6-project limit reached";
+      newCard.disabled = count >= 6;
+      const newCardTitle = newCard.querySelector("b");
+      if (newCardTitle) newCardTitle.textContent = count ? "Create another page" : "Create your first page";
+      landingLibrary.querySelector("[data-new-card-copy]").textContent = remaining ? `${remaining} project space${remaining === 1 ? "" : "s"} available` : "6-project limit reached";
       updateLandingCountBadges(count);
     };
     const openCreator = () => {
-      if (!landingAdvancedMode() && builtInCount + customSites.length >= 6) { showToast("Delete a project or enable Advanced Mode to create another"); return; }
+      if (customSites.length >= 6) { showToast("Delete a project before creating another"); return; }
       dialog?.showModal();
     };
     customSites.forEach((site) => grid?.insertBefore(projectCard(site), landingLibrary.querySelector("[data-library-create-card]")));
     bindProjectMenus(); renderSummary();
     landingLibrary.querySelectorAll("[data-library-create], [data-library-create-card]").forEach((button) => button.addEventListener("click", openCreator));
-    advancedToggle.checked = landingAdvancedMode();
-    advancedToggle.addEventListener("change", () => { localStorage.setItem(landingAdvancedModeKey, String(advancedToggle.checked)); renderSummary(); showToast(advancedToggle.checked ? "Advanced Mode enabled" : "Standard 6-project limit restored"); });
     document.addEventListener("click", closeProjectMenu);
     const nameInput = form?.elements.namedItem("page_name");
     const slugInput = form?.elements.namedItem("slug");
     slugInput?.addEventListener("input", () => { slugEdited = true; slugInput.value = makePageSlug(slugInput.value); });
     nameInput?.addEventListener("input", () => { if (!slugEdited && slugInput) slugInput.value = makePageSlug(nameInput.value); });
-    form?.addEventListener("submit", (event) => {
+    form?.addEventListener("submit", async (event) => {
       if (event.submitter?.value === "cancel") return;
       event.preventDefault();
       const products = [...form.querySelectorAll('input[name="starter_products[]"]:checked')].map((input) => input.value);
@@ -1657,9 +1694,10 @@
       if (!form.reportValidity()) return;
       const site = { name: String(nameInput.value).trim(), url: `${makePageSlug(slugInput.value)}.ezkart.site`, products, customProducts: creatorProducts.selected(products) };
       if (customSites.some((item) => item.url === site.url) || landingLibrary.querySelector(`[data-site-url="${CSS.escape(site.url)}"]`)) { showToast("A page with this URL already exists"); return; }
-      customSites.push(site);
-      if (!writeLandingSites(customSites)) { customSites.pop(); return; }
-      window.location.href = `?page=sites&edit=${encodeURIComponent(site.url)}`;
+      try {
+        await saveCloudLandingPage(site, { status: "draft" });
+        window.location.href = `?page=sites&edit=${encodeURIComponent(site.url)}`;
+      } catch (error) { showToast(error instanceof Error ? error.message : "The landing page could not be created."); }
     });
     dialog?.addEventListener("close", () => { if (dialog.returnValue === "cancel") { form?.reset(); creatorProducts.reset(); slugEdited = false; } });
   }
@@ -2029,10 +2067,11 @@
     let draggedImageSnapshot = null;
     let saveTimer;
     let zoom = 90;
-    let activeSiteKey = sqStudio.querySelector("[data-sq-site].active")?.dataset.siteUrl || "default";
+    const requestedSiteUrl = new URLSearchParams(window.location.search).get("edit") || "";
+    let activeSiteKey = requestedSiteUrl;
+    let activeSiteDocument = null;
+    let cloudSavePromise = Promise.resolve(true);
     let baseSiteState = null;
-    const storageKeyFor = (site = activeSiteKey) => `ezkart:landing-builder:v3:${site}`;
-    const legacyStorageKeyFor = (site = activeSiteKey) => `ezkart:landing-builder:v2:${site}`;
 
     const openSqPanel = (name) => {
       sqStudio.querySelectorAll("[data-sq-tab]").forEach((button) => button.classList.toggle("active", button.dataset.sqTab === name));
@@ -2071,20 +2110,27 @@
       redoStack.length = 0;
       updateHistoryButtons();
     };
-    const persistCurrentState = () => {
-      try {
-        localStorage.setItem(storageKeyFor(), JSON.stringify(captureState()));
-        return true;
-      } catch (_) {
-        if (saveState) saveState.textContent = "Saved for this session";
-        return false;
-      }
+    const persistCurrentState = (changes = {}) => {
+      const site = readLandingSites().find((page) => page.url === activeSiteKey);
+      if (!site) return Promise.resolve(false);
+      const state = captureState();
+      cloudSavePromise = cloudSavePromise.catch(() => false).then(async () => {
+        try {
+          activeSiteDocument = await saveCloudLandingPage(site, { state, ...changes });
+          return true;
+        } catch (error) {
+          if (saveState) saveState.textContent = "Cloud save failed";
+          showToast(error instanceof Error ? error.message : "The landing page could not be saved.");
+          return false;
+        }
+      });
+      return cloudSavePromise;
     };
     const markSqChanged = () => {
       if (!saveState) return;
       saveState.textContent = "Saving…";
       window.clearTimeout(saveTimer);
-      saveTimer = window.setTimeout(() => { if (persistCurrentState()) saveState.textContent = "Saved just now"; }, 550);
+      saveTimer = window.setTimeout(async () => { if (await persistCurrentState()) saveState.textContent = "Saved to cloud just now"; }, 550);
     };
 
     const formatRupiah = (amount) => `Rp${new Intl.NumberFormat("id-ID").format(amount)}`;
@@ -3988,23 +4034,30 @@
     exportDialog?.querySelector("[data-sq-download-html]")?.addEventListener("click", () => {
       const html = exportDialog.querySelector("[data-sq-html-output]")?.value || generateHtml(); const url = URL.createObjectURL(new Blob([html], { type: "text/html" })); const link = document.createElement("a"); link.href = url; link.download = `${normalize(document.querySelector("[data-current-site-name]")?.textContent).replace(/[^a-z0-9]+/g, "-") || "ezkart-page"}.html`; link.click(); window.setTimeout(() => URL.revokeObjectURL(url), 1000); showToast("HTML file downloaded");
     });
-    sqStudio.querySelector("[data-sq-publish]")?.addEventListener("click", () => {
-      const saved = persistCurrentState();
-      try { localStorage.setItem(`${storageKeyFor()}:published`, new Date().toISOString()); } catch (_) { /* draft remains available in this tab */ }
-      if (saveState) saveState.textContent = saved ? "Published just now" : "Published for this session";
-      showToast("Published snapshot updated with checkout and responsive settings");
+    sqStudio.querySelector("[data-sq-publish]")?.addEventListener("click", async () => {
+      const saved = await persistCurrentState({ status: "published", publishedHtml: generateHtml() });
+      if (saveState) saveState.textContent = saved ? "Published to cloud just now" : "Cloud publish failed";
+      if (saved) showToast("Published snapshot saved to R2 with checkout and responsive settings");
     });
     const cloneBaseSiteState = () => JSON.parse(JSON.stringify(baseSiteState || captureState()));
-    const loadSite = (site, force = false) => {
+    const loadSite = async (site, force = false) => {
       if (!site || (!force && site.classList.contains("active"))) return;
-      if (!force) persistCurrentState();
+      if (!force && activeSiteKey) await persistCurrentState();
       activeSiteKey = site.dataset.siteUrl || "default";
       sqStudio.querySelectorAll("[data-sq-site]").forEach((item) => item.classList.toggle("active", item === site));
       document.querySelectorAll("[data-current-site-name]").forEach((target) => { target.textContent = site.dataset.siteName; });
       document.querySelectorAll("[data-current-site-url]").forEach((target) => { target.textContent = site.dataset.siteUrl; });
       window.history.replaceState(null, "", `?page=sites&edit=${encodeURIComponent(site.dataset.siteUrl)}`);
       let state = null;
-      try { state = JSON.parse(localStorage.getItem(storageKeyFor()) || localStorage.getItem(legacyStorageKeyFor()) || "null"); } catch (_) { state = null; }
+      try {
+        activeSiteDocument = await loadCloudLandingPage(site.dataset.siteUrl);
+        state = activeSiteDocument.state || null;
+        site.dataset.siteProducts = activeSiteDocument.products.join(",");
+        site.dataset.siteCustomProducts = JSON.stringify(activeSiteDocument.customProducts);
+      } catch (error) {
+        showToast(error instanceof Error ? error.message : "The landing page could not be loaded.");
+        return;
+      }
       undoStack.length = 0; redoStack.length = 0; updateHistoryButtons();
       restoreState([2, 3].includes(state?.version) ? state : cloneBaseSiteState());
       readCatalogProducts().forEach((product) => installCustomProduct(product, selectedProducts().includes(product.id)));
@@ -4016,12 +4069,12 @@
         sqStudio.querySelectorAll("[data-sq-product]").forEach((input) => { input.checked = starters.includes(input.value); });
         updateProductView(); markSqChanged();
       }
-      showToast(`${site.dataset.siteName} loaded with its saved draft`);
+      showToast(`${site.dataset.siteName} loaded from R2`);
     };
-    const bindSiteButton = (site) => { site.onclick = () => loadSite(site); };
+    const bindSiteButton = (site) => { site.onclick = () => { void loadSite(site); }; };
     const pageList = sqStudio.querySelector(".sq-page-list");
     const addSavedSiteButton = ({ name, url, products = [], customProducts = [] }) => {
-      const sourceSite = pageList?.querySelector("[data-sq-site]");
+      const sourceSite = pageList?.querySelector("template[data-sq-site-template]")?.content.firstElementChild;
       if (!pageList || !sourceSite || !name || !url || pageList.querySelector(`[data-site-url="${CSS.escape(url)}"]`)) return null;
       const site = sourceSite.cloneNode(true);
       site.classList.remove("active"); site.dataset.siteName = name; site.dataset.siteUrl = url; site.dataset.siteProducts = products.join(","); site.dataset.siteCustomProducts = JSON.stringify(customProducts); site.dataset.customSite = "true";
@@ -4030,12 +4083,12 @@
       pageList.append(site); bindSiteButton(site); return site;
     };
     readLandingSites().forEach(addSavedSiteButton);
-    updateLandingCountBadges(3 + readLandingSites().length);
+    updateLandingCountBadges();
     sqStudio.querySelectorAll("[data-sq-site]").forEach(bindSiteButton);
 
     const newPageDialog = document.getElementById("page-creator-dialog");
     sqStudio.querySelectorAll("[data-open-page-creator]").forEach((button) => button.addEventListener("click", () => {
-      if (!landingAdvancedMode() && sqStudio.querySelectorAll("[data-sq-site]").length >= 6) { showToast("The standard workspace supports 6 projects. Delete one or enable Advanced Mode from Landing Pages."); return; }
+      if (readLandingSites().length >= 6) { showToast("Delete a project before creating another"); return; }
       newPageDialog?.showModal();
     }));
     const newPageForm = newPageDialog?.querySelector("[data-page-creator-form]");
@@ -4048,7 +4101,7 @@
     newPageSlug?.addEventListener("input", () => { newPageSlugEdited = true; newPageSlug.value = makePageSlug(newPageSlug.value); });
     newPageName?.addEventListener("input", () => { if (!newPageSlugEdited && newPageSlug) newPageSlug.value = makePageSlug(newPageName.value); });
     newPageDialog?.addEventListener("close", () => { if (newPageDialog.returnValue === "cancel") { newPageForm?.reset(); newPageProducts.reset(); newPageSlugEdited = false; } });
-    newPageForm?.addEventListener("submit", (event) => {
+    newPageForm?.addEventListener("submit", async (event) => {
       if (event.submitter?.value === "cancel") return;
       event.preventDefault(); event.stopImmediatePropagation();
       const starters = [...newPageForm.querySelectorAll('input[name="starter_products[]"]:checked')];
@@ -4058,16 +4111,16 @@
       const siteUrl = `${String(newPageForm.elements.slug.value).trim()}.ezkart.site`;
       const starterIds = starters.map((starter) => starter.value);
       const customProducts = newPageProducts.selected(starterIds);
-      const site = addSavedSiteButton({ name, url: siteUrl, products: starterIds, customProducts });
+      if (readLandingSites().some((page) => page.url === siteUrl)) { showToast("A page with this URL already exists"); return; }
+      let savedPage;
+      try { savedPage = await saveCloudLandingPage({ name, url: siteUrl, products: starterIds, customProducts }, { status: "draft" }); }
+      catch (error) { showToast(error instanceof Error ? error.message : "The landing page could not be created."); return; }
+      const site = addSavedSiteButton(savedPage);
       if (!site) { showToast("A page with this URL already exists"); return; }
-      try {
-        const savedSites = [...sqStudio.querySelectorAll("[data-custom-site]")].map((item) => { let own = []; try { own = JSON.parse(item.dataset.siteCustomProducts || "[]"); } catch (_) { own = []; } return { name: item.dataset.siteName, url: item.dataset.siteUrl, products: item.dataset.siteProducts.split(",").filter(Boolean), customProducts: own }; });
-        writeLandingSites(savedSites);
-      } catch (_) { /* page remains available in this tab */ }
-      newPageDialog?.close(); loadSite(site);
+      newPageDialog?.close(); await loadSite(site);
       sqStudio.querySelectorAll("[data-sq-product]").forEach((input) => { input.checked = starters.some((starter) => starter.value === input.value); });
       updateProductView(); markSqChanged();
-      updateLandingCountBadges(3 + readLandingSites().length);
+      updateLandingCountBadges();
       showToast(`${name} created with ${starters.length} products`); newPageForm.reset(); newPageProducts.reset(); newPageSlugEdited = false;
     });
 
@@ -4098,16 +4151,9 @@
     syncBrandControls();
     syncCommerceStatus();
     baseSiteState = captureState();
-    const requestedSiteUrl = new URLSearchParams(window.location.search).get("edit") || "";
     const requestedSiteButton = [...sqStudio.querySelectorAll("[data-sq-site]")].find((site) => site.dataset.siteUrl === requestedSiteUrl);
-    if (requestedSiteButton) loadSite(requestedSiteButton, true);
-    else {
-      try {
-        const stored = JSON.parse(localStorage.getItem(storageKeyFor()) || localStorage.getItem(legacyStorageKeyFor()) || "null");
-        if ([2, 3].includes(stored?.version)) restoreState(stored);
-      } catch (_) { /* start with the server-provided page */ }
-    }
-    window.addEventListener("beforeunload", persistCurrentState);
+    if (requestedSiteButton) await loadSite(requestedSiteButton, true);
+    else window.location.replace("?page=sites");
     setZoom(fitZoomForDevice());
   }
 

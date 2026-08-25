@@ -52,6 +52,9 @@ access token, or refresh token in this repository.
 - `PUT|DELETE /v1/products/:id` stores or removes a seller-scoped product,
   gallery, and variant set in D1.
 - `PUT|DELETE /v1/drafts/:id` stores or removes a seller-scoped editor draft.
+- `GET /v1/landing-pages` lists the active seller's R2-backed page projects.
+  `GET|PUT|DELETE /v1/landing-pages/:id` loads, saves, or removes one private
+  project, including its responsive builder state and published HTML snapshot.
 
 Each seller may publish up to 10 products. The Worker returns a readable limit
 error and D1 also enforces the cap to cover concurrent create requests.

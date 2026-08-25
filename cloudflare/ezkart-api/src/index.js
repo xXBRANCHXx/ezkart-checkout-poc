@@ -6,6 +6,8 @@ const json = (payload, status = 200, headers = {}) => new Response(JSON.stringif
 const privateImmutableImageCacheControl = "private, max-age=31536000, immutable";
 const publicImmutableImageCacheControl = "public, max-age=31536000, immutable";
 const maximumProductsPerSeller = 10;
+const maximumLandingPagesPerSeller = 6;
+const maximumLandingPageBytes = 16000000;
 const abandonedUploadGraceMilliseconds = 24 * 60 * 60 * 1000;
 
 const allowedOrigin = (request, env) => {
@@ -333,6 +335,127 @@ async function catalog(request, env) {
     updatedAt: row.updated_at,
   }));
   return { products, drafts };
+}
+
+const landingPagePrefix = (sellerId) => `sellers/${sellerId}/landing-pages/`;
+const landingPageKey = (sellerId, id) => `${landingPagePrefix(sellerId)}${id}.json`;
+const cleanLandingPageId = (value) => {
+  const id = String(value || "").trim().toLowerCase();
+  if (id.length < 1 || id.length > 48 || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id)) {
+    throw new Response("Landing page URL is invalid", { status: 400 });
+  }
+  return id;
+};
+const landingPageSummary = (page) => ({
+  id: page.id,
+  name: page.name,
+  url: page.url,
+  status: page.status,
+  products: Array.isArray(page.products) ? page.products : [],
+  customProducts: Array.isArray(page.customProducts) ? page.customProducts.map((product) => ({
+    id: product?.id || "",
+    name: cleanText(product?.name, 70),
+    type: cleanText(product?.type, 20),
+    price: Math.max(0, Math.round(Number(product?.price) || 0)),
+  })) : [],
+  createdAt: page.createdAt,
+  updatedAt: page.updatedAt,
+  publishedAt: page.publishedAt || null,
+});
+
+async function landingPageObject(env, sellerId, id) {
+  const object = await env.PRIVATE_ASSETS.get(landingPageKey(sellerId, id));
+  if (!object) throw new Response("Landing page not found", { status: 404 });
+  try {
+    const page = JSON.parse(await object.text());
+    if (!page || typeof page !== "object" || Array.isArray(page)) throw new Error("invalid landing page object");
+    return page;
+  } catch (_) {
+    throw new Response("Landing page data is invalid", { status: 500 });
+  }
+}
+
+async function landingPages(request, env) {
+  const { seller } = await sellerContext(request, env);
+  const objects = [];
+  let cursor;
+  do {
+    const result = await env.PRIVATE_ASSETS.list({ prefix: landingPagePrefix(seller.id), limit: 1000, ...(cursor ? { cursor } : {}) });
+    objects.push(...result.objects.filter((object) => object.key.endsWith(".json")));
+    cursor = result.truncated ? result.cursor : undefined;
+  } while (cursor);
+  const pages = await Promise.all(objects.map(async (object) => {
+    const id = object.key.slice(landingPagePrefix(seller.id).length, -5);
+    return landingPageSummary(await landingPageObject(env, seller.id, id));
+  }));
+  return pages.sort((left, right) => String(right.updatedAt || "").localeCompare(String(left.updatedAt || "")));
+}
+
+async function landingPage(request, env, rawId) {
+  const { seller } = await sellerContext(request, env);
+  return landingPageObject(env, seller.id, cleanLandingPageId(rawId));
+}
+
+async function saveLandingPage(request, env, rawId) {
+  const { seller } = await sellerContext(request, env);
+  const id = cleanLandingPageId(rawId);
+  const payload = await requestJson(request, maximumLandingPageBytes);
+  let existing = null;
+  try { existing = await landingPageObject(env, seller.id, id); } catch (error) {
+    if (!(error instanceof Response) || error.status !== 404) throw error;
+  }
+  if (!existing) {
+    const listed = await env.PRIVATE_ASSETS.list({ prefix: landingPagePrefix(seller.id), limit: maximumLandingPagesPerSeller + 1 });
+    if (listed.objects.filter((object) => object.key.endsWith(".json")).length >= maximumLandingPagesPerSeller) {
+      throw new Response(`This store can have up to ${maximumLandingPagesPerSeller} landing pages`, { status: 409 });
+    }
+  }
+  const name = cleanText(payload.name ?? existing?.name, 60);
+  if (!name) throw new Response("Landing page name is required", { status: 400 });
+  const products = Array.isArray(payload.products)
+    ? [...new Set(payload.products.slice(0, 100).map((productId) => cleanId(productId, "Product ID")))]
+    : Array.isArray(existing?.products) ? existing.products : [];
+  const customProducts = Array.isArray(payload.customProducts)
+    ? payload.customProducts.slice(0, 100)
+    : Array.isArray(existing?.customProducts) ? existing.customProducts : [];
+  const state = Object.hasOwn(payload, "state")
+    ? payload.state && typeof payload.state === "object" && !Array.isArray(payload.state) ? payload.state : null
+    : existing?.state || null;
+  const status = payload.status === "published" ? "published" : payload.status === "draft" ? "draft" : existing?.status || "draft";
+  const publishedHtml = Object.hasOwn(payload, "publishedHtml")
+    ? String(payload.publishedHtml || "")
+    : String(existing?.publishedHtml || "");
+  const now = new Date().toISOString();
+  const page = {
+    id,
+    name,
+    url: `${id}.ezkart.site`,
+    status,
+    products,
+    customProducts,
+    state,
+    publishedHtml,
+    createdAt: existing?.createdAt || now,
+    updatedAt: now,
+    publishedAt: payload.status === "published" ? now : existing?.publishedAt || null,
+  };
+  const serialized = JSON.stringify(page);
+  if (new TextEncoder().encode(serialized).byteLength > maximumLandingPageBytes) {
+    throw new Response("Landing page project is too large", { status: 413 });
+  }
+  await env.PRIVATE_ASSETS.put(landingPageKey(seller.id, id), serialized, {
+    httpMetadata: { contentType: "application/json; charset=utf-8" },
+    customMetadata: { sellerId: seller.id, landingPageId: id, status, updatedAt: now },
+  });
+  return page;
+}
+
+async function deleteLandingPage(request, env, rawId) {
+  const { seller } = await sellerContext(request, env);
+  const id = cleanLandingPageId(rawId);
+  const key = landingPageKey(seller.id, id);
+  if (!(await env.PRIVATE_ASSETS.head(key))) throw new Response("Landing page not found", { status: 404 });
+  await env.PRIVATE_ASSETS.delete(key);
 }
 
 const imageTypes = new Map([
@@ -863,6 +986,11 @@ export default {
       if (request.method === "GET" && url.pathname === "/health") return json(await health(env), 200, cors);
       if (request.method === "GET" && url.pathname === "/v1/me") return json({ ok: true, user: await currentUser(request, env) }, 200, cors);
       if (request.method === "GET" && url.pathname === "/v1/catalog") return json({ ok: true, ...(await catalog(request, env)) }, 200, cors);
+      if (request.method === "GET" && url.pathname === "/v1/landing-pages") return json({ ok: true, pages: await landingPages(request, env) }, 200, cors);
+      const landingPageMatch = /^\/v1\/landing-pages\/([a-z0-9-]+)$/.exec(url.pathname);
+      if (request.method === "GET" && landingPageMatch) return json({ ok: true, page: await landingPage(request, env, landingPageMatch[1]) }, 200, cors);
+      if (["PUT", "POST"].includes(request.method) && landingPageMatch) return json({ ok: true, page: await saveLandingPage(request, env, landingPageMatch[1]) }, 200, cors);
+      if (request.method === "DELETE" && landingPageMatch) { await deleteLandingPage(request, env, landingPageMatch[1]); return json({ ok: true }, 200, cors); }
       if (request.method === "POST" && url.pathname === "/v1/media") return json({ ok: true, media: await uploadMedia(request, env) }, 201, cors);
       const publicMediaMatch = /^\/v1\/public\/media\/([a-zA-Z0-9_-]+)$/.exec(url.pathname);
       if (request.method === "GET" && publicMediaMatch) return await servePublicMedia(request, env, context, cleanId(publicMediaMatch[1], "Image ID"));

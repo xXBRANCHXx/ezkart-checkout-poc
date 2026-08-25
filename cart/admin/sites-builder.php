@@ -5,8 +5,8 @@ declare(strict_types=1);
   <header class="sq-commandbar">
     <div class="sq-page-identity">
       <a href="?page=sites" aria-label="Return to landing pages"><?= ez_admin_icon('chevron-left') ?></a>
-      <button type="button" data-sq-open-panel="pages"><span><small>Landing page</small><b data-current-site-name>Morning Ritual Store</b></span><?= ez_admin_icon('chevron-down') ?></button>
-      <span class="sq-live-state"><i></i> Live</span>
+      <button type="button" data-sq-open-panel="pages"><span><small>Landing page</small><b data-current-site-name>Landing page</b></span><?= ez_admin_icon('chevron-down') ?></button>
+      <span class="sq-live-state"><i></i> Draft</span>
     </div>
     <div class="sq-history-tools" aria-label="Editing history">
       <button type="button" data-sq-undo aria-label="Undo" disabled><?= ez_admin_icon('undo') ?></button>
@@ -119,11 +119,8 @@ declare(strict_types=1);
         <section class="sq-tool-panel" data-sq-panel="pages">
           <header><div><small>Website</small><h2>Pages &amp; hosting</h2></div><button type="button" data-open-page-creator aria-label="New landing page"><?= ez_admin_icon('plus') ?></button></header>
           <div class="sq-page-list">
-            <button class="active" type="button" data-sq-site data-site-name="Morning Ritual Store" data-site-url="madu-nusantara.id"><span><?= ez_admin_product_art('Granola Madu Nusantara') ?></span><div><b>Morning Ritual Store</b><small>madu-nusantara.id</small></div><em>Live</em></button>
-            <button type="button" data-sq-site data-site-name="Kopi Susu at Home" data-site-url="kopisusu.ezkart.site"><span><?= ez_admin_product_art('Kopi Susu Concentrate') ?></span><div><b>Kopi Susu at Home</b><small>kopisusu.ezkart.site</small></div><em>Live</em></button>
-            <button type="button" data-sq-site data-site-name="Sambal Roa Launch" data-site-url="sambal-roa.ezkart.site"><span><?= ez_admin_product_art('Sambal Roa Signature') ?></span><div><b>Sambal Roa Launch</b><small>sambal-roa.ezkart.site</small></div><em class="draft">Draft</em></button>
+            <template data-sq-site-template><button type="button" data-sq-site><span><?= ez_admin_icon('layout') ?></span><div><b>Landing page</b><small>page.ezkart.site</small></div><em class="draft">Draft</em></button></template>
           </div>
-          <div class="sq-host-card"><span><?= ez_admin_icon('globe') ?></span><div><b>madu-nusantara.id</b><small>DNS verified · SSL auto-renewing</small></div><em>Healthy</em></div>
           <div class="sq-host-card"><span><?= ez_admin_icon('shield') ?></span><div><b>Managed hosting</b><small>Global CDN · 99.99% uptime</small></div><em>Active</em></div>
           <button class="sq-wide-button" type="button" data-toast="Domain manager opened">Manage domains &amp; SEO</button>
         </section>
@@ -131,7 +128,7 @@ declare(strict_types=1);
     </aside>
 
     <main class="sq-canvas-stage">
-      <div class="sq-canvas-meta"><span><?= ez_admin_icon('shield') ?><b data-current-site-url>madu-nusantara.id</b></span><div><button type="button" data-sq-zoom-out aria-label="Zoom out">−</button><output data-sq-zoom>80%</output><button type="button" data-sq-zoom-in aria-label="Zoom in">+</button></div></div>
+      <div class="sq-canvas-meta"><span><?= ez_admin_icon('shield') ?><b data-current-site-url>ezkart.site</b></span><div><button type="button" data-sq-zoom-out aria-label="Zoom out">−</button><output data-sq-zoom>80%</output><button type="button" data-sq-zoom-in aria-label="Zoom in">+</button></div></div>
       <div class="sq-canvas-scroll">
         <div class="sq-device-frame" data-sq-device-frame>
           <article class="sq-page-preview theme-coral radius-soft layout-rich" data-sq-preview-root>
@@ -209,7 +206,7 @@ declare(strict_types=1);
 </section>
 
 <dialog class="sq-live-preview-dialog" id="landing-preview-dialog">
-  <div class="sq-live-preview-shell"><header><div><small>Live page preview</small><h2 data-sq-preview-title>Morning Ritual Store</h2></div><nav aria-label="Preview size"><button class="active" type="button" data-sq-preview-device="desktop"><?= ez_admin_icon('monitor') ?><span>Desktop · 1440</span></button><button type="button" data-sq-preview-device="tablet"><?= ez_admin_icon('layout') ?><span>Tablet · 768</span></button><button type="button" data-sq-preview-device="mobile"><?= ez_admin_icon('smartphone') ?><span>Mobile · 390</span></button></nav><div><button type="button" data-sq-preview-new-tab><?= ez_admin_icon('globe') ?><span>Open tab</span></button><button type="button" data-sq-preview-close aria-label="Close preview"><?= ez_admin_icon('x') ?></button></div></header><main data-sq-live-preview-stage data-preview-device="desktop"><div class="sq-live-preview-frame"><iframe title="Landing page production preview" sandbox="allow-scripts allow-forms allow-popups allow-top-navigation-by-user-activation" data-sq-live-preview-frame></iframe></div></main></div>
+  <div class="sq-live-preview-shell"><header><div><small>Live page preview</small><h2 data-sq-preview-title>Landing page</h2></div><nav aria-label="Preview size"><button class="active" type="button" data-sq-preview-device="desktop"><?= ez_admin_icon('monitor') ?><span>Desktop · 1440</span></button><button type="button" data-sq-preview-device="tablet"><?= ez_admin_icon('layout') ?><span>Tablet · 768</span></button><button type="button" data-sq-preview-device="mobile"><?= ez_admin_icon('smartphone') ?><span>Mobile · 390</span></button></nav><div><button type="button" data-sq-preview-new-tab><?= ez_admin_icon('globe') ?><span>Open tab</span></button><button type="button" data-sq-preview-close aria-label="Close preview"><?= ez_admin_icon('x') ?></button></div></header><main data-sq-live-preview-stage data-preview-device="desktop"><div class="sq-live-preview-frame"><iframe title="Landing page production preview" sandbox="allow-scripts allow-forms allow-popups allow-top-navigation-by-user-activation" data-sq-live-preview-frame></iframe></div></main></div>
 </dialog>
 
 <dialog class="sq-export-dialog" id="html-export-dialog">
