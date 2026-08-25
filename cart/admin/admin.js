@@ -295,9 +295,16 @@
       if (!imageUploadId && variant.imageSource === "variant-upload" && String(variant.image || "").startsWith("data:image/")) {
         imageUploadId = (await uploadCloudImage(variant.image)).id;
       }
-      variants.push({ ...variant, imageUploadId });
+      const variantPayload = { ...variant };
+      delete variantPayload.image;
+      delete variantPayload.customImage;
+      variants.push({ ...variantPayload, imageUploadId });
     }
-    return { ...product, imageUploadIds, variants };
+    const productPayload = { ...product };
+    delete productPayload.images;
+    delete productPayload.image;
+    delete productPayload.mediaIds;
+    return { ...productPayload, imageUploadIds, variants };
   };
   const saveCloudProduct = async (product) => {
     const payload = await cloudProductPayload(product);
