@@ -986,9 +986,10 @@ button, a { -webkit-tap-highlight-color: transparent; }
 @media(min-width:981px){
   .page-site-editor .sidebar{width:64px;padding:12px 8px;overflow-x:hidden;box-shadow:1px 0 0 rgba(25,31,42,.03);transition:width .2s ease,box-shadow .2s ease}
   .page-site-editor .sidebar:hover,.page-site-editor .sidebar:focus-within{width:236px;box-shadow:12px 0 32px rgba(20,26,38,.14)}
-  .page-site-editor .sidebar-brand{width:48px;height:52px;padding:0;overflow:hidden}
-  .page-site-editor .sidebar-brand img{width:135px;max-width:none;height:52px;flex:0 0 135px;object-position:left center}
+  .page-site-editor .sidebar-brand{width:48px;height:52px;padding:0;align-items:center;justify-content:center;overflow:hidden}
+  .page-site-editor .sidebar-brand img{width:48px;max-width:none;height:48px;flex:0 0 48px;object-fit:contain;object-position:center;transition:width .2s ease,flex-basis .2s ease}
   .page-site-editor .sidebar:hover .sidebar-brand,.page-site-editor .sidebar:focus-within .sidebar-brand{width:220px}
+  .page-site-editor .sidebar:hover .sidebar-brand img,.page-site-editor .sidebar:focus-within .sidebar-brand img{width:135px;flex-basis:135px}
   .page-site-editor .primary-nav{width:220px}
   .page-site-editor .primary-nav a{width:220px;padding-inline:15px;overflow:hidden;white-space:nowrap}
   .page-site-editor .primary-nav a .icon{flex:0 0 18px}
