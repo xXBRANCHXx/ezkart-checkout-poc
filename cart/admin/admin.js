@@ -2302,6 +2302,7 @@
       const match = String(value || "").match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
       return match ? `#${match.slice(1, 4).map((part) => Number(part).toString(16).padStart(2, "0")).join("")}` : fallback;
     };
+    const isTransparentColor = (value) => /transparent/i.test(String(value || "")) || /rgba\([^)]*,\s*0(?:\.0+)?\s*\)/i.test(String(value || ""));
     const codeSourceFor = (element) => element?.querySelector("template[data-sq-code-source]")?.innerHTML || "";
     const renderCodeElement = (element) => {
       const frame = element?.querySelector("iframe[data-sq-code-render]");
@@ -2422,16 +2423,57 @@
       if (hideButton) hideButton.lastChild.textContent = selectedElement.classList.contains("sq-element-hidden") ? " Show" : " Hide";
       const computed = getComputedStyle(selectedElement);
       const colorFallbacks = { color: "#24262b", backgroundColor: "#ffffff", borderColor: "#e3e5e7" };
-      sqStudio.querySelectorAll("[data-sq-element-color]").forEach((input) => { input.value = colorToHex(computed[input.dataset.sqElementColor], colorFallbacks[input.dataset.sqElementColor]); });
-      const surface = sqStudio.querySelector("[data-sq-element-surface]");
-      if (surface) surface.value = selectedElement.dataset.sqSurface || "none";
-      const align = sqStudio.querySelector("[data-sq-element-align]");
-      if (align) align.value = selectedElement.dataset.sqAlign || "left";
-      const radius = Number.parseInt(selectedElement.style.borderRadius || "0", 10) || 0;
+      sqStudio.querySelectorAll("[data-sq-element-color]").forEach((input) => {
+        const property = input.dataset.sqElementColor;
+        const transparent = isTransparentColor(computed[property]);
+        const value = colorToHex(computed[property], colorFallbacks[property]);
+        input.value = value;
+        const hex = sqStudio.querySelector(`[data-sq-element-color-hex="${property}"]`);
+        if (hex) { hex.value = transparent ? "Transparent" : value.toUpperCase(); hex.classList.toggle("is-transparent", transparent); }
+        sqStudio.querySelector(`[data-sq-color-card="${property}"]`)?.classList.toggle("is-transparent", transparent);
+      });
+      const family = String(computed.fontFamily || "").toLowerCase();
+      const fontFamily = sqStudio.querySelector("[data-sq-element-font-family]");
+      if (fontFamily) fontFamily.value = family.includes("monospace") || family.includes("consolas") ? "ui-monospace, SFMono-Regular, Consolas, monospace" : family.includes("georgia") ? "Georgia, 'Times New Roman', serif" : family.includes("times new roman") ? "'Times New Roman', Times, serif" : family.includes("arial") || family.includes("helvetica") ? "Arial, Helvetica, sans-serif" : "Poppins, sans-serif";
+      const fontWeight = sqStudio.querySelector("[data-sq-element-font-weight]");
+      if (fontWeight) fontWeight.value = ["400", "500", "600", "700"].reduce((best, weight) => Math.abs(Number(weight) - Number.parseInt(computed.fontWeight, 10)) < Math.abs(Number(best) - Number.parseInt(computed.fontWeight, 10)) ? weight : best, "400");
+      const computedFontSize = Math.round(Number.parseFloat(computed.fontSize) || 16);
+      const fontSize = sqStudio.querySelector("[data-sq-element-font-size]");
+      const fontSizeOutput = sqStudio.querySelector("[data-sq-element-font-size-output]");
+      if (fontSize) fontSize.value = String(Math.min(160, Math.max(8, computedFontSize)));
+      if (fontSizeOutput) fontSizeOutput.textContent = `${computedFontSize}px`;
+      const computedLineHeight = computed.lineHeight === "normal" ? 1.2 : (Number.parseFloat(computed.lineHeight) / (Number.parseFloat(computed.fontSize) || 16));
+      const lineHeight = Math.min(2.2, Math.max(.7, Math.round(computedLineHeight * 100) / 100));
+      const lineHeightInput = sqStudio.querySelector("[data-sq-element-line-height]");
+      const lineHeightOutput = sqStudio.querySelector("[data-sq-element-line-height-output]");
+      if (lineHeightInput) lineHeightInput.value = String(lineHeight);
+      if (lineHeightOutput) lineHeightOutput.textContent = String(lineHeight);
+      const spacing = computed.letterSpacing === "normal" ? 0 : Number.parseFloat(computed.letterSpacing) || 0;
+      const letterSpacing = sqStudio.querySelector("[data-sq-element-letter-spacing]");
+      const letterSpacingOutput = sqStudio.querySelector("[data-sq-element-letter-spacing-output]");
+      if (letterSpacing) letterSpacing.value = String(Math.min(20, Math.max(-10, spacing)));
+      if (letterSpacingOutput) letterSpacingOutput.textContent = `${Math.round(spacing * 100) / 100}px`;
+      const surfaceValue = selectedElement.dataset.sqSurface || "none";
+      sqStudio.querySelectorAll("[data-sq-element-surface]").forEach((button) => { button.classList.toggle("active", button.dataset.sqElementSurface === surfaceValue); button.setAttribute("aria-pressed", String(button.dataset.sqElementSurface === surfaceValue)); });
+      const alignValue = selectedElement.dataset.sqAlign || computed.textAlign || "left";
+      sqStudio.querySelectorAll("[data-sq-element-align]").forEach((button) => { button.classList.toggle("active", button.dataset.sqElementAlign === alignValue); button.setAttribute("aria-pressed", String(button.dataset.sqElementAlign === alignValue)); });
+      const transformValue = computed.textTransform === "uppercase" || computed.textTransform === "lowercase" ? computed.textTransform : "none";
+      sqStudio.querySelectorAll("[data-sq-element-transform]").forEach((button) => { button.classList.toggle("active", button.dataset.sqElementTransform === transformValue); button.setAttribute("aria-pressed", String(button.dataset.sqElementTransform === transformValue)); });
+      const borderWidth = Math.round(Number.parseFloat(computed.borderTopWidth) || 0);
+      const borderWidthInput = sqStudio.querySelector("[data-sq-element-border-width]");
+      const borderWidthOutput = sqStudio.querySelector("[data-sq-element-border-width-output]");
+      if (borderWidthInput) borderWidthInput.value = String(Math.min(12, borderWidth));
+      if (borderWidthOutput) borderWidthOutput.textContent = `${borderWidth}px`;
+      const borderStyle = sqStudio.querySelector("[data-sq-element-border-style]");
+      if (borderStyle) borderStyle.value = ["solid", "dashed", "dotted", "double"].includes(computed.borderTopStyle) ? computed.borderTopStyle : "solid";
+      const radius = Number.parseInt(selectedElement.style.borderRadius || computed.borderTopLeftRadius || "0", 10) || 0;
       const radiusInput = sqStudio.querySelector("[data-sq-element-radius]");
       const radiusOutput = sqStudio.querySelector("[data-sq-element-radius-output]");
-      if (radiusInput) radiusInput.value = String(radius);
-      if (radiusOutput) radiusOutput.textContent = `${radius}px`;
+      const radiusNumber = sqStudio.querySelector("[data-sq-element-radius-number]");
+      if (radiusInput) radiusInput.value = String(Math.min(64, radius));
+      if (radiusOutput) radiusOutput.textContent = radius >= 999 ? "Pill" : `${radius}px`;
+      if (radiusNumber) radiusNumber.value = String(radius);
+      sqStudio.querySelectorAll("[data-sq-radius-choice]").forEach((button) => { const active = Number(button.dataset.sqRadiusChoice) === radius; button.classList.toggle("active", active); button.setAttribute("aria-pressed", String(active)); });
       const buttonControls = sqStudio.querySelector("[data-sq-element-button-controls]");
       const hasButton = Boolean(action);
       if (buttonControls) buttonControls.hidden = !hasButton;
@@ -3276,43 +3318,110 @@
     let elementStyleSnapshot;
     const rememberElementStyle = () => { if (!elementStyleSnapshot) elementStyleSnapshot = captureState(); };
     const finishElementStyle = () => { if (elementStyleSnapshot) remember(elementStyleSnapshot); elementStyleSnapshot = null; };
+    const updateElementColor = (property, value) => {
+      if (!selectedElement?.isConnected) return;
+      selectedElement.style[property] = value;
+      if (property === "color") selectedElement.classList.add("sq-color-override");
+      if (property === "borderColor" && !isTransparentColor(value) && (getComputedStyle(selectedElement).borderStyle === "none" || getComputedStyle(selectedElement).borderTopWidth === "0px")) {
+        selectedElement.style.borderWidth = "1px";
+        selectedElement.style.borderStyle = "solid";
+      }
+      const hex = sqStudio.querySelector(`[data-sq-element-color-hex="${property}"]`);
+      if (hex) { hex.value = isTransparentColor(value) ? "Transparent" : colorToHex(value).toUpperCase(); hex.classList.toggle("is-transparent", isTransparentColor(value)); }
+      sqStudio.querySelector(`[data-sq-color-card="${property}"]`)?.classList.toggle("is-transparent", isTransparentColor(value));
+      markSqChanged();
+    };
     sqStudio.querySelectorAll("[data-sq-element-color]").forEach((input) => {
       input.addEventListener("focus", rememberElementStyle);
       input.addEventListener("input", () => {
-        if (!selectedElement?.isConnected) return;
         const property = input.dataset.sqElementColor;
-        selectedElement.style[property] = input.value;
-        if (property === "color") selectedElement.classList.add("sq-color-override");
-        if (property === "borderColor" && getComputedStyle(selectedElement).borderStyle === "none") selectedElement.style.border = `1px solid ${input.value}`;
-        markSqChanged();
+        updateElementColor(property, input.value);
       });
-      input.addEventListener("change", finishElementStyle);
+      input.addEventListener("change", () => { finishElementStyle(); syncElementControls(); });
     });
-    sqStudio.querySelector("[data-sq-element-surface]")?.addEventListener("change", (event) => {
+    sqStudio.querySelectorAll("[data-sq-element-color-hex]").forEach((input) => {
+      input.addEventListener("focus", rememberElementStyle);
+      input.addEventListener("input", () => {
+        const value = input.value.trim();
+        if (!/^#[0-9a-f]{6}$/i.test(value)) return;
+        const property = input.dataset.sqElementColorHex;
+        const picker = sqStudio.querySelector(`[data-sq-element-color="${property}"]`);
+        if (picker) picker.value = value;
+        updateElementColor(property, value);
+      });
+      input.addEventListener("change", () => { finishElementStyle(); syncElementControls(); });
+    });
+    sqStudio.querySelectorAll("[data-sq-element-color-clear]").forEach((button) => button.addEventListener("click", () => {
       if (!selectedElement?.isConnected) return;
       remember();
+      const property = button.dataset.sqElementColorClear;
+      selectedElement.style[property] = "transparent";
+      if (property === "borderColor") selectedElement.style.borderWidth = "0px";
+      syncElementControls(); markSqChanged();
+    }));
+    const bindElementStyleSelect = (selector, property) => sqStudio.querySelector(selector)?.addEventListener("change", (event) => {
+      if (!selectedElement?.isConnected) return;
+      remember(); selectedElement.style[property] = event.currentTarget.value; refreshElementOverlay(); markSqChanged(); syncElementControls();
+    });
+    bindElementStyleSelect("[data-sq-element-font-family]", "fontFamily");
+    bindElementStyleSelect("[data-sq-element-font-weight]", "fontWeight");
+    bindElementStyleSelect("[data-sq-element-border-style]", "borderStyle");
+    const bindElementStyleRange = (selector, property, unit, outputSelector, formatter = (value) => `${value}${unit}`) => {
+      const input = sqStudio.querySelector(selector);
+      input?.addEventListener("pointerdown", rememberElementStyle);
+      input?.addEventListener("focus", rememberElementStyle);
+      input?.addEventListener("input", (event) => {
+        if (!selectedElement?.isConnected) return;
+        rememberElementStyle();
+        const value = event.currentTarget.value;
+        selectedElement.style[property] = `${value}${unit}`;
+        if (property === "borderWidth" && Number(value) > 0 && getComputedStyle(selectedElement).borderStyle === "none") selectedElement.style.borderStyle = sqStudio.querySelector("[data-sq-element-border-style]")?.value || "solid";
+        if (property === "borderWidth" && Number(value) > 0 && isTransparentColor(getComputedStyle(selectedElement).borderColor)) selectedElement.style.borderColor = sqStudio.querySelector('[data-sq-element-color="borderColor"]')?.value || "#e3e5e7";
+        const output = sqStudio.querySelector(outputSelector);
+        if (output) output.textContent = formatter(value);
+        refreshElementOverlay(); markSqChanged();
+      });
+      input?.addEventListener("change", () => { finishElementStyle(); syncElementControls(); });
+    };
+    bindElementStyleRange("[data-sq-element-font-size]", "fontSize", "px", "[data-sq-element-font-size-output]");
+    bindElementStyleRange("[data-sq-element-line-height]", "lineHeight", "", "[data-sq-element-line-height-output]", (value) => value);
+    bindElementStyleRange("[data-sq-element-letter-spacing]", "letterSpacing", "px", "[data-sq-element-letter-spacing-output]");
+    bindElementStyleRange("[data-sq-element-border-width]", "borderWidth", "px", "[data-sq-element-border-width-output]");
+    bindElementStyleRange("[data-sq-element-radius]", "borderRadius", "px", "[data-sq-element-radius-output]");
+    sqStudio.querySelectorAll("[data-sq-element-surface]").forEach((button) => button.addEventListener("click", () => {
+      if (!selectedElement?.isConnected) return;
+      remember();
+      const value = button.dataset.sqElementSurface;
       selectedElement.classList.remove("sq-surface-soft", "sq-surface-card", "sq-surface-outline", "sq-surface-glass");
-      selectedElement.classList.remove("sq-color-override");
-      selectedElement.dataset.sqSurface = event.currentTarget.value;
-      if (event.currentTarget.value !== "none") selectedElement.classList.add(`sq-surface-${event.currentTarget.value}`);
-      markSqChanged();
-    });
-    sqStudio.querySelector("[data-sq-element-align]")?.addEventListener("change", (event) => {
+      selectedElement.dataset.sqSurface = value;
+      if (value !== "none") selectedElement.classList.add(`sq-surface-${value}`);
+      syncElementControls(); refreshElementOverlay(); markSqChanged();
+    }));
+    sqStudio.querySelectorAll("[data-sq-element-align]").forEach((button) => button.addEventListener("click", () => {
       if (!selectedElement?.isConnected) return;
-      remember(); selectedElement.dataset.sqAlign = event.currentTarget.value; selectedElement.style.textAlign = event.currentTarget.value; markSqChanged();
-    });
-    sqStudio.querySelector("[data-sq-element-radius]")?.addEventListener("input", (event) => {
+      remember(); const value = button.dataset.sqElementAlign; selectedElement.dataset.sqAlign = value; selectedElement.style.textAlign = value; syncElementControls(); markSqChanged();
+    }));
+    sqStudio.querySelectorAll("[data-sq-element-transform]").forEach((button) => button.addEventListener("click", () => {
       if (!selectedElement?.isConnected) return;
-      rememberElementStyle(); selectedElement.style.borderRadius = `${event.currentTarget.value}px`;
-      const output = sqStudio.querySelector("[data-sq-element-radius-output]"); if (output) output.textContent = `${event.currentTarget.value}px`; markSqChanged();
+      remember(); selectedElement.style.textTransform = button.dataset.sqElementTransform; syncElementControls(); refreshElementOverlay(); markSqChanged();
+    }));
+    sqStudio.querySelectorAll("[data-sq-radius-choice]").forEach((button) => button.addEventListener("click", () => {
+      if (!selectedElement?.isConnected) return;
+      remember(); selectedElement.style.borderRadius = `${button.dataset.sqRadiusChoice}px`; syncElementControls(); refreshElementOverlay(); markSqChanged();
+    }));
+    sqStudio.querySelector("[data-sq-element-radius-number]")?.addEventListener("focus", rememberElementStyle);
+    sqStudio.querySelector("[data-sq-element-radius-number]")?.addEventListener("input", (event) => {
+      if (!selectedElement?.isConnected) return;
+      rememberElementStyle(); const value = Math.min(999, Math.max(0, Number(event.currentTarget.value) || 0)); selectedElement.style.borderRadius = `${value}px`; syncElementControls(); refreshElementOverlay(); markSqChanged();
     });
-    sqStudio.querySelector("[data-sq-element-radius]")?.addEventListener("change", finishElementStyle);
+    sqStudio.querySelector("[data-sq-element-radius-number]")?.addEventListener("change", finishElementStyle);
     sqStudio.querySelector("[data-sq-element-style-reset]")?.addEventListener("click", () => {
       if (!selectedElement?.isConnected) return;
       remember();
-      ["color", "backgroundColor", "border", "borderColor", "borderRadius", "textAlign", "boxShadow", "backdropFilter"].forEach((property) => { selectedElement.style[property] = ""; });
+      ["color", "backgroundColor", "border", "borderColor", "borderWidth", "borderStyle", "borderRadius", "textAlign", "textTransform", "fontFamily", "fontWeight", "fontSize", "lineHeight", "letterSpacing", "boxShadow", "backdropFilter"].forEach((property) => { selectedElement.style[property] = ""; });
       selectedElement.classList.remove("sq-surface-soft", "sq-surface-card", "sq-surface-outline", "sq-surface-glass");
-      delete selectedElement.dataset.sqSurface; delete selectedElement.dataset.sqAlign; syncElementControls(); markSqChanged();
+      selectedElement.classList.remove("sq-color-override");
+      delete selectedElement.dataset.sqSurface; delete selectedElement.dataset.sqAlign; syncElementControls(); refreshElementOverlay(); markSqChanged();
     });
     sqStudio.querySelector("[data-sq-select-section]")?.addEventListener("click", () => selectSqSection(selectedSection, true));
 
@@ -3940,8 +4049,10 @@
       const responsiveSpacing = `${spacingCssFor("desktop")}\n${fluidCssFor("desktop")}\n${elementCssFor("desktop")}\n${productCssFor("desktop")}\n@media(max-width:900px){${spacingCssFor("tablet")}\n${fluidCssFor("tablet")}\n${elementCssFor("tablet")}\n${productCssFor("tablet")}}\n@media(max-width:600px){${spacingCssFor("mobile")}\n${fluidCssFor("mobile")}\n${elementCssFor("mobile")}\n${productCssFor("mobile")}}`;
       const commerceScript = `<script>(()=>{const defaults=${JSON.stringify(selectedProducts())},cart=new Set();document.querySelectorAll('[data-ezkart-add]').forEach(button=>button.addEventListener('click',()=>{const id=button.dataset.ezkartAdd;cart.has(id)?cart.delete(id):cart.add(id);button.textContent=cart.has(id)?'Added ✓':'Add to cart'}));const checkout=()=>{const products=cart.size?[...cart]:defaults;if(!products.length){alert('This page has no connected products.');return}location.href='/cart/?products='+encodeURIComponent(products.join(','))};document.querySelector('[data-ezkart-checkout]')?.addEventListener('click',checkout);document.querySelectorAll('[data-ezkart-action]').forEach(button=>button.addEventListener('click',()=>{const type=button.dataset.ezkartAction,target=button.dataset.ezkartTarget||'';if(type==='checkout'){checkout();return}if(type==='section'){document.getElementById(target.replace(/^#/,''))?.scrollIntoView({behavior:'smooth'});return}const href=type==='email'?'mailto:'+target:type==='phone'?'tel:'+target:target;if(type==='url'&&button.dataset.ezkartNewTab==='true')window.open(href,'_blank','noopener');else if(href)location.href=href}));const observer=new IntersectionObserver(entries=>entries.forEach(entry=>{if(entry.isIntersecting){entry.target.classList.add(entry.target.matches('[class*="element-animation-"]')?'sq-element-animate':'animating');observer.unobserve(entry.target)}}),{threshold:.12});document.querySelectorAll('[class*="animation-"],[class*="element-animation-"]').forEach(element=>observer.observe(element))})();<\/script>`;
       const fontBase = new URL("assets/fonts/poppins-400.woff2", window.location.href).href;
-      const fontBold = new URL("assets/fonts/poppins-600.woff2", window.location.href).href;
-      return `<!doctype html>\n<html lang="id">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1">\n<title>${escapeHtml(pageName)}</title>\n<meta name="description" content="Shop selected Indonesian products with secure Ezkart checkout and delivery.">\n<style>@font-face{font-family:Poppins;src:url('${fontBase}') format('woff2');font-weight:400}@font-face{font-family:Poppins;src:url('${fontBold}') format('woff2');font-weight:600}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:#fff;font-family:Poppins,Arial,sans-serif}.svg-sprite{width:0;height:0;position:absolute;overflow:hidden}@media(prefers-reduced-motion:reduce){*{animation:none!important;scroll-behavior:auto!important}}\n${css}\n${responsiveSpacing}\n</style>\n</head>\n<body>\n${sprite}\n${clone.outerHTML}\n${commerceScript}\n</body>\n</html>`;
+      const fontMedium = new URL("assets/fonts/poppins-500.woff2", window.location.href).href;
+      const fontSemibold = new URL("assets/fonts/poppins-600.woff2", window.location.href).href;
+      const fontBold = new URL("assets/fonts/poppins-700.woff2", window.location.href).href;
+      return `<!doctype html>\n<html lang="id">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1">\n<title>${escapeHtml(pageName)}</title>\n<meta name="description" content="Shop selected Indonesian products with secure Ezkart checkout and delivery.">\n<style>@font-face{font-family:Poppins;src:url('${fontBase}') format('woff2');font-weight:400}@font-face{font-family:Poppins;src:url('${fontMedium}') format('woff2');font-weight:500}@font-face{font-family:Poppins;src:url('${fontSemibold}') format('woff2');font-weight:600}@font-face{font-family:Poppins;src:url('${fontBold}') format('woff2');font-weight:700}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:#fff;font-family:Poppins,Arial,sans-serif}.svg-sprite{width:0;height:0;position:absolute;overflow:hidden}@media(prefers-reduced-motion:reduce){*{animation:none!important;scroll-behavior:auto!important}}\n${css}\n${responsiveSpacing}\n</style>\n</head>\n<body>\n${sprite}\n${clone.outerHTML}\n${commerceScript}\n</body>\n</html>`;
     };
     sqStudio.querySelector("[data-sq-export]")?.addEventListener("click", () => {
       const html = generateHtml(); const output = exportDialog?.querySelector("[data-sq-html-output]"); if (output) output.value = html; const size = exportDialog?.querySelector("[data-sq-html-size]"); if (size) size.textContent = `${new Blob([html]).size.toLocaleString("id-ID")} bytes · ready to host`; exportDialog?.showModal();
