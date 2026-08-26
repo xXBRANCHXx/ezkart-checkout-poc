@@ -2057,6 +2057,10 @@
     const pageSpacingState = JSON.parse(JSON.stringify(defaultPageSpacing));
     const defaultGridDensity = { desktop: 3, tablet: 3, mobile: 3 };
     const gridDensityState = { ...defaultGridDensity };
+    const defaultGridColumns = { desktop: 12, tablet: 12, mobile: 12 };
+    const gridColumnsState = { ...defaultGridColumns };
+    const defaultGridCellHeight = { desktop: 24, tablet: 24, mobile: 24 };
+    const gridCellHeightState = { ...defaultGridCellHeight };
     const inlineEditSnapshots = new WeakMap();
     let selectedSection = "announcement";
     let selectedElement = null;
@@ -2070,6 +2074,7 @@
     let draggedImageSnapshot = null;
     let showLayoutGrid = true;
     let layoutGridDragging = false;
+    let pageSpacingMode = false;
     let saveTimer;
     let zoom = 90;
     const requestedSiteUrl = new URLSearchParams(window.location.search).get("edit") || "";
@@ -2104,8 +2109,10 @@
       spacing: JSON.stringify([...spacingState.entries()]),
       pageSpacing: JSON.parse(JSON.stringify(pageSpacingState)),
       gridDensity: { ...gridDensityState },
+      gridColumns: { ...gridColumnsState },
+      gridCellHeight: { ...gridCellHeightState },
       catalog: { prices: { ...productPrices }, names: { ...productNames }, images: { ...productImages }, meta: JSON.parse(JSON.stringify(productMeta)) },
-      version: 5,
+      version: 6,
     });
     const updateHistoryButtons = () => {
       if (undoButton) undoButton.disabled = undoStack.length === 0;
@@ -2161,14 +2168,16 @@
 
     const maximumFluidRows = 80;
     const layoutKey = (device = activeDevice) => `layout${device[0].toUpperCase()}${device.slice(1)}`;
+    const fluidColumns = (device = activeDevice) => Math.max(2, Math.min(24, Number(gridColumnsState[device]) || 12));
     const fluidMinRowsKey = (device = activeDevice) => `sqMinRows${device[0].toUpperCase()}${device.slice(1)}`;
     const fluidMinRows = (section, device = activeDevice) => Math.max(1, Number.parseInt(section?.dataset[fluidMinRowsKey(device)] || section?.dataset.sqMinRows || section?.dataset.sqRows || "12", 10));
     const parseElementLayout = (element, device = activeDevice) => {
       const raw = element?.dataset[layoutKey(device)] || element?.dataset.layoutDesktop || "1,1,12,4";
       const [x, y, width, height] = raw.split(",").map((value) => Number.parseInt(value, 10));
-      const safeWidth = Math.max(1, Math.min(12, width || 12));
+      const columns = fluidColumns(device);
+      const safeWidth = Math.max(1, Math.min(columns, width || columns));
       return {
-        x: Math.max(1, Math.min(13 - safeWidth, x || 1)),
+        x: Math.max(1, Math.min(columns - safeWidth + 1, x || 1)),
         y: Math.max(1, y || 1),
         width: safeWidth,
         height: Math.max(1, height || 4),
@@ -2176,9 +2185,10 @@
     };
     const setElementLayout = (element, layout, device = activeDevice) => {
       if (!element) return;
-      const width = Math.max(1, Math.min(12, Number(layout.width) || 1));
+      const columns = fluidColumns(device);
+      const width = Math.max(1, Math.min(columns, Number(layout.width) || 1));
       const normalized = {
-        x: Math.max(1, Math.min(13 - width, Number(layout.x) || 1)),
+        x: Math.max(1, Math.min(columns - width + 1, Number(layout.x) || 1)),
         y: Math.max(1, Math.min(maximumFluidRows, Number(layout.y) || 1)),
         width,
         height: Math.max(1, Math.min(maximumFluidRows, Number(layout.height) || 1)),
@@ -2225,16 +2235,17 @@
       second.y + second.height <= first.y
     );
     const findOpenElementLayout = (section, desired, device = activeDevice) => {
-      const width = Math.max(1, Math.min(12, Number(desired.width) || 4));
+      const columns = fluidColumns(device);
+      const width = Math.max(1, Math.min(columns, Number(desired.width) || 4));
       const height = Math.max(1, Math.min(maximumFluidRows, Number(desired.height) || 2));
       const minimumRows = fluidMinRows(section, device);
       const occupied = [...(section?.querySelectorAll(":scope > [data-sq-element]") || [])]
         .filter((element) => !element.classList.contains("sq-element-hidden"))
         .map((element) => parseElementLayout(element, device));
       const maximumOccupiedRow = occupied.reduce((maximum, layout) => Math.max(maximum, layout.y + layout.height - 1), minimumRows);
-      const preferredX = Math.max(1, Math.round((13 - width) / 2));
+      const preferredX = Math.max(1, Math.round((columns - width + 2) / 2));
       const preferredY = Math.max(1, Math.round((minimumRows - height) / 2) + 1);
-      const xCandidates = Array.from({ length: 13 - width }, (_, index) => index + 1)
+      const xCandidates = Array.from({ length: columns - width + 1 }, (_, index) => index + 1)
         .sort((a, b) => Math.abs(a - preferredX) - Math.abs(b - preferredX));
       const rowsToSearch = Math.min(maximumFluidRows - height + 1, Math.max(minimumRows - height + 1, maximumOccupiedRow + 2));
       const yCandidates = Array.from({ length: rowsToSearch }, (_, index) => index + 1)
@@ -2247,8 +2258,19 @@
       }
       return { x: preferredX, y: Math.min(maximumFluidRows - height + 1, maximumOccupiedRow + 1), width, height };
     };
-    const gridDensityLabel = (density) => ({ 1: "Roomy", 2: "Open", 3: "Balanced", 4: "Fine", 5: "Ultra fine" })[density] || "Balanced";
-    const gridBaseRowHeight = (device = activeDevice) => ({ 1: 52, 2: 42, 3: 34, 4: 26, 5: 18 })[gridDensityState[device]] || 34;
+    const gridDensityPresets = {
+      1: { columns: 8, cellHeight: 42, label: "Roomy" },
+      2: { columns: 10, cellHeight: 32, label: "Open" },
+      3: { columns: 12, cellHeight: 24, label: "Balanced" },
+      4: { columns: 16, cellHeight: 16, label: "Fine" },
+      5: { columns: 20, cellHeight: 8, label: "Ultra fine" },
+    };
+    const gridDensityLabel = (density) => gridDensityPresets[density]?.label || "Custom";
+    const matchingGridDensity = (device = activeDevice) => Number(Object.keys(gridDensityPresets).find((density) => {
+      const preset = gridDensityPresets[density];
+      return preset.columns === fluidColumns(device) && preset.cellHeight === gridCellHeightState[device];
+    })) || 0;
+    const gridBaseRowHeight = (device = activeDevice) => gridCellHeightState[device] + pageSpacingState.columnGap;
     const fluidRowHeight = (section, device = activeDevice) => {
       const base = gridBaseRowHeight(device);
       if (section?.classList.contains("sq-announcement")) return Math.max(7, Math.round(base * 10 / 34));
@@ -2258,9 +2280,11 @@
       if (section?.classList.contains("sq-product-section")) return Math.max(18, Math.round(base * 28 / 34));
       return base;
     };
-    const setGridDensity = (device, density) => {
-      const nextDensity = Math.max(1, Math.min(5, Math.round(Number(density) || 3)));
-      if (nextDensity === gridDensityState[device]) return;
+    const updateGridGeometry = (device, { columns = fluidColumns(device), cellHeight = gridCellHeightState[device] } = {}) => {
+      const nextColumns = Math.max(2, Math.min(24, Math.round(Number(columns) || 12)));
+      const nextCellHeight = Math.max(6, Math.min(72, Math.round(Number(cellHeight) || 24)));
+      if (nextColumns === fluidColumns(device) && nextCellHeight === gridCellHeightState[device]) return;
+      const previousColumns = fluidColumns(device);
       const sections = [...(previewRoot?.querySelectorAll("[data-sq-fluid]") || [])];
       const geometry = sections.map((section) => ({
         section,
@@ -2268,16 +2292,29 @@
         minimumRows: fluidMinRows(section, device),
         elements: [...section.querySelectorAll(":scope > [data-sq-element]")].map((element) => ({ element, layout: parseElementLayout(element, device) })),
       }));
-      gridDensityState[device] = nextDensity;
+      gridColumnsState[device] = nextColumns;
+      gridCellHeightState[device] = nextCellHeight;
       geometry.forEach(({ section, rowHeight, minimumRows, elements }) => {
         const scale = rowHeight / fluidRowHeight(section, device);
         section.dataset[fluidMinRowsKey(device)] = String(Math.max(1, Math.min(maximumFluidRows, Math.round(minimumRows * scale))));
-        elements.forEach(({ element, layout }) => setElementLayout(element, {
-          ...layout,
-          y: Math.max(1, Math.round((layout.y - 1) * scale) + 1),
-          height: Math.max(1, Math.round(layout.height * scale)),
-        }, device));
+        elements.forEach(({ element, layout }) => {
+          const left = Math.round((layout.x - 1) * nextColumns / previousColumns) + 1;
+          const right = Math.round((layout.x - 1 + layout.width) * nextColumns / previousColumns);
+          setElementLayout(element, {
+            ...layout,
+            x: left,
+            width: Math.max(1, right - left + 1),
+            y: Math.max(1, Math.round((layout.y - 1) * scale) + 1),
+            height: Math.max(1, Math.round(layout.height * scale)),
+          }, device);
+        });
       });
+    };
+    const setGridDensity = (device, density) => {
+      const nextDensity = Math.max(1, Math.min(5, Math.round(Number(density) || 3)));
+      const preset = gridDensityPresets[nextDensity];
+      gridDensityState[device] = nextDensity;
+      updateGridGeometry(device, { columns: preset.columns, cellHeight: preset.cellHeight });
     };
     const applyFluidSection = (section) => {
       if (!section?.matches("[data-sq-fluid]")) return;
@@ -2291,13 +2328,14 @@
       section.dataset.sqRows = String(rows);
       section.style.setProperty("--sq-fluid-rows", String(rows));
       section.style.setProperty("--sq-fluid-row-height", `${fluidRowHeight(section)}px`);
+      section.style.setProperty("--sq-fluid-columns", String(fluidColumns()));
     };
     const applyFluidLayouts = () => previewRoot?.querySelectorAll("[data-sq-fluid]").forEach(applyFluidSection);
     const removeLayoutGrid = () => previewRoot?.querySelectorAll(".sq-layout-grid-overlay").forEach((grid) => grid.remove());
     const refreshLayoutGrid = () => {
       removeLayoutGrid();
-      if (!showLayoutGrid || (!layoutGridDragging && activeElementPanel !== "layout") || !selectedElement?.isConnected) return;
-      const section = selectedElement.closest("[data-sq-fluid]");
+      if (!showLayoutGrid || (!layoutGridDragging && activeElementPanel !== "layout" && !pageSpacingMode)) return;
+      const section = selectedElement?.closest("[data-sq-fluid]") || previewRoot?.querySelector(`[data-section-id="${selectedSection}"][data-sq-fluid]`) || previewRoot?.querySelector("[data-sq-fluid]");
       if (!section) return;
       const rows = Math.max(1, Number.parseInt(section.dataset.sqRows || section.dataset.sqMinRows || "12", 10));
       const computed = getComputedStyle(section);
@@ -2310,8 +2348,9 @@
       grid.style.setProperty("--sq-grid-rows", String(rows));
       grid.style.setProperty("--sq-grid-row-height", `${fluidRowHeight(section)}px`);
       grid.style.setProperty("--sq-grid-gap", computed.columnGap || "0px");
+      grid.style.setProperty("--sq-grid-columns", String(fluidColumns()));
       const cells = document.createDocumentFragment();
-      for (let index = 0; index < rows * 12; index += 1) cells.append(document.createElement("i"));
+      for (let index = 0; index < rows * fluidColumns(); index += 1) cells.append(document.createElement("i"));
       grid.append(cells);
       section.prepend(grid);
     };
@@ -2519,12 +2558,17 @@
       if (gridDensityOutput) gridDensityOutput.textContent = gridDensityLabel(gridDensityState[activeDevice]);
       if (gridDensityDevice) gridDensityDevice.textContent = activeDevice[0].toUpperCase() + activeDevice.slice(1);
       if (gridVisibility) gridVisibility.checked = showLayoutGrid;
-      const centeredX = Math.max(1, Math.round((13 - layout.width) / 2));
-      const position = layout.x === 1 ? "left" : layout.x === 13 - layout.width ? "right" : layout.x === centeredX ? "center" : "";
+      const columns = fluidColumns();
+      const centeredX = Math.max(1, Math.round((columns - layout.width + 2) / 2));
+      const position = layout.x === 1 ? "left" : layout.x === columns - layout.width + 1 ? "right" : layout.x === centeredX ? "center" : "";
       sqStudio.querySelectorAll("[data-sq-element-position-choice]").forEach((button) => { const active = button.dataset.sqElementPositionChoice === position; button.classList.toggle("active", active); button.setAttribute("aria-pressed", String(active)); });
       const quickWidth = sqStudio.querySelector("[data-sq-element-width-quick]");
       const quickWidthOutput = sqStudio.querySelector("[data-sq-element-width-quick-output]");
-      if (quickWidth) quickWidth.value = String(layout.width);
+      if (quickWidth) { quickWidth.max = String(columns); quickWidth.value = String(layout.width); }
+      const exactX = sqStudio.querySelector("[data-sq-element-x]");
+      const exactWidth = sqStudio.querySelector("[data-sq-element-w]");
+      if (exactX) exactX.max = String(columns);
+      if (exactWidth) exactWidth.max = String(columns);
       if (quickWidthOutput) quickWidthOutput.textContent = `${layout.width} ${layout.width === 1 ? "column" : "columns"}`;
       const hideButton = sqStudio.querySelector("[data-sq-element-hide]");
       if (hideButton) hideButton.lastChild.textContent = selectedElement.classList.contains("sq-element-hidden") ? " Show" : " Hide";
@@ -2709,6 +2753,13 @@
     };
     const selectSqElement = (element, action = null, image = null, content = null) => {
       if (!element?.matches("[data-sq-element]")) return;
+      pageSpacingMode = false;
+      inspector?.classList.remove("page-spacing-open");
+      const pageControls = sqStudio.querySelector("[data-sq-page-spacing-controls]");
+      if (pageControls) pageControls.hidden = true;
+      sqStudio.querySelectorAll("[data-sq-section-controls]").forEach((control) => { control.hidden = false; });
+      const sectionActions = sqStudio.querySelector("[data-sq-section-actions]");
+      if (sectionActions) sectionActions.hidden = false;
       selectedElement = element;
       selectedAction = action?.matches?.("button,a") && element.contains(action) ? action : null;
       selectedImage = image?.matches?.("img") && element.contains(image) ? image : null;
@@ -2753,8 +2804,7 @@
       applyFluidSection(section);
       rebuildLayerList();
       bindSqInteractions();
-      syncElementControls();
-      syncInspectorContent();
+      deselectSqItem(section?.dataset.sectionId);
       markSqChanged();
       showToast("Element deleted — Undo is available");
     };
@@ -2776,7 +2826,8 @@
         const computed = getComputedStyle(section);
         const horizontalPadding = Number.parseFloat(computed.paddingLeft) + Number.parseFloat(computed.paddingRight);
         const columnGap = Number.parseFloat(computed.columnGap) || 0;
-        const columnWidth = (((section.clientWidth - horizontalPadding - columnGap * 11) / 12) + columnGap) * renderedScale;
+        const columns = fluidColumns();
+        const columnWidth = (((section.clientWidth - horizontalPadding - columnGap * (columns - 1)) / columns) + columnGap) * renderedScale;
         const rowHeight = fluidRowHeight(section) * renderedScale;
         let changed = false;
         const move = (pointerEvent) => {
@@ -2844,6 +2895,39 @@
       const gapOutput = sqStudio.querySelector("[data-sq-page-column-gap-output]");
       if (gap) gap.value = String(pageSpacingState.columnGap);
       if (gapOutput) gapOutput.textContent = `${pageSpacingState.columnGap}px`;
+      syncBuilderRanges();
+    };
+    const gridContentWidth = (device = activeDevice) => {
+      const section = device === activeDevice ? previewRoot?.querySelector(`[data-section-id="${selectedSection}"][data-sq-fluid]`) || previewRoot?.querySelector("[data-sq-fluid]") : null;
+      if (section?.clientWidth) {
+        const computed = getComputedStyle(section);
+        return Math.max(120, section.clientWidth - (Number.parseFloat(computed.paddingLeft) || 0) - (Number.parseFloat(computed.paddingRight) || 0));
+      }
+      return Math.max(120, ({ desktop: 1440, tablet: 768, mobile: 390 }[device] || 1440) - (pageSpacingState.gutters[device] || 0) * 2);
+    };
+    const gridCellWidth = (device = activeDevice) => Math.max(1, Math.round((gridContentWidth(device) - pageSpacingState.columnGap * (fluidColumns(device) - 1)) / fluidColumns(device)));
+    const syncPageGridControls = () => {
+      const density = sqStudio.querySelector("[data-sq-grid-density]");
+      const densityOutput = sqStudio.querySelector("[data-sq-grid-density-output]");
+      const countOutput = sqStudio.querySelector("[data-sq-grid-count-output]");
+      const device = sqStudio.querySelector("[data-sq-grid-density-device]");
+      const width = sqStudio.querySelector("[data-sq-grid-cell-width]");
+      const widthOutput = sqStudio.querySelector("[data-sq-grid-cell-width-output]");
+      const height = sqStudio.querySelector("[data-sq-grid-cell-height]");
+      const heightOutput = sqStudio.querySelector("[data-sq-grid-cell-height-output]");
+      const visibility = sqStudio.querySelector("[data-sq-show-layout-grid]");
+      if (density) density.value = String(gridDensityState[activeDevice]);
+      const matchingDensity = matchingGridDensity();
+      if (densityOutput) densityOutput.textContent = matchingDensity ? gridDensityLabel(matchingDensity) : "Custom";
+      const section = previewRoot?.querySelector(`[data-section-id="${selectedSection}"][data-sq-fluid]`) || previewRoot?.querySelector("[data-sq-fluid]");
+      const rows = Math.max(1, Number.parseInt(section?.dataset.sqRows || section?.dataset.sqMinRows || "12", 10));
+      if (countOutput) countOutput.textContent = `${fluidColumns()} columns × ${rows} rows`;
+      if (device) device.textContent = activeDevice[0].toUpperCase() + activeDevice.slice(1);
+      if (width) width.value = String(gridCellWidth());
+      if (widthOutput) widthOutput.textContent = `${gridCellWidth()}px`;
+      if (height) height.value = String(gridCellHeightState[activeDevice]);
+      if (heightOutput) heightOutput.textContent = `${gridCellHeightState[activeDevice]}px`;
+      if (visibility) visibility.checked = showLayoutGrid;
       syncBuilderRanges();
     };
     const applyPageGutter = (device, gutter) => {
@@ -2942,6 +3026,13 @@
       block.append(toolbar);
     };
     const selectSqSection = (sectionId, focusSection = false) => {
+      pageSpacingMode = false;
+      inspector?.classList.remove("page-spacing-open");
+      const pageControls = sqStudio.querySelector("[data-sq-page-spacing-controls]");
+      if (pageControls) pageControls.hidden = true;
+      sqStudio.querySelectorAll("[data-sq-section-controls]").forEach((control) => { control.hidden = false; });
+      const sectionActions = sqStudio.querySelector("[data-sq-section-actions]");
+      if (sectionActions) sectionActions.hidden = false;
       selectedSection = sectionId;
       sqStudio.classList.remove("mobile-panel-open");
       sqStudio.classList.remove("inspector-closed");
@@ -2984,6 +3075,36 @@
       if (selectedElement) requestAnimationFrame(refreshElementOverlay);
       else requestAnimationFrame(refreshSectionToolbar);
     };
+    const deselectSqItem = (sectionId = selectedSection) => {
+      if (sectionId) selectedSection = sectionId;
+      pageSpacingMode = true;
+      selectedElement = null;
+      selectedAction = null;
+      selectedImage = null;
+      selectedContent = null;
+      sqStudio.classList.remove("mobile-panel-open", "inspector-closed");
+      inspector?.classList.remove("collapsed", "element-selected");
+      inspector?.classList.add("page-spacing-open");
+      previewRoot?.querySelectorAll(".selected, .sq-element-selected, .sq-image-selected").forEach((item) => item.classList.remove("selected", "sq-element-selected", "sq-image-selected"));
+      sqStudio.querySelectorAll("[data-sq-layer], [data-sq-layer-group], [data-sq-element-layer]").forEach((item) => item.classList.remove("active"));
+      removeElementOverlay();
+      removeSectionToolbar();
+      removeLayoutGrid();
+      const elementControls = sqStudio.querySelector("[data-sq-element-controls]");
+      const pageControls = sqStudio.querySelector("[data-sq-page-spacing-controls]");
+      const sectionActions = sqStudio.querySelector("[data-sq-section-actions]");
+      if (elementControls) elementControls.hidden = true;
+      if (pageControls) pageControls.hidden = false;
+      if (sectionActions) sectionActions.hidden = true;
+      sqStudio.querySelectorAll("[data-sq-section-controls]").forEach((control) => { control.hidden = true; });
+      const context = sqStudio.querySelector("[data-sq-inspector-context]");
+      const title = sqStudio.querySelector("[data-sq-inspector-title]");
+      if (context) context.textContent = "Page settings";
+      if (title) title.textContent = "Spacing";
+      syncPageSpacingControls();
+      syncPageGridControls();
+      requestAnimationFrame(refreshLayoutGrid);
+    };
 
     const reorderSection = (dragId, targetId, placeAfter) => {
       if (!dragId || !targetId || dragId === targetId) return;
@@ -3005,6 +3126,7 @@
       });
       sqStudio.querySelectorAll("[data-sq-layer]").forEach((layer) => {
         layer.onclick = () => {
+          if (!selectedElement && !pageSpacingMode && layer.dataset.sectionId === selectedSection) { deselectSqItem(layer.dataset.sectionId); return; }
           selectSqSection(layer.dataset.sectionId, true);
           previewRoot?.querySelector(`[data-section-id="${layer.dataset.sectionId}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
         };
@@ -3020,6 +3142,7 @@
           const element = [...(previewRoot?.querySelectorAll("[data-sq-element]") || [])].find((candidate) => candidate.dataset.sqElementId === layer.dataset.sqElementLayer);
           if (!element) return;
           const section = element.closest("[data-section-id]");
+          if (selectedElement === element) { deselectSqItem(section?.dataset.sectionId); return; }
           if (section) selectSqSection(section.dataset.sectionId);
           const action = element.matches("button,a") ? element : element.querySelector("button,a");
           const image = element.matches("img") ? element : element.querySelector("img");
@@ -3043,7 +3166,7 @@
         layer.ondragend = () => { draggedElementId = ""; layer.classList.remove("dragging"); sqStudio.querySelectorAll(".drag-over").forEach((item) => item.classList.remove("drag-over")); };
       });
       previewRoot?.querySelectorAll("[data-sq-block]").forEach((block) => {
-        block.onclick = () => selectSqSection(block.dataset.sectionId);
+        block.onclick = () => deselectSqItem(block.dataset.sectionId);
         block.ondragstart = (event) => { draggedSection = block.dataset.sectionId; block.classList.add("dragging"); event.dataTransfer.effectAllowed = "move"; };
         block.ondragover = (event) => { event.preventDefault(); block.classList.add("drag-over"); };
         block.ondragleave = () => block.classList.remove("drag-over");
@@ -3070,6 +3193,7 @@
         element.onclick = (event) => {
           event.stopPropagation();
           const section = element.closest("[data-section-id]");
+          if (selectedElement === element) { deselectSqItem(section?.dataset.sectionId); return; }
           if (section) selectSqSection(section.dataset.sectionId);
           const action = event.target.closest?.("button,a");
           const image = event.target.closest?.("img");
@@ -3086,6 +3210,7 @@
           item.onclick = (event) => {
             event.stopPropagation();
             const section = item.closest("[data-section-id]");
+            if (selectedElement === item.closest("[data-sq-element]")) { deselectSqItem(section?.dataset.sectionId); return; }
             if (section) selectSqSection(section.dataset.sectionId);
             selectSqElement(item.closest("[data-sq-element]"), null, item.querySelector("img"));
             previewRoot.querySelectorAll(".sq-image-selected").forEach((image) => image.classList.remove("sq-image-selected"));
@@ -3200,6 +3325,7 @@
           content.onclick = (event) => {
             event.stopPropagation();
             if (content.matches("a,button")) event.preventDefault();
+            if (selectedElement === content.closest("[data-sq-element]")) { deselectSqItem(block.dataset.sectionId); return; }
             selectSqSection(block.dataset.sectionId);
             selectSqElement(content.closest("[data-sq-element]"), content.matches("button,a") ? content : null, null, content);
           };
@@ -3216,6 +3342,9 @@
           content.onblur = () => inlineEditSnapshots.delete(content);
         });
       });
+      previewRoot.onclick = (event) => {
+        if (!event.target.closest?.("[data-sq-element], [data-sq-block]")) deselectSqItem(selectedSection);
+      };
     };
 
     const bindSqProductInput = (input) => {
@@ -3261,13 +3390,19 @@
       const savedColumnGap = Number(savedPageSpacing.columnGap ?? defaultPageSpacing.columnGap);
       pageSpacingState.columnGap = Number.isFinite(savedColumnGap) ? Math.max(0, savedColumnGap) : defaultPageSpacing.columnGap;
       ["desktop", "tablet", "mobile"].forEach((device) => { const density = Math.round(Number(state.gridDensity?.[device] ?? defaultGridDensity[device])); gridDensityState[device] = Math.max(1, Math.min(5, Number.isFinite(density) ? density : defaultGridDensity[device])); });
+      ["desktop", "tablet", "mobile"].forEach((device) => {
+        const density = gridDensityState[device];
+        gridColumnsState[device] = Math.max(2, Math.min(24, Math.round(Number(state.gridColumns?.[device] ?? gridDensityPresets[density].columns))));
+        gridCellHeightState[device] = Math.max(6, Math.min(72, Math.round(Number(state.gridCellHeight?.[device] ?? gridDensityPresets[density].cellHeight))));
+      });
       previewRoot.style.setProperty("--sq-builder-column-gap", `${pageSpacingState.columnGap}px`);
       bindSqInteractions();
       updateProductView();
       applyFluidLayouts();
-      selectSqSection(state.selectedSection || "hero");
+      deselectSqItem(state.selectedSection || "hero");
       syncBrandControls();
       syncPageSpacingControls();
+      syncPageGridControls();
       markSqChanged();
     };
     undoButton?.addEventListener("click", () => {
@@ -3412,6 +3547,7 @@
       applySpacing();
       applyFluidLayouts();
       syncElementControls();
+      syncPageGridControls();
       refreshLayoutGrid();
       if (selectedElement) requestAnimationFrame(refreshElementOverlay);
     }));
@@ -3420,13 +3556,26 @@
 
     let gridDensitySnapshot;
     const gridDensityInput = sqStudio.querySelector("[data-sq-grid-density]");
-    gridDensityInput?.addEventListener("pointerdown", () => { if (!gridDensitySnapshot) gridDensitySnapshot = captureState(); });
-    gridDensityInput?.addEventListener("focus", () => { if (!gridDensitySnapshot) gridDensitySnapshot = captureState(); });
+    const beginGridGeometryEdit = () => { if (!gridDensitySnapshot) gridDensitySnapshot = captureState(); };
+    sqStudio.querySelectorAll("[data-sq-grid-density], [data-sq-grid-cell-width], [data-sq-grid-cell-height]").forEach((input) => {
+      input.addEventListener("pointerdown", beginGridGeometryEdit);
+      input.addEventListener("focus", beginGridGeometryEdit);
+    });
     gridDensityInput?.addEventListener("input", () => {
       setGridDensity(activeDevice, gridDensityInput.value);
-      applyFluidLayouts(); syncElementControls(); refreshLayoutGrid(); refreshElementOverlay(); markSqChanged();
+      applyFluidLayouts(); syncPageGridControls(); syncElementControls(); refreshLayoutGrid(); refreshElementOverlay(); markSqChanged();
     });
-    gridDensityInput?.addEventListener("change", () => { if (gridDensitySnapshot) remember(gridDensitySnapshot); gridDensitySnapshot = null; });
+    sqStudio.querySelector("[data-sq-grid-cell-width]")?.addEventListener("input", (event) => {
+      const requestedWidth = Math.max(6, Number(event.currentTarget.value) || gridCellWidth());
+      const columns = Math.max(2, Math.min(24, Math.round((gridContentWidth() + pageSpacingState.columnGap) / (requestedWidth + pageSpacingState.columnGap))));
+      updateGridGeometry(activeDevice, { columns });
+      applyFluidLayouts(); syncPageGridControls(); refreshLayoutGrid(); markSqChanged();
+    });
+    sqStudio.querySelector("[data-sq-grid-cell-height]")?.addEventListener("input", (event) => {
+      updateGridGeometry(activeDevice, { cellHeight: Number(event.currentTarget.value) });
+      applyFluidLayouts(); syncPageGridControls(); refreshLayoutGrid(); markSqChanged();
+    });
+    sqStudio.querySelectorAll("[data-sq-grid-density], [data-sq-grid-cell-width], [data-sq-grid-cell-height]").forEach((input) => input.addEventListener("change", () => { if (gridDensitySnapshot) remember(gridDensitySnapshot); gridDensitySnapshot = null; }));
     sqStudio.querySelector("[data-sq-show-layout-grid]")?.addEventListener("change", (event) => { showLayoutGrid = event.currentTarget.checked; refreshLayoutGrid(); });
 
     let spacingSnapshot;
@@ -3489,7 +3638,8 @@
       if (!selectedElement?.isConnected) return;
       remember();
       const layout = parseElementLayout(selectedElement);
-      const x = button.dataset.sqElementPositionChoice === "left" ? 1 : button.dataset.sqElementPositionChoice === "right" ? 13 - layout.width : Math.max(1, Math.round((13 - layout.width) / 2));
+      const columns = fluidColumns();
+      const x = button.dataset.sqElementPositionChoice === "left" ? 1 : button.dataset.sqElementPositionChoice === "right" ? columns - layout.width + 1 : Math.max(1, Math.round((columns - layout.width + 2) / 2));
       setElementLayout(selectedElement, { ...layout, x });
       applyFluidSection(selectedElement.closest("[data-sq-fluid]"));
       syncElementControls(); refreshElementOverlay(); markSqChanged();
@@ -3857,6 +4007,9 @@
       const heroPieces = elements.filter((element) => ["eyebrow", "heading", "text", "button", "trust-note"].includes(element.dataset.sqElementType));
       const panels = elements.filter((element) => element.dataset.sqElementType === "hero-panel");
       const copy = elements.find((element) => ["copy", "text", "logo", "brand", "collection-heading"].includes(element.dataset.sqElementType)) || elements[0];
+      const columns = fluidColumns();
+      const leftWidth = Math.ceil(columns / 2);
+      const rightWidth = columns - leftWidth;
       const placeHeroCopy = (region) => {
         heroPieces.forEach((element) => {
           const role = element.dataset.sqElementType === "trust-note" ? "trust" : element.dataset.sqElementType;
@@ -3867,28 +4020,28 @@
       elements.forEach((element) => element.classList.remove("sq-element-hidden", "sq-single-image"));
       if (event.currentTarget.value === "text-only") {
         [...images, ...panels].forEach((element) => element.classList.add("sq-element-hidden"));
-        if (heroPieces.length) placeHeroCopy({ x: 2, y: 2, width: 10, height: Math.max(8, Number(section.dataset.sqRows || 12) - 2) });
-        else if (copy) setElementLayout(copy, { x: 2, y: 1, width: 10, height: Math.max(6, Number(section.dataset.sqRows || 12)) });
+        if (heroPieces.length) placeHeroCopy({ x: Math.min(2, columns), y: 2, width: Math.max(1, columns - 2), height: Math.max(8, Number(section.dataset.sqRows || 12) - 2) });
+        else if (copy) setElementLayout(copy, { x: Math.min(2, columns), y: 1, width: Math.max(1, columns - 2), height: Math.max(6, Number(section.dataset.sqRows || 12)) });
       } else if (event.currentTarget.value === "image-only") {
         elements.forEach((element) => element.classList.toggle("sq-element-hidden", !images.includes(element)));
-        images.forEach((element, index) => setElementLayout(element, { x: 1, y: 1 + index * 6, width: 12, height: Math.max(6, Number(section.dataset.sqRows || 12)) }));
+        images.forEach((element, index) => setElementLayout(element, { x: 1, y: 1 + index * 6, width: columns, height: Math.max(6, Number(section.dataset.sqRows || 12)) }));
       } else if (event.currentTarget.value === "single-image") {
-        if (heroPieces.length) placeHeroCopy({ x: 1, y: 2, width: 6, height: 11 });
-        else if (copy) setElementLayout(copy, { x: 1, y: 1, width: 6, height: 12 });
-        images.slice(0, 1).forEach((element) => { element.classList.add("sq-single-image"); setElementLayout(element, { x: 7, y: 1, width: 6, height: 12 }); });
+        if (heroPieces.length) placeHeroCopy({ x: 1, y: 2, width: leftWidth, height: 11 });
+        else if (copy) setElementLayout(copy, { x: 1, y: 1, width: leftWidth, height: 12 });
+        images.slice(0, 1).forEach((element) => { element.classList.add("sq-single-image"); setElementLayout(element, { x: leftWidth + 1, y: 1, width: rightWidth, height: 12 }); });
         images.slice(1).forEach((element) => element.classList.add("sq-element-hidden"));
       } else if (event.currentTarget.value === "stacked") {
         if (heroPieces.length) {
-          placeHeroCopy({ x: 1, y: 1, width: 12, height: 8 });
-          images.forEach((element, index) => setElementLayout(element, { x: 1, y: 9 + index * 8, width: 12, height: 8 }));
+          placeHeroCopy({ x: 1, y: 1, width: columns, height: 8 });
+          images.forEach((element, index) => setElementLayout(element, { x: 1, y: 9 + index * 8, width: columns, height: 8 }));
         } else {
           let row = 1;
-          elements.forEach((element) => { setElementLayout(element, { x: 1, y: row, width: 12, height: 6 }); row += 6; });
+          elements.forEach((element) => { setElementLayout(element, { x: 1, y: row, width: columns, height: 6 }); row += 6; });
         }
       } else {
-        if (heroPieces.length) placeHeroCopy({ x: 1, y: 2, width: 6, height: 11 });
-        else if (copy) setElementLayout(copy, { x: 1, y: 1, width: 6, height: 12 });
-        images.forEach((element, index) => { setElementLayout(element, { x: 7, y: 1 + index * 6, width: 6, height: images.length > 1 ? 6 : 12 }); });
+        if (heroPieces.length) placeHeroCopy({ x: 1, y: 2, width: leftWidth, height: 11 });
+        else if (copy) setElementLayout(copy, { x: 1, y: 1, width: leftWidth, height: 12 });
+        images.forEach((element, index) => { setElementLayout(element, { x: leftWidth + 1, y: 1 + index * 6, width: rightWidth, height: images.length > 1 ? 6 : 12 }); });
       }
       applyFluidSection(section);
       rebuildLayerList(); bindSqInteractions();
@@ -3943,6 +4096,7 @@
       const gutter = Math.max(0, Number(input.value) || 0);
       applyPageGutter(input.dataset.sqPageGutter, gutter);
       syncPageSpacingControls();
+      syncPageGridControls();
       refreshLayoutGrid();
       if (selectedElement?.isConnected) refreshElementOverlay();
       markSqChanged();
@@ -3950,7 +4104,7 @@
     sqStudio.querySelector("[data-sq-page-column-gap]")?.addEventListener("input", (event) => {
       pageSpacingState.columnGap = Math.max(0, Number(event.currentTarget.value) || 0);
       previewRoot?.style.setProperty("--sq-builder-column-gap", `${pageSpacingState.columnGap}px`);
-      syncPageSpacingControls(); applyFluidLayouts();
+      syncPageSpacingControls(); syncPageGridControls(); applyFluidLayouts();
       refreshLayoutGrid();
       if (selectedElement?.isConnected) refreshElementOverlay();
       markSqChanged();
@@ -3958,9 +4112,11 @@
     sqStudio.querySelector("[data-sq-page-spacing-reset]")?.addEventListener("click", () => {
       remember();
       Object.entries(defaultPageSpacing.gutters).forEach(([device, gutter]) => applyPageGutter(device, gutter));
+      Object.assign(gridDensityState, defaultGridDensity);
+      ["desktop", "tablet", "mobile"].forEach((device) => updateGridGeometry(device, { columns: defaultGridColumns[device], cellHeight: defaultGridCellHeight[device] }));
       pageSpacingState.columnGap = defaultPageSpacing.columnGap;
       previewRoot?.style.setProperty("--sq-builder-column-gap", `${defaultPageSpacing.columnGap}px`);
-      syncPageSpacingControls(); applyFluidLayouts(); refreshLayoutGrid(); markSqChanged();
+      syncPageSpacingControls(); syncPageGridControls(); applyFluidLayouts(); refreshLayoutGrid(); markSqChanged();
     });
     previewRoot?.style.setProperty("--sq-builder-column-gap", `${pageSpacingState.columnGap}px`);
     syncPageSpacingControls();
@@ -4097,7 +4253,7 @@
         }
         element.dataset.sqElement = "";
         element.dataset.sqElementType ||= element.matches("img,.sq-free-image") ? "image" : "content";
-        ["desktop", "tablet", "mobile"].forEach((device) => setElementLayout(element, { x: 1, y: row, width: 12, height: 5 }, device));
+        ["desktop", "tablet", "mobile"].forEach((device) => setElementLayout(element, { x: 1, y: row, width: fluidColumns(device), height: 5 }, device));
         row += 5;
       });
       section.dataset.sqRows = String(Math.max(12, row - 1));
@@ -4116,7 +4272,7 @@
         image: { width: 6, height: 8 }, divider: { width: 8, height: 1 }, form: { width: 6, height: 5 }, html: { width: 8, height: 8 },
       }[button.dataset.sqAddElement] || { width: 6, height: 4 };
       ["desktop", "tablet", "mobile"].forEach((device) => {
-        const desired = device === "mobile" ? { ...dimensions, width: 12 } : dimensions;
+        const desired = device === "mobile" ? { ...dimensions, width: fluidColumns(device) } : dimensions;
         setElementLayout(element, findOpenElementLayout(section, desired, device), device);
       });
       section.append(element);
@@ -4200,7 +4356,7 @@
     });
     document.addEventListener("keydown", (event) => {
       if (event.target.closest("input,textarea,select,[contenteditable=true]")) return;
-      if (event.key === "Escape" && selectedElement?.isConnected) { selectSqSection(selectedSection, true); return; }
+      if (event.key === "Escape" && selectedElement?.isConnected) { deselectSqItem(selectedSection); return; }
       if (event.key === "Delete" || event.key === "Backspace") { event.preventDefault(); if (selectedElement?.isConnected) deleteSelectedElement(); else deleteSelectedSection(); return; }
       if (!selectedElement?.isConnected) return;
       const movements = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
@@ -4258,7 +4414,7 @@
         }
         delete action.dataset.sqLinkType; delete action.dataset.sqLink; delete action.dataset.sqNewTab;
       });
-      clone.querySelectorAll("[data-sq-fluid]").forEach((node) => { node.classList.add("ez-fluid-section"); node.removeAttribute("data-sq-fluid"); node.removeAttribute("data-sq-rows"); node.removeAttribute("data-sq-min-rows"); });
+      clone.querySelectorAll("[data-sq-fluid]").forEach((node) => { node.classList.add("ez-fluid-section"); node.style.removeProperty("--sq-fluid-row-height"); node.style.removeProperty("--sq-fluid-columns"); node.removeAttribute("data-sq-fluid"); node.removeAttribute("data-sq-rows"); node.removeAttribute("data-sq-min-rows"); });
       clone.querySelectorAll("[data-sq-element]").forEach((node) => {
         const hover = node.dataset.sqHover;
         if (hover && hover !== "none") node.classList.add(`hover-${hover}`);
@@ -4275,7 +4431,7 @@
       const sprite = document.querySelector(".svg-sprite")?.outerHTML || "";
       const css = `${collectExportCss()}\nhtml{scrollbar-width:none}html::-webkit-scrollbar{width:0;height:0}.sq-page-block,.sq-page-block:hover{outline-color:transparent!important}`;
       const spacingCssFor = (device) => [...spacingState.entries()].filter(([key]) => key.endsWith(`:${device}`)).map(([key, value]) => { const section = key.slice(0, -(device.length + 1)); return `[data-ezkart-section="${section}"]{padding:${value.top}px ${value.right}px ${value.bottom}px ${value.left}px!important}`; }).join("\n");
-      const fluidCssFor = (device) => [...previewRoot.querySelectorAll("[data-sq-fluid]")].map((section) => `[data-ezkart-section="${section.dataset.sectionId}"]{--sq-fluid-row-height:${fluidRowHeight(section, device)}px}`).join("\n");
+      const fluidCssFor = (device) => [...previewRoot.querySelectorAll("[data-sq-fluid]")].map((section) => `[data-ezkart-section="${section.dataset.sectionId}"]{--sq-fluid-row-height:${fluidRowHeight(section, device)}px;--sq-fluid-columns:${fluidColumns(device)}}`).join("\n");
       const elementCssFor = (device) => [...previewRoot.querySelectorAll("[data-sq-element]")].map((element) => { const layout = parseElementLayout(element, device); const inset = elementInsetFor(element, device); const padding = element.classList.contains("sq-custom-inset") ? `padding:${inset.top}px ${inset.right}px ${inset.bottom}px ${inset.left}px!important;` : ""; return `[data-ezkart-element="${element.dataset.sqElementId}"]{grid-column:${layout.x}/span ${layout.width}!important;grid-row:${layout.y}/span ${layout.height}!important;${padding}}`; }).join("\n");
       const productCssFor = (device) => [...previewRoot.querySelectorAll('[data-sq-element-type="product-grid"]')].map((element) => {
         const settings = productGridSettings(element, device);
@@ -4326,7 +4482,7 @@
         return;
       }
       undoStack.length = 0; redoStack.length = 0; updateHistoryButtons();
-      restoreState([2, 3, 4, 5].includes(state?.version) ? state : cloneBaseSiteState());
+      restoreState([2, 3, 4, 5, 6].includes(state?.version) ? state : cloneBaseSiteState());
       readCatalogProducts().forEach((product) => installCustomProduct(product, selectedProducts().includes(product.id)));
       let customProducts = [];
       try { customProducts = JSON.parse(site.dataset.siteCustomProducts || "[]"); } catch (_) { customProducts = []; }
@@ -4336,6 +4492,7 @@
         sqStudio.querySelectorAll("[data-sq-product]").forEach((input) => { input.checked = starters.includes(input.value); });
         updateProductView(); markSqChanged();
       }
+      deselectSqItem(state?.selectedSection || "hero");
       showToast(`${site.dataset.siteName} loaded from R2`);
     };
     const bindSiteButton = (site) => { site.onclick = () => { void loadSite(site); }; };
@@ -4413,7 +4570,7 @@
     rebuildLayerList();
     bindSqInteractions();
     updateProductView();
-    selectSqSection("announcement");
+    deselectSqItem("hero");
     syncBrandControls();
     syncCommerceStatus();
     baseSiteState = captureState();
