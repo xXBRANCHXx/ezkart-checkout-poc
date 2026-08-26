@@ -3420,6 +3420,82 @@
 
     sqStudio.querySelectorAll("[data-sq-product]").forEach(bindSqProductInput);
 
+    const storefrontOptionGroups = (product, variants) => {
+      const explicit = (Array.isArray(product?.options) ? product.options : []).map((group) => {
+        const name = String(group?.name || "").trim();
+        const values = [...new Set((Array.isArray(group?.values) ? group.values : []).map((value) => String(value).trim()).filter(Boolean))]
+          .filter((value) => variants.some((variant) => variant.options?.some((option) => option.option === name && option.value === value)));
+        return { name, values };
+      }).filter((group) => group.name && group.values.length);
+      if (explicit.length) return explicit;
+      const names = [];
+      variants.forEach((variant) => (variant.options || []).forEach((option) => {
+        const name = String(option?.option || "").trim();
+        if (name && !names.includes(name)) names.push(name);
+      }));
+      return names.map((name) => ({
+        name,
+        values: [...new Set(variants.map((variant) => variant.options?.find((option) => option.option === name)?.value).map((value) => String(value || "").trim()).filter(Boolean))],
+      })).filter((group) => group.values.length);
+    };
+    const installStorefrontVariantControls = (card, product, variants, fallbackPrice, fallbackImage) => {
+      if (!card) return;
+      const previousVariant = card.dataset.sqSelectedVariant || card.querySelector("[data-sq-variant-picker]")?.value || "";
+      card.querySelectorAll(".sq-product-variant, [data-sq-product-options]").forEach((control) => control.remove());
+      if (!variants.length) return;
+      const groups = storefrontOptionGroups(product, variants);
+      if (!groups.length) return;
+      const controls = document.createElement("div");
+      controls.className = "sq-product-options";
+      controls.dataset.sqProductOptions = "";
+      controls.dataset.ezkartVariants = JSON.stringify(variants.map((variant) => ({
+        id: variant.id,
+        price: Math.max(1000, Number(variant.price) || fallbackPrice),
+        image: variant.image || fallbackImage,
+        options: variant.options || [],
+      })));
+      const initialVariant = variants.find((variant) => variant.id === previousVariant) || variants[0];
+      groups.forEach((group, index) => {
+        const label = document.createElement("label");
+        const caption = document.createElement("span");
+        const select = document.createElement("select");
+        caption.textContent = group.name;
+        select.dataset.sqVariantOption = String(index);
+        select.dataset.ezkartOption = group.name;
+        group.values.forEach((value) => {
+          const option = document.createElement("option");
+          option.value = value;
+          option.textContent = value;
+          select.append(option);
+        });
+        const initialValue = initialVariant.options?.find((option) => option.option === group.name)?.value;
+        if (initialValue && group.values.includes(initialValue)) select.value = initialValue;
+        label.append(caption, select);
+        controls.append(label);
+      });
+      const footer = card.querySelector("footer");
+      if (footer) footer.before(controls);
+      else card.querySelector(":scope > div")?.append(controls);
+      const selects = [...controls.querySelectorAll("select")];
+      const valueFor = (variant, group) => variant.options?.find((option) => option.option === group.name)?.value;
+      const applyVariant = (changedIndex = -1) => {
+        let selected = variants.find((variant) => groups.every((group, index) => valueFor(variant, group) === selects[index].value));
+        if (!selected && changedIndex >= 0) selected = variants.find((variant) => valueFor(variant, groups[changedIndex]) === selects[changedIndex].value);
+        selected ||= variants[0];
+        groups.forEach((group, index) => { const value = valueFor(selected, group); if (value) selects[index].value = value; });
+        card.dataset.sqSelectedVariant = selected.id || "";
+        const priceTarget = card.querySelector("footer b");
+        const imageTarget = card.querySelector(".product-art img");
+        if (priceTarget) priceTarget.textContent = formatRupiah(Math.max(1000, Number(selected.price) || fallbackPrice));
+        if (imageTarget) imageTarget.src = selected.image || fallbackImage;
+        selects.forEach((select, index) => [...select.options].forEach((option) => {
+          option.disabled = !variants.some((variant) => groups.every((group, groupIndex) => groupIndex === index ? valueFor(variant, group) === option.value : valueFor(variant, group) === selects[groupIndex].value));
+        }));
+      };
+      selects.forEach((select, index) => select.addEventListener("change", () => applyVariant(index)));
+      applyVariant();
+    };
+
     const installCustomProduct = (product, checked = true) => {
       const id = String(product?.id || "").trim();
       const name = String(product?.name || "").trim();
@@ -3449,16 +3525,16 @@
       const empty = picker?.querySelector("[data-sq-products-empty]");
       if (empty) empty.hidden = Boolean(picker.querySelector("[data-sq-product]"));
       previewRoot?.querySelectorAll("[data-sq-product-grid]").forEach((grid) => {
-        if (grid.querySelector(`[data-product-card="${CSS.escape(id)}"]`)) return;
-        const card = document.createElement("article");
-        card.dataset.productCard = id;
-        card.dataset.productType = type;
-        card.dataset.customCatalogProduct = "true";
-        const variantPicker = variants.length ? `<label class="sq-product-variant"><span>Choose a variant</span><select data-sq-variant-picker>${variants.map((variant) => `<option value="${escapeHtml(variant.id)}" data-price="${Math.max(1000, Number(variant.price) || price)}" data-image="${escapeHtml(variant.image || imageUrl)}">${escapeHtml(variant.name)}</option>`).join("")}</select></label>` : "";
-        card.innerHTML = `<span class="product-art"><img src="${imageUrl}" alt="${safeName}">${images.length > 1 ? `<em class="sq-media-count">+${images.length - 1} photos</em>` : ""}</span><div><small>${typeName}${escapeHtml(schedule)}</small><h3>${safeName}</h3><p>${escapeHtml(detail)}</p>${variantPicker}<footer><b>${safePrice}</b><button type="button">${type === "subscription" ? "Subscribe" : "Add to cart"}</button></footer></div>`;
-        const variantSelect = card.querySelector("[data-sq-variant-picker]");
-        variantSelect?.addEventListener("change", () => { const option = variantSelect.selectedOptions[0]; card.querySelector("footer b").textContent = formatRupiah(Number(option.dataset.price) || price); card.querySelector(".product-art img").src = option.dataset.image || imageUrl; });
-        grid.append(card);
+        let card = grid.querySelector(`[data-product-card="${CSS.escape(id)}"]`);
+        if (!card) {
+          card = document.createElement("article");
+          card.dataset.productCard = id;
+          card.dataset.productType = type;
+          card.dataset.customCatalogProduct = "true";
+          card.innerHTML = `<span class="product-art"><img src="${imageUrl}" alt="${safeName}">${images.length > 1 ? `<em class="sq-media-count">+${images.length - 1} photos</em>` : ""}</span><div><small>${typeName}${escapeHtml(schedule)}</small><h3>${safeName}</h3><p>${escapeHtml(detail)}</p><footer><b>${safePrice}</b><button type="button">${type === "subscription" ? "Subscribe" : "Add to cart"}</button></footer></div>`;
+          grid.append(card);
+        }
+        installStorefrontVariantControls(card, product, variants, price, imageUrl);
       });
       previewRoot?.querySelectorAll("[data-sq-basket-lines]").forEach((basket) => {
         if (basket.querySelector(`[data-product-line="${CSS.escape(id)}"]`)) return;
@@ -4441,7 +4517,7 @@
         return `${id}{grid-template-columns:${columns}!important}${id} .product-art{height:${density[1]}!important}${id}>article>div{padding:${density[2]}!important}${id} p{display:${density[3]}}`;
       }).join("\n");
       const responsiveSpacing = `${spacingCssFor("desktop")}\n${fluidCssFor("desktop")}\n${elementCssFor("desktop")}\n${productCssFor("desktop")}\n@media(max-width:900px){${spacingCssFor("tablet")}\n${fluidCssFor("tablet")}\n${elementCssFor("tablet")}\n${productCssFor("tablet")}}\n@media(max-width:600px){${spacingCssFor("mobile")}\n${fluidCssFor("mobile")}\n${elementCssFor("mobile")}\n${productCssFor("mobile")}}`;
-      const commerceScript = `<script>(()=>{const defaults=${JSON.stringify(selectedProducts())},cart=new Set();document.querySelectorAll('[data-ezkart-add]').forEach(button=>button.addEventListener('click',()=>{const id=button.dataset.ezkartAdd;cart.has(id)?cart.delete(id):cart.add(id);button.textContent=cart.has(id)?'Added ✓':'Add to cart'}));const checkout=()=>{const products=cart.size?[...cart]:defaults;if(!products.length){alert('This page has no connected products.');return}location.href='/cart/?products='+encodeURIComponent(products.join(','))};document.querySelector('[data-ezkart-checkout]')?.addEventListener('click',checkout);document.querySelectorAll('[data-ezkart-action]').forEach(button=>button.addEventListener('click',()=>{const type=button.dataset.ezkartAction,target=button.dataset.ezkartTarget||'';if(type==='checkout'){checkout();return}if(type==='section'){document.getElementById(target.replace(/^#/,''))?.scrollIntoView({behavior:'smooth'});return}const href=type==='email'?'mailto:'+target:type==='phone'?'tel:'+target:target;if(type==='url'&&button.dataset.ezkartNewTab==='true')window.open(href,'_blank','noopener');else if(href)location.href=href}));const observer=new IntersectionObserver(entries=>entries.forEach(entry=>{if(entry.isIntersecting){entry.target.classList.add(entry.target.matches('[class*="element-animation-"]')?'sq-element-animate':'animating');observer.unobserve(entry.target)}}),{threshold:.12});document.querySelectorAll('[class*="animation-"],[class*="element-animation-"]').forEach(element=>observer.observe(element))})();<\/script>`;
+      const commerceScript = `<script>(()=>{const defaults=${JSON.stringify(selectedProducts())},cart=new Set(),money=value=>'Rp'+new Intl.NumberFormat('id-ID').format(value);document.querySelectorAll('[data-ezkart-variants]').forEach(controls=>{let variants=[];try{variants=JSON.parse(controls.dataset.ezkartVariants||'[]')}catch(_){return}const card=controls.closest('[data-product-card]'),selects=[...controls.querySelectorAll('[data-ezkart-option]')],valueFor=(variant,name)=>variant.options?.find(option=>option.option===name)?.value,sync=(changed=-1)=>{const groups=selects.map(select=>select.dataset.ezkartOption);let selected=variants.find(variant=>groups.every((group,index)=>valueFor(variant,group)===selects[index].value));if(!selected&&changed>=0)selected=variants.find(variant=>valueFor(variant,groups[changed])===selects[changed].value);selected||=variants[0];if(!selected)return;groups.forEach((group,index)=>{const value=valueFor(selected,group);if(value)selects[index].value=value});card.dataset.ezkartVariant=selected.id||'';const price=card.querySelector('footer b'),image=card.querySelector('.product-art img');if(price)price.textContent=money(Math.max(1000,Number(selected.price)||0));if(image&&selected.image)image.src=selected.image;selects.forEach((select,index)=>[...select.options].forEach(option=>{option.disabled=!variants.some(variant=>groups.every((group,groupIndex)=>groupIndex===index?valueFor(variant,group)===option.value:valueFor(variant,group)===selects[groupIndex].value))}))};selects.forEach((select,index)=>select.addEventListener('change',()=>sync(index)));sync()});document.querySelectorAll('[data-ezkart-add]').forEach(button=>button.addEventListener('click',()=>{const id=button.dataset.ezkartAdd;cart.has(id)?cart.delete(id):cart.add(id);button.textContent=cart.has(id)?'Added ✓':'Add to cart'}));const checkout=()=>{const products=cart.size?[...cart]:defaults;if(!products.length){alert('This page has no connected products.');return}location.href='/cart/?products='+encodeURIComponent(products.join(','))};document.querySelector('[data-ezkart-checkout]')?.addEventListener('click',checkout);document.querySelectorAll('[data-ezkart-action]').forEach(button=>button.addEventListener('click',()=>{const type=button.dataset.ezkartAction,target=button.dataset.ezkartTarget||'';if(type==='checkout'){checkout();return}if(type==='section'){document.getElementById(target.replace(/^#/,''))?.scrollIntoView({behavior:'smooth'});return}const href=type==='email'?'mailto:'+target:type==='phone'?'tel:'+target:target;if(type==='url'&&button.dataset.ezkartNewTab==='true')window.open(href,'_blank','noopener');else if(href)location.href=href}));const observer=new IntersectionObserver(entries=>entries.forEach(entry=>{if(entry.isIntersecting){entry.target.classList.add(entry.target.matches('[class*="element-animation-"]')?'sq-element-animate':'animating');observer.unobserve(entry.target)}}),{threshold:.12});document.querySelectorAll('[class*="animation-"],[class*="element-animation-"]').forEach(element=>observer.observe(element))})();<\/script>`;
       const fontBase = new URL("assets/fonts/poppins-400.woff2", window.location.href).href;
       const fontMedium = new URL("assets/fonts/poppins-500.woff2", window.location.href).href;
       const fontSemibold = new URL("assets/fonts/poppins-600.woff2", window.location.href).href;
