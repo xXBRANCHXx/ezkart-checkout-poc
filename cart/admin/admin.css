@@ -1488,6 +1488,8 @@ button, a { -webkit-tap-highlight-color: transparent; }
 }
 .sq-product-grid > article > .product-art {
   position: relative;
+  height: auto !important;
+  aspect-ratio: 1 / 1;
   overflow: hidden;
   background: color-mix(in srgb, var(--site-accent) 4%, var(--site-surface, #fff)) !important;
   border-bottom: 1px solid color-mix(in srgb, var(--site-ink, #24262b) 8%, transparent);
@@ -1656,11 +1658,9 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .sq-product-grid.product-density-compact > article footer { padding-top: 12px; gap: 8px; }
 .sq-product-grid.product-density-compact > article footer button { min-width: 88px; min-height: 38px; padding-inline: 11px; font-size: 8px; }
 .sq-product-grid.product-density-showcase > article > div { padding: clamp(20px, 5cqw, 28px); }
+.sq-page-preview.product-count-1 .sq-product-grid { max-width: 380px; }
 
 .sq-device-frame.device-mobile .sq-product-grid { --sq-card-footer-columns: minmax(0, 1fr) auto; --sq-card-action-height: 42px; }
-.sq-device-frame.device-mobile .sq-product-grid.product-density-compact .product-art { height: 140px !important; }
-.sq-device-frame.device-mobile .sq-product-grid.product-density-balanced .product-art { height: 185px !important; }
-.sq-device-frame.device-mobile .sq-product-grid.product-density-showcase .product-art { height: 230px !important; }
 .sq-device-frame.device-mobile .sq-product-grid > article > div { padding: 14px; }
 .sq-device-frame.device-mobile .sq-product-grid > article h3 { margin-top: 10px; font-size: 16px; line-height: 1.25; }
 .sq-device-frame.device-mobile .sq-product-grid > article > div > p { font-size: 9px; line-height: 1.55; }
@@ -1668,12 +1668,38 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .sq-device-frame.device-mobile .sq-product-grid > article footer button { min-width: 108px; padding-inline: 12px; }
 @media (max-width: 600px) {
   .sq-product-grid { --sq-card-footer-columns: minmax(0, 1fr) auto; --sq-card-action-height: 42px; }
-  .sq-product-grid.product-density-compact .product-art { height: 140px !important; }
-  .sq-product-grid.product-density-balanced .product-art { height: 185px !important; }
-  .sq-product-grid.product-density-showcase .product-art { height: 230px !important; }
   .sq-product-grid > article > div { padding: 14px; }
   .sq-product-grid > article h3 { margin-top: 10px; font-size: 16px; line-height: 1.25; }
   .sq-product-grid > article > div > p { font-size: 9px; line-height: 1.55; }
   .sq-product-grid > article footer { padding-top: 14px; gap: 9px; }
   .sq-product-grid > article footer button { min-width: 108px; padding-inline: 12px; }
 }
+
+/* Consistent storefront dropdowns without browser-default chrome. */
+.sq-page-preview select {
+  min-width: 0;
+  padding-right: 34px !important;
+  color: var(--site-ink, #24262b);
+  background-color: var(--site-surface, #fff);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='m3 4.5 3 3 3-3' stroke='%23676D75' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 11px center;
+  background-size: 12px;
+  border-color: color-mix(in srgb, var(--site-ink, #24262b) 16%, transparent);
+  box-shadow: 0 1px 2px rgba(24, 27, 34, .03);
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  transition: border-color .16s, box-shadow .16s, background-color .16s;
+}
+.sq-page-preview select:hover {
+  background-color: color-mix(in srgb, var(--site-accent) 3%, var(--site-surface, #fff));
+  border-color: color-mix(in srgb, var(--site-accent) 38%, transparent);
+}
+.sq-page-preview select:focus-visible {
+  outline: 0;
+  border-color: var(--site-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--site-accent) 15%, transparent);
+}
+.sq-page-preview select:disabled { opacity: .45; cursor: not-allowed; }
+.sq-page-preview select option { color: var(--site-ink, #24262b); background: var(--site-surface, #fff); }

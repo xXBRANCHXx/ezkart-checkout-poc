@@ -2075,6 +2075,7 @@
     let showLayoutGrid = true;
     let layoutGridDragging = false;
     let pageSpacingMode = false;
+    let scheduleProductGridFit = () => {};
     let saveTimer;
     let zoom = 90;
     const requestedSiteUrl = new URLSearchParams(window.location.search).get("edit") || "";
@@ -2164,6 +2165,7 @@
       const totalTarget = sqStudio.querySelector("[data-sq-basket-total]");
       if (totalTarget) totalTarget.textContent = formatRupiah(total);
       sqStudio.querySelectorAll("[data-sq-product-count], [data-sq-layer-product-count]").forEach((target) => { target.textContent = String(products.length); });
+      scheduleProductGridFit();
     };
 
     const maximumFluidRows = 80;
@@ -2331,6 +2333,40 @@
       section.style.setProperty("--sq-fluid-columns", String(fluidColumns()));
     };
     const applyFluidLayouts = () => previewRoot?.querySelectorAll("[data-sq-fluid]").forEach(applyFluidSection);
+    let productGridFitFrame = 0;
+    const observedProductCards = new WeakSet();
+    const productCardObserver = typeof ResizeObserver === "function" ? new ResizeObserver(() => scheduleProductGridFit()) : null;
+    const fitProductGridHeight = (grid) => {
+      const section = grid?.closest("[data-sq-fluid]");
+      const cards = [...(grid?.querySelectorAll(":scope > [data-product-card]") || [])].filter((card) => !card.hidden);
+      if (!section || !cards.length) return false;
+      const gridRect = grid.getBoundingClientRect();
+      const renderedScale = grid.offsetWidth ? gridRect.width / grid.offsetWidth : 1;
+      const contentHeight = Math.max(...cards.map((card) => (card.getBoundingClientRect().bottom - gridRect.top) / Math.max(.01, renderedScale)));
+      const rowGap = Number.parseFloat(getComputedStyle(section).rowGap) || 0;
+      const requiredRows = Math.max(1, Math.min(maximumFluidRows, Math.ceil((contentHeight + rowGap) / fluidRowHeight(section))));
+      const layout = parseElementLayout(grid);
+      if (requiredRows === layout.height) return false;
+      setElementLayout(grid, { ...layout, height: requiredRows });
+      return true;
+    };
+    scheduleProductGridFit = () => {
+      window.cancelAnimationFrame(productGridFitFrame);
+      productGridFitFrame = window.requestAnimationFrame(() => {
+        const changedSections = new Set();
+        previewRoot?.querySelectorAll("[data-sq-product-grid]").forEach((grid) => {
+          grid.querySelectorAll(":scope > [data-product-card]").forEach((card) => {
+            if (!observedProductCards.has(card)) { observedProductCards.add(card); productCardObserver?.observe(card); }
+          });
+          if (fitProductGridHeight(grid)) changedSections.add(grid.closest("[data-sq-fluid]"));
+        });
+        changedSections.forEach(applyFluidSection);
+        if (changedSections.size && selectedElement?.matches("[data-sq-product-grid]")) {
+          syncElementControls();
+          refreshElementOverlay();
+        }
+      });
+    };
     const removeLayoutGrid = () => previewRoot?.querySelectorAll(".sq-layout-grid-overlay").forEach((grid) => grid.remove());
     const refreshLayoutGrid = () => {
       removeLayoutGrid();
@@ -3536,6 +3572,7 @@
         }
         installStorefrontVariantControls(card, product, variants, price, imageUrl);
       });
+      scheduleProductGridFit();
       previewRoot?.querySelectorAll("[data-sq-basket-lines]").forEach((basket) => {
         if (basket.querySelector(`[data-product-line="${CSS.escape(id)}"]`)) return;
         const line = document.createElement("li"); line.dataset.productLine = id; line.innerHTML = `<span>${safeName}</span><b>${safePrice}</b>`; basket.append(line);
@@ -3622,6 +3659,7 @@
       loadSpacingControls();
       applySpacing();
       applyFluidLayouts();
+      scheduleProductGridFit();
       syncElementControls();
       syncPageGridControls();
       refreshLayoutGrid();
@@ -4514,7 +4552,7 @@
         const density = { compact: ["150px", "clamp(96px,58cqw,175px)", "11px", "none"], balanced: ["220px", "clamp(120px,62cqw,250px)", "18px", "block"], showcase: ["310px", "clamp(180px,70cqw,360px)", "18px", "block"] }[settings.density] || ["220px", "clamp(120px,62cqw,250px)", "18px", "block"];
         const columns = settings.columns === "auto" ? `repeat(auto-fit,minmax(min(100%,${density[0]}),1fr))` : `repeat(${settings.columns},minmax(0,1fr))`;
         const id = `[data-ezkart-element="${element.dataset.sqElementId}"]`;
-        return `${id}{grid-template-columns:${columns}!important}${id} .product-art{height:${density[1]}!important}${id}>article>div{padding:${density[2]}!important}${id} p{display:${density[3]}}`;
+        return `${id}{grid-template-columns:${columns}!important}${id}>article>.product-art{height:auto!important;aspect-ratio:1/1!important}${id}>article>div{padding:${density[2]}!important}${id} p{display:${density[3]}}`;
       }).join("\n");
       const responsiveSpacing = `${spacingCssFor("desktop")}\n${fluidCssFor("desktop")}\n${elementCssFor("desktop")}\n${productCssFor("desktop")}\n@media(max-width:900px){${spacingCssFor("tablet")}\n${fluidCssFor("tablet")}\n${elementCssFor("tablet")}\n${productCssFor("tablet")}}\n@media(max-width:600px){${spacingCssFor("mobile")}\n${fluidCssFor("mobile")}\n${elementCssFor("mobile")}\n${productCssFor("mobile")}}`;
       const commerceScript = `<script>(()=>{const defaults=${JSON.stringify(selectedProducts())},cart=new Set(),money=value=>'Rp'+new Intl.NumberFormat('id-ID').format(value);document.querySelectorAll('[data-ezkart-variants]').forEach(controls=>{let variants=[];try{variants=JSON.parse(controls.dataset.ezkartVariants||'[]')}catch(_){return}const card=controls.closest('[data-product-card]'),selects=[...controls.querySelectorAll('[data-ezkart-option]')],valueFor=(variant,name)=>variant.options?.find(option=>option.option===name)?.value,sync=(changed=-1)=>{const groups=selects.map(select=>select.dataset.ezkartOption);let selected=variants.find(variant=>groups.every((group,index)=>valueFor(variant,group)===selects[index].value));if(!selected&&changed>=0)selected=variants.find(variant=>valueFor(variant,groups[changed])===selects[changed].value);selected||=variants[0];if(!selected)return;groups.forEach((group,index)=>{const value=valueFor(selected,group);if(value)selects[index].value=value});card.dataset.ezkartVariant=selected.id||'';const price=card.querySelector('footer b'),image=card.querySelector('.product-art img');if(price)price.textContent=money(Math.max(1000,Number(selected.price)||0));if(image&&selected.image)image.src=selected.image;selects.forEach((select,index)=>[...select.options].forEach(option=>{option.disabled=!variants.some(variant=>groups.every((group,groupIndex)=>groupIndex===index?valueFor(variant,group)===option.value:valueFor(variant,group)===selects[groupIndex].value))}))};selects.forEach((select,index)=>select.addEventListener('change',()=>sync(index)));sync()});document.querySelectorAll('[data-ezkart-add]').forEach(button=>button.addEventListener('click',()=>{const id=button.dataset.ezkartAdd;cart.has(id)?cart.delete(id):cart.add(id);button.textContent=cart.has(id)?'Added ✓':'Add to cart'}));const checkout=()=>{const products=cart.size?[...cart]:defaults;if(!products.length){alert('This page has no connected products.');return}location.href='/cart/?products='+encodeURIComponent(products.join(','))};document.querySelector('[data-ezkart-checkout]')?.addEventListener('click',checkout);document.querySelectorAll('[data-ezkart-action]').forEach(button=>button.addEventListener('click',()=>{const type=button.dataset.ezkartAction,target=button.dataset.ezkartTarget||'';if(type==='checkout'){checkout();return}if(type==='section'){document.getElementById(target.replace(/^#/,''))?.scrollIntoView({behavior:'smooth'});return}const href=type==='email'?'mailto:'+target:type==='phone'?'tel:'+target:target;if(type==='url'&&button.dataset.ezkartNewTab==='true')window.open(href,'_blank','noopener');else if(href)location.href=href}));const observer=new IntersectionObserver(entries=>entries.forEach(entry=>{if(entry.isIntersecting){entry.target.classList.add(entry.target.matches('[class*="element-animation-"]')?'sq-element-animate':'animating');observer.unobserve(entry.target)}}),{threshold:.12});document.querySelectorAll('[class*="animation-"],[class*="element-animation-"]').forEach(element=>observer.observe(element))})();<\/script>`;
