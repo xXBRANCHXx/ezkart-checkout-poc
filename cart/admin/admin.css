@@ -1718,14 +1718,14 @@ button, a { -webkit-tap-highlight-color: transparent; }
   letter-spacing: -.025em;
   line-height: 1.2;
 }
-.sq-product-grid > article footer button {
+.sq-page-preview .sq-product-grid > article footer button {
   min-width: 108px;
   min-height: var(--sq-card-action-height);
   padding: 0 16px;
   color: var(--button-primary-fg, #fff);
   background: var(--button-primary-bg, var(--site-accent));
   border: 1px solid var(--button-primary-border, var(--site-accent));
-  border-radius: var(--button-primary-radius, 10px);
+  border-radius: 999px !important;
   box-shadow: 0 7px 16px color-mix(in srgb, var(--button-primary-bg, var(--site-accent)) 20%, transparent);
   font: 600 10px Poppins, sans-serif;
   transition: transform .18s, box-shadow .18s, filter .18s;
