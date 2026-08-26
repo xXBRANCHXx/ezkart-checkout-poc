@@ -1009,7 +1009,9 @@ button, a { -webkit-tap-highlight-color: transparent; }
   .page-site-editor .sq-builder-sidebar:hover,.page-site-editor .sq-builder-sidebar:focus-within{width:324px;box-shadow:14px 0 30px rgba(20,26,38,.13)}
   .page-site-editor .sq-tool-rail{width:52px;padding:8px 6px;position:relative;z-index:2}
   .page-site-editor .sq-tool-rail button{min-height:48px;padding:0;gap:0}
-  .page-site-editor .sq-tool-rail button span{display:none}
+  .page-site-editor .sq-tool-rail button span{width:max-content;max-width:190px;padding:8px 10px;position:absolute;z-index:20;left:calc(100% + 12px);top:50%;display:block;visibility:hidden;color:#fff;background:#252a34;border:1px solid rgba(255,255,255,.12);border-radius:7px;box-shadow:0 7px 20px rgba(18,24,35,.24);font-size:10px;font-weight:600;line-height:1;opacity:0;pointer-events:none;transform:translate(-4px,-50%);transition:visibility 0s linear .12s,opacity .12s ease,transform .12s ease;white-space:nowrap}
+  .page-site-editor .sq-tool-rail button span:before{content:"";width:7px;height:7px;position:absolute;left:-4px;top:50%;background:#252a34;border-left:1px solid rgba(255,255,255,.12);border-bottom:1px solid rgba(255,255,255,.12);transform:translateY(-50%) rotate(45deg)}
+  .page-site-editor .sq-tool-rail button:hover span,.page-site-editor .sq-tool-rail button:focus-visible span{visibility:visible;opacity:1;transform:translate(0,-50%);transition-delay:.12s}
   .page-site-editor .sq-tool-rail button i{right:2px;top:3px}
   .page-site-editor .sq-tool-panels{width:272px;visibility:hidden;opacity:0;pointer-events:none;transform:translateX(-8px);transition:visibility 0s linear .2s,opacity .16s ease,transform .2s ease}
   .page-site-editor .sq-builder-sidebar:hover .sq-tool-panels,.page-site-editor .sq-builder-sidebar:focus-within .sq-tool-panels{visibility:visible;opacity:1;pointer-events:auto;transform:none;transition-delay:0s}
