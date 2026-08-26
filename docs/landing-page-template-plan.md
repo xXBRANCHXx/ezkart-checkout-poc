@@ -2,11 +2,13 @@
 
 ## Status and scope
 
-This document is the approved starting brief for Ezkart's landing-page template program. Read it before planning or implementing template, renderer, template-selection, or builder work.
+This document preserves the future art-direction brief for Ezkart's landing-page template program. Read it before planning or implementing template, renderer, template-selection, or builder work.
+
+The template program is paused. No complete templates, template selector, template generator, or template-specific assets should ship until the builder's reusable elements can create, edit, and reproduce every required composition from scratch with a polished user experience. The designs below are reference targets for that later phase, not currently available products.
 
 Templates are complete, polished, long-form storefront sites—not isolated sections, skeletal blueprints, or the same layout with different colors. Ezkart needs at least five templates spanning meaningfully different genres. We will design and build them one at a time with an unusually high quality bar.
 
-Every template must eventually be fully editable in the Ezkart builder. The builder representation and editing model are intentionally deferred until the templates themselves establish the right visual and interaction standard.
+Every future template must be composed from the same reusable, merchant-editable element system available on a blank canvas. A template may provide a composition and art direction, but it must not introduce a parallel editing model or template-only behavior.
 
 When a merchant applies a template, commerce content must come from real products in the merchant's Ezkart catalog. Preview/demo content can illustrate a template before selection, but it must not survive as fake merchandise in an applied page.
 
@@ -355,7 +357,8 @@ Ask these questions at the end of every design pass:
 
 Any failed answer requires another design pass before approval.
 
-## Deferred builder discussion
+## Element-system prerequisite
 
-Do not let current builder limitations dilute these template plans. After the template standard is established, design the builder model so every meaningful part is editable while preserving each template's composition, responsive behavior, and art direction. Avoid flattening all five templates into one generic section system merely because it is easier to implement.
+Before template work resumes, finish and validate the element library, direct manipulation, responsive controls, layers, discoverability, accessibility, undo/redo, persistence, preview, and export behavior. A merchant must be able to reproduce every meaningful part of a proposed template from a blank canvas without hidden template-only code.
 
+When templates return, preserve their distinctive composition, responsive behavior, and art direction by combining those proven elements. Do not flatten the designs into palette swaps, and do not bypass the shared element system to achieve them.

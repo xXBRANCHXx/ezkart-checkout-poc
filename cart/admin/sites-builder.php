@@ -30,7 +30,6 @@ declare(strict_types=1);
     <aside class="sq-builder-sidebar">
       <nav class="sq-tool-rail" aria-label="Builder tools">
         <button class="active" type="button" data-sq-tab="layers" aria-label="Page layers"><?= ez_admin_icon('layers') ?><span>Layers</span></button>
-        <button type="button" data-sq-tab="templates" aria-label="Website templates"><?= ez_admin_icon('layout') ?><span>Templates</span></button>
         <button type="button" data-sq-tab="add" aria-label="Add section"><?= ez_admin_icon('plus') ?><span>Add</span></button>
         <button type="button" data-sq-tab="products" aria-label="Products"><?= ez_admin_icon('box') ?><span>Products</span><i data-sq-product-count>0</i></button>
         <button type="button" data-sq-tab="design" aria-label="Site design"><?= ez_admin_icon('palette') ?><span>Design</span></button>
@@ -43,28 +42,6 @@ declare(strict_types=1);
           <p class="sq-panel-intro">Drag sections to reorder them. Click anything to edit it.</p>
           <div class="sq-layer-list" data-sq-layer-list aria-label="Sections and elements"></div>
           <footer><span><?= ez_admin_icon('shield') ?> Autosaved and versioned</span></footer>
-        </section>
-
-        <section class="sq-tool-panel sq-template-panel" data-sq-panel="templates">
-          <header><div><small>Complete websites</small><h2>Template gallery</h2></div><span class="sq-template-total">13 designs</span></header>
-          <p class="sq-panel-intro">Start with a complete branded page. Every section, image, color, button, and animation stays editable.</p>
-          <label class="sq-panel-search"><?= ez_admin_icon('search') ?><input type="search" placeholder="Search style or industry" data-sq-template-search></label>
-          <div class="sq-template-filters" aria-label="Template categories"><button class="active" type="button" data-template-filter="all">All</button><button type="button" data-template-filter="shop">Shop</button><button type="button" data-template-filter="services">Services</button><button type="button" data-template-filter="editorial">Editorial</button></div>
-          <div class="sq-template-grid">
-            <button type="button" data-sq-template="gallery" data-template-category="shop editorial" data-search="gallery catalog modern minimal multi product home retail general"><span style="--template-image:url('/landing-templates/gallery/assets/collection-hero.png')"><i>Catalog</i><em>New template</em></span><b>Gallery</b><small>Modern multi-product catalog</small></button>
-            <button type="button" data-sq-template="sora" data-template-category="shop editorial" data-search="fashion modest warm editorial sora"><span style="--template-image:url('assets/templates/fashion-terracotta.webp')"><i>Fashion</i><em>Live motion</em></span><b>Sora Modest</b><small>Warm editorial fashion</small></button>
-            <button type="button" data-sq-template="embun" data-template-category="shop" data-search="beauty skincare botanical green embun"><span style="--template-image:url('assets/templates/skincare-sage.webp')"><i>Beauty</i><em>Live motion</em></span><b>Embun Botanics</b><small>Botanical product launch</small></button>
-            <button type="button" data-sq-template="pulih" data-template-category="services editorial" data-search="wellness yoga studio calm bali pulih"><span style="--template-image:url('assets/templates/wellness-bali.webp')"><i>Wellness</i><em>Live motion</em></span><b>Ruang Pulih</b><small>Wellness &amp; membership</small></button>
-            <button type="button" data-sq-template="tanah" data-template-category="shop editorial" data-search="homeware ceramics interior clay tanah"><span style="--template-image:url('assets/templates/homeware-clay.webp')"><i>Home</i><em>Live motion</em></span><b>Tanah Studio</b><small>Artisanal homeware</small></button>
-            <button type="button" data-sq-template="senja" data-template-category="shop" data-search="coffee cafe dark modern senja"><span style="--template-image:url('assets/products/kopi-susu.webp')"><i>Coffee</i><em>Live motion</em></span><b>Kopi Senja</b><small>Bold coffee commerce</small></button>
-            <button type="button" data-sq-template="timur" data-template-category="shop" data-search="food sambal spicy red launch timur"><span style="--template-image:url('assets/products/sambal-roa.webp')"><i>Food</i><em>Live motion</em></span><b>Dapur Timur</b><small>High-energy food launch</small></button>
-            <button type="button" data-sq-template="pagi" data-template-category="shop" data-search="food granola breakfast bright pagi"><span style="--template-image:url('assets/products/granola.webp')"><i>Food</i><em>Live motion</em></span><b>Meja Pagi</b><small>Bright everyday goods</small></button>
-            <button type="button" data-sq-template="mono" data-template-category="shop editorial" data-search="minimal monochrome catalog mono"><span class="template-mono"><i>Minimal</i><em>Live motion</em></span><b>Mono Catalog</b><small>Quiet product grid</small></button>
-            <button type="button" data-sq-template="neon" data-template-category="shop editorial" data-search="streetwear neon launch drop bold"><span class="template-neon"><i>Launch</i><em>Live motion</em></span><b>Neon Drop</b><small>High-impact campaign</small></button>
-            <button type="button" data-sq-template="kisah" data-template-category="services editorial" data-search="portfolio photographer creative kisah"><span style="--template-image:url('assets/templates/fashion-terracotta.webp')"><i>Portfolio</i><em>Live motion</em></span><b>Kisah Visual</b><small>Creative portfolio shop</small></button>
-            <button type="button" data-sq-template="kelas" data-template-category="services" data-search="course creator class digital kelas"><span style="--template-image:url('assets/templates/wellness-bali.webp')"><i>Creator</i><em>Live motion</em></span><b>Kelas Bertumbuh</b><small>Course &amp; community</small></button>
-            <button type="button" data-sq-template="kanvas" data-template-category="editorial" data-search="image first campaign minimal kanvas"><span style="--template-image:url('assets/templates/skincare-sage.webp')"><i>Image-led</i><em>Live motion</em></span><b>Kanvas</b><small>Full-bleed storytelling</small></button>
-          </div>
         </section>
 
         <section class="sq-tool-panel" data-sq-panel="add">
