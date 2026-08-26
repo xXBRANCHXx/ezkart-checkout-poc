@@ -2806,6 +2806,10 @@
       markSqChanged();
     };
     const bindSqInteractions = () => {
+      previewRoot?.querySelectorAll(".animating, .sq-element-animate").forEach((element) => element.classList.remove("animating", "sq-element-animate"));
+      previewRoot?.querySelectorAll('[class*="hover-"]').forEach((element) => {
+        [...element.classList].filter((name) => name.startsWith("hover-")).forEach((name) => element.classList.remove(name));
+      });
       sqStudio.querySelectorAll("[data-sq-layer]").forEach((layer) => {
         layer.onclick = () => {
           selectSqSection(layer.dataset.sectionId, true);
@@ -3483,28 +3487,13 @@
       selectedElement.dataset.sqButtonRole = button.dataset.sqRoleChoice;
       syncElementControls(); markSqChanged();
     }));
-    const replayElementAnimation = () => {
-      if (!selectedElement?.isConnected) return;
-      selectedElement.classList.remove("sq-element-animate"); void selectedElement.offsetWidth; selectedElement.classList.add("sq-element-animate");
-      window.setTimeout(() => selectedElement?.classList.remove("sq-element-animate"), 2400);
-    };
-    const replayVisibleTemplateAnimations = () => {
-      const stage = sqStudio.querySelector(".sq-canvas-scroll")?.getBoundingClientRect();
-      if (!stage) return;
-      previewRoot?.querySelectorAll('[class*="element-animation-"]').forEach((element) => {
-        const rect = element.getBoundingClientRect();
-        if (rect.bottom < stage.top || rect.top > stage.bottom) return;
-        element.classList.remove("sq-element-animate"); void element.offsetWidth; element.classList.add("sq-element-animate");
-        window.setTimeout(() => element.classList.remove("sq-element-animate"), 2400);
-      });
-    };
     sqStudio.querySelector("[data-sq-element-animation-control]")?.addEventListener("change", (event) => {
       if (!selectedElement?.isConnected) return;
       remember();
       [...selectedElement.classList].filter((name) => name.startsWith("element-animation-")).forEach((name) => selectedElement.classList.remove(name));
       selectedElement.dataset.sqElementAnimation = event.currentTarget.value;
       if (event.currentTarget.value !== "none") selectedElement.classList.add(`element-animation-${event.currentTarget.value}`);
-      replayElementAnimation(); markSqChanged();
+      markSqChanged();
     });
     sqStudio.querySelectorAll("[data-sq-entrance-preview]").forEach((button) => button.addEventListener("click", () => {
       const select = sqStudio.querySelector("[data-sq-element-animation-control]");
@@ -3518,7 +3507,7 @@
         if (!selectedElement?.isConnected) return;
         selectedElement.style.setProperty(property, `${event.currentTarget.value}ms`);
         const output = sqStudio.querySelector(`[data-sq-element-${field}-output]`); if (output) output.textContent = `${event.currentTarget.value}ms`;
-        replayElementAnimation(); markSqChanged();
+        markSqChanged();
       });
     });
     sqStudio.querySelectorAll("[data-sq-hover-choice]").forEach((button) => button.addEventListener("click", () => {
@@ -3526,10 +3515,9 @@
       remember();
       [...selectedElement.classList].filter((name) => name.startsWith("hover-")).forEach((name) => selectedElement.classList.remove(name));
       selectedElement.dataset.sqHover = button.dataset.sqHoverChoice;
-      if (button.dataset.sqHoverChoice !== "none") selectedElement.classList.add(`hover-${button.dataset.sqHoverChoice}`);
       syncElementControls(); markSqChanged();
     }));
-    sqStudio.querySelector("[data-sq-element-replay]")?.addEventListener("click", replayElementAnimation);
+    sqStudio.querySelector("[data-sq-element-replay]")?.addEventListener("click", () => sqStudio.querySelector("[data-sq-preview]")?.click());
     let codeSnapshot;
     const updateSelectedCode = () => {
       if (selectedElement?.dataset.sqElementType !== "custom-code") return;
@@ -3590,14 +3578,6 @@
       refreshElementOverlay();
       markSqChanged();
     });
-    const replayAnimation = () => {
-      const block = previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`);
-      if (!block) return;
-      block.classList.remove("animating");
-      void block.offsetWidth;
-      block.classList.add("animating");
-      window.setTimeout(() => block.classList.remove("animating"), 2700);
-    };
     sqStudio.querySelector("[data-sq-animation]")?.addEventListener("change", (event) => {
       remember();
       const block = previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`);
@@ -3605,7 +3585,7 @@
       block.classList.remove("animation-fade", "animation-slide-up", "animation-slide-left", "animation-scale");
       block.dataset.animation = event.currentTarget.value;
       if (event.currentTarget.value !== "none") block.classList.add(`animation-${event.currentTarget.value}`);
-      replayAnimation(); markSqChanged();
+      markSqChanged();
     });
     [["duration", "animation-duration", "ms"], ["delay", "animation-delay", "ms"]].forEach(([field, property, suffix]) => {
       sqStudio.querySelector(`[data-sq-${field}]`)?.addEventListener("input", (event) => {
@@ -3613,14 +3593,14 @@
         block?.style.setProperty(`--${property}`, `${event.currentTarget.value}${suffix}`);
         const output = sqStudio.querySelector(`[data-sq-${field}-output]`);
         if (output) output.textContent = `${event.currentTarget.value}${suffix}`;
-        replayAnimation(); markSqChanged();
+        markSqChanged();
       });
     });
     sqStudio.querySelector("[data-sq-easing]")?.addEventListener("change", (event) => {
       previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`)?.style.setProperty("--animation-easing", event.currentTarget.value);
-      replayAnimation(); markSqChanged();
+      markSqChanged();
     });
-    sqStudio.querySelector("[data-sq-replay]")?.addEventListener("click", replayAnimation);
+    sqStudio.querySelector("[data-sq-replay]")?.addEventListener("click", () => sqStudio.querySelector("[data-sq-preview]")?.click());
 
     sqStudio.querySelector("[data-sq-content-width]")?.addEventListener("input", (event) => {
       const block = previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`);
@@ -3738,7 +3718,7 @@
       const faq = `<section class="sq-page-block sq-template-gallery-faq" draggable="true" data-sq-block data-sq-fluid data-sq-rows="12" data-section-id="faq">${templateHandle("FAQ")}<h2 data-sq-element data-sq-element-type="heading" ${galleryLayout("1,2,5,8", "1,2,12,4", "1,1,12,4")}>Questions,<br>answered.</h2><details open data-sq-element data-sq-element-type="faq" ${galleryLayout("7,1,6,4", "1,6,12,2", "1,5,12,3")}><summary>How does payment work?</summary><p>Checkout is secured by Ezkart and connected directly to this page.</p></details><details data-sq-element data-sq-element-type="faq" ${galleryLayout("7,5,6,4", "1,8,12,2", "1,8,12,3")}><summary>When will my order arrive?</summary><p>Live courier options, price, and estimated delivery time appear at checkout.</p></details><details data-sq-element data-sq-element-type="faq" ${galleryLayout("7,9,6,4", "1,10,12,2", "1,11,12,3")}><summary>Can I buy more than one item?</summary><p>Yes. Build a basket from any connected products and pay once.</p></details></section>`;
       const newsletter = `<section class="sq-page-block sq-template-gallery-newsletter" draggable="true" data-sq-block data-sq-fluid data-sq-rows="12" data-section-id="newsletter">${templateHandle("newsletter")}<small data-sq-element data-sq-element-type="eyebrow" ${galleryLayout("1,2,1,2", "1,2,2,2", "1,1,12,2")}>G / 07</small><div data-sq-element data-sq-element-type="copy" ${galleryLayout("3,3,6,7", "2,3,10,6", "1,3,12,6")}><h2>New objects,<br>occasionally.</h2><p>A quiet signup area with an honest reason to subscribe.</p></div><form data-sq-element data-sq-element-type="form" ${galleryLayout("9,7,4,3", "3,9,8,3", "1,10,12,3")}><label>Email address</label><div><input type="email" placeholder="you@example.com"><button type="button">Subscribe →</button></div></form></section>`;
       const footer = `<footer class="sq-page-block sq-template-gallery-footer" draggable="true" data-sq-block data-sq-fluid data-sq-rows="8" data-section-id="footer">${templateHandle("footer")}<strong data-sq-element data-sq-element-type="logo" ${galleryLayout("1,2,5,5", "1,2,6,5", "1,1,12,4")}>${escapeHtml(config.brand)}</strong><div data-sq-element data-sq-element-type="navigation" ${galleryLayout("7,2,3,5", "7,2,3,5", "1,5,6,3")}><b>Shop</b><a href="#products">All products</a><a href="#gallery-story">Story</a></div><div data-sq-element data-sq-element-type="navigation" ${galleryLayout("10,2,3,5", "10,2,3,5", "7,5,6,3")}><b>Help</b><a href="#faq">FAQ</a><a href="#shipping">Delivery</a></div></footer>`;
-      return [announcement, navigation, hero, collectionIndex, intro, commerceSectionMarkup("products", "fade", "image-zoom"), editorial, principle, materials, emptyReviews, commerceSectionMarkup("benefits", "fade", "none"), faq, commerceSectionMarkup("checkout", "fade", "none"), commerceSectionMarkup("shipping", "fade", "none"), newsletter, footer].join("");
+      return [announcement, navigation, hero, collectionIndex, intro, commerceSectionMarkup("products", "fade", "none"), editorial, principle, materials, emptyReviews, commerceSectionMarkup("benefits", "fade", "none"), faq, commerceSectionMarkup("checkout", "fade", "none"), commerceSectionMarkup("shipping", "fade", "none"), newsletter, footer].join("");
     };
     const makeTemplateMarkup = (config, key) => {
       const layout = templateHeroLayouts(config.mode);
@@ -3813,7 +3793,6 @@
       rebuildLayerList(); bindSqInteractions(); updateProductView(); selectSqSection("hero"); syncBrandControls();
       sqStudio.querySelectorAll("[data-sq-template]").forEach((item) => item.classList.toggle("selected", item === button));
       openSqPanel("layers"); sqStudio.querySelector(".sq-canvas-scroll")?.scrollTo({ top: 0, behavior: "smooth" }); markSqChanged();
-      window.setTimeout(replayVisibleTemplateAnimations, 180);
       showToast(`${config.name} applied — every element remains editable`);
     }));
     let activeTemplateFilter = "all";
@@ -4023,6 +4002,8 @@
       });
       clone.querySelectorAll("[data-sq-fluid]").forEach((node) => { node.classList.add("ez-fluid-section"); node.removeAttribute("data-sq-fluid"); node.removeAttribute("data-sq-rows"); node.removeAttribute("data-sq-min-rows"); });
       clone.querySelectorAll("[data-sq-element]").forEach((node) => {
+        const hover = node.dataset.sqHover;
+        if (hover && hover !== "none") node.classList.add(`hover-${hover}`);
         node.classList.add("ez-fluid-element");
         node.dataset.ezkartElement = node.dataset.sqElementId;
         ["sqElement", "sqElementId", "sqElementType", "sqElementAnimation", "sqHover", "sqSurface", "sqAlign", "sqButtonRole", "layoutDesktop", "layoutTablet", "layoutMobile"].forEach((key) => delete node.dataset[key]);
