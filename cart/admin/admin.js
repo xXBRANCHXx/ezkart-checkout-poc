@@ -3040,17 +3040,6 @@
       };
     };
 
-    const normalizeTemplatePresentation = () => {
-      const galleryCta = previewRoot?.querySelector('.sq-template-gallery-hero > [data-sq-element-type="button"], .sq-template-gallery-hero > .button-primary');
-      if (!galleryCta) return;
-      galleryCta.style.setProperty("color", "#111111", "important");
-      galleryCta.style.setProperty("background-color", "#ffffff", "important");
-      galleryCta.style.setProperty("border-color", "#111111", "important");
-      galleryCta.style.setProperty("box-shadow", "none", "important");
-      galleryCta.style.setProperty("filter", "none", "important");
-      galleryCta.style.setProperty("opacity", "1", "important");
-    };
-
     const restoreState = (state) => {
       if (!previewRoot || !layerList) return;
       selectedElement = null;
@@ -3061,7 +3050,6 @@
       previewRoot.className = state.previewClass;
       if (state.previewStyle) previewRoot.setAttribute("style", state.previewStyle); else previewRoot.removeAttribute("style");
       upgradeLegacyStructure();
-      normalizeTemplatePresentation();
       rebuildLayerList();
       const productPicker = sqStudio.querySelector(".sq-product-picker");
       if (productPicker && typeof state.productPicker === "string") productPicker.innerHTML = state.productPicker;
@@ -3807,7 +3795,6 @@
       const buttonRadius = templateRadius === "square" ? 0 : 12;
       previewRoot.className = `sq-page-preview radius-${templateRadius} layout-${templateLayout} template-${button.dataset.sqTemplate}`;
       previewRoot.setAttribute("style", `--site-accent:${config.accent};--site-page:${config.page};--site-ink:${config.ink};--site-surface:${config.surface};--button-primary-bg:${config.accent};--button-primary-fg:${config.primaryFg || (config.mode === "image-led" ? "#171717" : "#ffffff")};--button-primary-border:${config.accent};--button-primary-radius:${buttonRadius}px;--button-secondary-bg:${config.surface};--button-secondary-fg:${config.ink};--button-secondary-border:${config.ink};--button-secondary-radius:${buttonRadius}px;--button-tertiary-bg:transparent;--button-tertiary-fg:${config.accent};--button-tertiary-border:transparent;--button-tertiary-radius:0px`);
-      normalizeTemplatePresentation();
       applyButtonTreatment("primary", "solid"); applyButtonTreatment("secondary", "outline"); applyButtonTreatment("tertiary", "text");
       rebuildLayerList(); bindSqInteractions(); updateProductView(); selectSqSection("hero"); syncBrandControls();
       sqStudio.querySelectorAll("[data-sq-template]").forEach((item) => item.classList.toggle("selected", item === button));
