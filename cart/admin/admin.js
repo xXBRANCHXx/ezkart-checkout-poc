@@ -2030,6 +2030,17 @@
     const saveState = sqStudio.querySelector("[data-sq-save-state]");
     const undoButton = sqStudio.querySelector("[data-sq-undo]");
     const redoButton = sqStudio.querySelector("[data-sq-redo]");
+    const syncBuilderRange = (input) => {
+      const minimum = Number(input.min || 0);
+      const maximum = Number(input.max || 100);
+      const value = Number(input.value || minimum);
+      const progress = maximum === minimum ? 0 : Math.min(100, Math.max(0, ((value - minimum) / (maximum - minimum)) * 100));
+      input.style.setProperty("--sq-range-progress", `${progress}%`);
+    };
+    const syncBuilderRanges = () => sqStudio.querySelectorAll('input[type="range"]').forEach(syncBuilderRange);
+    sqStudio.addEventListener("input", (event) => { if (event.target.matches?.('input[type="range"]')) syncBuilderRange(event.target); });
+    sqStudio.addEventListener("change", (event) => { if (event.target.matches?.('input[type="range"]')) syncBuilderRange(event.target); });
+    syncBuilderRanges();
     const productPrices = { granola: 58000, coffee: 79000, sambal: 46000 };
     const productNames = { granola: "Granola Madu Nusantara", coffee: "Kopi Susu Concentrate", sambal: "Sambal Roa Signature" };
     const productImages = { granola: "assets/products/granola.webp", coffee: "assets/products/kopi-susu.webp", sambal: "assets/products/sambal-roa.webp" };
@@ -2401,12 +2412,16 @@
         if (context) context.textContent = "Selected section";
         const productControls = sqStudio.querySelector("[data-sq-product-layout-controls]");
         if (productControls) productControls.hidden = true;
+        syncBuilderRanges();
         return;
       }
       const layout = parseElementLayout(selectedElement);
       const isLogo = selectedElement.dataset.sqElementType === "logo";
       const isProductGrid = selectedElement.dataset.sqElementType === "product-grid";
       const isCode = selectedElement.dataset.sqElementType === "custom-code";
+      const elementType = selectedElement.dataset.sqElementType || "";
+      const typographyControls = sqStudio.querySelector("[data-sq-typography-controls]");
+      if (typographyControls) typographyControls.hidden = ["image", "collage", "gallery", "divider", "spacer", "icon", "custom-code"].includes(elementType);
       const action = isProductGrid ? null : actionForElement();
       const image = isLogo || isProductGrid ? null : imageForElement();
       const contentName = selectedContent?.matches("h1,h2,h3") ? "Heading" : selectedContent ? "Text" : "";
@@ -2576,6 +2591,7 @@
       const emptyContent = sqStudio.querySelector("[data-sq-element-content-empty]");
       if (emptyContent) emptyContent.hidden = [textControls, logoControls, imageControls, buttonControls, codeControls].some((control) => control && !control.hidden);
       showElementPanel(activeElementPanel);
+      syncBuilderRanges();
     };
     const removeElementOverlay = () => previewRoot?.querySelectorAll(".sq-element-overlay").forEach((overlay) => overlay.remove());
     const refreshElementOverlay = () => {
@@ -3760,6 +3776,7 @@
       const radiusInput = sqStudio.querySelector("[data-sq-button-radius]"); if (radiusInput) radiusInput.value = String(radius);
       const radiusOutput = sqStudio.querySelector("[data-sq-button-radius-output]"); if (radiusOutput) radiusOutput.textContent = `${radius}px`;
       const preview = sqStudio.querySelector("[data-sq-button-preview]"); if (preview) { preview.classList.remove("button-primary", "button-secondary", "button-tertiary"); preview.classList.add(`button-${role}`); }
+      syncBuilderRanges();
     };
     sqStudio.querySelector("[data-sq-button-style-role]")?.addEventListener("change", syncButtonSystemControls);
     sqStudio.querySelectorAll("[data-sq-button-color]").forEach((input) => input.addEventListener("input", () => {

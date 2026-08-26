@@ -168,9 +168,8 @@ declare(strict_types=1);
           </div>
           <div class="sq-element-panel" id="sq-element-panel-style" role="tabpanel" aria-labelledby="sq-element-tab-style" data-sq-element-panel="style" hidden>
           <div class="sq-element-appearance">
-            <div class="sq-style-intro"><span aria-hidden="true">Aa</span><div><h3>Make it yours</h3><p>Type, color, surface, and shape for this element.</p></div></div>
-            <section class="sq-style-card" aria-labelledby="sq-style-type-title">
-              <div class="sq-style-card-heading"><div><small>01</small><h3 id="sq-style-type-title">Typography</h3></div><span>Type system</span></div>
+            <section class="sq-style-card" aria-labelledby="sq-style-type-title" data-sq-typography-controls>
+              <div class="sq-style-card-heading"><h3 id="sq-style-type-title">Typography</h3><span>Text</span></div>
               <div class="sq-style-two-column">
                 <label><span>Font</span><select data-sq-element-font-family><option value="Poppins, sans-serif">Poppins</option><option value="Arial, Helvetica, sans-serif">Modern Sans</option><option value="Georgia, 'Times New Roman', serif">Editorial Serif</option><option value="'Times New Roman', Times, serif">Classic Serif</option><option value="ui-monospace, SFMono-Regular, Consolas, monospace">Mono</option></select></label>
                 <label><span>Weight</span><select data-sq-element-font-weight><option value="400">Regular</option><option value="500">Medium</option><option value="600">Semibold</option><option value="700">Bold</option></select></label>
@@ -186,7 +185,7 @@ declare(strict_types=1);
               <div class="sq-style-segmented" role="group" aria-label="Letter case"><button type="button" data-sq-element-transform="none">Normal</button><button type="button" data-sq-element-transform="uppercase">UPPER</button><button type="button" data-sq-element-transform="lowercase">lower</button></div>
             </section>
             <section class="sq-style-card" aria-labelledby="sq-style-colors-title">
-              <div class="sq-style-card-heading"><div><small>02</small><h3 id="sq-style-colors-title">Colors</h3></div><span>Direct edit</span></div>
+              <div class="sq-style-card-heading"><h3 id="sq-style-colors-title">Colors</h3><span>Fill &amp; outline</span></div>
               <div class="sq-style-color-list">
                 <div class="sq-style-color" data-sq-color-card="color"><input type="color" value="#24262b" aria-label="Choose text color" data-sq-element-color="color"><label><span>Text</span><input type="text" value="#24262B" maxlength="7" spellcheck="false" data-sq-element-color-hex="color"></label></div>
                 <div class="sq-style-color" data-sq-color-card="backgroundColor"><input type="color" value="#ffffff" aria-label="Choose background color" data-sq-element-color="backgroundColor"><label><span>Background</span><input type="text" value="#FFFFFF" maxlength="7" spellcheck="false" data-sq-element-color-hex="backgroundColor"></label><button type="button" aria-label="Remove background color" title="No background" data-sq-element-color-clear="backgroundColor">×</button></div>
@@ -194,7 +193,7 @@ declare(strict_types=1);
               </div>
             </section>
             <section class="sq-style-card" aria-labelledby="sq-style-surface-title">
-              <div class="sq-style-card-heading"><div><small>03</small><h3 id="sq-style-surface-title">Surface &amp; border</h3></div><span>Treatment</span></div>
+              <div class="sq-style-card-heading"><h3 id="sq-style-surface-title">Surface &amp; border</h3></div>
               <span class="sq-style-label">Surface</span>
               <div class="sq-surface-choices" role="group" aria-label="Surface treatment"><button type="button" data-sq-element-surface="none"><i></i><span>None</span></button><button type="button" data-sq-element-surface="soft"><i></i><span>Soft</span></button><button type="button" data-sq-element-surface="card"><i></i><span>Card</span></button><button type="button" data-sq-element-surface="outline"><i></i><span>Outline</span></button><button type="button" data-sq-element-surface="glass"><i></i><span>Glass</span></button></div>
               <div class="sq-style-two-column">
@@ -203,7 +202,7 @@ declare(strict_types=1);
               </div>
             </section>
             <section class="sq-style-card" aria-labelledby="sq-style-corners-title">
-              <div class="sq-style-card-heading"><div><small>04</small><h3 id="sq-style-corners-title">Corners</h3></div><span>Shape</span></div>
+              <div class="sq-style-card-heading"><h3 id="sq-style-corners-title">Corners</h3></div>
               <div class="sq-radius-presets" role="group" aria-label="Corner presets"><button type="button" data-sq-radius-choice="0"><i></i><span>Square</span></button><button type="button" data-sq-radius-choice="8"><i></i><span>Soft</span></button><button type="button" data-sq-radius-choice="20"><i></i><span>Round</span></button><button type="button" data-sq-radius-choice="999"><i></i><span>Pill</span></button></div>
               <div class="sq-radius-control"><label class="sq-style-range"><span>Radius</span><input type="range" min="0" max="64" value="0" data-sq-element-radius><output data-sq-element-radius-output>0px</output></label><label class="sq-radius-number"><span>Exact</span><input type="number" min="0" max="999" value="0" data-sq-element-radius-number><b>px</b></label></div>
             </section>
