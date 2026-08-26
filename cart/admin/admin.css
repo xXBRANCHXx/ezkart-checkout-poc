@@ -2178,3 +2178,9 @@ button, a { -webkit-tap-highlight-color: transparent; }
 @media (prefers-reduced-motion: reduce) {
   .sq-layout-grid-overlay { animation: none; transition: none; }
 }
+
+/* A sandboxed iframe owns its internal clicks. The canvas must receive them
+   so custom code and Component instances select, move, resize, and duplicate
+   like every other element. Interactions remain enabled in Preview/export. */
+.sq-canvas-scroll .sq-page-preview .sq-free-code { cursor: pointer; }
+.sq-canvas-scroll .sq-page-preview .sq-free-code > iframe { pointer-events: none; user-select: none; }
