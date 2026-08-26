@@ -2360,6 +2360,36 @@
       if (!image) return;
       image.style.filter = `blur(${imageFilterValue(image, "blur")}px) brightness(${imageFilterValue(image, "brightness")}%) contrast(${imageFilterValue(image, "contrast")}%) saturate(${imageFilterValue(image, "saturate")}%) grayscale(${imageFilterValue(image, "grayscale")}%) opacity(${imageFilterValue(image, "opacity")}%)`;
     };
+    let activeElementPanel = "content";
+    const showElementPanel = (panelName) => {
+      const panels = [...sqStudio.querySelectorAll("[data-sq-element-panel]")];
+      if (!panels.some((panel) => panel.dataset.sqElementPanel === panelName)) return;
+      activeElementPanel = panelName;
+      sqStudio.querySelectorAll("[data-sq-element-tab]").forEach((button) => {
+        const active = button.dataset.sqElementTab === panelName;
+        button.classList.toggle("active", active);
+        button.setAttribute("aria-selected", String(active));
+        button.tabIndex = active ? 0 : -1;
+      });
+      panels.forEach((panel) => {
+        const active = panel.dataset.sqElementPanel === panelName;
+        panel.hidden = !active;
+        panel.classList.toggle("active", active);
+      });
+    };
+    const elementTabs = [...sqStudio.querySelectorAll("[data-sq-element-tab]")];
+    elementTabs.forEach((button, index) => {
+      button.addEventListener("click", () => showElementPanel(button.dataset.sqElementTab));
+      button.addEventListener("keydown", (event) => {
+        const movement = { ArrowLeft: -1, ArrowRight: 1, Home: -index, End: elementTabs.length - index - 1 }[event.key];
+        if (movement == null) return;
+        event.preventDefault();
+        const target = elementTabs[(index + movement + elementTabs.length) % elementTabs.length];
+        showElementPanel(target.dataset.sqElementTab);
+        target.focus();
+      });
+    });
+    showElementPanel(activeElementPanel);
     const syncElementControls = () => {
       const controls = sqStudio.querySelector("[data-sq-element-controls]");
       const valid = selectedElement?.isConnected && selectedElement.closest(`[data-section-id="${selectedSection}"]`);
@@ -2373,14 +2403,13 @@
         return;
       }
       const layout = parseElementLayout(selectedElement);
-      const type = sqStudio.querySelector(".sq-element-controls [data-sq-element-type]");
       const isLogo = selectedElement.dataset.sqElementType === "logo";
       const isProductGrid = selectedElement.dataset.sqElementType === "product-grid";
+      const isCode = selectedElement.dataset.sqElementType === "custom-code";
       const action = isProductGrid ? null : actionForElement();
       const image = isLogo || isProductGrid ? null : imageForElement();
       const contentName = selectedContent?.matches("h1,h2,h3") ? "Heading" : selectedContent ? "Text" : "";
       const contextualName = isLogo ? "Logo" : selectedAction && action ? "Button" : selectedImage && image ? "Image" : contentName || elementTypeName(selectedElement);
-      if (type) type.textContent = contextualName;
       const context = sqStudio.querySelector("[data-sq-inspector-context]");
       const title = sqStudio.querySelector("[data-sq-inspector-title]");
       if (context) context.textContent = "Selected element";
@@ -2445,7 +2474,6 @@
       sqStudio.querySelectorAll("[data-sq-role-choice]").forEach((button) => button.classList.toggle("active", button.dataset.sqRoleChoice === buttonRole));
       const animation = sqStudio.querySelector("[data-sq-element-animation-control]");
       if (animation) animation.value = selectedElement.dataset.sqElementAnimation || "none";
-      sqStudio.querySelectorAll("[data-sq-entrance-preview]").forEach((button) => button.classList.toggle("active", button.dataset.sqEntrancePreview === (selectedElement.dataset.sqElementAnimation || "none")));
       const duration = Number.parseInt(selectedElement.style.getPropertyValue("--element-duration") || "700", 10);
       const delay = Number.parseInt(selectedElement.style.getPropertyValue("--element-delay") || "0", 10);
       [["duration", duration], ["delay", delay]].forEach(([field, value]) => {
@@ -2456,12 +2484,15 @@
       });
       sqStudio.querySelectorAll("[data-sq-hover-choice]").forEach((button) => button.classList.toggle("active", button.dataset.sqHoverChoice === (selectedElement.dataset.sqHover || "none")));
       const codeControls = sqStudio.querySelector("[data-sq-code-controls]");
-      const isCode = selectedElement.dataset.sqElementType === "custom-code";
       if (codeControls) codeControls.hidden = !isCode;
       const codeInput = sqStudio.querySelector("[data-sq-code-input]");
       if (isCode && codeInput) codeInput.value = codeSourceFor(selectedElement);
       const textControls = sqStudio.querySelector("[data-sq-element-text-controls]");
-      const textTarget = selectedContent?.isConnected && selectedElement.contains(selectedContent) && !selectedAction ? selectedContent : null;
+      const explicitTextTarget = selectedContent?.isConnected && selectedElement.contains(selectedContent) && !selectedAction ? selectedContent : null;
+      const fallbackTextTarget = !action && !image && !isLogo && !isProductGrid && !isCode
+        ? (selectedElement.matches("[data-sq-editable]") ? selectedElement : editableNodesFor(selectedElement)[0] || null)
+        : null;
+      const textTarget = explicitTextTarget || fallbackTextTarget;
       if (textControls) textControls.hidden = !textTarget;
       if (textTarget) {
         const textInput = sqStudio.querySelector("[data-sq-element-text]");
@@ -2500,6 +2531,9 @@
         if (density) density.value = settings.density;
         if (device) device.textContent = activeDevice[0].toUpperCase() + activeDevice.slice(1);
       }
+      const emptyContent = sqStudio.querySelector("[data-sq-element-content-empty]");
+      if (emptyContent) emptyContent.hidden = [textControls, logoControls, imageControls, buttonControls, codeControls].some((control) => control && !control.hidden);
+      showElementPanel(activeElementPanel);
     };
     const removeElementOverlay = () => previewRoot?.querySelectorAll(".sq-element-overlay").forEach((overlay) => overlay.remove());
     const refreshElementOverlay = () => {
@@ -2533,6 +2567,8 @@
       previewRoot?.querySelectorAll(".sq-element-selected").forEach((item) => item.classList.remove("sq-element-selected"));
       element.classList.add("sq-element-selected");
       sqStudio.querySelectorAll("[data-sq-element-layer]").forEach((layer) => layer.classList.toggle("active", layer.dataset.sqElementLayer === element.dataset.sqElementId));
+      const elementType = element.dataset.sqElementType || "";
+      showElementPanel(elementType === "product-grid" ? "layout" : ["divider", "spacer", "icon"].includes(elementType) ? "style" : "content");
       syncElementControls();
       requestAnimationFrame(refreshElementOverlay);
     };
@@ -3468,13 +3504,6 @@
       if (event.currentTarget.value !== "none") selectedElement.classList.add(`element-animation-${event.currentTarget.value}`);
       markSqChanged();
     });
-    sqStudio.querySelectorAll("[data-sq-entrance-preview]").forEach((button) => button.addEventListener("click", () => {
-      const select = sqStudio.querySelector("[data-sq-element-animation-control]");
-      if (!select) return;
-      select.value = button.dataset.sqEntrancePreview;
-      select.dispatchEvent(new Event("change", { bubbles: true }));
-      syncElementControls();
-    }));
     [["duration", "--element-duration"], ["delay", "--element-delay"]].forEach(([field, property]) => {
       sqStudio.querySelector(`[data-sq-element-${field}]`)?.addEventListener("input", (event) => {
         if (!selectedElement?.isConnected) return;
