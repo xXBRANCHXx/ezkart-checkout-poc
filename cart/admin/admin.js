@@ -2309,7 +2309,7 @@
       grid.style.top = computed.paddingTop;
       grid.style.setProperty("--sq-grid-rows", String(rows));
       grid.style.setProperty("--sq-grid-row-height", `${fluidRowHeight(section)}px`);
-      grid.style.setProperty("--sq-grid-column-gap", computed.columnGap || "0px");
+      grid.style.setProperty("--sq-grid-gap", computed.columnGap || "0px");
       const cells = document.createDocumentFragment();
       for (let index = 0; index < rows * 12; index += 1) cells.append(document.createElement("i"));
       grid.append(cells);

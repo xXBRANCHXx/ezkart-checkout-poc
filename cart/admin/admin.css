@@ -1384,7 +1384,12 @@ button, a { -webkit-tap-highlight-color: transparent; }
 
 /* Page gutters, column rhythm, and exact element insets. */
 .sq-page-block[data-sq-fluid],
-.ez-fluid-section { column-gap: var(--sq-builder-column-gap, 10px) !important; }
+.ez-fluid-section {
+  column-gap: var(--sq-builder-column-gap, 10px) !important;
+  row-gap: var(--sq-builder-column-gap, 10px) !important;
+  grid-template-rows: repeat(var(--sq-fluid-rows, 12), max(4px, calc(var(--sq-fluid-row-height, 34px) - var(--sq-builder-column-gap, 10px)))) !important;
+  grid-auto-rows: max(4px, calc(var(--sq-fluid-row-height, 34px) - var(--sq-builder-column-gap, 10px))) !important;
+}
 .sq-free-heading,
 .sq-free-text { padding: 0 !important; }
 .sq-page-preview .sq-custom-inset { padding: var(--sq-inset-desktop, 0) !important; }
@@ -1423,21 +1428,22 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .sq-layout-grid-controls + .sq-product-layout-controls:not([hidden]),
 .sq-layout-grid-controls + .sq-product-layout-controls[hidden] + .sq-element-inset-controls { margin-top: 16px; }
 .sq-layout-grid-overlay {
-  height: calc(var(--sq-grid-rows) * var(--sq-grid-row-height));
+  height: calc(var(--sq-grid-rows) * var(--sq-grid-row-height) - var(--sq-grid-gap));
   position: absolute !important;
-  z-index: 0 !important;
+  z-index: 8 !important;
   display: grid !important;
   grid-template-columns: repeat(12, minmax(0, 1fr)) !important;
-  grid-auto-rows: var(--sq-grid-row-height) !important;
-  column-gap: var(--sq-grid-column-gap) !important;
-  row-gap: 0 !important;
+  grid-auto-rows: max(4px, calc(var(--sq-grid-row-height) - var(--sq-grid-gap))) !important;
+  gap: var(--sq-grid-gap) !important;
   pointer-events: none !important;
   overflow: hidden;
 }
 .sq-layout-grid-overlay > i {
   min-width: 0;
   display: block;
-  background: rgba(255, 255, 255, .16);
-  border: 1px solid rgba(247, 11, 97, .24);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .34);
+  background: rgba(255, 255, 255, .045);
+  border: 1px solid rgba(247, 11, 97, .44);
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .24), 0 1px 2px rgba(24, 27, 34, .08);
 }
+.sq-page-block > .sq-block-handle { z-index: 12; }
