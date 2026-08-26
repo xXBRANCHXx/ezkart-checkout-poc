@@ -2474,6 +2474,21 @@
       if (element?.matches("button,a")) return element;
       return element?.querySelector("button,a") || null;
     };
+    const applyButtonRoleToElement = (element, role = "primary") => {
+      if (!element) return;
+      const roleClasses = ["button-primary", "button-secondary", "button-tertiary"];
+      element.dataset.sqButtonRole = role;
+      if (element.dataset.sqElementType === "product-grid") {
+        element.classList.remove(...roleClasses);
+        element.querySelectorAll("article footer > button").forEach((button) => {
+          button.classList.remove(...roleClasses);
+          button.classList.add(`button-${role}`);
+        });
+        return;
+      }
+      element.classList.remove(...roleClasses);
+      element.classList.add(`button-${role}`);
+    };
     const imageForElement = (element = selectedElement) => {
       if (selectedImage?.isConnected && element?.contains(selectedImage)) return selectedImage;
       if (element?.matches("img")) return element;
@@ -2486,7 +2501,7 @@
       if (href.startsWith("#")) return "section";
       if (href.startsWith("mailto:")) return "email";
       if (href.startsWith("tel:")) return "phone";
-      if (/checkout|buy now|secure checkout/i.test(action.textContent)) return "checkout";
+      if (/checkout|buy now|secure checkout|add to cart/i.test(action.textContent)) return "checkout";
       return href ? "url" : "section";
     };
     const inferredActionTarget = (action, type = inferredActionType(action)) => {
@@ -2570,7 +2585,9 @@
       const elementType = selectedElement.dataset.sqElementType || "";
       const typographyControls = sqStudio.querySelector("[data-sq-typography-controls]");
       if (typographyControls) typographyControls.hidden = ["image", "collage", "gallery", "divider", "spacer", "icon", "custom-code"].includes(elementType);
-      const action = isProductGrid ? null : actionForElement();
+      const action = isProductGrid
+        ? (selectedAction?.isConnected && selectedElement.contains(selectedAction) ? selectedAction : null)
+        : actionForElement();
       const image = isLogo || isProductGrid ? null : imageForElement();
       const contentName = selectedContent?.matches("h1,h2,h3") ? "Heading" : selectedContent ? "Text" : "";
       const contextualName = isLogo ? "Logo" : selectedAction && action ? "Button" : selectedImage && image ? "Image" : contentName || elementTypeName(selectedElement);
@@ -2701,6 +2718,18 @@
       }
       const buttonRole = selectedElement.dataset.sqButtonRole || "primary";
       sqStudio.querySelectorAll("[data-sq-role-choice]").forEach((button) => button.classList.toggle("active", button.dataset.sqRoleChoice === buttonRole));
+      const brandSummary = sqStudio.querySelector("[data-sq-button-brand-summary]");
+      if (brandSummary) brandSummary.hidden = !hasButton;
+      if (hasButton) {
+        const roleLabel = sqStudio.querySelector("[data-sq-selected-brand-role]");
+        if (roleLabel) roleLabel.textContent = buttonRole[0].toUpperCase() + buttonRole.slice(1);
+        sqStudio.querySelectorAll("[data-sq-selected-brand-swatch]").forEach((swatch) => {
+          swatch.style.background = buttonValue(buttonRole, swatch.dataset.sqSelectedBrandSwatch);
+        });
+        sqStudio.querySelectorAll("[data-sq-selected-brand-value]").forEach((value) => {
+          value.textContent = colorToHex(buttonValue(buttonRole, value.dataset.sqSelectedBrandValue), "#000000").toUpperCase();
+        });
+      }
       const animation = sqStudio.querySelector("[data-sq-element-animation-control]");
       if (animation) animation.value = selectedElement.dataset.sqElementAnimation || "none";
       const duration = Number.parseInt(selectedElement.style.getPropertyValue("--element-duration") || "700", 10);
@@ -2805,7 +2834,7 @@
       element.classList.add("sq-element-selected");
       sqStudio.querySelectorAll("[data-sq-element-layer]").forEach((layer) => layer.classList.toggle("active", layer.dataset.sqElementLayer === element.dataset.sqElementId));
       const elementType = element.dataset.sqElementType || "";
-      showElementPanel(elementType === "product-grid" ? "layout" : ["divider", "spacer", "icon"].includes(elementType) ? "style" : "content");
+      showElementPanel(action ? "content" : elementType === "product-grid" ? "layout" : ["divider", "spacer", "icon"].includes(elementType) ? "style" : "content");
       syncElementControls();
       requestAnimationFrame(refreshElementOverlay);
     };
@@ -3213,9 +3242,8 @@
       previewRoot?.querySelectorAll(".sq-free-code").forEach(renderCodeElement);
       previewRoot?.querySelectorAll("[data-sq-fluid] > [data-sq-element]").forEach((element, index) => {
         if (!element.dataset.sqElementId) element.dataset.sqElementId = `element-${Date.now()}-${index}`;
-        if ((element.matches("button") || element.querySelector("button")) && !element.dataset.sqButtonRole) {
-          element.dataset.sqButtonRole = element.dataset.sqElementType === "navigation" ? "secondary" : "primary";
-          element.classList.add(`button-${element.dataset.sqButtonRole}`);
+        if (element.matches("button") || element.querySelector("button")) {
+          applyButtonRoleToElement(element, element.dataset.sqButtonRole || (element.dataset.sqElementType === "navigation" ? "secondary" : "primary"));
         }
         if (element.dataset.sqElementType !== "product-grid") {
           const actions = element.matches("button,a") ? [element] : [...element.querySelectorAll("button,a")];
@@ -3229,10 +3257,10 @@
         element.onclick = (event) => {
           event.stopPropagation();
           const section = element.closest("[data-section-id]");
-          if (selectedElement === element) { deselectSqItem(section?.dataset.sectionId); return; }
-          if (section) selectSqSection(section.dataset.sectionId);
           const action = event.target.closest?.("button,a");
           const image = event.target.closest?.("img");
+          if (selectedElement === element && (!action || selectedAction === action)) { deselectSqItem(section?.dataset.sectionId); return; }
+          if (section) selectSqSection(section.dataset.sectionId);
           selectSqElement(element, action, image);
         };
       });
@@ -3351,7 +3379,7 @@
       previewRoot?.querySelectorAll("[data-sq-block]").forEach((block) => {
         editableNodesFor(block).forEach((content, index) => {
           if (!content.dataset.sqEditable) content.dataset.sqEditable = `copy-${index + 1}`;
-          content.contentEditable = "true";
+          content.contentEditable = content.matches("button,a") ? "false" : "true";
           content.spellcheck = true;
           content.draggable = false;
           const startInlineEdit = () => {
@@ -3360,10 +3388,13 @@
           content.onpointerdown = (event) => { event.stopPropagation(); startInlineEdit(); };
           content.onclick = (event) => {
             event.stopPropagation();
-            if (content.matches("a,button")) event.preventDefault();
-            if (selectedElement === content.closest("[data-sq-element]")) { deselectSqItem(block.dataset.sectionId); return; }
+            const isAction = content.matches("a,button");
+            if (isAction) event.preventDefault();
+            const element = content.closest("[data-sq-element]");
+            if (!isAction && selectedElement === element) { deselectSqItem(block.dataset.sectionId); return; }
+            if (isAction && selectedElement === element && selectedAction === content) { deselectSqItem(block.dataset.sectionId); return; }
             selectSqSection(block.dataset.sectionId);
-            selectSqElement(content.closest("[data-sq-element]"), content.matches("button,a") ? content : null, null, content);
+            selectSqElement(element, isAction ? content : null, null, isAction ? null : content);
           };
           content.ondragstart = (event) => event.stopPropagation();
           content.onfocus = startInlineEdit;
@@ -4142,9 +4173,7 @@
     sqStudio.querySelectorAll("[data-sq-role-choice]").forEach((button) => button.addEventListener("click", () => {
       if (!selectedElement?.isConnected) return;
       remember();
-      selectedElement.classList.remove("button-primary", "button-secondary", "button-tertiary");
-      selectedElement.classList.add(`button-${button.dataset.sqRoleChoice}`);
-      selectedElement.dataset.sqButtonRole = button.dataset.sqRoleChoice;
+      applyButtonRoleToElement(selectedElement, button.dataset.sqRoleChoice);
       syncElementControls(); markSqChanged();
     }));
     sqStudio.querySelector("[data-sq-element-animation-control]")?.addEventListener("change", (event) => {
@@ -4310,22 +4339,37 @@
     let globalStyleSnapshot;
     const startGlobalStyleEdit = () => { if (!globalStyleSnapshot) globalStyleSnapshot = captureState(); };
     const finishGlobalStyleEdit = () => { if (globalStyleSnapshot) remember(globalStyleSnapshot); globalStyleSnapshot = null; };
-    sqStudio.querySelectorAll("[data-sq-brand-color], [data-sq-button-color], [data-sq-button-radius]").forEach((input) => { input.addEventListener("focus", startGlobalStyleEdit); input.addEventListener("pointerdown", startGlobalStyleEdit); input.addEventListener("change", finishGlobalStyleEdit); });
+    sqStudio.querySelectorAll("[data-sq-brand-color], [data-sq-brand-font], [data-sq-button-color], [data-sq-button-radius], [data-sq-button-border-width], [data-sq-button-height], [data-sq-button-weight], [data-sq-button-shadow], [data-sq-button-case]").forEach((input) => { input.addEventListener("focus", startGlobalStyleEdit); input.addEventListener("pointerdown", startGlobalStyleEdit); input.addEventListener("change", finishGlobalStyleEdit); });
     sqStudio.querySelectorAll("[data-sq-brand-color]").forEach((input) => input.addEventListener("input", () => {
       const key = input.dataset.sqBrandColor;
       previewRoot?.style.setProperty(brandVariable[key], input.value);
       if (key === "accent") previewRoot?.style.setProperty("--button-primary-bg", input.value);
+      const output = sqStudio.querySelector(`[data-sq-brand-color-output="${key}"]`);
+      if (output) output.textContent = input.value.toUpperCase();
       sqStudio.querySelectorAll("[data-sq-theme]").forEach((button) => button.classList.remove("active"));
+      if (selectedAction?.isConnected) syncElementControls();
+      markSqChanged();
+    }));
+    sqStudio.querySelectorAll("[data-sq-brand-font]").forEach((input) => input.addEventListener("change", () => {
+      previewRoot?.style.setProperty(`--site-${input.dataset.sqBrandFont}-font`, input.value);
       markSqChanged();
     }));
     const buttonDefaults = {
-      primary: { bg: "#f44b34", fg: "#ffffff", border: "#f44b34", radius: 10, treatment: "solid" },
-      secondary: { bg: "#ffffff", fg: "#24262b", border: "#24262b", radius: 10, treatment: "outline" },
-      tertiary: { bg: "#ffffff", fg: "#f44b34", border: "#ffffff", radius: 0, treatment: "text" },
+      primary: { bg: "#f44b34", fg: "#ffffff", border: "#f44b34", radius: 24, borderWidth: 0, height: 42, weight: 600, shadow: "soft", case: "none", treatment: "solid" },
+      secondary: { bg: "#ffffff", fg: "#24262b", border: "#24262b", radius: 10, borderWidth: 1, height: 42, weight: 600, shadow: "none", case: "none", treatment: "outline" },
+      tertiary: { bg: "#ffffff", fg: "#f44b34", border: "#ffffff", radius: 0, borderWidth: 0, height: 42, weight: 600, shadow: "none", case: "none", treatment: "text" },
     };
     const activeButtonRole = () => sqStudio.querySelector("[data-sq-button-style-role]")?.value || "primary";
-    const buttonValue = (role, field) => previewRoot?.style.getPropertyValue(`--button-${role}-${field}`).trim() || String(buttonDefaults[role][field]);
+    const buttonValue = (role, field) => {
+      const fallbackField = field.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
+      return previewRoot?.style.getPropertyValue(`--button-${role}-${field}`).trim() || String(buttonDefaults[role][fallbackField] ?? "");
+    };
     const buttonTreatment = (role) => [...(previewRoot?.classList || [])].find((name) => name.startsWith(`buttons-${role}-`))?.replace(`buttons-${role}-`, "") || buttonDefaults[role].treatment;
+    const buttonShadowValue = (role, value) => ({ none: "none", soft: `0 7px 16px color-mix(in srgb,var(--button-${role}-bg) 20%,transparent)`, strong: `0 12px 28px color-mix(in srgb,var(--button-${role}-bg) 32%,transparent)` })[value] || "none";
+    const buttonShadowName = (role) => {
+      const value = buttonValue(role, "shadow");
+      return value === "none" ? "none" : value.includes("12px 28px") ? "strong" : "soft";
+    };
     const applyButtonTreatment = (role, treatment) => {
       [...(previewRoot?.classList || [])].filter((name) => name.startsWith(`buttons-${role}-`)).forEach((name) => previewRoot.classList.remove(name));
       previewRoot?.classList.add(`buttons-${role}-${treatment}`);
@@ -4337,17 +4381,72 @@
       const radius = Number.parseInt(buttonValue(role, "radius"), 10) || 0;
       const radiusInput = sqStudio.querySelector("[data-sq-button-radius]"); if (radiusInput) radiusInput.value = String(radius);
       const radiusOutput = sqStudio.querySelector("[data-sq-button-radius-output]"); if (radiusOutput) radiusOutput.textContent = `${radius}px`;
-      const preview = sqStudio.querySelector("[data-sq-button-preview]"); if (preview) { preview.classList.remove("button-primary", "button-secondary", "button-tertiary"); preview.classList.add(`button-${role}`); }
+      const borderWidth = Number.parseInt(buttonValue(role, "border-width"), 10);
+      const borderWidthInput = sqStudio.querySelector("[data-sq-button-border-width]"); if (borderWidthInput) borderWidthInput.value = String(Number.isFinite(borderWidth) ? borderWidth : buttonDefaults[role].borderWidth);
+      const borderWidthOutput = sqStudio.querySelector("[data-sq-button-border-width-output]"); if (borderWidthOutput) borderWidthOutput.textContent = `${borderWidthInput?.value || 0}px`;
+      const height = Number.parseInt(buttonValue(role, "height"), 10) || buttonDefaults[role].height;
+      const heightInput = sqStudio.querySelector("[data-sq-button-height]"); if (heightInput) heightInput.value = String(height);
+      const heightOutput = sqStudio.querySelector("[data-sq-button-height-output]"); if (heightOutput) heightOutput.textContent = `${height}px`;
+      const weight = sqStudio.querySelector("[data-sq-button-weight]"); if (weight) weight.value = String(Number.parseInt(buttonValue(role, "weight"), 10) || buttonDefaults[role].weight);
+      const shadow = sqStudio.querySelector("[data-sq-button-shadow]"); if (shadow) shadow.value = buttonShadowName(role);
+      const letterCase = sqStudio.querySelector("[data-sq-button-case]"); if (letterCase) letterCase.value = buttonValue(role, "case") || buttonDefaults[role].case;
+      const preview = sqStudio.querySelector("[data-sq-button-preview]");
+      if (preview) {
+        const treatmentValue = buttonTreatment(role);
+        const background = buttonValue(role, "bg");
+        preview.classList.remove("button-primary", "button-secondary", "button-tertiary");
+        preview.classList.add(`button-${role}`);
+        preview.style.color = treatmentValue === "outline" || treatmentValue === "text" ? background : buttonValue(role, "fg");
+        preview.style.background = treatmentValue === "outline" || treatmentValue === "text" ? "transparent" : treatmentValue === "soft" ? `color-mix(in srgb,${background} 14%,transparent)` : background;
+        preview.style.border = `${borderWidthInput?.value || 0}px solid ${buttonValue(role, "border")}`;
+        preview.style.borderRadius = `${radius}px`;
+        preview.style.minHeight = `${height}px`;
+        preview.style.fontWeight = weight?.value || "600";
+        preview.style.textTransform = letterCase?.value || "none";
+        preview.style.boxShadow = ["soft", "text"].includes(treatmentValue) ? "none" : buttonShadowValue(role, shadow?.value || "none");
+      }
       syncBuilderRanges();
     };
     sqStudio.querySelector("[data-sq-button-style-role]")?.addEventListener("change", syncButtonSystemControls);
     sqStudio.querySelectorAll("[data-sq-button-color]").forEach((input) => input.addEventListener("input", () => {
-      previewRoot?.style.setProperty(`--button-${activeButtonRole()}-${input.dataset.sqButtonColor}`, input.value); markSqChanged();
+      previewRoot?.style.setProperty(`--button-${activeButtonRole()}-${input.dataset.sqButtonColor}`, input.value);
+      if (selectedAction?.isConnected) syncElementControls();
+      syncButtonSystemControls();
+      markSqChanged();
     }));
-    sqStudio.querySelector("[data-sq-button-treatment]")?.addEventListener("change", (event) => { remember(); applyButtonTreatment(activeButtonRole(), event.currentTarget.value); markSqChanged(); });
+    sqStudio.querySelector("[data-sq-button-treatment]")?.addEventListener("change", (event) => {
+      remember();
+      const role = activeButtonRole();
+      applyButtonTreatment(role, event.currentTarget.value);
+      if (event.currentTarget.value === "outline" && Number.parseInt(buttonValue(role, "border-width"), 10) === 0) previewRoot?.style.setProperty(`--button-${role}-border-width`, "1px");
+      syncButtonSystemControls();
+      markSqChanged();
+    });
     sqStudio.querySelector("[data-sq-button-radius]")?.addEventListener("input", (event) => {
       previewRoot?.style.setProperty(`--button-${activeButtonRole()}-radius`, `${event.currentTarget.value}px`);
-      const output = sqStudio.querySelector("[data-sq-button-radius-output]"); if (output) output.textContent = `${event.currentTarget.value}px`; markSqChanged();
+      const output = sqStudio.querySelector("[data-sq-button-radius-output]"); if (output) output.textContent = `${event.currentTarget.value}px`; syncButtonSystemControls(); markSqChanged();
+    });
+    [["border-width", "px"], ["height", "px"]].forEach(([field, suffix]) => {
+      sqStudio.querySelector(`[data-sq-button-${field}]`)?.addEventListener("input", (event) => {
+        previewRoot?.style.setProperty(`--button-${activeButtonRole()}-${field}`, `${event.currentTarget.value}${suffix}`);
+        const output = sqStudio.querySelector(`[data-sq-button-${field}-output]`); if (output) output.textContent = `${event.currentTarget.value}${suffix}`;
+        syncButtonSystemControls();
+        markSqChanged();
+      });
+    });
+    sqStudio.querySelector("[data-sq-button-weight]")?.addEventListener("change", (event) => { previewRoot?.style.setProperty(`--button-${activeButtonRole()}-weight`, event.currentTarget.value); syncButtonSystemControls(); markSqChanged(); });
+    sqStudio.querySelector("[data-sq-button-case]")?.addEventListener("change", (event) => { previewRoot?.style.setProperty(`--button-${activeButtonRole()}-case`, event.currentTarget.value); syncButtonSystemControls(); markSqChanged(); });
+    sqStudio.querySelector("[data-sq-button-shadow]")?.addEventListener("change", (event) => { const role = activeButtonRole(); previewRoot?.style.setProperty(`--button-${role}-shadow`, buttonShadowValue(role, event.currentTarget.value)); syncButtonSystemControls(); markSqChanged(); });
+    sqStudio.querySelector("[data-sq-edit-button-brand]")?.addEventListener("click", () => {
+      const role = selectedElement?.dataset.sqButtonRole || "primary";
+      const roleSelect = sqStudio.querySelector("[data-sq-button-style-role]");
+      if (roleSelect) roleSelect.value = role;
+      openSqPanel("brand");
+      syncButtonSystemControls();
+      const system = sqStudio.querySelector("[data-sq-brand-button-system]");
+      system?.scrollIntoView({ behavior: "smooth", block: "start" });
+      system?.classList.remove("brand-focus");
+      requestAnimationFrame(() => system?.classList.add("brand-focus"));
     });
     sqStudio.querySelectorAll("[data-sq-theme]").forEach((button) => button.addEventListener("click", () => {
       remember();
@@ -4355,7 +4454,11 @@
       previewRoot?.classList.remove("theme-coral", "theme-forest", "theme-indigo", "theme-charcoal");
       previewRoot?.classList.add(button.dataset.sqTheme);
       const colors = { "theme-coral": ["#f44b34", "#fffbf7", "#24262b", "#ffffff"], "theme-forest": ["#1c6b55", "#f1f5ef", "#17382e", "#ffffff"], "theme-indigo": ["#3f58a8", "#f1f3fb", "#1d2644", "#ffffff"], "theme-charcoal": ["#24262b", "#f4f4f2", "#24262b", "#ffffff"] }[button.dataset.sqTheme];
-      ["accent", "page", "ink", "surface"].forEach((key, index) => { previewRoot?.style.setProperty(brandVariable[key], colors[index]); const input = sqStudio.querySelector(`[data-sq-brand-color="${key}"]`); if (input) input.value = colors[index]; });
+      ["accent", "page", "ink", "surface"].forEach((key, index) => { previewRoot?.style.setProperty(brandVariable[key], colors[index]); const input = sqStudio.querySelector(`[data-sq-brand-color="${key}"]`); if (input) input.value = colors[index]; const output = sqStudio.querySelector(`[data-sq-brand-color-output="${key}"]`); if (output) output.textContent = colors[index].toUpperCase(); });
+      previewRoot?.style.setProperty("--button-primary-bg", colors[0]);
+      previewRoot?.style.setProperty("--button-primary-border", colors[0]);
+      syncButtonSystemControls();
+      if (selectedAction?.isConnected) syncElementControls();
       markSqChanged();
     }));
     sqStudio.querySelector("[data-sq-radius]")?.addEventListener("change", (event) => {
@@ -4398,7 +4501,11 @@
     };
     const syncBrandControls = () => {
       const computed = getComputedStyle(previewRoot);
-      ["accent", "page", "ink", "surface"].forEach((key) => { const input = sqStudio.querySelector(`[data-sq-brand-color="${key}"]`); if (input) input.value = colorToHex(computed.getPropertyValue(brandVariable[key]), input.value); });
+      ["accent", "page", "ink", "surface"].forEach((key) => { const input = sqStudio.querySelector(`[data-sq-brand-color="${key}"]`); if (input) input.value = colorToHex(computed.getPropertyValue(brandVariable[key]), input.value); const output = sqStudio.querySelector(`[data-sq-brand-color-output="${key}"]`); if (output && input) output.textContent = input.value.toUpperCase(); });
+      sqStudio.querySelectorAll("[data-sq-brand-font]").forEach((input) => {
+        const font = computed.getPropertyValue(`--site-${input.dataset.sqBrandFont}-font`).trim() || "Poppins, sans-serif";
+        if ([...input.options].some((option) => option.value === font)) input.value = font;
+      });
       syncButtonSystemControls();
     };
     const newBlockMarkup = (type, sectionId) => {
@@ -4609,7 +4716,7 @@
         node.classList.remove("sq-element-selected", "sq-element-animate");
       });
       clone.querySelectorAll("img[src]").forEach((image) => { image.src = new URL(image.getAttribute("src"), window.location.href).href; });
-      clone.querySelectorAll("[data-product-card]").forEach((card) => { const button = card.querySelector("button"); if (button) { button.dataset.ezkartAdd = card.dataset.productCard; button.type = "button"; } });
+      clone.querySelectorAll("[data-product-card]").forEach((card) => { const button = card.querySelector("footer button"); if (button) { button.dataset.ezkartAdd = card.dataset.productCard; button.type = "button"; } });
       const checkout = clone.querySelector(".sq-cart-section aside>button"); if (checkout) checkout.dataset.ezkartCheckout = "";
       [clone, ...clone.querySelectorAll("*")].forEach((node) => [...node.attributes].forEach((attribute) => { if (attribute.name.startsWith("data-sq-")) node.removeAttribute(attribute.name); }));
       const pageName = document.querySelector("[data-current-site-name]")?.textContent || "Ezkart Landing Page";
