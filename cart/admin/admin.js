@@ -2215,6 +2215,7 @@
     const requestedSiteUrl = new URLSearchParams(window.location.search).get("edit") || "";
     let activeSiteKey = requestedSiteUrl;
     let activeSiteDocument = null;
+    let siteLoadRequest = 0;
     let cloudSavePromise = Promise.resolve(true);
     let baseSiteState = null;
 
@@ -4951,35 +4952,46 @@ document.querySelectorAll('[class*="animation-"],[class*="element-animation-"]')
     const cloneBaseSiteState = () => JSON.parse(JSON.stringify(baseSiteState || captureState()));
     const loadSite = async (site, force = false) => {
       if (!site || (!force && site.classList.contains("active"))) return;
-      if (!force && activeSiteKey) await persistCurrentState();
-      activeSiteKey = site.dataset.siteUrl || "default";
-      sqStudio.querySelectorAll("[data-sq-site]").forEach((item) => item.classList.toggle("active", item === site));
-      document.querySelectorAll("[data-current-site-name]").forEach((target) => { target.textContent = site.dataset.siteName; });
-      document.querySelectorAll("[data-current-site-url]").forEach((target) => { target.textContent = site.dataset.siteUrl; });
-      window.history.replaceState(null, "", `?page=sites&edit=${encodeURIComponent(site.dataset.siteUrl)}`);
-      let state = null;
+      const loadRequest = ++siteLoadRequest;
+      sqStudio.classList.add("sq-site-loading");
+      sqStudio.setAttribute("aria-busy", "true");
       try {
-        activeSiteDocument = await loadCloudLandingPage(site.dataset.siteUrl);
-        state = activeSiteDocument.state || null;
-        site.dataset.siteProducts = activeSiteDocument.products.join(",");
-        site.dataset.siteCustomProducts = JSON.stringify(activeSiteDocument.customProducts);
-      } catch (error) {
-        showToast(error instanceof Error ? error.message : "The landing page could not be loaded.");
-        return;
+        if (!force && activeSiteKey) await persistCurrentState();
+        activeSiteKey = site.dataset.siteUrl || "default";
+        sqStudio.querySelectorAll("[data-sq-site]").forEach((item) => item.classList.toggle("active", item === site));
+        document.querySelectorAll("[data-current-site-name]").forEach((target) => { target.textContent = site.dataset.siteName; });
+        document.querySelectorAll("[data-current-site-url]").forEach((target) => { target.textContent = site.dataset.siteUrl; });
+        window.history.replaceState(null, "", `?page=sites&edit=${encodeURIComponent(site.dataset.siteUrl)}`);
+        let state = null;
+        try {
+          activeSiteDocument = await loadCloudLandingPage(site.dataset.siteUrl);
+          state = activeSiteDocument.state || null;
+          site.dataset.siteProducts = activeSiteDocument.products.join(",");
+          site.dataset.siteCustomProducts = JSON.stringify(activeSiteDocument.customProducts);
+        } catch (error) {
+          showToast(error instanceof Error ? error.message : "The landing page could not be loaded.");
+          return;
+        }
+        undoStack.length = 0; redoStack.length = 0; updateHistoryButtons();
+        restoreState([2, 3, 4, 5, 6].includes(state?.version) ? state : cloneBaseSiteState());
+        readCatalogProducts().forEach((product) => installCustomProduct(product, selectedProducts().includes(product.id)));
+        let customProducts = [];
+        try { customProducts = JSON.parse(site.dataset.siteCustomProducts || "[]"); } catch (_) { customProducts = []; }
+        customProducts.forEach((product) => installCustomProduct(product, true));
+        if (![2, 3].includes(state?.version) && site.dataset.siteProducts) {
+          const starters = site.dataset.siteProducts.split(",").filter(Boolean);
+          sqStudio.querySelectorAll("[data-sq-product]").forEach((input) => { input.checked = starters.includes(input.value); });
+          updateProductView(); markSqChanged();
+        }
+        deselectSqItem(state?.selectedSection || "hero");
+        showToast(`${site.dataset.siteName} loaded from R2`);
+      } finally {
+        window.requestAnimationFrame(() => {
+          if (loadRequest !== siteLoadRequest) return;
+          sqStudio.classList.remove("sq-site-loading");
+          sqStudio.setAttribute("aria-busy", "false");
+        });
       }
-      undoStack.length = 0; redoStack.length = 0; updateHistoryButtons();
-      restoreState([2, 3, 4, 5, 6].includes(state?.version) ? state : cloneBaseSiteState());
-      readCatalogProducts().forEach((product) => installCustomProduct(product, selectedProducts().includes(product.id)));
-      let customProducts = [];
-      try { customProducts = JSON.parse(site.dataset.siteCustomProducts || "[]"); } catch (_) { customProducts = []; }
-      customProducts.forEach((product) => installCustomProduct(product, true));
-      if (![2, 3].includes(state?.version) && site.dataset.siteProducts) {
-        const starters = site.dataset.siteProducts.split(",").filter(Boolean);
-        sqStudio.querySelectorAll("[data-sq-product]").forEach((input) => { input.checked = starters.includes(input.value); });
-        updateProductView(); markSqChanged();
-      }
-      deselectSqItem(state?.selectedSection || "hero");
-      showToast(`${site.dataset.siteName} loaded from R2`);
     };
     const bindSiteButton = (site) => { site.onclick = () => { void loadSite(site); }; };
     const pageList = sqStudio.querySelector(".sq-page-list");

@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 ?>
-<section class="sq-studio" id="visual-builder" aria-label="Landing page builder">
+<section class="sq-studio sq-site-loading" id="visual-builder" aria-label="Landing page builder" aria-busy="true">
   <header class="sq-commandbar">
     <div class="sq-page-identity">
       <a href="?page=sites" aria-label="Return to landing pages"><?= ez_admin_icon('chevron-left') ?></a>
