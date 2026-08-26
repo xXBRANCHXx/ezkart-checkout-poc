@@ -1439,7 +1439,12 @@ button, a { -webkit-tap-highlight-color: transparent; }
   gap: var(--sq-grid-gap) !important;
   pointer-events: none !important;
   overflow: hidden;
+  transform-origin: center;
+  animation: sqGridReveal .18s cubic-bezier(.2,.8,.2,1) both;
+  transition: opacity .18s ease, transform .18s ease;
 }
+.sq-layout-grid-overlay.is-hiding { opacity: 0; transform: scale(.995); }
+@keyframes sqGridReveal { from { opacity: 0; transform: scale(.995); } to { opacity: 1; transform: scale(1); } }
 .sq-layout-grid-overlay > i {
   min-width: 0;
   display: block;
@@ -2091,3 +2096,85 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .sq-review-rating button { min-width: 0; height: 34px; padding: 0; color: #717780; background: #fff; border: 1px solid #dfdcda; border-radius: 8px; font: 600 9px Poppins, sans-serif; }
 .sq-review-rating button:hover { color: #d72d4d; background: #fff5f1; border-color: #efb5a5; }
 .sq-review-rating button.active { color: #fff; background: linear-gradient(110deg,#ff5b18,#f60b67); border-color: transparent; box-shadow: 0 5px 13px rgba(242,48,79,.18); }
+
+/* Reusable coded Components use familiar Figma language and remain compact. */
+.sq-components-library { padding-top: 16px; border-top: 1px solid #ebe8e5; }
+.sq-components-heading { margin-bottom: 9px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.sq-components-heading h3 { margin: 0; }
+.sq-components-heading > span { padding: 3px 7px; color: #8a7773; background: #fff4ef; border-radius: 999px; font-size: 8px; font-weight: 650; }
+.sq-create-component { width: 100%; min-height: 54px; padding: 9px 10px; display: flex; align-items: center; gap: 9px; color: #342f2e; background: #fff; border: 1px dashed #e5b6a9; border-radius: 11px; text-align: left; }
+.sq-create-component:hover { color: #d52e4e; background: #fff8f5; border-color: #ed7e66; }
+.sq-create-component:disabled { cursor: not-allowed; opacity: .48; }
+.sq-create-component > .icon { width: 17px; color: #ed3152; }
+.sq-create-component span, .sq-create-component b, .sq-create-component small { display: block; }
+.sq-create-component b { font-size: 10px; }
+.sq-create-component small { margin-top: 2px; color: #81858d; font-size: 8px; }
+.sq-component-list { margin-top: 8px; display: grid; gap: 7px; }
+.sq-component-card { min-width: 0; display: grid; grid-template-columns: minmax(0,1fr) 32px; align-items: stretch; background: #fff; border: 1px solid #e5e1de; border-radius: 11px; overflow: hidden; cursor: grab; transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease, opacity .15s ease; }
+.sq-component-card:hover { border-color: #efad9d; box-shadow: 0 7px 18px rgba(36,28,26,.07); transform: translateY(-1px); }
+.sq-component-card.sq-library-drag-source { opacity: .48; transform: scale(.985); cursor: grabbing; }
+.sq-component-card > button { min-width: 0; padding: 9px; color: #302d2c; background: transparent; border: 0; text-align: left; }
+.sq-component-card > [data-sq-insert-component] { display: grid; grid-template-columns: 31px minmax(0,1fr); align-items: center; gap: 8px; }
+.sq-component-card > [data-sq-edit-component] { padding: 0; display: grid; place-items: center; color: #858991; border-left: 1px solid #ede9e6; }
+.sq-component-card > [data-sq-edit-component]:hover { color: #d92f50; background: #fff5f1; }
+.sq-component-card .icon { width: 14px; }
+.sq-component-mark { width: 31px; height: 31px; display: grid; place-items: center; color: #fff; background: linear-gradient(135deg,#ff6323,#f40b64); border-radius: 9px; font-size: 11px; font-weight: 700; }
+.sq-component-card b, .sq-component-card small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sq-component-card b { font-size: 9px; }
+.sq-component-card small { margin-top: 2px; color: #858992; font-size: 8px; }
+.sq-component-empty { margin: 8px 2px 0; color: #92969e; font-size: 8px; line-height: 1.55; }
+.sq-component-empty[hidden] { display: none; }
+.sq-component-instance-controls { margin: 12px 0; padding: 12px; background: #fff8f5; border: 1px solid #f0d1c8; border-radius: 12px; }
+.sq-component-instance-controls[hidden] { display: none; }
+.sq-instance-badge { display: flex; align-items: center; gap: 9px; }
+.sq-instance-badge > .icon { width: 18px; color: #ed3152; }
+.sq-instance-badge small, .sq-instance-badge b { display: block; }
+.sq-instance-badge small { color: #8a8280; font-size: 8px; }
+.sq-instance-badge b { margin-top: 1px; color: #2d2b2a; font-size: 10px; }
+.sq-component-instance-controls > button { width: 100%; height: 35px; margin-top: 7px; color: #d82f4e; background: #fff; border: 1px solid #edb9ac; border-radius: 8px; font: 600 9px Poppins,sans-serif; }
+.sq-component-instance-controls > button:hover { background: #fff1ec; border-color: #eb7c64; }
+.sq-component-instance-controls > [data-sq-detach-instance] { color: #686d75; border-color: #dedbd8; }
+
+.sq-component-dialog { width: min(860px, calc(100vw - 32px)); max-width: none; padding: 0; color: #25272b; background: #fff; border: 0; border-radius: 18px; box-shadow: 0 28px 90px rgba(22,18,17,.3); font-family: Poppins, sans-serif; overflow: hidden; }
+.sq-component-dialog::backdrop { background: rgba(24,22,23,.48); backdrop-filter: blur(3px); }
+.sq-component-dialog > form { margin: 0; }
+.sq-component-dialog header { padding: 18px 20px; display: grid; grid-template-columns: 40px minmax(0,1fr) 34px; align-items: center; gap: 12px; background: linear-gradient(115deg,#fff7f2,#fff); border-bottom: 1px solid #eee7e3; }
+.sq-component-dialog header > span { width: 40px; height: 40px; display: grid; place-items: center; color: #fff; background: linear-gradient(135deg,#ff6323,#f40b64); border-radius: 11px; }
+.sq-component-dialog header .icon { width: 18px; }
+.sq-component-dialog header small, .sq-component-dialog header h2, .sq-component-dialog header p { margin: 0; display: block; }
+.sq-component-dialog header small { color: #e8324f; font-size: 9px; font-weight: 650; text-transform: uppercase; letter-spacing: .06em; }
+.sq-component-dialog header h2 { margin-top: 2px; font-size: 17px; }
+.sq-component-dialog header p { margin-top: 3px; color: #7c8087; font-size: 10px; }
+.sq-component-dialog header button { width: 34px; height: 34px; padding: 0; display: grid; place-items: center; color: #777c84; background: #fff; border: 1px solid #e4dfdc; border-radius: 9px; }
+.sq-component-dialog > form > section { padding: 18px 20px; }
+.sq-component-meta { display: grid; grid-template-columns: minmax(0,.75fr) minmax(0,1.25fr); gap: 10px; }
+.sq-component-dialog label > span { margin-bottom: 6px; display: block; color: #555b64; font-size: 10px; font-weight: 600; }
+.sq-component-dialog input, .sq-component-dialog textarea { width: 100%; box-sizing: border-box; border: 1px solid #dedbd8; border-radius: 9px; outline: 0; font: 500 11px Poppins,sans-serif; }
+.sq-component-dialog input { height: 40px; padding: 0 11px; }
+.sq-component-dialog :is(input,textarea):focus { border-color: #ed4960; box-shadow: 0 0 0 3px rgba(242,55,82,.1); }
+.sq-component-code-field { margin-top: 14px; display: block; }
+.sq-component-dialog textarea { min-height: min(48vh,430px); padding: 14px; color: #e9edf1; background: #25272d; border-color: #25272d; border-radius: 12px; resize: vertical; font: 500 12px/1.65 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace; tab-size: 2; }
+.sq-component-budget { margin-top: 9px; display: flex; justify-content: space-between; gap: 12px; color: #858991; font-size: 9px; }
+.sq-component-budget b { color: #41454c; }
+.sq-component-budget b.over-limit { color: #da2449; }
+.sq-component-error { margin: 10px 0 0; padding: 9px 11px; color: #b82342; background: #fff0f2; border: 1px solid #f2c4ce; border-radius: 8px; font-size: 10px; }
+.sq-component-dialog footer { padding: 13px 20px; display: grid; grid-template-columns: auto 1fr auto auto; gap: 8px; border-top: 1px solid #ebe7e4; }
+.sq-component-dialog footer button { min-width: 90px; height: 38px; padding: 0 14px; color: #555a62; background: #fff; border: 1px solid #dedbd8; border-radius: 9px; font: 600 10px Poppins,sans-serif; }
+.sq-component-dialog footer button:hover { background: #faf8f7; }
+.sq-component-dialog footer button.primary { color: #fff; background: linear-gradient(110deg,#ff5c1f,#f40b64); border-color: transparent; box-shadow: 0 7px 18px rgba(240,45,79,.18); }
+.sq-component-dialog footer [data-sq-component-delete] { color: #c12645; border-color: #efbcc6; }
+
+/* Rail tooltips must sit above an expanded library panel. */
+@media (min-width:721px) {
+  .page-site-editor .sq-tool-rail { z-index: 5 !important; }
+  .page-site-editor .sq-tool-rail button span { z-index: 100 !important; }
+}
+@media (max-width:720px) {
+  .sq-component-dialog header p { display: none; }
+  .sq-component-meta { grid-template-columns: 1fr; }
+  .sq-component-dialog footer { grid-template-columns: 1fr 1fr; }
+  .sq-component-dialog footer > span { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sq-layout-grid-overlay { animation: none; transition: none; }
+}

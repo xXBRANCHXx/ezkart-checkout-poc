@@ -8,6 +8,8 @@ const publicImmutableImageCacheControl = "public, max-age=31536000, immutable";
 const maximumProductsPerSeller = 10;
 const maximumLandingPagesPerSeller = 6;
 const maximumLandingPageBytes = 16000000;
+const maximumComponentsPerSeller = 20;
+const maximumComponentBytes = 200 * 1024;
 const abandonedUploadGraceMilliseconds = 24 * 60 * 60 * 1000;
 
 const allowedOrigin = (request, env) => {
@@ -455,6 +457,84 @@ async function deleteLandingPage(request, env, rawId) {
   const id = cleanLandingPageId(rawId);
   const key = landingPageKey(seller.id, id);
   if (!(await env.PRIVATE_ASSETS.head(key))) throw new Response("Landing page not found", { status: 404 });
+  await env.PRIVATE_ASSETS.delete(key);
+}
+
+const componentPrefix = (sellerId) => `sellers/${sellerId}/components/`;
+const componentKey = (sellerId, id) => `${componentPrefix(sellerId)}${id}.json`;
+const cleanComponentId = (value) => {
+  const id = String(value || "").trim().toLowerCase();
+  if (id.length < 3 || id.length > 64 || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id)) {
+    throw new Response("Component ID is invalid", { status: 400 });
+  }
+  return id;
+};
+
+async function componentObject(env, sellerId, id) {
+  const object = await env.PRIVATE_ASSETS.get(componentKey(sellerId, id));
+  if (!object) throw new Response("Component not found", { status: 404 });
+  try {
+    const component = JSON.parse(await object.text());
+    if (!component || typeof component !== "object" || Array.isArray(component)) throw new Error("invalid component object");
+    return component;
+  } catch (_) {
+    throw new Response("Component data is invalid", { status: 500 });
+  }
+}
+
+async function components(request, env) {
+  const { seller } = await sellerContext(request, env);
+  const result = await env.PRIVATE_ASSETS.list({ prefix: componentPrefix(seller.id), limit: maximumComponentsPerSeller + 1 });
+  const stored = result.objects.filter((object) => object.key.endsWith(".json")).slice(0, maximumComponentsPerSeller);
+  const values = await Promise.all(stored.map((object) => {
+    const id = object.key.slice(componentPrefix(seller.id).length, -5);
+    return componentObject(env, seller.id, id);
+  }));
+  return values.sort((left, right) => String(right.updatedAt || "").localeCompare(String(left.updatedAt || "")));
+}
+
+async function component(request, env, rawId) {
+  const { seller } = await sellerContext(request, env);
+  return componentObject(env, seller.id, cleanComponentId(rawId));
+}
+
+async function saveComponent(request, env, rawId) {
+  const { seller } = await sellerContext(request, env);
+  const id = cleanComponentId(rawId);
+  // JSON escaping can make the transport body larger than the UTF-8 component
+  // itself. Enforce the exact 200 KB limit below after parsing the code value.
+  const payload = await requestJson(request, maximumComponentBytes * 3 + 8192);
+  let existing = null;
+  try { existing = await componentObject(env, seller.id, id); } catch (error) {
+    if (!(error instanceof Response) || error.status !== 404) throw error;
+  }
+  if (!existing) {
+    const listed = await env.PRIVATE_ASSETS.list({ prefix: componentPrefix(seller.id), limit: maximumComponentsPerSeller + 1 });
+    if (listed.objects.filter((object) => object.key.endsWith(".json")).length >= maximumComponentsPerSeller) {
+      throw new Response(`This store can have up to ${maximumComponentsPerSeller} components`, { status: 409 });
+    }
+  }
+  const name = cleanText(payload.name ?? existing?.name, 80);
+  if (!name) throw new Response("Component name is required", { status: 400 });
+  const description = cleanText(payload.description ?? existing?.description, 180);
+  const code = String(payload.code ?? existing?.code ?? "");
+  const sizeBytes = new TextEncoder().encode(code).byteLength;
+  if (!code.trim()) throw new Response("Component code is required", { status: 400 });
+  if (sizeBytes > maximumComponentBytes) throw new Response("Component code is larger than 200 KB", { status: 413 });
+  const now = new Date().toISOString();
+  const value = { id, name, description, code, sizeBytes, createdAt: existing?.createdAt || now, updatedAt: now };
+  await env.PRIVATE_ASSETS.put(componentKey(seller.id, id), JSON.stringify(value), {
+    httpMetadata: { contentType: "application/json; charset=utf-8" },
+    customMetadata: { sellerId: seller.id, componentId: id, updatedAt: now },
+  });
+  return value;
+}
+
+async function deleteComponent(request, env, rawId) {
+  const { seller } = await sellerContext(request, env);
+  const id = cleanComponentId(rawId);
+  const key = componentKey(seller.id, id);
+  if (!(await env.PRIVATE_ASSETS.head(key))) throw new Response("Component not found", { status: 404 });
   await env.PRIVATE_ASSETS.delete(key);
 }
 
@@ -991,6 +1071,11 @@ export default {
       if (request.method === "GET" && landingPageMatch) return json({ ok: true, page: await landingPage(request, env, landingPageMatch[1]) }, 200, cors);
       if (["PUT", "POST"].includes(request.method) && landingPageMatch) return json({ ok: true, page: await saveLandingPage(request, env, landingPageMatch[1]) }, 200, cors);
       if (request.method === "DELETE" && landingPageMatch) { await deleteLandingPage(request, env, landingPageMatch[1]); return json({ ok: true }, 200, cors); }
+      if (request.method === "GET" && url.pathname === "/v1/components") return json({ ok: true, components: await components(request, env), limits: { count: maximumComponentsPerSeller, bytes: maximumComponentBytes } }, 200, cors);
+      const componentMatch = /^\/v1\/components\/([a-z0-9-]+)$/.exec(url.pathname);
+      if (request.method === "GET" && componentMatch) return json({ ok: true, component: await component(request, env, componentMatch[1]) }, 200, cors);
+      if (["PUT", "POST"].includes(request.method) && componentMatch) return json({ ok: true, component: await saveComponent(request, env, componentMatch[1]) }, 200, cors);
+      if (request.method === "DELETE" && componentMatch) { await deleteComponent(request, env, componentMatch[1]); return json({ ok: true }, 200, cors); }
       if (request.method === "POST" && url.pathname === "/v1/media") return json({ ok: true, media: await uploadMedia(request, env) }, 201, cors);
       const publicMediaMatch = /^\/v1\/public\/media\/([a-zA-Z0-9_-]+)$/.exec(url.pathname);
       if (request.method === "GET" && publicMediaMatch) return await servePublicMedia(request, env, context, cleanId(publicMediaMatch[1], "Image ID"));

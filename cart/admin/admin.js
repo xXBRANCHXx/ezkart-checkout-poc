@@ -203,11 +203,24 @@
     customProducts: Array.isArray(page?.customProducts) ? page.customProducts : [],
     status: page?.status === "published" ? "published" : "draft",
   });
+  const componentLimits = { count: 20, bytes: 200 * 1024 };
+  const componentBytes = (value) => new TextEncoder().encode(String(value || "")).byteLength;
+  const normalizeCloudComponent = (component) => ({
+    id: String(component?.id || ""),
+    name: String(component?.name || "Untitled component").slice(0, 80),
+    description: String(component?.description || "").slice(0, 180),
+    code: String(component?.code || ""),
+    sizeBytes: componentBytes(component?.code || ""),
+    createdAt: component?.createdAt || null,
+    updatedAt: component?.updatedAt || null,
+  });
   let cloudCatalogProducts = [];
   let cloudProductDrafts = [];
   let cloudLandingPages = [];
+  let cloudComponents = [];
   let cloudLoadError = "";
   let cloudLandingLoadError = "";
+  let cloudComponentLoadError = "";
   if (cloudEnabled) {
     try {
       const catalog = await cloudRequest("GET", "/v1/catalog");
@@ -221,6 +234,12 @@
       cloudLandingPages = (Array.isArray(landingPages.pages) ? landingPages.pages : []).map(normalizeCloudLandingPage);
     } catch (error) {
       cloudLandingLoadError = error instanceof Error ? error.message : "Cloud landing-page storage could not be loaded.";
+    }
+    try {
+      const components = await cloudRequest("GET", "/v1/components");
+      cloudComponents = (Array.isArray(components.components) ? components.components : []).map(normalizeCloudComponent);
+    } catch (error) {
+      cloudComponentLoadError = error instanceof Error ? error.message : "Cloud components could not be loaded.";
     }
   }
 
@@ -240,9 +259,47 @@
   const productDraftsKey = scopedStorageKey(legacyProductDraftsKey);
   const legacyActiveProductDraftKey = "ezkart:product-editor:active-draft";
   const activeProductDraftKey = scopedStorageKey(legacyActiveProductDraftKey);
+  const componentStorageKey = scopedStorageKey("ezkart:components:v1");
   migrateLegacyStorage(legacyProductCatalogKey, productCatalogKey);
   migrateLegacyStorage(legacyProductDraftsKey, productDraftsKey);
   migrateLegacyStorage(legacyActiveProductDraftKey, activeProductDraftKey, sessionStorage);
+  const readLocalComponents = () => {
+    try {
+      const value = JSON.parse(localStorage.getItem(componentStorageKey) || "[]");
+      return Array.isArray(value) ? value.slice(0, componentLimits.count).map(normalizeCloudComponent).filter((component) => component.id && component.code) : [];
+    } catch (_) { return []; }
+  };
+  const writeLocalComponents = (components) => {
+    try { localStorage.setItem(componentStorageKey, JSON.stringify(components.slice(0, componentLimits.count))); return true; }
+    catch (_) { showToast("Component storage is full. Delete an unused component or reduce its code size."); return false; }
+  };
+  const readComponents = () => {
+    const components = [...cloudComponents];
+    readLocalComponents().forEach((component) => { if (!components.some((item) => item.id === component.id)) components.push(component); });
+    return components.slice(0, componentLimits.count);
+  };
+  const saveReusableComponent = async (component) => {
+    const normalized = normalizeCloudComponent(component);
+    if (componentBytes(normalized.code) > componentLimits.bytes) throw new Error("Component code is larger than 200 KB.");
+    if (cloudEnabled) {
+      const result = await cloudRequest("PUT", `/v1/components/${encodeURIComponent(normalized.id)}`, normalized);
+      const saved = normalizeCloudComponent(result.component);
+      const index = cloudComponents.findIndex((item) => item.id === saved.id);
+      if (index >= 0) cloudComponents[index] = saved; else cloudComponents.unshift(saved);
+      writeLocalComponents(readLocalComponents().filter((item) => item.id !== saved.id));
+      return saved;
+    }
+    const components = readLocalComponents();
+    const index = components.findIndex((item) => item.id === normalized.id);
+    if (index >= 0) components[index] = normalized; else components.unshift(normalized);
+    if (!writeLocalComponents(components)) throw new Error("The component could not be saved in this browser.");
+    return normalized;
+  };
+  const deleteReusableComponent = async (componentId) => {
+    if (cloudEnabled && cloudComponents.some((component) => component.id === componentId)) await cloudRequest("DELETE", `/v1/components/${encodeURIComponent(componentId)}`);
+    cloudComponents = cloudComponents.filter((component) => component.id !== componentId);
+    writeLocalComponents(readLocalComponents().filter((component) => component.id !== componentId));
+  };
   for (let index = localStorage.length - 1; index >= 0; index -= 1) {
     const key = localStorage.key(index) || "";
     if (key.startsWith("ezkart:landing-builder:advanced-mode") || key.startsWith("ezkart:landing-builder:v2:") || key.startsWith("ezkart:landing-builder:v3:")) {
@@ -380,6 +437,7 @@
   if (cloudLoadError) showToast(`Cloud storage unavailable: ${cloudLoadError}`);
   else window.setTimeout(() => { void migrateLegacyCloudData(); }, 600);
   if (cloudLandingLoadError) window.setTimeout(() => showToast(`Landing-page storage unavailable: ${cloudLandingLoadError}`), cloudLoadError ? 2500 : 0);
+  if (cloudComponentLoadError) window.setTimeout(() => showToast(`Component storage unavailable: ${cloudComponentLoadError}`), 3500);
   const hydrateCreatorCatalog = (form) => {
     const fieldset = form?.querySelector("[data-creator-products]");
     if (!fieldset) return;
@@ -2208,8 +2266,10 @@
     let libraryDrag = null;
     let libraryDropPreview = null;
     let draggedImageSnapshot = null;
-    let showLayoutGrid = true;
+    let showLayoutGrid = false;
     let layoutGridDragging = false;
+    let layoutGridTransient = false;
+    let layoutGridTimer = 0;
     let pageSpacingMode = false;
     let scheduleProductGridFit = () => {};
     let saveTimer;
@@ -2510,17 +2570,27 @@
         }
       });
     };
-    const removeLayoutGrid = () => previewRoot?.querySelectorAll(".sq-layout-grid-overlay").forEach((grid) => grid.remove());
+    const removeLayoutGrid = (animate = false) => previewRoot?.querySelectorAll(".sq-layout-grid-overlay").forEach((grid) => {
+      if (!animate) { grid.remove(); return; }
+      grid.classList.add("is-hiding");
+      window.setTimeout(() => { if (grid.classList.contains("is-hiding")) grid.remove(); }, 180);
+    });
     const refreshLayoutGrid = () => {
-      removeLayoutGrid();
-      if (!showLayoutGrid || (!layoutGridDragging && activeElementPanel !== "layout" && !pageSpacingMode)) return;
+      const visible = showLayoutGrid || layoutGridDragging || layoutGridTransient;
+      if (!visible) { removeLayoutGrid(true); return; }
       const section = selectedElement?.closest("[data-sq-fluid]") || previewRoot?.querySelector(`[data-section-id="${selectedSection}"][data-sq-fluid]`) || previewRoot?.querySelector("[data-sq-fluid]");
       if (!section) return;
+      previewRoot?.querySelectorAll(".sq-layout-grid-overlay").forEach((candidate) => { if (candidate.parentElement !== section) candidate.remove(); });
       const rows = Math.max(1, Number.parseInt(section.dataset.sqRows || section.dataset.sqMinRows || "12", 10));
       const computed = getComputedStyle(section);
-      const grid = document.createElement("div");
-      grid.className = "sq-layout-grid-overlay";
-      grid.setAttribute("aria-hidden", "true");
+      let grid = section.querySelector(":scope > .sq-layout-grid-overlay");
+      if (!grid) {
+        grid = document.createElement("div");
+        grid.className = "sq-layout-grid-overlay";
+        grid.setAttribute("aria-hidden", "true");
+        section.prepend(grid);
+      }
+      grid.classList.remove("is-hiding");
       grid.style.left = computed.paddingLeft;
       grid.style.right = computed.paddingRight;
       grid.style.top = computed.paddingTop;
@@ -2528,12 +2598,22 @@
       grid.style.setProperty("--sq-grid-row-height", `${fluidRowHeight(section)}px`);
       grid.style.setProperty("--sq-grid-gap", computed.columnGap || "0px");
       grid.style.setProperty("--sq-grid-columns", String(fluidColumns()));
-      const cells = document.createDocumentFragment();
-      for (let index = 0; index < rows * fluidColumns(); index += 1) cells.append(document.createElement("i"));
-      grid.append(cells);
-      section.prepend(grid);
+      const cellCount = rows * fluidColumns();
+      if (grid.childElementCount !== cellCount) {
+        const cells = document.createDocumentFragment();
+        for (let index = 0; index < cellCount; index += 1) cells.append(document.createElement("i"));
+        grid.replaceChildren(cells);
+      }
     };
-    const elementTypeName = (element) => (element?.dataset.sqElementType || "element").replace(/-/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+    const revealLayoutGrid = (duration = 900) => {
+      layoutGridTransient = true;
+      window.clearTimeout(layoutGridTimer);
+      refreshLayoutGrid();
+      layoutGridTimer = window.setTimeout(() => { layoutGridTransient = false; refreshLayoutGrid(); }, duration);
+    };
+    const elementTypeName = (element) => element?.dataset.sqElementType === "component-instance"
+      ? `${element.dataset.sqComponentName || "Component"} instance`
+      : (element?.dataset.sqElementType || "element").replace(/-/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
     const reviewRating = (element) => Math.max(1, Math.min(5, Math.round(Number(element?.dataset.sqReviewRating) || 5)));
     const renderReviewStars = (element, value = reviewRating(element)) => {
       if (!element?.matches('[data-sq-element-type="review"]')) return;
@@ -2626,6 +2706,16 @@
       const source = codeSourceFor(element);
       frame.onload = () => frame.contentWindow?.postMessage({ type: "ezkart-render-code", html: source }, "*");
       frame.src = `code-preview.php?render=${Date.now()}`;
+    };
+    const componentForId = (componentId) => readComponents().find((component) => component.id === componentId) || null;
+    const syncComponentInstance = (element) => {
+      if (!element?.matches('[data-sq-element-type="component-instance"]')) return;
+      const main = componentForId(element.dataset.sqComponentId);
+      if (!main) return;
+      element.dataset.sqComponentName = main.name;
+      const source = element.querySelector("template[data-sq-code-source]");
+      if (source && source.innerHTML !== main.code) source.innerHTML = main.code;
+      renderCodeElement(element);
     };
     const actionForElement = (element = selectedElement) => {
       if (selectedAction?.isConnected && element?.contains(selectedAction)) return selectedAction;
@@ -2740,9 +2830,10 @@
       const isLogo = selectedElement.dataset.sqElementType === "logo";
       const isProductGrid = selectedElement.dataset.sqElementType === "product-grid";
       const isCode = selectedElement.dataset.sqElementType === "custom-code";
+      const isComponentInstance = selectedElement.dataset.sqElementType === "component-instance";
       const elementType = selectedElement.dataset.sqElementType || "";
       const typographyControls = sqStudio.querySelector("[data-sq-typography-controls]");
-      if (typographyControls) typographyControls.hidden = ["image", "collage", "gallery", "divider", "spacer", "icon", "custom-code"].includes(elementType);
+      if (typographyControls) typographyControls.hidden = ["image", "collage", "gallery", "divider", "spacer", "icon", "custom-code", "component-instance"].includes(elementType);
       const action = isProductGrid
         ? (selectedAction?.isConnected && selectedElement.contains(selectedAction) ? selectedAction : null)
         : actionForElement();
@@ -2903,9 +2994,13 @@
       if (codeControls) codeControls.hidden = !isCode;
       const codeInput = sqStudio.querySelector("[data-sq-code-input]");
       if (isCode && codeInput) codeInput.value = codeSourceFor(selectedElement);
+      const componentInstanceControls = sqStudio.querySelector("[data-sq-component-instance-controls]");
+      if (componentInstanceControls) componentInstanceControls.hidden = !isComponentInstance;
+      const instanceName = sqStudio.querySelector("[data-sq-instance-name]");
+      if (isComponentInstance && instanceName) instanceName.textContent = selectedElement.dataset.sqComponentName || componentForId(selectedElement.dataset.sqComponentId)?.name || "Main component";
       const textControls = sqStudio.querySelector("[data-sq-element-text-controls]");
       const explicitTextTarget = selectedContent?.isConnected && selectedElement.contains(selectedContent) && !selectedAction ? selectedContent : null;
-      const fallbackTextTarget = !action && !image && !isLogo && !isProductGrid && !isCode
+      const fallbackTextTarget = !action && !image && !isLogo && !isProductGrid && !isCode && !isComponentInstance
         ? (selectedElement.matches("[data-sq-editable]") ? selectedElement : editableNodesFor(selectedElement)[0] || null)
         : null;
       const textTarget = explicitTextTarget || fallbackTextTarget;
@@ -2960,7 +3055,7 @@
         if (device) device.textContent = activeDevice[0].toUpperCase() + activeDevice.slice(1);
       }
       const emptyContent = sqStudio.querySelector("[data-sq-element-content-empty]");
-      if (emptyContent) emptyContent.hidden = [textControls, reviewControls, logoControls, imageControls, buttonControls, codeControls].some((control) => control && !control.hidden);
+      if (emptyContent) emptyContent.hidden = [textControls, reviewControls, logoControls, imageControls, buttonControls, codeControls, componentInstanceControls].some((control) => control && !control.hidden);
       showElementPanel(activeElementPanel);
       syncBuilderRanges();
     };
@@ -3082,7 +3177,7 @@
           window.removeEventListener("pointerup", end);
           window.removeEventListener("pointercancel", end);
           layoutGridDragging = false;
-          refreshLayoutGrid();
+          revealLayoutGrid(650);
           if (changed) { remember(snapshot); markSqChanged(); }
         };
         window.addEventListener("pointermove", move);
@@ -3357,6 +3452,7 @@
     const bindSqInteractions = () => {
       previewRoot?.querySelectorAll(".animating, .sq-element-animate").forEach((element) => element.classList.remove("animating", "sq-element-animate"));
       previewRoot?.querySelectorAll('[data-sq-element-type="review"]').forEach((element) => renderReviewStars(element));
+      previewRoot?.querySelectorAll('[data-sq-element-type="component-instance"]').forEach(syncComponentInstance);
       previewRoot?.querySelectorAll('[class*="hover-"]').forEach((element) => {
         [...element.classList].filter((name) => name.startsWith("hover-")).forEach((name) => element.classList.remove(name));
       });
@@ -3405,7 +3501,7 @@
         block.onclick = () => deselectSqItem(block.dataset.sectionId);
         block.ondragstart = (event) => { draggedSection = block.dataset.sectionId; block.classList.add("dragging"); event.dataTransfer.effectAllowed = "move"; };
         block.ondragover = (event) => {
-          if (libraryDrag?.kind === "element") {
+          if (["element", "component"].includes(libraryDrag?.kind)) {
             event.preventDefault(); event.stopPropagation();
             event.dataTransfer.dropEffect = "copy";
             updateLibraryDropPreview(block, event);
@@ -3414,7 +3510,7 @@
           event.preventDefault(); block.classList.add("drag-over");
         };
         block.ondragleave = (event) => {
-          if (libraryDrag?.kind === "element") {
+          if (["element", "component"].includes(libraryDrag?.kind)) {
             if (!block.contains(event.relatedTarget)) clearLibraryDropPreview();
             return;
           }
@@ -3422,7 +3518,7 @@
         };
         block.ondrop = (event) => {
           event.preventDefault(); block.classList.remove("drag-over");
-          if (libraryDrag?.kind === "element") { event.stopPropagation(); dropLibraryElement(block, event); return; }
+          if (["element", "component"].includes(libraryDrag?.kind)) { event.stopPropagation(); dropLibraryElement(block, event); return; }
           const rect = block.getBoundingClientRect(); reorderSection(draggedSection, block.dataset.sectionId, event.clientY > rect.top + rect.height / 2);
         };
         block.ondragend = () => { block.classList.remove("dragging"); previewRoot.querySelectorAll(".drag-over").forEach((item) => item.classList.remove("drag-over")); };
@@ -3977,17 +4073,17 @@
     });
     gridDensityInput?.addEventListener("input", () => {
       setGridDensity(activeDevice, gridDensityInput.value);
-      applyFluidLayouts(); syncPageGridControls(); syncElementControls(); refreshLayoutGrid(); refreshElementOverlay(); markSqChanged();
+      applyFluidLayouts(); syncPageGridControls(); syncElementControls(); revealLayoutGrid(); refreshElementOverlay(); markSqChanged();
     });
     sqStudio.querySelector("[data-sq-grid-cell-width]")?.addEventListener("input", (event) => {
       const requestedWidth = Math.max(6, Number(event.currentTarget.value) || gridCellWidth());
       const columns = Math.max(2, Math.min(24, Math.round((gridContentWidth() + pageSpacingState.columnGap) / (requestedWidth + pageSpacingState.columnGap))));
       updateGridGeometry(activeDevice, { columns });
-      applyFluidLayouts(); syncPageGridControls(); refreshLayoutGrid(); markSqChanged();
+      applyFluidLayouts(); syncPageGridControls(); revealLayoutGrid(); markSqChanged();
     });
     sqStudio.querySelector("[data-sq-grid-cell-height]")?.addEventListener("input", (event) => {
       updateGridGeometry(activeDevice, { cellHeight: Number(event.currentTarget.value) });
-      applyFluidLayouts(); syncPageGridControls(); refreshLayoutGrid(); markSqChanged();
+      applyFluidLayouts(); syncPageGridControls(); revealLayoutGrid(); markSqChanged();
     });
     sqStudio.querySelectorAll("[data-sq-grid-density], [data-sq-grid-cell-width], [data-sq-grid-cell-height]").forEach((input) => input.addEventListener("change", () => { if (gridDensitySnapshot) remember(gridDensitySnapshot); gridDensitySnapshot = null; }));
     sqStudio.querySelector("[data-sq-show-layout-grid]")?.addEventListener("change", (event) => { showLayoutGrid = event.currentTarget.checked; refreshLayoutGrid(); });
@@ -4517,7 +4613,7 @@
       applyPageGutter(input.dataset.sqPageGutter, gutter);
       syncPageSpacingControls();
       syncPageGridControls();
-      refreshLayoutGrid();
+      revealLayoutGrid();
       if (selectedElement?.isConnected) refreshElementOverlay();
       markSqChanged();
     }));
@@ -4525,7 +4621,7 @@
       pageSpacingState.columnGap = Math.max(0, Number(event.currentTarget.value) || 0);
       previewRoot?.style.setProperty("--sq-builder-column-gap", `${pageSpacingState.columnGap}px`);
       syncPageSpacingControls(); syncPageGridControls(); applyFluidLayouts();
-      refreshLayoutGrid();
+      revealLayoutGrid();
       if (selectedElement?.isConnected) refreshElementOverlay();
       markSqChanged();
     });
@@ -4536,7 +4632,7 @@
       ["desktop", "tablet", "mobile"].forEach((device) => updateGridGeometry(device, { columns: defaultGridColumns[device], cellHeight: defaultGridCellHeight[device] }));
       pageSpacingState.columnGap = defaultPageSpacing.columnGap;
       previewRoot?.style.setProperty("--sq-builder-column-gap", `${defaultPageSpacing.columnGap}px`);
-      syncPageSpacingControls(); syncPageGridControls(); applyFluidLayouts(); refreshLayoutGrid(); markSqChanged();
+      syncPageSpacingControls(); syncPageGridControls(); applyFluidLayouts(); revealLayoutGrid(); markSqChanged();
     });
     previewRoot?.style.setProperty("--sq-builder-column-gap", `${pageSpacingState.columnGap}px`);
     syncPageSpacingControls();
@@ -4799,7 +4895,7 @@
       libraryDropPreview = null;
       previewRoot?.querySelectorAll(".sq-library-drop-section").forEach((section) => section.classList.remove("sq-library-drop-section"));
     };
-    const libraryPointerLayout = (section, event, dimensions = libraryElementDimensions(libraryDrag?.type)) => {
+    const libraryPointerLayout = (section, event, dimensions = libraryDrag?.kind === "component" ? { width: 8, height: 8 } : libraryElementDimensions(libraryDrag?.type)) => {
       const columns = fluidColumns();
       const width = Math.max(1, Math.min(columns, activeDevice === "mobile" ? columns : dimensions.width));
       const height = Math.max(1, dimensions.height);
@@ -4860,14 +4956,54 @@
       showToast(`${elementTypeName(element)} added — drag it anywhere in the section`);
       return element;
     };
+    const createComponentInstanceElement = (component) => {
+      const element = document.createElement("div");
+      element.className = "sq-free-element sq-free-code sq-component-instance";
+      element.dataset.sqElement = "";
+      element.dataset.sqElementType = "component-instance";
+      element.dataset.sqComponentId = component.id;
+      element.dataset.sqComponentName = component.name;
+      const frame = document.createElement("iframe");
+      frame.title = `${component.name} component preview`;
+      frame.setAttribute("sandbox", "allow-scripts allow-forms");
+      frame.dataset.sqCodeRender = "";
+      const source = document.createElement("template");
+      source.dataset.sqCodeSource = "";
+      source.innerHTML = component.code;
+      element.append(frame, source);
+      return element;
+    };
+    const addComponentInstance = (component, section, preferredLayout = null) => {
+      if (!component || !section) return null;
+      remember();
+      ensureElementSection(section);
+      removeElementOverlay();
+      const element = createComponentInstanceElement(component);
+      const dimensions = { width: 8, height: 8 };
+      ["desktop", "tablet", "mobile"].forEach((device) => {
+        const desired = device === "mobile" ? { ...dimensions, width: fluidColumns(device) } : dimensions;
+        setElementLayout(element, findOpenElementLayout(section, desired, device), device);
+      });
+      if (preferredLayout) setElementLayout(element, preferredLayout, activeDevice);
+      section.append(element);
+      rebuildLayerList(); bindSqInteractions(); applyFluidSection(section); renderCodeElement(element);
+      selectSqElement(element); syncInspectorContent(); openSqPanel("layers");
+      element.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+      markSqChanged();
+      showToast(`${component.name} instance added`);
+      return element;
+    };
     const dropLibraryElement = (section, event) => {
       if (!libraryDrag) return;
-      const type = libraryDrag.type;
       const layout = libraryDropPreview?.dataset.layout?.split(",").map(Number);
       const preferredLayout = layout?.length === 4 ? { x: layout[0], y: layout[1], width: layout[2], height: layout[3] } : libraryPointerLayout(section, event);
+      const dragged = libraryDrag;
       clearLibraryDropPreview();
-      addLibraryElement(type, section, preferredLayout);
+      if (dragged.kind === "component") addComponentInstance(componentForId(dragged.componentId), section, preferredLayout);
+      else addLibraryElement(dragged.type, section, preferredLayout);
       libraryDrag = null;
+      layoutGridDragging = false;
+      revealLayoutGrid(650);
       document.body.classList.remove("sq-library-dragging");
     };
     sqStudio.querySelectorAll("[data-sq-add-element]").forEach((button) => {
@@ -4875,6 +5011,8 @@
       button.addEventListener("dragstart", (event) => {
         const type = button.dataset.sqAddElement;
         libraryDrag = { kind: "element", type, label: button.querySelector("b")?.textContent.trim() || elementTypeName({ dataset: { sqElementType: type } }) };
+        layoutGridDragging = true;
+        refreshLayoutGrid();
         document.body.classList.add("sq-library-dragging");
         button.classList.add("sq-library-drag-source");
         event.dataTransfer.effectAllowed = "copy";
@@ -4886,12 +5024,172 @@
         document.body.classList.remove("sq-library-dragging");
         clearLibraryDropPreview();
         libraryDrag = null;
+        layoutGridDragging = false;
+        revealLayoutGrid(650);
       });
       button.addEventListener("click", () => {
         const section = previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`);
         addLibraryElement(button.dataset.sqAddElement, section);
       });
     });
+
+    const componentDialog = document.querySelector("[data-sq-component-dialog]");
+    const componentForm = componentDialog?.querySelector("[data-sq-component-form]");
+    const componentNameInput = componentForm?.querySelector('[name="component_name"]');
+    const componentDescriptionInput = componentForm?.querySelector('[name="component_description"]');
+    const componentCodeInput = componentForm?.querySelector('[name="component_code"]');
+    const componentError = componentForm?.querySelector("[data-sq-component-error]");
+    const componentDeleteButton = componentForm?.querySelector("[data-sq-component-delete]");
+    let editingComponentId = "";
+    const starterComponentCode = [
+      "<style>",
+      "  .card { padding: 24px; color: #24262b; background: #ffffff; border: 1px solid #e7e2df; border-radius: 18px; font-family: system-ui, sans-serif; }",
+      "  .card h2 { margin: 0 0 8px; font-size: 28px; }",
+      "  .card p { margin: 0; color: #6f747c; line-height: 1.6; }",
+      "</style>",
+      "<article class=\"card\">",
+      "  <h2>Reusable component</h2>",
+      "  <p>Edit the main component once and every connected instance updates.</p>",
+      "</article>",
+    ].join("\n");
+    const formatComponentBytes = (bytes) => bytes < 1024 ? `${bytes} B` : `${(bytes / 1024).toFixed(bytes >= 10240 ? 0 : 1)} KB`;
+    const syncComponentBudget = () => {
+      const bytes = componentBytes(componentCodeInput?.value || "");
+      const size = componentForm?.querySelector("[data-sq-component-size]");
+      const total = componentForm?.querySelector("[data-sq-component-total]");
+      if (size) { size.textContent = formatComponentBytes(bytes); size.classList.toggle("over-limit", bytes > componentLimits.bytes); }
+      if (total) total.textContent = String(readComponents().length);
+    };
+    const closeComponentEditor = () => componentDialog?.close();
+    const openComponentEditor = (component = null) => {
+      if (!componentDialog || !componentForm) return;
+      editingComponentId = component?.id || "";
+      componentNameInput.value = component?.name || "";
+      componentDescriptionInput.value = component?.description || "";
+      componentCodeInput.value = component?.code || starterComponentCode;
+      if (componentError) { componentError.hidden = true; componentError.textContent = ""; }
+      if (componentDeleteButton) componentDeleteButton.hidden = !component;
+      const context = componentForm.querySelector("[data-sq-component-dialog-context]");
+      const title = componentForm.querySelector("[data-sq-component-dialog-title]");
+      if (context) context.textContent = component ? "Main component" : "Create component";
+      if (title) title.textContent = component ? component.name : "New main component";
+      syncComponentBudget();
+      componentDialog.showModal();
+      window.setTimeout(() => componentNameInput?.focus(), 40);
+    };
+    const renderComponentLibrary = () => {
+      const components = readComponents();
+      const list = sqStudio.querySelector("[data-sq-component-list]");
+      const count = sqStudio.querySelector("[data-sq-component-count]");
+      const empty = sqStudio.querySelector("[data-sq-component-empty]");
+      const createButton = sqStudio.querySelector("[data-sq-create-component]");
+      if (count) count.textContent = `${components.length} / ${componentLimits.count}`;
+      if (empty) empty.hidden = components.length > 0;
+      if (createButton) {
+        createButton.disabled = components.length >= componentLimits.count;
+        createButton.title = components.length >= componentLimits.count ? "Delete a component before creating another" : "Create component";
+      }
+      if (!list) return;
+      list.innerHTML = components.map((component) => `<article class="sq-component-card" draggable="true" data-sq-component="${escapeHtml(component.id)}" data-search="${escapeHtml(`${component.name} ${component.description}`)}"><button type="button" data-sq-insert-component><span class="sq-component-mark">${escapeHtml(component.name.slice(0, 1).toUpperCase())}</span><span><b>${escapeHtml(component.name)}</b><small>${escapeHtml(component.description || "Drag an instance onto the canvas")}</small></span></button><button type="button" data-sq-edit-component aria-label="Edit ${escapeHtml(component.name)}">${iconMarkup("code")}</button></article>`).join("");
+      list.querySelectorAll("[data-sq-component]").forEach((card) => {
+        const component = componentForId(card.dataset.sqComponent);
+        if (!component) return;
+        card.querySelector("[data-sq-insert-component]")?.addEventListener("click", () => {
+          const section = previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`) || previewRoot?.querySelector("[data-sq-block]");
+          addComponentInstance(component, section);
+        });
+        card.querySelector("[data-sq-edit-component]")?.addEventListener("click", () => openComponentEditor(component));
+        card.addEventListener("dragstart", (event) => {
+          libraryDrag = { kind: "component", componentId: component.id, label: component.name };
+          layoutGridDragging = true;
+          refreshLayoutGrid();
+          document.body.classList.add("sq-library-dragging");
+          card.classList.add("sq-library-drag-source");
+          event.dataTransfer.effectAllowed = "copy";
+          event.dataTransfer.setData("application/x-ezkart-component", component.id);
+          event.dataTransfer.setData("text/plain", component.name);
+        });
+        card.addEventListener("dragend", () => {
+          card.classList.remove("sq-library-drag-source");
+          document.body.classList.remove("sq-library-dragging");
+          clearLibraryDropPreview();
+          libraryDrag = null;
+          layoutGridDragging = false;
+          revealLayoutGrid(650);
+        });
+      });
+    };
+    sqStudio.querySelector("[data-sq-create-component]")?.addEventListener("click", () => {
+      if (readComponents().length >= componentLimits.count) { showToast("You can save up to 20 components. Delete one to create another."); return; }
+      openComponentEditor();
+    });
+    componentDialog?.querySelectorAll("[data-sq-component-close]").forEach((button) => button.addEventListener("click", closeComponentEditor));
+    componentCodeInput?.addEventListener("input", syncComponentBudget);
+    componentForm?.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const name = componentNameInput?.value.trim() || "";
+      const description = componentDescriptionInput?.value.trim() || "";
+      const code = componentCodeInput?.value || "";
+      const bytes = componentBytes(code);
+      const fail = (message) => { if (componentError) { componentError.textContent = message; componentError.hidden = false; } };
+      if (!name) { fail("Give this main component a name."); componentNameInput?.focus(); return; }
+      if (!code.trim()) { fail("Add HTML, CSS, or JavaScript before saving."); componentCodeInput?.focus(); return; }
+      if (bytes > componentLimits.bytes) { fail(`This component is ${formatComponentBytes(bytes)}. The maximum is 200 KB.`); return; }
+      if (!editingComponentId && readComponents().length >= componentLimits.count) { fail("This account already has 20 components. Delete one before creating another."); return; }
+      const id = editingComponentId || `component-${Date.now().toString(36)}`;
+      const saveButton = componentForm.querySelector("[data-sq-component-save]");
+      if (saveButton) saveButton.disabled = true;
+      try {
+        const saved = await saveReusableComponent({ id, name, description, code });
+        const instances = [...(previewRoot?.querySelectorAll(`[data-sq-element-type="component-instance"][data-sq-component-id="${CSS.escape(id)}"]`) || [])];
+        if (instances.length) remember();
+        instances.forEach((instance) => {
+          instance.dataset.sqComponentName = saved.name;
+          const source = instance.querySelector(":scope > [data-sq-code-source]");
+          if (source) source.innerHTML = saved.code;
+          renderCodeElement(instance);
+        });
+        if (instances.length) { rebuildLayerList(); bindSqInteractions(); markSqChanged(); }
+        renderComponentLibrary();
+        closeComponentEditor();
+        showToast(editingComponentId ? "Main component updated everywhere" : "Component created — drag an instance onto the canvas");
+      } catch (error) {
+        fail(error instanceof Error ? error.message : "The component could not be saved.");
+      } finally {
+        if (saveButton) saveButton.disabled = false;
+      }
+    });
+    componentDeleteButton?.addEventListener("click", async () => {
+      const component = componentForId(editingComponentId);
+      if (!component || !window.confirm(`Delete the main component “${component.name}”? Existing instances will be detached and keep their current appearance.`)) return;
+      try {
+        remember();
+        previewRoot?.querySelectorAll(`[data-sq-element-type="component-instance"][data-sq-component-id="${CSS.escape(component.id)}"]`).forEach((instance) => {
+          instance.dataset.sqElementType = "custom-code";
+          delete instance.dataset.sqComponentId;
+          delete instance.dataset.sqComponentName;
+          instance.classList.remove("sq-component-instance");
+        });
+        await deleteReusableComponent(component.id);
+        rebuildLayerList(); bindSqInteractions(); markSqChanged(); renderComponentLibrary(); closeComponentEditor();
+        showToast("Main component deleted; its instances were detached");
+      } catch (error) { if (componentError) { componentError.textContent = error instanceof Error ? error.message : "The component could not be deleted."; componentError.hidden = false; } }
+    });
+    sqStudio.querySelector("[data-sq-edit-main-component]")?.addEventListener("click", () => {
+      const component = componentForId(selectedElement?.dataset.sqComponentId);
+      if (component) openComponentEditor(component); else showToast("This main component is no longer available. Detach the instance to edit its code.");
+    });
+    sqStudio.querySelector("[data-sq-detach-instance]")?.addEventListener("click", () => {
+      if (!selectedElement?.matches('[data-sq-element-type="component-instance"]')) return;
+      remember();
+      selectedElement.dataset.sqElementType = "custom-code";
+      delete selectedElement.dataset.sqComponentId;
+      delete selectedElement.dataset.sqComponentName;
+      selectedElement.classList.remove("sq-component-instance");
+      rebuildLayerList(); bindSqInteractions(); syncInspectorContent(); markSqChanged();
+      showToast("Instance detached — its code can now be edited independently");
+    });
+    renderComponentLibrary();
     sqStudio.querySelectorAll("[data-sq-add-block]").forEach((button) => button.addEventListener("click", () => {
       remember();
       const type = button.dataset.sqAddBlock;
@@ -4904,7 +5202,7 @@
     }));
     sqStudio.querySelector("[data-sq-block-search]")?.addEventListener("input", (event) => {
       const query = normalize(event.currentTarget.value);
-      sqStudio.querySelectorAll("[data-sq-add-block], [data-sq-add-element]").forEach((button) => { button.hidden = Boolean(query) && !normalize(button.dataset.search).includes(query); });
+      sqStudio.querySelectorAll("[data-sq-add-block], [data-sq-add-element], [data-sq-component]").forEach((button) => { button.hidden = Boolean(query) && !normalize(button.dataset.search).includes(query); });
     });
 
     sqStudio.querySelector("[data-sq-duplicate]")?.addEventListener("click", () => {
