@@ -1830,7 +1830,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .sq-brand-panel label > output { position: absolute; top: 0; right: 0; color: #f40767; font-size: 7px; }
 .sq-brand-panel .sq-button-color-row label { padding: 6px; background: #f8f8f8; border: 1px solid #ece9e7; border-radius: 9px; }
 .sq-brand-panel .sq-button-live-preview { min-height: 42px; margin-top: 13px; }
-.sq-brand-panel .sq-button-system.brand-focus { animation: sqBrandFocus .85s ease-out; }
+.sq-brand-panel .sq-control-section.brand-focus { animation: sqBrandFocus .85s ease-out; }
 @keyframes sqBrandFocus { 0% { box-shadow: 0 0 0 0 rgba(244, 7, 103, .3); } 45% { box-shadow: 0 0 0 5px rgba(244, 7, 103, .12); } 100% { box-shadow: none; } }
 .sq-page-preview { --button-primary-radius: 24px; }
 .sq-page-preview :is(.button-primary:is(button), .button-primary button) { box-shadow: var(--button-primary-shadow, none) !important; }
@@ -1876,3 +1876,107 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .page-site-editor .sq-inspector { position: relative; z-index: 70; box-shadow: -10px 0 24px rgba(20, 26, 38, .07); }
 .page-site-editor .sq-builder-sidebar { z-index: 80; }
 .page-site-editor .sq-tool-panels { position: relative; z-index: 2; background: #fff; box-shadow: 12px 0 28px rgba(20, 26, 38, .1); }
+
+/* Universal, accessible dropdowns for every landing-page builder control. */
+.sq-studio :is(.sq-tool-panels, .sq-inspector) select.sq-builder-native-select {
+  width: 1px !important;
+  height: 1px !important;
+  min-height: 1px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  position: absolute !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+.sq-builder-select { width: 100%; min-width: 0; position: relative; }
+.sq-builder-select-trigger {
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  padding: 0 10px 0 11px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 9px;
+  color: #30343b;
+  background: #fff;
+  border: 1px solid #dedbd8;
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(25, 29, 36, .035);
+  font: 500 9px Poppins, sans-serif !important;
+  text-align: left;
+  transition: border-color .16s, box-shadow .16s, background-color .16s;
+}
+.sq-builder-select-trigger:hover { background: #fffaf8; border-color: #efb9aa; }
+.sq-builder-select.open .sq-builder-select-trigger,
+.sq-builder-select-trigger:focus-visible {
+  outline: 0;
+  border-color: #f24a51;
+  box-shadow: 0 0 0 3px rgba(242, 74, 81, .11);
+}
+.sq-builder-select-trigger:disabled { color: #a1a5ab; background: #f5f5f5; cursor: not-allowed; }
+.sq-builder-select-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sq-builder-select-trigger svg { width: 13px; height: 13px; flex: 0 0 13px; fill: none; stroke: #777d85; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; transition: transform .16s; }
+.sq-builder-select.open .sq-builder-select-trigger svg { transform: rotate(180deg); }
+.sq-builder-select-menu {
+  max-height: 260px;
+  padding: 6px;
+  position: fixed;
+  z-index: 1000;
+  overflow-x: hidden;
+  overflow-y: auto;
+  color: #30343b;
+  background: rgba(255, 255, 255, .985);
+  border: 1px solid #e4dedb;
+  border-radius: 13px;
+  box-shadow: 0 18px 48px rgba(24, 27, 34, .18), 0 4px 12px rgba(24, 27, 34, .08);
+  backdrop-filter: blur(14px);
+  scrollbar-width: thin;
+  scrollbar-color: #d5cfcb transparent;
+  animation: sqBuilderSelectIn .14s ease-out;
+}
+.sq-builder-select-menu[hidden] { display: none !important; }
+.sq-builder-select-menu::-webkit-scrollbar { width: 6px; }
+.sq-builder-select-menu::-webkit-scrollbar-thumb { background: #d5cfcb; border-radius: 999px; }
+.sq-builder-select-option {
+  width: 100%;
+  min-height: 34px;
+  padding: 7px 9px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: #3c4047;
+  background: transparent;
+  border: 0;
+  border-radius: 9px;
+  font: 500 9px Poppins, sans-serif;
+  text-align: left;
+}
+.sq-builder-select-option > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sq-builder-select-option > i { color: #ee3155; font-size: 10px; font-style: normal; opacity: 0; }
+.sq-builder-select-option:hover,
+.sq-builder-select-option:focus-visible { outline: 0; color: #272a30; background: #fff4ef; }
+.sq-builder-select-option.selected { color: #d9234c; background: #fff0eb; font-weight: 600; }
+.sq-builder-select-option.selected > i { opacity: 1; }
+.sq-builder-select-option:disabled { opacity: .4; cursor: not-allowed; }
+@keyframes sqBuilderSelectIn { from { opacity: 0; transform: translateY(-4px) scale(.985); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .sq-builder-select-menu { animation: none; } }
+
+.sq-page-appearance-card {
+  margin: 12px 0;
+  padding: 13px;
+  background: #fff;
+  border: 1px solid #e7e3e0;
+  border-radius: 12px;
+  box-shadow: 0 3px 12px rgba(30, 27, 25, .025);
+}
+.sq-page-appearance-card .sq-inspector-heading { margin-bottom: 10px; }
+.sq-page-appearance-colors { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.sq-page-appearance-colors label { min-width: 0; margin: 0 !important; padding: 7px; display: grid; grid-template-columns: 34px minmax(0, 1fr); align-items: center; gap: 8px; background: #faf9f8; border: 1px solid #e9e5e2; border-radius: 9px; }
+.sq-page-appearance-colors label > span { margin: 0 !important; color: #666d76; font-size: 8px; }
+.sq-page-appearance-colors input[type="color"] { width: 34px !important; height: 34px !important; padding: 2px !important; grid-row: 1 / span 2; background: #fff; border: 1px solid #ddd8d4 !important; border-radius: 8px !important; cursor: pointer; }
+.sq-page-appearance-colors output { min-width: 0; position: static !important; grid-column: 2; grid-row: 2; overflow: hidden; color: #92969c !important; font: 6px/1.2 ui-monospace, SFMono-Regular, Consolas, monospace !important; text-overflow: ellipsis; }
+.sq-page-appearance-card > button { width: 100%; height: 35px; margin-top: 10px; padding: 0 10px; display: flex; align-items: center; justify-content: space-between; color: #d9234c; background: #fff8f5; border: 1px solid #f1cfc5; border-radius: 9px; font: 600 8px Poppins, sans-serif; }
+.sq-page-appearance-card > button:hover { background: #fff0ea; border-color: #efa995; }
+.sq-page-appearance-card > button .icon { width: 12px; }

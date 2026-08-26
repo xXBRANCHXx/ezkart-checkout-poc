@@ -2030,6 +2030,139 @@
     const saveState = sqStudio.querySelector("[data-sq-save-state]");
     const undoButton = sqStudio.querySelector("[data-sq-undo]");
     const redoButton = sqStudio.querySelector("[data-sq-redo]");
+    let openBuilderSelect = null;
+    let builderSelectId = 0;
+    const positionBuilderSelectMenu = (control) => {
+      if (!control?.menu || control.menu.hidden) return;
+      const rect = control.trigger.getBoundingClientRect();
+      const availableBelow = window.innerHeight - rect.bottom - 12;
+      const menuHeight = Math.min(control.menu.scrollHeight, 260);
+      const openUp = availableBelow < Math.min(menuHeight, 150) && rect.top > availableBelow;
+      control.menu.style.width = `${Math.max(rect.width, 150)}px`;
+      control.menu.style.left = `${Math.min(window.innerWidth - Math.max(rect.width, 150) - 8, Math.max(8, rect.left))}px`;
+      control.menu.style.top = openUp ? `${Math.max(8, rect.top - menuHeight - 6)}px` : `${rect.bottom + 6}px`;
+      control.menu.classList.toggle("opens-up", openUp);
+    };
+    const closeBuilderSelect = (control = openBuilderSelect, { restoreFocus = false } = {}) => {
+      if (!control) return;
+      control.menu.hidden = true;
+      control.trigger.setAttribute("aria-expanded", "false");
+      control.wrapper.classList.remove("open");
+      if (restoreFocus) control.trigger.focus();
+      if (openBuilderSelect === control) openBuilderSelect = null;
+    };
+    const syncBuilderSelect = (select) => {
+      const control = select?._sqBuilderSelect;
+      if (!control) return;
+      const options = [...select.options];
+      const signature = options.map((option) => `${option.value}\u0000${option.textContent}\u0000${option.disabled}`).join("\u0001");
+      if (control.signature !== signature) {
+        control.signature = signature;
+        control.menu.replaceChildren(...options.map((option) => {
+          const item = document.createElement("button");
+          item.type = "button";
+          item.className = "sq-builder-select-option";
+          item.dataset.value = option.value;
+          item.setAttribute("role", "option");
+          item.disabled = option.disabled;
+          item.innerHTML = `<span>${escapeHtml(option.textContent)}</span><i aria-hidden="true">✓</i>`;
+          item.addEventListener("click", () => {
+            if (item.disabled) return;
+            select.value = item.dataset.value;
+            select.dispatchEvent(new Event("input", { bubbles: true }));
+            select.dispatchEvent(new Event("change", { bubbles: true }));
+            syncBuilderSelect(select);
+            closeBuilderSelect(control, { restoreFocus: true });
+          });
+          return item;
+        }));
+      }
+      const selected = select.selectedOptions[0] || options[0];
+      control.value.textContent = selected?.textContent || "Choose an option";
+      control.trigger.setAttribute("aria-label", `${control.label}: ${selected?.textContent || "Choose an option"}`);
+      control.trigger.disabled = select.disabled;
+      control.menu.querySelectorAll("[role=option]").forEach((item) => {
+        const active = item.dataset.value === select.value;
+        item.classList.toggle("selected", active);
+        item.setAttribute("aria-selected", String(active));
+      });
+    };
+    const openBuilderSelectMenu = (control, direction = 0) => {
+      if (openBuilderSelect && openBuilderSelect !== control) closeBuilderSelect(openBuilderSelect);
+      syncBuilderSelect(control.select);
+      control.menu.hidden = false;
+      control.trigger.setAttribute("aria-expanded", "true");
+      control.wrapper.classList.add("open");
+      openBuilderSelect = control;
+      positionBuilderSelectMenu(control);
+      const options = [...control.menu.querySelectorAll("[role=option]:not(:disabled)")];
+      const selectedIndex = Math.max(0, options.findIndex((item) => item.classList.contains("selected")));
+      const targetIndex = direction < 0 ? Math.max(0, selectedIndex - 1) : direction > 0 ? Math.min(options.length - 1, selectedIndex + 1) : selectedIndex;
+      options[targetIndex]?.focus();
+    };
+    const enhanceBuilderSelect = (select) => {
+      if (select._sqBuilderSelect || select.multiple) return;
+      const wrapper = document.createElement("div");
+      wrapper.className = "sq-builder-select";
+      wrapper.dataset.sqBuilderSelect = "";
+      const trigger = document.createElement("button");
+      trigger.type = "button";
+      trigger.className = "sq-builder-select-trigger";
+      trigger.setAttribute("aria-haspopup", "listbox");
+      trigger.setAttribute("aria-expanded", "false");
+      const value = document.createElement("span");
+      value.className = "sq-builder-select-value";
+      trigger.append(value);
+      trigger.insertAdjacentHTML("beforeend", '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="m3 4.5 3 3 3-3"/></svg>');
+      const menu = document.createElement("div");
+      menu.id = `sq-builder-select-menu-${++builderSelectId}`;
+      menu.className = "sq-builder-select-menu";
+      menu.dataset.sqBuilderSelectMenu = "";
+      menu.setAttribute("role", "listbox");
+      menu.hidden = true;
+      trigger.setAttribute("aria-controls", menu.id);
+      select.classList.add("sq-builder-native-select");
+      select.tabIndex = -1;
+      select.setAttribute("aria-hidden", "true");
+      select.after(wrapper);
+      wrapper.append(trigger);
+      document.body.append(menu);
+      const control = { select, wrapper, trigger, value, menu, signature: "" };
+      control.label = select.getAttribute("aria-label") || select.closest("label")?.querySelector(":scope > span")?.textContent.trim() || "Choose an option";
+      select._sqBuilderSelect = control;
+      trigger.addEventListener("click", () => control.menu.hidden ? openBuilderSelectMenu(control) : closeBuilderSelect(control));
+      trigger.addEventListener("keydown", (event) => {
+        if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+        event.preventDefault();
+        openBuilderSelectMenu(control, event.key === "ArrowUp" || event.key === "Home" ? -1 : 1);
+        if (event.key === "Home") control.menu.querySelector("[role=option]:not(:disabled)")?.focus();
+        if (event.key === "End") [...control.menu.querySelectorAll("[role=option]:not(:disabled)")].at(-1)?.focus();
+      });
+      menu.addEventListener("keydown", (event) => {
+        const options = [...menu.querySelectorAll("[role=option]:not(:disabled)")];
+        const current = options.indexOf(document.activeElement);
+        if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
+          event.preventDefault();
+          const next = event.key === "Home" ? 0 : event.key === "End" ? options.length - 1 : (current + (event.key === "ArrowDown" ? 1 : -1) + options.length) % options.length;
+          options[next]?.focus();
+        }
+        if (event.key === "Escape") { event.preventDefault(); closeBuilderSelect(control, { restoreFocus: true }); }
+      });
+      menu.addEventListener("focusout", (event) => {
+        if (menu.contains(event.relatedTarget) || event.relatedTarget === trigger) return;
+        closeBuilderSelect(control);
+      });
+      select.addEventListener("input", () => syncBuilderSelect(select));
+      select.addEventListener("change", () => syncBuilderSelect(select));
+      new MutationObserver(() => syncBuilderSelect(select)).observe(select, { childList: true, subtree: true, attributes: true, attributeFilter: ["disabled", "label"] });
+      syncBuilderSelect(select);
+    };
+    const builderSelects = () => [...sqStudio.querySelectorAll(".sq-tool-panels select, .sq-inspector select")];
+    const enhanceBuilderSelects = () => builderSelects().forEach(enhanceBuilderSelect);
+    const syncBuilderSelects = () => { enhanceBuilderSelects(); builderSelects().forEach(syncBuilderSelect); };
+    document.addEventListener("pointerdown", (event) => { if (openBuilderSelect && !openBuilderSelect.wrapper.contains(event.target) && !openBuilderSelect.menu.contains(event.target)) closeBuilderSelect(openBuilderSelect); });
+    window.addEventListener("resize", () => positionBuilderSelectMenu(openBuilderSelect));
+    document.addEventListener("scroll", () => positionBuilderSelectMenu(openBuilderSelect), true);
     const syncBuilderRange = (input) => {
       const minimum = Number(input.min || 0);
       const maximum = Number(input.max || 100);
@@ -2037,9 +2170,10 @@
       const progress = maximum === minimum ? 0 : Math.min(100, Math.max(0, ((value - minimum) / (maximum - minimum)) * 100));
       input.style.setProperty("--sq-range-progress", `${progress}%`);
     };
-    const syncBuilderRanges = () => sqStudio.querySelectorAll('input[type="range"]').forEach(syncBuilderRange);
+    const syncBuilderRanges = () => { sqStudio.querySelectorAll('input[type="range"]').forEach(syncBuilderRange); syncBuilderSelects(); };
     sqStudio.addEventListener("input", (event) => { if (event.target.matches?.('input[type="range"]')) syncBuilderRange(event.target); });
     sqStudio.addEventListener("change", (event) => { if (event.target.matches?.('input[type="range"]')) syncBuilderRange(event.target); });
+    enhanceBuilderSelects();
     syncBuilderRanges();
     const productPrices = { granola: 58000, coffee: 79000, sambal: 46000 };
     const productNames = { granola: "Granola Madu Nusantara", coffee: "Kopi Susu Concentrate", sambal: "Sambal Roa Signature" };
@@ -2094,7 +2228,7 @@
     sqStudio.querySelectorAll("[data-sq-tab]").forEach((button) => button.addEventListener("click", () => openSqPanel(button.dataset.sqTab, { pin: true })));
     sqStudio.querySelectorAll("[data-sq-open-panel]").forEach((button) => button.addEventListener("click", () => openSqPanel(button.dataset.sqOpenPanel, { pin: true })));
     document.addEventListener("pointerdown", (event) => {
-      if (builderSidebar?.contains(event.target) || event.target.closest?.("[data-sq-edit-button-brand], [data-sq-open-panel]")) return;
+      if (builderSidebar?.contains(event.target) || event.target.closest?.("[data-sq-edit-button-brand], [data-sq-open-panel], [data-sq-builder-select-menu]")) return;
       builderSidebar?.classList.remove("sq-panel-pinned");
     });
 
@@ -4342,18 +4476,40 @@
     syncPageSpacingControls();
 
     const brandVariable = { accent: "--site-accent", page: "--site-page", ink: "--site-ink", surface: "--site-surface" };
+    const syncPageAppearanceControls = () => {
+      if (!previewRoot) return;
+      const computed = getComputedStyle(previewRoot);
+      sqStudio.querySelectorAll("[data-sq-page-brand-color]").forEach((input) => {
+        const key = input.dataset.sqPageBrandColor;
+        input.value = colorToHex(computed.getPropertyValue(brandVariable[key]), input.value);
+        const output = sqStudio.querySelector(`[data-sq-page-brand-output="${key}"]`);
+        if (output) output.textContent = input.value.toUpperCase();
+      });
+    };
     let globalStyleSnapshot;
     const startGlobalStyleEdit = () => { if (!globalStyleSnapshot) globalStyleSnapshot = captureState(); };
     const finishGlobalStyleEdit = () => { if (globalStyleSnapshot) remember(globalStyleSnapshot); globalStyleSnapshot = null; };
-    sqStudio.querySelectorAll("[data-sq-brand-color], [data-sq-brand-font], [data-sq-button-color], [data-sq-button-radius], [data-sq-button-border-width], [data-sq-button-height], [data-sq-button-weight], [data-sq-button-shadow], [data-sq-button-case]").forEach((input) => { input.addEventListener("focus", startGlobalStyleEdit); input.addEventListener("pointerdown", startGlobalStyleEdit); input.addEventListener("change", finishGlobalStyleEdit); });
+    sqStudio.querySelectorAll("[data-sq-brand-color], [data-sq-page-brand-color], [data-sq-brand-font], [data-sq-button-color], [data-sq-button-radius], [data-sq-button-border-width], [data-sq-button-height], [data-sq-button-weight], [data-sq-button-shadow], [data-sq-button-case]").forEach((input) => { input.addEventListener("focus", startGlobalStyleEdit); input.addEventListener("pointerdown", startGlobalStyleEdit); input.addEventListener("change", finishGlobalStyleEdit); });
     sqStudio.querySelectorAll("[data-sq-brand-color]").forEach((input) => input.addEventListener("input", () => {
       const key = input.dataset.sqBrandColor;
       previewRoot?.style.setProperty(brandVariable[key], input.value);
       if (key === "accent") previewRoot?.style.setProperty("--button-primary-bg", input.value);
       const output = sqStudio.querySelector(`[data-sq-brand-color-output="${key}"]`);
       if (output) output.textContent = input.value.toUpperCase();
+      syncPageAppearanceControls();
       sqStudio.querySelectorAll("[data-sq-theme]").forEach((button) => button.classList.remove("active"));
       if (selectedAction?.isConnected) syncElementControls();
+      markSqChanged();
+    }));
+    sqStudio.querySelectorAll("[data-sq-page-brand-color]").forEach((input) => input.addEventListener("input", () => {
+      const key = input.dataset.sqPageBrandColor;
+      previewRoot?.style.setProperty(brandVariable[key], input.value);
+      const brandInput = sqStudio.querySelector(`[data-sq-brand-color="${key}"]`);
+      const brandOutput = sqStudio.querySelector(`[data-sq-brand-color-output="${key}"]`);
+      if (brandInput) brandInput.value = input.value;
+      if (brandOutput) brandOutput.textContent = input.value.toUpperCase();
+      syncPageAppearanceControls();
+      sqStudio.querySelectorAll("[data-sq-theme]").forEach((button) => button.classList.remove("active"));
       markSqChanged();
     }));
     sqStudio.querySelectorAll("[data-sq-brand-font]").forEach((input) => input.addEventListener("change", () => {
@@ -4451,9 +4607,18 @@
       syncButtonSystemControls();
       const system = sqStudio.querySelector("[data-sq-brand-button-system]");
       system?.scrollIntoView({ behavior: "smooth", block: "start" });
-      roleSelect?.focus({ preventScroll: true });
+      (roleSelect?._sqBuilderSelect?.trigger || roleSelect)?.focus({ preventScroll: true });
       system?.classList.remove("brand-focus");
       requestAnimationFrame(() => system?.classList.add("brand-focus"));
+    });
+    sqStudio.querySelector("[data-sq-page-brand-link]")?.addEventListener("click", () => {
+      openSqPanel("brand", { pin: true });
+      syncBrandControls();
+      const palette = sqStudio.querySelector("[data-sq-brand-palette]");
+      palette?.scrollIntoView({ behavior: "smooth", block: "start" });
+      sqStudio.querySelector('[data-sq-brand-color="page"]')?.focus({ preventScroll: true });
+      palette?.classList.remove("brand-focus");
+      requestAnimationFrame(() => palette?.classList.add("brand-focus"));
     });
     sqStudio.querySelectorAll("[data-sq-theme]").forEach((button) => button.addEventListener("click", () => {
       remember();
@@ -4464,6 +4629,7 @@
       ["accent", "page", "ink", "surface"].forEach((key, index) => { previewRoot?.style.setProperty(brandVariable[key], colors[index]); const input = sqStudio.querySelector(`[data-sq-brand-color="${key}"]`); if (input) input.value = colors[index]; const output = sqStudio.querySelector(`[data-sq-brand-color-output="${key}"]`); if (output) output.textContent = colors[index].toUpperCase(); });
       previewRoot?.style.setProperty("--button-primary-bg", colors[0]);
       previewRoot?.style.setProperty("--button-primary-border", colors[0]);
+      syncPageAppearanceControls();
       syncButtonSystemControls();
       if (selectedAction?.isConnected) syncElementControls();
       markSqChanged();
@@ -4513,6 +4679,7 @@
         const font = computed.getPropertyValue(`--site-${input.dataset.sqBrandFont}-font`).trim() || "Poppins, sans-serif";
         if ([...input.options].some((option) => option.value === font)) input.value = font;
       });
+      syncPageAppearanceControls();
       syncButtonSystemControls();
     };
     const newBlockMarkup = (type, sectionId) => {
