@@ -1269,7 +1269,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 @media(max-width:900px){.template-gallery .sq-hero-heading{font-size:5.6em}.template-gallery .sq-product-grid .product-art{height:300px}}
 @media(max-width:600px){.template-gallery .sq-hero-heading{font-size:4.5em}.template-gallery .sq-product-grid{grid-template-columns:1fr}.template-gallery .sq-product-grid>article{border-right:0}.template-gallery .sq-product-grid .product-art{height:320px}}
 
-.template-gallery .sq-product-grid .product-art{height:auto!important;aspect-ratio:1;display:grid;place-items:center;background:#fff}.template-gallery .sq-product-grid .product-art img{width:100%;height:100%;padding:clamp(18px,3vw,46px);object-fit:contain;background:#fff;box-sizing:border-box}
+.template-gallery .sq-product-grid .product-art{height:auto!important;aspect-ratio:1;display:grid;place-items:center;background:#fff}.template-gallery .sq-product-grid .product-art img{width:100%;height:100%;padding:clamp(18px,3vw,46px);object-fit:contain;background:#fff;box-sizing:border-box;transition:none!important}.template-gallery .sq-product-grid.hover-image-zoom:hover img{transform:none!important}
 
 /* Dedicated Gallery builder composition. This mirrors the approved standalone template instead of the legacy generic generator. */
 .template-gallery :is(.sq-template-gallery-announcement,.sq-template-gallery-nav,.sq-template-gallery-hero,.sq-template-gallery-index,.sq-template-gallery-intro,.sq-template-gallery-editorial,.sq-template-gallery-principle,.sq-template-gallery-materials,.sq-template-gallery-reviews,.sq-template-gallery-faq,.sq-template-gallery-newsletter,.sq-template-gallery-footer){column-gap:0!important;background:var(--site-page)}
