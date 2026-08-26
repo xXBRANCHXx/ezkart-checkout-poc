@@ -1410,3 +1410,34 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .sq-reset-element-inset { width: 100%; height: 30px; margin-top: 7px; color: #6a7079; background: #f7f6f5; border: 1px solid #e2dfdc; border-radius: 7px; font: 600 7px Poppins, sans-serif; }
 .sq-reset-element-inset:hover { color: #d83d42; background: #fff5f1; border-color: #efb7a7; }
 .sq-element-inset-controls + .sq-advanced-layout { margin-top: 16px; padding-top: 0; border-top: 0; }
+
+/* Fluid Engine-style layout grid: visible while arranging, absent from output. */
+.sq-layout-grid-controls { padding-bottom: 16px; border-bottom: 1px solid #e9e6e3; }
+.sq-layout-grid-controls .sq-inspector-heading { margin-bottom: 10px; }
+.sq-show-layout-grid { margin: 0 0 12px !important; display: flex !important; align-items: center; gap: 7px; }
+.sq-show-layout-grid input { width: 13px !important; height: 13px; accent-color: var(--sq-control-accent); }
+.sq-show-layout-grid span { margin: 0 !important; color: #555c66 !important; font-size: 8px !important; }
+.sq-grid-density-control { position: relative; }
+.sq-grid-density-control > output { color: #d83d42 !important; font-weight: 600; }
+.sq-grid-density-scale { margin-top: -2px; display: flex; justify-content: space-between; color: #99928d; font-size: 6px; }
+.sq-layout-grid-controls + .sq-product-layout-controls:not([hidden]),
+.sq-layout-grid-controls + .sq-product-layout-controls[hidden] + .sq-element-inset-controls { margin-top: 16px; }
+.sq-layout-grid-overlay {
+  height: calc(var(--sq-grid-rows) * var(--sq-grid-row-height));
+  position: absolute !important;
+  z-index: 0 !important;
+  display: grid !important;
+  grid-template-columns: repeat(12, minmax(0, 1fr)) !important;
+  grid-auto-rows: var(--sq-grid-row-height) !important;
+  column-gap: var(--sq-grid-column-gap) !important;
+  row-gap: 0 !important;
+  pointer-events: none !important;
+  overflow: hidden;
+}
+.sq-layout-grid-overlay > i {
+  min-width: 0;
+  display: block;
+  background: rgba(255, 255, 255, .16);
+  border: 1px solid rgba(247, 11, 97, .24);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .34);
+}
