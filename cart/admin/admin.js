@@ -2084,13 +2084,19 @@
     let cloudSavePromise = Promise.resolve(true);
     let baseSiteState = null;
 
-    const openSqPanel = (name) => {
+    const builderSidebar = sqStudio.querySelector(".sq-builder-sidebar");
+    const openSqPanel = (name, { pin = false } = {}) => {
       sqStudio.querySelectorAll("[data-sq-tab]").forEach((button) => button.classList.toggle("active", button.dataset.sqTab === name));
       sqStudio.querySelectorAll("[data-sq-panel]").forEach((panel) => panel.classList.toggle("active", panel.dataset.sqPanel === name));
+      builderSidebar?.classList.toggle("sq-panel-pinned", pin || builderSidebar.classList.contains("sq-panel-pinned"));
       if (window.matchMedia("(max-width: 720px)").matches) sqStudio.classList.add("mobile-panel-open");
     };
-    sqStudio.querySelectorAll("[data-sq-tab]").forEach((button) => button.addEventListener("click", () => openSqPanel(button.dataset.sqTab)));
-    sqStudio.querySelectorAll("[data-sq-open-panel]").forEach((button) => button.addEventListener("click", () => openSqPanel(button.dataset.sqOpenPanel)));
+    sqStudio.querySelectorAll("[data-sq-tab]").forEach((button) => button.addEventListener("click", () => openSqPanel(button.dataset.sqTab, { pin: true })));
+    sqStudio.querySelectorAll("[data-sq-open-panel]").forEach((button) => button.addEventListener("click", () => openSqPanel(button.dataset.sqOpenPanel, { pin: true })));
+    document.addEventListener("pointerdown", (event) => {
+      if (builderSidebar?.contains(event.target) || event.target.closest?.("[data-sq-edit-button-brand], [data-sq-open-panel]")) return;
+      builderSidebar?.classList.remove("sq-panel-pinned");
+    });
 
     const selectedProducts = () => [...sqStudio.querySelectorAll("[data-sq-product]:checked")].map((input) => input.value);
     const previewSnapshotHtml = () => {
@@ -4441,10 +4447,11 @@
       const role = selectedElement?.dataset.sqButtonRole || "primary";
       const roleSelect = sqStudio.querySelector("[data-sq-button-style-role]");
       if (roleSelect) roleSelect.value = role;
-      openSqPanel("brand");
+      openSqPanel("brand", { pin: true });
       syncButtonSystemControls();
       const system = sqStudio.querySelector("[data-sq-brand-button-system]");
       system?.scrollIntoView({ behavior: "smooth", block: "start" });
+      roleSelect?.focus({ preventScroll: true });
       system?.classList.remove("brand-focus");
       requestAnimationFrame(() => system?.classList.add("brand-focus"));
     });

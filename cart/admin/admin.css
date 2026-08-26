@@ -1864,3 +1864,15 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .sq-button-brand-summary > button { width: 100%; height: 34px; padding: 0 10px; display: flex; align-items: center; justify-content: space-between; color: #d91a48; background: #fff; border: 1px solid #f0c9bf; border-radius: 8px; font-size: 8px; font-weight: 600; }
 .sq-button-brand-summary > button:hover { background: #fff3ee; border-color: #efa590; }
 .sq-button-brand-summary > button .icon { width: 12px; }
+
+@media (min-width: 721px) {
+  .page-site-editor .sq-builder-sidebar.sq-panel-pinned { width: 324px; box-shadow: 14px 0 30px rgba(20, 26, 38, .13); }
+  .page-site-editor .sq-builder-sidebar.sq-panel-pinned .sq-tool-panels { visibility: visible; opacity: 1; pointer-events: auto; transform: none; transition-delay: 0s; }
+}
+
+/* Keep every editing surface above canvas content and selection overlays. */
+.page-site-editor .sq-editor-grid { isolation: isolate; }
+.page-site-editor .sq-canvas-stage { z-index: 1; }
+.page-site-editor .sq-inspector { position: relative; z-index: 70; box-shadow: -10px 0 24px rgba(20, 26, 38, .07); }
+.page-site-editor .sq-builder-sidebar { z-index: 80; }
+.page-site-editor .sq-tool-panels { position: relative; z-index: 2; background: #fff; box-shadow: 12px 0 28px rgba(20, 26, 38, .1); }
