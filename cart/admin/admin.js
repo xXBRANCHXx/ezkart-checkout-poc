@@ -2205,6 +2205,8 @@
     let draggedSection = "";
     let draggedImage = null;
     let draggedElementId = "";
+    let libraryDrag = null;
+    let libraryDropPreview = null;
     let draggedImageSnapshot = null;
     let showLayoutGrid = true;
     let layoutGridDragging = false;
@@ -2532,6 +2534,21 @@
       section.prepend(grid);
     };
     const elementTypeName = (element) => (element?.dataset.sqElementType || "element").replace(/-/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+    const reviewRating = (element) => Math.max(1, Math.min(5, Math.round(Number(element?.dataset.sqReviewRating) || 5)));
+    const renderReviewStars = (element, value = reviewRating(element)) => {
+      if (!element?.matches('[data-sq-element-type="review"]')) return;
+      const rating = Math.max(1, Math.min(5, Math.round(Number(value) || 5)));
+      element.dataset.sqReviewRating = String(rating);
+      let stars = element.querySelector(":scope > .sq-review-stars");
+      if (!stars) {
+        stars = document.createElement("div");
+        stars.className = "sq-review-stars";
+        element.prepend(stars);
+      }
+      stars.setAttribute("role", "img");
+      stars.setAttribute("aria-label", `${rating} out of 5 stars`);
+      stars.innerHTML = Array.from({ length: 5 }, (_, index) => `<span aria-hidden="true" class="${index < rating ? "active" : ""}">★</span>`).join("");
+    };
     const heroPieceLayout = (base, role) => {
       const headingHeight = Math.max(3, Math.round(base.height * .42));
       const descriptionHeight = Math.max(2, Math.round(base.height * .22));
@@ -2899,6 +2916,18 @@
         if (textInput) textInput.value = textTarget.textContent.trim();
         if (textLabel) textLabel.textContent = textTarget.matches("h1,h2,h3") ? "Heading" : textTarget.matches("a") ? "Link label" : "Text content";
       }
+      const reviewControls = sqStudio.querySelector("[data-sq-review-controls]");
+      const isReview = elementType === "review";
+      if (reviewControls) reviewControls.hidden = !isReview;
+      if (isReview) {
+        const rating = reviewRating(selectedElement);
+        renderReviewStars(selectedElement, rating);
+        sqStudio.querySelectorAll("[data-sq-review-rating]").forEach((button) => {
+          const active = Number(button.dataset.sqReviewRating) === rating;
+          button.classList.toggle("active", active);
+          button.setAttribute("aria-pressed", String(active));
+        });
+      }
       const imageControls = sqStudio.querySelector("[data-sq-image-controls]");
       if (imageControls) imageControls.hidden = !image;
       if (image) {
@@ -2931,7 +2960,7 @@
         if (device) device.textContent = activeDevice[0].toUpperCase() + activeDevice.slice(1);
       }
       const emptyContent = sqStudio.querySelector("[data-sq-element-content-empty]");
-      if (emptyContent) emptyContent.hidden = [textControls, logoControls, imageControls, buttonControls, codeControls].some((control) => control && !control.hidden);
+      if (emptyContent) emptyContent.hidden = [textControls, reviewControls, logoControls, imageControls, buttonControls, codeControls].some((control) => control && !control.hidden);
       showElementPanel(activeElementPanel);
       syncBuilderRanges();
     };
@@ -3327,6 +3356,7 @@
     };
     const bindSqInteractions = () => {
       previewRoot?.querySelectorAll(".animating, .sq-element-animate").forEach((element) => element.classList.remove("animating", "sq-element-animate"));
+      previewRoot?.querySelectorAll('[data-sq-element-type="review"]').forEach((element) => renderReviewStars(element));
       previewRoot?.querySelectorAll('[class*="hover-"]').forEach((element) => {
         [...element.classList].filter((name) => name.startsWith("hover-")).forEach((name) => element.classList.remove(name));
       });
@@ -3374,9 +3404,27 @@
       previewRoot?.querySelectorAll("[data-sq-block]").forEach((block) => {
         block.onclick = () => deselectSqItem(block.dataset.sectionId);
         block.ondragstart = (event) => { draggedSection = block.dataset.sectionId; block.classList.add("dragging"); event.dataTransfer.effectAllowed = "move"; };
-        block.ondragover = (event) => { event.preventDefault(); block.classList.add("drag-over"); };
-        block.ondragleave = () => block.classList.remove("drag-over");
-        block.ondrop = (event) => { event.preventDefault(); block.classList.remove("drag-over"); const rect = block.getBoundingClientRect(); reorderSection(draggedSection, block.dataset.sectionId, event.clientY > rect.top + rect.height / 2); };
+        block.ondragover = (event) => {
+          if (libraryDrag?.kind === "element") {
+            event.preventDefault(); event.stopPropagation();
+            event.dataTransfer.dropEffect = "copy";
+            updateLibraryDropPreview(block, event);
+            return;
+          }
+          event.preventDefault(); block.classList.add("drag-over");
+        };
+        block.ondragleave = (event) => {
+          if (libraryDrag?.kind === "element") {
+            if (!block.contains(event.relatedTarget)) clearLibraryDropPreview();
+            return;
+          }
+          block.classList.remove("drag-over");
+        };
+        block.ondrop = (event) => {
+          event.preventDefault(); block.classList.remove("drag-over");
+          if (libraryDrag?.kind === "element") { event.stopPropagation(); dropLibraryElement(block, event); return; }
+          const rect = block.getBoundingClientRect(); reorderSection(draggedSection, block.dataset.sectionId, event.clientY > rect.top + rect.height / 2);
+        };
         block.ondragend = () => { block.classList.remove("dragging"); previewRoot.querySelectorAll(".drag-over").forEach((item) => item.classList.remove("drag-over")); };
       });
       applyFluidLayouts();
@@ -3613,17 +3661,26 @@
       syncPageGridControls();
       markSqChanged();
     };
-    undoButton?.addEventListener("click", () => {
+    const undoBuilderChange = () => {
       if (!undoStack.length) return;
       redoStack.push(captureState());
       restoreState(undoStack.pop());
       updateHistoryButtons();
-    });
-    redoButton?.addEventListener("click", () => {
+    };
+    const redoBuilderChange = () => {
       if (!redoStack.length) return;
       undoStack.push(captureState());
       restoreState(redoStack.pop());
       updateHistoryButtons();
+    };
+    undoButton?.addEventListener("click", undoBuilderChange);
+    redoButton?.addEventListener("click", redoBuilderChange);
+    document.addEventListener("keydown", (event) => {
+      if (!(event.ctrlKey || event.metaKey) || event.altKey || event.key.toLowerCase() !== "z") return;
+      const editingText = event.target.matches?.("input, textarea, [contenteditable='true']");
+      if (editingText) return;
+      event.preventDefault();
+      if (event.shiftKey) redoBuilderChange(); else undoBuilderChange();
     });
 
     sqStudio.querySelectorAll("[data-sq-product]").forEach(bindSqProductInput);
@@ -4149,6 +4206,14 @@
       refreshElementOverlay(); markSqChanged();
     });
     sqStudio.querySelector("[data-sq-element-text]")?.addEventListener("change", () => { if (textControlSnapshot) remember(textControlSnapshot); textControlSnapshot = null; });
+    sqStudio.querySelectorAll("[data-sq-review-rating]").forEach((button) => button.addEventListener("click", () => {
+      if (selectedElement?.dataset.sqElementType !== "review") return;
+      remember();
+      renderReviewStars(selectedElement, button.dataset.sqReviewRating);
+      syncElementControls();
+      refreshElementOverlay();
+      markSqChanged();
+    }));
 
     let actionControlSnapshot;
     const startActionEdit = () => { if (!actionControlSnapshot) actionControlSnapshot = captureState(); };
@@ -4689,7 +4754,7 @@
       if (type === "full-image") return `<section class="sq-page-block sq-generated-image" draggable="true" data-sq-block data-sq-fluid data-sq-rows="14" data-section-id="${sectionId}">${handle}<div class="sq-free-image" data-sq-element data-sq-element-type="image" data-layout-desktop="1,1,12,14" data-layout-tablet="1,1,12,14" data-layout-mobile="1,1,12,14"><img src="${productImages.granola}" alt="Granola Madu Nusantara product story"></div></section>`;
       if (type === "gallery") return `<section class="sq-page-block sq-generated-gallery" draggable="true" data-sq-block data-sq-fluid data-sq-rows="12" data-section-id="${sectionId}">${handle}<div class="sq-free-image" data-sq-element data-sq-element-type="image" data-layout-desktop="1,1,6,12" data-layout-tablet="1,1,12,6" data-layout-mobile="1,1,12,6"><img src="${productImages.granola}" alt="Granola"></div><div class="sq-free-image" data-sq-element data-sq-element-type="image" data-layout-desktop="7,1,3,12" data-layout-tablet="1,7,6,6" data-layout-mobile="1,7,6,6"><img src="${productImages.coffee}" alt="Kopi Susu"></div><div class="sq-free-image" data-sq-element data-sq-element-type="image" data-layout-desktop="10,1,3,12" data-layout-tablet="7,7,6,6" data-layout-mobile="7,7,6,6"><img src="${productImages.sambal}" alt="Sambal Roa"></div></section>`;
       if (type === "text") return `<section class="sq-page-block sq-generated-text" draggable="true" data-sq-block data-sq-fluid data-sq-rows="10" data-section-id="${sectionId}">${handle}<small data-sq-element data-sq-element-type="eyebrow" data-layout-desktop="2,1,10,2" data-layout-tablet="1,1,12,2" data-layout-mobile="1,1,12,2">YOUR STORY</small><h2 data-sq-element data-sq-element-type="heading" data-layout-desktop="2,3,10,4" data-layout-tablet="1,3,12,4" data-layout-mobile="1,3,12,4">A clear idea deserves room to breathe.</h2><p data-sq-element data-sq-element-type="text" data-layout-desktop="3,7,8,3" data-layout-tablet="1,7,12,3" data-layout-mobile="1,7,12,3">Write a concise product or brand story here. Every line remains editable directly on the page.</p></section>`;
-      if (type === "testimonials") return `<section class="sq-page-block sq-generated-reviews" draggable="true" data-sq-block data-sq-fluid data-sq-rows="8" data-section-id="${sectionId}">${handle}<article data-sq-element data-sq-element-type="review" data-layout-desktop="1,1,6,8" data-layout-tablet="1,1,6,8" data-layout-mobile="1,1,12,4"><b>“Excellent flavor and beautifully packed.”</b><small>Sarah · verified buyer</small></article><article data-sq-element data-sq-element-type="review" data-layout-desktop="7,1,6,8" data-layout-tablet="7,1,6,8" data-layout-mobile="1,5,12,4"><b>“Checkout was easy and delivery was quick.”</b><small>Michael · verified buyer</small></article></section>`;
+      if (type === "testimonials") return `<section class="sq-page-block sq-generated-reviews" draggable="true" data-sq-block data-sq-fluid data-sq-rows="8" data-section-id="${sectionId}">${handle}<article data-sq-element data-sq-element-type="review" data-sq-review-rating="5" data-layout-desktop="1,1,6,8" data-layout-tablet="1,1,6,8" data-layout-mobile="1,1,12,4"><b>“Excellent flavor and beautifully packed.”</b><small>Sarah · verified buyer</small></article><article data-sq-element data-sq-element-type="review" data-sq-review-rating="5" data-layout-desktop="7,1,6,8" data-layout-tablet="7,1,6,8" data-layout-mobile="1,5,12,4"><b>“Checkout was easy and delivery was quick.”</b><small>Michael · verified buyer</small></article></section>`;
       if (type === "faq") return `<section class="sq-page-block sq-generated-faq" draggable="true" data-sq-block data-sq-fluid data-sq-rows="12" data-section-id="${sectionId}">${handle}<h2 data-sq-element data-sq-element-type="heading" data-layout-desktop="1,1,12,3" data-layout-tablet="1,1,12,3" data-layout-mobile="1,1,12,3">Questions, answered.</h2><details open data-sq-element data-sq-element-type="faq" data-layout-desktop="1,4,12,4" data-layout-tablet="1,4,12,4" data-layout-mobile="1,4,12,4"><summary>How does payment work?</summary><p>Customers complete a secure checkout prepared by Ezkart.</p></details><details data-sq-element data-sq-element-type="faq" data-layout-desktop="1,8,12,4" data-layout-tablet="1,8,12,4" data-layout-mobile="1,8,12,4"><summary>How is shipping calculated?</summary><p>Product weights, destination, courier, and service determine the live rate.</p></details></section>`;
       if (type === "spacer") return `<section class="sq-page-block sq-generated-spacer" draggable="true" data-sq-block data-sq-fluid data-sq-rows="3" data-section-id="${sectionId}">${handle}<span data-sq-element data-sq-element-type="spacer" data-layout-desktop="1,1,12,3" data-layout-tablet="1,1,12,3" data-layout-mobile="1,1,12,3">Responsive spacer · 80px</span></section>`;
       const template = previewRoot?.querySelector(`[data-section-id="${type}"]`);
@@ -4725,23 +4790,64 @@
       });
       section.dataset.sqRows = String(Math.max(12, row - 1));
     };
-    sqStudio.querySelectorAll("[data-sq-add-element]").forEach((button) => button.addEventListener("click", () => {
-      const section = previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`);
-      if (!section) return;
+    const libraryElementDimensions = (type) => ({
+      heading: { width: 6, height: 4 }, text: { width: 6, height: 3 }, button: { width: 3, height: 2 },
+      image: { width: 6, height: 8 }, divider: { width: 8, height: 1 }, form: { width: 6, height: 5 }, html: { width: 8, height: 8 },
+    }[type] || { width: 6, height: 4 });
+    const clearLibraryDropPreview = () => {
+      libraryDropPreview?.remove();
+      libraryDropPreview = null;
+      previewRoot?.querySelectorAll(".sq-library-drop-section").forEach((section) => section.classList.remove("sq-library-drop-section"));
+    };
+    const libraryPointerLayout = (section, event, dimensions = libraryElementDimensions(libraryDrag?.type)) => {
+      const columns = fluidColumns();
+      const width = Math.max(1, Math.min(columns, activeDevice === "mobile" ? columns : dimensions.width));
+      const height = Math.max(1, dimensions.height);
+      const rect = section.getBoundingClientRect();
+      const scale = section.offsetWidth ? rect.width / section.offsetWidth : 1;
+      const computed = getComputedStyle(section);
+      const paddingLeft = (Number.parseFloat(computed.paddingLeft) || 0) * scale;
+      const paddingRight = (Number.parseFloat(computed.paddingRight) || 0) * scale;
+      const paddingTop = (Number.parseFloat(computed.paddingTop) || 0) * scale;
+      const gap = (Number.parseFloat(computed.columnGap) || 0) * scale;
+      const innerWidth = Math.max(1, rect.width - paddingLeft - paddingRight);
+      const columnWidth = Math.max(1, (innerWidth - gap * (columns - 1)) / columns);
+      const pointerColumn = Math.floor(Math.max(0, event.clientX - rect.left - paddingLeft) / Math.max(1, columnWidth + gap)) + 1;
+      const x = Math.max(1, Math.min(columns - width + 1, pointerColumn - Math.floor(width / 2)));
+      const renderedRowHeight = Math.max(1, fluidRowHeight(section) * scale);
+      const pointerRow = Math.floor(Math.max(0, event.clientY - rect.top - paddingTop) / renderedRowHeight) + 1;
+      const y = Math.max(1, Math.min(maximumFluidRows - height + 1, pointerRow - Math.floor(height / 2)));
+      return { x, y, width, height };
+    };
+    const updateLibraryDropPreview = (section, event) => {
+      if (!libraryDrag || !section) return;
+      const layout = libraryPointerLayout(section, event);
+      if (!libraryDropPreview) {
+        libraryDropPreview = document.createElement("div");
+        libraryDropPreview.className = "sq-library-drop-preview";
+        libraryDropPreview.setAttribute("aria-hidden", "true");
+      }
+      if (libraryDropPreview.parentElement !== section) section.append(libraryDropPreview);
+      libraryDropPreview.style.gridColumn = `${layout.x} / span ${layout.width}`;
+      libraryDropPreview.style.gridRow = `${layout.y} / span ${layout.height}`;
+      libraryDropPreview.dataset.layout = `${layout.x},${layout.y},${layout.width},${layout.height}`;
+      libraryDropPreview.innerHTML = `<span>${escapeHtml(libraryDrag.label)}</span>`;
+      previewRoot?.querySelectorAll(".sq-library-drop-section").forEach((candidate) => candidate.classList.toggle("sq-library-drop-section", candidate === section));
+    };
+    const addLibraryElement = (type, section, preferredLayout = null) => {
+      if (!section) return null;
       remember();
       ensureElementSection(section);
       removeElementOverlay();
       const wrapper = document.createElement("div");
-      wrapper.innerHTML = newElementMarkup(button.dataset.sqAddElement);
+      wrapper.innerHTML = newElementMarkup(type);
       const element = wrapper.firstElementChild;
-      const dimensions = {
-        heading: { width: 6, height: 4 }, text: { width: 6, height: 3 }, button: { width: 3, height: 2 },
-        image: { width: 6, height: 8 }, divider: { width: 8, height: 1 }, form: { width: 6, height: 5 }, html: { width: 8, height: 8 },
-      }[button.dataset.sqAddElement] || { width: 6, height: 4 };
+      const dimensions = libraryElementDimensions(type);
       ["desktop", "tablet", "mobile"].forEach((device) => {
         const desired = device === "mobile" ? { ...dimensions, width: fluidColumns(device) } : dimensions;
         setElementLayout(element, findOpenElementLayout(section, desired, device), device);
       });
+      if (preferredLayout) setElementLayout(element, preferredLayout, activeDevice);
       section.append(element);
       rebuildLayerList();
       bindSqInteractions();
@@ -4752,7 +4858,40 @@
       element.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
       markSqChanged();
       showToast(`${elementTypeName(element)} added — drag it anywhere in the section`);
-    }));
+      return element;
+    };
+    const dropLibraryElement = (section, event) => {
+      if (!libraryDrag) return;
+      const type = libraryDrag.type;
+      const layout = libraryDropPreview?.dataset.layout?.split(",").map(Number);
+      const preferredLayout = layout?.length === 4 ? { x: layout[0], y: layout[1], width: layout[2], height: layout[3] } : libraryPointerLayout(section, event);
+      clearLibraryDropPreview();
+      addLibraryElement(type, section, preferredLayout);
+      libraryDrag = null;
+      document.body.classList.remove("sq-library-dragging");
+    };
+    sqStudio.querySelectorAll("[data-sq-add-element]").forEach((button) => {
+      button.draggable = true;
+      button.addEventListener("dragstart", (event) => {
+        const type = button.dataset.sqAddElement;
+        libraryDrag = { kind: "element", type, label: button.querySelector("b")?.textContent.trim() || elementTypeName({ dataset: { sqElementType: type } }) };
+        document.body.classList.add("sq-library-dragging");
+        button.classList.add("sq-library-drag-source");
+        event.dataTransfer.effectAllowed = "copy";
+        event.dataTransfer.setData("application/x-ezkart-element", type);
+        event.dataTransfer.setData("text/plain", libraryDrag.label);
+      });
+      button.addEventListener("dragend", () => {
+        button.classList.remove("sq-library-drag-source");
+        document.body.classList.remove("sq-library-dragging");
+        clearLibraryDropPreview();
+        libraryDrag = null;
+      });
+      button.addEventListener("click", () => {
+        const section = previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`);
+        addLibraryElement(button.dataset.sqAddElement, section);
+      });
+    });
     sqStudio.querySelectorAll("[data-sq-add-block]").forEach((button) => button.addEventListener("click", () => {
       remember();
       const type = button.dataset.sqAddBlock;

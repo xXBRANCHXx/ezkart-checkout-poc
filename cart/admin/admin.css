@@ -2034,3 +2034,60 @@ button, a { -webkit-tap-highlight-color: transparent; }
 }
 @keyframes sqSiteLoadingSpin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .sq-studio.sq-site-loading .sq-canvas-scroll::before { animation: none; } }
+
+/* Builder text must remain readable at normal desktop viewing distances. */
+.page-site-editor .sq-tool-panel > header small,
+.page-site-editor .sq-block-group h3 { font-size: 9px; }
+.page-site-editor .sq-tool-panel > header h2 { font-size: 16px; }
+.page-site-editor .sq-panel-intro,
+.page-site-editor .sq-library-note { font-size: 10px; line-height: 1.6; }
+.page-site-editor :is(.sq-tool-panel, .sq-inspector) small { font-size: 9px; line-height: 1.5; }
+.page-site-editor :is(.sq-tool-panel, .sq-inspector) label > span { font-size: 9px; }
+.page-site-editor :is(.sq-tool-panel, .sq-inspector) output { font-size: 8px; }
+.page-site-editor .sq-block-grid b { font-size: 11px; }
+.page-site-editor .sq-block-grid small { font-size: 9px; line-height: 1.45; }
+.page-site-editor .sq-inspector :is(.sq-field-note, .sq-content-empty, .sq-element-panel-empty) { font-size: 10px; line-height: 1.6; }
+.page-site-editor .sq-brand-intro b,
+.page-site-editor .sq-brand-panel .sq-inspector-heading h3 { font-size: 11px; }
+.page-site-editor .sq-brand-intro small,
+.page-site-editor .sq-brand-panel label > span { font-size: 9px !important; }
+.page-site-editor .sq-brand-colors { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.page-site-editor .sq-brand-panel .sq-brand-colors label { display: grid; grid-template-columns: 38px minmax(0, 1fr); align-items: center; column-gap: 8px; }
+.page-site-editor .sq-brand-panel .sq-brand-colors label > span { margin: 0; }
+.page-site-editor .sq-brand-panel .sq-brand-colors input[type="color"] { width: 38px !important; grid-row: 1 / span 2; }
+.page-site-editor .sq-brand-panel .sq-brand-colors output { min-width: 0; margin: 2px 0 0; position: static; grid-column: 2; overflow: visible; font-size: 8px; text-overflow: clip; }
+.page-site-editor .sq-page-appearance-colors output { font-size: 8px !important; }
+
+/* Dragging a library element previews its exact responsive grid footprint. */
+.sq-element-library [data-sq-add-element] { cursor: grab; user-select: none; }
+.sq-element-library [data-sq-add-element]:active,
+.sq-element-library [data-sq-add-element].sq-library-drag-source { cursor: grabbing; }
+.sq-element-library [data-sq-add-element].sq-library-drag-source { color: #d92f4f; background: #fff5f1; border-color: #efb9aa; opacity: .58; }
+.sq-library-drop-section { outline-color: color-mix(in srgb, var(--site-accent) 24%, transparent) !important; }
+.sq-library-drop-preview {
+  min-width: 0;
+  min-height: 0;
+  position: relative;
+  z-index: 14;
+  display: grid;
+  place-items: center;
+  color: #c82e49;
+  background: color-mix(in srgb, #fff 86%, var(--site-accent));
+  border: 2px dotted color-mix(in srgb, var(--site-accent) 62%, #fff);
+  border-radius: 14px;
+  box-shadow: inset 0 0 0 4px rgba(255,255,255,.5), 0 8px 22px rgba(39,31,29,.07);
+  pointer-events: none;
+  transition: background-color .12s, border-color .12s;
+}
+.sq-library-drop-preview > span { padding: 5px 8px; background: rgba(255,255,255,.86); border-radius: 7px; font: 600 9px Poppins, sans-serif; box-shadow: 0 2px 7px rgba(35,29,28,.06); }
+
+/* Review ratings are visible on the page and editable from the Content tab. */
+.sq-generated-reviews article { display: flex; flex-direction: column; justify-content: center; }
+.sq-review-stars { margin-bottom: 13px; display: flex; gap: 4px; color: color-mix(in srgb, var(--site-ink, #24262b) 16%, transparent); font-size: .9em; line-height: 1; letter-spacing: .02em; }
+.sq-review-stars span.active { color: var(--site-accent); }
+.sq-review-editor { margin-top: 14px; padding: 13px; background: #faf9f8; border: 1px solid #e9e5e2; border-radius: 11px; }
+.sq-review-editor[hidden] { display: none !important; }
+.sq-review-rating { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 5px; }
+.sq-review-rating button { min-width: 0; height: 34px; padding: 0; color: #717780; background: #fff; border: 1px solid #dfdcda; border-radius: 8px; font: 600 9px Poppins, sans-serif; }
+.sq-review-rating button:hover { color: #d72d4d; background: #fff5f1; border-color: #efb5a5; }
+.sq-review-rating button.active { color: #fff; background: linear-gradient(110deg,#ff5b18,#f60b67); border-color: transparent; box-shadow: 0 5px 13px rgba(242,48,79,.18); }
