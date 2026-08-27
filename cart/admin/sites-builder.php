@@ -106,6 +106,10 @@ declare(strict_types=1);
     <main class="sq-canvas-stage">
       <div class="sq-canvas-meta"><span><?= ez_admin_icon('shield') ?><b data-current-site-url>ezkart.site</b></span><div><button type="button" data-sq-zoom-out aria-label="Zoom out">−</button><output data-sq-zoom>80%</output><button type="button" data-sq-zoom-in aria-label="Zoom in">+</button></div></div>
       <div class="sq-canvas-scroll">
+        <div class="sq-site-loader" role="status" aria-live="polite" aria-atomic="true">
+          <span class="sq-site-loader-worm" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+          <span class="sq-site-loader-copy"><b>Loading your page</b><small>Preparing your Ezkart canvas</small></span>
+        </div>
         <div class="sq-device-frame" data-sq-device-frame>
           <article class="sq-page-preview theme-coral radius-soft layout-rich" data-sq-preview-root>
             <section class="sq-page-block sq-announcement selected" draggable="true" data-sq-block data-sq-fluid data-sq-rows="2" data-section-id="announcement"><button class="sq-block-handle" type="button" aria-label="Drag announcement section"><?= ez_admin_icon('grip') ?></button><p data-sq-element data-sq-element-type="text" data-layout-desktop="1,1,12,2" data-layout-tablet="1,1,12,2" data-layout-mobile="1,1,12,2">Secure checkout for every product on this page</p></section>
