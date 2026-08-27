@@ -2350,7 +2350,7 @@
       }));
       const visibleElements = [root, ...root.querySelectorAll("*")].filter(inThumbnailViewport);
       await Promise.allSettled(visibleElements.map(async (element) => {
-        const background = getComputedStyle(element).backgroundImage;
+        const background = element.ownerDocument.defaultView?.getComputedStyle(element).backgroundImage || "none";
         if (!background || background === "none" || !background.includes("url(")) return;
         let embedded = background;
         const sources = [...background.matchAll(/url\((?:"([^"]+)"|'([^']+)'|([^'")]+))\)/g)].map((match) => match[1] || match[2] || match[3]).filter(Boolean);
@@ -2445,7 +2445,7 @@
           if (captureFrame.contentDocument?.fonts?.ready) await captureFrame.contentDocument.fonts.ready.catch(() => {});
           rendered = await window.html2canvas(captureRoot, {
             allowTaint: false,
-            backgroundColor: getComputedStyle(captureRoot).getPropertyValue("--site-page").trim() || "#ffffff",
+            backgroundColor: captureRoot.ownerDocument.defaultView?.getComputedStyle(captureRoot).getPropertyValue("--site-page").trim() || "#ffffff",
             foreignObjectRendering: false,
             height: sourceHeight,
             imageTimeout: 5000,
