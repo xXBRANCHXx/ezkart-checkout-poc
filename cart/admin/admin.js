@@ -3289,7 +3289,7 @@
         const scrollStrengthOutput = sqStudio.querySelector("[data-sq-image-scroll-strength-output]");
         if (scrollEffectInput) scrollEffectInput.value = scrollEffect;
         if (scrollStrengthInput) { scrollStrengthInput.value = String(scrollStrength); scrollStrengthInput.disabled = scrollEffect === "none"; }
-        if (scrollStrengthOutput) scrollStrengthOutput.textContent = `${scrollStrength}%`;
+        if (scrollStrengthOutput) scrollStrengthOutput.textContent = scrollStrength === 100 ? "100% · fixed" : scrollStrength === 0 ? "0% · normal" : `${scrollStrength}%`;
       }
       const productControls = sqStudio.querySelector("[data-sq-product-layout-controls]");
       if (productControls) productControls.hidden = !isProductGrid;
@@ -3571,13 +3571,41 @@
       const stored = Number(image?.dataset.sqImageScrollStrength);
       return Math.max(0, Math.min(100, Number.isFinite(stored) ? stored : 50));
     };
+    const imageScrollHostFor = (image) => image?.closest("[data-sq-image-item]") || image?.parentElement || null;
+    const releaseImageScrollEffect = (image) => {
+      const host = imageScrollHostFor(image);
+      image?.style.removeProperty("--sq-image-scroll-distance");
+      image?.style.removeProperty("--sq-image-scroll-media-height");
+      image?.style.removeProperty("--sq-image-scroll-scale");
+      if (host && ![...host.querySelectorAll('img[data-sq-image-scroll]')].some((candidate) => candidate !== image && ["parallax", "parallax-deep", "parallax-reverse"].includes(candidate.dataset.sqImageScroll))) host.classList.remove("sq-image-scroll-host");
+    };
     const applyImageScrollEffect = (image) => {
       if (!image) return;
       const strength = imageScrollStrength(image);
-      image.style.setProperty("--sq-image-scroll-distance", `${Math.round(strength * 2.4)}px`);
-      image.style.setProperty("--sq-image-scroll-scale", String(1 + strength / 120));
+      const effect = image.dataset.sqImageScroll;
+      if (!["parallax", "parallax-deep", "parallax-reverse"].includes(effect)) {
+        const host = imageScrollHostFor(image);
+        if (host && !host.querySelector('img[data-sq-image-scroll="parallax"],img[data-sq-image-scroll="parallax-deep"],img[data-sq-image-scroll="parallax-reverse"]')) host.classList.remove("sq-image-scroll-host");
+        image.style.setProperty("--sq-image-scroll-scale", String(1 + strength / 180));
+        return;
+      }
+      const host = imageScrollHostFor(image);
+      if (!host) return;
+      host.classList.add("sq-image-scroll-host");
+      const hostHeight = Math.max(1, host.clientHeight);
+      const viewportHeight = Math.max(1, marqueeScrollRoot?.clientHeight || window.innerHeight);
+      const amount = strength / 100;
+      image.style.setProperty("--sq-image-scroll-distance", `${((viewportHeight + hostHeight) * .5 * amount).toFixed(2)}px`);
+      image.style.setProperty("--sq-image-scroll-media-height", `${(hostHeight + (Math.max(hostHeight, viewportHeight) - hostHeight) * amount).toFixed(2)}px`);
     };
-    const scheduleImageScrollEffects = () => previewRoot?.querySelectorAll('img[data-sq-image-scroll]:not([data-sq-image-scroll="none"])').forEach(applyImageScrollEffect);
+    const observedImageScrollHosts = new WeakSet();
+    const imageScrollResizeObserver = typeof ResizeObserver === "function" ? new ResizeObserver(() => previewRoot?.querySelectorAll('img[data-sq-image-scroll]:not([data-sq-image-scroll="none"])').forEach(applyImageScrollEffect)) : null;
+    const scheduleImageScrollEffects = () => previewRoot?.querySelectorAll('img[data-sq-image-scroll]:not([data-sq-image-scroll="none"])').forEach((image) => {
+      applyImageScrollEffect(image);
+      const host = imageScrollHostFor(image);
+      if (host && !observedImageScrollHosts.has(host)) { observedImageScrollHosts.add(host); imageScrollResizeObserver?.observe(host); }
+    });
+    window.addEventListener("resize", scheduleImageScrollEffects, { passive: true });
     const syncMarqueeCopies = (element, value, source = null) => {
       if (element?.dataset.sqElementType !== "marquee") return;
       element.querySelectorAll(".sq-marquee-copy").forEach((copy) => { if (copy !== source) copy.textContent = value; });
@@ -4759,6 +4787,7 @@
       if (!image) return;
       remember();
       Object.keys(imageDefaults).forEach((name) => { delete image.dataset[`sqFilter${name[0].toUpperCase()}${name.slice(1)}`]; });
+      releaseImageScrollEffect(image);
       delete image.dataset.sqImageScroll;
       delete image.dataset.sqImageScrollStrength;
       image.style.filter = ""; image.style.objectFit = ""; image.style.objectPosition = "";
@@ -4775,6 +4804,7 @@
       remember();
       const effect = event.currentTarget.value;
       if (effect === "none") {
+        releaseImageScrollEffect(image);
         delete image.dataset.sqImageScroll;
         image.style.transform = "";
         image.style.transformOrigin = "";
@@ -4796,7 +4826,7 @@
       if (image.dataset.sqImageScroll === "parallax-deep") image.dataset.sqImageScroll = "parallax";
       image.dataset.sqImageScrollStrength = event.currentTarget.value;
       const output = sqStudio.querySelector("[data-sq-image-scroll-strength-output]");
-      if (output) output.textContent = `${event.currentTarget.value}%`;
+      if (output) output.textContent = Number(event.currentTarget.value) === 100 ? "100% · fixed" : Number(event.currentTarget.value) === 0 ? "0% · normal" : `${event.currentTarget.value}%`;
       scheduleImageScrollEffects(); markSqChanged();
     });
     imageScrollStrengthInput?.addEventListener("change", () => {
@@ -5817,6 +5847,9 @@ const updateScrollMarquees=()=>{marqueeFrame=0;document.querySelectorAll('.sq-fr
 const scheduleScrollMarquees=()=>{if(!marqueeFrame)marqueeFrame=requestAnimationFrame(updateScrollMarquees)};
 const syncMarquees=()=>{document.querySelectorAll('.sq-free-marquee').forEach(element=>{const track=element.querySelector('.sq-marquee-track'),source=track?.querySelector('.sq-marquee-copy:not([aria-hidden])');if(!track||!source)return;track.querySelectorAll('.sq-marquee-copy[aria-hidden="true"]').forEach(copy=>copy.remove());const width=Math.max(1,source.offsetWidth),copies=Math.max(2,Math.ceil(Math.max(1,element.clientWidth)/width)+2);for(let index=1;index<copies;index+=1){const copy=source.cloneNode(true);copy.removeAttribute('contenteditable');copy.setAttribute('aria-hidden','true');track.append(copy)}track.style.setProperty('--sq-marquee-distance',width+'px');track.style.setProperty('--sq-marquee-duration',Math.max(2,width/marqueeSpeed(element))+'s');const manual=element.dataset.ezkartMarqueeMode==='scroll';element.classList.toggle('sq-marquee-manual',manual);if(!manual)track.style.removeProperty('transform')});scheduleScrollMarquees()};
 addEventListener('scroll',scheduleScrollMarquees,{passive:true});addEventListener('resize',syncMarquees,{passive:true});document.fonts?.ready.then(syncMarquees);syncMarquees();
+const imageScrollHosts=new WeakSet(),imageScrollObserver=typeof ResizeObserver==='function'?new ResizeObserver(()=>syncImageScrollEffects()):null;
+const syncImageScrollEffects=()=>{document.querySelectorAll('img[data-ezkart-image-scroll]').forEach(image=>{const stored=Number(image.dataset.ezkartImageScrollStrength),strength=Math.max(0,Math.min(100,Number.isFinite(stored)?stored:50)),effect=image.dataset.ezkartImageScroll,host=image.parentElement;if(!host)return;if(effect==='parallax'||effect==='parallax-reverse'){host.classList.add('sq-image-scroll-host');const hostHeight=Math.max(1,host.clientHeight),amount=strength/100;image.style.setProperty('--sq-image-scroll-distance',((innerHeight+hostHeight)*.5*amount).toFixed(2)+'px');image.style.setProperty('--sq-image-scroll-media-height',(hostHeight+(Math.max(hostHeight,innerHeight)-hostHeight)*amount).toFixed(2)+'px');if(!imageScrollHosts.has(host)){imageScrollHosts.add(host);imageScrollObserver?.observe(host)}}else image.style.setProperty('--sq-image-scroll-scale',String(1+strength/180))})};
+addEventListener('resize',syncImageScrollEffects,{passive:true});requestAnimationFrame(syncImageScrollEffects);
 document.querySelectorAll('[data-ezkart-variants]').forEach(controls=>{
   let variants=[];
   try{variants=JSON.parse(controls.dataset.ezkartVariants||'[]')}catch(_){return}
