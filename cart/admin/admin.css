@@ -1527,6 +1527,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .sq-upload-image { color: #d83d42 !important; background: #fff4ef !important; border-color: #f2c3b6 !important; }
 .sq-replay-button:hover { color: #d83d42; background: #fff7f3; border-color: #efb6a6; }
 .sq-canvas-scroll .sq-page-block[data-sq-fluid] > [data-sq-element]:is(:hover, .sq-element-selected) { outline-color: var(--sq-control-accent) !important; }
+.sq-canvas-scroll .sq-page-block[data-sq-fluid] > [data-sq-element].sq-element-selected { outline: 0 !important; }
 .sq-element-overlay { border-color: var(--sq-control-accent) !important; }
 .sq-element-resize { border-color: var(--sq-control-accent) !important; }
 .sq-layer-elements > button:is(:hover, .active) { color: #d83d42; background: #fff3ef; border-color: #f3c0b1; }
