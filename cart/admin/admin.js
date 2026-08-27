@@ -147,7 +147,7 @@
   const cloudEnabled = document.body.dataset.adminCloudEnabled === "true";
   const cloudCsrfToken = document.body.dataset.adminCsrfToken || "";
   const cloudMediaBase = String(document.body.dataset.adminCloudMediaBase || "").replace(/\/$/, "");
-  const landingPageThumbnailVersion = "3";
+  const landingPageThumbnailVersion = "4";
   const cloudUrl = (path) => `./?cloud=${encodeURIComponent(path)}`;
   const cloudPrivateMediaUrl = (id) => cloudUrl(`/v1/media/${encodeURIComponent(id)}`);
   const cloudMediaUrl = (id) => cloudMediaBase
@@ -2404,35 +2404,55 @@
       const landingId = landingPageId(activeSiteDocument.id || activeSiteKey);
       if (!landingId) return Promise.resolve(false);
       thumbnailCapturePromise = (async () => {
-        const captureFrame = document.createElement("div");
-        captureFrame.className = "sq-device-frame sq-thumbnail-capture-frame";
-        captureFrame.setAttribute("aria-hidden", "true");
-        captureFrame.style.cssText = "position:fixed;z-index:-2147483647;left:0;top:0;width:1440px;max-width:none;pointer-events:none;overflow:hidden;transform:none;zoom:1;";
-        const captureRoot = previewRoot.cloneNode(true);
-        captureRoot.dataset.sqThumbnailCaptureRoot = "";
-        captureRoot.style.width = "1440px";
-        captureRoot.style.maxWidth = "none";
-        captureRoot.style.overflow = "hidden";
-        captureRoot.querySelectorAll("img").forEach((image) => { image.loading = "eager"; image.decoding = "sync"; });
-        captureRoot.querySelectorAll(".sq-element-overlay,.sq-section-toolbar,.sq-layout-grid-overlay,.sq-block-handle").forEach((element) => element.remove());
-        captureRoot.querySelectorAll(".selected,.sq-element-selected,.sq-image-selected,.sq-element-animate,.animating").forEach((element) => element.classList.remove("selected", "sq-element-selected", "sq-image-selected", "sq-element-animate", "animating"));
-        captureFrame.append(captureRoot);
-        document.body.append(captureFrame);
-        await inlineThumbnailResources(captureRoot);
-        await waitForThumbnailImages(captureRoot);
-        if (document.fonts?.ready) await document.fonts.ready.catch(() => {});
         const sourceWidth = 1440;
         const sourceHeight = 810;
+        const captureFrame = document.createElement("iframe");
+        captureFrame.title = "Landing page thumbnail renderer";
+        captureFrame.setAttribute("aria-hidden", "true");
+        captureFrame.setAttribute("sandbox", "allow-same-origin");
+        captureFrame.tabIndex = -1;
+        captureFrame.style.cssText = `position:fixed;z-index:-2147483647;left:-20000px;top:0;width:${sourceWidth}px;height:${sourceHeight}px;border:0;pointer-events:none;overflow:hidden;`;
+        const captureUrl = URL.createObjectURL(new Blob([generateHtml()], { type: "text/html" }));
         let rendered;
         try {
+          const captureRoot = await new Promise((resolve, reject) => {
+            const startedAt = Date.now();
+            const findRenderedPage = () => {
+              const captureDocument = captureFrame.contentDocument;
+              const root = captureDocument?.querySelector(".sq-page-preview");
+              if (root) {
+                captureDocument.documentElement.style.cssText += `;width:${sourceWidth}px;min-width:${sourceWidth}px;overflow:hidden`;
+                captureDocument.body.style.cssText += `;width:${sourceWidth}px;min-width:${sourceWidth}px;overflow:hidden`;
+                root.style.width = `${sourceWidth}px`;
+                root.style.minWidth = `${sourceWidth}px`;
+                requestAnimationFrame(() => requestAnimationFrame(() => resolve(root)));
+                return;
+              }
+              if (Date.now() - startedAt > 10000) { reject(new Error("Desktop thumbnail preview timed out.")); return; }
+              window.setTimeout(findRenderedPage, 50);
+            };
+            captureFrame.addEventListener("load", () => {
+              findRenderedPage();
+            }, { once: true });
+            captureFrame.addEventListener("error", () => reject(new Error("Desktop thumbnail preview failed to load.")), { once: true });
+            captureFrame.src = captureUrl;
+            document.body.append(captureFrame);
+          });
+          captureRoot.querySelectorAll("img").forEach((image) => { image.loading = "eager"; image.decoding = "sync"; });
+          captureRoot.querySelectorAll(".sq-element-animate,.animating").forEach((element) => element.classList.remove("sq-element-animate", "animating"));
+          await inlineThumbnailResources(captureRoot);
+          await waitForThumbnailImages(captureRoot);
+          if (captureFrame.contentDocument?.fonts?.ready) await captureFrame.contentDocument.fonts.ready.catch(() => {});
           rendered = await window.html2canvas(captureRoot, {
             allowTaint: false,
             backgroundColor: getComputedStyle(captureRoot).getPropertyValue("--site-page").trim() || "#ffffff",
-            foreignObjectRendering: true,
+            foreignObjectRendering: false,
             height: sourceHeight,
             imageTimeout: 5000,
             logging: false,
             scale: 1,
+            scrollX: 0,
+            scrollY: 0,
             useCORS: true,
             width: sourceWidth,
             windowHeight: sourceHeight,
@@ -2440,6 +2460,7 @@
           });
         } finally {
           captureFrame.remove();
+          URL.revokeObjectURL(captureUrl);
         }
         const blob = await encodeLandingThumbnail(rendered);
         const result = await cloudRequest("PUT", `/v1/landing-pages/${encodeURIComponent(landingId)}/thumbnail`, { dataUrl: await blobDataUrl(blob) });
