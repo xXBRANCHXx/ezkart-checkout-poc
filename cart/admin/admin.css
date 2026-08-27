@@ -1162,7 +1162,8 @@ button, a { -webkit-tap-highlight-color: transparent; }
   position: absolute;
   z-index: 4;
   inset: 0 0 auto;
-  background: rgba(255, 255, 255, .94);
+  color: #fff;
+  background: rgba(0, 0, 0, .5);
   border: 0;
   backdrop-filter: blur(8px);
   opacity: 0;
@@ -1170,6 +1171,9 @@ button, a { -webkit-tap-highlight-color: transparent; }
   transform: translateY(-5px);
   transition: opacity .18s ease, transform .18s ease, visibility 0s linear .18s;
 }
+.project-browser > i,
+.project-browser > i:first-child { background: rgba(255, 255, 255, .72); }
+.project-browser small { color: #fff; }
 .landing-project-card:hover .project-browser,
 .landing-project-card:focus-within .project-browser {
   opacity: 1;
@@ -1232,7 +1236,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
   top: 1px;
   right: 5px;
   height: 28px;
-  color: #727985;
+  color: #fff;
   background: transparent;
   border: 0;
   border-radius: 0;
@@ -1261,8 +1265,8 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .project-action-dots > i { width: 3px; height: 3px; display: block; background: currentColor; border-radius: 50%; }
 .project-url-copy .icon,
 .project-actions .icon { width: 13px; }
-.project-url-copy:hover { color: #f40b64; background: transparent; border: 0; box-shadow: none; transform: none; }
-.project-url-copy:focus-visible { outline: 2px solid #f40b64; outline-offset: -3px; border-radius: 5px; }
+.project-url-copy:hover { color: #fff; background: transparent; border: 0; box-shadow: none; opacity: .78; transform: none; }
+.project-url-copy:focus-visible { outline: 2px solid #fff; outline-offset: -3px; border-radius: 5px; }
 .project-actions:hover { color: #f40b64; background: transparent; border-color: transparent; box-shadow: none; transform: none; }
 .project-actions:focus-visible { outline: 2px solid #f40b64; outline-offset: 1px; border-radius: 4px; }
 .project-url-copy.copied { color: #168653; background: transparent; border: 0; box-shadow: none; }
