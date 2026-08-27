@@ -3574,17 +3574,19 @@
       image?.style.removeProperty("--sq-image-scroll-scale");
       if (image) {
         image.style.transform = "";
-        image.classList.remove("jarallax-img");
+        image.classList.remove("jarallax-img", "ezkart-scroll-media");
       }
       if (host) {
-        host.classList.remove("sq-image-scroll-host", "jarallax");
+        host.classList.remove("sq-image-scroll-host", "jarallax", "ezkart-scroll-frame");
         host.removeAttribute("data-jarallax");
         host.removeAttribute("data-speed");
         host.removeAttribute("data-type");
+        host.removeAttribute("data-ezkart-scroll-effect");
+        host.removeAttribute("data-ezkart-scroll-strength");
       }
     };
     // The editor canvas remains static. Production scroll effects run in Preview/export
-    // through Jarallax so authoring never competes with canvas scaling or drag gestures.
+    // through one native-scroll timeline so authoring never competes with canvas gestures.
     const scheduleImageScrollEffects = () => previewRoot?.querySelectorAll("img[data-sq-image-scroll]").forEach(releaseImageScrollEffect);
     const syncMarqueeCopies = (element, value, source = null) => {
       if (element?.dataset.sqElementType !== "marquee") return;
@@ -5751,21 +5753,22 @@
         const effect = image.dataset.sqImageScroll === "parallax-deep" ? "parallax" : image.dataset.sqImageScroll || "none";
         const storedStrength = Number(image.dataset.sqImageScrollStrength);
         const strength = Math.max(0, Math.min(100, Number.isFinite(storedStrength) ? storedStrength : 50));
-        const host = image.closest("[data-sq-image-item]") || image.parentElement;
-        image.classList.remove("jarallax-img");
+        const parent = image.parentElement;
+        const host = parent?.classList.contains("product-art") ? parent : image.closest("[data-sq-image-item]") || parent;
+        image.classList.remove("jarallax-img", "ezkart-scroll-media");
         if (host) {
-          host.classList.remove("sq-image-scroll-host", "jarallax");
+          host.classList.remove("sq-image-scroll-host", "jarallax", "ezkart-scroll-frame");
           host.removeAttribute("data-jarallax");
           host.removeAttribute("data-speed");
           host.removeAttribute("data-type");
+          host.removeAttribute("data-ezkart-scroll-effect");
+          host.removeAttribute("data-ezkart-scroll-strength");
         }
         if (effect !== "none" && host) {
-          const speed = effect === "parallax" ? 1 - strength / 100 : effect === "parallax-reverse" ? 1 + strength / 100 : strength / 100;
-          host.classList.add("jarallax");
-          host.dataset.jarallax = "";
-          host.dataset.speed = speed.toFixed(2);
-          if (effect === "zoom") host.dataset.type = "scale";
-          image.classList.add("jarallax-img");
+          host.classList.add("ezkart-scroll-frame");
+          host.dataset.ezkartScrollEffect = effect;
+          host.dataset.ezkartScrollStrength = String(strength);
+          image.classList.add("ezkart-scroll-media");
         }
         image.style.removeProperty("transform");
         image.style.removeProperty("transform-origin");
@@ -5865,11 +5868,9 @@ document.querySelectorAll('[class*="animation-"],[class*="element-animation-"]')
       const fontMedium = new URL("assets/fonts/poppins-500.woff2", window.location.href).href;
       const fontSemibold = new URL("assets/fonts/poppins-600.woff2", window.location.href).href;
       const fontBold = new URL("assets/fonts/poppins-700.woff2", window.location.href).href;
-      const jarallaxCss = new URL("assets/vendor/jarallax.min.css", window.location.href).href;
-      const jarallaxJs = new URL("assets/vendor/jarallax.min.js", window.location.href).href;
-      const hasScrollMotion = Boolean(clone.querySelector(".jarallax[data-jarallax]"));
-      const motionStyles = hasScrollMotion ? `<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lenis@1.3.26/dist/lenis.css">\n<link rel="stylesheet" href="${jarallaxCss}">` : "";
-      const motionScripts = hasScrollMotion ? `<script src="https://cdn.jsdelivr.net/npm/lenis@1.3.26/dist/lenis.min.js"><\/script>\n<script>window.ezkartSmoothScroll=typeof Lenis==='function'?new Lenis({autoRaf:true,lerp:.1,smoothWheel:true,anchors:true,stopInertiaOnNavigate:true}):null;<\/script>\n<script src="${jarallaxJs}"><\/script>` : "";
+      const hasScrollMotion = Boolean(clone.querySelector(".ezkart-scroll-frame"));
+      const motionStyles = hasScrollMotion ? `<style>.ezkart-scroll-frame{position:relative!important;overflow:hidden!important;contain:paint}.ezkart-scroll-frame>.ezkart-scroll-media{width:100%!important;max-width:none!important;height:100%;position:absolute!important;left:0!important;top:50%!important;display:block;object-fit:cover;transform:translate3d(0,-50%,0);transform-origin:center;will-change:transform;backface-visibility:hidden}@media(prefers-reduced-motion:reduce){.ezkart-scroll-frame>.ezkart-scroll-media{height:100%!important;transform:translate3d(0,-50%,0)!important}}</style>` : "";
+      const motionScripts = hasScrollMotion ? `<script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"><\/script>\n<script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/ScrollTrigger.min.js"><\/script>\n<script>(()=>{if(typeof gsap!=='object'||typeof ScrollTrigger==='undefined'||matchMedia('(prefers-reduced-motion: reduce)').matches)return;gsap.registerPlugin(ScrollTrigger);document.querySelectorAll('.ezkart-scroll-frame').forEach(frame=>{const media=frame.querySelector(':scope>.ezkart-scroll-media');if(!media)return;const strength=Math.max(0,Math.min(100,Number(frame.dataset.ezkartScrollStrength)||0))/100,effect=frame.dataset.ezkartScrollEffect||'parallax';if(effect==='zoom'){gsap.fromTo(media,{yPercent:-50,scale:1},{yPercent:-50,scale:1+strength*.55,ease:'none',scrollTrigger:{trigger:frame,start:'top bottom',end:'bottom top',scrub:.22}});return}const travel=()=>{const frameHeight=Math.max(1,frame.clientHeight),viewportHeight=Math.max(1,innerHeight);media.style.height=(frameHeight+(Math.max(frameHeight,viewportHeight)-frameHeight)*strength)+'px';return(viewportHeight+frameHeight)*.5*strength*(effect==='parallax-reverse'?-1:1)};gsap.fromTo(media,{y:()=>-travel(),yPercent:-50},{y:()=>travel(),yPercent:-50,ease:'none',scrollTrigger:{trigger:frame,start:'top bottom',end:'bottom top',scrub:.22,invalidateOnRefresh:true}})});addEventListener('load',()=>ScrollTrigger.refresh(),{once:true})})();<\/script>` : "";
       return `<!doctype html>\n<html lang="id">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1">\n<title>${escapeHtml(pageName)}</title>\n<meta name="description" content="Shop selected Indonesian products with secure Ezkart checkout and delivery.">\n${motionStyles}\n<style>@font-face{font-family:Poppins;src:url('${fontBase}') format('woff2');font-weight:400}@font-face{font-family:Poppins;src:url('${fontMedium}') format('woff2');font-weight:500}@font-face{font-family:Poppins;src:url('${fontSemibold}') format('woff2');font-weight:600}@font-face{font-family:Poppins;src:url('${fontBold}') format('woff2');font-weight:700}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:#fff;font-family:Poppins,Arial,sans-serif}.svg-sprite{width:0;height:0;position:absolute;overflow:hidden}@media(prefers-reduced-motion:reduce){*{animation:none!important;scroll-behavior:auto!important}}\n${css}\n${responsiveSpacing}\n</style>\n</head>\n<body>\n${sprite}\n${clone.outerHTML}\n${motionScripts}\n${commerceScript}\n</body>\n</html>`;
     };
     sqStudio.querySelector("[data-sq-export]")?.addEventListener("click", () => {
