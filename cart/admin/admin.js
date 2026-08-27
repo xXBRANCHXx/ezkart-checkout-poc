@@ -3574,9 +3574,9 @@
     const imageScrollHostFor = (image) => image?.closest("[data-sq-image-item]") || image?.parentElement || null;
     const releaseImageScrollEffect = (image) => {
       const host = imageScrollHostFor(image);
-      image?.style.removeProperty("--sq-image-scroll-distance");
       image?.style.removeProperty("--sq-image-scroll-media-height");
       image?.style.removeProperty("--sq-image-scroll-scale");
+      if (image) image.style.transform = "";
       if (host && ![...host.querySelectorAll('img[data-sq-image-scroll]')].some((candidate) => candidate !== image && ["parallax", "parallax-deep", "parallax-reverse"].includes(candidate.dataset.sqImageScroll))) host.classList.remove("sq-image-scroll-host");
     };
     const applyImageScrollEffect = (image) => {
@@ -3592,19 +3592,46 @@
       const host = imageScrollHostFor(image);
       if (!host) return;
       host.classList.add("sq-image-scroll-host");
-      const hostHeight = Math.max(1, host.clientHeight);
-      const viewportHeight = Math.max(1, marqueeScrollRoot?.clientHeight || window.innerHeight);
-      const amount = strength / 100;
-      image.style.setProperty("--sq-image-scroll-distance", `${((viewportHeight + hostHeight) * .5 * amount).toFixed(2)}px`);
-      image.style.setProperty("--sq-image-scroll-media-height", `${(hostHeight + (Math.max(hostHeight, viewportHeight) - hostHeight) * amount).toFixed(2)}px`);
+    };
+    let imageScrollFrame = 0;
+    const updateImageScrollEffects = () => {
+      imageScrollFrame = 0;
+      if (!marqueeScrollRoot || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      const viewport = marqueeScrollRoot.getBoundingClientRect();
+      const frameWidth = deviceFrame?.getBoundingClientRect().width || 0;
+      const canvasScale = deviceFrame?.offsetWidth ? Math.max(.01, frameWidth / deviceFrame.offsetWidth) : 1;
+      const viewportCenter = viewport.top + viewport.height / 2;
+      const viewportHeight = viewport.height / canvasScale;
+      const updates = [...(previewRoot?.querySelectorAll('img[data-sq-image-scroll]:not([data-sq-image-scroll="none"])') || [])].map((image) => {
+        const host = imageScrollHostFor(image);
+        if (!host) return null;
+        return { image, host, effect: image.dataset.sqImageScroll, strength: imageScrollStrength(image), rect: host.getBoundingClientRect(), hostHeight: Math.max(1, host.clientHeight) };
+      }).filter(Boolean);
+      updates.forEach(({ image, effect, strength, rect, hostHeight }) => {
+        const amount = strength / 100;
+        const centerDelta = (viewportCenter - (rect.top + rect.height / 2)) / canvasScale;
+        if (["parallax", "parallax-deep", "parallax-reverse"].includes(effect)) {
+          const offset = centerDelta * amount * (effect === "parallax-reverse" ? -1 : 1);
+          image.style.setProperty("--sq-image-scroll-media-height", `${(hostHeight + (Math.max(hostHeight, viewportHeight) - hostHeight) * amount).toFixed(2)}px`);
+          image.style.transform = `translate3d(0,calc(-50% + ${offset.toFixed(2)}px),0)`;
+        } else if (effect === "zoom") {
+          const range = Math.max(1, (viewport.height + rect.height) / 2);
+          const proximity = 1 - Math.min(1, Math.abs(viewportCenter - (rect.top + rect.height / 2)) / range);
+          image.style.transform = `translate3d(0,0,0) scale(${(1 + proximity * strength / 180).toFixed(4)})`;
+        }
+      });
     };
     const observedImageScrollHosts = new WeakSet();
-    const imageScrollResizeObserver = typeof ResizeObserver === "function" ? new ResizeObserver(() => previewRoot?.querySelectorAll('img[data-sq-image-scroll]:not([data-sq-image-scroll="none"])').forEach(applyImageScrollEffect)) : null;
-    const scheduleImageScrollEffects = () => previewRoot?.querySelectorAll('img[data-sq-image-scroll]:not([data-sq-image-scroll="none"])').forEach((image) => {
+    const imageScrollResizeObserver = typeof ResizeObserver === "function" ? new ResizeObserver(() => scheduleImageScrollEffects()) : null;
+    const scheduleImageScrollEffects = () => {
+      previewRoot?.querySelectorAll('img[data-sq-image-scroll]:not([data-sq-image-scroll="none"])').forEach((image) => {
       applyImageScrollEffect(image);
       const host = imageScrollHostFor(image);
       if (host && !observedImageScrollHosts.has(host)) { observedImageScrollHosts.add(host); imageScrollResizeObserver?.observe(host); }
-    });
+      });
+      if (!imageScrollFrame) imageScrollFrame = window.requestAnimationFrame(updateImageScrollEffects);
+    };
+    marqueeScrollRoot.addEventListener("scroll", scheduleImageScrollEffects, { passive: true });
     window.addEventListener("resize", scheduleImageScrollEffects, { passive: true });
     const syncMarqueeCopies = (element, value, source = null) => {
       if (element?.dataset.sqElementType !== "marquee") return;
@@ -5847,9 +5874,11 @@ const updateScrollMarquees=()=>{marqueeFrame=0;document.querySelectorAll('.sq-fr
 const scheduleScrollMarquees=()=>{if(!marqueeFrame)marqueeFrame=requestAnimationFrame(updateScrollMarquees)};
 const syncMarquees=()=>{document.querySelectorAll('.sq-free-marquee').forEach(element=>{const track=element.querySelector('.sq-marquee-track'),source=track?.querySelector('.sq-marquee-copy:not([aria-hidden])');if(!track||!source)return;track.querySelectorAll('.sq-marquee-copy[aria-hidden="true"]').forEach(copy=>copy.remove());const width=Math.max(1,source.offsetWidth),copies=Math.max(2,Math.ceil(Math.max(1,element.clientWidth)/width)+2);for(let index=1;index<copies;index+=1){const copy=source.cloneNode(true);copy.removeAttribute('contenteditable');copy.setAttribute('aria-hidden','true');track.append(copy)}track.style.setProperty('--sq-marquee-distance',width+'px');track.style.setProperty('--sq-marquee-duration',Math.max(2,width/marqueeSpeed(element))+'s');const manual=element.dataset.ezkartMarqueeMode==='scroll';element.classList.toggle('sq-marquee-manual',manual);if(!manual)track.style.removeProperty('transform')});scheduleScrollMarquees()};
 addEventListener('scroll',scheduleScrollMarquees,{passive:true});addEventListener('resize',syncMarquees,{passive:true});document.fonts?.ready.then(syncMarquees);syncMarquees();
-const imageScrollHosts=new WeakSet(),imageScrollObserver=typeof ResizeObserver==='function'?new ResizeObserver(()=>syncImageScrollEffects()):null;
-const syncImageScrollEffects=()=>{document.querySelectorAll('img[data-ezkart-image-scroll]').forEach(image=>{const stored=Number(image.dataset.ezkartImageScrollStrength),strength=Math.max(0,Math.min(100,Number.isFinite(stored)?stored:50)),effect=image.dataset.ezkartImageScroll,host=image.parentElement;if(!host)return;if(effect==='parallax'||effect==='parallax-reverse'){host.classList.add('sq-image-scroll-host');const hostHeight=Math.max(1,host.clientHeight),amount=strength/100;image.style.setProperty('--sq-image-scroll-distance',((innerHeight+hostHeight)*.5*amount).toFixed(2)+'px');image.style.setProperty('--sq-image-scroll-media-height',(hostHeight+(Math.max(hostHeight,innerHeight)-hostHeight)*amount).toFixed(2)+'px');if(!imageScrollHosts.has(host)){imageScrollHosts.add(host);imageScrollObserver?.observe(host)}}else image.style.setProperty('--sq-image-scroll-scale',String(1+strength/180))})};
-addEventListener('resize',syncImageScrollEffects,{passive:true});requestAnimationFrame(syncImageScrollEffects);
+let imageScrollFrame=0;const imageScrollHosts=new WeakSet();
+const updateImageScrollEffects=()=>{imageScrollFrame=0;if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;const center=innerHeight/2,updates=[...document.querySelectorAll('img[data-ezkart-image-scroll]')].map(image=>{const host=image.closest('.sq-image-scroll-host')||image.parentElement;if(!host)return null;const stored=Number(image.dataset.ezkartImageScrollStrength);return{image,host,effect:image.dataset.ezkartImageScroll,strength:Math.max(0,Math.min(100,Number.isFinite(stored)?stored:50)),rect:host.getBoundingClientRect(),hostHeight:Math.max(1,host.clientHeight)}}).filter(Boolean);updates.forEach(({image,effect,strength,rect,hostHeight})=>{const amount=strength/100,delta=center-(rect.top+rect.height/2);if(effect==='parallax'||effect==='parallax-reverse'){image.style.setProperty('--sq-image-scroll-media-height',(hostHeight+(Math.max(hostHeight,innerHeight)-hostHeight)*amount).toFixed(2)+'px');image.style.transform='translate3d(0,calc(-50% + '+(delta*amount*(effect==='parallax-reverse'?-1:1)).toFixed(2)+'px),0)'}else if(effect==='zoom'){const range=Math.max(1,(innerHeight+rect.height)/2),proximity=1-Math.min(1,Math.abs(delta)/range);image.style.transform='translate3d(0,0,0) scale('+(1+proximity*strength/180).toFixed(4)+')'}})};
+const scheduleImageScrollEffects=()=>{document.querySelectorAll('img[data-ezkart-image-scroll]').forEach(image=>{const effect=image.dataset.ezkartImageScroll;if(effect==='parallax'||effect==='parallax-reverse'){const host=image.closest('.sq-image-scroll-host')||image.parentElement;host?.classList.add('sq-image-scroll-host');if(host&&!imageScrollHosts.has(host)){imageScrollHosts.add(host);imageScrollObserver?.observe(host)}}});if(!imageScrollFrame)imageScrollFrame=requestAnimationFrame(updateImageScrollEffects)};
+const imageScrollObserver=typeof ResizeObserver==='function'?new ResizeObserver(scheduleImageScrollEffects):null;
+addEventListener('scroll',scheduleImageScrollEffects,{passive:true});addEventListener('resize',scheduleImageScrollEffects,{passive:true});scheduleImageScrollEffects();
 document.querySelectorAll('[data-ezkart-variants]').forEach(controls=>{
   let variants=[];
   try{variants=JSON.parse(controls.dataset.ezkartVariants||'[]')}catch(_){return}
