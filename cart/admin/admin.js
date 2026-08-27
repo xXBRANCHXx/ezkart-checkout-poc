@@ -2299,6 +2299,7 @@
     let layoutGridTransient = false;
     let layoutGridTimer = 0;
     let sectionHeightResizeTarget = null;
+    let sectionHeightPreviewRows = 0;
     let pageSpacingMode = false;
     let scheduleProductGridFit = () => {};
     let saveTimer;
@@ -2683,18 +2684,28 @@
         const startRows = Math.max(minimum, Number.parseInt(section.dataset.sqRows || String(minimum), 10));
         const sectionRect = section.getBoundingClientRect();
         const renderedScale = section.offsetWidth ? sectionRect.width / section.offsetWidth : zoom / 100;
-        const renderedRowHeight = Math.max(1, fluidRowHeight(section) * renderedScale);
+        const logicalRowHeight = fluidRowHeight(section);
+        const startHeight = sectionRect.height / Math.max(.01, renderedScale);
+        const minimumHeight = Math.max(logicalRowHeight, startHeight - (startRows - minimum) * logicalRowHeight);
+        const maximumHeight = minimumHeight + (maximumFluidRows - minimum) * logicalRowHeight;
         const wasDraggable = section.draggable;
         let currentRows = startRows;
         section.draggable = false;
         handle.setPointerCapture?.(event.pointerId);
         sectionHeightResizeTarget = section;
+        sectionHeightPreviewRows = startRows;
+        section.classList.add("sq-section-height-dragging");
+        section.style.setProperty("--sq-section-drag-height", `${startHeight}px`);
+        section.style.setProperty("--sq-fluid-rows", String(minimum));
         layoutGridDragging = true;
         refreshLayoutGrid();
         handle.classList.add("dragging");
         document.body.classList.add("sq-section-height-resizing");
         const move = (pointerEvent) => {
-          currentRows = setSectionHeightRows(section, startRows + Math.round((pointerEvent.clientY - startY) / renderedRowHeight));
+          const nextHeight = Math.max(minimumHeight, Math.min(maximumHeight, startHeight + (pointerEvent.clientY - startY) / Math.max(.01, renderedScale)));
+          section.style.setProperty("--sq-section-drag-height", `${nextHeight}px`);
+          currentRows = Math.max(minimum, Math.min(maximumFluidRows, minimum + Math.round((nextHeight - minimumHeight) / logicalRowHeight)));
+          sectionHeightPreviewRows = currentRows;
           refreshLayoutGrid();
           if (selectedElement?.isConnected && section.contains(selectedElement)) refreshElementOverlay();
         };
@@ -2704,9 +2715,13 @@
           window.removeEventListener("pointercancel", end);
           handle.classList.remove("dragging");
           section.draggable = wasDraggable;
+          section.classList.remove("sq-section-height-dragging");
+          section.style.removeProperty("--sq-section-drag-height");
+          setSectionHeightRows(section, currentRows);
           document.body.classList.remove("sq-section-height-resizing");
           layoutGridDragging = false;
           sectionHeightResizeTarget = null;
+          sectionHeightPreviewRows = 0;
           if (showLayoutGrid) refreshLayoutGrid(); else removeLayoutGrid(true);
           if (currentRows !== startRows) { remember(snapshot); markSqChanged(); }
         };
@@ -2769,7 +2784,9 @@
       const section = sectionHeightResizeTarget || selectedElement?.closest("[data-sq-fluid]") || previewRoot?.querySelector(`[data-section-id="${selectedSection}"][data-sq-fluid]`) || previewRoot?.querySelector("[data-sq-fluid]");
       if (!section) return;
       previewRoot?.querySelectorAll(".sq-layout-grid-overlay").forEach((candidate) => { if (candidate.parentElement !== section) candidate.remove(); });
-      const rows = Math.max(1, Number.parseInt(section.dataset.sqRows || section.dataset.sqMinRows || "12", 10));
+      const rows = Math.max(1, section === sectionHeightResizeTarget && sectionHeightPreviewRows > 0
+        ? sectionHeightPreviewRows
+        : Number.parseInt(section.dataset.sqRows || section.dataset.sqMinRows || "12", 10));
       const computed = getComputedStyle(section);
       let grid = section.querySelector(":scope > .sq-layout-grid-overlay");
       if (!grid) {
