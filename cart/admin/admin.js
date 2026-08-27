@@ -3262,6 +3262,8 @@
       }
       const imageControls = sqStudio.querySelector("[data-sq-image-controls]");
       if (imageControls) imageControls.hidden = !image;
+      const imageScrollControls = sqStudio.querySelector("[data-sq-image-scroll-controls]");
+      if (imageScrollControls) imageScrollControls.hidden = !image;
       if (image) {
         const srcInput = sqStudio.querySelector("[data-sq-image-src]");
         const altInput = sqStudio.querySelector("[data-sq-image-alt]");
@@ -3279,6 +3281,14 @@
           const output = sqStudio.querySelector(`[data-sq-image-output="${name}"]`);
           if (output) output.textContent = `${value}${name === "blur" ? "px" : "%"}`;
           });
+        const scrollEffect = image.dataset.sqImageScroll || "none";
+        const scrollStrength = Math.max(10, Math.min(100, Number(image.dataset.sqImageScrollStrength) || 50));
+        const scrollEffectInput = sqStudio.querySelector("[data-sq-image-scroll-effect]");
+        const scrollStrengthInput = sqStudio.querySelector("[data-sq-image-scroll-strength]");
+        const scrollStrengthOutput = sqStudio.querySelector("[data-sq-image-scroll-strength-output]");
+        if (scrollEffectInput) scrollEffectInput.value = scrollEffect;
+        if (scrollStrengthInput) { scrollStrengthInput.value = String(scrollStrength); scrollStrengthInput.disabled = scrollEffect === "none"; }
+        if (scrollStrengthOutput) scrollStrengthOutput.textContent = `${scrollStrength}%`;
       }
       const productControls = sqStudio.querySelector("[data-sq-product-layout-controls]");
       if (productControls) productControls.hidden = !isProductGrid;
@@ -3292,7 +3302,7 @@
         if (device) device.textContent = activeDevice[0].toUpperCase() + activeDevice.slice(1);
       }
       const emptyContent = sqStudio.querySelector("[data-sq-element-content-empty]");
-      if (emptyContent) emptyContent.hidden = [textControls, marqueeControls, reviewControls, logoControls, imageControls, buttonControls, codeControls, componentInstanceControls].some((control) => control && !control.hidden);
+      if (emptyContent) emptyContent.hidden = [textControls, marqueeControls, reviewControls, logoControls, imageControls, imageScrollControls, buttonControls, codeControls, componentInstanceControls].some((control) => control && !control.hidden);
       showElementPanel(activeElementPanel);
       syncBuilderRanges();
     };
@@ -3556,6 +3566,39 @@
     const marqueeResizeObserver = typeof ResizeObserver === "function" ? new ResizeObserver((entries) => entries.forEach((entry) => syncMarqueeTrack(entry.target))) : null;
     marqueeScrollRoot?.addEventListener("scroll", scheduleScrollLinkedMarquees, { passive: true });
     window.addEventListener("resize", () => previewRoot?.querySelectorAll('[data-sq-element-type="marquee"]').forEach(syncMarqueeTrack), { passive: true });
+    let imageScrollFrame = 0;
+    const imageScrollStrength = (image) => Math.max(10, Math.min(100, Number(image?.dataset.sqImageScrollStrength) || 50));
+    const imageScrollTransform = (effect, strength, progress, height = 1) => {
+      let offset = 0;
+      let scale = 1;
+      if (effect === "parallax") { offset = progress * strength * .42; scale = 1.08 + strength / 1200; }
+      if (effect === "parallax-deep") { offset = progress * strength * .85; scale = 1.14 + strength / 700; }
+      if (effect === "parallax-reverse") { offset = progress * strength * -.55; scale = 1.1 + strength / 900; }
+      if (effect === "zoom") scale = 1 + (1 - Math.abs(progress)) * strength / 500;
+      if (offset) scale = Math.max(scale, 1 + Math.abs(offset) * 2 / Math.max(1, height));
+      return `translate3d(0,${offset.toFixed(2)}px,0) scale(${scale.toFixed(4)})`;
+    };
+    const updateImageScrollEffects = () => {
+      imageScrollFrame = 0;
+      const viewport = marqueeScrollRoot?.getBoundingClientRect();
+      if (!viewport) return;
+      const viewportCenter = viewport.top + viewport.height / 2;
+      previewRoot?.querySelectorAll('img[data-sq-image-scroll]:not([data-sq-image-scroll="none"])').forEach((image) => {
+        const host = image.closest("[data-sq-element]") || image.parentElement;
+        const rect = host?.getBoundingClientRect();
+        if (!rect) return;
+        const range = Math.max(1, (viewport.height + rect.height) / 2);
+        const progress = Math.max(-1, Math.min(1, (rect.top + rect.height / 2 - viewportCenter) / range));
+        image.style.transform = imageScrollTransform(image.dataset.sqImageScroll, imageScrollStrength(image), progress, rect.height);
+        image.style.transformOrigin = "center";
+        image.style.willChange = "transform";
+      });
+    };
+    const scheduleImageScrollEffects = () => {
+      if (!imageScrollFrame) imageScrollFrame = window.requestAnimationFrame(updateImageScrollEffects);
+    };
+    marqueeScrollRoot?.addEventListener("scroll", scheduleImageScrollEffects, { passive: true });
+    window.addEventListener("resize", scheduleImageScrollEffects, { passive: true });
     const syncMarqueeCopies = (element, value, source = null) => {
       if (element?.dataset.sqElementType !== "marquee") return;
       element.querySelectorAll(".sq-marquee-copy").forEach((copy) => { if (copy !== source) copy.textContent = value; });
@@ -3746,6 +3789,7 @@
         syncMarqueeTrack(element);
         if (!observedMarquees.has(element)) { observedMarquees.add(element); marqueeResizeObserver?.observe(element); }
       });
+      scheduleImageScrollEffects();
       previewRoot?.querySelectorAll('[class*="hover-"]').forEach((element) => {
         [...element.classList].filter((name) => name.startsWith("hover-")).forEach((name) => element.classList.remove(name));
       });
@@ -4736,8 +4780,48 @@
       if (!image) return;
       remember();
       Object.keys(imageDefaults).forEach((name) => { delete image.dataset[`sqFilter${name[0].toUpperCase()}${name.slice(1)}`]; });
+      delete image.dataset.sqImageScroll;
+      delete image.dataset.sqImageScrollStrength;
       image.style.filter = ""; image.style.objectFit = ""; image.style.objectPosition = "";
+      image.style.transform = ""; image.style.transformOrigin = ""; image.style.willChange = "";
       syncElementControls(); markSqChanged();
+    });
+    const selectedMotionImage = () => {
+      if (!selectedElement?.isConnected || ["logo", "product-grid"].includes(selectedElement.dataset.sqElementType)) return null;
+      return imageForElement();
+    };
+    sqStudio.querySelector("[data-sq-image-scroll-effect]")?.addEventListener("change", (event) => {
+      const image = selectedMotionImage();
+      if (!image) return;
+      remember();
+      const effect = event.currentTarget.value;
+      if (effect === "none") {
+        delete image.dataset.sqImageScroll;
+        image.style.transform = "";
+        image.style.transformOrigin = "";
+        image.style.willChange = "";
+      } else {
+        image.dataset.sqImageScroll = effect;
+        image.dataset.sqImageScrollStrength ||= "50";
+      }
+      syncElementControls(); scheduleImageScrollEffects(); markSqChanged();
+    });
+    let imageScrollStrengthSnapshot = null;
+    const startImageScrollStrengthEdit = () => { if (!imageScrollStrengthSnapshot) imageScrollStrengthSnapshot = captureState(); };
+    const imageScrollStrengthInput = sqStudio.querySelector("[data-sq-image-scroll-strength]");
+    imageScrollStrengthInput?.addEventListener("pointerdown", startImageScrollStrengthEdit);
+    imageScrollStrengthInput?.addEventListener("focus", startImageScrollStrengthEdit);
+    imageScrollStrengthInput?.addEventListener("input", (event) => {
+      const image = selectedMotionImage();
+      if (!image || !image.dataset.sqImageScroll) return;
+      image.dataset.sqImageScrollStrength = event.currentTarget.value;
+      const output = sqStudio.querySelector("[data-sq-image-scroll-strength-output]");
+      if (output) output.textContent = `${event.currentTarget.value}%`;
+      scheduleImageScrollEffects(); markSqChanged();
+    });
+    imageScrollStrengthInput?.addEventListener("change", () => {
+      if (imageScrollStrengthSnapshot) remember(imageScrollStrengthSnapshot);
+      imageScrollStrengthSnapshot = null;
     });
     const selectedLogoParts = () => selectedElement?.dataset.sqElementType === "logo" ? {
       image: selectedElement.querySelector("[data-sq-logo-image]"),
@@ -5673,6 +5757,16 @@
         element.dataset.ezkartMarqueeSpeed = String(marqueeSpeed(element));
         element.classList.toggle("sq-marquee-manual", element.dataset.ezkartMarqueeMode === "scroll");
       });
+      clone.querySelectorAll("img[data-sq-image-scroll]").forEach((image) => {
+        const effect = image.dataset.sqImageScroll || "none";
+        if (effect !== "none") {
+          image.dataset.ezkartImageScroll = effect;
+          image.dataset.ezkartImageScrollStrength = String(Math.max(10, Math.min(100, Number(image.dataset.sqImageScrollStrength) || 50)));
+        }
+        image.style.removeProperty("transform");
+        image.style.removeProperty("transform-origin");
+        image.style.removeProperty("will-change");
+      });
       clone.querySelectorAll(".sq-block-handle, .sq-image-drag-handle, .sq-element-overlay, .sq-section-toolbar, .sq-layout-grid-overlay, .sq-section-height-handle, .section-hidden, .sq-element-hidden").forEach((node) => node.remove());
       clone.querySelectorAll("[data-product-card][hidden], [data-product-line][hidden], .sq-hero-collage > span[hidden]").forEach((node) => node.remove());
       clone.querySelectorAll("[data-section-id]").forEach((node) => { node.dataset.ezkartSection = node.dataset.sectionId; });
@@ -5734,6 +5828,10 @@ const updateScrollMarquees=()=>{marqueeFrame=0;document.querySelectorAll('.sq-fr
 const scheduleScrollMarquees=()=>{if(!marqueeFrame)marqueeFrame=requestAnimationFrame(updateScrollMarquees)};
 const syncMarquees=()=>{document.querySelectorAll('.sq-free-marquee').forEach(element=>{const track=element.querySelector('.sq-marquee-track'),source=track?.querySelector('.sq-marquee-copy:not([aria-hidden])');if(!track||!source)return;track.querySelectorAll('.sq-marquee-copy[aria-hidden="true"]').forEach(copy=>copy.remove());const width=Math.max(1,source.offsetWidth),copies=Math.max(2,Math.ceil(Math.max(1,element.clientWidth)/width)+2);for(let index=1;index<copies;index+=1){const copy=source.cloneNode(true);copy.removeAttribute('contenteditable');copy.setAttribute('aria-hidden','true');track.append(copy)}track.style.setProperty('--sq-marquee-distance',width+'px');track.style.setProperty('--sq-marquee-duration',Math.max(2,width/marqueeSpeed(element))+'s');const manual=element.dataset.ezkartMarqueeMode==='scroll';element.classList.toggle('sq-marquee-manual',manual);if(!manual)track.style.removeProperty('transform')});scheduleScrollMarquees()};
 addEventListener('scroll',scheduleScrollMarquees,{passive:true});addEventListener('resize',syncMarquees,{passive:true});document.fonts?.ready.then(syncMarquees);syncMarquees();
+let imageScrollFrame=0;
+const updateImageScrollEffects=()=>{imageScrollFrame=0;if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;const center=innerHeight/2;document.querySelectorAll('img[data-ezkart-image-scroll]').forEach(image=>{const host=image.closest('.ez-fluid-element')||image.parentElement,rect=host?.getBoundingClientRect();if(!rect)return;const range=Math.max(1,(innerHeight+rect.height)/2),progress=Math.max(-1,Math.min(1,(rect.top+rect.height/2-center)/range)),strength=Math.max(10,Math.min(100,Number(image.dataset.ezkartImageScrollStrength)||50)),effect=image.dataset.ezkartImageScroll;let offset=0,scale=1;if(effect==='parallax'){offset=progress*strength*.42;scale=1.08+strength/1200}if(effect==='parallax-deep'){offset=progress*strength*.85;scale=1.14+strength/700}if(effect==='parallax-reverse'){offset=progress*strength*-.55;scale=1.1+strength/900}if(effect==='zoom')scale=1+(1-Math.abs(progress))*strength/500;if(offset)scale=Math.max(scale,1+Math.abs(offset)*2/Math.max(1,rect.height));image.style.transform='translate3d(0,'+offset.toFixed(2)+'px,0) scale('+scale.toFixed(4)+')';image.style.transformOrigin='center';image.style.willChange='transform'})};
+const scheduleImageScrollEffects=()=>{if(!imageScrollFrame)imageScrollFrame=requestAnimationFrame(updateImageScrollEffects)};
+addEventListener('scroll',scheduleImageScrollEffects,{passive:true});addEventListener('resize',scheduleImageScrollEffects,{passive:true});scheduleImageScrollEffects();
 document.querySelectorAll('[data-ezkart-variants]').forEach(controls=>{
   let variants=[];
   try{variants=JSON.parse(controls.dataset.ezkartVariants||'[]')}catch(_){return}
