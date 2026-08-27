@@ -4497,9 +4497,15 @@
     let textControlSnapshot;
     sqStudio.querySelector("[data-sq-element-text]")?.addEventListener("focus", () => { textControlSnapshot = captureState(); });
     sqStudio.querySelector("[data-sq-element-text]")?.addEventListener("input", (event) => {
-      if (!selectedContent?.isConnected) return;
-      selectedContent.textContent = event.currentTarget.value;
-      const sectionField = sqStudio.querySelector(`[data-sq-content-field="${selectedContent.dataset.sqEditable}"]`);
+      const explicitTarget = selectedContent?.isConnected && selectedElement?.contains(selectedContent) ? selectedContent : null;
+      const fallbackTarget = selectedElement?.isConnected && !selectedAction && !selectedImage
+        ? (selectedElement.matches("[data-sq-editable]") ? selectedElement : editableNodesFor(selectedElement)[0] || null)
+        : null;
+      const textTarget = explicitTarget || fallbackTarget;
+      if (!textTarget) return;
+      selectedContent = textTarget;
+      textTarget.textContent = event.currentTarget.value;
+      const sectionField = sqStudio.querySelector(`[data-sq-content-field="${textTarget.dataset.sqEditable}"]`);
       if (sectionField) sectionField.value = event.currentTarget.value;
       refreshElementOverlay(); markSqChanged();
     });
