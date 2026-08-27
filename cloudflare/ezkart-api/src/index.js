@@ -466,7 +466,7 @@ async function saveLandingPage(request, env, rawId) {
     httpMetadata: { contentType: "application/json; charset=utf-8" },
     customMetadata: { sellerId: seller.id, landingPageId: id, status, updatedAt: now },
   });
-  return landingPageWithThumbnailMetadata(env, seller.id, id);
+  return page;
 }
 
 const decodeLandingPageThumbnail = (dataUrl) => {

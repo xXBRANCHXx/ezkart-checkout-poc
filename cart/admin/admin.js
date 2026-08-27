@@ -464,8 +464,8 @@
   const readLandingSites = () => [...cloudLandingPages];
   const landingPageId = (url) => String(url || "").toLowerCase().replace(/\.ezkart\.site$/, "");
   const replaceCloudLandingPage = (page) => {
-    const normalized = normalizeCloudLandingPage(page);
-    const index = cloudLandingPages.findIndex((item) => item.id === normalized.id);
+    const index = cloudLandingPages.findIndex((item) => item.id === page?.id);
+    const normalized = normalizeCloudLandingPage({ ...(index >= 0 ? cloudLandingPages[index] : {}), ...page });
     if (index >= 0) cloudLandingPages[index] = { ...cloudLandingPages[index], ...normalized };
     else cloudLandingPages.unshift(normalized);
     return normalized;
