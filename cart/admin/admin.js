@@ -2617,8 +2617,15 @@
       gridDensityState[device] = nextDensity;
       updateGridGeometry(device, { columns: preset.columns, cellHeight: preset.cellHeight });
     };
+    const syncSectionEdgeVariables = (section) => {
+      if (!section) return;
+      const computed = getComputedStyle(section);
+      section.style.setProperty("--sq-section-pad-left", computed.paddingLeft || "0px");
+      section.style.setProperty("--sq-section-pad-right", computed.paddingRight || "0px");
+    };
     const applyFluidSection = (section) => {
       if (!section?.matches("[data-sq-fluid]")) return;
+      syncSectionEdgeVariables(section);
       if (!section.dataset.sqMinRows) section.dataset.sqMinRows = section.dataset.sqRows || "12";
       let rows = fluidMinRows(section);
       section.querySelectorAll(":scope > [data-sq-element]").forEach((element) => {
@@ -3427,6 +3434,7 @@
       block.style.paddingRight = `${values.right}px`;
       block.style.paddingBottom = `${values.bottom}px`;
       block.style.paddingLeft = `${values.left}px`;
+      syncSectionEdgeVariables(block);
     };
     const syncPageSpacingControls = () => {
       sqStudio.querySelectorAll("[data-sq-page-gutter]").forEach((input) => {
@@ -3483,6 +3491,7 @@
         if (device === activeDevice) {
           block.style.paddingLeft = `${gutter}px`;
           block.style.paddingRight = `${gutter}px`;
+          syncSectionEdgeVariables(block);
         }
       });
     };
@@ -5616,7 +5625,7 @@
       const sprite = document.querySelector(".svg-sprite")?.outerHTML || "";
       const css = `${collectExportCss()}\nhtml{scrollbar-width:none}html::-webkit-scrollbar{width:0;height:0}.sq-page-block,.sq-page-block:hover{outline-color:transparent!important}`;
       const spacingCssFor = (device) => [...spacingState.entries()].filter(([key]) => key.endsWith(`:${device}`)).map(([key, value]) => { const section = key.slice(0, -(device.length + 1)); return `[data-ezkart-section="${section}"]{padding:${value.top}px ${value.right}px ${value.bottom}px ${value.left}px!important}`; }).join("\n");
-      const fluidCssFor = (device) => [...previewRoot.querySelectorAll("[data-sq-fluid]")].map((section) => `[data-ezkart-section="${section.dataset.sectionId}"]{--sq-fluid-row-height:${fluidRowHeight(section, device)}px;--sq-fluid-columns:${fluidColumns(device)};--sq-fluid-rows:${Math.max(fluidMinRows(section, device), sectionContentRows(section, device))}}`).join("\n");
+      const fluidCssFor = (device) => [...previewRoot.querySelectorAll("[data-sq-fluid]")].map((section) => { const spacing = readSpacing(section.dataset.sectionId, device); return `[data-ezkart-section="${section.dataset.sectionId}"]{--sq-fluid-row-height:${fluidRowHeight(section, device)}px;--sq-fluid-columns:${fluidColumns(device)};--sq-fluid-rows:${Math.max(fluidMinRows(section, device), sectionContentRows(section, device))};--sq-section-pad-left:${spacing.left}px;--sq-section-pad-right:${spacing.right}px}`; }).join("\n");
       const elementCssFor = (device) => [...previewRoot.querySelectorAll("[data-sq-element]")].map((element) => { const layout = parseElementLayout(element, device); const inset = elementInsetFor(element, device); const padding = element.classList.contains("sq-custom-inset") ? `padding:${inset.top}px ${inset.right}px ${inset.bottom}px ${inset.left}px!important;` : ""; return `[data-ezkart-element="${element.dataset.sqElementId}"]{grid-column:${layout.x}/span ${layout.width}!important;grid-row:${layout.y}/span ${layout.height}!important;${padding}}`; }).join("\n");
       const productCssFor = (device) => [...previewRoot.querySelectorAll('[data-sq-element-type="product-grid"]')].map((element) => {
         const settings = productGridSettings(element, device);
