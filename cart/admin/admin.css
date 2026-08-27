@@ -1163,7 +1163,42 @@ button, a { -webkit-tap-highlight-color: transparent; }
   object-position: top center;
 }
 .landing-project-preview.thumbnail-ready .project-page-thumbnail { opacity: 1; }
-.landing-project-preview.thumbnail-ready .project-mini-page { visibility: hidden; }
+.landing-project-preview.thumbnail-ready :is(.project-mini-page, .project-thumbnail-placeholder) { visibility: hidden; }
+.project-thumbnail-placeholder {
+  height: 218px;
+  padding: 20px;
+  display: grid;
+  place-items: center;
+  color: #777f8a;
+  background: linear-gradient(110deg, #f3f4f6 20%, #fafafa 42%, #f3f4f6 64%);
+  background-size: 240% 100%;
+  animation: landing-thumbnail-loading 1.5s ease-in-out infinite;
+}
+.project-thumbnail-placeholder > span { display: grid; place-items: center; gap: 8px; text-align: center; }
+.project-thumbnail-placeholder .icon { width: 20px; color: #ff174f; }
+.project-thumbnail-placeholder b { max-width: 190px; font-size: 9px; font-weight: 500; line-height: 1.5; }
+@keyframes landing-thumbnail-loading { 0%, 100% { background-position: 100% 0; } 50% { background-position: 0 0; } }
+
+/* Never flash the static zero-project state while authenticated cloud data hydrates. */
+.page-sites-library[data-admin-cloud-enabled="true"]:not(.cloud-landing-ready) .landing-library { position: relative; min-height: 650px; }
+.page-sites-library[data-admin-cloud-enabled="true"]:not(.cloud-landing-ready) :is(.landing-library-summary, .landing-project-grid, .landing-library-note) { visibility: hidden; }
+.page-sites-library[data-admin-cloud-enabled="true"]:not(.cloud-landing-ready) .landing-library-actions { opacity: .45; pointer-events: none; }
+.page-sites-library[data-admin-cloud-enabled="true"]:not(.cloud-landing-ready) .landing-library::after {
+  content: "Loading your landing pages…";
+  height: 260px;
+  position: absolute;
+  inset: 150px 34px auto;
+  display: grid;
+  place-items: center;
+  color: #757e89;
+  background: linear-gradient(110deg, #eef0f3 18%, #f8f9fa 42%, #eef0f3 66%);
+  background-size: 240% 100%;
+  border: 1px solid #e1e5e9;
+  border-radius: 15px;
+  box-shadow: 0 8px 28px rgba(28, 34, 45, .04);
+  font: 500 12px Poppins, sans-serif;
+  animation: landing-thumbnail-loading 1.5s ease-in-out infinite;
+}
 
 .dashboard-page .product-editor small { font-size: 10px; }
 .dashboard-page .product-editor p,

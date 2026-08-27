@@ -147,6 +147,7 @@
   const cloudEnabled = document.body.dataset.adminCloudEnabled === "true";
   const cloudCsrfToken = document.body.dataset.adminCsrfToken || "";
   const cloudMediaBase = String(document.body.dataset.adminCloudMediaBase || "").replace(/\/$/, "");
+  const landingPageThumbnailVersion = "3";
   const cloudUrl = (path) => `./?cloud=${encodeURIComponent(path)}`;
   const cloudPrivateMediaUrl = (id) => cloudUrl(`/v1/media/${encodeURIComponent(id)}`);
   const cloudMediaUrl = (id) => cloudMediaBase
@@ -208,7 +209,7 @@
       thumbnailUpdatedAt,
       thumbnailBytes: Math.max(0, Math.round(Number(page?.thumbnailBytes) || 0)),
       thumbnailVersion: String(page?.thumbnailVersion || ""),
-      thumbnailUrl: id && thumbnailUpdatedAt
+      thumbnailUrl: id && thumbnailUpdatedAt && String(page?.thumbnailVersion || "") === landingPageThumbnailVersion
         ? `${cloudUrl(`/v1/landing-pages/${encodeURIComponent(id)}/thumbnail`)}&v=${encodeURIComponent(thumbnailUpdatedAt)}`
         : "",
     };
@@ -232,25 +233,19 @@
   let cloudLandingLoadError = "";
   let cloudComponentLoadError = "";
   if (cloudEnabled) {
-    try {
-      const catalog = await cloudRequest("GET", "/v1/catalog");
-      cloudCatalogProducts = (Array.isArray(catalog.products) ? catalog.products : []).map(normalizeCloudProduct);
-      cloudProductDrafts = (Array.isArray(catalog.drafts) ? catalog.drafts : []).map(normalizeCloudDraft);
-    } catch (error) {
-      cloudLoadError = error instanceof Error ? error.message : "Cloud product storage could not be loaded.";
-    }
-    try {
-      const landingPages = await cloudRequest("GET", "/v1/landing-pages");
-      cloudLandingPages = (Array.isArray(landingPages.pages) ? landingPages.pages : []).map(normalizeCloudLandingPage);
-    } catch (error) {
-      cloudLandingLoadError = error instanceof Error ? error.message : "Cloud landing-page storage could not be loaded.";
-    }
-    try {
-      const components = await cloudRequest("GET", "/v1/components");
-      cloudComponents = (Array.isArray(components.components) ? components.components : []).map(normalizeCloudComponent);
-    } catch (error) {
-      cloudComponentLoadError = error instanceof Error ? error.message : "Cloud components could not be loaded.";
-    }
+    const [catalogLoad, landingPageLoad, componentLoad] = await Promise.allSettled([
+      cloudRequest("GET", "/v1/catalog"),
+      cloudRequest("GET", "/v1/landing-pages"),
+      cloudRequest("GET", "/v1/components"),
+    ]);
+    if (catalogLoad.status === "fulfilled") {
+      cloudCatalogProducts = (Array.isArray(catalogLoad.value.products) ? catalogLoad.value.products : []).map(normalizeCloudProduct);
+      cloudProductDrafts = (Array.isArray(catalogLoad.value.drafts) ? catalogLoad.value.drafts : []).map(normalizeCloudDraft);
+    } else cloudLoadError = catalogLoad.reason instanceof Error ? catalogLoad.reason.message : "Cloud product storage could not be loaded.";
+    if (landingPageLoad.status === "fulfilled") cloudLandingPages = (Array.isArray(landingPageLoad.value.pages) ? landingPageLoad.value.pages : []).map(normalizeCloudLandingPage);
+    else cloudLandingLoadError = landingPageLoad.reason instanceof Error ? landingPageLoad.reason.message : "Cloud landing-page storage could not be loaded.";
+    if (componentLoad.status === "fulfilled") cloudComponents = (Array.isArray(componentLoad.value.components) ? componentLoad.value.components : []).map(normalizeCloudComponent);
+    else cloudComponentLoadError = componentLoad.reason instanceof Error ? componentLoad.reason.message : "Cloud components could not be loaded.";
   }
 
   const storageScope = document.body.dataset.adminStorageScope || "anonymous";
@@ -1686,18 +1681,10 @@
     hydrateCreatorCatalog(form);
 
     const projectTone = (products = []) => products.includes("coffee") ? "coffee" : products.includes("sambal") ? "chili" : "gold";
-    const projectImage = (site) => {
-      if (site.customProducts?.[0]?.image) return site.customProducts[0].image;
-      const shared = readCatalogProducts().find((product) => (site.products || []).includes(product.id));
-      if (shared?.image || shared?.images?.[0]) return shared.image || shared.images[0];
-      if ((site.products || []).includes("coffee")) return "assets/products/kopi-susu.webp";
-      if ((site.products || []).includes("sambal")) return "assets/products/sambal-roa.webp";
-      return "assets/products/granola.webp";
-    };
     const projectCard = (site) => {
       const tone = projectTone(site.products);
       const href = `?page=sites&edit=${encodeURIComponent(site.url)}`;
-      const fallbackPreview = `<span class="project-mini-page"><span><b>${escapeHtml(site.name)}</b><em>Shop now</em></span><span class="product-art"><img src="${projectImage(site)}" alt="" loading="lazy"></span><i></i><i></i><i></i></span>`;
+      const fallbackPreview = `<span class="project-thumbnail-placeholder"><span><svg class="icon" aria-hidden="true"><use href="#icon-layout"></use></svg><b>${site.thumbnailUrl ? "Loading current preview" : "Preview will appear after opening the editor"}</b></span></span>`;
       const pagePreview = site.thumbnailUrl
         ? `<span class="project-page-thumbnail"><img src="${escapeHtml(site.thumbnailUrl)}" alt="Current preview of ${escapeHtml(site.name)}" loading="lazy" decoding="async"></span>${fallbackPreview}`
         : fallbackPreview;
@@ -1757,7 +1744,7 @@
       dialog?.showModal();
     };
     customSites.forEach((site) => grid?.insertBefore(projectCard(site), landingLibrary.querySelector("[data-library-create-card]")));
-    bindProjectMenus(); renderSummary();
+    bindProjectMenus(); renderSummary(); document.body.classList.add("cloud-landing-ready");
     landingLibrary.querySelectorAll("[data-library-create], [data-library-create-card]").forEach((button) => button.addEventListener("click", openCreator));
     document.addEventListener("click", closeProjectMenu);
     const nameInput = form?.elements.namedItem("page_name");
@@ -2302,8 +2289,6 @@
     let thumbnailScheduleTimer = 0;
     const landingPageThumbnailIntervalMs = 10 * 60 * 1000;
     const landingPageThumbnailMaxBytes = 300 * 1024;
-    const landingPageThumbnailVersion = "2";
-
     const canvasBlob = (canvas, type, quality) => new Promise((resolve) => canvas.toBlob(resolve, type, quality));
     const blobDataUrl = (blob) => new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -2311,6 +2296,47 @@
       reader.onerror = () => reject(new Error("Thumbnail encoding failed."));
       reader.readAsDataURL(blob);
     });
+    const thumbnailResourceDataUrl = async (source, cache) => {
+      const url = String(source || "");
+      if (!url || url.startsWith("data:") || url.startsWith("blob:")) return url;
+      const absolute = new URL(url, window.location.href);
+      if (!cache.has(absolute.href)) cache.set(absolute.href, (async () => {
+        const response = await fetch(absolute.href, { cache: "force-cache", credentials: absolute.origin === window.location.origin ? "same-origin" : "omit", mode: "cors" });
+        if (!response.ok) throw new Error(`Image request failed with ${response.status}.`);
+        const blob = await response.blob();
+        if (!blob.type.startsWith("image/")) throw new Error("Thumbnail resource is not an image.");
+        return blobDataUrl(blob);
+      })());
+      return cache.get(absolute.href);
+    };
+    const inlineThumbnailResources = async (root) => {
+      const cache = new Map();
+      const rootTop = root.getBoundingClientRect().top;
+      const inThumbnailViewport = (element) => {
+        const bounds = element.getBoundingClientRect();
+        return bounds.bottom >= rootTop && bounds.top <= rootTop + 810;
+      };
+      const images = [...root.querySelectorAll("img")].filter(inThumbnailViewport);
+      await Promise.allSettled(images.map(async (image) => {
+        const source = image.currentSrc || image.getAttribute("src") || "";
+        const dataUrl = await thumbnailResourceDataUrl(source, cache);
+        if (!dataUrl || dataUrl === source) return;
+        image.removeAttribute("srcset");
+        image.src = dataUrl;
+        if (typeof image.decode === "function") await image.decode().catch(() => {});
+      }));
+      const visibleElements = [root, ...root.querySelectorAll("*")].filter(inThumbnailViewport);
+      await Promise.allSettled(visibleElements.map(async (element) => {
+        const background = getComputedStyle(element).backgroundImage;
+        if (!background || background === "none" || !background.includes("url(")) return;
+        let embedded = background;
+        const sources = [...background.matchAll(/url\((?:"([^"]+)"|'([^']+)'|([^'")]+))\)/g)].map((match) => match[1] || match[2] || match[3]).filter(Boolean);
+        await Promise.all(sources.map(async (source) => {
+          try { embedded = embedded.replaceAll(source, await thumbnailResourceDataUrl(source, cache)); } catch (_) {}
+        }));
+        element.style.backgroundImage = embedded;
+      }));
+    };
     const waitForThumbnailImages = async (root = previewRoot) => {
       const pending = [...(root?.querySelectorAll("img") || [])]
         .filter((image) => !image.complete)
@@ -2358,16 +2384,18 @@
         const captureFrame = document.createElement("div");
         captureFrame.className = "sq-device-frame sq-thumbnail-capture-frame";
         captureFrame.setAttribute("aria-hidden", "true");
-        captureFrame.style.cssText = "position:fixed;z-index:-2147483647;left:0;top:0;width:1440px;max-width:none;pointer-events:none;overflow:hidden;";
+        captureFrame.style.cssText = "position:fixed;z-index:-2147483647;left:0;top:0;width:1440px;max-width:none;pointer-events:none;overflow:hidden;transform:none;zoom:1;";
         const captureRoot = previewRoot.cloneNode(true);
         captureRoot.dataset.sqThumbnailCaptureRoot = "";
         captureRoot.style.width = "1440px";
         captureRoot.style.maxWidth = "none";
         captureRoot.style.overflow = "hidden";
+        captureRoot.querySelectorAll("img").forEach((image) => { image.loading = "eager"; image.decoding = "sync"; });
         captureRoot.querySelectorAll(".sq-element-overlay,.sq-section-toolbar,.sq-layout-grid-overlay,.sq-block-handle").forEach((element) => element.remove());
         captureRoot.querySelectorAll(".selected,.sq-element-selected,.sq-image-selected,.sq-element-animate,.animating").forEach((element) => element.classList.remove("selected", "sq-element-selected", "sq-image-selected", "sq-element-animate", "animating"));
         captureFrame.append(captureRoot);
         document.body.append(captureFrame);
+        await inlineThumbnailResources(captureRoot);
         await waitForThumbnailImages(captureRoot);
         if (document.fonts?.ready) await document.fonts.ready.catch(() => {});
         const sourceWidth = 1440;
@@ -2381,7 +2409,7 @@
             height: sourceHeight,
             imageTimeout: 5000,
             logging: false,
-            scale: 0.5,
+            scale: 1,
             useCORS: true,
             width: sourceWidth,
             windowHeight: sourceHeight,
