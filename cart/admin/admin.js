@@ -147,7 +147,7 @@
   const cloudEnabled = document.body.dataset.adminCloudEnabled === "true";
   const cloudCsrfToken = document.body.dataset.adminCsrfToken || "";
   const cloudMediaBase = String(document.body.dataset.adminCloudMediaBase || "").replace(/\/$/, "");
-  const landingPageThumbnailVersion = "4";
+  const landingPageThumbnailVersion = "5";
   const cloudUrl = (path) => `./?cloud=${encodeURIComponent(path)}`;
   const cloudPrivateMediaUrl = (id) => cloudUrl(`/v1/media/${encodeURIComponent(id)}`);
   const cloudMediaUrl = (id) => cloudMediaBase
@@ -2311,92 +2311,43 @@
     let thumbnailCapturePromise = null;
     let thumbnailScheduleTimer = 0;
     const landingPageThumbnailIntervalMs = 10 * 60 * 1000;
-    const landingPageThumbnailMaxBytes = 300 * 1024;
-    const canvasBlob = (canvas, type, quality) => new Promise((resolve) => canvas.toBlob(resolve, type, quality));
-    const blobDataUrl = (blob) => new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result || ""));
-      reader.onerror = () => reject(new Error("Thumbnail encoding failed."));
-      reader.readAsDataURL(blob);
-    });
-    const thumbnailResourceDataUrl = async (source, cache) => {
-      const url = String(source || "");
-      if (!url || url.startsWith("data:") || url.startsWith("blob:")) return url;
-      const absolute = new URL(url, window.location.href);
-      if (!cache.has(absolute.href)) cache.set(absolute.href, (async () => {
-        const response = await fetch(absolute.href, { cache: "force-cache", credentials: absolute.origin === window.location.origin ? "same-origin" : "omit", mode: "cors" });
-        if (!response.ok) throw new Error(`Image request failed with ${response.status}.`);
-        const blob = await response.blob();
-        if (!blob.type.startsWith("image/")) throw new Error("Thumbnail resource is not an image.");
-        return blobDataUrl(blob);
-      })());
-      return cache.get(absolute.href);
-    };
-    const inlineThumbnailResources = async (root) => {
-      const cache = new Map();
-      const rootTop = root.getBoundingClientRect().top;
-      const inThumbnailViewport = (element) => {
-        const bounds = element.getBoundingClientRect();
-        return bounds.bottom >= rootTop && bounds.top <= rootTop + 810;
+    const renderLandingThumbnail = () => new Promise((resolve, reject) => {
+      const captureFrame = document.createElement("iframe");
+      captureFrame.title = "Landing page thumbnail renderer";
+      captureFrame.setAttribute("aria-hidden", "true");
+      captureFrame.setAttribute("sandbox", "allow-scripts allow-same-origin");
+      captureFrame.tabIndex = -1;
+      captureFrame.style.cssText = "position:fixed;z-index:-2147483647;left:-20000px;top:0;width:1440px;height:810px;border:0;pointer-events:none;overflow:hidden;";
+      let settled = false;
+      const cleanup = () => {
+        window.clearTimeout(timeout);
+        window.removeEventListener("message", receiveThumbnail);
+        captureFrame.remove();
       };
-      const images = [...root.querySelectorAll("img")].filter(inThumbnailViewport);
-      await Promise.allSettled(images.map(async (image) => {
-        const source = image.currentSrc || image.getAttribute("src") || "";
-        const dataUrl = await thumbnailResourceDataUrl(source, cache);
-        if (!dataUrl || dataUrl === source) return;
-        image.removeAttribute("srcset");
-        image.src = dataUrl;
-        if (typeof image.decode === "function") await image.decode().catch(() => {});
-      }));
-      const visibleElements = [root, ...root.querySelectorAll("*")].filter(inThumbnailViewport);
-      await Promise.allSettled(visibleElements.map(async (element) => {
-        const background = element.ownerDocument.defaultView?.getComputedStyle(element).backgroundImage || "none";
-        if (!background || background === "none" || !background.includes("url(")) return;
-        let embedded = background;
-        const sources = [...background.matchAll(/url\((?:"([^"]+)"|'([^']+)'|([^'")]+))\)/g)].map((match) => match[1] || match[2] || match[3]).filter(Boolean);
-        await Promise.all(sources.map(async (source) => {
-          try { embedded = embedded.replaceAll(source, await thumbnailResourceDataUrl(source, cache)); } catch (_) {}
-        }));
-        element.style.backgroundImage = embedded;
-      }));
-    };
-    const waitForThumbnailImages = async (root = previewRoot) => {
-      const pending = [...(root?.querySelectorAll("img") || [])]
-        .filter((image) => !image.complete)
-        .map((image) => new Promise((resolve) => {
-          const finish = () => resolve();
-          image.addEventListener("load", finish, { once: true });
-          image.addEventListener("error", finish, { once: true });
-        }));
-      if (!pending.length) return;
-      await Promise.race([
-        Promise.all(pending),
-        new Promise((resolve) => window.setTimeout(resolve, 4000)),
-      ]);
-    };
-    const encodeLandingThumbnail = async (sourceCanvas) => {
-      const output = document.createElement("canvas");
-      output.width = 720;
-      output.height = 405;
-      const context = output.getContext("2d", { alpha: false });
-      if (!context) throw new Error("Thumbnail canvas is unavailable.");
-      context.fillStyle = "#ffffff";
-      context.fillRect(0, 0, output.width, output.height);
-      context.drawImage(sourceCanvas, 0, 0, sourceCanvas.width, sourceCanvas.height, 0, 0, output.width, output.height);
-      let blob = null;
-      for (const quality of [0.64, 0.54, 0.44, 0.34]) {
-        blob = await canvasBlob(output, "image/webp", quality);
-        if (blob?.type === "image/webp" && blob.size <= landingPageThumbnailMaxBytes) break;
-      }
-      if (!blob || blob.type !== "image/webp") {
-        for (const quality of [0.58, 0.46, 0.34]) {
-          blob = await canvasBlob(output, "image/jpeg", quality);
-          if (blob && blob.size <= landingPageThumbnailMaxBytes) break;
+      const finish = (callback, value) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        callback(value);
+      };
+      const receiveThumbnail = (event) => {
+        if (event.source !== captureFrame.contentWindow || !event.data) return;
+        if (event.data.type === "ezkart-thumbnail-renderer-ready") {
+          captureFrame.contentWindow?.postMessage({ type: "ezkart-render-thumbnail", html: generateHtml() }, "*");
+          return;
         }
-      }
-      if (!blob || blob.size > landingPageThumbnailMaxBytes) throw new Error("Thumbnail could not be compressed below 300 KB.");
-      return blob;
-    };
+        if (event.data.type === "ezkart-thumbnail-rendered" && typeof event.data.dataUrl === "string") {
+          finish(resolve, event.data.dataUrl);
+          return;
+        }
+        if (event.data.type === "ezkart-thumbnail-failed") finish(reject, new Error(String(event.data.message || "Desktop thumbnail rendering failed.")));
+      };
+      const timeout = window.setTimeout(() => finish(reject, new Error("Desktop thumbnail preview timed out.")), 20000);
+      window.addEventListener("message", receiveThumbnail);
+      captureFrame.addEventListener("error", () => finish(reject, new Error("Desktop thumbnail preview failed to load.")), { once: true });
+      captureFrame.src = `thumbnail-preview.php?render=${Date.now()}`;
+      document.body.append(captureFrame);
+    });
     const refreshLandingThumbnailIfDue = () => {
       if (thumbnailCapturePromise || !previewRoot || !activeSiteDocument || typeof window.html2canvas !== "function") return thumbnailCapturePromise || Promise.resolve(false);
       const lastUpdate = Date.parse(activeSiteDocument.thumbnailUpdatedAt || "");
@@ -2404,66 +2355,7 @@
       const landingId = landingPageId(activeSiteDocument.id || activeSiteKey);
       if (!landingId) return Promise.resolve(false);
       thumbnailCapturePromise = (async () => {
-        const sourceWidth = 1440;
-        const sourceHeight = 810;
-        const captureFrame = document.createElement("iframe");
-        captureFrame.title = "Landing page thumbnail renderer";
-        captureFrame.setAttribute("aria-hidden", "true");
-        captureFrame.setAttribute("sandbox", "allow-same-origin");
-        captureFrame.tabIndex = -1;
-        captureFrame.style.cssText = `position:fixed;z-index:-2147483647;left:-20000px;top:0;width:${sourceWidth}px;height:${sourceHeight}px;border:0;pointer-events:none;overflow:hidden;`;
-        const captureUrl = URL.createObjectURL(new Blob([generateHtml()], { type: "text/html" }));
-        let rendered;
-        try {
-          const captureRoot = await new Promise((resolve, reject) => {
-            const startedAt = Date.now();
-            const findRenderedPage = () => {
-              const captureDocument = captureFrame.contentDocument;
-              const root = captureDocument?.querySelector(".sq-page-preview");
-              if (root) {
-                captureDocument.documentElement.style.cssText += `;width:${sourceWidth}px;min-width:${sourceWidth}px;overflow:hidden`;
-                captureDocument.body.style.cssText += `;width:${sourceWidth}px;min-width:${sourceWidth}px;overflow:hidden`;
-                root.style.width = `${sourceWidth}px`;
-                root.style.minWidth = `${sourceWidth}px`;
-                requestAnimationFrame(() => requestAnimationFrame(() => resolve(root)));
-                return;
-              }
-              if (Date.now() - startedAt > 10000) { reject(new Error("Desktop thumbnail preview timed out.")); return; }
-              window.setTimeout(findRenderedPage, 50);
-            };
-            captureFrame.addEventListener("load", () => {
-              findRenderedPage();
-            }, { once: true });
-            captureFrame.addEventListener("error", () => reject(new Error("Desktop thumbnail preview failed to load.")), { once: true });
-            captureFrame.src = captureUrl;
-            document.body.append(captureFrame);
-          });
-          captureRoot.querySelectorAll("img").forEach((image) => { image.loading = "eager"; image.decoding = "sync"; });
-          captureRoot.querySelectorAll(".sq-element-animate,.animating").forEach((element) => element.classList.remove("sq-element-animate", "animating"));
-          await inlineThumbnailResources(captureRoot);
-          await waitForThumbnailImages(captureRoot);
-          if (captureFrame.contentDocument?.fonts?.ready) await captureFrame.contentDocument.fonts.ready.catch(() => {});
-          rendered = await window.html2canvas(captureRoot, {
-            allowTaint: false,
-            backgroundColor: captureRoot.ownerDocument.defaultView?.getComputedStyle(captureRoot).getPropertyValue("--site-page").trim() || "#ffffff",
-            foreignObjectRendering: false,
-            height: sourceHeight,
-            imageTimeout: 5000,
-            logging: false,
-            scale: 1,
-            scrollX: 0,
-            scrollY: 0,
-            useCORS: true,
-            width: sourceWidth,
-            windowHeight: sourceHeight,
-            windowWidth: sourceWidth,
-          });
-        } finally {
-          captureFrame.remove();
-          URL.revokeObjectURL(captureUrl);
-        }
-        const blob = await encodeLandingThumbnail(rendered);
-        const result = await cloudRequest("PUT", `/v1/landing-pages/${encodeURIComponent(landingId)}/thumbnail`, { dataUrl: await blobDataUrl(blob) });
+        const result = await cloudRequest("PUT", `/v1/landing-pages/${encodeURIComponent(landingId)}/thumbnail`, { dataUrl: await renderLandingThumbnail() });
         const thumbnail = result.thumbnail || {};
         const current = cloudLandingPages.find((page) => page.id === landingId);
         if (current && thumbnail.updatedAt) replaceCloudLandingPage({ ...current, thumbnailUpdatedAt: thumbnail.updatedAt, thumbnailBytes: thumbnail.bytes, thumbnailVersion: thumbnail.version });
