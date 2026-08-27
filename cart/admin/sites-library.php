@@ -17,7 +17,7 @@
     <button class="landing-project-new" type="button" data-library-create-card><span><?= ez_admin_icon('plus') ?></span><b>Create your first page</b><small data-new-card-copy>6 project spaces available</small></button>
   </div>
 
-  <aside class="landing-library-note"><span><?= ez_admin_icon('shield') ?></span><div><b>Saved securely to Ezkart cloud storage</b><p>Each project keeps its responsive layouts, content, product selection, and published snapshot in R2.</p></div><a href="?page=products">Manage products</a></aside>
+  <aside class="landing-library-note"><span><?= ez_admin_icon('shield') ?></span><div><b>Your landing pages stay safely saved</b><p>Layouts, content, products, and publishing settings stay synchronized with your Ezkart account.</p></div><a href="?page=products">Manage products</a></aside>
 </section>
 
 <dialog class="page-creator-dialog" id="library-page-creator-dialog"><form method="dialog" data-library-page-form>

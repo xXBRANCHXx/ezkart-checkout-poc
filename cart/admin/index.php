@@ -686,14 +686,14 @@ function ez_admin_proxy_cloud_request(string $accessToken, string $path, string 
 {
     $allowedPath = preg_match('#^/v1/(?:catalog|media(?:/[a-zA-Z0-9_-]+)?|products/[a-zA-Z0-9_-]+(?:/duplicate)?|drafts/[a-zA-Z0-9_-]+|landing-pages(?:/[a-z0-9-]+(?:/thumbnail)?)?|components(?:/[a-z0-9-]+)?)$#', $path) === 1;
     if (!$allowedPath || str_contains($path, '?') || str_contains($path, '#')) {
-        ez_admin_json(['ok' => false, 'error' => 'Cloud data path is not allowed.'], 400);
+        ez_admin_json(['ok' => false, 'error' => 'That saved-data path is not allowed.'], 400);
     }
     if (!in_array($method, ['GET', 'POST', 'PUT', 'DELETE'], true)) {
         ez_admin_json(['ok' => false, 'error' => 'Method not allowed.'], 405);
     }
     $apiUrl = rtrim(ez_config('cloudflare_api_url'), '/');
     if (filter_var($apiUrl, FILTER_VALIDATE_URL) === false || !function_exists('curl_init')) {
-        ez_admin_json(['ok' => false, 'error' => 'Cloud product storage is unavailable.'], 503);
+        ez_admin_json(['ok' => false, 'error' => 'Saved product data is unavailable.'], 503);
     }
     $contentLength = max(0, (int) ($_SERVER['CONTENT_LENGTH'] ?? 0));
     $isLandingPageRequest = preg_match('#^/v1/landing-pages/[a-z0-9-]+$#', $path) === 1;
@@ -703,7 +703,7 @@ function ez_admin_proxy_cloud_request(string $accessToken, string $path, string 
     }
     $body = in_array($method, ['POST', 'PUT'], true) ? file_get_contents('php://input') : '';
     if (!is_string($body) || strlen($body) > $maximumBodyBytes) {
-        ez_admin_json(['ok' => false, 'error' => $isLandingPageRequest ? 'Landing page project is too large.' : 'Cloud request body is too large.'], 413);
+        ez_admin_json(['ok' => false, 'error' => $isLandingPageRequest ? 'Landing page project is too large.' : 'The request is too large.'], 413);
     }
 
     $isMediaRequest = $method === 'GET'
@@ -712,7 +712,7 @@ function ez_admin_proxy_cloud_request(string $accessToken, string $path, string 
         && preg_match('#^/v1/landing-pages/[a-z0-9-]+/thumbnail$#', $path) === 1;
     $isImageRequest = $isMediaRequest || $isThumbnailRequest;
     $handle = curl_init($apiUrl . $path);
-    if ($handle === false) ez_admin_json(['ok' => false, 'error' => 'Cloud request could not start.'], 503);
+    if ($handle === false) ez_admin_json(['ok' => false, 'error' => 'The save request could not start.'], 503);
     $headers = ['Accept: application/json', 'Authorization: Bearer ' . $accessToken];
     if ($body !== '') $headers[] = 'Content-Type: application/json';
     if ($isImageRequest) {
@@ -751,7 +751,7 @@ function ez_admin_proxy_cloud_request(string $accessToken, string $path, string 
     $error = curl_error($handle);
     if (!is_string($responseBody)) {
         ez_admin_log_auth_error('Cloud data proxy failed', new RuntimeException($error !== '' ? $error : 'Empty Worker response.'));
-        ez_admin_json(['ok' => false, 'error' => 'Cloud product storage could not be reached.'], 503);
+        ez_admin_json(['ok' => false, 'error' => 'Your saved Ezkart data could not be reached.'], 503);
     }
     http_response_code($status > 0 ? $status : 502);
     if ($isImageRequest && in_array($status, [200, 304], true)) {
@@ -1169,7 +1169,7 @@ if ($authenticated) {
 $cloudPath = trim((string) ($_GET['cloud'] ?? ''));
 if ($cloudPath !== '') {
     if (!$authenticated || $authenticationMethod !== 'supabase') {
-        ez_admin_json(['ok' => false, 'error' => 'Sign in with Google to use Ezkart cloud storage.'], 401);
+        ez_admin_json(['ok' => false, 'error' => 'Sign in with Google to access your saved Ezkart data.'], 401);
     }
     $cloudMethod = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
     if (in_array($cloudMethod, ['POST', 'PUT', 'DELETE'], true)) {
@@ -1178,7 +1178,7 @@ if ($cloudPath !== '') {
         }
         $cloudCsrf = (string) ($_SERVER['HTTP_X_EZKART_CSRF'] ?? '');
         if (!hash_equals($csrfToken, $cloudCsrf)) {
-            ez_admin_json(['ok' => false, 'error' => 'The cloud save request expired. Reload and try again.'], 403);
+            ez_admin_json(['ok' => false, 'error' => 'The save request expired. Reload and try again.'], 403);
         }
     }
     $cloudAccessToken = (string) ($_SESSION['supabase_access_token'] ?? '');
@@ -1681,7 +1681,7 @@ $html2CanvasVersion = (string) (@filemtime(__DIR__ . '/assets/vendor/html2canvas
         <section class="dashboard-grid footer-grid">
           <article class="panel reviews-panel" id="customer-reviews"><header class="panel-header"><h2>Customer Reviews</h2><a href="?page=reviews">Open reviews</a></header><div class="review-body"><div><strong>4.8</strong><p class="review-stars"><?= str_repeat(ez_admin_icon('star'), 5) ?></p><small>Sandbox review preview</small></div><ul><?php foreach ([5 => 82, 4 => 12, 3 => 4, 2 => 1, 1 => 1] as $stars => $width): ?><li><span><?= $stars ?> <?= ez_admin_icon('star') ?></span><i><b style="width:<?= $metrics['paid_count'] > 0 ? $width : 0 ?>%"></b></i><small><?= $metrics['paid_count'] > 0 ? max(0, (int) round($metrics['paid_count'] * $width / 100)) : 0 ?></small></li><?php endforeach; ?></ul></div></article>
 
-          <article class="panel storefront-panel"><header class="panel-header"><h2>Landing Page &amp; Domain</h2><a href="?page=sites">Create page</a></header><div class="storefront-summary"><span class="storefront-preview"><?= ez_admin_icon('layout') ?><i>Empty</i></span><div><small>Hosted storefront</small><b data-landing-page-summary>No landing pages</b><p><?= ez_admin_icon('globe') ?> Create your first Ezkart site</p><em><?= ez_admin_icon('shield') ?> R2 cloud storage ready</em></div></div><div class="storefront-pipeline"><span><?= ez_admin_icon('box') ?><small>Product</small></span><i></i><span><?= ez_admin_icon('layout') ?><small>Page</small></span><i></i><span><?= ez_admin_icon('credit-card') ?><small>Payment</small></span><i></i><span><?= ez_admin_icon('truck') ?><small>Shipping</small></span></div></article>
+          <article class="panel storefront-panel"><header class="panel-header"><h2>Landing Page &amp; Domain</h2><a href="?page=sites">Create page</a></header><div class="storefront-summary"><span class="storefront-preview"><?= ez_admin_icon('layout') ?><i>Empty</i></span><div><small>Hosted storefront</small><b data-landing-page-summary>No landing pages</b><p><?= ez_admin_icon('globe') ?> Create your first Ezkart site</p><em><?= ez_admin_icon('shield') ?> Securely saved with Ezkart</em></div></div><div class="storefront-pipeline"><span><?= ez_admin_icon('box') ?><small>Product</small></span><i></i><span><?= ez_admin_icon('layout') ?><small>Page</small></span><i></i><span><?= ez_admin_icon('credit-card') ?><small>Payment</small></span><i></i><span><?= ez_admin_icon('truck') ?><small>Shipping</small></span></div></article>
 
           <article class="panel payout-panel" id="payout-summary"><header class="panel-header"><h2>Payment Summary</h2><a href="?page=payments">View all payments</a></header><div class="payout-body"><small>Provider-confirmed Volume</small><div><strong><?= ez_admin_money($metrics['paid_volume']) ?></strong><em class="positive"><?= ez_admin_icon('check-circle') ?> Verified</em><span>signed sandbox notifications</span></div></div><footer><div><small>Environment</small><b><?= $commerceProduction ? 'DOKU pending' : 'Legacy sandbox' ?></b></div><div><small>Paid Orders</small><b><?= number_format($metrics['paid_count']) ?></b></div><a href="../">Open Checkout</a></footer></article>
         </section>

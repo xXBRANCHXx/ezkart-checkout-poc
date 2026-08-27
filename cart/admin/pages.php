@@ -313,7 +313,7 @@ function ez_orders_table(array $rows, string $tableId, string $csrfToken): void
             <?php else: ?><em>Setup started</em><?php endif; ?>
           </article>
           <article><?= ez_admin_icon('check-circle') ?><div><b>Trusted device session</b><p>This browser stays signed in for up to 30 days.</p></div><em>Enabled</em></article>
-          <article><?= ez_admin_icon('box') ?><div><b>Protected cloud data</b><p>Store changes require your authenticated server session.</p></div><em>Protected</em></article>
+          <article><?= ez_admin_icon('box') ?><div><b>Protected account data</b><p>Store changes require your authenticated server session.</p></div><em>Protected</em></article>
         </div>
         <?php if ($mfaSetup !== null): ?>
           <div class="mfa-setup-panel">

@@ -154,7 +154,7 @@
     ? `${cloudMediaBase}/v1/public/media/${encodeURIComponent(id)}`
     : cloudPrivateMediaUrl(id);
   const cloudRequest = async (method, path, payload = null) => {
-    if (!cloudEnabled) throw new Error("Sign in with Google to use cloud product storage.");
+    if (!cloudEnabled) throw new Error("Sign in with Google to access your saved products.");
     const response = await fetch(cloudUrl(path), {
       method,
       credentials: "same-origin",
@@ -167,7 +167,7 @@
       cache: "no-store",
     });
     const result = await response.json().catch(() => ({}));
-    if (!response.ok || result.ok !== true) throw new Error(String(result.error || `Cloud storage returned ${response.status}.`));
+    if (!response.ok || result.ok !== true) throw new Error(String(result.error || `Ezkart returned ${response.status}.`));
     return result;
   };
   const normalizeCloudProduct = (product) => {
@@ -241,11 +241,11 @@
     if (catalogLoad.status === "fulfilled") {
       cloudCatalogProducts = (Array.isArray(catalogLoad.value.products) ? catalogLoad.value.products : []).map(normalizeCloudProduct);
       cloudProductDrafts = (Array.isArray(catalogLoad.value.drafts) ? catalogLoad.value.drafts : []).map(normalizeCloudDraft);
-    } else cloudLoadError = catalogLoad.reason instanceof Error ? catalogLoad.reason.message : "Cloud product storage could not be loaded.";
+    } else cloudLoadError = catalogLoad.reason instanceof Error ? catalogLoad.reason.message : "Saved products could not be loaded.";
     if (landingPageLoad.status === "fulfilled") cloudLandingPages = (Array.isArray(landingPageLoad.value.pages) ? landingPageLoad.value.pages : []).map(normalizeCloudLandingPage);
-    else cloudLandingLoadError = landingPageLoad.reason instanceof Error ? landingPageLoad.reason.message : "Cloud landing-page storage could not be loaded.";
+    else cloudLandingLoadError = landingPageLoad.reason instanceof Error ? landingPageLoad.reason.message : "Saved landing pages could not be loaded.";
     if (componentLoad.status === "fulfilled") cloudComponents = (Array.isArray(componentLoad.value.components) ? componentLoad.value.components : []).map(normalizeCloudComponent);
-    else cloudComponentLoadError = componentLoad.reason instanceof Error ? componentLoad.reason.message : "Cloud components could not be loaded.";
+    else cloudComponentLoadError = componentLoad.reason instanceof Error ? componentLoad.reason.message : "Saved components could not be loaded.";
   }
 
   const storageScope = document.body.dataset.adminStorageScope || "anonymous";
@@ -360,7 +360,7 @@
       const existingId = product.mediaIds?.[index];
       if (existingId) { imageUploadIds.push(existingId); continue; }
       const source = typeof imageValues[index] === "string" ? imageValues[index] : imageValues[index]?.data;
-      if (!String(source || "").startsWith("data:image/")) throw new Error("A product image is not ready for cloud upload.");
+      if (!String(source || "").startsWith("data:image/")) throw new Error("A product image is not ready for upload.");
       imageUploadIds.push((await uploadCloudImage(source)).id);
     }
     const variants = [];
@@ -394,7 +394,7 @@
     for (const image of Array.isArray(snapshot.images) ? snapshot.images : []) {
       let cloudId = image.cloudId || null;
       if (!cloudId && String(image.data || "").startsWith("data:image/")) cloudId = (await uploadCloudImage(image.data)).id;
-      if (!cloudId) throw new Error("A draft image is not ready for cloud upload.");
+      if (!cloudId) throw new Error("A draft image is not ready for upload.");
       next.images.push({ id: image.id, cloudId });
     }
     next.variants = [];
@@ -403,7 +403,7 @@
       if (customImage) {
         let cloudId = customImage.cloudId || null;
         if (!cloudId && String(customImage.data || "").startsWith("data:image/")) cloudId = (await uploadCloudImage(customImage.data)).id;
-        if (!cloudId) throw new Error("A variant draft image is not ready for cloud upload.");
+        if (!cloudId) throw new Error("A variant draft image is not ready for upload.");
         customImage = { cloudId };
       }
       next.variants.push({ ...variant, customImage });
@@ -436,13 +436,13 @@
       if (cloudProductDrafts.some((item) => item.id === draft.id)) { removeLocalDraft(draft.id); continue; }
       try { await saveCloudDraft(draft); migrated += 1; } catch (_) { failed += 1; }
     }
-    if (migrated > 0) showToast(`${migrated} browser-saved item${migrated === 1 ? "" : "s"} moved to cloud storage`);
-    if (failed > 0) showToast(`${failed} item${failed === 1 ? "" : "s"} could not move to cloud yet; the browser copy was kept`);
+    if (migrated > 0) showToast(`${migrated} browser-saved item${migrated === 1 ? "" : "s"} added to your Ezkart account`);
+    if (failed > 0) showToast(`${failed} item${failed === 1 ? "" : "s"} could not be synchronized yet; the browser copy was kept`);
   };
-  if (cloudLoadError) showToast(`Cloud storage unavailable: ${cloudLoadError}`);
+  if (cloudLoadError) showToast(`Saved products unavailable: ${cloudLoadError}`);
   else window.setTimeout(() => { void migrateLegacyCloudData(); }, 600);
-  if (cloudLandingLoadError) window.setTimeout(() => showToast(`Landing-page storage unavailable: ${cloudLandingLoadError}`), cloudLoadError ? 2500 : 0);
-  if (cloudComponentLoadError) window.setTimeout(() => showToast(`Component storage unavailable: ${cloudComponentLoadError}`), 3500);
+  if (cloudLandingLoadError) window.setTimeout(() => showToast(`Landing pages unavailable: ${cloudLandingLoadError}`), cloudLoadError ? 2500 : 0);
+  if (cloudComponentLoadError) window.setTimeout(() => showToast(`Components unavailable: ${cloudComponentLoadError}`), 3500);
   const hydrateCreatorCatalog = (form) => {
     const fieldset = form?.querySelector("[data-creator-products]");
     if (!fieldset) return;
@@ -467,7 +467,7 @@
     return normalized;
   };
   const saveCloudLandingPage = async (site, changes = {}) => {
-    if (!cloudEnabled) throw new Error("Sign in with Google to save landing pages to Ezkart cloud storage.");
+    if (!cloudEnabled) throw new Error("Sign in with Google to save landing pages to your Ezkart account.");
     const id = landingPageId(site?.url || site?.id);
     const result = await cloudRequest("PUT", `/v1/landing-pages/${encodeURIComponent(id)}`, {
       name: site.name,
@@ -480,12 +480,12 @@
     return saved;
   };
   const loadCloudLandingPage = async (url) => {
-    if (!cloudEnabled) throw new Error("Sign in with Google to load landing pages from Ezkart cloud storage.");
+    if (!cloudEnabled) throw new Error("Sign in with Google to load your saved landing pages.");
     const result = await cloudRequest("GET", `/v1/landing-pages/${encodeURIComponent(landingPageId(url))}`);
     return replaceCloudLandingPage(result.page);
   };
   const deleteCloudLandingPage = async (url) => {
-    if (!cloudEnabled) throw new Error("Sign in with Google to delete landing pages from Ezkart cloud storage.");
+    if (!cloudEnabled) throw new Error("Sign in with Google to delete saved landing pages.");
     const id = landingPageId(url);
     await cloudRequest("DELETE", `/v1/landing-pages/${encodeURIComponent(id)}`);
     cloudLandingPages = cloudLandingPages.filter((page) => page.id !== id);
@@ -937,13 +937,13 @@
       for (const image of selectedImages) {
         if (image.cloudId) continue;
         const source = image.data || image.url;
-        if (!String(source || "").startsWith("data:image/")) throw new Error("A product image could not be prepared for cloud storage.");
+        if (!String(source || "").startsWith("data:image/")) throw new Error("A product image could not be prepared for upload.");
         image.cloudId = (await uploadCloudImage(source)).id;
       }
       for (const variant of variants) {
         if (!variant.useCustomImage || !variant.customImage || variant.customImage.cloudId) continue;
         const source = variant.customImage.data || variant.customImage.url;
-        if (!String(source || "").startsWith("data:image/")) throw new Error(`A ${currentType() === "subscription" ? "plan" : "variant"} image could not be prepared for cloud storage.`);
+        if (!String(source || "").startsWith("data:image/")) throw new Error(`A ${currentType() === "subscription" ? "plan" : "variant"} image could not be prepared for upload.`);
         variant.customImage.cloudId = (await uploadCloudImage(source)).id;
       }
     };
@@ -960,11 +960,11 @@
           if (index >= 0) drafts[index] = snapshot; else drafts.push(snapshot);
           if (!writeProductDrafts(drafts)) throw new Error("Draft storage is full.");
         }
-        if (draftStatus) { draftStatus.classList.remove("is-saving"); draftStatus.innerHTML = "<i></i> Saved to cloud"; }
-        if (announce) showToast(cloudEnabled ? "Product draft saved to cloud" : "Product draft saved");
+        if (draftStatus) { draftStatus.classList.remove("is-saving"); draftStatus.innerHTML = "<i></i> Saved"; }
+        if (announce) showToast("Product draft saved");
       }).catch((error) => {
-        if (draftStatus) { draftStatus.classList.remove("is-saving"); draftStatus.innerHTML = "<i></i> Cloud save needs attention"; }
-        showError(error instanceof Error ? error.message : "The draft could not be saved to cloud.");
+        if (draftStatus) { draftStatus.classList.remove("is-saving"); draftStatus.innerHTML = "<i></i> Save needs attention"; }
+        showError(error instanceof Error ? error.message : "The draft could not be saved.");
       });
       return draftSavePromise;
     };
@@ -1695,14 +1695,35 @@
       card.dataset.siteName = site.name;
       card.dataset.siteUrl = site.url;
       const published = site.status === "published";
-      card.innerHTML = `<a class="landing-project-preview tone-${tone}${site.thumbnailUrl ? " has-thumbnail" : ""}" href="${href}" aria-label="Edit ${escapeHtml(site.name)}"><span class="project-browser"><i></i><i></i><i></i><small>${escapeHtml(site.url)}</small></span>${pagePreview}<span class="project-edit-hint">Open editor</span></a><div class="landing-project-details"><div><span class="project-status ${published ? "live" : "draft"}"><i></i>${published ? "Published" : "Draft"}</span><h2><a href="${href}">${escapeHtml(site.name)}</a></h2><p>Your R2-backed storefront project, ready for responsive editing.</p></div><button type="button" data-project-menu aria-label="Project actions"><svg class="icon" aria-hidden="true"><use href="#icon-settings"></use></svg></button></div><footer><span><svg class="icon" aria-hidden="true"><use href="#icon-globe"></use></svg>${escapeHtml(site.url)}</span><a href="${href}">Edit page <svg class="icon" aria-hidden="true"><use href="#icon-chevron-right"></use></svg></a></footer>`;
+      card.innerHTML = `<a class="landing-project-card-link" href="${href}" aria-label="Open ${escapeHtml(site.name)} in the editor"><span class="landing-project-preview tone-${tone}${site.thumbnailUrl ? " has-thumbnail" : ""}"><span class="project-browser"><i></i><i></i><i></i><small>${escapeHtml(site.url)}</small></span>${pagePreview}</span><span class="landing-project-details"><span><span class="project-status ${published ? "live" : "draft"}"><i></i>${published ? "Published" : "Draft"}</span><h2>${escapeHtml(site.name)}</h2></span></span></a><button class="project-url-copy" type="button" data-project-copy-url aria-label="Copy https://${escapeHtml(site.url)}" title="Copy URL"><svg class="icon" aria-hidden="true"><use href="#icon-copy"></use></svg></button><button class="project-actions" type="button" data-project-menu aria-label="Project actions" title="Project actions" aria-haspopup="menu" aria-expanded="false"><svg class="icon" aria-hidden="true"><use href="#icon-more-vertical"></use></svg></button>`;
       const thumbnail = card.querySelector(".project-page-thumbnail img");
       thumbnail?.addEventListener("load", () => card.querySelector(".landing-project-preview")?.classList.add("thumbnail-ready"));
       thumbnail?.addEventListener("error", () => card.querySelector(".project-page-thumbnail")?.remove());
       if (thumbnail?.complete && thumbnail.naturalWidth > 0) card.querySelector(".landing-project-preview")?.classList.add("thumbnail-ready");
+      const copyUrl = card.querySelector("[data-project-copy-url]");
+      copyUrl?.addEventListener("click", async () => {
+        const url = `https://${site.url}`;
+        try { await navigator.clipboard.writeText(url); }
+        catch (_) {
+          const input = document.createElement("input");
+          input.value = url; input.style.position = "fixed"; input.style.opacity = "0";
+          document.body.append(input); input.select(); document.execCommand("copy"); input.remove();
+        }
+        copyUrl.classList.add("copied");
+        copyUrl.setAttribute("aria-label", "URL copied");
+        copyUrl.querySelector("use")?.setAttribute("href", "#icon-check-circle");
+        window.setTimeout(() => {
+          copyUrl.classList.remove("copied");
+          copyUrl.setAttribute("aria-label", `Copy https://${site.url}`);
+          copyUrl.querySelector("use")?.setAttribute("href", "#icon-copy");
+        }, 1400);
+      });
       return card;
     };
-    const closeProjectMenu = () => document.querySelector(".landing-project-menu")?.remove();
+    const closeProjectMenu = () => {
+      document.querySelector(".landing-project-menu")?.remove();
+      landingLibrary.querySelectorAll("[data-project-menu]").forEach((button) => button.setAttribute("aria-expanded", "false"));
+    };
     const bindProjectMenus = () => landingLibrary.querySelectorAll("[data-project-menu]").forEach((button) => {
       button.onclick = (event) => {
         event.stopPropagation(); closeProjectMenu();
@@ -1710,16 +1731,18 @@
         if (!card?.dataset.customSite) { showToast("Built-in projects stay available as starting points"); return; }
         const menu = document.createElement("div");
         menu.className = "landing-project-menu";
-        menu.innerHTML = '<button type="button">Delete project</button>';
+        menu.setAttribute("role", "menu");
+        menu.innerHTML = '<button type="button" role="menuitem">Delete landing page</button>';
+        button.setAttribute("aria-expanded", "true");
         const rect = button.getBoundingClientRect();
         menu.style.left = `${Math.max(8, rect.right - 160)}px`; menu.style.top = `${rect.bottom + 5}px`;
         menu.querySelector("button").onclick = async () => {
-          if (!window.confirm(`Delete “${card.dataset.siteName}”? This permanently removes its project from Ezkart cloud storage.`)) return;
+          if (!window.confirm(`Delete “${card.dataset.siteName}”? This permanently removes the landing page from your account.`)) return;
           const url = card.dataset.siteUrl;
           try {
             await deleteCloudLandingPage(url);
             customSites = readLandingSites();
-            card.remove(); closeProjectMenu(); renderSummary(); showToast("Landing page deleted from cloud storage");
+            card.remove(); closeProjectMenu(); renderSummary(); showToast("Landing page deleted");
           } catch (error) { showToast(error instanceof Error ? error.message : "The landing page could not be deleted."); }
         };
         document.body.append(menu);
@@ -2495,7 +2518,7 @@
           scheduleLandingThumbnailRefresh();
           return true;
         } catch (error) {
-          if (saveState) saveState.textContent = "Cloud save failed";
+          if (saveState) saveState.textContent = "Save failed";
           showToast(error instanceof Error ? error.message : "The landing page could not be saved.");
           return false;
         }
@@ -2506,7 +2529,7 @@
       if (!saveState) return;
       saveState.textContent = "Saving…";
       window.clearTimeout(saveTimer);
-      saveTimer = window.setTimeout(async () => { if (await persistCurrentState()) saveState.textContent = "Saved to cloud just now"; }, 550);
+      saveTimer = window.setTimeout(async () => { if (await persistCurrentState()) saveState.textContent = "Saved just now"; }, 550);
     };
 
     const formatRupiah = (amount) => `Rp${new Intl.NumberFormat("id-ID").format(amount)}`;
@@ -5541,8 +5564,8 @@ document.querySelectorAll('[class*="animation-"],[class*="element-animation-"]')
     });
     sqStudio.querySelector("[data-sq-publish]")?.addEventListener("click", async () => {
       const saved = await persistCurrentState({ status: "published", publishedHtml: generateHtml() });
-      if (saveState) saveState.textContent = saved ? "Published to cloud just now" : "Cloud publish failed";
-      if (saved) showToast("Published snapshot saved to R2 with checkout and responsive settings");
+      if (saveState) saveState.textContent = saved ? "Published just now" : "Publish failed";
+      if (saved) showToast("Landing page published");
     });
     const cloneBaseSiteState = () => JSON.parse(JSON.stringify(baseSiteState || captureState()));
     const loadSite = async (site, force = false) => {
@@ -5580,7 +5603,6 @@ document.querySelectorAll('[class*="animation-"],[class*="element-animation-"]')
         }
         deselectSqItem(state?.selectedSection || "hero");
         scheduleLandingThumbnailRefresh(1600);
-        showToast(`${site.dataset.siteName} loaded from R2`);
       } finally {
         window.requestAnimationFrame(() => {
           if (loadRequest !== siteLoadRequest) return;

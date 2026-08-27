@@ -1145,11 +1145,23 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .dashboard-page .landing-library-summary strong small { font-size: 13px; }
 
 /* The project library uses the latest real page capture once it has loaded. */
+.landing-project-card { position: relative; cursor: pointer; }
+.landing-project-card:focus-within { border-color: #a99df0; box-shadow: 0 0 0 3px rgba(103, 84, 232, .1), 0 15px 36px rgba(28, 34, 45, .11); }
+.landing-project-card-link { display: block; color: inherit; text-decoration: none; }
+.landing-project-card-link:focus-visible { outline: 3px solid rgba(103, 84, 232, .4); outline-offset: -3px; border-radius: 14px; }
+.landing-project-preview { height: auto; }
 .landing-project-preview.has-thumbnail { background: #fff; }
+.landing-project-preview::after {
+  z-index: 2;
+  inset: 27px 0 0;
+  background: linear-gradient(180deg, rgba(0, 0, 0, .06), transparent 42%, rgba(0, 0, 0, .42));
+}
+.project-browser { position: relative; z-index: 3; padding-right: 36px; }
 .project-page-thumbnail {
   position: absolute;
   z-index: 1;
-  inset: 27px 0 0;
+  inset: 27px 0 auto;
+  aspect-ratio: 16 / 9;
   overflow: hidden;
   background: #fff;
   opacity: 0;
@@ -1165,7 +1177,8 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .landing-project-preview.thumbnail-ready .project-page-thumbnail { opacity: 1; }
 .landing-project-preview.thumbnail-ready :is(.project-mini-page, .project-thumbnail-placeholder) { visibility: hidden; }
 .project-thumbnail-placeholder {
-  height: 218px;
+  height: auto;
+  aspect-ratio: 16 / 9;
   padding: 20px;
   display: grid;
   place-items: center;
@@ -1177,6 +1190,33 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .project-thumbnail-placeholder > span { display: grid; place-items: center; gap: 8px; text-align: center; }
 .project-thumbnail-placeholder .icon { width: 20px; color: #ff174f; }
 .project-thumbnail-placeholder b { max-width: 190px; font-size: 9px; font-weight: 500; line-height: 1.5; }
+.landing-project-details { min-height: 68px; padding: 13px 54px 14px 16px; display: flex; align-items: center; }
+.landing-project-details > span { min-width: 0; }
+.landing-project-details h2 { margin: 6px 0 0; color: #252a33; font-size: 14px; line-height: 1.25; }
+.project-url-copy,
+.project-actions {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  position: absolute;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  color: #727985;
+  background: rgba(255, 255, 255, .92);
+  border: 1px solid rgba(31, 36, 45, .1);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(25, 30, 38, .08);
+  transition: color .16s, background .16s, border-color .16s, transform .16s;
+}
+.project-url-copy { top: 0; right: 5px; height: 27px; background: transparent; border-color: transparent; border-radius: 6px; box-shadow: none; }
+.project-actions { right: 14px; bottom: 19px; }
+.project-url-copy .icon,
+.project-actions .icon { width: 13px; }
+.project-url-copy:hover,
+.project-actions:hover { color: #f40b64; background: #fff; border-color: #efc9d4; transform: translateY(-1px); }
+.project-url-copy.copied { color: #168653; background: #effaf4; border-color: #ccebd9; }
+.landing-project-new { min-height: 355px; }
 @keyframes landing-thumbnail-loading { 0%, 100% { background-position: 100% 0; } 50% { background-position: 0 0; } }
 
 /* Never flash the static zero-project state while authenticated cloud data hydrates. */
