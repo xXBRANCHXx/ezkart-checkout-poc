@@ -3281,8 +3281,9 @@
           const output = sqStudio.querySelector(`[data-sq-image-output="${name}"]`);
           if (output) output.textContent = `${value}${name === "blur" ? "px" : "%"}`;
           });
-        const scrollEffect = image.dataset.sqImageScroll || "none";
-        const scrollStrength = Math.max(10, Math.min(100, Number(image.dataset.sqImageScrollStrength) || 50));
+        const scrollEffect = image.dataset.sqImageScroll === "parallax-deep" ? "parallax" : image.dataset.sqImageScroll || "none";
+        const storedScrollStrength = Number(image.dataset.sqImageScrollStrength);
+        const scrollStrength = Math.max(0, Math.min(100, Number.isFinite(storedScrollStrength) ? storedScrollStrength : 50));
         const scrollEffectInput = sqStudio.querySelector("[data-sq-image-scroll-effect]");
         const scrollStrengthInput = sqStudio.querySelector("[data-sq-image-scroll-strength]");
         const scrollStrengthOutput = sqStudio.querySelector("[data-sq-image-scroll-strength-output]");
@@ -3566,36 +3567,58 @@
     const marqueeResizeObserver = typeof ResizeObserver === "function" ? new ResizeObserver((entries) => entries.forEach((entry) => syncMarqueeTrack(entry.target))) : null;
     marqueeScrollRoot?.addEventListener("scroll", scheduleScrollLinkedMarquees, { passive: true });
     window.addEventListener("resize", () => previewRoot?.querySelectorAll('[data-sq-element-type="marquee"]').forEach(syncMarqueeTrack), { passive: true });
-    let imageScrollFrame = 0;
-    const imageScrollStrength = (image) => Math.max(10, Math.min(100, Number(image?.dataset.sqImageScrollStrength) || 50));
+    let imageScrollMeasureFrame = 0;
+    let imageScrollAnimationFrame = 0;
+    const imageScrollStates = new WeakMap();
+    const imageScrollStrength = (image) => {
+      const stored = Number(image?.dataset.sqImageScrollStrength);
+      return Math.max(0, Math.min(100, Number.isFinite(stored) ? stored : 50));
+    };
     const imageScrollTransform = (effect, strength, progress, height = 1) => {
       let offset = 0;
       let scale = 1;
-      if (effect === "parallax") { offset = progress * strength * .42; scale = 1.08 + strength / 1200; }
-      if (effect === "parallax-deep") { offset = progress * strength * .85; scale = 1.14 + strength / 700; }
-      if (effect === "parallax-reverse") { offset = progress * strength * -.55; scale = 1.1 + strength / 900; }
-      if (effect === "zoom") scale = 1 + (1 - Math.abs(progress)) * strength / 500;
+      if (["parallax", "parallax-deep"].includes(effect)) { offset = progress * strength * .72; scale = 1.06 + strength / 1000; }
+      if (effect === "parallax-reverse") { offset = progress * strength * -.72; scale = 1.06 + strength / 1000; }
+      if (effect === "zoom") scale = 1 + (1 - Math.abs(progress)) * strength / 400;
       if (offset) scale = Math.max(scale, 1 + Math.abs(offset) * 2 / Math.max(1, height));
-      return `translate3d(0,${offset.toFixed(2)}px,0) scale(${scale.toFixed(4)})`;
+      return { offset, scale };
     };
-    const updateImageScrollEffects = () => {
-      imageScrollFrame = 0;
+    const animateImageScrollEffects = () => {
+      imageScrollAnimationFrame = 0;
+      let unsettled = false;
+      previewRoot?.querySelectorAll('img[data-sq-image-scroll]:not([data-sq-image-scroll="none"])').forEach((image) => {
+        const state = imageScrollStates.get(image);
+        if (!state) return;
+        state.offset += (state.targetOffset - state.offset) * .2;
+        state.scale += (state.targetScale - state.scale) * .2;
+        if (Math.abs(state.targetOffset - state.offset) < .04) state.offset = state.targetOffset; else unsettled = true;
+        if (Math.abs(state.targetScale - state.scale) < .0004) state.scale = state.targetScale; else unsettled = true;
+        image.style.transform = `translate3d(0,${state.offset.toFixed(2)}px,0) scale(${state.scale.toFixed(4)})`;
+        image.style.transformOrigin = "center";
+        image.style.willChange = "transform";
+      });
+      if (unsettled) imageScrollAnimationFrame = window.requestAnimationFrame(animateImageScrollEffects);
+    };
+    const updateImageScrollTargets = () => {
+      imageScrollMeasureFrame = 0;
       const viewport = marqueeScrollRoot?.getBoundingClientRect();
       if (!viewport) return;
       const viewportCenter = viewport.top + viewport.height / 2;
       previewRoot?.querySelectorAll('img[data-sq-image-scroll]:not([data-sq-image-scroll="none"])').forEach((image) => {
-        const host = image.closest("[data-sq-element]") || image.parentElement;
+        const host = image.closest("[data-sq-image-item]") || image.parentElement;
         const rect = host?.getBoundingClientRect();
         if (!rect) return;
         const range = Math.max(1, (viewport.height + rect.height) / 2);
         const progress = Math.max(-1, Math.min(1, (rect.top + rect.height / 2 - viewportCenter) / range));
-        image.style.transform = imageScrollTransform(image.dataset.sqImageScroll, imageScrollStrength(image), progress, rect.height);
-        image.style.transformOrigin = "center";
-        image.style.willChange = "transform";
+        const target = imageScrollTransform(image.dataset.sqImageScroll, imageScrollStrength(image), progress, rect.height);
+        const state = imageScrollStates.get(image);
+        if (state) { state.targetOffset = target.offset; state.targetScale = target.scale; }
+        else imageScrollStates.set(image, { offset: target.offset, scale: target.scale, targetOffset: target.offset, targetScale: target.scale });
       });
+      if (!imageScrollAnimationFrame) imageScrollAnimationFrame = window.requestAnimationFrame(animateImageScrollEffects);
     };
     const scheduleImageScrollEffects = () => {
-      if (!imageScrollFrame) imageScrollFrame = window.requestAnimationFrame(updateImageScrollEffects);
+      if (!imageScrollMeasureFrame) imageScrollMeasureFrame = window.requestAnimationFrame(updateImageScrollTargets);
     };
     marqueeScrollRoot?.addEventListener("scroll", scheduleImageScrollEffects, { passive: true });
     window.addEventListener("resize", scheduleImageScrollEffects, { passive: true });
@@ -4782,6 +4805,7 @@
       Object.keys(imageDefaults).forEach((name) => { delete image.dataset[`sqFilter${name[0].toUpperCase()}${name.slice(1)}`]; });
       delete image.dataset.sqImageScroll;
       delete image.dataset.sqImageScrollStrength;
+      imageScrollStates.delete(image);
       image.style.filter = ""; image.style.objectFit = ""; image.style.objectPosition = "";
       image.style.transform = ""; image.style.transformOrigin = ""; image.style.willChange = "";
       syncElementControls(); markSqChanged();
@@ -4797,6 +4821,7 @@
       const effect = event.currentTarget.value;
       if (effect === "none") {
         delete image.dataset.sqImageScroll;
+        imageScrollStates.delete(image);
         image.style.transform = "";
         image.style.transformOrigin = "";
         image.style.willChange = "";
@@ -4814,6 +4839,7 @@
     imageScrollStrengthInput?.addEventListener("input", (event) => {
       const image = selectedMotionImage();
       if (!image || !image.dataset.sqImageScroll) return;
+      if (image.dataset.sqImageScroll === "parallax-deep") image.dataset.sqImageScroll = "parallax";
       image.dataset.sqImageScrollStrength = event.currentTarget.value;
       const output = sqStudio.querySelector("[data-sq-image-scroll-strength-output]");
       if (output) output.textContent = `${event.currentTarget.value}%`;
@@ -5758,10 +5784,11 @@
         element.classList.toggle("sq-marquee-manual", element.dataset.ezkartMarqueeMode === "scroll");
       });
       clone.querySelectorAll("img[data-sq-image-scroll]").forEach((image) => {
-        const effect = image.dataset.sqImageScroll || "none";
+        const effect = image.dataset.sqImageScroll === "parallax-deep" ? "parallax" : image.dataset.sqImageScroll || "none";
+        const storedStrength = Number(image.dataset.sqImageScrollStrength);
         if (effect !== "none") {
           image.dataset.ezkartImageScroll = effect;
-          image.dataset.ezkartImageScrollStrength = String(Math.max(10, Math.min(100, Number(image.dataset.sqImageScrollStrength) || 50)));
+          image.dataset.ezkartImageScrollStrength = String(Math.max(0, Math.min(100, Number.isFinite(storedStrength) ? storedStrength : 50)));
         }
         image.style.removeProperty("transform");
         image.style.removeProperty("transform-origin");
@@ -5828,9 +5855,10 @@ const updateScrollMarquees=()=>{marqueeFrame=0;document.querySelectorAll('.sq-fr
 const scheduleScrollMarquees=()=>{if(!marqueeFrame)marqueeFrame=requestAnimationFrame(updateScrollMarquees)};
 const syncMarquees=()=>{document.querySelectorAll('.sq-free-marquee').forEach(element=>{const track=element.querySelector('.sq-marquee-track'),source=track?.querySelector('.sq-marquee-copy:not([aria-hidden])');if(!track||!source)return;track.querySelectorAll('.sq-marquee-copy[aria-hidden="true"]').forEach(copy=>copy.remove());const width=Math.max(1,source.offsetWidth),copies=Math.max(2,Math.ceil(Math.max(1,element.clientWidth)/width)+2);for(let index=1;index<copies;index+=1){const copy=source.cloneNode(true);copy.removeAttribute('contenteditable');copy.setAttribute('aria-hidden','true');track.append(copy)}track.style.setProperty('--sq-marquee-distance',width+'px');track.style.setProperty('--sq-marquee-duration',Math.max(2,width/marqueeSpeed(element))+'s');const manual=element.dataset.ezkartMarqueeMode==='scroll';element.classList.toggle('sq-marquee-manual',manual);if(!manual)track.style.removeProperty('transform')});scheduleScrollMarquees()};
 addEventListener('scroll',scheduleScrollMarquees,{passive:true});addEventListener('resize',syncMarquees,{passive:true});document.fonts?.ready.then(syncMarquees);syncMarquees();
-let imageScrollFrame=0;
-const updateImageScrollEffects=()=>{imageScrollFrame=0;if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;const center=innerHeight/2;document.querySelectorAll('img[data-ezkart-image-scroll]').forEach(image=>{const host=image.closest('.ez-fluid-element')||image.parentElement,rect=host?.getBoundingClientRect();if(!rect)return;const range=Math.max(1,(innerHeight+rect.height)/2),progress=Math.max(-1,Math.min(1,(rect.top+rect.height/2-center)/range)),strength=Math.max(10,Math.min(100,Number(image.dataset.ezkartImageScrollStrength)||50)),effect=image.dataset.ezkartImageScroll;let offset=0,scale=1;if(effect==='parallax'){offset=progress*strength*.42;scale=1.08+strength/1200}if(effect==='parallax-deep'){offset=progress*strength*.85;scale=1.14+strength/700}if(effect==='parallax-reverse'){offset=progress*strength*-.55;scale=1.1+strength/900}if(effect==='zoom')scale=1+(1-Math.abs(progress))*strength/500;if(offset)scale=Math.max(scale,1+Math.abs(offset)*2/Math.max(1,rect.height));image.style.transform='translate3d(0,'+offset.toFixed(2)+'px,0) scale('+scale.toFixed(4)+')';image.style.transformOrigin='center';image.style.willChange='transform'})};
-const scheduleImageScrollEffects=()=>{if(!imageScrollFrame)imageScrollFrame=requestAnimationFrame(updateImageScrollEffects)};
+let imageScrollMeasureFrame=0,imageScrollAnimationFrame=0;const imageScrollStates=new WeakMap();
+const animateImageScrollEffects=()=>{imageScrollAnimationFrame=0;let unsettled=false;document.querySelectorAll('img[data-ezkart-image-scroll]').forEach(image=>{const state=imageScrollStates.get(image);if(!state)return;state.offset+=(state.targetOffset-state.offset)*.2;state.scale+=(state.targetScale-state.scale)*.2;if(Math.abs(state.targetOffset-state.offset)<.04)state.offset=state.targetOffset;else unsettled=true;if(Math.abs(state.targetScale-state.scale)<.0004)state.scale=state.targetScale;else unsettled=true;image.style.transform='translate3d(0,'+state.offset.toFixed(2)+'px,0) scale('+state.scale.toFixed(4)+')';image.style.transformOrigin='center';image.style.willChange='transform'});if(unsettled)imageScrollAnimationFrame=requestAnimationFrame(animateImageScrollEffects)};
+const updateImageScrollEffects=()=>{imageScrollMeasureFrame=0;if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;const center=innerHeight/2;document.querySelectorAll('img[data-ezkart-image-scroll]').forEach(image=>{const host=image.parentElement,rect=host?.getBoundingClientRect();if(!rect)return;const range=Math.max(1,(innerHeight+rect.height)/2),progress=Math.max(-1,Math.min(1,(rect.top+rect.height/2-center)/range)),stored=Number(image.dataset.ezkartImageScrollStrength),strength=Math.max(0,Math.min(100,Number.isFinite(stored)?stored:50)),effect=image.dataset.ezkartImageScroll;let offset=0,scale=1;if(effect==='parallax'){offset=progress*strength*.72;scale=1.06+strength/1000}if(effect==='parallax-reverse'){offset=progress*strength*-.72;scale=1.06+strength/1000}if(effect==='zoom')scale=1+(1-Math.abs(progress))*strength/400;if(offset)scale=Math.max(scale,1+Math.abs(offset)*2/Math.max(1,rect.height));const state=imageScrollStates.get(image);if(state){state.targetOffset=offset;state.targetScale=scale}else imageScrollStates.set(image,{offset,scale,targetOffset:offset,targetScale:scale})});if(!imageScrollAnimationFrame)imageScrollAnimationFrame=requestAnimationFrame(animateImageScrollEffects)};
+const scheduleImageScrollEffects=()=>{if(!imageScrollMeasureFrame)imageScrollMeasureFrame=requestAnimationFrame(updateImageScrollEffects)};
 addEventListener('scroll',scheduleImageScrollEffects,{passive:true});addEventListener('resize',scheduleImageScrollEffects,{passive:true});scheduleImageScrollEffects();
 document.querySelectorAll('[data-ezkart-variants]').forEach(controls=>{
   let variants=[];
