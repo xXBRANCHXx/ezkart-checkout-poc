@@ -5326,14 +5326,21 @@
     };
     sqStudio.querySelector("[data-sq-delete]")?.addEventListener("click", deleteSelectedSection);
 
+    const zoomSlider = sqStudio.querySelector("[data-sq-zoom-slider]");
     const setZoom = (value) => {
-      zoom = Math.max(60, Math.min(100, Math.round(value)));
+      const minimum = Number(zoomSlider?.min || 40);
+      zoom = Math.max(minimum, Math.min(100, Math.round(Number(value) || 100)));
       deviceFrame?.classList.remove("zoom-60", "zoom-70", "zoom-80", "zoom-90");
       if (deviceFrame) deviceFrame.style.zoom = zoom === 100 ? "" : String(zoom / 100);
-      const output = sqStudio.querySelector("[data-sq-zoom]"); if (output) output.textContent = `${zoom}%`;
+      sqStudio.querySelectorAll("[data-sq-zoom]").forEach((output) => { output.textContent = `${zoom}%`; });
+      if (zoomSlider) {
+        zoomSlider.value = String(zoom);
+        zoomSlider.style.setProperty("--sq-range-progress", `${((zoom - minimum) / (100 - minimum)) * 100}%`);
+      }
     };
     sqStudio.querySelector("[data-sq-zoom-out]")?.addEventListener("click", () => setZoom(zoom - 10));
     sqStudio.querySelector("[data-sq-zoom-in]")?.addEventListener("click", () => setZoom(zoom + 10));
+    zoomSlider?.addEventListener("input", () => setZoom(zoomSlider.value));
     sqStudio.querySelector("[data-sq-fit]")?.addEventListener("click", () => setZoom(fitZoomForDevice(activeDevice)));
     sqStudio.querySelector("[data-sq-close-inspector]")?.addEventListener("click", () => { inspector?.classList.add("collapsed"); sqStudio.classList.add("inspector-closed"); });
     const livePreviewDialog = document.getElementById("landing-preview-dialog");

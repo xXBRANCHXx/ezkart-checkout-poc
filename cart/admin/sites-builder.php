@@ -127,7 +127,18 @@ declare(strict_types=1);
           </article>
         </div>
       </div>
-      <footer class="sq-stage-footer"><span><i></i> Editable canvas</span><span data-sq-stage-size>Desktop · 1440px</span><span data-sq-commerce-status><?= ez_admin_icon('shield') ?> Checking commerce integrations…</span></footer>
+      <footer class="sq-stage-footer">
+        <span class="sq-stage-ready"><i></i> Editable canvas</span>
+        <div class="sq-stage-scale">
+          <span class="sq-stage-size" data-sq-stage-size>Desktop · 1440px</span>
+          <label>
+            <span>Page scale</span>
+            <input type="range" min="40" max="100" step="1" value="90" data-sq-zoom-slider aria-label="Page scale">
+            <output data-sq-zoom>90%</output>
+          </label>
+        </div>
+        <span data-sq-commerce-status><?= ez_admin_icon('shield') ?> Checking commerce integrations…</span>
+      </footer>
     </main>
 
     <aside class="sq-inspector">
