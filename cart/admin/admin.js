@@ -2395,6 +2395,7 @@
       if (!previewRoot) return "";
       const clone = previewRoot.cloneNode(true);
       clone.querySelectorAll(".sq-element-overlay, .sq-section-toolbar, .sq-layout-grid-overlay, .sq-section-height-handle").forEach((overlay) => overlay.remove());
+      clone.querySelectorAll('.sq-free-marquee .sq-marquee-copy[aria-hidden="true"]').forEach((copy) => copy.remove());
       clone.querySelectorAll(".sq-element-selected, .sq-image-selected, .sq-element-animate").forEach((element) => element.classList.remove("sq-element-selected", "sq-image-selected", "sq-element-animate"));
       return clone.innerHTML;
     };
@@ -3052,6 +3053,7 @@
       const isProductGrid = selectedElement.dataset.sqElementType === "product-grid";
       const isCode = selectedElement.dataset.sqElementType === "custom-code";
       const isComponentInstance = selectedElement.dataset.sqElementType === "component-instance";
+      const isMarquee = selectedElement.dataset.sqElementType === "marquee";
       const elementType = selectedElement.dataset.sqElementType || "";
       const typographyControls = sqStudio.querySelector("[data-sq-typography-controls]");
       if (typographyControls) typographyControls.hidden = ["image", "collage", "gallery", "divider", "spacer", "icon", "custom-code", "component-instance"].includes(elementType);
@@ -3232,6 +3234,20 @@
         if (textInput) textInput.value = textTarget.textContent.trim();
         if (textLabel) textLabel.textContent = textTarget.matches("h1,h2,h3") ? "Heading" : textTarget.matches("a") ? "Link label" : "Text content";
       }
+      const marqueeControls = sqStudio.querySelector("[data-sq-marquee-controls]");
+      if (marqueeControls) marqueeControls.hidden = !isMarquee;
+      if (isMarquee) {
+        const mode = marqueeMode(selectedElement);
+        const speed = marqueeSpeed(selectedElement);
+        const modeInput = sqStudio.querySelector("[data-sq-marquee-mode]");
+        const speedInput = sqStudio.querySelector("[data-sq-marquee-speed]");
+        const speedOutput = sqStudio.querySelector("[data-sq-marquee-speed-output]");
+        const modeNote = sqStudio.querySelector("[data-sq-marquee-mode-note]");
+        if (modeInput) modeInput.value = mode;
+        if (speedInput) speedInput.value = String(speed);
+        if (speedOutput) speedOutput.textContent = mode === "scroll" ? `${Math.round(speed / 60 * 100)}% scroll` : `${speed} px/s`;
+        if (modeNote) modeNote.textContent = mode === "scroll" ? "The strip moves with the visitor’s page scroll and reverses when they scroll up." : "Automatic movement loops continuously with no empty gap.";
+      }
       const reviewControls = sqStudio.querySelector("[data-sq-review-controls]");
       const isReview = elementType === "review";
       if (reviewControls) reviewControls.hidden = !isReview;
@@ -3276,7 +3292,7 @@
         if (device) device.textContent = activeDevice[0].toUpperCase() + activeDevice.slice(1);
       }
       const emptyContent = sqStudio.querySelector("[data-sq-element-content-empty]");
-      if (emptyContent) emptyContent.hidden = [textControls, reviewControls, logoControls, imageControls, buttonControls, codeControls, componentInstanceControls].some((control) => control && !control.hidden);
+      if (emptyContent) emptyContent.hidden = [textControls, marqueeControls, reviewControls, logoControls, imageControls, buttonControls, codeControls, componentInstanceControls].some((control) => control && !control.hidden);
       showElementPanel(activeElementPanel);
       syncBuilderRanges();
     };
@@ -3496,9 +3512,54 @@
       });
     };
 
+    const marqueeScrollRoot = sqStudio.querySelector(".sq-canvas-scroll");
+    const observedMarquees = new WeakSet();
+    let marqueeScrollFrame = 0;
+    const marqueeMode = (element) => element?.dataset.sqMarqueeMode === "scroll" ? "scroll" : "auto";
+    const marqueeSpeed = (element) => Math.max(20, Math.min(200, Number(element?.dataset.sqMarqueeSpeed) || 60));
+    const updateScrollLinkedMarquees = () => {
+      marqueeScrollFrame = 0;
+      const scrollPosition = marqueeScrollRoot?.scrollTop || 0;
+      previewRoot?.querySelectorAll('[data-sq-element-type="marquee"].sq-marquee-manual').forEach((element) => {
+        const track = element.querySelector(".sq-marquee-track");
+        const distance = Number.parseFloat(track?.style.getPropertyValue("--sq-marquee-distance")) || 1;
+        const offset = (scrollPosition * marqueeSpeed(element) / 60) % distance;
+        if (track) track.style.transform = `translate3d(${-offset}px,0,0)`;
+      });
+    };
+    const scheduleScrollLinkedMarquees = () => {
+      if (!marqueeScrollFrame) marqueeScrollFrame = window.requestAnimationFrame(updateScrollLinkedMarquees);
+    };
+    const syncMarqueeTrack = (element) => {
+      if (element?.dataset.sqElementType !== "marquee") return;
+      const track = element.querySelector(".sq-marquee-track");
+      const source = track?.querySelector(".sq-marquee-copy:not([aria-hidden])");
+      if (!track || !source) return;
+      track.querySelectorAll('.sq-marquee-copy[aria-hidden="true"]').forEach((copy) => copy.remove());
+      const copyWidth = Math.max(1, source.offsetWidth);
+      const copies = Math.max(2, Math.ceil(Math.max(1, element.clientWidth) / copyWidth) + 2);
+      for (let index = 1; index < copies; index += 1) {
+        const copy = source.cloneNode(true);
+        copy.removeAttribute("contenteditable");
+        copy.removeAttribute("data-sq-editable");
+        copy.setAttribute("aria-hidden", "true");
+        track.append(copy);
+      }
+      const speed = marqueeSpeed(element);
+      track.style.setProperty("--sq-marquee-distance", `${copyWidth}px`);
+      track.style.setProperty("--sq-marquee-duration", `${Math.max(2, copyWidth / speed)}s`);
+      const manual = marqueeMode(element) === "scroll";
+      element.classList.toggle("sq-marquee-manual", manual);
+      if (!manual) track.style.removeProperty("transform");
+      else scheduleScrollLinkedMarquees();
+    };
+    const marqueeResizeObserver = typeof ResizeObserver === "function" ? new ResizeObserver((entries) => entries.forEach((entry) => syncMarqueeTrack(entry.target))) : null;
+    marqueeScrollRoot?.addEventListener("scroll", scheduleScrollLinkedMarquees, { passive: true });
+    window.addEventListener("resize", () => previewRoot?.querySelectorAll('[data-sq-element-type="marquee"]').forEach(syncMarqueeTrack), { passive: true });
     const syncMarqueeCopies = (element, value, source = null) => {
       if (element?.dataset.sqElementType !== "marquee") return;
       element.querySelectorAll(".sq-marquee-copy").forEach((copy) => { if (copy !== source) copy.textContent = value; });
+      window.requestAnimationFrame(() => syncMarqueeTrack(element));
     };
     const editableContentSelector = [
       ".sq-announcement>p",
@@ -3681,6 +3742,10 @@
       previewRoot?.querySelectorAll(".animating, .sq-element-animate").forEach((element) => element.classList.remove("animating", "sq-element-animate"));
       previewRoot?.querySelectorAll('[data-sq-element-type="review"]').forEach((element) => renderReviewStars(element));
       previewRoot?.querySelectorAll('[data-sq-element-type="component-instance"]').forEach(syncComponentInstance);
+      previewRoot?.querySelectorAll('[data-sq-element-type="marquee"]').forEach((element) => {
+        syncMarqueeTrack(element);
+        if (!observedMarquees.has(element)) { observedMarquees.add(element); marqueeResizeObserver?.observe(element); }
+      });
       previewRoot?.querySelectorAll('[class*="hover-"]').forEach((element) => {
         [...element.classList].filter((name) => name.startsWith("hover-")).forEach((name) => element.classList.remove(name));
       });
@@ -4540,6 +4605,27 @@
       refreshElementOverlay(); markSqChanged();
     });
     sqStudio.querySelector("[data-sq-element-text]")?.addEventListener("change", () => { if (textControlSnapshot) remember(textControlSnapshot); textControlSnapshot = null; });
+    sqStudio.querySelector("[data-sq-marquee-mode]")?.addEventListener("change", (event) => {
+      if (selectedElement?.dataset.sqElementType !== "marquee") return;
+      remember();
+      selectedElement.dataset.sqMarqueeMode = event.currentTarget.value === "scroll" ? "scroll" : "auto";
+      syncMarqueeTrack(selectedElement);
+      syncElementControls();
+      markSqChanged();
+    });
+    let marqueeSpeedSnapshot;
+    const startMarqueeSpeedEdit = () => { if (!marqueeSpeedSnapshot && selectedElement?.dataset.sqElementType === "marquee") marqueeSpeedSnapshot = captureState(); };
+    const marqueeSpeedInput = sqStudio.querySelector("[data-sq-marquee-speed]");
+    marqueeSpeedInput?.addEventListener("pointerdown", startMarqueeSpeedEdit);
+    marqueeSpeedInput?.addEventListener("focus", startMarqueeSpeedEdit);
+    marqueeSpeedInput?.addEventListener("input", (event) => {
+      if (selectedElement?.dataset.sqElementType !== "marquee") return;
+      selectedElement.dataset.sqMarqueeSpeed = String(Math.max(20, Math.min(200, Number(event.currentTarget.value) || 60)));
+      syncMarqueeTrack(selectedElement);
+      syncElementControls();
+      markSqChanged();
+    });
+    marqueeSpeedInput?.addEventListener("change", () => { if (marqueeSpeedSnapshot) remember(marqueeSpeedSnapshot); marqueeSpeedSnapshot = null; });
     sqStudio.querySelectorAll("[data-sq-review-rating]").forEach((button) => button.addEventListener("click", () => {
       if (selectedElement?.dataset.sqElementType !== "review") return;
       remember();
@@ -5098,7 +5184,7 @@
     const newElementMarkup = (type) => {
       if (type === "heading") return `<div class="sq-free-element sq-free-heading" data-sq-element data-sq-element-type="heading"><h2>Write a powerful heading.</h2></div>`;
       if (type === "text") return `<div class="sq-free-element sq-free-text" data-sq-element data-sq-element-type="text"><p>Add your story, product details, or supporting copy here.</p></div>`;
-      if (type === "marquee") return `<div class="sq-free-element sq-free-marquee" data-sq-element data-sq-element-type="marquee"><div class="sq-marquee-track"><span class="sq-marquee-copy">NEW ARRIVALS ✦ SHOP THE DROP ✦ MADE FOR YOUR EVERYDAY ✦</span><span class="sq-marquee-copy" aria-hidden="true">NEW ARRIVALS ✦ SHOP THE DROP ✦ MADE FOR YOUR EVERYDAY ✦</span></div></div>`;
+      if (type === "marquee") return `<div class="sq-free-element sq-free-marquee" data-sq-element data-sq-element-type="marquee" data-sq-marquee-mode="auto" data-sq-marquee-speed="60"><div class="sq-marquee-track"><span class="sq-marquee-copy">NEW ARRIVALS ✦ SHOP THE DROP ✦ MADE FOR YOUR EVERYDAY ✦</span><span class="sq-marquee-copy" aria-hidden="true">NEW ARRIVALS ✦ SHOP THE DROP ✦ MADE FOR YOUR EVERYDAY ✦</span></div></div>`;
       if (type === "button") return `<div class="sq-free-element sq-free-button" data-sq-element data-sq-element-type="button"><button type="button">Call to action</button></div>`;
       if (type === "image") return `<div class="sq-free-element sq-free-image" data-sq-element data-sq-element-type="image"><img src="${productImages.granola}" alt="Product image"></div>`;
       if (type === "divider") return `<div class="sq-free-element sq-free-divider" data-sq-element data-sq-element-type="divider"><span></span></div>`;
@@ -5582,6 +5668,11 @@
         const source = element.querySelector("template[data-sq-code-source]")?.innerHTML || "";
         const content = document.createElement("template"); content.innerHTML = source; element.replaceChildren(content.content.cloneNode(true));
       });
+      clone.querySelectorAll('.sq-free-marquee[data-sq-element-type="marquee"]').forEach((element) => {
+        element.dataset.ezkartMarqueeMode = element.dataset.sqMarqueeMode === "scroll" ? "scroll" : "auto";
+        element.dataset.ezkartMarqueeSpeed = String(marqueeSpeed(element));
+        element.classList.toggle("sq-marquee-manual", element.dataset.ezkartMarqueeMode === "scroll");
+      });
       clone.querySelectorAll(".sq-block-handle, .sq-image-drag-handle, .sq-element-overlay, .sq-section-toolbar, .sq-layout-grid-overlay, .sq-section-height-handle, .section-hidden, .sq-element-hidden").forEach((node) => node.remove());
       clone.querySelectorAll("[data-product-card][hidden], [data-product-line][hidden], .sq-hero-collage > span[hidden]").forEach((node) => node.remove());
       clone.querySelectorAll("[data-section-id]").forEach((node) => { node.dataset.ezkartSection = node.dataset.sectionId; });
@@ -5637,6 +5728,12 @@
       const responsiveSpacing = `${spacingCssFor("desktop")}\n${fluidCssFor("desktop")}\n${elementCssFor("desktop")}\n${productCssFor("desktop")}\n@media(max-width:900px){${spacingCssFor("tablet")}\n${fluidCssFor("tablet")}\n${elementCssFor("tablet")}\n${productCssFor("tablet")}}\n@media(max-width:600px){${spacingCssFor("mobile")}\n${fluidCssFor("mobile")}\n${elementCssFor("mobile")}\n${productCssFor("mobile")}}`;
       const commerceScript = `<script>(()=>{
 const defaults=${JSON.stringify(selectedProducts())},cart=new Set(),money=value=>'Rp'+new Intl.NumberFormat('id-ID').format(value);
+let marqueeFrame=0;
+const marqueeSpeed=element=>Math.max(20,Math.min(200,Number(element.dataset.ezkartMarqueeSpeed)||60));
+const updateScrollMarquees=()=>{marqueeFrame=0;document.querySelectorAll('.sq-free-marquee.sq-marquee-manual').forEach(element=>{const track=element.querySelector('.sq-marquee-track'),distance=Number.parseFloat(track?.style.getPropertyValue('--sq-marquee-distance'))||1,offset=(scrollY*marqueeSpeed(element)/60)%distance;if(track)track.style.transform='translate3d('+-offset+'px,0,0)'})};
+const scheduleScrollMarquees=()=>{if(!marqueeFrame)marqueeFrame=requestAnimationFrame(updateScrollMarquees)};
+const syncMarquees=()=>{document.querySelectorAll('.sq-free-marquee').forEach(element=>{const track=element.querySelector('.sq-marquee-track'),source=track?.querySelector('.sq-marquee-copy:not([aria-hidden])');if(!track||!source)return;track.querySelectorAll('.sq-marquee-copy[aria-hidden="true"]').forEach(copy=>copy.remove());const width=Math.max(1,source.offsetWidth),copies=Math.max(2,Math.ceil(Math.max(1,element.clientWidth)/width)+2);for(let index=1;index<copies;index+=1){const copy=source.cloneNode(true);copy.removeAttribute('contenteditable');copy.setAttribute('aria-hidden','true');track.append(copy)}track.style.setProperty('--sq-marquee-distance',width+'px');track.style.setProperty('--sq-marquee-duration',Math.max(2,width/marqueeSpeed(element))+'s');const manual=element.dataset.ezkartMarqueeMode==='scroll';element.classList.toggle('sq-marquee-manual',manual);if(!manual)track.style.removeProperty('transform')});scheduleScrollMarquees()};
+addEventListener('scroll',scheduleScrollMarquees,{passive:true});addEventListener('resize',syncMarquees,{passive:true});document.fonts?.ready.then(syncMarquees);syncMarquees();
 document.querySelectorAll('[data-ezkart-variants]').forEach(controls=>{
   let variants=[];
   try{variants=JSON.parse(controls.dataset.ezkartVariants||'[]')}catch(_){return}
