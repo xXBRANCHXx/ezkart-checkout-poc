@@ -207,6 +207,7 @@
       status: page?.status === "published" ? "published" : "draft",
       thumbnailUpdatedAt,
       thumbnailBytes: Math.max(0, Math.round(Number(page?.thumbnailBytes) || 0)),
+      thumbnailVersion: String(page?.thumbnailVersion || ""),
       thumbnailUrl: id && thumbnailUpdatedAt
         ? `${cloudUrl(`/v1/landing-pages/${encodeURIComponent(id)}/thumbnail`)}&v=${encodeURIComponent(thumbnailUpdatedAt)}`
         : "",
@@ -2301,6 +2302,7 @@
     let thumbnailScheduleTimer = 0;
     const landingPageThumbnailIntervalMs = 10 * 60 * 1000;
     const landingPageThumbnailMaxBytes = 300 * 1024;
+    const landingPageThumbnailVersion = "2";
 
     const canvasBlob = (canvas, type, quality) => new Promise((resolve) => canvas.toBlob(resolve, type, quality));
     const blobDataUrl = (blob) => new Promise((resolve, reject) => {
@@ -2309,8 +2311,8 @@
       reader.onerror = () => reject(new Error("Thumbnail encoding failed."));
       reader.readAsDataURL(blob);
     });
-    const waitForThumbnailImages = async () => {
-      const pending = [...(previewRoot?.querySelectorAll("img") || [])]
+    const waitForThumbnailImages = async (root = previewRoot) => {
+      const pending = [...(root?.querySelectorAll("img") || [])]
         .filter((image) => !image.complete)
         .map((image) => new Promise((resolve) => {
           const finish = () => resolve();
@@ -2349,39 +2351,52 @@
     const refreshLandingThumbnailIfDue = () => {
       if (thumbnailCapturePromise || !previewRoot || !activeSiteDocument || typeof window.html2canvas !== "function") return thumbnailCapturePromise || Promise.resolve(false);
       const lastUpdate = Date.parse(activeSiteDocument.thumbnailUpdatedAt || "");
-      if (Number.isFinite(lastUpdate) && Date.now() - lastUpdate < landingPageThumbnailIntervalMs) return Promise.resolve(false);
+      if (activeSiteDocument.thumbnailVersion === landingPageThumbnailVersion && Number.isFinite(lastUpdate) && Date.now() - lastUpdate < landingPageThumbnailIntervalMs) return Promise.resolve(false);
       const landingId = landingPageId(activeSiteDocument.id || activeSiteKey);
       if (!landingId) return Promise.resolve(false);
       thumbnailCapturePromise = (async () => {
-        await waitForThumbnailImages();
+        const captureFrame = document.createElement("div");
+        captureFrame.className = "sq-device-frame sq-thumbnail-capture-frame";
+        captureFrame.setAttribute("aria-hidden", "true");
+        captureFrame.style.cssText = "position:fixed;z-index:-2147483647;left:0;top:0;width:1440px;max-width:none;pointer-events:none;overflow:hidden;";
+        const captureRoot = previewRoot.cloneNode(true);
+        captureRoot.dataset.sqThumbnailCaptureRoot = "";
+        captureRoot.style.width = "1440px";
+        captureRoot.style.maxWidth = "none";
+        captureRoot.style.overflow = "hidden";
+        captureRoot.querySelectorAll(".sq-element-overlay,.sq-section-toolbar,.sq-layout-grid-overlay,.sq-block-handle").forEach((element) => element.remove());
+        captureRoot.querySelectorAll(".selected,.sq-element-selected,.sq-image-selected,.sq-element-animate,.animating").forEach((element) => element.classList.remove("selected", "sq-element-selected", "sq-image-selected", "sq-element-animate", "animating"));
+        captureFrame.append(captureRoot);
+        document.body.append(captureFrame);
+        await waitForThumbnailImages(captureRoot);
         if (document.fonts?.ready) await document.fonts.ready.catch(() => {});
-        const sourceWidth = Math.max(320, previewRoot.scrollWidth || previewRoot.offsetWidth || 1440);
-        const sourceHeight = Math.min(previewRoot.scrollHeight || Math.round(sourceWidth * 9 / 16), Math.round(sourceWidth * 9 / 16));
-        const rendered = await window.html2canvas(previewRoot, {
-          allowTaint: false,
-          backgroundColor: getComputedStyle(previewRoot).getPropertyValue("--site-page").trim() || "#ffffff",
-          foreignObjectRendering: true,
-          height: sourceHeight,
-          imageTimeout: 5000,
-          logging: false,
-          onclone: (clonedDocument) => {
-            const clonedRoot = clonedDocument.querySelector("[data-sq-preview-root]");
-            clonedRoot?.querySelectorAll(".sq-element-overlay,.sq-section-toolbar,.sq-layout-grid-overlay,.sq-block-handle").forEach((element) => element.remove());
-            clonedRoot?.querySelectorAll(".selected,.sq-element-selected,.sq-image-selected,.sq-element-animate,.animating").forEach((element) => element.classList.remove("selected", "sq-element-selected", "sq-image-selected", "sq-element-animate", "animating"));
-          },
-          scale: 720 / sourceWidth,
-          useCORS: true,
-          width: sourceWidth,
-          windowHeight: sourceHeight,
-          windowWidth: sourceWidth,
-        });
+        const sourceWidth = 1440;
+        const sourceHeight = 810;
+        let rendered;
+        try {
+          rendered = await window.html2canvas(captureRoot, {
+            allowTaint: false,
+            backgroundColor: getComputedStyle(captureRoot).getPropertyValue("--site-page").trim() || "#ffffff",
+            foreignObjectRendering: true,
+            height: sourceHeight,
+            imageTimeout: 5000,
+            logging: false,
+            scale: 0.5,
+            useCORS: true,
+            width: sourceWidth,
+            windowHeight: sourceHeight,
+            windowWidth: sourceWidth,
+          });
+        } finally {
+          captureFrame.remove();
+        }
         const blob = await encodeLandingThumbnail(rendered);
         const result = await cloudRequest("PUT", `/v1/landing-pages/${encodeURIComponent(landingId)}/thumbnail`, { dataUrl: await blobDataUrl(blob) });
         const thumbnail = result.thumbnail || {};
         const current = cloudLandingPages.find((page) => page.id === landingId);
-        if (current && thumbnail.updatedAt) replaceCloudLandingPage({ ...current, thumbnailUpdatedAt: thumbnail.updatedAt, thumbnailBytes: thumbnail.bytes });
+        if (current && thumbnail.updatedAt) replaceCloudLandingPage({ ...current, thumbnailUpdatedAt: thumbnail.updatedAt, thumbnailBytes: thumbnail.bytes, thumbnailVersion: thumbnail.version });
         if (activeSiteDocument?.id === landingId && thumbnail.updatedAt) {
-          activeSiteDocument = normalizeCloudLandingPage({ ...activeSiteDocument, thumbnailUpdatedAt: thumbnail.updatedAt, thumbnailBytes: thumbnail.bytes });
+          activeSiteDocument = normalizeCloudLandingPage({ ...activeSiteDocument, thumbnailUpdatedAt: thumbnail.updatedAt, thumbnailBytes: thumbnail.bytes, thumbnailVersion: thumbnail.version });
         }
         return !thumbnail.skipped;
       })().catch((error) => {

@@ -10,6 +10,7 @@ const maximumLandingPagesPerSeller = 6;
 const maximumLandingPageBytes = 16000000;
 const maximumLandingPageThumbnailBytes = 300 * 1024;
 const landingPageThumbnailIntervalMilliseconds = 10 * 60 * 1000;
+const landingPageThumbnailVersion = "2";
 const maximumComponentsPerSeller = 20;
 const maximumComponentBytes = 200 * 1024;
 const abandonedUploadGraceMilliseconds = 24 * 60 * 60 * 1000;
@@ -368,6 +369,7 @@ const landingPageSummary = (page) => ({
   publishedAt: page.publishedAt || null,
   thumbnailUpdatedAt: page.thumbnailUpdatedAt || null,
   thumbnailBytes: Math.max(0, Math.round(Number(page.thumbnailBytes) || 0)),
+  thumbnailVersion: String(page.thumbnailVersion || ""),
 });
 
 async function landingPageObject(env, sellerId, id) {
@@ -391,6 +393,7 @@ async function landingPageWithThumbnailMetadata(env, sellerId, id) {
     ...page,
     thumbnailUpdatedAt: thumbnail?.customMetadata?.updatedAt || null,
     thumbnailBytes: Math.max(0, Math.round(Number(thumbnail?.size) || 0)),
+    thumbnailVersion: String(thumbnail?.customMetadata?.version || ""),
   };
 }
 
@@ -505,10 +508,11 @@ async function saveLandingPageThumbnail(request, env, rawId) {
   const previousThumbnail = await env.PRIVATE_ASSETS.head(landingPageThumbnailKey(seller.id, id));
   const previousUpdate = Date.parse(previousThumbnail?.customMetadata?.updatedAt || "");
   const nowMilliseconds = Date.now();
-  if (Number.isFinite(previousUpdate) && nowMilliseconds - previousUpdate < landingPageThumbnailIntervalMilliseconds) {
+  if (previousThumbnail?.customMetadata?.version === landingPageThumbnailVersion && Number.isFinite(previousUpdate) && nowMilliseconds - previousUpdate < landingPageThumbnailIntervalMilliseconds) {
     return {
       updatedAt: previousThumbnail.customMetadata.updatedAt,
       bytes: Math.max(0, Math.round(Number(previousThumbnail.size) || 0)),
+      version: landingPageThumbnailVersion,
       skipped: true,
     };
   }
@@ -517,9 +521,9 @@ async function saveLandingPageThumbnail(request, env, rawId) {
   const updatedAt = new Date(nowMilliseconds).toISOString();
   await env.PRIVATE_ASSETS.put(landingPageThumbnailKey(seller.id, id), thumbnail.bytes, {
     httpMetadata: { contentType: thumbnail.contentType },
-    customMetadata: { sellerId: seller.id, landingPageId: id, updatedAt },
+    customMetadata: { sellerId: seller.id, landingPageId: id, updatedAt, version: landingPageThumbnailVersion },
   });
-  return { updatedAt, bytes: thumbnail.bytes.byteLength, skipped: false };
+  return { updatedAt, bytes: thumbnail.bytes.byteLength, version: landingPageThumbnailVersion, skipped: false };
 }
 
 async function deleteLandingPage(request, env, rawId) {
