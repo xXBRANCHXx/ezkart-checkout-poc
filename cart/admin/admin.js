@@ -3823,6 +3823,7 @@
       previewRoot.innerHTML = state.preview;
       previewRoot.className = state.previewClass;
       if (state.previewStyle) previewRoot.setAttribute("style", state.previewStyle); else previewRoot.removeAttribute("style");
+      setExtraPageHeight(Number.parseFloat(previewRoot.style.getPropertyValue("--sq-page-extra-height")) || 0);
       upgradeLegacyStructure();
       rebuildLayerList();
       const productPicker = sqStudio.querySelector(".sq-product-picker");
@@ -5327,6 +5328,7 @@
     sqStudio.querySelector("[data-sq-delete]")?.addEventListener("click", deleteSelectedSection);
 
     const zoomSlider = sqStudio.querySelector("[data-sq-zoom-slider]");
+    const pageHeightHandle = sqStudio.querySelector("[data-sq-page-height-handle]");
     const setZoom = (value) => {
       const minimum = Number(zoomSlider?.min || 40);
       zoom = Math.max(minimum, Math.min(100, Math.round(Number(value) || 100)));
@@ -5342,6 +5344,49 @@
     sqStudio.querySelector("[data-sq-zoom-in]")?.addEventListener("click", () => setZoom(zoom + 10));
     zoomSlider?.addEventListener("input", () => setZoom(zoomSlider.value));
     sqStudio.querySelector("[data-sq-fit]")?.addEventListener("click", () => setZoom(fitZoomForDevice(activeDevice)));
+    const setExtraPageHeight = (value) => {
+      if (!previewRoot) return 0;
+      const next = Math.max(0, Math.min(6000, Math.round(Number(value) || 0)));
+      if (next > 0) previewRoot.style.setProperty("--sq-page-extra-height", `${next}px`);
+      else previewRoot.style.removeProperty("--sq-page-extra-height");
+      pageHeightHandle?.classList.toggle("has-extension", next > 0);
+      pageHeightHandle?.setAttribute("aria-valuenow", String(next));
+      pageHeightHandle?.setAttribute("aria-valuetext", next > 0 ? `${next} pixels of extra page height` : "Minimum page height");
+      return next;
+    };
+    pageHeightHandle?.addEventListener("pointerdown", (event) => {
+      if (!previewRoot) return;
+      event.preventDefault();
+      const snapshot = captureState();
+      const startY = event.clientY;
+      const startHeight = Number.parseFloat(previewRoot.style.getPropertyValue("--sq-page-extra-height")) || 0;
+      let currentHeight = startHeight;
+      pageHeightHandle.classList.add("dragging");
+      document.body.classList.add("sq-page-height-resizing");
+      const move = (pointerEvent) => {
+        currentHeight = setExtraPageHeight(startHeight + (pointerEvent.clientY - startY) / Math.max(.4, zoom / 100));
+      };
+      const end = () => {
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", end);
+        window.removeEventListener("pointercancel", end);
+        pageHeightHandle.classList.remove("dragging");
+        document.body.classList.remove("sq-page-height-resizing");
+        if (currentHeight !== startHeight) { remember(snapshot); markSqChanged(); }
+      };
+      window.addEventListener("pointermove", move);
+      window.addEventListener("pointerup", end, { once: true });
+      window.addEventListener("pointercancel", end, { once: true });
+    });
+    pageHeightHandle?.addEventListener("keydown", (event) => {
+      if (!["ArrowUp", "ArrowDown"].includes(event.key) || !previewRoot) return;
+      event.preventDefault();
+      const snapshot = captureState();
+      const current = Number.parseFloat(previewRoot.style.getPropertyValue("--sq-page-extra-height")) || 0;
+      setExtraPageHeight(current + (event.key === "ArrowDown" ? 40 : -40));
+      remember(snapshot); markSqChanged();
+    });
+    setExtraPageHeight(Number.parseFloat(previewRoot?.style.getPropertyValue("--sq-page-extra-height")) || 0);
     sqStudio.querySelector("[data-sq-close-inspector]")?.addEventListener("click", () => { inspector?.classList.add("collapsed"); sqStudio.classList.add("inspector-closed"); });
     const livePreviewDialog = document.getElementById("landing-preview-dialog");
     const livePreviewFrame = livePreviewDialog?.querySelector("[data-sq-live-preview-frame]");
