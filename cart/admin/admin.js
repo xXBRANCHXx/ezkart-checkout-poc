@@ -2298,6 +2298,7 @@
     let layoutGridDragging = false;
     let layoutGridTransient = false;
     let layoutGridTimer = 0;
+    let sectionHeightResizeTarget = null;
     let pageSpacingMode = false;
     let scheduleProductGridFit = () => {};
     let saveTimer;
@@ -2683,12 +2684,18 @@
         const sectionRect = section.getBoundingClientRect();
         const renderedScale = section.offsetWidth ? sectionRect.width / section.offsetWidth : zoom / 100;
         const renderedRowHeight = Math.max(1, fluidRowHeight(section) * renderedScale);
+        const wasDraggable = section.draggable;
         let currentRows = startRows;
-        selectSqSection(section.dataset.sectionId);
+        section.draggable = false;
+        handle.setPointerCapture?.(event.pointerId);
+        sectionHeightResizeTarget = section;
+        layoutGridDragging = true;
+        refreshLayoutGrid();
         handle.classList.add("dragging");
         document.body.classList.add("sq-section-height-resizing");
         const move = (pointerEvent) => {
           currentRows = setSectionHeightRows(section, startRows + Math.round((pointerEvent.clientY - startY) / renderedRowHeight));
+          refreshLayoutGrid();
           if (selectedElement?.isConnected && section.contains(selectedElement)) refreshElementOverlay();
         };
         const end = () => {
@@ -2696,7 +2703,11 @@
           window.removeEventListener("pointerup", end);
           window.removeEventListener("pointercancel", end);
           handle.classList.remove("dragging");
+          section.draggable = wasDraggable;
           document.body.classList.remove("sq-section-height-resizing");
+          layoutGridDragging = false;
+          sectionHeightResizeTarget = null;
+          if (showLayoutGrid) refreshLayoutGrid(); else removeLayoutGrid(true);
           if (currentRows !== startRows) { remember(snapshot); markSqChanged(); }
         };
         window.addEventListener("pointermove", move);
@@ -2755,7 +2766,7 @@
     const refreshLayoutGrid = () => {
       const visible = showLayoutGrid || layoutGridDragging || layoutGridTransient;
       if (!visible) { removeLayoutGrid(true); return; }
-      const section = selectedElement?.closest("[data-sq-fluid]") || previewRoot?.querySelector(`[data-section-id="${selectedSection}"][data-sq-fluid]`) || previewRoot?.querySelector("[data-sq-fluid]");
+      const section = sectionHeightResizeTarget || selectedElement?.closest("[data-sq-fluid]") || previewRoot?.querySelector(`[data-section-id="${selectedSection}"][data-sq-fluid]`) || previewRoot?.querySelector("[data-sq-fluid]");
       if (!section) return;
       previewRoot?.querySelectorAll(".sq-layout-grid-overlay").forEach((candidate) => { if (candidate.parentElement !== section) candidate.remove(); });
       const rows = Math.max(1, Number.parseInt(section.dataset.sqRows || section.dataset.sqMinRows || "12", 10));
