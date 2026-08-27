@@ -3289,7 +3289,7 @@
         const scrollStrengthOutput = sqStudio.querySelector("[data-sq-image-scroll-strength-output]");
         if (scrollEffectInput) scrollEffectInput.value = scrollEffect;
         if (scrollStrengthInput) { scrollStrengthInput.value = String(scrollStrength); scrollStrengthInput.disabled = scrollEffect === "none"; }
-        if (scrollStrengthOutput) scrollStrengthOutput.textContent = scrollStrength === 100 ? "100% · fixed" : scrollStrength === 0 ? "0% · normal" : `${scrollStrength}%`;
+        if (scrollStrengthOutput) scrollStrengthOutput.textContent = scrollStrength === 100 && scrollEffect === "parallax" ? "100% · fixed" : scrollStrength === 0 ? "0% · normal" : `${scrollStrength}%`;
       }
       const productControls = sqStudio.querySelector("[data-sq-product-layout-controls]");
       if (productControls) productControls.hidden = !isProductGrid;
@@ -3567,80 +3567,25 @@
     const marqueeResizeObserver = typeof ResizeObserver === "function" ? new ResizeObserver((entries) => entries.forEach((entry) => syncMarqueeTrack(entry.target))) : null;
     marqueeScrollRoot?.addEventListener("scroll", scheduleScrollLinkedMarquees, { passive: true });
     window.addEventListener("resize", () => previewRoot?.querySelectorAll('[data-sq-element-type="marquee"]').forEach(syncMarqueeTrack), { passive: true });
-    const imageScrollStrength = (image) => {
-      const stored = Number(image?.dataset.sqImageScrollStrength);
-      return Math.max(0, Math.min(100, Number.isFinite(stored) ? stored : 50));
-    };
     const imageScrollHostFor = (image) => image?.closest("[data-sq-image-item]") || image?.parentElement || null;
     const releaseImageScrollEffect = (image) => {
       const host = imageScrollHostFor(image);
       image?.style.removeProperty("--sq-image-scroll-media-height");
       image?.style.removeProperty("--sq-image-scroll-scale");
-      if (image) image.style.transform = "";
-      if (host && ![...host.querySelectorAll('img[data-sq-image-scroll]')].some((candidate) => candidate !== image && ["parallax", "parallax-deep", "parallax-reverse"].includes(candidate.dataset.sqImageScroll))) host.classList.remove("sq-image-scroll-host");
-    };
-    const applyImageScrollEffect = (image) => {
-      if (!image) return;
-      const strength = imageScrollStrength(image);
-      const effect = image.dataset.sqImageScroll;
-      if (!["parallax", "parallax-deep", "parallax-reverse"].includes(effect)) {
-        const host = imageScrollHostFor(image);
-        if (host && !host.querySelector('img[data-sq-image-scroll="parallax"],img[data-sq-image-scroll="parallax-deep"],img[data-sq-image-scroll="parallax-reverse"]')) host.classList.remove("sq-image-scroll-host");
-        image.style.setProperty("--sq-image-scroll-scale", String(1 + strength / 180));
-        return;
+      if (image) {
+        image.style.transform = "";
+        image.classList.remove("jarallax-img");
       }
-      const host = imageScrollHostFor(image);
-      if (!host) return;
-      host.classList.add("sq-image-scroll-host");
-      const frameWidth = deviceFrame?.getBoundingClientRect().width || 0;
-      const canvasScale = deviceFrame?.offsetWidth ? Math.max(.01, frameWidth / deviceFrame.offsetWidth) : 1;
-      const hostHeight = Math.max(1, host.clientHeight);
-      const viewportHeight = Math.max(1, (marqueeScrollRoot?.getBoundingClientRect().height || window.innerHeight) / canvasScale);
-      const amount = strength / 100;
-      image.style.setProperty("--sq-image-scroll-media-height", `${(hostHeight + (Math.max(hostHeight, viewportHeight) - hostHeight) * amount).toFixed(2)}px`);
+      if (host) {
+        host.classList.remove("sq-image-scroll-host", "jarallax");
+        host.removeAttribute("data-jarallax");
+        host.removeAttribute("data-speed");
+        host.removeAttribute("data-type");
+      }
     };
-    let imageScrollFrame = 0;
-    const updateImageScrollEffects = () => {
-      imageScrollFrame = 0;
-      if (!marqueeScrollRoot || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-      const viewport = marqueeScrollRoot.getBoundingClientRect();
-      const frameWidth = deviceFrame?.getBoundingClientRect().width || 0;
-      const canvasScale = deviceFrame?.offsetWidth ? Math.max(.01, frameWidth / deviceFrame.offsetWidth) : 1;
-      const viewportCenter = viewport.top + viewport.height / 2;
-      const updates = [...(previewRoot?.querySelectorAll('img[data-sq-image-scroll]:not([data-sq-image-scroll="none"])') || [])].map((image) => {
-        const host = imageScrollHostFor(image);
-        if (!host) return null;
-        return { image, effect: image.dataset.sqImageScroll, strength: imageScrollStrength(image), rect: host.getBoundingClientRect() };
-      }).filter(Boolean);
-      updates.forEach(({ image, effect, strength, rect }) => {
-        const amount = strength / 100;
-        const centerDelta = (viewportCenter - (rect.top + rect.height / 2)) / canvasScale;
-        if (["parallax", "parallax-deep", "parallax-reverse"].includes(effect)) {
-          const offset = centerDelta * amount * (effect === "parallax-reverse" ? -1 : 1);
-          image.style.transform = `translate3d(0,calc(-50% + ${offset.toFixed(2)}px),0)`;
-        } else if (effect === "zoom") {
-          const range = Math.max(1, (viewport.height + rect.height) / 2);
-          const proximity = 1 - Math.min(1, Math.abs(viewportCenter - (rect.top + rect.height / 2)) / range);
-          image.style.transform = `translate3d(0,0,0) scale(${(1 + proximity * strength / 180).toFixed(4)})`;
-        }
-      });
-    };
-    const observedImageScrollHosts = new WeakSet();
-    const imageScrollResizeObserver = typeof ResizeObserver === "function" ? new ResizeObserver(() => prepareImageScrollEffects()) : null;
-    const scheduleImageScrollFrame = () => {
-      if (!imageScrollFrame) imageScrollFrame = window.requestAnimationFrame(updateImageScrollEffects);
-    };
-    const prepareImageScrollEffects = () => {
-      previewRoot?.querySelectorAll('img[data-sq-image-scroll]:not([data-sq-image-scroll="none"])').forEach((image) => {
-      applyImageScrollEffect(image);
-      const host = imageScrollHostFor(image);
-      if (host && !observedImageScrollHosts.has(host)) { observedImageScrollHosts.add(host); imageScrollResizeObserver?.observe(host); }
-      });
-      scheduleImageScrollFrame();
-    };
-    const scheduleImageScrollEffects = prepareImageScrollEffects;
-    marqueeScrollRoot.addEventListener("scroll", scheduleImageScrollFrame, { passive: true });
-    window.addEventListener("resize", prepareImageScrollEffects, { passive: true });
+    // The editor canvas remains static. Production scroll effects run in Preview/export
+    // through Jarallax so authoring never competes with canvas scaling or drag gestures.
+    const scheduleImageScrollEffects = () => previewRoot?.querySelectorAll("img[data-sq-image-scroll]").forEach(releaseImageScrollEffect);
     const syncMarqueeCopies = (element, value, source = null) => {
       if (element?.dataset.sqElementType !== "marquee") return;
       element.querySelectorAll(".sq-marquee-copy").forEach((copy) => { if (copy !== source) copy.textContent = value; });
@@ -4861,7 +4806,7 @@
       if (image.dataset.sqImageScroll === "parallax-deep") image.dataset.sqImageScroll = "parallax";
       image.dataset.sqImageScrollStrength = event.currentTarget.value;
       const output = sqStudio.querySelector("[data-sq-image-scroll-strength-output]");
-      if (output) output.textContent = Number(event.currentTarget.value) === 100 ? "100% · fixed" : Number(event.currentTarget.value) === 0 ? "0% · normal" : `${event.currentTarget.value}%`;
+      if (output) output.textContent = Number(event.currentTarget.value) === 100 && image.dataset.sqImageScroll === "parallax" ? "100% · fixed" : Number(event.currentTarget.value) === 0 ? "0% · normal" : `${event.currentTarget.value}%`;
       scheduleImageScrollEffects(); markSqChanged();
     });
     imageScrollStrengthInput?.addEventListener("change", () => {
@@ -5805,13 +5750,28 @@
       clone.querySelectorAll("img[data-sq-image-scroll]").forEach((image) => {
         const effect = image.dataset.sqImageScroll === "parallax-deep" ? "parallax" : image.dataset.sqImageScroll || "none";
         const storedStrength = Number(image.dataset.sqImageScrollStrength);
-        if (effect !== "none") {
-          image.dataset.ezkartImageScroll = effect;
-          image.dataset.ezkartImageScrollStrength = String(Math.max(0, Math.min(100, Number.isFinite(storedStrength) ? storedStrength : 50)));
+        const strength = Math.max(0, Math.min(100, Number.isFinite(storedStrength) ? storedStrength : 50));
+        const host = image.closest("[data-sq-image-item]") || image.parentElement;
+        image.classList.remove("jarallax-img");
+        if (host) {
+          host.classList.remove("sq-image-scroll-host", "jarallax");
+          host.removeAttribute("data-jarallax");
+          host.removeAttribute("data-speed");
+          host.removeAttribute("data-type");
+        }
+        if (effect !== "none" && host) {
+          const speed = effect === "parallax" ? 1 - strength / 100 : effect === "parallax-reverse" ? 1 + strength / 100 : strength / 100;
+          host.classList.add("jarallax");
+          host.dataset.jarallax = "";
+          host.dataset.speed = speed.toFixed(2);
+          if (effect === "zoom") host.dataset.type = "scale";
+          image.classList.add("jarallax-img");
         }
         image.style.removeProperty("transform");
         image.style.removeProperty("transform-origin");
         image.style.removeProperty("will-change");
+        image.style.removeProperty("--sq-image-scroll-media-height");
+        image.style.removeProperty("--sq-image-scroll-scale");
       });
       clone.querySelectorAll(".sq-block-handle, .sq-image-drag-handle, .sq-element-overlay, .sq-section-toolbar, .sq-layout-grid-overlay, .sq-section-height-handle, .section-hidden, .sq-element-hidden").forEach((node) => node.remove());
       clone.querySelectorAll("[data-product-card][hidden], [data-product-line][hidden], .sq-hero-collage > span[hidden]").forEach((node) => node.remove());
@@ -5882,12 +5842,6 @@ const updateScrollMarquees=()=>{marqueeFrame=0;document.querySelectorAll('.sq-fr
 const scheduleScrollMarquees=()=>{if(!marqueeFrame)marqueeFrame=requestAnimationFrame(updateScrollMarquees)};
 const syncMarquees=()=>{document.querySelectorAll('.sq-free-marquee').forEach(element=>{const track=element.querySelector('.sq-marquee-track'),source=track?.querySelector('.sq-marquee-copy:not([aria-hidden])');if(!track||!source)return;track.querySelectorAll('.sq-marquee-copy[aria-hidden="true"]').forEach(copy=>copy.remove());const width=Math.max(1,source.offsetWidth),copies=Math.max(2,Math.ceil(Math.max(1,element.clientWidth)/width)+2);for(let index=1;index<copies;index+=1){const copy=source.cloneNode(true);copy.removeAttribute('contenteditable');copy.setAttribute('aria-hidden','true');track.append(copy)}track.style.setProperty('--sq-marquee-distance',width+'px');track.style.setProperty('--sq-marquee-duration',Math.max(2,width/marqueeSpeed(element))+'s');const manual=element.dataset.ezkartMarqueeMode==='scroll';element.classList.toggle('sq-marquee-manual',manual);if(!manual)track.style.removeProperty('transform')});scheduleScrollMarquees()};
 addEventListener('scroll',scheduleScrollMarquees,{passive:true});addEventListener('resize',syncMarquees,{passive:true});document.fonts?.ready.then(syncMarquees);syncMarquees();
-let imageScrollFrame=0;const imageScrollHosts=new WeakSet();
-const updateImageScrollEffects=()=>{imageScrollFrame=0;if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;const center=innerHeight/2,updates=[...document.querySelectorAll('img[data-ezkart-image-scroll]')].map(image=>{const host=image.closest('.sq-image-scroll-host')||image.parentElement;if(!host)return null;const stored=Number(image.dataset.ezkartImageScrollStrength);return{image,effect:image.dataset.ezkartImageScroll,strength:Math.max(0,Math.min(100,Number.isFinite(stored)?stored:50)),rect:host.getBoundingClientRect()}}).filter(Boolean);updates.forEach(({image,effect,strength,rect})=>{const amount=strength/100,delta=center-(rect.top+rect.height/2);if(effect==='parallax'||effect==='parallax-reverse')image.style.transform='translate3d(0,calc(-50% + '+(delta*amount*(effect==='parallax-reverse'?-1:1)).toFixed(2)+'px),0)';else if(effect==='zoom'){const range=Math.max(1,(innerHeight+rect.height)/2),proximity=1-Math.min(1,Math.abs(delta)/range);image.style.transform='translate3d(0,0,0) scale('+(1+proximity*strength/180).toFixed(4)+')'}})};
-const scheduleImageScrollFrame=()=>{if(!imageScrollFrame)imageScrollFrame=requestAnimationFrame(updateImageScrollEffects)};
-let imageScrollObserver=null;const prepareImageScrollEffects=()=>{document.querySelectorAll('img[data-ezkart-image-scroll]').forEach(image=>{const effect=image.dataset.ezkartImageScroll;if(effect!=='parallax'&&effect!=='parallax-reverse')return;const host=image.closest('.sq-image-scroll-host')||image.parentElement;if(!host)return;host.classList.add('sq-image-scroll-host');const stored=Number(image.dataset.ezkartImageScrollStrength),strength=Math.max(0,Math.min(100,Number.isFinite(stored)?stored:50)),hostHeight=Math.max(1,host.clientHeight),amount=strength/100;image.style.setProperty('--sq-image-scroll-media-height',(hostHeight+(Math.max(hostHeight,innerHeight)-hostHeight)*amount).toFixed(2)+'px');if(!imageScrollHosts.has(host)){imageScrollHosts.add(host);imageScrollObserver?.observe(host)}});scheduleImageScrollFrame()};
-imageScrollObserver=typeof ResizeObserver==='function'?new ResizeObserver(prepareImageScrollEffects):null;
-addEventListener('scroll',scheduleImageScrollFrame,{passive:true});addEventListener('resize',prepareImageScrollEffects,{passive:true});prepareImageScrollEffects();
 document.querySelectorAll('[data-ezkart-variants]').forEach(controls=>{
   let variants=[];
   try{variants=JSON.parse(controls.dataset.ezkartVariants||'[]')}catch(_){return}
@@ -5911,7 +5865,9 @@ document.querySelectorAll('[class*="animation-"],[class*="element-animation-"]')
       const fontMedium = new URL("assets/fonts/poppins-500.woff2", window.location.href).href;
       const fontSemibold = new URL("assets/fonts/poppins-600.woff2", window.location.href).href;
       const fontBold = new URL("assets/fonts/poppins-700.woff2", window.location.href).href;
-      return `<!doctype html>\n<html lang="id">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1">\n<title>${escapeHtml(pageName)}</title>\n<meta name="description" content="Shop selected Indonesian products with secure Ezkart checkout and delivery.">\n<style>@font-face{font-family:Poppins;src:url('${fontBase}') format('woff2');font-weight:400}@font-face{font-family:Poppins;src:url('${fontMedium}') format('woff2');font-weight:500}@font-face{font-family:Poppins;src:url('${fontSemibold}') format('woff2');font-weight:600}@font-face{font-family:Poppins;src:url('${fontBold}') format('woff2');font-weight:700}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:#fff;font-family:Poppins,Arial,sans-serif}.svg-sprite{width:0;height:0;position:absolute;overflow:hidden}@media(prefers-reduced-motion:reduce){*{animation:none!important;scroll-behavior:auto!important}}\n${css}\n${responsiveSpacing}\n</style>\n</head>\n<body>\n${sprite}\n${clone.outerHTML}\n${commerceScript}\n</body>\n</html>`;
+      const jarallaxCss = new URL("assets/vendor/jarallax.min.css", window.location.href).href;
+      const jarallaxJs = new URL("assets/vendor/jarallax.min.js", window.location.href).href;
+      return `<!doctype html>\n<html lang="id">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1">\n<title>${escapeHtml(pageName)}</title>\n<meta name="description" content="Shop selected Indonesian products with secure Ezkart checkout and delivery.">\n<link rel="stylesheet" href="${jarallaxCss}">\n<style>@font-face{font-family:Poppins;src:url('${fontBase}') format('woff2');font-weight:400}@font-face{font-family:Poppins;src:url('${fontMedium}') format('woff2');font-weight:500}@font-face{font-family:Poppins;src:url('${fontSemibold}') format('woff2');font-weight:600}@font-face{font-family:Poppins;src:url('${fontBold}') format('woff2');font-weight:700}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:#fff;font-family:Poppins,Arial,sans-serif}.svg-sprite{width:0;height:0;position:absolute;overflow:hidden}@media(prefers-reduced-motion:reduce){*{animation:none!important;scroll-behavior:auto!important}}\n${css}\n${responsiveSpacing}\n</style>\n</head>\n<body>\n${sprite}\n${clone.outerHTML}\n<script src="${jarallaxJs}"><\/script>\n${commerceScript}\n</body>\n</html>`;
     };
     sqStudio.querySelector("[data-sq-export]")?.addEventListener("click", () => {
       const html = generateHtml(); const output = exportDialog?.querySelector("[data-sq-html-output]"); if (output) output.value = html; const size = exportDialog?.querySelector("[data-sq-html-size]"); if (size) size.textContent = `${new Blob([html]).size.toLocaleString("id-ID")} bytes · ready to host`; exportDialog?.showModal();
