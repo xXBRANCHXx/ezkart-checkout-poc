@@ -209,7 +209,7 @@
       thumbnailUpdatedAt,
       thumbnailBytes: Math.max(0, Math.round(Number(page?.thumbnailBytes) || 0)),
       thumbnailVersion: String(page?.thumbnailVersion || ""),
-      thumbnailUrl: id && thumbnailUpdatedAt && String(page?.thumbnailVersion || "") === landingPageThumbnailVersion
+      thumbnailUrl: id && thumbnailUpdatedAt
         ? `${cloudUrl(`/v1/landing-pages/${encodeURIComponent(id)}/thumbnail`)}&v=${encodeURIComponent(thumbnailUpdatedAt)}`
         : "",
     };
