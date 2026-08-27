@@ -2670,15 +2670,17 @@
       }
       handle.draggable = false;
       handle.setAttribute("aria-label", `Resize ${String(section.dataset.sectionId || "page").replace(/-/g, " ")} section`);
-      const minimum = sectionContentRows(section);
-      const rows = Math.max(minimum, Number.parseInt(section.dataset.sqRows || section.dataset.sqMinRows || String(minimum), 10));
-      handle.setAttribute("aria-valuemin", String(minimum));
+      const initialMinimum = sectionContentRows(section);
+      const rows = Math.max(initialMinimum, Number.parseInt(section.dataset.sqRows || section.dataset.sqMinRows || String(initialMinimum), 10));
+      handle.setAttribute("aria-valuemin", String(initialMinimum));
       handle.setAttribute("aria-valuenow", String(rows));
       handle.setAttribute("aria-valuetext", `${rows} grid rows`);
       handle.onclick = (event) => event.stopPropagation();
       handle.onpointerdown = (event) => {
         event.preventDefault();
         event.stopPropagation();
+        const minimum = sectionContentRows(section);
+        handle.setAttribute("aria-valuemin", String(minimum));
         const snapshot = captureState();
         const startY = event.clientY;
         const startRows = Math.max(minimum, Number.parseInt(section.dataset.sqRows || String(minimum), 10));
@@ -2732,6 +2734,8 @@
       handle.onkeydown = (event) => {
         if (!["ArrowUp", "ArrowDown"].includes(event.key)) return;
         event.preventDefault(); event.stopPropagation();
+        const minimum = sectionContentRows(section);
+        handle.setAttribute("aria-valuemin", String(minimum));
         const snapshot = captureState();
         const current = Number.parseInt(section.dataset.sqRows || String(minimum), 10);
         const next = setSectionHeightRows(section, current + (event.key === "ArrowDown" ? 1 : -1));
