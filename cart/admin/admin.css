@@ -1144,6 +1144,27 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .dashboard-page .landing-library-header > div:first-child > p:last-child,
 .dashboard-page .landing-library-summary strong small { font-size: 13px; }
 
+/* The project library uses the latest real page capture once it has loaded. */
+.landing-project-preview.has-thumbnail { background: #fff; }
+.project-page-thumbnail {
+  position: absolute;
+  z-index: 1;
+  inset: 27px 0 0;
+  overflow: hidden;
+  background: #fff;
+  opacity: 0;
+  transition: opacity .22s ease;
+}
+.project-page-thumbnail img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  object-position: top center;
+}
+.landing-project-preview.thumbnail-ready .project-page-thumbnail { opacity: 1; }
+.landing-project-preview.thumbnail-ready .project-mini-page { visibility: hidden; }
+
 .dashboard-page .product-editor small { font-size: 10px; }
 .dashboard-page .product-editor p,
 .dashboard-page .product-editor :is(input, select, textarea, button),

@@ -684,7 +684,7 @@ function ez_admin_sync_cloudflare_user(string $accessToken): array
 
 function ez_admin_proxy_cloud_request(string $accessToken, string $path, string $method): never
 {
-    $allowedPath = preg_match('#^/v1/(?:catalog|media(?:/[a-zA-Z0-9_-]+)?|products/[a-zA-Z0-9_-]+(?:/duplicate)?|drafts/[a-zA-Z0-9_-]+|landing-pages(?:/[a-z0-9-]+)?|components(?:/[a-z0-9-]+)?)$#', $path) === 1;
+    $allowedPath = preg_match('#^/v1/(?:catalog|media(?:/[a-zA-Z0-9_-]+)?|products/[a-zA-Z0-9_-]+(?:/duplicate)?|drafts/[a-zA-Z0-9_-]+|landing-pages(?:/[a-z0-9-]+(?:/thumbnail)?)?|components(?:/[a-z0-9-]+)?)$#', $path) === 1;
     if (!$allowedPath || str_contains($path, '?') || str_contains($path, '#')) {
         ez_admin_json(['ok' => false, 'error' => 'Cloud data path is not allowed.'], 400);
     }
@@ -708,11 +708,14 @@ function ez_admin_proxy_cloud_request(string $accessToken, string $path, string 
 
     $isMediaRequest = $method === 'GET'
         && preg_match('#^/v1/media/[a-zA-Z0-9_-]+$#', $path) === 1;
+    $isThumbnailRequest = $method === 'GET'
+        && preg_match('#^/v1/landing-pages/[a-z0-9-]+/thumbnail$#', $path) === 1;
+    $isImageRequest = $isMediaRequest || $isThumbnailRequest;
     $handle = curl_init($apiUrl . $path);
     if ($handle === false) ez_admin_json(['ok' => false, 'error' => 'Cloud request could not start.'], 503);
     $headers = ['Accept: application/json', 'Authorization: Bearer ' . $accessToken];
     if ($body !== '') $headers[] = 'Content-Type: application/json';
-    if ($isMediaRequest) {
+    if ($isImageRequest) {
         foreach (['HTTP_IF_NONE_MATCH' => 'If-None-Match', 'HTTP_IF_MODIFIED_SINCE' => 'If-Modified-Since'] as $serverKey => $headerName) {
             $conditionalValue = trim((string) ($_SERVER[$serverKey] ?? ''));
             if ($conditionalValue !== '' && strlen($conditionalValue) <= 512 && !preg_match('/[\r\n]/', $conditionalValue)) {
@@ -751,8 +754,8 @@ function ez_admin_proxy_cloud_request(string $accessToken, string $path, string 
         ez_admin_json(['ok' => false, 'error' => 'Cloud product storage could not be reached.'], 503);
     }
     http_response_code($status > 0 ? $status : 502);
-    if ($isMediaRequest && in_array($status, [200, 304], true)) {
-        header('Cache-Control: private, max-age=31536000, immutable');
+    if ($isImageRequest && in_array($status, [200, 304], true)) {
+        header('Cache-Control: ' . ($isThumbnailRequest ? 'private, max-age=600' : 'private, max-age=31536000, immutable'));
         foreach (['etag' => 'ETag', 'last-modified' => 'Last-Modified'] as $key => $headerName) {
             if (($upstreamHeaders[$key] ?? '') !== '') header($headerName . ': ' . $upstreamHeaders[$key]);
         }
@@ -1392,6 +1395,7 @@ $catalogInventory = $legacyDataAccess ? [
 $adminCssVersion = (string) (@filemtime(__DIR__ . '/admin.css') ?: 1);
 $catalogCssVersion = (string) (@filemtime(__DIR__ . '/catalog.css') ?: 1);
 $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
+$html2CanvasVersion = (string) (@filemtime(__DIR__ . '/assets/vendor/html2canvas.min.js') ?: 1);
 ?>
 <!doctype html>
 <html lang="id">
@@ -1688,6 +1692,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
   <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
   <script src="assets/vendor/leaflet.js"></script>
   <?php if ($page === 'settings' && $mfaSetup !== null): ?><script src="assets/vendor/qrcode-generator.min.js"></script><?php endif; ?>
+  <?php if ($siteEditor): ?><script src="assets/vendor/html2canvas.min.js?v=<?= ez_admin_escape($html2CanvasVersion) ?>"></script><?php endif; ?>
   <script src="admin.js?v=<?= ez_admin_escape($adminJsVersion) ?>"></script>
 <?php endif; ?>
 </body>

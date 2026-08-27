@@ -197,12 +197,21 @@
         : variant.customImage || null,
     })),
   });
-  const normalizeCloudLandingPage = (page) => ({
-    ...page,
-    products: Array.isArray(page?.products) ? page.products : [],
-    customProducts: Array.isArray(page?.customProducts) ? page.customProducts : [],
-    status: page?.status === "published" ? "published" : "draft",
-  });
+  const normalizeCloudLandingPage = (page) => {
+    const id = String(page?.id || "");
+    const thumbnailUpdatedAt = page?.thumbnailUpdatedAt || null;
+    return {
+      ...page,
+      products: Array.isArray(page?.products) ? page.products : [],
+      customProducts: Array.isArray(page?.customProducts) ? page.customProducts : [],
+      status: page?.status === "published" ? "published" : "draft",
+      thumbnailUpdatedAt,
+      thumbnailBytes: Math.max(0, Math.round(Number(page?.thumbnailBytes) || 0)),
+      thumbnailUrl: id && thumbnailUpdatedAt
+        ? `${cloudUrl(`/v1/landing-pages/${encodeURIComponent(id)}/thumbnail`)}&v=${encodeURIComponent(thumbnailUpdatedAt)}`
+        : "",
+    };
+  };
   const componentLimits = { count: 20, bytes: 200 * 1024 };
   const componentBytes = (value) => new TextEncoder().encode(String(value || "")).byteLength;
   const normalizeCloudComponent = (component) => ({
@@ -1687,6 +1696,10 @@
     const projectCard = (site) => {
       const tone = projectTone(site.products);
       const href = `?page=sites&edit=${encodeURIComponent(site.url)}`;
+      const fallbackPreview = `<span class="project-mini-page"><span><b>${escapeHtml(site.name)}</b><em>Shop now</em></span><span class="product-art"><img src="${projectImage(site)}" alt="" loading="lazy"></span><i></i><i></i><i></i></span>`;
+      const pagePreview = site.thumbnailUrl
+        ? `<span class="project-page-thumbnail"><img src="${escapeHtml(site.thumbnailUrl)}" alt="Current preview of ${escapeHtml(site.name)}" loading="lazy" decoding="async"></span>${fallbackPreview}`
+        : fallbackPreview;
       const card = document.createElement("article");
       card.className = "landing-project-card";
       card.dataset.projectCard = "";
@@ -1694,7 +1707,11 @@
       card.dataset.siteName = site.name;
       card.dataset.siteUrl = site.url;
       const published = site.status === "published";
-      card.innerHTML = `<a class="landing-project-preview tone-${tone}" href="${href}" aria-label="Edit ${escapeHtml(site.name)}"><span class="project-browser"><i></i><i></i><i></i><small>${escapeHtml(site.url)}</small></span><span class="project-mini-page"><span><b>${escapeHtml(site.name)}</b><em>Shop now</em></span><span class="product-art"><img src="${projectImage(site)}" alt="" loading="lazy"></span><i></i><i></i><i></i></span><span class="project-edit-hint">Open editor</span></a><div class="landing-project-details"><div><span class="project-status ${published ? "live" : "draft"}"><i></i>${published ? "Published" : "Draft"}</span><h2><a href="${href}">${escapeHtml(site.name)}</a></h2><p>Your R2-backed storefront project, ready for responsive editing.</p></div><button type="button" data-project-menu aria-label="Project actions"><svg class="icon" aria-hidden="true"><use href="#icon-settings"></use></svg></button></div><footer><span><svg class="icon" aria-hidden="true"><use href="#icon-globe"></use></svg>${escapeHtml(site.url)}</span><a href="${href}">Edit page <svg class="icon" aria-hidden="true"><use href="#icon-chevron-right"></use></svg></a></footer>`;
+      card.innerHTML = `<a class="landing-project-preview tone-${tone}${site.thumbnailUrl ? " has-thumbnail" : ""}" href="${href}" aria-label="Edit ${escapeHtml(site.name)}"><span class="project-browser"><i></i><i></i><i></i><small>${escapeHtml(site.url)}</small></span>${pagePreview}<span class="project-edit-hint">Open editor</span></a><div class="landing-project-details"><div><span class="project-status ${published ? "live" : "draft"}"><i></i>${published ? "Published" : "Draft"}</span><h2><a href="${href}">${escapeHtml(site.name)}</a></h2><p>Your R2-backed storefront project, ready for responsive editing.</p></div><button type="button" data-project-menu aria-label="Project actions"><svg class="icon" aria-hidden="true"><use href="#icon-settings"></use></svg></button></div><footer><span><svg class="icon" aria-hidden="true"><use href="#icon-globe"></use></svg>${escapeHtml(site.url)}</span><a href="${href}">Edit page <svg class="icon" aria-hidden="true"><use href="#icon-chevron-right"></use></svg></a></footer>`;
+      const thumbnail = card.querySelector(".project-page-thumbnail img");
+      thumbnail?.addEventListener("load", () => card.querySelector(".landing-project-preview")?.classList.add("thumbnail-ready"));
+      thumbnail?.addEventListener("error", () => card.querySelector(".project-page-thumbnail")?.remove());
+      if (thumbnail?.complete && thumbnail.naturalWidth > 0) card.querySelector(".landing-project-preview")?.classList.add("thumbnail-ready");
       return card;
     };
     const closeProjectMenu = () => document.querySelector(".landing-project-menu")?.remove();
@@ -2280,6 +2297,103 @@
     let siteLoadRequest = 0;
     let cloudSavePromise = Promise.resolve(true);
     let baseSiteState = null;
+    let thumbnailCapturePromise = null;
+    let thumbnailScheduleTimer = 0;
+    const landingPageThumbnailIntervalMs = 10 * 60 * 1000;
+    const landingPageThumbnailMaxBytes = 300 * 1024;
+
+    const canvasBlob = (canvas, type, quality) => new Promise((resolve) => canvas.toBlob(resolve, type, quality));
+    const blobDataUrl = (blob) => new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ""));
+      reader.onerror = () => reject(new Error("Thumbnail encoding failed."));
+      reader.readAsDataURL(blob);
+    });
+    const waitForThumbnailImages = async () => {
+      const pending = [...(previewRoot?.querySelectorAll("img") || [])]
+        .filter((image) => !image.complete)
+        .map((image) => new Promise((resolve) => {
+          const finish = () => resolve();
+          image.addEventListener("load", finish, { once: true });
+          image.addEventListener("error", finish, { once: true });
+        }));
+      if (!pending.length) return;
+      await Promise.race([
+        Promise.all(pending),
+        new Promise((resolve) => window.setTimeout(resolve, 4000)),
+      ]);
+    };
+    const encodeLandingThumbnail = async (sourceCanvas) => {
+      const output = document.createElement("canvas");
+      output.width = 720;
+      output.height = 405;
+      const context = output.getContext("2d", { alpha: false });
+      if (!context) throw new Error("Thumbnail canvas is unavailable.");
+      context.fillStyle = "#ffffff";
+      context.fillRect(0, 0, output.width, output.height);
+      context.drawImage(sourceCanvas, 0, 0, sourceCanvas.width, sourceCanvas.height, 0, 0, output.width, output.height);
+      let blob = null;
+      for (const quality of [0.64, 0.54, 0.44, 0.34]) {
+        blob = await canvasBlob(output, "image/webp", quality);
+        if (blob?.type === "image/webp" && blob.size <= landingPageThumbnailMaxBytes) break;
+      }
+      if (!blob || blob.type !== "image/webp") {
+        for (const quality of [0.58, 0.46, 0.34]) {
+          blob = await canvasBlob(output, "image/jpeg", quality);
+          if (blob && blob.size <= landingPageThumbnailMaxBytes) break;
+        }
+      }
+      if (!blob || blob.size > landingPageThumbnailMaxBytes) throw new Error("Thumbnail could not be compressed below 300 KB.");
+      return blob;
+    };
+    const refreshLandingThumbnailIfDue = () => {
+      if (thumbnailCapturePromise || !previewRoot || !activeSiteDocument || typeof window.html2canvas !== "function") return thumbnailCapturePromise || Promise.resolve(false);
+      const lastUpdate = Date.parse(activeSiteDocument.thumbnailUpdatedAt || "");
+      if (Number.isFinite(lastUpdate) && Date.now() - lastUpdate < landingPageThumbnailIntervalMs) return Promise.resolve(false);
+      const landingId = landingPageId(activeSiteDocument.id || activeSiteKey);
+      if (!landingId) return Promise.resolve(false);
+      thumbnailCapturePromise = (async () => {
+        await waitForThumbnailImages();
+        if (document.fonts?.ready) await document.fonts.ready.catch(() => {});
+        const sourceWidth = Math.max(320, previewRoot.scrollWidth || previewRoot.offsetWidth || 1440);
+        const sourceHeight = Math.min(previewRoot.scrollHeight || Math.round(sourceWidth * 9 / 16), Math.round(sourceWidth * 9 / 16));
+        const rendered = await window.html2canvas(previewRoot, {
+          allowTaint: false,
+          backgroundColor: getComputedStyle(previewRoot).getPropertyValue("--site-page").trim() || "#ffffff",
+          foreignObjectRendering: true,
+          height: sourceHeight,
+          imageTimeout: 5000,
+          logging: false,
+          onclone: (clonedDocument) => {
+            const clonedRoot = clonedDocument.querySelector("[data-sq-preview-root]");
+            clonedRoot?.querySelectorAll(".sq-element-overlay,.sq-section-toolbar,.sq-layout-grid-overlay,.sq-block-handle").forEach((element) => element.remove());
+            clonedRoot?.querySelectorAll(".selected,.sq-element-selected,.sq-image-selected,.sq-element-animate,.animating").forEach((element) => element.classList.remove("selected", "sq-element-selected", "sq-image-selected", "sq-element-animate", "animating"));
+          },
+          scale: 720 / sourceWidth,
+          useCORS: true,
+          width: sourceWidth,
+          windowHeight: sourceHeight,
+          windowWidth: sourceWidth,
+        });
+        const blob = await encodeLandingThumbnail(rendered);
+        const result = await cloudRequest("PUT", `/v1/landing-pages/${encodeURIComponent(landingId)}/thumbnail`, { dataUrl: await blobDataUrl(blob) });
+        const thumbnail = result.thumbnail || {};
+        const current = cloudLandingPages.find((page) => page.id === landingId);
+        if (current && thumbnail.updatedAt) replaceCloudLandingPage({ ...current, thumbnailUpdatedAt: thumbnail.updatedAt, thumbnailBytes: thumbnail.bytes });
+        if (activeSiteDocument?.id === landingId && thumbnail.updatedAt) {
+          activeSiteDocument = normalizeCloudLandingPage({ ...activeSiteDocument, thumbnailUpdatedAt: thumbnail.updatedAt, thumbnailBytes: thumbnail.bytes });
+        }
+        return !thumbnail.skipped;
+      })().catch((error) => {
+        console.warn("Landing page thumbnail refresh skipped:", error);
+        return false;
+      }).finally(() => { thumbnailCapturePromise = null; });
+      return thumbnailCapturePromise;
+    };
+    const scheduleLandingThumbnailRefresh = (delay = 1200) => {
+      window.clearTimeout(thumbnailScheduleTimer);
+      thumbnailScheduleTimer = window.setTimeout(() => { void refreshLandingThumbnailIfDue(); }, delay);
+    };
 
     const builderSidebar = sqStudio.querySelector(".sq-builder-sidebar");
     const openSqPanel = (name, { pin = false } = {}) => {
@@ -2335,6 +2449,7 @@
       cloudSavePromise = cloudSavePromise.catch(() => false).then(async () => {
         try {
           activeSiteDocument = await saveCloudLandingPage(site, { state, ...changes });
+          scheduleLandingThumbnailRefresh();
           return true;
         } catch (error) {
           if (saveState) saveState.textContent = "Cloud save failed";
@@ -5421,6 +5536,7 @@ document.querySelectorAll('[class*="animation-"],[class*="element-animation-"]')
           updateProductView(); markSqChanged();
         }
         deselectSqItem(state?.selectedSection || "hero");
+        scheduleLandingThumbnailRefresh(1600);
         showToast(`${site.dataset.siteName} loaded from R2`);
       } finally {
         window.requestAnimationFrame(() => {

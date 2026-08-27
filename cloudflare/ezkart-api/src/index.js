@@ -8,6 +8,8 @@ const publicImmutableImageCacheControl = "public, max-age=31536000, immutable";
 const maximumProductsPerSeller = 10;
 const maximumLandingPagesPerSeller = 6;
 const maximumLandingPageBytes = 16000000;
+const maximumLandingPageThumbnailBytes = 300 * 1024;
+const landingPageThumbnailIntervalMilliseconds = 10 * 60 * 1000;
 const maximumComponentsPerSeller = 20;
 const maximumComponentBytes = 200 * 1024;
 const abandonedUploadGraceMilliseconds = 24 * 60 * 60 * 1000;
@@ -341,6 +343,7 @@ async function catalog(request, env) {
 
 const landingPagePrefix = (sellerId) => `sellers/${sellerId}/landing-pages/`;
 const landingPageKey = (sellerId, id) => `${landingPagePrefix(sellerId)}${id}.json`;
+const landingPageThumbnailKey = (sellerId, id) => `sellers/${sellerId}/landing-page-thumbnails/${id}`;
 const cleanLandingPageId = (value) => {
   const id = String(value || "").trim().toLowerCase();
   if (id.length < 1 || id.length > 48 || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id)) {
@@ -363,6 +366,8 @@ const landingPageSummary = (page) => ({
   createdAt: page.createdAt,
   updatedAt: page.updatedAt,
   publishedAt: page.publishedAt || null,
+  thumbnailUpdatedAt: page.thumbnailUpdatedAt || null,
+  thumbnailBytes: Math.max(0, Math.round(Number(page.thumbnailBytes) || 0)),
 });
 
 async function landingPageObject(env, sellerId, id) {
@@ -377,6 +382,18 @@ async function landingPageObject(env, sellerId, id) {
   }
 }
 
+async function landingPageWithThumbnailMetadata(env, sellerId, id) {
+  const [page, thumbnail] = await Promise.all([
+    landingPageObject(env, sellerId, id),
+    env.PRIVATE_ASSETS.head(landingPageThumbnailKey(sellerId, id)),
+  ]);
+  return {
+    ...page,
+    thumbnailUpdatedAt: thumbnail?.customMetadata?.updatedAt || null,
+    thumbnailBytes: Math.max(0, Math.round(Number(thumbnail?.size) || 0)),
+  };
+}
+
 async function landingPages(request, env) {
   const { seller } = await sellerContext(request, env);
   const objects = [];
@@ -388,14 +405,14 @@ async function landingPages(request, env) {
   } while (cursor);
   const pages = await Promise.all(objects.map(async (object) => {
     const id = object.key.slice(landingPagePrefix(seller.id).length, -5);
-    return landingPageSummary(await landingPageObject(env, seller.id, id));
+    return landingPageSummary(await landingPageWithThumbnailMetadata(env, seller.id, id));
   }));
   return pages.sort((left, right) => String(right.updatedAt || "").localeCompare(String(left.updatedAt || "")));
 }
 
 async function landingPage(request, env, rawId) {
   const { seller } = await sellerContext(request, env);
-  return landingPageObject(env, seller.id, cleanLandingPageId(rawId));
+  return landingPageWithThumbnailMetadata(env, seller.id, cleanLandingPageId(rawId));
 }
 
 async function saveLandingPage(request, env, rawId) {
@@ -449,7 +466,60 @@ async function saveLandingPage(request, env, rawId) {
     httpMetadata: { contentType: "application/json; charset=utf-8" },
     customMetadata: { sellerId: seller.id, landingPageId: id, status, updatedAt: now },
   });
-  return page;
+  return landingPageWithThumbnailMetadata(env, seller.id, id);
+}
+
+const decodeLandingPageThumbnail = (dataUrl) => {
+  const match = /^data:image\/(webp|jpeg);base64,([a-zA-Z0-9+/=]+)$/.exec(String(dataUrl || ""));
+  if (!match) throw new Response("Thumbnail must be a WebP or JPEG data URL", { status: 400 });
+  let decoded;
+  try { decoded = atob(match[2]); } catch (_) { throw new Response("Thumbnail data is invalid", { status: 400 }); }
+  if (decoded.length < 1 || decoded.length > maximumLandingPageThumbnailBytes) {
+    throw new Response(`Thumbnail must be ${maximumLandingPageThumbnailBytes} bytes or smaller`, { status: 413 });
+  }
+  return {
+    bytes: Uint8Array.from(decoded, (character) => character.charCodeAt(0)),
+    contentType: match[1] === "jpeg" ? "image/jpeg" : "image/webp",
+  };
+};
+
+async function landingPageThumbnail(request, env, rawId) {
+  const { seller } = await sellerContext(request, env);
+  const id = cleanLandingPageId(rawId);
+  await landingPageObject(env, seller.id, id);
+  const object = await env.PRIVATE_ASSETS.get(landingPageThumbnailKey(seller.id, id));
+  if (!object) throw new Response("Landing page thumbnail not found", { status: 404 });
+  const headers = new Headers({
+    "content-type": object.httpMetadata?.contentType || "image/webp",
+    "cache-control": "private, max-age=600",
+    "x-content-type-options": "nosniff",
+  });
+  if (object.httpEtag) headers.set("etag", object.httpEtag);
+  return new Response(object.body, { status: 200, headers });
+}
+
+async function saveLandingPageThumbnail(request, env, rawId) {
+  const { seller } = await sellerContext(request, env);
+  const id = cleanLandingPageId(rawId);
+  await landingPageObject(env, seller.id, id);
+  const previousThumbnail = await env.PRIVATE_ASSETS.head(landingPageThumbnailKey(seller.id, id));
+  const previousUpdate = Date.parse(previousThumbnail?.customMetadata?.updatedAt || "");
+  const nowMilliseconds = Date.now();
+  if (Number.isFinite(previousUpdate) && nowMilliseconds - previousUpdate < landingPageThumbnailIntervalMilliseconds) {
+    return {
+      updatedAt: previousThumbnail.customMetadata.updatedAt,
+      bytes: Math.max(0, Math.round(Number(previousThumbnail.size) || 0)),
+      skipped: true,
+    };
+  }
+  const payload = await requestJson(request, 430000);
+  const thumbnail = decodeLandingPageThumbnail(payload.dataUrl);
+  const updatedAt = new Date(nowMilliseconds).toISOString();
+  await env.PRIVATE_ASSETS.put(landingPageThumbnailKey(seller.id, id), thumbnail.bytes, {
+    httpMetadata: { contentType: thumbnail.contentType },
+    customMetadata: { sellerId: seller.id, landingPageId: id, updatedAt },
+  });
+  return { updatedAt, bytes: thumbnail.bytes.byteLength, skipped: false };
 }
 
 async function deleteLandingPage(request, env, rawId) {
@@ -457,7 +527,7 @@ async function deleteLandingPage(request, env, rawId) {
   const id = cleanLandingPageId(rawId);
   const key = landingPageKey(seller.id, id);
   if (!(await env.PRIVATE_ASSETS.head(key))) throw new Response("Landing page not found", { status: 404 });
-  await env.PRIVATE_ASSETS.delete(key);
+  await env.PRIVATE_ASSETS.delete([key, landingPageThumbnailKey(seller.id, id)]);
 }
 
 const componentPrefix = (sellerId) => `sellers/${sellerId}/components/`;
@@ -1067,6 +1137,14 @@ export default {
       if (request.method === "GET" && url.pathname === "/v1/me") return json({ ok: true, user: await currentUser(request, env) }, 200, cors);
       if (request.method === "GET" && url.pathname === "/v1/catalog") return json({ ok: true, ...(await catalog(request, env)) }, 200, cors);
       if (request.method === "GET" && url.pathname === "/v1/landing-pages") return json({ ok: true, pages: await landingPages(request, env) }, 200, cors);
+      const landingPageThumbnailMatch = /^\/v1\/landing-pages\/([a-z0-9-]+)\/thumbnail$/.exec(url.pathname);
+      if (request.method === "GET" && landingPageThumbnailMatch) {
+        const response = await landingPageThumbnail(request, env, landingPageThumbnailMatch[1]);
+        const headers = new Headers(response.headers);
+        Object.entries(cors).forEach(([name, value]) => headers.set(name, value));
+        return new Response(response.body, { status: response.status, headers });
+      }
+      if (["PUT", "POST"].includes(request.method) && landingPageThumbnailMatch) return json({ ok: true, thumbnail: await saveLandingPageThumbnail(request, env, landingPageThumbnailMatch[1]) }, 200, cors);
       const landingPageMatch = /^\/v1\/landing-pages\/([a-z0-9-]+)$/.exec(url.pathname);
       if (request.method === "GET" && landingPageMatch) return json({ ok: true, page: await landingPage(request, env, landingPageMatch[1]) }, 200, cors);
       if (["PUT", "POST"].includes(request.method) && landingPageMatch) return json({ ok: true, page: await saveLandingPage(request, env, landingPageMatch[1]) }, 200, cors);
