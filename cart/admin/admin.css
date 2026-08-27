@@ -1210,11 +1210,21 @@ button, a { -webkit-tap-highlight-color: transparent; }
   transition: color .16s, background .16s, border-color .16s, transform .16s;
 }
 .project-url-copy { top: 0; right: 5px; height: 27px; background: transparent; border-color: transparent; border-radius: 6px; box-shadow: none; }
-.project-actions { right: 14px; bottom: 19px; }
+.project-actions {
+  right: 14px;
+  bottom: 19px;
+  color: #6f7680;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+.project-actions > span { display: block; font: 700 20px/1 Arial, sans-serif; transform: translateY(-1px); }
 .project-url-copy .icon,
 .project-actions .icon { width: 13px; }
-.project-url-copy:hover,
-.project-actions:hover { color: #f40b64; background: #fff; border-color: #efc9d4; transform: translateY(-1px); }
+.project-url-copy:hover { color: #f40b64; background: #fff; border-color: #efc9d4; transform: translateY(-1px); }
+.project-actions:hover { color: #f40b64; background: transparent; border-color: transparent; box-shadow: none; transform: none; }
+.project-actions:focus-visible { outline: 2px solid #f40b64; outline-offset: 1px; border-radius: 4px; }
 .project-url-copy.copied { color: #168653; background: #effaf4; border-color: #ccebd9; }
 .landing-project-new { min-height: 355px; }
 @keyframes landing-thumbnail-loading { 0%, 100% { background-position: 100% 0; } 50% { background-position: 0 0; } }
