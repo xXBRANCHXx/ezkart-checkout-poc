@@ -3487,6 +3487,10 @@
       });
     };
 
+    const syncMarqueeCopies = (element, value, source = null) => {
+      if (element?.dataset.sqElementType !== "marquee") return;
+      element.querySelectorAll(".sq-marquee-copy").forEach((copy) => { if (copy !== source) copy.textContent = value; });
+    };
     const editableContentSelector = [
       ".sq-announcement>p",
       ".sq-site-logo>b", ".sq-store-nav a", ".sq-store-nav div>button",
@@ -3502,7 +3506,7 @@
       ".sq-generated-reviews b", ".sq-generated-reviews small",
       ".sq-generated-faq>h2", ".sq-generated-faq summary", ".sq-generated-faq p",
       ".sq-generated-spacer>span",
-      ".sq-free-heading>h2", ".sq-free-text>p", ".sq-free-button>button", ".sq-free-form>h3", ".sq-free-form>p",
+      ".sq-free-heading>h2", ".sq-free-text>p", ".sq-free-marquee .sq-marquee-copy:not([aria-hidden])", ".sq-free-button>button", ".sq-free-form>h3", ".sq-free-form>p",
     ].join(",");
     const editableNodesFor = (block) => block ? [...block.querySelectorAll(editableContentSelector)].filter((node) => !node.closest(".sq-image-drag-handle")) : [];
     const contentFieldLabel = (node, index) => {
@@ -3547,6 +3551,7 @@
         input.addEventListener("input", () => {
           if (!before) before = captureState();
           node.textContent = input.value;
+          syncMarqueeCopies(node.closest("[data-sq-element]"), input.value, node);
           if (!remembered) { remember(before); remembered = true; }
           markSqChanged();
         });
@@ -3902,6 +3907,7 @@
           content.oninput = () => {
             const before = inlineEditSnapshots.get(content);
             if (before && !before.remembered) { remember(before.state); before.remembered = true; }
+            syncMarqueeCopies(content.closest("[data-sq-element]"), content.textContent, content);
             const inspectorField = sqStudio.querySelector(`[data-sq-content-field="${content.dataset.sqEditable}"]`);
             if (inspectorField) inspectorField.value = content.textContent.trim();
             markSqChanged();
@@ -4519,6 +4525,7 @@
       if (!textTarget) return;
       selectedContent = textTarget;
       textTarget.textContent = event.currentTarget.value;
+      syncMarqueeCopies(selectedElement, event.currentTarget.value, textTarget);
       const sectionField = sqStudio.querySelector(`[data-sq-content-field="${textTarget.dataset.sqEditable}"]`);
       if (sectionField) sectionField.value = event.currentTarget.value;
       refreshElementOverlay(); markSqChanged();
@@ -5033,7 +5040,7 @@
     const layerDetails = {
       announcement: ["Announcement", "Promotional message", "message"], navigation: ["Navigation", "Brand, links, and button", "layout"], hero: ["Hero", "Image, copy, and motion", "layout"], products: ["Product collection", "Connected commerce grid", "box"], "image-story": ["Brand story", "Editorial content", "image"], reviews: ["Customer proof", "Credible review state", "star"], benefits: ["Services", "Merchant service information", "star"], faq: ["FAQ", "Purchase objections answered", "help"], checkout: ["Checkout", "Secure cart action", "credit-card"], shipping: ["Shipping", "Courier and ETA", "truck"], newsletter: ["Newsletter", "Email signup", "mail"], footer: ["Footer", "Store links and information", "layout"],
     };
-    const elementLayerIcon = (type) => ({ image: "image", collage: "image", logo: "image", button: "play", checkout: "credit-card", "product-grid": "box", navigation: "layout", benefit: "star", review: "star", faq: "help", icon: "star", "custom-code": "code" })[type] || "message";
+    const elementLayerIcon = (type) => ({ image: "image", collage: "image", logo: "image", button: "play", marquee: "trend", checkout: "credit-card", "product-grid": "box", navigation: "layout", benefit: "star", review: "star", faq: "help", icon: "star", "custom-code": "code" })[type] || "message";
     const elementLayerPreview = (element) => {
       const image = element.querySelector("img");
       if (image?.alt) return image.alt;
@@ -5082,6 +5089,7 @@
     const newElementMarkup = (type) => {
       if (type === "heading") return `<div class="sq-free-element sq-free-heading" data-sq-element data-sq-element-type="heading"><h2>Write a powerful heading.</h2></div>`;
       if (type === "text") return `<div class="sq-free-element sq-free-text" data-sq-element data-sq-element-type="text"><p>Add your story, product details, or supporting copy here.</p></div>`;
+      if (type === "marquee") return `<div class="sq-free-element sq-free-marquee" data-sq-element data-sq-element-type="marquee"><div class="sq-marquee-track"><span class="sq-marquee-copy">NEW ARRIVALS ✦ SHOP THE DROP ✦ MADE FOR YOUR EVERYDAY ✦</span><span class="sq-marquee-copy" aria-hidden="true">NEW ARRIVALS ✦ SHOP THE DROP ✦ MADE FOR YOUR EVERYDAY ✦</span></div></div>`;
       if (type === "button") return `<div class="sq-free-element sq-free-button" data-sq-element data-sq-element-type="button"><button type="button">Call to action</button></div>`;
       if (type === "image") return `<div class="sq-free-element sq-free-image" data-sq-element data-sq-element-type="image"><img src="${productImages.granola}" alt="Product image"></div>`;
       if (type === "divider") return `<div class="sq-free-element sq-free-divider" data-sq-element data-sq-element-type="divider"><span></span></div>`;
@@ -5109,7 +5117,7 @@
       section.dataset.sqRows = String(Math.max(12, row - 1));
     };
     const libraryElementDimensions = (type) => ({
-      heading: { width: 6, height: 4 }, text: { width: 6, height: 3 }, button: { width: 3, height: 2 },
+      heading: { width: 6, height: 4 }, text: { width: 6, height: 3 }, marquee: { width: fluidColumns(), height: 2 }, button: { width: 3, height: 2 },
       image: { width: 6, height: 8 }, divider: { width: 8, height: 1 }, form: { width: 6, height: 5 }, html: { width: 8, height: 8 },
     }[type] || { width: 6, height: 4 });
     const clearLibraryDropPreview = () => {
@@ -5162,7 +5170,7 @@
       const element = wrapper.firstElementChild;
       const dimensions = libraryElementDimensions(type);
       ["desktop", "tablet", "mobile"].forEach((device) => {
-        const desired = device === "mobile" ? { ...dimensions, width: fluidColumns(device) } : dimensions;
+        const desired = device === "mobile" || type === "marquee" ? { ...dimensions, width: fluidColumns(device) } : dimensions;
         setElementLayout(element, findOpenElementLayout(section, desired, device), device);
       });
       if (preferredLayout) setElementLayout(element, preferredLayout, activeDevice);
@@ -5551,7 +5559,7 @@
 
     const exportDialog = document.getElementById("html-export-dialog");
     const collectExportCss = () => {
-      const tokens = [".sq-page-preview", ".sq-page-block", ".sq-announcement", ".sq-store-nav", ".sq-site-logo", ".sq-hero", ".sq-product", ".sq-image-story", ".sq-benefit", ".sq-cart", ".sq-shipping", ".sq-generated", ".sq-free", ".sq-surface", ".sq-color", ".element-animation", ".hover-", ".button-", ".ez-fluid", "@keyframes sq", "@keyframes element", ".product-art", ".icon", ".svg-sprite"];
+      const tokens = [".sq-page-preview", ".sq-page-block", ".sq-announcement", ".sq-store-nav", ".sq-site-logo", ".sq-hero", ".sq-product", ".sq-image-story", ".sq-benefit", ".sq-cart", ".sq-shipping", ".sq-generated", ".sq-free", ".sq-marquee", ".sq-surface", ".sq-color", ".element-animation", ".hover-", ".button-", ".ez-fluid", "@keyframes sq", "@keyframes element", ".product-art", ".icon", ".svg-sprite"];
       const collect = (rules) => [...rules].map((rule) => {
         if (rule.type === CSSRule.KEYFRAMES_RULE) return tokens.some((token) => rule.cssText.includes(token)) ? rule.cssText : "";
         if (rule.cssRules && !rule.selectorText) { const nested = collect(rule.cssRules); return nested ? `${rule.conditionText ? `@media ${rule.conditionText}` : rule.cssText.slice(0, rule.cssText.indexOf("{"))}{${nested}}` : ""; }

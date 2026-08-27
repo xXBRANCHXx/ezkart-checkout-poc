@@ -47,14 +47,19 @@ declare(strict_types=1);
         <section class="sq-tool-panel" data-sq-panel="add">
           <header><div><small>Section library</small><h2>Add content</h2></div></header>
           <label class="sq-panel-search"><?= ez_admin_icon('search') ?><input type="search" placeholder="Search elements or sections" data-sq-block-search></label>
-          <div class="sq-block-group"><h3>Free-position elements</h3><div class="sq-block-grid sq-element-library">
+          <div class="sq-block-group"><h3>Text &amp; movement</h3><div class="sq-block-grid sq-element-library">
             <button type="button" data-sq-add-element="heading" data-search="heading title text"><?= ez_admin_icon('message') ?><b>Heading</b><small>Independent headline</small></button>
             <button type="button" data-sq-add-element="text" data-search="paragraph text copy"><?= ez_admin_icon('message') ?><b>Text</b><small>Body copy block</small></button>
-            <button type="button" data-sq-add-element="button" data-search="button call action"><?= ez_admin_icon('play') ?><b>Button</b><small>Linked action</small></button>
+            <button type="button" data-sq-add-element="marquee" data-search="marquee ticker scrolling moving announcement text"><?= ez_admin_icon('trend') ?><b>Marquee</b><small>Looping text ticker</small></button>
+          </div></div>
+          <div class="sq-block-group"><h3>Media &amp; structure</h3><div class="sq-block-grid sq-element-library">
             <button type="button" data-sq-add-element="image" data-search="image photo picture"><?= ez_admin_icon('image') ?><b>Image</b><small>Single movable image</small></button>
             <button type="button" data-sq-add-element="divider" data-search="divider line separator"><?= ez_admin_icon('layers') ?><b>Divider</b><small>Visual separator</small></button>
-            <button type="button" data-sq-add-element="form" data-search="form email newsletter lead"><?= ez_admin_icon('mail') ?><b>Form</b><small>Email capture</small></button>
             <button type="button" data-sq-add-element="html" data-search="html css javascript code embed custom"><?= ez_admin_icon('code') ?><b>HTML / code</b><small>Sandboxed custom code</small></button>
+          </div></div>
+          <div class="sq-block-group"><h3>Actions &amp; capture</h3><div class="sq-block-grid sq-element-library">
+            <button type="button" data-sq-add-element="button" data-search="button call action"><?= ez_admin_icon('play') ?><b>Button</b><small>Linked action</small></button>
+            <button type="button" data-sq-add-element="form" data-search="form email newsletter lead"><?= ez_admin_icon('mail') ?><b>Form</b><small>Email capture</small></button>
           </div><p class="sq-library-note">Add to the selected section, then move, resize, duplicate, hide, or delete it independently.</p></div>
           <div class="sq-block-group sq-components-library"><div class="sq-components-heading"><h3>Components</h3><span data-sq-component-count>0 / 20</span></div><button class="sq-create-component" type="button" data-sq-create-component><?= ez_admin_icon('plus') ?><span><b>Create component</b><small>Save reusable HTML, CSS &amp; JS</small></span></button><div class="sq-component-list" data-sq-component-list></div><p class="sq-component-empty" data-sq-component-empty>Your main components will appear here. Drag an instance onto any section.</p></div>
           <div class="sq-block-group"><h3>Commerce</h3><div class="sq-block-grid">
