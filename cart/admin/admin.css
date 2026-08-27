@@ -1163,7 +1163,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
   z-index: 4;
   inset: 0 0 auto;
   color: #fff;
-  background: rgba(0, 0, 0, .5);
+  background: rgba(0, 0, 0, .3);
   border: 0;
   backdrop-filter: blur(8px);
   opacity: 0;
