@@ -2664,10 +2664,11 @@
         }
       });
     };
-    const removeLayoutGrid = (animate = false) => previewRoot?.querySelectorAll(".sq-layout-grid-overlay").forEach((grid) => {
+    const removeLayoutGrid = (animate = false, duration = 360) => previewRoot?.querySelectorAll(".sq-layout-grid-overlay").forEach((grid) => {
       if (!animate) { grid.remove(); return; }
+      grid.style.setProperty("--sq-grid-dismiss-duration", `${duration}ms`);
       grid.classList.add("is-hiding");
-      window.setTimeout(() => { if (grid.classList.contains("is-hiding")) grid.remove(); }, 180);
+      window.setTimeout(() => { if (grid.classList.contains("is-hiding")) grid.remove(); }, duration);
     });
     const refreshLayoutGrid = () => {
       const visible = showLayoutGrid || layoutGridDragging || layoutGridTransient;
@@ -2703,7 +2704,12 @@
       layoutGridTransient = true;
       window.clearTimeout(layoutGridTimer);
       refreshLayoutGrid();
-      layoutGridTimer = window.setTimeout(() => { layoutGridTransient = false; refreshLayoutGrid(); }, duration);
+      const hold = 100;
+      layoutGridTimer = window.setTimeout(() => {
+        layoutGridTransient = false;
+        if (showLayoutGrid || layoutGridDragging) { refreshLayoutGrid(); return; }
+        removeLayoutGrid(true, Math.max(260, duration - hold));
+      }, hold);
     };
     const elementTypeName = (element) => element?.dataset.sqElementType === "component-instance"
       ? `${element.dataset.sqComponentName || "Component"} instance`

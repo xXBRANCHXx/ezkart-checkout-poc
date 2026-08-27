@@ -1592,10 +1592,14 @@ button, a { -webkit-tap-highlight-color: transparent; }
   overflow: hidden;
   transform-origin: center;
   animation: sqGridReveal .18s cubic-bezier(.2,.8,.2,1) both;
-  transition: opacity .18s ease, transform .18s ease;
 }
-.sq-layout-grid-overlay.is-hiding { opacity: 0; transform: scale(.995); }
+.sq-layout-grid-overlay.is-hiding { opacity: 0; animation: sqGridDismiss var(--sq-grid-dismiss-duration, 360ms) cubic-bezier(.4,0,.2,1) forwards; }
 @keyframes sqGridReveal { from { opacity: 0; transform: scale(.995); } to { opacity: 1; transform: scale(1); } }
+@keyframes sqGridDismiss {
+  0% { opacity: 1; filter: blur(0); transform: scale(1); }
+  65% { opacity: .28; filter: blur(.25px); }
+  100% { opacity: 0; filter: blur(1px); transform: scale(.988); }
+}
 .sq-layout-grid-overlay > i {
   min-width: 0;
   display: block;
