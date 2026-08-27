@@ -1,10 +1,7 @@
 <?php declare(strict_types=1); ?>
 <section class="landing-library" data-landing-library>
   <header class="landing-library-header">
-    <div><p class="page-eyebrow">Hosted storefronts</p><h1>Your landing pages</h1><p>Create a page, connect products, and shape the storefront around your brand.</p></div>
-    <div class="landing-library-actions">
-      <button class="action-button primary" type="button" data-library-create><?= ez_admin_icon('plus') ?> New landing page</button>
-    </div>
+    <div><h1>Your landing pages</h1><p>Create a page, connect products, and shape the storefront around your brand.</p></div>
   </header>
 
   <div class="landing-library-summary">
@@ -17,7 +14,6 @@
     <button class="landing-project-new" type="button" data-library-create-card><span><?= ez_admin_icon('plus') ?></span><b>Create your first page</b><small data-new-card-copy>6 project spaces available</small></button>
   </div>
 
-  <aside class="landing-library-note"><span><?= ez_admin_icon('shield') ?></span><div><b>Your landing pages stay safely saved</b><p>Layouts, content, products, and publishing settings stay synchronized with your Ezkart account.</p></div><a href="?page=products">Manage products</a></aside>
 </section>
 
 <dialog class="page-creator-dialog" id="library-page-creator-dialog"><form method="dialog" data-library-page-form>

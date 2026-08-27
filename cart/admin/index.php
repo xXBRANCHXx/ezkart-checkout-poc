@@ -1600,14 +1600,6 @@ $html2CanvasVersion = (string) (@filemtime(__DIR__ . '/assets/vendor/html2canvas
           </form>
         </div>
       </header>
-      <?php if ($authenticationMethod === 'supabase' && is_array($profileSync)): ?>
-        <div class="identity-sync <?= ($profileSync['ok'] ?? false) === true ? 'connected' : 'attention' ?>" role="status">
-          <?= ez_admin_icon(($profileSync['ok'] ?? false) === true ? 'check-circle' : 'help') ?>
-          <b>Google identity verified.</b>
-          <span><?= ez_admin_escape((string) ($profileSync['message'] ?? 'D1 profile status unavailable.')) ?></span>
-        </div>
-      <?php endif; ?>
-
       <?php if ($page === 'dashboard'): ?>
       <main class="dashboard page-canvas" id="overview">
         <section class="welcome-row">
