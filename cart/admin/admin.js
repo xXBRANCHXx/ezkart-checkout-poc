@@ -3116,8 +3116,9 @@
     const applyImageBlend = (image) => {
       if (!image) return;
       const host = imageVisualHostFor(image);
-      const mode = imageBlendMode(image);
       const source = imageBlendSource(image);
+      if (source === "color" && imageBlendColor(image) && imageBlendMode(image) === "normal" && image.dataset.sqImageBlendNormal !== "true") image.dataset.sqImageBlendMode = "multiply";
+      const mode = imageBlendMode(image);
       if (mode !== "normal" && source === "color" && !image.hasAttribute("data-sq-image-blend-color")) image.dataset.sqImageBlendColor = defaultImageBlendColor();
       const color = imageBlendColor(image);
       const active = mode !== "normal" || (source === "color" && Boolean(color));
@@ -5268,8 +5269,8 @@
       if (!image) return;
       remember();
       const mode = imageBlendModes.has(event.currentTarget.value) ? event.currentTarget.value : "normal";
-      if (mode === "normal") delete image.dataset.sqImageBlendMode;
-      else image.dataset.sqImageBlendMode = mode;
+      if (mode === "normal") { delete image.dataset.sqImageBlendMode; image.dataset.sqImageBlendNormal = "true"; }
+      else { image.dataset.sqImageBlendMode = mode; delete image.dataset.sqImageBlendNormal; }
       applyImageBlend(image); syncElementControls(); markSqChanged();
     });
     sqStudio.querySelector("[data-sq-image-blend-source]")?.addEventListener("change", (event) => {
@@ -5286,7 +5287,7 @@
       const color = /^#[0-9a-f]{6}$/i.test(rawColor || "") ? rawColor.toLowerCase() : "";
       if (color) {
         image.dataset.sqImageBlendColor = color;
-        if (imageBlendSource(image) === "color" && imageBlendMode(image) === "normal") image.dataset.sqImageBlendMode = "multiply";
+        if (imageBlendSource(image) === "color" && imageBlendMode(image) === "normal" && image.dataset.sqImageBlendNormal !== "true") image.dataset.sqImageBlendMode = "multiply";
       }
       else image.dataset.sqImageBlendColor = "transparent";
       applyImageBlend(image); syncElementControls(); markSqChanged();
@@ -5352,6 +5353,7 @@
       delete image.dataset.sqImageScrollStrength;
       delete image.dataset.sqImageScrollDamping;
       delete image.dataset.sqImageBlendMode;
+      delete image.dataset.sqImageBlendNormal;
       delete image.dataset.sqImageBlendSource;
       delete image.dataset.sqImageBlendColor;
       ["Zoom", "X", "Y"].forEach((key) => delete image.dataset[`sqImageCrop${key}`]);
