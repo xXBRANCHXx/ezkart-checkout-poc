@@ -2397,6 +2397,8 @@
       clone.querySelectorAll(".sq-element-overlay, .sq-section-toolbar, .sq-layout-grid-overlay, .sq-section-height-handle").forEach((overlay) => overlay.remove());
       clone.querySelectorAll('.sq-free-marquee .sq-marquee-copy[aria-hidden="true"]').forEach((copy) => copy.remove());
       clone.querySelectorAll(".sq-element-selected, .sq-image-selected, .sq-element-animate").forEach((element) => element.classList.remove("sq-element-selected", "sq-image-selected", "sq-element-animate"));
+      clone.querySelectorAll(".sq-image-scroll-host").forEach((host) => host.classList.remove("sq-image-scroll-host"));
+      clone.querySelectorAll(".sq-image-scroll-media").forEach((image) => { image.classList.remove("sq-image-scroll-media"); image.style.removeProperty("transform"); });
       return clone.innerHTML;
     };
     const captureState = () => ({
@@ -3569,14 +3571,30 @@
     const marqueeResizeObserver = typeof ResizeObserver === "function" ? new ResizeObserver((entries) => entries.forEach((entry) => syncMarqueeTrack(entry.target))) : null;
     marqueeScrollRoot?.addEventListener("scroll", scheduleScrollLinkedMarquees, { passive: true });
     window.addEventListener("resize", () => previewRoot?.querySelectorAll('[data-sq-element-type="marquee"]').forEach(syncMarqueeTrack), { passive: true });
-    const imageScrollHostFor = (image) => image?.closest("[data-sq-image-item]") || image?.parentElement || null;
+    const imageScrollHostFor = (image) => {
+      const item = image?.closest("[data-sq-image-item]");
+      return item && item !== image ? item : image?.parentElement || null;
+    };
+    const editorImageScrollStates = new WeakMap();
+    let editorImageScrollFrame = 0;
+    let editorImageScrollTime = 0;
+    const editorImageScrollClamp = (value) => Math.max(0, Math.min(1, value));
+    const editorImageScrollDamp = (value, velocity, target, delta, smoothTime = .11) => {
+      const omega = 2 / smoothTime;
+      const x = omega * delta;
+      const decay = 1 / (1 + x + .48 * x * x + .235 * x * x * x);
+      const change = value - target;
+      const temp = (velocity + omega * change) * delta;
+      return [target + (change + temp) * decay, (velocity - omega * temp) * decay];
+    };
     const releaseImageScrollEffect = (image) => {
       const host = imageScrollHostFor(image);
       image?.style.removeProperty("--sq-image-scroll-media-height");
       image?.style.removeProperty("--sq-image-scroll-scale");
       if (image) {
         image.style.transform = "";
-        image.classList.remove("jarallax-img", "ezkart-scroll-media");
+        image.classList.remove("jarallax-img", "ezkart-scroll-media", "sq-image-scroll-media");
+        editorImageScrollStates.delete(image);
       }
       if (host) {
         host.classList.remove("sq-image-scroll-host", "jarallax", "ezkart-scroll-frame");
@@ -3588,9 +3606,57 @@
         host.removeAttribute("data-ezkart-scroll-damping");
       }
     };
-    // The editor canvas remains static. Production scroll effects run in Preview/export
-    // through one native-scroll timeline so authoring never competes with canvas gestures.
-    const scheduleImageScrollEffects = () => previewRoot?.querySelectorAll("img[data-sq-image-scroll]").forEach(releaseImageScrollEffect);
+    const updateEditorImageScrollEffects = (time) => {
+      editorImageScrollFrame = 0;
+      if (!previewRoot || !marqueeScrollRoot) return;
+      const viewport = marqueeScrollRoot.getBoundingClientRect();
+      const viewportHeight = Math.max(1, marqueeScrollRoot.clientHeight);
+      const delta = Math.min(.05, editorImageScrollTime ? Math.max(0, (time - editorImageScrollTime) / 1000) : 1 / 60);
+      editorImageScrollTime = time;
+      let moving = false;
+      previewRoot.querySelectorAll("img.sq-image-scroll-media:not([data-sq-image-scroll])").forEach(releaseImageScrollEffect);
+      previewRoot.querySelectorAll('img[data-sq-image-scroll]:not([data-sq-image-scroll="none"])').forEach((image) => {
+        const host = imageScrollHostFor(image);
+        const rect = host?.getBoundingClientRect();
+        if (!host || !rect || rect.height < 1 || rect.bottom < viewport.top - viewportHeight * .25 || rect.top > viewport.bottom + viewportHeight * .25) return;
+        host.classList.add("sq-image-scroll-host");
+        image.classList.add("sq-image-scroll-media");
+        const effect = image.dataset.sqImageScroll === "parallax-deep" ? "parallax" : image.dataset.sqImageScroll;
+        const strength = Math.max(0, Math.min(100, Number(image.dataset.sqImageScrollStrength) || 0)) / 100;
+        const reverse = effect === "parallax-reverse";
+        const zoom = effect === "zoom";
+        const rate = reverse ? strength * .35 : strength;
+        const progress = editorImageScrollClamp((viewport.bottom - rect.top) / (viewportHeight + rect.height));
+        const displayScale = rect.height / Math.max(1, host.clientHeight);
+        const visualOffset = zoom ? 0 : (progress - .5) * (viewportHeight + rect.height) * rate * (reverse ? -1 : 1);
+        const yTarget = visualOffset / Math.max(.001, displayScale);
+        const overscan = reverse ? (viewportHeight + rect.height) * rate : Math.max(0, viewportHeight - rect.height) * rate;
+        const coverScale = zoom || !rate ? 1 : 1 + (overscan + 4) / rect.height;
+        const scaleTarget = zoom ? 1 + progress * strength * .3 : coverScale;
+        const damping = image.dataset.sqImageScrollDamping !== "false";
+        const state = editorImageScrollStates.get(image) || { y: yTarget, yVelocity: 0, scale: scaleTarget, scaleVelocity: 0 };
+        if (damping) {
+          [state.y, state.yVelocity] = editorImageScrollDamp(state.y, state.yVelocity, yTarget, delta);
+          if (zoom) [state.scale, state.scaleVelocity] = editorImageScrollDamp(state.scale, state.scaleVelocity, scaleTarget, delta);
+          else { state.scale = scaleTarget; state.scaleVelocity = 0; }
+        } else {
+          state.y = yTarget; state.yVelocity = 0; state.scale = scaleTarget; state.scaleVelocity = 0;
+        }
+        editorImageScrollStates.set(image, state);
+        image.style.transform = `translate3d(0,${state.y.toFixed(3)}px,0) scale(${state.scale.toFixed(5)})`;
+        if (damping && (Math.abs(yTarget - state.y) > .02 || Math.abs(state.yVelocity) > .02 || zoom && (Math.abs(scaleTarget - state.scale) > .0001 || Math.abs(state.scaleVelocity) > .0001))) moving = true;
+      });
+      if (moving) editorImageScrollFrame = window.requestAnimationFrame(updateEditorImageScrollEffects);
+    };
+    const scheduleImageScrollEffects = () => {
+      if (!editorImageScrollFrame) {
+        editorImageScrollTime = 0;
+        editorImageScrollFrame = window.requestAnimationFrame(updateEditorImageScrollEffects);
+      }
+    };
+    marqueeScrollRoot?.addEventListener("scroll", scheduleImageScrollEffects, { passive: true });
+    window.addEventListener("resize", scheduleImageScrollEffects, { passive: true });
+    if (typeof ResizeObserver === "function" && previewRoot) new ResizeObserver(scheduleImageScrollEffects).observe(previewRoot);
     const syncMarqueeCopies = (element, value, source = null) => {
       if (element?.dataset.sqElementType !== "marquee") return;
       element.querySelectorAll(".sq-marquee-copy").forEach((copy) => { if (copy !== source) copy.textContent = value; });
@@ -4388,6 +4454,7 @@
       applySpacing();
       applyFluidLayouts();
       scheduleProductGridFit();
+      scheduleImageScrollEffects();
       syncElementControls();
       syncPageGridControls();
       refreshLayoutGrid();
@@ -4806,7 +4873,7 @@
       if (!image || !image.dataset.sqImageScroll) return;
       remember();
       image.dataset.sqImageScrollDamping = event.currentTarget.checked ? "true" : "false";
-      markSqChanged();
+      scheduleImageScrollEffects(); markSqChanged();
     });
     let imageScrollStrengthSnapshot = null;
     const startImageScrollStrengthEdit = () => { if (!imageScrollStrengthSnapshot) imageScrollStrengthSnapshot = captureState(); };
@@ -5765,8 +5832,9 @@
         const storedStrength = Number(image.dataset.sqImageScrollStrength);
         const strength = Math.max(0, Math.min(100, Number.isFinite(storedStrength) ? storedStrength : 50));
         const parent = image.parentElement;
-        const host = parent?.classList.contains("product-art") ? parent : image.closest("[data-sq-image-item]") || parent;
-        image.classList.remove("jarallax-img", "ezkart-scroll-media");
+        const imageItem = image.closest("[data-sq-image-item]");
+        const host = parent?.classList.contains("product-art") ? parent : (imageItem && imageItem !== image ? imageItem : parent);
+        image.classList.remove("jarallax-img", "ezkart-scroll-media", "sq-image-scroll-media");
         if (host) {
           host.classList.remove("sq-image-scroll-host", "jarallax", "ezkart-scroll-frame");
           host.removeAttribute("data-jarallax");
