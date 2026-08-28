@@ -3,16 +3,22 @@ declare(strict_types=1);
 
 require_once dirname(__DIR__) . '/api/bootstrap.php';
 
-$thumbnailRepairFrame = ($_GET['thumbnail-repair'] ?? '') === '1'
+$previewRepairFrame = ($_GET['preview-repair'] ?? '') === '1'
     && ($_GET['page'] ?? '') === 'sites'
     && preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*\.ezkart\.site$/', (string) ($_GET['edit'] ?? '')) === 1;
+$previewDocumentFrame = preg_match('#^/v1/landing-pages/[a-z0-9-]+/preview$#', (string) ($_GET['cloud'] ?? '')) === 1;
+$embeddedPreviewFrame = $previewRepairFrame || $previewDocumentFrame;
 
 header('Cache-Control: no-store');
 header('X-Content-Type-Options: nosniff');
-header('X-Frame-Options: ' . ($thumbnailRepairFrame ? 'SAMEORIGIN' : 'DENY'));
+header('X-Frame-Options: ' . ($embeddedPreviewFrame ? 'SAMEORIGIN' : 'DENY'));
 header('Referrer-Policy: no-referrer');
 header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
-header("Content-Security-Policy: default-src 'self'; img-src 'self' data: blob: https:; style-src 'self'; style-src-attr 'unsafe-inline'; script-src 'self'; connect-src 'self'; frame-src 'self'; form-action 'self'; frame-ancestors " . ($thumbnailRepairFrame ? "'self'" : "'none'") . "; base-uri 'none'");
+if ($previewDocumentFrame) {
+    header("Content-Security-Policy: default-src 'none'; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline' https:; font-src 'self' data: https:; script-src 'none'; connect-src 'none'; frame-src 'none'; form-action 'none'; frame-ancestors 'self'; base-uri 'none'");
+} else {
+    header("Content-Security-Policy: default-src 'self'; img-src 'self' data: blob: https:; style-src 'self'; style-src-attr 'unsafe-inline'; script-src 'self'; connect-src 'self'; frame-src 'self'; form-action 'self'; frame-ancestors " . ($previewRepairFrame ? "'self'" : "'none'") . "; base-uri 'none'");
+}
 
 const EZ_ADMIN_SESSION_LIFETIME = 60 * 60 * 24 * 30;
 
@@ -688,7 +694,7 @@ function ez_admin_sync_cloudflare_user(string $accessToken): array
 
 function ez_admin_proxy_cloud_request(string $accessToken, string $path, string $method): never
 {
-    $allowedPath = preg_match('#^/v1/(?:catalog|media(?:/[a-zA-Z0-9_-]+)?|products/[a-zA-Z0-9_-]+(?:/duplicate)?|drafts/[a-zA-Z0-9_-]+|landing-pages(?:/[a-z0-9-]+(?:/thumbnail(?:-diagnostic)?)?)?|components(?:/[a-z0-9-]+)?)$#', $path) === 1;
+    $allowedPath = preg_match('#^/v1/(?:catalog|media(?:/[a-zA-Z0-9_-]+)?|products/[a-zA-Z0-9_-]+(?:/duplicate)?|drafts/[a-zA-Z0-9_-]+|landing-pages(?:/[a-z0-9-]+(?:/preview)?)?|components(?:/[a-z0-9-]+)?)$#', $path) === 1;
     if (!$allowedPath || str_contains($path, '?') || str_contains($path, '#')) {
         ez_admin_json(['ok' => false, 'error' => 'That saved-data path is not allowed.'], 400);
     }
@@ -701,25 +707,28 @@ function ez_admin_proxy_cloud_request(string $accessToken, string $path, string 
     }
     $contentLength = max(0, (int) ($_SERVER['CONTENT_LENGTH'] ?? 0));
     $isLandingPageRequest = preg_match('#^/v1/landing-pages/[a-z0-9-]+$#', $path) === 1;
-    $maximumBodyBytes = $isLandingPageRequest ? 16_000_000 : 3_200_000;
+    $isLandingPagePreviewWrite = in_array($method, ['POST', 'PUT'], true)
+        && preg_match('#^/v1/landing-pages/[a-z0-9-]+/preview$#', $path) === 1;
+    $isLargeLandingPageRequest = $isLandingPageRequest || $isLandingPagePreviewWrite;
+    $maximumBodyBytes = $isLandingPagePreviewWrite ? 20_000_000 : ($isLandingPageRequest ? 16_001_000 : 3_200_000);
     if ($contentLength > $maximumBodyBytes) {
-        ez_admin_json(['ok' => false, 'error' => $isLandingPageRequest ? 'Landing page project is too large.' : 'Upload is larger than the 2 MB image limit.'], 413);
+        ez_admin_json(['ok' => false, 'error' => $isLargeLandingPageRequest ? 'Landing page project is too large.' : 'Upload is larger than the 2 MB image limit.'], 413);
     }
     $body = in_array($method, ['POST', 'PUT'], true) ? file_get_contents('php://input') : '';
     if (!is_string($body) || strlen($body) > $maximumBodyBytes) {
-        ez_admin_json(['ok' => false, 'error' => $isLandingPageRequest ? 'Landing page project is too large.' : 'The request is too large.'], 413);
+        ez_admin_json(['ok' => false, 'error' => $isLargeLandingPageRequest ? 'Landing page project is too large.' : 'The request is too large.'], 413);
     }
 
     $isMediaRequest = $method === 'GET'
         && preg_match('#^/v1/media/[a-zA-Z0-9_-]+$#', $path) === 1;
-    $isThumbnailRequest = $method === 'GET'
-        && preg_match('#^/v1/landing-pages/[a-z0-9-]+/thumbnail$#', $path) === 1;
-    $isImageRequest = $isMediaRequest || $isThumbnailRequest;
+    $isPreviewRequest = $method === 'GET'
+        && preg_match('#^/v1/landing-pages/[a-z0-9-]+/preview$#', $path) === 1;
+    $isImageRequest = $isMediaRequest;
     $handle = curl_init($apiUrl . $path);
     if ($handle === false) ez_admin_json(['ok' => false, 'error' => 'The save request could not start.'], 503);
     $headers = ['Accept: application/json', 'Authorization: Bearer ' . $accessToken];
     if ($body !== '') $headers[] = 'Content-Type: application/json';
-    if ($isImageRequest) {
+    if ($isImageRequest || $isPreviewRequest) {
         foreach (['HTTP_IF_NONE_MATCH' => 'If-None-Match', 'HTTP_IF_MODIFIED_SINCE' => 'If-Modified-Since'] as $serverKey => $headerName) {
             $conditionalValue = trim((string) ($_SERVER[$serverKey] ?? ''));
             if ($conditionalValue !== '' && strlen($conditionalValue) <= 512 && !preg_match('/[\r\n]/', $conditionalValue)) {
@@ -758,8 +767,8 @@ function ez_admin_proxy_cloud_request(string $accessToken, string $path, string 
         ez_admin_json(['ok' => false, 'error' => 'Your saved Ezkart data could not be reached.'], 503);
     }
     http_response_code($status > 0 ? $status : 502);
-    if ($isImageRequest && in_array($status, [200, 304], true)) {
-        header('Cache-Control: ' . ($isThumbnailRequest ? 'private, max-age=600' : 'private, max-age=31536000, immutable'));
+    if (($isImageRequest || $isPreviewRequest) && in_array($status, [200, 304], true)) {
+        header('Cache-Control: ' . ($isPreviewRequest ? 'private, max-age=600' : 'private, max-age=31536000, immutable'));
         foreach (['etag' => 'ETag', 'last-modified' => 'Last-Modified'] as $key => $headerName) {
             if (($upstreamHeaders[$key] ?? '') !== '') header($headerName . ': ' . $upstreamHeaders[$key]);
         }
@@ -1399,7 +1408,6 @@ $catalogInventory = $legacyDataAccess ? [
 $adminCssVersion = (string) (@filemtime(__DIR__ . '/admin.css') ?: 1);
 $catalogCssVersion = (string) (@filemtime(__DIR__ . '/catalog.css') ?: 1);
 $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
-$html2CanvasVersion = (string) (@filemtime(__DIR__ . '/assets/vendor/html2canvas.min.js') ?: 1);
 ?>
 <!doctype html>
 <html lang="id">
@@ -1688,7 +1696,6 @@ $html2CanvasVersion = (string) (@filemtime(__DIR__ . '/assets/vendor/html2canvas
   <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
   <script src="assets/vendor/leaflet.js"></script>
   <?php if ($page === 'settings' && $mfaSetup !== null): ?><script src="assets/vendor/qrcode-generator.min.js"></script><?php endif; ?>
-  <?php if ($siteEditor): ?><script src="assets/vendor/html2canvas.min.js?v=<?= ez_admin_escape($html2CanvasVersion) ?>"></script><?php endif; ?>
   <script src="admin.js?v=<?= ez_admin_escape($adminJsVersion) ?>"></script>
 <?php endif; ?>
 </body>

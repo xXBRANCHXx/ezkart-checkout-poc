@@ -147,7 +147,7 @@
   const cloudEnabled = document.body.dataset.adminCloudEnabled === "true";
   const cloudCsrfToken = document.body.dataset.adminCsrfToken || "";
   const cloudMediaBase = String(document.body.dataset.adminCloudMediaBase || "").replace(/\/$/, "");
-  const landingPageThumbnailVersion = "6";
+  const landingPagePreviewVersion = "1";
   const cloudUrl = (path) => `./?cloud=${encodeURIComponent(path)}`;
   const cloudPrivateMediaUrl = (id) => cloudUrl(`/v1/media/${encodeURIComponent(id)}`);
   const cloudMediaUrl = (id) => cloudMediaBase
@@ -200,24 +200,24 @@
   });
   const normalizeCloudLandingPage = (page) => {
     const id = String(page?.id || "");
-    const thumbnailUpdatedAt = page?.thumbnailUpdatedAt || null;
-    const thumbnailSourceUpdatedAt = page?.thumbnailSourceUpdatedAt || null;
-    const thumbnailVersion = String(page?.thumbnailVersion || "");
-    const thumbnailIsCurrent = Boolean(id
-      && thumbnailUpdatedAt
-      && thumbnailVersion === landingPageThumbnailVersion
-      && thumbnailSourceUpdatedAt === page?.updatedAt);
+    const previewUpdatedAt = page?.previewUpdatedAt || null;
+    const previewSourceUpdatedAt = page?.previewSourceUpdatedAt || null;
+    const previewVersion = String(page?.previewVersion || "");
+    const previewIsCurrent = Boolean(id
+      && previewUpdatedAt
+      && previewVersion === landingPagePreviewVersion
+      && previewSourceUpdatedAt === page?.updatedAt);
     return {
       ...page,
       products: Array.isArray(page?.products) ? page.products : [],
       customProducts: Array.isArray(page?.customProducts) ? page.customProducts : [],
       status: page?.status === "published" ? "published" : "draft",
-      thumbnailUpdatedAt,
-      thumbnailBytes: Math.max(0, Math.round(Number(page?.thumbnailBytes) || 0)),
-      thumbnailSourceUpdatedAt,
-      thumbnailVersion,
-      thumbnailUrl: thumbnailIsCurrent
-        ? `${cloudUrl(`/v1/landing-pages/${encodeURIComponent(id)}/thumbnail`)}&v=${encodeURIComponent(thumbnailUpdatedAt)}`
+      previewUpdatedAt,
+      previewBytes: Math.max(0, Math.round(Number(page?.previewBytes) || 0)),
+      previewSourceUpdatedAt,
+      previewVersion,
+      previewUrl: previewIsCurrent
+        ? `${cloudUrl(`/v1/landing-pages/${encodeURIComponent(id)}/preview`)}&v=${encodeURIComponent(previewUpdatedAt)}`
         : "",
     };
   };
@@ -1691,9 +1691,9 @@
     const projectCard = (site) => {
       const tone = projectTone(site.products);
       const href = `?page=sites&edit=${encodeURIComponent(site.url)}`;
-      const fallbackPreview = `<span class="project-thumbnail-placeholder"><span><svg class="icon" aria-hidden="true"><use href="#icon-layout"></use></svg><b>${site.thumbnailUrl ? "Loading current preview" : "Refreshing preview…"}</b></span></span>`;
-      const pagePreview = site.thumbnailUrl
-        ? `<span class="project-page-thumbnail"><img src="${escapeHtml(site.thumbnailUrl)}" alt="Current preview of ${escapeHtml(site.name)}" loading="lazy" decoding="async"></span>${fallbackPreview}`
+      const fallbackPreview = `<span class="project-thumbnail-placeholder"><span><svg class="icon" aria-hidden="true"><use href="#icon-layout"></use></svg><b>${site.previewUrl ? "Loading current preview" : "Preparing preview…"}</b></span></span>`;
+      const pagePreview = site.previewUrl
+        ? `<span class="project-page-thumbnail"><iframe src="${escapeHtml(site.previewUrl)}" title="Current preview of ${escapeHtml(site.name)}" sandbox loading="lazy" scrolling="no" tabindex="-1"></iframe></span>${fallbackPreview}`
         : fallbackPreview;
       const card = document.createElement("article");
       card.className = "landing-project-card";
@@ -1702,11 +1702,9 @@
       card.dataset.siteName = site.name;
       card.dataset.siteUrl = site.url;
       const published = site.status === "published";
-      card.innerHTML = `<a class="landing-project-card-link" href="${href}" aria-label="Open ${escapeHtml(site.name)} in the editor"><span class="landing-project-preview tone-${tone}${site.thumbnailUrl ? " has-thumbnail" : ""}"><span class="project-browser"><i></i><i></i><i></i><small>${escapeHtml(site.url)}</small></span>${pagePreview}</span><span class="landing-project-details"><span><span class="project-status ${published ? "live" : "draft"}"><i></i>${published ? "Published" : "Draft"}</span><h2>${escapeHtml(site.name)}</h2></span></span></a><button class="project-url-copy" type="button" data-project-copy-url aria-label="Copy https://${escapeHtml(site.url)}"><svg class="icon" aria-hidden="true"><use href="#icon-copy"></use></svg></button><button class="project-actions" type="button" data-project-menu aria-label="Project actions" aria-haspopup="menu" aria-expanded="false"><span class="project-action-dots" aria-hidden="true"><i></i><i></i><i></i></span></button>`;
-      const thumbnail = card.querySelector(".project-page-thumbnail img");
-      thumbnail?.addEventListener("load", () => card.querySelector(".landing-project-preview")?.classList.add("thumbnail-ready"));
-      thumbnail?.addEventListener("error", () => card.querySelector(".project-page-thumbnail")?.remove());
-      if (thumbnail?.complete && thumbnail.naturalWidth > 0) card.querySelector(".landing-project-preview")?.classList.add("thumbnail-ready");
+      card.innerHTML = `<a class="landing-project-card-link" href="${href}" aria-label="Open ${escapeHtml(site.name)} in the editor"><span class="landing-project-preview tone-${tone}${site.previewUrl ? " has-preview" : ""}"><span class="project-browser"><i></i><i></i><i></i><small>${escapeHtml(site.url)}</small></span>${pagePreview}</span><span class="landing-project-details"><span><span class="project-status ${published ? "live" : "draft"}"><i></i>${published ? "Published" : "Draft"}</span><h2>${escapeHtml(site.name)}</h2></span></span></a><button class="project-url-copy" type="button" data-project-copy-url aria-label="Copy https://${escapeHtml(site.url)}"><svg class="icon" aria-hidden="true"><use href="#icon-copy"></use></svg></button><button class="project-actions" type="button" data-project-menu aria-label="Project actions" aria-haspopup="menu" aria-expanded="false"><span class="project-action-dots" aria-hidden="true"><i></i><i></i><i></i></span></button>`;
+      const previewFrame = card.querySelector(".project-page-thumbnail iframe");
+      previewFrame?.addEventListener("load", () => card.querySelector(".landing-project-preview")?.classList.add("preview-ready"));
       const copyUrl = card.querySelector("[data-project-copy-url]");
       copyUrl?.addEventListener("click", async () => {
         const url = `https://${site.url}`;
@@ -1756,7 +1754,7 @@
       };
     });
     const repairLandingPagePreviews = async () => {
-      const pendingSites = customSites.filter((site) => !site.thumbnailUrl);
+      const pendingSites = customSites.filter((site) => !site.previewUrl);
       for (const site of pendingSites) {
         await new Promise((resolve) => {
           const landingId = landingPageId(site.id || site.url);
@@ -1788,13 +1786,13 @@
           const receiveRepair = (event) => {
             if (event.origin !== window.location.origin || event.source !== frame.contentWindow || !event.data) return;
             if (event.data.landingPageId !== landingId) return;
-            if (event.data.type === "ezkart-thumbnail-repaired") void finish(true);
-            if (event.data.type === "ezkart-thumbnail-repair-failed") void finish(false);
+            if (event.data.type === "ezkart-preview-repaired") void finish(true);
+            if (event.data.type === "ezkart-preview-repair-failed") void finish(false);
           };
           const timeout = window.setTimeout(() => { void finish(false); }, 45000);
           window.addEventListener("message", receiveRepair);
           frame.addEventListener("error", () => { void finish(false); }, { once: true });
-          frame.src = `?page=sites&edit=${encodeURIComponent(site.url)}&thumbnail-repair=1`;
+          frame.src = `?page=sites&edit=${encodeURIComponent(site.url)}&preview-repair=1`;
           document.body.append(frame);
         });
       }
@@ -2442,127 +2440,84 @@
     let saveTimer;
     let zoom = 90;
     const requestedSiteUrl = new URLSearchParams(window.location.search).get("edit") || "";
-    const thumbnailRepairMode = new URLSearchParams(window.location.search).get("thumbnail-repair") === "1";
+    const previewRepairMode = new URLSearchParams(window.location.search).get("preview-repair") === "1";
     let activeSiteKey = requestedSiteUrl;
     let activeSiteDocument = null;
     let siteLoadRequest = 0;
     let cloudSavePromise = Promise.resolve(true);
     let baseSiteState = null;
-    let thumbnailCapturePromise = null;
-    let thumbnailScheduleTimer = 0;
-    let thumbnailRefreshPending = false;
-    let thumbnailRetryCount = 0;
-    let thumbnailRetrySource = "";
-    const renderLandingThumbnail = () => new Promise((resolve, reject) => {
-      const captureFrame = document.createElement("iframe");
-      captureFrame.title = "Landing page thumbnail renderer";
-      captureFrame.setAttribute("aria-hidden", "true");
-      captureFrame.setAttribute("sandbox", "allow-scripts allow-same-origin");
-      captureFrame.tabIndex = -1;
-      captureFrame.style.cssText = "position:fixed;z-index:-2147483647;left:-20000px;top:0;width:1440px;height:810px;border:0;pointer-events:none;overflow:hidden;";
-      let settled = false;
-      const cleanup = () => {
-        window.clearTimeout(timeout);
-        window.removeEventListener("message", receiveThumbnail);
-        captureFrame.remove();
-      };
-      const finish = (callback, value) => {
-        if (settled) return;
-        settled = true;
-        cleanup();
-        callback(value);
-      };
-      const receiveThumbnail = (event) => {
-        if (event.source !== captureFrame.contentWindow || !event.data) return;
-        if (event.data.type === "ezkart-thumbnail-renderer-ready") {
-          captureFrame.contentWindow?.postMessage({ type: "ezkart-render-thumbnail", html: generateHtml() }, "*");
-          return;
-        }
-        if (event.data.type === "ezkart-thumbnail-rendered" && typeof event.data.dataUrl === "string") {
-          finish(resolve, event.data.dataUrl);
-          return;
-        }
-        if (event.data.type === "ezkart-thumbnail-failed") finish(reject, new Error(String(event.data.message || "Desktop thumbnail rendering failed.")));
-      };
-      const timeout = window.setTimeout(() => finish(reject, new Error("Desktop thumbnail preview timed out.")), 20000);
-      window.addEventListener("message", receiveThumbnail);
-      captureFrame.addEventListener("error", () => finish(reject, new Error("Desktop thumbnail preview failed to load.")), { once: true });
-      captureFrame.src = `thumbnail-preview.php?render=${Date.now()}`;
-      document.body.append(captureFrame);
-    });
-    const refreshLandingThumbnailIfDue = () => {
-      if (thumbnailCapturePromise) {
-        thumbnailRefreshPending = true;
-        return thumbnailCapturePromise;
+    let previewSavePromise = null;
+    let previewScheduleTimer = 0;
+    let previewRefreshPending = false;
+    let previewRetryCount = 0;
+    let previewRetrySource = "";
+    const refreshLandingPreviewIfDue = () => {
+      if (previewSavePromise) {
+        previewRefreshPending = true;
+        return previewSavePromise;
       }
       if (!previewRoot || !activeSiteDocument) return Promise.resolve(false);
       const landingId = landingPageId(activeSiteDocument.id || activeSiteKey);
       if (!landingId) return Promise.resolve(false);
       const sourceUpdatedAt = String(activeSiteDocument.updatedAt || "");
       if (!sourceUpdatedAt) return Promise.resolve(false);
-      if (activeSiteDocument.thumbnailVersion === landingPageThumbnailVersion
-        && activeSiteDocument.thumbnailSourceUpdatedAt === sourceUpdatedAt
-        && activeSiteDocument.thumbnailUpdatedAt) return Promise.resolve(false);
-      if (thumbnailRetrySource !== sourceUpdatedAt) {
-        thumbnailRetrySource = sourceUpdatedAt;
-        thumbnailRetryCount = 0;
+      if (activeSiteDocument.previewVersion === landingPagePreviewVersion
+        && activeSiteDocument.previewSourceUpdatedAt === sourceUpdatedAt
+        && activeSiteDocument.previewUpdatedAt) return Promise.resolve(false);
+      if (previewRetrySource !== sourceUpdatedAt) {
+        previewRetrySource = sourceUpdatedAt;
+        previewRetryCount = 0;
       }
-      thumbnailCapturePromise = (async () => {
-        const result = await cloudRequest("PUT", `/v1/landing-pages/${encodeURIComponent(landingId)}/thumbnail`, {
-          dataUrl: await renderLandingThumbnail(),
+      previewSavePromise = (async () => {
+        const result = await cloudRequest("PUT", `/v1/landing-pages/${encodeURIComponent(landingId)}/preview`, {
+          html: generateHtml(),
           sourceUpdatedAt,
         });
-        const thumbnail = result.thumbnail || {};
+        const preview = result.preview || {};
         const current = cloudLandingPages.find((page) => page.id === landingId);
-        const thumbnailChanges = {
-          thumbnailUpdatedAt: thumbnail.updatedAt,
-          thumbnailBytes: thumbnail.bytes,
-          thumbnailSourceUpdatedAt: thumbnail.sourceUpdatedAt,
-          thumbnailVersion: thumbnail.version,
+        const previewChanges = {
+          previewUpdatedAt: preview.updatedAt,
+          previewBytes: preview.bytes,
+          previewSourceUpdatedAt: preview.sourceUpdatedAt,
+          previewVersion: preview.version,
         };
-        if (current && thumbnail.updatedAt) replaceCloudLandingPage({ ...current, ...thumbnailChanges });
-        if (activeSiteDocument?.id === landingId && thumbnail.updatedAt) {
-          activeSiteDocument = normalizeCloudLandingPage({ ...activeSiteDocument, ...thumbnailChanges });
+        if (current && preview.updatedAt) replaceCloudLandingPage({ ...current, ...previewChanges });
+        if (activeSiteDocument?.id === landingId && preview.updatedAt) {
+          activeSiteDocument = normalizeCloudLandingPage({ ...activeSiteDocument, ...previewChanges });
         }
-        thumbnailRetryCount = 0;
-        if (thumbnailRepairMode && window.parent !== window) {
-          window.parent.postMessage({ type: "ezkart-thumbnail-repaired", landingPageId: landingId }, window.location.origin);
+        previewRetryCount = 0;
+        if (previewRepairMode && window.parent !== window) {
+          window.parent.postMessage({ type: "ezkart-preview-repaired", landingPageId: landingId }, window.location.origin);
         }
-        return !thumbnail.skipped;
+        return !preview.skipped;
       })().catch((error) => {
-        console.warn("Landing page thumbnail refresh failed:", error);
-        if (thumbnailRepairMode) {
-          void cloudRequest("POST", `/v1/landing-pages/${encodeURIComponent(landingId)}/thumbnail-diagnostic`, {
-            message: String(error instanceof Error ? error.message : error || "Unknown thumbnail error").slice(0, 300),
-            sourceUpdatedAt,
-          }).catch(() => false);
-        }
+        console.warn("Landing page preview refresh failed:", error);
         const currentSource = activeSiteDocument?.id === landingId ? String(activeSiteDocument.updatedAt || "") : "";
         if (currentSource && currentSource !== sourceUpdatedAt) {
-          thumbnailRefreshPending = true;
-        } else if (currentSource && thumbnailRetryCount < 3) {
-          thumbnailRetryCount += 1;
-          window.clearTimeout(thumbnailScheduleTimer);
-          thumbnailScheduleTimer = window.setTimeout(() => { void refreshLandingThumbnailIfDue(); }, 2000 * thumbnailRetryCount);
+          previewRefreshPending = true;
+        } else if (currentSource && previewRetryCount < 3) {
+          previewRetryCount += 1;
+          window.clearTimeout(previewScheduleTimer);
+          previewScheduleTimer = window.setTimeout(() => { void refreshLandingPreviewIfDue(); }, 2000 * previewRetryCount);
         } else if (currentSource) {
           showToast("Page saved, but its library preview could not update. Reopen the page to retry.");
-          if (thumbnailRepairMode && window.parent !== window) {
-            window.parent.postMessage({ type: "ezkart-thumbnail-repair-failed", landingPageId: landingId }, window.location.origin);
+          if (previewRepairMode && window.parent !== window) {
+            window.parent.postMessage({ type: "ezkart-preview-repair-failed", landingPageId: landingId }, window.location.origin);
           }
         }
         return false;
       }).finally(() => {
-        thumbnailCapturePromise = null;
-        if (thumbnailRefreshPending) {
-          thumbnailRefreshPending = false;
-          scheduleLandingThumbnailRefresh(250);
+        previewSavePromise = null;
+        if (previewRefreshPending) {
+          previewRefreshPending = false;
+          scheduleLandingPreviewRefresh(250);
         }
       });
-      return thumbnailCapturePromise;
+      return previewSavePromise;
     };
-    const scheduleLandingThumbnailRefresh = (delay = 1200) => {
-      window.clearTimeout(thumbnailScheduleTimer);
-      thumbnailScheduleTimer = window.setTimeout(() => { void refreshLandingThumbnailIfDue(); }, delay);
+    const scheduleLandingPreviewRefresh = (delay = 1200) => {
+      window.clearTimeout(previewScheduleTimer);
+      previewScheduleTimer = window.setTimeout(() => { void refreshLandingPreviewIfDue(); }, delay);
     };
 
     const builderSidebar = sqStudio.querySelector(".sq-builder-sidebar");
@@ -2625,7 +2580,7 @@
       cloudSavePromise = cloudSavePromise.catch(() => false).then(async () => {
         try {
           activeSiteDocument = await saveCloudLandingPage(site, { state, ...changes });
-          scheduleLandingThumbnailRefresh();
+          scheduleLandingPreviewRefresh();
           return true;
         } catch (error) {
           if (saveState) saveState.textContent = "Save failed";
@@ -6790,10 +6745,10 @@ document.querySelectorAll('[class*="animation-"],[class*="element-animation-"]')
           const starters = site.dataset.siteProducts.split(",").filter(Boolean);
           sqStudio.querySelectorAll("[data-sq-product]").forEach((input) => { input.checked = starters.includes(input.value); });
           updateProductView();
-          if (!thumbnailRepairMode) markSqChanged();
+          if (!previewRepairMode) markSqChanged();
         }
         deselectSqItem(state?.selectedSection || "hero");
-        scheduleLandingThumbnailRefresh(1600);
+        scheduleLandingPreviewRefresh(1600);
       } finally {
         window.requestAnimationFrame(() => {
           if (loadRequest !== siteLoadRequest) return;
