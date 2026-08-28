@@ -183,13 +183,14 @@ declare(strict_types=1);
             <div class="sq-image-blend-editor">
               <div class="sq-inspector-heading"><h3>Blending</h3><span>Compositing</span></div>
               <label><span>Blend mode</span><select data-sq-image-blend-mode><option value="normal">Normal</option><option value="multiply">Multiply</option><option value="screen">Screen</option><option value="overlay">Overlay</option><option value="darken">Darken</option><option value="lighten">Lighten</option><option value="color-dodge">Color dodge</option><option value="color-burn">Color burn</option><option value="hard-light">Hard light</option><option value="soft-light">Soft light</option><option value="difference">Difference</option><option value="exclusion">Exclusion</option><option value="hue">Hue</option><option value="saturation">Saturation</option><option value="color">Color</option><option value="luminosity">Luminosity</option></select></label>
+              <label><span>Blend with</span><select data-sq-image-blend-source><option value="color">Backdrop color</option><option value="behind">Content behind</option></select></label>
               <span class="sq-image-blend-label">Backdrop color</span>
               <div class="sq-image-blend-color is-transparent" data-sq-image-blend-color-wrap>
                 <input type="color" value="#f44b34" aria-label="Image backdrop color" data-sq-image-blend-color>
                 <input type="text" value="Transparent" maxlength="7" aria-label="Image backdrop color hex value" data-sq-image-blend-color-hex>
                 <button type="button" title="Remove backdrop color" aria-label="Remove backdrop color" data-sq-image-blend-color-clear>×</button>
               </div>
-              <p>Blend the image with a color beneath it. Multiply and Overlay are great for polished brand treatments.</p>
+              <p data-sq-image-blend-note>Blend the image with a color beneath it. Multiply and Overlay are great for polished brand treatments.</p>
             </div>
             <div class="sq-image-adjustments">
               <label><span>Blur</span><input type="range" min="0" max="24" step="1" value="0" data-sq-image-filter="blur"><output data-sq-image-output="blur">0px</output></label>

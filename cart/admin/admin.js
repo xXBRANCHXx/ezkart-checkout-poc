@@ -3007,19 +3007,24 @@
     const imageDefaults = { blur: 0, brightness: 100, contrast: 100, saturate: 100, grayscale: 0, opacity: 100 };
     const imageBlendModes = new Set(["normal", "multiply", "screen", "overlay", "darken", "lighten", "color-dodge", "color-burn", "hard-light", "soft-light", "difference", "exclusion", "hue", "saturation", "color", "luminosity"]);
     const imageBlendMode = (image) => imageBlendModes.has(image?.dataset.sqImageBlendMode) ? image.dataset.sqImageBlendMode : "normal";
+    const imageBlendSource = (image) => image?.dataset.sqImageBlendSource === "behind" ? "behind" : "color";
     const imageBlendColor = (image) => /^#[0-9a-f]{6}$/i.test(image?.dataset.sqImageBlendColor || "") ? image.dataset.sqImageBlendColor.toLowerCase() : "";
     const defaultImageBlendColor = () => previewRoot ? colorToHex(getComputedStyle(previewRoot).getPropertyValue("--site-accent"), "#f44b34") : "#f44b34";
     const applyImageBlend = (image) => {
       if (!image) return;
       const host = imageVisualHostFor(image);
       const mode = imageBlendMode(image);
-      if (mode !== "normal" && !image.hasAttribute("data-sq-image-blend-color")) image.dataset.sqImageBlendColor = defaultImageBlendColor();
+      const source = imageBlendSource(image);
+      if (mode !== "normal" && source === "color" && !image.hasAttribute("data-sq-image-blend-color")) image.dataset.sqImageBlendColor = defaultImageBlendColor();
       const color = imageBlendColor(image);
-      image.style.mixBlendMode = mode === "normal" ? "" : mode;
-      image.classList.toggle("sq-image-blend-media", mode !== "normal" || Boolean(color));
+      const active = mode !== "normal" || (source === "color" && Boolean(color));
+      image.style.mixBlendMode = mode !== "normal" && source === "color" ? mode : "";
+      image.classList.toggle("sq-image-blend-media", active);
       if (!host) return;
-      host.classList.toggle("sq-image-blend-host", mode !== "normal" || Boolean(color));
-      if (color) host.style.setProperty("--sq-image-blend-color", color);
+      host.classList.toggle("sq-image-blend-host", active);
+      host.classList.toggle("sq-image-blend-through", mode !== "normal" && source === "behind");
+      host.style.mixBlendMode = mode !== "normal" && source === "behind" ? mode : "";
+      if (source === "color" && color) host.style.setProperty("--sq-image-blend-color", color);
       else host.style.removeProperty("--sq-image-blend-color");
     };
     const imageFilterValue = (image, name) => Number(image?.dataset[`sqFilter${name[0].toUpperCase()}${name.slice(1)}`] ?? imageDefaults[name]);
@@ -3298,15 +3303,23 @@
         const position = image.style.objectPosition || getComputedStyle(image).objectPosition || "center";
         if (positionInput) positionInput.value = ["center", "top", "bottom", "left", "right"].includes(position) ? position : "center";
         const blendModeInput = sqStudio.querySelector("[data-sq-image-blend-mode]");
+        const blendSourceInput = sqStudio.querySelector("[data-sq-image-blend-source]");
         const blendColorInput = sqStudio.querySelector("[data-sq-image-blend-color]");
         const blendColorHex = sqStudio.querySelector("[data-sq-image-blend-color-hex]");
         const blendColorWrap = sqStudio.querySelector("[data-sq-image-blend-color-wrap]");
+        const blendColorClear = sqStudio.querySelector("[data-sq-image-blend-color-clear]");
+        const blendNote = sqStudio.querySelector("[data-sq-image-blend-note]");
         const blendMode = imageBlendMode(image);
+        const blendSource = imageBlendSource(image);
         const blendColor = imageBlendColor(image);
         if (blendModeInput) blendModeInput.value = blendMode;
+        if (blendSourceInput) blendSourceInput.value = blendSource;
         if (blendColorInput) blendColorInput.value = blendColor || defaultImageBlendColor();
         if (blendColorHex) { blendColorHex.value = blendColor ? blendColor.toUpperCase() : "Transparent"; blendColorHex.classList.toggle("is-transparent", !blendColor); }
+        [blendColorInput, blendColorHex, blendColorClear].forEach((control) => { if (control) control.disabled = blendSource === "behind"; });
         blendColorWrap?.classList.toggle("is-transparent", !blendColor);
+        blendColorWrap?.classList.toggle("is-disabled", blendSource === "behind");
+        if (blendNote) blendNote.textContent = blendSource === "behind" ? "Overlap this image with another layer, then use the layer order to choose what sits beneath it." : "Blend the image with a color beneath it. Multiply and Overlay are great for polished brand treatments.";
         sqStudio.querySelectorAll("[data-sq-image-filter]").forEach((input) => {
           const name = input.dataset.sqImageFilter;
           const value = imageFilterValue(image, name);
@@ -4150,7 +4163,7 @@
       if (state.previewStyle) previewRoot.setAttribute("style", state.previewStyle); else previewRoot.removeAttribute("style");
       setExtraPageHeight(Number.parseFloat(previewRoot.style.getPropertyValue("--sq-page-extra-height")) || 0);
       upgradeLegacyStructure();
-      previewRoot.querySelectorAll("img[data-sq-image-blend-mode],img[data-sq-image-blend-color]").forEach(applyImageBlend);
+      previewRoot.querySelectorAll("img[data-sq-image-blend-mode],img[data-sq-image-blend-source],img[data-sq-image-blend-color]").forEach(applyImageBlend);
       rebuildLayerList();
       const productPicker = sqStudio.querySelector(".sq-product-picker");
       if (productPicker && typeof state.productPicker === "string") productPicker.innerHTML = state.productPicker;
@@ -4842,6 +4855,14 @@
       else image.dataset.sqImageBlendMode = mode;
       applyImageBlend(image); syncElementControls(); markSqChanged();
     });
+    sqStudio.querySelector("[data-sq-image-blend-source]")?.addEventListener("change", (event) => {
+      const image = imageForElement();
+      if (!image) return;
+      remember();
+      if (event.currentTarget.value === "behind") image.dataset.sqImageBlendSource = "behind";
+      else delete image.dataset.sqImageBlendSource;
+      applyImageBlend(image); syncElementControls(); markSqChanged();
+    });
     const setSelectedImageBlendColor = (rawColor) => {
       const image = imageForElement();
       if (!image) return;
@@ -4911,6 +4932,7 @@
       delete image.dataset.sqImageScrollStrength;
       delete image.dataset.sqImageScrollDamping;
       delete image.dataset.sqImageBlendMode;
+      delete image.dataset.sqImageBlendSource;
       delete image.dataset.sqImageBlendColor;
       applyImageBlend(image);
       image.style.filter = ""; image.style.objectFit = ""; image.style.objectPosition = "";
@@ -5888,7 +5910,7 @@
     };
     const generateHtml = () => {
       const clone = previewRoot.cloneNode(true);
-      clone.querySelectorAll("img[data-sq-image-blend-mode],img[data-sq-image-blend-color]").forEach(applyImageBlend);
+      clone.querySelectorAll("img[data-sq-image-blend-mode],img[data-sq-image-blend-source],img[data-sq-image-blend-color]").forEach(applyImageBlend);
       clone.querySelectorAll(".sq-free-code").forEach((element) => {
         const source = element.querySelector("template[data-sq-code-source]")?.innerHTML || "";
         const content = document.createElement("template"); content.innerHTML = source; element.replaceChildren(content.content.cloneNode(true));
@@ -6155,7 +6177,7 @@ document.querySelectorAll('[class*="animation-"],[class*="element-animation-"]')
 
     readCatalogProducts().forEach((product) => installCustomProduct(product, false));
     upgradeLegacyStructure();
-    previewRoot?.querySelectorAll("img[data-sq-image-blend-mode],img[data-sq-image-blend-color]").forEach(applyImageBlend);
+    previewRoot?.querySelectorAll("img[data-sq-image-blend-mode],img[data-sq-image-blend-source],img[data-sq-image-blend-color]").forEach(applyImageBlend);
     rebuildLayerList();
     bindSqInteractions();
     updateProductView();
