@@ -5202,9 +5202,20 @@
       showElementPanel("content");
       syncElementControls();
     };
-    const installBackgroundImage = (scope, source, snapshot = captureState()) => {
-      const target = backgroundTargetFor(scope);
+    const installBackgroundImage = (scope, source, snapshot = captureState(), requestedTarget = backgroundTargetFor(scope)) => {
+      const target = requestedTarget;
       if (!target || !source) return null;
+      if (!(source instanceof HTMLImageElement)) {
+        const probe = document.createElement("img");
+        probe.alt = "";
+        probe.onload = () => {
+          if (!target.isConnected) return;
+          installBackgroundImage(scope, probe, snapshot, target);
+        };
+        probe.onerror = () => showToast("That image could not be loaded. The existing background was kept.");
+        probe.src = String(source);
+        return probe;
+      }
       const selector = scope === "page" ? ":scope > .sq-page-background" : ":scope > .sq-section-background";
       let layer = target.querySelector(selector);
       let image = layer?.querySelector("img");
@@ -5214,17 +5225,12 @@
         prepareBackgroundLayer(layer, scope);
         target.prepend(layer);
       }
-      if (source instanceof HTMLImageElement) {
-        const copy = source.cloneNode(true);
-        copy.alt = ""; copy.draggable = false;
-        copy.removeAttribute("tabindex");
-        copy.classList.remove("sq-image-selected", "sq-element-selected", "sq-image-crop-editing", "is-cropping");
-        layer.replaceChildren(copy);
-        image = copy;
-      } else {
-        if (!image) { image = document.createElement("img"); image.alt = ""; image.draggable = false; layer.append(image); }
-        image.src = String(source);
-      }
+      const copy = source.cloneNode(true);
+      copy.alt = ""; copy.draggable = false;
+      copy.removeAttribute("tabindex");
+      copy.classList.remove("sq-image-selected", "sq-element-selected", "sq-image-crop-editing", "is-cropping");
+      layer.replaceChildren(copy);
+      image = copy;
       applyImageCrop(image); applySelectedImageFilters(image); applyImageBlend(image);
       remember(snapshot); rebuildLayerList(); bindSqInteractions(); syncBackgroundManagers(); scheduleImageScrollEffects(); markSqChanged();
       selectBackgroundLayer(scope);
