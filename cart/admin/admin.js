@@ -1691,7 +1691,7 @@
     const projectCard = (site) => {
       const tone = projectTone(site.products);
       const href = `?page=sites&edit=${encodeURIComponent(site.url)}`;
-      const fallbackPreview = `<span class="project-thumbnail-placeholder"><span><svg class="icon" aria-hidden="true"><use href="#icon-layout"></use></svg><b>${site.thumbnailUrl ? "Loading current preview" : "Preview will appear after opening the editor"}</b></span></span>`;
+      const fallbackPreview = `<span class="project-thumbnail-placeholder"><span><svg class="icon" aria-hidden="true"><use href="#icon-layout"></use></svg><b>${site.thumbnailUrl ? "Loading current preview" : "Refreshing preview…"}</b></span></span>`;
       const pagePreview = site.thumbnailUrl
         ? `<span class="project-page-thumbnail"><img src="${escapeHtml(site.thumbnailUrl)}" alt="Current preview of ${escapeHtml(site.name)}" loading="lazy" decoding="async"></span>${fallbackPreview}`
         : fallbackPreview;
@@ -1755,6 +1755,50 @@
         document.body.append(menu);
       };
     });
+    const repairLandingPagePreviews = async () => {
+      const pendingSites = customSites.filter((site) => !site.thumbnailUrl);
+      for (const site of pendingSites) {
+        await new Promise((resolve) => {
+          const landingId = landingPageId(site.id || site.url);
+          const frame = document.createElement("iframe");
+          frame.title = `Refreshing preview for ${site.name}`;
+          frame.setAttribute("aria-hidden", "true");
+          frame.tabIndex = -1;
+          frame.style.cssText = "position:fixed;z-index:-2147483647;left:-20000px;top:0;width:1440px;height:900px;border:0;pointer-events:none;overflow:hidden;";
+          let settled = false;
+          const finish = async (repaired) => {
+            if (settled) return;
+            settled = true;
+            window.clearTimeout(timeout);
+            window.removeEventListener("message", receiveRepair);
+            frame.remove();
+            if (repaired) {
+              try {
+                const updated = await loadCloudLandingPage(site.url);
+                const currentCard = grid?.querySelector(`[data-project-card][data-site-url="${CSS.escape(site.url)}"]`);
+                currentCard?.replaceWith(projectCard(updated));
+                customSites = readLandingSites();
+                bindProjectMenus();
+              } catch (error) {
+                console.warn("Landing page preview refreshed but the card could not reload:", error);
+              }
+            }
+            resolve();
+          };
+          const receiveRepair = (event) => {
+            if (event.origin !== window.location.origin || event.source !== frame.contentWindow || !event.data) return;
+            if (event.data.landingPageId !== landingId) return;
+            if (event.data.type === "ezkart-thumbnail-repaired") void finish(true);
+            if (event.data.type === "ezkart-thumbnail-repair-failed") void finish(false);
+          };
+          const timeout = window.setTimeout(() => { void finish(false); }, 45000);
+          window.addEventListener("message", receiveRepair);
+          frame.addEventListener("error", () => { void finish(false); }, { once: true });
+          frame.src = `?page=sites&edit=${encodeURIComponent(site.url)}&thumbnail-repair=1`;
+          document.body.append(frame);
+        });
+      }
+    };
     const renderSummary = () => {
       const count = customSites.length;
       const remaining = Math.max(0, 6 - count);
@@ -1775,6 +1819,7 @@
     };
     customSites.forEach((site) => grid?.insertBefore(projectCard(site), landingLibrary.querySelector("[data-library-create-card]")));
     bindProjectMenus(); renderSummary(); document.body.classList.add("cloud-landing-ready");
+    window.setTimeout(() => { void repairLandingPagePreviews(); }, 500);
     landingLibrary.querySelectorAll("[data-library-create], [data-library-create-card]").forEach((button) => button.addEventListener("click", openCreator));
     document.addEventListener("click", closeProjectMenu);
     const nameInput = form?.elements.namedItem("page_name");
@@ -2397,6 +2442,7 @@
     let saveTimer;
     let zoom = 90;
     const requestedSiteUrl = new URLSearchParams(window.location.search).get("edit") || "";
+    const thumbnailRepairMode = new URLSearchParams(window.location.search).get("thumbnail-repair") === "1";
     let activeSiteKey = requestedSiteUrl;
     let activeSiteDocument = null;
     let siteLoadRequest = 0;
@@ -2479,6 +2525,9 @@
           activeSiteDocument = normalizeCloudLandingPage({ ...activeSiteDocument, ...thumbnailChanges });
         }
         thumbnailRetryCount = 0;
+        if (thumbnailRepairMode && window.parent !== window) {
+          window.parent.postMessage({ type: "ezkart-thumbnail-repaired", landingPageId: landingId }, window.location.origin);
+        }
         return !thumbnail.skipped;
       })().catch((error) => {
         console.warn("Landing page thumbnail refresh failed:", error);
@@ -2491,6 +2540,9 @@
           thumbnailScheduleTimer = window.setTimeout(() => { void refreshLandingThumbnailIfDue(); }, 2000 * thumbnailRetryCount);
         } else if (currentSource) {
           showToast("Page saved, but its library preview could not update. Reopen the page to retry.");
+          if (thumbnailRepairMode && window.parent !== window) {
+            window.parent.postMessage({ type: "ezkart-thumbnail-repair-failed", landingPageId: landingId }, window.location.origin);
+          }
         }
         return false;
       }).finally(() => {
