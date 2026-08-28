@@ -3,12 +3,16 @@ declare(strict_types=1);
 
 require_once dirname(__DIR__) . '/api/bootstrap.php';
 
+$thumbnailRepairFrame = ($_GET['thumbnail-repair'] ?? '') === '1'
+    && ($_GET['page'] ?? '') === 'sites'
+    && preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*\.ezkart\.site$/', (string) ($_GET['edit'] ?? '')) === 1;
+
 header('Cache-Control: no-store');
 header('X-Content-Type-Options: nosniff');
-header('X-Frame-Options: DENY');
+header('X-Frame-Options: ' . ($thumbnailRepairFrame ? 'SAMEORIGIN' : 'DENY'));
 header('Referrer-Policy: no-referrer');
 header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
-header("Content-Security-Policy: default-src 'self'; img-src 'self' data: blob: https:; style-src 'self'; style-src-attr 'unsafe-inline'; script-src 'self'; connect-src 'self'; frame-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'");
+header("Content-Security-Policy: default-src 'self'; img-src 'self' data: blob: https:; style-src 'self'; style-src-attr 'unsafe-inline'; script-src 'self'; connect-src 'self'; frame-src 'self'; form-action 'self'; frame-ancestors " . ($thumbnailRepairFrame ? "'self'" : "'none'") . "; base-uri 'none'");
 
 const EZ_ADMIN_SESSION_LIFETIME = 60 * 60 * 24 * 30;
 
