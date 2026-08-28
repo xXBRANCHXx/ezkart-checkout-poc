@@ -97,16 +97,22 @@ header("Content-Security-Policy: default-src 'none'; img-src 'self' data: https:
         parsed.querySelectorAll("*").forEach((element) => [...element.attributes].forEach((attribute) => {
           if (attribute.name.toLowerCase().startsWith("on")) element.removeAttribute(attribute.name);
         }));
-        const renderer = parsed.createElement("script");
-        renderer.src = rendererUrl;
-        renderer.nonce = nonce;
-        const capture = parsed.createElement("script");
-        capture.nonce = nonce;
-        capture.textContent = captureSource;
-        parsed.body.append(renderer, capture);
         document.open();
         document.write("<!doctype html>" + parsed.documentElement.outerHTML);
         document.close();
+        const renderer = document.createElement("script");
+        renderer.src = rendererUrl;
+        renderer.nonce = nonce;
+        renderer.addEventListener("load", () => {
+          const capture = document.createElement("script");
+          capture.nonce = nonce;
+          capture.textContent = captureSource;
+          document.body.append(capture);
+        }, { once: true });
+        renderer.addEventListener("error", () => {
+          parent.postMessage({ type: "ezkart-thumbnail-failed", message: "Thumbnail renderer could not load." }, "*");
+        }, { once: true });
+        document.body.append(renderer);
       }, { once: true });
       parent.postMessage({ type: "ezkart-thumbnail-renderer-ready" }, "*");
     })();
