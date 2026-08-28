@@ -532,6 +532,16 @@ async function saveLandingPageThumbnail(request, env, rawId) {
   return { updatedAt, bytes: thumbnail.bytes.byteLength, sourceUpdatedAt, version: landingPageThumbnailVersion, skipped: false };
 }
 
+async function recordLandingPageThumbnailDiagnostic(request, env, rawId) {
+  const { seller } = await sellerContext(request, env);
+  const id = cleanLandingPageId(rawId);
+  await landingPageObject(env, seller.id, id);
+  const payload = await requestJson(request, 2000);
+  const message = cleanText(payload.message, 300) || "Unknown thumbnail error";
+  console.warn("Landing page thumbnail diagnostic", { sellerId: seller.id, landingPageId: id, message });
+  return { recorded: true };
+}
+
 async function deleteLandingPage(request, env, rawId) {
   const { seller } = await sellerContext(request, env);
   const id = cleanLandingPageId(rawId);
@@ -1155,6 +1165,8 @@ export default {
         return new Response(response.body, { status: response.status, headers });
       }
       if (["PUT", "POST"].includes(request.method) && landingPageThumbnailMatch) return json({ ok: true, thumbnail: await saveLandingPageThumbnail(request, env, landingPageThumbnailMatch[1]) }, 200, cors);
+      const landingPageThumbnailDiagnosticMatch = /^\/v1\/landing-pages\/([a-z0-9-]+)\/thumbnail-diagnostic$/.exec(url.pathname);
+      if (request.method === "POST" && landingPageThumbnailDiagnosticMatch) return json({ ok: true, diagnostic: await recordLandingPageThumbnailDiagnostic(request, env, landingPageThumbnailDiagnosticMatch[1]) }, 200, cors);
       const landingPageMatch = /^\/v1\/landing-pages\/([a-z0-9-]+)$/.exec(url.pathname);
       if (request.method === "GET" && landingPageMatch) return json({ ok: true, page: await landingPage(request, env, landingPageMatch[1]) }, 200, cors);
       if (["PUT", "POST"].includes(request.method) && landingPageMatch) return json({ ok: true, page: await saveLandingPage(request, env, landingPageMatch[1]) }, 200, cors);

@@ -52,6 +52,13 @@ header("Content-Security-Policy: default-src 'none'; img-src 'self' data: https:
         if (!blob || blob.size > maximumBytes) throw new Error("Thumbnail could not be compressed below 300 KB.");
         return blobDataUrl(blob);
       };
+      const removeUnsupportedColorFunctions = (rules) => [...rules].forEach((rule) => {
+        if (rule.cssRules) removeUnsupportedColorFunctions(rule.cssRules);
+        if (!rule.style) return;
+        [...rule.style].forEach((property) => {
+          if (/(?:color-mix|oklch|oklab|lab|lch|color)\(/i.test(rule.style.getPropertyValue(property))) rule.style.removeProperty(property);
+        });
+      });
       addEventListener("message", async (event) => {
         if (event.source !== parent || !event.data || event.data.type !== "ezkart-render-thumbnail" || typeof event.data.html !== "string") return;
         try {
@@ -63,6 +70,9 @@ header("Content-Security-Policy: default-src 'none'; img-src 'self' data: https:
             if (attribute.name.toLowerCase().startsWith("on")) element.removeAttribute(attribute.name);
           }));
           parsed.head.querySelectorAll('style,link[rel="stylesheet"]').forEach((element) => document.head.append(document.importNode(element, true)));
+          [...document.styleSheets].forEach((sheet) => {
+            try { removeUnsupportedColorFunctions(sheet.cssRules); } catch (_) {}
+          });
           [...parsed.body.childNodes].forEach((node) => document.body.append(document.importNode(node, true)));
           const root = document.querySelector(".sq-page-preview");
           if (!root) throw new Error("Desktop preview did not initialize.");

@@ -2531,6 +2531,12 @@
         return !thumbnail.skipped;
       })().catch((error) => {
         console.warn("Landing page thumbnail refresh failed:", error);
+        if (thumbnailRepairMode) {
+          void cloudRequest("POST", `/v1/landing-pages/${encodeURIComponent(landingId)}/thumbnail-diagnostic`, {
+            message: String(error instanceof Error ? error.message : error || "Unknown thumbnail error").slice(0, 300),
+            sourceUpdatedAt,
+          }).catch(() => false);
+        }
         const currentSource = activeSiteDocument?.id === landingId ? String(activeSiteDocument.updatedAt || "") : "";
         if (currentSource && currentSource !== sourceUpdatedAt) {
           thumbnailRefreshPending = true;
@@ -6783,7 +6789,8 @@ document.querySelectorAll('[class*="animation-"],[class*="element-animation-"]')
         if (![2, 3].includes(state?.version) && site.dataset.siteProducts) {
           const starters = site.dataset.siteProducts.split(",").filter(Boolean);
           sqStudio.querySelectorAll("[data-sq-product]").forEach((input) => { input.checked = starters.includes(input.value); });
-          updateProductView(); markSqChanged();
+          updateProductView();
+          if (!thumbnailRepairMode) markSqChanged();
         }
         deselectSqItem(state?.selectedSection || "hero");
         scheduleLandingThumbnailRefresh(1600);
