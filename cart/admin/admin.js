@@ -2966,6 +2966,10 @@
       if (element?.matches("img")) return element;
       return element?.querySelector("img") || null;
     };
+    const imageVisualHostFor = (image) => {
+      const item = image?.closest("[data-sq-image-item]");
+      return item && item !== image ? item : image?.parentElement || null;
+    };
     const inferredActionType = (action) => {
       if (!action) return "none";
       if (action.dataset.sqLinkType) return action.dataset.sqLinkType;
@@ -3001,6 +3005,21 @@
       return "";
     };
     const imageDefaults = { blur: 0, brightness: 100, contrast: 100, saturate: 100, grayscale: 0, opacity: 100 };
+    const imageBlendModes = new Set(["normal", "multiply", "screen", "overlay", "darken", "lighten", "color-dodge", "color-burn", "hard-light", "soft-light", "difference", "exclusion", "hue", "saturation", "color", "luminosity"]);
+    const imageBlendMode = (image) => imageBlendModes.has(image?.dataset.sqImageBlendMode) ? image.dataset.sqImageBlendMode : "normal";
+    const imageBlendColor = (image) => /^#[0-9a-f]{6}$/i.test(image?.dataset.sqImageBlendColor || "") ? image.dataset.sqImageBlendColor.toLowerCase() : "";
+    const applyImageBlend = (image) => {
+      if (!image) return;
+      const host = imageVisualHostFor(image);
+      const mode = imageBlendMode(image);
+      const color = imageBlendColor(image);
+      image.style.mixBlendMode = mode === "normal" ? "" : mode;
+      image.classList.toggle("sq-image-blend-media", mode !== "normal" || Boolean(color));
+      if (!host) return;
+      host.classList.toggle("sq-image-blend-host", mode !== "normal" || Boolean(color));
+      if (color) host.style.setProperty("--sq-image-blend-color", color);
+      else host.style.removeProperty("--sq-image-blend-color");
+    };
     const imageFilterValue = (image, name) => Number(image?.dataset[`sqFilter${name[0].toUpperCase()}${name.slice(1)}`] ?? imageDefaults[name]);
     const applySelectedImageFilters = (image = imageForElement()) => {
       if (!image) return;
@@ -3276,6 +3295,16 @@
         if (fitInput) fitInput.value = image.style.objectFit || getComputedStyle(image).objectFit || "cover";
         const position = image.style.objectPosition || getComputedStyle(image).objectPosition || "center";
         if (positionInput) positionInput.value = ["center", "top", "bottom", "left", "right"].includes(position) ? position : "center";
+        const blendModeInput = sqStudio.querySelector("[data-sq-image-blend-mode]");
+        const blendColorInput = sqStudio.querySelector("[data-sq-image-blend-color]");
+        const blendColorHex = sqStudio.querySelector("[data-sq-image-blend-color-hex]");
+        const blendColorWrap = sqStudio.querySelector("[data-sq-image-blend-color-wrap]");
+        const blendMode = imageBlendMode(image);
+        const blendColor = imageBlendColor(image);
+        if (blendModeInput) blendModeInput.value = blendMode;
+        if (blendColorInput) blendColorInput.value = blendColor || "#f44b34";
+        if (blendColorHex) { blendColorHex.value = blendColor ? blendColor.toUpperCase() : "Transparent"; blendColorHex.classList.toggle("is-transparent", !blendColor); }
+        blendColorWrap?.classList.toggle("is-transparent", !blendColor);
         sqStudio.querySelectorAll("[data-sq-image-filter]").forEach((input) => {
           const name = input.dataset.sqImageFilter;
           const value = imageFilterValue(image, name);
@@ -3571,10 +3600,7 @@
     const marqueeResizeObserver = typeof ResizeObserver === "function" ? new ResizeObserver((entries) => entries.forEach((entry) => syncMarqueeTrack(entry.target))) : null;
     marqueeScrollRoot?.addEventListener("scroll", scheduleScrollLinkedMarquees, { passive: true });
     window.addEventListener("resize", () => previewRoot?.querySelectorAll('[data-sq-element-type="marquee"]').forEach(syncMarqueeTrack), { passive: true });
-    const imageScrollHostFor = (image) => {
-      const item = image?.closest("[data-sq-image-item]");
-      return item && item !== image ? item : image?.parentElement || null;
-    };
+    const imageScrollHostFor = imageVisualHostFor;
     const editorImageScrollStates = new WeakMap();
     let editorImageScrollFrame = 0;
     let editorImageScrollTime = 0;
@@ -4122,6 +4148,7 @@
       if (state.previewStyle) previewRoot.setAttribute("style", state.previewStyle); else previewRoot.removeAttribute("style");
       setExtraPageHeight(Number.parseFloat(previewRoot.style.getPropertyValue("--sq-page-extra-height")) || 0);
       upgradeLegacyStructure();
+      previewRoot.querySelectorAll("img[data-sq-image-blend-mode],img[data-sq-image-blend-color]").forEach(applyImageBlend);
       rebuildLayerList();
       const productPicker = sqStudio.querySelector(".sq-product-picker");
       if (productPicker && typeof state.productPicker === "string") productPicker.innerHTML = state.productPicker;
@@ -4804,6 +4831,44 @@
         remember(); image.style[property] = event.currentTarget.value; markSqChanged();
       });
     });
+    sqStudio.querySelector("[data-sq-image-blend-mode]")?.addEventListener("change", (event) => {
+      const image = imageForElement();
+      if (!image) return;
+      remember();
+      const mode = imageBlendModes.has(event.currentTarget.value) ? event.currentTarget.value : "normal";
+      if (mode === "normal") delete image.dataset.sqImageBlendMode;
+      else image.dataset.sqImageBlendMode = mode;
+      applyImageBlend(image); markSqChanged();
+    });
+    const setSelectedImageBlendColor = (rawColor) => {
+      const image = imageForElement();
+      if (!image) return;
+      const color = /^#[0-9a-f]{6}$/i.test(rawColor || "") ? rawColor.toLowerCase() : "";
+      if (color) image.dataset.sqImageBlendColor = color;
+      else delete image.dataset.sqImageBlendColor;
+      applyImageBlend(image); syncElementControls(); markSqChanged();
+    };
+    const blendColorInput = sqStudio.querySelector("[data-sq-image-blend-color]");
+    blendColorInput?.addEventListener("pointerdown", startImageEdit);
+    blendColorInput?.addEventListener("focus", startImageEdit);
+    blendColorInput?.addEventListener("input", (event) => setSelectedImageBlendColor(event.currentTarget.value));
+    blendColorInput?.addEventListener("change", (event) => { finishImageEdit(); setSelectedImageBlendColor(event.currentTarget.value); });
+    const blendColorHexInput = sqStudio.querySelector("[data-sq-image-blend-color-hex]");
+    blendColorHexInput?.addEventListener("focus", startImageEdit);
+    blendColorHexInput?.addEventListener("input", (event) => {
+      const value = event.currentTarget.value.trim();
+      if (/^#[0-9a-f]{6}$/i.test(value)) setSelectedImageBlendColor(value);
+    });
+    blendColorHexInput?.addEventListener("change", (event) => {
+      const value = event.currentTarget.value.trim();
+      finishImageEdit();
+      if (!/^#[0-9a-f]{6}$/i.test(value)) { syncElementControls(); showToast("Enter a six-digit hex color, like #F44B34"); return; }
+      setSelectedImageBlendColor(value);
+    });
+    sqStudio.querySelector("[data-sq-image-blend-color-clear]")?.addEventListener("click", () => {
+      if (!imageBlendColor(imageForElement())) return;
+      remember(); setSelectedImageBlendColor("");
+    });
     sqStudio.querySelectorAll("[data-sq-image-filter]").forEach((input) => {
       input.addEventListener("pointerdown", startImageEdit);
       input.addEventListener("focus", startImageEdit);
@@ -4843,6 +4908,9 @@
       delete image.dataset.sqImageScroll;
       delete image.dataset.sqImageScrollStrength;
       delete image.dataset.sqImageScrollDamping;
+      delete image.dataset.sqImageBlendMode;
+      delete image.dataset.sqImageBlendColor;
+      applyImageBlend(image);
       image.style.filter = ""; image.style.objectFit = ""; image.style.objectPosition = "";
       image.style.transform = ""; image.style.transformOrigin = ""; image.style.willChange = "";
       syncElementControls(); markSqChanged();
@@ -5808,7 +5876,7 @@
 
     const exportDialog = document.getElementById("html-export-dialog");
     const collectExportCss = () => {
-      const tokens = [".sq-page-preview", ".sq-page-block", ".sq-announcement", ".sq-store-nav", ".sq-site-logo", ".sq-hero", ".sq-product", ".sq-image-story", ".sq-benefit", ".sq-cart", ".sq-shipping", ".sq-generated", ".sq-free", ".sq-marquee", ".sq-surface", ".sq-color", ".element-animation", ".hover-", ".button-", ".ez-fluid", "@keyframes sq", "@keyframes element", ".product-art", ".icon", ".svg-sprite"];
+      const tokens = [".sq-page-preview", ".sq-page-block", ".sq-announcement", ".sq-store-nav", ".sq-site-logo", ".sq-hero", ".sq-product", ".sq-image-story", ".sq-image-blend", ".sq-benefit", ".sq-cart", ".sq-shipping", ".sq-generated", ".sq-free", ".sq-marquee", ".sq-surface", ".sq-color", ".element-animation", ".hover-", ".button-", ".ez-fluid", "@keyframes sq", "@keyframes element", ".product-art", ".icon", ".svg-sprite"];
       const collect = (rules) => [...rules].map((rule) => {
         if (rule.type === CSSRule.KEYFRAMES_RULE) return tokens.some((token) => rule.cssText.includes(token)) ? rule.cssText : "";
         if (rule.cssRules && !rule.selectorText) { const nested = collect(rule.cssRules); return nested ? `${rule.conditionText ? `@media ${rule.conditionText}` : rule.cssText.slice(0, rule.cssText.indexOf("{"))}{${nested}}` : ""; }
@@ -5818,6 +5886,7 @@
     };
     const generateHtml = () => {
       const clone = previewRoot.cloneNode(true);
+      clone.querySelectorAll("img[data-sq-image-blend-mode],img[data-sq-image-blend-color]").forEach(applyImageBlend);
       clone.querySelectorAll(".sq-free-code").forEach((element) => {
         const source = element.querySelector("template[data-sq-code-source]")?.innerHTML || "";
         const content = document.createElement("template"); content.innerHTML = source; element.replaceChildren(content.content.cloneNode(true));
@@ -6084,6 +6153,7 @@ document.querySelectorAll('[class*="animation-"],[class*="element-animation-"]')
 
     readCatalogProducts().forEach((product) => installCustomProduct(product, false));
     upgradeLegacyStructure();
+    previewRoot?.querySelectorAll("img[data-sq-image-blend-mode],img[data-sq-image-blend-color]").forEach(applyImageBlend);
     rebuildLayerList();
     bindSqInteractions();
     updateProductView();
