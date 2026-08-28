@@ -147,7 +147,7 @@
   const cloudEnabled = document.body.dataset.adminCloudEnabled === "true";
   const cloudCsrfToken = document.body.dataset.adminCsrfToken || "";
   const cloudMediaBase = String(document.body.dataset.adminCloudMediaBase || "").replace(/\/$/, "");
-  const landingPageThumbnailVersion = "5";
+  const landingPageThumbnailVersion = "6";
   const cloudUrl = (path) => `./?cloud=${encodeURIComponent(path)}`;
   const cloudPrivateMediaUrl = (id) => cloudUrl(`/v1/media/${encodeURIComponent(id)}`);
   const cloudMediaUrl = (id) => cloudMediaBase
@@ -208,6 +208,7 @@
       status: page?.status === "published" ? "published" : "draft",
       thumbnailUpdatedAt,
       thumbnailBytes: Math.max(0, Math.round(Number(page?.thumbnailBytes) || 0)),
+      thumbnailSourceUpdatedAt: page?.thumbnailSourceUpdatedAt || null,
       thumbnailVersion: String(page?.thumbnailVersion || ""),
       thumbnailUrl: id && thumbnailUpdatedAt
         ? `${cloudUrl(`/v1/landing-pages/${encodeURIComponent(id)}/thumbnail`)}&v=${encodeURIComponent(thumbnailUpdatedAt)}`
@@ -2397,7 +2398,9 @@
     let baseSiteState = null;
     let thumbnailCapturePromise = null;
     let thumbnailScheduleTimer = 0;
-    const landingPageThumbnailIntervalMs = 10 * 60 * 1000;
+    let thumbnailRefreshPending = false;
+    let thumbnailRetryCount = 0;
+    let thumbnailRetrySource = "";
     const renderLandingThumbnail = () => new Promise((resolve, reject) => {
       const captureFrame = document.createElement("iframe");
       captureFrame.title = "Landing page thumbnail renderer";
@@ -2436,24 +2439,61 @@
       document.body.append(captureFrame);
     });
     const refreshLandingThumbnailIfDue = () => {
-      if (thumbnailCapturePromise || !previewRoot || !activeSiteDocument || typeof window.html2canvas !== "function") return thumbnailCapturePromise || Promise.resolve(false);
-      const lastUpdate = Date.parse(activeSiteDocument.thumbnailUpdatedAt || "");
-      if (activeSiteDocument.thumbnailVersion === landingPageThumbnailVersion && Number.isFinite(lastUpdate) && Date.now() - lastUpdate < landingPageThumbnailIntervalMs) return Promise.resolve(false);
+      if (thumbnailCapturePromise) {
+        thumbnailRefreshPending = true;
+        return thumbnailCapturePromise;
+      }
+      if (!previewRoot || !activeSiteDocument) return Promise.resolve(false);
       const landingId = landingPageId(activeSiteDocument.id || activeSiteKey);
       if (!landingId) return Promise.resolve(false);
+      const sourceUpdatedAt = String(activeSiteDocument.updatedAt || "");
+      if (!sourceUpdatedAt) return Promise.resolve(false);
+      if (activeSiteDocument.thumbnailVersion === landingPageThumbnailVersion
+        && activeSiteDocument.thumbnailSourceUpdatedAt === sourceUpdatedAt
+        && activeSiteDocument.thumbnailUpdatedAt) return Promise.resolve(false);
+      if (thumbnailRetrySource !== sourceUpdatedAt) {
+        thumbnailRetrySource = sourceUpdatedAt;
+        thumbnailRetryCount = 0;
+      }
       thumbnailCapturePromise = (async () => {
-        const result = await cloudRequest("PUT", `/v1/landing-pages/${encodeURIComponent(landingId)}/thumbnail`, { dataUrl: await renderLandingThumbnail() });
+        const result = await cloudRequest("PUT", `/v1/landing-pages/${encodeURIComponent(landingId)}/thumbnail`, {
+          dataUrl: await renderLandingThumbnail(),
+          sourceUpdatedAt,
+        });
         const thumbnail = result.thumbnail || {};
         const current = cloudLandingPages.find((page) => page.id === landingId);
-        if (current && thumbnail.updatedAt) replaceCloudLandingPage({ ...current, thumbnailUpdatedAt: thumbnail.updatedAt, thumbnailBytes: thumbnail.bytes, thumbnailVersion: thumbnail.version });
+        const thumbnailChanges = {
+          thumbnailUpdatedAt: thumbnail.updatedAt,
+          thumbnailBytes: thumbnail.bytes,
+          thumbnailSourceUpdatedAt: thumbnail.sourceUpdatedAt,
+          thumbnailVersion: thumbnail.version,
+        };
+        if (current && thumbnail.updatedAt) replaceCloudLandingPage({ ...current, ...thumbnailChanges });
         if (activeSiteDocument?.id === landingId && thumbnail.updatedAt) {
-          activeSiteDocument = normalizeCloudLandingPage({ ...activeSiteDocument, thumbnailUpdatedAt: thumbnail.updatedAt, thumbnailBytes: thumbnail.bytes, thumbnailVersion: thumbnail.version });
+          activeSiteDocument = normalizeCloudLandingPage({ ...activeSiteDocument, ...thumbnailChanges });
         }
+        thumbnailRetryCount = 0;
         return !thumbnail.skipped;
       })().catch((error) => {
-        console.warn("Landing page thumbnail refresh skipped:", error);
+        console.warn("Landing page thumbnail refresh failed:", error);
+        const currentSource = activeSiteDocument?.id === landingId ? String(activeSiteDocument.updatedAt || "") : "";
+        if (currentSource && currentSource !== sourceUpdatedAt) {
+          thumbnailRefreshPending = true;
+        } else if (currentSource && thumbnailRetryCount < 3) {
+          thumbnailRetryCount += 1;
+          window.clearTimeout(thumbnailScheduleTimer);
+          thumbnailScheduleTimer = window.setTimeout(() => { void refreshLandingThumbnailIfDue(); }, 2000 * thumbnailRetryCount);
+        } else if (currentSource) {
+          showToast("Page saved, but its library preview could not update. Reopen the page to retry.");
+        }
         return false;
-      }).finally(() => { thumbnailCapturePromise = null; });
+      }).finally(() => {
+        thumbnailCapturePromise = null;
+        if (thumbnailRefreshPending) {
+          thumbnailRefreshPending = false;
+          scheduleLandingThumbnailRefresh(250);
+        }
+      });
       return thumbnailCapturePromise;
     };
     const scheduleLandingThumbnailRefresh = (delay = 1200) => {

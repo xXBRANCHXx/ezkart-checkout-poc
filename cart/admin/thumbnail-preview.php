@@ -87,7 +87,11 @@ header("Content-Security-Policy: default-src 'none'; img-src 'self' data: https:
         })().catch(postFailure);
       })();`;
       addEventListener("message", (event) => {
-        if (event.source !== parent || !event.data || event.data.type !== "ezkart-render-thumbnail" || typeof event.data.html !== "string" || event.data.html.length > 1500000) return;
+        if (event.source !== parent || !event.data || event.data.type !== "ezkart-render-thumbnail" || typeof event.data.html !== "string") return;
+        if (event.data.html.length > 18000000) {
+          parent.postMessage({ type: "ezkart-thumbnail-failed", message: "This landing page is too large to render a library preview." }, "*");
+          return;
+        }
         const parsed = new DOMParser().parseFromString(event.data.html, "text/html");
         parsed.querySelectorAll("script,iframe,object,embed,base,meta[http-equiv]").forEach((element) => element.remove());
         parsed.querySelectorAll("*").forEach((element) => [...element.attributes].forEach((attribute) => {
