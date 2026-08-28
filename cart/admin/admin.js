@@ -3422,6 +3422,19 @@
       if (imageControls) imageControls.hidden = !image;
       const imageScrollControls = sqStudio.querySelector("[data-sq-image-scroll-controls]");
       if (imageScrollControls) imageScrollControls.hidden = !image;
+      const backgroundScopeCard = sqStudio.querySelector("[data-sq-selected-background-scope]");
+      if (backgroundScopeCard) backgroundScopeCard.hidden = !isBackgroundImage;
+      if (isBackgroundImage) {
+        const scope = selectedElement.dataset.sqBackgroundScope;
+        const section = selectedElement.closest("[data-section-id]");
+        const sectionName = sectionNames[section?.dataset.sectionId] || "Section";
+        const scopeTitle = sqStudio.querySelector("[data-sq-selected-background-title]");
+        const scopeCopy = sqStudio.querySelector("[data-sq-selected-background-copy]");
+        if (scopeTitle) scopeTitle.textContent = scope === "page" ? "Editing the page background" : `Editing ${sectionName}'s background`;
+        if (scopeCopy) scopeCopy.textContent = scope === "page"
+          ? "This layer sits behind every section. A section background can cover it."
+          : `Only ${sectionName} changes here. Page background controls do not change this image.`;
+      }
       if (image) {
         const imageHeading = sqStudio.querySelector("[data-sq-image-controls] > .sq-inspector-heading h3");
         if (imageHeading) imageHeading.textContent = isBackgroundImage ? "Background image" : "Image";
@@ -3597,7 +3610,8 @@
       applyFluidSection(section);
       rebuildLayerList();
       bindSqInteractions();
-      deselectSqItem(section?.dataset.sectionId);
+      if (deletingBackground && backgroundScope === "page") deselectSqItem(section?.dataset.sectionId);
+      else if (section?.dataset.sectionId) selectSqSection(section.dataset.sectionId, true);
       syncBackgroundManagers();
       markSqChanged();
       showToast(deletingBackground ? `${backgroundScope === "page" ? "Page" : "Section"} background removed` : "Element deleted — Undo is available");
@@ -4132,7 +4146,6 @@
       });
       sqStudio.querySelectorAll("[data-sq-layer]").forEach((layer) => {
         layer.onclick = () => {
-          if (!selectedElement && !pageSpacingMode && layer.dataset.sectionId === selectedSection) { deselectSqItem(layer.dataset.sectionId); return; }
           selectSqSection(layer.dataset.sectionId, true);
           previewRoot?.querySelector(`[data-section-id="${layer.dataset.sectionId}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
         };
@@ -4148,7 +4161,7 @@
           const element = [...(previewRoot?.querySelectorAll("[data-sq-element]") || [])].find((candidate) => candidate.dataset.sqElementId === layer.dataset.sqElementLayer);
           if (!element) return;
           const section = element.closest("[data-section-id]");
-          if (selectedElement === element) { deselectSqItem(section?.dataset.sectionId); return; }
+          if (selectedElement === element) { if (section) selectSqSection(section.dataset.sectionId, true); return; }
           if (section) selectSqSection(section.dataset.sectionId);
           const action = element.matches("button,a") ? element : element.querySelector("button,a");
           const image = element.matches("img") ? element : element.querySelector("img");
@@ -4173,7 +4186,15 @@
       });
       previewRoot?.querySelectorAll("[data-sq-block]").forEach((block) => {
         ensureSectionHeightHandle(block);
-        block.onclick = () => deselectSqItem(block.dataset.sectionId);
+        block.onclick = (event) => {
+          event.stopPropagation();
+          const sectionId = block.dataset.sectionId;
+          if (block.querySelector(":scope > .sq-section-background img")) {
+            selectBackgroundLayer("section", sectionId);
+            return;
+          }
+          selectSqSection(sectionId, true);
+        };
         block.ondragstart = (event) => { draggedSection = block.dataset.sectionId; block.classList.add("dragging"); event.dataTransfer.effectAllowed = "move"; };
         block.ondragover = (event) => {
           if (["element", "component"].includes(libraryDrag?.kind)) {
@@ -4222,7 +4243,7 @@
           const section = element.closest("[data-section-id]");
           const action = event.target.closest?.("button,a");
           const image = event.target.closest?.("img");
-          if (selectedElement === element && (!action || selectedAction === action)) { deselectSqItem(section?.dataset.sectionId); return; }
+          if (selectedElement === element && (!action || selectedAction === action)) { if (section) selectSqSection(section.dataset.sectionId, true); return; }
           if (section) selectSqSection(section.dataset.sectionId);
           selectSqElement(element, action, image);
         };
@@ -4237,7 +4258,7 @@
           item.onclick = (event) => {
             event.stopPropagation();
             const section = item.closest("[data-section-id]");
-            if (selectedElement === item.closest("[data-sq-element]")) { deselectSqItem(section?.dataset.sectionId); return; }
+            if (selectedElement === item.closest("[data-sq-element]")) { if (section) selectSqSection(section.dataset.sectionId, true); return; }
             if (section) selectSqSection(section.dataset.sectionId);
             selectSqElement(item.closest("[data-sq-element]"), null, item.querySelector("img"));
             previewRoot.querySelectorAll(".sq-image-selected").forEach((image) => image.classList.remove("sq-image-selected"));
@@ -4354,8 +4375,8 @@
             const isAction = content.matches("a,button");
             if (isAction) event.preventDefault();
             const element = content.closest("[data-sq-element]");
-            if (!isAction && selectedElement === element) { deselectSqItem(block.dataset.sectionId); return; }
-            if (isAction && selectedElement === element && selectedAction === content) { deselectSqItem(block.dataset.sectionId); return; }
+            if (!isAction && selectedElement === element) { selectSqSection(block.dataset.sectionId, true); return; }
+            if (isAction && selectedElement === element && selectedAction === content) { selectSqSection(block.dataset.sectionId, true); return; }
             selectSqSection(block.dataset.sectionId);
             selectSqElement(element, isAction ? content : null, null, isAction ? null : content);
           };
@@ -4374,7 +4395,12 @@
         });
       });
       previewRoot.onclick = (event) => {
-        if (!event.target.closest?.("[data-sq-element], [data-sq-block]")) deselectSqItem(selectedSection);
+        if (event.target.closest?.("[data-sq-element], [data-sq-block]")) return;
+        if (previewRoot.querySelector(":scope > .sq-page-background img")) {
+          selectBackgroundLayer("page");
+          return;
+        }
+        deselectSqItem(selectedSection);
       };
     };
 
@@ -5184,12 +5210,46 @@
         const url = manager.querySelector("[data-sq-background-url]");
         const edit = manager.querySelector("[data-sq-background-edit]");
         const remove = manager.querySelector("[data-sq-background-remove]");
+        const heading = manager.querySelector(".sq-inspector-heading h3");
+        const headingScope = manager.querySelector(".sq-inspector-heading span");
+        const notice = manager.querySelector("[data-sq-background-scope-notice]");
+        const noticeTitle = manager.querySelector("[data-sq-background-scope-title]");
+        const noticeCopy = manager.querySelector("[data-sq-background-scope-copy]");
+        const noticeJump = manager.querySelector("[data-sq-background-scope-jump]");
         if (thumbnail) { thumbnail.classList.toggle("has-image", Boolean(image)); thumbnail.style.backgroundImage = image ? `url("${String(image.currentSrc || image.src).replace(/["\\]/g, "\\$&")}")` : ""; }
         if (title) title.textContent = image ? `${scope === "page" ? "Page" : "Section"} background ready` : "No background image";
         if (status) status.textContent = image ? "Click Edit effects for crop, blend, filters, and parallax." : "Upload an image or paste a URL below.";
         if (url && document.activeElement !== url) url.value = image && /^(https?:\/\/|\/|\.\.\/|\.\/)/i.test(image.getAttribute("src") || "") ? image.getAttribute("src") : "";
         if (edit) edit.hidden = !image;
         if (remove) remove.hidden = !image;
+        if (scope === "page") {
+          const sectionLayers = [...(previewRoot?.querySelectorAll("[data-sq-block] > .sq-section-background") || [])].filter((candidate) => candidate.querySelector("img"));
+          const firstSection = sectionLayers[0]?.closest("[data-section-id]");
+          const firstName = sectionNames[firstSection?.dataset.sectionId] || "Section";
+          if (heading) heading.textContent = "Page background image";
+          if (headingScope) headingScope.textContent = "Whole page";
+          if (notice) notice.hidden = sectionLayers.length === 0;
+          if (noticeTitle) noticeTitle.textContent = sectionLayers.length === 1 ? `${firstName} has its own background` : `${sectionLayers.length} sections have their own backgrounds`;
+          if (noticeCopy) noticeCopy.textContent = "Section backgrounds sit above the page background. Editing this page layer will not recolor them.";
+          if (noticeJump) {
+            noticeJump.textContent = sectionLayers.length === 1 ? `Edit ${firstName}` : `Edit first section`;
+            noticeJump.dataset.sqBackgroundJumpScope = "section";
+            noticeJump.dataset.sectionId = firstSection?.dataset.sectionId || selectedSection;
+          }
+        } else {
+          const pageLayer = previewRoot?.querySelector(":scope > .sq-page-background img");
+          const sectionName = sectionNames[selectedSection] || "This section";
+          if (heading) heading.textContent = `${sectionName} background image`;
+          if (headingScope) headingScope.textContent = "This section only";
+          if (notice) notice.hidden = !pageLayer;
+          if (noticeTitle) noticeTitle.textContent = "A page background also exists";
+          if (noticeCopy) noticeCopy.textContent = `${sectionName}'s background sits above it. Changes here affect only this section.`;
+          if (noticeJump) {
+            noticeJump.textContent = "Edit page background";
+            noticeJump.dataset.sqBackgroundJumpScope = "page";
+            delete noticeJump.dataset.sectionId;
+          }
+        }
       });
     };
     const selectBackgroundLayer = (scope, sectionId = selectedSection) => {
@@ -5253,6 +5313,7 @@
     };
     sqStudio.querySelectorAll("[data-sq-image-background]").forEach((button) => button.addEventListener("click", () => setImageAsBackground(button.dataset.sqImageBackground)));
     sqStudio.querySelectorAll("[data-sq-background-edit]").forEach((button) => button.addEventListener("click", () => selectBackgroundLayer(button.dataset.sqBackgroundEdit)));
+    sqStudio.querySelectorAll("[data-sq-background-scope-jump]").forEach((button) => button.addEventListener("click", () => selectBackgroundLayer(button.dataset.sqBackgroundJumpScope, button.dataset.sectionId || selectedSection)));
     sqStudio.querySelectorAll("[data-sq-background-remove]").forEach((button) => button.addEventListener("click", () => removeBackgroundImage(button.dataset.sqBackgroundRemove)));
     sqStudio.querySelectorAll("[data-sq-background-apply]").forEach((button) => button.addEventListener("click", () => {
       const scope = button.dataset.sqBackgroundApply;
@@ -6405,7 +6466,11 @@
     });
     document.addEventListener("keydown", (event) => {
       if (event.target.closest("input,textarea,select,[contenteditable=true]")) return;
-      if (event.key === "Escape" && selectedElement?.isConnected) { deselectSqItem(selectedSection); return; }
+      if (event.key === "Escape" && selectedElement?.isConnected) {
+        if (selectedElement.dataset.sqBackgroundScope === "page") deselectSqItem(selectedSection);
+        else selectSqSection(selectedSection, true);
+        return;
+      }
       if (event.key === "Delete" || event.key === "Backspace") { event.preventDefault(); if (selectedElement?.isConnected) deleteSelectedElement(); else deleteSelectedSection(); return; }
       if (!selectedElement?.isConnected) return;
       if (selectedElement.matches(".sq-page-background,.sq-section-background")) return;
