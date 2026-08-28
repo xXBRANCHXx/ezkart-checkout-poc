@@ -3008,10 +3008,12 @@
     const imageBlendModes = new Set(["normal", "multiply", "screen", "overlay", "darken", "lighten", "color-dodge", "color-burn", "hard-light", "soft-light", "difference", "exclusion", "hue", "saturation", "color", "luminosity"]);
     const imageBlendMode = (image) => imageBlendModes.has(image?.dataset.sqImageBlendMode) ? image.dataset.sqImageBlendMode : "normal";
     const imageBlendColor = (image) => /^#[0-9a-f]{6}$/i.test(image?.dataset.sqImageBlendColor || "") ? image.dataset.sqImageBlendColor.toLowerCase() : "";
+    const defaultImageBlendColor = () => previewRoot ? colorToHex(getComputedStyle(previewRoot).getPropertyValue("--site-accent"), "#f44b34") : "#f44b34";
     const applyImageBlend = (image) => {
       if (!image) return;
       const host = imageVisualHostFor(image);
       const mode = imageBlendMode(image);
+      if (mode !== "normal" && !image.hasAttribute("data-sq-image-blend-color")) image.dataset.sqImageBlendColor = defaultImageBlendColor();
       const color = imageBlendColor(image);
       image.style.mixBlendMode = mode === "normal" ? "" : mode;
       image.classList.toggle("sq-image-blend-media", mode !== "normal" || Boolean(color));
@@ -3302,7 +3304,7 @@
         const blendMode = imageBlendMode(image);
         const blendColor = imageBlendColor(image);
         if (blendModeInput) blendModeInput.value = blendMode;
-        if (blendColorInput) blendColorInput.value = blendColor || "#f44b34";
+        if (blendColorInput) blendColorInput.value = blendColor || defaultImageBlendColor();
         if (blendColorHex) { blendColorHex.value = blendColor ? blendColor.toUpperCase() : "Transparent"; blendColorHex.classList.toggle("is-transparent", !blendColor); }
         blendColorWrap?.classList.toggle("is-transparent", !blendColor);
         sqStudio.querySelectorAll("[data-sq-image-filter]").forEach((input) => {
@@ -4838,14 +4840,14 @@
       const mode = imageBlendModes.has(event.currentTarget.value) ? event.currentTarget.value : "normal";
       if (mode === "normal") delete image.dataset.sqImageBlendMode;
       else image.dataset.sqImageBlendMode = mode;
-      applyImageBlend(image); markSqChanged();
+      applyImageBlend(image); syncElementControls(); markSqChanged();
     });
     const setSelectedImageBlendColor = (rawColor) => {
       const image = imageForElement();
       if (!image) return;
       const color = /^#[0-9a-f]{6}$/i.test(rawColor || "") ? rawColor.toLowerCase() : "";
       if (color) image.dataset.sqImageBlendColor = color;
-      else delete image.dataset.sqImageBlendColor;
+      else image.dataset.sqImageBlendColor = "transparent";
       applyImageBlend(image); syncElementControls(); markSqChanged();
     };
     const blendColorInput = sqStudio.querySelector("[data-sq-image-blend-color]");
