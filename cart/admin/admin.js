@@ -2261,6 +2261,90 @@
     sqStudio.addEventListener("change", (event) => { if (event.target.matches?.('input[type="range"]')) syncBuilderRange(event.target); });
     enhanceBuilderSelects();
     syncBuilderRanges();
+    const colorPicker = document.createElement("div");
+    colorPicker.className = "sq-color-popover";
+    colorPicker.hidden = true;
+    colorPicker.setAttribute("role", "dialog");
+    colorPicker.setAttribute("aria-label", "Color picker");
+    colorPicker.innerHTML = `<header><div><small>Color</small><b>Choose a color</b></div><button type="button" data-sq-color-close aria-label="Close">×</button></header><div class="sq-color-picker-current"><i data-sq-color-preview></i><label><span>Hex</span><input type="text" maxlength="7" spellcheck="false" data-sq-color-hex></label></div><label class="sq-color-spectrum"><span>Saturation</span><input type="range" min="0" max="100" value="100" data-sq-color-saturation></label><label class="sq-color-lightness"><span>Lightness</span><input type="range" min="0" max="100" value="50" data-sq-color-lightness></label><label class="sq-color-hue"><span>Hue</span><input type="range" min="0" max="360" value="0" data-sq-color-hue></label><section><div><b>Document colors</b><small>Page palette</small></div><div class="sq-color-swatches" data-sq-document-colors></div></section><section><div><b>Recent</b><small>Cached on this device</small></div><div class="sq-color-swatches" data-sq-recent-colors></div></section><footer><button type="button" data-sq-color-cancel>Cancel</button><button type="button" data-sq-color-apply>Apply</button></footer>`;
+    document.body.append(colorPicker);
+    let colorPickerTarget = null;
+    let colorPickerOriginal = "#ffffff";
+    let colorPickerHsl = { h: 0, s: 100, l: 50 };
+    const cachedColorKey = "ezkart-builder-recent-colors";
+    const readCachedColors = () => { try { const value = JSON.parse(localStorage.getItem(cachedColorKey) || "[]"); return Array.isArray(value) ? value.filter((color) => /^#[0-9a-f]{6}$/i.test(color)).slice(0, 12) : []; } catch (_) { return []; } };
+    const cacheColor = (color) => { try { localStorage.setItem(cachedColorKey, JSON.stringify([color.toUpperCase(), ...readCachedColors().filter((item) => item.toLowerCase() !== color.toLowerCase())].slice(0, 12))); } catch (_) {} };
+    const hexToHsl = (hex) => {
+      const value = hex.replace("#", "");
+      const [r, g, b] = [0, 2, 4].map((offset) => Number.parseInt(value.slice(offset, offset + 2), 16) / 255);
+      const maximum = Math.max(r, g, b), minimum = Math.min(r, g, b), delta = maximum - minimum;
+      let h = 0;
+      if (delta) h = maximum === r ? 60 * (((g - b) / delta) % 6) : maximum === g ? 60 * ((b - r) / delta + 2) : 60 * ((r - g) / delta + 4);
+      const l = (maximum + minimum) / 2;
+      const s = delta ? delta / (1 - Math.abs(2 * l - 1)) : 0;
+      return { h: Math.round((h + 360) % 360), s: Math.round(s * 100), l: Math.round(l * 100) };
+    };
+    const hslToHex = ({ h, s, l }) => {
+      const saturation = s / 100, lightness = l / 100, chroma = (1 - Math.abs(2 * lightness - 1)) * saturation;
+      const x = chroma * (1 - Math.abs((h / 60) % 2 - 1)), m = lightness - chroma / 2;
+      const [r, g, b] = h < 60 ? [chroma, x, 0] : h < 120 ? [x, chroma, 0] : h < 180 ? [0, chroma, x] : h < 240 ? [0, x, chroma] : h < 300 ? [x, 0, chroma] : [chroma, 0, x];
+      return `#${[r, g, b].map((channel) => Math.round((channel + m) * 255).toString(16).padStart(2, "0")).join("")}`;
+    };
+    const renderColorSwatches = (container, colors) => {
+      if (!container) return;
+      container.replaceChildren(...colors.map((color) => { const button = document.createElement("button"); button.type = "button"; button.style.background = color; button.dataset.sqCachedColor = color; button.title = color.toUpperCase(); button.setAttribute("aria-label", `Use ${color}`); return button; }));
+    };
+    const documentColors = () => {
+      const computed = previewRoot ? getComputedStyle(previewRoot) : null;
+      return [...new Set(["--site-accent", "--site-page", "--site-ink", "--site-surface", "--button-primary-bg", "--button-primary-fg"].map((variable) => colorToHex(computed?.getPropertyValue(variable), "#ffffff").toUpperCase()))];
+    };
+    const syncColorPicker = (applyToTarget = true) => {
+      const color = hslToHex(colorPickerHsl);
+      const hex = colorPicker.querySelector("[data-sq-color-hex]");
+      const preview = colorPicker.querySelector("[data-sq-color-preview]");
+      if (hex && document.activeElement !== hex) hex.value = color.toUpperCase();
+      if (preview) preview.style.background = color;
+      colorPicker.style.setProperty("--sq-picker-hue", String(colorPickerHsl.h));
+      colorPicker.querySelector("[data-sq-color-hue]").value = String(colorPickerHsl.h);
+      colorPicker.querySelector("[data-sq-color-saturation]").value = String(colorPickerHsl.s);
+      colorPicker.querySelector("[data-sq-color-lightness]").value = String(colorPickerHsl.l);
+      if (applyToTarget && colorPickerTarget) { colorPickerTarget.value = color; colorPickerTarget.dispatchEvent(new Event("input", { bubbles: true })); }
+    };
+    const closeColorPicker = (commit = true) => {
+      if (!colorPickerTarget) return;
+      if (!commit) { colorPickerTarget.value = colorPickerOriginal; colorPickerTarget.dispatchEvent(new Event("input", { bubbles: true })); }
+      else cacheColor(colorPickerTarget.value);
+      colorPickerTarget.dispatchEvent(new Event("change", { bubbles: true }));
+      colorPickerTarget = null;
+      colorPicker.hidden = true;
+    };
+    const openColorPicker = (input) => {
+      if (!input || input.disabled) return;
+      if (colorPickerTarget && colorPickerTarget !== input) closeColorPicker(true);
+      colorPickerTarget = input;
+      colorPickerOriginal = /^#[0-9a-f]{6}$/i.test(input.value) ? input.value : "#ffffff";
+      colorPickerHsl = hexToHsl(colorPickerOriginal);
+      renderColorSwatches(colorPicker.querySelector("[data-sq-document-colors]"), documentColors());
+      renderColorSwatches(colorPicker.querySelector("[data-sq-recent-colors]"), readCachedColors().length ? readCachedColors() : documentColors().slice(0, 4));
+      colorPicker.hidden = false;
+      const rect = input.getBoundingClientRect();
+      const width = 286;
+      const preferredLeft = rect.left >= width + 20 ? rect.left - width - 10 : rect.right + 10;
+      colorPicker.style.left = `${Math.max(10, Math.min(innerWidth - width - 10, preferredLeft))}px`;
+      colorPicker.style.top = `${Math.max(10, Math.min(innerHeight - colorPicker.offsetHeight - 10, rect.top))}px`;
+      syncColorPicker(false);
+      colorPicker.querySelector("[data-sq-color-hex]")?.focus({ preventScroll: true });
+    };
+    sqStudio.addEventListener("pointerdown", (event) => { const input = event.target.closest?.('input[type="color"]'); if (!input) return; event.preventDefault(); input.focus({ preventScroll: true }); openColorPicker(input); }, true);
+    sqStudio.addEventListener("click", (event) => { if (event.target.closest?.('input[type="color"]')) event.preventDefault(); }, true);
+    colorPicker.querySelectorAll("[data-sq-color-hue], [data-sq-color-saturation], [data-sq-color-lightness]").forEach((input) => input.addEventListener("input", () => { colorPickerHsl = { h: Number(colorPicker.querySelector("[data-sq-color-hue]").value), s: Number(colorPicker.querySelector("[data-sq-color-saturation]").value), l: Number(colorPicker.querySelector("[data-sq-color-lightness]").value) }; syncColorPicker(); }));
+    colorPicker.querySelector("[data-sq-color-hex]")?.addEventListener("input", (event) => { if (/^#[0-9a-f]{6}$/i.test(event.currentTarget.value)) { colorPickerHsl = hexToHsl(event.currentTarget.value); syncColorPicker(); } });
+    colorPicker.addEventListener("click", (event) => { const swatch = event.target.closest("[data-sq-cached-color]"); if (!swatch) return; colorPickerHsl = hexToHsl(swatch.dataset.sqCachedColor); syncColorPicker(); });
+    colorPicker.querySelector("[data-sq-color-apply]")?.addEventListener("click", () => closeColorPicker(true));
+    colorPicker.querySelector("[data-sq-color-cancel]")?.addEventListener("click", () => closeColorPicker(false));
+    colorPicker.querySelector("[data-sq-color-close]")?.addEventListener("click", () => closeColorPicker(true));
+    colorPicker.addEventListener("keydown", (event) => { if (event.key === "Escape") { event.preventDefault(); closeColorPicker(false); colorPickerOriginal = "#ffffff"; } });
+    document.addEventListener("pointerdown", (event) => { if (!colorPicker.hidden && !colorPicker.contains(event.target) && event.target !== colorPickerTarget) closeColorPicker(true); });
     const productPrices = { granola: 58000, coffee: 79000, sambal: 46000 };
     const productNames = { granola: "Granola Madu Nusantara", coffee: "Kopi Susu Concentrate", sambal: "Sambal Roa Signature" };
     const productImages = { granola: "assets/products/granola.webp", coffee: "assets/products/kopi-susu.webp", sambal: "assets/products/sambal-roa.webp" };
@@ -2282,6 +2366,7 @@
     const defaultGridCellHeight = { desktop: 24, tablet: 24, mobile: 24 };
     const gridCellHeightState = { ...defaultGridCellHeight };
     const inlineEditSnapshots = new WeakMap();
+    const directDragSuppressClicks = new WeakSet();
     let selectedSection = "announcement";
     let selectedElement = null;
     let selectedAction = null;
@@ -2378,13 +2463,15 @@
 
     const builderSidebar = sqStudio.querySelector(".sq-builder-sidebar");
     const openSqPanel = (name, { pin = false } = {}) => {
-      sqStudio.querySelectorAll("[data-sq-tab]").forEach((button) => button.classList.toggle("active", button.dataset.sqTab === name));
+      sqStudio.querySelectorAll("[data-sq-tab]").forEach((button) => button.classList.toggle("active", button.dataset.sqTab === name || name === "pages" && button.dataset.sqTab === "layers"));
       sqStudio.querySelectorAll("[data-sq-panel]").forEach((panel) => panel.classList.toggle("active", panel.dataset.sqPanel === name));
+      sqStudio.querySelectorAll("[data-sq-structure-view]").forEach((button) => button.classList.toggle("active", button.dataset.sqStructureView === (name === "pages" ? "pages" : "sections")));
       builderSidebar?.classList.toggle("sq-panel-pinned", pin || builderSidebar.classList.contains("sq-panel-pinned"));
       if (window.matchMedia("(max-width: 720px)").matches) sqStudio.classList.add("mobile-panel-open");
     };
     sqStudio.querySelectorAll("[data-sq-tab]").forEach((button) => button.addEventListener("click", () => openSqPanel(button.dataset.sqTab, { pin: true })));
     sqStudio.querySelectorAll("[data-sq-open-panel]").forEach((button) => button.addEventListener("click", () => openSqPanel(button.dataset.sqOpenPanel, { pin: true })));
+    sqStudio.querySelectorAll("[data-sq-structure-view]").forEach((button) => button.addEventListener("click", () => openSqPanel(button.dataset.sqStructureView === "pages" ? "pages" : "layers", { pin: true })));
     document.addEventListener("pointerdown", (event) => {
       if (builderSidebar?.contains(event.target) || event.target.closest?.("[data-sq-edit-button-brand], [data-sq-open-panel], [data-sq-builder-select-menu]")) return;
       builderSidebar?.classList.remove("sq-panel-pinned");
@@ -2397,6 +2484,7 @@
       clone.querySelectorAll(".sq-element-overlay, .sq-section-toolbar, .sq-layout-grid-overlay, .sq-section-height-handle").forEach((overlay) => overlay.remove());
       clone.querySelectorAll('.sq-free-marquee .sq-marquee-copy[aria-hidden="true"]').forEach((copy) => copy.remove());
       clone.querySelectorAll(".sq-element-selected, .sq-image-selected, .sq-element-animate").forEach((element) => element.classList.remove("sq-element-selected", "sq-image-selected", "sq-element-animate"));
+      clone.querySelectorAll(".sq-image-crop-editing, .sq-direct-dragging").forEach((element) => element.classList.remove("sq-image-crop-editing", "is-cropping", "sq-direct-dragging"));
       clone.querySelectorAll(".sq-image-scroll-host").forEach((host) => host.classList.remove("sq-image-scroll-host"));
       clone.querySelectorAll(".sq-image-scroll-media").forEach((image) => { image.classList.remove("sq-image-scroll-media"); image.style.removeProperty("transform"); });
       return clone.innerHTML;
@@ -3005,6 +3093,20 @@
       return "";
     };
     const imageDefaults = { blur: 0, brightness: 100, contrast: 100, saturate: 100, grayscale: 0, opacity: 100 };
+    const imageCropValue = (image, key, fallback) => {
+      const value = Number(image?.dataset[`sqImageCrop${key}`]);
+      return Number.isFinite(value) ? value : fallback;
+    };
+    const imageCropZoom = (image) => Math.max(1, Math.min(3, imageCropValue(image, "Zoom", 100) / 100));
+    const applyImageCrop = (image) => {
+      if (!image) return;
+      const x = Math.max(0, Math.min(100, imageCropValue(image, "X", 50)));
+      const y = Math.max(0, Math.min(100, imageCropValue(image, "Y", 50)));
+      const zoom = imageCropZoom(image);
+      image.style.objectPosition = `${x}% ${y}%`;
+      image.style.setProperty("--sq-image-crop-zoom", zoom.toFixed(3));
+      image.classList.toggle("sq-image-crop-media", zoom !== 1 || x !== 50 || y !== 50);
+    };
     const imageBlendModes = new Set(["normal", "multiply", "screen", "overlay", "darken", "lighten", "color-dodge", "color-burn", "hard-light", "soft-light", "difference", "exclusion", "hue", "saturation", "color", "luminosity"]);
     const imageBlendMode = (image) => imageBlendModes.has(image?.dataset.sqImageBlendMode) ? image.dataset.sqImageBlendMode : "normal";
     const imageBlendSource = (image) => image?.dataset.sqImageBlendSource === "behind" ? "behind" : "color";
@@ -3030,8 +3132,11 @@
     const imageFilterValue = (image, name) => Number(image?.dataset[`sqFilter${name[0].toUpperCase()}${name.slice(1)}`] ?? imageDefaults[name]);
     const applySelectedImageFilters = (image = imageForElement()) => {
       if (!image) return;
-      image.style.filter = `blur(${imageFilterValue(image, "blur")}px) brightness(${imageFilterValue(image, "brightness")}%) contrast(${imageFilterValue(image, "contrast")}%) saturate(${imageFilterValue(image, "saturate")}%) grayscale(${imageFilterValue(image, "grayscale")}%) opacity(${imageFilterValue(image, "opacity")}%)`;
+      image.style.filter = `blur(${imageFilterValue(image, "blur")}px) brightness(${imageFilterValue(image, "brightness")}%) contrast(${imageFilterValue(image, "contrast")}%) saturate(${imageFilterValue(image, "saturate")}%) grayscale(${imageFilterValue(image, "grayscale")}%)`;
+      const host = imageVisualHostFor(image);
+      if (host) host.style.opacity = imageFilterValue(image, "opacity") === 100 ? "" : String(imageFilterValue(image, "opacity") / 100);
     };
+    let cropEditingImage = null;
     let activeElementPanel = "content";
     const showElementPanel = (panelName) => {
       const panels = [...sqStudio.querySelectorAll("[data-sq-element-panel]")];
@@ -3083,11 +3188,12 @@
       const isComponentInstance = selectedElement.dataset.sqElementType === "component-instance";
       const isMarquee = selectedElement.dataset.sqElementType === "marquee";
       const elementType = selectedElement.dataset.sqElementType || "";
+      const isNavigation = elementType === "navigation";
       const typographyControls = sqStudio.querySelector("[data-sq-typography-controls]");
       if (typographyControls) typographyControls.hidden = ["image", "collage", "gallery", "divider", "spacer", "icon", "custom-code", "component-instance"].includes(elementType);
       const action = isProductGrid
         ? (selectedAction?.isConnected && selectedElement.contains(selectedAction) ? selectedAction : null)
-        : actionForElement();
+        : isNavigation ? selectedAction : actionForElement();
       const image = isLogo || isProductGrid ? null : imageForElement();
       const contentName = selectedContent?.matches("h1,h2,h3") ? "Heading" : selectedContent ? "Text" : "";
       const contextualName = isLogo ? "Logo" : selectedAction && action ? "Button" : selectedImage && image ? "Image" : contentName || elementTypeName(selectedElement);
@@ -3216,6 +3322,20 @@
         if (width) width.value = String(logoWidth);
         if (widthOutput) widthOutput.textContent = `${logoWidth}px`;
       }
+      const navigationControls = sqStudio.querySelector("[data-sq-navigation-controls]");
+      if (navigationControls) navigationControls.hidden = !isNavigation;
+      if (isNavigation) {
+        const links = [...selectedElement.querySelectorAll(":scope > a")];
+        const list = sqStudio.querySelector("[data-sq-navigation-link-list]");
+        if (list) list.innerHTML = links.map((link, index) => `<div class="sq-navigation-link-row" data-sq-navigation-link-row="${index}"><input type="text" maxlength="40" value="${escapeHtml(link.textContent.trim())}" aria-label="Navigation label"><input type="text" maxlength="200" value="${escapeHtml(link.getAttribute("href") || "#")}" aria-label="Navigation destination"><button type="button" aria-label="Remove ${escapeHtml(link.textContent.trim())}">×</button></div>`).join("");
+        const cta = selectedElement.querySelector(":scope > button");
+        const ctaVisible = sqStudio.querySelector("[data-sq-navigation-cta-visible]");
+        const ctaLabel = sqStudio.querySelector("[data-sq-navigation-cta-label]");
+        const ctaTarget = sqStudio.querySelector("[data-sq-navigation-cta-target]");
+        if (ctaVisible) ctaVisible.checked = Boolean(cta) && !cta.hidden;
+        if (ctaLabel) ctaLabel.value = cta?.textContent.trim() || "Buy now";
+        if (ctaTarget) ctaTarget.value = cta?.dataset.sqLink ? `#${cta.dataset.sqLink.replace(/^#/, "")}` : "#products";
+      }
       const buttonRole = selectedElement.dataset.sqButtonRole || "primary";
       sqStudio.querySelectorAll("[data-sq-role-choice]").forEach((button) => button.classList.toggle("active", button.dataset.sqRoleChoice === buttonRole));
       const brandSummary = sqStudio.querySelector("[data-sq-button-brand-summary]");
@@ -3251,7 +3371,7 @@
       if (isComponentInstance && instanceName) instanceName.textContent = selectedElement.dataset.sqComponentName || componentForId(selectedElement.dataset.sqComponentId)?.name || "Main component";
       const textControls = sqStudio.querySelector("[data-sq-element-text-controls]");
       const explicitTextTarget = selectedContent?.isConnected && selectedElement.contains(selectedContent) && !selectedAction ? selectedContent : null;
-      const fallbackTextTarget = !action && !image && !isLogo && !isProductGrid && !isCode && !isComponentInstance
+      const fallbackTextTarget = !action && !image && !isLogo && !isNavigation && !isProductGrid && !isCode && !isComponentInstance
         ? (selectedElement.matches("[data-sq-editable]") ? selectedElement : editableNodesFor(selectedElement)[0] || null)
         : null;
       const textTarget = explicitTextTarget || fallbackTextTarget;
@@ -3302,6 +3422,28 @@
         if (fitInput) fitInput.value = image.style.objectFit || getComputedStyle(image).objectFit || "cover";
         const position = image.style.objectPosition || getComputedStyle(image).objectPosition || "center";
         if (positionInput) positionInput.value = ["center", "top", "bottom", "left", "right"].includes(position) ? position : "center";
+        const cropZoom = Math.round(imageCropZoom(image) * 100);
+        const cropX = Math.max(0, Math.min(100, imageCropValue(image, "X", 50)));
+        const cropY = Math.max(0, Math.min(100, imageCropValue(image, "Y", 50)));
+        const cropToggle = sqStudio.querySelector("[data-sq-image-crop-toggle]");
+        const cropControls = sqStudio.querySelector("[data-sq-image-crop-controls]");
+        const cropZoomInput = sqStudio.querySelector("[data-sq-image-crop-zoom]");
+        const cropZoomOutput = sqStudio.querySelector("[data-sq-image-crop-zoom-output]");
+        const cropXInput = sqStudio.querySelector("[data-sq-image-crop-x]");
+        const cropYInput = sqStudio.querySelector("[data-sq-image-crop-y]");
+        const cropActive = cropEditingImage === image;
+        if (cropToggle) { cropToggle.classList.toggle("active", cropActive); cropToggle.textContent = cropActive ? "Done cropping" : "Crop on canvas"; }
+        if (cropControls) cropControls.hidden = !cropActive;
+        if (cropZoomInput) cropZoomInput.value = String(cropZoom);
+        if (cropZoomOutput) cropZoomOutput.textContent = `${cropZoom}%`;
+        if (cropXInput) cropXInput.value = String(cropX);
+        if (cropYInput) cropYInput.value = String(cropY);
+        sqStudio.querySelectorAll("[data-sq-image-background]").forEach((button) => {
+          const scope = button.dataset.sqImageBackground;
+          const hasBackground = scope === "page" ? Boolean(previewRoot?.querySelector(":scope > .sq-page-background")) : Boolean(selectedElement?.closest("[data-sq-block]")?.querySelector(":scope > .sq-section-background"));
+          button.classList.toggle("active", hasBackground);
+          button.textContent = hasBackground ? `Clear ${scope}` : scope[0].toUpperCase() + scope.slice(1);
+        });
         const blendModeInput = sqStudio.querySelector("[data-sq-image-blend-mode]");
         const blendSourceInput = sqStudio.querySelector("[data-sq-image-blend-source]");
         const blendColorInput = sqStudio.querySelector("[data-sq-image-blend-color]");
@@ -3351,7 +3493,7 @@
         if (device) device.textContent = activeDevice[0].toUpperCase() + activeDevice.slice(1);
       }
       const emptyContent = sqStudio.querySelector("[data-sq-element-content-empty]");
-      if (emptyContent) emptyContent.hidden = [textControls, marqueeControls, reviewControls, logoControls, imageControls, imageScrollControls, buttonControls, codeControls, componentInstanceControls].some((control) => control && !control.hidden);
+      if (emptyContent) emptyContent.hidden = [textControls, marqueeControls, reviewControls, logoControls, navigationControls, imageControls, imageScrollControls, buttonControls, codeControls, componentInstanceControls].some((control) => control && !control.hidden);
       showElementPanel(activeElementPanel);
       syncBuilderRanges();
     };
@@ -3379,6 +3521,10 @@
     };
     const selectSqElement = (element, action = null, image = null, content = null) => {
       if (!element?.matches("[data-sq-element]")) return;
+      if (cropEditingImage && (!element.contains(cropEditingImage) || image?.matches?.("img") && image !== cropEditingImage)) {
+        imageVisualHostFor(cropEditingImage)?.classList.remove("sq-image-crop-editing");
+        cropEditingImage = null;
+      }
       pageSpacingMode = false;
       inspector?.classList.remove("page-spacing-open");
       const pageControls = sqStudio.querySelector("[data-sq-page-spacing-controls]");
@@ -3475,6 +3621,66 @@
           layoutGridDragging = false;
           revealLayoutGrid(650);
           if (changed) { remember(snapshot); markSqChanged(); }
+        };
+        window.addEventListener("pointermove", move);
+        window.addEventListener("pointerup", end, { once: true });
+        window.addEventListener("pointercancel", end, { once: true });
+      };
+    };
+    const directDraggableElementTypes = new Set(["image", "divider", "spacer", "icon", "custom-code", "component-instance"]);
+    const bindDirectElementDrag = (element) => {
+      const enabled = directDraggableElementTypes.has(element?.dataset.sqElementType);
+      element?.classList.toggle("sq-direct-draggable", enabled);
+      if (!enabled) return;
+      element.onpointerdown = (event) => {
+        if (event.button !== 0 || cropEditingImage || event.target.closest?.("button,a,input,textarea,select,[contenteditable=true],.sq-element-toolbar,.sq-element-resize")) return;
+        const section = element.closest("[data-sq-fluid]");
+        if (!section) return;
+        const startLayout = parseElementLayout(element);
+        const snapshot = captureState();
+        const startX = event.clientX;
+        const startY = event.clientY;
+        const sectionRect = section.getBoundingClientRect();
+        const renderedScale = section.offsetWidth ? sectionRect.width / section.offsetWidth : 1;
+        const computed = getComputedStyle(section);
+        const gap = Number.parseFloat(computed.columnGap) || 0;
+        const columns = fluidColumns();
+        const columnWidth = (((section.clientWidth - Number.parseFloat(computed.paddingLeft) - Number.parseFloat(computed.paddingRight) - gap * (columns - 1)) / columns) + gap) * renderedScale;
+        const rowHeight = fluidRowHeight(section) * renderedScale;
+        let dragging = false;
+        let changed = false;
+        element.setPointerCapture?.(event.pointerId);
+        const move = (pointerEvent) => {
+          const dx = pointerEvent.clientX - startX;
+          const dy = pointerEvent.clientY - startY;
+          if (!dragging && Math.hypot(dx, dy) < 5) return;
+          if (!dragging) {
+            dragging = true;
+            pointerEvent.preventDefault();
+            selectSqSection(section.dataset.sectionId);
+            selectSqElement(element, null, element.querySelector("img"));
+            element.classList.add("sq-direct-dragging");
+            layoutGridDragging = true;
+            refreshLayoutGrid();
+          }
+          const columnDelta = Math.round(dx / Math.max(1, columnWidth));
+          const rowDelta = Math.round(dy / Math.max(1, rowHeight));
+          changed = columnDelta !== 0 || rowDelta !== 0;
+          setElementLayout(element, { ...startLayout, x: startLayout.x + columnDelta, y: startLayout.y + rowDelta });
+          applyFluidSection(section); syncElementControls(); refreshElementOverlay();
+        };
+        const end = () => {
+          window.removeEventListener("pointermove", move);
+          window.removeEventListener("pointerup", end);
+          window.removeEventListener("pointercancel", end);
+          element.classList.remove("sq-direct-dragging");
+          if (dragging) {
+            directDragSuppressClicks.add(element);
+            window.setTimeout(() => directDragSuppressClicks.delete(element), 0);
+            layoutGridDragging = false;
+            revealLayoutGrid(650);
+            if (changed) { remember(snapshot); markSqChanged(); }
+          }
         };
         window.addEventListener("pointermove", move);
         window.addEventListener("pointerup", end, { once: true });
@@ -3673,7 +3879,8 @@
         const yTarget = visualOffset / Math.max(.001, displayScale);
         const overscan = reverse ? (viewportHeight + rect.height) * rate : Math.max(0, viewportHeight - rect.height) * rate;
         const coverScale = zoom || !rate ? 1 : 1 + (overscan + 4) / rect.height;
-        const scaleTarget = zoom ? 1 + progress * strength * .3 : coverScale;
+        const cropScale = imageCropZoom(image);
+        const scaleTarget = (zoom ? 1 + progress * strength * .3 : coverScale) * cropScale;
         const damping = image.dataset.sqImageScrollDamping !== "false";
         const state = editorImageScrollStates.get(image) || { y: yTarget, yVelocity: 0, scale: scaleTarget, scaleVelocity: 0 };
         if (damping) {
@@ -3838,6 +4045,8 @@
     };
     const deselectSqItem = (sectionId = selectedSection) => {
       if (sectionId) selectedSection = sectionId;
+      if (cropEditingImage) imageVisualHostFor(cropEditingImage)?.classList.remove("sq-image-crop-editing");
+      cropEditingImage = null;
       pageSpacingMode = true;
       selectedElement = null;
       selectedAction = null;
@@ -3976,8 +4185,11 @@
           });
         }
         element.draggable = false;
+        element.querySelectorAll("img").forEach((image) => { image.draggable = false; });
+        bindDirectElementDrag(element);
         element.onclick = (event) => {
           event.stopPropagation();
+          if (directDragSuppressClicks.has(element)) return;
           const section = element.closest("[data-section-id]");
           const action = event.target.closest?.("button,a");
           const image = event.target.closest?.("img");
@@ -4164,6 +4376,8 @@
       setExtraPageHeight(Number.parseFloat(previewRoot.style.getPropertyValue("--sq-page-extra-height")) || 0);
       upgradeLegacyStructure();
       previewRoot.querySelectorAll("img[data-sq-image-blend-mode],img[data-sq-image-blend-source],img[data-sq-image-blend-color]").forEach(applyImageBlend);
+      previewRoot.querySelectorAll("img[data-sq-image-crop-zoom],img[data-sq-image-crop-x],img[data-sq-image-crop-y]").forEach(applyImageCrop);
+      previewRoot.querySelectorAll("img[data-sq-filter-opacity]").forEach(applySelectedImageFilters);
       rebuildLayerList();
       const productPicker = sqStudio.querySelector(".sq-product-picker");
       if (productPicker && typeof state.productPicker === "string") productPicker.innerHTML = state.productPicker;
@@ -4843,9 +5057,106 @@
       sqStudio.querySelector(selector)?.addEventListener("change", (event) => {
         const image = imageForElement();
         if (!image) return;
-        remember(); image.style[property] = event.currentTarget.value; markSqChanged();
+        remember();
+        image.style[property] = event.currentTarget.value;
+        if (property === "objectPosition") {
+          const [x, y] = ({ center: [50, 50], top: [50, 0], bottom: [50, 100], left: [0, 50], right: [100, 50] })[event.currentTarget.value] || [50, 50];
+          image.dataset.sqImageCropX = String(x); image.dataset.sqImageCropY = String(y); applyImageCrop(image);
+        }
+        markSqChanged();
       });
     });
+    const setImageCropValue = (image, key, value) => {
+      if (!image) return;
+      image.dataset[`sqImageCrop${key}`] = String(value);
+      applyImageCrop(image);
+      scheduleImageScrollEffects();
+      const output = key === "Zoom" ? sqStudio.querySelector("[data-sq-image-crop-zoom-output]") : null;
+      if (output) output.textContent = `${value}%`;
+      markSqChanged();
+    };
+    sqStudio.querySelector("[data-sq-image-crop-toggle]")?.addEventListener("click", () => {
+      const image = imageForElement();
+      if (!image) return;
+      const closing = cropEditingImage === image;
+      if (cropEditingImage) imageVisualHostFor(cropEditingImage)?.classList.remove("sq-image-crop-editing");
+      cropEditingImage = closing ? null : image;
+      imageVisualHostFor(cropEditingImage)?.classList.add("sq-image-crop-editing");
+      if (!closing) applyImageCrop(image);
+      syncElementControls();
+    });
+    ["Zoom", "X", "Y"].forEach((key) => {
+      const input = sqStudio.querySelector(`[data-sq-image-crop-${key.toLowerCase()}]`);
+      input?.addEventListener("pointerdown", startImageEdit);
+      input?.addEventListener("focus", startImageEdit);
+      input?.addEventListener("input", (event) => setImageCropValue(imageForElement(), key, Number(event.currentTarget.value)));
+      input?.addEventListener("change", finishImageEdit);
+    });
+    sqStudio.querySelector("[data-sq-image-crop-reset]")?.addEventListener("click", () => {
+      const image = imageForElement();
+      if (!image) return;
+      remember();
+      ["Zoom", "X", "Y"].forEach((key) => delete image.dataset[`sqImageCrop${key}`]);
+      applyImageCrop(image); scheduleImageScrollEffects(); syncElementControls(); markSqChanged();
+    });
+    previewRoot?.addEventListener("pointerdown", (event) => {
+      const image = cropEditingImage;
+      const host = imageVisualHostFor(image);
+      if (!image?.isConnected || !host?.contains(event.target) || event.button !== 0) return;
+      event.preventDefault(); event.stopPropagation();
+      const snapshot = captureState();
+      const rect = host.getBoundingClientRect();
+      const startX = event.clientX;
+      const startY = event.clientY;
+      const originalX = imageCropValue(image, "X", 50);
+      const originalY = imageCropValue(image, "Y", 50);
+      let changed = false;
+      image.setPointerCapture?.(event.pointerId);
+      host.classList.add("is-cropping");
+      const move = (pointerEvent) => {
+        const x = Math.max(0, Math.min(100, originalX - (pointerEvent.clientX - startX) / Math.max(1, rect.width) * 100));
+        const y = Math.max(0, Math.min(100, originalY - (pointerEvent.clientY - startY) / Math.max(1, rect.height) * 100));
+        changed = changed || Math.abs(x - originalX) > .1 || Math.abs(y - originalY) > .1;
+        image.dataset.sqImageCropX = x.toFixed(1);
+        image.dataset.sqImageCropY = y.toFixed(1);
+        applyImageCrop(image); syncElementControls(); markSqChanged();
+      };
+      const end = () => {
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", end);
+        window.removeEventListener("pointercancel", end);
+        host.classList.remove("is-cropping");
+        if (changed) remember(snapshot);
+      };
+      window.addEventListener("pointermove", move);
+      window.addEventListener("pointerup", end, { once: true });
+      window.addEventListener("pointercancel", end, { once: true });
+    }, true);
+    const setImageAsBackground = (scope) => {
+      const image = imageForElement();
+      const section = selectedElement?.closest("[data-sq-block]");
+      const target = scope === "page" ? previewRoot : section;
+      if (!image || !target) return;
+      remember();
+      const selector = scope === "page" ? ":scope > .sq-page-background" : ":scope > .sq-section-background";
+      const existing = target.querySelector(selector);
+      if (existing) {
+        existing.remove(); syncElementControls(); markSqChanged(); showToast(`${scope[0].toUpperCase() + scope.slice(1)} background cleared`); return;
+      }
+      const layer = document.createElement("div");
+      layer.className = scope === "page" ? "sq-page-background" : "sq-section-background";
+      layer.setAttribute("aria-hidden", "true");
+      const copy = image.cloneNode(true);
+      copy.alt = ""; copy.draggable = false;
+      copy.removeAttribute("tabindex");
+      copy.classList.remove("sq-image-selected", "sq-element-selected", "sq-image-crop-editing", "is-cropping");
+      layer.append(copy);
+      target.prepend(layer);
+      applyImageCrop(copy); applySelectedImageFilters(copy); applyImageBlend(copy);
+      scheduleImageScrollEffects(); syncElementControls(); markSqChanged();
+      showToast(`Image set as ${scope} background`);
+    };
+    sqStudio.querySelectorAll("[data-sq-image-background]").forEach((button) => button.addEventListener("click", () => setImageAsBackground(button.dataset.sqImageBackground)));
     sqStudio.querySelector("[data-sq-image-blend-mode]")?.addEventListener("change", (event) => {
       const image = imageForElement();
       if (!image) return;
@@ -4934,8 +5245,10 @@
       delete image.dataset.sqImageBlendMode;
       delete image.dataset.sqImageBlendSource;
       delete image.dataset.sqImageBlendColor;
-      applyImageBlend(image);
+      ["Zoom", "X", "Y"].forEach((key) => delete image.dataset[`sqImageCrop${key}`]);
+      applyImageBlend(image); applyImageCrop(image); applySelectedImageFilters(image);
       image.style.filter = ""; image.style.objectFit = ""; image.style.objectPosition = "";
+      image.style.removeProperty("--sq-image-crop-zoom"); image.classList.remove("sq-image-crop-media");
       image.style.transform = ""; image.style.transformOrigin = ""; image.style.willChange = "";
       syncElementControls(); markSqChanged();
     });
@@ -5041,6 +5354,75 @@
       refreshElementOverlay(); markSqChanged();
     });
     sqStudio.querySelector("[data-sq-logo-width]")?.addEventListener("change", finishLogoEdit);
+    const navigationElement = () => previewRoot?.querySelector('[data-sq-element-type="navigation"]') || null;
+    const selectHeaderElement = (type) => {
+      const element = previewRoot?.querySelector(`[data-sq-element-type="${type}"]`);
+      const section = element?.closest("[data-section-id]");
+      if (!element || !section) return;
+      openSqPanel("layers", { pin: true });
+      selectSqSection(section.dataset.sectionId);
+      selectSqElement(element);
+      element.scrollIntoView({ behavior: "smooth", block: "center" });
+    };
+    sqStudio.querySelector("[data-sq-edit-logo]")?.addEventListener("click", () => selectHeaderElement("logo"));
+    sqStudio.querySelector("[data-sq-edit-navigation]")?.addEventListener("click", () => selectHeaderElement("navigation"));
+    const setNavigationDestination = (action, rawValue) => {
+      const value = String(rawValue || "").trim() || "#products";
+      const sectionLink = value.startsWith("#");
+      action.dataset.sqLinkType = sectionLink ? "section" : "url";
+      action.dataset.sqLink = sectionLink ? value.slice(1) : value;
+      action.dataset.sqNewTab ||= "false";
+      if (action.matches("a")) action.setAttribute("href", value);
+    };
+    let navigationSnapshot = null;
+    const startNavigationEdit = () => { if (!navigationSnapshot) navigationSnapshot = captureState(); };
+    const finishNavigationEdit = () => { if (navigationSnapshot) remember(navigationSnapshot); navigationSnapshot = null; markSqChanged(); };
+    const navigationLinkList = sqStudio.querySelector("[data-sq-navigation-link-list]");
+    navigationLinkList?.addEventListener("focusin", startNavigationEdit);
+    navigationLinkList?.addEventListener("input", (event) => {
+      const row = event.target.closest("[data-sq-navigation-link-row]");
+      const link = navigationElement()?.querySelectorAll(":scope > a")[Number(row?.dataset.sqNavigationLinkRow)];
+      if (!link || !row) return;
+      const fields = row.querySelectorAll("input");
+      if (event.target === fields[0]) link.textContent = event.target.value;
+      if (event.target === fields[1]) setNavigationDestination(link, event.target.value);
+      markSqChanged();
+    });
+    navigationLinkList?.addEventListener("change", finishNavigationEdit);
+    navigationLinkList?.addEventListener("click", (event) => {
+      const button = event.target.closest("button");
+      const row = button?.closest("[data-sq-navigation-link-row]");
+      const link = navigationElement()?.querySelectorAll(":scope > a")[Number(row?.dataset.sqNavigationLinkRow)];
+      if (!button || !link) return;
+      remember(); link.remove(); syncElementControls(); markSqChanged();
+    });
+    sqStudio.querySelector("[data-sq-navigation-add-link]")?.addEventListener("click", () => {
+      const navigation = navigationElement();
+      if (!navigation) return;
+      if (navigation.querySelectorAll(":scope > a").length >= 6) { showToast("Navigation supports up to six links"); return; }
+      remember();
+      const link = document.createElement("a");
+      link.textContent = "New page";
+      setNavigationDestination(link, "#section");
+      const cta = navigation.querySelector(":scope > button");
+      if (cta) cta.before(link); else navigation.append(link);
+      syncElementControls(); markSqChanged();
+    });
+    const updateNavigationCta = () => {
+      const navigation = navigationElement();
+      if (!navigation) return;
+      let cta = navigation.querySelector(":scope > button");
+      if (!cta) { cta = document.createElement("button"); cta.type = "button"; navigation.append(cta); }
+      cta.hidden = !sqStudio.querySelector("[data-sq-navigation-cta-visible]")?.checked;
+      cta.textContent = sqStudio.querySelector("[data-sq-navigation-cta-label]")?.value.trim() || "Buy now";
+      setNavigationDestination(cta, sqStudio.querySelector("[data-sq-navigation-cta-target]")?.value || "#products");
+      markSqChanged();
+    };
+    sqStudio.querySelectorAll("[data-sq-navigation-cta-visible], [data-sq-navigation-cta-label], [data-sq-navigation-cta-target]").forEach((input) => {
+      input.addEventListener("focus", startNavigationEdit);
+      input.addEventListener("input", updateNavigationCta);
+      input.addEventListener("change", finishNavigationEdit);
+    });
     sqStudio.querySelector("[data-sq-logo-clear]")?.addEventListener("click", () => { if (!selectedLogoParts()) return; remember(); setLogoSource(""); showToast("Header switched to the brand name"); });
     sqStudio.querySelectorAll("[data-sq-role-choice]").forEach((button) => button.addEventListener("click", () => {
       if (!selectedElement?.isConnected) return;
@@ -5900,7 +6282,7 @@
 
     const exportDialog = document.getElementById("html-export-dialog");
     const collectExportCss = () => {
-      const tokens = [".sq-page-preview", ".sq-page-block", ".sq-announcement", ".sq-store-nav", ".sq-site-logo", ".sq-hero", ".sq-product", ".sq-image-story", ".sq-image-blend", ".sq-benefit", ".sq-cart", ".sq-shipping", ".sq-generated", ".sq-free", ".sq-marquee", ".sq-surface", ".sq-color", ".element-animation", ".hover-", ".button-", ".ez-fluid", "@keyframes sq", "@keyframes element", ".product-art", ".icon", ".svg-sprite"];
+      const tokens = [".sq-page-preview", ".sq-page-block", ".sq-page-background", ".sq-section-background", ".sq-announcement", ".sq-store-nav", ".sq-site-logo", ".sq-hero", ".sq-product", ".sq-image-story", ".sq-image-blend", ".sq-image-crop", ".sq-benefit", ".sq-cart", ".sq-shipping", ".sq-generated", ".sq-free", ".sq-marquee", ".sq-surface", ".sq-color", ".element-animation", ".hover-", ".button-", ".ez-fluid", "@keyframes sq", "@keyframes element", ".product-art", ".icon", ".svg-sprite"];
       const collect = (rules) => [...rules].map((rule) => {
         if (rule.type === CSSRule.KEYFRAMES_RULE) return tokens.some((token) => rule.cssText.includes(token)) ? rule.cssText : "";
         if (rule.cssRules && !rule.selectorText) { const nested = collect(rule.cssRules); return nested ? `${rule.conditionText ? `@media ${rule.conditionText}` : rule.cssText.slice(0, rule.cssText.indexOf("{"))}{${nested}}` : ""; }
@@ -5911,6 +6293,8 @@
     const generateHtml = () => {
       const clone = previewRoot.cloneNode(true);
       clone.querySelectorAll("img[data-sq-image-blend-mode],img[data-sq-image-blend-source],img[data-sq-image-blend-color]").forEach(applyImageBlend);
+      clone.querySelectorAll("img[data-sq-image-crop-zoom],img[data-sq-image-crop-x],img[data-sq-image-crop-y]").forEach(applyImageCrop);
+      clone.querySelectorAll("img[data-sq-filter-opacity]").forEach(applySelectedImageFilters);
       clone.querySelectorAll(".sq-free-code").forEach((element) => {
         const source = element.querySelector("template[data-sq-code-source]")?.innerHTML || "";
         const content = document.createElement("template"); content.innerHTML = source; element.replaceChildren(content.content.cloneNode(true));
@@ -5951,6 +6335,7 @@
         image.style.removeProperty("--sq-image-scroll-scale");
       });
       clone.querySelectorAll(".sq-block-handle, .sq-image-drag-handle, .sq-element-overlay, .sq-section-toolbar, .sq-layout-grid-overlay, .sq-section-height-handle, .section-hidden, .sq-element-hidden").forEach((node) => node.remove());
+      clone.querySelectorAll(".sq-image-crop-editing, .sq-direct-draggable, .sq-direct-dragging").forEach((node) => node.classList.remove("sq-image-crop-editing", "is-cropping", "sq-direct-draggable", "sq-direct-dragging"));
       clone.querySelectorAll("[data-product-card][hidden], [data-product-line][hidden], .sq-hero-collage > span[hidden]").forEach((node) => node.remove());
       clone.querySelectorAll("[data-section-id]").forEach((node) => { node.dataset.ezkartSection = node.dataset.sectionId; });
       clone.querySelectorAll("[draggable], [contenteditable], [data-sq-block], [data-section-id]").forEach((node) => { node.removeAttribute("draggable"); node.removeAttribute("contenteditable"); node.removeAttribute("data-sq-block"); node.removeAttribute("data-section-id"); node.classList.remove("selected", "dragging", "drag-over", "animating"); });
@@ -6043,7 +6428,7 @@ document.querySelectorAll('[class*="animation-"],[class*="element-animation-"]')
       const fontSemibold = new URL("assets/fonts/poppins-600.woff2", window.location.href).href;
       const fontBold = new URL("assets/fonts/poppins-700.woff2", window.location.href).href;
       const hasScrollMotion = Boolean(clone.querySelector(".ezkart-scroll-frame"));
-      const motionStyles = hasScrollMotion ? `<style>.ezkart-scroll-frame{position:relative!important;overflow:hidden!important;contain:paint}.ezkart-scroll-frame>.ezkart-scroll-media{width:100%!important;max-width:none!important;height:100%;position:absolute!important;left:0!important;top:50%!important;display:block;object-fit:cover;transform:translate3d(0,calc(-50% + var(--ezkart-scroll-y,0px)),0) scale(var(--ezkart-scroll-scale,1));transform-origin:center;will-change:transform;backface-visibility:hidden}@media(prefers-reduced-motion:reduce){.ezkart-scroll-frame>.ezkart-scroll-media{height:100%!important;transform:translate3d(0,-50%,0)!important;will-change:auto}}</style>` : "";
+      const motionStyles = hasScrollMotion ? `<style>.ezkart-scroll-frame{position:relative!important;overflow:hidden!important;contain:paint}.ezkart-scroll-frame>.ezkart-scroll-media{width:100%!important;max-width:none!important;height:100%;position:absolute!important;left:0!important;top:50%!important;display:block;object-fit:cover;transform:translate3d(0,calc(-50% + var(--ezkart-scroll-y,0px)),0) scale(calc(var(--ezkart-scroll-scale,1) * var(--sq-image-crop-zoom,1)));transform-origin:center;will-change:transform;backface-visibility:hidden}@media(prefers-reduced-motion:reduce){.ezkart-scroll-frame>.ezkart-scroll-media{height:100%!important;transform:translate3d(0,-50%,0) scale(var(--sq-image-crop-zoom,1))!important;will-change:auto}}</style>` : "";
       const motionScripts = hasScrollMotion ? `<script>(()=>{const frames=[...document.querySelectorAll('.ezkart-scroll-frame')].map(frame=>({frame,media:frame.querySelector(':scope>.ezkart-scroll-media'),effect:frame.dataset.ezkartScrollEffect||'parallax',strength:Math.max(0,Math.min(100,Number(frame.dataset.ezkartScrollStrength)||0))/100,damping:frame.dataset.ezkartScrollDamping!=='false',y:null,yVelocity:0,scale:1,scaleVelocity:0,coverScale:1})).filter(item=>item.media);if(!frames.length)return;const reduced=matchMedia('(prefers-reduced-motion: reduce)');let raf=0,lastTime=0,viewportHeight=1;const clamp=value=>Math.max(0,Math.min(1,value));const damp=(value,velocity,target,delta,smoothTime)=>{const omega=2/smoothTime,x=omega*delta,decay=1/(1+x+.48*x*x+.235*x*x*x),change=value-target,temp=(velocity+omega*change)*delta;return[target+(change+temp)*decay,(velocity-omega*temp)*decay]};const render=time=>{raf=0;if(reduced.matches)return;const delta=Math.min(.05,lastTime?Math.max(0,(time-lastTime)/1000):1/60);lastTime=time;let moving=false;frames.forEach(item=>{const rect=item.frame.getBoundingClientRect();if(rect.bottom<-viewportHeight*.25||rect.top>viewportHeight*1.25)return;const progress=clamp((viewportHeight-rect.top)/(viewportHeight+rect.height)),reverse=item.effect==='parallax-reverse',rate=reverse?item.strength*.35:item.strength,zoom=item.effect==='zoom';const yTarget=zoom?0:(progress-.5)*(viewportHeight+rect.height)*rate*(reverse?-1:1),scaleTarget=zoom?1+progress*item.strength*.3:item.coverScale;if(item.y===null){item.y=yTarget;item.scale=scaleTarget}else if(item.damping){[item.y,item.yVelocity]=damp(item.y,item.yVelocity,yTarget,delta,.11);if(zoom)[item.scale,item.scaleVelocity]=damp(item.scale,item.scaleVelocity,scaleTarget,delta,.11);else{item.scale=scaleTarget;item.scaleVelocity=0}}else{item.y=yTarget;item.yVelocity=0;item.scale=scaleTarget;item.scaleVelocity=0}item.media.style.setProperty('--ezkart-scroll-y',item.y.toFixed(3)+'px');item.media.style.setProperty('--ezkart-scroll-scale',item.scale.toFixed(5));if(item.damping&&(Math.abs(yTarget-item.y)>.02||Math.abs(item.yVelocity)>.02||zoom&&(Math.abs(scaleTarget-item.scale)>.0001||Math.abs(item.scaleVelocity)>.0001)))moving=true});if(moving)raf=requestAnimationFrame(render)};const schedule=()=>{if(!raf){lastTime=0;raf=requestAnimationFrame(render)}};const measure=()=>{viewportHeight=Math.max(1,document.documentElement.clientHeight||innerHeight);frames.forEach(item=>{const frameHeight=Math.max(1,item.frame.clientHeight),reverse=item.effect==='parallax-reverse',rate=reverse?item.strength*.35:item.strength,overscan=reverse?(viewportHeight+frameHeight)*rate:Math.max(0,viewportHeight-frameHeight)*rate;item.coverScale=item.effect==='zoom'||reduced.matches||!rate?1:1+(overscan+4)/frameHeight;if(item.scale<item.coverScale){item.scale=item.coverScale;item.scaleVelocity=0}if(reduced.matches){item.y=null;item.yVelocity=0;item.scale=1;item.scaleVelocity=0;item.media.style.removeProperty('--ezkart-scroll-y');item.media.style.removeProperty('--ezkart-scroll-scale')}});schedule()};addEventListener('scroll',schedule,{passive:true});addEventListener('touchmove',schedule,{passive:true});addEventListener('resize',measure,{passive:true});addEventListener('orientationchange',measure,{passive:true});addEventListener('pageshow',measure);window.visualViewport?.addEventListener('resize',measure,{passive:true});reduced.addEventListener?.('change',measure);if(typeof ResizeObserver==='function'){const observer=new ResizeObserver(measure);frames.forEach(item=>observer.observe(item.frame))}document.fonts?.ready.then(measure);measure()})();<\/script>` : "";
       return `<!doctype html>\n<html lang="id">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1">\n<title>${escapeHtml(pageName)}</title>\n<meta name="description" content="Shop selected Indonesian products with secure Ezkart checkout and delivery.">\n${motionStyles}\n<style>@font-face{font-family:Poppins;src:url('${fontBase}') format('woff2');font-weight:400}@font-face{font-family:Poppins;src:url('${fontMedium}') format('woff2');font-weight:500}@font-face{font-family:Poppins;src:url('${fontSemibold}') format('woff2');font-weight:600}@font-face{font-family:Poppins;src:url('${fontBold}') format('woff2');font-weight:700}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:#fff;font-family:Poppins,Arial,sans-serif}.svg-sprite{width:0;height:0;position:absolute;overflow:hidden}@media(prefers-reduced-motion:reduce){*{animation:none!important;scroll-behavior:auto!important}}\n${css}\n${responsiveSpacing}\n</style>\n</head>\n<body>\n${sprite}\n${clone.outerHTML}\n${motionScripts}\n${commerceScript}\n</body>\n</html>`;
     };
@@ -6178,6 +6563,8 @@ document.querySelectorAll('[class*="animation-"],[class*="element-animation-"]')
     readCatalogProducts().forEach((product) => installCustomProduct(product, false));
     upgradeLegacyStructure();
     previewRoot?.querySelectorAll("img[data-sq-image-blend-mode],img[data-sq-image-blend-source],img[data-sq-image-blend-color]").forEach(applyImageBlend);
+    previewRoot?.querySelectorAll("img[data-sq-image-crop-zoom],img[data-sq-image-crop-x],img[data-sq-image-crop-y]").forEach(applyImageCrop);
+    previewRoot?.querySelectorAll("img[data-sq-filter-opacity]").forEach(applySelectedImageFilters);
     rebuildLayerList();
     bindSqInteractions();
     updateProductView();
