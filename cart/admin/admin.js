@@ -3474,7 +3474,11 @@
         [blendColorInput, blendColorHex, blendColorClear].forEach((control) => { if (control) control.disabled = blendSource === "behind"; });
         blendColorWrap?.classList.toggle("is-transparent", !blendColor);
         blendColorWrap?.classList.toggle("is-disabled", blendSource === "behind");
-        if (blendNote) blendNote.textContent = blendSource === "behind" ? "Overlap this image with another layer, then use the layer order to choose what sits beneath it." : "Blend the image with a color beneath it. Multiply and Overlay are great for polished brand treatments.";
+        if (blendNote) blendNote.textContent = blendSource === "behind"
+          ? "Overlap this image with another layer, then use the layer order to choose what sits beneath it."
+          : blendMode === "normal" && blendColor
+            ? "Normal shows the original image unchanged. Choose a blend mode to mix in the backdrop color."
+            : "Blend the image with a color beneath it. Multiply and Overlay are great for polished brand treatments.";
         sqStudio.querySelectorAll("[data-sq-image-filter]").forEach((input) => {
           const name = input.dataset.sqImageFilter;
           const value = imageFilterValue(image, name);
@@ -5280,7 +5284,10 @@
       const image = imageForElement();
       if (!image) return;
       const color = /^#[0-9a-f]{6}$/i.test(rawColor || "") ? rawColor.toLowerCase() : "";
-      if (color) image.dataset.sqImageBlendColor = color;
+      if (color) {
+        image.dataset.sqImageBlendColor = color;
+        if (imageBlendSource(image) === "color" && imageBlendMode(image) === "normal") image.dataset.sqImageBlendMode = "multiply";
+      }
       else image.dataset.sqImageBlendColor = "transparent";
       applyImageBlend(image); syncElementControls(); markSqChanged();
     };
