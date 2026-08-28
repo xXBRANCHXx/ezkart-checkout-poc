@@ -201,6 +201,12 @@
   const normalizeCloudLandingPage = (page) => {
     const id = String(page?.id || "");
     const thumbnailUpdatedAt = page?.thumbnailUpdatedAt || null;
+    const thumbnailSourceUpdatedAt = page?.thumbnailSourceUpdatedAt || null;
+    const thumbnailVersion = String(page?.thumbnailVersion || "");
+    const thumbnailIsCurrent = Boolean(id
+      && thumbnailUpdatedAt
+      && thumbnailVersion === landingPageThumbnailVersion
+      && thumbnailSourceUpdatedAt === page?.updatedAt);
     return {
       ...page,
       products: Array.isArray(page?.products) ? page.products : [],
@@ -208,9 +214,9 @@
       status: page?.status === "published" ? "published" : "draft",
       thumbnailUpdatedAt,
       thumbnailBytes: Math.max(0, Math.round(Number(page?.thumbnailBytes) || 0)),
-      thumbnailSourceUpdatedAt: page?.thumbnailSourceUpdatedAt || null,
-      thumbnailVersion: String(page?.thumbnailVersion || ""),
-      thumbnailUrl: id && thumbnailUpdatedAt
+      thumbnailSourceUpdatedAt,
+      thumbnailVersion,
+      thumbnailUrl: thumbnailIsCurrent
         ? `${cloudUrl(`/v1/landing-pages/${encodeURIComponent(id)}/thumbnail`)}&v=${encodeURIComponent(thumbnailUpdatedAt)}`
         : "",
     };
