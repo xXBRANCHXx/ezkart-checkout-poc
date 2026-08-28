@@ -2379,7 +2379,7 @@
     let libraryDrag = null;
     let libraryDropPreview = null;
     let draggedImageSnapshot = null;
-    let showLayoutGrid = false;
+    let showLayoutGrid = true;
     let layoutGridDragging = false;
     let layoutGridTransient = false;
     let layoutGridTimer = 0;
@@ -2925,6 +2925,7 @@
     };
     const elementTypeName = (element) => element?.dataset.sqElementType === "component-instance"
       ? `${element.dataset.sqComponentName || "Component"} instance`
+      : element?.dataset.sqElementType === "navigation" ? "Navigation bar"
       : (element?.dataset.sqElementType || "element").replace(/-/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
     const reviewRating = (element) => Math.max(1, Math.min(5, Math.round(Number(element?.dataset.sqReviewRating) || 5)));
     const renderReviewStars = (element, value = reviewRating(element)) => {
@@ -3170,7 +3171,8 @@
     showElementPanel(activeElementPanel);
     const syncElementControls = () => {
       const controls = sqStudio.querySelector("[data-sq-element-controls]");
-      const valid = selectedElement?.isConnected && selectedElement.closest(`[data-section-id="${selectedSection}"]`);
+      const selectedBackground = selectedElement?.matches?.(".sq-page-background,.sq-section-background");
+      const valid = selectedElement?.isConnected && (selectedBackground || selectedElement.closest(`[data-section-id="${selectedSection}"]`));
       if (controls) controls.hidden = !valid;
       inspector?.classList.toggle("element-selected", Boolean(valid));
       if (!valid) {
@@ -3189,18 +3191,25 @@
       const isMarquee = selectedElement.dataset.sqElementType === "marquee";
       const elementType = selectedElement.dataset.sqElementType || "";
       const isNavigation = elementType === "navigation";
+      const isBackgroundImage = elementType === "image-background";
       const typographyControls = sqStudio.querySelector("[data-sq-typography-controls]");
-      if (typographyControls) typographyControls.hidden = ["image", "collage", "gallery", "divider", "spacer", "icon", "custom-code", "component-instance"].includes(elementType);
+      if (typographyControls) typographyControls.hidden = ["image", "image-background", "collage", "gallery", "divider", "spacer", "icon", "custom-code", "component-instance"].includes(elementType);
       const action = isProductGrid
         ? (selectedAction?.isConnected && selectedElement.contains(selectedAction) ? selectedAction : null)
         : isNavigation ? selectedAction : actionForElement();
       const image = isLogo || isProductGrid ? null : imageForElement();
       const contentName = selectedContent?.matches("h1,h2,h3") ? "Heading" : selectedContent ? "Text" : "";
-      const contextualName = isLogo ? "Logo" : selectedAction && action ? "Button" : selectedImage && image ? "Image" : contentName || elementTypeName(selectedElement);
+      const contextualName = isBackgroundImage ? `${selectedElement.dataset.sqBackgroundScope === "page" ? "Page" : "Section"} background` : isLogo ? "Logo" : selectedAction && action ? "Button" : selectedImage && image ? "Image" : contentName || elementTypeName(selectedElement);
       const context = sqStudio.querySelector("[data-sq-inspector-context]");
       const title = sqStudio.querySelector("[data-sq-inspector-title]");
-      if (context) context.textContent = "Selected element";
+      if (context) context.textContent = isBackgroundImage ? "Selected background image" : "Selected element";
       if (title) title.textContent = contextualName;
+      const backButton = sqStudio.querySelector("[data-sq-select-section]");
+      if (backButton?.lastChild) backButton.lastChild.textContent = isBackgroundImage && selectedElement.dataset.sqBackgroundScope === "page" ? " Back to page" : " Back to section";
+      sqStudio.querySelectorAll("[data-sq-element-tab]").forEach((button) => { button.hidden = isBackgroundImage && ["style", "layout"].includes(button.dataset.sqElementTab); });
+      const elementActions = sqStudio.querySelector("[data-sq-element-actions]");
+      if (elementActions) elementActions.hidden = isBackgroundImage;
+      if (isBackgroundImage && ["style", "layout"].includes(activeElementPanel)) showElementPanel("content");
       [["x", layout.x], ["y", layout.y], ["w", layout.width], ["h", layout.height]].forEach(([field, value]) => {
         const input = sqStudio.querySelector(`[data-sq-element-${field}]`);
         if (input) input.value = String(value);
@@ -3413,6 +3422,8 @@
       const imageScrollControls = sqStudio.querySelector("[data-sq-image-scroll-controls]");
       if (imageScrollControls) imageScrollControls.hidden = !image;
       if (image) {
+        const imageHeading = sqStudio.querySelector("[data-sq-image-controls] > .sq-inspector-heading h3");
+        if (imageHeading) imageHeading.textContent = isBackgroundImage ? "Background image" : "Image";
         const srcInput = sqStudio.querySelector("[data-sq-image-src]");
         const altInput = sqStudio.querySelector("[data-sq-image-alt]");
         const fitInput = sqStudio.querySelector("[data-sq-image-fit]");
@@ -3438,11 +3449,13 @@
         if (cropZoomOutput) cropZoomOutput.textContent = `${cropZoom}%`;
         if (cropXInput) cropXInput.value = String(cropX);
         if (cropYInput) cropYInput.value = String(cropY);
+        const backgroundActions = sqStudio.querySelector(".sq-image-background-actions");
+        if (backgroundActions) backgroundActions.hidden = isBackgroundImage;
         sqStudio.querySelectorAll("[data-sq-image-background]").forEach((button) => {
           const scope = button.dataset.sqImageBackground;
           const hasBackground = scope === "page" ? Boolean(previewRoot?.querySelector(":scope > .sq-page-background")) : Boolean(selectedElement?.closest("[data-sq-block]")?.querySelector(":scope > .sq-section-background"));
           button.classList.toggle("active", hasBackground);
-          button.textContent = hasBackground ? `Clear ${scope}` : scope[0].toUpperCase() + scope.slice(1);
+          button.textContent = hasBackground ? `Replace ${scope}` : `Set ${scope}`;
         });
         const blendModeInput = sqStudio.querySelector("[data-sq-image-blend-mode]");
         const blendSourceInput = sqStudio.querySelector("[data-sq-image-blend-source]");
@@ -3501,6 +3514,7 @@
     const refreshElementOverlay = () => {
       removeElementOverlay();
       if (!selectedElement?.isConnected) return;
+      if (selectedElement.matches(".sq-page-background,.sq-section-background")) return;
       const section = selectedElement.closest("[data-sq-fluid]");
       if (!section) return;
       const overlay = document.createElement("div");
@@ -3520,7 +3534,7 @@
       bindElementPointerControl(overlay.querySelector("[data-sq-element-resize]"), true);
     };
     const selectSqElement = (element, action = null, image = null, content = null) => {
-      if (!element?.matches("[data-sq-element]")) return;
+      if (!element?.matches("[data-sq-element],.sq-page-background,.sq-section-background")) return;
       if (cropEditingImage && (!element.contains(cropEditingImage) || image?.matches?.("img") && image !== cropEditingImage)) {
         imageVisualHostFor(cropEditingImage)?.classList.remove("sq-image-crop-editing");
         cropEditingImage = null;
@@ -3564,6 +3578,8 @@
     };
     const deleteSelectedElement = () => {
       if (!selectedElement?.isConnected) return;
+      const deletingBackground = selectedElement.matches(".sq-page-background,.sq-section-background");
+      const backgroundScope = selectedElement.dataset.sqBackgroundScope;
       remember();
       const section = selectedElement.closest("[data-sq-fluid]");
       selectedElement.remove();
@@ -3577,8 +3593,9 @@
       rebuildLayerList();
       bindSqInteractions();
       deselectSqItem(section?.dataset.sectionId);
+      syncBackgroundManagers();
       markSqChanged();
-      showToast("Element deleted — Undo is available");
+      showToast(deletingBackground ? `${backgroundScope === "page" ? "Page" : "Section"} background removed` : "Element deleted — Undo is available");
     };
     const bindElementPointerControl = (handle, resizing) => {
       if (!handle) return;
@@ -3761,6 +3778,7 @@
       if (height) height.value = String(gridCellHeightState[activeDevice]);
       if (heightOutput) heightOutput.textContent = `${gridCellHeightState[activeDevice]}px`;
       if (visibility) visibility.checked = showLayoutGrid;
+      sqStudio.querySelectorAll("[data-sq-grid-toggle]").forEach((button) => { button.classList.toggle("active", showLayoutGrid); button.setAttribute("aria-pressed", String(showLayoutGrid)); button.setAttribute("aria-label", showLayoutGrid ? "Hide rectangle grid" : "Show rectangle grid"); });
       syncBuilderRanges();
     };
     const applyPageGutter = (device, gutter) => {
@@ -4040,8 +4058,9 @@
       if (spacingState.has(spacingKey())) applySpacing();
       syncInspectorContent();
       syncElementControls();
+      syncBackgroundManagers();
       if (selectedElement) requestAnimationFrame(refreshElementOverlay);
-      else requestAnimationFrame(refreshSectionToolbar);
+      else { sqStudio.querySelector(".sq-inspector-scroll")?.scrollTo({ top: 0, behavior: "smooth" }); requestAnimationFrame(refreshSectionToolbar); }
     };
     const deselectSqItem = (sectionId = selectedSection) => {
       if (sectionId) selectedSection = sectionId;
@@ -4073,6 +4092,8 @@
       if (title) title.textContent = "Spacing";
       syncPageSpacingControls();
       syncPageGridControls();
+      syncBackgroundManagers();
+      sqStudio.querySelector(".sq-inspector-scroll")?.scrollTo({ top: 0, behavior: "smooth" });
       requestAnimationFrame(refreshLayoutGrid);
     };
 
@@ -4098,6 +4119,9 @@
         if (!observedMarquees.has(element)) { observedMarquees.add(element); marqueeResizeObserver?.observe(element); }
       });
       scheduleImageScrollEffects();
+      sqStudio.querySelectorAll("[data-sq-background-layer]").forEach((button) => {
+        button.onclick = (event) => { event.stopPropagation(); selectBackgroundLayer(button.dataset.sqBackgroundLayer, button.dataset.sectionId || selectedSection); };
+      });
       previewRoot?.querySelectorAll('[class*="hover-"]').forEach((element) => {
         [...element.classList].filter((name) => name.startsWith("hover-")).forEach((name) => element.classList.remove(name));
       });
@@ -4741,7 +4765,8 @@
       applyFluidLayouts(); syncPageGridControls(); revealLayoutGrid(); markSqChanged();
     });
     sqStudio.querySelectorAll("[data-sq-grid-density], [data-sq-grid-cell-width], [data-sq-grid-cell-height]").forEach((input) => input.addEventListener("change", () => { if (gridDensitySnapshot) remember(gridDensitySnapshot); gridDensitySnapshot = null; }));
-    sqStudio.querySelector("[data-sq-show-layout-grid]")?.addEventListener("change", (event) => { showLayoutGrid = event.currentTarget.checked; refreshLayoutGrid(); });
+    sqStudio.querySelector("[data-sq-show-layout-grid]")?.addEventListener("change", (event) => { showLayoutGrid = event.currentTarget.checked; syncPageGridControls(); refreshLayoutGrid(); });
+    sqStudio.querySelectorAll("[data-sq-grid-toggle]").forEach((button) => button.addEventListener("click", () => { showLayoutGrid = !showLayoutGrid; syncPageGridControls(); refreshLayoutGrid(); }));
 
     let spacingSnapshot;
     sqStudio.querySelectorAll("[data-sq-spacing]").forEach((input) => {
@@ -4945,7 +4970,7 @@
       selectedElement.classList.remove("sq-color-override");
       delete selectedElement.dataset.sqSurface; delete selectedElement.dataset.sqAlign; syncElementControls(); refreshElementOverlay(); markSqChanged();
     });
-    sqStudio.querySelector("[data-sq-select-section]")?.addEventListener("click", () => selectSqSection(selectedSection, true));
+    sqStudio.querySelector("[data-sq-select-section]")?.addEventListener("click", () => selectedElement?.dataset.sqBackgroundScope === "page" ? deselectSqItem(selectedSection) : selectSqSection(selectedSection, true));
 
     let textControlSnapshot;
     sqStudio.querySelector("[data-sq-element-text]")?.addEventListener("focus", () => { textControlSnapshot = captureState(); });
@@ -5048,7 +5073,7 @@
         const image = imageForElement();
         if (!image) return;
         image.setAttribute(attribute, event.currentTarget.value.trim());
-        finishImageEdit(); markSqChanged();
+        finishImageEdit(); syncBackgroundManagers(); markSqChanged();
       });
     };
     updateImageTextSetting("[data-sq-image-src]", "src");
@@ -5132,31 +5157,108 @@
       window.addEventListener("pointerup", end, { once: true });
       window.addEventListener("pointercancel", end, { once: true });
     }, true);
+    const backgroundTargetFor = (scope) => scope === "page" ? previewRoot : previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`);
+    const backgroundLayerFor = (scope) => backgroundTargetFor(scope)?.querySelector(scope === "page" ? ":scope > .sq-page-background" : ":scope > .sq-section-background") || null;
+    const prepareBackgroundLayer = (layer, scope) => {
+      if (!layer) return null;
+      layer.dataset.sqElementType = "image-background";
+      layer.dataset.sqBackgroundScope = scope;
+      layer.setAttribute("aria-hidden", "true");
+      return layer;
+    };
+    const syncBackgroundManagers = () => {
+      previewRoot?.querySelectorAll(":scope > .sq-page-background").forEach((layer) => prepareBackgroundLayer(layer, "page"));
+      previewRoot?.querySelectorAll("[data-sq-block] > .sq-section-background").forEach((layer) => prepareBackgroundLayer(layer, "section"));
+      sqStudio.querySelectorAll("[data-sq-background-manager]").forEach((manager) => {
+        const scope = manager.dataset.sqBackgroundManager;
+        const layer = backgroundLayerFor(scope);
+        const image = layer?.querySelector("img");
+        const thumbnail = manager.querySelector("[data-sq-background-thumbnail]");
+        const title = manager.querySelector("[data-sq-background-title]");
+        const status = manager.querySelector("[data-sq-background-status]");
+        const url = manager.querySelector("[data-sq-background-url]");
+        const edit = manager.querySelector("[data-sq-background-edit]");
+        const remove = manager.querySelector("[data-sq-background-remove]");
+        if (thumbnail) { thumbnail.classList.toggle("has-image", Boolean(image)); thumbnail.style.backgroundImage = image ? `url("${String(image.currentSrc || image.src).replace(/["\\]/g, "\\$&")}")` : ""; }
+        if (title) title.textContent = image ? `${scope === "page" ? "Page" : "Section"} background ready` : "No background image";
+        if (status) status.textContent = image ? "Click Edit effects for crop, blend, filters, and parallax." : "Upload an image or paste a URL below.";
+        if (url && document.activeElement !== url) url.value = image && /^(https?:\/\/|\/|\.\.\/|\.\/)/i.test(image.getAttribute("src") || "") ? image.getAttribute("src") : "";
+        if (edit) edit.hidden = !image;
+        if (remove) remove.hidden = !image;
+      });
+    };
+    const selectBackgroundLayer = (scope, sectionId = selectedSection) => {
+      if (scope === "section" && sectionId !== selectedSection) selectSqSection(sectionId);
+      const layer = backgroundLayerFor(scope);
+      const image = layer?.querySelector("img");
+      if (!layer || !image) return;
+      prepareBackgroundLayer(layer, scope);
+      selectSqElement(layer, null, image);
+      showElementPanel("content");
+      syncElementControls();
+    };
+    const installBackgroundImage = (scope, source, snapshot = captureState()) => {
+      const target = backgroundTargetFor(scope);
+      if (!target || !source) return null;
+      const selector = scope === "page" ? ":scope > .sq-page-background" : ":scope > .sq-section-background";
+      let layer = target.querySelector(selector);
+      let image = layer?.querySelector("img");
+      if (!layer) {
+        layer = document.createElement("div");
+        layer.className = scope === "page" ? "sq-page-background" : "sq-section-background";
+        prepareBackgroundLayer(layer, scope);
+        target.prepend(layer);
+      }
+      if (source instanceof HTMLImageElement) {
+        const copy = source.cloneNode(true);
+        copy.alt = ""; copy.draggable = false;
+        copy.removeAttribute("tabindex");
+        copy.classList.remove("sq-image-selected", "sq-element-selected", "sq-image-crop-editing", "is-cropping");
+        layer.replaceChildren(copy);
+        image = copy;
+      } else {
+        if (!image) { image = document.createElement("img"); image.alt = ""; image.draggable = false; layer.append(image); }
+        image.src = String(source);
+      }
+      applyImageCrop(image); applySelectedImageFilters(image); applyImageBlend(image);
+      remember(snapshot); rebuildLayerList(); bindSqInteractions(); syncBackgroundManagers(); scheduleImageScrollEffects(); markSqChanged();
+      selectBackgroundLayer(scope);
+      showToast(`${scope === "page" ? "Page" : "Section"} background added — image controls are open`);
+      return image;
+    };
+    const removeBackgroundImage = (scope) => {
+      const layer = backgroundLayerFor(scope);
+      if (!layer) return;
+      remember();
+      if (selectedElement === layer) { selectedElement = null; selectedImage = null; }
+      layer.remove(); rebuildLayerList(); bindSqInteractions(); syncBackgroundManagers(); markSqChanged();
+      if (scope === "page") deselectSqItem(selectedSection); else selectSqSection(selectedSection, true);
+      showToast(`${scope === "page" ? "Page" : "Section"} background removed`);
+    };
     const setImageAsBackground = (scope) => {
       const image = imageForElement();
-      const section = selectedElement?.closest("[data-sq-block]");
-      const target = scope === "page" ? previewRoot : section;
-      if (!image || !target) return;
-      remember();
-      const selector = scope === "page" ? ":scope > .sq-page-background" : ":scope > .sq-section-background";
-      const existing = target.querySelector(selector);
-      if (existing) {
-        existing.remove(); syncElementControls(); markSqChanged(); showToast(`${scope[0].toUpperCase() + scope.slice(1)} background cleared`); return;
-      }
-      const layer = document.createElement("div");
-      layer.className = scope === "page" ? "sq-page-background" : "sq-section-background";
-      layer.setAttribute("aria-hidden", "true");
-      const copy = image.cloneNode(true);
-      copy.alt = ""; copy.draggable = false;
-      copy.removeAttribute("tabindex");
-      copy.classList.remove("sq-image-selected", "sq-element-selected", "sq-image-crop-editing", "is-cropping");
-      layer.append(copy);
-      target.prepend(layer);
-      applyImageCrop(copy); applySelectedImageFilters(copy); applyImageBlend(copy);
-      scheduleImageScrollEffects(); syncElementControls(); markSqChanged();
-      showToast(`Image set as ${scope} background`);
+      if (!image) return;
+      installBackgroundImage(scope, image);
     };
     sqStudio.querySelectorAll("[data-sq-image-background]").forEach((button) => button.addEventListener("click", () => setImageAsBackground(button.dataset.sqImageBackground)));
+    sqStudio.querySelectorAll("[data-sq-background-edit]").forEach((button) => button.addEventListener("click", () => selectBackgroundLayer(button.dataset.sqBackgroundEdit)));
+    sqStudio.querySelectorAll("[data-sq-background-remove]").forEach((button) => button.addEventListener("click", () => removeBackgroundImage(button.dataset.sqBackgroundRemove)));
+    sqStudio.querySelectorAll("[data-sq-background-apply]").forEach((button) => button.addEventListener("click", () => {
+      const scope = button.dataset.sqBackgroundApply;
+      const value = sqStudio.querySelector(`[data-sq-background-url="${scope}"]`)?.value.trim();
+      if (!value || !/^(https?:\/\/|\/|\.\.\/|\.\/)/i.test(value)) { showToast("Paste a valid image URL"); return; }
+      installBackgroundImage(scope, value);
+    }));
+    sqStudio.querySelectorAll("[data-sq-background-upload]").forEach((input) => input.addEventListener("change", (event) => {
+      const file = event.currentTarget.files?.[0];
+      if (!file) return;
+      if (file.size > 8 * 1024 * 1024) { showToast("Choose an image smaller than 8 MB"); event.currentTarget.value = ""; return; }
+      const snapshot = captureState();
+      const reader = new FileReader();
+      reader.onload = () => installBackgroundImage(event.currentTarget.dataset.sqBackgroundUpload, String(reader.result || ""), snapshot);
+      reader.readAsDataURL(file);
+      event.currentTarget.value = "";
+    }));
     sqStudio.querySelector("[data-sq-image-blend-mode]")?.addEventListener("change", (event) => {
       const image = imageForElement();
       if (!image) return;
@@ -5228,7 +5330,7 @@
       reader.onload = () => {
         image.src = String(reader.result || "");
         image.alt = image.alt || file.name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ");
-        remember(snapshot); syncElementControls(); markSqChanged(); showToast("Image replaced — effects stay editable");
+        remember(snapshot); syncElementControls(); syncBackgroundManagers(); markSqChanged(); showToast("Image replaced — effects stay editable");
       };
       reader.readAsDataURL(file);
       event.currentTarget.value = "";
@@ -5354,9 +5456,14 @@
       refreshElementOverlay(); markSqChanged();
     });
     sqStudio.querySelector("[data-sq-logo-width]")?.addEventListener("change", finishLogoEdit);
-    const navigationElement = () => previewRoot?.querySelector('[data-sq-element-type="navigation"]') || null;
+    const navigationElement = () => selectedElement?.dataset.sqElementType === "navigation" ? selectedElement : previewRoot?.querySelector('[data-sq-element-type="navigation"]') || null;
     const selectHeaderElement = (type) => {
       const element = previewRoot?.querySelector(`[data-sq-element-type="${type}"]`);
+      if (!element && type === "navigation") {
+        const section = previewRoot?.querySelector('[data-section-id="navigation"]') || previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`);
+        addLibraryElement("navigation", section);
+        return;
+      }
       const section = element?.closest("[data-section-id]");
       if (!element || !section) return;
       openSqPanel("layers", { pin: true });
@@ -5364,8 +5471,14 @@
       selectSqElement(element);
       element.scrollIntoView({ behavior: "smooth", block: "center" });
     };
-    sqStudio.querySelector("[data-sq-edit-logo]")?.addEventListener("click", () => selectHeaderElement("logo"));
-    sqStudio.querySelector("[data-sq-edit-navigation]")?.addEventListener("click", () => selectHeaderElement("navigation"));
+    sqStudio.querySelectorAll("[data-sq-edit-logo]").forEach((button) => button.addEventListener("click", () => selectHeaderElement("logo")));
+    sqStudio.querySelectorAll("[data-sq-edit-navigation]").forEach((button) => button.addEventListener("click", () => selectHeaderElement("navigation")));
+    sqStudio.querySelectorAll("[data-sq-edit-page-background]").forEach((button) => button.addEventListener("click", () => {
+      deselectSqItem(selectedSection);
+      const manager = sqStudio.querySelector('[data-sq-background-manager="page"]');
+      manager?.scrollIntoView({ behavior: "smooth", block: "start" });
+      manager?.querySelector('[data-sq-background-upload="page"]')?.parentElement?.focus?.({ preventScroll: true });
+    }));
     const setNavigationDestination = (action, rawValue) => {
       const value = String(rawValue || "").trim() || "#products";
       const sectionLink = value.startsWith("#");
@@ -5772,19 +5885,31 @@
     };
     const rebuildLayerList = () => {
       if (!layerList) return;
-      layerList.replaceChildren(...[...(previewRoot?.querySelectorAll(":scope > [data-sq-block]") || [])].map((section) => {
+      const groups = [...(previewRoot?.querySelectorAll(":scope > [data-sq-block]") || [])].map((section) => {
         const sectionId = section.dataset.sectionId;
         const detailKey = Object.keys(layerDetails).sort((a, b) => b.length - a.length).find((key) => sectionId === key || sectionId.startsWith(`${key}-`));
         const details = layerDetails[detailKey] || [elementTypeName(section), "Editable section", "layers"];
         const elements = [...section.querySelectorAll(":scope > [data-sq-element]")];
+        const sectionBackground = section.querySelector(":scope > .sq-section-background");
         elements.forEach((element, index) => { if (!element.dataset.sqElementId) element.dataset.sqElementId = `element-${sectionId.replace(/[^a-z0-9-]/gi, "-")}-${index + 1}-${Date.now()}`; });
         const wrapper = document.createElement("div");
         wrapper.className = `sq-layer-group${sectionId === selectedSection ? " active" : ""}${section.classList.contains("section-hidden") ? " section-hidden" : ""}`;
         wrapper.dataset.sqLayerGroup = "";
         wrapper.dataset.sectionId = sectionId;
-        wrapper.innerHTML = `<button type="button" draggable="true" data-sq-layer data-section-id="${escapeHtml(sectionId)}">${iconMarkup("grip")}<span>${iconMarkup(details[2])}</span><div><b>${escapeHtml(details[0])}</b><small>${elements.length} element${elements.length === 1 ? "" : "s"} · ${escapeHtml(details[1])}</small></div>${iconMarkup("chevron-right")}</button><div class="sq-layer-elements" aria-label="${escapeHtml(details[0])} elements">${elements.map((element) => `<button type="button" draggable="true" class="${element.classList.contains("sq-element-hidden") ? "element-hidden" : ""}" data-sq-element-layer="${escapeHtml(element.dataset.sqElementId)}"><span>${iconMarkup(elementLayerIcon(element.dataset.sqElementType))}</span><div><b>${escapeHtml(elementTypeName(element))}</b><small>${escapeHtml(elementLayerPreview(element))}</small></div>${iconMarkup("chevron-right")}</button>`).join("")}</div>`;
+        const backgroundEntry = sectionBackground ? `<button type="button" class="sq-background-layer-entry" data-sq-background-layer="section" data-section-id="${escapeHtml(sectionId)}"><span>${iconMarkup("image")}</span><div><b>Background image</b><small>Click to edit crop, blend, filters, and motion</small></div>${iconMarkup("chevron-right")}</button>` : "";
+        wrapper.innerHTML = `<button type="button" draggable="true" data-sq-layer data-section-id="${escapeHtml(sectionId)}">${iconMarkup("grip")}<span>${iconMarkup(details[2])}</span><div><b>${escapeHtml(details[0])}</b><small>${elements.length} element${elements.length === 1 ? "" : "s"} · ${escapeHtml(details[1])}</small></div>${iconMarkup("chevron-right")}</button><div class="sq-layer-elements" aria-label="${escapeHtml(details[0])} elements">${backgroundEntry}${elements.map((element) => `<button type="button" draggable="true" class="${element.classList.contains("sq-element-hidden") ? "element-hidden" : ""}" data-sq-element-layer="${escapeHtml(element.dataset.sqElementId)}"><span>${iconMarkup(elementLayerIcon(element.dataset.sqElementType))}</span><div><b>${escapeHtml(elementTypeName(element))}</b><small>${escapeHtml(elementLayerPreview(element))}</small></div>${iconMarkup("chevron-right")}</button>`).join("")}</div>`;
         return wrapper;
-      }));
+      });
+      const pageBackground = previewRoot?.querySelector(":scope > .sq-page-background");
+      if (pageBackground) {
+        const entry = document.createElement("button");
+        entry.type = "button";
+        entry.className = "sq-page-background-entry";
+        entry.dataset.sqBackgroundLayer = "page";
+        entry.innerHTML = `<span>${iconMarkup("image")}</span><div><b>Page background image</b><small>Whole-page crop, blend, filters, and motion</small></div>${iconMarkup("chevron-right")}`;
+        groups.unshift(entry);
+      }
+      layerList.replaceChildren(...groups);
     };
     const syncBrandControls = () => {
       const computed = getComputedStyle(previewRoot);
@@ -5814,6 +5939,7 @@
       if (type === "text") return `<div class="sq-free-element sq-free-text" data-sq-element data-sq-element-type="text"><p>Add your story, product details, or supporting copy here.</p></div>`;
       if (type === "marquee") return `<div class="sq-free-element sq-free-marquee" data-sq-element data-sq-element-type="marquee" data-sq-marquee-mode="auto" data-sq-marquee-speed="60"><div class="sq-marquee-track"><span class="sq-marquee-copy">NEW ARRIVALS ✦ SHOP THE DROP ✦ MADE FOR YOUR EVERYDAY ✦</span><span class="sq-marquee-copy" aria-hidden="true">NEW ARRIVALS ✦ SHOP THE DROP ✦ MADE FOR YOUR EVERYDAY ✦</span></div></div>`;
       if (type === "button") return `<div class="sq-free-element sq-free-button" data-sq-element data-sq-element-type="button"><button type="button">Call to action</button></div>`;
+      if (type === "navigation") return `<nav class="sq-free-element sq-free-navigation" data-sq-element data-sq-element-type="navigation"><a href="#products">Shop</a><a href="#story">Our story</a><a href="#contact">Contact</a><button type="button">Buy now</button></nav>`;
       if (type === "image") return `<div class="sq-free-element sq-free-image" data-sq-element data-sq-element-type="image"><img src="${productImages.granola}" alt="Product image"></div>`;
       if (type === "divider") return `<div class="sq-free-element sq-free-divider" data-sq-element data-sq-element-type="divider"><span></span></div>`;
       if (type === "html") return `<div class="sq-free-element sq-free-code" data-sq-element data-sq-element-type="custom-code"><iframe title="Custom code preview" sandbox="allow-scripts allow-forms" data-sq-code-render></iframe><template data-sq-code-source><style>.custom-promo{height:100%;padding:32px;display:grid;place-content:center;background:linear-gradient(135deg,#191923,#392d69);color:white;border-radius:18px;text-align:center}.custom-promo strong{font-size:28px}.custom-promo p{margin:8px 0 0;opacity:.72}</style><div class="custom-promo"><strong>Custom HTML block</strong><p>Add HTML, CSS, or JavaScript from the inspector.</p></div></template></div>`;
@@ -5841,7 +5967,7 @@
     };
     const libraryElementDimensions = (type) => ({
       heading: { width: 6, height: 4 }, text: { width: 6, height: 3 }, marquee: { width: fluidColumns(), height: 2 }, button: { width: 3, height: 2 },
-      image: { width: 6, height: 8 }, divider: { width: 8, height: 1 }, form: { width: 6, height: 5 }, html: { width: 8, height: 8 },
+      navigation: { width: fluidColumns(), height: 2 }, image: { width: 6, height: 8 }, divider: { width: 8, height: 1 }, form: { width: 6, height: 5 }, html: { width: 8, height: 8 },
     }[type] || { width: 6, height: 4 });
     const clearLibraryDropPreview = () => {
       libraryDropPreview?.remove();
@@ -5893,7 +6019,7 @@
       const element = wrapper.firstElementChild;
       const dimensions = libraryElementDimensions(type);
       ["desktop", "tablet", "mobile"].forEach((device) => {
-        const desired = device === "mobile" || type === "marquee" ? { ...dimensions, width: fluidColumns(device) } : dimensions;
+        const desired = device === "mobile" || ["marquee", "navigation"].includes(type) ? { ...dimensions, width: fluidColumns(device) } : dimensions;
         setElementLayout(element, findOpenElementLayout(section, desired, device), device);
       });
       if (preferredLayout) setElementLayout(element, preferredLayout, activeDevice);
@@ -6267,6 +6393,7 @@
       if (event.key === "Escape" && selectedElement?.isConnected) { deselectSqItem(selectedSection); return; }
       if (event.key === "Delete" || event.key === "Backspace") { event.preventDefault(); if (selectedElement?.isConnected) deleteSelectedElement(); else deleteSelectedSection(); return; }
       if (!selectedElement?.isConnected) return;
+      if (selectedElement.matches(".sq-page-background,.sq-section-background")) return;
       const movements = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
       if (!movements[event.key]) return;
       event.preventDefault();
@@ -6335,7 +6462,7 @@
         image.style.removeProperty("--sq-image-scroll-scale");
       });
       clone.querySelectorAll(".sq-block-handle, .sq-image-drag-handle, .sq-element-overlay, .sq-section-toolbar, .sq-layout-grid-overlay, .sq-section-height-handle, .section-hidden, .sq-element-hidden").forEach((node) => node.remove());
-      clone.querySelectorAll(".sq-image-crop-editing, .sq-direct-draggable, .sq-direct-dragging").forEach((node) => node.classList.remove("sq-image-crop-editing", "is-cropping", "sq-direct-draggable", "sq-direct-dragging"));
+      clone.querySelectorAll(".sq-image-crop-editing, .sq-direct-draggable, .sq-direct-dragging, .sq-page-background.sq-element-selected, .sq-section-background.sq-element-selected").forEach((node) => node.classList.remove("sq-image-crop-editing", "is-cropping", "sq-direct-draggable", "sq-direct-dragging", "sq-element-selected"));
       clone.querySelectorAll("[data-product-card][hidden], [data-product-line][hidden], .sq-hero-collage > span[hidden]").forEach((node) => node.remove());
       clone.querySelectorAll("[data-section-id]").forEach((node) => { node.dataset.ezkartSection = node.dataset.sectionId; });
       clone.querySelectorAll("[draggable], [contenteditable], [data-sq-block], [data-section-id]").forEach((node) => { node.removeAttribute("draggable"); node.removeAttribute("contenteditable"); node.removeAttribute("data-sq-block"); node.removeAttribute("data-section-id"); node.classList.remove("selected", "dragging", "drag-over", "animating"); });
