@@ -3275,7 +3275,8 @@
     const applyNavigationSectionBehavior = (section) => {
       if (!section) return;
       const position = ["static", "sticky", "fixed"].includes(section.dataset.sqNavPosition) ? section.dataset.sqNavPosition : "static";
-      const offset = Math.max(0, Math.min(120, Number(section.dataset.sqNavOffset) || 0));
+      const offsetWasCustomized = section.dataset.sqNavOffsetCustomized === "true";
+      const offset = offsetWasCustomized ? Math.max(0, Math.min(120, Number(section.dataset.sqNavOffset) || 0)) : 0;
       const surfaceFallback = section.dataset.sqNavTemplate === "overlay" ? "transparent" : "solid";
       const surface = ["solid", "blur", "transparent"].includes(section.dataset.sqNavSurface) ? section.dataset.sqNavSurface : surfaceFallback;
       const opacity = Math.max(0, Math.min(100, Number(section.dataset.sqNavOpacity ?? (surface === "transparent" ? 0 : surface === "blur" ? 82 : 100))));
@@ -3283,6 +3284,7 @@
       if (position !== "static") moveNavigationSectionToTop(section);
       section.dataset.sqNavPosition = position;
       section.dataset.sqNavOffset = String(offset);
+      section.dataset.sqNavOffsetCustomized = String(offsetWasCustomized);
       section.dataset.sqNavSurface = surface;
       section.dataset.sqNavOpacity = String(opacity);
       section.dataset.sqNavBlur = String(blur);
@@ -5809,6 +5811,7 @@
       const section = navigationSectionFor();
       if (!section) return;
       section.dataset.sqNavOffset = String(event.currentTarget.value);
+      section.dataset.sqNavOffsetCustomized = "true";
       applyNavigationSectionBehavior(section);
       const output = sqStudio.querySelector("[data-sq-navigation-offset-output]");
       if (output) output.textContent = `${event.currentTarget.value}px`;
