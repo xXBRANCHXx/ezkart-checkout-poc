@@ -2546,6 +2546,10 @@
       clone.querySelectorAll(".sq-image-crop-editing, .sq-direct-dragging").forEach((element) => element.classList.remove("sq-image-crop-editing", "is-cropping", "sq-direct-dragging"));
       clone.querySelectorAll(".sq-image-scroll-host").forEach((host) => host.classList.remove("sq-image-scroll-host"));
       clone.querySelectorAll(".sq-image-scroll-media").forEach((image) => { image.classList.remove("sq-image-scroll-media"); image.style.removeProperty("transform"); });
+      clone.querySelectorAll("[data-sq-nav-position]").forEach((navigation) => {
+        navigation.classList.remove("sq-nav-is-stuck", "sq-nav-hidden");
+        navigation.style.removeProperty("--sq-nav-editor-shift");
+      });
       return clone.innerHTML;
     };
     const captureState = () => ({
@@ -3230,6 +3234,37 @@
     });
     showElementPanel(activeElementPanel);
     const navigationSectionFor = (element = selectedElement) => element?.dataset?.sqElementType === "navigation" ? element.closest("[data-sq-block]") : null;
+    const navigationScrollRoot = sqStudio.querySelector(".sq-canvas-scroll");
+    let editorNavigationFrame = 0;
+    const syncEditorNavigation = () => {
+      editorNavigationFrame = 0;
+      if (!navigationScrollRoot || !previewRoot || !deviceFrame) return;
+      const scrollRect = navigationScrollRoot.getBoundingClientRect();
+      const rootRect = previewRoot.getBoundingClientRect();
+      const renderedScale = deviceFrame.offsetWidth > 0 ? deviceFrame.getBoundingClientRect().width / deviceFrame.offsetWidth : zoom / 100;
+      const scale = Number.isFinite(renderedScale) && renderedScale > 0 ? renderedScale : 1;
+      previewRoot.querySelectorAll("[data-sq-nav-position]").forEach((navigation) => {
+        const position = navigation.dataset.sqNavPosition || "static";
+        if (position === "static") {
+          navigation.classList.remove("sq-nav-is-stuck", "sq-nav-hidden");
+          navigation.style.removeProperty("--sq-nav-editor-shift");
+          return;
+        }
+        const offset = Math.max(0, Math.min(120, Number(navigation.dataset.sqNavOffset) || 0));
+        const desiredTop = scrollRect.top + offset * scale;
+        const maximumShift = Math.max(0, previewRoot.offsetHeight - navigation.offsetHeight);
+        const shift = Math.max(0, Math.min(maximumShift, (desiredTop - rootRect.top) / scale));
+        navigation.style.setProperty("--sq-nav-editor-shift", `${shift}px`);
+        navigation.classList.toggle("sq-nav-is-stuck", shift > .5);
+        navigation.classList.remove("sq-nav-hidden");
+      });
+    };
+    const scheduleEditorNavigation = () => {
+      if (editorNavigationFrame) return;
+      editorNavigationFrame = requestAnimationFrame(syncEditorNavigation);
+    };
+    navigationScrollRoot?.addEventListener("scroll", scheduleEditorNavigation, { passive: true });
+    window.addEventListener("resize", scheduleEditorNavigation);
     const moveNavigationSectionToTop = (section) => {
       if (!section || section.parentElement !== previewRoot) return;
       const pageBackground = [...previewRoot.querySelectorAll(":scope > .sq-page-background")].at(-1) || null;
@@ -3256,6 +3291,7 @@
       section.style.setProperty("--sq-nav-offset", `${offset}px`);
       section.style.setProperty("--sq-nav-surface-opacity", `${opacity}%`);
       section.style.setProperty("--sq-nav-backdrop-blur", `${blur}px`);
+      scheduleEditorNavigation();
     };
     const syncNavigationLayoutControls = (isNavigation) => {
       const controls = sqStudio.querySelector("[data-sq-navigation-layout-controls]");
@@ -6700,6 +6736,7 @@
         zoomSlider.value = String(zoom);
         zoomSlider.style.setProperty("--sq-range-progress", `${((zoom - minimum) / (100 - minimum)) * 100}%`);
       }
+      scheduleEditorNavigation();
     };
     sqStudio.querySelector("[data-sq-zoom-out]")?.addEventListener("click", () => setZoom(zoom - 10));
     sqStudio.querySelector("[data-sq-zoom-in]")?.addEventListener("click", () => setZoom(zoom + 10));
@@ -6858,6 +6895,8 @@
       clone.querySelectorAll(".sq-image-crop-editing, .sq-direct-draggable, .sq-direct-dragging, .sq-page-background.sq-element-selected, .sq-section-background.sq-element-selected").forEach((node) => node.classList.remove("sq-image-crop-editing", "is-cropping", "sq-direct-draggable", "sq-direct-dragging", "sq-element-selected"));
       clone.querySelectorAll("[data-product-card][hidden], [data-product-line][hidden], .sq-hero-collage > span[hidden]").forEach((node) => node.remove());
       clone.querySelectorAll("[data-sq-nav-position]").forEach((node) => {
+        node.classList.remove("sq-nav-is-stuck", "sq-nav-hidden");
+        node.style.removeProperty("--sq-nav-editor-shift");
         node.dataset.ezkartNavTemplate = node.dataset.sqNavTemplate || "essential";
         node.dataset.ezkartNavPosition = node.dataset.sqNavPosition || "static";
         node.dataset.ezkartNavOffset = node.dataset.sqNavOffset || "0";
