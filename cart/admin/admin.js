@@ -3230,15 +3230,32 @@
     });
     showElementPanel(activeElementPanel);
     const navigationSectionFor = (element = selectedElement) => element?.dataset?.sqElementType === "navigation" ? element.closest("[data-sq-block]") : null;
+    const moveNavigationSectionToTop = (section) => {
+      if (!section || section.parentElement !== previewRoot) return;
+      const pageBackground = [...previewRoot.querySelectorAll(":scope > .sq-page-background")].at(-1) || null;
+      const firstPageSection = pageBackground?.nextElementSibling || previewRoot.firstElementChild;
+      if (firstPageSection === section) return;
+      if (pageBackground) pageBackground.after(section); else previewRoot.prepend(section);
+    };
     const applyNavigationSectionBehavior = (section) => {
       if (!section) return;
       const position = ["static", "sticky", "fixed"].includes(section.dataset.sqNavPosition) ? section.dataset.sqNavPosition : "static";
       const offset = Math.max(0, Math.min(120, Number(section.dataset.sqNavOffset) || 0));
+      const surfaceFallback = section.dataset.sqNavTemplate === "overlay" ? "transparent" : "solid";
+      const surface = ["solid", "blur", "transparent"].includes(section.dataset.sqNavSurface) ? section.dataset.sqNavSurface : surfaceFallback;
+      const opacity = Math.max(0, Math.min(100, Number(section.dataset.sqNavOpacity ?? (surface === "transparent" ? 0 : surface === "blur" ? 82 : 100))));
+      const blur = Math.max(0, Math.min(32, Number(section.dataset.sqNavBlur ?? 16)));
+      if (position !== "static") moveNavigationSectionToTop(section);
       section.dataset.sqNavPosition = position;
       section.dataset.sqNavOffset = String(offset);
+      section.dataset.sqNavSurface = surface;
+      section.dataset.sqNavOpacity = String(opacity);
+      section.dataset.sqNavBlur = String(blur);
       section.dataset.sqNavShadow ||= "true";
       section.classList.add("sq-navigation-template-section");
       section.style.setProperty("--sq-nav-offset", `${offset}px`);
+      section.style.setProperty("--sq-nav-surface-opacity", `${opacity}%`);
+      section.style.setProperty("--sq-nav-backdrop-blur", `${blur}px`);
     };
     const syncNavigationLayoutControls = (isNavigation) => {
       const controls = sqStudio.querySelector("[data-sq-navigation-layout-controls]");
@@ -3261,6 +3278,20 @@
       const shadow = sqStudio.querySelector("[data-sq-navigation-stuck-shadow]");
       if (hideOnScroll) hideOnScroll.checked = section.dataset.sqNavHideScroll === "true";
       if (shadow) shadow.checked = section.dataset.sqNavShadow !== "false";
+      const surface = section.dataset.sqNavSurface || "solid";
+      sqStudio.querySelectorAll("[data-sq-navigation-surface]").forEach((button) => {
+        const active = button.dataset.sqNavigationSurface === surface;
+        button.classList.toggle("active", active);
+        button.setAttribute("aria-pressed", String(active));
+      });
+      const opacity = sqStudio.querySelector("[data-sq-navigation-opacity]");
+      const opacityOutput = sqStudio.querySelector("[data-sq-navigation-opacity-output]");
+      const blur = sqStudio.querySelector("[data-sq-navigation-blur]");
+      const blurOutput = sqStudio.querySelector("[data-sq-navigation-blur-output]");
+      if (opacity) { opacity.value = section.dataset.sqNavOpacity || "100"; opacity.disabled = surface === "transparent"; }
+      if (opacityOutput) opacityOutput.textContent = `${section.dataset.sqNavOpacity || "100"}%`;
+      if (blur) { blur.value = section.dataset.sqNavBlur || "16"; blur.disabled = surface !== "blur"; }
+      if (blurOutput) blurOutput.textContent = `${section.dataset.sqNavBlur || "16"}px`;
     };
     const syncElementControls = () => {
       const controls = sqStudio.querySelector("[data-sq-element-controls]");
@@ -5723,6 +5754,11 @@
       if (!section) return;
       remember();
       section.dataset.sqNavPosition = button.dataset.sqNavigationPosition;
+      if (section.dataset.sqNavPosition !== "static") {
+        moveNavigationSectionToTop(section);
+        rebuildLayerList();
+        bindSqInteractions();
+      }
       applyNavigationSectionBehavior(section);
       syncNavigationLayoutControls(true);
       markSqChanged();
@@ -5743,6 +5779,33 @@
       markSqChanged();
     });
     navigationOffset?.addEventListener("change", finishNavigationBehaviorEdit);
+    sqStudio.querySelectorAll("[data-sq-navigation-surface]").forEach((button) => button.addEventListener("click", () => {
+      const section = navigationSectionFor();
+      if (!section) return;
+      remember();
+      section.dataset.sqNavSurface = button.dataset.sqNavigationSurface;
+      if (section.dataset.sqNavSurface === "transparent") section.dataset.sqNavOpacity = "0";
+      else if (section.dataset.sqNavSurface === "blur" && Number(section.dataset.sqNavOpacity) === 0) section.dataset.sqNavOpacity = "82";
+      else if (section.dataset.sqNavSurface === "solid" && Number(section.dataset.sqNavOpacity) === 0) section.dataset.sqNavOpacity = "100";
+      applyNavigationSectionBehavior(section);
+      syncNavigationLayoutControls(true);
+      markSqChanged();
+    }));
+    [["[data-sq-navigation-opacity]", "sqNavOpacity", "%"], ["[data-sq-navigation-blur]", "sqNavBlur", "px"]].forEach(([selector, key, suffix]) => {
+      const input = sqStudio.querySelector(selector);
+      input?.addEventListener("pointerdown", startNavigationBehaviorEdit);
+      input?.addEventListener("focus", startNavigationBehaviorEdit);
+      input?.addEventListener("input", (event) => {
+        const section = navigationSectionFor();
+        if (!section) return;
+        section.dataset[key] = String(event.currentTarget.value);
+        applyNavigationSectionBehavior(section);
+        const output = sqStudio.querySelector(selector.replace("]", "-output]"));
+        if (output) output.textContent = `${event.currentTarget.value}${suffix}`;
+        markSqChanged();
+      });
+      input?.addEventListener("change", finishNavigationBehaviorEdit);
+    });
     [["[data-sq-navigation-hide-scroll]", "sqNavHideScroll"], ["[data-sq-navigation-stuck-shadow]", "sqNavShadow"]].forEach(([selector, key]) => {
       const input = sqStudio.querySelector(selector);
       input?.addEventListener("pointerdown", startNavigationBehaviorEdit);
@@ -6285,7 +6348,11 @@
     };
     const navigationTemplateMarkup = (template, sectionId = "navigation") => {
       const handle = `<button class="sq-block-handle" type="button" aria-label="Drag navigation section">${iconMarkup("grip")}</button>`;
-      const section = (rows, position, shadow, hideOnScroll, body) => `<header class="sq-page-block sq-store-nav sq-navigation-template-section" draggable="true" data-sq-block data-sq-fluid data-sq-rows="${rows}" data-section-id="${sectionId}" data-sq-nav-template="${template}" data-sq-nav-position="${position}" data-sq-nav-offset="0" data-sq-nav-shadow="${shadow}" data-sq-nav-hide-scroll="${hideOnScroll}">${handle}${body}</header>`;
+      const section = (rows, position, shadow, hideOnScroll, body) => {
+        const surface = template === "overlay" ? "transparent" : "solid";
+        const opacity = surface === "transparent" ? 0 : 100;
+        return `<header class="sq-page-block sq-store-nav sq-navigation-template-section" draggable="true" data-sq-block data-sq-fluid data-sq-rows="${rows}" data-section-id="${sectionId}" data-sq-nav-template="${template}" data-sq-nav-position="${position}" data-sq-nav-offset="0" data-sq-nav-surface="${surface}" data-sq-nav-opacity="${opacity}" data-sq-nav-blur="16" data-sq-nav-shadow="${shadow}" data-sq-nav-hide-scroll="${hideOnScroll}">${handle}${body}</header>`;
+      };
       const mainLinks = [["Shop", "#products"], ["Our story", "#story"], ["Contact", "#contact"]];
       if (template === "centered") return section(2, "static", "false", "false", `${navigationLinksMarkup({ slot: "left", links: [["Shop", "#products"], ["Our story", "#story"]], button: "", layouts: { desktop: "1,1,4,2", tablet: "1,1,4,2", mobile: "1,1,1,1" } })}${navigationLogoMarkup({ desktop: "5,1,4,2", tablet: "5,1,4,2", mobile: "1,1,6,2" })}${navigationLinksMarkup({ slot: "right", links: [["Search", "#products"]], button: "Cart", layouts: { desktop: "9,1,4,2", tablet: "9,1,4,2", mobile: "7,1,6,2" } })}`);
       if (template === "announcement") return section(4, "sticky", "true", "true", `<p class="sq-nav-announcement-copy" data-sq-element data-sq-element-type="text" data-layout-desktop="1,1,12,1" data-layout-tablet="1,1,12,1" data-layout-mobile="1,1,12,1">Free shipping on orders over Rp500k</p>${navigationLogoMarkup({ desktop: "1,2,4,3", tablet: "1,2,4,3", mobile: "1,2,5,3" })}${navigationLinksMarkup({ links: mainLinks, layouts: { desktop: "5,2,8,3", tablet: "5,2,8,3", mobile: "6,2,7,3" } })}`);
@@ -6308,6 +6375,7 @@
         if (announcement) announcement.after(section); else previewRoot?.prepend(section);
       }
       remember(snapshot);
+      moveNavigationSectionToTop(section);
       applyNavigationSectionBehavior(section);
       rebuildLayerList();
       bindSqInteractions();
@@ -6793,6 +6861,9 @@
         node.dataset.ezkartNavTemplate = node.dataset.sqNavTemplate || "essential";
         node.dataset.ezkartNavPosition = node.dataset.sqNavPosition || "static";
         node.dataset.ezkartNavOffset = node.dataset.sqNavOffset || "0";
+        node.dataset.ezkartNavSurface = node.dataset.sqNavSurface || (node.dataset.sqNavTemplate === "overlay" ? "transparent" : "solid");
+        node.dataset.ezkartNavOpacity = node.dataset.sqNavOpacity || (node.dataset.ezkartNavSurface === "transparent" ? "0" : "100");
+        node.dataset.ezkartNavBlur = node.dataset.sqNavBlur || "16";
         node.dataset.ezkartNavHideScroll = node.dataset.sqNavHideScroll || "false";
         node.dataset.ezkartNavShadow = node.dataset.sqNavShadow || "true";
       });
@@ -6865,7 +6936,7 @@ const scheduleScrollMarquees=()=>{if(!marqueeFrame)marqueeFrame=requestAnimation
 const syncMarquees=()=>{document.querySelectorAll('.sq-free-marquee').forEach(element=>{const track=element.querySelector('.sq-marquee-track'),source=track?.querySelector('.sq-marquee-copy:not([aria-hidden])');if(!track||!source)return;track.querySelectorAll('.sq-marquee-copy[aria-hidden="true"]').forEach(copy=>copy.remove());const width=Math.max(1,source.offsetWidth),copies=Math.max(2,Math.ceil(Math.max(1,element.clientWidth)/width)+2);for(let index=1;index<copies;index+=1){const copy=source.cloneNode(true);copy.removeAttribute('contenteditable');copy.setAttribute('aria-hidden','true');track.append(copy)}track.style.setProperty('--sq-marquee-distance',width+'px');track.style.setProperty('--sq-marquee-duration',Math.max(2,width/marqueeSpeed(element))+'s');const manual=element.dataset.ezkartMarqueeMode==='scroll';element.classList.toggle('sq-marquee-manual',manual);if(!manual)track.style.removeProperty('transform')});scheduleScrollMarquees()};
 addEventListener('scroll',scheduleScrollMarquees,{passive:true});addEventListener('resize',syncMarquees,{passive:true});document.fonts?.ready.then(syncMarquees);syncMarquees();
 let navigationFrame=0,lastNavigationScroll=scrollY;
-const syncNavigations=()=>{navigationFrame=0;const current=scrollY,direction=current-lastNavigationScroll;document.querySelectorAll('[data-ezkart-nav-position]').forEach(nav=>{const position=nav.dataset.ezkartNavPosition||'static',offset=Math.max(0,Math.min(120,Number(nav.dataset.ezkartNavOffset)||0)),stuck=position==='fixed'||position==='sticky'&&nav.getBoundingClientRect().top<=offset+1;nav.style.setProperty('--sq-nav-offset',offset+'px');nav.classList.toggle('sq-nav-is-stuck',stuck);if(!stuck||nav.dataset.ezkartNavHideScroll!=='true')nav.classList.remove('sq-nav-hidden');else if(direction>2&&current>offset+48)nav.classList.add('sq-nav-hidden');else if(direction<-2)nav.classList.remove('sq-nav-hidden')});lastNavigationScroll=current};
+const syncNavigations=()=>{navigationFrame=0;const current=scrollY,direction=current-lastNavigationScroll;document.querySelectorAll('[data-ezkart-nav-position]').forEach(nav=>{const position=nav.dataset.ezkartNavPosition||'static',offset=Math.max(0,Math.min(120,Number(nav.dataset.ezkartNavOffset)||0)),opacity=Math.max(0,Math.min(100,Number(nav.dataset.ezkartNavOpacity??100))),blur=Math.max(0,Math.min(32,Number(nav.dataset.ezkartNavBlur??16))),stuck=position==='fixed'||position==='sticky'&&nav.getBoundingClientRect().top<=offset+1;nav.style.setProperty('--sq-nav-offset',offset+'px');nav.style.setProperty('--sq-nav-surface-opacity',opacity+'%');nav.style.setProperty('--sq-nav-backdrop-blur',blur+'px');nav.classList.toggle('sq-nav-is-stuck',stuck);if(!stuck||nav.dataset.ezkartNavHideScroll!=='true')nav.classList.remove('sq-nav-hidden');else if(direction>2&&current>offset+48)nav.classList.add('sq-nav-hidden');else if(direction<-2)nav.classList.remove('sq-nav-hidden')});lastNavigationScroll=current};
 const scheduleNavigations=()=>{if(!navigationFrame)navigationFrame=requestAnimationFrame(syncNavigations)};
 addEventListener('scroll',scheduleNavigations,{passive:true});addEventListener('resize',scheduleNavigations,{passive:true});syncNavigations();
 document.querySelectorAll('.sq-nav-commerce-search form').forEach(form=>{const input=form.querySelector('input[type="search"]'),button=form.querySelector('button'),filterProducts=()=>{const query=(input?.value||'').trim().toLocaleLowerCase();document.querySelectorAll('[data-product-card]').forEach(card=>{card.hidden=Boolean(query)&&!card.textContent.toLocaleLowerCase().includes(query)})};form.addEventListener('submit',event=>{event.preventDefault();filterProducts()});button?.addEventListener('click',filterProducts);input?.addEventListener('input',filterProducts)});
