@@ -3247,8 +3247,9 @@
         toggle.setAttribute("aria-label", "Open navigation menu");
         toggle.setAttribute("aria-expanded", "false");
         toggle.innerHTML = "<i></i><i></i><i></i>";
-        target.append(toggle);
       }
+      const cta = target.querySelector(":scope > button:not(.sq-nav-menu-toggle)");
+      if (cta) target.insertBefore(toggle, cta); else target.append(toggle);
       let menu = section.querySelector(":scope > .sq-nav-mobile-menu");
       if (!menu) {
         menu = document.createElement("nav");
