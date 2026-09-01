@@ -2435,7 +2435,6 @@
     let layoutGridTimer = 0;
     let sectionHeightResizeTarget = null;
     let sectionHeightPreviewRows = 0;
-    let pageSpacingMode = false;
     let scheduleProductGridFit = () => {};
     let saveTimer;
     let zoom = 90;
@@ -3068,6 +3067,20 @@
         composite.remove();
         section.classList.add("sq-hero-elements");
       });
+      const heroSection = previewRoot?.querySelector('[data-section-id="hero"]') || previewRoot?.querySelector(":scope > [data-sq-block]:not(.sq-store-nav):not(.sq-announcement)");
+      previewRoot?.querySelectorAll(":scope > .sq-page-background").forEach((legacyLayer) => {
+        if (heroSection && !heroSection.querySelector(":scope > .sq-section-background")) {
+          legacyLayer.className = "sq-section-background";
+          legacyLayer.dataset.sqBackgroundScope = "section";
+          heroSection.dataset.sqBackgroundType = "image";
+          heroSection.prepend(legacyLayer);
+        } else {
+          legacyLayer.remove();
+        }
+      });
+      previewRoot?.querySelectorAll(":scope > [data-sq-block]").forEach((section) => {
+        section.dataset.sqBackgroundType ||= section.querySelector(":scope > .sq-section-background img") ? "image" : "solid";
+      });
     };
     const colorToHex = (value, fallback = "#ffffff") => {
       if (/^#[0-9a-f]{6}$/i.test(value || "")) return value.toLowerCase();
@@ -3380,13 +3393,13 @@
     };
     const syncElementControls = () => {
       const controls = sqStudio.querySelector("[data-sq-element-controls]");
-      const selectedBackground = selectedElement?.matches?.(".sq-page-background,.sq-section-background");
+      const selectedBackground = selectedElement?.matches?.(".sq-section-background");
       const valid = selectedElement?.isConnected && (selectedBackground || selectedElement.closest(`[data-section-id="${selectedSection}"]`));
       if (controls) controls.hidden = !valid;
       inspector?.classList.toggle("element-selected", Boolean(valid));
       if (!valid) {
         const context = sqStudio.querySelector("[data-sq-inspector-context]");
-        if (context) context.textContent = "Selected section";
+        if (context) context.textContent = "Section settings";
         const productControls = sqStudio.querySelector("[data-sq-product-layout-controls]");
         if (productControls) productControls.hidden = true;
         const navigationLayoutControls = sqStudio.querySelector("[data-sq-navigation-layout-controls]");
@@ -3410,13 +3423,13 @@
         : isNavigation ? selectedAction : actionForElement();
       const image = isLogo || isProductGrid ? null : imageForElement();
       const contentName = selectedContent?.matches("h1,h2,h3") ? "Heading" : selectedContent ? "Text" : "";
-      const contextualName = isBackgroundImage ? `${selectedElement.dataset.sqBackgroundScope === "page" ? "Page" : "Section"} background` : isLogo ? "Logo" : selectedAction && action ? "Button" : selectedImage && image ? "Image" : contentName || elementTypeName(selectedElement);
+      const contextualName = isBackgroundImage ? "Section background" : isLogo ? "Logo" : selectedAction && action ? "Button" : selectedImage && image ? "Image" : contentName || elementTypeName(selectedElement);
       const context = sqStudio.querySelector("[data-sq-inspector-context]");
       const title = sqStudio.querySelector("[data-sq-inspector-title]");
       if (context) context.textContent = isBackgroundImage ? "Selected background image" : "Selected element";
       if (title) title.textContent = contextualName;
       const backButton = sqStudio.querySelector("[data-sq-select-section]");
-      if (backButton?.lastChild) backButton.lastChild.textContent = isBackgroundImage && selectedElement.dataset.sqBackgroundScope === "page" ? " Back to page" : " Back to section";
+      if (backButton?.lastChild) backButton.lastChild.textContent = " Back to section";
       sqStudio.querySelectorAll("[data-sq-element-tab]").forEach((button) => { button.hidden = isBackgroundImage && ["style", "layout"].includes(button.dataset.sqElementTab); });
       const elementActions = sqStudio.querySelector("[data-sq-element-actions]");
       if (elementActions) elementActions.hidden = isBackgroundImage;
@@ -3640,15 +3653,12 @@
       const backgroundScopeCard = sqStudio.querySelector("[data-sq-selected-background-scope]");
       if (backgroundScopeCard) backgroundScopeCard.hidden = !isBackgroundImage;
       if (isBackgroundImage) {
-        const scope = selectedElement.dataset.sqBackgroundScope;
         const section = selectedElement.closest("[data-section-id]");
         const sectionName = sectionNames[section?.dataset.sectionId] || "Section";
         const scopeTitle = sqStudio.querySelector("[data-sq-selected-background-title]");
         const scopeCopy = sqStudio.querySelector("[data-sq-selected-background-copy]");
-        if (scopeTitle) scopeTitle.textContent = scope === "page" ? "Editing the page background" : `Editing ${sectionName}'s background`;
-        if (scopeCopy) scopeCopy.textContent = scope === "page"
-          ? "This layer sits behind every section. A section background can cover it."
-          : `Only ${sectionName} changes here. Page background controls do not change this image.`;
+        if (scopeTitle) scopeTitle.textContent = `Editing ${sectionName}'s background`;
+        if (scopeCopy) scopeCopy.textContent = `This image belongs only to the ${sectionName} section.`;
       }
       if (image) {
         const imageHeading = sqStudio.querySelector("[data-sq-image-controls] > .sq-inspector-heading h3");
@@ -3681,10 +3691,9 @@
         const backgroundActions = sqStudio.querySelector(".sq-image-background-actions");
         if (backgroundActions) backgroundActions.hidden = isBackgroundImage;
         sqStudio.querySelectorAll("[data-sq-image-background]").forEach((button) => {
-          const scope = button.dataset.sqImageBackground;
-          const hasBackground = scope === "page" ? Boolean(previewRoot?.querySelector(":scope > .sq-page-background")) : Boolean(selectedElement?.closest("[data-sq-block]")?.querySelector(":scope > .sq-section-background"));
+          const hasBackground = Boolean(selectedElement?.closest("[data-sq-block]")?.querySelector(":scope > .sq-section-background"));
           button.classList.toggle("active", hasBackground);
-          button.textContent = hasBackground ? `Replace ${scope}` : `Set ${scope}`;
+          button.textContent = hasBackground ? "Replace section image" : "Use image";
         });
         const blendModeInput = sqStudio.querySelector("[data-sq-image-blend-mode]");
         const blendSourceInput = sqStudio.querySelector("[data-sq-image-blend-source]");
@@ -3706,8 +3715,8 @@
         if (blendNote) blendNote.textContent = blendSource === "behind"
           ? "Overlap this image with another layer, then use the layer order to choose what sits beneath it."
           : blendMode === "normal" && blendColor
-            ? "Normal shows the original image unchanged. Choose a blend mode to mix in the backdrop color."
-            : "Blend the image with a color beneath it. Multiply and Overlay are great for polished brand treatments.";
+            ? "Normal shows the original image unchanged. Choose a blend mode to mix in the overlay color."
+            : "Blend the image with its overlay color. Multiply and Overlay are useful for polished brand treatments.";
         sqStudio.querySelectorAll("[data-sq-image-filter]").forEach((input) => {
           const name = input.dataset.sqImageFilter;
           const value = imageFilterValue(image, name);
@@ -3767,12 +3776,11 @@
       bindElementPointerControl(overlay.querySelector("[data-sq-element-resize]"), true);
     };
     const selectSqElement = (element, action = null, image = null, content = null) => {
-      if (!element?.matches("[data-sq-element],.sq-page-background,.sq-section-background")) return;
+      if (!element?.matches("[data-sq-element],.sq-section-background")) return;
       if (cropEditingImage && (!element.contains(cropEditingImage) || image?.matches?.("img") && image !== cropEditingImage)) {
         imageVisualHostFor(cropEditingImage)?.classList.remove("sq-image-crop-editing");
         cropEditingImage = null;
       }
-      pageSpacingMode = false;
       inspector?.classList.remove("page-spacing-open");
       const pageControls = sqStudio.querySelector("[data-sq-page-spacing-controls]");
       if (pageControls) pageControls.hidden = true;
@@ -3811,10 +3819,10 @@
     };
     const deleteSelectedElement = () => {
       if (!selectedElement?.isConnected) return;
-      const deletingBackground = selectedElement.matches(".sq-page-background,.sq-section-background");
-      const backgroundScope = selectedElement.dataset.sqBackgroundScope;
+      const deletingBackground = selectedElement.matches(".sq-section-background");
       remember();
       const section = selectedElement.closest("[data-sq-fluid]");
+      if (deletingBackground && section) section.dataset.sqBackgroundType = "solid";
       selectedElement.remove();
       selectedElement = null;
       selectedAction = null;
@@ -3825,11 +3833,10 @@
       applyFluidSection(section);
       rebuildLayerList();
       bindSqInteractions();
-      if (deletingBackground && backgroundScope === "page") deselectSqItem(section?.dataset.sectionId);
-      else if (section?.dataset.sectionId) selectSqSection(section.dataset.sectionId, true);
+      if (section?.dataset.sectionId) selectSqSection(section.dataset.sectionId, true);
       syncBackgroundManagers();
       markSqChanged();
-      showToast(deletingBackground ? `${backgroundScope === "page" ? "Page" : "Section"} background removed` : "Element deleted — Undo is available");
+      showToast(deletingBackground ? "Section background removed" : "Element deleted — Undo is available");
     };
     const bindElementPointerControl = (handle, resizing) => {
       if (!handle) return;
@@ -4246,7 +4253,6 @@
       block.append(toolbar);
     };
     const selectSqSection = (sectionId, focusSection = false) => {
-      pageSpacingMode = false;
       inspector?.classList.remove("page-spacing-open");
       const pageControls = sqStudio.querySelector("[data-sq-page-spacing-controls]");
       if (pageControls) pageControls.hidden = true;
@@ -4261,7 +4267,9 @@
       sqStudio.querySelectorAll("[data-sq-layer-group]").forEach((group) => group.classList.toggle("active", group.dataset.sectionId === sectionId));
       previewRoot?.querySelectorAll("[data-sq-block]").forEach((block) => block.classList.toggle("selected", block.dataset.sectionId === sectionId));
       const title = sqStudio.querySelector("[data-sq-inspector-title]");
+      const context = sqStudio.querySelector("[data-sq-inspector-context]");
       const layerTitle = sqStudio.querySelector(`[data-sq-layer][data-section-id="${sectionId}"] b`)?.textContent;
+      if (context) context.textContent = "Section settings";
       if (title) title.textContent = layerTitle || sectionNames[sectionId] || "Section";
       const block = previewRoot?.querySelector(`[data-section-id="${sectionId}"]`);
       if (selectedElement && (focusSection || !block?.contains(selectedElement))) {
@@ -4297,38 +4305,9 @@
       else { sqStudio.querySelector(".sq-inspector-scroll")?.scrollTo({ top: 0, behavior: "smooth" }); requestAnimationFrame(refreshSectionToolbar); }
     };
     const deselectSqItem = (sectionId = selectedSection) => {
-      if (sectionId) selectedSection = sectionId;
       if (cropEditingImage) imageVisualHostFor(cropEditingImage)?.classList.remove("sq-image-crop-editing");
       cropEditingImage = null;
-      pageSpacingMode = true;
-      selectedElement = null;
-      selectedAction = null;
-      selectedImage = null;
-      selectedContent = null;
-      sqStudio.classList.remove("mobile-panel-open", "inspector-closed");
-      inspector?.classList.remove("collapsed", "element-selected");
-      inspector?.classList.add("page-spacing-open");
-      previewRoot?.querySelectorAll(".selected, .sq-element-selected, .sq-image-selected").forEach((item) => item.classList.remove("selected", "sq-element-selected", "sq-image-selected"));
-      sqStudio.querySelectorAll("[data-sq-layer], [data-sq-layer-group], [data-sq-element-layer]").forEach((item) => item.classList.remove("active"));
-      removeElementOverlay();
-      removeSectionToolbar();
-      removeLayoutGrid();
-      const elementControls = sqStudio.querySelector("[data-sq-element-controls]");
-      const pageControls = sqStudio.querySelector("[data-sq-page-spacing-controls]");
-      const sectionActions = sqStudio.querySelector("[data-sq-section-actions]");
-      if (elementControls) elementControls.hidden = true;
-      if (pageControls) pageControls.hidden = false;
-      if (sectionActions) sectionActions.hidden = true;
-      sqStudio.querySelectorAll("[data-sq-section-controls]").forEach((control) => { control.hidden = true; });
-      const context = sqStudio.querySelector("[data-sq-inspector-context]");
-      const title = sqStudio.querySelector("[data-sq-inspector-title]");
-      if (context) context.textContent = "Page settings";
-      if (title) title.textContent = "Spacing";
-      syncPageSpacingControls();
-      syncPageGridControls();
-      syncBackgroundManagers();
-      sqStudio.querySelector(".sq-inspector-scroll")?.scrollTo({ top: 0, behavior: "smooth" });
-      requestAnimationFrame(refreshLayoutGrid);
+      selectSqSection(sectionId || selectedSection || "hero", true);
     };
 
     const reorderSection = (dragId, targetId, placeAfter) => {
@@ -4404,10 +4383,6 @@
         block.onclick = (event) => {
           event.stopPropagation();
           const sectionId = block.dataset.sectionId;
-          if (block.querySelector(":scope > .sq-section-background img")) {
-            selectBackgroundLayer("section", sectionId);
-            return;
-          }
           selectSqSection(sectionId, true);
         };
         block.ondragstart = (event) => { draggedSection = block.dataset.sectionId; block.classList.add("dragging"); event.dataTransfer.effectAllowed = "move"; };
@@ -4611,10 +4586,6 @@
       });
       previewRoot.onclick = (event) => {
         if (event.target.closest?.("[data-sq-element], [data-sq-block]")) return;
-        if (previewRoot.querySelector(":scope > .sq-page-background img")) {
-          selectBackgroundLayer("page");
-          return;
-        }
         deselectSqItem(selectedSection);
       };
     };
@@ -5217,7 +5188,7 @@
       selectedElement.classList.remove("sq-color-override");
       delete selectedElement.dataset.sqSurface; delete selectedElement.dataset.sqAlign; syncElementControls(); refreshElementOverlay(); markSqChanged();
     });
-    sqStudio.querySelector("[data-sq-select-section]")?.addEventListener("click", () => selectedElement?.dataset.sqBackgroundScope === "page" ? deselectSqItem(selectedSection) : selectSqSection(selectedSection, true));
+    sqStudio.querySelector("[data-sq-select-section]")?.addEventListener("click", () => selectSqSection(selectedSection, true));
 
     let textControlSnapshot;
     sqStudio.querySelector("[data-sq-element-text]")?.addEventListener("focus", () => { textControlSnapshot = captureState(); });
@@ -5404,81 +5375,79 @@
       window.addEventListener("pointerup", end, { once: true });
       window.addEventListener("pointercancel", end, { once: true });
     }, true);
-    const backgroundTargetFor = (scope) => scope === "page" ? previewRoot : previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`);
-    const backgroundLayerFor = (scope) => backgroundTargetFor(scope)?.querySelector(scope === "page" ? ":scope > .sq-page-background" : ":scope > .sq-section-background") || null;
-    const prepareBackgroundLayer = (layer, scope) => {
+    const backgroundTargetFor = () => previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`);
+    const backgroundLayerFor = () => backgroundTargetFor()?.querySelector(":scope > .sq-section-background") || null;
+    const prepareBackgroundLayer = (layer) => {
       if (!layer) return null;
       layer.dataset.sqElementType = "image-background";
-      layer.dataset.sqBackgroundScope = scope;
+      layer.dataset.sqBackgroundScope = "section";
       layer.setAttribute("aria-hidden", "true");
       return layer;
     };
+    const sectionBackgroundColor = (section) => {
+      const custom = section?.style.getPropertyValue("--sq-section-background-color").trim();
+      if (/^#[0-9a-f]{6}$/i.test(custom || "")) return custom.toLowerCase();
+      const computed = section ? getComputedStyle(section).backgroundColor : "";
+      return isTransparentColor(computed) ? "#ffffff" : colorToHex(computed, "#ffffff");
+    };
+    const setSectionBackgroundColor = (section, rawColor) => {
+      if (!section || !/^#[0-9a-f]{6}$/i.test(rawColor || "")) return;
+      const color = rawColor.toLowerCase();
+      const channels = color.slice(1).match(/.{2}/g).map((part) => Number.parseInt(part, 16) / 255);
+      const luminance = channels.map((value) => value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4).reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index], 0);
+      section.dataset.sqBackgroundType = "solid";
+      section.classList.remove("section-bg-light", "section-bg-white", "section-bg-dark", "section-bg-accent");
+      section.classList.add("section-bg-custom");
+      section.classList.toggle("section-bg-custom-dark", luminance < .36);
+      section.style.setProperty("--sq-section-background-color", color);
+    };
     const syncBackgroundManagers = () => {
-      previewRoot?.querySelectorAll(":scope > .sq-page-background").forEach((layer) => prepareBackgroundLayer(layer, "page"));
-      previewRoot?.querySelectorAll("[data-sq-block] > .sq-section-background").forEach((layer) => prepareBackgroundLayer(layer, "section"));
+      previewRoot?.querySelectorAll("[data-sq-block] > .sq-section-background").forEach(prepareBackgroundLayer);
       sqStudio.querySelectorAll("[data-sq-background-manager]").forEach((manager) => {
-        const scope = manager.dataset.sqBackgroundManager;
-        const layer = backgroundLayerFor(scope);
+        const section = backgroundTargetFor();
+        const layer = backgroundLayerFor();
         const image = layer?.querySelector("img");
+        const type = section?.dataset.sqBackgroundType === "image" ? "image" : "solid";
+        if (section) section.dataset.sqBackgroundType = type;
         const thumbnail = manager.querySelector("[data-sq-background-thumbnail]");
         const title = manager.querySelector("[data-sq-background-title]");
         const status = manager.querySelector("[data-sq-background-status]");
         const url = manager.querySelector("[data-sq-background-url]");
         const edit = manager.querySelector("[data-sq-background-edit]");
         const remove = manager.querySelector("[data-sq-background-remove]");
-        const heading = manager.querySelector(".sq-inspector-heading h3");
-        const headingScope = manager.querySelector(".sq-inspector-heading span");
-        const notice = manager.querySelector("[data-sq-background-scope-notice]");
-        const noticeTitle = manager.querySelector("[data-sq-background-scope-title]");
-        const noticeCopy = manager.querySelector("[data-sq-background-scope-copy]");
-        const noticeJump = manager.querySelector("[data-sq-background-scope-jump]");
+        const sectionName = sectionNames[selectedSection] || "Section";
+        const sectionNameLabel = manager.querySelector("[data-sq-section-background-name]");
+        if (sectionNameLabel) sectionNameLabel.textContent = sectionName;
+        manager.querySelectorAll("[data-sq-section-background-type]").forEach((button) => {
+          const active = button.dataset.sqSectionBackgroundType === type;
+          button.classList.toggle("active", active);
+          button.setAttribute("aria-pressed", String(active));
+        });
+        manager.querySelectorAll("[data-sq-section-background-panel]").forEach((panel) => { panel.hidden = panel.dataset.sqSectionBackgroundPanel !== type; });
+        const color = sectionBackgroundColor(section);
+        const colorInput = manager.querySelector("[data-sq-section-background-color]");
+        const colorOutput = manager.querySelector("[data-sq-section-background-color-output]");
+        if (colorInput && document.activeElement !== colorInput) colorInput.value = color;
+        if (colorOutput) colorOutput.textContent = color.toUpperCase();
         if (thumbnail) { thumbnail.classList.toggle("has-image", Boolean(image)); thumbnail.style.backgroundImage = image ? `url("${String(image.currentSrc || image.src).replace(/["\\]/g, "\\$&")}")` : ""; }
-        if (title) title.textContent = image ? `${scope === "page" ? "Page" : "Section"} background ready` : "No background image";
-        if (status) status.textContent = image ? "Click Edit effects for crop, blend, filters, and parallax." : "Upload an image or paste a URL below.";
+        if (title) title.textContent = image ? "Section image ready" : "No background image";
+        if (status) status.textContent = image ? "Open image settings for crop, overlay, filters, and motion." : "Upload an image or paste a URL below.";
         if (url && document.activeElement !== url) url.value = image && /^(https?:\/\/|\/|\.\.\/|\.\/)/i.test(image.getAttribute("src") || "") ? image.getAttribute("src") : "";
         if (edit) edit.hidden = !image;
         if (remove) remove.hidden = !image;
-        if (scope === "page") {
-          const sectionLayers = [...(previewRoot?.querySelectorAll("[data-sq-block] > .sq-section-background") || [])].filter((candidate) => candidate.querySelector("img"));
-          const firstSection = sectionLayers[0]?.closest("[data-section-id]");
-          const firstName = sectionNames[firstSection?.dataset.sectionId] || "Section";
-          if (heading) heading.textContent = "Page background image";
-          if (headingScope) headingScope.textContent = "Whole page";
-          if (notice) notice.hidden = sectionLayers.length === 0;
-          if (noticeTitle) noticeTitle.textContent = sectionLayers.length === 1 ? `${firstName} has its own background` : `${sectionLayers.length} sections have their own backgrounds`;
-          if (noticeCopy) noticeCopy.textContent = "Section backgrounds sit above the page background. Editing this page layer will not recolor them.";
-          if (noticeJump) {
-            noticeJump.textContent = sectionLayers.length === 1 ? `Edit ${firstName}` : `Edit first section`;
-            noticeJump.dataset.sqBackgroundJumpScope = "section";
-            noticeJump.dataset.sectionId = firstSection?.dataset.sectionId || selectedSection;
-          }
-        } else {
-          const pageLayer = previewRoot?.querySelector(":scope > .sq-page-background img");
-          const sectionName = sectionNames[selectedSection] || "This section";
-          if (heading) heading.textContent = `${sectionName} background image`;
-          if (headingScope) headingScope.textContent = "This section only";
-          if (notice) notice.hidden = !pageLayer;
-          if (noticeTitle) noticeTitle.textContent = "A page background also exists";
-          if (noticeCopy) noticeCopy.textContent = `${sectionName}'s background sits above it. Changes here affect only this section.`;
-          if (noticeJump) {
-            noticeJump.textContent = "Edit page background";
-            noticeJump.dataset.sqBackgroundJumpScope = "page";
-            delete noticeJump.dataset.sectionId;
-          }
-        }
       });
     };
-    const selectBackgroundLayer = (scope, sectionId = selectedSection) => {
-      if (scope === "section" && sectionId !== selectedSection) selectSqSection(sectionId);
-      const layer = backgroundLayerFor(scope);
+    const selectBackgroundLayer = (_scope = "section", sectionId = selectedSection) => {
+      if (sectionId !== selectedSection) selectSqSection(sectionId);
+      const layer = backgroundLayerFor();
       const image = layer?.querySelector("img");
       if (!layer || !image) return;
-      prepareBackgroundLayer(layer, scope);
+      prepareBackgroundLayer(layer);
       selectSqElement(layer, null, image);
       showElementPanel("content");
       syncElementControls();
     };
-    const installBackgroundImage = (scope, source, snapshot = captureState(), requestedTarget = backgroundTargetFor(scope)) => {
+    const installBackgroundImage = (_scope, source, snapshot = captureState(), requestedTarget = backgroundTargetFor()) => {
       const target = requestedTarget;
       if (!target || !source) return null;
       if (!(source instanceof HTMLImageElement)) {
@@ -5486,19 +5455,18 @@
         probe.alt = "";
         probe.onload = () => {
           if (!target.isConnected) return;
-          installBackgroundImage(scope, probe, snapshot, target);
+          installBackgroundImage("section", probe, snapshot, target);
         };
         probe.onerror = () => showToast("That image could not be loaded. The existing background was kept.");
         probe.src = String(source);
         return probe;
       }
-      const selector = scope === "page" ? ":scope > .sq-page-background" : ":scope > .sq-section-background";
-      let layer = target.querySelector(selector);
+      let layer = target.querySelector(":scope > .sq-section-background");
       let image = layer?.querySelector("img");
       if (!layer) {
         layer = document.createElement("div");
-        layer.className = scope === "page" ? "sq-page-background" : "sq-section-background";
-        prepareBackgroundLayer(layer, scope);
+        layer.className = "sq-section-background";
+        prepareBackgroundLayer(layer);
         target.prepend(layer);
       }
       const copy = source.cloneNode(true);
@@ -5507,30 +5475,53 @@
       copy.classList.remove("sq-image-selected", "sq-element-selected", "sq-image-crop-editing", "is-cropping");
       layer.replaceChildren(copy);
       image = copy;
+      target.dataset.sqBackgroundType = "image";
       applyImageCrop(image); applySelectedImageFilters(image); applyImageBlend(image);
       remember(snapshot); rebuildLayerList(); bindSqInteractions(); syncBackgroundManagers(); scheduleImageScrollEffects(); markSqChanged();
-      selectBackgroundLayer(scope);
-      showToast(`${scope === "page" ? "Page" : "Section"} background added — image controls are open`);
+      selectBackgroundLayer("section");
+      showToast("Section background image added — image settings are open");
       return image;
     };
-    const removeBackgroundImage = (scope) => {
-      const layer = backgroundLayerFor(scope);
+    const removeBackgroundImage = () => {
+      const layer = backgroundLayerFor();
       if (!layer) return;
       remember();
       if (selectedElement === layer) { selectedElement = null; selectedImage = null; }
+      const section = backgroundTargetFor();
+      if (section) section.dataset.sqBackgroundType = "solid";
       layer.remove(); rebuildLayerList(); bindSqInteractions(); syncBackgroundManagers(); markSqChanged();
-      if (scope === "page") deselectSqItem(selectedSection); else selectSqSection(selectedSection, true);
-      showToast(`${scope === "page" ? "Page" : "Section"} background removed`);
+      selectSqSection(selectedSection, true);
+      showToast("Section background image removed");
     };
-    const setImageAsBackground = (scope) => {
+    const setImageAsBackground = () => {
       const image = imageForElement();
       if (!image) return;
-      installBackgroundImage(scope, image);
+      installBackgroundImage("section", image);
     };
-    sqStudio.querySelectorAll("[data-sq-image-background]").forEach((button) => button.addEventListener("click", () => setImageAsBackground(button.dataset.sqImageBackground)));
+    sqStudio.querySelectorAll("[data-sq-image-background]").forEach((button) => button.addEventListener("click", setImageAsBackground));
+    sqStudio.querySelectorAll("[data-sq-section-background-type]").forEach((button) => button.addEventListener("click", () => {
+      const section = backgroundTargetFor();
+      if (!section) return;
+      const type = button.dataset.sqSectionBackgroundType === "image" ? "image" : "solid";
+      if (section.dataset.sqBackgroundType === type) return;
+      remember();
+      section.dataset.sqBackgroundType = type;
+      syncBackgroundManagers();
+      markSqChanged();
+    }));
+    let sectionBackgroundColorSnapshot = null;
+    const backgroundColorInput = sqStudio.querySelector("[data-sq-section-background-color]");
+    const startSectionBackgroundColor = () => { if (!sectionBackgroundColorSnapshot) sectionBackgroundColorSnapshot = captureState(); };
+    backgroundColorInput?.addEventListener("pointerdown", startSectionBackgroundColor);
+    backgroundColorInput?.addEventListener("focus", startSectionBackgroundColor);
+    backgroundColorInput?.addEventListener("input", (event) => {
+      setSectionBackgroundColor(backgroundTargetFor(), event.currentTarget.value);
+      syncBackgroundManagers();
+      markSqChanged();
+    });
+    backgroundColorInput?.addEventListener("change", () => { if (sectionBackgroundColorSnapshot) remember(sectionBackgroundColorSnapshot); sectionBackgroundColorSnapshot = null; });
     sqStudio.querySelectorAll("[data-sq-background-edit]").forEach((button) => button.addEventListener("click", () => selectBackgroundLayer(button.dataset.sqBackgroundEdit)));
-    sqStudio.querySelectorAll("[data-sq-background-scope-jump]").forEach((button) => button.addEventListener("click", () => selectBackgroundLayer(button.dataset.sqBackgroundJumpScope, button.dataset.sectionId || selectedSection)));
-    sqStudio.querySelectorAll("[data-sq-background-remove]").forEach((button) => button.addEventListener("click", () => removeBackgroundImage(button.dataset.sqBackgroundRemove)));
+    sqStudio.querySelectorAll("[data-sq-background-remove]").forEach((button) => button.addEventListener("click", removeBackgroundImage));
     sqStudio.querySelectorAll("[data-sq-background-apply]").forEach((button) => button.addEventListener("click", () => {
       const scope = button.dataset.sqBackgroundApply;
       const value = sqStudio.querySelector(`[data-sq-background-url="${scope}"]`)?.value.trim();
@@ -5765,12 +5756,6 @@
     };
     sqStudio.querySelectorAll("[data-sq-edit-logo]").forEach((button) => button.addEventListener("click", () => selectHeaderElement("logo")));
     sqStudio.querySelectorAll("[data-sq-edit-navigation]").forEach((button) => button.addEventListener("click", () => selectHeaderElement("navigation")));
-    sqStudio.querySelectorAll("[data-sq-edit-page-background]").forEach((button) => button.addEventListener("click", () => {
-      deselectSqItem(selectedSection);
-      const manager = sqStudio.querySelector('[data-sq-background-manager="page"]');
-      manager?.scrollIntoView({ behavior: "smooth", block: "start" });
-      manager?.querySelector('[data-sq-background-upload="page"]')?.parentElement?.focus?.({ preventScroll: true });
-    }));
     const setNavigationDestination = (action, rawValue) => {
       const value = String(rawValue || "").trim() || "#products";
       if (action.matches("button") && value.toLowerCase() === "checkout") {
@@ -6029,14 +6014,6 @@
       if (output) output.textContent = `${event.currentTarget.value}px`;
       markSqChanged();
     });
-    sqStudio.querySelector("[data-sq-background]")?.addEventListener("change", (event) => {
-      remember();
-      const block = previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`);
-      block?.classList.remove("section-bg-light", "section-bg-white", "section-bg-dark", "section-bg-accent");
-      block?.classList.add(`section-bg-${event.currentTarget.value}`);
-      markSqChanged();
-    });
-
     let pageSpacingSnapshot;
     const startPageSpacingEdit = () => { if (!pageSpacingSnapshot) pageSpacingSnapshot = captureState(); };
     const finishPageSpacingEdit = () => { if (pageSpacingSnapshot) remember(pageSpacingSnapshot); pageSpacingSnapshot = null; };
@@ -6264,19 +6241,10 @@
         wrapper.className = `sq-layer-group${sectionId === selectedSection ? " active" : ""}${section.classList.contains("section-hidden") ? " section-hidden" : ""}`;
         wrapper.dataset.sqLayerGroup = "";
         wrapper.dataset.sectionId = sectionId;
-        const backgroundEntry = sectionBackground ? `<button type="button" class="sq-background-layer-entry" data-sq-background-layer="section" data-section-id="${escapeHtml(sectionId)}"><span>${iconMarkup("image")}</span><div><b>Background image</b><small>Click to edit crop, blend, filters, and motion</small></div>${iconMarkup("chevron-right")}</button>` : "";
+        const backgroundEntry = sectionBackground ? `<button type="button" class="sq-background-layer-entry" data-sq-background-layer="section" data-section-id="${escapeHtml(sectionId)}"><span>${iconMarkup("image")}</span><div><b>Background image</b><small>Click to edit crop, overlay, filters, and motion</small></div>${iconMarkup("chevron-right")}</button>` : "";
         wrapper.innerHTML = `<button type="button" draggable="true" data-sq-layer data-section-id="${escapeHtml(sectionId)}">${iconMarkup("grip")}<span>${iconMarkup(details[2])}</span><div><b>${escapeHtml(details[0])}</b><small>${elements.length} element${elements.length === 1 ? "" : "s"} · ${escapeHtml(details[1])}</small></div>${iconMarkup("chevron-right")}</button><div class="sq-layer-elements" aria-label="${escapeHtml(details[0])} elements">${backgroundEntry}${elements.map((element) => `<button type="button" draggable="true" class="${element.classList.contains("sq-element-hidden") ? "element-hidden" : ""}" data-sq-element-layer="${escapeHtml(element.dataset.sqElementId)}"><span>${iconMarkup(elementLayerIcon(element.dataset.sqElementType))}</span><div><b>${escapeHtml(elementTypeName(element))}</b><small>${escapeHtml(elementLayerPreview(element))}</small></div>${iconMarkup("chevron-right")}</button>`).join("")}</div>`;
         return wrapper;
       });
-      const pageBackground = previewRoot?.querySelector(":scope > .sq-page-background");
-      if (pageBackground) {
-        const entry = document.createElement("button");
-        entry.type = "button";
-        entry.className = "sq-page-background-entry";
-        entry.dataset.sqBackgroundLayer = "page";
-        entry.innerHTML = `<span>${iconMarkup("image")}</span><div><b>Page background image</b><small>Whole-page crop, blend, filters, and motion</small></div>${iconMarkup("chevron-right")}`;
-        groups.unshift(entry);
-      }
       layerList.replaceChildren(...groups);
     };
     const syncBrandControls = () => {
@@ -6867,8 +6835,7 @@
     document.addEventListener("keydown", (event) => {
       if (event.target.closest("input,textarea,select,[contenteditable=true]")) return;
       if (event.key === "Escape" && selectedElement?.isConnected) {
-        if (selectedElement.dataset.sqBackgroundScope === "page") deselectSqItem(selectedSection);
-        else selectSqSection(selectedSection, true);
+        selectSqSection(selectedSection, true);
         return;
       }
       if (event.key === "Delete" || event.key === "Backspace") { event.preventDefault(); if (selectedElement?.isConnected) deleteSelectedElement(); else deleteSelectedSection(); return; }
