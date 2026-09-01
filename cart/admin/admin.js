@@ -3234,6 +3234,51 @@
     });
     showElementPanel(activeElementPanel);
     const navigationSectionFor = (element = selectedElement) => element?.dataset?.sqElementType === "navigation" ? element.closest("[data-sq-block]") : null;
+    const ensureNavigationMobileMenu = (section) => {
+      if (!section) return;
+      const navigations = [...section.querySelectorAll(':scope > [data-sq-element-type="navigation"]')];
+      const target = [...navigations].reverse().find((navigation) => navigation.querySelector(':scope > button:not(.sq-nav-menu-toggle)')) || navigations.at(-1);
+      if (!target) return;
+      let toggle = target.querySelector(":scope > .sq-nav-menu-toggle");
+      if (!toggle) {
+        toggle = document.createElement("button");
+        toggle.type = "button";
+        toggle.className = "sq-nav-menu-toggle";
+        toggle.setAttribute("aria-label", "Open navigation menu");
+        toggle.setAttribute("aria-expanded", "false");
+        toggle.innerHTML = "<i></i><i></i><i></i>";
+        target.append(toggle);
+      }
+      let menu = section.querySelector(":scope > .sq-nav-mobile-menu");
+      if (!menu) {
+        menu = document.createElement("nav");
+        menu.className = "sq-nav-mobile-menu";
+        menu.setAttribute("aria-label", "Mobile navigation");
+        menu.hidden = true;
+        section.append(menu);
+      }
+      const renderLinks = () => {
+        const links = navigations.flatMap((navigation) => [...navigation.querySelectorAll(":scope > a")]);
+        menu.replaceChildren(...links.map((link) => {
+          const copy = link.cloneNode(true);
+          copy.removeAttribute("contenteditable");
+          copy.removeAttribute("data-sq-editable");
+          copy.onclick = (event) => { event.preventDefault(); menu.hidden = true; toggle.setAttribute("aria-expanded", "false"); section.classList.remove("sq-nav-menu-open"); };
+          return copy;
+        }));
+      };
+      renderLinks();
+      toggle.onclick = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        renderLinks();
+        const open = menu.hidden;
+        menu.hidden = !open;
+        toggle.setAttribute("aria-expanded", String(open));
+        toggle.setAttribute("aria-label", open ? "Close navigation menu" : "Open navigation menu");
+        section.classList.toggle("sq-nav-menu-open", open);
+      };
+    };
     const navigationScrollRoot = sqStudio.querySelector(".sq-canvas-scroll");
     let editorNavigationFrame = 0;
     const syncEditorNavigation = () => {
@@ -3293,6 +3338,7 @@
       section.style.setProperty("--sq-nav-offset", `${offset}px`);
       section.style.setProperty("--sq-nav-surface-opacity", `${opacity}%`);
       section.style.setProperty("--sq-nav-backdrop-blur", `${blur}px`);
+      ensureNavigationMobileMenu(section);
       scheduleEditorNavigation();
     };
     const syncNavigationLayoutControls = (isNavigation) => {
@@ -3502,7 +3548,7 @@
         const links = [...selectedElement.querySelectorAll(":scope > a")];
         const list = sqStudio.querySelector("[data-sq-navigation-link-list]");
         if (list) list.innerHTML = links.map((link, index) => `<div class="sq-navigation-link-row" data-sq-navigation-link-row="${index}"><input type="text" maxlength="40" value="${escapeHtml(link.textContent.trim())}" aria-label="Navigation label"><input type="text" maxlength="200" value="${escapeHtml(link.getAttribute("href") || "#")}" aria-label="Navigation destination"><button type="button" aria-label="Remove ${escapeHtml(link.textContent.trim())}">×</button></div>`).join("");
-        const cta = selectedElement.querySelector(":scope > button");
+        const cta = selectedElement.querySelector(":scope > button:not(.sq-nav-menu-toggle)");
         const ctaVisible = sqStudio.querySelector("[data-sq-navigation-cta-visible]");
         const ctaLabel = sqStudio.querySelector("[data-sq-navigation-cta-label]");
         const ctaTarget = sqStudio.querySelector("[data-sq-navigation-cta-target]");
@@ -4132,7 +4178,7 @@
       ".sq-generated-spacer>span",
       ".sq-free-heading>h2", ".sq-free-text>p", ".sq-free-marquee .sq-marquee-copy:not([aria-hidden])", ".sq-free-button>button", ".sq-free-form>h3", ".sq-free-form>p",
     ].join(",");
-    const editableNodesFor = (block) => block ? [...block.querySelectorAll(editableContentSelector)].filter((node) => !node.closest(".sq-image-drag-handle")) : [];
+    const editableNodesFor = (block) => block ? [...block.querySelectorAll(editableContentSelector)].filter((node) => !node.closest(".sq-image-drag-handle,.sq-nav-mobile-menu")) : [];
     const contentFieldLabel = (node, index) => {
       const article = node.closest("article");
       const group = article?.parentElement ? [...article.parentElement.children].filter((item) => item.matches("article")).indexOf(article) + 1 : 0;
@@ -5768,15 +5814,15 @@
       const link = document.createElement("a");
       link.textContent = "New page";
       setNavigationDestination(link, "#section");
-      const cta = navigation.querySelector(":scope > button");
+      const cta = navigation.querySelector(":scope > button:not(.sq-nav-menu-toggle)");
       if (cta) cta.before(link); else navigation.append(link);
       syncElementControls(); markSqChanged();
     });
     const updateNavigationCta = () => {
       const navigation = navigationElement();
       if (!navigation) return;
-      let cta = navigation.querySelector(":scope > button");
-      if (!cta) { cta = document.createElement("button"); cta.type = "button"; navigation.append(cta); }
+      let cta = navigation.querySelector(":scope > button:not(.sq-nav-menu-toggle)");
+      if (!cta) { cta = document.createElement("button"); cta.type = "button"; const toggle = navigation.querySelector(":scope > .sq-nav-menu-toggle"); if (toggle) toggle.before(cta); else navigation.append(cta); }
       cta.hidden = !sqStudio.querySelector("[data-sq-navigation-cta-visible]")?.checked;
       cta.textContent = sqStudio.querySelector("[data-sq-navigation-cta-label]")?.value.trim() || "Buy now";
       setNavigationDestination(cta, sqStudio.querySelector("[data-sq-navigation-cta-target]")?.value || "#products");
@@ -6914,6 +6960,16 @@
       clone.querySelectorAll("[draggable], [contenteditable], [data-sq-block], [data-section-id]").forEach((node) => { node.removeAttribute("draggable"); node.removeAttribute("contenteditable"); node.removeAttribute("data-sq-block"); node.removeAttribute("data-section-id"); node.classList.remove("selected", "dragging", "drag-over", "animating"); });
       clone.querySelectorAll("[data-sq-image-list], [data-sq-image-item]").forEach((node) => { node.removeAttribute("data-sq-image-list"); node.removeAttribute("data-sq-image-item"); node.removeAttribute("tabindex"); node.classList.remove("sq-image-selected", "sq-image-dragging", "sq-image-drop-target"); });
       clone.querySelectorAll("[data-sq-editable], [data-sq-content]").forEach((node) => { node.removeAttribute("data-sq-editable"); node.removeAttribute("data-sq-content"); });
+      clone.querySelectorAll(".sq-navigation-template-section").forEach((section) => {
+        const menu = section.querySelector(":scope > .sq-nav-mobile-menu");
+        if (!menu) return;
+        const links = [...section.querySelectorAll(':scope > [data-sq-element-type="navigation"] > a')];
+        menu.replaceChildren(...links.map((link) => link.cloneNode(true)));
+        menu.hidden = true;
+        section.classList.remove("sq-nav-menu-open");
+        const toggle = section.querySelector(".sq-nav-menu-toggle");
+        if (toggle) { toggle.setAttribute("aria-expanded", "false"); toggle.setAttribute("aria-label", "Open navigation menu"); }
+      });
       clone.querySelectorAll("[data-sq-link-type]").forEach((action) => {
         let type = action.dataset.sqLinkType || "none";
         const target = safeActionTarget(type, action.dataset.sqLink || "");
@@ -6997,6 +7053,7 @@ let navigationFrame=0,lastNavigationScroll=scrollY;
 const syncNavigations=()=>{navigationFrame=0;const current=scrollY,direction=current-lastNavigationScroll;document.querySelectorAll('[data-ezkart-nav-position]').forEach(nav=>{const position=nav.dataset.ezkartNavPosition||'static',offset=Math.max(0,Math.min(120,Number(nav.dataset.ezkartNavOffset)||0)),opacity=Math.max(0,Math.min(100,Number(nav.dataset.ezkartNavOpacity??100))),blur=Math.max(0,Math.min(32,Number(nav.dataset.ezkartNavBlur??16))),stuck=position==='fixed'||position==='sticky'&&nav.getBoundingClientRect().top<=offset+1;nav.style.setProperty('--sq-nav-offset',offset+'px');nav.style.setProperty('--sq-nav-surface-opacity',opacity+'%');nav.style.setProperty('--sq-nav-backdrop-blur',blur+'px');nav.classList.toggle('sq-nav-is-stuck',stuck);if(!stuck||nav.dataset.ezkartNavHideScroll!=='true')nav.classList.remove('sq-nav-hidden');else if(direction>2&&current>offset+48)nav.classList.add('sq-nav-hidden');else if(direction<-2)nav.classList.remove('sq-nav-hidden')});lastNavigationScroll=current};
 const scheduleNavigations=()=>{if(!navigationFrame)navigationFrame=requestAnimationFrame(syncNavigations)};
 addEventListener('scroll',scheduleNavigations,{passive:true});addEventListener('resize',scheduleNavigations,{passive:true});syncNavigations();
+document.querySelectorAll('.sq-navigation-template-section').forEach(section=>{const toggle=section.querySelector('.sq-nav-menu-toggle'),menu=section.querySelector(':scope>.sq-nav-mobile-menu');if(!toggle||!menu)return;const setOpen=open=>{menu.hidden=!open;section.classList.toggle('sq-nav-menu-open',open);toggle.setAttribute('aria-expanded',String(open));toggle.setAttribute('aria-label',open?'Close navigation menu':'Open navigation menu')};toggle.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();setOpen(menu.hidden)});menu.addEventListener('click',event=>{if(event.target.closest('a'))setOpen(false)});addEventListener('keydown',event=>{if(event.key==='Escape'&&!menu.hidden){setOpen(false);toggle.focus()}});document.addEventListener('click',event=>{if(!section.contains(event.target))setOpen(false)})});
 document.querySelectorAll('.sq-nav-commerce-search form').forEach(form=>{const input=form.querySelector('input[type="search"]'),button=form.querySelector('button'),filterProducts=()=>{const query=(input?.value||'').trim().toLocaleLowerCase();document.querySelectorAll('[data-product-card]').forEach(card=>{card.hidden=Boolean(query)&&!card.textContent.toLocaleLowerCase().includes(query)})};form.addEventListener('submit',event=>{event.preventDefault();filterProducts()});button?.addEventListener('click',filterProducts);input?.addEventListener('input',filterProducts)});
 document.querySelectorAll('[data-ezkart-variants]').forEach(controls=>{
   let variants=[];
