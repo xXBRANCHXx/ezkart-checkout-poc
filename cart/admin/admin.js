@@ -3299,7 +3299,6 @@
       editorNavigationFrame = 0;
       if (!navigationScrollRoot || !previewRoot || !deviceFrame) return;
       const scrollRect = navigationScrollRoot.getBoundingClientRect();
-      const rootRect = previewRoot.getBoundingClientRect();
       const renderedScale = deviceFrame.offsetWidth > 0 ? deviceFrame.getBoundingClientRect().width / deviceFrame.offsetWidth : zoom / 100;
       const scale = Number.isFinite(renderedScale) && renderedScale > 0 ? renderedScale : 1;
       previewRoot.querySelectorAll("[data-sq-nav-position]").forEach((navigation) => {
@@ -3310,11 +3309,9 @@
           return;
         }
         const offset = Math.max(0, Math.min(120, Number(navigation.dataset.sqNavOffset) || 0));
-        const desiredTop = scrollRect.top + offset * scale;
-        const maximumShift = Math.max(0, previewRoot.offsetHeight - navigation.offsetHeight);
-        const shift = Math.max(0, Math.min(maximumShift, (desiredTop - rootRect.top) / scale));
-        navigation.style.setProperty("--sq-nav-editor-shift", `${shift}px`);
-        navigation.classList.toggle("sq-nav-is-stuck", shift > .5);
+        const stickyTop = scrollRect.top + offset * scale;
+        navigation.style.removeProperty("--sq-nav-editor-shift");
+        navigation.classList.toggle("sq-nav-is-stuck", navigation.getBoundingClientRect().top <= stickyTop + 1);
         navigation.classList.remove("sq-nav-hidden");
       });
     };
