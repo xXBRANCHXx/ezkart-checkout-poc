@@ -3229,6 +3229,39 @@
       });
     });
     showElementPanel(activeElementPanel);
+    const navigationSectionFor = (element = selectedElement) => element?.dataset?.sqElementType === "navigation" ? element.closest("[data-sq-block]") : null;
+    const applyNavigationSectionBehavior = (section) => {
+      if (!section) return;
+      const position = ["static", "sticky", "fixed"].includes(section.dataset.sqNavPosition) ? section.dataset.sqNavPosition : "static";
+      const offset = Math.max(0, Math.min(120, Number(section.dataset.sqNavOffset) || 0));
+      section.dataset.sqNavPosition = position;
+      section.dataset.sqNavOffset = String(offset);
+      section.dataset.sqNavShadow ||= "true";
+      section.classList.add("sq-navigation-template-section");
+      section.style.setProperty("--sq-nav-offset", `${offset}px`);
+    };
+    const syncNavigationLayoutControls = (isNavigation) => {
+      const controls = sqStudio.querySelector("[data-sq-navigation-layout-controls]");
+      if (controls) controls.hidden = !isNavigation;
+      if (!isNavigation) return;
+      const section = navigationSectionFor();
+      if (!section) return;
+      applyNavigationSectionBehavior(section);
+      const position = section.dataset.sqNavPosition || "static";
+      sqStudio.querySelectorAll("[data-sq-navigation-position]").forEach((button) => {
+        const active = button.dataset.sqNavigationPosition === position;
+        button.classList.toggle("active", active);
+        button.setAttribute("aria-pressed", String(active));
+      });
+      const offset = sqStudio.querySelector("[data-sq-navigation-offset]");
+      const offsetOutput = sqStudio.querySelector("[data-sq-navigation-offset-output]");
+      if (offset) offset.value = section.dataset.sqNavOffset || "0";
+      if (offsetOutput) offsetOutput.textContent = `${section.dataset.sqNavOffset || "0"}px`;
+      const hideOnScroll = sqStudio.querySelector("[data-sq-navigation-hide-scroll]");
+      const shadow = sqStudio.querySelector("[data-sq-navigation-stuck-shadow]");
+      if (hideOnScroll) hideOnScroll.checked = section.dataset.sqNavHideScroll === "true";
+      if (shadow) shadow.checked = section.dataset.sqNavShadow !== "false";
+    };
     const syncElementControls = () => {
       const controls = sqStudio.querySelector("[data-sq-element-controls]");
       const selectedBackground = selectedElement?.matches?.(".sq-page-background,.sq-section-background");
@@ -3240,6 +3273,8 @@
         if (context) context.textContent = "Selected section";
         const productControls = sqStudio.querySelector("[data-sq-product-layout-controls]");
         if (productControls) productControls.hidden = true;
+        const navigationLayoutControls = sqStudio.querySelector("[data-sq-navigation-layout-controls]");
+        if (navigationLayoutControls) navigationLayoutControls.hidden = true;
         syncBuilderRanges();
         return;
       }
@@ -3393,6 +3428,7 @@
       }
       const navigationControls = sqStudio.querySelector("[data-sq-navigation-controls]");
       if (navigationControls) navigationControls.hidden = !isNavigation;
+      syncNavigationLayoutControls(isNavigation);
       if (isNavigation) {
         const links = [...selectedElement.querySelectorAll(":scope > a")];
         const list = sqStudio.querySelector("[data-sq-navigation-link-list]");
@@ -3403,7 +3439,11 @@
         const ctaTarget = sqStudio.querySelector("[data-sq-navigation-cta-target]");
         if (ctaVisible) ctaVisible.checked = Boolean(cta) && !cta.hidden;
         if (ctaLabel) ctaLabel.value = cta?.textContent.trim() || "Buy now";
-        if (ctaTarget) ctaTarget.value = cta?.dataset.sqLink ? `#${cta.dataset.sqLink.replace(/^#/, "")}` : "#products";
+        if (ctaTarget) {
+          const ctaType = inferredActionType(cta);
+          const ctaDestination = inferredActionTarget(cta, ctaType);
+          ctaTarget.value = ctaType === "checkout" ? "checkout" : ctaType === "section" ? `#${ctaDestination.replace(/^#/, "") || "products"}` : ctaDestination || "#products";
+        }
       }
       const buttonRole = selectedElement.dataset.sqButtonRole || "primary";
       sqStudio.querySelectorAll("[data-sq-role-choice]").forEach((button) => button.classList.toggle("active", button.dataset.sqRoleChoice === buttonRole));
@@ -4487,6 +4527,7 @@
       previewRoot.innerHTML = state.preview;
       previewRoot.className = state.previewClass;
       if (state.previewStyle) previewRoot.setAttribute("style", state.previewStyle); else previewRoot.removeAttribute("style");
+      previewRoot.querySelectorAll("[data-sq-nav-position]").forEach(applyNavigationSectionBehavior);
       setExtraPageHeight(Number.parseFloat(previewRoot.style.getPropertyValue("--sq-page-extra-height")) || 0);
       upgradeLegacyStructure();
       previewRoot.querySelectorAll("img[data-sq-image-blend-mode],img[data-sq-image-blend-source],img[data-sq-image-blend-color]").forEach(applyImageBlend);
@@ -5616,6 +5657,12 @@
     }));
     const setNavigationDestination = (action, rawValue) => {
       const value = String(rawValue || "").trim() || "#products";
+      if (action.matches("button") && value.toLowerCase() === "checkout") {
+        action.dataset.sqLinkType = "checkout";
+        action.dataset.sqLink = "";
+        action.dataset.sqNewTab = "false";
+        return;
+      }
       const sectionLink = value.startsWith("#");
       action.dataset.sqLinkType = sectionLink ? "section" : "url";
       action.dataset.sqLink = sectionLink ? value.slice(1) : value;
@@ -5670,6 +5717,43 @@
       input.addEventListener("focus", startNavigationEdit);
       input.addEventListener("input", updateNavigationCta);
       input.addEventListener("change", finishNavigationEdit);
+    });
+    sqStudio.querySelectorAll("[data-sq-navigation-position]").forEach((button) => button.addEventListener("click", () => {
+      const section = navigationSectionFor();
+      if (!section) return;
+      remember();
+      section.dataset.sqNavPosition = button.dataset.sqNavigationPosition;
+      applyNavigationSectionBehavior(section);
+      syncNavigationLayoutControls(true);
+      markSqChanged();
+    }));
+    let navigationBehaviorSnapshot = null;
+    const startNavigationBehaviorEdit = () => { if (!navigationBehaviorSnapshot) navigationBehaviorSnapshot = captureState(); };
+    const finishNavigationBehaviorEdit = () => { if (navigationBehaviorSnapshot) remember(navigationBehaviorSnapshot); navigationBehaviorSnapshot = null; markSqChanged(); };
+    const navigationOffset = sqStudio.querySelector("[data-sq-navigation-offset]");
+    navigationOffset?.addEventListener("pointerdown", startNavigationBehaviorEdit);
+    navigationOffset?.addEventListener("focus", startNavigationBehaviorEdit);
+    navigationOffset?.addEventListener("input", (event) => {
+      const section = navigationSectionFor();
+      if (!section) return;
+      section.dataset.sqNavOffset = String(event.currentTarget.value);
+      applyNavigationSectionBehavior(section);
+      const output = sqStudio.querySelector("[data-sq-navigation-offset-output]");
+      if (output) output.textContent = `${event.currentTarget.value}px`;
+      markSqChanged();
+    });
+    navigationOffset?.addEventListener("change", finishNavigationBehaviorEdit);
+    [["[data-sq-navigation-hide-scroll]", "sqNavHideScroll"], ["[data-sq-navigation-stuck-shadow]", "sqNavShadow"]].forEach(([selector, key]) => {
+      const input = sqStudio.querySelector(selector);
+      input?.addEventListener("pointerdown", startNavigationBehaviorEdit);
+      input?.addEventListener("keydown", (event) => { if ([" ", "Enter"].includes(event.key)) startNavigationBehaviorEdit(); });
+      input?.addEventListener("change", (event) => {
+        const section = navigationSectionFor();
+        if (!section) return;
+        section.dataset[key] = String(event.currentTarget.checked);
+        applyNavigationSectionBehavior(section);
+        finishNavigationBehaviorEdit();
+      });
     });
     sqStudio.querySelector("[data-sq-logo-clear]")?.addEventListener("click", () => { if (!selectedLogoParts()) return; remember(); setLogoSource(""); showToast("Header switched to the brand name"); });
     sqStudio.querySelectorAll("[data-sq-role-choice]").forEach((button) => button.addEventListener("click", () => {
@@ -6170,6 +6254,73 @@
       showToast(`${elementTypeName(element)} added — drag it anywhere in the section`);
       return element;
     };
+    const scaledNavigationLayout = (layout, device) => {
+      const [x, y, width, height] = String(layout).split(",").map((value) => Number.parseInt(value, 10));
+      const columns = fluidColumns(device);
+      const left = Math.floor((Math.max(1, x || 1) - 1) * columns / 12) + 1;
+      const right = Math.ceil((Math.max(1, x || 1) - 1 + Math.max(1, width || 1)) * columns / 12);
+      return `${left},${Math.max(1, y || 1)},${Math.max(1, right - left + 1)},${Math.max(1, height || 1)}`;
+    };
+    const responsiveNavigationLayouts = (layouts) => Object.fromEntries(["desktop", "tablet", "mobile"].map((device) => [device, scaledNavigationLayout(layouts[device], device)]));
+    const navigationLogoMarkup = (sourceLayouts) => {
+      const layouts = responsiveNavigationLayouts(sourceLayouts);
+      const source = previewRoot?.querySelector('[data-sq-element-type="logo"]');
+      const logo = source?.cloneNode(true) || document.createElement("div");
+      if (!source) logo.innerHTML = '<img data-sq-logo-image alt="" hidden><b data-sq-logo-text>Your brand</b>';
+      logo.className = "sq-site-logo";
+      logo.dataset.sqElement = "";
+      logo.dataset.sqElementType = "logo";
+      delete logo.dataset.sqElementId;
+      logo.removeAttribute("contenteditable");
+      logo.classList.remove("sq-element-selected", "sq-element-hidden");
+      ["desktop", "tablet", "mobile"].forEach((device) => logo.setAttribute(`data-layout-${device}`, layouts[device]));
+      return logo.outerHTML;
+    };
+    const navigationLinksMarkup = ({ className = "", slot = "", links = [], button = "Buy now", buttonAction = "checkout", layouts: sourceLayouts }) => {
+      const layouts = responsiveNavigationLayouts(sourceLayouts);
+      const actionType = buttonAction === "checkout" ? "checkout" : buttonAction.startsWith("#") ? "section" : "url";
+      const actionTarget = actionType === "section" ? buttonAction.slice(1) : actionType === "url" ? buttonAction : "";
+      const buttonMarkup = button ? `<button type="button" data-sq-link-type="${actionType}" data-sq-link="${actionTarget}" data-sq-new-tab="false">${button}</button>` : "";
+      return `<nav class="sq-template-navigation button-primary${className ? ` ${className}` : ""}" data-sq-element data-sq-element-type="navigation" data-sq-button-role="primary"${slot ? ` data-sq-nav-slot="${slot}"` : ""} data-layout-desktop="${layouts.desktop}" data-layout-tablet="${layouts.tablet}" data-layout-mobile="${layouts.mobile}">${links.map(([label, target]) => `<a href="${target}">${label}</a>`).join("")}${buttonMarkup}</nav>`;
+    };
+    const navigationTemplateMarkup = (template, sectionId = "navigation") => {
+      const handle = `<button class="sq-block-handle" type="button" aria-label="Drag navigation section">${iconMarkup("grip")}</button>`;
+      const section = (rows, position, shadow, hideOnScroll, body) => `<header class="sq-page-block sq-store-nav sq-navigation-template-section" draggable="true" data-sq-block data-sq-fluid data-sq-rows="${rows}" data-section-id="${sectionId}" data-sq-nav-template="${template}" data-sq-nav-position="${position}" data-sq-nav-offset="0" data-sq-nav-shadow="${shadow}" data-sq-nav-hide-scroll="${hideOnScroll}">${handle}${body}</header>`;
+      const mainLinks = [["Shop", "#products"], ["Our story", "#story"], ["Contact", "#contact"]];
+      if (template === "centered") return section(2, "static", "false", "false", `${navigationLinksMarkup({ slot: "left", links: [["Shop", "#products"], ["Our story", "#story"]], button: "", layouts: { desktop: "1,1,4,2", tablet: "1,1,4,2", mobile: "1,1,1,1" } })}${navigationLogoMarkup({ desktop: "5,1,4,2", tablet: "5,1,4,2", mobile: "1,1,6,2" })}${navigationLinksMarkup({ slot: "right", links: [["Search", "#products"]], button: "Cart", layouts: { desktop: "9,1,4,2", tablet: "9,1,4,2", mobile: "7,1,6,2" } })}`);
+      if (template === "announcement") return section(4, "sticky", "true", "true", `<p class="sq-nav-announcement-copy" data-sq-element data-sq-element-type="text" data-layout-desktop="1,1,12,1" data-layout-tablet="1,1,12,1" data-layout-mobile="1,1,12,1">Free shipping on orders over Rp500k</p>${navigationLogoMarkup({ desktop: "1,2,4,3", tablet: "1,2,4,3", mobile: "1,2,5,3" })}${navigationLinksMarkup({ links: mainLinks, layouts: { desktop: "5,2,8,3", tablet: "5,2,8,3", mobile: "6,2,7,3" } })}`);
+      if (template === "overlay") return section(2, "sticky", "true", "false", `${navigationLogoMarkup({ desktop: "1,1,4,2", tablet: "1,1,4,2", mobile: "1,1,5,2" })}${navigationLinksMarkup({ links: mainLinks, layouts: { desktop: "5,1,8,2", tablet: "5,1,8,2", mobile: "6,1,7,2" } })}`);
+      if (template === "commerce") return section(2, "sticky", "true", "false", `${navigationLogoMarkup({ desktop: "1,1,3,2", tablet: "1,1,3,2", mobile: "1,1,5,2" })}<div class="sq-nav-commerce-search" data-sq-element data-sq-element-type="form" data-layout-desktop="4,1,5,2" data-layout-tablet="4,1,5,2" data-layout-mobile="1,1,1,1"><form role="search"><input type="search" placeholder="Search products…" aria-label="Search products"><button type="button">Search</button></form></div>${navigationLinksMarkup({ links: [["Account", "#contact"]], button: "Cart", layouts: { desktop: "9,1,4,2", tablet: "9,1,4,2", mobile: "6,1,7,2" } })}`);
+      if (template === "minimal") return section(2, "sticky", "true", "false", `${navigationLogoMarkup({ desktop: "1,1,6,2", tablet: "1,1,6,2", mobile: "1,1,6,2" })}${navigationLinksMarkup({ links: [], button: "Shop now", buttonAction: "#products", layouts: { desktop: "7,1,6,2", tablet: "7,1,6,2", mobile: "7,1,6,2" } })}`);
+      return section(2, "sticky", "true", "false", `${navigationLogoMarkup({ desktop: "1,1,4,2", tablet: "1,1,4,2", mobile: "1,1,5,2" })}${navigationLinksMarkup({ links: mainLinks, layouts: { desktop: "5,1,8,2", tablet: "5,1,8,2", mobile: "6,1,7,2" } })}`);
+    };
+    const addNavigationTemplate = (template) => {
+      const existing = previewRoot?.querySelector('[data-section-id="navigation"]') || previewRoot?.querySelector(".sq-navigation-template-section");
+      const sectionId = existing?.dataset.sectionId || "navigation";
+      const snapshot = captureState();
+      const wrapper = document.createElement("div");
+      wrapper.innerHTML = navigationTemplateMarkup(template, sectionId);
+      const section = wrapper.firstElementChild;
+      if (!section) return;
+      if (existing) existing.replaceWith(section);
+      else {
+        const announcement = previewRoot?.querySelector('[data-section-id="announcement"]');
+        if (announcement) announcement.after(section); else previewRoot?.prepend(section);
+      }
+      remember(snapshot);
+      applyNavigationSectionBehavior(section);
+      rebuildLayerList();
+      bindSqInteractions();
+      applyFluidSection(section);
+      setLibraryView("");
+      openSqPanel("layers", { pin: true });
+      selectSqSection(sectionId);
+      const navigation = section.querySelector('[data-sq-nav-slot="right"]') || section.querySelector('[data-sq-element-type="navigation"]');
+      if (navigation) selectSqElement(navigation);
+      markSqChanged();
+      section.scrollIntoView({ behavior: "smooth", block: "start" });
+      showToast(`${template[0].toUpperCase() + template.slice(1)} navigation added — every element is editable`);
+    };
     const createComponentInstanceElement = (component) => {
       const element = document.createElement("div");
       element.className = "sq-free-element sq-free-code sq-component-instance";
@@ -6246,6 +6397,41 @@
         addLibraryElement(button.dataset.sqAddElement, section);
       });
     });
+
+    const addPanel = sqStudio.querySelector('[data-sq-panel="add"]');
+    const libraryViews = [...sqStudio.querySelectorAll("[data-sq-library-view]")];
+    const setLibraryView = (name = "") => {
+      if (!addPanel) return;
+      libraryViews.forEach((view) => { view.hidden = view.dataset.sqLibraryView !== name; });
+      addPanel.classList.toggle("sq-library-view-open", Boolean(name));
+      addPanel.scrollTo({ top: 0, behavior: "auto" });
+      if (name) libraryViews.find((view) => view.dataset.sqLibraryView === name)?.querySelector("[data-sq-library-search]")?.focus({ preventScroll: true });
+    };
+    sqStudio.querySelectorAll("[data-sq-open-library]").forEach((button) => button.addEventListener("click", () => setLibraryView(button.dataset.sqOpenLibrary)));
+    sqStudio.querySelectorAll("[data-sq-close-library]").forEach((button) => button.addEventListener("click", () => setLibraryView("")));
+    const filterLibraryView = (view) => {
+      const query = normalize(view.querySelector("[data-sq-library-search]")?.value || "");
+      const activeFilter = view.querySelector("[data-sq-library-filter].active")?.dataset.sqLibraryFilter || "all";
+      view.querySelectorAll("[data-sq-library-card]").forEach((card) => {
+        const matchesQuery = !query || normalize(card.dataset.search).includes(query);
+        const categories = String(card.dataset.category || "").split(/\s+/);
+        const matchesFilter = activeFilter === "all" || categories.includes(activeFilter);
+        card.hidden = !matchesQuery || !matchesFilter;
+      });
+    };
+    libraryViews.forEach((view) => {
+      view.querySelector("[data-sq-library-search]")?.addEventListener("input", () => filterLibraryView(view));
+      view.querySelectorAll("[data-sq-library-filter]").forEach((button) => button.addEventListener("click", () => {
+        view.querySelectorAll("[data-sq-library-filter]").forEach((item) => {
+          const active = item === button;
+          item.classList.toggle("active", active);
+          item.setAttribute("aria-pressed", String(active));
+        });
+        filterLibraryView(view);
+      }));
+    });
+    addPanel?.addEventListener("keydown", (event) => { if (event.key === "Escape" && addPanel.classList.contains("sq-library-view-open")) { event.stopPropagation(); setLibraryView(""); } });
+    sqStudio.querySelectorAll("[data-sq-add-navigation-template]").forEach((button) => button.addEventListener("click", () => addNavigationTemplate(button.dataset.sqAddNavigationTemplate)));
 
     const componentDialog = document.querySelector("[data-sq-component-dialog]");
     const componentForm = componentDialog?.querySelector("[data-sq-component-form]");
@@ -6416,7 +6602,7 @@
     }));
     sqStudio.querySelector("[data-sq-block-search]")?.addEventListener("input", (event) => {
       const query = normalize(event.currentTarget.value);
-      sqStudio.querySelectorAll("[data-sq-add-block], [data-sq-add-element], [data-sq-component]").forEach((button) => { button.hidden = Boolean(query) && !normalize(button.dataset.search).includes(query); });
+      sqStudio.querySelectorAll("[data-sq-add-block], [data-sq-add-element], [data-sq-open-library], [data-sq-component]").forEach((button) => { button.hidden = Boolean(query) && !normalize(button.dataset.search).includes(query); });
     });
 
     sqStudio.querySelector("[data-sq-duplicate]")?.addEventListener("click", () => {
@@ -6548,7 +6734,7 @@
 
     const exportDialog = document.getElementById("html-export-dialog");
     const collectExportCss = () => {
-      const tokens = [".sq-page-preview", ".sq-page-block", ".sq-page-background", ".sq-section-background", ".sq-announcement", ".sq-store-nav", ".sq-site-logo", ".sq-hero", ".sq-product", ".sq-image-story", ".sq-image-blend", ".sq-image-crop", ".sq-benefit", ".sq-cart", ".sq-shipping", ".sq-generated", ".sq-free", ".sq-marquee", ".sq-surface", ".sq-color", ".element-animation", ".hover-", ".button-", ".ez-fluid", "@keyframes sq", "@keyframes element", ".product-art", ".icon", ".svg-sprite"];
+      const tokens = [".sq-page-preview", ".sq-page-block", ".sq-page-background", ".sq-section-background", ".sq-announcement", ".sq-store-nav", ".sq-site-logo", ".sq-navigation-template", ".sq-nav-", ".sq-hero", ".sq-product", ".sq-image-story", ".sq-image-blend", ".sq-image-crop", ".sq-benefit", ".sq-cart", ".sq-shipping", ".sq-generated", ".sq-free", ".sq-marquee", ".sq-surface", ".sq-color", ".element-animation", ".hover-", ".button-", ".ez-fluid", "@keyframes sq", "@keyframes element", ".product-art", ".icon", ".svg-sprite"];
       const collect = (rules) => [...rules].map((rule) => {
         if (rule.type === CSSRule.KEYFRAMES_RULE) return tokens.some((token) => rule.cssText.includes(token)) ? rule.cssText : "";
         if (rule.cssRules && !rule.selectorText) { const nested = collect(rule.cssRules); return nested ? `${rule.conditionText ? `@media ${rule.conditionText}` : rule.cssText.slice(0, rule.cssText.indexOf("{"))}{${nested}}` : ""; }
@@ -6603,6 +6789,14 @@
       clone.querySelectorAll(".sq-block-handle, .sq-image-drag-handle, .sq-element-overlay, .sq-section-toolbar, .sq-layout-grid-overlay, .sq-section-height-handle, .section-hidden, .sq-element-hidden").forEach((node) => node.remove());
       clone.querySelectorAll(".sq-image-crop-editing, .sq-direct-draggable, .sq-direct-dragging, .sq-page-background.sq-element-selected, .sq-section-background.sq-element-selected").forEach((node) => node.classList.remove("sq-image-crop-editing", "is-cropping", "sq-direct-draggable", "sq-direct-dragging", "sq-element-selected"));
       clone.querySelectorAll("[data-product-card][hidden], [data-product-line][hidden], .sq-hero-collage > span[hidden]").forEach((node) => node.remove());
+      clone.querySelectorAll("[data-sq-nav-position]").forEach((node) => {
+        node.dataset.ezkartNavTemplate = node.dataset.sqNavTemplate || "essential";
+        node.dataset.ezkartNavPosition = node.dataset.sqNavPosition || "static";
+        node.dataset.ezkartNavOffset = node.dataset.sqNavOffset || "0";
+        node.dataset.ezkartNavHideScroll = node.dataset.sqNavHideScroll || "false";
+        node.dataset.ezkartNavShadow = node.dataset.sqNavShadow || "true";
+      });
+      clone.querySelectorAll("[data-sq-nav-slot]").forEach((node) => { node.dataset.ezkartNavSlot = node.dataset.sqNavSlot; });
       clone.querySelectorAll("[data-section-id]").forEach((node) => { node.dataset.ezkartSection = node.dataset.sectionId; });
       clone.querySelectorAll("[draggable], [contenteditable], [data-sq-block], [data-section-id]").forEach((node) => { node.removeAttribute("draggable"); node.removeAttribute("contenteditable"); node.removeAttribute("data-sq-block"); node.removeAttribute("data-section-id"); node.classList.remove("selected", "dragging", "drag-over", "animating"); });
       clone.querySelectorAll("[data-sq-image-list], [data-sq-image-item]").forEach((node) => { node.removeAttribute("data-sq-image-list"); node.removeAttribute("data-sq-image-item"); node.removeAttribute("tabindex"); node.classList.remove("sq-image-selected", "sq-image-dragging", "sq-image-drop-target"); });
@@ -6670,6 +6864,11 @@ const updateScrollMarquees=()=>{marqueeFrame=0;document.querySelectorAll('.sq-fr
 const scheduleScrollMarquees=()=>{if(!marqueeFrame)marqueeFrame=requestAnimationFrame(updateScrollMarquees)};
 const syncMarquees=()=>{document.querySelectorAll('.sq-free-marquee').forEach(element=>{const track=element.querySelector('.sq-marquee-track'),source=track?.querySelector('.sq-marquee-copy:not([aria-hidden])');if(!track||!source)return;track.querySelectorAll('.sq-marquee-copy[aria-hidden="true"]').forEach(copy=>copy.remove());const width=Math.max(1,source.offsetWidth),copies=Math.max(2,Math.ceil(Math.max(1,element.clientWidth)/width)+2);for(let index=1;index<copies;index+=1){const copy=source.cloneNode(true);copy.removeAttribute('contenteditable');copy.setAttribute('aria-hidden','true');track.append(copy)}track.style.setProperty('--sq-marquee-distance',width+'px');track.style.setProperty('--sq-marquee-duration',Math.max(2,width/marqueeSpeed(element))+'s');const manual=element.dataset.ezkartMarqueeMode==='scroll';element.classList.toggle('sq-marquee-manual',manual);if(!manual)track.style.removeProperty('transform')});scheduleScrollMarquees()};
 addEventListener('scroll',scheduleScrollMarquees,{passive:true});addEventListener('resize',syncMarquees,{passive:true});document.fonts?.ready.then(syncMarquees);syncMarquees();
+let navigationFrame=0,lastNavigationScroll=scrollY;
+const syncNavigations=()=>{navigationFrame=0;const current=scrollY,direction=current-lastNavigationScroll;document.querySelectorAll('[data-ezkart-nav-position]').forEach(nav=>{const position=nav.dataset.ezkartNavPosition||'static',offset=Math.max(0,Math.min(120,Number(nav.dataset.ezkartNavOffset)||0)),stuck=position==='fixed'||position==='sticky'&&nav.getBoundingClientRect().top<=offset+1;nav.style.setProperty('--sq-nav-offset',offset+'px');nav.classList.toggle('sq-nav-is-stuck',stuck);if(!stuck||nav.dataset.ezkartNavHideScroll!=='true')nav.classList.remove('sq-nav-hidden');else if(direction>2&&current>offset+48)nav.classList.add('sq-nav-hidden');else if(direction<-2)nav.classList.remove('sq-nav-hidden')});lastNavigationScroll=current};
+const scheduleNavigations=()=>{if(!navigationFrame)navigationFrame=requestAnimationFrame(syncNavigations)};
+addEventListener('scroll',scheduleNavigations,{passive:true});addEventListener('resize',scheduleNavigations,{passive:true});syncNavigations();
+document.querySelectorAll('.sq-nav-commerce-search form').forEach(form=>{const input=form.querySelector('input[type="search"]'),button=form.querySelector('button'),filterProducts=()=>{const query=(input?.value||'').trim().toLocaleLowerCase();document.querySelectorAll('[data-product-card]').forEach(card=>{card.hidden=Boolean(query)&&!card.textContent.toLocaleLowerCase().includes(query)})};form.addEventListener('submit',event=>{event.preventDefault();filterProducts()});button?.addEventListener('click',filterProducts);input?.addEventListener('input',filterProducts)});
 document.querySelectorAll('[data-ezkart-variants]').forEach(controls=>{
   let variants=[];
   try{variants=JSON.parse(controls.dataset.ezkartVariants||'[]')}catch(_){return}
