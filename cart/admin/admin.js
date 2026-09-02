@@ -5432,6 +5432,17 @@
         if (url && document.activeElement !== url) url.value = image && /^(https?:\/\/|\/|\.\.\/|\.\/)/i.test(image.getAttribute("src") || "") ? image.getAttribute("src") : "";
         if (edit) edit.hidden = !image;
         if (remove) remove.hidden = !image;
+        const scrollEffect = image?.dataset.sqImageScroll === "parallax-deep" ? "parallax" : image?.dataset.sqImageScroll || "none";
+        const storedScrollStrength = Number(image?.dataset.sqImageScrollStrength);
+        const scrollStrength = Math.max(0, Math.min(100, Number.isFinite(storedScrollStrength) ? storedScrollStrength : 50));
+        const scrollEffectInput = manager.querySelector("[data-sq-section-background-scroll-effect]");
+        const scrollStrengthInput = manager.querySelector("[data-sq-section-background-scroll-strength]");
+        const scrollStrengthOutput = manager.querySelector("[data-sq-section-background-scroll-strength-output]");
+        const scrollDampingInput = manager.querySelector("[data-sq-section-background-scroll-damping]");
+        if (scrollEffectInput) { scrollEffectInput.value = scrollEffect; scrollEffectInput.disabled = !image; }
+        if (scrollStrengthInput) { scrollStrengthInput.value = String(scrollStrength); scrollStrengthInput.disabled = !image || scrollEffect === "none"; }
+        if (scrollStrengthOutput) scrollStrengthOutput.textContent = scrollStrength === 100 && scrollEffect === "parallax" ? "100% · fixed" : scrollStrength === 0 ? "0% · normal" : `${scrollStrength}%`;
+        if (scrollDampingInput) { scrollDampingInput.checked = image?.dataset.sqImageScrollDamping !== "false"; scrollDampingInput.disabled = !image || scrollEffect === "none"; }
       });
     };
     const selectBackgroundLayer = (_scope = "section", sectionId = selectedSection) => {
@@ -5446,38 +5457,40 @@
     };
     const installBackgroundImage = (_scope, source, snapshot = captureState(), requestedTarget = backgroundTargetFor()) => {
       const target = requestedTarget;
-      if (!target || !source) return null;
-      if (!(source instanceof HTMLImageElement)) {
-        const probe = document.createElement("img");
-        probe.alt = "";
-        probe.onload = () => {
-          if (!target.isConnected) return;
-          installBackgroundImage("section", probe, snapshot, target);
-        };
-        probe.onerror = () => showToast("That image could not be loaded. The existing background was kept.");
-        probe.src = String(source);
-        return probe;
-      }
+      if (!target || !source) { showToast("Select a section before adding its background image."); return null; }
       let layer = target.querySelector(":scope > .sq-section-background");
-      let image = layer?.querySelector("img");
+      const previousImage = layer?.querySelector("img")?.cloneNode(true) || null;
+      const createdLayer = !layer;
       if (!layer) {
         layer = document.createElement("div");
         layer.className = "sq-section-background";
         prepareBackgroundLayer(layer);
         target.prepend(layer);
       }
-      const copy = source.cloneNode(true);
+      const copy = source instanceof HTMLImageElement ? source.cloneNode(true) : document.createElement("img");
       copy.alt = ""; copy.draggable = false;
       copy.removeAttribute("tabindex");
       copy.classList.remove("sq-image-selected", "sq-element-selected", "sq-image-crop-editing", "is-cropping");
+      copy.addEventListener("error", () => {
+        if (!target.isConnected || !layer.isConnected) return;
+        if (previousImage) {
+          layer.replaceChildren(previousImage);
+          applyImageCrop(previousImage); applySelectedImageFilters(previousImage); applyImageBlend(previousImage);
+        } else if (createdLayer) {
+          layer.remove();
+          target.dataset.sqBackgroundType = "solid";
+        }
+        rebuildLayerList(); bindSqInteractions(); syncBackgroundManagers(); markSqChanged();
+        showToast("That image could not be loaded. Try a PNG, JPEG, WebP, GIF, or AVIF file.");
+      }, { once: true });
+      if (!(source instanceof HTMLImageElement)) copy.src = String(source);
       layer.replaceChildren(copy);
-      image = copy;
       target.dataset.sqBackgroundType = "image";
-      applyImageCrop(image); applySelectedImageFilters(image); applyImageBlend(image);
+      applyImageCrop(copy); applySelectedImageFilters(copy); applyImageBlend(copy);
       remember(snapshot); rebuildLayerList(); bindSqInteractions(); syncBackgroundManagers(); scheduleImageScrollEffects(); markSqChanged();
-      selectBackgroundLayer("section");
+      selectBackgroundLayer("section", target.dataset.sectionId || selectedSection);
       showToast("Section background image added — image settings are open");
-      return image;
+      return copy;
     };
     const removeBackgroundImage = () => {
       const layer = backgroundLayerFor();
@@ -5526,15 +5539,58 @@
       installBackgroundImage(scope, value);
     }));
     sqStudio.querySelectorAll("[data-sq-background-upload]").forEach((input) => input.addEventListener("change", (event) => {
-      const file = event.currentTarget.files?.[0];
+      const upload = event.currentTarget;
+      const file = upload.files?.[0];
       if (!file) return;
-      if (file.size > 8 * 1024 * 1024) { showToast("Choose an image smaller than 8 MB"); event.currentTarget.value = ""; return; }
+      if (file.size > 8 * 1024 * 1024) { showToast("Choose an image smaller than 8 MB"); upload.value = ""; return; }
+      const scope = upload.dataset.sqBackgroundUpload;
+      const target = backgroundTargetFor();
       const snapshot = captureState();
       const reader = new FileReader();
-      reader.onload = () => installBackgroundImage(event.currentTarget.dataset.sqBackgroundUpload, String(reader.result || ""), snapshot);
+      reader.onload = () => installBackgroundImage(scope, String(reader.result || ""), snapshot, target);
+      reader.onerror = () => showToast("That image could not be read. Try another file.");
       reader.readAsDataURL(file);
-      event.currentTarget.value = "";
+      upload.value = "";
     }));
+    const sectionBackgroundMotionImage = () => backgroundLayerFor()?.querySelector("img") || null;
+    sqStudio.querySelector("[data-sq-section-background-scroll-effect]")?.addEventListener("change", (event) => {
+      const image = sectionBackgroundMotionImage();
+      if (!image) return;
+      remember();
+      const effect = ["parallax", "parallax-reverse", "zoom"].includes(event.currentTarget.value) ? event.currentTarget.value : "none";
+      if (effect === "none") {
+        releaseImageScrollEffect(image);
+        delete image.dataset.sqImageScroll;
+      } else {
+        image.dataset.sqImageScroll = effect;
+        image.dataset.sqImageScrollStrength ||= "50";
+      }
+      syncBackgroundManagers(); scheduleImageScrollEffects(); markSqChanged();
+    });
+    sqStudio.querySelector("[data-sq-section-background-scroll-damping]")?.addEventListener("change", (event) => {
+      const image = sectionBackgroundMotionImage();
+      if (!image?.dataset.sqImageScroll) return;
+      remember();
+      image.dataset.sqImageScrollDamping = event.currentTarget.checked ? "true" : "false";
+      scheduleImageScrollEffects(); markSqChanged();
+    });
+    let sectionBackgroundScrollStrengthSnapshot = null;
+    const sectionBackgroundScrollStrengthInput = sqStudio.querySelector("[data-sq-section-background-scroll-strength]");
+    const startSectionBackgroundScrollStrengthEdit = () => { if (!sectionBackgroundScrollStrengthSnapshot) sectionBackgroundScrollStrengthSnapshot = captureState(); };
+    sectionBackgroundScrollStrengthInput?.addEventListener("pointerdown", startSectionBackgroundScrollStrengthEdit);
+    sectionBackgroundScrollStrengthInput?.addEventListener("focus", startSectionBackgroundScrollStrengthEdit);
+    sectionBackgroundScrollStrengthInput?.addEventListener("input", (event) => {
+      const image = sectionBackgroundMotionImage();
+      if (!image?.dataset.sqImageScroll) return;
+      image.dataset.sqImageScrollStrength = event.currentTarget.value;
+      const output = sqStudio.querySelector("[data-sq-section-background-scroll-strength-output]");
+      if (output) output.textContent = Number(event.currentTarget.value) === 100 && image.dataset.sqImageScroll === "parallax" ? "100% · fixed" : Number(event.currentTarget.value) === 0 ? "0% · normal" : `${event.currentTarget.value}%`;
+      scheduleImageScrollEffects(); markSqChanged();
+    });
+    sectionBackgroundScrollStrengthInput?.addEventListener("change", () => {
+      if (sectionBackgroundScrollStrengthSnapshot) remember(sectionBackgroundScrollStrengthSnapshot);
+      sectionBackgroundScrollStrengthSnapshot = null;
+    });
     sqStudio.querySelector("[data-sq-image-blend-mode]")?.addEventListener("change", (event) => {
       const image = imageForElement();
       if (!image) return;
