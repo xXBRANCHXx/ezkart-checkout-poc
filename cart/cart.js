@@ -14,6 +14,7 @@
     payment: null,
     step: "cart",
   };
+  const CART_STORAGE_KEY = "ezkart.checkout.cart.v1";
 
   const rupiah = (value) => new Intl.NumberFormat("id-ID", {
     style: "currency",
@@ -35,6 +36,23 @@
   const total = () => subtotal() + shippingPrice();
   const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character]);
   let midtransLoader = null;
+
+  function persistCart() {
+    try {
+      window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(state.cart));
+    } catch (_) {
+      // Checkout remains usable when storage is unavailable or blocked.
+    }
+  }
+
+  function savedCart() {
+    try {
+      const stored = JSON.parse(window.localStorage.getItem(CART_STORAGE_KEY) || "{}");
+      return Object.fromEntries(Object.entries(stored).filter(([id, quantity]) => PRODUCTS[id] && Number.isInteger(quantity) && quantity > 0 && quantity <= 9));
+    } catch (_) {
+      return {};
+    }
+  }
 
   function ensureMidtransSnap() {
     if (window.snap && typeof window.snap.pay === "function") return Promise.resolve();
@@ -94,6 +112,7 @@
   function renderCart() {
     const count = itemCount();
     el("header-count").textContent = count;
+    el("cart-shortcut").setAttribute("aria-label", `Lihat keranjang, ${count} item`);
     el("summary-count").textContent = `${count} item`;
     el("empty-cart").hidden = count > 0;
     el("summary-totals").hidden = count === 0;
@@ -125,6 +144,7 @@
     if (!state.cart[id]) delete state.cart[id];
     state.shipping = null;
     state.payment = null;
+    persistCart();
     renderCart();
     if (change > 0) showToast(`${PRODUCTS[id].name} ditambahkan`);
   }
@@ -291,14 +311,27 @@
     state.shipping = null;
     state.payment = null;
     el("customer-form").reset();
+    persistCart();
     renderCart();
     setStep("cart");
   });
 
-  const requestedProducts = (new URLSearchParams(window.location.search).get("products") || "")
+  const searchParams = new URLSearchParams(window.location.search);
+  const requestedCart = Object.fromEntries((searchParams.get("cart") || "")
+    .split(",")
+    .map((entry) => entry.trim().match(/^([a-z0-9_-]+):(\d+)$/i))
+    .filter(Boolean)
+    .map((match) => [match[1], Math.max(1, Math.min(9, Number(match[2]) || 1))])
+    .filter(([id]) => PRODUCTS[id]));
+  const requestedProducts = (searchParams.get("products") || "")
     .split(",")
     .map((id) => id.trim())
     .filter((id, index, values) => PRODUCTS[id] && values.indexOf(id) === index);
-  requestedProducts.forEach((id) => { state.cart[id] = 1; });
+  state.cart = searchParams.has("cart")
+    ? requestedCart
+    : requestedProducts.length
+      ? Object.fromEntries(requestedProducts.map((id) => [id, 1]))
+      : savedCart();
+  persistCart();
   renderCart();
 })();
