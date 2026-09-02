@@ -6922,6 +6922,9 @@
     };
     const generateHtml = ({ libraryPreview = false } = {}) => {
       const clone = previewRoot.cloneNode(true);
+      clone.querySelectorAll('[data-sq-background-type="solid"]').forEach((section) => {
+        section.querySelector(":scope > .sq-section-background")?.remove();
+      });
       clone.querySelectorAll("img[data-sq-image-blend-mode],img[data-sq-image-blend-source],img[data-sq-image-blend-color]").forEach(applyImageBlend);
       clone.querySelectorAll("img[data-sq-image-crop-zoom],img[data-sq-image-crop-x],img[data-sq-image-crop-y]").forEach(applyImageCrop);
       clone.querySelectorAll("img[data-sq-filter-opacity]").forEach(applySelectedImageFilters);
