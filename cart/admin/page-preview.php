@@ -17,8 +17,13 @@ header("Content-Security-Policy: default-src 'none'; img-src 'self' data: https:
 <body>
   <p>Preparing production preview…</p>
   <script>
+    const maximumPreviewCharacters = 16_000_000;
     addEventListener('message', function (event) {
-      if (event.source !== parent || !event.data || event.data.type !== 'ezkart-render-page' || typeof event.data.html !== 'string' || event.data.html.length > 1500000) return;
+      if (event.source !== parent || !event.data || event.data.type !== 'ezkart-render-page' || typeof event.data.html !== 'string') return;
+      if (event.data.html.length > maximumPreviewCharacters) {
+        document.body.innerHTML = '<p>This landing page is too large to preview. Reduce embedded media and try again.</p>';
+        return;
+      }
       document.open();
       document.write(event.data.html);
       document.close();

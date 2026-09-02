@@ -6881,7 +6881,10 @@
       setLivePreviewDevice(activeDevice);
       livePreviewDialog.showModal();
       requestAnimationFrame(() => {
-        livePreviewFrame.onload = () => livePreviewFrame.contentWindow?.postMessage({ type: "ezkart-render-page", html }, "*");
+        livePreviewFrame.onload = () => {
+          livePreviewFrame.onload = null;
+          livePreviewFrame.contentWindow?.postMessage({ type: "ezkart-render-page", html }, "*");
+        };
         livePreviewFrame.src = `page-preview.php?render=${Date.now()}`;
       });
     });
