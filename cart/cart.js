@@ -472,6 +472,5 @@
 
   byId("year").textContent = new Date().getFullYear();
   applyMerchantBrand();
-  setStep("confirm");
   loadCatalog();
 })();

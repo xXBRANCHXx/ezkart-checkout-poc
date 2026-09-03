@@ -14,7 +14,7 @@ if (preg_match('/^EZK-[A-Z0-9-]{8,70}$/', $orderId) !== 1) {
   <meta name="robots" content="noindex,nofollow">
   <meta name="theme-color" content="#ffffff">
   <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="cart.css?v=checkout-rebuild-1">
+  <link rel="stylesheet" href="cart.css?v=checkout-rebuild-3">
   <title>Order status · Ezkart</title>
 </head>
 <body class="return-page">
