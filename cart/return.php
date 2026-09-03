@@ -12,23 +12,32 @@ if (preg_match('/^EZK-[A-Z0-9-]{8,70}$/', $orderId) !== 1) {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="robots" content="noindex,nofollow">
+  <meta name="theme-color" content="#ffffff">
   <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="cart.css?v=checkout-confirmation-1">
+  <link rel="stylesheet" href="cart.css?v=checkout-rebuild-1">
   <title>Order status · Ezkart</title>
 </head>
-<body>
+<body class="return-page">
   <header class="checkout-header">
-    <div class="merchant-brand"><img id="merchant-logo-return" alt="" referrerpolicy="no-referrer" hidden><span id="merchant-name-return">Store</span></div>
-    <div class="security-badge"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 19 6v5c0 4.6-2.9 8.3-7 10-4.1-1.7-7-5.4-7-10V6l7-3Z"></path><path d="m9 12 2 2 4-4"></path></svg><span>Secure checkout by Ezkart</span></div>
+    <div class="header-inner">
+      <div class="return-header-brand">
+        <img src="../assets/ezkart-logo.svg" alt="Ezkart" width="1020" height="420">
+        <span>Order confirmation</span>
+      </div>
+      <div class="merchant-brand">
+        <span class="merchant-avatar" id="merchant-avatar-return" aria-hidden="true">S</span>
+        <img id="merchant-logo-return" alt="" referrerpolicy="no-referrer" hidden>
+        <span class="merchant-copy"><small>Order from</small><strong id="merchant-name-return">Store</strong></span>
+      </div>
+    </div>
   </header>
+
   <main class="return-shell" data-order="<?= htmlspecialchars($orderId, ENT_QUOTES, 'UTF-8') ?>">
-    <section class="success-card return-card">
-      <div class="success-icon pending-icon" id="return-icon">···</div>
-      <h1 id="return-title">Confirming your payment…</h1>
-      <p id="return-message">We’re waiting for a signed confirmation from the payment provider. Please keep this page open.</p>
+    <section class="return-card">
+      <div class="success-icon" id="return-icon" aria-hidden="true">···</div>
+      <p class="eyebrow" id="return-eyebrow">Checking order</p>
+      <h1 id="return-title">Confirming your payment</h1>
+      <p id="return-message">We’re securely checking your payment status. Please keep this page open.</p>
       <div class="success-details">
         <div><span>Order number</span><b id="return-order"><?= htmlspecialchars($orderId, ENT_QUOTES, 'UTF-8') ?></b></div>
         <div><span>Status</span><b id="return-status">Pending</b></div>
@@ -36,31 +45,55 @@ if (preg_match('/^EZK-[A-Z0-9-]{8,70}$/', $orderId) !== 1) {
         <div><span>Payment reference</span><b id="return-reference">—</b></div>
         <div><span>Delivery</span><b id="return-fulfillment">Waiting for payment</b></div>
       </div>
-      <div class="success-actions"><a class="primary-button" href="./">Back to checkout</a><a class="text-button" href="../">Return to Ezkart</a></div>
+      <div class="success-actions">
+        <a class="primary-button" href="./">Back to checkout</a>
+        <a class="text-button" href="../">Return to Ezkart</a>
+      </div>
     </section>
   </main>
+
+  <footer class="checkout-footer">
+    <img src="../assets/ezkart-logo.svg" alt="Ezkart" width="1020" height="420">
+    <p>Simple, secure checkout for Indonesian businesses.</p>
+    <span>© <?= gmdate('Y') ?> Ezkart</span>
+  </footer>
+
   <script>
     (() => {
+      const safeMessage = (value, fallback = 'Order status is temporarily unavailable.') => String(value || fallback)
+        .replace(/midtrans|doku|xendit|stripe|paypal/gi, 'payment service')
+        .replace(/biteship/gi, 'delivery service');
       try {
         const brand = JSON.parse(sessionStorage.getItem('ezkart.checkout.brand') || '{}');
         const name = String(brand.name || 'Store').slice(0, 80);
         document.getElementById('merchant-name-return').textContent = name;
+        document.getElementById('merchant-avatar-return').textContent = name.charAt(0).toUpperCase();
         if (brand.logo && /^https?:\/\//i.test(brand.logo)) {
           const image = document.getElementById('merchant-logo-return');
           image.src = brand.logo;
-          image.alt = `${name} logo`;
+          image.alt = name + ' logo';
           image.hidden = false;
-          document.getElementById('merchant-name-return').hidden = true;
+          document.getElementById('merchant-avatar-return').hidden = true;
+          image.addEventListener('error', () => {
+            image.hidden = true;
+            document.getElementById('merchant-avatar-return').hidden = false;
+          }, { once: true });
         }
       } catch (_) {}
+
       const shell = document.querySelector('.return-shell');
       const order = shell.dataset.order;
-      const money = new Intl.NumberFormat('id-ID', { style:'currency', currency:'IDR', maximumFractionDigits:0 });
+      const money = new Intl.NumberFormat('id-ID', {
+        style: 'currency',
+        currency: 'IDR',
+        maximumFractionDigits: 0,
+      });
       let attempts = 0;
+
       async function check() {
         attempts += 1;
         try {
-          const response = await fetch(`api/status.php?order=${encodeURIComponent(order)}`, { cache:'no-store' });
+          const response = await fetch('api/status.php?order=' + encodeURIComponent(order), { cache: 'no-store' });
           const data = await response.json();
           if (!response.ok) throw new Error(data.error || 'Order status is unavailable.');
           document.getElementById('return-total').textContent = money.format(data.total);
@@ -71,28 +104,37 @@ if (preg_match('/^EZK-[A-Z0-9-]{8,70}$/', $orderId) !== 1) {
             ? (data.biteship_waybill_id || data.biteship_order_id || 'Pickup arranged')
             : data.fulfillment_status === 'AWAITING_PICKUP_ARRANGEMENT' ? 'Seller arranging pickup'
             : data.fulfillment_status === 'AWAITING_ACCEPTANCE' ? 'Waiting for seller confirmation'
-            : data.fulfillment_status === 'RETRY_REQUIRED' ? 'Delivery setup needs attention' : 'Waiting for payment';
+            : data.fulfillment_status === 'RETRY_REQUIRED' ? 'Delivery setup needs attention'
+            : 'Waiting for payment';
+
           if (data.status === 'PAID') {
             shell.classList.add('confirmed');
             document.getElementById('return-icon').textContent = '✓';
+            document.getElementById('return-eyebrow').textContent = 'Order received';
             document.getElementById('return-title').textContent = 'Payment confirmed';
             if (data.fulfillment_status === 'CONFIRMED') {
-              document.getElementById('return-message').textContent = `Thank you, ${String(data.customer_name).split(' ')[0]}. Your payment is verified and courier pickup has been arranged.`;
+              const firstName = String(data.customer_name || '').split(' ')[0];
+              document.getElementById('return-message').textContent = (firstName ? 'Thank you, ' + firstName + '. ' : '') + 'Your order is confirmed and pickup has been arranged.';
               return;
             }
-            document.getElementById('return-message').textContent = 'Your payment is secure. The seller will confirm the order before arranging pickup.';
+            document.getElementById('return-message').textContent = 'Your payment is confirmed. The seller will review the order before arranging pickup.';
           }
+
           if (data.status === 'FAILED') {
             document.getElementById('return-icon').textContent = '×';
+            document.getElementById('return-eyebrow').textContent = 'Payment incomplete';
             document.getElementById('return-title').textContent = 'Payment wasn’t completed';
-            document.getElementById('return-message').textContent = 'The payment was declined, expired, or cancelled. Your card was not charged by Ezkart.';
+            document.getElementById('return-message').textContent = 'The payment was declined, expired, or cancelled. You can return to checkout and try again.';
             return;
           }
         } catch (error) {
-          document.getElementById('return-message').textContent = error.message;
+          document.getElementById('return-message').textContent = safeMessage(error.message);
         }
-        if (attempts < 30) setTimeout(check, 2000);
-        else document.getElementById('return-message').textContent = 'Confirmation is taking longer than usual. Keep the order number above for support.';
+        if (attempts < 30) {
+          window.setTimeout(check, 2000);
+        } else {
+          document.getElementById('return-message').textContent = 'Confirmation is taking longer than usual. Keep the order number above for support.';
+        }
       }
       check();
     })();

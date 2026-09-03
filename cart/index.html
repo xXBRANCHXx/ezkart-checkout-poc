@@ -3,125 +3,147 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Review your order, choose delivery, and complete secure payment with Ezkart." />
+    <meta name="description" content="Review your order and complete delivery and payment securely with Ezkart." />
     <meta name="theme-color" content="#ffffff" />
     <meta name="robots" content="noindex,nofollow" />
     <link rel="canonical" href="https://ezkart.id/cart/" />
     <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="cart.css?v=checkout-confirmation-1" />
-    <title>Secure checkout · Ezkart</title>
+    <link rel="stylesheet" href="cart.css?v=checkout-rebuild-1" />
+    <title>Checkout · Ezkart</title>
   </head>
   <body>
     <a class="skip-link" href="#checkout-main">Skip to checkout</a>
 
     <header class="checkout-header">
-      <button class="merchant-brand" id="merchant-home" type="button" aria-label="Return to store">
-        <img id="merchant-logo" alt="" referrerpolicy="no-referrer" hidden />
-        <span id="merchant-name">Store</span>
-      </button>
-      <div class="security-badge">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 19 6v5c0 4.6-2.9 8.3-7 10-4.1-1.7-7-5.4-7-10V6l7-3Z"></path><path d="m9 12 2 2 4-4"></path></svg>
-        <span>Secure checkout by Ezkart</span>
+      <div class="header-inner">
+        <button class="merchant-brand" id="merchant-home" type="button" aria-label="Return to store">
+          <span class="merchant-avatar" id="merchant-avatar" aria-hidden="true">S</span>
+          <img id="merchant-logo" alt="" referrerpolicy="no-referrer" hidden />
+          <span class="merchant-copy"><small>Checkout for</small><strong id="merchant-name">Store</strong></span>
+        </button>
+        <a class="ezkart-brand" href="../" aria-label="Ezkart home">
+          <span>Secure checkout by</span>
+          <img src="../assets/ezkart-logo.svg" alt="Ezkart" width="1020" height="420" />
+        </a>
       </div>
     </header>
 
+    <nav class="checkout-progress" aria-label="Checkout progress">
+      <ol>
+        <li class="active" data-progress-step="confirm"><span>1</span><b>Cart</b></li>
+        <li data-progress-step="checkout"><span>2</span><b>Delivery</b></li>
+        <li><span>3</span><b>Payment</b></li>
+      </ol>
+    </nav>
+
     <main class="checkout-main" id="checkout-main" aria-live="polite">
-      <section class="checkout-panel active" data-panel="confirm" aria-labelledby="cart-title">
-        <header class="page-heading">
-          <h1 id="cart-title">Confirm your cart</h1>
-          <p>Review the selected products and quantities before checkout.</p>
-        </header>
+      <div class="checkout-layout">
+        <div class="checkout-content">
+          <section class="checkout-panel active" data-panel="confirm" aria-labelledby="cart-title">
+            <header class="page-heading">
+              <p class="eyebrow">Your order</p>
+              <h1 id="cart-title">Review your cart</h1>
+              <p>Check your items and quantities before continuing.</p>
+            </header>
 
-        <div class="catalog-loading" id="catalog-loading" role="status">
-          <i aria-hidden="true"></i>
-          <div><b>Loading your cart</b><span>Getting the latest product details…</span></div>
-        </div>
-        <div class="cart-items" id="cart-items" hidden></div>
-        <div class="checkout-error" id="catalog-error" hidden>
-          <span aria-hidden="true">!</span>
-          <div><b>We couldn’t load this cart</b><p id="catalog-error-message"></p></div>
-          <button type="button" id="retry-catalog">Try again</button>
-        </div>
-        <div class="empty-cart" id="empty-cart" hidden>
-          <h2>Your cart is empty</h2>
-          <p>Return to the store and add a product before starting checkout.</p>
-        </div>
+            <div class="catalog-loading surface-state" id="catalog-loading" role="status">
+              <i aria-hidden="true"></i>
+              <div><b>Loading your cart</b><span>Just a moment while we collect your items.</span></div>
+            </div>
+            <div class="cart-items" id="cart-items" hidden></div>
+            <div class="checkout-error surface-state" id="catalog-error" hidden>
+              <span class="state-icon" aria-hidden="true">!</span>
+              <div><b>We couldn’t load your cart</b><p id="catalog-error-message"></p></div>
+              <button type="button" id="retry-catalog">Try again</button>
+            </div>
+            <div class="empty-cart surface-state" id="empty-cart" hidden>
+              <span class="empty-bag" aria-hidden="true"></span>
+              <h2>Your cart is empty</h2>
+              <p>Go back to the store and choose something you love.</p>
+              <button class="outline-button" type="button" id="empty-back-to-store">Return to store</button>
+            </div>
 
-        <div class="cart-confirmation-footer">
-          <div><span id="cart-count">0 items</span><strong id="cart-subtotal">Rp0</strong></div>
-          <div class="panel-actions">
-            <button class="quiet-button" type="button" id="back-to-store">Continue shopping</button>
-            <button class="primary-button" type="button" id="to-checkout" disabled>Checkout</button>
-          </div>
-        </div>
-      </section>
+            <button class="text-button continue-shopping" type="button" id="back-to-store"><span aria-hidden="true">←</span> Continue shopping</button>
+          </section>
 
-      <section class="checkout-panel" data-panel="checkout" aria-labelledby="checkout-title">
-        <header class="page-heading checkout-page-heading">
-          <button class="back-link" type="button" data-go="confirm">Back to cart</button>
-          <h1 id="checkout-title">Checkout</h1>
-          <p>Add your delivery details, choose a courier, and complete payment.</p>
-        </header>
+          <section class="checkout-panel" data-panel="checkout" aria-labelledby="checkout-title">
+            <button class="text-button back-to-cart" type="button" data-go="confirm"><span aria-hidden="true">←</span> Back to cart</button>
+            <header class="page-heading">
+              <p class="eyebrow">Almost there</p>
+              <h1 id="checkout-title">Delivery & payment</h1>
+              <p>Tell us where to send your order, then choose the delivery option that works for you.</p>
+            </header>
 
-        <form id="customer-form" novalidate>
-          <div class="checkout-form-grid">
-            <section class="form-section" aria-labelledby="contact-title">
-              <h2 id="contact-title">Contact</h2>
-              <div class="field-grid">
-                <label><span>Full name</span><input name="fullName" autocomplete="name" placeholder="Nadia Putri" required maxlength="100" /><small class="field-error"></small></label>
-                <label><span>WhatsApp number</span><input name="phone" inputmode="tel" autocomplete="tel" placeholder="08xxxxxxxxxx" required maxlength="20" /><small class="field-error"></small></label>
-                <label><span>Email address</span><input name="email" type="email" autocomplete="email" placeholder="name@email.com" required maxlength="120" /><small class="field-error"></small></label>
-              </div>
-            </section>
+            <form id="customer-form" novalidate>
+              <section class="form-card" aria-labelledby="contact-title">
+                <header class="section-heading">
+                  <span>01</span>
+                  <div><h2 id="contact-title">Contact information</h2><p>We’ll use this to send your order updates.</p></div>
+                </header>
+                <div class="field-grid contact-fields">
+                  <label class="full-field"><span>Full name</span><input name="fullName" autocomplete="name" placeholder="Nadia Putri" required maxlength="100" /><small class="field-error"></small></label>
+                  <label><span>WhatsApp number</span><input name="phone" inputmode="tel" autocomplete="tel" placeholder="08xxxxxxxxxx" required maxlength="20" /><small class="field-error"></small></label>
+                  <label><span>Email address</span><input name="email" type="email" autocomplete="email" placeholder="name@email.com" required maxlength="120" /><small class="field-error"></small></label>
+                </div>
+              </section>
 
-            <section class="form-section" aria-labelledby="address-title">
-              <h2 id="address-title">Delivery address</h2>
-              <div class="field-grid">
-                <label><span>District / city</span><input name="location" autocomplete="address-level2" placeholder="Kebayoran Baru, Jakarta Selatan" required maxlength="120" /><small class="field-error"></small></label>
-                <label><span>Full address</span><textarea name="address" autocomplete="street-address" placeholder="Street, building or house number, RT/RW, and a nearby landmark" required maxlength="300"></textarea><small class="field-error"></small></label>
-                <div class="field-pair">
+              <section class="form-card" aria-labelledby="address-title">
+                <header class="section-heading">
+                  <span>02</span>
+                  <div><h2 id="address-title">Shipping address</h2><p>Use an address where someone can receive the package.</p></div>
+                </header>
+                <div class="field-grid">
+                  <label class="full-field"><span>District / city</span><input name="location" autocomplete="address-level2" placeholder="Kebayoran Baru, Jakarta Selatan" required maxlength="120" /><small class="field-error"></small></label>
+                  <label class="full-field"><span>Full address</span><textarea name="address" autocomplete="street-address" placeholder="Street, building or house number, RT/RW, and a nearby landmark" required maxlength="300"></textarea><small class="field-error"></small></label>
                   <label><span>Postcode</span><input name="postalCode" inputmode="numeric" autocomplete="postal-code" placeholder="12345" required maxlength="5" /><small class="field-error"></small></label>
                   <label><span>Courier note <em>Optional</em></span><input name="note" placeholder="Leave with reception" maxlength="120" /><small class="field-error"></small></label>
                 </div>
-              </div>
-            </section>
-          </div>
+                <button class="outline-button rate-button" id="get-rates" type="submit">Find delivery options <span aria-hidden="true">→</span></button>
+              </section>
 
-          <div class="rate-action"><button class="secondary-button" id="get-rates" type="submit">Get delivery options</button></div>
+              <section class="form-card delivery-card" aria-labelledby="shipping-title">
+                <header class="section-heading">
+                  <span>03</span>
+                  <div><h2 id="shipping-title">Delivery method</h2><p id="quote-location">Enter your address to see available options.</p></div>
+                </header>
+                <div class="shipping-options" id="shipping-options">
+                  <div class="quote-state"><span class="delivery-illustration" aria-hidden="true"></span><b>Delivery options will appear here</b><small>Rates are calculated for your destination and order weight.</small></div>
+                </div>
+              </section>
 
-          <section class="delivery-choice" aria-labelledby="shipping-title">
-            <header><div><h2 id="shipping-title">Delivery</h2><p id="quote-location">Enter your address to see live rates.</p></div><span id="shipping-provider">Biteship</span></header>
-            <div class="shipping-options" id="shipping-options">
-              <div class="quote-state"><b>Delivery options will appear here</b><small>Rates are calculated from your postcode and the total package weight.</small></div>
-            </div>
+              <section class="payment-message" aria-labelledby="payment-title">
+                <span class="payment-check" aria-hidden="true">✓</span>
+                <div><h2 id="payment-title">Choose payment securely</h2><p>After confirming the order, you’ll choose from the available payment methods in a protected window.</p></div>
+              </section>
+            </form>
           </section>
+        </div>
 
-          <section class="payment-section" aria-labelledby="payment-title">
-            <div class="payment-copy">
-              <span class="payment-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3 19 6v5c0 4.6-2.9 8.3-7 10-4.1-1.7-7-5.4-7-10V6l7-3Z"></path><path d="m9 12 2 2 4-4"></path></svg></span>
-              <div><h2 id="payment-title">Payment</h2><p>Payment methods open in a protected Midtrans window.</p></div>
-            </div>
+        <aside class="order-summary" aria-labelledby="summary-title">
+          <div class="summary-card">
+            <header><div><p class="eyebrow">Summary</p><h2 id="summary-title">Your order</h2></div><span id="cart-count">0 items</span></header>
+            <div class="summary-items" id="summary-items"></div>
             <dl class="checkout-totals">
-              <div><dt>Subtotal</dt><dd id="checkout-subtotal">Rp0</dd></div>
-              <div><dt>Delivery</dt><dd id="shipping-total">Not selected</dd></div>
-              <div><dt>Total</dt><dd id="grand-total">Rp0</dd></div>
+              <div><dt>Subtotal</dt><dd id="cart-subtotal">Rp0</dd></div>
+              <div><dt>Delivery</dt><dd id="shipping-total">Calculated next</dd></div>
+              <div class="total-row"><dt>Total</dt><dd id="grand-total">Rp0</dd></div>
             </dl>
-            <button class="primary-button payment-button" id="pay-button" type="button" disabled>Select a delivery option</button>
-          </section>
-        </form>
-      </section>
+            <button class="primary-button" type="button" id="to-checkout" disabled>Continue to checkout <span aria-hidden="true">→</span></button>
+            <button class="primary-button" type="button" id="pay-button" disabled hidden>Choose a delivery method</button>
+            <p class="summary-note"><span aria-hidden="true">✓</span> Your payment details are encrypted and secure.</p>
+          </div>
+          <div class="support-note"><span>Need help?</span><a href="../docs/Ezkart-Customer-Checkout-Guide.pdf">View checkout guide <span aria-hidden="true">↗</span></a></div>
+        </aside>
+      </div>
     </main>
 
     <footer class="checkout-footer">
+      <img src="../assets/ezkart-logo.svg" alt="Ezkart" width="1020" height="420" />
+      <p>Simple, secure checkout for Indonesian businesses.</p>
       <span>© <span id="year">2026</span> Ezkart</span>
-      <p>Secure payment · Live delivery rates · Order confirmation</p>
-      <a href="../docs/Ezkart-Customer-Checkout-Guide.pdf">Checkout help</a>
     </footer>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="cart.js?v=checkout-confirmation-1"></script>
+    <script src="cart.js?v=checkout-rebuild-1"></script>
   </body>
 </html>

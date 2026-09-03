@@ -302,9 +302,27 @@ function ez_remote_storefront_products(array $ids): array
 function ez_catalog(array $requestedIds = []): array
 {
     $demo = [
-        'granola' => ['sku' => 'EZK-DEMO-GRANOLA', 'name' => 'Granola Madu Nusantara', 'price' => 58000, 'weight' => 320],
-        'coffee' => ['sku' => 'EZK-DEMO-COFFEE', 'name' => 'Kopi Susu Concentrate', 'price' => 79000, 'weight' => 650],
-        'sambal' => ['sku' => 'EZK-DEMO-SAMBAL', 'name' => 'Sambal Roa Signature', 'price' => 46000, 'weight' => 260],
+        'granola' => [
+            'sku' => 'EZK-DEMO-GRANOLA',
+            'name' => 'Granola Madu Nusantara',
+            'price' => 58000,
+            'weight' => 320,
+            'image_url' => 'admin/assets/products/granola.webp',
+        ],
+        'coffee' => [
+            'sku' => 'EZK-DEMO-COFFEE',
+            'name' => 'Kopi Susu Concentrate',
+            'price' => 79000,
+            'weight' => 650,
+            'image_url' => 'admin/assets/products/kopi-susu.webp',
+        ],
+        'sambal' => [
+            'sku' => 'EZK-DEMO-SAMBAL',
+            'name' => 'Sambal Roa Signature',
+            'price' => 46000,
+            'weight' => 260,
+            'image_url' => 'admin/assets/products/sambal-roa.webp',
+        ],
     ];
     if ($requestedIds === []) return $demo;
     $ids = array_values(array_unique(array_filter(array_map('strval', $requestedIds), static fn(string $id): bool => preg_match('/^[a-zA-Z0-9][a-zA-Z0-9_-]{2,95}(?:~[a-zA-Z0-9][a-zA-Z0-9_-]{2,95})?$/', $id) === 1)));
