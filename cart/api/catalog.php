@@ -11,8 +11,8 @@ try {
         'trim',
         explode(',', (string) ($_GET['products'] ?? '')),
     ))));
-    if ($ids === [] || count($ids) > 9) {
-        throw new InvalidArgumentException('Request between 1 and 9 products.');
+    if ($ids === [] || count($ids) > 100) {
+        throw new InvalidArgumentException('The product request is too large.');
     }
     $catalog = array_values(array_filter(ez_catalog($ids), 'is_array'));
     if (count($catalog) !== count($ids)) {

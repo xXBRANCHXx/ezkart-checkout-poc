@@ -8,7 +8,7 @@ function ez_page_header(string $eyebrow, string $title, string $description, arr
       <div><p class="page-eyebrow"><?= ez_admin_escape($eyebrow) ?></p><h1><?= ez_admin_escape($title) ?></h1><p><?= ez_admin_escape($description) ?></p></div>
       <?php if ($actions !== []): ?><div class="page-actions"><?php foreach ($actions as $action): ?>
         <?php if (($action['href'] ?? '') !== ''): ?><a class="action-button <?= ez_admin_escape($action['style'] ?? '') ?>" href="<?= ez_admin_escape($action['href']) ?>"<?= !empty($action['new_tab']) ? ' target="_blank" rel="noopener"' : '' ?>><?= ez_admin_escape($action['label']) ?></a>
-        <?php else: ?><button class="action-button <?= ez_admin_escape($action['style'] ?? '') ?>" type="button"<?= !empty($action['product_creator']) ? ' data-open-product-creator' : ' data-toast="' . ez_admin_escape($action['toast'] ?? 'Action completed') . '"' ?><?= !empty($action['page_creator']) ? ' data-open-page-creator' : '' ?>><?= ez_admin_escape($action['label']) ?></button><?php endif; ?>
+        <?php else: ?><button class="action-button <?= ez_admin_escape($action['style'] ?? '') ?>" type="button"<?= !empty($action['product_creator']) ? ' data-open-product-creator' : (!empty($action['copy_cart_link']) ? ' data-copy-cart-link' : ' data-toast="' . ez_admin_escape($action['toast'] ?? 'Action completed') . '"') ?><?= !empty($action['page_creator']) ? ' data-open-page-creator' : '' ?>><?= ez_admin_escape($action['label']) ?></button><?php endif; ?>
       <?php endforeach; ?></div><?php endif; ?>
     </header>
     <?php
@@ -194,7 +194,7 @@ function ez_orders_table(array $rows, string $tableId, string $csrfToken): void
 <?php break; case 'products': ?>
   <?php $productPageInventory = []; // Legacy demonstrations stay out of the signed-in seller catalog. ?>
   <?php ez_page_header('Catalog management', 'Products', 'Manage photography, pricing, inventory, and merchandising for the complete Ezkart catalog.', [
-      ['label'=>'Preview storefront','href'=>'../'], ['label'=>'Create product','href'=>'?page=product-new&new=1','new_tab'=>true,'style'=>'primary'],
+      ['label'=>'Copy cart link','copy_cart_link'=>true], ['label'=>'Create product','href'=>'?page=product-new&new=1','new_tab'=>true,'style'=>'primary'],
   ]); ?>
   <?php ez_stat_strip([
       ['icon'=>'box','label'=>'Active products','value'=>(string) count($productPageInventory),'detail'=>'Published in this store'],

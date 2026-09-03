@@ -347,8 +347,8 @@ async function storefrontProducts(url, env) {
     .split(",")
     .map((id) => id.trim())
     .filter(Boolean);
-  if (requested.length < 1 || requested.length > 9) {
-    throw new Response("Request between 1 and 9 products", { status: 400 });
+  if (requested.length < 1 || requested.length > 100) {
+    throw new Response("The product request is too large", { status: 400 });
   }
   const selections = [...new Set(requested)].map((selectionId) => {
     const parts = selectionId.split("~");
@@ -405,6 +405,7 @@ async function storefrontProducts(url, env) {
     const imageId = variant?.image_upload_id || mainMedia?.id || "";
     return {
       id: selection.selectionId,
+      sellerId: row.seller_id,
       productId: row.id,
       variantId: variant?.id || "",
       type: row.type,

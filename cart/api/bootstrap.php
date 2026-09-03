@@ -329,11 +329,11 @@ function ez_catalog(array $requestedIds = []): array
     ];
     if ($requestedIds === []) return $demo;
     $ids = array_values(array_unique(array_filter(array_map('strval', $requestedIds), static fn(string $id): bool => preg_match('/^[a-zA-Z0-9][a-zA-Z0-9_-]{2,95}(?:~[a-zA-Z0-9][a-zA-Z0-9_-]{2,95})?$/', $id) === 1)));
-    if ($ids === [] || count($ids) > 9) throw new InvalidArgumentException('Request between 1 and 9 valid products.');
+    if ($ids === [] || count($ids) > 100) throw new InvalidArgumentException('The product request is too large.');
     $catalog = [];
     $remoteIds = [];
     foreach ($ids as $id) {
-        if (isset($demo[$id])) $catalog[$id] = $demo[$id] + ['id' => $id, 'type' => 'physical', 'description' => '', 'image_url' => '', 'image_alt' => $demo[$id]['name'], 'stock' => 9];
+        if (isset($demo[$id])) $catalog[$id] = $demo[$id] + ['id' => $id, 'seller_id' => 'demo', 'type' => 'physical', 'description' => '', 'image_url' => '', 'image_alt' => $demo[$id]['name']];
         else $remoteIds[] = $id;
     }
     if ($remoteIds !== []) {
@@ -348,6 +348,7 @@ function ez_catalog(array $requestedIds = []): array
             $imagePath = trim((string) ($product['imagePath'] ?? ''));
             $catalog[$id] = [
                 'id' => $id,
+                'seller_id' => mb_substr(trim((string) ($product['sellerId'] ?? '')) ?: 'remote', 0, 96),
                 'product_id' => mb_substr(trim((string) ($product['productId'] ?? $id)), 0, 96),
                 'variant_id' => mb_substr(trim((string) ($product['variantId'] ?? '')), 0, 96),
                 'sku' => mb_substr(trim((string) ($product['sku'] ?? '')) ?: 'EZK-' . strtoupper($id), 0, 50),
@@ -374,6 +375,11 @@ function ez_catalog(array $requestedIds = []): array
     foreach ($ids as $id) {
         $ordered[$id] = $catalog[$id] ?? null;
     }
+    $sellerIds = array_values(array_unique(array_filter(array_map(
+        static fn($product): string => is_array($product) ? trim((string) ($product['seller_id'] ?? '')) : '',
+        $ordered,
+    ))));
+    if (count($sellerIds) > 1) throw new InvalidArgumentException('Products from different stores need separate carts.');
     return $ordered;
 }
 

@@ -8,7 +8,11 @@
     shipping: null,
     step: "confirm",
     loaded: false,
+    shop: "store",
+    returnUrl: "",
   };
+
+  const params = new URLSearchParams(window.location.search);
 
   const byId = (id) => document.getElementById(id);
   const money = (value) => new Intl.NumberFormat("id-ID", {
@@ -39,6 +43,61 @@
   const total = () => subtotal() + shippingPrice();
   let paymentLoader = null;
 
+  const validSelectionId = (value) => /^[a-z0-9][a-z0-9_-]{2,95}(?:~[a-z0-9][a-z0-9_-]{2,95})?$/i.test(value);
+  const safeShopScope = (value) => {
+    const scope = String(value || "").trim();
+    return /^[a-z0-9][a-z0-9_-]{5,79}$/i.test(scope) ? scope.toLowerCase() : "";
+  };
+  const brandScope = (value) => String(value || "store")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48) || "store";
+  const safeReturnUrl = (value) => {
+    const requested = String(value || "").trim();
+    if (!requested) return "";
+    try {
+      const url = new URL(requested, window.location.href);
+      const checkoutPath = new URL(".", window.location.href).pathname;
+      if (!["https:", "http:"].includes(url.protocol)) return "";
+      if (url.origin === window.location.origin && url.pathname.startsWith(checkoutPath)) return "";
+      return url.href;
+    } catch (_) {
+      return "";
+    }
+  };
+  const cartStorageKey = () => `ezkart.checkout.cart.v1:${state.shop}`;
+  const shopStorageKey = () => `ezkart.checkout.shop.v1:${state.shop}`;
+  const readStoredCart = () => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(cartStorageKey()) || "{}");
+      return Object.fromEntries(Object.entries(saved).filter(([id, quantity]) => (
+        validSelectionId(id) && Number.isSafeInteger(quantity) && quantity > 0
+      )));
+    } catch (_) {
+      return {};
+    }
+  };
+  const saveCart = () => {
+    try {
+      localStorage.setItem(cartStorageKey(), JSON.stringify(state.cart));
+    } catch (_) {}
+  };
+  const readStoredShop = () => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(shopStorageKey()) || "{}");
+      return saved && typeof saved === "object" ? saved : {};
+    } catch (_) {
+      return {};
+    }
+  };
+  const saveShop = (shop) => {
+    try {
+      localStorage.setItem(shopStorageKey(), JSON.stringify(shop));
+    } catch (_) {}
+  };
+
   function showToast(message) {
     const toast = byId("toast");
     toast.textContent = friendlyError(message);
@@ -48,16 +107,18 @@
   }
 
   function applyMerchantBrand() {
-    const params = new URLSearchParams(window.location.search);
-    const stored = (() => {
+    const legacyStored = (() => {
       try {
         return JSON.parse(sessionStorage.getItem("ezkart.checkout.brand") || "{}");
       } catch (_) {
         return {};
       }
     })();
-    const name = String(params.get("brand") || stored.name || "Store").trim().slice(0, 80) || "Store";
-    const requestedLogo = String(params.get("logo") || stored.logo || "").trim();
+    const requestedName = String(params.get("brand") || "").trim();
+    state.shop = safeShopScope(params.get("shop")) || brandScope(requestedName || legacyStored.name);
+    const stored = readStoredShop();
+    const name = String(requestedName || stored.name || legacyStored.name || "Store").trim().slice(0, 80) || "Store";
+    const requestedLogo = String(params.get("logo") || stored.logo || legacyStored.logo || "").trim();
     let logo = "";
 
     try {
@@ -65,9 +126,13 @@
       if (["https:", "http:"].includes(url.protocol) && requestedLogo.length <= 1800) logo = url.href;
     } catch (_) {}
 
-    try {
-      sessionStorage.setItem("ezkart.checkout.brand", JSON.stringify({ name, logo }));
-    } catch (_) {}
+    const explicitReturn = safeReturnUrl(params.get("return"));
+    const referringPage = safeReturnUrl(document.referrer);
+    const storedReturn = safeReturnUrl(stored.returnUrl);
+    state.returnUrl = explicitReturn || referringPage || storedReturn;
+    const shop = { name, logo, returnUrl: state.returnUrl };
+    saveShop(shop);
+    try { sessionStorage.setItem("ezkart.checkout.brand", JSON.stringify({ ...shop, scope: state.shop })); } catch (_) {}
 
     byId("merchant-name").textContent = name;
     byId("merchant-avatar").textContent = name.charAt(0).toUpperCase();
@@ -86,27 +151,47 @@
   }
 
   function requestedCart() {
-    const params = new URLSearchParams(window.location.search);
     const requested = {};
-    (params.get("cart") || "").split(",").forEach((entry) => {
+    const parseEntries = (value, defaultQuantity = null) => String(value || "").split(",").forEach((entry) => {
       const match = entry.trim().match(/^([a-z0-9][a-z0-9_-]{2,95}(?:~[a-z0-9][a-z0-9_-]{2,95})?):(\d+)$/i);
       if (match) {
         const quantity = Number(match[2]);
         requested[match[1]] = Number.isSafeInteger(quantity) && quantity > 0 ? quantity : 1;
+      } else if (defaultQuantity !== null && validSelectionId(entry.trim())) {
+        requested[entry.trim()] = defaultQuantity;
       }
     });
-    if (!Object.keys(requested).length) {
-      (params.get("products") || "")
-        .split(",")
-        .map((id) => id.trim())
-        .filter(Boolean)
-        .forEach((id) => { requested[id] = 1; });
+    if (params.has("add")) {
+      parseEntries(params.get("add"), 1);
+      return { mode: "merge", items: requested };
     }
-    return requested;
+    if (params.has("cart")) {
+      parseEntries(params.get("cart"));
+      return { mode: "replace", items: requested };
+    }
+    if (params.has("products")) {
+      parseEntries(params.get("products"), 1);
+      return { mode: "replace", items: requested };
+    }
+    return { mode: "stored", items: {} };
+  }
+
+  function cleanAddParameter() {
+    if (!params.has("add")) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("add");
+    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
   }
 
   async function loadCatalog() {
-    const requested = requestedCart();
+    const request = requestedCart();
+    const saved = readStoredCart();
+    const requested = request.mode === "merge"
+      ? Object.fromEntries([...new Set([...Object.keys(saved), ...Object.keys(request.items)])].map((id) => [
+        id,
+        (saved[id] || 0) + (request.items[id] || 0),
+      ]))
+      : request.mode === "replace" ? request.items : saved;
     const ids = Object.keys(requested);
     state.loaded = false;
     byId("catalog-loading").hidden = false;
@@ -118,6 +203,7 @@
     if (!ids.length) {
       state.products = {};
       state.cart = {};
+      saveCart();
       state.loaded = true;
       byId("catalog-loading").hidden = true;
       renderCart();
@@ -143,6 +229,8 @@
         const quantity = Math.min(requested[id], stock);
         return [id, quantity];
       }).filter(([, quantity]) => quantity > 0));
+      saveCart();
+      cleanAddParameter();
       state.loaded = true;
       byId("catalog-loading").hidden = true;
       renderCart();
@@ -237,6 +325,7 @@
     const maximum = Math.max(0, Number(product.stock ?? Number.MAX_SAFE_INTEGER));
     state.cart[id] = Math.max(0, Math.min(maximum, (state.cart[id] || 0) + change));
     if (!state.cart[id]) delete state.cart[id];
+    saveCart();
     resetDelivery();
     renderCart();
   }
@@ -400,7 +489,7 @@
         throw new Error("The payment service returned an invalid session.");
       }
 
-      const returnUrl = `return.php?order=${encodeURIComponent(orderId)}`;
+      const returnUrl = `return.php?order=${encodeURIComponent(orderId)}&shop=${encodeURIComponent(state.shop)}`;
       window.snap.pay(token, {
         onSuccess: () => window.location.assign(returnUrl),
         onPending: () => window.location.assign(returnUrl),
@@ -426,7 +515,8 @@
   }
 
   const returnToStore = () => {
-    if (window.history.length > 1) window.history.back();
+    if (state.returnUrl) window.location.assign(state.returnUrl);
+    else if (window.history.length > 1) window.history.back();
     else window.location.assign("../");
   };
 

@@ -8,6 +8,23 @@ delivery details, shipping quotes, signed provider notifications, merchant
 acceptance, and an idempotent Biteship pickup after the merchant chooses
 Arrange pickup.
 
+## Checkout links for existing websites
+
+The Products admin can copy a merchant cart URL or a product-specific checkout
+URL for use on an existing website. Cart state is stored on the Ezkart checkout
+origin and isolated by the opaque `shop` value, so customers can return to the
+merchant site, add another product, and check out both items together.
+
+- `/cart/?shop=<scope>` reopens that merchant's saved cart.
+- `/cart/?shop=<scope>&add=<product-id>` adds one item to the saved cart.
+- `/cart/?shop=<scope>&add=<product-id>:<quantity>` adds a chosen quantity.
+- `/cart/?shop=<scope>&cart=<product-id>:<quantity>,...` replaces the saved cart
+  during a complete storefront-cart handoff.
+
+Optional `brand`, `logo`, and `return` parameters set the merchant identity and
+the Continue shopping destination. When `return` is omitted, checkout remembers
+the referring merchant page when the browser supplies it.
+
 ## Payment-provider decision
 
 Ezkart is awaiting CV approval before completing DOKU merchant onboarding.

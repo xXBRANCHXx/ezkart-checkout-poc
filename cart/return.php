@@ -14,7 +14,7 @@ if (preg_match('/^EZK-[A-Z0-9-]{8,70}$/', $orderId) !== 1) {
   <meta name="robots" content="noindex,nofollow">
   <meta name="theme-color" content="#ffffff">
   <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="cart.css?v=checkout-rebuild-4">
+  <link rel="stylesheet" href="cart.css?v=checkout-rebuild-5">
   <title>Order status · Ezkart</title>
 </head>
 <body class="return-page">
@@ -41,8 +41,8 @@ if (preg_match('/^EZK-[A-Z0-9-]{8,70}$/', $orderId) !== 1) {
         <div><span>Delivery</span><b id="return-fulfillment">Waiting for payment</b></div>
       </div>
       <div class="success-actions">
-        <a class="primary-button" href="./">Back to checkout</a>
-        <a class="text-button" href="../">Return to Ezkart</a>
+        <a class="primary-button" id="return-checkout-link" href="./">Back to checkout</a>
+        <a class="text-button" id="return-store-link" href="../">Return to store</a>
       </div>
     </section>
   </main>
@@ -55,11 +55,16 @@ if (preg_match('/^EZK-[A-Z0-9-]{8,70}$/', $orderId) !== 1) {
 
   <script>
     (() => {
+      const params = new URLSearchParams(window.location.search);
+      const scope = /^[a-z0-9][a-z0-9_-]{5,79}$/i.test(params.get('shop') || '')
+        ? params.get('shop').toLowerCase()
+        : '';
       const safeMessage = (value, fallback = 'Order status is temporarily unavailable.') => String(value || fallback)
         .replace(/midtrans|doku|xendit|stripe|paypal/gi, 'payment service')
         .replace(/biteship/gi, 'delivery service');
       try {
-        const brand = JSON.parse(sessionStorage.getItem('ezkart.checkout.brand') || '{}');
+        const scopedBrand = scope ? localStorage.getItem('ezkart.checkout.shop.v1:' + scope) : '';
+        const brand = JSON.parse(scopedBrand || sessionStorage.getItem('ezkart.checkout.brand') || '{}');
         const name = String(brand.name || 'Store').slice(0, 80);
         document.getElementById('merchant-name-return').textContent = name;
         document.getElementById('merchant-avatar-return').textContent = name.charAt(0).toUpperCase();
@@ -73,6 +78,10 @@ if (preg_match('/^EZK-[A-Z0-9-]{8,70}$/', $orderId) !== 1) {
             image.hidden = true;
             document.getElementById('merchant-avatar-return').hidden = false;
           }, { once: true });
+        }
+        if (scope) document.getElementById('return-checkout-link').href = './?shop=' + encodeURIComponent(scope);
+        if (brand.returnUrl && /^https?:\/\//i.test(brand.returnUrl)) {
+          document.getElementById('return-store-link').href = brand.returnUrl;
         }
       } catch (_) {}
 
@@ -103,6 +112,9 @@ if (preg_match('/^EZK-[A-Z0-9-]{8,70}$/', $orderId) !== 1) {
             : 'Waiting for payment';
 
           if (data.status === 'PAID') {
+            if (scope) {
+              try { localStorage.removeItem('ezkart.checkout.cart.v1:' + scope); } catch (_) {}
+            }
             shell.classList.add('confirmed');
             document.getElementById('return-icon').textContent = '✓';
             document.getElementById('return-title').textContent = 'Payment confirmed';
