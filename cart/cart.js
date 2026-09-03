@@ -135,7 +135,7 @@
         <div><b>${escapeHtml(product.name)}</b><small>Qty ${quantity}</small></div>
         <strong>${money(product.price * quantity)}</strong>
       </div>`;
-    }).join("") : '<div class="summary-item"><div class="summary-thumb">0</div><div><b>Your bag is empty</b><small>Add an item to continue</small></div></div>';
+    }).join("") : '<div class="summary-item"><div class="summary-thumb">0</div><div><b>Your cart is empty</b><small>Add an item to continue</small></div></div>';
 
     el("subtotal").textContent = money(subtotal());
     el("shipping-total").textContent = state.shipping ? money(shippingPrice()) : "Calculated next";
@@ -272,7 +272,7 @@
         onSuccess: () => window.location.assign(returnUrl),
         onPending: () => window.location.assign(returnUrl),
         onError: () => { showToast("Payment was not completed."); button.disabled = false; button.textContent = original; },
-        onClose: () => { showToast("Payment window closed. Your bag is still here."); button.disabled = false; button.textContent = original; },
+        onClose: () => { showToast("Payment window closed. Your cart is still here."); button.disabled = false; button.textContent = original; },
       });
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Payment could not start.");

@@ -4,14 +4,14 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Review your order, choose delivery, and complete secure payment with Ezkart." />
-    <meta name="theme-color" content="#f7f8fc" />
+    <meta name="theme-color" content="#ffffff" />
     <meta name="robots" content="noindex,nofollow" />
     <link rel="canonical" href="https://ezkart.id/cart/" />
     <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="cart.css?v=checkout-reboot-2" />
+    <link rel="stylesheet" href="cart.css?v=checkout-reboot-3" />
     <title>Secure checkout · Ezkart</title>
   </head>
   <body>
@@ -31,7 +31,7 @@
       <section class="checkout-flow" aria-live="polite">
         <nav class="checkout-progress" aria-label="Checkout progress">
           <ol>
-            <li class="active" data-progress="bag"><span>1</span><b>Your bag</b></li>
+            <li class="active" data-progress="bag"><span>1</span><b>Cart</b></li>
             <li data-progress="delivery"><span>2</span><b>Delivery</b></li>
             <li data-progress="payment"><span>3</span><b>Payment</b></li>
           </ol>
@@ -39,9 +39,8 @@
 
         <section class="checkout-panel active" data-panel="bag" aria-labelledby="bag-title">
           <header class="panel-heading">
-            <p>Step 1 of 3</p>
-            <h1 id="bag-title">Everything look good?</h1>
-            <span>Check your picks, then tell us where they’re going.</span>
+            <h1 id="bag-title">Review your cart</h1>
+            <span>Check your items and quantities before continuing.</span>
           </header>
 
           <div class="catalog-loading" id="catalog-loading" role="status">
@@ -56,7 +55,7 @@
           </div>
           <div class="empty-bag" id="empty-bag" hidden>
             <span aria-hidden="true">0</span>
-            <h2>Your bag is empty</h2>
+            <h2>Your cart is empty</h2>
             <p>Return to the store and add a product before starting checkout.</p>
           </div>
 
@@ -68,7 +67,6 @@
 
         <section class="checkout-panel" data-panel="delivery" aria-labelledby="delivery-title">
           <header class="panel-heading">
-            <p>Step 2 of 3</p>
             <h1 id="delivery-title">Where should we send it?</h1>
             <span>We’ll use these details only for this order and its delivery.</span>
           </header>
@@ -94,7 +92,7 @@
             </div>
 
             <div class="panel-actions">
-              <button class="quiet-button" type="button" data-go="bag">← Back to bag</button>
+              <button class="quiet-button" type="button" data-go="bag">← Back to cart</button>
               <button class="primary-button" type="submit">See delivery options <span>→</span></button>
             </div>
           </form>
@@ -102,7 +100,6 @@
 
         <section class="checkout-panel" data-panel="payment" aria-labelledby="payment-title">
           <header class="panel-heading">
-            <p>Step 3 of 3</p>
             <h1 id="payment-title">Delivery and payment</h1>
             <span>Choose a courier, review the final total, then pay securely.</span>
           </header>
@@ -126,7 +123,7 @@
       </section>
 
       <aside class="order-summary" aria-labelledby="summary-title">
-        <header><div><p>Your order</p><h2 id="summary-title">Order summary</h2></div><span id="summary-count">0 items</span></header>
+        <header><h2 id="summary-title">Order summary</h2><span id="summary-count">0 items</span></header>
         <div class="summary-items" id="summary-items"><div class="summary-skeleton"><i></i><span></span><b></b></div></div>
         <dl class="summary-totals">
           <div><dt>Subtotal</dt><dd id="subtotal">Rp0</dd></div>
@@ -144,6 +141,6 @@
     </footer>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="cart.js?v=checkout-reboot-2"></script>
+    <script src="cart.js?v=checkout-reboot-3"></script>
   </body>
 </html>

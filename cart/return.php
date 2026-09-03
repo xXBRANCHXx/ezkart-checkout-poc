@@ -16,7 +16,7 @@ if (preg_match('/^EZK-[A-Z0-9-]{8,70}$/', $orderId) !== 1) {
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="cart.css?v=checkout-reboot-2">
+  <link rel="stylesheet" href="cart.css?v=checkout-reboot-3">
   <title>Order status · Ezkart</title>
 </head>
 <body>
@@ -27,7 +27,6 @@ if (preg_match('/^EZK-[A-Z0-9-]{8,70}$/', $orderId) !== 1) {
   <main class="return-shell" data-order="<?= htmlspecialchars($orderId, ENT_QUOTES, 'UTF-8') ?>">
     <section class="success-card return-card">
       <div class="success-icon pending-icon" id="return-icon">···</div>
-      <p class="eyebrow">Midtrans payment status</p>
       <h1 id="return-title">Confirming your payment…</h1>
       <p id="return-message">We’re waiting for a signed confirmation from the payment provider. Please keep this page open.</p>
       <div class="success-details">
