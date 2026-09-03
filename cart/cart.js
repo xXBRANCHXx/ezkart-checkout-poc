@@ -1,169 +1,185 @@
 (() => {
   "use strict";
 
-  const PRODUCTS = {
-    granola: { name: "Granola Madu Nusantara", price: 58000, weight: 320 },
-    coffee: { name: "Kopi Susu Concentrate", price: 79000, weight: 650 },
-    sambal: { name: "Sambal Roa Signature", price: 46000, weight: 260 },
-  };
-
   const state = {
+    products: {},
     cart: {},
     customer: {},
     shipping: null,
-    payment: null,
-    step: "cart",
+    step: "bag",
+    loaded: false,
   };
-  const CART_STORAGE_KEY = "ezkart.checkout.cart.v1";
 
-  const rupiah = (value) => new Intl.NumberFormat("id-ID", {
+  const el = (id) => document.getElementById(id);
+  const money = (value) => new Intl.NumberFormat("id-ID", {
     style: "currency",
     currency: "IDR",
     maximumFractionDigits: 0,
-  }).format(value);
-
-  const el = (id) => document.getElementById(id);
-  const itemCount = () => Object.values(state.cart).reduce((sum, quantity) => sum + quantity, 0);
-  const subtotal = () => Object.entries(state.cart).reduce(
-    (sum, [id, quantity]) => sum + PRODUCTS[id].price * quantity,
-    0
-  );
-  const weight = () => Object.entries(state.cart).reduce(
-    (sum, [id, quantity]) => sum + PRODUCTS[id].weight * quantity,
-    0
-  );
-  const shippingPrice = () => state.shipping?.price || 0;
+  }).format(Number(value) || 0);
+  const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, (character) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;",
+  })[character]);
+  const cartEntries = () => Object.entries(state.cart).filter(([id, quantity]) => state.products[id] && quantity > 0);
+  const itemCount = () => cartEntries().reduce((sum, [, quantity]) => sum + quantity, 0);
+  const subtotal = () => cartEntries().reduce((sum, [id, quantity]) => sum + state.products[id].price * quantity, 0);
+  const shippingPrice = () => Number(state.shipping?.price) || 0;
   const total = () => subtotal() + shippingPrice();
-  const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character]);
-  let midtransLoader = null;
-
-  function persistCart() {
-    try {
-      window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(state.cart));
-    } catch (_) {
-      // Checkout remains usable when storage is unavailable or blocked.
-    }
-  }
-
-  function savedCart() {
-    try {
-      const stored = JSON.parse(window.localStorage.getItem(CART_STORAGE_KEY) || "{}");
-      return Object.fromEntries(Object.entries(stored).filter(([id, quantity]) => PRODUCTS[id] && Number.isInteger(quantity) && quantity > 0 && quantity <= 9));
-    } catch (_) {
-      return {};
-    }
-  }
-
-  function ensureMidtransSnap() {
-    if (window.snap && typeof window.snap.pay === "function") return Promise.resolve();
-    if (midtransLoader) return midtransLoader;
-    midtransLoader = (async () => {
-      const response = await fetch("api/checkout-config.php", { headers: { Accept: "application/json" }, cache: "no-store" });
-      const payload = await response.json().catch(() => ({}));
-      const snapUrl = String(payload.snap_url || "");
-      const expectedSnapUrl = payload.environment === "production" ? "https://app.midtrans.com/snap/snap.js" : "https://app.sandbox.midtrans.com/snap/snap.js";
-      if (!response.ok || !payload.client_key || snapUrl !== expectedSnapUrl) {
-        throw new Error(payload.error || "Midtrans belum dikonfigurasi.");
-      }
-      await new Promise((resolve, reject) => {
-        const script = document.createElement("script");
-        script.src = payload.snap_url;
-        script.dataset.clientKey = payload.client_key;
-        script.async = true;
-        script.onload = resolve;
-        script.onerror = () => reject(new Error("Midtrans Snap tidak dapat dimuat."));
-        document.head.append(script);
-      });
-      if (!window.snap || typeof window.snap.pay !== "function") throw new Error("Midtrans Snap belum siap.");
-    })().catch((error) => {
-      midtransLoader = null;
-      throw error;
-    });
-    return midtransLoader;
-  }
+  let snapLoader = null;
 
   function showToast(message) {
     const toast = el("toast");
     toast.textContent = message;
     toast.classList.add("visible");
     window.clearTimeout(showToast.timer);
-    showToast.timer = window.setTimeout(() => toast.classList.remove("visible"), 2200);
+    showToast.timer = window.setTimeout(() => toast.classList.remove("visible"), 2400);
+  }
+
+  function requestedCart() {
+    const params = new URLSearchParams(window.location.search);
+    const cart = {};
+    (params.get("cart") || "").split(",").forEach((entry) => {
+      const match = entry.trim().match(/^([a-z0-9_-]+):(\d+)$/i);
+      if (match) cart[match[1]] = Math.max(1, Math.min(9, Number(match[2]) || 1));
+    });
+    if (!Object.keys(cart).length) {
+      (params.get("products") || "").split(",").map((id) => id.trim()).filter(Boolean).forEach((id) => { cart[id] = 1; });
+    }
+    return cart;
+  }
+
+  async function loadCatalog() {
+    const requested = requestedCart();
+    const ids = Object.keys(requested);
+    state.loaded = false;
+    el("catalog-loading").hidden = false;
+    el("catalog-error").hidden = true;
+    el("bag-items").hidden = true;
+    el("empty-bag").hidden = true;
+    el("to-delivery").disabled = true;
+    if (!ids.length) {
+      state.products = {};
+      state.cart = {};
+      state.loaded = true;
+      el("catalog-loading").hidden = true;
+      renderCart();
+      return;
+    }
+    try {
+      const response = await fetch(`api/catalog.php?products=${encodeURIComponent(ids.join(","))}`, {
+        headers: { Accept: "application/json" },
+        cache: "no-store",
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || "The selected products are unavailable.");
+      const products = Array.isArray(payload.products) ? payload.products : [];
+      state.products = Object.fromEntries(products.map((product) => [product.id, product]));
+      if (ids.some((id) => !state.products[id])) throw new Error("A selected product is no longer available.");
+      let remainingCapacity = 9;
+      state.cart = Object.fromEntries(ids.map((id) => {
+        const stock = Math.max(0, Number(state.products[id].stock ?? 9));
+        const quantity = Math.min(requested[id], stock, remainingCapacity);
+        remainingCapacity -= quantity;
+        return [id, quantity];
+      }).filter(([, quantity]) => quantity > 0));
+      state.loaded = true;
+      el("catalog-loading").hidden = true;
+      renderCart();
+    } catch (error) {
+      el("catalog-loading").hidden = true;
+      el("catalog-error").hidden = false;
+      el("catalog-error-message").textContent = error instanceof Error ? error.message : "Please try again.";
+      el("summary-items").innerHTML = '<div class="summary-item"><div class="summary-thumb">!</div><div><b>Order unavailable</b><small>Try loading it again</small></div></div>';
+    }
+  }
+
+  function productImage(product, className) {
+    return product.image_url
+      ? `<img src="${escapeHtml(product.image_url)}" alt="${escapeHtml(product.image_alt || product.name)}" />`
+      : `<span class="${className}" aria-hidden="true">EZ</span>`;
+  }
+
+  function renderCart() {
+    const entries = cartEntries();
+    const count = itemCount();
+    el("bag-items").hidden = !state.loaded || !entries.length;
+    el("empty-bag").hidden = !state.loaded || Boolean(entries.length);
+    el("to-delivery").disabled = !entries.length;
+    el("summary-count").textContent = `${count} ${count === 1 ? "item" : "items"}`;
+
+    el("bag-items").innerHTML = entries.map(([id, quantity]) => {
+      const product = state.products[id];
+      const remaining = Number(product.stock ?? 9);
+      return `<article class="bag-item" data-cart-id="${escapeHtml(id)}">
+        <div class="bag-item-media">${productImage(product, "product-placeholder")}</div>
+        <div class="bag-item-copy">
+          <span>${escapeHtml(product.category || "Product")} · ${Number(product.weight) || 0} g</span>
+          <h2>${escapeHtml(product.name)}</h2>
+          <p>${escapeHtml(product.description || product.sku || "Ready to ship")}</p>
+          <div class="item-controls">
+            <div class="quantity-control" aria-label="Quantity for ${escapeHtml(product.name)}">
+              <button type="button" data-quantity="minus" aria-label="Decrease quantity">−</button>
+              <output>${quantity}</output>
+              <button type="button" data-quantity="plus" aria-label="Increase quantity" ${quantity >= Math.min(remaining, 9) || count >= 9 ? "disabled" : ""}>+</button>
+            </div>
+            <button class="remove-item" type="button" data-remove>Remove</button>
+          </div>
+        </div>
+        <strong class="bag-item-price">${money(product.price * quantity)}</strong>
+      </article>`;
+    }).join("");
+
+    el("summary-items").innerHTML = entries.length ? entries.map(([id, quantity]) => {
+      const product = state.products[id];
+      return `<div class="summary-item">
+        ${productImage(product, "summary-thumb")}
+        <div><b>${escapeHtml(product.name)}</b><small>Qty ${quantity}</small></div>
+        <strong>${money(product.price * quantity)}</strong>
+      </div>`;
+    }).join("") : '<div class="summary-item"><div class="summary-thumb">0</div><div><b>Your bag is empty</b><small>Add an item to continue</small></div></div>';
+
+    el("subtotal").textContent = money(subtotal());
+    el("shipping-total").textContent = state.shipping ? money(shippingPrice()) : "Calculated next";
+    el("grand-total").textContent = money(total());
+    if (state.shipping) el("pay-button").textContent = `Pay ${money(total())}`;
+  }
+
+  function changeQuantity(id, change) {
+    const product = state.products[id];
+    if (!product) return;
+    const otherItems = itemCount() - (state.cart[id] || 0);
+    const maximum = Math.min(9 - otherItems, Math.max(0, Number(product.stock ?? 9)));
+    state.cart[id] = Math.max(0, Math.min(maximum, (state.cart[id] || 0) + change));
+    if (!state.cart[id]) delete state.cart[id];
+    state.shipping = null;
+    renderCart();
   }
 
   function setStep(step) {
+    if (!['bag', 'delivery', 'payment'].includes(step)) return;
     state.step = step;
-    document.querySelectorAll("[data-panel]").forEach((panel) => {
-      panel.classList.toggle("active", panel.dataset.panel === step);
-    });
-
-    const steps = ["cart", "details", "payment", "complete"];
+    const steps = ['bag', 'delivery', 'payment'];
     const activeIndex = steps.indexOf(step);
+    document.querySelectorAll("[data-panel]").forEach((panel) => panel.classList.toggle("active", panel.dataset.panel === step));
     document.querySelectorAll("[data-progress]").forEach((item, index) => {
       item.classList.toggle("active", index === activeIndex);
       item.classList.toggle("done", index < activeIndex);
       item.setAttribute("aria-current", index === activeIndex ? "step" : "false");
     });
-
-    el("cart-summary").classList.toggle("summary-hidden", step === "complete");
-    document.querySelector(".checkout-content").classList.toggle("content-wide", step === "complete");
     window.scrollTo({ top: 0, behavior: "smooth" });
-  }
-
-  function renderCart() {
-    const count = itemCount();
-    el("header-count").textContent = count;
-    el("cart-shortcut").setAttribute("aria-label", `Lihat keranjang, ${count} item`);
-    el("summary-count").textContent = `${count} item`;
-    el("empty-cart").hidden = count > 0;
-    el("summary-totals").hidden = count === 0;
-    el("checkout-button").disabled = count === 0;
-
-    el("cart-items").innerHTML = Object.entries(state.cart)
-      .filter(([, quantity]) => quantity > 0)
-      .map(([id, quantity]) => {
-        const product = PRODUCTS[id];
-        return `
-          <div class="cart-row" data-cart-id="${id}">
-            <div><b>${product.name}</b><small>${rupiah(product.price)} · ${product.weight} g</small></div>
-            <div class="quantity-control" aria-label="Jumlah ${product.name}">
-              <button type="button" data-quantity="minus" aria-label="Kurangi ${product.name}">−</button>
-              <span>${quantity}</span>
-              <button type="button" data-quantity="plus" aria-label="Tambah ${product.name}">+</button>
-            </div>
-            <strong>${rupiah(product.price * quantity)}</strong>
-          </div>`;
-      }).join("");
-
-    el("subtotal").textContent = rupiah(subtotal());
-    el("shipping-total").textContent = state.shipping ? rupiah(shippingPrice()) : "Belum dipilih";
-    el("grand-total").textContent = rupiah(total());
-  }
-
-  function changeQuantity(id, change) {
-    state.cart[id] = Math.max(0, Math.min(9, (state.cart[id] || 0) + change));
-    if (!state.cart[id]) delete state.cart[id];
-    state.shipping = null;
-    state.payment = null;
-    persistCart();
-    renderCart();
-    if (change > 0) showToast(`${PRODUCTS[id].name} ditambahkan`);
   }
 
   function validateForm(form) {
     let valid = true;
     const values = Object.fromEntries(new FormData(form).entries());
     form.querySelectorAll("[required]").forEach((field) => {
-      let message = "";
       const value = field.value.trim();
-      if (!value) message = "Kolom ini wajib diisi.";
-      if (field.name === "email" && value && !/^\S+@\S+\.\S+$/.test(value)) message = "Masukkan alamat email yang valid.";
-      if (field.name === "phone" && value && !/^(?:\+62|62|0)8[1-9][0-9]{6,12}$/.test(value.replace(/[\s-]/g, ""))) {
-        message = "Masukkan nomor WhatsApp Indonesia yang valid.";
-      }
-      if (field.name === "postalCode" && value && !/^\d{5}$/.test(value)) message = "Kode pos harus terdiri dari 5 angka.";
+      let message = value ? "" : "This field is required.";
+      if (field.name === "email" && value && !/^\S+@\S+\.\S+$/.test(value)) message = "Enter a valid email address.";
+      if (field.name === "phone" && value && !/^(?:\+62|62|0)8[1-9][0-9]{6,12}$/.test(value.replace(/[\s-]/g, ""))) message = "Enter a valid Indonesian WhatsApp number.";
+      if (field.name === "postalCode" && value && !/^\d{5}$/.test(value)) message = "Enter a five-digit postcode.";
+      field.classList.toggle("invalid", Boolean(message));
       const error = field.parentElement.querySelector(".field-error");
       if (error) error.textContent = message;
-      field.classList.toggle("invalid", Boolean(message));
       if (message) valid = false;
     });
     return { valid, values };
@@ -171,11 +187,10 @@
 
   async function buildShippingQuotes() {
     state.shipping = null;
-    state.payment = null;
-    el("payment-section").classList.add("locked");
     el("pay-button").disabled = true;
-    el("quote-location").textContent = `${state.customer.location} · ${(weight() / 1000).toFixed(2)} kg`;
-    el("shipping-options").innerHTML = '<div class="quote-state"><span></span><b>Meminta tarif Biteship…</b><small>Tarif dihitung dari kode pos dan berat keranjang.</small></div>';
+    el("pay-button").textContent = "Choose delivery first";
+    el("quote-location").textContent = `${state.customer.location} · ${state.customer.postalCode}`;
+    el("shipping-options").innerHTML = '<div class="quote-state"><i aria-hidden="true"></i><b>Finding delivery options</b><small>Live rates are based on your postcode and the total package weight.</small></div>';
     try {
       const response = await fetch("api/rates.php", {
         method: "POST",
@@ -183,155 +198,113 @@
         body: JSON.stringify({ cart: state.cart, postal_code: state.customer.postalCode }),
       });
       const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload.error || `Biteship error (${response.status}).`);
-      const quotes = Array.isArray(payload.quotes) ? payload.quotes.filter((quote) => quote && quote.id && Number(quote.price) > 0) : [];
-      if (!quotes.length) throw new Error("Biteship tidak menemukan layanan untuk rute ini.");
-      const provider = el("shipping-provider");
-      if (provider) provider.textContent = payload.provider || "Biteship";
-      el("shipping-options").innerHTML = quotes.map((quote, index) => `
-        <label class="shipping-option">
-          <input type="radio" name="shipping" value="${escapeHtml(quote.id)}" ${index === 0 ? "checked" : ""} />
-          <span class="courier-mark">${escapeHtml(String(quote.courier).slice(0, 3).toUpperCase())}</span>
-          <span><b>${escapeHtml(quote.courier)} ${escapeHtml(quote.service)}</b><small>Estimasi tiba ${escapeHtml(quote.days)}</small></span>
-          <strong>${rupiah(Number(quote.price))}</strong>
-          <i aria-hidden="true"></i>
-        </label>
-      `).join("");
+      if (!response.ok) throw new Error(payload.error || "Delivery rates are unavailable.");
+      const quotes = Array.isArray(payload.quotes) ? payload.quotes.filter((quote) => quote?.id && Number(quote.price) > 0) : [];
+      if (!quotes.length) throw new Error("No courier service is available for this route.");
+      el("shipping-provider").textContent = payload.provider || "Biteship";
+      el("shipping-options").innerHTML = quotes.map((quote, index) => `<label class="shipping-option">
+        <input type="radio" name="shipping" value="${escapeHtml(quote.id)}" ${index === 0 ? "checked" : ""} />
+        <span class="courier-mark">${escapeHtml(String(quote.courier).slice(0, 3).toUpperCase())}</span>
+        <span><b>${escapeHtml(quote.courier)} ${escapeHtml(quote.service)}</b><small>${escapeHtml(quote.days || "ETA from courier")}</small></span>
+        <strong>${money(quote.price)}</strong><i aria-hidden="true"></i>
+      </label>`).join("");
       selectShipping(quotes[0]);
-      el("shipping-options").querySelectorAll("input").forEach((input) => {
-        input.addEventListener("change", () => selectShipping(quotes.find((quote) => quote.id === input.value)));
-      });
-      return true;
+      el("shipping-options").querySelectorAll("input").forEach((input) => input.addEventListener("change", () => selectShipping(quotes.find((quote) => quote.id === input.value))));
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Tarif Biteship tidak tersedia.";
-      el("shipping-options").innerHTML = `<div class="quote-state error"><b>Tarif pengiriman belum tersedia</b><small>${escapeHtml(message)}</small><button type="button" data-retry-rates>Coba lagi</button></div>`;
+      const message = error instanceof Error ? error.message : "Delivery rates are unavailable.";
+      el("shipping-options").innerHTML = `<div class="quote-state error"><b>Couldn’t load delivery options</b><small>${escapeHtml(message)}</small><button type="button" data-retry-rates>Try again</button></div>`;
       el("shipping-options").querySelector("[data-retry-rates]")?.addEventListener("click", buildShippingQuotes);
       showToast(message);
       renderCart();
-      return false;
     }
   }
 
   function selectShipping(quote) {
+    if (!quote) return;
     state.shipping = quote;
-    state.payment = "Midtrans Snap";
-    el("payment-section").classList.remove("locked");
     el("pay-button").disabled = false;
     renderCart();
   }
 
-  async function startMidtransSnap() {
-    if (!state.shipping || !state.payment) return;
+  async function ensureSnap() {
+    if (window.snap?.pay) return;
+    if (snapLoader) return snapLoader;
+    snapLoader = (async () => {
+      const response = await fetch("api/checkout-config.php", { headers: { Accept: "application/json" }, cache: "no-store" });
+      const payload = await response.json().catch(() => ({}));
+      const expected = payload.environment === "production" ? "https://app.midtrans.com/snap/snap.js" : "https://app.sandbox.midtrans.com/snap/snap.js";
+      if (!response.ok || !payload.client_key || payload.snap_url !== expected) throw new Error(payload.error || "Secure payment is not configured.");
+      el("checkout-mode").textContent = payload.environment === "production" ? "Live payment" : "Test payment";
+      await new Promise((resolve, reject) => {
+        const script = document.createElement("script");
+        script.src = payload.snap_url;
+        script.dataset.clientKey = payload.client_key;
+        script.async = true;
+        script.onload = resolve;
+        script.onerror = () => reject(new Error("The secure payment window could not load."));
+        document.head.append(script);
+      });
+      if (!window.snap?.pay) throw new Error("The secure payment window is not ready.");
+    })().catch((error) => { snapLoader = null; throw error; });
+    return snapLoader;
+  }
+
+  async function startPayment() {
+    if (!state.shipping || !itemCount()) return;
     const button = el("pay-button");
-    const originalLabel = button.innerHTML;
+    const original = button.textContent;
     button.disabled = true;
-    button.textContent = "Membuka Midtrans Snap…";
+    button.textContent = "Opening secure payment…";
     try {
-      await ensureMidtransSnap();
+      await ensureSnap();
       const response = await fetch("api/start.php", {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({
-          cart: state.cart,
-          customer: state.customer,
-          shipping_id: state.shipping.id,
-        }),
+        body: JSON.stringify({ cart: state.cart, customer: state.customer, shipping_id: state.shipping.id }),
       });
       const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload.error || `Midtrans error (${response.status}).`);
-      const snapToken = String(payload.snap_token || "");
+      if (!response.ok) throw new Error(payload.error || "Payment could not start.");
+      const token = String(payload.snap_token || "");
       const orderId = String(payload.order_id || "");
-      if (!snapToken || !/^EZK-MIDTRANS-[A-Z0-9-]+$/.test(orderId)) {
-        throw new Error("Midtrans tidak mengembalikan token Snap yang valid.");
-      }
+      if (!token || !/^EZK-MIDTRANS-[A-Z0-9-]+$/.test(orderId)) throw new Error("The payment provider returned an invalid session.");
       const returnUrl = `return.php?order=${encodeURIComponent(orderId)}`;
-      button.textContent = "Menunggu pembayaran Midtrans…";
-      window.snap.pay(snapToken, {
+      window.snap.pay(token, {
         onSuccess: () => window.location.assign(returnUrl),
         onPending: () => window.location.assign(returnUrl),
-        onError: () => {
-          showToast("Pembayaran Midtrans tidak berhasil.");
-          button.disabled = false;
-          button.innerHTML = originalLabel;
-        },
-        onClose: () => {
-          showToast("Jendela pembayaran ditutup.");
-          button.disabled = false;
-          button.innerHTML = originalLabel;
-        },
+        onError: () => { showToast("Payment was not completed."); button.disabled = false; button.textContent = original; },
+        onClose: () => { showToast("Payment window closed. Your bag is still here."); button.disabled = false; button.textContent = original; },
       });
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "Tidak dapat membuka Midtrans Snap.");
+      showToast(error instanceof Error ? error.message : "Payment could not start.");
       button.disabled = false;
-      button.innerHTML = originalLabel;
+      button.textContent = original;
     }
   }
 
-  document.querySelectorAll(".add-product").forEach((button) => {
-    button.addEventListener("click", () => changeQuantity(button.closest("[data-product-id]").dataset.productId, 1));
+  el("bag-items").addEventListener("click", (event) => {
+    const row = event.target.closest("[data-cart-id]");
+    if (!row) return;
+    if (event.target.closest("[data-remove]")) changeQuantity(row.dataset.cartId, -(state.cart[row.dataset.cartId] || 0));
+    const quantity = event.target.closest("[data-quantity]");
+    if (quantity) changeQuantity(row.dataset.cartId, quantity.dataset.quantity === "plus" ? 1 : -1);
   });
-
-  el("cart-items").addEventListener("click", (event) => {
-    const button = event.target.closest("[data-quantity]");
-    if (!button) return;
-    const id = button.closest("[data-cart-id]").dataset.cartId;
-    changeQuantity(id, button.dataset.quantity === "plus" ? 1 : -1);
-  });
-
-  el("checkout-button").addEventListener("click", () => {
-    if (itemCount()) setStep("details");
-  });
-
-  el("cart-shortcut").addEventListener("click", () => {
-    if (state.step !== "cart") setStep("cart");
-    el("cart-summary").scrollIntoView({ behavior: "smooth", block: "start" });
-  });
-
-  document.querySelectorAll("[data-go]").forEach((button) => {
-    button.addEventListener("click", () => setStep(button.dataset.go));
-  });
-
+  el("to-delivery").addEventListener("click", () => { if (itemCount()) setStep("delivery"); });
+  document.querySelectorAll("[data-go]").forEach((button) => button.addEventListener("click", () => setStep(button.dataset.go)));
   el("customer-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     const result = validateForm(event.currentTarget);
-    if (!result.valid) {
-      event.currentTarget.querySelector(".invalid")?.focus();
-      return;
-    }
+    if (!result.valid) { event.currentTarget.querySelector(".invalid")?.focus(); return; }
     state.customer = result.values;
     setStep("payment");
     await buildShippingQuotes();
   });
-
-  el("pay-button").addEventListener("click", startMidtransSnap);
-
-  el("reset-demo").addEventListener("click", () => {
-    state.cart = {};
-    state.customer = {};
-    state.shipping = null;
-    state.payment = null;
-    el("customer-form").reset();
-    persistCart();
-    renderCart();
-    setStep("cart");
+  el("pay-button").addEventListener("click", startPayment);
+  el("retry-catalog").addEventListener("click", loadCatalog);
+  el("back-to-store").addEventListener("click", () => {
+    if (window.history.length > 1) window.history.back();
+    else window.location.assign("../");
   });
 
-  const searchParams = new URLSearchParams(window.location.search);
-  const requestedCart = Object.fromEntries((searchParams.get("cart") || "")
-    .split(",")
-    .map((entry) => entry.trim().match(/^([a-z0-9_-]+):(\d+)$/i))
-    .filter(Boolean)
-    .map((match) => [match[1], Math.max(1, Math.min(9, Number(match[2]) || 1))])
-    .filter(([id]) => PRODUCTS[id]));
-  const requestedProducts = (searchParams.get("products") || "")
-    .split(",")
-    .map((id) => id.trim())
-    .filter((id, index, values) => PRODUCTS[id] && values.indexOf(id) === index);
-  state.cart = searchParams.has("cart")
-    ? requestedCart
-    : requestedProducts.length
-      ? Object.fromEntries(requestedProducts.map((id) => [id, 1]))
-      : savedCart();
-  persistCart();
-  renderCart();
+  el("year").textContent = new Date().getFullYear();
+  loadCatalog();
 })();

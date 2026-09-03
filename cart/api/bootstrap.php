@@ -273,13 +273,77 @@ function ez_integration_status(): array
     return ['midtrans' => $midtrans, 'biteship' => $biteship, 'biteship_fulfillment' => $biteshipFulfillment, 'environment' => $environment];
 }
 
-function ez_catalog(): array
+function ez_remote_storefront_products(array $ids): array
 {
-    return [
+    $apiUrl = rtrim(ez_config('cloudflare_api_url'), '/');
+    if ($apiUrl === '' || filter_var($apiUrl, FILTER_VALIDATE_URL) === false || !function_exists('curl_init')) {
+        throw new RuntimeException('The storefront catalog is unavailable.');
+    }
+    $url = $apiUrl . '/v1/storefront/products?' . http_build_query(['ids' => implode(',', $ids)]);
+    $handle = curl_init($url);
+    if ($handle === false) throw new RuntimeException('The storefront catalog request could not start.');
+    curl_setopt_array($handle, [
+        CURLOPT_HTTPHEADER => ['Accept: application/json'],
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_CONNECTTIMEOUT => 8,
+        CURLOPT_TIMEOUT => 15,
+        CURLOPT_SSL_VERIFYPEER => true,
+    ]);
+    $body = curl_exec($handle);
+    $status = (int) curl_getinfo($handle, CURLINFO_HTTP_CODE);
+    $error = curl_error($handle);
+    $payload = is_string($body) ? json_decode($body, true) : null;
+    if ($status !== 200 || !is_array($payload) || ($payload['ok'] ?? false) !== true) {
+        throw new RuntimeException($error !== '' ? $error : (string) ($payload['error'] ?? 'The storefront catalog did not respond.'));
+    }
+    return is_array($payload['products'] ?? null) ? $payload['products'] : [];
+}
+
+function ez_catalog(array $requestedIds = []): array
+{
+    $demo = [
         'granola' => ['sku' => 'EZK-DEMO-GRANOLA', 'name' => 'Granola Madu Nusantara', 'price' => 58000, 'weight' => 320],
         'coffee' => ['sku' => 'EZK-DEMO-COFFEE', 'name' => 'Kopi Susu Concentrate', 'price' => 79000, 'weight' => 650],
         'sambal' => ['sku' => 'EZK-DEMO-SAMBAL', 'name' => 'Sambal Roa Signature', 'price' => 46000, 'weight' => 260],
     ];
+    if ($requestedIds === []) return $demo;
+    $ids = array_values(array_unique(array_filter(array_map('strval', $requestedIds), static fn(string $id): bool => preg_match('/^[a-zA-Z0-9_-]{1,120}$/', $id) === 1)));
+    if ($ids === [] || count($ids) > 9) throw new InvalidArgumentException('Request between 1 and 9 valid products.');
+    $catalog = [];
+    $remoteIds = [];
+    foreach ($ids as $id) {
+        if (isset($demo[$id])) $catalog[$id] = $demo[$id] + ['id' => $id, 'type' => 'physical', 'description' => '', 'image_url' => '', 'image_alt' => $demo[$id]['name'], 'stock' => 9];
+        else $remoteIds[] = $id;
+    }
+    if ($remoteIds !== []) {
+        $apiUrl = rtrim(ez_config('cloudflare_api_url'), '/');
+        foreach (ez_remote_storefront_products($remoteIds) as $product) {
+            if (!is_array($product)) continue;
+            $id = trim((string) ($product['id'] ?? ''));
+            $name = trim((string) ($product['name'] ?? ''));
+            $price = (int) ($product['price'] ?? 0);
+            $weight = (int) ($product['weightGrams'] ?? 0);
+            if (!in_array($id, $remoteIds, true) || $name === '' || $price < 1 || $weight < 1 || ($product['type'] ?? '') !== 'physical') continue;
+            $imagePath = trim((string) ($product['imagePath'] ?? ''));
+            $catalog[$id] = [
+                'id' => $id,
+                'sku' => mb_substr(trim((string) ($product['sku'] ?? '')) ?: 'EZK-' . strtoupper($id), 0, 50),
+                'name' => mb_substr($name, 0, 160),
+                'description' => mb_substr(trim((string) ($product['description'] ?? '')), 0, 500),
+                'type' => 'physical',
+                'price' => $price,
+                'weight' => $weight,
+                'stock' => max(0, (int) ($product['stock'] ?? 0)),
+                'image_url' => str_starts_with($imagePath, '/') ? $apiUrl . $imagePath : '',
+                'image_alt' => mb_substr(trim((string) ($product['imageAlt'] ?? '')) ?: $name, 0, 160),
+            ];
+        }
+    }
+    $ordered = [];
+    foreach ($ids as $id) {
+        $ordered[$id] = $catalog[$id] ?? null;
+    }
+    return $ordered;
 }
 
 function ez_normalize_biteship_quotes(array $pricing): array
@@ -320,7 +384,9 @@ function ez_biteship_quotes(array $cart, string $destinationPostalCode): array
     }
     $items = [];
     $itemCount = 0;
-    foreach (ez_catalog() as $id => $product) {
+    $catalog = ez_catalog(array_keys($cart));
+    foreach ($catalog as $id => $product) {
+        if (!is_array($product)) throw new InvalidArgumentException('A selected product is unavailable.');
         $raw = $cart[$id] ?? 0;
         if (!is_int($raw) && (!is_string($raw) || preg_match('/^\d+$/', $raw) !== 1)) {
             throw new InvalidArgumentException('A cart quantity is invalid.');
@@ -330,6 +396,9 @@ function ez_biteship_quotes(array $cart, string $destinationPostalCode): array
             throw new InvalidArgumentException('Cart quantities must be between 0 and 9.');
         }
         if ($quantity === 0) continue;
+        if (isset($product['stock']) && $quantity > (int) $product['stock']) {
+            throw new InvalidArgumentException('A selected quantity is no longer available.');
+        }
         $items[] = [
             'name' => $product['name'],
             'description' => $product['sku'],
@@ -370,7 +439,9 @@ function ez_checkout_request(array $input): array
     $subtotal = 0;
     $weight = 0;
     $itemCount = 0;
-    foreach (ez_catalog() as $id => $product) {
+    $catalog = ez_catalog(array_keys($cart));
+    foreach ($catalog as $id => $product) {
+        if (!is_array($product)) throw new InvalidArgumentException('A selected product is unavailable.');
         $raw = $cart[$id] ?? 0;
         if (!is_int($raw) && (!is_string($raw) || preg_match('/^\d+$/', $raw) !== 1)) {
             throw new InvalidArgumentException('A cart quantity is invalid.');
@@ -380,6 +451,9 @@ function ez_checkout_request(array $input): array
             throw new InvalidArgumentException('Cart quantities must be between 0 and 9.');
         }
         if ($quantity === 0) continue;
+        if (isset($product['stock']) && $quantity > (int) $product['stock']) {
+            throw new InvalidArgumentException('A selected quantity is no longer available.');
+        }
         $lineTotal = $product['price'] * $quantity;
         $items[] = [
             'id' => $product['sku'],

@@ -342,6 +342,52 @@ async function catalog(request, env) {
   return { products, drafts };
 }
 
+async function storefrontProducts(url, env) {
+  const requested = String(url.searchParams.get("ids") || "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
+  if (requested.length < 1 || requested.length > 9) {
+    throw new Response("Request between 1 and 9 products", { status: 400 });
+  }
+  const ids = [...new Set(requested.map((id) => cleanId(id, "Product ID")))];
+  const productResults = await env.DB.batch(ids.map((id) => env.DB.prepare(`
+    SELECT p.id, p.seller_id, p.type, p.title, p.description, p.sku, p.currency,
+      p.price_amount, p.stock_quantity, p.weight_grams, p.metadata_json
+    FROM products p
+    JOIN sellers s ON s.id = p.seller_id
+    WHERE p.id = ? AND p.status = 'active' AND s.status = 'active'
+    LIMIT 1
+  `).bind(id)));
+  const rows = productResults.map((result) => result.results?.[0]).filter(Boolean);
+  if (!rows.length) return [];
+  const mediaResults = await env.DB.batch(rows.map((row) => env.DB.prepare(`
+    SELECT id, alt_text
+    FROM product_media
+    WHERE seller_id = ? AND product_id = ?
+    ORDER BY sort_order
+    LIMIT 1
+  `).bind(row.seller_id, row.id)));
+  return rows.map((row, index) => {
+    const metadata = parseJson(row.metadata_json, {});
+    const media = mediaResults[index]?.results?.[0] || null;
+    return {
+      id: row.id,
+      type: row.type,
+      name: row.title,
+      description: row.description || "",
+      sku: row.sku || "",
+      currency: row.currency,
+      price: Number(row.price_amount || 0),
+      stock: row.stock_quantity === null ? null : Number(row.stock_quantity),
+      weightGrams: row.weight_grams === null ? null : Number(row.weight_grams),
+      category: cleanText(metadata.category, 80),
+      imagePath: media ? `/v1/public/media/${encodeURIComponent(media.id)}` : "",
+      imageAlt: media?.alt_text || row.title,
+    };
+  });
+}
+
 const landingPagePrefix = (sellerId) => `sellers/${sellerId}/landing-pages/`;
 const landingPageKey = (sellerId, id) => `${landingPagePrefix(sellerId)}${id}.json`;
 // Kept only so preview writes and page deletion can remove obsolete raster artifacts.
@@ -1143,6 +1189,7 @@ export default {
     try {
       if (request.method === "GET" && url.pathname === "/health") return json(await health(env), 200, cors);
       if (request.method === "GET" && url.pathname === "/v1/me") return json({ ok: true, user: await currentUser(request, env) }, 200, cors);
+      if (request.method === "GET" && url.pathname === "/v1/storefront/products") return json({ ok: true, products: await storefrontProducts(url, env) }, 200, cors);
       if (request.method === "GET" && url.pathname === "/v1/catalog") return json({ ok: true, ...(await catalog(request, env)) }, 200, cors);
       if (request.method === "GET" && url.pathname === "/v1/landing-pages") return json({ ok: true, pages: await landingPages(request, env) }, 200, cors);
       const landingPagePreviewMatch = /^\/v1\/landing-pages\/([a-z0-9-]+)\/preview$/.exec(url.pathname);
