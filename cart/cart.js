@@ -6,7 +6,7 @@
     cart: {},
     customer: {},
     shipping: null,
-    step: "bag",
+    step: "cart",
     loaded: false,
   };
 
@@ -38,7 +38,7 @@
     const params = new URLSearchParams(window.location.search);
     const cart = {};
     (params.get("cart") || "").split(",").forEach((entry) => {
-      const match = entry.trim().match(/^([a-z0-9_-]+):(\d+)$/i);
+      const match = entry.trim().match(/^([a-z0-9][a-z0-9_-]{2,95}(?:~[a-z0-9][a-z0-9_-]{2,95})?):(\d+)$/i);
       if (match) cart[match[1]] = Math.max(1, Math.min(9, Number(match[2]) || 1));
     });
     if (!Object.keys(cart).length) {
@@ -53,8 +53,8 @@
     state.loaded = false;
     el("catalog-loading").hidden = false;
     el("catalog-error").hidden = true;
-    el("bag-items").hidden = true;
-    el("empty-bag").hidden = true;
+    el("cart-items").hidden = true;
+    el("empty-cart").hidden = true;
     el("to-delivery").disabled = true;
     if (!ids.length) {
       state.products = {};
@@ -101,20 +101,20 @@
   function renderCart() {
     const entries = cartEntries();
     const count = itemCount();
-    el("bag-items").hidden = !state.loaded || !entries.length;
-    el("empty-bag").hidden = !state.loaded || Boolean(entries.length);
+    el("cart-items").hidden = !state.loaded || !entries.length;
+    el("empty-cart").hidden = !state.loaded || Boolean(entries.length);
     el("to-delivery").disabled = !entries.length;
     el("summary-count").textContent = `${count} ${count === 1 ? "item" : "items"}`;
 
-    el("bag-items").innerHTML = entries.map(([id, quantity]) => {
+    el("cart-items").innerHTML = entries.map(([id, quantity]) => {
       const product = state.products[id];
       const remaining = Number(product.stock ?? 9);
-      return `<article class="bag-item" data-cart-id="${escapeHtml(id)}">
-        <div class="bag-item-media">${productImage(product, "product-placeholder")}</div>
-        <div class="bag-item-copy">
-          <span>${escapeHtml(product.category || "Product")} · ${Number(product.weight) || 0} g</span>
-          <h2>${escapeHtml(product.name)}</h2>
-          <p>${escapeHtml(product.description || product.sku || "Ready to ship")}</p>
+      return `<article class="cart-item" data-cart-id="${escapeHtml(id)}">
+        <div class="cart-item-media">${productImage(product, "product-placeholder")}</div>
+        <div class="cart-item-copy">
+          <h2>${escapeHtml(product.product_name || product.name)}</h2>
+          ${product.variant_name ? `<p class="cart-item-variant">${escapeHtml(product.variant_name)}</p>` : ""}
+          <p class="cart-item-meta">${escapeHtml([product.sku, Number(product.weight) > 0 ? `${Number(product.weight)} g` : ""].filter(Boolean).join(" · ") || "Ready to ship")}</p>
           <div class="item-controls">
             <div class="quantity-control" aria-label="Quantity for ${escapeHtml(product.name)}">
               <button type="button" data-quantity="minus" aria-label="Decrease quantity">−</button>
@@ -124,7 +124,7 @@
             <button class="remove-item" type="button" data-remove>Remove</button>
           </div>
         </div>
-        <strong class="bag-item-price">${money(product.price * quantity)}</strong>
+        <strong class="cart-item-price">${money(product.price * quantity)}</strong>
       </article>`;
     }).join("");
 
@@ -132,7 +132,7 @@
       const product = state.products[id];
       return `<div class="summary-item">
         ${productImage(product, "summary-thumb")}
-        <div><b>${escapeHtml(product.name)}</b><small>Qty ${quantity}</small></div>
+        <div><b>${escapeHtml(product.product_name || product.name)}</b><small>${product.variant_name ? `${escapeHtml(product.variant_name)} · ` : ""}Qty ${quantity}</small></div>
         <strong>${money(product.price * quantity)}</strong>
       </div>`;
     }).join("") : '<div class="summary-item"><div class="summary-thumb">0</div><div><b>Your cart is empty</b><small>Add an item to continue</small></div></div>';
@@ -155,9 +155,9 @@
   }
 
   function setStep(step) {
-    if (!['bag', 'delivery', 'payment'].includes(step)) return;
+    if (!['cart', 'delivery', 'payment'].includes(step)) return;
     state.step = step;
-    const steps = ['bag', 'delivery', 'payment'];
+    const steps = ['cart', 'delivery', 'payment'];
     const activeIndex = steps.indexOf(step);
     document.querySelectorAll("[data-panel]").forEach((panel) => panel.classList.toggle("active", panel.dataset.panel === step));
     document.querySelectorAll("[data-progress]").forEach((item, index) => {
@@ -281,7 +281,7 @@
     }
   }
 
-  el("bag-items").addEventListener("click", (event) => {
+  el("cart-items").addEventListener("click", (event) => {
     const row = event.target.closest("[data-cart-id]");
     if (!row) return;
     if (event.target.closest("[data-remove]")) changeQuantity(row.dataset.cartId, -(state.cart[row.dataset.cartId] || 0));

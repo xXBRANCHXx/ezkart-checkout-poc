@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="cart.css?v=checkout-reboot-3" />
+    <link rel="stylesheet" href="cart.css?v=checkout-professional-1" />
     <title>Secure checkout · Ezkart</title>
   </head>
   <body>
@@ -22,7 +22,7 @@
         <img src="../assets/ezkart-logo.svg" alt="Ezkart" width="1020" height="420" />
       </a>
       <div class="header-security">
-        <span class="lock-mark" aria-hidden="true">⌁</span>
+        <span class="lock-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="10" rx="2"></rect><path d="M8 10V7a4 4 0 0 1 8 0v3"></path></svg></span>
         <span><b>Secure checkout</b><small id="checkout-mode">Protected payment</small></span>
       </div>
     </header>
@@ -31,15 +31,15 @@
       <section class="checkout-flow" aria-live="polite">
         <nav class="checkout-progress" aria-label="Checkout progress">
           <ol>
-            <li class="active" data-progress="bag"><span>1</span><b>Cart</b></li>
+            <li class="active" data-progress="cart"><span>1</span><b>Cart</b></li>
             <li data-progress="delivery"><span>2</span><b>Delivery</b></li>
             <li data-progress="payment"><span>3</span><b>Payment</b></li>
           </ol>
         </nav>
 
-        <section class="checkout-panel active" data-panel="bag" aria-labelledby="bag-title">
+        <section class="checkout-panel active" data-panel="cart" aria-labelledby="cart-title">
           <header class="panel-heading">
-            <h1 id="bag-title">Review your cart</h1>
+            <h1 id="cart-title">Review your cart</h1>
             <span>Check your items and quantities before continuing.</span>
           </header>
 
@@ -47,19 +47,19 @@
             <i aria-hidden="true"></i>
             <div><b>Loading your order</b><span>Getting the latest product details…</span></div>
           </div>
-          <div class="bag-items" id="bag-items" hidden></div>
+          <div class="cart-items" id="cart-items" hidden></div>
           <div class="checkout-error" id="catalog-error" hidden>
             <span aria-hidden="true">!</span>
             <div><b>We couldn’t load this order</b><p id="catalog-error-message"></p></div>
             <button type="button" id="retry-catalog">Try again</button>
           </div>
-          <div class="empty-bag" id="empty-bag" hidden>
+          <div class="empty-cart" id="empty-cart" hidden>
             <span aria-hidden="true">0</span>
             <h2>Your cart is empty</h2>
             <p>Return to the store and add a product before starting checkout.</p>
           </div>
 
-          <div class="panel-actions bag-actions">
+          <div class="panel-actions cart-actions">
             <button class="quiet-button" type="button" id="back-to-store">← Continue shopping</button>
             <button class="primary-button" type="button" id="to-delivery" disabled>Continue to delivery <span>→</span></button>
           </div>
@@ -92,7 +92,7 @@
             </div>
 
             <div class="panel-actions">
-              <button class="quiet-button" type="button" data-go="bag">← Back to cart</button>
+              <button class="quiet-button" type="button" data-go="cart">← Back to cart</button>
               <button class="primary-button" type="submit">See delivery options <span>→</span></button>
             </div>
           </form>
@@ -110,7 +110,7 @@
           </section>
 
           <section class="payment-handoff" id="payment-handoff" aria-labelledby="secure-payment-title">
-            <span class="payment-mark" aria-hidden="true">◆</span>
+            <span class="payment-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="10" rx="2"></rect><path d="M8 10V7a4 4 0 0 1 8 0v3"></path></svg></span>
             <div><h2 id="secure-payment-title">Secure payment</h2><p>Available payment methods will open in the protected payment window.</p></div>
             <b id="payment-provider-label">Midtrans Snap</b>
           </section>
@@ -141,6 +141,6 @@
     </footer>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="cart.js?v=checkout-reboot-3"></script>
+    <script src="cart.js?v=checkout-professional-1"></script>
   </body>
 </html>

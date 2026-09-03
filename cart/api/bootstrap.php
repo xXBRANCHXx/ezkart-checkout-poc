@@ -307,7 +307,7 @@ function ez_catalog(array $requestedIds = []): array
         'sambal' => ['sku' => 'EZK-DEMO-SAMBAL', 'name' => 'Sambal Roa Signature', 'price' => 46000, 'weight' => 260],
     ];
     if ($requestedIds === []) return $demo;
-    $ids = array_values(array_unique(array_filter(array_map('strval', $requestedIds), static fn(string $id): bool => preg_match('/^[a-zA-Z0-9_-]{1,120}$/', $id) === 1)));
+    $ids = array_values(array_unique(array_filter(array_map('strval', $requestedIds), static fn(string $id): bool => preg_match('/^[a-zA-Z0-9][a-zA-Z0-9_-]{2,95}(?:~[a-zA-Z0-9][a-zA-Z0-9_-]{2,95})?$/', $id) === 1)));
     if ($ids === [] || count($ids) > 9) throw new InvalidArgumentException('Request between 1 and 9 valid products.');
     $catalog = [];
     $remoteIds = [];
@@ -327,8 +327,18 @@ function ez_catalog(array $requestedIds = []): array
             $imagePath = trim((string) ($product['imagePath'] ?? ''));
             $catalog[$id] = [
                 'id' => $id,
+                'product_id' => mb_substr(trim((string) ($product['productId'] ?? $id)), 0, 96),
+                'variant_id' => mb_substr(trim((string) ($product['variantId'] ?? '')), 0, 96),
                 'sku' => mb_substr(trim((string) ($product['sku'] ?? '')) ?: 'EZK-' . strtoupper($id), 0, 50),
                 'name' => mb_substr($name, 0, 160),
+                'product_name' => mb_substr(trim((string) ($product['productName'] ?? $name)), 0, 160),
+                'variant_name' => mb_substr(trim((string) ($product['variantName'] ?? '')), 0, 120),
+                'options' => array_values(array_filter(array_map(static function ($option): ?array {
+                    if (!is_array($option)) return null;
+                    $label = mb_substr(trim((string) ($option['option'] ?? '')), 0, 20);
+                    $value = mb_substr(trim((string) ($option['value'] ?? '')), 0, 60);
+                    return $label !== '' && $value !== '' ? ['label' => $label, 'value' => $value] : null;
+                }, is_array($product['options'] ?? null) ? $product['options'] : []))),
                 'description' => mb_substr(trim((string) ($product['description'] ?? '')), 0, 500),
                 'type' => 'physical',
                 'price' => $price,

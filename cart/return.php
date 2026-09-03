@@ -16,13 +16,13 @@ if (preg_match('/^EZK-[A-Z0-9-]{8,70}$/', $orderId) !== 1) {
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="cart.css?v=checkout-reboot-3">
+  <link rel="stylesheet" href="cart.css?v=checkout-professional-1">
   <title>Order status · Ezkart</title>
 </head>
 <body>
   <header class="checkout-header">
     <a class="brand" href="../" aria-label="Ezkart home"><img src="../assets/ezkart-logo.svg" alt="Ezkart"></a>
-    <div class="header-security"><span class="lock-mark" aria-hidden="true">✓</span><span><b>Secure checkout</b><small>Protected order status</small></span></div>
+    <div class="header-security"><span class="lock-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="10" rx="2"></rect><path d="M8 10V7a4 4 0 0 1 8 0v3"></path></svg></span><span><b>Secure checkout</b><small>Protected order status</small></span></div>
   </header>
   <main class="return-shell" data-order="<?= htmlspecialchars($orderId, ENT_QUOTES, 'UTF-8') ?>">
     <section class="success-card return-card">

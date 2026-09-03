@@ -350,42 +350,79 @@ async function storefrontProducts(url, env) {
   if (requested.length < 1 || requested.length > 9) {
     throw new Response("Request between 1 and 9 products", { status: 400 });
   }
-  const ids = [...new Set(requested.map((id) => cleanId(id, "Product ID")))];
-  const productResults = await env.DB.batch(ids.map((id) => env.DB.prepare(`
+  const selections = [...new Set(requested)].map((selectionId) => {
+    const parts = selectionId.split("~");
+    if (parts.length > 2) throw new Response("Product selection is invalid", { status: 400 });
+    return {
+      selectionId,
+      productId: cleanId(parts[0], "Product ID"),
+      variantId: parts[1] ? cleanId(parts[1], "Variant ID") : "",
+    };
+  });
+  const productIds = [...new Set(selections.map((selection) => selection.productId))];
+  const [productResults, variantResults, mediaResults] = await Promise.all([
+    env.DB.batch(productIds.map((id) => env.DB.prepare(`
     SELECT p.id, p.seller_id, p.type, p.title, p.description, p.sku, p.currency,
       p.price_amount, p.stock_quantity, p.weight_grams, p.metadata_json
     FROM products p
     JOIN sellers s ON s.id = p.seller_id
     WHERE p.id = ? AND p.status = 'active' AND s.status = 'active'
     LIMIT 1
-  `).bind(id)));
-  const rows = productResults.map((result) => result.results?.[0]).filter(Boolean);
-  if (!rows.length) return [];
-  const mediaResults = await env.DB.batch(rows.map((row) => env.DB.prepare(`
-    SELECT id, alt_text
+  `).bind(id))),
+    env.DB.batch(productIds.map((id) => env.DB.prepare(`
+      SELECT id, product_id, name, options_json, sku, price_amount, stock_quantity,
+        weight_grams, image_upload_id, sort_order
+      FROM product_variants
+      WHERE product_id = ?
+      ORDER BY sort_order
+    `).bind(id))),
+    env.DB.batch(productIds.map((id) => env.DB.prepare(`
+    SELECT id, product_id, alt_text
     FROM product_media
-    WHERE seller_id = ? AND product_id = ?
+    WHERE product_id = ?
     ORDER BY sort_order
     LIMIT 1
-  `).bind(row.seller_id, row.id)));
-  return rows.map((row, index) => {
+  `).bind(id))),
+  ]);
+  const products = new Map(productResults.map((result) => result.results?.[0]).filter(Boolean).map((row) => [row.id, row]));
+  const variants = new Map(productIds.map((id, index) => [id, (variantResults[index]?.results || []).filter((variant) => {
+    const storedOptions = parseJson(variant.options_json, []);
+    return Array.isArray(storedOptions) || !storedOptions.hidden;
+  })]));
+  const media = new Map(mediaResults.map((result) => result.results?.[0]).filter(Boolean).map((row) => [row.product_id, row]));
+  return selections.map((selection) => {
+    const row = products.get(selection.productId);
+    if (!row) return null;
+    const availableVariants = variants.get(row.id) || [];
+    const variant = selection.variantId
+      ? availableVariants.find((item) => item.id === selection.variantId)
+      : availableVariants[0] || null;
+    if (selection.variantId && !variant) return null;
     const metadata = parseJson(row.metadata_json, {});
-    const media = mediaResults[index]?.results?.[0] || null;
+    const storedOptions = variant ? parseJson(variant.options_json, []) : [];
+    const options = Array.isArray(storedOptions) ? storedOptions : Array.isArray(storedOptions.values) ? storedOptions.values : [];
+    const mainMedia = media.get(row.id) || null;
+    const imageId = variant?.image_upload_id || mainMedia?.id || "";
     return {
-      id: row.id,
+      id: selection.selectionId,
+      productId: row.id,
+      variantId: variant?.id || "",
       type: row.type,
-      name: row.title,
+      name: variant ? `${row.title} — ${variant.name}` : row.title,
+      productName: row.title,
+      variantName: variant?.name || "",
+      options,
       description: row.description || "",
-      sku: row.sku || "",
+      sku: variant?.sku || row.sku || "",
       currency: row.currency,
-      price: Number(row.price_amount || 0),
-      stock: row.stock_quantity === null ? null : Number(row.stock_quantity),
-      weightGrams: row.weight_grams === null ? null : Number(row.weight_grams),
+      price: Number(variant?.price_amount ?? row.price_amount ?? 0),
+      stock: (variant?.stock_quantity ?? row.stock_quantity) === null ? null : Number(variant?.stock_quantity ?? row.stock_quantity),
+      weightGrams: (variant?.weight_grams ?? row.weight_grams) === null ? null : Number(variant?.weight_grams ?? row.weight_grams),
       category: cleanText(metadata.category, 80),
-      imagePath: media ? `/v1/public/media/${encodeURIComponent(media.id)}` : "",
-      imageAlt: media?.alt_text || row.title,
+      imagePath: imageId ? `/v1/public/media/${encodeURIComponent(imageId)}` : "",
+      imageAlt: variant?.name ? `${row.title} — ${variant.name}` : mainMedia?.alt_text || row.title,
     };
-  });
+  }).filter(Boolean);
 }
 
 const landingPagePrefix = (sellerId) => `sellers/${sellerId}/landing-pages/`;
