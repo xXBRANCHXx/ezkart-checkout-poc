@@ -330,7 +330,7 @@
       showToast(message);
     } finally {
       button.disabled = false;
-      button.innerHTML = 'Update delivery options <span class="arrow-icon arrow-right" aria-hidden="true"></span>';
+      button.textContent = "Update delivery options";
       renderTotals();
     }
   }
