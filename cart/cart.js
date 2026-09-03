@@ -6,7 +6,7 @@
     cart: {},
     customer: {},
     shipping: null,
-    step: "cart",
+    step: "confirm",
     loaded: false,
   };
 
@@ -34,6 +34,31 @@
     showToast.timer = window.setTimeout(() => toast.classList.remove("visible"), 2400);
   }
 
+  function applyMerchantBrand() {
+    const params = new URLSearchParams(window.location.search);
+    const stored = (() => {
+      try { return JSON.parse(sessionStorage.getItem("ezkart.checkout.brand") || "{}"); }
+      catch (_) { return {}; }
+    })();
+    const name = String(params.get("brand") || stored.name || "Store").trim().slice(0, 80) || "Store";
+    const requestedLogo = String(params.get("logo") || stored.logo || "").trim();
+    let logo = "";
+    try {
+      const url = new URL(requestedLogo);
+      if (["https:", "http:"].includes(url.protocol) && requestedLogo.length <= 1800) logo = url.href;
+    } catch (_) {}
+    try { sessionStorage.setItem("ezkart.checkout.brand", JSON.stringify({ name, logo })); } catch (_) {}
+    el("merchant-name").textContent = name;
+    const image = el("merchant-logo");
+    if (logo) {
+      image.src = logo;
+      image.alt = `${name} logo`;
+      image.hidden = false;
+      el("merchant-name").hidden = true;
+    }
+    document.title = `${name} checkout`;
+  }
+
   function requestedCart() {
     const params = new URLSearchParams(window.location.search);
     const cart = {};
@@ -55,7 +80,7 @@
     el("catalog-error").hidden = true;
     el("cart-items").hidden = true;
     el("empty-cart").hidden = true;
-    el("to-delivery").disabled = true;
+    el("to-checkout").disabled = true;
     if (!ids.length) {
       state.products = {};
       state.cart = {};
@@ -88,14 +113,21 @@
       el("catalog-loading").hidden = true;
       el("catalog-error").hidden = false;
       el("catalog-error-message").textContent = error instanceof Error ? error.message : "Please try again.";
-      el("summary-items").innerHTML = '<div class="summary-item"><div class="summary-thumb">!</div><div><b>Order unavailable</b><small>Try loading it again</small></div></div>';
     }
   }
 
-  function productImage(product, className) {
+  function productImage(product) {
     return product.image_url
       ? `<img src="${escapeHtml(product.image_url)}" alt="${escapeHtml(product.image_alt || product.name)}" />`
-      : `<span class="${className}" aria-hidden="true">EZ</span>`;
+      : '<span class="product-placeholder" aria-hidden="true">EZ</span>';
+  }
+
+  function renderTotals() {
+    el("cart-subtotal").textContent = money(subtotal());
+    el("checkout-subtotal").textContent = money(subtotal());
+    el("shipping-total").textContent = state.shipping ? money(shippingPrice()) : "Not selected";
+    el("grand-total").textContent = money(total());
+    if (state.shipping) el("pay-button").textContent = `Pay ${money(total())}`;
   }
 
   function renderCart() {
@@ -103,14 +135,14 @@
     const count = itemCount();
     el("cart-items").hidden = !state.loaded || !entries.length;
     el("empty-cart").hidden = !state.loaded || Boolean(entries.length);
-    el("to-delivery").disabled = !entries.length;
-    el("summary-count").textContent = `${count} ${count === 1 ? "item" : "items"}`;
+    el("to-checkout").disabled = !entries.length;
+    el("cart-count").textContent = `${count} ${count === 1 ? "item" : "items"}`;
 
     el("cart-items").innerHTML = entries.map(([id, quantity]) => {
       const product = state.products[id];
       const remaining = Number(product.stock ?? 9);
       return `<article class="cart-item" data-cart-id="${escapeHtml(id)}">
-        <div class="cart-item-media">${productImage(product, "product-placeholder")}</div>
+        <div class="cart-item-media">${productImage(product)}</div>
         <div class="cart-item-copy">
           <h2>${escapeHtml(product.product_name || product.name)}</h2>
           ${product.variant_name ? `<p class="cart-item-variant">${escapeHtml(product.variant_name)}</p>` : ""}
@@ -127,20 +159,7 @@
         <strong class="cart-item-price">${money(product.price * quantity)}</strong>
       </article>`;
     }).join("");
-
-    el("summary-items").innerHTML = entries.length ? entries.map(([id, quantity]) => {
-      const product = state.products[id];
-      return `<div class="summary-item">
-        ${productImage(product, "summary-thumb")}
-        <div><b>${escapeHtml(product.product_name || product.name)}</b><small>${product.variant_name ? `${escapeHtml(product.variant_name)} · ` : ""}Qty ${quantity}</small></div>
-        <strong>${money(product.price * quantity)}</strong>
-      </div>`;
-    }).join("") : '<div class="summary-item"><div class="summary-thumb">0</div><div><b>Your cart is empty</b><small>Add an item to continue</small></div></div>';
-
-    el("subtotal").textContent = money(subtotal());
-    el("shipping-total").textContent = state.shipping ? money(shippingPrice()) : "Calculated next";
-    el("grand-total").textContent = money(total());
-    if (state.shipping) el("pay-button").textContent = `Pay ${money(total())}`;
+    renderTotals();
   }
 
   function changeQuantity(id, change) {
@@ -155,17 +174,13 @@
   }
 
   function setStep(step) {
-    if (!['cart', 'delivery', 'payment'].includes(step)) return;
+    if (!["confirm", "checkout"].includes(step)) return;
     state.step = step;
-    const steps = ['cart', 'delivery', 'payment'];
-    const activeIndex = steps.indexOf(step);
     document.querySelectorAll("[data-panel]").forEach((panel) => panel.classList.toggle("active", panel.dataset.panel === step));
-    document.querySelectorAll("[data-progress]").forEach((item, index) => {
-      item.classList.toggle("active", index === activeIndex);
-      item.classList.toggle("done", index < activeIndex);
-      item.setAttribute("aria-current", index === activeIndex ? "step" : "false");
-    });
+    const heading = document.querySelector(`[data-panel="${step}"] h1`);
     window.scrollTo({ top: 0, behavior: "smooth" });
+    heading?.setAttribute("tabindex", "-1");
+    heading?.focus({ preventScroll: true });
   }
 
   function validateForm(form) {
@@ -186,11 +201,15 @@
   }
 
   async function buildShippingQuotes() {
+    const rateButton = el("get-rates");
     state.shipping = null;
     el("pay-button").disabled = true;
-    el("pay-button").textContent = "Choose delivery first";
+    el("pay-button").textContent = "Select a delivery option";
     el("quote-location").textContent = `${state.customer.location} · ${state.customer.postalCode}`;
     el("shipping-options").innerHTML = '<div class="quote-state"><i aria-hidden="true"></i><b>Finding delivery options</b><small>Live rates are based on your postcode and the total package weight.</small></div>';
+    rateButton.disabled = true;
+    rateButton.textContent = "Loading delivery options…";
+    renderTotals();
     try {
       const response = await fetch("api/rates.php", {
         method: "POST",
@@ -215,7 +234,10 @@
       el("shipping-options").innerHTML = `<div class="quote-state error"><b>Couldn’t load delivery options</b><small>${escapeHtml(message)}</small><button type="button" data-retry-rates>Try again</button></div>`;
       el("shipping-options").querySelector("[data-retry-rates]")?.addEventListener("click", buildShippingQuotes);
       showToast(message);
-      renderCart();
+    } finally {
+      rateButton.disabled = false;
+      rateButton.textContent = "Update delivery options";
+      renderTotals();
     }
   }
 
@@ -223,7 +245,7 @@
     if (!quote) return;
     state.shipping = quote;
     el("pay-button").disabled = false;
-    renderCart();
+    renderTotals();
   }
 
   async function ensureSnap() {
@@ -234,7 +256,6 @@
       const payload = await response.json().catch(() => ({}));
       const expected = payload.environment === "production" ? "https://app.midtrans.com/snap/snap.js" : "https://app.sandbox.midtrans.com/snap/snap.js";
       if (!response.ok || !payload.client_key || payload.snap_url !== expected) throw new Error(payload.error || "Secure payment is not configured.");
-      el("checkout-mode").textContent = payload.environment === "production" ? "Live payment" : "Test payment";
       await new Promise((resolve, reject) => {
         const script = document.createElement("script");
         script.src = payload.snap_url;
@@ -281,6 +302,11 @@
     }
   }
 
+  const returnToStore = () => {
+    if (window.history.length > 1) window.history.back();
+    else window.location.assign("../");
+  };
+
   el("cart-items").addEventListener("click", (event) => {
     const row = event.target.closest("[data-cart-id]");
     if (!row) return;
@@ -288,23 +314,21 @@
     const quantity = event.target.closest("[data-quantity]");
     if (quantity) changeQuantity(row.dataset.cartId, quantity.dataset.quantity === "plus" ? 1 : -1);
   });
-  el("to-delivery").addEventListener("click", () => { if (itemCount()) setStep("delivery"); });
+  el("to-checkout").addEventListener("click", () => { if (itemCount()) setStep("checkout"); });
   document.querySelectorAll("[data-go]").forEach((button) => button.addEventListener("click", () => setStep(button.dataset.go)));
   el("customer-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     const result = validateForm(event.currentTarget);
     if (!result.valid) { event.currentTarget.querySelector(".invalid")?.focus(); return; }
     state.customer = result.values;
-    setStep("payment");
     await buildShippingQuotes();
   });
   el("pay-button").addEventListener("click", startPayment);
   el("retry-catalog").addEventListener("click", loadCatalog);
-  el("back-to-store").addEventListener("click", () => {
-    if (window.history.length > 1) window.history.back();
-    else window.location.assign("../");
-  });
+  el("back-to-store").addEventListener("click", returnToStore);
+  el("merchant-home").addEventListener("click", returnToStore);
 
   el("year").textContent = new Date().getFullYear();
+  applyMerchantBrand();
   loadCatalog();
 })();

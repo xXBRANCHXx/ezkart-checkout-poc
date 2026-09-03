@@ -16,13 +16,13 @@ if (preg_match('/^EZK-[A-Z0-9-]{8,70}$/', $orderId) !== 1) {
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="cart.css?v=checkout-professional-1">
+  <link rel="stylesheet" href="cart.css?v=checkout-confirmation-1">
   <title>Order status · Ezkart</title>
 </head>
 <body>
   <header class="checkout-header">
-    <a class="brand" href="../" aria-label="Ezkart home"><img src="../assets/ezkart-logo.svg" alt="Ezkart"></a>
-    <div class="header-security"><span class="lock-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="10" rx="2"></rect><path d="M8 10V7a4 4 0 0 1 8 0v3"></path></svg></span><span><b>Secure checkout</b><small>Protected order status</small></span></div>
+    <div class="merchant-brand"><img id="merchant-logo-return" alt="" referrerpolicy="no-referrer" hidden><span id="merchant-name-return">Store</span></div>
+    <div class="security-badge"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 19 6v5c0 4.6-2.9 8.3-7 10-4.1-1.7-7-5.4-7-10V6l7-3Z"></path><path d="m9 12 2 2 4-4"></path></svg><span>Secure checkout by Ezkart</span></div>
   </header>
   <main class="return-shell" data-order="<?= htmlspecialchars($orderId, ENT_QUOTES, 'UTF-8') ?>">
     <section class="success-card return-card">
@@ -41,6 +41,18 @@ if (preg_match('/^EZK-[A-Z0-9-]{8,70}$/', $orderId) !== 1) {
   </main>
   <script>
     (() => {
+      try {
+        const brand = JSON.parse(sessionStorage.getItem('ezkart.checkout.brand') || '{}');
+        const name = String(brand.name || 'Store').slice(0, 80);
+        document.getElementById('merchant-name-return').textContent = name;
+        if (brand.logo && /^https?:\/\//i.test(brand.logo)) {
+          const image = document.getElementById('merchant-logo-return');
+          image.src = brand.logo;
+          image.alt = `${name} logo`;
+          image.hidden = false;
+          document.getElementById('merchant-name-return').hidden = true;
+        }
+      } catch (_) {}
       const shell = document.querySelector('.return-shell');
       const order = shell.dataset.order;
       const money = new Intl.NumberFormat('id-ID', { style:'currency', currency:'IDR', maximumFractionDigits:0 });
