@@ -4,14 +4,14 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Review your order, choose delivery, and complete secure payment with Ezkart." />
-    <meta name="theme-color" content="#f4f1eb" />
+    <meta name="theme-color" content="#f7f8fc" />
     <meta name="robots" content="noindex,nofollow" />
     <link rel="canonical" href="https://ezkart.id/cart/" />
     <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="cart.css?v=fresh-checkout-1" />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="cart.css?v=checkout-reboot-2" />
     <title>Secure checkout · Ezkart</title>
   </head>
   <body>
@@ -22,7 +22,7 @@
         <img src="../assets/ezkart-logo.svg" alt="Ezkart" width="1020" height="420" />
       </a>
       <div class="header-security">
-        <span class="lock-mark" aria-hidden="true">✓</span>
+        <span class="lock-mark" aria-hidden="true">⌁</span>
         <span><b>Secure checkout</b><small id="checkout-mode">Protected payment</small></span>
       </div>
     </header>
@@ -31,7 +31,7 @@
       <section class="checkout-flow" aria-live="polite">
         <nav class="checkout-progress" aria-label="Checkout progress">
           <ol>
-            <li class="active" data-progress="bag"><span>1</span><b>Review</b></li>
+            <li class="active" data-progress="bag"><span>1</span><b>Your bag</b></li>
             <li data-progress="delivery"><span>2</span><b>Delivery</b></li>
             <li data-progress="payment"><span>3</span><b>Payment</b></li>
           </ol>
@@ -40,8 +40,8 @@
         <section class="checkout-panel active" data-panel="bag" aria-labelledby="bag-title">
           <header class="panel-heading">
             <p>Step 1 of 3</p>
-            <h1 id="bag-title">Review your bag</h1>
-            <span>Check your items and quantities before continuing.</span>
+            <h1 id="bag-title">Everything look good?</h1>
+            <span>Check your picks, then tell us where they’re going.</span>
           </header>
 
           <div class="catalog-loading" id="catalog-loading" role="status">
@@ -133,7 +133,7 @@
           <div><dt>Delivery</dt><dd id="shipping-total">Calculated next</dd></div>
           <div><dt>Total</dt><dd id="grand-total">Rp0</dd></div>
         </dl>
-        <div class="summary-assurance"><span aria-hidden="true">✓</span><p><b>Your payment details stay private</b>Ezkart never receives your card number, PIN, OTP, or banking password.</p></div>
+        <div class="summary-assurance"><span aria-hidden="true">✓</span><p><b>Safe from cart to doorstep</b>Your payment details stay private and your delivery is tracked.</p></div>
       </aside>
     </main>
 
@@ -144,6 +144,6 @@
     </footer>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="cart.js?v=fresh-checkout-1"></script>
+    <script src="cart.js?v=checkout-reboot-2"></script>
   </body>
 </html>
