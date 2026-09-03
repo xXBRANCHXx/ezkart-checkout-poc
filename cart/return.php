@@ -20,10 +20,6 @@ if (preg_match('/^EZK-[A-Z0-9-]{8,70}$/', $orderId) !== 1) {
 <body class="return-page">
   <header class="checkout-header">
     <div class="header-inner">
-      <div class="return-header-brand">
-        <img src="../assets/ezkart-logo.svg" alt="Ezkart" width="1020" height="420">
-        <span>Order confirmation</span>
-      </div>
       <div class="merchant-brand">
         <span class="merchant-avatar" id="merchant-avatar-return" aria-hidden="true">S</span>
         <img id="merchant-logo-return" alt="" referrerpolicy="no-referrer" hidden>
@@ -35,7 +31,6 @@ if (preg_match('/^EZK-[A-Z0-9-]{8,70}$/', $orderId) !== 1) {
   <main class="return-shell" data-order="<?= htmlspecialchars($orderId, ENT_QUOTES, 'UTF-8') ?>">
     <section class="return-card">
       <div class="success-icon" id="return-icon" aria-hidden="true">···</div>
-      <p class="eyebrow" id="return-eyebrow">Checking order</p>
       <h1 id="return-title">Confirming your payment</h1>
       <p id="return-message">We’re securely checking your payment status. Please keep this page open.</p>
       <div class="success-details">
@@ -110,7 +105,6 @@ if (preg_match('/^EZK-[A-Z0-9-]{8,70}$/', $orderId) !== 1) {
           if (data.status === 'PAID') {
             shell.classList.add('confirmed');
             document.getElementById('return-icon').textContent = '✓';
-            document.getElementById('return-eyebrow').textContent = 'Order received';
             document.getElementById('return-title').textContent = 'Payment confirmed';
             if (data.fulfillment_status === 'CONFIRMED') {
               const firstName = String(data.customer_name || '').split(' ')[0];
@@ -122,7 +116,6 @@ if (preg_match('/^EZK-[A-Z0-9-]{8,70}$/', $orderId) !== 1) {
 
           if (data.status === 'FAILED') {
             document.getElementById('return-icon').textContent = '×';
-            document.getElementById('return-eyebrow').textContent = 'Payment incomplete';
             document.getElementById('return-title').textContent = 'Payment wasn’t completed';
             document.getElementById('return-message').textContent = 'The payment was declined, expired, or cancelled. You can return to checkout and try again.';
             return;

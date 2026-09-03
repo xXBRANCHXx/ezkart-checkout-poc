@@ -21,10 +21,6 @@
           <img id="merchant-logo" alt="" referrerpolicy="no-referrer" hidden />
           <span class="merchant-copy"><small>Checkout for</small><strong id="merchant-name">Store</strong></span>
         </button>
-        <a class="ezkart-brand" href="../" aria-label="Ezkart home">
-          <span>Secure checkout by</span>
-          <img src="../assets/ezkart-logo.svg" alt="Ezkart" width="1020" height="420" />
-        </a>
       </div>
     </header>
 
@@ -41,7 +37,6 @@
         <div class="checkout-content">
           <section class="checkout-panel active" data-panel="confirm" aria-labelledby="cart-title">
             <header class="page-heading">
-              <p class="eyebrow">Your order</p>
               <h1 id="cart-title">Review your cart</h1>
               <p>Check your items and quantities before continuing.</p>
             </header>
@@ -63,13 +58,12 @@
               <button class="outline-button" type="button" id="empty-back-to-store">Return to store</button>
             </div>
 
-            <button class="text-button continue-shopping" type="button" id="back-to-store"><span aria-hidden="true">←</span> Continue shopping</button>
+            <button class="text-button continue-shopping" type="button" id="back-to-store"><span class="arrow-icon arrow-left" aria-hidden="true"></span> Continue shopping</button>
           </section>
 
           <section class="checkout-panel" data-panel="checkout" aria-labelledby="checkout-title">
-            <button class="text-button back-to-cart" type="button" data-go="confirm"><span aria-hidden="true">←</span> Back to cart</button>
+            <button class="text-button back-to-cart" type="button" data-go="confirm"><span class="arrow-icon arrow-left" aria-hidden="true"></span> Back to cart</button>
             <header class="page-heading">
-              <p class="eyebrow">Almost there</p>
               <h1 id="checkout-title">Delivery & payment</h1>
               <p>Tell us where to send your order, then choose the delivery option that works for you.</p>
             </header>
@@ -98,7 +92,7 @@
                   <label><span>Postcode</span><input name="postalCode" inputmode="numeric" autocomplete="postal-code" placeholder="12345" required maxlength="5" /><small class="field-error"></small></label>
                   <label><span>Courier note <em>Optional</em></span><input name="note" placeholder="Leave with reception" maxlength="120" /><small class="field-error"></small></label>
                 </div>
-                <button class="outline-button rate-button" id="get-rates" type="submit">Find delivery options <span aria-hidden="true">→</span></button>
+                <button class="outline-button rate-button" id="get-rates" type="submit">Find delivery options <span class="arrow-icon arrow-right" aria-hidden="true"></span></button>
               </section>
 
               <section class="form-card delivery-card" aria-labelledby="shipping-title">
@@ -111,28 +105,24 @@
                 </div>
               </section>
 
-              <section class="payment-message" aria-labelledby="payment-title">
-                <span class="payment-check" aria-hidden="true">✓</span>
-                <div><h2 id="payment-title">Choose payment securely</h2><p>After confirming the order, you’ll choose from the available payment methods in a protected window.</p></div>
-              </section>
             </form>
           </section>
         </div>
 
         <aside class="order-summary" aria-labelledby="summary-title">
           <div class="summary-card">
-            <header><div><p class="eyebrow">Summary</p><h2 id="summary-title">Your order</h2></div><span id="cart-count">0 items</span></header>
+            <header><h2 id="summary-title">Your order</h2><span id="cart-count">0 items</span></header>
             <div class="summary-items" id="summary-items"></div>
             <dl class="checkout-totals">
               <div><dt>Subtotal</dt><dd id="cart-subtotal">Rp0</dd></div>
               <div><dt>Delivery</dt><dd id="shipping-total">Calculated next</dd></div>
               <div class="total-row"><dt>Total</dt><dd id="grand-total">Rp0</dd></div>
             </dl>
-            <button class="primary-button" type="button" id="to-checkout" disabled>Continue to checkout <span aria-hidden="true">→</span></button>
+            <button class="primary-button" type="button" id="to-checkout" disabled>Continue to checkout <span class="arrow-icon arrow-right" aria-hidden="true"></span></button>
             <button class="primary-button" type="button" id="pay-button" disabled hidden>Choose a delivery method</button>
-            <p class="summary-note"><span aria-hidden="true">✓</span> Your payment details are encrypted and secure.</p>
+            <p class="summary-note">Secure checkout by Ezkart</p>
           </div>
-          <div class="support-note"><span>Need help?</span><a href="../docs/Ezkart-Customer-Checkout-Guide.pdf">View checkout guide <span aria-hidden="true">↗</span></a></div>
+          <div class="support-note"><span>Need help?</span><a href="../docs/Ezkart-Customer-Checkout-Guide.pdf">View checkout guide <span class="arrow-icon arrow-up-right" aria-hidden="true"></span></a></div>
         </aside>
       </div>
     </main>

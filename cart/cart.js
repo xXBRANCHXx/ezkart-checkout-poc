@@ -90,7 +90,10 @@
     const requested = {};
     (params.get("cart") || "").split(",").forEach((entry) => {
       const match = entry.trim().match(/^([a-z0-9][a-z0-9_-]{2,95}(?:~[a-z0-9][a-z0-9_-]{2,95})?):(\d+)$/i);
-      if (match) requested[match[1]] = Math.max(1, Math.min(9, Number(match[2]) || 1));
+      if (match) {
+        const quantity = Number(match[2]);
+        requested[match[1]] = Number.isSafeInteger(quantity) && quantity > 0 ? quantity : 1;
+      }
     });
     if (!Object.keys(requested).length) {
       (params.get("products") || "")
@@ -135,11 +138,9 @@
         throw new Error("A selected product is no longer available.");
       }
 
-      let remainingCapacity = 9;
       state.cart = Object.fromEntries(ids.map((id) => {
-        const stock = Math.max(0, Number(state.products[id].stock ?? 9));
-        const quantity = Math.min(requested[id], stock, remainingCapacity);
-        remainingCapacity -= quantity;
+        const stock = Math.max(0, Number(state.products[id].stock ?? Number.MAX_SAFE_INTEGER));
+        const quantity = Math.min(requested[id], stock);
         return [id, quantity];
       }).filter(([, quantity]) => quantity > 0));
       state.loaded = true;
@@ -192,18 +193,14 @@
 
   function renderCart() {
     const entries = cartEntries();
-    const count = itemCount();
     byId("cart-items").hidden = !state.loaded || !entries.length;
     byId("empty-cart").hidden = !state.loaded || Boolean(entries.length);
     byId("to-checkout").disabled = !entries.length;
 
     byId("cart-items").innerHTML = entries.map(([id, quantity]) => {
       const product = state.products[id];
-      const stock = Math.max(0, Number(product.stock ?? 9));
-      const details = [
-        product.variant_name,
-        Number(product.weight) > 0 ? `${Number(product.weight)} g` : "",
-      ].filter(Boolean).join(" · ") || "Ready to ship";
+      const stock = Math.max(0, Number(product.stock ?? Number.MAX_SAFE_INTEGER));
+      const details = Number(product.weight) > 0 ? `${Number(product.weight)} g` : "Ready to ship";
 
       return `<article class="cart-item" data-cart-id="${escapeHtml(id)}">
         <div class="cart-item-media">${productImage(product)}</div>
@@ -215,7 +212,7 @@
             <div class="quantity-control" aria-label="Quantity for ${escapeHtml(productTitle(product))}">
               <button type="button" data-quantity="minus" aria-label="Decrease quantity">−</button>
               <output aria-label="Quantity">${quantity}</output>
-              <button type="button" data-quantity="plus" aria-label="Increase quantity" ${quantity >= Math.min(stock, 9) || count >= 9 ? "disabled" : ""}>+</button>
+              <button type="button" data-quantity="plus" aria-label="Increase quantity" ${quantity >= stock ? "disabled" : ""}>+</button>
             </div>
             <button class="remove-item" type="button" data-remove>Remove</button>
           </div>
@@ -237,8 +234,7 @@
   function changeQuantity(id, change) {
     const product = state.products[id];
     if (!product) return;
-    const otherItems = itemCount() - (state.cart[id] || 0);
-    const maximum = Math.min(9 - otherItems, Math.max(0, Number(product.stock ?? 9)));
+    const maximum = Math.max(0, Number(product.stock ?? Number.MAX_SAFE_INTEGER));
     state.cart[id] = Math.max(0, Math.min(maximum, (state.cart[id] || 0) + change));
     if (!state.cart[id]) delete state.cart[id];
     resetDelivery();
@@ -334,7 +330,7 @@
       showToast(message);
     } finally {
       button.disabled = false;
-      button.innerHTML = 'Update delivery options <span aria-hidden="true">→</span>';
+      button.innerHTML = 'Update delivery options <span class="arrow-icon arrow-right" aria-hidden="true"></span>';
       renderTotals();
     }
   }

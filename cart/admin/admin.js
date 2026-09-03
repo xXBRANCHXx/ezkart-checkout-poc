@@ -2399,9 +2399,9 @@
     const productNames = { granola: "Granola Madu Nusantara", coffee: "Kopi Susu Concentrate", sambal: "Sambal Roa Signature" };
     const productImages = { granola: "assets/products/granola.webp", coffee: "assets/products/kopi-susu.webp", sambal: "assets/products/sambal-roa.webp" };
     const productMeta = {
-      granola: { type: "physical", weightGrams: 320, images: ["assets/products/granola.webp"] },
-      coffee: { type: "physical", weightGrams: 650, images: ["assets/products/kopi-susu.webp"] },
-      sambal: { type: "physical", weightGrams: 260, images: ["assets/products/sambal-roa.webp"] },
+      granola: { type: "physical", stock: 46, weightGrams: 320, images: ["assets/products/granola.webp"] },
+      coffee: { type: "physical", stock: 28, weightGrams: 650, images: ["assets/products/kopi-susu.webp"] },
+      sambal: { type: "physical", stock: 34, weightGrams: 260, images: ["assets/products/sambal-roa.webp"] },
     };
     const sectionNames = { announcement: "Announcement", navigation: "Navigation", hero: "Hero", products: "Product collection", "image-story": "Image story", benefits: "Benefits", checkout: "Checkout", shipping: "Shipping" };
     const undoStack = [];
@@ -4838,7 +4838,7 @@
       productPrices[id] = price;
       productImages[id] = imageUrl;
       const variants = Array.isArray(product.variants) ? product.variants.filter((variant) => !variant.hidden).slice(0, 100) : [];
-      productMeta[id] = { type, images, ...(variants.length ? { options: Array.isArray(product.options) ? product.options : [], variants } : {}), ...(type === "physical" ? { weightGrams: Math.max(1, Number(product.weightGrams) || 1) } : {}), ...(type === "digital" ? { digitalFileName: String(product.digitalFileName || "") } : {}), ...(type === "subscription" ? { subscription: { interval: Math.max(1, Number(product.subscription?.interval) || 1), unit: product.subscription?.unit || "month" } } : {}) };
+      productMeta[id] = { type, images, ...(variants.length ? { options: Array.isArray(product.options) ? product.options : [], variants } : {}), ...(type === "physical" ? { stock: Math.max(0, Number(product.stock) || 0), weightGrams: Math.max(1, Number(product.weightGrams) || 1) } : {}), ...(type === "digital" ? { digitalFileName: String(product.digitalFileName || "") } : {}), ...(type === "subscription" ? { subscription: { interval: Math.max(1, Number(product.subscription?.interval) || 1), unit: product.subscription?.unit || "month" } } : {}) };
 
       const picker = sqStudio.querySelector(".sq-product-picker");
       let input = picker?.querySelector(`[data-sq-product][value="${CSS.escape(id)}"]`);
@@ -5276,6 +5276,17 @@
       const products = selectedProducts();
       const url = new URL("../", window.location.href);
       url.searchParams.set("products", products.join(","));
+      const brandElement = previewRoot.querySelector(".sq-site-logo");
+      const brandImage = brandElement?.querySelector("img[src]:not([hidden])");
+      const brandName = (brandElement?.querySelector("b")?.textContent
+        || brandImage?.getAttribute("alt")
+        || document.querySelector("[data-current-site-name]")?.textContent
+        || "Store").trim().slice(0, 80);
+      if (brandName) url.searchParams.set("brand", brandName);
+      if (brandImage) {
+        const logo = new URL(brandImage.getAttribute("src"), window.location.href).href;
+        if (/^https?:\/\//i.test(logo) && logo.length <= 1800) url.searchParams.set("logo", logo);
+      }
       window.open(url.href, "_blank", "noopener");
     });
 
@@ -7090,11 +7101,13 @@
         return [id, {
           name: productNames[id] || card?.querySelector("h3")?.textContent.trim() || id,
           price: Math.max(0, Number(productPrices[id]) || 0),
+          stock: productMeta[id]?.type === "physical" ? Math.max(0, Number(productMeta[id]?.stock) || 0) : null,
           image: baseImage,
           variants: (Array.isArray(productMeta[id]?.variants) ? productMeta[id].variants : []).filter((variant) => !variant.hidden).map((variant) => ({
             id: variant.id,
             name: variant.name,
             price: Math.max(0, Number(variant.price) || 0),
+            stock: productMeta[id]?.type === "physical" ? Math.max(0, Number(variant.stock) || 0) : null,
             image: variant.image || baseImage,
             options: Array.isArray(variant.options) ? variant.options : [],
           })),
@@ -7110,14 +7123,14 @@ body.ezkart-cart-open{overflow:hidden}.ezkart-cart-trigger{min-height:44px;paddi
 const catalog=${catalogJson},storefrontBrand=${brandJson},storageKey='ezkart.storefront.cart.v2:'+location.pathname,money=value=>'Rp'+new Intl.NumberFormat('id-ID').format(value),escapeHtml=value=>String(value).replace(/[&<>'"]/g,character=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[character]));
 const selectionId=(productId,variantId='')=>variantId?productId+'~'+variantId:productId,lineProduct=lineId=>{const [productId,variantId='']=String(lineId).split('~'),base=catalog[productId];if(!base)return null;const variants=Array.isArray(base.variants)?base.variants:[],variant=variantId?variants.find(item=>item.id===variantId):variants[0]||null;if(variantId&&!variant)return null;return{...base,...(variant||{}),name:variant?base.name+' — '+variant.name:base.name,productId,variantId:variant?.id||''}};
 let cart={};
-try{const saved=JSON.parse(localStorage.getItem(storageKey)||'{}');cart=Object.fromEntries(Object.entries(saved).filter(([id,quantity])=>lineProduct(id)&&Number.isInteger(quantity)&&quantity>0&&quantity<=9))}catch(_){}
+try{const saved=JSON.parse(localStorage.getItem(storageKey)||'{}');cart=Object.fromEntries(Object.entries(saved).filter(([id,quantity])=>{const product=lineProduct(id),stock=product?.stock==null?Number.MAX_SAFE_INTEGER:Number(product.stock);return product&&Number.isInteger(quantity)&&quantity>0&&(!Number.isFinite(stock)||quantity<=stock)}))}catch(_){}
 const cartEntries=()=>Object.entries(cart).filter(([id,quantity])=>lineProduct(id)&&quantity>0),cartCount=()=>cartEntries().reduce((sum,[,quantity])=>sum+quantity,0),cartSubtotal=()=>cartEntries().reduce((sum,[id,quantity])=>sum+lineProduct(id).price*quantity,0);
 const saveCart=()=>{try{localStorage.setItem(storageKey,JSON.stringify(cart))}catch(_){}};
 const cartLayer=document.querySelector('[data-ezkart-cart-layer]'),cartDrawer=cartLayer?.querySelector('.ezkart-cart-drawer'),cartItems=document.querySelector('[data-ezkart-cart-items]'),cartGo=document.querySelector('[data-ezkart-cart-go]');let cartReturnFocus=null,cartCloseTimer=0;
 const renderCart=()=>{const entries=cartEntries(),count=cartCount();document.querySelectorAll('[data-ezkart-cart-count]').forEach(target=>{target.textContent=String(count);target.classList.remove('ezkart-cart-bump');void target.offsetWidth;if(count)target.classList.add('ezkart-cart-bump')});document.querySelectorAll('[data-ezkart-cart-open]').forEach(button=>button.setAttribute('aria-label','Open cart, '+count+' '+(count===1?'item':'items')));document.querySelector('[data-ezkart-cart-summary]').textContent=count+' '+(count===1?'item':'items');document.querySelector('[data-ezkart-cart-subtotal]').textContent=money(cartSubtotal());cartGo.disabled=!count;cartItems.innerHTML=entries.length?entries.map(([id,quantity])=>{const product=lineProduct(id),thumb=product.image?'<img src="'+escapeHtml(product.image)+'" alt="">':'<span class="ezkart-cart-thumb" aria-hidden="true">EZ</span>';return '<article class="ezkart-cart-row" data-ezkart-cart-row="'+escapeHtml(id)+'">'+thumb+'<div><h3>'+escapeHtml(product.name)+'</h3><p>'+money(product.price)+' each</p><div class="ezkart-cart-quantity" aria-label="Quantity for '+escapeHtml(product.name)+'"><button type="button" data-ezkart-cart-quantity="-1" aria-label="Decrease quantity">−</button><span>'+quantity+'</span><button type="button" data-ezkart-cart-quantity="1" aria-label="Increase quantity">+</button></div></div><strong>'+money(product.price*quantity)+'</strong></article>'}).join(''):'<div class="ezkart-cart-empty"><b>Your cart is empty</b><p>Add something you like, then come back here to review it before checkout.</p></div>';document.querySelectorAll('[data-ezkart-add]').forEach(button=>{const productId=button.dataset.ezkartAdd,quantity=entries.filter(([id])=>lineProduct(id)?.productId===productId).reduce((sum,[,value])=>sum+value,0);button.textContent=quantity?'Added · '+quantity:'Add to cart'});document.querySelectorAll('[data-ezkart-basket-lines]').forEach(list=>{list.innerHTML=entries.length?entries.map(([id,quantity])=>{const product=lineProduct(id);return'<li><span>'+escapeHtml(product.name)+' × '+quantity+'</span><b>'+money(product.price*quantity)+'</b></li>'}).join(''):'<li class="ezkart-basket-empty">Your cart is empty</li>'});document.querySelectorAll('[data-ezkart-basket-total]').forEach(total=>{total.textContent=money(cartSubtotal())});saveCart()};
 const openCart=()=>{if(!cartLayer)return;clearTimeout(cartCloseTimer);cartReturnFocus=document.activeElement;cartLayer.hidden=false;document.body.classList.add('ezkart-cart-open');requestAnimationFrame(()=>{cartLayer.classList.add('is-open');cartDrawer?.focus()})};
 const closeCart=()=>{if(!cartLayer||cartLayer.hidden)return;cartLayer.classList.remove('is-open');document.body.classList.remove('ezkart-cart-open');cartCloseTimer=setTimeout(()=>{cartLayer.hidden=true;cartReturnFocus?.focus?.()},240)};
-const changeCart=(id,change)=>{if(!lineProduct(id))return;const maximum=Math.max(0,9-(cartCount()-(cart[id]||0)));cart[id]=Math.max(0,Math.min(maximum,(cart[id]||0)+change));if(!cart[id])delete cart[id];renderCart()};
+const changeCart=(id,change)=>{const product=lineProduct(id);if(!product)return;const stock=product.stock==null?Number.MAX_SAFE_INTEGER:Number(product.stock),maximum=Number.isFinite(stock)?Math.max(0,stock):Number.MAX_SAFE_INTEGER;cart[id]=Math.max(0,Math.min(maximum,(cart[id]||0)+change));if(!cart[id])delete cart[id];renderCart()};
 const goCheckout=()=>{const entries=cartEntries();if(!entries.length)return;const params=new URLSearchParams({cart:entries.map(([id,quantity])=>id+':'+quantity).join(',')});if(storefrontBrand.name)params.set('brand',storefrontBrand.name);if(/^https?:\\/\\//i.test(storefrontBrand.logo||'')&&storefrontBrand.logo.length<=1800)params.set('logo',storefrontBrand.logo);location.href='/cart/?'+params};
 document.querySelectorAll('[data-ezkart-action="checkout"]').forEach(button=>{if(!button.querySelector('[data-ezkart-cart-count]')){const count=document.createElement('span');count.className='ezkart-cart-count';count.dataset.ezkartCartCount='';count.textContent='0';button.append(count)}});
 document.querySelectorAll('[data-ezkart-cart-open]').forEach(button=>button.addEventListener('click',openCart));document.querySelectorAll('[data-ezkart-cart-close]').forEach(button=>button.addEventListener('click',closeCart));cartGo?.addEventListener('click',goCheckout);cartItems?.addEventListener('click',event=>{const button=event.target.closest('[data-ezkart-cart-quantity]'),row=button?.closest('[data-ezkart-cart-row]');if(button&&row)changeCart(row.dataset.ezkartCartRow,Number(button.dataset.ezkartCartQuantity))});addEventListener('keydown',event=>{if(cartLayer?.hidden)return;if(event.key==='Escape'){event.preventDefault();closeCart();return}if(event.key!=='Tab')return;const focusable=[...cartDrawer.querySelectorAll('button:not(:disabled),a[href],input:not(:disabled),[tabindex]:not([tabindex="-1"])')],first=focusable[0],last=focusable.at(-1);if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus()}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus()}});

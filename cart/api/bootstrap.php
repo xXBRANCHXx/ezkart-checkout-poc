@@ -307,6 +307,7 @@ function ez_catalog(array $requestedIds = []): array
             'name' => 'Granola Madu Nusantara',
             'price' => 58000,
             'weight' => 320,
+            'stock' => 46,
             'image_url' => 'admin/assets/products/granola.webp',
         ],
         'coffee' => [
@@ -314,6 +315,7 @@ function ez_catalog(array $requestedIds = []): array
             'name' => 'Kopi Susu Concentrate',
             'price' => 79000,
             'weight' => 650,
+            'stock' => 28,
             'image_url' => 'admin/assets/products/kopi-susu.webp',
         ],
         'sambal' => [
@@ -321,6 +323,7 @@ function ez_catalog(array $requestedIds = []): array
             'name' => 'Sambal Roa Signature',
             'price' => 46000,
             'weight' => 260,
+            'stock' => 34,
             'image_url' => 'admin/assets/products/sambal-roa.webp',
         ],
     ];
@@ -420,8 +423,8 @@ function ez_biteship_quotes(array $cart, string $destinationPostalCode): array
             throw new InvalidArgumentException('A cart quantity is invalid.');
         }
         $quantity = (int) $raw;
-        if ($quantity < 0 || $quantity > 9) {
-            throw new InvalidArgumentException('Cart quantities must be between 0 and 9.');
+        if ($quantity < 0) {
+            throw new InvalidArgumentException('Cart quantities cannot be negative.');
         }
         if ($quantity === 0) continue;
         if (isset($product['stock']) && $quantity > (int) $product['stock']) {
@@ -436,8 +439,8 @@ function ez_biteship_quotes(array $cart, string $destinationPostalCode): array
         ];
         $itemCount += $quantity;
     }
-    if ($itemCount < 1 || $itemCount > 9) {
-        throw new InvalidArgumentException('Add between 1 and 9 products.');
+    if ($itemCount < 1) {
+        throw new InvalidArgumentException('Add at least one product.');
     }
     $credentials = ez_biteship_credentials();
     $response = ez_http_json(EZ_BITESHIP_RATES_URL, [
@@ -475,8 +478,8 @@ function ez_checkout_request(array $input): array
             throw new InvalidArgumentException('A cart quantity is invalid.');
         }
         $quantity = (int) $raw;
-        if ($quantity < 0 || $quantity > 9) {
-            throw new InvalidArgumentException('Cart quantities must be between 0 and 9.');
+        if ($quantity < 0) {
+            throw new InvalidArgumentException('Cart quantities cannot be negative.');
         }
         if ($quantity === 0) continue;
         if (isset($product['stock']) && $quantity > (int) $product['stock']) {
@@ -502,8 +505,8 @@ function ez_checkout_request(array $input): array
         $weight += $product['weight'] * $quantity;
         $itemCount += $quantity;
     }
-    if ($itemCount < 1 || $itemCount > 9) {
-        throw new InvalidArgumentException('Add between 1 and 9 products.');
+    if ($itemCount < 1) {
+        throw new InvalidArgumentException('Add at least one product.');
     }
 
     $name = trim((string) ($customer['fullName'] ?? ''));
