@@ -3048,25 +3048,24 @@
     };
     const prepareLogoElement = (element) => {
       if (!element) return null;
-      const fallbackText = element.textContent.trim() || "Your brand";
+      const namedText = element.querySelector("[data-sq-logo-text]");
+      const fallbackText = namedText?.textContent.trim() || element.textContent.trim() || "Your brand";
       element.classList.add("sq-site-logo");
       element.dataset.sqElement = "";
       element.dataset.sqElementType = "logo";
-      let image = element.querySelector(":scope > [data-sq-logo-image], :scope > img");
+      let image = element.querySelector("[data-sq-logo-image], img");
       if (!image) {
         image = document.createElement("img");
         image.alt = "";
-        element.prepend(image);
       }
       image.dataset.sqLogoImage = "";
-      let text = element.querySelector(":scope > [data-sq-logo-text], :scope > b");
-      if (!text) {
+      let text = namedText || element.querySelector("b");
+      if (!text || text.contains(image)) {
         text = document.createElement("b");
-        text.textContent = fallbackText;
-        [...element.childNodes].filter((node) => node.nodeType === Node.TEXT_NODE).forEach((node) => node.remove());
-        element.append(text);
       }
+      text.textContent = text.textContent.trim() || fallbackText;
       text.dataset.sqLogoText = "";
+      element.replaceChildren(image, text);
       const hasImage = Boolean(image.getAttribute("src")?.trim());
       image.hidden = !hasImage;
       text.hidden = hasImage;
