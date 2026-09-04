@@ -3000,12 +3000,13 @@
         section.prepend(grid);
       }
       grid.classList.remove("is-hiding");
-      grid.style.left = computed.paddingLeft;
-      grid.style.right = computed.paddingRight;
-      grid.style.top = computed.paddingTop;
+      grid.style.left = computed.paddingLeft || "0px";
+      grid.style.right = computed.paddingRight || "0px";
+      grid.style.top = computed.paddingTop || "0px";
+      grid.style.bottom = computed.paddingBottom || "0px";
       grid.style.setProperty("--sq-grid-rows", String(rows));
-      grid.style.setProperty("--sq-grid-row-height", `${fluidRowHeight(section)}px`);
-      grid.style.setProperty("--sq-grid-gap", computed.columnGap || "0px");
+      grid.style.setProperty("--sq-grid-column-gap", computed.columnGap || "0px");
+      grid.style.setProperty("--sq-grid-row-gap", computed.rowGap || "0px");
       grid.style.setProperty("--sq-grid-columns", String(fluidColumns()));
       const cellCount = rows * fluidColumns();
       if (grid.childElementCount !== cellCount) {
