@@ -133,7 +133,8 @@ declare(strict_types=1);
       <div class="sq-canvas-scroll">
         <div class="sq-site-loader" role="status" aria-live="polite" aria-atomic="true">
           <span class="sq-site-loader-worm" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
-          <span class="sq-site-loader-copy"><b>Loading your page</b><small>Preparing your Ezkart canvas</small></span>
+          <span class="sq-site-loader-copy"><b data-sq-site-loader-title>Loading your page</b><small data-sq-site-loader-message>Preparing your Ezkart canvas</small></span>
+          <button type="button" data-sq-site-retry hidden>Try again</button>
         </div>
         <div class="sq-device-frame" data-sq-device-frame>
           <article class="sq-page-preview theme-coral radius-soft layout-rich" data-sq-preview-root>

@@ -167,7 +167,11 @@
       cache: "no-store",
     });
     const result = await response.json().catch(() => ({}));
-    if (!response.ok || result.ok !== true) throw new Error(String(result.error || `Ezkart returned ${response.status}.`));
+    if (!response.ok || result.ok !== true) {
+      const error = new Error(String(result.error || `Ezkart returned ${response.status}.`));
+      error.status = response.status;
+      throw error;
+    }
     return result;
   };
   const normalizeCloudProduct = (product) => {
@@ -488,8 +492,19 @@
   };
   const loadCloudLandingPage = async (url) => {
     if (!cloudEnabled) throw new Error("Sign in with Google to load your saved landing pages.");
-    const result = await cloudRequest("GET", `/v1/landing-pages/${encodeURIComponent(landingPageId(url))}`);
-    return replaceCloudLandingPage(result.page);
+    let lastError;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        const result = await cloudRequest("GET", `/v1/landing-pages/${encodeURIComponent(landingPageId(url))}`);
+        return replaceCloudLandingPage(result.page);
+      } catch (error) {
+        lastError = error;
+        const status = Number(error?.status) || 0;
+        if (attempt === 2 || status >= 400 && status < 500) throw error;
+        await new Promise((resolve) => window.setTimeout(resolve, 350 * (attempt + 1)));
+      }
+    }
+    throw lastError;
   };
   const deleteCloudLandingPage = async (url) => {
     if (!cloudEnabled) throw new Error("Sign in with Google to delete saved landing pages.");
@@ -2603,7 +2618,7 @@
     };
     const persistCurrentState = (changes = {}) => {
       const site = readLandingSites().find((page) => page.url === activeSiteKey);
-      if (!site) return Promise.resolve(false);
+      if (!site || !activeSiteDocument || landingPageId(activeSiteDocument.id) !== landingPageId(activeSiteKey)) return Promise.resolve(false);
       const state = captureState();
       cloudSavePromise = cloudSavePromise.catch(() => false).then(async () => {
         try {
@@ -7350,8 +7365,16 @@ document.querySelectorAll('[class*="animation-"],[class*="element-animation-"]')
     const loadSite = async (site, force = false) => {
       if (!site || (!force && site.classList.contains("active"))) return;
       const loadRequest = ++siteLoadRequest;
+      let loadFailed = false;
       sqStudio.classList.add("sq-site-loading");
+      sqStudio.classList.remove("sq-site-load-failed");
       sqStudio.setAttribute("aria-busy", "true");
+      const loaderTitle = sqStudio.querySelector("[data-sq-site-loader-title]");
+      const loaderMessage = sqStudio.querySelector("[data-sq-site-loader-message]");
+      const retryButton = sqStudio.querySelector("[data-sq-site-retry]");
+      if (loaderTitle) loaderTitle.textContent = "Loading your page";
+      if (loaderMessage) loaderMessage.textContent = "Preparing your Ezkart canvas";
+      if (retryButton) retryButton.hidden = true;
       try {
         if (!force && activeSiteKey) await persistCurrentState();
         activeSiteKey = site.dataset.siteUrl || "default";
@@ -7363,9 +7386,19 @@ document.querySelectorAll('[class*="animation-"],[class*="element-animation-"]')
         try {
           activeSiteDocument = await loadCloudLandingPage(site.dataset.siteUrl);
           state = activeSiteDocument.state || null;
+          site.dataset.siteName = activeSiteDocument.name;
+          const siteTitle = site.querySelector("b");
+          if (siteTitle) siteTitle.textContent = activeSiteDocument.name;
+          document.querySelectorAll("[data-current-site-name]").forEach((target) => { target.textContent = activeSiteDocument.name; });
           site.dataset.siteProducts = activeSiteDocument.products.join(",");
           site.dataset.siteCustomProducts = JSON.stringify(activeSiteDocument.customProducts);
         } catch (error) {
+          loadFailed = true;
+          activeSiteDocument = null;
+          sqStudio.classList.add("sq-site-load-failed");
+          if (loaderTitle) loaderTitle.textContent = "Your page could not load";
+          if (loaderMessage) loaderMessage.textContent = "The saved page was not changed. Try loading it again.";
+          if (retryButton) retryButton.hidden = false;
           showToast(error instanceof Error ? error.message : "The landing page could not be loaded.");
           return;
         }
@@ -7386,11 +7419,17 @@ document.querySelectorAll('[class*="animation-"],[class*="element-animation-"]')
       } finally {
         window.requestAnimationFrame(() => {
           if (loadRequest !== siteLoadRequest) return;
-          sqStudio.classList.remove("sq-site-loading");
-          sqStudio.setAttribute("aria-busy", "false");
+          if (!loadFailed) {
+            sqStudio.classList.remove("sq-site-loading");
+            sqStudio.setAttribute("aria-busy", "false");
+          }
         });
       }
     };
+    sqStudio.querySelector("[data-sq-site-retry]")?.addEventListener("click", () => {
+      const site = [...sqStudio.querySelectorAll("[data-sq-site]")].find((item) => item.dataset.siteUrl === activeSiteKey);
+      if (site) void loadSite(site, true);
+    });
     const bindSiteButton = (site) => { site.onclick = () => { void loadSite(site); }; };
     const pageList = sqStudio.querySelector(".sq-page-list");
     const addSavedSiteButton = ({ name, url, products = [], customProducts = [] }) => {
@@ -7474,7 +7513,11 @@ document.querySelectorAll('[class*="animation-"],[class*="element-animation-"]')
     syncBrandControls();
     syncCommerceStatus();
     baseSiteState = captureState();
-    const requestedSiteButton = [...sqStudio.querySelectorAll("[data-sq-site]")].find((site) => site.dataset.siteUrl === requestedSiteUrl);
+    let requestedSiteButton = [...sqStudio.querySelectorAll("[data-sq-site]")].find((site) => site.dataset.siteUrl === requestedSiteUrl);
+    if (!requestedSiteButton && /^[a-z0-9]+(?:-[a-z0-9]+)*\.ezkart\.site$/.test(requestedSiteUrl)) {
+      const recoveryName = landingPageId(requestedSiteUrl).split("-").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
+      requestedSiteButton = addSavedSiteButton({ name: recoveryName || "Landing page", url: requestedSiteUrl });
+    }
     if (requestedSiteButton) await loadSite(requestedSiteButton, true);
     else window.location.replace("?page=sites");
     setZoom(fitZoomForDevice());

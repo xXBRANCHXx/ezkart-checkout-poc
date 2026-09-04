@@ -2206,6 +2206,19 @@ button, a { -webkit-tap-highlight-color: transparent; }
   transform: translate(-50%, -50%);
   transition-delay: 0s;
 }
+.sq-studio.sq-site-load-failed .sq-site-loader { pointer-events: auto; }
+.sq-site-loader > button {
+  min-width: 104px;
+  height: 38px;
+  padding: 0 18px;
+  color: #fff;
+  background: #242832;
+  border: 0;
+  border-radius: 9px;
+  font: 600 10px Poppins, sans-serif;
+  cursor: pointer;
+}
+.sq-site-loader > button[hidden] { display: none; }
 .sq-site-loader-worm { height: 30px; display: flex; align-items: flex-end; justify-content: center; gap: 6px; color: #ff5a1d; animation: sqSiteLoadingColor 4.8s ease-in-out infinite; }
 .sq-site-loader-worm i {
   width: 12px;
