@@ -5773,39 +5773,48 @@
       if (imageScrollStrengthSnapshot) remember(imageScrollStrengthSnapshot);
       imageScrollStrengthSnapshot = null;
     });
-    const selectedLogoParts = () => selectedElement?.dataset.sqElementType === "logo" ? {
-      image: selectedElement.querySelector("[data-sq-logo-image]"),
-      text: selectedElement.querySelector("[data-sq-logo-text]"),
+    const selectedLogoParts = (element = selectedElement) => element?.dataset.sqElementType === "logo" ? {
+      element,
+      image: element.querySelector("[data-sq-logo-image]"),
+      text: element.querySelector("[data-sq-logo-text]"),
     } : null;
-    const setLogoSource = (source) => {
-      const logo = selectedLogoParts();
-      if (!logo?.image || !logo.text) return;
+    const setLogoSource = (source, requestedLogo = selectedLogoParts()) => {
+      const logo = requestedLogo;
+      if (!logo?.element?.isConnected || !logo.image?.isConnected || !logo.text?.isConnected) return false;
       const value = String(source || "").trim();
       if (value) logo.image.setAttribute("src", value); else logo.image.removeAttribute("src");
       logo.image.hidden = !value;
       logo.text.hidden = Boolean(value);
-      refreshElementOverlay();
-      syncElementControls();
+      if (selectedElement === logo.element) {
+        refreshElementOverlay();
+        syncElementControls();
+      }
       markSqChanged();
+      return true;
     };
     let logoSnapshot;
     const startLogoEdit = () => { if (!logoSnapshot) logoSnapshot = captureState(); };
     const finishLogoEdit = () => { if (logoSnapshot) remember(logoSnapshot); logoSnapshot = null; };
     sqStudio.querySelector("[data-sq-logo-upload]")?.addEventListener("change", (event) => {
-      const file = event.currentTarget.files?.[0];
-      if (!selectedLogoParts() || !file) return;
-      if (file.size > 4 * 1024 * 1024) { showToast("Choose a logo smaller than 4 MB"); event.currentTarget.value = ""; return; }
+      const upload = event.currentTarget;
+      const file = upload.files?.[0];
+      const logo = selectedLogoParts();
+      if (!logo || !file) return;
+      if (file.size > 4 * 1024 * 1024) { showToast("Choose a logo smaller than 4 MB"); upload.value = ""; return; }
       const snapshot = captureState();
       const reader = new FileReader();
       reader.onload = () => {
-        setLogoSource(String(reader.result || ""));
-        const logo = selectedLogoParts();
+        if (!setLogoSource(String(reader.result || ""), logo)) {
+          showToast("That logo could not be added because its header is no longer available.");
+          return;
+        }
         if (logo?.image && !logo.image.alt) logo.image.alt = `${logo.text?.textContent.trim() || "Brand"} logo`;
         remember(snapshot);
         showToast("Logo uploaded and added to the header");
       };
+      reader.onerror = () => showToast("That logo could not be read. Try another file.");
       reader.readAsDataURL(file);
-      event.currentTarget.value = "";
+      upload.value = "";
     });
     sqStudio.querySelector("[data-sq-logo-src]")?.addEventListener("focus", startLogoEdit);
     sqStudio.querySelector("[data-sq-logo-src]")?.addEventListener("change", (event) => { setLogoSource(event.currentTarget.value); finishLogoEdit(); });
