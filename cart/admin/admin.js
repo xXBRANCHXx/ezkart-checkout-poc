@@ -5847,11 +5847,18 @@
         return;
       }
       const section = element?.closest("[data-section-id]");
-      if (!element || !section) return;
+      if (!element || !section) {
+        showToast(type === "logo" ? "Add a navigation bar before editing its logo." : "Add a navigation bar before editing its links.");
+        return;
+      }
       openSqPanel("layers", { pin: true });
-      selectSqSection(section.dataset.sectionId);
+      selectSqSection(section.dataset.sectionId, true);
       selectSqElement(element);
       element.scrollIntoView({ behavior: "smooth", block: "center" });
+      window.requestAnimationFrame(() => {
+        const inspectorScroll = sqStudio.querySelector(".sq-inspector-scroll");
+        inspectorScroll?.scrollTo({ top: 0, behavior: "smooth" });
+      });
     };
     sqStudio.querySelectorAll("[data-sq-edit-logo]").forEach((button) => button.addEventListener("click", () => selectHeaderElement("logo")));
     sqStudio.querySelectorAll("[data-sq-edit-navigation]").forEach((button) => button.addEventListener("click", () => selectHeaderElement("navigation")));

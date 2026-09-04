@@ -2428,3 +2428,26 @@ body>.sq-page-preview.sq-has-pinned-navigation:not(.sq-has-announcement-navigati
 @media(max-width:600px){.sq-navigation-template-section>.sq-template-navigation a{display:none}.sq-navigation-template-section[data-ezkart-nav-template="centered"]>[data-ezkart-nav-slot="left"]{display:none!important}.sq-navigation-template-section>.sq-template-navigation{gap:7px}}
 @media(prefers-reduced-motion:reduce){.sq-navigation-template-section,.sq-navigation-behavior-toggle>i,.sq-navigation-behavior-toggle>i:after{transition:none}}
 .sq-site-header-shortcuts>div:last-child{grid-template-columns:repeat(3,minmax(0,1fr))}
+
+/* Keep element editors reachable when the compact canvas layout drops the
+   inspector column. Header shortcuts and direct canvas selection both open
+   this responsive inspector drawer. */
+@media(max-width:1120px){
+  .page-site-editor .sq-studio:not(.preview-mode) .sq-inspector.element-selected:not(.collapsed){
+    width:min(320px,calc(100vw - 52px));
+    max-height:calc(100vh - 64px);
+    position:fixed;
+    z-index:90;
+    top:64px;
+    right:0;
+    bottom:0;
+    display:grid;
+    box-shadow:-16px 0 38px rgba(20,26,38,.18);
+  }
+}
+@media(max-width:720px){
+  .page-site-editor .sq-studio:not(.preview-mode) .sq-inspector.element-selected:not(.collapsed){
+    max-height:calc(100vh - 58px);
+    top:58px;
+  }
+}
