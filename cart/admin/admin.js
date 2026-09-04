@@ -5773,14 +5773,35 @@
       if (imageScrollStrengthSnapshot) remember(imageScrollStrengthSnapshot);
       imageScrollStrengthSnapshot = null;
     });
-    const selectedLogoParts = (element = selectedElement) => element?.dataset.sqElementType === "logo" ? {
+    const logoPartsFor = (element) => element?.dataset.sqElementType === "logo" ? {
       element,
+      elementId: element.dataset.sqElementId || "",
+      sectionId: element.closest("[data-section-id]")?.dataset.sectionId || "",
       image: element.querySelector("[data-sq-logo-image]"),
       text: element.querySelector("[data-sq-logo-text]"),
     } : null;
+    const selectedLogoParts = (element = selectedElement) => logoPartsFor(element);
+    const currentLogoParts = (requestedLogo = selectedLogoParts()) => {
+      if (!requestedLogo) return null;
+      let element = requestedLogo.element;
+      if (!element?.isConnected && requestedLogo.elementId) {
+        element = previewRoot?.querySelector(`[data-sq-element-id="${CSS.escape(requestedLogo.elementId)}"][data-sq-element-type="logo"]`);
+      }
+      if (!element?.isConnected && requestedLogo.sectionId) {
+        element = previewRoot?.querySelector(`[data-section-id="${CSS.escape(requestedLogo.sectionId)}"] > [data-sq-element-type="logo"]`);
+      }
+      if (!element?.isConnected) element = previewRoot?.querySelector('[data-sq-element-type="logo"]');
+      return element?.isConnected ? logoPartsFor(element) : null;
+    };
     const setLogoSource = (source, requestedLogo = selectedLogoParts()) => {
-      const logo = requestedLogo;
-      if (!logo?.element?.isConnected || !logo.image?.isConnected || !logo.text?.isConnected) return false;
+      const logo = currentLogoParts(requestedLogo);
+      if (!logo?.image || !logo.text) return null;
+      if (selectedElement === requestedLogo?.element && selectedElement !== logo.element) {
+        selectedElement = logo.element;
+        selectedAction = null;
+        selectedImage = null;
+        selectedContent = null;
+      }
       const value = String(source || "").trim();
       if (value) logo.image.setAttribute("src", value); else logo.image.removeAttribute("src");
       logo.image.hidden = !value;
@@ -5790,7 +5811,7 @@
         syncElementControls();
       }
       markSqChanged();
-      return true;
+      return logo;
     };
     let logoSnapshot;
     const startLogoEdit = () => { if (!logoSnapshot) logoSnapshot = captureState(); };
@@ -5804,11 +5825,12 @@
       const snapshot = captureState();
       const reader = new FileReader();
       reader.onload = () => {
-        if (!setLogoSource(String(reader.result || ""), logo)) {
+        const installedLogo = setLogoSource(String(reader.result || ""), logo);
+        if (!installedLogo) {
           showToast("That logo could not be added because its header is no longer available.");
           return;
         }
-        if (logo?.image && !logo.image.alt) logo.image.alt = `${logo.text?.textContent.trim() || "Brand"} logo`;
+        if (!installedLogo.image.alt) installedLogo.image.alt = `${installedLogo.text?.textContent.trim() || "Brand"} logo`;
         remember(snapshot);
         showToast("Logo uploaded and added to the header");
       };
