@@ -3596,7 +3596,7 @@
         const alt = sqStudio.querySelector("[data-sq-logo-alt]");
         const width = sqStudio.querySelector("[data-sq-logo-width]");
         const widthOutput = sqStudio.querySelector("[data-sq-logo-width-output]");
-        const logoWidth = Number.parseInt(logoImage?.style.width || "140", 10) || 140;
+        const logoWidth = Number.parseInt(selectedElement.dataset.sqLogoRenderWidth || logoImage?.style.width || "140", 10) || 140;
         if (source) source.value = logoImage?.getAttribute("src") || "";
         if (text) text.value = logoText?.textContent.trim() || "";
         if (alt) alt.value = logoImage?.getAttribute("alt") || "";
@@ -4665,6 +4665,7 @@
       previewRoot.querySelectorAll("[data-sq-nav-position]").forEach(applyNavigationSectionBehavior);
       setExtraPageHeight(Number.parseFloat(previewRoot.style.getPropertyValue("--sq-page-extra-height")) || 0);
       upgradeLegacyStructure();
+      syncLogoWidths();
       previewRoot.querySelectorAll("img[data-sq-image-blend-mode],img[data-sq-image-blend-source],img[data-sq-image-blend-color]").forEach(applyImageBlend);
       previewRoot.querySelectorAll("img[data-sq-image-crop-zoom],img[data-sq-image-crop-x],img[data-sq-image-crop-y]").forEach(applyImageCrop);
       previewRoot.querySelectorAll("img[data-sq-filter-opacity]").forEach(applySelectedImageFilters);
@@ -5850,6 +5851,36 @@
       if (!element?.isConnected) element = previewRoot?.querySelector('[data-sq-element-type="logo"]');
       return element?.isConnected ? logoPartsFor(element) : null;
     };
+    const applyLogoWidth = (logo, rawWidth, { syncOutput = true } = {}) => {
+      if (!logo?.element?.isConnected || !logo.image) return null;
+      const width = Math.max(40, Math.min(280, Math.round(Number(rawWidth) || 140)));
+      logo.element.dataset.sqLogoRenderWidth = String(width);
+      logo.image.style.width = `${width}px`;
+      const section = logo.element.closest("[data-sq-block]");
+      const syncNavigationHeight = () => {
+        if (!section?.isConnected) return;
+        const hasImage = Boolean(logo.image.getAttribute("src")?.trim()) && !logo.image.hidden;
+        const naturalWidth = Number(logo.image.naturalWidth) || 1;
+        const naturalHeight = Number(logo.image.naturalHeight) || 1;
+        const renderedHeight = Math.max(1, Math.round(width * naturalHeight / naturalWidth));
+        const needsRoom = hasImage && renderedHeight > 52;
+        section.classList.toggle("sq-nav-logo-sized", needsRoom);
+        if (needsRoom) section.style.setProperty("--sq-nav-logo-height", `${renderedHeight + 16}px`);
+        else section.style.removeProperty("--sq-nav-logo-height");
+        refreshElementOverlay();
+      };
+      syncNavigationHeight();
+      if (logo.image.getAttribute("src")?.trim() && !logo.image.complete) logo.image.addEventListener("load", syncNavigationHeight, { once: true });
+      if (syncOutput) {
+        const output = sqStudio.querySelector("[data-sq-logo-width-output]");
+        if (output) output.textContent = `${width}px`;
+      }
+      return logo;
+    };
+    const syncLogoWidths = () => previewRoot?.querySelectorAll('[data-sq-element-type="logo"]').forEach((element) => {
+      const logo = logoPartsFor(element);
+      applyLogoWidth(logo, element.dataset.sqLogoRenderWidth || logo?.image?.style.width || 140, { syncOutput: false });
+    });
     const setLogoSource = (source, requestedLogo = selectedLogoParts()) => {
       const logo = currentLogoParts(requestedLogo);
       if (!logo?.image || !logo.text) return null;
@@ -5863,6 +5894,7 @@
       if (value) logo.image.setAttribute("src", value); else logo.image.removeAttribute("src");
       logo.image.hidden = !value;
       logo.text.hidden = Boolean(value);
+      applyLogoWidth(logo, logo.element.dataset.sqLogoRenderWidth || logo.image.style.width || 140);
       if (selectedElement === logo.element) {
         refreshElementOverlay();
         syncElementControls();
@@ -5912,10 +5944,8 @@
     sqStudio.querySelector("[data-sq-logo-width]")?.addEventListener("input", (event) => {
       const logo = currentLogoParts();
       if (!logo?.image) return;
-      logo.image.style.width = `${event.currentTarget.value}px`;
-      const output = sqStudio.querySelector("[data-sq-logo-width-output]");
-      if (output) output.textContent = `${event.currentTarget.value}px`;
-      refreshElementOverlay(); markSqChanged();
+      applyLogoWidth(logo, event.currentTarget.value);
+      markSqChanged();
     });
     sqStudio.querySelector("[data-sq-logo-width]")?.addEventListener("change", finishLogoEdit);
     const navigationElement = () => currentElementForInspector("navigation");
@@ -7429,6 +7459,7 @@ document.querySelectorAll('[class*="animation-"],[class*="element-animation-"]')
 
     readCatalogProducts().forEach((product) => installCustomProduct(product, false));
     upgradeLegacyStructure();
+    syncLogoWidths();
     previewRoot?.querySelectorAll("img[data-sq-image-blend-mode],img[data-sq-image-blend-source],img[data-sq-image-blend-color]").forEach(applyImageBlend);
     previewRoot?.querySelectorAll("img[data-sq-image-crop-zoom],img[data-sq-image-crop-x],img[data-sq-image-crop-y]").forEach(applyImageCrop);
     previewRoot?.querySelectorAll("img[data-sq-filter-opacity]").forEach(applySelectedImageFilters);
