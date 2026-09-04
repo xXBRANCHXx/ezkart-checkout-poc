@@ -174,6 +174,20 @@
     }
     return result;
   };
+  const retryCloudRequest = async (method, path, payload = null, attempts = 3) => {
+    let lastError;
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      try {
+        return await cloudRequest(method, path, payload);
+      } catch (error) {
+        lastError = error;
+        const status = Number(error?.status) || 0;
+        if (attempt === attempts - 1 || (status >= 400 && status < 500)) throw error;
+        await new Promise((resolve) => window.setTimeout(resolve, 350 * (attempt + 1)));
+      }
+    }
+    throw lastError;
+  };
   const normalizeCloudProduct = (product) => {
     const media = Array.isArray(product?.media) ? product.media : [];
     const productMediaUrl = product?.status === "archived" ? cloudPrivateMediaUrl : cloudMediaUrl;
@@ -480,7 +494,7 @@
   const saveCloudLandingPage = async (site, changes = {}) => {
     if (!cloudEnabled) throw new Error("Sign in with Google to save landing pages to your Ezkart account.");
     const id = landingPageId(site?.url || site?.id);
-    const result = await cloudRequest("PUT", `/v1/landing-pages/${encodeURIComponent(id)}`, {
+    const result = await retryCloudRequest("PUT", `/v1/landing-pages/${encodeURIComponent(id)}`, {
       name: site.name,
       products: Array.isArray(site.products) ? site.products : [],
       customProducts: Array.isArray(site.customProducts) ? site.customProducts : [],
@@ -492,19 +506,8 @@
   };
   const loadCloudLandingPage = async (url) => {
     if (!cloudEnabled) throw new Error("Sign in with Google to load your saved landing pages.");
-    let lastError;
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      try {
-        const result = await cloudRequest("GET", `/v1/landing-pages/${encodeURIComponent(landingPageId(url))}`);
-        return replaceCloudLandingPage(result.page);
-      } catch (error) {
-        lastError = error;
-        const status = Number(error?.status) || 0;
-        if (attempt === 2 || status >= 400 && status < 500) throw error;
-        await new Promise((resolve) => window.setTimeout(resolve, 350 * (attempt + 1)));
-      }
-    }
-    throw lastError;
+    const result = await retryCloudRequest("GET", `/v1/landing-pages/${encodeURIComponent(landingPageId(url))}`);
+    return replaceCloudLandingPage(result.page);
   };
   const deleteCloudLandingPage = async (url) => {
     if (!cloudEnabled) throw new Error("Sign in with Google to delete saved landing pages.");
@@ -6629,27 +6632,36 @@
       ["desktop", "tablet", "mobile"].forEach((device) => logo.setAttribute(`data-layout-${device}`, layouts[device]));
       return logo.outerHTML;
     };
-    const navigationLinksMarkup = ({ className = "", slot = "", links = [], button = "Buy now", buttonAction = "checkout", layouts: sourceLayouts }) => {
+    const navigationLinksMarkup = (sourceLayouts) => {
       const layouts = responsiveNavigationLayouts(sourceLayouts);
-      const actionType = buttonAction === "checkout" ? "checkout" : buttonAction.startsWith("#") ? "section" : "url";
-      const actionTarget = actionType === "section" ? buttonAction.slice(1) : actionType === "url" ? buttonAction : "";
-      const buttonMarkup = button ? `<button type="button" data-sq-link-type="${actionType}" data-sq-link="${actionTarget}" data-sq-new-tab="false">${button}</button>` : "";
-      return `<nav class="sq-template-navigation button-primary${className ? ` ${className}` : ""}" data-sq-element data-sq-element-type="navigation" data-sq-button-role="primary"${slot ? ` data-sq-nav-slot="${slot}"` : ""} data-layout-desktop="${layouts.desktop}" data-layout-tablet="${layouts.tablet}" data-layout-mobile="${layouts.mobile}">${links.map(([label, target]) => `<a href="${target}">${label}</a>`).join("")}${buttonMarkup}</nav>`;
+      const source = previewRoot?.querySelector('[data-section-id="navigation"] [data-sq-element-type="navigation"]');
+      const navigation = document.createElement("nav");
+      navigation.className = "sq-template-navigation button-primary";
+      navigation.dataset.sqElement = "";
+      navigation.dataset.sqElementType = "navigation";
+      navigation.dataset.sqButtonRole = source?.dataset.sqButtonRole || "primary";
+      const editableItems = [...(source?.children || [])].filter((item) => item.matches("a, button:not(.sq-nav-menu-toggle)"));
+      if (editableItems.length) editableItems.forEach((item) => navigation.append(item.cloneNode(true)));
+      else navigation.innerHTML = '<a href="#products" data-sq-link-type="section" data-sq-link="products" data-sq-new-tab="false">Shop</a><a href="#story" data-sq-link-type="section" data-sq-link="story" data-sq-new-tab="false">Our story</a><a href="#contact" data-sq-link-type="section" data-sq-link="contact" data-sq-new-tab="false">Contact</a><button type="button" data-sq-link-type="checkout" data-sq-link="" data-sq-new-tab="false">Buy now</button>';
+      navigation.querySelectorAll("[contenteditable]").forEach((item) => item.removeAttribute("contenteditable"));
+      ["desktop", "tablet", "mobile"].forEach((device) => navigation.setAttribute(`data-layout-${device}`, layouts[device]));
+      return navigation.outerHTML;
     };
     const navigationTemplateMarkup = (template, sectionId = "navigation") => {
       const handle = `<button class="sq-block-handle" type="button" aria-label="Drag navigation section">${iconMarkup("grip")}</button>`;
-      const section = (rows, position, shadow, hideOnScroll, body) => {
-        const surface = template === "overlay" ? "transparent" : "solid";
-        const opacity = surface === "transparent" ? 0 : 100;
-        return `<header class="sq-page-block sq-store-nav sq-navigation-template-section" draggable="true" data-sq-block data-sq-fluid data-sq-rows="${rows}" data-section-id="${sectionId}" data-sq-nav-template="${template}" data-sq-nav-position="${position}" data-sq-nav-offset="0" data-sq-nav-surface="${surface}" data-sq-nav-opacity="${opacity}" data-sq-nav-blur="16" data-sq-nav-shadow="${shadow}" data-sq-nav-hide-scroll="${hideOnScroll}">${handle}${body}</header>`;
+      const definitions = {
+        current: { position: "static", surface: "solid", opacity: 100, shadow: false },
+        sticky: { position: "sticky", surface: "solid", opacity: 100, shadow: true },
+        centered: { position: "static", surface: "solid", opacity: 100, shadow: false },
+        minimal: { position: "sticky", surface: "solid", opacity: 100, shadow: false },
+        glass: { position: "sticky", surface: "blur", opacity: 82, shadow: true },
+        overlay: { position: "sticky", surface: "transparent", opacity: 0, shadow: true },
       };
-      const mainLinks = [["Shop", "#products"], ["Our story", "#story"], ["Contact", "#contact"]];
-      if (template === "centered") return section(2, "static", "false", "false", `${navigationLinksMarkup({ slot: "left", links: [["Shop", "#products"], ["Our story", "#story"]], button: "", layouts: { desktop: "1,1,4,2", tablet: "1,1,4,2", mobile: "1,1,1,1" } })}${navigationLogoMarkup({ desktop: "5,1,4,2", tablet: "5,1,4,2", mobile: "1,1,6,2" })}${navigationLinksMarkup({ slot: "right", links: [["Search", "#products"]], button: "Cart", layouts: { desktop: "9,1,4,2", tablet: "9,1,4,2", mobile: "7,1,6,2" } })}`);
-      if (template === "announcement") return section(4, "sticky", "true", "true", `<p class="sq-nav-announcement-copy" data-sq-element data-sq-element-type="text" data-layout-desktop="1,1,12,1" data-layout-tablet="1,1,12,1" data-layout-mobile="1,1,12,1">Free shipping on orders over Rp500k</p>${navigationLogoMarkup({ desktop: "1,2,4,3", tablet: "1,2,4,3", mobile: "1,2,5,3" })}${navigationLinksMarkup({ links: mainLinks, layouts: { desktop: "5,2,8,3", tablet: "5,2,8,3", mobile: "6,2,7,3" } })}`);
-      if (template === "overlay") return section(2, "sticky", "true", "false", `${navigationLogoMarkup({ desktop: "1,1,4,2", tablet: "1,1,4,2", mobile: "1,1,5,2" })}${navigationLinksMarkup({ links: mainLinks, layouts: { desktop: "5,1,8,2", tablet: "5,1,8,2", mobile: "6,1,7,2" } })}`);
-      if (template === "commerce") return section(2, "sticky", "true", "false", `${navigationLogoMarkup({ desktop: "1,1,3,2", tablet: "1,1,3,2", mobile: "1,1,5,2" })}<div class="sq-nav-commerce-search" data-sq-element data-sq-element-type="form" data-layout-desktop="4,1,5,2" data-layout-tablet="4,1,5,2" data-layout-mobile="1,1,1,1"><form role="search"><input type="search" placeholder="Search products…" aria-label="Search products"><button type="button">Search</button></form></div>${navigationLinksMarkup({ links: [["Account", "#contact"]], button: "Cart", layouts: { desktop: "9,1,4,2", tablet: "9,1,4,2", mobile: "6,1,7,2" } })}`);
-      if (template === "minimal") return section(2, "sticky", "true", "false", `${navigationLogoMarkup({ desktop: "1,1,6,2", tablet: "1,1,6,2", mobile: "1,1,6,2" })}${navigationLinksMarkup({ links: [], button: "Shop now", buttonAction: "#products", layouts: { desktop: "7,1,6,2", tablet: "7,1,6,2", mobile: "7,1,6,2" } })}`);
-      return section(2, "sticky", "true", "false", `${navigationLogoMarkup({ desktop: "1,1,4,2", tablet: "1,1,4,2", mobile: "1,1,5,2" })}${navigationLinksMarkup({ links: mainLinks, layouts: { desktop: "5,1,8,2", tablet: "5,1,8,2", mobile: "6,1,7,2" } })}`);
+      const selectedTemplate = Object.hasOwn(definitions, template) ? template : "current";
+      const definition = definitions[selectedTemplate];
+      const logo = navigationLogoMarkup({ desktop: "1,1,4,2", tablet: "1,1,5,2", mobile: "1,1,5,2" });
+      const navigation = navigationLinksMarkup({ desktop: "5,1,8,2", tablet: "6,1,7,2", mobile: "6,1,7,2" });
+      return `<header class="sq-page-block sq-store-nav sq-navigation-template-section" draggable="true" data-sq-block data-sq-fluid data-sq-rows="2" data-section-id="${sectionId}" data-sq-nav-template="${selectedTemplate}" data-sq-nav-position="${definition.position}" data-sq-nav-offset="0" data-sq-nav-surface="${definition.surface}" data-sq-nav-opacity="${definition.opacity}" data-sq-nav-blur="16" data-sq-nav-shadow="${definition.shadow}" data-sq-nav-hide-scroll="false">${handle}${logo}${navigation}</header>`;
     };
     const addNavigationTemplate = (template) => {
       const existing = previewRoot?.querySelector('[data-section-id="navigation"]') || previewRoot?.querySelector(".sq-navigation-template-section");
@@ -6665,7 +6677,6 @@
         if (announcement) announcement.after(section); else previewRoot?.prepend(section);
       }
       remember(snapshot);
-      moveNavigationSectionToTop(section);
       applyNavigationSectionBehavior(section);
       rebuildLayerList();
       bindSqInteractions();
@@ -7156,7 +7167,7 @@
       clone.querySelectorAll("[data-sq-nav-position]").forEach((node) => {
         node.classList.remove("sq-nav-is-stuck", "sq-nav-hidden");
         node.style.removeProperty("--sq-nav-editor-shift");
-        node.dataset.ezkartNavTemplate = node.dataset.sqNavTemplate || "essential";
+        node.dataset.ezkartNavTemplate = node.dataset.sqNavTemplate || "current";
         node.dataset.ezkartNavPosition = node.dataset.sqNavPosition || "static";
         node.dataset.ezkartNavOffset = node.dataset.sqNavOffset || "0";
         node.dataset.ezkartNavSurface = node.dataset.sqNavSurface || (node.dataset.sqNavTemplate === "overlay" ? "transparent" : "solid");
