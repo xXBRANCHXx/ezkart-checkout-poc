@@ -3535,8 +3535,11 @@
       const colorFallbacks = { color: "#24262b", backgroundColor: "#ffffff", borderColor: "#e3e5e7" };
       sqStudio.querySelectorAll("[data-sq-element-color]").forEach((input) => {
         const property = input.dataset.sqElementColor;
-        const transparent = isTransparentColor(computed[property]);
-        const value = colorToHex(computed[property], colorFallbacks[property]);
+        const renderedValue = isNavigation && property === "color"
+          ? getComputedStyle(selectedElement.querySelector(":scope > a") || selectedElement).color
+          : computed[property];
+        const transparent = isTransparentColor(renderedValue);
+        const value = colorToHex(renderedValue, colorFallbacks[property]);
         input.value = value;
         const hex = sqStudio.querySelector(`[data-sq-element-color-hex="${property}"]`);
         if (hex) { hex.value = transparent ? "Transparent" : value.toUpperCase(); hex.classList.toggle("is-transparent", transparent); }
@@ -5154,7 +5157,10 @@
     const updateElementColor = (property, value) => {
       if (!selectedElement?.isConnected) return;
       selectedElement.style[property] = value;
-      if (property === "color") selectedElement.classList.add("sq-color-override");
+      if (property === "color") {
+        selectedElement.classList.add("sq-color-override");
+        if (selectedElement.dataset.sqElementType === "navigation") selectedElement.style.setProperty("--sq-nav-link-color", value);
+      }
       if (property === "borderColor" && !isTransparentColor(value) && (getComputedStyle(selectedElement).borderStyle === "none" || getComputedStyle(selectedElement).borderTopWidth === "0px")) {
         selectedElement.style.borderWidth = "1px";
         selectedElement.style.borderStyle = "solid";
@@ -5189,6 +5195,7 @@
       remember();
       const property = button.dataset.sqElementColorClear;
       selectedElement.style[property] = "transparent";
+      if (property === "color" && selectedElement.dataset.sqElementType === "navigation") selectedElement.style.setProperty("--sq-nav-link-color", "transparent");
       if (property === "borderColor") selectedElement.style.borderWidth = "0px";
       syncElementControls(); markSqChanged();
     }));
@@ -5252,6 +5259,7 @@
       if (!selectedElement?.isConnected) return;
       remember();
       ["color", "backgroundColor", "border", "borderColor", "borderWidth", "borderStyle", "borderRadius", "textAlign", "textTransform", "fontFamily", "fontWeight", "fontSize", "lineHeight", "letterSpacing", "boxShadow", "backdropFilter"].forEach((property) => { selectedElement.style[property] = ""; });
+      selectedElement.style.removeProperty("--sq-nav-link-color");
       selectedElement.classList.remove("sq-surface-soft", "sq-surface-card", "sq-surface-outline", "sq-surface-glass");
       selectedElement.classList.remove("sq-color-override");
       delete selectedElement.dataset.sqSurface; delete selectedElement.dataset.sqAlign; syncElementControls(); refreshElementOverlay(); markSqChanged();
@@ -6643,6 +6651,10 @@
       const editableItems = [...(source?.children || [])].filter((item) => item.matches("a, button:not(.sq-nav-menu-toggle)"));
       if (editableItems.length) editableItems.forEach((item) => navigation.append(item.cloneNode(true)));
       else navigation.innerHTML = '<a href="#products" data-sq-link-type="section" data-sq-link="products" data-sq-new-tab="false">Shop</a><a href="#story" data-sq-link-type="section" data-sq-link="story" data-sq-new-tab="false">Our story</a><a href="#contact" data-sq-link-type="section" data-sq-link="contact" data-sq-new-tab="false">Contact</a><button type="button" data-sq-link-type="checkout" data-sq-link="" data-sq-new-tab="false">Buy now</button>';
+      navigation.querySelectorAll(":scope > a").forEach((link) => {
+        link.style.removeProperty("color");
+        link.classList.remove("sq-color-override");
+      });
       navigation.querySelectorAll("[contenteditable]").forEach((item) => item.removeAttribute("contenteditable"));
       ["desktop", "tablet", "mobile"].forEach((device) => navigation.setAttribute(`data-layout-${device}`, layouts[device]));
       return navigation.outerHTML;
