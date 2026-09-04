@@ -6796,11 +6796,20 @@
 
     const addPanel = sqStudio.querySelector('[data-sq-panel="add"]');
     const libraryViews = [...sqStudio.querySelectorAll("[data-sq-library-view]")];
+    const syncNavigationTemplateOptions = () => {
+      const activeTemplate = previewRoot?.querySelector('[data-section-id="navigation"]')?.dataset.sqNavTemplate || "";
+      sqStudio.querySelectorAll("[data-sq-add-navigation-template]").forEach((option) => {
+        const active = option.dataset.sqAddNavigationTemplate === activeTemplate;
+        option.classList.toggle("active", active);
+        option.setAttribute("aria-pressed", String(active));
+      });
+    };
     const setLibraryView = (name = "") => {
       if (!addPanel) return;
       libraryViews.forEach((view) => { view.hidden = view.dataset.sqLibraryView !== name; });
       addPanel.classList.toggle("sq-library-view-open", Boolean(name));
       addPanel.scrollTo({ top: 0, behavior: "auto" });
+      if (name === "navigation") syncNavigationTemplateOptions();
       if (name) libraryViews.find((view) => view.dataset.sqLibraryView === name)?.querySelector("[data-sq-library-search]")?.focus({ preventScroll: true });
     };
     sqStudio.querySelectorAll("[data-sq-open-library]").forEach((button) => button.addEventListener("click", () => setLibraryView(button.dataset.sqOpenLibrary)));
