@@ -5808,7 +5808,37 @@
         sectionId: element.closest("[data-section-id]")?.dataset.sectionId || "",
       } : null;
     };
-    const selectedLogoParts = (element = selectedElement) => logoPartsFor(element);
+    const restoreSelectedElementReference = (element, expectedType) => {
+      if (!element?.isConnected || element.dataset.sqElementType !== expectedType) return null;
+      if (selectedElement !== element) {
+        selectedElement = element;
+        selectedAction = null;
+        selectedImage = null;
+        selectedContent = null;
+        previewRoot?.querySelectorAll(".sq-element-selected").forEach((item) => item.classList.toggle("sq-element-selected", item === element));
+      }
+      return element;
+    };
+    const currentElementForInspector = (expectedType, requestedElement = selectedElement) => {
+      let element = requestedElement;
+      const shouldRestoreSelection = !selectedElement?.isConnected || selectedElement?.dataset.sqElementType === expectedType;
+      const elementId = element?.dataset.sqElementId || "";
+      const sectionId = element?.closest?.("[data-section-id]")?.dataset.sectionId || selectedSection || "";
+      if (!element?.isConnected || element.dataset.sqElementType !== expectedType) {
+        element = elementId
+          ? previewRoot?.querySelector(`[data-sq-element-id="${CSS.escape(elementId)}"][data-sq-element-type="${CSS.escape(expectedType)}"]`)
+          : null;
+      }
+      if (!element?.isConnected && sectionId) {
+        element = previewRoot?.querySelector(`[data-section-id="${CSS.escape(sectionId)}"] [data-sq-element-type="${CSS.escape(expectedType)}"]`);
+      }
+      if (!element?.isConnected) {
+        element = previewRoot?.querySelector(`.sq-element-selected[data-sq-element-type="${CSS.escape(expectedType)}"]`)
+          || previewRoot?.querySelector(`[data-sq-element-type="${CSS.escape(expectedType)}"]`);
+      }
+      return shouldRestoreSelection ? restoreSelectedElementReference(element, expectedType) : element;
+    };
+    const selectedLogoParts = (element = selectedElement) => logoPartsFor(currentElementForInspector("logo", element));
     const currentLogoParts = (requestedLogo = selectedLogoParts()) => {
       if (!requestedLogo) return null;
       let element = requestedLogo.element;
@@ -5870,17 +5900,18 @@
     sqStudio.querySelector("[data-sq-logo-src]")?.addEventListener("change", (event) => { setLogoSource(event.currentTarget.value); finishLogoEdit(); });
     sqStudio.querySelector("[data-sq-logo-text-input]")?.addEventListener("focus", startLogoEdit);
     sqStudio.querySelector("[data-sq-logo-text-input]")?.addEventListener("input", (event) => {
-      const logo = selectedLogoParts();
+      const logo = currentLogoParts();
       if (!logo?.text) return;
       logo.text.textContent = event.currentTarget.value || "Your brand";
       refreshElementOverlay(); markSqChanged();
     });
     sqStudio.querySelector("[data-sq-logo-text-input]")?.addEventListener("change", finishLogoEdit);
     sqStudio.querySelector("[data-sq-logo-alt]")?.addEventListener("focus", startLogoEdit);
-    sqStudio.querySelector("[data-sq-logo-alt]")?.addEventListener("change", (event) => { const logo = selectedLogoParts(); if (logo?.image) logo.image.alt = event.currentTarget.value.trim(); finishLogoEdit(); markSqChanged(); });
+    sqStudio.querySelector("[data-sq-logo-alt]")?.addEventListener("input", (event) => { const logo = currentLogoParts(); if (logo?.image) logo.image.alt = event.currentTarget.value; markSqChanged(); });
+    sqStudio.querySelector("[data-sq-logo-alt]")?.addEventListener("change", finishLogoEdit);
     sqStudio.querySelector("[data-sq-logo-width]")?.addEventListener("pointerdown", startLogoEdit);
     sqStudio.querySelector("[data-sq-logo-width]")?.addEventListener("input", (event) => {
-      const logo = selectedLogoParts();
+      const logo = currentLogoParts();
       if (!logo?.image) return;
       logo.image.style.width = `${event.currentTarget.value}px`;
       const output = sqStudio.querySelector("[data-sq-logo-width-output]");
@@ -5888,7 +5919,7 @@
       refreshElementOverlay(); markSqChanged();
     });
     sqStudio.querySelector("[data-sq-logo-width]")?.addEventListener("change", finishLogoEdit);
-    const navigationElement = () => selectedElement?.dataset.sqElementType === "navigation" ? selectedElement : previewRoot?.querySelector('[data-sq-element-type="navigation"]') || null;
+    const navigationElement = () => currentElementForInspector("navigation");
     const selectHeaderElement = (type) => {
       const element = previewRoot?.querySelector(`[data-sq-element-type="${type}"]`);
       if (!element && type === "navigation") {
