@@ -3046,6 +3046,32 @@
       [...source.attributes].forEach((attribute) => target.setAttribute(attribute.name, attribute.value));
       return target;
     };
+    const prepareLogoElement = (element) => {
+      if (!element) return null;
+      const fallbackText = element.textContent.trim() || "Your brand";
+      element.classList.add("sq-site-logo");
+      element.dataset.sqElement = "";
+      element.dataset.sqElementType = "logo";
+      let image = element.querySelector(":scope > [data-sq-logo-image], :scope > img");
+      if (!image) {
+        image = document.createElement("img");
+        image.alt = "";
+        element.prepend(image);
+      }
+      image.dataset.sqLogoImage = "";
+      let text = element.querySelector(":scope > [data-sq-logo-text], :scope > b");
+      if (!text) {
+        text = document.createElement("b");
+        text.textContent = fallbackText;
+        [...element.childNodes].filter((node) => node.nodeType === Node.TEXT_NODE).forEach((node) => node.remove());
+        element.append(text);
+      }
+      text.dataset.sqLogoText = "";
+      const hasImage = Boolean(image.getAttribute("src")?.trim());
+      image.hidden = !hasImage;
+      text.hidden = hasImage;
+      return { element, image, text };
+    };
     const upgradeLegacyStructure = () => {
       previewRoot?.querySelectorAll('.sq-store-nav > [data-sq-element-type="brand"]').forEach((brand) => {
         if (brand.classList.contains("sq-site-logo")) return;
@@ -3062,6 +3088,7 @@
         logo.replaceChildren(image, text);
         brand.replaceWith(logo);
       });
+      previewRoot?.querySelectorAll('[data-sq-element-type="logo"],.sq-site-logo').forEach(prepareLogoElement);
       previewRoot?.querySelectorAll('.sq-hero > .sq-hero-copy[data-sq-element-type="copy"]').forEach((composite) => {
         const section = composite.closest("[data-sq-fluid]");
         if (!section) return;
@@ -5773,13 +5800,14 @@
       if (imageScrollStrengthSnapshot) remember(imageScrollStrengthSnapshot);
       imageScrollStrengthSnapshot = null;
     });
-    const logoPartsFor = (element) => element?.dataset.sqElementType === "logo" ? {
-      element,
-      elementId: element.dataset.sqElementId || "",
-      sectionId: element.closest("[data-section-id]")?.dataset.sectionId || "",
-      image: element.querySelector("[data-sq-logo-image]"),
-      text: element.querySelector("[data-sq-logo-text]"),
-    } : null;
+    const logoPartsFor = (element) => {
+      const prepared = element?.dataset.sqElementType === "logo" ? prepareLogoElement(element) : null;
+      return prepared ? {
+        ...prepared,
+        elementId: element.dataset.sqElementId || "",
+        sectionId: element.closest("[data-section-id]")?.dataset.sectionId || "",
+      } : null;
+    };
     const selectedLogoParts = (element = selectedElement) => logoPartsFor(element);
     const currentLogoParts = (requestedLogo = selectedLogoParts()) => {
       if (!requestedLogo) return null;
