@@ -5853,27 +5853,31 @@
     };
     const applyLogoWidth = (logo, rawWidth, { syncOutput = true } = {}) => {
       if (!logo?.element?.isConnected || !logo.image) return null;
-      const width = Math.max(40, Math.min(280, Math.round(Number(rawWidth) || 140)));
+      const requestedWidth = Math.max(1, Math.min(280, Math.round(Number(rawWidth) || 140)));
+      const naturalWidth = Number(logo.image.naturalWidth);
+      const naturalHeight = Number(logo.image.naturalHeight);
+      const hasDimensions = Boolean(logo.image.getAttribute("src")?.trim()) && naturalWidth > 0 && naturalHeight > 0;
+      const maximumWidth = hasDimensions ? Math.max(1, Math.min(280, Math.floor(52 * naturalWidth / naturalHeight))) : 280;
+      const minimumWidth = Math.min(40, maximumWidth);
+      const width = Math.max(minimumWidth, Math.min(requestedWidth, maximumWidth));
       logo.element.dataset.sqLogoRenderWidth = String(width);
       logo.image.style.width = `${width}px`;
       const section = logo.element.closest("[data-sq-block]");
-      const syncNavigationHeight = () => {
-        if (!section?.isConnected) return;
-        const hasImage = Boolean(logo.image.getAttribute("src")?.trim()) && !logo.image.hidden;
-        const naturalWidth = Number(logo.image.naturalWidth) || 1;
-        const naturalHeight = Number(logo.image.naturalHeight) || 1;
-        const renderedHeight = Math.max(1, Math.round(width * naturalHeight / naturalWidth));
-        const needsRoom = hasImage && renderedHeight > 52;
-        section.classList.toggle("sq-nav-logo-sized", needsRoom);
-        if (needsRoom) section.style.setProperty("--sq-nav-logo-height", `${renderedHeight + 16}px`);
-        else section.style.removeProperty("--sq-nav-logo-height");
-        refreshElementOverlay();
-      };
-      syncNavigationHeight();
-      if (logo.image.getAttribute("src")?.trim() && !logo.image.complete) logo.image.addEventListener("load", syncNavigationHeight, { once: true });
+      section?.classList.remove("sq-nav-logo-sized");
+      section?.style.removeProperty("--sq-nav-logo-height");
+      const control = sqStudio.querySelector("input[data-sq-logo-width]");
+      if (control) {
+        control.min = String(minimumWidth);
+        control.max = String(maximumWidth);
+        control.value = String(width);
+      }
       if (syncOutput) {
         const output = sqStudio.querySelector("[data-sq-logo-width-output]");
         if (output) output.textContent = `${width}px`;
+      }
+      refreshElementOverlay();
+      if (logo.image.getAttribute("src")?.trim() && !logo.image.complete) {
+        logo.image.addEventListener("load", () => applyLogoWidth(logo, requestedWidth, { syncOutput }), { once: true });
       }
       return logo;
     };

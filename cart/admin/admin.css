@@ -2451,12 +2451,3 @@ body>.sq-page-preview.sq-has-pinned-navigation:not(.sq-has-announcement-navigati
     top:58px;
   }
 }
-
-/* Let an explicitly enlarged logo determine the navbar's rendered height. */
-.sq-store-nav.sq-nav-logo-sized {
-  min-height: var(--sq-nav-logo-height) !important;
-  height: var(--sq-nav-logo-height) !important;
-  align-content: center !important;
-}
-.sq-store-nav.sq-nav-logo-sized > .sq-site-logo { overflow: visible !important; }
-.sq-store-nav.sq-nav-logo-sized > .sq-site-logo img { max-height: none; }
