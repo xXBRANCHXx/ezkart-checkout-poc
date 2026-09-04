@@ -174,20 +174,6 @@
     }
     return result;
   };
-  const retryCloudRequest = async (method, path, payload = null, attempts = 3) => {
-    let lastError;
-    for (let attempt = 0; attempt < attempts; attempt += 1) {
-      try {
-        return await cloudRequest(method, path, payload);
-      } catch (error) {
-        lastError = error;
-        const status = Number(error?.status) || 0;
-        if (attempt === attempts - 1 || (status >= 400 && status < 500)) throw error;
-        await new Promise((resolve) => window.setTimeout(resolve, 350 * (attempt + 1)));
-      }
-    }
-    throw lastError;
-  };
   const normalizeCloudProduct = (product) => {
     const media = Array.isArray(product?.media) ? product.media : [];
     const productMediaUrl = product?.status === "archived" ? cloudPrivateMediaUrl : cloudMediaUrl;
@@ -494,7 +480,7 @@
   const saveCloudLandingPage = async (site, changes = {}) => {
     if (!cloudEnabled) throw new Error("Sign in with Google to save landing pages to your Ezkart account.");
     const id = landingPageId(site?.url || site?.id);
-    const result = await retryCloudRequest("PUT", `/v1/landing-pages/${encodeURIComponent(id)}`, {
+    const result = await cloudRequest("PUT", `/v1/landing-pages/${encodeURIComponent(id)}`, {
       name: site.name,
       products: Array.isArray(site.products) ? site.products : [],
       customProducts: Array.isArray(site.customProducts) ? site.customProducts : [],
@@ -506,7 +492,7 @@
   };
   const loadCloudLandingPage = async (url) => {
     if (!cloudEnabled) throw new Error("Sign in with Google to load your saved landing pages.");
-    const result = await retryCloudRequest("GET", `/v1/landing-pages/${encodeURIComponent(landingPageId(url))}`);
+    const result = await cloudRequest("GET", `/v1/landing-pages/${encodeURIComponent(landingPageId(url))}`);
     return replaceCloudLandingPage(result.page);
   };
   const deleteCloudLandingPage = async (url) => {
@@ -521,6 +507,34 @@
     document.querySelectorAll("[data-landing-page-summary]").forEach((target) => { target.textContent = count ? `${count} landing page${count === 1 ? "" : "s"}` : "No landing pages"; });
   };
   const formatCreatorPrice = (amount) => `Rp${new Intl.NumberFormat("id-ID").format(amount)}`;
+  const readImageFile = (file) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("That image could not be read. Try another file."));
+    reader.readAsDataURL(file);
+  });
+  const optimizeBuilderImage = async (file, maximumDimension = 2200, quality = .84) => {
+    const original = await readImageFile(file);
+    if (!file?.type?.startsWith("image/") || file.type === "image/gif" || file.type === "image/svg+xml" || file.size <= 350 * 1024) return original;
+    const objectUrl = URL.createObjectURL(file);
+    try {
+      const image = new Image();
+      await new Promise((resolve, reject) => { image.onload = resolve; image.onerror = reject; image.src = objectUrl; });
+      const scale = Math.min(1, maximumDimension / Math.max(image.naturalWidth, image.naturalHeight));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+      canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+      const context = canvas.getContext("2d");
+      if (!context) return original;
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      const optimized = canvas.toDataURL("image/webp", quality);
+      return optimized.length > 32 && optimized.length < original.length ? optimized : original;
+    } catch (_) {
+      return original;
+    } finally {
+      URL.revokeObjectURL(objectUrl);
+    }
+  };
   const compressCreatorProductImage = async (file) => {
     if (!file || !file.type.startsWith("image/")) throw new Error("Choose a PNG, JPEG, WebP, or AVIF product photo.");
     if (file.size > 2 * 1024 * 1024) throw new Error(`${file.name || "An image"} is larger than 2 MB.`);
@@ -5629,7 +5643,7 @@
       if (!value || !/^(https?:\/\/|\/|\.\.\/|\.\/)/i.test(value)) { showToast("Paste a valid image URL"); return; }
       installBackgroundImage(scope, value);
     }));
-    sqStudio.querySelectorAll("[data-sq-background-upload]").forEach((input) => input.addEventListener("change", (event) => {
+    sqStudio.querySelectorAll("[data-sq-background-upload]").forEach((input) => input.addEventListener("change", async (event) => {
       const upload = event.currentTarget;
       const file = upload.files?.[0];
       if (!file) return;
@@ -5637,10 +5651,11 @@
       const scope = upload.dataset.sqBackgroundUpload;
       const target = backgroundTargetFor();
       const snapshot = captureState();
-      const reader = new FileReader();
-      reader.onload = () => installBackgroundImage(scope, String(reader.result || ""), snapshot, target);
-      reader.onerror = () => showToast("That image could not be read. Try another file.");
-      reader.readAsDataURL(file);
+      try {
+        installBackgroundImage(scope, await optimizeBuilderImage(file, 2400, .84), snapshot, target);
+      } catch (error) {
+        showToast(error instanceof Error ? error.message : "That image could not be read. Try another file.");
+      }
       upload.value = "";
     }));
     const sectionBackgroundMotionImage = () => backgroundLayerFor()?.querySelector("img") || null;
@@ -5746,20 +5761,21 @@
       });
       input.addEventListener("change", finishImageEdit);
     });
-    sqStudio.querySelector("[data-sq-image-upload]")?.addEventListener("change", (event) => {
+    sqStudio.querySelector("[data-sq-image-upload]")?.addEventListener("change", async (event) => {
+      const upload = event.currentTarget;
       const image = imageForElement();
-      const file = event.currentTarget.files?.[0];
+      const file = upload.files?.[0];
       if (!image || !file) return;
-      if (file.size > 8 * 1024 * 1024) { showToast("Choose an image smaller than 8 MB"); event.currentTarget.value = ""; return; }
+      if (file.size > 8 * 1024 * 1024) { showToast("Choose an image smaller than 8 MB"); upload.value = ""; return; }
       const snapshot = captureState();
-      const reader = new FileReader();
-      reader.onload = () => {
-        image.src = String(reader.result || "");
+      try {
+        image.src = await optimizeBuilderImage(file, 2000, .84);
         image.alt = image.alt || file.name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ");
         remember(snapshot); syncElementControls(); syncBackgroundManagers(); markSqChanged(); showToast("Image replaced — effects stay editable");
-      };
-      reader.readAsDataURL(file);
-      event.currentTarget.value = "";
+      } catch (error) {
+        showToast(error instanceof Error ? error.message : "That image could not be read. Try another file.");
+      }
+      upload.value = "";
     });
     sqStudio.querySelector("[data-sq-image-reset]")?.addEventListener("click", () => {
       const image = imageForElement();
@@ -5936,16 +5952,15 @@
     let logoSnapshot;
     const startLogoEdit = () => { if (!logoSnapshot) logoSnapshot = captureState(); };
     const finishLogoEdit = () => { if (logoSnapshot) remember(logoSnapshot); logoSnapshot = null; };
-    sqStudio.querySelector("[data-sq-logo-upload]")?.addEventListener("change", (event) => {
+    sqStudio.querySelector("[data-sq-logo-upload]")?.addEventListener("change", async (event) => {
       const upload = event.currentTarget;
       const file = upload.files?.[0];
       const logo = selectedLogoParts();
       if (!logo || !file) return;
       if (file.size > 4 * 1024 * 1024) { showToast("Choose a logo smaller than 4 MB"); upload.value = ""; return; }
       const snapshot = captureState();
-      const reader = new FileReader();
-      reader.onload = () => {
-        const installedLogo = setLogoSource(String(reader.result || ""), logo);
+      try {
+        const installedLogo = setLogoSource(await optimizeBuilderImage(file, 1000, .9), logo);
         if (!installedLogo) {
           showToast("That logo could not be added because its header is no longer available.");
           return;
@@ -5953,9 +5968,9 @@
         if (!installedLogo.image.alt) installedLogo.image.alt = `${installedLogo.text?.textContent.trim() || "Brand"} logo`;
         remember(snapshot);
         showToast("Logo uploaded and added to the header");
-      };
-      reader.onerror = () => showToast("That logo could not be read. Try another file.");
-      reader.readAsDataURL(file);
+      } catch (error) {
+        showToast(error instanceof Error ? error.message : "That logo could not be read. Try another file.");
+      }
       upload.value = "";
     });
     sqStudio.querySelector("[data-sq-logo-src]")?.addEventListener("focus", startLogoEdit);
