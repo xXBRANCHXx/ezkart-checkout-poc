@@ -30,30 +30,9 @@
     {id:'shop',name:'Shop index',description:'Brand and checkout above collection links.',preview:'nav-shop'},
     {id:'compact',name:'Essential',description:'A quiet wordmark and a short set of text links.',preview:'nav-compact'},
   ];
-  function thumbnail(type) {
-    const shapes = {
-      split:'<rect x="100" y="10" width="70" height="94" fill="#e4b49a"/><path d="M106 88 132 36 168 88" fill="#bb8264"/><path d="M12 22h69m-69 12h58m-58 24h67m-67 7h53"/><rect x="12" y="82" width="43" height="12" fill="#d64639"/>',
-      poster:'<path d="M12 14h148m-148 13h131"/><rect x="12" y="46" width="156" height="59" fill="#b8c8b4"/><path d="M30 99 94 51l55 48" fill="#7e9479"/>',
-      product:'<rect x="12" y="12" width="72" height="92" fill="#f0d3af"/><rect x="35" y="35" width="26" height="51" rx="4" fill="#b88046"/><path d="M104 27h62m-62 12h51m-51 26h58"/><rect x="104" y="85" width="52" height="13" fill="#d64639"/>',
-      catalog:'<path d="M12 17h88"/><rect x="12" y="34" width="46" height="58" fill="#b8c8b4"/><rect x="67" y="34" width="46" height="58" fill="#e4b49a"/><rect x="122" y="34" width="46" height="58" fill="#d8c7a4"/><path d="M12 103h38m17 0h38m17 0h38"/>',
-      story:'<rect x="12" y="10" width="74" height="94" fill="#b8c8b4"/><path d="M104 22h60m-60 12h48m-48 23h59m-59 9h61m-61 9h48m-48 18h33"/>',
-      pair:'<rect x="12" y="12" width="74" height="76" fill="#c1c9b9"/><rect x="94" y="12" width="74" height="76" fill="#e4b49a"/><path d="M12 101h57m25 0h57"/>',
-      wide:'<rect x="12" y="10" width="156" height="82" fill="#c1c9b9"/><path d="m26 83 39-48 28 27 26-34 40 55" fill="#869c80"/><path d="M12 104h95"/>',
-      specs:'<path d="M12 16h83m-83 24h51m27 0h72M12 63h51m27 0h72M12 87h51m27 0h72"/><path d="M12 49h156M12 74h156M12 98h156" stroke="#d9dcdf"/>',
-      steps:'<path d="M12 17h106M12 42h13m12 0h124M12 69h13m12 0h124M12 96h13m12 0h124"/>',
-      table:'<path d="M12 18h82M12 44h154M12 66h154M12 88h154M70 35v68m48-68v68"/><path d="M20 54h30m32 0h24m24 0h22M20 78h30m32 0h24m24 0h22" stroke="#a0a7a6"/>',
-      faq:'<path d="M12 16h84M12 40h122m20 0h12m-6-6v12M12 66h122m20 0h12m-6-6v12M12 92h122m20 0h12m-6-6v12"/>',
-      quote:'<path d="M22 30h135M22 46h119M22 62h91M22 92h57"/><path d="M12 22v56" stroke="#d64639"/>',
-      cta:'<path d="M29 32h123M43 46h95"/><rect x="62" y="72" width="57" height="16" fill="#d64639"/>',
-      footer:'<path d="M12 24h51m31 0h28m17 0h28M94 42h27m18 0h27M94 58h23m22 0h22M12 95h156"/>',
-      notice:'<rect x="10" y="42" width="160" height="32" fill="#f1e2d6"/><path d="M37 58h107"/>',
-      'nav-studio':'<path d="M12 50h37m27 0h17m13 0h17"/><rect x="138" y="42" width="31" height="16" fill="#d64639"/><path d="M12 76h157" stroke="#d9dcdf"/>',
-      'nav-masthead':'<path d="M12 28h104m-104 13h82M12 72h22m14 0h22m14 0h22m14 0h22"/><path d="M12 57h157M12 89h157" stroke="#d9dcdf"/>',
-      'nav-split':'<path d="M12 57h16m10 0h16M73 57h34m25 0h16m10 0h11"/><path d="M12 76h157" stroke="#d9dcdf"/>',
-      'nav-shop':'<path d="M12 31h63m-63 45h24m11 0h24m11 0h24m11 0h24"/><rect x="127" y="23" width="42" height="16" fill="#d64639"/><path d="M12 57h157M12 93h157" stroke="#d9dcdf"/>',
-      'nav-compact':'<path d="M12 55h29m62 0h22m17 0h27"/><path d="M12 76h157" stroke="#d9dcdf"/>',
-    };
-    return `<svg viewBox="0 0 180 116" aria-hidden="true" class="sq-composition-thumbnail"><rect width="180" height="116" fill="#faf8f5"/><g stroke="#444841" stroke-width="3" stroke-linecap="round" fill="none">${shapes[type] || shapes.split}</g></svg>`;
+  function thumbnail(id) {
+    const known = definitions.some(item => item.id === id) || navDefinitions.some(item => `nav-${item.id}` === id);
+    return known ? `<img src="assets/components/${id}.webp" alt="" loading="lazy" decoding="async" class="sq-composition-thumbnail">` : '';
   }
   function create(id, {sectionId, content = {}, product = null, products = []} = {}) {
     const definition = definitions.find(item => item.id === id);

@@ -30,7 +30,7 @@ Place `catalog.json` in the workspace with the same product objects returned by 
 }
 ```
 
-`mediaBase` resolves catalog media. `publicBase` supplies the real font and checkout origin for standalone exports. Set it before exporting a storefront for use outside this local workspace. Only product IDs in this catalog can be attached to a project. Catalog data is supplied explicitly; the server does not read browser cookies or cloud credentials.
+`mediaBase` resolves catalog media. `publicBase` supplies the real checkout origin and fallback font URLs for standalone exports. Set it before exporting a storefront for use outside this local workspace. Only product IDs in this catalog can be attached to a project. Catalog data is supplied explicitly; the server does not read browser cookies or cloud credentials.
 
 ## Tools
 
@@ -41,13 +41,17 @@ Place `catalog.json` in the workspace with the same product objects returned by 
 - `device_set`, `page_audit`, `page_screenshot`
 - `undo`, `redo`, `project_save`, `page_export`
 
-A typical session creates a project with catalog product IDs, adds `hero-split` and `product-collection`, configures navigation and a palette, inspects element IDs, edits individual elements, checks all devices, and exports. `page_inspect` lists editable text fields so `element_update` can target a specific FAQ answer, comparison cell, or heading. Layout edits use the same grid coordinates as dragging in the editor. `section_update` accepts exact padding per device.
+A typical session creates a project with catalog product IDs, adds `hero-split` and `product-collection`, configures navigation and a palette, inspects element IDs, edits individual elements, checks all devices, and exports. `page_inspect` lists editable text fields so `element_update` can target a specific FAQ answer, comparison cell, or heading. Layout edits follow `page_inspect`: grid coordinates for grid elements, and pixel offsets with optional width/height for flow elements. Both use the same selection, drag, resize, history, and save controls. `section_update` accepts exact padding per device.
 
-The 15 section compositions are in `cart/admin/builder-components.js`; all their elements can also be edited individually. The five navigation compositions are Studio, Masthead, Centered brand, Shop index, and Essential. Surface, positioning, and scroll behavior remain independently editable in the inspector.
+The library has 24 editable section compositions: 15 grid compositions in `cart/admin/builder-components.js` and nine responsive compositions adapted from the user-owned Ezkart.id in `cart/admin/builder-showcase-data.js`. The latter preserve the reference’s DOM layout while exposing native editable content groups; they do not embed the page in an iframe. The five navigation compositions are Studio, Masthead, Centered brand, Shop index, and Essential. Surface, positioning, and scroll behavior remain independently editable in the inspector.
 
 The completed ZERO example can be recreated through the MCP protocol with `node examples/zero-studio.mjs unique-project-id`. It requires the two corresponding ZERO products in the connected catalog and creates a new draft. Every section in that example is native and editable; it does not add a template selector.
 
 `element_update` also accepts `autoHeight: false` when you want a manually sized text element. The inspector exposes the same “Fit height to content” control.
+
+The Ezkart.id reference can be recreated with `node examples/ezkart-id.mjs unique-project-id`. It builds nine native sections through MCP, uses the original marketing illustrations, and attaches no catalog products. Exported fonts and captions are self-contained. Navigation, the responsive demonstration, FAQ disclosures, and the accessible film dialog share their runtime with the editor.
+
+Component thumbnails are screenshots of these actual components, using the existing Ezkart marketing illustration. To regenerate them, run `node scripts/build-previews.mjs` (requires ImageMagick). Its illustrative product fixture exists only in a temporary workspace. To refresh the reference source, run `node scripts/build-showcase.mjs`; an optional directory argument reads a previously retrieved `index.html`, `styles.css`, and `overview-id.vtt` instead. Review any upstream content changes before committing generated files.
 
 ## Local behavior
 
@@ -63,4 +67,4 @@ This server saves local drafts and HTML exports. It does not publish or deploy p
 npm test
 ```
 
-Integration tests run the MCP protocol and the real browser editor. They cover persistence across project switches and restarts, history, invalid edits, all native compositions, navigation replacement, panel/canvas fit, responsive export and FAQ expansion, and workspace request boundaries.
+Integration tests run the MCP protocol and the real browser editor. They cover persistence across project switches and restarts, history, invalid edits, all native compositions, navigation replacement, panel/canvas fit, responsive export and FAQ expansion, workspace request boundaries, catalog image sizing, native reference editing and duplication, per-device sizing, embedded fonts, navigation, and the film dialog.

@@ -41,7 +41,12 @@ test('all native compositions, navigation changes, responsive export, FAQ reflow
  try{
   await page.goto(ws.url+'/cart/admin/?page=sites&edit=review.ezkart.site');await page.waitForFunction(()=>globalThis.EzkartBuilder);
   const invoke=(method,args={})=>page.evaluate(({method,args})=>EzkartBuilder[method](args),{method,args});
-  const library=await invoke('components');assert.equal(library.sections.length,15);assert.equal(library.navigation.length,5);
+  const library=await invoke('components');assert.equal(library.sections.length,24);assert.equal(library.navigation.length,5);
+  const uneditable=await page.evaluate(()=>Object.keys(EzkartShowcaseData.templates).flatMap(id=>{
+   const holder=document.createElement('div');holder.innerHTML=EzkartComponents.create(id,{sectionId:'coverage'});const walker=document.createTreeWalker(holder,NodeFilter.SHOW_TEXT),missing=[];
+   while(walker.nextNode()){const node=walker.currentNode;if(node.textContent.trim()&&!node.parentElement.closest('[data-sq-element],svg,dialog'))missing.push({component:id,text:node.textContent.trim().slice(0,80)});}return missing;
+  }));assert.deepEqual(uneditable,[], 'Every visible reference text must belong to an editable native element');
+
   for(const {id} of library.sections)await invoke('addSection',{component:id,id,content:{title:'A long editable heading for layout checks',body:'A paragraph that wraps naturally across the canvas. '.repeat(4)}});
   for(const device of ['desktop','tablet','mobile']){await invoke('setDevice',{device});await invoke('settle');const audit=await invoke('audit');assert.deepEqual(audit.issues.filter(issue=>issue.type==='overflow'),[]);}
   await invoke('setDevice',{device:'desktop'});
@@ -67,4 +72,39 @@ test('workspace rejects traversal and cross-origin writes',async()=>{
   assert.equal((await fetch(ws.url+'/cart/admin/?cloud=/v1/landing-pages/safe',{method:'PUT',body:'{}'})).status,403);
   assert.equal((await fetch(ws.url+'/cart/admin/?cloud=/v1/landing-pages/safe',{headers:{Origin:'https://unrelated.example'}})).status,403);
  }finally{await ws.stop();await rm(directory,{recursive:true,force:true});}
+});
+
+test('reference sections stay editable, preserve device-specific sizing, and export working navigation and media',async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'ezkart-flow-test-'));const ws=await new Workspace(directory).init();await ws.create({id:'reference',name:'Reference'});await ws.start();
+ const browser=await chromium.launch(),page=await browser.newPage({viewport:{width:1600,height:1000},reducedMotion:'reduce'});const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ try{
+  await page.goto(ws.url+'/cart/admin/?page=sites&edit=reference.ezkart.site');await page.waitForFunction(()=>globalThis.EzkartBuilder);
+  const invoke=(method,args={})=>page.evaluate(({method,args})=>EzkartBuilder[method](args),{method,args});
+  for(const [component,id] of [['brand-navigation','navigation'],['centered-showcase','top'],['device-showcase','landing-pages'],['film-showcase','in-motion'],['support-questions','questions']])await invoke('addSection',{component,id});await invoke('removeSection',{id:'blank'});
+  const field=(await invoke('inspect')).sections.find(s=>s.id==='top').elements.find(e=>e.type==='heading');
+  assert.equal(field.fields.length,3);await invoke('updateElement',{id:field.id,text:'A new first line.',field:0});await invoke('undo');assert.equal((await invoke('inspect')).sections.find(s=>s.id==='top').elements.find(e=>e.id===field.id).fields[0].text,field.fields[0].text);
+  await invoke('updateElement',{id:field.id,layout:{x:18,width:1000},device:'desktop'});
+  await page.locator(`[data-sq-element-id="${field.id}"]`).click();await page.locator('[data-sq-overlay-duplicate]').click();assert.equal(await page.locator('#top h1').count(),2);await invoke('undo');
+  await invoke('setDevice',{device:'mobile'});assert.equal(await page.locator('#top h1').evaluate(n=>n.style.getPropertyValue('--sq-flow-width')),'');await invoke('setDevice',{device:'desktop'});await invoke('save');
+  await page.reload();await page.waitForFunction(()=>globalThis.EzkartBuilder);await invoke('settle');assert.equal((await invoke('inspect')).sections.find(s=>s.id==='top').elements.find(e=>e.id===field.id).layout.x,18);
+  const html=await invoke('exportHtml');assert.match(html,/@container ezkart-page/);assert.match(html,/data:font\/woff2;base64/);assert.doesNotMatch(html,/<iframe/);
+  await page.route('**/flow-export',r=>r.fulfill({body:html,contentType:'text/html'}));await page.setViewportSize({width:1440,height:1000});await page.goto(ws.url+'/flow-export');await page.evaluate(()=>document.fonts.ready);
+  assert.equal(await page.locator('#top h1').evaluate(n=>n.offsetWidth),1000);assert.equal(await page.locator('[data-ezkart-cart-open]').count(),0);assert.equal(await page.evaluate(()=>[...document.fonts].every(f=>f.status==='loaded')),true);
+  await page.locator('.ezm-watch-button').click();assert.equal(await page.locator('.ezm-film-dialog').evaluate(n=>n.open),true);await page.keyboard.press('Escape');assert.equal(await page.locator('.ezm-film-dialog').evaluate(n=>n.open),false);
+  await page.locator('.ezm-device-switch [data-device=mobile]').click();assert.equal(await page.locator('.ezm-responsive-preview').getAttribute('data-preview-device'),'mobile');
+  await page.setViewportSize({width:390,height:1000});assert.ok(await page.locator('#top h1').evaluate(n=>n.offsetWidth)<=390);await page.evaluate(()=>scrollTo(0,0));await page.locator('.ezm-menu-toggle').click();assert.equal(await page.locator('.ezm-menu-toggle').getAttribute('aria-expanded'),'true');await page.keyboard.press('Escape');assert.equal(await page.locator('.ezm-menu-toggle').getAttribute('aria-expanded'),'false');
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth),390);assert.deepEqual(errors,[]);
+ }finally{await browser.close();await ws.stop();await rm(directory,{recursive:true,force:true});}
+});
+
+test('catalog photos keep a square aspect ratio instead of the admin thumbnail flex basis',async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'ezkart-photo-test-'));const ws=await new Workspace(directory).init();await ws.start();
+ await writeFile(join(directory,'catalog.json'),JSON.stringify({mediaBase:ws.url+'/preview-media',products:[{id:'custom-photo',name:'Photo regression fixture',type:'physical',price:10000,stock:3,weightGrams:100,media:[{id:'photo'}]}]}));await ws.create({id:'photos',name:'Photos',productIds:['custom-photo']});
+ const browser=await chromium.launch(),page=await browser.newPage({viewport:{width:1440,height:1000}});
+ try{
+  await page.route('**/preview-media/**',r=>r.fulfill({body:'<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="#f44b34"/></svg>',contentType:'image/svg+xml'}));await page.goto(ws.url+'/cart/admin/?page=sites&edit=photos.ezkart.site');await page.waitForFunction(()=>globalThis.EzkartBuilder);
+  await page.evaluate(async()=>{await EzkartBuilder.addSection({component:'product-collection',id:'products'});await EzkartBuilder.removeSection({id:'blank'});});
+  const check=async()=>{const size=await page.locator('.sq-product-grid .product-art').evaluate(n=>({width:n.offsetWidth,height:n.offsetHeight,flex:getComputedStyle(n).flexBasis}));assert.ok(size.width>100);assert.ok(Math.abs(size.width-size.height)<2);assert.notEqual(size.flex,'36px');};
+  await check();const html=await page.evaluate(()=>EzkartBuilder.exportHtml());await page.route('**/photo-export',r=>r.fulfill({body:html,contentType:'text/html'}));await page.goto(ws.url+'/photo-export');await check();
+ }finally{await browser.close();await ws.stop();await rm(directory,{recursive:true,force:true});}
 });
