@@ -2590,11 +2590,16 @@
       builderSidebar?.classList.toggle("sq-panel-pinned", pin || builderSidebar.classList.contains("sq-panel-pinned"));
       if (window.matchMedia("(max-width: 720px)").matches) sqStudio.classList.toggle("mobile-panel-open", pin);
     };
-    sqStudio.querySelectorAll("[data-sq-tab]").forEach((button) => button.addEventListener("click", () => openSqPanel(button.dataset.sqTab, { pin: true })));
+    sqStudio.querySelectorAll("[data-sq-tab]").forEach((button) => button.addEventListener("click", () => {
+      if (button.classList.contains('active') && builderSidebar?.classList.contains('sq-panel-pinned')) {
+        builderSidebar.classList.remove('sq-panel-pinned');sqStudio.classList.remove('mobile-panel-open');button.blur();
+      } else openSqPanel(button.dataset.sqTab, {pin:true});
+    }));
     sqStudio.querySelectorAll("[data-sq-open-panel]").forEach((button) => button.addEventListener("click", () => openSqPanel(button.dataset.sqOpenPanel, { pin: true })));
     sqStudio.querySelectorAll("[data-sq-structure-view]").forEach((button) => button.addEventListener("click", () => openSqPanel(button.dataset.sqStructureView === "pages" ? "pages" : "layers", { pin: true })));
     document.addEventListener("pointerdown", (event) => {
       if (builderSidebar?.contains(event.target) || event.target.closest?.("[data-sq-edit-button-brand], [data-sq-open-panel], [data-sq-builder-select-menu]")) return;
+      if (window.matchMedia("(min-width:1121px)").matches) return;
       builderSidebar?.classList.remove("sq-panel-pinned");
       sqStudio.classList.remove("mobile-panel-open");
     });
@@ -2842,6 +2847,8 @@
     };
     const applyFluidSection = (section) => {
       if (!section?.matches("[data-sq-fluid]")) return;
+      const spacing = readSpacing(section.dataset.sectionId);
+      section.style.padding = `${spacing.top}px ${spacing.right}px ${spacing.bottom}px ${spacing.left}px`;
       syncSectionEdgeVariables(section);
       if (!section.dataset.sqMinRows) section.dataset.sqMinRows = section.dataset.sqRows || "12";
       let rows = fluidMinRows(section);
@@ -3510,6 +3517,8 @@
         ? (selectedAction?.isConnected && selectedElement.contains(selectedAction) ? selectedAction : null)
         : isNavigation ? selectedAction : actionForElement();
       const image = isLogo || isProductGrid ? null : imageForElement();
+      const autoHeightControl=sqStudio.querySelector('[data-sq-auto-height-control]');
+      if(autoHeightControl){autoHeightControl.hidden=!selectedElement.closest('.sq-composition')||!['heading','text','copy','faq','comparison','quote'].includes(elementType);autoHeightControl.querySelector('input').checked=selectedElement.dataset.sqAutoHeight==='true';}
       const contentName = selectedContent?.matches("h1,h2,h3") ? "Heading" : selectedContent ? "Text" : "";
       const contextualName = isBackgroundImage ? "Section background" : isLogo ? "Logo" : selectedAction && action ? "Button" : selectedImage && image ? "Image" : contentName || elementTypeName(selectedElement);
       const context = sqStudio.querySelector("[data-sq-inspector-context]");
@@ -4041,8 +4050,11 @@
 
     const spacingKey = (section = selectedSection, device = activeDevice) => `${section}:${device}`;
     const defaultSpacing = (section = selectedSection, device = activeDevice) => {
-      if (section === "announcement") return device === "mobile" ? { top: 7, right: 12, bottom: 7, left: 12 } : { top: 8, right: 18, bottom: 8, left: 18 };
+      const block = previewRoot?.querySelector(`[data-section-id="${CSS.escape(section)}"]`);
       const gutter = pageSpacingState.gutters[device] ?? defaultPageSpacing.gutters[device];
+      if (section === "announcement" || block?.dataset.sqComposition === "announcement") return { top: 10, right: gutter, bottom: 10, left: gutter };
+      if (block?.classList.contains("sq-store-nav")) return { top: 0, right: gutter, bottom: 0, left: gutter };
+      if (block?.dataset.sqComposition) return { top: device === "desktop" ? 64 : device === "tablet" ? 48 : 32, right: gutter, bottom: device === "desktop" ? 64 : device === "tablet" ? 48 : 32, left: gutter };
       if (device === "mobile") return { top: 36, right: gutter, bottom: 36, left: gutter };
       if (device === "tablet") return { top: 52, right: gutter, bottom: 52, left: gutter };
       return { top: 70, right: gutter, bottom: 70, left: gutter };
@@ -4055,6 +4067,7 @@
         const output = sqStudio.querySelector(`[data-sq-spacing-output="${input.dataset.sqSpacing}"]`);
         if (output) output.textContent = input.value;
       });
+      sqStudio.querySelectorAll("[data-sq-spacing-number]").forEach((input) => { input.value = String(values[input.dataset.sqSpacingNumber]); });
       const label = sqStudio.querySelector("[data-sq-spacing-device]");
       if (label) label.textContent = activeDevice[0].toUpperCase() + activeDevice.slice(1);
     };
@@ -4067,6 +4080,8 @@
       block.style.paddingBottom = `${values.bottom}px`;
       block.style.paddingLeft = `${values.left}px`;
       syncSectionEdgeVariables(block);
+      refreshLayoutGrid();
+      if (selectedElement) refreshElementOverlay();
     };
     const syncPageSpacingControls = () => {
       sqStudio.querySelectorAll("[data-sq-page-gutter]").forEach((input) => {
@@ -4278,6 +4293,7 @@
       ".sq-generated-faq>h2", ".sq-generated-faq summary", ".sq-generated-faq p",
       ".sq-generated-spacer>span",
       ".sq-free-heading>h2", ".sq-free-text>p", ".sq-free-marquee .sq-marquee-copy:not([aria-hidden])", ".sq-free-button>button", ".sq-free-form>h3", ".sq-free-form>p",
+      ".sq-composition-heading>h1", ".sq-composition-heading>h3", ".sq-composition-detail h3", ".sq-composition-detail p", ".sq-composition-faq summary", ".sq-composition-faq p", ".sq-composition-comparison th", ".sq-composition-comparison td", ".sq-composition-quote blockquote", ".sq-composition-quote p", ".sq-composition-footer-links>a",
     ].join(",");
     const editableNodesFor = (block) => block ? [...block.querySelectorAll(editableContentSelector)].filter((node) => !node.closest(".sq-image-drag-handle,.sq-nav-mobile-menu")) : [];
     const contentFieldLabel = (node, index) => {
@@ -4927,7 +4943,7 @@
       const type = ["physical", "digital", "subscription"].includes(product.type) ? product.type : "physical";
       const typeName = { physical: "Physical product", digital: "Digital download", subscription: "Subscription" }[type];
       const schedule = type === "subscription" ? ` · every ${product.subscription?.interval || 1} ${product.subscription?.unit || "month"}` : "";
-      const detail = type === "physical" ? `Ships at ${Math.max(1, Number(product.weightGrams) || 1)} g.` : type === "digital" ? `${product.digitalFileName || "Digital file"} · delivered after confirmed payment.` : "Recurring billing on the selected schedule.";
+      const detail = type === "physical" ? String(product.description || "") : type === "digital" ? `${product.digitalFileName || "Digital file"} · delivered after confirmed payment.` : "Recurring billing on the selected schedule.";
       const imageUrl = String(images[0]);
       const safeName = escapeHtml(name);
       const safePrice = escapeHtml(formatRupiah(price));
@@ -4956,6 +4972,8 @@
           card.innerHTML = `<span class="product-art"><img src="${imageUrl}" alt="${safeName}">${images.length > 1 ? `<em class="sq-media-count">+${images.length - 1} photos</em>` : ""}</span><div><small>${typeName}${escapeHtml(schedule)}</small><h3>${safeName}</h3><p>${escapeHtml(detail)}</p><footer><b>${safePrice}</b><button type="button">${type === "subscription" ? "Subscribe" : "Add to cart"}</button></footer></div>`;
           grid.append(card);
         }
+        const descriptionNode = card.querySelector(':scope > div > p');
+        if(type === 'physical' && /^Ships at \d+ g\.$/.test(descriptionNode?.textContent || '')) descriptionNode.textContent=detail;
         installStorefrontVariantControls(card, product, variants, price, imageUrl);
       });
       scheduleProductGridFit();
@@ -5030,8 +5048,10 @@
     const fitZoomForDevice = (device = activeDevice) => {
       const canvas = sqStudio.querySelector(".sq-canvas-scroll");
       const targetWidth = { desktop: 1440, tablet: 768, mobile: 390 }[device] || 1440;
-      const availableWidth = Math.max(1, (canvas?.clientWidth || targetWidth) - 64);
-      return Math.max(60, Math.min(100, Math.floor((availableWidth / targetWidth) * 100)));
+      const style = canvas ? getComputedStyle(canvas) : null;
+      const padding = (Number.parseFloat(style?.paddingLeft) || 0) + (Number.parseFloat(style?.paddingRight) || 0);
+      const availableWidth = Math.max(1, (canvas?.clientWidth || targetWidth) - padding - 2);
+      return Math.max(10, Math.min(100, Math.floor((availableWidth / targetWidth) * 100)));
     };
     sqStudio.querySelectorAll("[data-sq-device]").forEach((button) => button.addEventListener("click", () => {
       activeDevice = button.dataset.sqDevice;
@@ -5083,6 +5103,7 @@
     let spacingSnapshot;
     sqStudio.querySelectorAll("[data-sq-spacing]").forEach((input) => {
       input.addEventListener("pointerdown", () => { spacingSnapshot = captureState(); });
+      input.addEventListener("focus", () => { spacingSnapshot = captureState(); });
       input.addEventListener("input", () => {
         const values = { ...readSpacing(), [input.dataset.sqSpacing]: Number(input.value) };
         if (sqStudio.querySelector("[data-sq-link-spacing]")?.checked) Object.keys(values).forEach((side) => { values[side] = Number(input.value); });
@@ -5092,6 +5113,24 @@
         markSqChanged();
       });
       input.addEventListener("change", () => { if (spacingSnapshot) remember(spacingSnapshot); spacingSnapshot = null; });
+    });
+    sqStudio.querySelectorAll("[data-sq-spacing-number]").forEach((input) => {
+      input.addEventListener("focus", () => { spacingSnapshot = captureState(); });
+      input.addEventListener("input", () => {
+        if (input.value === "" || !input.validity.valid) return;
+        const range = sqStudio.querySelector(`[data-sq-spacing="${input.dataset.sqSpacingNumber}"]`);
+        range.value = input.value;
+        range.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+      input.addEventListener("change", () => { if (spacingSnapshot) remember(spacingSnapshot); spacingSnapshot = null; loadSpacingControls(); });
+    });
+    sqStudio.querySelector("[data-sq-fit-section]")?.addEventListener("click", () => {
+      const section = previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`);
+      if (!section) return;
+      remember(); setSectionHeightRows(section, sectionContentRows(section)); refreshLayoutGrid(); markSqChanged();
+    });
+    sqStudio.querySelector("[data-sq-reset-section-spacing]")?.addEventListener("click", () => {
+      remember(); spacingState.delete(spacingKey()); loadSpacingControls(); applySpacing(); markSqChanged();
     });
     let elementControlSnapshot;
     sqStudio.querySelectorAll("[data-sq-element-x], [data-sq-element-y], [data-sq-element-w], [data-sq-element-h]").forEach((input) => {
@@ -5106,6 +5145,9 @@
         markSqChanged();
       });
       input.addEventListener("change", () => { if (elementControlSnapshot) remember(elementControlSnapshot); elementControlSnapshot = null; });
+    });
+    sqStudio.querySelector('[data-sq-auto-height-toggle]')?.addEventListener('change',event=>{
+      if(!selectedElement)return;remember();selectedElement.dataset.sqAutoHeight=String(event.target.checked);markSqChanged();scheduleNativeFit();
     });
     const quickWidth = sqStudio.querySelector("[data-sq-element-width-quick]");
     quickWidth?.addEventListener("pointerdown", () => { if (!elementControlSnapshot) elementControlSnapshot = captureState(); });
@@ -6504,7 +6546,7 @@
       const groups = [...(previewRoot?.querySelectorAll(":scope > [data-sq-block]") || [])].map((section) => {
         const sectionId = section.dataset.sectionId;
         const detailKey = Object.keys(layerDetails).sort((a, b) => b.length - a.length).find((key) => sectionId === key || sectionId.startsWith(`${key}-`));
-        const details = layerDetails[detailKey] || [elementTypeName(section), "Editable section", "layers"];
+        const details = section.dataset.sqSectionName ? [section.dataset.sqSectionName, "Editable section", "layers"] : layerDetails[detailKey] || ["Section", "Editable section", "layers"];
         const elements = [...section.querySelectorAll(":scope > [data-sq-element]")];
         const sectionBackground = section.querySelector(":scope > .sq-section-background");
         elements.forEach((element, index) => { if (!element.dataset.sqElementId) element.dataset.sqElementId = `element-${sectionId.replace(/[^a-z0-9-]/gi, "-")}-${index + 1}-${Date.now()}`; });
@@ -6528,7 +6570,21 @@
       syncPageAppearanceControls();
       syncButtonSystemControls();
     };
+    const nativeComponentMarkup = (component, options) => {
+      const wrapper=document.createElement('div');wrapper.innerHTML=globalThis.EzkartComponents.create(component, options);
+      wrapper.querySelectorAll('[data-sq-element]').forEach(element=>['desktop','tablet','mobile'].forEach(device=>{
+        const [x,y,width,height]=element.getAttribute(`data-layout-${device}`).split(',').map(Number),columns=fluidColumns(device);
+        const left=Math.floor((x-1)*columns/12)+1,right=Math.ceil((x-1+width)*columns/12);
+        element.setAttribute(`data-layout-${device}`,`${left},${y},${Math.max(1,right-left+1)},${height}`);
+      }));return wrapper.innerHTML;
+    };
     const newBlockMarkup = (type, sectionId) => {
+      const aliases = { "full-image": "image-wide", gallery: "image-pair", text: "story-split", testimonials: "quote", faq: "faq-list", products: "product-collection", checkout: "call-to-action" };
+      const componentId = aliases[type] || type;
+      if (globalThis.EzkartComponents?.definitions.some((item) => item.id === componentId)) {
+        const catalog = readCatalogProducts().filter((product) => selectedProducts().includes(product.id));
+        return nativeComponentMarkup(componentId, { sectionId, product: catalog[0], products: catalog });
+      }
       const handle = `<button class="sq-block-handle" type="button" aria-label="Drag section">${iconMarkup("grip")}</button>`;
       if (type === "blank") return `<section class="sq-page-block sq-generated-blank" draggable="true" data-sq-block data-sq-fluid data-sq-rows="12" data-section-id="${sectionId}">${handle}</section>`;
       if (type === "full-image") return `<section class="sq-page-block sq-generated-image" draggable="true" data-sq-block data-sq-fluid data-sq-rows="14" data-section-id="${sectionId}">${handle}<div class="sq-free-image" data-sq-element data-sq-element-type="image" data-layout-desktop="1,1,12,14" data-layout-tablet="1,1,12,14" data-layout-mobile="1,1,12,14"><img src="${productImages.granola}" alt="Granola Madu Nusantara product story"></div></section>`;
@@ -6672,7 +6728,10 @@
       navigation.dataset.sqElement = "";
       navigation.dataset.sqElementType = "navigation";
       navigation.dataset.sqButtonRole = source?.dataset.sqButtonRole || "primary";
-      const editableItems = [...(source?.children || [])].filter((item) => item.matches("a, button:not(.sq-nav-menu-toggle)"));
+      const sources = [...previewRoot.querySelectorAll('[data-section-id="navigation"] > [data-sq-element-type="navigation"]')].sort((a,b) => (a.dataset.sqNavSlot === 'left' ? -1 : 0) - (b.dataset.sqNavSlot === 'left' ? -1 : 0));
+      const editableItems = sources.flatMap(nav => [...nav.children]).filter((item) => item.matches("a, button:not(.sq-nav-menu-toggle)"));
+      const preservedAction=source?.closest('[data-sq-block]')?.dataset.sqCompactAction;
+      if(preservedAction&&!editableItems.some(item=>item.matches('button'))){const saved=document.createElement('template');saved.innerHTML=preservedAction;const action=saved.content.querySelector('button');if(action)editableItems.push(action);}
       if (editableItems.length) editableItems.forEach((item) => navigation.append(item.cloneNode(true)));
       else navigation.innerHTML = '<a href="#products" data-sq-link-type="section" data-sq-link="products" data-sq-new-tab="false">Shop</a><a href="#story" data-sq-link-type="section" data-sq-link="story" data-sq-new-tab="false">Our story</a><a href="#contact" data-sq-link-type="section" data-sq-link="contact" data-sq-new-tab="false">Contact</a><button type="button" data-sq-link-type="checkout" data-sq-link="" data-sq-new-tab="false">Buy now</button>';
       navigation.querySelectorAll(":scope > a").forEach((link) => {
@@ -6684,20 +6743,40 @@
       return navigation.outerHTML;
     };
     const navigationTemplateMarkup = (template, sectionId = "navigation") => {
-      const handle = `<button class="sq-block-handle" type="button" aria-label="Drag navigation section">${iconMarkup("grip")}</button>`;
-      const definitions = {
-        current: { position: "static", surface: "solid", opacity: 100, shadow: false },
-        sticky: { position: "sticky", surface: "solid", opacity: 100, shadow: true },
-        centered: { position: "static", surface: "solid", opacity: 100, shadow: false },
-        minimal: { position: "sticky", surface: "solid", opacity: 100, shadow: false },
-        glass: { position: "sticky", surface: "blur", opacity: 82, shadow: true },
-        overlay: { position: "sticky", surface: "transparent", opacity: 0, shadow: true },
-      };
-      const selectedTemplate = Object.hasOwn(definitions, template) ? template : "current";
-      const definition = definitions[selectedTemplate];
-      const logo = navigationLogoMarkup({ desktop: "1,1,4,2", tablet: "1,1,5,2", mobile: "1,1,5,2" });
-      const navigation = navigationLinksMarkup({ desktop: "5,1,8,2", tablet: "6,1,7,2", mobile: "6,1,7,2" });
-      return `<header class="sq-page-block sq-store-nav sq-navigation-template-section" draggable="true" data-sq-block data-sq-fluid data-sq-rows="2" data-section-id="${sectionId}" data-sq-nav-template="${selectedTemplate}" data-sq-nav-position="${definition.position}" data-sq-nav-offset="0" data-sq-nav-surface="${definition.surface}" data-sq-nav-opacity="${definition.opacity}" data-sq-nav-blur="16" data-sq-nav-shadow="${definition.shadow}" data-sq-nav-hide-scroll="false">${handle}${logo}${navigation}</header>`;
+      const aliases = { current: "studio", sticky: "studio", centered: "split", minimal: "compact", glass: "studio", overlay: "studio" };
+      const selected = aliases[template] || template;
+      const kind = ["studio", "masthead", "split", "shop", "compact"].includes(selected) ? selected : "studio";
+      const doubleRow = kind === "masthead" || kind === "shop";
+      const logoLayouts = kind === "split" ? {desktop:"5,1,4,2",tablet:"1,1,5,2",mobile:"1,1,5,2"}
+        : doubleRow ? {desktop:"1,1,8,2",tablet:"1,1,8,2",mobile:"1,1,5,2"}
+        : {desktop:"1,1,4,2",tablet:"1,1,5,2",mobile:"1,1,5,2"};
+      const navLayouts = doubleRow ? {desktop:"1,3,12,2",tablet:"1,3,12,2",mobile:"6,1,7,2"}
+        : kind === "split" ? {desktop:"9,1,4,2",tablet:"6,1,7,2",mobile:"6,1,7,2"}
+        : {desktop:"5,1,8,2",tablet:"6,1,7,2",mobile:"6,1,7,2"};
+      const holder = document.createElement("div");
+      holder.innerHTML = navigationLogoMarkup(logoLayouts) + navigationLinksMarkup(navLayouts);
+      const nav = holder.querySelector('[data-sq-element-type="navigation"]');
+      nav.dataset.sqNavSlot = "right";
+      let compactAction='';
+      if(kind==='compact'){const action=nav.querySelector('button');if(action){compactAction=action.outerHTML;action.remove();}}
+
+      if (kind === "shop") {
+        const actionNav = document.createElement('nav');
+        actionNav.className = 'sq-template-navigation button-primary';actionNav.dataset.sqElement='';actionNav.dataset.sqElementType='navigation';actionNav.dataset.sqNavSlot='action';actionNav.dataset.sqButtonRole='primary';
+        const action=nav.querySelector('button');if(action)actionNav.append(action);
+        Object.entries(responsiveNavigationLayouts({desktop:'9,1,4,2',tablet:'9,1,4,2',mobile:'6,1,7,2'})).forEach(([device,layout])=>actionNav.setAttribute(`data-layout-${device}`,layout));
+        nav.dataset.sqNavSlot='categories';holder.append(actionNav);
+      }
+      if (kind === "split") {
+        const left = document.createElement("nav");
+        left.className = "sq-template-navigation"; left.dataset.sqElement = ""; left.dataset.sqElementType = "navigation"; left.dataset.sqNavSlot = "left";
+        const links = [...nav.querySelectorAll(":scope > a")];
+        links.slice(0, Math.max(1, Math.ceil(links.length / 2))).forEach(link => left.append(link));
+        const layouts = responsiveNavigationLayouts({desktop:"1,1,4,2",tablet:"1,3,12,1",mobile:"1,3,12,1"});
+        Object.entries(layouts).forEach(([device,layout]) => left.setAttribute(`data-layout-${device}`,layout));
+        holder.append(left);
+      }
+      return `<header class="sq-page-block sq-store-nav sq-navigation-template-section sq-authored-navigation sq-navigation-${kind}" draggable="true" data-sq-block data-sq-fluid data-sq-min-rows="${doubleRow?4:2}" data-sq-min-rows-mobile="2" data-sq-rows="${doubleRow?4:2}" data-section-id="${sectionId}" data-sq-section-name="${globalThis.EzkartComponents?.navDefinitions.find(item=>item.id===kind)?.name || "Navigation"} navigation" data-sq-nav-template="${kind}" data-sq-compact-action="${escapeHtml(compactAction)}" data-sq-nav-position="static" data-sq-nav-offset="0" data-sq-nav-surface="solid" data-sq-nav-opacity="100" data-sq-nav-blur="0" data-sq-nav-shadow="false" data-sq-nav-hide-scroll="false">${holder.innerHTML}</header>`;
     };
     const addNavigationTemplate = (template) => {
       const existing = previewRoot?.querySelector('[data-section-id="navigation"]') || previewRoot?.querySelector(".sq-navigation-template-section");
@@ -6804,6 +6883,14 @@
     });
 
     const addPanel = sqStudio.querySelector('[data-sq-panel="add"]');
+    const nativeComponentList = addPanel?.querySelector("[data-sq-native-component-list]");
+    if (nativeComponentList && globalThis.EzkartComponents) {
+      nativeComponentList.innerHTML = globalThis.EzkartComponents.definitions.map((item) => `<button type="button" class="sq-native-component-card" data-sq-add-block="${item.id}" data-search="${escapeHtml(`${item.name} ${item.category} ${item.description}`)}">${globalThis.EzkartComponents.thumbnail(item.preview)}<span><b>${escapeHtml(item.name)}</b><small>${escapeHtml(item.description)}</small></span></button>`).join("");
+    }
+    const navigationCatalog = addPanel?.querySelector("[data-sq-navigation-catalog]");
+    if (navigationCatalog && globalThis.EzkartComponents) {
+      navigationCatalog.innerHTML = globalThis.EzkartComponents.navDefinitions.map((item) => `<button type="button" class="sq-navigation-choice" data-sq-add-navigation-template="${item.id}" aria-pressed="false">${globalThis.EzkartComponents.thumbnail(item.preview)}<span><b>${escapeHtml(item.name)}</b><small>${escapeHtml(item.description)}</small></span></button>`).join("");
+    }
     const blockSearch = addPanel?.querySelector("[data-sq-block-search]");
     const filterBlockLibrary = () => {
       if (!addPanel) return;
@@ -7046,13 +7133,16 @@
       const wrapper = document.createElement("div"); wrapper.innerHTML = newBlockMarkup(type, sectionId);
       const newBlock = wrapper.firstElementChild;
       const selectedBlock = previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`);
-      selectedBlock?.after(newBlock);
+      if (selectedBlock) selectedBlock.after(newBlock); else previewRoot?.append(newBlock);
+      readCatalogProducts().forEach((product) => installCustomProduct(product, selectedProducts().includes(product.id)));
       rebuildLayerList(); bindSqInteractions(); updateProductView(); selectSqSection(sectionId); openSqPanel("layers"); newBlock?.scrollIntoView({ behavior: "smooth", block: "center" }); markSqChanged();
     }));
 
     sqStudio.querySelector("[data-sq-duplicate]")?.addEventListener("click", () => {
       const block = previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`); if (!block) return;
-      remember(); const newId = `${selectedSection}-copy-${Date.now()}`; const blockCopy = block.cloneNode(true); blockCopy.querySelectorAll(".sq-section-toolbar, .sq-element-overlay, .sq-section-height-handle").forEach((node) => node.remove()); blockCopy.dataset.sectionId = newId; blockCopy.classList.remove("selected"); blockCopy.querySelectorAll("[data-sq-element-id]").forEach((element, index) => { element.dataset.sqElementId = `element-${newId}-${index + 1}`; }); block.after(blockCopy); rebuildLayerList(); bindSqInteractions(); selectSqSection(newId, true); markSqChanged();
+      remember(); const newId = `${selectedSection}-copy-${Date.now()}`; const blockCopy = block.cloneNode(true); blockCopy.querySelectorAll(".sq-section-toolbar, .sq-element-overlay, .sq-section-height-handle").forEach((node) => node.remove()); blockCopy.dataset.sectionId = newId; blockCopy.id = newId;
+      blockCopy.querySelectorAll("[data-sq-element]").forEach((element, index) => { element.dataset.sqElementId = `${newId}-element-${index + 1}`; });
+      ["desktop", "tablet", "mobile"].forEach((device) => { spacingState.set(spacingKey(newId, device), { ...readSpacing(selectedSection, device) }); }); blockCopy.classList.remove("selected"); blockCopy.querySelectorAll("[data-sq-element-id]").forEach((element, index) => { element.dataset.sqElementId = `element-${newId}-${index + 1}`; }); block.after(blockCopy); rebuildLayerList(); bindSqInteractions(); selectSqSection(newId, true); markSqChanged();
     });
     sqStudio.querySelector("[data-sq-visibility]")?.addEventListener("click", () => {
       const block = previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`); if (!block) return;
@@ -7068,7 +7158,7 @@
     const zoomSlider = sqStudio.querySelector("[data-sq-zoom-slider]");
     const pageHeightHandle = sqStudio.querySelector("[data-sq-page-height-handle]");
     const setZoom = (value) => {
-      const minimum = Number(zoomSlider?.min || 40);
+      const minimum = Number(zoomSlider?.min || 10);
       zoom = Math.max(minimum, Math.min(100, Math.round(Number(value) || 100)));
       deviceFrame?.classList.remove("zoom-60", "zoom-70", "zoom-80", "zoom-90");
       if (deviceFrame) deviceFrame.style.zoom = zoom === 100 ? "" : String(zoom / 100);
@@ -7182,7 +7272,7 @@
 
     const exportDialog = document.getElementById("html-export-dialog");
     const collectExportCss = () => {
-      const tokens = [".sq-page-preview", ".sq-page-block", ".sq-page-background", ".sq-section-background", ".sq-announcement", ".sq-store-nav", ".sq-site-logo", ".sq-navigation-template", ".sq-nav-", ".sq-hero", ".sq-product", ".sq-image-story", ".sq-image-blend", ".sq-image-crop", ".sq-benefit", ".sq-cart", ".sq-shipping", ".sq-generated", ".sq-free", ".sq-marquee", ".sq-surface", ".sq-color", ".element-animation", ".hover-", ".button-", ".ez-fluid", "@keyframes sq", "@keyframes element", ".product-art", ".icon", ".svg-sprite"];
+      const tokens = [".sq-page-preview", ".sq-page-block", ".sq-page-background", ".sq-section-background", ".sq-announcement", ".sq-store-nav", ".sq-site-logo", ".sq-navigation-template", ".sq-nav-", ".sq-hero", ".sq-product", ".sq-image-story", ".sq-image-blend", ".sq-image-crop", ".sq-benefit", ".sq-cart", ".sq-shipping", ".sq-generated", ".sq-composition", ".sq-authored-navigation", ".sq-navigation-", ".sq-step-number", ".sq-image-placeholder", ".sq-free", ".sq-marquee", ".sq-surface", ".sq-color", ".element-animation", ".hover-", ".button-", ".ez-fluid", "@keyframes sq", "@keyframes element", ".product-art", ".icon", ".svg-sprite"];
       const collect = (rules) => [...rules].map((rule) => {
         if (rule.type === CSSRule.KEYFRAMES_RULE) return tokens.some((token) => rule.cssText.includes(token)) ? rule.cssText : "";
         if (rule.cssRules && !rule.selectorText) { const nested = collect(rule.cssRules); return nested ? `${rule.conditionText ? `@media ${rule.conditionText}` : rule.cssText.slice(0, rule.cssText.indexOf("{"))}{${nested}}` : ""; }
@@ -7191,6 +7281,7 @@
       return [...document.styleSheets].map((sheet) => { try { return collect(sheet.cssRules); } catch (_) { return ""; } }).join("\n");
     };
     const generateHtml = ({ libraryPreview = false } = {}) => {
+      const exportBase = document.body.dataset.adminPublicBase || window.location.href;
       const clone = previewRoot.cloneNode(true);
       clone.querySelectorAll('[data-sq-background-type="solid"]').forEach((section) => {
         section.querySelector(":scope > .sq-section-background")?.remove();
@@ -7300,10 +7391,14 @@
         if (hover && hover !== "none") node.classList.add(`hover-${hover}`);
         node.classList.add("ez-fluid-element");
         node.dataset.ezkartElement = node.dataset.sqElementId;
+        if (node.closest('.sq-composition')) {
+          if (node.dataset.sqAutoHeight === 'true' || node.dataset.sqElementType === 'product-grid') node.dataset.ezkartAutoHeight = 'true';
+          ["desktop", "tablet", "mobile"].forEach(device => node.setAttribute(`data-ezkart-layout-${device}`, node.getAttribute(`data-layout-${device}`)));
+        }
         ["sqElement", "sqElementId", "sqElementType", "sqElementAnimation", "sqHover", "sqSurface", "sqAlign", "sqButtonRole", "layoutDesktop", "layoutTablet", "layoutMobile"].forEach((key) => delete node.dataset[key]);
         node.classList.remove("sq-element-selected", "sq-element-animate");
       });
-      clone.querySelectorAll("img[src]").forEach((image) => { image.src = new URL(image.getAttribute("src"), window.location.href).href; });
+      clone.querySelectorAll("img[src]").forEach((image) => { image.src = new URL(image.getAttribute("src"), exportBase).href; });
       const brandElement = clone.querySelector(".sq-site-logo");
       const brandImage = brandElement?.querySelector("img[src]:not([hidden])");
       const brandText = brandElement?.querySelector("b")?.textContent.trim();
@@ -7343,15 +7438,15 @@
         const lineTops = new Set([...range.getClientRects()].filter((rect) => rect.width > 0 && rect.height > 0).map((rect) => Math.round(rect.top)));
         return lineTops.size <= 1;
       }).map((element) => element.dataset.sqElementId));
-      const spacingCssFor = (device) => [...spacingState.entries()].filter(([key]) => key.endsWith(`:${device}`)).map(([key, value]) => { const section = key.slice(0, -(device.length + 1)); return `[data-ezkart-section="${section}"]{padding:${value.top}px ${value.right}px ${value.bottom}px ${value.left}px!important}`; }).join("\n");
+      const spacingCssFor = (device) => [...previewRoot.querySelectorAll("[data-section-id]")].map(node => { const section = node.dataset.sectionId, value = readSpacing(section, device); return `[data-ezkart-section="${section}"]{padding:${value.top}px ${value.right}px ${value.bottom}px ${value.left}px!important}`; }).join("\n");
       const fluidCssFor = (device) => [...previewRoot.querySelectorAll("[data-sq-fluid]")].map((section) => { const spacing = readSpacing(section.dataset.sectionId, device); return `[data-ezkart-section="${section.dataset.sectionId}"]{--sq-fluid-row-height:${fluidRowHeight(section, device)}px;--sq-fluid-columns:${fluidColumns(device)};--sq-fluid-rows:${Math.max(fluidMinRows(section, device), sectionContentRows(section, device))};--sq-section-pad-left:${spacing.left}px;--sq-section-pad-right:${spacing.right}px}`; }).join("\n");
-      const elementCssFor = (device) => [...previewRoot.querySelectorAll("[data-sq-element]")].map((element) => { const layout = parseElementLayout(element, device); const inset = elementInsetFor(element, device); const padding = element.classList.contains("sq-custom-inset") ? `padding:${inset.top}px ${inset.right}px ${inset.bottom}px ${inset.left}px!important;` : ""; const headingWrap = singleLineDesktopHeadings.has(element.dataset.sqElementId) ? `white-space:${device === "desktop" ? "nowrap" : "normal"}!important;` : ""; return `[data-ezkart-element="${element.dataset.sqElementId}"]{grid-column:${layout.x}/span ${layout.width}!important;grid-row:${layout.y}/span ${layout.height}!important;${padding}${headingWrap}}`; }).join("\n");
+      const elementCssFor = (device) => [...previewRoot.querySelectorAll("[data-sq-element]")].map((element) => { const layout = parseElementLayout(element, device); const inset = elementInsetFor(element, device); const padding = element.classList.contains("sq-custom-inset") ? `padding:${inset.top}px ${inset.right}px ${inset.bottom}px ${inset.left}px!important;` : ""; const headingWrap = !element.closest(".sq-composition") && singleLineDesktopHeadings.has(element.dataset.sqElementId) ? `white-space:${device === "desktop" ? "nowrap" : "normal"}!important;` : ""; return `[data-ezkart-element="${element.dataset.sqElementId}"]{grid-column:${layout.x}/span ${layout.width}!important;grid-row:${layout.y}/span ${layout.height}!important;${padding}${headingWrap}}`; }).join("\n");
       const productCssFor = (device) => [...previewRoot.querySelectorAll('[data-sq-element-type="product-grid"]')].map((element) => {
         const settings = productGridSettings(element, device);
         const density = { compact: ["150px", "clamp(96px,58cqw,175px)", "11px", "none"], balanced: ["220px", "clamp(120px,62cqw,250px)", "18px", "block"], showcase: ["310px", "clamp(180px,70cqw,360px)", "18px", "block"] }[settings.density] || ["220px", "clamp(120px,62cqw,250px)", "18px", "block"];
         const columns = settings.columns === "auto" ? `repeat(auto-fit,minmax(min(100%,${density[0]}),1fr))` : `repeat(${settings.columns},minmax(0,1fr))`;
         const id = `[data-ezkart-element="${element.dataset.sqElementId}"]`;
-        return `${id}{grid-template-columns:${columns}!important}${id}>article>.product-art{height:auto!important;aspect-ratio:1/1!important}${id}>article>div{padding:${density[2]}!important}${id} p{display:${density[3]}}`;
+        return `.sq-page-preview ${id}.sq-product-grid{grid-template-columns:${columns}!important}${id}>article>.product-art{height:auto!important;aspect-ratio:1/1!important}${id}>article>div{padding:${density[2]}!important}${id} p{display:${density[3]}}`;
       }).join("\n");
       const responsiveSpacing = `${spacingCssFor("desktop")}\n${fluidCssFor("desktop")}\n${elementCssFor("desktop")}\n${productCssFor("desktop")}\n@media(max-width:900px){${spacingCssFor("tablet")}\n${fluidCssFor("tablet")}\n${elementCssFor("tablet")}\n${productCssFor("tablet")}}\n@media(max-width:600px){${spacingCssFor("mobile")}\n${fluidCssFor("mobile")}\n${elementCssFor("mobile")}\n${productCssFor("mobile")}}`;
       const storefrontCatalog = Object.fromEntries(selectedProducts().map((id) => {
@@ -7391,7 +7486,7 @@ const renderCart=()=>{const entries=cartEntries(),count=cartCount();document.que
 const openCart=()=>{if(!cartLayer)return;clearTimeout(cartCloseTimer);cartReturnFocus=document.activeElement;cartLayer.hidden=false;document.body.classList.add('ezkart-cart-open');requestAnimationFrame(()=>{cartLayer.classList.add('is-open');cartDrawer?.focus()})};
 const closeCart=()=>{if(!cartLayer||cartLayer.hidden)return;cartLayer.classList.remove('is-open');document.body.classList.remove('ezkart-cart-open');cartCloseTimer=setTimeout(()=>{cartLayer.hidden=true;cartReturnFocus?.focus?.()},240)};
 const changeCart=(id,change)=>{const product=lineProduct(id);if(!product)return;const stock=product.stock==null?Number.MAX_SAFE_INTEGER:Number(product.stock),maximum=Number.isFinite(stock)?Math.max(0,stock):Number.MAX_SAFE_INTEGER;cart[id]=Math.max(0,Math.min(maximum,(cart[id]||0)+change));if(!cart[id])delete cart[id];renderCart()};
-const goCheckout=()=>{const entries=cartEntries();if(!entries.length)return;const params=new URLSearchParams({shop:checkoutScope,cart:entries.map(([id,quantity])=>id+':'+quantity).join(','),return:location.href});if(storefrontBrand.name)params.set('brand',storefrontBrand.name);if(/^https?:\\/\\//i.test(storefrontBrand.logo||'')&&storefrontBrand.logo.length<=1800)params.set('logo',storefrontBrand.logo);location.href='/cart/?'+params};
+const goCheckout=()=>{const entries=cartEntries();if(!entries.length)return;const params=new URLSearchParams({shop:checkoutScope,cart:entries.map(([id,quantity])=>id+':'+quantity).join(','),return:location.href});if(storefrontBrand.name)params.set('brand',storefrontBrand.name);if(/^https?:\\/\\//i.test(storefrontBrand.logo||'')&&storefrontBrand.logo.length<=1800)params.set('logo',storefrontBrand.logo);location.href=${JSON.stringify(new URL('../', exportBase).href)}+'?'+params};
 document.querySelectorAll('[data-ezkart-action="checkout"]').forEach(button=>{if(!button.querySelector('[data-ezkart-cart-count]')){const count=document.createElement('span');count.className='ezkart-cart-count';count.dataset.ezkartCartCount='';count.textContent='0';button.append(count)}});
 document.querySelectorAll('[data-ezkart-cart-open]').forEach(button=>button.addEventListener('click',openCart));document.querySelectorAll('[data-ezkart-cart-close]').forEach(button=>button.addEventListener('click',closeCart));cartGo?.addEventListener('click',goCheckout);cartItems?.addEventListener('click',event=>{const button=event.target.closest('[data-ezkart-cart-quantity]'),row=button?.closest('[data-ezkart-cart-row]');if(button&&row)changeCart(row.dataset.ezkartCartRow,Number(button.dataset.ezkartCartQuantity))});addEventListener('keydown',event=>{if(cartLayer?.hidden)return;if(event.key==='Escape'){event.preventDefault();closeCart();return}if(event.key!=='Tab')return;const focusable=[...cartDrawer.querySelectorAll('button:not(:disabled),a[href],input:not(:disabled),[tabindex]:not([tabindex="-1"])')],first=focusable[0],last=focusable.at(-1);if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus()}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus()}});
 let marqueeFrame=0;
@@ -7425,15 +7520,33 @@ renderCart();
 const observer=new IntersectionObserver(entries=>entries.forEach(entry=>{if(entry.isIntersecting){entry.target.classList.add(entry.target.matches('[class*="element-animation-"]')?'sq-element-animate':'animating');observer.unobserve(entry.target)}}),{threshold:.12});
 document.querySelectorAll('[class*="animation-"],[class*="element-animation-"]').forEach(element=>observer.observe(element))
 })();<\/script>`;
-      const fontBase = new URL("assets/fonts/poppins-400.woff2", window.location.href).href;
-      const fontMedium = new URL("assets/fonts/poppins-500.woff2", window.location.href).href;
-      const fontSemibold = new URL("assets/fonts/poppins-600.woff2", window.location.href).href;
-      const fontBold = new URL("assets/fonts/poppins-700.woff2", window.location.href).href;
+      const compositionScript = globalThis.EzkartComponents ? `<script>(()=>{
+const fitContent=${globalThis.EzkartComponents.fitContent.toString()};
+let frame=0,device='';
+const layouts=new WeakMap();
+const write=(element,layout)=>{layouts.set(element,layout);element.style.setProperty('grid-column',layout.x+'/span '+layout.width,'important');element.style.setProperty('grid-row',layout.y+'/span '+layout.height,'important')};
+const fit=()=>{frame=0;const next=innerWidth<=600?'mobile':innerWidth<=900?'tablet':'desktop';
+ const pinned=document.querySelector('body>.sq-authored-navigation'),root=document.querySelector('body>.sq-page-preview');
+ if(pinned&&root)root.style.setProperty('--sq-pinned-nav-height',(pinned.offsetHeight+(parseFloat(getComputedStyle(pinned).top)||0))+'px');
+ document.querySelectorAll('.sq-composition').forEach(section=>{
+  const elements=[...section.querySelectorAll(':scope>.ez-fluid-element')];
+  if(next!==device)elements.forEach(element=>{const [x,y,width,height]=(element.getAttribute('data-ezkart-layout-'+next)||'1,1,12,1').split(',').map(Number);write(element,{x,y,width,height})});
+  const rowHeight=parseFloat(getComputedStyle(section).getPropertyValue('--sq-fluid-row-height'))||34;
+  fitContent(section,element=>layouts.get(element),write,rowHeight);
+  section.style.setProperty('--sq-fluid-rows',Math.max(1,...elements.filter(element=>getComputedStyle(element).display!=='none').map(element=>{const layout=layouts.get(element);return layout.y+layout.height-1})));
+ });device=next};
+const schedule=()=>{if(!frame)frame=requestAnimationFrame(fit)};
+addEventListener('resize',schedule);document.addEventListener('toggle',schedule,true);document.addEventListener('load',schedule,true);document.fonts?.ready.then(schedule);schedule();
+})();<\/script>` : '';
+      const fontBase = new URL("assets/fonts/poppins-400.woff2", exportBase).href;
+      const fontMedium = new URL("assets/fonts/poppins-500.woff2", exportBase).href;
+      const fontSemibold = new URL("assets/fonts/poppins-600.woff2", exportBase).href;
+      const fontBold = new URL("assets/fonts/poppins-700.woff2", exportBase).href;
       const hasScrollMotion = Boolean(clone.querySelector(".ezkart-scroll-frame"));
       const motionStyles = hasScrollMotion ? `<style>.ezkart-scroll-frame{position:relative!important;overflow:hidden!important;contain:paint}.ezkart-scroll-frame>.ezkart-scroll-media{width:100%!important;max-width:none!important;height:100%;position:absolute!important;left:0!important;top:50%!important;display:block;object-fit:cover;transform:translate3d(0,calc(-50% + var(--ezkart-scroll-y,0px)),0) scale(calc(var(--ezkart-scroll-scale,1) * var(--sq-image-crop-zoom,1)));transform-origin:center;will-change:transform;backface-visibility:hidden}@media(prefers-reduced-motion:reduce){.ezkart-scroll-frame>.ezkart-scroll-media{height:100%!important;transform:translate3d(0,-50%,0) scale(var(--sq-image-crop-zoom,1))!important;will-change:auto}}</style>` : "";
       const libraryPreviewStyles = libraryPreview ? `<style id="ezkart-library-preview-style">.sq-free-marquee .sq-marquee-track{animation:none!important;transform:translate3d(0,0,0)!important;will-change:auto!important}</style>` : "";
       const motionScripts = hasScrollMotion ? `<script>(()=>{const frames=[...document.querySelectorAll('.ezkart-scroll-frame')].map(frame=>({frame,media:frame.querySelector(':scope>.ezkart-scroll-media'),effect:frame.dataset.ezkartScrollEffect||'parallax',strength:Math.max(0,Math.min(100,Number(frame.dataset.ezkartScrollStrength)||0))/100,damping:frame.dataset.ezkartScrollDamping!=='false',y:null,yVelocity:0,scale:1,scaleVelocity:0,coverScale:1})).filter(item=>item.media);if(!frames.length)return;const reduced=matchMedia('(prefers-reduced-motion: reduce)');let raf=0,lastTime=0,viewportHeight=1;const clamp=value=>Math.max(0,Math.min(1,value));const damp=(value,velocity,target,delta,smoothTime)=>{const omega=2/smoothTime,x=omega*delta,decay=1/(1+x+.48*x*x+.235*x*x*x),change=value-target,temp=(velocity+omega*change)*delta;return[target+(change+temp)*decay,(velocity-omega*temp)*decay]};const render=time=>{raf=0;if(reduced.matches)return;const delta=Math.min(.05,lastTime?Math.max(0,(time-lastTime)/1000):1/60);lastTime=time;let moving=false;frames.forEach(item=>{const rect=item.frame.getBoundingClientRect();if(rect.bottom<-viewportHeight*.25||rect.top>viewportHeight*1.25)return;const progress=clamp((viewportHeight-rect.top)/(viewportHeight+rect.height)),reverse=item.effect==='parallax-reverse',rate=reverse?item.strength*.35:item.strength,zoom=item.effect==='zoom';const yTarget=zoom?0:(progress-.5)*(viewportHeight+rect.height)*rate*(reverse?-1:1),scaleTarget=zoom?1+progress*item.strength*.3:item.coverScale;if(item.y===null){item.y=yTarget;item.scale=scaleTarget}else if(item.damping){[item.y,item.yVelocity]=damp(item.y,item.yVelocity,yTarget,delta,.11);if(zoom)[item.scale,item.scaleVelocity]=damp(item.scale,item.scaleVelocity,scaleTarget,delta,.11);else{item.scale=scaleTarget;item.scaleVelocity=0}}else{item.y=yTarget;item.yVelocity=0;item.scale=scaleTarget;item.scaleVelocity=0}item.media.style.setProperty('--ezkart-scroll-y',item.y.toFixed(3)+'px');item.media.style.setProperty('--ezkart-scroll-scale',item.scale.toFixed(5));if(item.damping&&(Math.abs(yTarget-item.y)>.02||Math.abs(item.yVelocity)>.02||zoom&&(Math.abs(scaleTarget-item.scale)>.0001||Math.abs(item.scaleVelocity)>.0001)))moving=true});if(moving)raf=requestAnimationFrame(render)};const schedule=()=>{if(!raf){lastTime=0;raf=requestAnimationFrame(render)}};const measure=()=>{viewportHeight=Math.max(1,document.documentElement.clientHeight||innerHeight);frames.forEach(item=>{const frameHeight=Math.max(1,item.frame.clientHeight),reverse=item.effect==='parallax-reverse',rate=reverse?item.strength*.35:item.strength,overscan=reverse?(viewportHeight+frameHeight)*rate:Math.max(0,viewportHeight-frameHeight)*rate;item.coverScale=item.effect==='zoom'||reduced.matches||!rate?1:1+(overscan+4)/frameHeight;if(item.scale<item.coverScale){item.scale=item.coverScale;item.scaleVelocity=0}if(reduced.matches){item.y=null;item.yVelocity=0;item.scale=1;item.scaleVelocity=0;item.media.style.removeProperty('--ezkart-scroll-y');item.media.style.removeProperty('--ezkart-scroll-scale')}});schedule()};addEventListener('scroll',schedule,{passive:true});addEventListener('touchmove',schedule,{passive:true});addEventListener('resize',measure,{passive:true});addEventListener('orientationchange',measure,{passive:true});addEventListener('pageshow',measure);window.visualViewport?.addEventListener('resize',measure,{passive:true});reduced.addEventListener?.('change',measure);if(typeof ResizeObserver==='function'){const observer=new ResizeObserver(measure);frames.forEach(item=>observer.observe(item.frame))}document.fonts?.ready.then(measure);measure()})();<\/script>` : "";
-      return `<!doctype html>\n<html lang="id">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1">\n<title>${escapeHtml(pageName)}</title>\n<meta name="description" content="Shop selected Indonesian products with secure Ezkart checkout and delivery.">\n${motionStyles}\n<style>@font-face{font-family:Poppins;src:url('${fontBase}') format('woff2');font-weight:400}@font-face{font-family:Poppins;src:url('${fontMedium}') format('woff2');font-weight:500}@font-face{font-family:Poppins;src:url('${fontSemibold}') format('woff2');font-weight:600}@font-face{font-family:Poppins;src:url('${fontBold}') format('woff2');font-weight:700}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:#fff;font-family:Poppins,Arial,sans-serif}.svg-sprite{width:0;height:0;position:absolute;overflow:hidden}@media(prefers-reduced-motion:reduce){*{animation:none!important;scroll-behavior:auto!important}}\n${css}\n${responsiveSpacing}\n</style>\n${commerceStyles}\n${libraryPreviewStyles}\n</head>\n<body>\n${sprite}\n${clone.outerHTML}\n${pinnedNavigationHtml}\n${commerceMarkup}\n${motionScripts}\n${commerceScript}\n</body>\n</html>`;
+      return `<!doctype html>\n<html lang="id">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1">\n<title>${escapeHtml(pageName)}</title>\n<meta name="description" content="Shop selected Indonesian products with secure Ezkart checkout and delivery.">\n${motionStyles}\n<style>@font-face{font-family:Poppins;src:url('${fontBase}') format('woff2');font-weight:400}@font-face{font-family:Poppins;src:url('${fontMedium}') format('woff2');font-weight:500}@font-face{font-family:Poppins;src:url('${fontSemibold}') format('woff2');font-weight:600}@font-face{font-family:Poppins;src:url('${fontBold}') format('woff2');font-weight:700}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:#fff;font-family:Poppins,Arial,sans-serif}.svg-sprite{width:0;height:0;position:absolute;overflow:hidden}@media(prefers-reduced-motion:reduce){*{animation:none!important;scroll-behavior:auto!important}}\n${css}\n${responsiveSpacing}\n</style>\n${commerceStyles}\n${libraryPreviewStyles}\n</head>\n<body>\n${sprite}\n${clone.outerHTML}\n${pinnedNavigationHtml}\n${commerceMarkup}\n${motionScripts}\n${commerceScript}\n${compositionScript}\n</body>\n</html>`;
     };
     sqStudio.querySelector("[data-sq-export]")?.addEventListener("click", () => {
       const html = generateHtml(); const output = exportDialog?.querySelector("[data-sq-html-output]"); if (output) output.value = html; const size = exportDialog?.querySelector("[data-sq-html-size]"); if (size) size.textContent = `${new Blob([html]).size.toLocaleString("id-ID")} bytes · ready to host`; exportDialog?.showModal();
@@ -7502,7 +7615,7 @@ document.querySelectorAll('[class*="animation-"],[class*="element-animation-"]')
           updateProductView();
           if (!previewRepairMode) markSqChanged();
         }
-        deselectSqItem(state?.selectedSection || "hero");
+        deselectSqItem(state?.selectedSection || previewRoot.querySelector('[data-sq-block]')?.dataset.sectionId || 'blank');
         if (window.matchMedia("(max-width: 1120px)").matches) closeSqInspector();
         scheduleLandingPreviewRefresh(1600);
       } finally {
@@ -7602,6 +7715,8 @@ document.querySelectorAll('[class*="animation-"],[class*="element-animation-"]')
     syncBrandControls();
     syncCommerceStatus();
     baseSiteState = captureState();
+    baseSiteState.preview='<section class="sq-page-block sq-generated-blank" data-sq-block data-sq-fluid data-sq-min-rows="1" data-sq-rows="12" data-section-id="blank" draggable="true"></section>';
+    baseSiteState.selectedSection='blank';baseSiteState.spacing='[]';
     let requestedSiteButton = [...sqStudio.querySelectorAll("[data-sq-site]")].find((site) => site.dataset.siteUrl === requestedSiteUrl);
     if (!requestedSiteButton && /^[a-z0-9]+(?:-[a-z0-9]+)*\.ezkart\.site$/.test(requestedSiteUrl)) {
       const recoveryName = landingPageId(requestedSiteUrl).split("-").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
@@ -7610,6 +7725,173 @@ document.querySelectorAll('[class*="animation-"],[class*="element-animation-"]')
     if (requestedSiteButton) await loadSite(requestedSiteButton, true);
     else window.location.replace("?page=sites");
     setZoom(fitZoomForDevice());
+    if (typeof ResizeObserver === 'function') {
+      let lastCanvasWidth = 0;
+      new ResizeObserver(entries => {
+        const width = entries[0].contentRect.width;
+        if (Math.abs(width-lastCanvasWidth)<1) return;
+        lastCanvasWidth=width;setZoom(fitZoomForDevice());
+      }).observe(sqStudio.querySelector('.sq-canvas-scroll'));
+    }
+    let nativeFitFrame = 0;
+    const fitNativeContent = () => {
+      nativeFitFrame = 0;
+      let changed = false;
+      previewRoot.querySelectorAll('.sq-composition').forEach((section) => {
+        if (globalThis.EzkartComponents?.fitContent(section, parseElementLayout, setElementLayout, fluidRowHeight(section))) { applyFluidSection(section); changed = true; }
+      });
+      if (changed && selectedElement?.isConnected) refreshElementOverlay();
+    };
+    const scheduleNativeFit = () => { if (!nativeFitFrame) nativeFitFrame = requestAnimationFrame(fitNativeContent); };
+    new MutationObserver(records => {
+      if (records.some(record => {
+        const target = record.target.nodeType === Node.TEXT_NODE ? record.target.parentElement : record.target;
+        return target?.closest('.sq-composition') && !target.closest('.sq-element-overlay,.sq-layout-grid-overlay,.sq-section-toolbar');
+      })) scheduleNativeFit();
+    }).observe(previewRoot, {childList:true,subtree:true,characterData:true});
+    previewRoot.addEventListener('toggle',scheduleNativeFit,true);
+    previewRoot.addEventListener('load',scheduleNativeFit,true);
+    window.addEventListener('resize',scheduleNativeFit);
+    document.fonts?.ready.then(scheduleNativeFit);
+    sqStudio.addEventListener('input', scheduleNativeFit);
+    sqStudio.addEventListener('change', scheduleNativeFit);
+    scheduleNativeFit();
+    const settleBuilder = async () => {
+      await document.fonts?.ready;
+      for (let i=0;i<3;i++) { await new Promise(requestAnimationFrame); fitNativeContent(); }
+    };
+    const builderSection = (id) => {
+      const section = previewRoot.querySelector(`[data-section-id="${CSS.escape(String(id))}"]`);
+      if (!section) throw new Error(`Section not found: ${id}`);
+      return section;
+    };
+    const builderElement = (id) => {
+      const element = previewRoot.querySelector(`[data-sq-element-id="${CSS.escape(String(id))}"]`);
+      if (!element) throw new Error(`Element not found: ${id}`);
+      return element;
+    };
+    const refreshNativeBuilder = () => { rebuildLayerList(); bindSqInteractions(); applyFluidLayouts(); scheduleNativeFit(); markSqChanged(); };
+    const inspectBuilder = () => ({
+      version:1,page:{id:activeSiteDocument?.id,name:activeSiteDocument?.name,url:activeSiteKey},device:activeDevice,
+      sections:[...previewRoot.querySelectorAll(':scope > [data-sq-block]')].map(section=>({
+        id:section.dataset.sectionId,name:section.dataset.sqSectionName || sectionNames[section.dataset.sectionId] || 'Section',component:section.dataset.sqComposition || section.dataset.sqNavTemplate || null,
+        spacing:readSpacing(section.dataset.sectionId),
+        elements:[...section.querySelectorAll(':scope > [data-sq-element]')].map(element=>({id:element.dataset.sqElementId,type:element.dataset.sqElementType,text:element.textContent.trim().slice(0,600),layout:parseElementLayout(element),image:element.querySelector('img')?.getAttribute('src') || null,fields:editableNodesFor(section).filter(node=>element.contains(node)).map(node=>({tag:node.tagName.toLowerCase(),text:node.textContent}))}))
+      }))
+    });
+    globalThis.EzkartBuilder = Object.freeze({
+      version:1,
+      inspect:inspectBuilder,
+      catalog:()=>readCatalogProducts(),
+      components:()=>({sections:globalThis.EzkartComponents?.definitions || [],navigation:globalThis.EzkartComponents?.navDefinitions || []}),
+      async settle(){await settleBuilder();return inspectBuilder();},
+      async addSection({component,id,content={},productId,after}={}) {
+        const sectionId=id || `${component}-${Date.now()}`;
+        if(previewRoot.querySelector(`[data-section-id="${CSS.escape(sectionId)}"]`)) throw new Error('That section ID is already in use.');
+        const catalog=readCatalogProducts().filter(product=>selectedProducts().includes(product.id));
+        const product=productId ? catalog.find(item=>item.id===productId) : catalog[0];
+        if(productId && !product) throw new Error('Choose a product connected to this page.');
+        const wrapper=document.createElement('div');
+        wrapper.innerHTML=nativeComponentMarkup(component,{sectionId,content,product,products:catalog});
+        const section=wrapper.firstElementChild;
+        const anchor=after ? builderSection(after) : null;
+        remember(); if(anchor) anchor.after(section); else previewRoot.append(section);
+        readCatalogProducts().forEach(item=>installCustomProduct(item,selectedProducts().includes(item.id)));
+        refreshNativeBuilder(); selectSqSection(sectionId,true); await settleBuilder(); return inspectBuilder();
+      },
+      async updateElement({id,text,field=0,src,alt,style={},layout,autoHeight,device=activeDevice}={}) {
+        const element=builderElement(id);
+        const fields=editableNodesFor(element.closest('[data-sq-block]')).filter(node=>element===node || element.contains(node));
+        const target=fields[field];
+        if(text!==undefined && !target) throw new Error('Select an editable text field from inspect().');
+        if(src!==undefined && src && !/^https?:\/\//i.test(src) && !/^\/(?!\/)/.test(src)) throw new Error('Use an HTTPS image URL or a site-relative image path.');
+        const allowed=new Set(['color','backgroundColor','fontSize','fontWeight','lineHeight','letterSpacing','textAlign','borderRadius','objectFit','opacity']);
+        for(const key of Object.keys(style)) if(!allowed.has(key)) throw new Error(`Unsupported style: ${key}`);
+        if(!['desktop','tablet','mobile'].includes(device)) throw new Error('Unknown device.');
+        remember();
+        if(text!==undefined) target.textContent=String(text);
+        if(src!==undefined){let img=element.querySelector('img');if(!img){element.querySelector('.sq-image-placeholder')?.remove();img=document.createElement('img');element.append(img);}img.src=src;}
+        if(alt!==undefined && element.querySelector('img')) element.querySelector('img').alt=String(alt);
+        Object.assign(element.style,style);
+        if(style.objectFit && element.querySelector("img"))element.querySelector("img").style.objectFit=style.objectFit;
+        if(autoHeight!==undefined)element.dataset.sqAutoHeight=String(Boolean(autoHeight));
+        if(layout) setElementLayout(element,{...parseElementLayout(element,device),...layout},device);
+        refreshNativeBuilder();await settleBuilder();return inspectBuilder();
+      },
+      async productGrid({id,columns='auto',density='balanced',device=activeDevice}={}) {
+        const element=builderElement(id);
+        if(element.dataset.sqElementType!=='product-grid')throw new Error('Select a product grid.');
+        if(!['auto','1','2','3','4','5','6'].includes(String(columns))||!['compact','balanced','showcase'].includes(density)||!['desktop','tablet','mobile'].includes(device))throw new Error('Invalid product layout.');
+        remember();element.dataset[productSettingKey('Columns',device)]=String(columns);element.dataset[productSettingKey('Density',device)]=density;
+        refreshNativeBuilder();scheduleProductGridFit();await settleBuilder();return inspectBuilder();
+      },
+      async updateSection({id,spacing,device=activeDevice,background,color,name,fitHeight=false}={}) {
+        const section=builderSection(id);
+        if(!['desktop','tablet','mobile'].includes(device))throw new Error('Unknown device.');
+        if(spacing && Object.entries(spacing).some(([side,value])=>!['top','right','bottom','left'].includes(side)||!Number.isFinite(value)||value<0||value>240))throw new Error('Padding must be between 0 and 240 pixels.');
+        remember();
+        if(spacing)spacingState.set(spacingKey(id,device),{...readSpacing(id,device),...spacing});
+        if(background!==undefined){section.style.removeProperty("background-color");setSectionBackgroundColor(section,background);}
+        if(color!==undefined){section.style.color=color;section.style.setProperty("--site-ink",color);}
+        if(name!==undefined)section.dataset.sqSectionName=String(name);
+        if(fitHeight)setSectionHeightRows(section,sectionContentRows(section,device),device);
+        refreshNativeBuilder();await settleBuilder();return inspectBuilder();
+      },
+      async navigation({layout='studio',brand,links,actionLabel='Shop now',actionTarget='products',sticky=false}={}) {
+        if(!globalThis.EzkartComponents.navDefinitions.some(item=>item.id===layout))throw new Error('Unknown navigation layout.');
+        if(links && (!Array.isArray(links)||links.length>8||links.some(link=>!link.label||!/^#|^https?:\/\//i.test(link.href))))throw new Error('Use up to eight links with labels and section or HTTPS destinations.');
+        addNavigationTemplate(layout);
+        const section=previewRoot.querySelector('.sq-authored-navigation');
+        if(brand!==undefined)section.querySelector('[data-sq-logo-text]').textContent=brand;
+        if(links){
+          const navs=[...section.querySelectorAll('[data-sq-element-type="navigation"]')];
+          navs.forEach(nav=>nav.querySelectorAll('a').forEach(a=>a.remove()));
+          const right=navs.find(nav=>nav.dataset.sqNavSlot==='right') || navs[0];
+          const left=navs.find(nav=>nav.dataset.sqNavSlot==='left');
+          links.forEach((link,i)=>{const a=document.createElement('a');a.textContent=link.label;a.href=link.href;a.dataset.sqLinkType=link.href.startsWith('#')?'section':'url';a.dataset.sqLink=link.href.replace(/^#/,'');const nav=left&&i<Math.ceil(links.length/2)?left:right;nav.insertBefore(a,nav.querySelector('button'));});
+          const action=section.querySelector('button:not(.sq-nav-menu-toggle)');
+          if(action){action.textContent=actionLabel;action.dataset.sqLinkType=actionTarget==='checkout'?'checkout':'section';action.dataset.sqLink=actionTarget==='checkout'?'':actionTarget.replace(/^#/,'');}
+        }
+        section.dataset.sqNavPosition=sticky?'sticky':'static';applyNavigationSectionBehavior(section);
+        refreshNativeBuilder();await settleBuilder();return inspectBuilder();
+      },
+      async theme({accent,page,ink,surface,headingFont,bodyFont,radius,buttonBackground,buttonText}={}) {
+        const colors={accent,page,ink,surface};
+        Object.values(colors).forEach(value=>{if(value!==undefined&&!/^#[0-9a-f]{6}$/i.test(value))throw new Error('Use six-digit hex colors.');});
+        remember();Object.entries(colors).forEach(([key,value])=>{if(value!==undefined)previewRoot.style.setProperty(brandVariable[key],value);});
+        if(headingFont)previewRoot.style.setProperty('--site-heading-font',headingFont);
+        if(bodyFont)previewRoot.style.setProperty('--site-body-font',bodyFont);
+        if(radius!==undefined)previewRoot.style.setProperty('--button-primary-radius',`${Math.max(0,Math.min(80,radius))}px`);
+        if(buttonBackground)previewRoot.style.setProperty('--button-primary-bg',buttonBackground);
+        if(buttonText)previewRoot.style.setProperty('--button-primary-fg',buttonText);
+        previewRoot.style.setProperty('--button-primary-shadow','none');
+        syncBrandControls();refreshNativeBuilder();await settleBuilder();return inspectBuilder();
+      },
+      moveSection({id,before}={}){const section=builderSection(id),anchor=before?builderSection(before):null;remember();if(anchor)anchor.before(section);else previewRoot.append(section);refreshNativeBuilder();return inspectBuilder();},
+      removeSection({id}={}){const section=builderSection(id);if(previewRoot.querySelectorAll('[data-sq-block]').length<=1)throw new Error('Keep at least one section.');remember();section.remove();selectedElement=null;selectedSection=previewRoot.querySelector('[data-sq-block]').dataset.sectionId;refreshNativeBuilder();return inspectBuilder();},
+      setDevice({device}={}){const button=sqStudio.querySelector(`[data-sq-device="${CSS.escape(device)}"]`);if(!button)throw new Error('Unknown device.');button.click();scheduleNativeFit();return inspectBuilder();},
+      undo(){undoBuilderChange();return inspectBuilder();},
+      redo(){redoBuilderChange();return inspectBuilder();},
+      async save(){await settleBuilder();clearTimeout(saveTimer);const saved=await persistCurrentState();if(!saved)throw new Error('The page could not be saved.');saveState.textContent='Saved just now';return {saved:true,page:activeSiteDocument.id};},
+      async exportHtml(){await settleBuilder();return generateHtml();},
+      snapshot:()=>captureState(),
+      async audit(){
+        await settleBuilder();const issues=[];
+        previewRoot.querySelectorAll('[data-sq-block]').forEach(section=>{
+          const rect=section.getBoundingClientRect();
+          section.querySelectorAll(':scope > [data-sq-element]').forEach(element=>{
+            if(!element.getClientRects().length||element.classList.contains('sq-element-hidden'))return;
+            const box=element.getBoundingClientRect();
+            if(box.left<rect.left-2||box.right>rect.right+2||box.bottom>rect.bottom+2)issues.push({type:'overflow',section:section.dataset.sectionId,element:element.dataset.sqElementId});
+            if(element.querySelector('.sq-image-placeholder') && !element.querySelector('img[src]:not([src=""])'))issues.push({type:'missing-image',element:element.dataset.sqElementId});
+          });
+        });
+        const h1=previewRoot.querySelectorAll('h1').length;if(h1!==1)issues.push({type:'heading-structure',message:`Page has ${h1} main headings; use one.`});
+        previewRoot.querySelectorAll('a[href^="#"],button[data-sq-link-type="section"]').forEach(link=>{const id=(link.getAttribute('href')||link.dataset.sqLink||'').replace(/^#/,'');if(id&&!previewRoot.querySelector(`[id="${CSS.escape(id)}"],[data-section-id="${CSS.escape(id)}"]`))issues.push({type:'broken-section-link',target:id});});
+        return {device:activeDevice,sections:inspectBuilder().sections.length,issues};
+      }
+    });
+
   }
 
   const mapElement = document.getElementById("fulfillment-map");
