@@ -9,9 +9,9 @@ declare(strict_types=1);
       <span class="sq-live-state"><i></i> Draft</span>
     </div>
     <div class="sq-history-tools" aria-label="Editing history">
-      <button type="button" data-sq-undo aria-label="Undo" disabled><?= ez_admin_icon('undo') ?></button>
-      <button type="button" data-sq-redo aria-label="Redo" disabled><?= ez_admin_icon('redo') ?></button>
-      <span data-sq-save-state>All changes saved</span>
+      <button type="button" data-sq-undo aria-label="Undo" title="Undo (Ctrl / ⌘ Z)" disabled><?= ez_admin_icon('undo') ?></button>
+      <button type="button" data-sq-redo aria-label="Redo" title="Redo (Ctrl / ⌘ Shift Z)" disabled><?= ez_admin_icon('redo') ?></button>
+      <span data-sq-save-state role="status" aria-live="polite">Loading page…</span>
     </div>
     <div class="sq-device-tools" aria-label="Responsive preview">
       <button class="active" type="button" data-sq-device="desktop" aria-label="Desktop preview"><?= ez_admin_icon('monitor') ?></button>
@@ -21,8 +21,8 @@ declare(strict_types=1);
       <button type="button" data-sq-grid-toggle aria-label="Show rectangle grid" aria-pressed="false" title="Show rectangle grid"><?= ez_admin_icon('layers') ?></button>
     </div>
     <div class="sq-command-actions">
-      <button type="button" data-sq-preview><?= ez_admin_icon('eye') ?><span>Preview</span></button>
-      <button type="button" data-sq-export><?= ez_admin_icon('code') ?><span>Export HTML</span></button>
+      <button type="button" data-sq-preview aria-label="Preview page" title="Preview page"><?= ez_admin_icon('eye') ?><span>Preview</span></button>
+      <button type="button" data-sq-export aria-label="Export HTML" title="Export HTML"><?= ez_admin_icon('code') ?><span>Export HTML</span></button>
       <button class="primary" type="button" data-sq-publish>Publish</button>
     </div>
   </header>
@@ -48,7 +48,9 @@ declare(strict_types=1);
 
         <section class="sq-tool-panel" data-sq-panel="add">
           <header><div><small>Section library</small><h2>Add content</h2></div></header>
-          <label class="sq-panel-search"><?= ez_admin_icon('search') ?><input type="search" placeholder="Search elements or sections" data-sq-block-search></label>
+          <label class="sq-panel-search"><?= ez_admin_icon('search') ?><input type="search" placeholder="Search elements or sections" aria-label="Search elements, sections, and components" data-sq-block-search></label>
+          <p class="sq-library-search-status" data-sq-library-search-status role="status" hidden></p>
+          <div class="sq-library-search-empty" data-sq-library-search-empty hidden><b>No matches found</b><p>Try a different name, such as image, button, or navigation.</p><button type="button" data-sq-clear-block-search>Clear search</button></div>
           <div class="sq-block-group"><h3>Text &amp; movement</h3><div class="sq-block-grid sq-element-library">
             <button type="button" data-sq-add-element="heading" data-search="heading title text"><?= ez_admin_icon('message') ?><b>Heading</b><small>Independent headline</small></button>
             <button type="button" data-sq-add-element="text" data-search="paragraph text copy"><?= ez_admin_icon('message') ?><b>Text</b><small>Body copy block</small></button>

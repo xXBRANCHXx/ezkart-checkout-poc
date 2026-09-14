@@ -2453,25 +2453,48 @@ body>.sq-page-preview.sq-has-pinned-navigation:not(.sq-has-announcement-navigati
 @media(prefers-reduced-motion:reduce){.sq-navigation-template-section,.sq-navigation-behavior-toggle>i,.sq-navigation-behavior-toggle>i:after{transition:none}}
 .sq-site-header-shortcuts>div:last-child{grid-template-columns:repeat(3,minmax(0,1fr))}
 
-/* Keep element editors reachable when the compact canvas layout drops the
-   inspector column. Header shortcuts and direct canvas selection both open
-   this responsive inspector drawer. */
+/* Section settings and element settings share the compact inspector drawer. */
 @media(max-width:1120px){
-  .page-site-editor .sq-studio:not(.preview-mode) .sq-inspector.element-selected:not(.collapsed){
+  .page-site-editor .sq-studio:not(.preview-mode) .sq-inspector:not(.collapsed){
     width:min(320px,calc(100vw - 52px));
-    max-height:calc(100vh - 64px);
+    max-height:calc(100dvh - var(--sq-commandbar-height));
     position:fixed;
     z-index:90;
-    top:64px;
+    top:var(--sq-commandbar-height);
     right:0;
     bottom:0;
     display:grid;
     box-shadow:-16px 0 38px rgba(20,26,38,.18);
   }
 }
+
+/* Keep history and save feedback available at every editor width. */
+.page-site-editor .sq-studio{--sq-commandbar-height:64px;grid-template-rows:var(--sq-commandbar-height) minmax(0,1fr)}
+.page-site-editor .sq-history-tools{display:flex}
+.page-site-editor .sq-history-tools>span{font-size:10px}
+.page-site-editor .sq-page-identity>a{flex-shrink:0}
+.page-site-editor .sq-commandbar button:focus-visible,.sq-library-search-empty button:focus-visible{outline:2px solid #ef4b38;outline-offset:3px}
+.sq-library-search-status{margin:12px 3px 0;color:#69727e;font-size:10px;line-height:1.6;overflow-wrap:anywhere}
+.sq-library-search-empty{margin:20px 3px;padding:18px 14px;background:#f8f9fa;border:1px solid #e7eaed;border-radius:9px}
+.sq-library-search-empty b{color:#353c46;font-size:12px}
+.sq-library-search-empty p{margin:8px 0 14px;color:#69727e;font-size:11px;line-height:1.65}
+.sq-library-search-empty button{min-height:34px;padding:0 12px;color:#c7382a;background:#fff;border:1px solid #dfe3e7;border-radius:7px;font-size:11px}
+.sq-block-group[hidden],.sq-library-search-status[hidden],.sq-library-search-empty[hidden]{display:none!important}
+@media(max-width:1400px){
+  .page-site-editor .sq-commandbar{grid-template-columns:minmax(0,1fr) auto auto auto;gap:10px}
+}
+@media(max-width:900px){
+  .page-site-editor .sq-studio{--sq-commandbar-height:100px}
+  .page-site-editor .sq-commandbar{padding:6px 10px;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:40px 38px;gap:4px 8px}
+  .page-site-editor .sq-page-identity{grid-area:1 / 1}
+  .page-site-editor .sq-command-actions{grid-area:1 / 2}
+  .page-site-editor .sq-history-tools{grid-area:2 / 1;justify-self:start;max-width:100%}
+  .page-site-editor .sq-device-tools{grid-area:2 / 2;justify-self:end}
+  .page-site-editor .sq-history-tools button{width:32px;height:32px;flex-shrink:0}
+  .page-site-editor .sq-history-tools>span{min-width:0;overflow:hidden;text-overflow:ellipsis}
+  .page-site-editor .sq-studio.mobile-panel-open .sq-tool-panels{top:var(--sq-commandbar-height)}
+}
 @media(max-width:720px){
-  .page-site-editor .sq-studio:not(.preview-mode) .sq-inspector.element-selected:not(.collapsed){
-    max-height:calc(100vh - 58px);
-    top:58px;
-  }
+  .page-site-editor .sq-history-tools{grid-column:1 / -1}
+  .page-site-editor .sq-editor-grid,.page-site-editor .sq-studio.inspector-closed .sq-editor-grid{grid-template-columns:52px minmax(0,1fr)}
 }

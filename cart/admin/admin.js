@@ -2577,12 +2577,18 @@
     };
 
     const builderSidebar = sqStudio.querySelector(".sq-builder-sidebar");
+    const closeSqInspector = () => {
+      closeBuilderSelect();
+      inspector?.classList.add("collapsed");
+      sqStudio.classList.add("inspector-closed");
+    };
     const openSqPanel = (name, { pin = false } = {}) => {
+      if (pin && window.matchMedia("(max-width: 1120px)").matches) closeSqInspector();
       sqStudio.querySelectorAll("[data-sq-tab]").forEach((button) => button.classList.toggle("active", button.dataset.sqTab === name || name === "pages" && button.dataset.sqTab === "layers"));
       sqStudio.querySelectorAll("[data-sq-panel]").forEach((panel) => panel.classList.toggle("active", panel.dataset.sqPanel === name));
       sqStudio.querySelectorAll("[data-sq-structure-view]").forEach((button) => button.classList.toggle("active", button.dataset.sqStructureView === (name === "pages" ? "pages" : "sections")));
       builderSidebar?.classList.toggle("sq-panel-pinned", pin || builderSidebar.classList.contains("sq-panel-pinned"));
-      if (window.matchMedia("(max-width: 720px)").matches) sqStudio.classList.add("mobile-panel-open");
+      if (window.matchMedia("(max-width: 720px)").matches) sqStudio.classList.toggle("mobile-panel-open", pin);
     };
     sqStudio.querySelectorAll("[data-sq-tab]").forEach((button) => button.addEventListener("click", () => openSqPanel(button.dataset.sqTab, { pin: true })));
     sqStudio.querySelectorAll("[data-sq-open-panel]").forEach((button) => button.addEventListener("click", () => openSqPanel(button.dataset.sqOpenPanel, { pin: true })));
@@ -2590,6 +2596,7 @@
     document.addEventListener("pointerdown", (event) => {
       if (builderSidebar?.contains(event.target) || event.target.closest?.("[data-sq-edit-button-brand], [data-sq-open-panel], [data-sq-builder-select-menu]")) return;
       builderSidebar?.classList.remove("sq-panel-pinned");
+      sqStudio.classList.remove("mobile-panel-open");
     });
 
     const selectedProducts = () => [...sqStudio.querySelectorAll("[data-sq-product]:checked")].map((input) => input.value);
@@ -3861,6 +3868,8 @@
     };
     const selectSqElement = (element, action = null, image = null, content = null) => {
       if (!element?.matches("[data-sq-element],.sq-section-background")) return;
+      inspector?.classList.remove("collapsed");
+      sqStudio.classList.remove("inspector-closed", "mobile-panel-open");
       if (cropEditingImage && (!element.contains(cropEditingImage) || image?.matches?.("img") && image !== cropEditingImage)) {
         imageVisualHostFor(cropEditingImage)?.classList.remove("sq-image-crop-editing");
         cropEditingImage = null;
@@ -6795,6 +6804,40 @@
     });
 
     const addPanel = sqStudio.querySelector('[data-sq-panel="add"]');
+    const blockSearch = addPanel?.querySelector("[data-sq-block-search]");
+    const filterBlockLibrary = () => {
+      if (!addPanel) return;
+      const query = normalize(blockSearch?.value);
+      const terms = query.split(/\s+/).filter(Boolean);
+      const selector = "[data-sq-add-block], [data-sq-add-element], [data-sq-open-library], [data-sq-component], [data-sq-create-component]";
+      let matches = 0;
+      addPanel.querySelectorAll(":scope > .sq-block-group").forEach((group) => {
+        let groupMatches = 0;
+        group.querySelectorAll(selector).forEach((card) => {
+          const searchable = normalize(`${card.dataset.search || ""} ${card.textContent}`);
+          card.hidden = !terms.every((term) => searchable.includes(term));
+          if (!card.hidden) groupMatches += 1;
+        });
+        group.hidden = Boolean(query) && groupMatches === 0;
+        matches += groupMatches;
+      });
+      const status = addPanel.querySelector("[data-sq-library-search-status]");
+      if (status) {
+        status.hidden = !query;
+        status.textContent = query ? `${matches} ${matches === 1 ? "result" : "results"} for “${blockSearch.value.trim()}”` : "";
+      }
+      const empty = addPanel.querySelector("[data-sq-library-search-empty]");
+      if (empty) empty.hidden = !query || matches > 0;
+      const componentEmpty = addPanel.querySelector("[data-sq-component-empty]");
+      if (componentEmpty) componentEmpty.hidden = Boolean(query) || readComponents().length > 0;
+      addPanel.querySelectorAll(".sq-library-note").forEach((note) => { note.hidden = Boolean(query); });
+    };
+    blockSearch?.addEventListener("input", filterBlockLibrary);
+    addPanel?.querySelector("[data-sq-clear-block-search]")?.addEventListener("click", () => {
+      blockSearch.value = "";
+      filterBlockLibrary();
+      blockSearch.focus();
+    });
     const libraryViews = [...sqStudio.querySelectorAll("[data-sq-library-view]")];
     const syncNavigationTemplateOptions = () => {
       const activeTemplate = previewRoot?.querySelector('[data-section-id="navigation"]')?.dataset.sqNavTemplate || "";
@@ -6896,6 +6939,7 @@
       }
       if (!list) return;
       list.innerHTML = components.map((component) => `<article class="sq-component-card" draggable="true" data-sq-component="${escapeHtml(component.id)}" data-search="${escapeHtml(`${component.name} ${component.description}`)}"><button type="button" data-sq-insert-component><span class="sq-component-mark">${escapeHtml(component.name.slice(0, 1).toUpperCase())}</span><span><b>${escapeHtml(component.name)}</b><small>${escapeHtml(component.description || "Drag an instance onto the canvas")}</small></span></button><button type="button" data-sq-edit-component aria-label="Edit ${escapeHtml(component.name)}">${iconMarkup("code")}</button></article>`).join("");
+      filterBlockLibrary();
       list.querySelectorAll("[data-sq-component]").forEach((card) => {
         const component = componentForId(card.dataset.sqComponent);
         if (!component) return;
@@ -7005,10 +7049,6 @@
       selectedBlock?.after(newBlock);
       rebuildLayerList(); bindSqInteractions(); updateProductView(); selectSqSection(sectionId); openSqPanel("layers"); newBlock?.scrollIntoView({ behavior: "smooth", block: "center" }); markSqChanged();
     }));
-    sqStudio.querySelector("[data-sq-block-search]")?.addEventListener("input", (event) => {
-      const query = normalize(event.currentTarget.value);
-      sqStudio.querySelectorAll("[data-sq-add-block], [data-sq-add-element], [data-sq-open-library], [data-sq-component]").forEach((button) => { button.hidden = Boolean(query) && !normalize(button.dataset.search).includes(query); });
-    });
 
     sqStudio.querySelector("[data-sq-duplicate]")?.addEventListener("click", () => {
       const block = previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`); if (!block) return;
@@ -7086,7 +7126,7 @@
       remember(snapshot); markSqChanged();
     });
     setExtraPageHeight(Number.parseFloat(previewRoot?.style.getPropertyValue("--sq-page-extra-height")) || 0);
-    sqStudio.querySelector("[data-sq-close-inspector]")?.addEventListener("click", () => { inspector?.classList.add("collapsed"); sqStudio.classList.add("inspector-closed"); });
+    sqStudio.querySelector("[data-sq-close-inspector]")?.addEventListener("click", closeSqInspector);
     const livePreviewDialog = document.getElementById("landing-preview-dialog");
     const livePreviewFrame = livePreviewDialog?.querySelector("[data-sq-live-preview-frame]");
     const livePreviewStage = livePreviewDialog?.querySelector("[data-sq-live-preview-stage]");
@@ -7463,6 +7503,7 @@ document.querySelectorAll('[class*="animation-"],[class*="element-animation-"]')
           if (!previewRepairMode) markSqChanged();
         }
         deselectSqItem(state?.selectedSection || "hero");
+        if (window.matchMedia("(max-width: 1120px)").matches) closeSqInspector();
         scheduleLandingPreviewRefresh(1600);
       } finally {
         window.requestAnimationFrame(() => {
