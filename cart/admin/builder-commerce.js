@@ -87,6 +87,18 @@
         field.dataset.layout = c.optionLayout || "compact";
         const legend = element("legend", c.label || "Choose an option");
         field.append(legend);
+        if (variants.length > 6 && c.optionLayout !== "detailed") {
+          const select = element("select", null, "sq-native-commerce-select");
+          select.dataset.commerceOption = "";
+          select.setAttribute("aria-label", c.label || "Choose an option");
+          variants.forEach(variant => {
+            const soldOut = product.type === "physical" && Number(variant.stock ?? product.stock) <= 0;
+            const option = element("option", variantName(variant) + (soldOut ? " — Sold out" : ""));
+            option.value = variant.id; option.selected = variant.id === selected.id;
+            select.append(option);
+          });
+          field.append(select); node.replaceChildren(field); return;
+        }
         const list = element("div", null, "sq-native-commerce-choices");
         (variants.length ? variants : [product]).forEach((variant) => {
           const label = element("label"),

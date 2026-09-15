@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "templates": [
+    {
+      "id": "pith",
+      "manifest": "pith/manifest.json"
+    }
+  ]
+}

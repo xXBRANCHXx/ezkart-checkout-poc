@@ -345,9 +345,10 @@ declare(strict_types=1);
 </dialog>
 
 <dialog class="page-creator-dialog" id="page-creator-dialog"><form method="dialog" data-page-creator-form>
-  <header><span><?= ez_admin_icon('layout') ?></span><div><small>Create a landing page</small><h2>Start with a blank canvas.</h2><p>Name your page to start with an empty canvas. Add products whenever you need them.</p></div><button type="button" data-creator-close aria-label="Close"><?= ez_admin_icon('x') ?></button></header>
+  <header><span><?= ez_admin_icon('layout') ?></span><div><small>Create a landing page</small><h2>Make it yours.</h2><p>Choose a design or start blank. Everything is yours to edit.</p></div><button type="button" data-creator-close aria-label="Close"><?= ez_admin_icon('x') ?></button></header>
   <section>
     <label><span>Page name</span><input name="page_name" required maxlength="60" placeholder="Example: Ramadan Collection"></label>
+    <div data-template-picker></div>
     <details class="sq-creator-optional"><summary>Connect products now (optional)</summary><fieldset data-creator-products><legend>Starting products · optional</legend><p class="creator-products-empty" data-creator-products-empty>You can build your page now and add products later.</p></fieldset></details>
     <label><span>Free Ezkart URL</span><div class="slug-field"><input name="slug" required pattern="[a-z0-9]+(?:-[a-z0-9]+)*" placeholder="ramadan-collection"><em>.ezkart.site</em></div></label>
   </section>

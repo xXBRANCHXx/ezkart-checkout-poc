@@ -33,6 +33,8 @@ tool('catalog_list','Read the real product catalog configured for this workspace
 tool('project_list','List editable local landing-page projects.',{},async()=> (await workspace.list()).map(({id,name,url,updatedAt})=>({id,name,url,updatedAt})),true);
 tool('project_create','Create an editable blank project, connect real catalog products, and open it in the actual Ezkart builder.',{id:identifier,name:z.string().min(1).max(60),productIds:z.array(z.string()).default([])},async args=>{await workspace.create(args);return open(args.id);});
 tool('project_open','Open an existing workspace project in the Ezkart editor.',{id:identifier},args=>open(args.id),true);
+tool('template_list','List installed landing-page templates and their catalog requirements.',{},()=>call('templates'),true);
+tool('template_apply','Apply an installed template to the current blank page using a real catalog product and store name. All content remains editable through ordinary native controls.',{templateId:identifier,productId:z.string(),brandName:z.string().min(1).max(80)},args=>call('applyTemplate',args));
 tool('component_list','List native section components and navigation compositions available in the same library merchants use.',{},()=>call('components'),true);
 tool('page_inspect','Read the section hierarchy, editable text fields, images, current spacing, and layout coordinates.',{},()=>call('inspect'),true);
 tool('section_add','Use component blank for an empty section, or insert an editable native composition. Content fields vary by component: title, body, image, alt, actionLabel, actionTarget, items, etc.',{component:z.string(),id:identifier,content:record.optional(),productId:z.string().optional(),after:z.string().optional()},args=>call('addSection',args));

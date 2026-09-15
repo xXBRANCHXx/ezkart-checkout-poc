@@ -14,7 +14,7 @@ test('MCP edits survive project switching and restart; undo, validation and expo
  const connect=async()=>{client=new Client({name:'integration-test',version:'1'});await client.connect(new StdioClientTransport({command:process.execPath,args:[join(repoRoot,'tools/builder-mcp/server.mjs')],env:{...process.env,EZKART_WORKSPACE:directory}}));};
  const call=async(name,args={})=>{const result=await client.callTool({name,arguments:args});assert.ok(!result.isError,JSON.stringify(result));return JSON.parse(result.content[0].text);};
  try{
-  await connect();assert.equal((await client.listTools()).tools.length,26);
+  await connect();assert.equal((await client.listTools()).tools.length,28);
   await call('project_create',{id:'first',name:'First'});
   await call('section_add',{component:'hero-split',id:'hero',content:{title:'One main heading',body:'Editable content'}});
   await call('section_remove',{id:'blank'});

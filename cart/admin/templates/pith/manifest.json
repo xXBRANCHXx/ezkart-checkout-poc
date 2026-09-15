@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "id": "pith",
+  "version": "1.0.0",
+  "name": "PITH",
+  "description": "Bold product photography, oversized type and decisive citrus color.",
+  "recipe": "recipe.json",
+  "thumbnail": "preview/desktop.png",
+  "previews": [
+    "preview/desktop.png",
+    "preview/mobile.png",
+    "preview/footer.png"
+  ],
+  "previewLabel": "Fictional branding shown. Your page uses your store name and product.",
+  "requirements": {
+    "minProducts": 1,
+    "maxProducts": 1,
+    "images": "optional",
+    "variants": "optional",
+    "description": "optional"
+  },
+  "theme": {
+    "accent": "#eae653",
+    "page": "#eae653",
+    "ink": "#24251c",
+    "surface": "#f4f1e6",
+    "headingFont": "Anton, Impact, sans-serif",
+    "bodyFont": "'DM Sans', Arial, sans-serif",
+    "buttonBackground": "#24251c",
+    "buttonText": "#f4f1e6",
+    "radius": 0
+  },
+  "approval": {
+    "version": "pith-native-polish-v2",
+    "instruction": "ok, make that a template.",
+    "recipeSha256": "a779e3b8280b4b2bec6f2549ff725f8e1391c814c726584bd14043807552ef60"
+  },
+  "optionalSections": {
+    "story": "Product description",
+    "serve": "Second product photo",
+    "pack-story": "Third product photo"
+  },
+  "demoContent": "preview/ only. Never applied to a merchant page."
+}

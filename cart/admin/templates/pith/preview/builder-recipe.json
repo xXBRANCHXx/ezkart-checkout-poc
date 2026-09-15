@@ -1,0 +1,4176 @@
+[
+  {
+    "id": "navigation",
+    "type": "container",
+    "name": "PITH header",
+    "props": {
+      "display": "block",
+      "flexDirection": "column",
+      "gap": "8%",
+      "minWidth": "0px",
+      "gridTemplateColumns": "minmax(0,1fr) minmax(0,1fr)",
+      "paddingTop": "0px",
+      "paddingBottom": "0px",
+      "paddingLeft": "clamp(24px,4.2cqw,80px)",
+      "paddingRight": "clamp(24px,4.2cqw,80px)",
+      "backgroundColor": "#eae653",
+      "color": "#24251c",
+      "fontFamily": "'DM Sans', Arial, sans-serif",
+      "fontSize": "16px",
+      "lineHeight": "1.5",
+      "position": "relative",
+      "top": "auto",
+      "zIndex": "100",
+      "borderBottomWidth": "0px",
+      "borderBottomStyle": "solid",
+      "borderBottomColor": "rgba(36,37,28,.3)"
+    },
+    "responsive": [
+      {
+        "max": 699,
+        "props": {
+          "gridTemplateColumns": "minmax(0,1fr)",
+          "paddingLeft": "24px",
+          "paddingRight": "24px",
+          "paddingTop": "55px",
+          "paddingBottom": "55px",
+          "gap": "32px"
+        }
+      },
+      {
+        "max": 359,
+        "props": {
+          "paddingLeft": "20px",
+          "paddingRight": "20px"
+        }
+      },
+      {
+        "max": 699,
+        "props": {
+          "paddingTop": "0px",
+          "paddingBottom": "0px"
+        }
+      }
+    ],
+    "children": [
+      {
+        "id": "nav-row",
+        "type": "container",
+        "name": "Navigation links",
+        "props": {
+          "display": "flex",
+          "flexDirection": "row",
+          "gap": "28px",
+          "minWidth": "0px",
+          "height": "76px",
+          "alignItems": "center",
+          "justifyContent": "space-between"
+        },
+        "responsive": [
+          {
+            "max": 699,
+            "props": {
+              "height": "64px",
+              "gap": "16px"
+            }
+          },
+          {
+            "max": 359,
+            "props": {
+              "gap": "12px"
+            }
+          }
+        ],
+        "children": [
+          {
+            "id": "brand-link",
+            "type": "button",
+            "tag": "a",
+            "name": "PITH home",
+            "action": {
+              "type": "link",
+              "target": "#native-navigation"
+            },
+            "props": {
+              "display": "flex",
+              "alignItems": "center",
+              "minHeight": "44px",
+              "width": "84px",
+              "flexShrink": "0"
+            },
+            "responsive": [
+              {
+                "max": 699,
+                "props": {
+                  "width": "74px"
+                }
+              }
+            ],
+            "children": [
+              {
+                "id": "pith-logo",
+                "type": "image",
+                "name": "PITH",
+                "src": "http://127.0.0.1:46322/assets/logo.svg",
+                "alt": "PITH",
+                "props": {
+                  "display": "block",
+                  "width": "100%",
+                  "height": "34px",
+                  "objectFit": "contain"
+                },
+                "responsive": [
+                  {
+                    "max": 699,
+                    "props": {
+                      "height": "30px"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "desktop-links",
+            "type": "container",
+            "name": "Main navigation",
+            "props": {
+              "display": "flex",
+              "flexDirection": "row",
+              "gap": "28px",
+              "minWidth": "0px",
+              "marginLeft": "auto",
+              "marginRight": "30px",
+              "alignItems": "center"
+            },
+            "responsive": [
+              {
+                "max": 899,
+                "props": {
+                  "display": "none"
+                }
+              }
+            ],
+            "children": [
+              {
+                "id": "nav-story",
+                "type": "button",
+                "tag": "a",
+                "name": "Our story",
+                "text": "Our story",
+                "action": {
+                  "type": "link",
+                  "target": "#native-story"
+                },
+                "props": {
+                  "display": "inline-flex",
+                  "alignItems": "center",
+                  "justifyContent": "space-between",
+                  "minHeight": "44px",
+                  "fontSize": "14px",
+                  "fontWeight": "500",
+                  "textDecoration": "none",
+                  "color": "inherit"
+                },
+                "marks": []
+              },
+              {
+                "id": "nav-serve",
+                "type": "button",
+                "tag": "a",
+                "name": "How to serve",
+                "text": "How to serve",
+                "action": {
+                  "type": "link",
+                  "target": "#native-serve"
+                },
+                "props": {
+                  "display": "inline-flex",
+                  "alignItems": "center",
+                  "justifyContent": "space-between",
+                  "minHeight": "44px",
+                  "fontSize": "14px",
+                  "fontWeight": "500",
+                  "textDecoration": "none",
+                  "color": "inherit"
+                },
+                "marks": []
+              },
+              {
+                "id": "nav-faq",
+                "type": "button",
+                "tag": "a",
+                "name": "FAQs",
+                "text": "FAQs",
+                "action": {
+                  "type": "link",
+                  "target": "#native-questions"
+                },
+                "props": {
+                  "display": "inline-flex",
+                  "alignItems": "center",
+                  "justifyContent": "space-between",
+                  "minHeight": "44px",
+                  "fontSize": "14px",
+                  "fontWeight": "500",
+                  "textDecoration": "none",
+                  "color": "inherit"
+                },
+                "marks": []
+              }
+            ]
+          },
+          {
+            "id": "nav-actions",
+            "type": "container",
+            "name": "Shopping and menu",
+            "props": {
+              "display": "flex",
+              "flexDirection": "row",
+              "gap": "24px",
+              "minWidth": "0px",
+              "alignItems": "center",
+              "marginLeft": "0px"
+            },
+            "responsive": [
+              {
+                "max": 899,
+                "props": {
+                  "marginLeft": "auto"
+                }
+              },
+              {
+                "max": 699,
+                "props": {
+                  "gap": "24px"
+                }
+              },
+              {
+                "max": 359,
+                "props": {
+                  "gap": "16px"
+                }
+              }
+            ],
+            "children": [
+              {
+                "id": "nav-shop",
+                "type": "button",
+                "tag": "a",
+                "name": "Shop the flavors",
+                "text": "Shop",
+                "action": {
+                  "type": "link",
+                  "target": "#native-shop"
+                },
+                "props": {
+                  "display": "inline-flex",
+                  "alignItems": "center",
+                  "justifyContent": "space-between",
+                  "minHeight": "44px",
+                  "fontSize": "14px",
+                  "fontWeight": "600",
+                  "textDecoration": "underline",
+                  "color": "#24251c",
+                  "backgroundColor": "transparent",
+                  "paddingLeft": "0px",
+                  "paddingRight": "0px",
+                  "borderRadius": "0px",
+                  "whiteSpace": "nowrap"
+                },
+                "responsive": [],
+                "marks": []
+              },
+              {
+                "id": "nav-menu",
+                "type": "button",
+                "tag": "button",
+                "name": "Open navigation menu",
+                "text": "Menu",
+                "action": {
+                  "type": "toggle",
+                  "target": "mobile-menu"
+                },
+                "props": {
+                  "display": "none",
+                  "width": "auto",
+                  "height": "44px",
+                  "textAlign": "center",
+                  "fontSize": "14px",
+                  "backgroundColor": "transparent",
+                  "color": "#24251c",
+                  "minWidth": "44px",
+                  "fontWeight": "500",
+                  "paddingLeft": "0px",
+                  "paddingRight": "0px"
+                },
+                "responsive": [
+                  {
+                    "max": 899,
+                    "props": {
+                      "display": "block"
+                    }
+                  }
+                ],
+                "marks": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "mobile-menu",
+        "type": "container",
+        "name": "Mobile navigation",
+        "props": {
+          "display": "flex",
+          "flexDirection": "column",
+          "gap": "10px",
+          "minWidth": "0px",
+          "position": "absolute",
+          "top": "100%",
+          "left": "0px",
+          "right": "0px",
+          "backgroundColor": "#eae653",
+          "paddingLeft": "24px",
+          "paddingRight": "24px",
+          "paddingTop": "16px",
+          "paddingBottom": "24px",
+          "zIndex": "90",
+          "borderBottomWidth": "1px",
+          "borderBottomStyle": "solid",
+          "borderBottomColor": "rgba(36,37,28,.3)"
+        },
+        "responsive": [],
+        "collapsed": true,
+        "children": [
+          {
+            "id": "mobile-shop",
+            "type": "button",
+            "tag": "a",
+            "name": "Shop the flavors",
+            "text": "Shop the flavors",
+            "action": {
+              "type": "link",
+              "target": "#native-shop"
+            },
+            "props": {
+              "display": "inline-flex",
+              "alignItems": "center",
+              "justifyContent": "space-between",
+              "minHeight": "44px",
+              "fontSize": "14px",
+              "fontWeight": "600",
+              "textDecoration": "none",
+              "color": "inherit"
+            },
+            "marks": []
+          },
+          {
+            "id": "mobile-story",
+            "type": "button",
+            "tag": "a",
+            "name": "Our story",
+            "text": "Our story",
+            "action": {
+              "type": "link",
+              "target": "#native-story"
+            },
+            "props": {
+              "display": "inline-flex",
+              "alignItems": "center",
+              "justifyContent": "space-between",
+              "minHeight": "44px",
+              "fontSize": "14px",
+              "fontWeight": "600",
+              "textDecoration": "none",
+              "color": "inherit"
+            },
+            "marks": []
+          },
+          {
+            "id": "mobile-serve",
+            "type": "button",
+            "tag": "a",
+            "name": "How to serve",
+            "text": "How to serve",
+            "action": {
+              "type": "link",
+              "target": "#native-serve"
+            },
+            "props": {
+              "display": "inline-flex",
+              "alignItems": "center",
+              "justifyContent": "space-between",
+              "minHeight": "44px",
+              "fontSize": "14px",
+              "fontWeight": "600",
+              "textDecoration": "none",
+              "color": "inherit"
+            },
+            "marks": []
+          },
+          {
+            "id": "mobile-faq",
+            "type": "button",
+            "tag": "a",
+            "name": "FAQs",
+            "text": "FAQs",
+            "action": {
+              "type": "link",
+              "target": "#native-questions"
+            },
+            "props": {
+              "display": "inline-flex",
+              "alignItems": "center",
+              "justifyContent": "space-between",
+              "minHeight": "44px",
+              "fontSize": "14px",
+              "fontWeight": "600",
+              "textDecoration": "none",
+              "color": "inherit"
+            },
+            "marks": []
+          }
+        ]
+      }
+    ],
+    "tag": "header"
+  },
+  {
+    "id": "hero",
+    "type": "container",
+    "name": "Take a Thip \u2014 Hero",
+    "props": {
+      "display": "grid",
+      "flexDirection": "column",
+      "gap": "8%",
+      "minWidth": "0px",
+      "gridTemplateColumns": "1.03fr 1fr",
+      "paddingTop": "48px",
+      "paddingBottom": "44px",
+      "paddingLeft": "clamp(24px,4.2cqw,80px)",
+      "paddingRight": "clamp(24px,4.2cqw,80px)",
+      "backgroundColor": "#eae653",
+      "color": "#24251c",
+      "fontFamily": "'DM Sans', Arial, sans-serif",
+      "fontSize": "16px",
+      "lineHeight": "1.5",
+      "gridTemplateRows": "auto 1fr",
+      "columnGap": "3%",
+      "rowGap": "0px"
+    },
+    "responsive": [
+      {
+        "max": 699,
+        "props": {
+          "gridTemplateColumns": "minmax(0,1fr)",
+          "paddingLeft": "24px",
+          "paddingRight": "24px",
+          "paddingTop": "55px",
+          "paddingBottom": "55px",
+          "gap": "32px"
+        }
+      },
+      {
+        "max": 359,
+        "props": {
+          "paddingLeft": "20px",
+          "paddingRight": "20px"
+        }
+      },
+      {
+        "max": 699,
+        "props": {
+          "paddingTop": "29px",
+          "paddingBottom": "32px",
+          "rowGap": "0px"
+        }
+      }
+    ],
+    "children": [
+      {
+        "id": "hero-title",
+        "type": "container",
+        "name": "Campaign headline",
+        "props": {
+          "display": "flex",
+          "flexDirection": "column",
+          "gap": "24px",
+          "minWidth": "0px",
+          "gridColumn": "1",
+          "gridRow": "1"
+        },
+        "responsive": [],
+        "children": [
+          {
+            "id": "hero-headline",
+            "type": "heading",
+            "tag": "h1",
+            "name": "TAKE A THIP",
+            "text": "TAKE\nA THIP",
+            "props": {
+              "fontFamily": "Anton, Impact, sans-serif",
+              "fontSize": "clamp(90px,9.35cqw,150px)",
+              "fontWeight": "400",
+              "lineHeight": "1.02",
+              "letterSpacing": "-.018em",
+              "whiteSpace": "pre-line"
+            },
+            "marks": [],
+            "responsive": [
+              {
+                "max": 699,
+                "props": {
+                  "fontSize": "clamp(65px,17.1cqw,110px)"
+                }
+              }
+            ]
+          },
+          {
+            "id": "hero-description",
+            "type": "text",
+            "name": "Dry citrus soda.\nFor a taste that takes the s",
+            "text": "Dry citrus soda.\nFor a taste that takes the scenic route.",
+            "props": {
+              "fontSize": "20px",
+              "lineHeight": "1.45",
+              "whiteSpace": "pre-line",
+              "marginTop": "4px"
+            },
+            "responsive": [
+              {
+                "max": 699,
+                "props": {
+                  "fontSize": "15px"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "hero-media",
+        "type": "container",
+        "name": "Hero product image",
+        "props": {
+          "display": "flex",
+          "flexDirection": "column",
+          "gap": "16px",
+          "minWidth": "0px",
+          "gridColumn": "2",
+          "gridRow": "1 / 3"
+        },
+        "responsive": [
+          {
+            "max": 699,
+            "props": {
+              "gridColumn": "1",
+              "gridRow": "2",
+              "marginTop": "16px"
+            }
+          }
+        ],
+        "children": [
+          {
+            "id": "hero-product-image",
+            "type": "commerce",
+            "part": "image",
+            "productId": "pith-dry-citrus-soda",
+            "group": "pith-flavor",
+            "name": "Selected flavor photo",
+            "props": {
+              "display": "block",
+              "width": "100%",
+              "minWidth": "0px",
+              "fontSize": "14px",
+              "height": "clamp(490px,48cqw,720px)",
+              "objectFit": "contain"
+            },
+            "loading": "eager",
+            "responsive": [
+              {
+                "max": 699,
+                "props": {
+                  "height": "330px"
+                }
+              },
+              {
+                "max": 359,
+                "props": {
+                  "height": "290px"
+                }
+              }
+            ]
+          },
+          {
+            "id": "hero-caption",
+            "type": "text",
+            "name": "A little peel. A little bite.                ",
+            "text": "A little peel. A little bite.                        6 \u00d7 250 ml",
+            "props": {
+              "fontSize": "12px",
+              "lineHeight": "1.5",
+              "whiteSpace": "pre-line",
+              "borderBottomWidth": "0px",
+              "borderBottomStyle": "solid",
+              "borderBottomColor": "rgba(36,37,28,.3)",
+              "paddingTop": "12px",
+              "borderTopWidth": "1px",
+              "borderTopStyle": "solid",
+              "borderTopColor": "rgba(36,37,28,.3)"
+            }
+          }
+        ]
+      },
+      {
+        "id": "hero-purchase",
+        "type": "container",
+        "name": "Hero purchase",
+        "props": {
+          "display": "flex",
+          "flexDirection": "column",
+          "gap": "16px",
+          "minWidth": "0px",
+          "gridColumn": "1",
+          "gridRow": "2",
+          "alignSelf": "flex-start",
+          "width": "100%",
+          "maxWidth": "455px",
+          "marginTop": "30px"
+        },
+        "responsive": [
+          {
+            "max": 699,
+            "props": {
+              "gridRow": "3",
+              "maxWidth": "none",
+              "marginTop": "20px"
+            }
+          }
+        ],
+        "children": [
+          {
+            "id": "hero-flavor",
+            "type": "commerce",
+            "part": "options",
+            "productId": "pith-dry-citrus-soda",
+            "group": "pith-flavor",
+            "name": "Choose your flavor",
+            "props": {
+              "display": "block",
+              "width": "100%",
+              "minWidth": "0px",
+              "fontSize": "14px"
+            },
+            "label": "Find your flavor"
+          },
+          {
+            "id": "hero-add",
+            "type": "commerce",
+            "part": "add",
+            "productId": "pith-dry-citrus-soda",
+            "group": "pith-flavor",
+            "name": "Add selected six-pack",
+            "props": {
+              "display": "block",
+              "width": "100%",
+              "minWidth": "0px",
+              "fontSize": "14px",
+              "backgroundColor": "#24251c",
+              "color": "#f4f1e6",
+              "paddingTop": "5px",
+              "paddingBottom": "5px",
+              "paddingLeft": "20px",
+              "paddingRight": "20px",
+              "borderRadius": "2px",
+              "fontWeight": "600"
+            },
+            "label": "Add a six-pack \u2197",
+            "showPrice": true
+          },
+          {
+            "id": "hero-purchase-note",
+            "type": "text",
+            "name": "Six 250 ml cans \u00b7 USD \u00b7 Available in this dem",
+            "text": "Six 250 ml cans \u00b7 USD \u00b7 Available in this demo",
+            "props": {
+              "fontSize": "12px",
+              "lineHeight": "1.5",
+              "whiteSpace": "pre-line",
+              "textAlign": "center"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "ingredients-ribbon",
+    "type": "container",
+    "name": "Ingredients at a glance",
+    "props": {
+      "display": "grid",
+      "flexDirection": "column",
+      "gap": "0px",
+      "minWidth": "0px",
+      "gridTemplateColumns": "repeat(4,minmax(0,1fr))",
+      "paddingTop": "0px",
+      "paddingBottom": "0px",
+      "paddingLeft": "0px",
+      "paddingRight": "0px",
+      "backgroundColor": "#eae653",
+      "color": "#24251c",
+      "fontFamily": "'DM Sans', Arial, sans-serif",
+      "fontSize": "16px",
+      "lineHeight": "1.5",
+      "borderBottomWidth": "1px",
+      "borderBottomStyle": "solid",
+      "borderBottomColor": "rgba(36,37,28,.3)",
+      "borderTopWidth": "1px",
+      "borderTopStyle": "solid",
+      "borderTopColor": "rgba(36,37,28,.3)"
+    },
+    "responsive": [
+      {
+        "max": 699,
+        "props": {
+          "gridTemplateColumns": "minmax(0,1fr)",
+          "paddingLeft": "24px",
+          "paddingRight": "24px",
+          "paddingTop": "55px",
+          "paddingBottom": "55px",
+          "gap": "32px"
+        }
+      },
+      {
+        "max": 359,
+        "props": {
+          "paddingLeft": "20px",
+          "paddingRight": "20px"
+        }
+      },
+      {
+        "max": 699,
+        "props": {
+          "gridTemplateColumns": "repeat(2,minmax(0,1fr))",
+          "paddingTop": "0px",
+          "paddingBottom": "0px",
+          "paddingLeft": "0px",
+          "paddingRight": "0px",
+          "gap": "0px"
+        }
+      }
+    ],
+    "children": [
+      {
+        "id": "ribbon-0",
+        "type": "text",
+        "name": "Citrus juice",
+        "text": "Citrus juice",
+        "props": {
+          "fontSize": "clamp(18px,2.25cqw,35px)",
+          "lineHeight": "1.5",
+          "whiteSpace": "pre-line",
+          "textAlign": "center",
+          "paddingTop": "24px",
+          "paddingBottom": "24px",
+          "borderRightWidth": "1px",
+          "borderRightStyle": "solid",
+          "borderRightColor": "rgba(36,37,28,.3)"
+        },
+        "responsive": [
+          {
+            "max": 699,
+            "props": {
+              "fontSize": "20px",
+              "paddingTop": "16px",
+              "paddingBottom": "16px"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ribbon-1",
+        "type": "text",
+        "name": "Peel extract",
+        "text": "Peel extract",
+        "props": {
+          "fontSize": "clamp(18px,2.25cqw,35px)",
+          "lineHeight": "1.5",
+          "whiteSpace": "pre-line",
+          "textAlign": "center",
+          "paddingTop": "24px",
+          "paddingBottom": "24px",
+          "borderRightWidth": "1px",
+          "borderRightStyle": "solid",
+          "borderRightColor": "rgba(36,37,28,.3)"
+        },
+        "responsive": [
+          {
+            "max": 699,
+            "props": {
+              "fontSize": "20px",
+              "paddingTop": "16px",
+              "paddingBottom": "16px"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ribbon-2",
+        "type": "text",
+        "name": "Fine bubbles",
+        "text": "Fine bubbles",
+        "props": {
+          "fontSize": "clamp(18px,2.25cqw,35px)",
+          "lineHeight": "1.5",
+          "whiteSpace": "pre-line",
+          "textAlign": "center",
+          "paddingTop": "24px",
+          "paddingBottom": "24px",
+          "borderRightWidth": "1px",
+          "borderRightStyle": "solid",
+          "borderRightColor": "rgba(36,37,28,.3)"
+        },
+        "responsive": [
+          {
+            "max": 699,
+            "props": {
+              "fontSize": "20px",
+              "paddingTop": "16px",
+              "paddingBottom": "16px"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ribbon-3",
+        "type": "text",
+        "name": "250 ml cans",
+        "text": "250 ml cans",
+        "props": {
+          "fontSize": "clamp(18px,2.25cqw,35px)",
+          "lineHeight": "1.5",
+          "whiteSpace": "pre-line",
+          "textAlign": "center",
+          "paddingTop": "24px",
+          "paddingBottom": "24px",
+          "borderRightWidth": "0px",
+          "borderRightStyle": "solid",
+          "borderRightColor": "rgba(36,37,28,.3)"
+        },
+        "responsive": [
+          {
+            "max": 699,
+            "props": {
+              "fontSize": "20px",
+              "paddingTop": "16px",
+              "paddingBottom": "16px"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "story",
+    "type": "container",
+    "name": "Our attitude",
+    "props": {
+      "display": "grid",
+      "flexDirection": "column",
+      "gap": "8%",
+      "minWidth": "0px",
+      "gridTemplateColumns": "minmax(0,1fr) minmax(0,1fr)",
+      "paddingTop": "110px",
+      "paddingBottom": "110px",
+      "paddingLeft": "clamp(24px,4.2cqw,80px)",
+      "paddingRight": "clamp(24px,4.2cqw,80px)",
+      "backgroundColor": "#f4f1e6",
+      "color": "#24251c",
+      "fontFamily": "'DM Sans', Arial, sans-serif",
+      "fontSize": "16px",
+      "lineHeight": "1.5"
+    },
+    "responsive": [
+      {
+        "max": 699,
+        "props": {
+          "gridTemplateColumns": "minmax(0,1fr)",
+          "paddingLeft": "24px",
+          "paddingRight": "24px",
+          "paddingTop": "55px",
+          "paddingBottom": "55px",
+          "gap": "32px"
+        }
+      },
+      {
+        "max": 359,
+        "props": {
+          "paddingLeft": "20px",
+          "paddingRight": "20px"
+        }
+      }
+    ],
+    "fill": {
+      "clip": "background",
+      "layers": []
+    },
+    "children": [
+      {
+        "id": "story-headline",
+        "type": "heading",
+        "tag": "h2",
+        "name": "SWEET ISN\u2019T THE WHOLE STORY.",
+        "text": "SWEET ISN\u2019T\nTHE WHOLE\nSTORY.",
+        "props": {
+          "fontFamily": "Anton, Impact, sans-serif",
+          "fontSize": "clamp(56px,6.5cqw,100px)",
+          "fontWeight": "400",
+          "lineHeight": "1.02",
+          "letterSpacing": "-.018em",
+          "whiteSpace": "pre-line"
+        },
+        "marks": [
+          {
+            "start": 22,
+            "end": 28,
+            "color": "#b62e22"
+          }
+        ],
+        "responsive": [
+          {
+            "max": 699,
+            "props": {
+              "fontSize": "clamp(57px,13.9cqw,82px)"
+            }
+          }
+        ]
+      },
+      {
+        "id": "story-copy",
+        "type": "container",
+        "name": "Why a little bitter tastes good",
+        "props": {
+          "display": "flex",
+          "flexDirection": "column",
+          "gap": "24px",
+          "minWidth": "0px",
+          "alignSelf": "center",
+          "maxWidth": "530px"
+        },
+        "responsive": [],
+        "children": [
+          {
+            "id": "story-lead",
+            "type": "text",
+            "name": "The good part of citrus?\nWe think it\u2019s the ed",
+            "text": "The good part of citrus?\nWe think it\u2019s the edge.",
+            "props": {
+              "fontSize": "30px",
+              "lineHeight": "1.27",
+              "whiteSpace": "pre-line",
+              "letterSpacing": "-.035em"
+            }
+          },
+          {
+            "id": "story-first",
+            "type": "text",
+            "name": "That first bright sip. The little tug of bitt",
+            "text": "That first bright sip. The little tug of bitter peel. The dry finish that leaves room for another bite of whatever\u2019s on the table.",
+            "props": {
+              "fontSize": "16px",
+              "lineHeight": "1.5",
+              "whiteSpace": "pre-line"
+            }
+          },
+          {
+            "id": "story-second",
+            "type": "text",
+            "name": "That\u2019s PITH. Citrus juice, a little cane suga",
+            "text": "That\u2019s PITH. Citrus juice, a little cane sugar, peel extract, and fine bubbles. Made for the hour that doesn\u2019t need a plan.",
+            "props": {
+              "fontSize": "16px",
+              "lineHeight": "1.5",
+              "whiteSpace": "pre-line"
+            }
+          },
+          {
+            "id": "story-link",
+            "type": "button",
+            "tag": "a",
+            "name": "Get into the ingredients \u2193",
+            "text": "Get into the ingredients \u2193",
+            "action": {
+              "type": "link",
+              "target": "#native-inside"
+            },
+            "props": {
+              "display": "inline-flex",
+              "alignItems": "center",
+              "justifyContent": "space-between",
+              "minHeight": "44px",
+              "fontSize": "14px",
+              "fontWeight": "600",
+              "textDecoration": "none",
+              "color": "inherit",
+              "borderBottomWidth": "1px",
+              "borderBottomStyle": "solid",
+              "borderBottomColor": "rgba(36,37,28,.3)",
+              "width": "fit-content",
+              "gap": "28px",
+              "paddingTop": "8px",
+              "paddingBottom": "8px"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "serve",
+    "type": "container",
+    "name": "The good pour",
+    "props": {
+      "display": "grid",
+      "flexDirection": "column",
+      "gap": "0px",
+      "minWidth": "0px",
+      "gridTemplateColumns": "1.65fr 1fr",
+      "paddingTop": "0px",
+      "paddingBottom": "0px",
+      "paddingLeft": "0px",
+      "paddingRight": "0px",
+      "backgroundColor": "#b62e22",
+      "color": "#24251c",
+      "fontFamily": "'DM Sans', Arial, sans-serif",
+      "fontSize": "16px",
+      "lineHeight": "1.5"
+    },
+    "responsive": [
+      {
+        "max": 699,
+        "props": {
+          "gridTemplateColumns": "minmax(0,1fr)",
+          "paddingLeft": "24px",
+          "paddingRight": "24px",
+          "paddingTop": "55px",
+          "paddingBottom": "55px",
+          "gap": "32px"
+        }
+      },
+      {
+        "max": 359,
+        "props": {
+          "paddingLeft": "20px",
+          "paddingRight": "20px"
+        }
+      },
+      {
+        "max": 899,
+        "props": {
+          "gridTemplateColumns": "minmax(0,1fr)"
+        }
+      },
+      {
+        "max": 699,
+        "props": {
+          "paddingTop": "0px",
+          "paddingBottom": "0px",
+          "paddingLeft": "0px",
+          "paddingRight": "0px",
+          "gap": "0px"
+        }
+      }
+    ],
+    "children": [
+      {
+        "id": "serving-photo",
+        "type": "container",
+        "name": "PITH at the table",
+        "props": {
+          "display": "flex",
+          "flexDirection": "column",
+          "gap": "0px",
+          "minWidth": "0px",
+          "position": "relative"
+        },
+        "responsive": [],
+        "children": [
+          {
+            "id": "pour-photo",
+            "type": "image",
+            "name": "PITH grapefruit soda being poured over ice at a sunlit red cafe table",
+            "src": "http://127.0.0.1:46322/assets/serve-1600.webp",
+            "alt": "PITH grapefruit soda being poured over ice at a sunlit red cafe table",
+            "props": {
+              "display": "block",
+              "width": "100%",
+              "height": "100%",
+              "objectFit": "cover",
+              "minHeight": "630px"
+            },
+            "responsive": [
+              {
+                "max": 899,
+                "props": {
+                  "height": "auto",
+                  "minHeight": "0px",
+                  "aspectRatio": "1.5"
+                }
+              },
+              {
+                "max": 699,
+                "props": {
+                  "aspectRatio": "1",
+                  "objectPosition": "56% center"
+                }
+              }
+            ]
+          },
+          {
+            "id": "pour-caption",
+            "type": "text",
+            "name": "One good pour. Nowhere to rush.",
+            "text": "One good pour. Nowhere to rush.",
+            "props": {
+              "fontSize": "12px",
+              "lineHeight": "1.5",
+              "whiteSpace": "pre-line",
+              "position": "absolute",
+              "left": "24px",
+              "bottom": "16px",
+              "color": "#f4f1e6"
+            }
+          }
+        ]
+      },
+      {
+        "id": "serve-copy",
+        "type": "container",
+        "name": "Serving guide",
+        "props": {
+          "display": "flex",
+          "flexDirection": "column",
+          "gap": "28px",
+          "minWidth": "0px",
+          "color": "#f4f1e6",
+          "backgroundColor": "#b62e22",
+          "paddingTop": "55px",
+          "paddingBottom": "45px",
+          "paddingLeft": "55px",
+          "paddingRight": "55px"
+        },
+        "responsive": [
+          {
+            "max": 699,
+            "props": {
+              "paddingLeft": "24px",
+              "paddingRight": "24px",
+              "paddingTop": "42px",
+              "paddingBottom": "35px"
+            }
+          }
+        ],
+        "children": [
+          {
+            "id": "serve-headline",
+            "type": "heading",
+            "tag": "h2",
+            "name": "ICE. PITH. THAT\u2019S IT.",
+            "text": "ICE.\nPITH.\nTHAT\u2019S IT.",
+            "props": {
+              "fontFamily": "Anton, Impact, sans-serif",
+              "fontSize": "clamp(66px,6.2cqw,94px)",
+              "fontWeight": "400",
+              "lineHeight": "1.02",
+              "letterSpacing": "-.018em",
+              "whiteSpace": "pre-line",
+              "color": "#f4f1e6"
+            }
+          },
+          {
+            "id": "serving-tabs",
+            "type": "container",
+            "name": "Choose serving style",
+            "props": {
+              "display": "flex",
+              "flexDirection": "row",
+              "gap": "0px",
+              "minWidth": "0px",
+              "borderTopWidth": "1px",
+              "borderRightWidth": "1px",
+              "borderBottomWidth": "1px",
+              "borderLeftWidth": "1px",
+              "borderTopStyle": "solid",
+              "borderRightStyle": "solid",
+              "borderBottomStyle": "solid",
+              "borderLeftStyle": "solid",
+              "borderTopColor": "#dba296",
+              "borderRightColor": "#dba296",
+              "borderBottomColor": "#dba296",
+              "borderLeftColor": "#dba296"
+            },
+            "responsive": [],
+            "children": [
+              {
+                "id": "serve-ice",
+                "type": "button",
+                "tag": "button",
+                "name": "Serve over ice",
+                "text": "Over ice",
+                "action": {
+                  "type": "state",
+                  "target": "over-ice"
+                },
+                "props": {
+                  "paddingTop": "12px",
+                  "paddingBottom": "12px",
+                  "backgroundColor": "#f4f1e6",
+                  "color": "#b62e22",
+                  "width": "50%",
+                  "fontSize": "14px",
+                  "textAlign": "center"
+                },
+                "states": {
+                  "from-can": {
+                    "props": {
+                      "backgroundColor": "transparent",
+                      "color": "#f4f1e6"
+                    }
+                  }
+                }
+              },
+              {
+                "id": "serve-can",
+                "type": "button",
+                "tag": "button",
+                "name": "Serve from the can",
+                "text": "From the can",
+                "action": {
+                  "type": "state",
+                  "target": "from-can"
+                },
+                "props": {
+                  "paddingTop": "12px",
+                  "paddingBottom": "12px",
+                  "backgroundColor": "transparent",
+                  "color": "#f4f1e6",
+                  "width": "50%",
+                  "fontSize": "14px",
+                  "textAlign": "center"
+                },
+                "states": {
+                  "from-can": {
+                    "props": {
+                      "backgroundColor": "#f4f1e6",
+                      "color": "#b62e22"
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "id": "serve-ice-copy",
+            "type": "container",
+            "name": "Over ice instructions",
+            "props": {
+              "display": "flex",
+              "flexDirection": "column",
+              "gap": "16px",
+              "minWidth": "0px",
+              "minHeight": "140px"
+            },
+            "responsive": [],
+            "states": {
+              "from-can": {
+                "props": {
+                  "display": "none"
+                }
+              }
+            },
+            "children": [
+              {
+                "id": "serve-ice-title",
+                "type": "text",
+                "name": "A little ritual.",
+                "text": "A little ritual.",
+                "props": {
+                  "fontSize": "24px",
+                  "lineHeight": "1.5",
+                  "whiteSpace": "pre-line"
+                }
+              },
+              {
+                "id": "serve-ice-steps",
+                "type": "text",
+                "name": "1. Fill a short glass with plenty of ice.\n2. ",
+                "text": "1. Fill a short glass with plenty of ice.\n2. Pour slowly. Let the bubbles settle.\n3. Add a citrus slice, if you feel like it.",
+                "props": {
+                  "fontSize": "15px",
+                  "lineHeight": "1.8",
+                  "whiteSpace": "pre-line"
+                }
+              }
+            ]
+          },
+          {
+            "id": "serve-can-copy",
+            "type": "container",
+            "name": "From the can instructions",
+            "props": {
+              "display": "none",
+              "flexDirection": "column",
+              "gap": "16px",
+              "minWidth": "0px",
+              "minHeight": "140px"
+            },
+            "responsive": [],
+            "states": {
+              "from-can": {
+                "props": {
+                  "display": "flex"
+                }
+              }
+            },
+            "children": [
+              {
+                "id": "serve-can-title",
+                "type": "text",
+                "name": "Keep it simple.",
+                "text": "Keep it simple.",
+                "props": {
+                  "fontSize": "24px",
+                  "lineHeight": "1.5",
+                  "whiteSpace": "pre-line"
+                }
+              },
+              {
+                "id": "serve-can-steps",
+                "type": "text",
+                "name": "1. Chill the can until it\u2019s properly cold.\n2.",
+                "text": "1. Chill the can until it\u2019s properly cold.\n2. Crack it open.\n3. Take a Thip.",
+                "props": {
+                  "fontSize": "15px",
+                  "lineHeight": "1.8",
+                  "whiteSpace": "pre-line"
+                }
+              }
+            ]
+          },
+          {
+            "id": "serve-size",
+            "type": "text",
+            "name": "250 ml. One can, one easy pour.",
+            "text": "250 ml. One can, one easy pour.",
+            "props": {
+              "fontSize": "12px",
+              "lineHeight": "1.5",
+              "whiteSpace": "pre-line",
+              "paddingTop": "20px",
+              "borderTopWidth": "1px",
+              "borderTopStyle": "solid",
+              "borderTopColor": "#dba296"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "inside",
+    "type": "container",
+    "name": "What\u2019s inside",
+    "props": {
+      "display": "grid",
+      "flexDirection": "column",
+      "gap": "8%",
+      "minWidth": "0px",
+      "gridTemplateColumns": "minmax(0,1fr) minmax(0,1fr)",
+      "paddingTop": "100px",
+      "paddingBottom": "100px",
+      "paddingLeft": "clamp(24px,4.2cqw,80px)",
+      "paddingRight": "clamp(24px,4.2cqw,80px)",
+      "backgroundColor": "#24251c",
+      "color": "#f4f1e6",
+      "fontFamily": "'DM Sans', Arial, sans-serif",
+      "fontSize": "16px",
+      "lineHeight": "1.5"
+    },
+    "responsive": [
+      {
+        "max": 699,
+        "props": {
+          "gridTemplateColumns": "minmax(0,1fr)",
+          "paddingLeft": "24px",
+          "paddingRight": "24px",
+          "paddingTop": "55px",
+          "paddingBottom": "55px",
+          "gap": "32px"
+        }
+      },
+      {
+        "max": 359,
+        "props": {
+          "paddingLeft": "20px",
+          "paddingRight": "20px"
+        }
+      }
+    ],
+    "children": [
+      {
+        "id": "inside-intro",
+        "type": "container",
+        "name": "Ingredient introduction",
+        "props": {
+          "display": "flex",
+          "flexDirection": "column",
+          "gap": "24px",
+          "minWidth": "0px"
+        },
+        "responsive": [],
+        "children": [
+          {
+            "id": "inside-headline",
+            "type": "heading",
+            "tag": "h2",
+            "name": "ALL BITE. NO MYSTERY.",
+            "text": "ALL BITE.\nNO MYSTERY.",
+            "props": {
+              "fontFamily": "Anton, Impact, sans-serif",
+              "fontSize": "clamp(55px,6cqw,92px)",
+              "fontWeight": "400",
+              "lineHeight": "1.02",
+              "letterSpacing": "-.018em",
+              "whiteSpace": "pre-line",
+              "color": "#eae653"
+            }
+          },
+          {
+            "id": "inside-description",
+            "type": "text",
+            "name": "A short ingredient list.\nEach one has a job t",
+            "text": "A short ingredient list.\nEach one has a job to do.",
+            "props": {
+              "fontSize": "22px",
+              "lineHeight": "1.5",
+              "whiteSpace": "pre-line"
+            }
+          },
+          {
+            "id": "inside-note",
+            "type": "text",
+            "name": "Explore the Pink Grapefruit recipe below.\nEac",
+            "text": "Explore the Pink Grapefruit recipe below.\nEach flavor\u2019s full list is in the shop.",
+            "props": {
+              "fontSize": "13px",
+              "lineHeight": "1.5",
+              "whiteSpace": "pre-line"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ingredient-answers",
+        "type": "container",
+        "name": "Ingredient details",
+        "props": {
+          "display": "flex",
+          "flexDirection": "column",
+          "gap": "0px",
+          "minWidth": "0px"
+        },
+        "responsive": [],
+        "children": [
+          {
+            "id": "ingredient-juice",
+            "type": "accordion",
+            "name": "01   Pink grapefruit juice",
+            "open": true,
+            "props": {
+              "display": "block",
+              "borderTopWidth": "1px",
+              "borderTopStyle": "solid",
+              "borderTopColor": "#64664e"
+            },
+            "children": [
+              {
+                "id": "ingredient-juice-question",
+                "type": "summary",
+                "name": "01   Pink grapefruit juice",
+                "text": "01   Pink grapefruit juice",
+                "props": {
+                  "display": "flex",
+                  "alignItems": "center",
+                  "justifyContent": "space-between",
+                  "minHeight": "80px",
+                  "paddingTop": "18px",
+                  "paddingBottom": "18px",
+                  "gap": "15px",
+                  "listStyleType": "none",
+                  "fontSize": "23px",
+                  "cursor": "pointer"
+                }
+              },
+              {
+                "id": "ingredient-juice-answer",
+                "type": "text",
+                "name": "The bright beginning. Grapefruit brings a tar",
+                "text": "The bright beginning. Grapefruit brings a tart, juicy character before the peel takes over.",
+                "props": {
+                  "fontSize": "15px",
+                  "lineHeight": "1.6",
+                  "whiteSpace": "pre-line",
+                  "paddingBottom": "25px",
+                  "maxWidth": "530px"
+                }
+              }
+            ]
+          },
+          {
+            "id": "ingredient-peel",
+            "type": "accordion",
+            "name": "02   Citrus peel extract",
+            "open": false,
+            "props": {
+              "display": "block",
+              "borderTopWidth": "1px",
+              "borderTopStyle": "solid",
+              "borderTopColor": "#64664e"
+            },
+            "children": [
+              {
+                "id": "ingredient-peel-question",
+                "type": "summary",
+                "name": "02   Citrus peel extract",
+                "text": "02   Citrus peel extract",
+                "props": {
+                  "display": "flex",
+                  "alignItems": "center",
+                  "justifyContent": "space-between",
+                  "minHeight": "80px",
+                  "paddingTop": "18px",
+                  "paddingBottom": "18px",
+                  "gap": "15px",
+                  "listStyleType": "none",
+                  "fontSize": "23px",
+                  "cursor": "pointer"
+                }
+              },
+              {
+                "id": "ingredient-peel-answer",
+                "type": "text",
+                "name": "The reason for the name. Peel gives this soda",
+                "text": "The reason for the name. Peel gives this soda its dry, gently bitter finish.",
+                "props": {
+                  "fontSize": "15px",
+                  "lineHeight": "1.6",
+                  "whiteSpace": "pre-line",
+                  "paddingBottom": "25px",
+                  "maxWidth": "530px"
+                }
+              }
+            ]
+          },
+          {
+            "id": "ingredient-sugar",
+            "type": "accordion",
+            "name": "03   A little cane sugar",
+            "open": false,
+            "props": {
+              "display": "block",
+              "borderTopWidth": "1px",
+              "borderTopStyle": "solid",
+              "borderTopColor": "#64664e"
+            },
+            "children": [
+              {
+                "id": "ingredient-sugar-question",
+                "type": "summary",
+                "name": "03   A little cane sugar",
+                "text": "03   A little cane sugar",
+                "props": {
+                  "display": "flex",
+                  "alignItems": "center",
+                  "justifyContent": "space-between",
+                  "minHeight": "80px",
+                  "paddingTop": "18px",
+                  "paddingBottom": "18px",
+                  "gap": "15px",
+                  "listStyleType": "none",
+                  "fontSize": "23px",
+                  "cursor": "pointer"
+                }
+              },
+              {
+                "id": "ingredient-sugar-answer",
+                "type": "text",
+                "name": "A touch of sweetness to round the tart edges.",
+                "text": "A touch of sweetness to round the tart edges. PITH contains sugar; it isn\u2019t a sugar-free soda.",
+                "props": {
+                  "fontSize": "15px",
+                  "lineHeight": "1.6",
+                  "whiteSpace": "pre-line",
+                  "paddingBottom": "25px",
+                  "maxWidth": "530px"
+                }
+              }
+            ]
+          },
+          {
+            "id": "ingredient-water",
+            "type": "accordion",
+            "name": "04   Carbonated water",
+            "open": false,
+            "props": {
+              "display": "block",
+              "borderTopWidth": "1px",
+              "borderTopStyle": "solid",
+              "borderTopColor": "#64664e"
+            },
+            "children": [
+              {
+                "id": "ingredient-water-question",
+                "type": "summary",
+                "name": "04   Carbonated water",
+                "text": "04   Carbonated water",
+                "props": {
+                  "display": "flex",
+                  "alignItems": "center",
+                  "justifyContent": "space-between",
+                  "minHeight": "80px",
+                  "paddingTop": "18px",
+                  "paddingBottom": "18px",
+                  "gap": "15px",
+                  "listStyleType": "none",
+                  "fontSize": "23px",
+                  "cursor": "pointer"
+                }
+              },
+              {
+                "id": "ingredient-water-answer",
+                "type": "text",
+                "name": "The lift. Small, lively bubbles carry the cit",
+                "text": "The lift. Small, lively bubbles carry the citrus from the first sip to the last.",
+                "props": {
+                  "fontSize": "15px",
+                  "lineHeight": "1.6",
+                  "whiteSpace": "pre-line",
+                  "paddingBottom": "25px",
+                  "maxWidth": "530px"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "shop",
+    "type": "container",
+    "name": "Choose your PITH",
+    "props": {
+      "display": "grid",
+      "flexDirection": "column",
+      "gap": "8%",
+      "minWidth": "0px",
+      "gridTemplateColumns": "minmax(0,1fr) minmax(0,1fr)",
+      "paddingTop": "90px",
+      "paddingBottom": "90px",
+      "paddingLeft": "clamp(24px,4.2cqw,80px)",
+      "paddingRight": "clamp(24px,4.2cqw,80px)",
+      "backgroundColor": "#eae653",
+      "color": "#24251c",
+      "fontFamily": "'DM Sans', Arial, sans-serif",
+      "fontSize": "16px",
+      "lineHeight": "1.5",
+      "gridTemplateRows": "auto 1fr",
+      "rowGap": "0px",
+      "columnGap": "8%"
+    },
+    "responsive": [
+      {
+        "max": 699,
+        "props": {
+          "gridTemplateColumns": "minmax(0,1fr)",
+          "paddingLeft": "24px",
+          "paddingRight": "24px",
+          "paddingTop": "55px",
+          "paddingBottom": "55px",
+          "gap": "32px"
+        }
+      },
+      {
+        "max": 359,
+        "props": {
+          "paddingLeft": "20px",
+          "paddingRight": "20px"
+        }
+      }
+    ],
+    "children": [
+      {
+        "id": "shop-heading",
+        "type": "container",
+        "name": "Shop introduction",
+        "props": {
+          "display": "flex",
+          "flexDirection": "column",
+          "gap": "20px",
+          "minWidth": "0px",
+          "gridColumn": "2",
+          "gridRow": "1"
+        },
+        "responsive": [
+          {
+            "max": 699,
+            "props": {
+              "gridColumn": "1",
+              "gridRow": "1"
+            }
+          }
+        ],
+        "children": [
+          {
+            "id": "shop-headline",
+            "type": "heading",
+            "tag": "h2",
+            "name": "PICK YOUR BITTER.",
+            "text": "PICK YOUR\nBITTER.",
+            "props": {
+              "fontFamily": "Anton, Impact, sans-serif",
+              "fontSize": "clamp(66px,6.9cqw,106px)",
+              "fontWeight": "400",
+              "lineHeight": "1.02",
+              "letterSpacing": "-.018em",
+              "whiteSpace": "pre-line"
+            }
+          },
+          {
+            "id": "shop-introduction",
+            "type": "text",
+            "name": "Two takes on the brighter side.",
+            "text": "Two takes on the brighter side.",
+            "props": {
+              "fontSize": "18px",
+              "lineHeight": "1.5",
+              "whiteSpace": "pre-line"
+            }
+          }
+        ]
+      },
+      {
+        "id": "shop-media",
+        "type": "container",
+        "name": "Selected product photo",
+        "props": {
+          "display": "flex",
+          "flexDirection": "column",
+          "gap": "20px",
+          "minWidth": "0px",
+          "gridColumn": "1",
+          "gridRow": "1 / 3"
+        },
+        "responsive": [
+          {
+            "max": 699,
+            "props": {
+              "gridColumn": "1",
+              "gridRow": "2",
+              "marginTop": "20px"
+            }
+          }
+        ],
+        "children": [
+          {
+            "id": "shop-product-image",
+            "type": "commerce",
+            "part": "image",
+            "productId": "pith-dry-citrus-soda",
+            "group": "pith-flavor",
+            "name": "Selected flavor photo",
+            "props": {
+              "display": "block",
+              "width": "100%",
+              "minWidth": "0px",
+              "fontSize": "14px",
+              "height": "680px",
+              "objectFit": "contain"
+            },
+            "responsive": [
+              {
+                "min": 700,
+                "max": 899,
+                "props": {
+                  "height": "570px"
+                }
+              },
+              {
+                "max": 699,
+                "props": {
+                  "height": "390px"
+                }
+              },
+              {
+                "max": 359,
+                "props": {
+                  "height": "330px"
+                }
+              }
+            ]
+          },
+          {
+            "id": "shop-image-caption",
+            "type": "commerce",
+            "part": "title",
+            "productId": "pith-dry-citrus-soda",
+            "group": "pith-flavor",
+            "name": "Selected flavor name",
+            "props": {
+              "display": "block",
+              "width": "100%",
+              "minWidth": "0px",
+              "fontSize": "12px",
+              "borderTopWidth": "1px",
+              "borderTopStyle": "solid",
+              "borderTopColor": "rgba(36,37,28,.3)",
+              "paddingTop": "12px"
+            }
+          }
+        ]
+      },
+      {
+        "id": "shop-options",
+        "type": "container",
+        "name": "Product choices and purchase",
+        "props": {
+          "display": "flex",
+          "flexDirection": "column",
+          "gap": "16px",
+          "minWidth": "0px",
+          "gridColumn": "2",
+          "gridRow": "2",
+          "marginTop": "30px",
+          "maxWidth": "600px"
+        },
+        "responsive": [
+          {
+            "max": 699,
+            "props": {
+              "gridColumn": "1",
+              "gridRow": "3",
+              "marginTop": "27px"
+            }
+          }
+        ],
+        "children": [
+          {
+            "id": "shop-flavors",
+            "type": "commerce",
+            "part": "options",
+            "productId": "pith-dry-citrus-soda",
+            "group": "pith-flavor",
+            "name": "Choose your flavor",
+            "props": {
+              "display": "block",
+              "width": "100%",
+              "minWidth": "0px",
+              "fontSize": "18px"
+            },
+            "label": "Your flavor",
+            "optionLayout": "detailed",
+            "priceSuffix": " / six-pack"
+          },
+          {
+            "id": "shop-price-row",
+            "type": "container",
+            "name": "Pack size and price",
+            "props": {
+              "display": "flex",
+              "flexDirection": "row",
+              "gap": "15px",
+              "minWidth": "0px",
+              "alignItems": "center",
+              "justifyContent": "space-between",
+              "marginTop": "10px"
+            },
+            "responsive": [],
+            "children": [
+              {
+                "id": "pack-size",
+                "type": "text",
+                "name": "Six good decisions.\n6 \u00d7 250 ml cans \u00b7 One-tim",
+                "text": "Six good decisions.\n6 \u00d7 250 ml cans \u00b7 One-time purchase",
+                "props": {
+                  "fontSize": "14px",
+                  "lineHeight": "1.5",
+                  "whiteSpace": "pre-line"
+                }
+              },
+              {
+                "id": "shop-price",
+                "type": "commerce",
+                "part": "price",
+                "productId": "pith-dry-citrus-soda",
+                "group": "pith-flavor",
+                "name": "Selected pack price",
+                "props": {
+                  "display": "block",
+                  "width": "auto",
+                  "minWidth": "0px",
+                  "fontSize": "27px",
+                  "fontWeight": "600"
+                }
+              }
+            ]
+          },
+          {
+            "id": "shop-add",
+            "type": "commerce",
+            "part": "add",
+            "productId": "pith-dry-citrus-soda",
+            "group": "pith-flavor",
+            "name": "Add selected six-pack",
+            "props": {
+              "display": "block",
+              "width": "100%",
+              "minWidth": "0px",
+              "fontSize": "14px",
+              "backgroundColor": "#24251c",
+              "color": "#f4f1e6",
+              "paddingTop": "5px",
+              "paddingBottom": "5px",
+              "paddingLeft": "20px",
+              "paddingRight": "20px",
+              "borderRadius": "2px",
+              "fontWeight": "600"
+            },
+            "label": "Add a six-pack \u2197",
+            "showPrice": false
+          },
+          {
+            "id": "shop-note",
+            "type": "text",
+            "name": "Six 250 ml cans \u00b7 USD \u00b7 Available in this dem",
+            "text": "Six 250 ml cans \u00b7 USD \u00b7 Available in this demo",
+            "props": {
+              "fontSize": "12px",
+              "lineHeight": "1.5",
+              "whiteSpace": "pre-line",
+              "textAlign": "center"
+            }
+          },
+          {
+            "id": "storage",
+            "type": "accordion",
+            "name": "Ingredients & storage",
+            "open": false,
+            "props": {
+              "display": "block",
+              "borderTopWidth": "1px",
+              "borderTopStyle": "solid",
+              "borderTopColor": "rgba(36,37,28,.3)"
+            },
+            "children": [
+              {
+                "id": "storage-question",
+                "type": "summary",
+                "name": "Ingredients & storage",
+                "text": "Ingredients & storage",
+                "props": {
+                  "display": "flex",
+                  "alignItems": "center",
+                  "justifyContent": "space-between",
+                  "minHeight": "80px",
+                  "paddingTop": "18px",
+                  "paddingBottom": "18px",
+                  "gap": "15px",
+                  "listStyleType": "none",
+                  "fontSize": "17px",
+                  "cursor": "pointer"
+                }
+              },
+              {
+                "id": "storage-answer",
+                "type": "text",
+                "name": "Carbonated water, citrus juice, cane sugar, c",
+                "text": "Carbonated water, citrus juice, cane sugar, citrus peel extract, citric acid.\n\nStore in a cool, dry place. Chill before opening and enjoy once opened. Do not freeze.\n\nFictional product recipe. Nutrition and allergen information would be confirmed on a real product label.",
+                "props": {
+                  "fontSize": "15px",
+                  "lineHeight": "1.6",
+                  "whiteSpace": "pre-line",
+                  "paddingBottom": "25px",
+                  "maxWidth": "530px"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "compare",
+    "type": "container",
+    "name": "Your kind of bite",
+    "props": {
+      "display": "grid",
+      "flexDirection": "column",
+      "gap": "8%",
+      "minWidth": "0px",
+      "gridTemplateColumns": "1fr 1.6fr",
+      "paddingTop": "90px",
+      "paddingBottom": "90px",
+      "paddingLeft": "clamp(24px,4.2cqw,80px)",
+      "paddingRight": "clamp(24px,4.2cqw,80px)",
+      "backgroundColor": "#f4f1e6",
+      "color": "#24251c",
+      "fontFamily": "'DM Sans', Arial, sans-serif",
+      "fontSize": "16px",
+      "lineHeight": "1.5"
+    },
+    "responsive": [
+      {
+        "max": 699,
+        "props": {
+          "gridTemplateColumns": "minmax(0,1fr)",
+          "paddingLeft": "24px",
+          "paddingRight": "24px",
+          "paddingTop": "55px",
+          "paddingBottom": "55px",
+          "gap": "32px"
+        }
+      },
+      {
+        "max": 359,
+        "props": {
+          "paddingLeft": "20px",
+          "paddingRight": "20px"
+        }
+      },
+      {
+        "min": 700,
+        "max": 899,
+        "props": {
+          "gridTemplateColumns": "minmax(0,1fr)"
+        }
+      }
+    ],
+    "children": [
+      {
+        "id": "compare-heading",
+        "type": "container",
+        "name": "Flavor comparison introduction",
+        "props": {
+          "display": "flex",
+          "flexDirection": "column",
+          "gap": "20px",
+          "minWidth": "0px"
+        },
+        "responsive": [],
+        "children": [
+          {
+            "id": "compare-headline",
+            "type": "heading",
+            "tag": "h2",
+            "name": "YOUR KIND OF BITE.",
+            "text": "YOUR KIND\nOF BITE.",
+            "props": {
+              "fontFamily": "Anton, Impact, sans-serif",
+              "fontSize": "clamp(56px,5.4cqw,83px)",
+              "fontWeight": "400",
+              "lineHeight": "1.02",
+              "letterSpacing": "-.018em",
+              "whiteSpace": "pre-line"
+            }
+          },
+          {
+            "id": "compare-copy",
+            "type": "text",
+            "name": "A flavor guide for the undecided.\nStart with ",
+            "text": "A flavor guide for the undecided.\nStart with the citrus you already love.",
+            "props": {
+              "fontSize": "16px",
+              "lineHeight": "1.5",
+              "whiteSpace": "pre-line"
+            }
+          }
+        ]
+      },
+      {
+        "id": "comparison-table",
+        "type": "container",
+        "name": "Flavor comparison",
+        "props": {
+          "display": "flex",
+          "flexDirection": "column",
+          "gap": "0px",
+          "minWidth": "0px",
+          "alignSelf": "center"
+        },
+        "responsive": [],
+        "children": [
+          {
+            "id": "compare-row-0",
+            "type": "container",
+            "name": "Comparison: The details",
+            "props": {
+              "display": "grid",
+              "flexDirection": "column",
+              "gap": "16px",
+              "minWidth": "0px",
+              "gridTemplateColumns": "28% 1fr 1fr",
+              "paddingTop": "19px",
+              "paddingBottom": "19px",
+              "borderBottomWidth": "1px",
+              "borderBottomStyle": "solid",
+              "borderBottomColor": "rgba(36,37,28,.3)"
+            },
+            "responsive": [
+              {
+                "max": 699,
+                "props": {
+                  "gap": "8px",
+                  "paddingTop": "14px",
+                  "paddingBottom": "14px"
+                }
+              }
+            ],
+            "children": [
+              {
+                "id": "compare-0-0",
+                "type": "text",
+                "name": "The details",
+                "text": "The details",
+                "props": {
+                  "fontSize": "14px",
+                  "lineHeight": "1.5",
+                  "whiteSpace": "pre-line",
+                  "fontWeight": "600",
+                  "color": "#24251c"
+                },
+                "responsive": [
+                  {
+                    "max": 699,
+                    "props": {
+                      "fontSize": "12px"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "compare-0-1",
+                "type": "text",
+                "name": "Pink grapefruit",
+                "text": "Pink grapefruit",
+                "props": {
+                  "fontSize": "14px",
+                  "lineHeight": "1.5",
+                  "whiteSpace": "pre-line",
+                  "fontWeight": "600",
+                  "color": "#b62e22"
+                },
+                "responsive": [
+                  {
+                    "max": 699,
+                    "props": {
+                      "fontSize": "12px"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "compare-0-2",
+                "type": "text",
+                "name": "Bitter orange",
+                "text": "Bitter orange",
+                "props": {
+                  "fontSize": "14px",
+                  "lineHeight": "1.5",
+                  "whiteSpace": "pre-line",
+                  "fontWeight": "600",
+                  "color": "#24251c"
+                },
+                "responsive": [
+                  {
+                    "max": 699,
+                    "props": {
+                      "fontSize": "12px"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "compare-row-1",
+            "type": "container",
+            "name": "Comparison: The juice",
+            "props": {
+              "display": "grid",
+              "flexDirection": "column",
+              "gap": "16px",
+              "minWidth": "0px",
+              "gridTemplateColumns": "28% 1fr 1fr",
+              "paddingTop": "19px",
+              "paddingBottom": "19px",
+              "borderBottomWidth": "1px",
+              "borderBottomStyle": "solid",
+              "borderBottomColor": "rgba(36,37,28,.3)"
+            },
+            "responsive": [
+              {
+                "max": 699,
+                "props": {
+                  "gap": "8px",
+                  "paddingTop": "14px",
+                  "paddingBottom": "14px"
+                }
+              }
+            ],
+            "children": [
+              {
+                "id": "compare-1-0",
+                "type": "text",
+                "name": "The juice",
+                "text": "The juice",
+                "props": {
+                  "fontSize": "13px",
+                  "lineHeight": "1.5",
+                  "whiteSpace": "pre-line",
+                  "fontWeight": "600",
+                  "color": "#24251c"
+                },
+                "responsive": [
+                  {
+                    "max": 699,
+                    "props": {
+                      "fontSize": "11px"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "compare-1-1",
+                "type": "text",
+                "name": "Pink grapefruit",
+                "text": "Pink grapefruit",
+                "props": {
+                  "fontSize": "13px",
+                  "lineHeight": "1.5",
+                  "whiteSpace": "pre-line",
+                  "fontWeight": "400",
+                  "color": "#24251c"
+                },
+                "responsive": [
+                  {
+                    "max": 699,
+                    "props": {
+                      "fontSize": "11px"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "compare-1-2",
+                "type": "text",
+                "name": "Orange",
+                "text": "Orange",
+                "props": {
+                  "fontSize": "13px",
+                  "lineHeight": "1.5",
+                  "whiteSpace": "pre-line",
+                  "fontWeight": "400",
+                  "color": "#24251c"
+                },
+                "responsive": [
+                  {
+                    "max": 699,
+                    "props": {
+                      "fontSize": "11px"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "compare-row-2",
+            "type": "container",
+            "name": "Comparison: The peel",
+            "props": {
+              "display": "grid",
+              "flexDirection": "column",
+              "gap": "16px",
+              "minWidth": "0px",
+              "gridTemplateColumns": "28% 1fr 1fr",
+              "paddingTop": "19px",
+              "paddingBottom": "19px",
+              "borderBottomWidth": "1px",
+              "borderBottomStyle": "solid",
+              "borderBottomColor": "rgba(36,37,28,.3)"
+            },
+            "responsive": [
+              {
+                "max": 699,
+                "props": {
+                  "gap": "8px",
+                  "paddingTop": "14px",
+                  "paddingBottom": "14px"
+                }
+              }
+            ],
+            "children": [
+              {
+                "id": "compare-2-0",
+                "type": "text",
+                "name": "The peel",
+                "text": "The peel",
+                "props": {
+                  "fontSize": "13px",
+                  "lineHeight": "1.5",
+                  "whiteSpace": "pre-line",
+                  "fontWeight": "600",
+                  "color": "#24251c"
+                },
+                "responsive": [
+                  {
+                    "max": 699,
+                    "props": {
+                      "fontSize": "11px"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "compare-2-1",
+                "type": "text",
+                "name": "Grapefruit extract",
+                "text": "Grapefruit extract",
+                "props": {
+                  "fontSize": "13px",
+                  "lineHeight": "1.5",
+                  "whiteSpace": "pre-line",
+                  "fontWeight": "400",
+                  "color": "#24251c"
+                },
+                "responsive": [
+                  {
+                    "max": 699,
+                    "props": {
+                      "fontSize": "11px"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "compare-2-2",
+                "type": "text",
+                "name": "Bitter orange extract",
+                "text": "Bitter orange extract",
+                "props": {
+                  "fontSize": "13px",
+                  "lineHeight": "1.5",
+                  "whiteSpace": "pre-line",
+                  "fontWeight": "400",
+                  "color": "#24251c"
+                },
+                "responsive": [
+                  {
+                    "max": 699,
+                    "props": {
+                      "fontSize": "11px"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "compare-row-3",
+            "type": "container",
+            "name": "Comparison: The character",
+            "props": {
+              "display": "grid",
+              "flexDirection": "column",
+              "gap": "16px",
+              "minWidth": "0px",
+              "gridTemplateColumns": "28% 1fr 1fr",
+              "paddingTop": "19px",
+              "paddingBottom": "19px",
+              "borderBottomWidth": "1px",
+              "borderBottomStyle": "solid",
+              "borderBottomColor": "rgba(36,37,28,.3)"
+            },
+            "responsive": [
+              {
+                "max": 699,
+                "props": {
+                  "gap": "8px",
+                  "paddingTop": "14px",
+                  "paddingBottom": "14px"
+                }
+              }
+            ],
+            "children": [
+              {
+                "id": "compare-3-0",
+                "type": "text",
+                "name": "The character",
+                "text": "The character",
+                "props": {
+                  "fontSize": "13px",
+                  "lineHeight": "1.5",
+                  "whiteSpace": "pre-line",
+                  "fontWeight": "600",
+                  "color": "#24251c"
+                },
+                "responsive": [
+                  {
+                    "max": 699,
+                    "props": {
+                      "fontSize": "11px"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "compare-3-1",
+                "type": "text",
+                "name": "Bright & tart",
+                "text": "Bright & tart",
+                "props": {
+                  "fontSize": "13px",
+                  "lineHeight": "1.5",
+                  "whiteSpace": "pre-line",
+                  "fontWeight": "400",
+                  "color": "#24251c"
+                },
+                "responsive": [
+                  {
+                    "max": 699,
+                    "props": {
+                      "fontSize": "11px"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "compare-3-2",
+                "type": "text",
+                "name": "Round & aromatic",
+                "text": "Round & aromatic",
+                "props": {
+                  "fontSize": "13px",
+                  "lineHeight": "1.5",
+                  "whiteSpace": "pre-line",
+                  "fontWeight": "400",
+                  "color": "#24251c"
+                },
+                "responsive": [
+                  {
+                    "max": 699,
+                    "props": {
+                      "fontSize": "11px"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "compare-row-4",
+            "type": "container",
+            "name": "Comparison: The pack",
+            "props": {
+              "display": "grid",
+              "flexDirection": "column",
+              "gap": "16px",
+              "minWidth": "0px",
+              "gridTemplateColumns": "28% 1fr 1fr",
+              "paddingTop": "19px",
+              "paddingBottom": "19px",
+              "borderBottomWidth": "1px",
+              "borderBottomStyle": "solid",
+              "borderBottomColor": "rgba(36,37,28,.3)"
+            },
+            "responsive": [
+              {
+                "max": 699,
+                "props": {
+                  "gap": "8px",
+                  "paddingTop": "14px",
+                  "paddingBottom": "14px"
+                }
+              }
+            ],
+            "children": [
+              {
+                "id": "compare-4-0",
+                "type": "text",
+                "name": "The pack",
+                "text": "The pack",
+                "props": {
+                  "fontSize": "13px",
+                  "lineHeight": "1.5",
+                  "whiteSpace": "pre-line",
+                  "fontWeight": "600",
+                  "color": "#24251c"
+                },
+                "responsive": [
+                  {
+                    "max": 699,
+                    "props": {
+                      "fontSize": "11px"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "compare-4-1",
+                "type": "text",
+                "name": "6 \u00d7 250 ml",
+                "text": "6 \u00d7 250 ml",
+                "props": {
+                  "fontSize": "13px",
+                  "lineHeight": "1.5",
+                  "whiteSpace": "pre-line",
+                  "fontWeight": "400",
+                  "color": "#24251c"
+                },
+                "responsive": [
+                  {
+                    "max": 699,
+                    "props": {
+                      "fontSize": "11px"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "compare-4-2",
+                "type": "text",
+                "name": "6 \u00d7 250 ml",
+                "text": "6 \u00d7 250 ml",
+                "props": {
+                  "fontSize": "13px",
+                  "lineHeight": "1.5",
+                  "whiteSpace": "pre-line",
+                  "fontWeight": "400",
+                  "color": "#24251c"
+                },
+                "responsive": [
+                  {
+                    "max": 699,
+                    "props": {
+                      "fontSize": "11px"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "compare-row-5",
+            "type": "container",
+            "name": "Comparison: The price",
+            "props": {
+              "display": "grid",
+              "flexDirection": "column",
+              "gap": "16px",
+              "minWidth": "0px",
+              "gridTemplateColumns": "28% 1fr 1fr",
+              "paddingTop": "19px",
+              "paddingBottom": "19px",
+              "borderBottomWidth": "1px",
+              "borderBottomStyle": "solid",
+              "borderBottomColor": "rgba(36,37,28,.3)"
+            },
+            "responsive": [
+              {
+                "max": 699,
+                "props": {
+                  "gap": "8px",
+                  "paddingTop": "14px",
+                  "paddingBottom": "14px"
+                }
+              }
+            ],
+            "children": [
+              {
+                "id": "compare-5-0",
+                "type": "text",
+                "name": "The price",
+                "text": "The price",
+                "props": {
+                  "fontSize": "13px",
+                  "lineHeight": "1.5",
+                  "whiteSpace": "pre-line",
+                  "fontWeight": "600",
+                  "color": "#24251c"
+                },
+                "responsive": [
+                  {
+                    "max": 699,
+                    "props": {
+                      "fontSize": "11px"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "compare-5-1",
+                "type": "text",
+                "name": "$24 USD",
+                "text": "$24 USD",
+                "props": {
+                  "fontSize": "13px",
+                  "lineHeight": "1.5",
+                  "whiteSpace": "pre-line",
+                  "fontWeight": "400",
+                  "color": "#24251c"
+                },
+                "responsive": [
+                  {
+                    "max": 699,
+                    "props": {
+                      "fontSize": "11px"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "compare-5-2",
+                "type": "text",
+                "name": "$26 USD",
+                "text": "$26 USD",
+                "props": {
+                  "fontSize": "13px",
+                  "lineHeight": "1.5",
+                  "whiteSpace": "pre-line",
+                  "fontWeight": "400",
+                  "color": "#24251c"
+                },
+                "responsive": [
+                  {
+                    "max": 699,
+                    "props": {
+                      "fontSize": "11px"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "pack-story",
+    "type": "container",
+    "name": "Six cans, open plans",
+    "props": {
+      "display": "grid",
+      "flexDirection": "column",
+      "gap": "5%",
+      "minWidth": "0px",
+      "gridTemplateColumns": "1fr 1.3fr",
+      "paddingTop": "70px",
+      "paddingBottom": "70px",
+      "paddingLeft": "clamp(24px,4.2cqw,80px)",
+      "paddingRight": "clamp(24px,4.2cqw,80px)",
+      "backgroundColor": "#e6c5b3",
+      "color": "#24251c",
+      "fontFamily": "'DM Sans', Arial, sans-serif",
+      "fontSize": "16px",
+      "lineHeight": "1.5"
+    },
+    "responsive": [
+      {
+        "max": 699,
+        "props": {
+          "gridTemplateColumns": "minmax(0,1fr)",
+          "paddingLeft": "24px",
+          "paddingRight": "24px",
+          "paddingTop": "55px",
+          "paddingBottom": "55px",
+          "gap": "32px"
+        }
+      },
+      {
+        "max": 359,
+        "props": {
+          "paddingLeft": "20px",
+          "paddingRight": "20px"
+        }
+      }
+    ],
+    "children": [
+      {
+        "id": "pack-copy",
+        "type": "container",
+        "name": "Six-pack story",
+        "props": {
+          "display": "flex",
+          "flexDirection": "column",
+          "gap": "25px",
+          "minWidth": "0px",
+          "alignSelf": "center"
+        },
+        "responsive": [],
+        "children": [
+          {
+            "id": "pack-headline",
+            "type": "heading",
+            "tag": "h2",
+            "name": "SIX CANS. OPEN PLANS.",
+            "text": "SIX CANS.\nOPEN PLANS.",
+            "props": {
+              "fontFamily": "Anton, Impact, sans-serif",
+              "fontSize": "clamp(62px,6.7cqw,103px)",
+              "fontWeight": "400",
+              "lineHeight": "1.02",
+              "letterSpacing": "-.018em",
+              "whiteSpace": "pre-line"
+            }
+          },
+          {
+            "id": "pack-story-lead",
+            "type": "text",
+            "name": "One for the kitchen counter.\nOne for the long",
+            "text": "One for the kitchen counter.\nOne for the long lunch.\nA few for whoever shows up.",
+            "props": {
+              "fontSize": "21px",
+              "lineHeight": "1.4",
+              "whiteSpace": "pre-line"
+            }
+          },
+          {
+            "id": "pack-story-detail",
+            "type": "text",
+            "name": "A compact six-pack of 250 ml cans.\nKeep it co",
+            "text": "A compact six-pack of 250 ml cans.\nKeep it cold. Keep the afternoon open.",
+            "props": {
+              "fontSize": "16px",
+              "lineHeight": "1.5",
+              "whiteSpace": "pre-line"
+            }
+          },
+          {
+            "id": "pack-shop-link",
+            "type": "button",
+            "tag": "a",
+            "name": "Find your flavor \u2197",
+            "text": "Find your flavor \u2197",
+            "action": {
+              "type": "link",
+              "target": "#native-shop"
+            },
+            "props": {
+              "display": "inline-flex",
+              "alignItems": "center",
+              "justifyContent": "space-between",
+              "minHeight": "44px",
+              "fontSize": "14px",
+              "fontWeight": "600",
+              "textDecoration": "none",
+              "color": "inherit",
+              "borderBottomWidth": "1px",
+              "borderBottomStyle": "solid",
+              "borderBottomColor": "rgba(36,37,28,.3)",
+              "width": "fit-content",
+              "gap": "28px",
+              "paddingTop": "8px",
+              "paddingBottom": "8px"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pack-photo-group",
+        "type": "container",
+        "name": "The PITH six-pack",
+        "props": {
+          "display": "flex",
+          "flexDirection": "column",
+          "gap": "20px",
+          "minWidth": "0px",
+          "alignSelf": "center"
+        },
+        "responsive": [],
+        "children": [
+          {
+            "id": "pack-photo",
+            "type": "image",
+            "name": "PITH Pink Grapefruit six-pack carrier with cans",
+            "src": "http://127.0.0.1:46322/assets/pack-1100.webp",
+            "alt": "PITH Pink Grapefruit six-pack carrier with cans",
+            "props": {
+              "display": "block",
+              "width": "100%",
+              "height": "auto",
+              "objectFit": "contain"
+            },
+            "responsive": []
+          },
+          {
+            "id": "pack-caption",
+            "type": "text",
+            "name": "Pink Grapefruit six-pack shown.",
+            "text": "Pink Grapefruit six-pack shown.",
+            "props": {
+              "fontSize": "12px",
+              "lineHeight": "1.5",
+              "whiteSpace": "pre-line",
+              "textAlign": "center"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "reviews",
+    "type": "container",
+    "name": "Reviews",
+    "props": {
+      "display": "grid",
+      "flexDirection": "column",
+      "gap": "8%",
+      "minWidth": "0px",
+      "gridTemplateColumns": "minmax(0,1fr) minmax(0,1fr)",
+      "paddingTop": "90px",
+      "paddingBottom": "90px",
+      "paddingLeft": "clamp(24px,4.2cqw,80px)",
+      "paddingRight": "clamp(24px,4.2cqw,80px)",
+      "backgroundColor": "#f4f1e6",
+      "color": "#24251c",
+      "fontFamily": "'DM Sans', Arial, sans-serif",
+      "fontSize": "16px",
+      "lineHeight": "1.5",
+      "borderBottomWidth": "1px",
+      "borderBottomStyle": "solid",
+      "borderBottomColor": "rgba(36,37,28,.3)"
+    },
+    "responsive": [
+      {
+        "max": 699,
+        "props": {
+          "gridTemplateColumns": "minmax(0,1fr)",
+          "paddingLeft": "24px",
+          "paddingRight": "24px",
+          "paddingTop": "55px",
+          "paddingBottom": "55px",
+          "gap": "32px"
+        }
+      },
+      {
+        "max": 359,
+        "props": {
+          "paddingLeft": "20px",
+          "paddingRight": "20px"
+        }
+      }
+    ],
+    "children": [
+      {
+        "id": "reviews-headline",
+        "type": "heading",
+        "tag": "h2",
+        "name": "THE FIRST SIP IS STILL AHEAD.",
+        "text": "THE FIRST SIP\nIS STILL AHEAD.",
+        "props": {
+          "fontFamily": "Anton, Impact, sans-serif",
+          "fontSize": "clamp(50px,5.1cqw,78px)",
+          "fontWeight": "400",
+          "lineHeight": "1.02",
+          "letterSpacing": "-.018em",
+          "whiteSpace": "pre-line"
+        }
+      },
+      {
+        "id": "reviews-empty",
+        "type": "container",
+        "name": "Honest review status",
+        "props": {
+          "display": "flex",
+          "flexDirection": "column",
+          "gap": "20px",
+          "minWidth": "0px",
+          "maxWidth": "460px",
+          "alignSelf": "center"
+        },
+        "responsive": [],
+        "children": [
+          {
+            "id": "reviews-lead",
+            "type": "text",
+            "name": "No reviews yet.",
+            "text": "No reviews yet.",
+            "props": {
+              "fontSize": "27px",
+              "lineHeight": "1.5",
+              "whiteSpace": "pre-line"
+            }
+          },
+          {
+            "id": "reviews-copy",
+            "type": "text",
+            "name": "PITH is a fictional product, so there are no ",
+            "text": "PITH is a fictional product, so there are no customer reviews to share. For now, the story is in the can, the ingredients, and your imagination.",
+            "props": {
+              "fontSize": "16px",
+              "lineHeight": "1.5",
+              "whiteSpace": "pre-line"
+            }
+          },
+          {
+            "id": "reviews-shop",
+            "type": "button",
+            "tag": "a",
+            "name": "Take another look \u2197",
+            "text": "Take another look \u2197",
+            "action": {
+              "type": "link",
+              "target": "#native-shop"
+            },
+            "props": {
+              "display": "inline-flex",
+              "alignItems": "center",
+              "justifyContent": "space-between",
+              "minHeight": "44px",
+              "fontSize": "14px",
+              "fontWeight": "600",
+              "textDecoration": "none",
+              "color": "inherit",
+              "borderBottomWidth": "1px",
+              "borderBottomStyle": "solid",
+              "borderBottomColor": "rgba(36,37,28,.3)",
+              "width": "fit-content",
+              "gap": "28px",
+              "paddingTop": "8px",
+              "paddingBottom": "8px"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "questions",
+    "type": "container",
+    "name": "Before you crack one open",
+    "props": {
+      "display": "grid",
+      "flexDirection": "column",
+      "gap": "8%",
+      "minWidth": "0px",
+      "gridTemplateColumns": "1fr 1.2fr",
+      "paddingTop": "90px",
+      "paddingBottom": "90px",
+      "paddingLeft": "clamp(24px,4.2cqw,80px)",
+      "paddingRight": "clamp(24px,4.2cqw,80px)",
+      "backgroundColor": "#f4f1e6",
+      "color": "#24251c",
+      "fontFamily": "'DM Sans', Arial, sans-serif",
+      "fontSize": "16px",
+      "lineHeight": "1.5"
+    },
+    "responsive": [
+      {
+        "max": 699,
+        "props": {
+          "gridTemplateColumns": "minmax(0,1fr)",
+          "paddingLeft": "24px",
+          "paddingRight": "24px",
+          "paddingTop": "55px",
+          "paddingBottom": "55px",
+          "gap": "32px"
+        }
+      },
+      {
+        "max": 359,
+        "props": {
+          "paddingLeft": "20px",
+          "paddingRight": "20px"
+        }
+      }
+    ],
+    "children": [
+      {
+        "id": "faq-introduction",
+        "type": "container",
+        "name": "Frequently asked questions",
+        "props": {
+          "display": "flex",
+          "flexDirection": "column",
+          "gap": "20px",
+          "minWidth": "0px"
+        },
+        "responsive": [],
+        "children": [
+          {
+            "id": "faq-headline",
+            "type": "heading",
+            "tag": "h2",
+            "name": "BEFORE YOU CRACK ONE OPEN.",
+            "text": "BEFORE\nYOU CRACK\nONE OPEN.",
+            "props": {
+              "fontFamily": "Anton, Impact, sans-serif",
+              "fontSize": "clamp(58px,5.7cqw,88px)",
+              "fontWeight": "400",
+              "lineHeight": "1.02",
+              "letterSpacing": "-.018em",
+              "whiteSpace": "pre-line"
+            }
+          },
+          {
+            "id": "faq-copy",
+            "type": "text",
+            "name": "A few things you might be wondering.",
+            "text": "A few things you might be wondering.",
+            "props": {
+              "fontSize": "16px",
+              "lineHeight": "1.5",
+              "whiteSpace": "pre-line"
+            }
+          },
+          {
+            "id": "about-concept-link",
+            "type": "button",
+            "tag": "a",
+            "name": "About this concept \u2197",
+            "text": "About this concept \u2197",
+            "action": {
+              "type": "link",
+              "target": "#native-policies"
+            },
+            "props": {
+              "display": "inline-flex",
+              "alignItems": "center",
+              "justifyContent": "space-between",
+              "minHeight": "44px",
+              "fontSize": "14px",
+              "fontWeight": "600",
+              "textDecoration": "none",
+              "color": "inherit",
+              "borderBottomWidth": "1px",
+              "borderBottomStyle": "solid",
+              "borderBottomColor": "rgba(36,37,28,.3)",
+              "width": "fit-content",
+              "gap": "28px",
+              "paddingTop": "8px",
+              "paddingBottom": "8px"
+            }
+          }
+        ]
+      },
+      {
+        "id": "faq-list",
+        "type": "container",
+        "name": "Questions and answers",
+        "props": {
+          "display": "flex",
+          "flexDirection": "column",
+          "gap": "0px",
+          "minWidth": "0px"
+        },
+        "responsive": [],
+        "children": [
+          {
+            "id": "faq-dry",
+            "type": "accordion",
+            "name": "What does \u201cdry citrus soda\u201d mean?",
+            "open": false,
+            "props": {
+              "display": "block",
+              "borderTopWidth": "1px",
+              "borderTopStyle": "solid",
+              "borderTopColor": "rgba(36,37,28,.3)"
+            },
+            "children": [
+              {
+                "id": "faq-dry-question",
+                "type": "summary",
+                "name": "What does \u201cdry citrus soda\u201d mean?",
+                "text": "What does \u201cdry citrus soda\u201d mean?",
+                "props": {
+                  "display": "flex",
+                  "alignItems": "center",
+                  "justifyContent": "space-between",
+                  "minHeight": "80px",
+                  "paddingTop": "18px",
+                  "paddingBottom": "18px",
+                  "gap": "15px",
+                  "listStyleType": "none",
+                  "fontSize": "17px",
+                  "cursor": "pointer"
+                }
+              },
+              {
+                "id": "faq-dry-answer",
+                "type": "text",
+                "name": "A citrus soda with a tart start and a bitter ",
+                "text": "A citrus soda with a tart start and a bitter peel finish. \u201cDry\u201d describes the intended taste; it doesn\u2019t mean sugar-free. Both fictional recipes contain cane sugar.",
+                "props": {
+                  "fontSize": "15px",
+                  "lineHeight": "1.6",
+                  "whiteSpace": "pre-line",
+                  "paddingBottom": "25px",
+                  "maxWidth": "530px"
+                }
+              }
+            ]
+          },
+          {
+            "id": "faq-first",
+            "type": "accordion",
+            "name": "Which flavor should I try first?",
+            "open": false,
+            "props": {
+              "display": "block",
+              "borderTopWidth": "1px",
+              "borderTopStyle": "solid",
+              "borderTopColor": "rgba(36,37,28,.3)"
+            },
+            "children": [
+              {
+                "id": "faq-first-question",
+                "type": "summary",
+                "name": "Which flavor should I try first?",
+                "text": "Which flavor should I try first?",
+                "props": {
+                  "display": "flex",
+                  "alignItems": "center",
+                  "justifyContent": "space-between",
+                  "minHeight": "80px",
+                  "paddingTop": "18px",
+                  "paddingBottom": "18px",
+                  "gap": "15px",
+                  "listStyleType": "none",
+                  "fontSize": "17px",
+                  "cursor": "pointer"
+                }
+              },
+              {
+                "id": "faq-first-answer",
+                "type": "text",
+                "name": "Choose Pink Grapefruit if you like a sharp, t",
+                "text": "Choose Pink Grapefruit if you like a sharp, tart citrus taste. Bitter Orange is rounder and more aromatic. Both finish with a little peel bitterness.",
+                "props": {
+                  "fontSize": "15px",
+                  "lineHeight": "1.6",
+                  "whiteSpace": "pre-line",
+                  "paddingBottom": "25px",
+                  "maxWidth": "530px"
+                }
+              }
+            ]
+          },
+          {
+            "id": "faq-pack",
+            "type": "accordion",
+            "name": "What comes in a pack?",
+            "open": false,
+            "props": {
+              "display": "block",
+              "borderTopWidth": "1px",
+              "borderTopStyle": "solid",
+              "borderTopColor": "rgba(36,37,28,.3)"
+            },
+            "children": [
+              {
+                "id": "faq-pack-question",
+                "type": "summary",
+                "name": "What comes in a pack?",
+                "text": "What comes in a pack?",
+                "props": {
+                  "display": "flex",
+                  "alignItems": "center",
+                  "justifyContent": "space-between",
+                  "minHeight": "80px",
+                  "paddingTop": "18px",
+                  "paddingBottom": "18px",
+                  "gap": "15px",
+                  "listStyleType": "none",
+                  "fontSize": "17px",
+                  "cursor": "pointer"
+                }
+              },
+              {
+                "id": "faq-pack-answer",
+                "type": "text",
+                "name": "Six 250 ml cans of your selected flavor in a ",
+                "text": "Six 250 ml cans of your selected flavor in a printed cardboard carrier. Pink Grapefruit is $24 per pack; Bitter Orange is $26. All concept prices are in US dollars.",
+                "props": {
+                  "fontSize": "15px",
+                  "lineHeight": "1.6",
+                  "whiteSpace": "pre-line",
+                  "paddingBottom": "25px",
+                  "maxWidth": "530px"
+                }
+              }
+            ]
+          },
+          {
+            "id": "faq-shipping",
+            "type": "accordion",
+            "name": "Where do you ship, and what does it cost?",
+            "open": false,
+            "props": {
+              "display": "block",
+              "borderTopWidth": "1px",
+              "borderTopStyle": "solid",
+              "borderTopColor": "rgba(36,37,28,.3)"
+            },
+            "children": [
+              {
+                "id": "faq-shipping-question",
+                "type": "summary",
+                "name": "Where do you ship, and what does it cost?",
+                "text": "Where do you ship, and what does it cost?",
+                "props": {
+                  "display": "flex",
+                  "alignItems": "center",
+                  "justifyContent": "space-between",
+                  "minHeight": "80px",
+                  "paddingTop": "18px",
+                  "paddingBottom": "18px",
+                  "gap": "15px",
+                  "listStyleType": "none",
+                  "fontSize": "17px",
+                  "cursor": "pointer"
+                }
+              },
+              {
+                "id": "faq-shipping-answer",
+                "type": "text",
+                "name": "This is a concept storefront, so nothing ship",
+                "text": "This is a concept storefront, so nothing ships. No actual shipping regions, rates, or delivery promises are offered.",
+                "props": {
+                  "fontSize": "15px",
+                  "lineHeight": "1.6",
+                  "whiteSpace": "pre-line",
+                  "paddingBottom": "25px",
+                  "maxWidth": "530px"
+                }
+              }
+            ]
+          },
+          {
+            "id": "faq-returns",
+            "type": "accordion",
+            "name": "How do returns and payment work?",
+            "open": false,
+            "props": {
+              "display": "block",
+              "borderTopWidth": "1px",
+              "borderTopStyle": "solid",
+              "borderTopColor": "rgba(36,37,28,.3)"
+            },
+            "children": [
+              {
+                "id": "faq-returns-question",
+                "type": "summary",
+                "name": "How do returns and payment work?",
+                "text": "How do returns and payment work?",
+                "props": {
+                  "display": "flex",
+                  "alignItems": "center",
+                  "justifyContent": "space-between",
+                  "minHeight": "80px",
+                  "paddingTop": "18px",
+                  "paddingBottom": "18px",
+                  "gap": "15px",
+                  "listStyleType": "none",
+                  "fontSize": "17px",
+                  "cursor": "pointer"
+                }
+              },
+              {
+                "id": "faq-returns-answer",
+                "type": "text",
+                "name": "No payment is collected and no order is place",
+                "text": "No payment is collected and no order is placed. The cart is saved only in this browser. Real payment methods and return terms would be supplied before a live store opens.",
+                "props": {
+                  "fontSize": "15px",
+                  "lineHeight": "1.6",
+                  "whiteSpace": "pre-line",
+                  "paddingBottom": "25px",
+                  "maxWidth": "530px"
+                }
+              }
+            ]
+          },
+          {
+            "id": "faq-buy",
+            "type": "accordion",
+            "name": "Can I actually buy PITH?",
+            "open": false,
+            "props": {
+              "display": "block",
+              "borderTopWidth": "1px",
+              "borderTopStyle": "solid",
+              "borderTopColor": "rgba(36,37,28,.3)"
+            },
+            "children": [
+              {
+                "id": "faq-buy-question",
+                "type": "summary",
+                "name": "Can I actually buy PITH?",
+                "text": "Can I actually buy PITH?",
+                "props": {
+                  "display": "flex",
+                  "alignItems": "center",
+                  "justifyContent": "space-between",
+                  "minHeight": "80px",
+                  "paddingTop": "18px",
+                  "paddingBottom": "18px",
+                  "gap": "15px",
+                  "listStyleType": "none",
+                  "fontSize": "17px",
+                  "cursor": "pointer"
+                }
+              },
+              {
+                "id": "faq-buy-answer",
+                "type": "text",
+                "name": "PITH, its products, packaging, and photograph",
+                "text": "PITH, its products, packaging, and photographs were created for this design concept. You can explore flavors, add packs to the cart, and try a clearly labeled demo checkout.",
+                "props": {
+                  "fontSize": "15px",
+                  "lineHeight": "1.6",
+                  "whiteSpace": "pre-line",
+                  "paddingBottom": "25px",
+                  "maxWidth": "530px"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "final-buy",
+    "type": "container",
+    "name": "Take a Thip \u2014 Final purchase",
+    "props": {
+      "display": "grid",
+      "flexDirection": "column",
+      "gap": "8%",
+      "minWidth": "0px",
+      "gridTemplateColumns": "1.5fr 1fr",
+      "paddingTop": "80px",
+      "paddingBottom": "80px",
+      "paddingLeft": "clamp(24px,4.2cqw,80px)",
+      "paddingRight": "clamp(24px,4.2cqw,80px)",
+      "backgroundColor": "#eae653",
+      "color": "#24251c",
+      "fontFamily": "'DM Sans', Arial, sans-serif",
+      "fontSize": "16px",
+      "lineHeight": "1.5",
+      "alignItems": "center"
+    },
+    "responsive": [
+      {
+        "max": 699,
+        "props": {
+          "gridTemplateColumns": "minmax(0,1fr)",
+          "paddingLeft": "24px",
+          "paddingRight": "24px",
+          "paddingTop": "55px",
+          "paddingBottom": "55px",
+          "gap": "32px"
+        }
+      },
+      {
+        "max": 359,
+        "props": {
+          "paddingLeft": "20px",
+          "paddingRight": "20px"
+        }
+      }
+    ],
+    "children": [
+      {
+        "id": "final-copy",
+        "type": "container",
+        "name": "Final invitation",
+        "props": {
+          "display": "flex",
+          "flexDirection": "column",
+          "gap": "20px",
+          "minWidth": "0px"
+        },
+        "responsive": [],
+        "children": [
+          {
+            "id": "final-headline",
+            "type": "heading",
+            "tag": "h2",
+            "name": "TAKE A THIP.",
+            "text": "TAKE A THIP.",
+            "props": {
+              "fontFamily": "Anton, Impact, sans-serif",
+              "fontSize": "clamp(64px,7.5cqw,122px)",
+              "fontWeight": "400",
+              "lineHeight": "1.02",
+              "letterSpacing": "-.018em",
+              "whiteSpace": "pre-line"
+            }
+          },
+          {
+            "id": "final-description",
+            "type": "text",
+            "name": "Leave a little room in the fridge.",
+            "text": "Leave a little room in the fridge.",
+            "props": {
+              "fontSize": "21px",
+              "lineHeight": "1.5",
+              "whiteSpace": "pre-line"
+            }
+          }
+        ]
+      },
+      {
+        "id": "final-purchase",
+        "type": "container",
+        "name": "Your selected six-pack",
+        "props": {
+          "display": "flex",
+          "flexDirection": "column",
+          "gap": "14px",
+          "minWidth": "0px",
+          "maxWidth": "420px",
+          "width": "100%"
+        },
+        "responsive": [],
+        "children": [
+          {
+            "id": "final-label",
+            "type": "text",
+            "name": "Your pick",
+            "text": "Your pick",
+            "props": {
+              "fontSize": "14px",
+              "lineHeight": "1.5",
+              "whiteSpace": "pre-line"
+            }
+          },
+          {
+            "id": "final-flavor",
+            "type": "commerce",
+            "part": "title",
+            "productId": "pith-dry-citrus-soda",
+            "group": "pith-flavor",
+            "name": "Selected flavor name",
+            "props": {
+              "display": "block",
+              "width": "100%",
+              "minWidth": "0px",
+              "fontSize": "34px",
+              "fontWeight": "600",
+              "letterSpacing": "-.04em"
+            }
+          },
+          {
+            "id": "final-price",
+            "type": "commerce",
+            "part": "price",
+            "productId": "pith-dry-citrus-soda",
+            "group": "pith-flavor",
+            "name": "Selected pack price",
+            "props": {
+              "display": "block",
+              "width": "100%",
+              "minWidth": "0px",
+              "fontSize": "16px"
+            },
+            "prefix": "6 \u00d7 250 ml \u00b7 ",
+            "suffix": " USD"
+          },
+          {
+            "id": "change-flavor",
+            "type": "button",
+            "tag": "a",
+            "name": "Change flavor \u2191",
+            "text": "Change flavor \u2191",
+            "action": {
+              "type": "link",
+              "target": "#native-shop"
+            },
+            "props": {
+              "display": "inline-flex",
+              "alignItems": "center",
+              "justifyContent": "space-between",
+              "minHeight": "44px",
+              "fontSize": "14px",
+              "fontWeight": "600",
+              "textDecoration": "none",
+              "color": "inherit",
+              "borderBottomWidth": "1px",
+              "borderBottomStyle": "solid",
+              "borderBottomColor": "rgba(36,37,28,.3)",
+              "width": "fit-content",
+              "gap": "28px",
+              "paddingTop": "8px",
+              "paddingBottom": "8px"
+            }
+          },
+          {
+            "id": "final-add",
+            "type": "commerce",
+            "part": "add",
+            "productId": "pith-dry-citrus-soda",
+            "group": "pith-flavor",
+            "name": "Add selected six-pack",
+            "props": {
+              "display": "block",
+              "width": "100%",
+              "minWidth": "0px",
+              "fontSize": "14px",
+              "backgroundColor": "#24251c",
+              "color": "#f4f1e6",
+              "paddingTop": "5px",
+              "paddingBottom": "5px",
+              "paddingLeft": "20px",
+              "paddingRight": "20px",
+              "borderRadius": "2px",
+              "fontWeight": "600"
+            },
+            "label": "Add a six-pack \u2197",
+            "showPrice": false
+          },
+          {
+            "id": "final-note",
+            "type": "text",
+            "name": "Fictional product. Demo checkout.",
+            "text": "Fictional product. Demo checkout.",
+            "props": {
+              "fontSize": "12px",
+              "lineHeight": "1.5",
+              "whiteSpace": "pre-line",
+              "textAlign": "center"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "footer",
+    "type": "container",
+    "name": "PITH footer",
+    "props": {
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "16px",
+      "minWidth": "0px",
+      "gridTemplateColumns": "minmax(0,1fr) minmax(0,1fr)",
+      "paddingTop": "36px",
+      "paddingBottom": "100px",
+      "paddingLeft": "clamp(24px,4.2cqw,80px)",
+      "paddingRight": "clamp(24px,4.2cqw,80px)",
+      "backgroundColor": "#24251c",
+      "color": "#f4f1e6",
+      "fontFamily": "'DM Sans', Arial, sans-serif",
+      "fontSize": "16px",
+      "lineHeight": "1.5"
+    },
+    "responsive": [
+      {
+        "max": 699,
+        "props": {
+          "gridTemplateColumns": "minmax(0,1fr)",
+          "paddingLeft": "24px",
+          "paddingRight": "24px",
+          "paddingTop": "55px",
+          "paddingBottom": "55px",
+          "gap": "32px"
+        }
+      },
+      {
+        "max": 359,
+        "props": {
+          "paddingLeft": "20px",
+          "paddingRight": "20px"
+        }
+      },
+      {
+        "max": 699,
+        "props": {
+          "paddingTop": "25px",
+          "paddingBottom": "80px",
+          "gap": "16px"
+        }
+      },
+      {
+        "max": 699,
+        "props": {
+          "paddingBottom": "96px"
+        }
+      }
+    ],
+    "children": [
+      {
+        "id": "footer-top",
+        "type": "container",
+        "name": "Footer introduction",
+        "props": {
+          "display": "flex",
+          "flexDirection": "row",
+          "gap": "20px",
+          "minWidth": "0px",
+          "alignItems": "center",
+          "justifyContent": "space-between"
+        },
+        "responsive": [],
+        "children": [
+          {
+            "id": "footer-tagline",
+            "type": "text",
+            "name": "Good taste has a little edge.",
+            "text": "Good taste has a little edge.",
+            "props": {
+              "fontSize": "16px",
+              "lineHeight": "1.5",
+              "whiteSpace": "pre-line"
+            }
+          },
+          {
+            "id": "back-top",
+            "type": "button",
+            "tag": "a",
+            "name": "Back to top \u2191",
+            "text": "Back to top \u2191",
+            "action": {
+              "type": "link",
+              "target": "#native-navigation"
+            },
+            "props": {
+              "display": "inline-flex",
+              "alignItems": "center",
+              "justifyContent": "space-between",
+              "minHeight": "44px",
+              "fontSize": "14px",
+              "fontWeight": "600",
+              "textDecoration": "none",
+              "color": "inherit"
+            }
+          }
+        ]
+      },
+      {
+        "id": "footer-logo",
+        "type": "image",
+        "name": "PITH",
+        "src": "http://127.0.0.1:46322/assets/logo-yellow.svg",
+        "alt": "PITH",
+        "props": {
+          "display": "block",
+          "width": "100%",
+          "height": "auto",
+          "objectFit": "contain",
+          "filter": "none",
+          "marginTop": "20px",
+          "marginBottom": "25px",
+          "maxHeight": "470px"
+        },
+        "responsive": []
+      },
+      {
+        "id": "footer-links",
+        "type": "container",
+        "name": "Footer navigation",
+        "props": {
+          "display": "flex",
+          "flexDirection": "row",
+          "gap": "25px",
+          "minWidth": "0px",
+          "justifyContent": "space-between",
+          "paddingTop": "13px",
+          "paddingBottom": "13px",
+          "borderTopWidth": "1px",
+          "borderTopStyle": "solid",
+          "borderTopColor": "#696b58",
+          "borderBottomWidth": "1px",
+          "borderBottomStyle": "solid",
+          "borderBottomColor": "#696b58"
+        },
+        "responsive": [
+          {
+            "min": 700,
+            "max": 1100,
+            "props": {
+              "flexDirection": "column"
+            }
+          },
+          {
+            "max": 699,
+            "props": {
+              "display": "grid",
+              "gridTemplateColumns": "1fr 1fr",
+              "gap": "20px"
+            }
+          }
+        ],
+        "children": [
+          {
+            "id": "footer-product-links",
+            "type": "container",
+            "name": "Product links",
+            "props": {
+              "display": "flex",
+              "flexDirection": "row",
+              "gap": "28px",
+              "minWidth": "0px"
+            },
+            "responsive": [
+              {
+                "max": 699,
+                "props": {
+                  "flexDirection": "column",
+                  "gap": "0px"
+                }
+              }
+            ],
+            "children": [
+              {
+                "id": "footer-shop",
+                "type": "button",
+                "tag": "a",
+                "name": "Shop the flavors",
+                "text": "Shop the flavors",
+                "action": {
+                  "type": "link",
+                  "target": "#native-shop"
+                },
+                "props": {
+                  "display": "inline-flex",
+                  "alignItems": "center",
+                  "justifyContent": "space-between",
+                  "minHeight": "44px",
+                  "fontSize": "14px",
+                  "fontWeight": "600",
+                  "textDecoration": "none",
+                  "color": "inherit"
+                }
+              },
+              {
+                "id": "footer-ingredients",
+                "type": "button",
+                "tag": "a",
+                "name": "What\u2019s inside",
+                "text": "What\u2019s inside",
+                "action": {
+                  "type": "link",
+                  "target": "#native-inside"
+                },
+                "props": {
+                  "display": "inline-flex",
+                  "alignItems": "center",
+                  "justifyContent": "space-between",
+                  "minHeight": "44px",
+                  "fontSize": "14px",
+                  "fontWeight": "600",
+                  "textDecoration": "none",
+                  "color": "inherit"
+                }
+              },
+              {
+                "id": "footer-serving",
+                "type": "button",
+                "tag": "a",
+                "name": "How to serve",
+                "text": "How to serve",
+                "action": {
+                  "type": "link",
+                  "target": "#native-serve"
+                },
+                "props": {
+                  "display": "inline-flex",
+                  "alignItems": "center",
+                  "justifyContent": "space-between",
+                  "minHeight": "44px",
+                  "fontSize": "14px",
+                  "fontWeight": "600",
+                  "textDecoration": "none",
+                  "color": "inherit"
+                }
+              }
+            ]
+          },
+          {
+            "id": "footer-policy-links",
+            "type": "container",
+            "name": "Store information",
+            "props": {
+              "display": "flex",
+              "flexDirection": "row",
+              "gap": "25px",
+              "minWidth": "0px"
+            },
+            "responsive": [
+              {
+                "max": 699,
+                "props": {
+                  "flexDirection": "column",
+                  "gap": "0px"
+                }
+              }
+            ],
+            "children": [
+              {
+                "id": "shipping-link",
+                "type": "button",
+                "tag": "a",
+                "name": "Shipping",
+                "text": "Shipping",
+                "action": {
+                  "type": "link",
+                  "target": "#native-policies"
+                },
+                "props": {
+                  "display": "inline-flex",
+                  "alignItems": "center",
+                  "justifyContent": "space-between",
+                  "minHeight": "44px",
+                  "fontSize": "14px",
+                  "fontWeight": "600",
+                  "textDecoration": "none",
+                  "color": "inherit"
+                }
+              },
+              {
+                "id": "returns-link",
+                "type": "button",
+                "tag": "a",
+                "name": "Returns & payment",
+                "text": "Returns & payment",
+                "action": {
+                  "type": "link",
+                  "target": "#native-policies"
+                },
+                "props": {
+                  "display": "inline-flex",
+                  "alignItems": "center",
+                  "justifyContent": "space-between",
+                  "minHeight": "44px",
+                  "fontSize": "14px",
+                  "fontWeight": "600",
+                  "textDecoration": "none",
+                  "color": "inherit"
+                }
+              },
+              {
+                "id": "privacy-link",
+                "type": "button",
+                "tag": "a",
+                "name": "Privacy",
+                "text": "Privacy",
+                "action": {
+                  "type": "link",
+                  "target": "#native-policies"
+                },
+                "props": {
+                  "display": "inline-flex",
+                  "alignItems": "center",
+                  "justifyContent": "space-between",
+                  "minHeight": "44px",
+                  "fontSize": "14px",
+                  "fontWeight": "600",
+                  "textDecoration": "none",
+                  "color": "inherit"
+                }
+              },
+              {
+                "id": "contact-link",
+                "type": "button",
+                "tag": "a",
+                "name": "Contact & concept",
+                "text": "Contact & concept",
+                "action": {
+                  "type": "link",
+                  "target": "#native-policies"
+                },
+                "props": {
+                  "display": "inline-flex",
+                  "alignItems": "center",
+                  "justifyContent": "space-between",
+                  "minHeight": "44px",
+                  "fontSize": "14px",
+                  "fontWeight": "600",
+                  "textDecoration": "none",
+                  "color": "inherit"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "policies",
+        "type": "accordion",
+        "name": "Concept, shipping, returns & privacy",
+        "open": false,
+        "props": {
+          "display": "block"
+        },
+        "children": [
+          {
+            "id": "policies-question",
+            "type": "summary",
+            "name": "Concept, shipping, returns & privacy",
+            "text": "Concept, shipping, returns & privacy",
+            "props": {
+              "display": "flex",
+              "alignItems": "center",
+              "justifyContent": "space-between",
+              "minHeight": "80px",
+              "paddingTop": "18px",
+              "paddingBottom": "18px",
+              "gap": "15px",
+              "listStyleType": "none",
+              "fontSize": "23px",
+              "cursor": "pointer"
+            }
+          },
+          {
+            "id": "policies-answer",
+            "type": "text",
+            "name": "PITH is a fictional brand created to demonstr",
+            "text": "PITH is a fictional brand created to demonstrate this editable storefront. No products are shipped, no payments are collected, and no real orders are placed. Your demo cart is stored only in your browser. There is no live customer service address for this fictional brand. Real shipping rates, payment methods, return terms and contact details must be supplied by the merchant before publishing.",
+            "props": {
+              "fontSize": "15px",
+              "lineHeight": "1.6",
+              "whiteSpace": "pre-line",
+              "paddingBottom": "25px",
+              "maxWidth": "530px"
+            }
+          }
+        ]
+      },
+      {
+        "id": "footer-bottom",
+        "type": "container",
+        "name": "Footer details",
+        "props": {
+          "display": "flex",
+          "flexDirection": "row",
+          "gap": "20px",
+          "minWidth": "0px",
+          "justifyContent": "space-between",
+          "color": "#bcbdad"
+        },
+        "responsive": [
+          {
+            "max": 699,
+            "props": {
+              "flexDirection": "column",
+              "gap": "8px"
+            }
+          }
+        ],
+        "children": [
+          {
+            "id": "copyright",
+            "type": "text",
+            "name": "\u00a9 2026 PITH. A fictional brand.",
+            "text": "\u00a9 2026 PITH. A fictional brand.",
+            "props": {
+              "fontSize": "11px",
+              "lineHeight": "1.5",
+              "whiteSpace": "pre-line"
+            }
+          },
+          {
+            "id": "footer-phrase",
+            "type": "text",
+            "name": "Take a Thip.",
+            "text": "Take a Thip.",
+            "props": {
+              "fontSize": "11px",
+              "lineHeight": "1.5",
+              "whiteSpace": "pre-line"
+            }
+          },
+          {
+            "id": "preview-label",
+            "type": "text",
+            "name": "Concept preview \u00b7 USD",
+            "text": "Concept preview \u00b7 USD",
+            "props": {
+              "fontSize": "11px",
+              "lineHeight": "1.5",
+              "whiteSpace": "pre-line"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "quick-purchase",
+    "type": "container",
+    "name": "Quick purchase bar",
+    "props": {
+      "display": "flex",
+      "flexDirection": "row",
+      "gap": "20px",
+      "minWidth": "0px",
+      "gridTemplateColumns": "minmax(0,1fr) minmax(0,1fr)",
+      "paddingTop": "12px",
+      "paddingBottom": "12px",
+      "paddingLeft": "20px",
+      "paddingRight": "15px",
+      "backgroundColor": "#f4f1e6",
+      "color": "#24251c",
+      "fontFamily": "'DM Sans', Arial, sans-serif",
+      "fontSize": "16px",
+      "lineHeight": "1.5",
+      "position": "fixed",
+      "bottom": "20px",
+      "top": "auto",
+      "left": "50%",
+      "right": "auto",
+      "transform": "translateX(-50%)",
+      "width": "500px",
+      "maxWidth": "calc(100% - 32px)",
+      "alignItems": "center",
+      "justifyContent": "space-between",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "marginLeft": "0px",
+      "marginRight": "0px",
+      "zIndex": "80",
+      "borderTopWidth": "1px",
+      "borderRightWidth": "1px",
+      "borderBottomWidth": "1px",
+      "borderLeftWidth": "1px",
+      "borderTopStyle": "solid",
+      "borderRightStyle": "solid",
+      "borderBottomStyle": "solid",
+      "borderLeftStyle": "solid",
+      "borderTopColor": "#24251c",
+      "borderRightColor": "#24251c",
+      "borderBottomColor": "#24251c",
+      "borderLeftColor": "#24251c"
+    },
+    "responsive": [
+      {
+        "max": 699,
+        "props": {
+          "gridTemplateColumns": "minmax(0,1fr)",
+          "paddingLeft": "24px",
+          "paddingRight": "24px",
+          "paddingTop": "55px",
+          "paddingBottom": "55px",
+          "gap": "32px"
+        }
+      },
+      {
+        "max": 359,
+        "props": {
+          "paddingLeft": "20px",
+          "paddingRight": "20px"
+        }
+      },
+      {
+        "max": 699,
+        "props": {
+          "bottom": "0px",
+          "left": "0px",
+          "transform": "none",
+          "width": "100%",
+          "maxWidth": "100%",
+          "paddingTop": "10px",
+          "paddingBottom": "10px",
+          "paddingLeft": "16px",
+          "paddingRight": "16px",
+          "gap": "12px"
+        }
+      }
+    ],
+    "scrollVisibility": {
+      "after": "hero",
+      "hideWhile": [
+        "shop-add",
+        "final-buy",
+        "footer"
+      ]
+    },
+    "children": [
+      {
+        "id": "quick-selection",
+        "type": "container",
+        "name": "Current flavor",
+        "props": {
+          "display": "flex",
+          "flexDirection": "column",
+          "gap": "2px",
+          "minWidth": "0px",
+          "flexGrow": "1"
+        },
+        "responsive": [],
+        "children": [
+          {
+            "id": "quick-flavor",
+            "type": "commerce",
+            "part": "title",
+            "productId": "pith-dry-citrus-soda",
+            "group": "pith-flavor",
+            "name": "Selected flavor name",
+            "props": {
+              "display": "block",
+              "width": "100%",
+              "minWidth": "0px",
+              "fontSize": "16px",
+              "fontWeight": "600"
+            }
+          },
+          {
+            "id": "quick-price",
+            "type": "commerce",
+            "part": "price",
+            "productId": "pith-dry-citrus-soda",
+            "group": "pith-flavor",
+            "name": "Selected pack price",
+            "props": {
+              "display": "block",
+              "width": "100%",
+              "minWidth": "0px",
+              "fontSize": "12px"
+            },
+            "prefix": "Six-pack \u00b7 "
+          }
+        ]
+      },
+      {
+        "id": "quick-add",
+        "type": "commerce",
+        "part": "add",
+        "productId": "pith-dry-citrus-soda",
+        "group": "pith-flavor",
+        "name": "Add selected six-pack",
+        "props": {
+          "display": "block",
+          "width": "auto",
+          "minWidth": "0px",
+          "fontSize": "14px",
+          "backgroundColor": "#24251c",
+          "color": "#f4f1e6",
+          "paddingLeft": "18px",
+          "paddingRight": "18px",
+          "borderRadius": "2px",
+          "fontWeight": "600"
+        },
+        "label": "Add six-pack \u2197"
+      }
+    ]
+  }
+]

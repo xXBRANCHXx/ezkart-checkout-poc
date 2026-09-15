@@ -82,6 +82,7 @@
       verticalAlign: "length",
       textDecoration: "text",
       textWrap: ["wrap", "nowrap", "balance", "pretty"],
+      overflowWrap: ["normal", "break-word", "anywhere"],
       color: "color",
     },
     Surface: {

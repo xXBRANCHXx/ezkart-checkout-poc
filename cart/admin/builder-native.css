@@ -734,3 +734,20 @@
 .page-site-editor .sq-style-color-list .sq-style-color > button {
   position: static;
 }
+.sq-native .sq-native-commerce-select {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: 48px;
+  padding: 12px 36px 12px 14px;
+  border: 1px solid currentColor;
+  border-radius: 0;
+  background: #fff;
+  color: #24251c;
+  font: inherit;
+  text-overflow: ellipsis;
+}
+.sq-native .sq-native-commerce-select:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
+}

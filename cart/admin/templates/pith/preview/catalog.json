@@ -1,0 +1,69 @@
+{
+  "products": [
+    {
+      "id": "pith-dry-citrus-soda",
+      "name": "PITH dry citrus soda \u2014 Six-pack",
+      "description": "Six 250 ml cans. Fictional product for the PITH concept.",
+      "type": "physical",
+      "price": 24,
+      "currency": "USD",
+      "stock": 24,
+      "weightGrams": 1700,
+      "images": [
+        "http://127.0.0.1:46275/assets/grapefruit-1000.webp"
+      ],
+      "options": [
+        {
+          "name": "Flavor",
+          "values": [
+            "Pink grapefruit",
+            "Bitter orange"
+          ]
+        }
+      ],
+      "variants": [
+        {
+          "id": "grapefruit",
+          "name": "Pink grapefruit",
+          "price": 24,
+          "stock": 12,
+          "image": "http://127.0.0.1:46275/assets/grapefruit-1000.webp",
+          "description": "Tart fruit. Bright peel. A dry little wink.",
+          "options": [
+            {
+              "option": "Flavor",
+              "value": "Pink grapefruit"
+            }
+          ],
+          "imageUploadId": "grapefruit-1000.webp"
+        },
+        {
+          "id": "orange",
+          "name": "Bitter orange",
+          "price": 26,
+          "stock": 12,
+          "image": "http://127.0.0.1:46275/assets/orange-1000.webp",
+          "description": "Round citrus. Fragrant peel. A deeper bite.",
+          "options": [
+            {
+              "option": "Flavor",
+              "value": "Bitter orange"
+            }
+          ],
+          "imageUploadId": "orange-1000.webp"
+        }
+      ],
+      "media": [
+        {
+          "id": "grapefruit-1000.webp"
+        }
+      ]
+    }
+  ],
+  "storageScope": "pith-preview-only",
+  "currency": "USD",
+  "locale": "en-US",
+  "demoCheckout": true,
+  "mediaBase": "./assets",
+  "publicBase": ""
+}

@@ -1718,6 +1718,7 @@
     let customSites = readLandingSites();
     let slugEdited = false;
     hydrateCreatorCatalog(form);
+    globalThis.EzkartTemplates?.attach(form, readCatalogProducts);
 
     const projectTone = (products = []) => products.includes("coffee") ? "coffee" : products.includes("sambal") ? "chili" : "gold";
     const projectCard = (site) => {
@@ -1864,7 +1865,9 @@
       const site = { name: String(nameInput.value).trim(), url: `${makePageSlug(slugInput.value)}.ezkart.site`, products, customProducts: [] };
       if (customSites.some((item) => item.url === site.url) || landingLibrary.querySelector(`[data-site-url="${CSS.escape(site.url)}"]`)) { showToast("A page with this URL already exists"); return; }
       try {
-        await saveCloudLandingPage(site, { status: "draft" });
+        const prepared = await globalThis.EzkartTemplates?.fromForm(form, readCatalogProducts());
+        if (prepared) site.products = prepared.state.products;
+        await saveCloudLandingPage(site, { status: "draft", ...(prepared ? { state: prepared.state } : {}) });
         window.location.href = `?page=sites&edit=${encodeURIComponent(site.url)}`;
       } catch (error) { showToast(error instanceof Error ? error.message : "The landing page could not be created."); }
     });
@@ -8197,6 +8200,7 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
     const newPageName = newPageForm?.elements.namedItem("page_name");
     const newPageSlug = newPageForm?.elements.namedItem("slug");
     hydrateCreatorCatalog(newPageForm);
+    globalThis.EzkartTemplates?.attach(newPageForm, readCatalogProducts);
     let newPageSlugEdited = false;
     const makePageSlug = (value) => normalize(value).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 48);
     newPageSlug?.addEventListener("input", () => { newPageSlugEdited = true; newPageSlug.value = makePageSlug(newPageSlug.value); });
@@ -8212,16 +8216,22 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
       const starterIds = starters.map((starter) => starter.value);
       const customProducts = [];
       if (readLandingSites().some((page) => page.url === siteUrl)) { showToast("A page with this URL already exists"); return; }
-      let savedPage;
-      try { savedPage = await saveCloudLandingPage({ name, url: siteUrl, products: starterIds, customProducts }, { status: "draft" }); }
+      let savedPage, prepared;
+      const submit = newPageForm.querySelector('[data-create-page]');
+      if (submit) submit.disabled = true;
+      try {
+        prepared = await globalThis.EzkartTemplates?.fromForm(newPageForm, readCatalogProducts());
+        savedPage = await saveCloudLandingPage({ name, url: siteUrl, products: prepared?.state.products || starterIds, customProducts }, { status: "draft", ...(prepared ? { state: prepared.state } : {}) });
+      }
       catch (error) { showToast(error instanceof Error ? error.message : "The landing page could not be created."); return; }
+      finally { if (submit) submit.disabled = false; }
       const site = addSavedSiteButton(savedPage);
       if (!site) { showToast("A page with this URL already exists"); return; }
       newPageDialog?.close(); await loadSite(site);
-      sqStudio.querySelectorAll("[data-sq-product]").forEach((input) => { input.checked = starters.some((starter) => starter.value === input.value); });
+      sqStudio.querySelectorAll("[data-sq-product]").forEach((input) => { input.checked = (prepared?.state.products || starterIds).includes(input.value); });
       updateProductView(); markSqChanged();
       updateLandingCountBadges();
-      showToast(`${name} created. Your blank page is ready.`); newPageForm.reset(); newPageSlugEdited = false;
+      showToast(`${name} created. ${prepared ? "Your design is ready to edit." : "Your blank page is ready."}`); newPageForm.reset(); newPageSlugEdited = false;
     });
 
     const syncCommerceStatus = async () => {
@@ -8380,6 +8390,13 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
       version:1,
       inspect:inspectBuilder,
       catalog:()=>readCatalogProducts(),
+      templates:()=>EzkartTemplates.list(),
+      async applyTemplate({templateId,productId,brandName}={}) {
+        if (previewRoot.querySelector('[data-sq-element],.sq-native-section')) throw Error('Create a blank page before applying a template.');
+        const prepared = await EzkartTemplates.prepare({templateId,productId,brandName,products:readCatalogProducts()});
+        remember(); restoreState(prepared.state); refreshNativeBuilder(); await settleBuilder();
+        return {templateId:prepared.template.id,version:prepared.template.version,sections:prepared.recipe.length,productId};
+      },
       nativeInsert(args){const element=addNativeNode(args);return {id:element.dataset.nativeId,count:1+element.querySelectorAll('.sq-native').length};},
       nativeUpdate({id,props,fill,responsive,text,marks,action,states,productId,part,group,optionLayout,prefix,suffix,priceSuffix,showPrice,src,poster,captions,captionsText,open,fit,scrollMotion,scrollVisibility,name,alt,label,icon,iconFill,iconStroke,iconWeight,muted,controls,loop,autoplay,collapsed}={}){
         const element=nativeFind(id);if(!element)throw Error('Native element not found.');const old=EzkartNative.read(element),next={...old,...Object.fromEntries(Object.entries({fill,responsive,text,marks,action,states,productId,part,group,optionLayout,prefix,suffix,priceSuffix,showPrice,src,poster,captions,captionsText,open,fit,scrollMotion,scrollVisibility,name,alt,label,icon,iconFill,iconStroke,iconWeight,muted,controls,loop,autoplay,collapsed}).filter(([,value])=>value!==undefined)),props:{...old.props,...props}};

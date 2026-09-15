@@ -1,0 +1,2038 @@
+[
+  {
+    "id": "navigation",
+    "type": "container",
+    "name": "Store header",
+    "props": {
+      "display": "block",
+      "flexDirection": "column",
+      "gap": "8%",
+      "minWidth": "0px",
+      "gridTemplateColumns": "minmax(0,1fr) minmax(0,1fr)",
+      "paddingTop": "0px",
+      "paddingBottom": "0px",
+      "paddingLeft": "clamp(24px,4.2cqw,80px)",
+      "paddingRight": "clamp(24px,4.2cqw,80px)",
+      "backgroundColor": "#eae653",
+      "color": "#24251c",
+      "fontFamily": "'DM Sans', Arial, sans-serif",
+      "fontSize": "16px",
+      "lineHeight": "1.5",
+      "position": "relative",
+      "top": "auto",
+      "zIndex": "100",
+      "borderBottomWidth": "0px",
+      "borderBottomStyle": "solid",
+      "borderBottomColor": "rgba(36,37,28,.3)"
+    },
+    "responsive": [
+      {
+        "max": 699,
+        "props": {
+          "gridTemplateColumns": "minmax(0,1fr)",
+          "paddingLeft": "24px",
+          "paddingRight": "24px",
+          "paddingTop": "55px",
+          "paddingBottom": "55px",
+          "gap": "32px"
+        }
+      },
+      {
+        "max": 359,
+        "props": {
+          "paddingLeft": "20px",
+          "paddingRight": "20px"
+        }
+      },
+      {
+        "max": 699,
+        "props": {
+          "paddingTop": "0px",
+          "paddingBottom": "0px"
+        }
+      }
+    ],
+    "children": [
+      {
+        "id": "nav-row",
+        "type": "container",
+        "name": "Navigation links",
+        "props": {
+          "display": "flex",
+          "flexDirection": "row",
+          "gap": "28px",
+          "minWidth": "0px",
+          "height": "76px",
+          "alignItems": "center",
+          "justifyContent": "space-between"
+        },
+        "responsive": [
+          {
+            "max": 699,
+            "props": {
+              "height": "64px",
+              "gap": "16px"
+            }
+          },
+          {
+            "max": 359,
+            "props": {
+              "gap": "12px"
+            }
+          }
+        ],
+        "children": [
+          {
+            "id": "brand-link",
+            "type": "button",
+            "tag": "a",
+            "name": "Store home",
+            "action": {
+              "type": "link",
+              "target": "#native-navigation"
+            },
+            "props": {
+              "display": "flex",
+              "alignItems": "center",
+              "minHeight": "44px",
+              "width": "auto",
+              "flexShrink": "1",
+              "maxWidth": "55%"
+            },
+            "responsive": [],
+            "children": [
+              {
+                "id": "brand-wordmark",
+                "type": "text",
+                "tag": "p",
+                "name": "Store name",
+                "text": {
+                  "$bind": "brandName"
+                },
+                "props": {
+                  "fontFamily": "Anton, Impact, sans-serif",
+                  "fontSize": "26px",
+                  "lineHeight": "1.1",
+                  "textTransform": "uppercase",
+                  "color": "#24251c",
+                  "minWidth": "0px",
+                  "textWrap": "balance",
+                  "paddingTop": "0px",
+                  "paddingBottom": "0px",
+                  "overflowWrap": "anywhere"
+                }
+              }
+            ]
+          },
+          {
+            "id": "desktop-links",
+            "type": "container",
+            "name": "Main navigation",
+            "props": {
+              "display": "flex",
+              "flexDirection": "row",
+              "gap": "28px",
+              "minWidth": "0px",
+              "marginLeft": "auto",
+              "marginRight": "30px",
+              "alignItems": "center"
+            },
+            "responsive": [
+              {
+                "max": 899,
+                "props": {
+                  "display": "none"
+                }
+              }
+            ],
+            "children": [
+              {
+                "id": "nav-story",
+                "type": "button",
+                "tag": "a",
+                "name": "Product details",
+                "text": "Product details",
+                "action": {
+                  "type": "link",
+                  "target": "#native-story"
+                },
+                "props": {
+                  "display": "inline-flex",
+                  "alignItems": "center",
+                  "justifyContent": "space-between",
+                  "minHeight": "44px",
+                  "fontSize": "14px",
+                  "fontWeight": "500",
+                  "textDecoration": "none",
+                  "color": "inherit"
+                },
+                "marks": [],
+                "$when": "description"
+              },
+              {
+                "id": "nav-serve",
+                "type": "button",
+                "tag": "a",
+                "name": "A closer look",
+                "text": "A closer look",
+                "action": {
+                  "type": "link",
+                  "target": "#native-serve"
+                },
+                "props": {
+                  "display": "inline-flex",
+                  "alignItems": "center",
+                  "justifyContent": "space-between",
+                  "minHeight": "44px",
+                  "fontSize": "14px",
+                  "fontWeight": "500",
+                  "textDecoration": "none",
+                  "color": "inherit"
+                },
+                "marks": [],
+                "$when": "image2"
+              }
+            ],
+            "$when": "hasDetailsNavigation"
+          },
+          {
+            "id": "nav-actions",
+            "type": "container",
+            "name": "Shopping and menu",
+            "props": {
+              "display": "flex",
+              "flexDirection": "row",
+              "gap": "24px",
+              "minWidth": "0px",
+              "alignItems": "center",
+              "marginLeft": "0px"
+            },
+            "responsive": [
+              {
+                "max": 899,
+                "props": {
+                  "marginLeft": "auto"
+                }
+              },
+              {
+                "max": 699,
+                "props": {
+                  "gap": "24px"
+                }
+              },
+              {
+                "max": 359,
+                "props": {
+                  "gap": "16px"
+                }
+              }
+            ],
+            "children": [
+              {
+                "id": "nav-shop",
+                "type": "button",
+                "tag": "a",
+                "name": "Shop the options",
+                "text": "Shop",
+                "action": {
+                  "type": "link",
+                  "target": "#native-shop"
+                },
+                "props": {
+                  "display": "inline-flex",
+                  "alignItems": "center",
+                  "justifyContent": "space-between",
+                  "minHeight": "44px",
+                  "fontSize": "14px",
+                  "fontWeight": "600",
+                  "textDecoration": "underline",
+                  "color": "#24251c",
+                  "backgroundColor": "transparent",
+                  "paddingLeft": "0px",
+                  "paddingRight": "0px",
+                  "borderRadius": "0px",
+                  "whiteSpace": "nowrap"
+                },
+                "responsive": [],
+                "marks": []
+              },
+              {
+                "id": "nav-menu",
+                "type": "button",
+                "tag": "button",
+                "name": "Open navigation menu",
+                "text": "Menu",
+                "action": {
+                  "type": "toggle",
+                  "target": "mobile-menu"
+                },
+                "props": {
+                  "display": "none",
+                  "width": "auto",
+                  "height": "44px",
+                  "textAlign": "center",
+                  "fontSize": "14px",
+                  "backgroundColor": "transparent",
+                  "color": "#24251c",
+                  "minWidth": "44px",
+                  "fontWeight": "500",
+                  "paddingLeft": "0px",
+                  "paddingRight": "0px"
+                },
+                "responsive": [
+                  {
+                    "max": 899,
+                    "props": {
+                      "display": "block"
+                    }
+                  }
+                ],
+                "marks": [],
+                "$when": "hasDetailsNavigation"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "mobile-menu",
+        "type": "container",
+        "name": "Mobile navigation",
+        "props": {
+          "display": "flex",
+          "flexDirection": "column",
+          "gap": "10px",
+          "minWidth": "0px",
+          "position": "absolute",
+          "top": "100%",
+          "left": "0px",
+          "right": "0px",
+          "backgroundColor": "#eae653",
+          "paddingLeft": "24px",
+          "paddingRight": "24px",
+          "paddingTop": "16px",
+          "paddingBottom": "24px",
+          "zIndex": "90",
+          "borderBottomWidth": "1px",
+          "borderBottomStyle": "solid",
+          "borderBottomColor": "rgba(36,37,28,.3)"
+        },
+        "responsive": [],
+        "collapsed": true,
+        "children": [
+          {
+            "id": "mobile-shop",
+            "type": "button",
+            "tag": "a",
+            "name": "Shop",
+            "text": "Shop",
+            "action": {
+              "type": "link",
+              "target": "#native-shop"
+            },
+            "props": {
+              "display": "inline-flex",
+              "alignItems": "center",
+              "justifyContent": "space-between",
+              "minHeight": "44px",
+              "fontSize": "14px",
+              "fontWeight": "600",
+              "textDecoration": "none",
+              "color": "inherit"
+            },
+            "marks": []
+          },
+          {
+            "id": "mobile-story",
+            "type": "button",
+            "tag": "a",
+            "name": "Product details",
+            "text": "Product details",
+            "action": {
+              "type": "link",
+              "target": "#native-story"
+            },
+            "props": {
+              "display": "inline-flex",
+              "alignItems": "center",
+              "justifyContent": "space-between",
+              "minHeight": "44px",
+              "fontSize": "14px",
+              "fontWeight": "600",
+              "textDecoration": "none",
+              "color": "inherit"
+            },
+            "marks": [],
+            "$when": "description"
+          },
+          {
+            "id": "mobile-serve",
+            "type": "button",
+            "tag": "a",
+            "name": "A closer look",
+            "text": "A closer look",
+            "action": {
+              "type": "link",
+              "target": "#native-serve"
+            },
+            "props": {
+              "display": "inline-flex",
+              "alignItems": "center",
+              "justifyContent": "space-between",
+              "minHeight": "44px",
+              "fontSize": "14px",
+              "fontWeight": "600",
+              "textDecoration": "none",
+              "color": "inherit"
+            },
+            "marks": [],
+            "$when": "image2"
+          }
+        ],
+        "$when": "hasDetailsNavigation"
+      }
+    ],
+    "tag": "header"
+  },
+  {
+    "id": "hero",
+    "type": "container",
+    "name": "Product hero",
+    "props": {
+      "display": "grid",
+      "flexDirection": "column",
+      "gap": "8%",
+      "minWidth": "0px",
+      "gridTemplateColumns": {
+        "$bind": "heroColumns"
+      },
+      "paddingTop": "48px",
+      "paddingBottom": "44px",
+      "paddingLeft": "clamp(24px,4.2cqw,80px)",
+      "paddingRight": "clamp(24px,4.2cqw,80px)",
+      "backgroundColor": "#eae653",
+      "color": "#24251c",
+      "fontFamily": "'DM Sans', Arial, sans-serif",
+      "fontSize": "16px",
+      "lineHeight": "1.5",
+      "gridTemplateRows": "auto auto",
+      "columnGap": "3%",
+      "rowGap": "0px"
+    },
+    "responsive": [
+      {
+        "max": 699,
+        "props": {
+          "gridTemplateColumns": "minmax(0,1fr)",
+          "paddingLeft": "24px",
+          "paddingRight": "24px",
+          "paddingTop": "55px",
+          "paddingBottom": "55px",
+          "gap": "32px"
+        }
+      },
+      {
+        "max": 359,
+        "props": {
+          "paddingLeft": "20px",
+          "paddingRight": "20px"
+        }
+      },
+      {
+        "max": 699,
+        "props": {
+          "paddingTop": "29px",
+          "paddingBottom": "32px",
+          "rowGap": "0px"
+        }
+      }
+    ],
+    "children": [
+      {
+        "id": "hero-title",
+        "type": "container",
+        "name": "Campaign headline",
+        "props": {
+          "display": "flex",
+          "flexDirection": "column",
+          "gap": "24px",
+          "minWidth": "0px",
+          "gridColumn": "1",
+          "gridRow": "1"
+        },
+        "responsive": [],
+        "children": [
+          {
+            "id": "hero-headline",
+            "type": "heading",
+            "tag": "h1",
+            "name": "Product headline",
+            "text": {
+              "$bind": "productName"
+            },
+            "props": {
+              "fontFamily": "Anton, Impact, sans-serif",
+              "fontSize": {
+                "$bind": "headlineSize"
+              },
+              "fontWeight": "400",
+              "lineHeight": "1.08",
+              "letterSpacing": "-.018em",
+              "whiteSpace": "pre-line",
+              "textTransform": "uppercase",
+              "textWrap": "balance",
+              "overflowWrap": "anywhere"
+            },
+            "marks": [],
+            "responsive": [
+              {
+                "max": 699,
+                "props": {
+                  "fontSize": {
+                    "$bind": "mobileHeadlineSize"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "hero-media",
+        "type": "container",
+        "name": "Hero product image",
+        "props": {
+          "display": "flex",
+          "flexDirection": "column",
+          "gap": "16px",
+          "minWidth": "0px",
+          "gridColumn": "2",
+          "gridRow": "1 / 4"
+        },
+        "responsive": [
+          {
+            "max": 699,
+            "props": {
+              "gridColumn": "1",
+              "gridRow": "2",
+              "marginTop": "16px"
+            }
+          }
+        ],
+        "children": [
+          {
+            "id": "hero-product-image",
+            "type": "commerce",
+            "part": "image",
+            "productId": {
+              "$bind": "productId"
+            },
+            "group": "primary-product",
+            "name": "Selected option photo",
+            "props": {
+              "display": "block",
+              "width": "100%",
+              "minWidth": "0px",
+              "fontSize": "14px",
+              "height": "clamp(490px,48cqw,720px)",
+              "objectFit": "contain",
+              "overflowWrap": "anywhere"
+            },
+            "loading": "eager",
+            "responsive": [
+              {
+                "max": 699,
+                "props": {
+                  "height": "330px"
+                }
+              },
+              {
+                "max": 359,
+                "props": {
+                  "height": "290px"
+                }
+              }
+            ]
+          }
+        ],
+        "$when": "hasImage"
+      },
+      {
+        "id": "hero-purchase",
+        "type": "container",
+        "name": "Hero purchase",
+        "props": {
+          "display": "flex",
+          "flexDirection": "column",
+          "gap": "16px",
+          "minWidth": "0px",
+          "gridColumn": "1",
+          "gridRow": "2",
+          "alignSelf": "flex-start",
+          "width": "100%",
+          "maxWidth": "455px",
+          "marginTop": "30px"
+        },
+        "responsive": [
+          {
+            "max": 699,
+            "props": {
+              "gridRow": "3",
+              "maxWidth": "none",
+              "marginTop": "20px"
+            }
+          }
+        ],
+        "children": [
+          {
+            "id": "hero-flavor",
+            "type": "commerce",
+            "part": "options",
+            "productId": {
+              "$bind": "productId"
+            },
+            "group": "primary-product",
+            "name": "Choose your option",
+            "props": {
+              "display": "block",
+              "width": "100%",
+              "minWidth": "0px",
+              "fontSize": "14px",
+              "overflowWrap": "anywhere"
+            },
+            "label": "Choose your option",
+            "$when": "hasVariants",
+            "optionLayout": "compact"
+          },
+          {
+            "id": "hero-price",
+            "type": "commerce",
+            "part": "price",
+            "productId": {
+              "$bind": "productId"
+            },
+            "group": "primary-product",
+            "name": "Current price",
+            "props": {
+              "fontSize": "24px",
+              "fontWeight": "500",
+              "overflowWrap": "anywhere"
+            }
+          },
+          {
+            "id": "hero-add",
+            "type": "commerce",
+            "part": "add",
+            "productId": {
+              "$bind": "productId"
+            },
+            "group": "primary-product",
+            "name": "Add selected six-product",
+            "props": {
+              "display": "block",
+              "width": "100%",
+              "minWidth": "0px",
+              "fontSize": "14px",
+              "backgroundColor": "#24251c",
+              "color": "#f4f1e6",
+              "paddingTop": "5px",
+              "paddingBottom": "5px",
+              "paddingLeft": "20px",
+              "paddingRight": "20px",
+              "borderRadius": "2px",
+              "fontWeight": "600",
+              "overflowWrap": "anywhere"
+            },
+            "label": "Add to cart",
+            "showPrice": true
+          }
+        ]
+      }
+    ],
+    "tag": "section"
+  },
+  {
+    "id": "story",
+    "type": "container",
+    "name": "Product details",
+    "props": {
+      "display": "grid",
+      "flexDirection": "column",
+      "gap": "8%",
+      "minWidth": "0px",
+      "gridTemplateColumns": "minmax(0,1fr) minmax(0,1fr)",
+      "paddingTop": "110px",
+      "paddingBottom": "110px",
+      "paddingLeft": "clamp(24px,4.2cqw,80px)",
+      "paddingRight": "clamp(24px,4.2cqw,80px)",
+      "backgroundColor": "#f4f1e6",
+      "color": "#24251c",
+      "fontFamily": "'DM Sans', Arial, sans-serif",
+      "fontSize": "16px",
+      "lineHeight": "1.5"
+    },
+    "responsive": [
+      {
+        "max": 699,
+        "props": {
+          "gridTemplateColumns": "minmax(0,1fr)",
+          "paddingLeft": "24px",
+          "paddingRight": "24px",
+          "paddingTop": "55px",
+          "paddingBottom": "55px",
+          "gap": "32px"
+        }
+      },
+      {
+        "max": 359,
+        "props": {
+          "paddingLeft": "20px",
+          "paddingRight": "20px"
+        }
+      }
+    ],
+    "fill": {
+      "clip": "background",
+      "layers": []
+    },
+    "children": [
+      {
+        "id": "story-headline",
+        "type": "heading",
+        "tag": "h2",
+        "name": "THE\nDETAILS.",
+        "text": "THE\nDETAILS.",
+        "props": {
+          "fontFamily": "Anton, Impact, sans-serif",
+          "fontSize": "clamp(56px,6.5cqw,100px)",
+          "fontWeight": "400",
+          "lineHeight": "1.02",
+          "letterSpacing": "-.018em",
+          "whiteSpace": "pre-line",
+          "overflowWrap": "anywhere"
+        },
+        "marks": [],
+        "responsive": [
+          {
+            "max": 699,
+            "props": {
+              "fontSize": "clamp(57px,13.9cqw,82px)"
+            }
+          }
+        ]
+      },
+      {
+        "id": "story-copy",
+        "type": "container",
+        "name": "Why a little bitter tastes good",
+        "props": {
+          "display": "flex",
+          "flexDirection": "column",
+          "gap": "24px",
+          "minWidth": "0px",
+          "alignSelf": "center",
+          "maxWidth": "530px"
+        },
+        "responsive": [],
+        "children": [
+          {
+            "id": "story-first",
+            "type": "text",
+            "name": "Story first",
+            "text": {
+              "$bind": "description"
+            },
+            "props": {
+              "fontSize": "16px",
+              "lineHeight": "1.5",
+              "whiteSpace": "pre-line",
+              "overflowWrap": "anywhere"
+            },
+            "marks": []
+          }
+        ]
+      }
+    ],
+    "$when": "description",
+    "tag": "section"
+  },
+  {
+    "id": "serve",
+    "type": "container",
+    "name": "The good pour",
+    "props": {
+      "display": "grid",
+      "flexDirection": "column",
+      "gap": "0px",
+      "minWidth": "0px",
+      "gridTemplateColumns": "1.65fr 1fr",
+      "paddingTop": "0px",
+      "paddingBottom": "0px",
+      "paddingLeft": "0px",
+      "paddingRight": "0px",
+      "backgroundColor": "#b62e22",
+      "color": "#24251c",
+      "fontFamily": "'DM Sans', Arial, sans-serif",
+      "fontSize": "16px",
+      "lineHeight": "1.5"
+    },
+    "responsive": [
+      {
+        "max": 699,
+        "props": {
+          "gridTemplateColumns": "minmax(0,1fr)",
+          "paddingLeft": "24px",
+          "paddingRight": "24px",
+          "paddingTop": "55px",
+          "paddingBottom": "55px",
+          "gap": "32px"
+        }
+      },
+      {
+        "max": 359,
+        "props": {
+          "paddingLeft": "20px",
+          "paddingRight": "20px"
+        }
+      },
+      {
+        "max": 899,
+        "props": {
+          "gridTemplateColumns": "minmax(0,1fr)"
+        }
+      },
+      {
+        "max": 699,
+        "props": {
+          "paddingTop": "0px",
+          "paddingBottom": "0px",
+          "paddingLeft": "0px",
+          "paddingRight": "0px",
+          "gap": "0px"
+        }
+      }
+    ],
+    "children": [
+      {
+        "id": "serving-photo",
+        "type": "container",
+        "name": "Store at the table",
+        "props": {
+          "display": "flex",
+          "flexDirection": "column",
+          "gap": "0px",
+          "minWidth": "0px",
+          "position": "relative"
+        },
+        "responsive": [],
+        "children": [
+          {
+            "id": "pour-photo",
+            "type": "image",
+            "name": "Product photo",
+            "src": {
+              "$bind": "image2"
+            },
+            "alt": {
+              "$bind": "productName"
+            },
+            "props": {
+              "display": "block",
+              "width": "100%",
+              "height": "100%",
+              "objectFit": "contain",
+              "minHeight": "630px"
+            },
+            "responsive": [
+              {
+                "max": 899,
+                "props": {
+                  "height": "auto",
+                  "minHeight": "0px",
+                  "aspectRatio": "1.5"
+                }
+              },
+              {
+                "max": 699,
+                "props": {
+                  "aspectRatio": "1",
+                  "objectPosition": "56% center"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "serve-copy",
+        "type": "container",
+        "name": "Serving guide",
+        "props": {
+          "display": "flex",
+          "flexDirection": "column",
+          "gap": "28px",
+          "minWidth": "0px",
+          "color": "#f4f1e6",
+          "backgroundColor": "#b62e22",
+          "paddingTop": "55px",
+          "paddingBottom": "45px",
+          "paddingLeft": "55px",
+          "paddingRight": "55px"
+        },
+        "responsive": [
+          {
+            "max": 699,
+            "props": {
+              "paddingLeft": "24px",
+              "paddingRight": "24px",
+              "paddingTop": "42px",
+              "paddingBottom": "35px"
+            }
+          }
+        ],
+        "children": [
+          {
+            "id": "serve-headline",
+            "type": "heading",
+            "tag": "h2",
+            "name": "A CLOSER\nLOOK.",
+            "text": "A CLOSER\nLOOK.",
+            "props": {
+              "fontFamily": "Anton, Impact, sans-serif",
+              "fontSize": "clamp(66px,6.2cqw,94px)",
+              "fontWeight": "400",
+              "lineHeight": "1.02",
+              "letterSpacing": "-.018em",
+              "whiteSpace": "pre-line",
+              "color": "#f4f1e6",
+              "overflowWrap": "anywhere"
+            },
+            "marks": []
+          },
+          {
+            "id": "serve-ice-title",
+            "type": "text",
+            "name": "Serve ice title",
+            "text": {
+              "$bind": "productName"
+            },
+            "props": {
+              "fontSize": "24px",
+              "lineHeight": "1.5",
+              "whiteSpace": "pre-line",
+              "overflowWrap": "anywhere"
+            },
+            "marks": []
+          }
+        ]
+      }
+    ],
+    "$when": "image2",
+    "tag": "section"
+  },
+  {
+    "id": "shop",
+    "type": "container",
+    "name": "Choose your Store",
+    "props": {
+      "display": "grid",
+      "flexDirection": "column",
+      "gap": "8%",
+      "minWidth": "0px",
+      "gridTemplateColumns": {
+        "$bind": "shopColumns"
+      },
+      "paddingTop": "90px",
+      "paddingBottom": "90px",
+      "paddingLeft": "clamp(24px,4.2cqw,80px)",
+      "paddingRight": "clamp(24px,4.2cqw,80px)",
+      "backgroundColor": "#eae653",
+      "color": "#24251c",
+      "fontFamily": "'DM Sans', Arial, sans-serif",
+      "fontSize": "16px",
+      "lineHeight": "1.5",
+      "gridTemplateRows": "auto 1fr",
+      "rowGap": "0px",
+      "columnGap": "8%"
+    },
+    "responsive": [
+      {
+        "max": 699,
+        "props": {
+          "gridTemplateColumns": "minmax(0,1fr)",
+          "paddingLeft": "24px",
+          "paddingRight": "24px",
+          "paddingTop": "55px",
+          "paddingBottom": "55px",
+          "gap": "32px"
+        }
+      },
+      {
+        "max": 359,
+        "props": {
+          "paddingLeft": "20px",
+          "paddingRight": "20px"
+        }
+      }
+    ],
+    "children": [
+      {
+        "id": "shop-heading",
+        "type": "container",
+        "name": "Shop introduction",
+        "props": {
+          "display": "flex",
+          "flexDirection": "column",
+          "gap": "20px",
+          "minWidth": "0px",
+          "gridColumn": {
+            "$bind": "shopContentColumn"
+          },
+          "gridRow": "1"
+        },
+        "responsive": [
+          {
+            "max": 699,
+            "props": {
+              "gridColumn": "1",
+              "gridRow": "1"
+            }
+          }
+        ],
+        "children": [
+          {
+            "id": "shop-headline",
+            "type": "heading",
+            "tag": "h2",
+            "name": "MAKE IT\nYOURS.",
+            "text": "MAKE IT\nYOURS.",
+            "props": {
+              "fontFamily": "Anton, Impact, sans-serif",
+              "fontSize": "clamp(66px,6.9cqw,106px)",
+              "fontWeight": "400",
+              "lineHeight": "1.02",
+              "letterSpacing": "-.018em",
+              "whiteSpace": "pre-line",
+              "overflowWrap": "anywhere"
+            },
+            "marks": []
+          },
+          {
+            "id": "shop-introduction",
+            "type": "text",
+            "name": "Shop introduction",
+            "text": {
+              "$bind": "productName"
+            },
+            "props": {
+              "fontSize": "18px",
+              "lineHeight": "1.5",
+              "whiteSpace": "pre-line",
+              "overflowWrap": "anywhere"
+            },
+            "marks": []
+          }
+        ]
+      },
+      {
+        "id": "shop-media",
+        "type": "container",
+        "name": "Selected product photo",
+        "props": {
+          "display": "flex",
+          "flexDirection": "column",
+          "gap": "20px",
+          "minWidth": "0px",
+          "gridColumn": "1",
+          "gridRow": "1 / 3"
+        },
+        "responsive": [
+          {
+            "max": 699,
+            "props": {
+              "gridColumn": "1",
+              "gridRow": "2",
+              "marginTop": "20px"
+            }
+          }
+        ],
+        "children": [
+          {
+            "id": "shop-product-image",
+            "type": "commerce",
+            "part": "image",
+            "productId": {
+              "$bind": "productId"
+            },
+            "group": "primary-product",
+            "name": "Selected option photo",
+            "props": {
+              "display": "block",
+              "width": "100%",
+              "minWidth": "0px",
+              "fontSize": "14px",
+              "height": "680px",
+              "objectFit": "contain",
+              "overflowWrap": "anywhere"
+            },
+            "responsive": [
+              {
+                "min": 700,
+                "max": 899,
+                "props": {
+                  "height": "570px"
+                }
+              },
+              {
+                "max": 699,
+                "props": {
+                  "height": "390px"
+                }
+              },
+              {
+                "max": 359,
+                "props": {
+                  "height": "330px"
+                }
+              }
+            ]
+          },
+          {
+            "id": "shop-image-caption",
+            "type": "commerce",
+            "part": "title",
+            "productId": {
+              "$bind": "productId"
+            },
+            "group": "primary-product",
+            "name": "Selected option name",
+            "props": {
+              "display": "block",
+              "width": "100%",
+              "minWidth": "0px",
+              "fontSize": "12px",
+              "borderTopWidth": "1px",
+              "borderTopStyle": "solid",
+              "borderTopColor": "rgba(36,37,28,.3)",
+              "paddingTop": "12px",
+              "overflowWrap": "anywhere"
+            }
+          }
+        ],
+        "$when": "hasImage"
+      },
+      {
+        "id": "shop-options",
+        "type": "container",
+        "name": "Product choices and purchase",
+        "props": {
+          "display": "flex",
+          "flexDirection": "column",
+          "gap": "16px",
+          "minWidth": "0px",
+          "gridColumn": {
+            "$bind": "shopContentColumn"
+          },
+          "gridRow": "2",
+          "marginTop": "30px",
+          "maxWidth": "600px"
+        },
+        "responsive": [
+          {
+            "max": 699,
+            "props": {
+              "gridColumn": "1",
+              "gridRow": "3",
+              "marginTop": "27px"
+            }
+          }
+        ],
+        "children": [
+          {
+            "id": "shop-flavors",
+            "type": "commerce",
+            "part": "options",
+            "productId": {
+              "$bind": "productId"
+            },
+            "group": "primary-product",
+            "name": "Choose your option",
+            "props": {
+              "display": "block",
+              "width": "100%",
+              "minWidth": "0px",
+              "fontSize": "18px",
+              "overflowWrap": "anywhere"
+            },
+            "label": "Choose your option",
+            "optionLayout": "compact",
+            "$when": "hasVariants"
+          },
+          {
+            "id": "shop-price-row",
+            "type": "container",
+            "name": "Pack size and price",
+            "props": {
+              "display": "flex",
+              "flexDirection": "row",
+              "gap": "15px",
+              "minWidth": "0px",
+              "alignItems": "center",
+              "justifyContent": "space-between",
+              "marginTop": "10px"
+            },
+            "responsive": [],
+            "children": [
+              {
+                "id": "shop-price",
+                "type": "commerce",
+                "part": "price",
+                "productId": {
+                  "$bind": "productId"
+                },
+                "group": "primary-product",
+                "name": "Selected product price",
+                "props": {
+                  "display": "block",
+                  "width": "auto",
+                  "minWidth": "0px",
+                  "fontSize": "27px",
+                  "fontWeight": "600",
+                  "overflowWrap": "anywhere"
+                }
+              }
+            ]
+          },
+          {
+            "id": "shop-add",
+            "type": "commerce",
+            "part": "add",
+            "productId": {
+              "$bind": "productId"
+            },
+            "group": "primary-product",
+            "name": "Add selected six-product",
+            "props": {
+              "display": "block",
+              "width": "100%",
+              "minWidth": "0px",
+              "fontSize": "14px",
+              "backgroundColor": "#24251c",
+              "color": "#f4f1e6",
+              "paddingTop": "5px",
+              "paddingBottom": "5px",
+              "paddingLeft": "20px",
+              "paddingRight": "20px",
+              "borderRadius": "2px",
+              "fontWeight": "600",
+              "overflowWrap": "anywhere"
+            },
+            "label": "Add to cart",
+            "showPrice": false
+          }
+        ]
+      }
+    ],
+    "tag": "section"
+  },
+  {
+    "id": "pack-story",
+    "type": "container",
+    "name": "Six cans, open plans",
+    "props": {
+      "display": "grid",
+      "flexDirection": "column",
+      "gap": "5%",
+      "minWidth": "0px",
+      "gridTemplateColumns": "1fr 1.3fr",
+      "paddingTop": "70px",
+      "paddingBottom": "70px",
+      "paddingLeft": "clamp(24px,4.2cqw,80px)",
+      "paddingRight": "clamp(24px,4.2cqw,80px)",
+      "backgroundColor": "#e6c5b3",
+      "color": "#24251c",
+      "fontFamily": "'DM Sans', Arial, sans-serif",
+      "fontSize": "16px",
+      "lineHeight": "1.5"
+    },
+    "responsive": [
+      {
+        "max": 699,
+        "props": {
+          "gridTemplateColumns": "minmax(0,1fr)",
+          "paddingLeft": "24px",
+          "paddingRight": "24px",
+          "paddingTop": "55px",
+          "paddingBottom": "55px",
+          "gap": "32px"
+        }
+      },
+      {
+        "max": 359,
+        "props": {
+          "paddingLeft": "20px",
+          "paddingRight": "20px"
+        }
+      }
+    ],
+    "children": [
+      {
+        "id": "pack-copy",
+        "type": "container",
+        "name": "Six-product story",
+        "props": {
+          "display": "flex",
+          "flexDirection": "column",
+          "gap": "25px",
+          "minWidth": "0px",
+          "alignSelf": "center"
+        },
+        "responsive": [],
+        "children": [
+          {
+            "id": "pack-headline",
+            "type": "heading",
+            "tag": "h2",
+            "name": "FROM\nEVERY\nANGLE.",
+            "text": "FROM\nEVERY\nANGLE.",
+            "props": {
+              "fontFamily": "Anton, Impact, sans-serif",
+              "fontSize": "clamp(62px,6.7cqw,103px)",
+              "fontWeight": "400",
+              "lineHeight": "1.02",
+              "letterSpacing": "-.018em",
+              "whiteSpace": "pre-line",
+              "overflowWrap": "anywhere"
+            },
+            "marks": []
+          },
+          {
+            "id": "pack-shop-link",
+            "type": "button",
+            "tag": "a",
+            "name": "Shop this product ↗",
+            "text": "Shop this product ↗",
+            "action": {
+              "type": "link",
+              "target": "#native-shop"
+            },
+            "props": {
+              "display": "inline-flex",
+              "alignItems": "center",
+              "justifyContent": "space-between",
+              "minHeight": "44px",
+              "fontSize": "14px",
+              "fontWeight": "600",
+              "textDecoration": "none",
+              "color": "inherit",
+              "borderBottomWidth": "1px",
+              "borderBottomStyle": "solid",
+              "borderBottomColor": "rgba(36,37,28,.3)",
+              "width": "fit-content",
+              "gap": "28px",
+              "paddingTop": "8px",
+              "paddingBottom": "8px"
+            },
+            "marks": []
+          }
+        ]
+      },
+      {
+        "id": "pack-photo-group",
+        "type": "container",
+        "name": "The Store six-product",
+        "props": {
+          "display": "flex",
+          "flexDirection": "column",
+          "gap": "20px",
+          "minWidth": "0px",
+          "alignSelf": "center"
+        },
+        "responsive": [],
+        "children": [
+          {
+            "id": "pack-photo",
+            "type": "image",
+            "name": "Product photo",
+            "src": {
+              "$bind": "image3"
+            },
+            "alt": {
+              "$bind": "productName"
+            },
+            "props": {
+              "display": "block",
+              "width": "100%",
+              "height": "auto",
+              "objectFit": "contain"
+            },
+            "responsive": []
+          }
+        ]
+      }
+    ],
+    "$when": "image3",
+    "tag": "section"
+  },
+  {
+    "id": "final-buy",
+    "type": "container",
+    "name": "Final purchase",
+    "props": {
+      "display": "grid",
+      "flexDirection": "column",
+      "gap": "8%",
+      "minWidth": "0px",
+      "gridTemplateColumns": "1.5fr 1fr",
+      "paddingTop": "80px",
+      "paddingBottom": "80px",
+      "paddingLeft": "clamp(24px,4.2cqw,80px)",
+      "paddingRight": "clamp(24px,4.2cqw,80px)",
+      "backgroundColor": "#eae653",
+      "color": "#24251c",
+      "fontFamily": "'DM Sans', Arial, sans-serif",
+      "fontSize": "16px",
+      "lineHeight": "1.5",
+      "alignItems": "center"
+    },
+    "responsive": [
+      {
+        "max": 699,
+        "props": {
+          "gridTemplateColumns": "minmax(0,1fr)",
+          "paddingLeft": "24px",
+          "paddingRight": "24px",
+          "paddingTop": "55px",
+          "paddingBottom": "55px",
+          "gap": "32px"
+        }
+      },
+      {
+        "max": 359,
+        "props": {
+          "paddingLeft": "20px",
+          "paddingRight": "20px"
+        }
+      }
+    ],
+    "children": [
+      {
+        "id": "final-copy",
+        "type": "container",
+        "name": "Final invitation",
+        "props": {
+          "display": "flex",
+          "flexDirection": "column",
+          "gap": "20px",
+          "minWidth": "0px"
+        },
+        "responsive": [],
+        "children": [
+          {
+            "id": "final-headline",
+            "type": "heading",
+            "tag": "h2",
+            "name": "MAKE IT\nYOURS.",
+            "text": "MAKE IT\nYOURS.",
+            "props": {
+              "fontFamily": "Anton, Impact, sans-serif",
+              "fontSize": "clamp(64px,7.5cqw,122px)",
+              "fontWeight": "400",
+              "lineHeight": "1.02",
+              "letterSpacing": "-.018em",
+              "whiteSpace": "pre-line",
+              "overflowWrap": "anywhere"
+            },
+            "marks": []
+          }
+        ]
+      },
+      {
+        "id": "final-purchase",
+        "type": "container",
+        "name": "Your selected six-product",
+        "props": {
+          "display": "flex",
+          "flexDirection": "column",
+          "gap": "14px",
+          "minWidth": "0px",
+          "maxWidth": "420px",
+          "width": "100%"
+        },
+        "responsive": [],
+        "children": [
+          {
+            "id": "final-label",
+            "type": "text",
+            "name": "Your selection",
+            "text": "Your selection",
+            "props": {
+              "fontSize": "14px",
+              "lineHeight": "1.5",
+              "whiteSpace": "pre-line",
+              "overflowWrap": "anywhere"
+            },
+            "marks": []
+          },
+          {
+            "id": "final-flavor",
+            "type": "commerce",
+            "part": "title",
+            "productId": {
+              "$bind": "productId"
+            },
+            "group": "primary-product",
+            "name": "Selected option name",
+            "props": {
+              "display": "block",
+              "width": "100%",
+              "minWidth": "0px",
+              "fontSize": "34px",
+              "fontWeight": "600",
+              "letterSpacing": "-.04em",
+              "overflowWrap": "anywhere"
+            }
+          },
+          {
+            "id": "final-price",
+            "type": "commerce",
+            "part": "price",
+            "productId": {
+              "$bind": "productId"
+            },
+            "group": "primary-product",
+            "name": "Selected product price",
+            "props": {
+              "display": "block",
+              "width": "100%",
+              "minWidth": "0px",
+              "fontSize": "16px",
+              "overflowWrap": "anywhere"
+            }
+          },
+          {
+            "id": "change-flavor",
+            "type": "button",
+            "tag": "a",
+            "name": "View options ↑",
+            "text": "View options ↑",
+            "action": {
+              "type": "link",
+              "target": "#native-shop"
+            },
+            "props": {
+              "display": "inline-flex",
+              "alignItems": "center",
+              "justifyContent": "space-between",
+              "minHeight": "44px",
+              "fontSize": "14px",
+              "fontWeight": "600",
+              "textDecoration": "none",
+              "color": "inherit",
+              "borderBottomWidth": "1px",
+              "borderBottomStyle": "solid",
+              "borderBottomColor": "rgba(36,37,28,.3)",
+              "width": "fit-content",
+              "gap": "28px",
+              "paddingTop": "8px",
+              "paddingBottom": "8px"
+            },
+            "marks": []
+          },
+          {
+            "id": "final-add",
+            "type": "commerce",
+            "part": "add",
+            "productId": {
+              "$bind": "productId"
+            },
+            "group": "primary-product",
+            "name": "Add selected six-product",
+            "props": {
+              "display": "block",
+              "width": "100%",
+              "minWidth": "0px",
+              "fontSize": "14px",
+              "backgroundColor": "#24251c",
+              "color": "#f4f1e6",
+              "paddingTop": "5px",
+              "paddingBottom": "5px",
+              "paddingLeft": "20px",
+              "paddingRight": "20px",
+              "borderRadius": "2px",
+              "fontWeight": "600",
+              "overflowWrap": "anywhere"
+            },
+            "label": "Add to cart",
+            "showPrice": false
+          }
+        ]
+      }
+    ],
+    "tag": "section"
+  },
+  {
+    "id": "footer",
+    "type": "container",
+    "name": "Store footer",
+    "props": {
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "16px",
+      "minWidth": "0px",
+      "gridTemplateColumns": "minmax(0,1fr) minmax(0,1fr)",
+      "paddingTop": "36px",
+      "paddingBottom": "100px",
+      "paddingLeft": "clamp(24px,4.2cqw,80px)",
+      "paddingRight": "clamp(24px,4.2cqw,80px)",
+      "backgroundColor": "#24251c",
+      "color": "#f4f1e6",
+      "fontFamily": "'DM Sans', Arial, sans-serif",
+      "fontSize": "16px",
+      "lineHeight": "1.5"
+    },
+    "responsive": [
+      {
+        "max": 699,
+        "props": {
+          "gridTemplateColumns": "minmax(0,1fr)",
+          "paddingLeft": "24px",
+          "paddingRight": "24px",
+          "paddingTop": "55px",
+          "paddingBottom": "55px",
+          "gap": "32px"
+        }
+      },
+      {
+        "max": 359,
+        "props": {
+          "paddingLeft": "20px",
+          "paddingRight": "20px"
+        }
+      },
+      {
+        "max": 699,
+        "props": {
+          "paddingTop": "25px",
+          "paddingBottom": "80px",
+          "gap": "16px"
+        }
+      },
+      {
+        "max": 699,
+        "props": {
+          "paddingBottom": "96px"
+        }
+      }
+    ],
+    "children": [
+      {
+        "id": "footer-top",
+        "type": "container",
+        "name": "Footer introduction",
+        "props": {
+          "display": "flex",
+          "flexDirection": "row",
+          "gap": "20px",
+          "minWidth": "0px",
+          "alignItems": "center",
+          "justifyContent": "space-between"
+        },
+        "responsive": [],
+        "children": [
+          {
+            "id": "back-top",
+            "type": "button",
+            "tag": "a",
+            "name": "Back to top ↑",
+            "text": "Back to top ↑",
+            "action": {
+              "type": "link",
+              "target": "#native-navigation"
+            },
+            "props": {
+              "display": "inline-flex",
+              "alignItems": "center",
+              "justifyContent": "space-between",
+              "minHeight": "44px",
+              "fontSize": "14px",
+              "fontWeight": "600",
+              "textDecoration": "none",
+              "color": "inherit"
+            }
+          }
+        ]
+      },
+      {
+        "id": "footer-logo",
+        "type": "text",
+        "tag": "p",
+        "name": "Store name",
+        "text": {
+          "$bind": "brandName"
+        },
+        "props": {
+          "fontFamily": "Anton, Impact, sans-serif",
+          "fontSize": {
+            "$bind": "wordmarkSize"
+          },
+          "lineHeight": "1.1",
+          "textTransform": "uppercase",
+          "color": "#eae653",
+          "minWidth": "0px",
+          "textWrap": "balance",
+          "paddingTop": "20px",
+          "paddingBottom": "35px",
+          "overflowWrap": "anywhere"
+        },
+        "responsive": [
+          {
+            "max": 699,
+            "props": {
+              "fontSize": {
+                "$bind": "mobileWordmarkSize"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": "footer-links",
+        "type": "container",
+        "name": "Footer navigation",
+        "props": {
+          "display": "flex",
+          "flexDirection": "row",
+          "gap": "25px",
+          "minWidth": "0px",
+          "justifyContent": "space-between",
+          "paddingTop": "13px",
+          "paddingBottom": "13px",
+          "borderTopWidth": "1px",
+          "borderTopStyle": "solid",
+          "borderTopColor": "#696b58",
+          "borderBottomWidth": "1px",
+          "borderBottomStyle": "solid",
+          "borderBottomColor": "#696b58"
+        },
+        "responsive": [
+          {
+            "min": 700,
+            "max": 1100,
+            "props": {
+              "flexDirection": "column"
+            }
+          },
+          {
+            "max": 699,
+            "props": {
+              "display": "grid",
+              "gridTemplateColumns": "1fr 1fr",
+              "gap": "20px"
+            }
+          }
+        ],
+        "children": [
+          {
+            "id": "footer-product-links",
+            "type": "container",
+            "name": "Product links",
+            "props": {
+              "display": "flex",
+              "flexDirection": "row",
+              "gap": "28px",
+              "minWidth": "0px"
+            },
+            "responsive": [
+              {
+                "max": 699,
+                "props": {
+                  "flexDirection": "column",
+                  "gap": "0px"
+                }
+              }
+            ],
+            "children": [
+              {
+                "id": "footer-shop",
+                "type": "button",
+                "tag": "a",
+                "name": "Shop",
+                "text": "Shop",
+                "action": {
+                  "type": "link",
+                  "target": "#native-shop"
+                },
+                "props": {
+                  "display": "inline-flex",
+                  "alignItems": "center",
+                  "justifyContent": "space-between",
+                  "minHeight": "44px",
+                  "fontSize": "14px",
+                  "fontWeight": "600",
+                  "textDecoration": "none",
+                  "color": "inherit"
+                },
+                "marks": []
+              },
+              {
+                "id": "footer-ingredients",
+                "type": "button",
+                "tag": "a",
+                "name": "Product details",
+                "text": "Product details",
+                "action": {
+                  "type": "link",
+                  "target": "#native-story"
+                },
+                "props": {
+                  "display": "inline-flex",
+                  "alignItems": "center",
+                  "justifyContent": "space-between",
+                  "minHeight": "44px",
+                  "fontSize": "14px",
+                  "fontWeight": "600",
+                  "textDecoration": "none",
+                  "color": "inherit"
+                },
+                "marks": [],
+                "$when": "description"
+              },
+              {
+                "id": "footer-serving",
+                "type": "button",
+                "tag": "a",
+                "name": "A closer look",
+                "text": "A closer look",
+                "action": {
+                  "type": "link",
+                  "target": "#native-serve"
+                },
+                "props": {
+                  "display": "inline-flex",
+                  "alignItems": "center",
+                  "justifyContent": "space-between",
+                  "minHeight": "44px",
+                  "fontSize": "14px",
+                  "fontWeight": "600",
+                  "textDecoration": "none",
+                  "color": "inherit"
+                },
+                "marks": [],
+                "$when": "image2"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "footer-bottom",
+        "type": "container",
+        "name": "Footer details",
+        "props": {
+          "display": "flex",
+          "flexDirection": "row",
+          "gap": "20px",
+          "minWidth": "0px",
+          "justifyContent": "space-between",
+          "color": "#bcbdad"
+        },
+        "responsive": [
+          {
+            "max": 699,
+            "props": {
+              "flexDirection": "column",
+              "gap": "8px"
+            }
+          }
+        ],
+        "children": [
+          {
+            "id": "copyright",
+            "type": "text",
+            "name": "Copyright",
+            "text": {
+              "$bind": "brandName"
+            },
+            "props": {
+              "fontSize": "11px",
+              "lineHeight": "1.5",
+              "whiteSpace": "pre-line",
+              "overflowWrap": "anywhere"
+            },
+            "marks": []
+          }
+        ]
+      }
+    ],
+    "tag": "footer"
+  },
+  {
+    "id": "quick-purchase",
+    "type": "container",
+    "name": "Quick purchase bar",
+    "props": {
+      "display": "flex",
+      "flexDirection": "row",
+      "gap": "20px",
+      "minWidth": "0px",
+      "gridTemplateColumns": "minmax(0,1fr) minmax(0,1fr)",
+      "paddingTop": "12px",
+      "paddingBottom": "12px",
+      "paddingLeft": "20px",
+      "paddingRight": "15px",
+      "backgroundColor": "#f4f1e6",
+      "color": "#24251c",
+      "fontFamily": "'DM Sans', Arial, sans-serif",
+      "fontSize": "16px",
+      "lineHeight": "1.5",
+      "position": "fixed",
+      "bottom": "20px",
+      "top": "auto",
+      "left": "50%",
+      "right": "auto",
+      "transform": "translateX(-50%)",
+      "width": "500px",
+      "maxWidth": "calc(100% - 32px)",
+      "alignItems": "center",
+      "justifyContent": "space-between",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "marginLeft": "0px",
+      "marginRight": "0px",
+      "zIndex": "80",
+      "borderTopWidth": "1px",
+      "borderRightWidth": "1px",
+      "borderBottomWidth": "1px",
+      "borderLeftWidth": "1px",
+      "borderTopStyle": "solid",
+      "borderRightStyle": "solid",
+      "borderBottomStyle": "solid",
+      "borderLeftStyle": "solid",
+      "borderTopColor": "#24251c",
+      "borderRightColor": "#24251c",
+      "borderBottomColor": "#24251c",
+      "borderLeftColor": "#24251c"
+    },
+    "responsive": [
+      {
+        "max": 699,
+        "props": {
+          "gridTemplateColumns": "minmax(0,1fr)",
+          "paddingLeft": "24px",
+          "paddingRight": "24px",
+          "paddingTop": "55px",
+          "paddingBottom": "55px",
+          "gap": "32px"
+        }
+      },
+      {
+        "max": 359,
+        "props": {
+          "paddingLeft": "20px",
+          "paddingRight": "20px"
+        }
+      },
+      {
+        "max": 699,
+        "props": {
+          "bottom": "0px",
+          "left": "0px",
+          "transform": "none",
+          "width": "100%",
+          "maxWidth": "100%",
+          "paddingTop": "10px",
+          "paddingBottom": "10px",
+          "paddingLeft": "16px",
+          "paddingRight": "16px",
+          "gap": "12px"
+        }
+      }
+    ],
+    "scrollVisibility": {
+      "after": "hero",
+      "hideWhile": [
+        "shop-add",
+        "final-buy",
+        "footer"
+      ]
+    },
+    "children": [
+      {
+        "id": "quick-selection",
+        "type": "container",
+        "name": "Current option",
+        "props": {
+          "display": "flex",
+          "flexDirection": "column",
+          "gap": "2px",
+          "minWidth": "0px",
+          "flexGrow": "1"
+        },
+        "responsive": [],
+        "children": [
+          {
+            "id": "quick-flavor",
+            "type": "commerce",
+            "part": "title",
+            "productId": {
+              "$bind": "productId"
+            },
+            "group": "primary-product",
+            "name": "Selected option name",
+            "props": {
+              "display": "block",
+              "width": "100%",
+              "minWidth": "0px",
+              "fontSize": "16px",
+              "fontWeight": "600",
+              "overflowWrap": "anywhere"
+            }
+          },
+          {
+            "id": "quick-price",
+            "type": "commerce",
+            "part": "price",
+            "productId": {
+              "$bind": "productId"
+            },
+            "group": "primary-product",
+            "name": "Selected product price",
+            "props": {
+              "display": "block",
+              "width": "100%",
+              "minWidth": "0px",
+              "fontSize": "12px",
+              "overflowWrap": "anywhere"
+            }
+          }
+        ]
+      },
+      {
+        "id": "quick-add",
+        "type": "commerce",
+        "part": "add",
+        "productId": {
+          "$bind": "productId"
+        },
+        "group": "primary-product",
+        "name": "Add selected six-product",
+        "props": {
+          "display": "block",
+          "width": "auto",
+          "minWidth": "0px",
+          "fontSize": "14px",
+          "backgroundColor": "#24251c",
+          "color": "#f4f1e6",
+          "paddingLeft": "18px",
+          "paddingRight": "18px",
+          "borderRadius": "2px",
+          "fontWeight": "600",
+          "overflowWrap": "anywhere"
+        },
+        "label": "Add to cart"
+      }
+    ],
+    "tag": "aside"
+  }
+]
