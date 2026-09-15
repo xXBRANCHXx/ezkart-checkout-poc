@@ -158,7 +158,7 @@ test('the ordinary new-page dialog accepts no products and opens a blank canvas'
    await route.fulfill({json:{ok:true,page:created}});
   });
   await page.goto(ws.url+'/cart/admin/?page=sites&edit=existing.ezkart.site');await page.waitForFunction(()=>globalThis.EzkartBuilder);
-  await page.locator('#page-creator-dialog').evaluate(d=>d.showModal());
+  await page.getByRole('button',{name:'+ New page',exact:true}).click();
   await page.locator('#page-creator-dialog [name=page_name]').fill('From UI');await page.locator('#page-creator-dialog [name=slug]').fill('from-ui');
   await page.locator('[data-create-page]').click();await page.waitForFunction(()=>EzkartBuilder.inspect().page.id==='from-ui');
   assert.deepEqual(created.products,[]);const state=await page.evaluate(()=>EzkartBuilder.inspect());assert.equal(state.sections.length,1);assert.equal(state.sections[0].elements.length,0);

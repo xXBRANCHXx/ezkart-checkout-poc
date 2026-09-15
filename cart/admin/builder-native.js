@@ -184,6 +184,7 @@
     heading: ["h1", "h2", "h3", "h4"],
     button: ["a", "button"],
     image: ["img"],
+    product: ["div"],
     icon: ["svg"],
     video: ["video"],
     accordion: ["details"],
@@ -191,6 +192,17 @@
     break: ["br"],
   };
   const defaults = {
+    product: {
+      display: "grid",
+      gridTemplateColumns: "minmax(0, 1fr)",
+      containerType: "inline-size",
+      width: "360px",
+      maxWidth: "100%",
+      height: "auto",
+      fontSize: "16px",
+      backgroundColor: "#ffffff",
+      borderRadius: "14px",
+    },
     container: { display: "flex", flexDirection: "column", gap: "16px" },
     text: { fontSize: "16px", lineHeight: "1.6" },
     heading: { fontSize: "48px", fontWeight: "600", lineHeight: "1.15" },
@@ -232,6 +244,14 @@
       .replace(/[A-Z]/g, (c) => " " + c.toLowerCase())
       .replace(/^./, (c) => c.toUpperCase());
   const identifier = (value) => /^[a-z][a-z0-9-]{0,80}$/.test(value || "");
+  const typeName = (type) =>
+    ({
+      container: "Layout group",
+      text: "Paragraph",
+      product: "Product card",
+      accordion: "Expandable answer",
+      summary: "Answer heading",
+    })[type] || label(type);
   function validateProps(props = {}) {
     for (const [key, value] of Object.entries(props)) {
       if (!schema[key]) throw Error(`Unknown native property: ${key}`);
@@ -307,6 +327,12 @@
       throw Error("Each native element needs a unique ID.");
     ids.add(config.id);
     if (!tags[config.type]) throw Error("Choose a native element type.");
+    if (
+      config.type === "product" &&
+      (typeof config.productId !== "string" ||
+        !/^[a-zA-Z0-9_-]{1,120}$/.test(config.productId))
+    )
+      throw Error("Choose a product from your catalog.");
     if (config.tag && !tags[config.type].includes(config.tag))
       throw Error("Choose a supported semantic role.");
     if (
@@ -563,13 +589,13 @@
     Object.entries(props)
       .map(
         ([key, value]) =>
-          `${cssName(key)}:${String(value).replace(/([\d.]+)vw\b/g, "calc($1 * var(--native-vw, 1vw))")}`,
+          `${cssName(key)}:${String(value).replace(/([\d.]+)vw\b/g, "calc($1 * var(--native-vw, 1vw))")}${key === "color" ? `;--native-text-color:${value}` : ""}`,
       )
       .join(";") +
     (fill?.layers?.length
-      ? `;background-image:${gradientCss(fill.layers)};${fill.clip === "text" ? "background-clip:text;-webkit-background-clip:text;color:transparent;" : ""}`
+      ? `;background-image:${gradientCss(fill.layers)};${fill.clip === "text" ? "background-clip:text;-webkit-background-clip:text;color:transparent;" : "background-clip:border-box;-webkit-background-clip:border-box;color:var(--native-text-color,inherit);"}`
       : fill
-        ? ";background-image:none;background-clip:border-box;"
+        ? ";background-image:none;background-clip:border-box;-webkit-background-clip:border-box;color:var(--native-text-color,inherit);"
         : "");
   function stylesheet(root, exported = false) {
     const query = (selector, rule) => {
@@ -851,6 +877,7 @@
             right: "auto",
             bottom: "auto",
           };
+      if (config.type === "product" && resizing) props.height = "auto";
       Object.assign(node.style, props);
     };
     const end = () => {
@@ -884,6 +911,8 @@
     sheet.textContent = stylesheet(hooks.root);
     hooks.root.querySelectorAll(".sq-native").forEach((node) => {
       const config = read(node);
+      if (config.type === "product")
+        hooks.renderProduct?.(node, config.productId);
       if (config.action)
         node.dataset.nativeAction = JSON.stringify(config.action);
       else delete node.dataset.nativeAction;
@@ -1351,6 +1380,20 @@
     panel.hidden = !selected;
     if (!selected) return;
     const config = read(selected);
+    panel.querySelector("[data-native-product-controls]").hidden =
+      config.type !== "product";
+    if (config.type === "product") {
+      const products = hooks.products?.() || [];
+      const field = panel.querySelector("[data-native-product-id]");
+      field.replaceChildren(
+        ...products.map((product) => new Option(product.name, product.id)),
+      );
+      if (!products.some((product) => product.id === config.productId))
+        field.append(
+          new Option("Product no longer available", config.productId),
+        );
+      field.value = config.productId;
+    }
     panel.querySelector("[data-native-content-title]").textContent =
       config.text !== undefined ? "Text" : label(config.type);
     const parent = selected.parentElement.closest(".sq-native");
@@ -1358,9 +1401,16 @@
     panel.querySelector("[data-native-element-kind]").textContent = parent
       ? parentName && !/^container( section)?$/i.test(parentName)
         ? `Inside “${parentName}”`
-        : "Inside a layout group"
+        : parent.matches(".sq-native-section")
+          ? "Inside this section"
+          : "Inside a layout group"
       : "On this page";
     panel.querySelector("[data-native-parent]").hidden = !parent;
+    panel.querySelector("[data-native-parent]").textContent = parent?.matches(
+      ".sq-native-section",
+    )
+      ? "↑ Edit section"
+      : "↑ Edit layout group";
     panel.querySelector("[data-native-word-controls]").hidden =
       config.text === undefined;
     panel.querySelector("[data-native-text-help]").hidden =
@@ -1385,7 +1435,10 @@
     hooks.inspector.querySelector("[data-sq-inspector-context]").textContent =
       "Selected element";
     hooks.inspector.querySelector("[data-sq-inspector-title]").textContent =
-      config.name || label(config.type);
+      config.name ||
+      (selected.matches(".sq-native-section")
+        ? "Section"
+        : typeName(config.type));
     const responsive = panel.querySelector("[data-native-breakpoint]");
     responsive.replaceChildren(
       new Option("All screen sizes", "base"),
@@ -1533,7 +1586,11 @@
       layers.length,
     );
     panel.querySelector("[data-native-fill-status]").textContent =
-      "Affects the entire element. Use “Color specific words” to change a phrase.";
+      config.text !== undefined
+        ? "Affects the entire element. Use “Color specific words” to change a phrase."
+        : `Applies to this ${config.type === "product" ? "product card" : "element"}.`;
+    panel.querySelector("[data-native-fill-section] > summary").textContent =
+      config.text !== undefined ? "Background & text color" : "Background";
     loadGradient(panel, layer);
     syncFillControls(panel);
     panel.querySelector("[data-native-name]").value = config.name || "";
@@ -1611,6 +1668,7 @@
         <label>Apply layout changes to<select data-native-breakpoint><option value="base">All screen sizes</option></select></label>
         <p class="sq-native-help" data-native-context-note>Layout and appearance settings affect all screen sizes.</p>
       </div>
+      <details open data-native-product-controls hidden><summary>Product card</summary><label>Product shown in this card<select data-native-product-id></select></label><p class="sq-native-help">Changing this product affects only this card.</p><button type="button" class="sq-native-wide" data-native-another-product>+ Add another product card</button></details>
       <details open data-native-content><summary data-native-content-title>Text</summary>
         <label>Your text<textarea rows="3" data-native-text></textarea></label>
         <p class="sq-native-help" data-native-text-help>Edit your copy here. Select words to change their color.</p>
@@ -1669,7 +1727,7 @@
         (node) =>
           node.matches("details") &&
           !node.matches(
-            "[data-native-content], [data-native-fill-section], [data-native-media], [data-native-icon-options]",
+            "[data-native-content], [data-native-fill-section], [data-native-product-controls], [data-native-media], [data-native-icon-options]",
           ),
       )
       .forEach((node) => advanced.append(node));
@@ -1750,6 +1808,7 @@
       const grid = document.createElement("div");
       grid.className = "sq-native-fields";
       for (const [key, type] of Object.entries(fields)) {
+        if (key === "backgroundColor") continue;
         const wrap = document.createElement("label");
         wrap.append(fieldNames[key] || label(key));
         const input = Array.isArray(type)
@@ -1815,6 +1874,24 @@
           select(selected);
         }
       }),
+    );
+    listen("[data-native-product-id]", "change", () => {
+      const productId = panel.querySelector("[data-native-product-id]").value;
+      if (
+        !(hooks.products?.() || []).some((product) => product.id === productId)
+      )
+        throw Error("Choose an available catalog product.");
+      const config = read(selected);
+      config.productId = productId;
+      validate(config);
+      hooks.remember();
+      write(selected, config);
+      refresh();
+      hooks.changed();
+      select(selected);
+    });
+    listen("[data-native-another-product]", "click", () =>
+      hooks.openProducts?.(),
     );
     listen("[data-native-text]", "select", () => {
       const field = panel.querySelector("[data-native-text]");
@@ -2274,6 +2351,7 @@
     refresh();
   }
   globalThis.EzkartNative = {
+    typeName,
     groups,
     schema,
     tags,

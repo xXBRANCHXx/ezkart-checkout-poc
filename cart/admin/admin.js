@@ -2653,7 +2653,7 @@
       const state = captureState();
       cloudSavePromise = cloudSavePromise.catch(() => false).then(async () => {
         try {
-          activeSiteDocument = await saveCloudLandingPage(site, { state, ...changes });
+          activeSiteDocument = await saveCloudLandingPage(site, { state, products: state.products, ...changes });
           scheduleLandingPreviewRefresh();
           return true;
         } catch (error) {
@@ -2672,6 +2672,35 @@
     };
 
     const formatRupiah = (amount) => `Rp${new Intl.NumberFormat("id-ID").format(amount)}`;
+    const productIdsForGrid = (grid) => {
+      if (grid?.dataset.nativeType === "product") return [EzkartNative.read(grid).productId];
+      if (grid?.dataset.sqProductIds) {
+        try { const ids = JSON.parse(grid.dataset.sqProductIds); if (Array.isArray(ids)) return ids; } catch {}
+      }
+      return selectedProducts();
+    };
+    const pinProductBlocks = () => previewRoot.querySelectorAll("[data-sq-product-grid]").forEach(grid => {
+      if (grid.dataset.nativeType !== "product" && !grid.dataset.sqProductIds)
+        grid.dataset.sqProductIds = JSON.stringify([...grid.querySelectorAll("[data-product-card]")].filter(card => !card.hidden).map(card => card.dataset.productCard));
+    });
+    const renderProductChoices = (grid) => {
+      const list = sqStudio.querySelector("[data-sq-block-product-list]");
+      if (!list || !grid) return;
+      const ids = productIdsForGrid(grid);
+      list.replaceChildren(...readCatalogProducts().map(product => {
+        const label = document.createElement("label");
+        const input = document.createElement("input");
+        input.type = "checkbox"; input.checked = ids.includes(product.id); input.value = product.id;
+        label.append(input, document.createTextNode(product.name));
+        input.onchange = () => {
+          remember(); pinProductBlocks();
+          grid.dataset.sqProductIds = JSON.stringify([...list.querySelectorAll("input:checked")].map(field => field.value));
+          if (input.checked) installCustomProduct(product, true);
+          updateProductView(); markSqChanged();
+        };
+        return label;
+      }));
+    };
     const updateProductView = () => {
       const products = selectedProducts();
       const needsShipping = products.some((product) => (productMeta[product]?.type || "physical") === "physical");
@@ -2679,7 +2708,10 @@
       previewRoot?.classList.add(`product-count-${products.length}`);
       previewRoot?.classList.toggle("products-need-shipping", needsShipping);
       previewRoot?.querySelectorAll("[data-physical-only]").forEach((element) => { element.hidden = !needsShipping; });
-      sqStudio.querySelectorAll("[data-product-card]").forEach((card) => { card.hidden = !products.includes(card.dataset.productCard); });
+      sqStudio.querySelectorAll("[data-product-card]").forEach((card) => {
+        const grid = card.closest("[data-sq-product-grid]");
+        card.hidden = !productIdsForGrid(grid).includes(card.dataset.productCard);
+      });
       sqStudio.querySelectorAll("[data-product-line]").forEach((line) => { line.hidden = !products.includes(line.dataset.productLine); });
       const productVisuals = [...sqStudio.querySelectorAll("[data-product-visual]")];
       productVisuals.forEach((visual) => { visual.hidden = true; visual.classList.remove("large"); });
@@ -3091,6 +3123,7 @@
     };
     const elementTypeName = (element) => element?.dataset.sqElementType === "component-instance"
       ? `${element.dataset.sqComponentName || "Component"} instance`
+      : element?.dataset.nativeType ? EzkartNative.read(element).name || EzkartNative.typeName(element.dataset.nativeType)
       : element?.dataset.sqElementType === "navigation" ? "Navigation bar"
       : (element?.dataset.sqElementType || "element").replace(/-/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
     const reviewRating = (element) => Math.max(1, Math.min(5, Math.round(Number(element?.dataset.sqReviewRating) || 5)));
@@ -3540,6 +3573,7 @@
       const layout = parseElementLayout(selectedElement);
       const isLogo = selectedElement.dataset.sqElementType === "logo";
       const isProductGrid = selectedElement.dataset.sqElementType === "product-grid";
+      if (isProductGrid) renderProductChoices(selectedElement);
       const isCode = selectedElement.dataset.sqElementType === "custom-code";
       const isComponentInstance = selectedElement.dataset.sqElementType === "component-instance";
       const isMarquee = selectedElement.dataset.sqElementType === "marquee";
@@ -4347,7 +4381,7 @@
       ".sq-free-heading>h1", ".sq-free-heading>h2", ".sq-free-heading>h3", ".sq-free-text>p", ".sq-free-marquee .sq-marquee-copy:not([aria-hidden])", ".sq-free-button>button", ".sq-free-form>h3", ".sq-free-form>p",
       '.sq-native[data-native-type="heading"][data-native-text-field],.sq-native[data-native-type="text"][data-native-text-field]', ".sq-composition-heading>h1", ".sq-composition-heading>h3", ".sq-composition-detail h3", ".sq-composition-detail p", ".sq-composition-faq summary", ".sq-composition-faq p", ".sq-composition-comparison th", ".sq-composition-comparison td", ".sq-composition-quote blockquote", ".sq-composition-quote p", ".sq-composition-footer-links>a",
     ].join(",");
-    const editableNodesFor = (block) => block ? [...block.querySelectorAll(block.closest(".sq-flow") || block.matches(".sq-flow") ? "[data-sq-flow-text]" : editableContentSelector)].filter((node) => !node.closest(".sq-image-drag-handle,.sq-nav-mobile-menu")) : [];
+    const editableNodesFor = (block) => block ? [...block.querySelectorAll(block.closest(".sq-flow") || block.matches(".sq-flow") ? "[data-sq-flow-text]" : editableContentSelector)].filter((node) => !node.closest('.sq-image-drag-handle,.sq-nav-mobile-menu,[data-native-type="product"]')) : [];
     const contentFieldLabel = (node, index) => {
       const article = node.closest("article");
       const group = article?.parentElement ? [...article.parentElement.children].filter((item) => item.matches("article")).indexOf(article) + 1 : 0;
@@ -4519,7 +4553,7 @@
           const element = [...(previewRoot?.querySelectorAll("[data-sq-element]") || [])].find((candidate) => candidate.dataset.sqElementId === layer.dataset.sqElementLayer);
           if (!element) return;
           const section = element.closest("[data-section-id]");
-          if (selectedElement === element) { if (section) selectSqSection(section.dataset.sectionId, true); return; }
+          if (selectedElement === element) return;
           if (section) selectSqSection(section.dataset.sectionId);
           const action = element.matches("button,a") ? element : element.querySelector("button,a");
           const image = element.matches("img") ? element : element.querySelector("img");
@@ -4600,7 +4634,7 @@
           const section = element.closest("[data-section-id]");
           const action = event.target.closest?.("button,a");
           const image = event.target.closest?.("img");
-          if (selectedElement === element && (!action || selectedAction === action)) { if (section) selectSqSection(section.dataset.sectionId, true); return; }
+          if (selectedElement === element && (!action || selectedAction === action)) return;
           if (section) selectSqSection(section.dataset.sectionId);
           selectSqElement(element, action, image);
         };
@@ -4733,8 +4767,8 @@
             const isAction = content.matches("a,button");
             if (isAction) event.preventDefault();
             const element = content.closest("[data-sq-element]");
-            if (!isAction && selectedElement === element) { selectSqSection(block.dataset.sectionId, true); return; }
-            if (isAction && selectedElement === element && selectedAction === content) { selectSqSection(block.dataset.sectionId, true); return; }
+            if (!isAction && selectedElement === element) return;
+            if (isAction && selectedElement === element && selectedAction === content) return;
             selectSqSection(block.dataset.sectionId);
             selectSqElement(element, isAction ? content : null, null, isAction ? null : content);
           };
@@ -4760,11 +4794,6 @@
 
     const bindSqProductInput = (input) => {
       input.onchange = () => {
-        if (selectedProducts().length === 0) {
-          input.checked = true;
-          showToast("Keep at least one product connected to the page");
-          return;
-        }
         const previous = captureState();
         previous.products = input.checked ? previous.products.filter((value) => value !== input.value) : [...previous.products, input.value];
         remember(previous);
@@ -4998,12 +5027,12 @@
       const name = String(product?.name || "").trim();
       const price = Math.max(1000, Math.round(Number(product?.price) || 0));
       const images = Array.isArray(product?.images) && product.images.length ? product.images.slice(0, 9) : [product?.image].filter(Boolean);
-      if (!id || !name || !price || !images.length) return null;
+      if (!id || !name || !price) return null;
       const type = ["physical", "digital", "subscription"].includes(product.type) ? product.type : "physical";
       const typeName = { physical: "Physical product", digital: "Digital download", subscription: "Subscription" }[type];
       const schedule = type === "subscription" ? ` · every ${product.subscription?.interval || 1} ${product.subscription?.unit || "month"}` : "";
       const detail = type === "physical" ? String(product.description || "") : type === "digital" ? `${product.digitalFileName || "Digital file"} · delivered after confirmed payment.` : "Recurring billing on the selected schedule.";
-      const imageUrl = String(images[0]);
+      const imageUrl = String(images[0] || "");
       const safeName = escapeHtml(name);
       const safePrice = escapeHtml(formatRupiah(price));
       productNames[id] = name;
@@ -5014,26 +5043,30 @@
 
       const picker = sqStudio.querySelector(".sq-product-picker");
       let input = picker?.querySelector(`[data-sq-product][value="${CSS.escape(id)}"]`);
-      if (picker && !input) {
-        const label = document.createElement("label");
-        label.innerHTML = `<input type="checkbox" value="${escapeHtml(id)}" data-sq-product${checked ? " checked" : ""}><span><span class="product-art"><img src="${imageUrl}" alt="${safeName}"></span><div><b>${safeName}</b><small>${safePrice} · ${typeName}</small></div><i>${iconMarkup("check-circle")}</i></span>`;
+      if (picker && (!input || !input.closest(".sq-catalog-product"))) {
+        if (input) { checked ||= input.checked; input.closest("label")?.remove(); }
+        const label = document.createElement("div");
+        label.className = "sq-catalog-product";
+        label.innerHTML = `<input type="checkbox" hidden value="${escapeHtml(id)}" data-sq-product${checked ? " checked" : ""}><span class="product-art">${imageUrl ? `<img src="${escapeHtml(imageUrl)}" alt="">` : iconMarkup("box")}</span><div><b>${safeName}</b><small>${safePrice}</small></div><button type="button" data-sq-place-product="${escapeHtml(id)}" aria-label="Add ${safeName} to page">Add</button>`;
         picker.append(label); input = label.querySelector("[data-sq-product]"); bindSqProductInput(input);
       } else if (input && checked) input.checked = true;
       const empty = picker?.querySelector("[data-sq-products-empty]");
       if (empty) empty.hidden = Boolean(picker.querySelector("[data-sq-product]"));
       previewRoot?.querySelectorAll("[data-sq-product-grid]").forEach((grid) => {
+        if (grid.dataset.nativeType === "product" && EzkartNative.read(grid).productId !== id) return;
         let card = grid.querySelector(`[data-product-card="${CSS.escape(id)}"]`);
         if (!card) {
           card = document.createElement("article");
           card.dataset.productCard = id;
           card.dataset.productType = type;
           card.dataset.customCatalogProduct = "true";
-          card.innerHTML = `<span class="product-art"><img src="${imageUrl}" alt="${safeName}">${images.length > 1 ? `<em class="sq-media-count">+${images.length - 1} photos</em>` : ""}</span><div><small>${typeName}${escapeHtml(schedule)}</small><h3>${safeName}</h3><p>${escapeHtml(detail)}</p><footer><b>${safePrice}</b><button type="button">${type === "subscription" ? "Subscribe" : "Add to cart"}</button></footer></div>`;
+          card.innerHTML = `<span class="product-art">${imageUrl ? `<img src="${escapeHtml(imageUrl)}" alt="${safeName}">` : `<span class="sq-product-image-placeholder">No product photo</span>`}${images.length > 1 ? `<em class="sq-media-count">+${images.length - 1} photos</em>` : ""}</span><div><small>${typeName}${escapeHtml(schedule)}</small><h3>${safeName}</h3><p>${escapeHtml(detail)}</p><footer><b>${safePrice}</b><button type="button">${type === "subscription" ? "Subscribe" : "Add to cart"}</button></footer></div>`;
           grid.append(card);
         }
         const descriptionNode = card.querySelector(':scope > div > p');
         if(type === 'physical' && /^Ships at \d+ g\.$/.test(descriptionNode?.textContent || '')) descriptionNode.textContent=detail;
         installStorefrontVariantControls(card, product, variants, price, imageUrl);
+        card.hidden = !productIdsForGrid(grid).includes(id);
       });
       scheduleProductGridFit();
       previewRoot?.querySelectorAll("[data-sq-basket-lines]").forEach((basket) => {
@@ -6640,7 +6673,7 @@
       const groups = [...(previewRoot?.querySelectorAll(":scope > [data-sq-block]") || [])].map((section) => {
         const sectionId = section.dataset.sectionId;
         const detailKey = Object.keys(layerDetails).sort((a, b) => b.length - a.length).find((key) => sectionId === key || sectionId.startsWith(`${key}-`));
-        const details = section.matches(".sq-native-section") ? [EzkartNative.read(section).name||"Container section","Native containers","layers"] : section.dataset.sqSectionName ? [section.dataset.sqSectionName, "Editable section", "layers"] : layerDetails[detailKey] || ["Section", "Editable section", "layers"];
+        const details = section.matches(".sq-native-section") ? [EzkartNative.read(section).name||section.dataset.sqSectionName||"Section","Page content","layers"] : section.dataset.sqSectionName ? [section.dataset.sqSectionName, "Editable section", "layers"] : layerDetails[detailKey] || ["Section", "Editable section", "layers"];
         const elements = [...section.querySelectorAll(section.matches(".sq-flow,.sq-native-section") ? "[data-sq-element]" : ":scope > [data-sq-element]")];
         const sectionBackground = section.querySelector(":scope > .sq-section-background");
         elements.forEach((element, index) => { if (!element.dataset.sqElementId) element.dataset.sqElementId = `element-${sectionId.replace(/[^a-z0-9-]/gi, "-")}-${index + 1}-${Date.now()}`; });
@@ -6778,14 +6811,48 @@
       });
       if(preferredLayout){const cell=section.clientWidth/fluidColumns();setFlowPosition(element,{x:(preferredLayout.x-1)*cell,y:(preferredLayout.y-1)*34,width:preferredLayout.width*cell,height:preferredLayout.height*34});}
     };
+    const compatibleSection = (section, native) => {
+      const needsSection = !section || (native ? !section.matches(".sq-native-section") && section.querySelector("[data-sq-element]") : section.matches(".sq-native-section"));
+      if (!needsSection) return section;
+      const holder = document.createElement("div");
+      holder.innerHTML = newBlockMarkup("blank", `section-${Date.now()}`);
+      const next = holder.firstElementChild;
+      if (section) section.after(next); else previewRoot.append(next);
+      return next;
+    };
+    const addCatalogProductCard = (productId) => {
+      const product = readCatalogProducts().find(item => item.id === productId);
+      if (!product) { showToast("Choose a product from your catalog."); return; }
+      const before = captureState();
+      pinProductBlocks();
+      const section = compatibleSection(previewRoot.querySelector(`[data-section-id="${CSS.escape(selectedSection)}"]`), true);
+      const selectedParent = selectedElement?.closest(".sq-native");
+      const parent = selectedParent && section.contains(selectedParent) ? (EzkartNative.read(selectedParent).type === "container" ? selectedParent : selectedParent.parentElement.closest(".sq-native")) : section;
+      const node = addNativeNode({section:section.dataset.sectionId,parent:parent?.dataset.nativeId,node:{id:`product-${Date.now()}`,type:"product",productId,props:{...EzkartNative.defaults.product}}});
+      undoStack[undoStack.length - 1] = before;
+      bindSqInteractions(); rebuildLayerList();
+      selectSqSection(section.dataset.sectionId); selectSqElement(node);
+      node.scrollIntoView({block:"nearest",inline:"nearest"});
+      markSqChanged(); showToast(`${product.name} added to this area`);
+      return node;
+    };
+    sqStudio.querySelector(".sq-product-picker")?.addEventListener("click", event => {
+      const button = event.target.closest("[data-sq-place-product]");
+      if (button) addCatalogProductCard(button.dataset.sqPlaceProduct);
+    });
+    sqStudio.querySelectorAll("[data-sq-open-products]").forEach(button => button.addEventListener("click",()=>openSqPanel("products",{pin:true})));
     const addLibraryElement = (type, section, preferredLayout = null) => {
-      if(type.startsWith('native-')||section?.matches('.sq-native-section')){
+      const before = captureState();
+      const nativeTypeName = type.replace(/^native-/, "");
+      const native = type.startsWith("native-") || section?.matches(".sq-native-section") && Boolean(EzkartNative.tags[nativeTypeName]);
+      section = compatibleSection(section, native);
+      if(native){
         const nativeType=type.replace(/^native-/,'');if(!EzkartNative.tags[nativeType]){showToast('Choose a native container element.');return null;}
         const parent=selectedElement?.matches('.sq-native')&&section.contains(selectedElement)?(['container','accordion','summary','button'].includes(selectedElement.dataset.nativeType)&&EzkartNative.read(selectedElement).text===undefined?selectedElement:selectedElement.parentElement.closest('.sq-native')):section;
-        const id=`native-${Date.now()}`,node={id,type:nativeType,text:['text','heading','button','summary'].includes(nativeType)?'Edit this text':undefined,props:EzkartNative.defaults[nativeType]};if(nativeType==='accordion')node.children=[{id:id+'-question',type:'summary',text:'Your question',props:EzkartNative.defaults.summary},{id:id+'-answer',type:'text',text:'Write your answer here.',props:{...EzkartNative.defaults.text,paddingTop:'16px'}}];return addNativeNode({section:section.dataset.sectionId,parent:parent?.dataset.nativeId,node});
+        const id=`native-${Date.now()}`,node={id,type:nativeType,text:['text','heading','button','summary'].includes(nativeType)?'Edit this text':undefined,props:{...EzkartNative.defaults[nativeType],...(nativeType==='container'?{minHeight:'120px',width:'100%'}:{})}};if(nativeType==='accordion')node.children=[{id:id+'-question',type:'summary',text:'Your question',props:EzkartNative.defaults.summary},{id:id+'-answer',type:'text',text:'Write your answer here.',props:{...EzkartNative.defaults.text,paddingTop:'16px'}}];const element = addNativeNode({section:section.dataset.sectionId,parent:parent?.dataset.nativeId,node}); undoStack[undoStack.length-1]=before; bindSqInteractions();rebuildLayerList();selectSqSection(section.dataset.sectionId);selectSqElement(element);markSqChanged();return element;
       }
       if (!section) return null;
-      remember();
+      remember(before);
       ensureElementSection(section);
       removeElementOverlay();
       const wrapper = document.createElement("div");
@@ -7009,11 +7076,12 @@
       navigationCatalog.innerHTML = globalThis.EzkartComponents.navDefinitions.map((item) => `<button type="button" class="sq-navigation-choice" data-sq-add-navigation-template="${item.id}" aria-pressed="false">${globalThis.EzkartComponents.thumbnail(`nav-${item.id}`)}<span><b>${escapeHtml(item.name)}</b><small>${escapeHtml(item.description)}</small></span></button>`).join("");
     }
     const blockSearch = addPanel?.querySelector("[data-sq-block-search]");
+    let libraryCategory = "elements";
     const filterBlockLibrary = () => {
       if (!addPanel) return;
       const query = normalize(blockSearch?.value);
       const terms = query.split(/\s+/).filter(Boolean);
-      const selector = "[data-sq-add-block], [data-sq-add-element], [data-sq-open-library], [data-sq-component], [data-sq-create-component]";
+      const selector = "[data-sq-add-block], [data-sq-add-element], [data-sq-open-products], [data-sq-open-library], [data-sq-component], [data-sq-create-component]";
       let matches = 0;
       addPanel.querySelectorAll(":scope > .sq-block-group").forEach((group) => {
         let groupMatches = 0;
@@ -7022,7 +7090,8 @@
           card.hidden = !terms.every((term) => searchable.includes(term));
           if (!card.hidden) groupMatches += 1;
         });
-        group.hidden = Boolean(query) && groupMatches === 0;
+        group.hidden = query ? groupMatches === 0 : group.dataset.sqLibraryGroup !== libraryCategory;
+        group.querySelectorAll(".sq-library-more").forEach(detail => { if (query) detail.open = true; });
         matches += groupMatches;
       });
       const status = addPanel.querySelector("[data-sq-library-search-status]");
@@ -7036,6 +7105,13 @@
       if (componentEmpty) componentEmpty.hidden = Boolean(query) || readComponents().length > 0;
       addPanel.querySelectorAll(".sq-library-note").forEach((note) => { note.hidden = Boolean(query); });
     };
+    addPanel?.querySelectorAll("[data-sq-library-category]").forEach(button => button.addEventListener("click", () => {
+      libraryCategory = button.dataset.sqLibraryCategory;
+      if (blockSearch) blockSearch.value = "";
+      addPanel.querySelectorAll("[data-sq-library-category]").forEach(item => item.setAttribute("aria-pressed", String(item === button)));
+      filterBlockLibrary();
+    }));
+    filterBlockLibrary();
     blockSearch?.addEventListener("input", filterBlockLibrary);
     addPanel?.querySelector("[data-sq-clear-block-search]")?.addEventListener("click", () => {
       blockSearch.value = "";
@@ -7755,7 +7831,7 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
         let customProducts = [];
         try { customProducts = JSON.parse(site.dataset.siteCustomProducts || "[]"); } catch (_) { customProducts = []; }
         customProducts.forEach((product) => installCustomProduct(product, true));
-        if (![2, 3].includes(state?.version) && site.dataset.siteProducts) {
+        if (![2, 3, 4, 5, 6].includes(state?.version) && site.dataset.siteProducts) {
           const starters = site.dataset.siteProducts.split(",").filter(Boolean);
           sqStudio.querySelectorAll("[data-sq-product]").forEach((input) => { input.checked = starters.includes(input.value); });
           updateProductView();
@@ -7826,7 +7902,7 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
       sqStudio.querySelectorAll("[data-sq-product]").forEach((input) => { input.checked = starters.some((starter) => starter.value === input.value); });
       updateProductView(); markSqChanged();
       updateLandingCountBadges();
-      showToast(`${name} created with ${starters.length} products`); newPageForm.reset(); newPageSlugEdited = false;
+      showToast(`${name} created. Your blank page is ready.`); newPageForm.reset(); newPageSlugEdited = false;
     });
 
     const syncCommerceStatus = async () => {
@@ -7889,13 +7965,45 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
       remember();
       if(node.id===sectionId&&!parent){const element=EzkartNative.create(node);element.classList.add('sq-page-block','sq-native-section');element.dataset.sqBlock='';element.dataset.sectionId=sectionId;element.removeAttribute('data-sq-element');section.replaceWith(element);EzkartNative.refresh();rebuildLayerList();bindSqInteractions();markSqChanged();return element;}
       if(!section.matches('.sq-native-section')){
+        const appearance = getComputedStyle(section);
+        const props = {display:'block',fontFamily:'Poppins, sans-serif',fontSize:'14px',color:appearance.color,backgroundColor:appearance.backgroundColor,...sectionProps};
+        let fill;
+        if (EzkartBackgrounds.type(section) === 'gradient') {
+          const gradient = EzkartBackgrounds.read(section);
+          const tint = hex => `rgba(${hex.slice(1).match(/../g).map(n=>parseInt(n,16)).join(',')},${gradient.opacity/100})`;
+          const stops = [{color:tint(gradient.from),position:0},{color:tint(gradient.to),position:100}];
+          const layers = gradient.kind === 'wash'
+            ? [gradient.from,gradient.to].map((value,index)=>({kind:'radial',shape:'ellipse',x:index?80:20,y:50,stops:[{color:tint(value),position:0},{color:'transparent',position:60}]}))
+            : [{kind:gradient.kind,angle:gradient.angle,shape:'ellipse',x:gradient.x,y:gradient.y,stops}];
+          props.backgroundColor = gradient.base;
+          fill = {clip:'background',layers};
+        }
+        const paddingProps = device => Object.fromEntries(Object.entries(readSpacing(sectionId,device)).map(([side,value])=>['padding'+side[0].toUpperCase()+side.slice(1),value+'px']));
+        if (spacingState.has(spacingKey(sectionId,'desktop'))) Object.assign(props,paddingProps('desktop'));
+        const responsive = ['tablet','mobile'].filter(device=>spacingState.has(spacingKey(sectionId,device))).map(device=>({max:device==='tablet'?900:600,props:paddingProps(device)}));
         section.className='sq-page-block sq-native sq-native-section';section.removeAttribute('data-sq-fluid');section.removeAttribute('style');section.replaceChildren();section.dataset.nativeId=sectionId;section.dataset.nativeType='container';
-        EzkartNative.write(section,{id:sectionId,type:'container',props:sectionProps||{display:'block',fontFamily:'Poppins, sans-serif',fontSize:'14px',color:'#222222'}});
+        delete section.dataset.sqBackgroundType;delete section.dataset.sqGradient;
+        EzkartNative.write(section,{id:sectionId,type:'container',props,...(fill?{fill}:{}),...(responsive.length?{responsive}:{})});
       }
       const target=parent?nativeFind(parent):section;if(!target||!section.contains(target)&&target!==section)throw Error('Choose a parent in this section.');
       const element=EzkartNative.create(node);target.append(element);EzkartNative.refresh();rebuildLayerList();bindSqInteractions();markSqChanged();return element;
     };
-    EzkartNative.init({root:previewRoot,inspector,remember,syncSelects:container=>container.querySelectorAll("select").forEach(select=>{enhanceBuilderSelect(select);syncBuilderSelect(select);}),changed:markSqChanged,rebind:()=>{rebuildLayerList();bindSqInteractions();},move:args=>globalThis.EzkartBuilder.nativeMove(args),toast:showToast,select:node=>{if(node?.matches('.sq-native-section'))selectSqSection(node.dataset.sectionId,true);else if(node)selectSqElement(node);}});
+    const renderNativeProduct = (node, productId) => {
+      node.classList.add("sq-product-grid");
+      node.dataset.sqProductGrid = "";
+      node.dataset.sqProductIds = JSON.stringify([productId]);
+      const product = readCatalogProducts().find(item => item.id === productId);
+      if (!product) {
+        node.innerHTML = '<p class="sq-product-missing">This product is no longer available. Choose another product in the sidebar.</p>';
+        return;
+      }
+      if (!node.querySelector(`[data-product-card="${CSS.escape(productId)}"]`)) {
+        node.replaceChildren();
+        installCustomProduct(product, true);
+      }
+      updateProductView();
+    };
+    EzkartNative.init({root:previewRoot,inspector,remember,products:readCatalogProducts,renderProduct:renderNativeProduct,openProducts:()=>openSqPanel("products",{pin:true}),syncSelects:container=>container.querySelectorAll("select").forEach(select=>{enhanceBuilderSelect(select);syncBuilderSelect(select);}),changed:markSqChanged,rebind:()=>{rebuildLayerList();bindSqInteractions();},move:args=>globalThis.EzkartBuilder.nativeMove(args),toast:showToast,select:node=>{if(node?.matches('.sq-native-section'))selectSqSection(node.dataset.sectionId,true);else if(node)selectSqElement(node);}});
     let nativeFitFrame = 0;
     const fitNativeContent = () => {
       nativeFitFrame = 0;
@@ -7948,8 +8056,8 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
       inspect:inspectBuilder,
       catalog:()=>readCatalogProducts(),
       nativeInsert(args){const element=addNativeNode(args);return {id:element.dataset.nativeId,count:1+element.querySelectorAll('.sq-native').length};},
-      nativeUpdate({id,props,fill,responsive,text,marks,action,states,src,poster,captions,captionsText,open,fit,scrollMotion,name,alt,label,icon,iconFill,iconStroke,iconWeight,muted,controls,loop,autoplay,collapsed}={}){
-        const element=nativeFind(id);if(!element)throw Error('Native element not found.');const old=EzkartNative.read(element),next={...old,...Object.fromEntries(Object.entries({fill,responsive,text,marks,action,states,src,poster,captions,captionsText,open,fit,scrollMotion,name,alt,label,icon,iconFill,iconStroke,iconWeight,muted,controls,loop,autoplay,collapsed}).filter(([,value])=>value!==undefined)),props:{...old.props,...props}};
+      nativeUpdate({id,props,fill,responsive,text,marks,action,states,productId,src,poster,captions,captionsText,open,fit,scrollMotion,name,alt,label,icon,iconFill,iconStroke,iconWeight,muted,controls,loop,autoplay,collapsed}={}){
+        const element=nativeFind(id);if(!element)throw Error('Native element not found.');const old=EzkartNative.read(element),next={...old,...Object.fromEntries(Object.entries({fill,responsive,text,marks,action,states,productId,src,poster,captions,captionsText,open,fit,scrollMotion,name,alt,label,icon,iconFill,iconStroke,iconWeight,muted,controls,loop,autoplay,collapsed}).filter(([,value])=>value!==undefined)),props:{...old.props,...props}};
         if(text!==undefined&&marks===undefined){const updated=EzkartNative.editText({...old},text);next.marks=updated.marks;}EzkartNative.validate(next);remember();EzkartNative.write(element,next);if(text!==undefined||marks!==undefined)EzkartNative.renderText(element,next);
         if(src!==undefined)element.src=src;if(element.tagName==='VIDEO')EzkartNative.syncMedia(element,next);if(poster!==undefined)element.poster=poster;if(open!==undefined)element.open=open;if(collapsed!==undefined){element.hidden=collapsed;element.toggleAttribute('data-native-collapsed',collapsed);}if(alt!==undefined&&element.tagName==='IMG')element.alt=alt;if(label!==undefined)element.setAttribute('aria-label',label);if(icon!==undefined&&element.tagName.toLowerCase()==='svg')element.innerHTML=EzkartNativeIcons[icon]||'';if(action?.type==='link'&&element.tagName==='A')element.href=action.target;
         EzkartNative.refresh();markSqChanged();return {id,config:next};

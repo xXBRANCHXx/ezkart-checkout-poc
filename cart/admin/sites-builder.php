@@ -6,6 +6,7 @@ declare(strict_types=1);
     <div class="sq-page-identity">
       <a href="?page=sites" aria-label="Return to landing pages"><?= ez_admin_icon('chevron-left') ?></a>
       <button type="button" data-sq-open-panel="pages"><span><small>Landing page</small><b data-current-site-name>Landing page</b></span><?= ez_admin_icon('chevron-down') ?></button>
+      <button class="sq-new-page-shortcut" type="button" data-open-page-creator>+ New page</button>
       <span class="sq-live-state"><i></i> Draft</span>
     </div>
     <div class="sq-history-tools" aria-label="Editing history">
@@ -31,7 +32,7 @@ declare(strict_types=1);
     <aside class="sq-builder-sidebar">
       <nav class="sq-tool-rail" aria-label="Builder tools">
         <button class="active" type="button" data-sq-tab="layers" aria-label="Pages and sections"><?= ez_admin_icon('layout') ?><span>Site</span></button>
-        <button type="button" data-sq-tab="add" aria-label="Add section"><?= ez_admin_icon('plus') ?><span>Add</span></button>
+        <button type="button" data-sq-tab="add" aria-label="Add elements"><?= ez_admin_icon('plus') ?><span>Add</span></button>
         <button type="button" data-sq-tab="products" aria-label="Products"><?= ez_admin_icon('box') ?><span>Products</span><i data-sq-product-count>0</i></button>
         <button type="button" data-sq-tab="brand" aria-label="Theme and brand styling"><?= ez_admin_icon('palette') ?><span>Theme</span></button>
       </nav>
@@ -47,28 +48,30 @@ declare(strict_types=1);
         </section>
 
         <section class="sq-tool-panel" data-sq-panel="add">
-          <header><div><small>Section library</small><h2>Add content</h2></div></header>
+          <header><div><h2>Add to page</h2></div></header>
           <label class="sq-panel-search"><?= ez_admin_icon('search') ?><input type="search" placeholder="Search elements or sections" aria-label="Search elements, sections, and components" data-sq-block-search></label>
           <p class="sq-library-search-status" data-sq-library-search-status role="status" hidden></p>
           <div class="sq-library-search-empty" data-sq-library-search-empty hidden><b>No matches found</b><p>Try a different name, such as image, button, or navigation.</p><button type="button" data-sq-clear-block-search>Clear search</button></div>
-          <div class="sq-block-group sq-native-components"><h3>Ready-to-edit sections</h3><div class="sq-native-component-grid" data-sq-native-component-list></div></div>
-          <div class="sq-block-group"><h3>Text &amp; movement</h3><div class="sq-block-grid sq-element-library">
-            <button type="button" data-sq-add-element="heading" data-search="heading title text"><?= ez_admin_icon('message') ?><b>Heading</b><small>Independent headline</small></button>
-            <button type="button" data-sq-add-element="text" data-search="paragraph text copy"><?= ez_admin_icon('message') ?><b>Text</b><small>Body copy block</small></button>
-            <button type="button" data-sq-add-element="marquee" data-search="marquee ticker scrolling moving announcement text"><?= ez_admin_icon('trend') ?><b>Marquee</b><small>Looping text ticker</small></button>
-          </div></div>
-          <div class="sq-block-group"><h3>Media &amp; structure</h3><div class="sq-block-grid sq-element-library">
-            <button type="button" data-sq-add-element="image" data-search="image photo picture"><?= ez_admin_icon('image') ?><b>Image</b><small>Single movable image</small></button>
-            <button type="button" data-sq-add-element="divider" data-search="divider line separator"><?= ez_admin_icon('layers') ?><b>Divider</b><small>Visual separator</small></button>
-            <button type="button" data-sq-add-element="html" data-search="html css javascript code embed custom"><?= ez_admin_icon('code') ?><b>HTML / code</b><small>Sandboxed custom code</small></button>
-          </div></div>
-          <div class="sq-block-group"><h3>Actions &amp; capture</h3><div class="sq-block-grid sq-element-library">
-            <button type="button" data-sq-add-element="button" data-search="button call action"><?= ez_admin_icon('play') ?><b>Button</b><small>Linked action</small></button>
-            <button type="button" data-sq-add-element="form" data-search="form email newsletter lead"><?= ez_admin_icon('mail') ?><b>Form</b><small>Email capture</small></button>
-            <button type="button" data-sq-open-library="navigation" data-search="navigation navbar nav menu links pages header sticky fixed announcement search"><?= ez_admin_icon('layout') ?><b>Navigation bars</b><small>Five distinct compositions</small></button>
-          </div><p class="sq-library-note">Add to the selected section, then move, resize, duplicate, hide, or delete it independently.</p></div>
-          <div class="sq-block-group sq-components-library"><div class="sq-components-heading"><h3>Your code components</h3><span data-sq-component-count>0 / 20</span></div><button class="sq-create-component" type="button" data-sq-create-component><?= ez_admin_icon('plus') ?><span><b>Create component</b><small>Save reusable HTML, CSS &amp; JS</small></span></button><div class="sq-component-list" data-sq-component-list></div><p class="sq-component-empty" data-sq-component-empty>Your main components will appear here. Drag an instance onto any section.</p></div>
-          <div class="sq-block-group"><h3>Flexible elements</h3><div class="sq-block-grid"><button type="button" data-sq-add-element="native-container" data-search="container"><b>Container</b><small>Nest, align, and space elements</small></button><button type="button" data-sq-add-element="native-heading" data-search="rich heading"><b>Rich heading</b><small>Style individual words</small></button><button type="button" data-sq-add-element="native-text" data-search="rich text"><b>Rich text</b><small>Color and gradient selections</small></button><button type="button" data-sq-add-element="native-button" data-search="styled button"><b>Styled button</b><small>Gradient fills and interactions</small></button><button type="button" data-sq-add-element="native-image" data-search="flexible image"><b>Flexible image</b><small>Size, crop, and position</small></button><button type="button" data-sq-add-element="native-icon" data-search="icon"><b>Icon</b><small>Choose a vector symbol</small></button><button type="button" data-sq-add-element="native-video" data-search="video"><b>Video</b><small>Inline playback or dialog</small></button><button type="button" data-sq-add-element="native-accordion" data-search="accordion"><b>Accordion</b><small>Expandable content</small></button><button type="button" data-sq-add-element="native-summary" data-search="accordion title"><b>Accordion title</b><small>Question or disclosure label</small></button></div></div><div class="sq-block-group"><h3>Start from scratch</h3><div class="sq-block-grid"><button type="button" data-sq-add-block="blank" data-search="blank empty section canvas"><?= ez_admin_icon('plus') ?><b>Blank section</b><small>Build with individual elements</small></button></div></div>
+          <div class="sq-library-categories" role="group" aria-label="Content library"><button type="button" data-sq-library-category="elements" aria-pressed="true">Elements</button><button type="button" data-sq-library-category="sections" aria-pressed="false">Sections</button><button type="button" data-sq-library-category="saved" aria-pressed="false">Saved</button></div>
+          <div class="sq-block-group" data-sq-library-group="elements"><div class="sq-block-grid sq-element-library">
+            <button type="button" data-sq-add-element="native-heading" data-search="heading title headline rich text"><?= ez_admin_icon('message') ?><b>Heading</b><small>A title or headline</small></button>
+            <button type="button" data-sq-add-element="native-text" data-search="paragraph text copy rich"><?= ez_admin_icon('message') ?><b>Paragraph</b><small>Your story and details</small></button>
+            <button type="button" data-sq-add-element="native-image" data-search="image photo picture"><?= ez_admin_icon('image') ?><b>Image</b><small>A photo or illustration</small></button>
+            <button type="button" data-sq-add-element="native-button" data-search="button link call action"><?= ez_admin_icon('play') ?><b>Button</b><small>A link or action</small></button>
+            <button type="button" data-sq-open-products data-search="product card shop catalog buy checkout"><?= ez_admin_icon('box') ?><b>Product</b><small>Choose from your catalog</small></button>
+            <button type="button" data-sq-add-element="native-container" data-search="container layout group row column"><?= ez_admin_icon('layout') ?><b>Layout group</b><small>Arrange elements together</small></button>
+          </div><details class="sq-library-more"><summary>More elements</summary><div class="sq-block-grid sq-element-library">
+            <button type="button" data-sq-add-element="native-video" data-search="video film media"><?= ez_admin_icon('play') ?><b>Video</b><small>Video playback</small></button>
+            <button type="button" data-sq-add-element="native-icon" data-search="icon symbol"><?= ez_admin_icon('star') ?><b>Icon</b><small>A small symbol</small></button>
+            <button type="button" data-sq-add-element="native-accordion" data-search="accordion faq question answer"><b>Expandable answer</b><small>Click to open and close</small></button>
+            <button type="button" data-sq-add-element="divider" data-search="divider separator line"><b>Divider</b><small>Separate page content</small></button>
+            <button type="button" data-sq-add-element="html" data-search="embed html code css javascript"><b>Embed code</b><small>Custom HTML or widget</small></button>
+            <button type="button" data-sq-add-element="form" data-search="form email newsletter signup"><b>Email signup</b><small>Collect an email address</small></button>
+            <button type="button" data-sq-add-element="marquee" data-search="marquee ticker scrolling text"><b>Scrolling text</b><small>A moving text strip</small></button>
+          </div></details></div>
+          <div class="sq-block-group" data-sq-library-group="sections" hidden><div class="sq-block-grid"><button type="button" data-sq-add-block="blank" data-search="blank empty section canvas"><?= ez_admin_icon('plus') ?><b>Blank section</b><small>An empty area to build in</small></button><button type="button" data-sq-open-library="navigation" data-search="navigation navbar menu header"><b>Navigation</b><small>Logo and page links</small></button></div></div>
+          <div class="sq-block-group sq-native-components" data-sq-library-group="sections" hidden><h3>Ready-made sections</h3><div class="sq-native-component-grid" data-sq-native-component-list></div></div>
+          <div class="sq-block-group sq-components-library" data-sq-library-group="saved" hidden><div class="sq-components-heading"><h3>Your saved components</h3><span data-sq-component-count>0 / 20</span></div><button class="sq-create-component" type="button" data-sq-create-component><?= ez_admin_icon('plus') ?><span><b>Create component</b><small>Save reusable HTML, CSS &amp; JS</small></span></button><div class="sq-component-list" data-sq-component-list></div><p class="sq-component-empty" data-sq-component-empty>Your saved components will appear here.</p></div>
           <div class="sq-navigation-library" data-sq-library-view="navigation" hidden>
             <header><button type="button" data-sq-close-library aria-label="Back to content library"><?= ez_admin_icon('chevron-left') ?></button><div><h2>Navigation</h2></div></header>
             <p class="sq-panel-intro">Choose a composition. Your logo and links stay editable.</p>
@@ -77,12 +80,12 @@ declare(strict_types=1);
         </section>
 
         <section class="sq-tool-panel" data-sq-panel="products">
-          <header><div><small>Commerce source</small><h2>Products</h2></div><a href="?page=products">Manage</a></header>
-          <p class="sq-panel-intro">Use one product or the whole catalog. Ezkart keeps price, stock, checkout items, and shipping weights synchronized.</p>
+          <header><div><h2>Your products</h2></div><a href="?page=products">Manage products</a></header>
+          <p class="sq-panel-intro">Add a product card to the selected area. Each card has its own product choice, so you can feature different products anywhere on your page.</p>
           <div class="sq-product-picker">
-            <p class="sq-products-empty" data-sq-products-empty>No catalog products are available. <a href="?page=products">Create a product</a> before building a landing page.</p>
+            <p class="sq-products-empty" data-sq-products-empty>Your catalog is empty. <a href="?page=products">Create a product</a> to add a product card. You can keep building the rest of your page.</p>
           </div>
-          <div class="sq-product-rule"><span><?= ez_admin_icon('check-circle') ?></span><p><b>At least one product</b><small>A landing page always needs something customers can purchase.</small></p></div>
+          <p class="sq-panel-intro">Prices, options, and checkout stay connected to your catalog.</p>
         </section>
 
         <section class="sq-tool-panel sq-brand-panel" data-sq-panel="brand">
@@ -139,8 +142,8 @@ declare(strict_types=1);
           <span class="sq-stage-size" data-sq-stage-size>Desktop · 1440px</span>
           <button class="sq-grid-quick-toggle" type="button" data-sq-grid-toggle aria-pressed="false"><?= ez_admin_icon('layers') ?> <span>Grid</span></button>
           <label>
-            <span>Page scale</span>
-            <input type="range" min="10" max="100" step="1" value="90" data-sq-zoom-slider aria-label="Page scale">
+            <span>Zoom</span>
+            <input type="range" min="10" max="100" step="1" value="90" data-sq-zoom-slider aria-label="Canvas zoom">
             <output data-sq-zoom>90%</output>
           </label>
         </div>
@@ -278,7 +281,8 @@ declare(strict_types=1);
             <p class="sq-field-note">Sticky stays in the page flow. Fixed remains attached to the browser window.</p>
           </div>
           <div class="sq-product-layout-controls" data-sq-product-layout-controls hidden>
-            <div class="sq-inspector-heading"><h3>Product grid layout</h3><span data-sq-product-layout-device>Desktop</span></div>
+            <div class="sq-inspector-heading"><h3>Products in this block</h3><span data-sq-product-layout-device>Desktop</span></div>
+            <p class="sq-field-note">Choose products for this block. Other product cards keep their own selection.</p><details class="sq-product-choices" open><summary>Choose products</summary><div data-sq-block-product-list></div></details>
             <label><span>Cards per row</span><select data-sq-product-columns><option value="auto">Auto fit while resizing</option><option value="1">1 card</option><option value="2">2 cards</option><option value="3">3 cards</option><option value="4">4 cards</option></select></label>
             <label><span>Card size</span><select data-sq-product-density><option value="compact">Compact</option><option value="balanced">Balanced</option><option value="showcase">Large showcase</option></select></label>
             <p class="sq-field-note">Drag product cards to reorder them. Auto fit reflows cards as you resize this element instead of clipping them.</p>
@@ -315,10 +319,10 @@ declare(strict_types=1);
 </dialog>
 
 <dialog class="page-creator-dialog" id="page-creator-dialog"><form method="dialog" data-page-creator-form>
-  <header><span><?= ez_admin_icon('layout') ?></span><div><small>Create a landing page</small><h2>Start with a blank canvas.</h2><p>Add products now, or start with your story and connect products later.</p></div><button type="button" data-creator-close aria-label="Close"><?= ez_admin_icon('x') ?></button></header>
+  <header><span><?= ez_admin_icon('layout') ?></span><div><small>Create a landing page</small><h2>Start with a blank canvas.</h2><p>Name your page to start with an empty canvas. Add products whenever you need them.</p></div><button type="button" data-creator-close aria-label="Close"><?= ez_admin_icon('x') ?></button></header>
   <section>
     <label><span>Page name</span><input name="page_name" required maxlength="60" placeholder="Example: Ramadan Collection"></label>
-    <fieldset data-creator-products><legend>Starting products · optional</legend><p class="creator-products-empty" data-creator-products-empty>You can build your page now and add products later.</p></fieldset>
+    <details class="sq-creator-optional"><summary>Connect products now (optional)</summary><fieldset data-creator-products><legend>Starting products · optional</legend><p class="creator-products-empty" data-creator-products-empty>You can build your page now and add products later.</p></fieldset></details>
     <label><span>Free Ezkart URL</span><div class="slug-field"><input name="slug" required pattern="[a-z0-9]+(?:-[a-z0-9]+)*" placeholder="ramadan-collection"><em>.ezkart.site</em></div></label>
   </section>
   <footer><button type="button" data-creator-close>Cancel</button><button class="primary" value="default" data-create-page>Create &amp; edit</button></footer>
