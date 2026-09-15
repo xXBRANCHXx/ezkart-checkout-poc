@@ -39,7 +39,8 @@ test("native inspector creates editable word gradients, layered button fills, ne
       n.setSelectionRange(14, 19);
       n.dispatchEvent(new Event("select"));
     });
-    await panel.locator("[data-native-apply-word-gradient]").click();
+    await panel.locator("[data-native-word-type]").selectOption("gradient");
+    await panel.locator("[data-native-apply-word-style]").click();
     let config = await invoke("nativeInspect", { id: heading.id });
     assert.equal(config.marks[0].start, 14);
     assert.equal(config.marks[0].gradient.length, 1);

@@ -2320,7 +2320,7 @@
       wrapper.append(trigger);
       document.body.append(menu);
       const control = { select, wrapper, trigger, value, menu, signature: "" };
-      control.label = select.getAttribute("aria-label") || select.closest("label")?.querySelector(":scope > span")?.textContent.trim() || "Choose an option";
+      control.label = select.getAttribute("aria-label") || select.closest("label")?.querySelector(":scope > span")?.textContent.trim() || [...(select.closest("label")?.childNodes || [])].filter(node => node.nodeType === Node.TEXT_NODE).map(node => node.textContent.trim()).join(" ").trim() || "Choose an option";
       select._sqBuilderSelect = control;
       trigger.addEventListener("click", () => control.menu.hidden ? openBuilderSelectMenu(control) : closeBuilderSelect(control));
       trigger.addEventListener("keydown", (event) => {
@@ -7895,7 +7895,7 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
       const target=parent?nativeFind(parent):section;if(!target||!section.contains(target)&&target!==section)throw Error('Choose a parent in this section.');
       const element=EzkartNative.create(node);target.append(element);EzkartNative.refresh();rebuildLayerList();bindSqInteractions();markSqChanged();return element;
     };
-    EzkartNative.init({root:previewRoot,inspector,remember,changed:markSqChanged,rebind:()=>{rebuildLayerList();bindSqInteractions();},move:args=>globalThis.EzkartBuilder.nativeMove(args),toast:showToast,select:node=>{if(node?.matches('.sq-native-section'))selectSqSection(node.dataset.sectionId,true);else if(node)selectSqElement(node);}});
+    EzkartNative.init({root:previewRoot,inspector,remember,syncSelects:container=>container.querySelectorAll("select").forEach(select=>{enhanceBuilderSelect(select);syncBuilderSelect(select);}),changed:markSqChanged,rebind:()=>{rebuildLayerList();bindSqInteractions();},move:args=>globalThis.EzkartBuilder.nativeMove(args),toast:showToast,select:node=>{if(node?.matches('.sq-native-section'))selectSqSection(node.dataset.sectionId,true);else if(node)selectSqElement(node);}});
     let nativeFitFrame = 0;
     const fitNativeContent = () => {
       nativeFitFrame = 0;

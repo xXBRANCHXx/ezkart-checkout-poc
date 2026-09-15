@@ -782,7 +782,10 @@
     state = "",
     selection,
     draftLayers = [],
-    layerIndex = 0;
+    layerIndex = 0,
+    wordLayers = [],
+    wordLayerIndex = 0,
+    wordSelectionKey = "";
   function remapTree(root, rootId) {
     const nodes = [root, ...root.querySelectorAll(".sq-native")];
     const anchors = new Map(
@@ -945,21 +948,235 @@
       layers: type === "solid" ? [] : layers,
     };
   }
+  function wordStylesInRange(config, start, end) {
+    const current = getContext(config);
+    const fill = current.fill ?? config.fill;
+    const base =
+      fill?.clip === "text" && fill.layers?.length
+        ? { gradient: fill.layers }
+        : {
+            color:
+              current.props?.color ||
+              config.props?.color ||
+              getComputedStyle(selected).color,
+          };
+    const cuts = [
+      ...new Set([
+        start,
+        end,
+        ...(config.marks || [])
+          .flatMap((m) => [m.start, m.end])
+          .filter((n) => n > start && n < end),
+      ]),
+    ].sort((a, b) => a - b);
+    return cuts.slice(0, -1).map((from, index) => {
+      const to = cuts[index + 1];
+      const mark = (config.marks || [])
+        .filter((m) => m.start <= from && m.end >= to)
+        .at(-1);
+      const style = mark?.gradient
+        ? { gradient: mark.gradient }
+        : mark?.color
+          ? { color: mark.color }
+          : base;
+      return { start: from - start, end: to - start, ...style };
+    });
+  }
   function syncWordSelection(panel) {
+    const config = read(selected);
+    const hasWordColors = config.marks?.some(
+      (mark) => mark.color || mark.gradient,
+    );
     const valid =
       selection &&
       selected === selection.node &&
-      read(selected).text?.slice(selection.start, selection.end) ===
-        selection.text;
+      selection.end > selection.start &&
+      config.text?.slice(selection.start, selection.end) === selection.text;
     const rich = panel.querySelector("[data-native-rich-range]");
+    const editor = panel.querySelector("[data-native-word-editor]");
+    editor.hidden = !valid;
     rich.textContent = valid
-      ? `Selected: “${selection.text}”`
-      : "Highlight words in the text box or on the canvas to style them.";
+      ? `Editing “${selection.text}”`
+      : hasWordColors
+        ? "Select words in your text, or choose a phrase below to edit its color."
+        : "Select words in your text to give them a different color.";
     rich.classList.toggle("has-selection", Boolean(valid));
-    panel.querySelector("[data-native-apply-word-color]").disabled = !valid;
-    panel.querySelector("[data-native-apply-word-gradient]").disabled = !valid;
-    panel.querySelector("[data-native-clear-marks]").disabled =
-      !read(selected).marks?.length;
+    if (!valid)
+      panel.querySelector("[data-native-apply-word-style]").disabled = true;
+    panel.querySelector("[data-native-clear-marks]").hidden = !hasWordColors;
+    panel
+      .querySelector("[data-native-word-styles]")
+      .querySelectorAll("button")
+      .forEach((button) => {
+        button.setAttribute(
+          "aria-pressed",
+          String(
+            Boolean(
+              valid &&
+              Number(button.dataset.start) === selection.start &&
+              Number(button.dataset.end) === selection.end,
+            ),
+          ),
+        );
+      });
+    if (!valid) {
+      wordSelectionKey = "";
+      return;
+    }
+    const styles = wordStylesInRange(config, selection.start, selection.end);
+    const key = JSON.stringify([
+      selected.dataset.nativeId,
+      selection.start,
+      selection.end,
+      styles,
+    ]);
+    if (key === wordSelectionKey) return;
+    wordSelectionKey = key;
+    const first = styles[0];
+    const mixed = styles.some(
+      (style) =>
+        JSON.stringify(style.gradient || style.color) !==
+        JSON.stringify(first.gradient || first.color),
+    );
+    panel.querySelector("[data-native-word-type]").value = mixed
+      ? "mixed"
+      : first.gradient
+        ? "gradient"
+        : "solid";
+    const solidColor = first.color || config.props?.color || "#303440";
+    panel.querySelector("[data-native-word-color-value]").value = solidColor;
+    wordLayers = structuredClone(
+      first.gradient || [
+        {
+          kind: "linear",
+          angle: 105,
+          stops: [
+            { color: solidColor, position: 0 },
+            { color: "#ed1467", position: 100 },
+          ],
+        },
+      ],
+    );
+    wordLayerIndex = 0;
+    loadWordGradient(panel);
+    syncWordFillControls(panel);
+    panel.querySelector("[data-native-word-status]").textContent = mixed
+      ? "These words have different colors. Choose a color style to make them match."
+      : "Changes apply only to the words shown above.";
+  }
+  function readWordGradient(panel) {
+    const layers = structuredClone(wordLayers);
+    layers[wordLayerIndex] = {
+      kind: panel.querySelector("[data-word-gradient-kind]").value,
+      angle: panel.querySelector("[data-word-gradient-angle]").valueAsNumber,
+      x: panel.querySelector("[data-word-gradient-x]").valueAsNumber,
+      y: panel.querySelector("[data-word-gradient-y]").valueAsNumber,
+      shape: panel.querySelector("[data-word-gradient-shape]").value,
+      stops: [...panel.querySelectorAll(".sq-word-stop")]
+        .map((row) => ({
+          color: row.querySelector("[data-stop-color]").value,
+          position: row.querySelector("[data-stop-position]").valueAsNumber,
+        }))
+        .sort((a, b) => a.position - b.position),
+    };
+    return layers;
+  }
+  function loadWordGradient(panel) {
+    const layer = wordLayers[wordLayerIndex];
+    for (const [key, fallback] of Object.entries({
+      kind: "linear",
+      angle: 105,
+      x: 50,
+      y: 50,
+      shape: "ellipse",
+    }))
+      panel.querySelector(`[data-word-gradient-${key}]`).value =
+        layer[key] ?? fallback;
+    renderStops(panel, layer.stops, true);
+    panel
+      .querySelector("[data-word-layer]")
+      .replaceChildren(
+        ...wordLayers.map(
+          (_, index) => new Option(`Gradient ${index + 1}`, index),
+        ),
+      );
+    panel.querySelector("[data-word-layer]").value = wordLayerIndex;
+  }
+  function syncWordFillControls(panel, edited = false) {
+    const type = panel.querySelector("[data-native-word-type]").value;
+    const radial =
+      panel.querySelector("[data-word-gradient-kind]").value === "radial";
+    panel.querySelector("[data-native-word-solid]").hidden = type !== "solid";
+    panel.querySelector("[data-native-word-gradient]").hidden =
+      type !== "gradient";
+    panel.querySelector("[data-word-linear]").hidden = radial;
+    panel.querySelector("[data-word-radial]").hidden = !radial;
+    panel.querySelector("[data-word-shape]").hidden = !radial;
+    panel.querySelector("[data-word-layer-add]").disabled =
+      wordLayers.length >= 8;
+    panel.querySelector("[data-word-layer-remove]").disabled =
+      wordLayers.length <= 1;
+    const rows = [...panel.querySelectorAll(".sq-word-stop")];
+    rows.forEach((row, index) => {
+      syncColorPicker(
+        row.querySelector("[data-stop-picker]"),
+        row.querySelector("[data-stop-color]").value,
+      );
+      row
+        .querySelector("[data-stop-color]")
+        .setAttribute("aria-label", `Word gradient color ${index + 1}`);
+      row
+        .querySelector("[data-stop-picker]")
+        .setAttribute("aria-label", `Choose word gradient color ${index + 1}`);
+      row
+        .querySelector("[data-stop-position]")
+        .setAttribute(
+          "aria-label",
+          `Word gradient color ${index + 1} position (%)`,
+        );
+      row.querySelector("button").disabled = rows.length <= 2;
+      row
+        .querySelector("button")
+        .setAttribute("aria-label", `Remove word gradient color ${index + 1}`);
+      row.querySelector("button").title =
+        rows.length <= 2
+          ? "A gradient needs at least two colors"
+          : `Remove color ${index + 1}`;
+    });
+    panel.querySelector("[data-word-add-stop]").disabled = rows.length >= 12;
+    const preview = panel.querySelector("[data-native-word-preview]");
+    const apply = panel.querySelector("[data-native-apply-word-style]");
+    const status = panel.querySelector("[data-native-word-status]");
+    const value = panel.querySelector("[data-native-word-color-value]").value;
+    syncColorPicker(panel.querySelector("[data-native-word-color]"), value);
+    preview.textContent = selection?.text || "";
+    preview.style.backgroundImage = "none";
+    preview.style.color = "inherit";
+    try {
+      if (type === "gradient") {
+        preview.style.backgroundImage = gradientCss(readWordGradient(panel));
+        preview.style.color = "transparent";
+      } else if (type === "solid") preview.style.color = color(value);
+      else if (selection)
+        renderText(preview, {
+          text: selection.text,
+          marks: wordStylesInRange(
+            read(selected),
+            selection.start,
+            selection.end,
+          ),
+        });
+      apply.disabled = type === "mixed";
+      if (edited || status.dataset.invalid)
+        status.textContent =
+          "Preview only. Apply to update the selected words.";
+      delete status.dataset.invalid;
+    } catch (error) {
+      apply.disabled = true;
+      status.textContent = error.message;
+      status.dataset.invalid = "true";
+    }
+    hooks.syncSelects?.(panel.querySelector("[data-native-word-editor]"));
   }
   function syncFillControls(panel, edited = false) {
     const solid =
@@ -1001,6 +1218,13 @@
     panel.querySelector("[data-native-layer-remove]").disabled = !layers.length;
     const status = panel.querySelector("[data-native-fill-status]");
     const apply = panel.querySelector("[data-native-apply-fill]");
+    const targetIsText =
+      panel.querySelector("[data-native-fill-type]").value === "text";
+    apply.textContent = targetIsText
+      ? "Apply gradient to all text"
+      : solid
+        ? "Apply background color"
+        : "Apply background gradient";
     const preview = panel.querySelector("[data-native-fill-preview]");
     syncColorPicker(
       panel.querySelector("[data-native-solid-picker]"),
@@ -1019,13 +1243,16 @@
       );
       apply.disabled = false;
       if (edited || status.dataset.invalid)
-        status.textContent = "Preview ready. Apply to update the element.";
+        status.textContent = targetIsText
+          ? "Preview only. Apply to update all text."
+          : "Preview only. Apply to update the background.";
       delete status.dataset.invalid;
     } catch (error) {
       status.textContent = error.message;
       status.dataset.invalid = "true";
       apply.disabled = true;
     }
+    hooks.syncSelects?.(panel.querySelector("[data-native-fill-section]"));
   }
   function syncColorPicker(picker, value) {
     if (!CSS.supports("color", value)) return;
@@ -1041,12 +1268,16 @@
           .map((part) => Number(part).toString(16).padStart(2, "0"))
           .join("");
   }
-  function renderStops(panel, stops) {
-    const host = panel.querySelector("[data-native-gradient-stops]");
+  function renderStops(panel, stops, words = false) {
+    const host = panel.querySelector(
+      words ? "[data-word-gradient-stops]" : "[data-native-gradient-stops]",
+    );
+    const update = () =>
+      words ? syncWordFillControls(panel, true) : syncFillControls(panel, true);
     host.replaceChildren(
       ...stops.map((stop) => {
         const row = document.createElement("div");
-        row.className = "sq-native-stop";
+        row.className = words ? "sq-word-stop" : "sq-native-stop";
         row.innerHTML =
           '<input type="color" data-stop-picker><input type="text" spellcheck="false" data-stop-color><div class="sq-native-unit"><input type="number" min="0" max="100" step="any" data-stop-position><span aria-hidden="true">%</span></div><button type="button">×</button>';
         const field = row.querySelector("[data-stop-color]"),
@@ -1061,7 +1292,7 @@
             ? field.value
             : "";
           if (/^#[0-9a-f]{6}$/i.test(field.value)) picker.value = field.value;
-          syncFillControls(panel, true);
+          update();
         };
         field.addEventListener("input", sync);
         picker.addEventListener("input", () => {
@@ -1071,12 +1302,12 @@
         row.querySelector("[data-stop-position]").value = stop.position;
         row
           .querySelector("[data-stop-position]")
-          .addEventListener("input", () => syncFillControls(panel, true));
+          .addEventListener("input", update);
         row.querySelector("button").onclick = () => {
           if (host.children.length <= 2) return;
           const next = row.nextElementSibling || row.previousElementSibling;
           row.remove();
-          syncFillControls(panel, true);
+          update();
           next?.querySelector("[data-stop-color]").focus();
         };
         return row;
@@ -1120,10 +1351,15 @@
     panel.hidden = !selected;
     if (!selected) return;
     const config = read(selected);
+    panel.querySelector("[data-native-content-title]").textContent =
+      config.text !== undefined ? "Text" : label(config.type);
     const parent = selected.parentElement.closest(".sq-native");
+    const parentName = parent && read(parent).name;
     panel.querySelector("[data-native-element-kind]").textContent = parent
-      ? `In ${read(parent).name || "container"}`
-      : "Page element";
+      ? parentName && !/^container( section)?$/i.test(parentName)
+        ? `Inside “${parentName}”`
+        : "Inside a layout group"
+      : "On this page";
     panel.querySelector("[data-native-parent]").hidden = !parent;
     panel.querySelector("[data-native-word-controls]").hidden =
       config.text === undefined;
@@ -1166,7 +1402,7 @@
     responsive.value = context;
     const variants = panel.querySelector("[data-native-variant]");
     variants.replaceChildren(
-      new Option("Default", ""),
+      new Option("Normal appearance", ""),
       ...Object.keys(config.states || {}).map((key) => new Option(key, key)),
     );
     variants.value = state;
@@ -1174,8 +1410,8 @@
     hooks.root.dataset.nativeState = state;
     panel.querySelector("[data-native-context-note]").textContent =
       context === "base" && !state
-        ? "Changes apply at every screen size."
-        : `Editing ${responsive.selectedOptions[0].text.toLowerCase()}${state ? ` · ${state} state` : ""}.`;
+        ? "Layout and appearance settings affect all screen sizes."
+        : `Editing ${responsive.selectedOptions[0].text.toLowerCase()}${state ? ` · ${state} version` : ""}.`;
     panel
       .querySelectorAll("[data-native-prop]")
       .forEach(
@@ -1186,14 +1422,28 @@
     text.value = config.text || "";
     const wordStyles = panel.querySelector("[data-native-word-styles]");
     wordStyles.replaceChildren();
-    if (config.marks?.length) {
+    if (config.marks?.some((mark) => mark.color || mark.gradient)) {
       const caption = document.createElement("small");
-      caption.textContent = "Styled words";
+      caption.textContent = "Words with custom colors";
       wordStyles.append(caption);
-      for (const mark of config.marks) {
+      for (const mark of config.marks.filter(
+        (mark) => mark.color || mark.gradient,
+      )) {
         const button = document.createElement("button");
         button.type = "button";
-        button.textContent = `${config.text.slice(mark.start, mark.end)} · ${mark.gradient ? "Gradient" : mark.color || "Style"}`;
+        button.dataset.start = mark.start;
+        button.dataset.end = mark.end;
+        const swatch = document.createElement("span");
+        swatch.className = "sq-word-swatch";
+        swatch.setAttribute("aria-hidden", "true");
+        swatch.style.background = mark.gradient
+          ? gradientCss(mark.gradient)
+          : mark.color;
+        const name = document.createElement("span");
+        name.textContent = `“${config.text.slice(mark.start, mark.end)}”`;
+        const action = document.createElement("small");
+        action.textContent = mark.gradient ? "Edit gradient" : "Edit color";
+        button.append(swatch, name, action);
         button.onclick = () => {
           selection = {
             node: selected,
@@ -1201,22 +1451,12 @@
             end: mark.end,
             text: config.text.slice(mark.start, mark.end),
           };
-          text.focus();
-          text.setSelectionRange(mark.start, mark.end);
           panel.querySelector("[data-native-word-controls]").open = true;
-          if (mark.gradient) {
-            panel.querySelector("[data-native-fill-type]").value = "text";
-            draftLayers = structuredClone(mark.gradient);
-            layerIndex = 0;
-            syncLayerOptions(panel);
-            loadGradient(panel, draftLayers[0]);
-            syncFillControls(panel, true);
-          } else if (mark.color && /^#[0-9a-f]{6}$/i.test(mark.color)) {
-            panel.querySelector("[data-native-word-color]").value = mark.color;
-            panel.querySelector("[data-native-word-color-value]").textContent =
-              mark.color.toUpperCase();
-          }
+          wordSelectionKey = "";
           syncWordSelection(panel);
+          panel
+            .querySelector("[data-native-word-editor]")
+            .focus({ preventScroll: true });
         };
         wordStyles.append(button);
       }
@@ -1293,7 +1533,7 @@
       layers.length,
     );
     panel.querySelector("[data-native-fill-status]").textContent =
-      "Preview your fill, then apply it to this element.";
+      "Affects the entire element. Use “Color specific words” to change a phrase.";
     loadGradient(panel, layer);
     syncFillControls(panel);
     panel.querySelector("[data-native-name]").value = config.name || "";
@@ -1357,6 +1597,7 @@
     );
     panel.querySelector("[data-native-open]").checked = Boolean(config.open);
     syncWordSelection(panel);
+    hooks.syncSelects?.(panel);
   }
   function init(callbacks) {
     hooks = callbacks;
@@ -1366,30 +1607,39 @@
     panel.hidden = true;
     panel.innerHTML = `
       <div class="sq-native-context">
-        <div class="sq-native-context-heading"><span data-native-element-kind>Element</span><button type="button" class="sq-native-text-button" data-native-parent>↑ Parent container</button></div>
-        <div class="sq-native-pair">
-          <label>Screen size<select data-native-breakpoint><option value="base">All screen sizes</option></select></label>
-          <label>State<select data-native-variant><option value="">Default</option></select></label>
-        </div>
-        <p class="sq-native-help" data-native-context-note>Changes apply at every screen size.</p>
+        <div class="sq-native-context-heading"><span data-native-element-kind>Element</span><button type="button" class="sq-native-text-button" data-native-parent>↑ Edit layout group</button></div>
+        <label>Apply layout changes to<select data-native-breakpoint><option value="base">All screen sizes</option></select></label>
+        <p class="sq-native-help" data-native-context-note>Layout and appearance settings affect all screen sizes.</p>
       </div>
-      <details open data-native-content><summary>Content</summary>
-        <label>Text<textarea rows="3" data-native-text></textarea></label>
-        <p class="sq-native-help" data-native-text-help>Edit here or double-click text on the canvas.</p>
+      <details open data-native-content><summary data-native-content-title>Text</summary>
+        <label>Your text<textarea rows="3" data-native-text></textarea></label>
+        <p class="sq-native-help" data-native-text-help>Edit your copy here. Select words to change their color.</p>
         <label>Image or video URL<input type="url" placeholder="https://…" data-native-src></label>
         <label>Image description / accessible label<input data-native-alt></label>
         <label>Icon<select data-native-icon></select></label>
-        <details class="sq-native-subsection" data-native-word-controls><summary>Style individual words</summary>
+        <details class="sq-native-subsection" data-native-word-controls><summary>Color specific words</summary>
           <p class="sq-native-selection-note" data-native-rich-range aria-live="polite"></p>
           <div data-native-word-styles></div>
-          <label>Word color<div class="sq-native-color-field"><input type="color" data-native-word-color value="#f44b34" aria-label="Selected word color"><span data-native-word-color-value>#F44B34</span></div></label>
-          <div class="sq-native-pair sq-native-actions"><button type="button" data-native-apply-word-color>Apply color</button><button type="button" data-native-apply-word-gradient>Apply gradient</button></div>
-          <p class="sq-native-help">For a gradient, use the colors in Color &amp; fill below.</p>
-          <button type="button" class="sq-native-text-button" data-native-clear-marks>Clear all word styles</button>
+          <div data-native-word-editor role="group" aria-label="Selected word color" tabindex="-1" hidden>
+            <label>Color style<select data-native-word-type><option value="mixed" disabled>Mixed colors</option><option value="solid">Solid color</option><option value="gradient">Gradient</option></select></label>
+            <div class="sq-word-preview"><span data-native-word-preview></span></div>
+            <div data-native-word-solid><label>Text color<div class="sq-native-color-field"><input type="color" data-native-word-color aria-label="Choose selected text color"><input type="text" spellcheck="false" data-native-word-color-value aria-label="Selected text color value"></div></label></div>
+            <div data-native-word-gradient hidden>
+              <div class="sq-native-pair"><label>Gradient direction<select data-word-gradient-kind><option value="linear">Straight</option><option value="radial">From a center</option></select></label><label data-word-linear>Angle (°)<input type="number" data-word-gradient-angle value="105"></label><label data-word-shape hidden>Shape<select data-word-gradient-shape><option value="ellipse">Oval</option><option value="circle">Circle</option></select></label></div>
+              <div class="sq-native-pair" data-word-radial hidden><label>Center left to right (%)<input type="number" data-word-gradient-x value="50"></label><label>Center top to bottom (%)<input type="number" data-word-gradient-y value="50"></label></div>
+              <div class="sq-native-stop-heading"><span>Gradient colors</span><span>At (%)</span><span></span></div><div data-word-gradient-stops></div>
+              <button type="button" class="sq-native-wide" data-word-add-stop>+ Add gradient color</button>
+              <details class="sq-native-subsection"><summary>Overlapping gradients</summary><label>Gradient to edit<select data-word-layer></select></label><div class="sq-native-pair"><button type="button" data-word-layer-add>Add gradient</button><button type="button" data-word-layer-remove>Remove gradient</button></div></details>
+            </div>
+            <button type="button" class="sq-native-primary sq-native-wide" data-native-apply-word-style>Apply to selected words</button>
+            <p class="sq-native-help" data-native-word-status aria-live="polite"></p>
+            <button type="button" class="sq-native-text-button" data-native-reset-word-style>Use default text color</button>
+          </div>
+          <button type="button" class="sq-native-text-button" data-native-clear-marks hidden>Use default color for all words</button>
         </details>
       </details>
-      <details open data-native-fill-section><summary>Color &amp; fill</summary>
-        <label>Fill type<select data-native-fill-type><option value="solid">Solid color</option><option value="gradient">Gradient background</option><option value="text">Gradient text</option></select></label>
+      <details open data-native-fill-section><summary>Background &amp; text color</summary>
+        <label>What to change<select data-native-fill-type><option value="solid">Background color</option><option value="gradient">Background gradient</option><option value="text">Gradient on all text</option></select></label>
         <div class="sq-native-preview-frame"><div data-native-fill-preview role="img"></div></div>
         <div data-native-solid-controls><label>Background color<div class="sq-native-color-field"><input type="color" value="#ffffff" data-native-solid-picker aria-label="Choose background color"><input type="text" value="transparent" spellcheck="false" data-native-solid-color aria-label="Background color value"></div></label></div>
         <div data-native-gradient-controls hidden>
@@ -1404,8 +1654,8 @@
           <button type="button" class="sq-native-wide" data-native-add-stop>+ Add color</button>
           <details class="sq-native-subsection" data-native-layers><summary>Gradient layers <span data-native-layer-count>1</span></summary><p class="sq-native-help">Combine up to 8 gradients. The first layer sits on top.</p><label>Editing layer<select data-native-layer></select></label><div class="sq-native-pair sq-native-actions"><button type="button" data-native-layer-add>+ Add layer</button><button type="button" data-native-layer-remove>Remove layer</button></div></details>
         </div>
-        <button type="button" class="sq-native-primary sq-native-wide" data-native-apply-fill>Apply fill</button>
-        <p class="sq-native-help" data-native-fill-status aria-live="polite">Preview your fill, then apply it to this element.</p>
+        <button type="button" class="sq-native-primary sq-native-wide" data-native-apply-fill>Apply to entire element</button>
+        <p class="sq-native-help" data-native-fill-status aria-live="polite">Affects the entire element. Use “Color specific words” to change a phrase.</p>
       </details>`;
     panel.insertAdjacentHTML(
       "beforeend",
@@ -1413,7 +1663,7 @@
     );
     const advanced = document.createElement("details");
     advanced.dataset.nativeAdvanced = "";
-    advanced.innerHTML = `<summary>Advanced settings</summary><details data-native-responsive><summary>Screen sizes &amp; states</summary><p class="sq-native-help">Create an override, then switch between versions at the top of this panel.</p><label>Width rule<select data-native-breakpoint-kind><option value="max">Up to width</option><option value="min">At least width</option></select></label><label>Screen width (px)<input type="number" min="240" max="3000" placeholder="e.g. 768" data-native-new-breakpoint></label><button type="button" class="sq-native-wide" data-native-add-breakpoint>Add screen size</button><label>New state name<input placeholder="e.g. expanded" data-native-new-state></label><p class="sq-native-help">Use lowercase words and hyphens.</p><button type="button" class="sq-native-wide" data-native-add-state>Add state</button></details>`;
+    advanced.innerHTML = `<summary>Advanced settings</summary><details data-native-responsive><summary>Responsive layout &amp; alternate versions</summary><label>Editing version<select data-native-variant><option value="">Normal appearance</option></select></label><p class="sq-native-help">Use different layouts for smaller screens, or create an alternate appearance for a click action.</p><label>Width rule<select data-native-breakpoint-kind><option value="max">Up to width</option><option value="min">At least width</option></select></label><label>Screen width (px)<input type="number" min="240" max="3000" placeholder="e.g. 768" data-native-new-breakpoint></label><button type="button" class="sq-native-wide" data-native-add-breakpoint>Add screen size</button><label>New version name<input placeholder="e.g. expanded" data-native-new-state></label><p class="sq-native-help">Use lowercase words and hyphens.</p><button type="button" class="sq-native-wide" data-native-add-state>Add version</button></details>`;
     [...panel.children]
       .filter(
         (node) =>
@@ -1493,7 +1743,7 @@
       const fields = groups[group];
       const detail = document.createElement("details");
       detail.dataset.nativeGroup = group;
-      detail.innerHTML = `<summary>${names[group] || group}</summary>`;
+      detail.innerHTML = `<summary>${group === "Typography" ? "Font & text alignment" : names[group] || group}</summary>`;
       const more = document.createElement("details");
       more.className = "sq-native-subsection";
       more.innerHTML = `<summary>More ${group.toLowerCase()} options</summary><div class="sq-native-fields"></div>`;
@@ -1529,7 +1779,7 @@
     }
     panel.insertAdjacentHTML(
       "beforeend",
-      '<details><summary>Interaction</summary><label>On click<select data-native-action-type><option value="">None</option><option value="link">Open link</option><option value="toggle">Show / hide element</option><option value="state">Switch state</option><option value="video-dialog">Open video dialog</option><option value="video-toggle">Play / pause video</option></select></label><label>Destination or target ID<input data-native-action-target></label><button type="button" data-native-action-apply>Apply action</button></details><p class="sq-native-help">Hold Alt and click an element to try its interaction.</p>',
+      '<details><summary>Click action</summary><label>On click<select data-native-action-type><option value="">None</option><option value="link">Open link</option><option value="toggle">Show / hide element</option><option value="state">Switch state</option><option value="video-dialog">Open video dialog</option><option value="video-toggle">Play / pause video</option></select></label><label>Destination or target ID<input data-native-action-target></label><button type="button" data-native-action-apply>Apply action</button></details><p class="sq-native-help">Hold Alt and click an element to try its interaction.</p>',
     );
     panel.append(advanced);
     panel.querySelectorAll("label").forEach((wrap) => {
@@ -1624,7 +1874,7 @@
       const config = read(selected);
       if (config.states?.[name])
         throw Error(
-          "This state already exists. Select it at the top of the panel.",
+          "This version already exists. Choose it in Editing version.",
         );
       hooks.remember();
       config.states ||= {};
@@ -1670,11 +1920,6 @@
       panel.querySelector("[data-native-solid-color]").value =
         panel.querySelector("[data-native-solid-picker]").value;
       syncFillControls(panel, true);
-    });
-    listen("[data-native-word-color]", "input", () => {
-      panel.querySelector("[data-native-word-color-value]").textContent = panel
-        .querySelector("[data-native-word-color]")
-        .value.toUpperCase();
     });
     listen("[data-native-layer]", "change", () => {
       draftLayers = fill().layers;
@@ -1834,7 +2079,7 @@
       });
       select(selected);
       panel.querySelector("[data-native-fill-status]").textContent =
-        "Fill applied. You can undo this change.";
+        "Element color updated. You can undo this change.";
     });
     listen("[data-native-add-stop]", "click", () => {
       const stops = [...panel.querySelectorAll(".sq-native-stop")].map(
@@ -1851,35 +2096,104 @@
         .querySelector(".sq-native-stop:last-child [data-stop-color]")
         .focus();
     });
-    const words = (gradient) => {
+    for (const key of ["kind", "angle", "x", "y", "shape"])
+      listen(`[data-word-gradient-${key}]`, "input", () =>
+        syncWordFillControls(panel, true),
+      );
+    listen("[data-native-word-type]", "input", () =>
+      syncWordFillControls(panel, true),
+    );
+    listen("[data-native-word-color-value]", "input", () =>
+      syncWordFillControls(panel, true),
+    );
+    listen("[data-native-word-color]", "input", () => {
+      panel.querySelector("[data-native-word-color-value]").value =
+        panel.querySelector("[data-native-word-color]").value;
+      syncWordFillControls(panel, true);
+    });
+    listen("[data-word-add-stop]", "click", () => {
+      const layers = readWordGradient(panel);
+      if (layers[wordLayerIndex].stops.length >= 12) return;
+      layers[wordLayerIndex].stops.push({ color: "#f44b34", position: 50 });
+      wordLayers = layers;
+      loadWordGradient(panel);
+      syncWordFillControls(panel, true);
+      panel.querySelector(".sq-word-stop:last-child [data-stop-color]").focus();
+    });
+    listen("[data-word-layer]", "change", () => {
+      wordLayers = readWordGradient(panel);
+      wordLayerIndex = Number(panel.querySelector("[data-word-layer]").value);
+      loadWordGradient(panel);
+      syncWordFillControls(panel, true);
+    });
+    listen("[data-word-layer-add]", "click", () => {
+      if (wordLayers.length >= 8) return;
+      wordLayers = readWordGradient(panel);
+      wordLayers.push({
+        kind: "linear",
+        angle: 105,
+        stops: [
+          { color: "#f44b3480", position: 0 },
+          { color: "transparent", position: 100 },
+        ],
+      });
+      wordLayerIndex = wordLayers.length - 1;
+      loadWordGradient(panel);
+      syncWordFillControls(panel, true);
+    });
+    listen("[data-word-layer-remove]", "click", () => {
+      if (wordLayers.length <= 1) return;
+      wordLayers = readWordGradient(panel);
+      wordLayers.splice(wordLayerIndex, 1);
+      wordLayerIndex = Math.max(0, wordLayerIndex - 1);
+      loadWordGradient(panel);
+      syncWordFillControls(panel, true);
+    });
+    const applyWords = (style) => {
       if (
         !selection ||
         selected !== selection.node ||
         read(selected).text?.slice(selection.start, selection.end) !==
           selection.text
       )
-        throw Error("Select words in this text first.");
-      const config = read(selection.node);
-      if (config.text === undefined) throw Error("Select a text element.");
-      config.marks = (config.marks || []).filter(
-        (mark) => mark.start !== selection.start || mark.end !== selection.end,
-      );
-      config.marks.push({
-        start: selection.start,
-        end: selection.end,
-        ...(gradient
-          ? { gradient: fill().layers }
-          : { color: panel.querySelector("[data-native-word-color]").value }),
-      });
+        throw Error("Select the words you want to change first.");
+      const config = read(selected),
+        original = config.marks || [];
+      const cuts = [
+        ...new Set([
+          0,
+          config.text.length,
+          selection.start,
+          selection.end,
+          ...original.flatMap((m) => [m.start, m.end]),
+        ]),
+      ].sort((a, b) => a - b);
+      config.marks = [];
+      for (let i = 0; i < cuts.length - 1; i++) {
+        const start = cuts[i],
+          end = cuts[i + 1];
+        const active = original
+          .filter((m) => m.start <= start && m.end >= end)
+          .at(-1);
+        const { start: oldStart, end: oldEnd, ...appearance } = active || {};
+        if (start >= selection.start && end <= selection.end) {
+          delete appearance.color;
+          delete appearance.gradient;
+          Object.assign(appearance, style);
+        }
+        if (Object.keys(appearance).length)
+          config.marks.push({ start, end, ...appearance });
+      }
       validate(config);
       hooks.remember();
-      write(selection.node, config);
-      renderText(selection.node, config);
+      write(selected, config);
+      renderText(selected, config);
       hooks.changed();
-      // Refresh styled-word shortcuts without discarding the fill being edited.
+      // Refresh the phrase list without replacing an unrelated element-color draft.
       const draft = inspectorFill(panel),
         editingLayer = layerIndex,
         type = panel.querySelector("[data-native-fill-type]").value;
+      wordSelectionKey = "";
       select(selected);
       draftLayers = draft.layers;
       layerIndex = editingLayer;
@@ -1888,19 +2202,30 @@
       if (draft.layers.length)
         loadGradient(panel, draft.layers[layerIndex] || draft.layers[0]);
       syncFillControls(panel);
-      panel.querySelector("[data-native-rich-range]").textContent =
-        `Applied ${gradient ? "gradient" : "color"} to “${selection.text}”.`;
+      panel.querySelector("[data-native-word-status]").textContent = style
+        ? "Selected words updated."
+        : "Selected words now use the text’s default color.";
     };
-    listen("[data-native-apply-word-color]", "click", () => words(false));
-    listen("[data-native-apply-word-gradient]", "click", () => {
-      if (panel.querySelector("[data-native-fill-type]").value === "solid")
-        panel.querySelector("[data-native-fill-type]").value = "text";
-      words(true);
-      syncFillControls(panel);
+    listen("[data-native-apply-word-style]", "click", () => {
+      const type = panel.querySelector("[data-native-word-type]").value;
+      if (type === "mixed") return;
+      applyWords(
+        type === "gradient"
+          ? { gradient: readWordGradient(panel) }
+          : {
+              color: color(
+                panel.querySelector("[data-native-word-color-value]").value,
+              ),
+            },
+      );
     });
+    listen("[data-native-reset-word-style]", "click", () => applyWords(null));
     listen("[data-native-clear-marks]", "click", () => {
-      change({ marks: [] });
-      renderText(selected, read(selected));
+      const marks = (read(selected).marks || [])
+        .map(({ color, gradient, ...mark }) => mark)
+        .filter((mark) => Object.keys(mark).length > 2);
+      change({ marks });
+      wordSelectionKey = "";
       select(selected);
     });
     listen("[data-native-action-apply]", "click", () => {
