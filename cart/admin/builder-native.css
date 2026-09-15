@@ -40,6 +40,7 @@
   display: none;
 }
 .sq-page-preview .sq-native-section {
+  position: relative;
   display: block;
   min-height: 0;
   padding: 0;

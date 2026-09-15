@@ -3239,7 +3239,9 @@
       const width = Math.max(1, section.clientWidth-left-right), height = Math.max(1, section.clientHeight-top-bottom);
       const columnGap = fluid ? parseFloat(computed.columnGap) || 0 : pageSpacingState.columnGap;
       const rowGap = fluid ? parseFloat(computed.rowGap) || 0 : pageSpacingState.columnGap;
-      const columns = fluidColumns(), rowStep = fluidRowHeight(section);
+      const columns = fluidColumns();
+      const cellHeight = fluid ? parseFloat(computed.gridTemplateRows) || Math.max(4, fluidRowHeight(section)-rowGap) : gridCellHeightState[activeDevice];
+      const rowStep = cellHeight + rowGap;
       const rows = fluid ? Math.max(1, section === sectionHeightResizeTarget && sectionHeightPreviewRows > 0 ? sectionHeightPreviewRows : Number.parseInt(section.dataset.sqRows || section.dataset.sqMinRows || '12',10)) : Math.max(1,Math.ceil((height+rowGap)/rowStep));
       return {left,top,right,bottom,width,height,columnGap,rowGap,columns,rows,rowStep,columnStep:(width+columnGap)/columns};
     };
@@ -3849,7 +3851,7 @@
       const gridDensityDevice = sqStudio.querySelector("[data-sq-grid-density-device]");
       const gridVisibility = sqStudio.querySelector("[data-sq-show-layout-grid]");
       if (gridDensity) gridDensity.value = String(gridDensityState[activeDevice]);
-      if (gridDensityOutput) gridDensityOutput.textContent = gridDensityLabel(gridDensityState[activeDevice]);
+      if (gridDensityOutput) gridDensityOutput.textContent = gridDensityLabel(matchingGridDensity());
       if (gridDensityDevice) gridDensityDevice.textContent = activeDevice[0].toUpperCase() + activeDevice.slice(1);
       if (gridVisibility) gridVisibility.checked = showLayoutGrid;
       const columns = fluidColumns();
@@ -4372,7 +4374,7 @@
     const spacingKey = (section = selectedSection, device = activeDevice) => `${section}:${device}`;
     const defaultSpacing = (section = selectedSection, device = activeDevice) => {
       const block = previewRoot?.querySelector(`[data-section-id="${CSS.escape(section)}"]`);
-      if(block?.matches('.sq-flow')){const style=getComputedStyle(block);return {top:parseFloat(style.paddingTop)||0,right:parseFloat(style.paddingRight)||0,bottom:parseFloat(style.paddingBottom)||0,left:parseFloat(style.paddingLeft)||0};}
+      if(block?.matches('.sq-flow,.sq-native-section')){const style=getComputedStyle(block);return {top:parseFloat(style.paddingTop)||0,right:parseFloat(style.paddingRight)||0,bottom:parseFloat(style.paddingBottom)||0,left:parseFloat(style.paddingLeft)||0};}
       const gutter = pageSpacingState.gutters[device] ?? defaultPageSpacing.gutters[device];
       if (section === "announcement" || block?.dataset.sqComposition === "announcement") return { top: 10, right: gutter, bottom: 10, left: gutter };
       if (block?.classList.contains("sq-store-nav")) return { top: 0, right: gutter, bottom: 0, left: gutter };
@@ -4397,6 +4399,8 @@
       const block = previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`);
       const values = readSpacing();
       if (!block) return;
+      // Native padding follows its responsive properties unless explicitly overridden.
+      if (block.matches('.sq-native-section') && !spacingState.has(spacingKey())) return;
       block.style.paddingTop = `${values.top}px`;
       block.style.paddingRight = `${values.right}px`;
       block.style.paddingBottom = `${values.bottom}px`;
@@ -5421,16 +5425,21 @@
       input.addEventListener("focus", beginGridGeometryEdit);
     });
     gridDensityInput?.addEventListener("input", () => {
+      beginGridGeometryEdit();
       setGridDensity(activeDevice, gridDensityInput.value);
       applyFluidLayouts(); syncPageGridControls(); syncElementControls(); revealLayoutGrid(); refreshElementOverlay(); markSqChanged();
     });
-    sqStudio.querySelector("[data-sq-grid-cell-width]")?.addEventListener("input", (event) => {
+    sqStudio.querySelector("[data-sq-grid-cell-width]")?.addEventListener("change", (event) => {
+      if (!event.currentTarget.value || !event.currentTarget.validity.valid) { syncPageGridControls(); return; }
+      beginGridGeometryEdit();
       const requestedWidth = Math.max(6, Number(event.currentTarget.value) || gridCellWidth());
       const columns = Math.max(2, Math.min(24, Math.round((gridContentWidth() + pageSpacingState.columnGap) / (requestedWidth + pageSpacingState.columnGap))));
       updateGridGeometry(activeDevice, { columns });
       applyFluidLayouts(); syncPageGridControls(); revealLayoutGrid(); markSqChanged();
     });
-    sqStudio.querySelector("[data-sq-grid-cell-height]")?.addEventListener("input", (event) => {
+    sqStudio.querySelector("[data-sq-grid-cell-height]")?.addEventListener("change", (event) => {
+      if (!event.currentTarget.value || !event.currentTarget.validity.valid) { syncPageGridControls(); return; }
+      beginGridGeometryEdit();
       updateGridGeometry(activeDevice, { cellHeight: Number(event.currentTarget.value) });
       applyFluidLayouts(); syncPageGridControls(); revealLayoutGrid(); markSqChanged();
     });
@@ -5442,6 +5451,29 @@
     };
     sqStudio.querySelector("[data-sq-show-layout-grid]")?.addEventListener("change", (event) => setGridVisible(event.currentTarget.checked));
     sqStudio.querySelectorAll("[data-sq-grid-toggle]").forEach((button) => button.addEventListener("click", () => setGridVisible(!showLayoutGrid)));
+    const gridSettings = sqStudio.querySelector('#sq-grid-settings');
+    const gridSettingsButton = sqStudio.querySelector('[data-sq-grid-settings]');
+    const positionGridSettings = () => {
+      if (!gridSettings || !gridSettingsButton) return;
+      const rect = gridSettingsButton.getBoundingClientRect(), width = Math.min(316, window.innerWidth-24);
+      gridSettings.style.left = `${Math.max(12,Math.min(window.innerWidth-width-12,rect.left+rect.width/2-width/2))}px`;
+      gridSettings.style.bottom = `${Math.max(12,window.innerHeight-rect.top+10)}px`;
+    };
+    gridSettings?.addEventListener('beforetoggle', event => {
+      gridSettingsButton?.setAttribute('aria-expanded', String(event.newState === 'open'));
+      if (event.newState === 'open') { syncPageGridControls(); syncPageSpacingControls(); positionGridSettings(); revealLayoutGrid(); }
+    });
+    // Keep editor shortcuts from acting on the selection while configuring guides.
+    gridSettings?.addEventListener('keydown', event => event.stopPropagation());
+    window.addEventListener('resize', positionGridSettings);
+    sqStudio.querySelector('[data-sq-grid-reset]')?.addEventListener('click', () => {
+      remember();
+      gridDensityState[activeDevice] = defaultGridDensity[activeDevice];
+      updateGridGeometry(activeDevice, {columns:defaultGridColumns[activeDevice],cellHeight:defaultGridCellHeight[activeDevice]});
+      pageSpacingState.columnGap = defaultPageSpacing.columnGap;
+      previewRoot?.style.setProperty('--sq-builder-column-gap',`${pageSpacingState.columnGap}px`);
+      applyFluidLayouts(); syncPageGridControls(); syncPageSpacingControls(); revealLayoutGrid(); refreshElementOverlay(); markSqChanged();
+    });
 
     let spacingSnapshot;
     sqStudio.querySelectorAll("[data-sq-spacing]").forEach((input) => {
@@ -6710,7 +6742,7 @@
     let pageSpacingSnapshot;
     const startPageSpacingEdit = () => { if (!pageSpacingSnapshot) pageSpacingSnapshot = captureState(); };
     const finishPageSpacingEdit = () => { if (pageSpacingSnapshot) remember(pageSpacingSnapshot); pageSpacingSnapshot = null; };
-    sqStudio.querySelectorAll("[data-sq-page-gutter], [data-sq-page-column-gap]").forEach((input) => { input.addEventListener("pointerdown", startPageSpacingEdit); input.addEventListener("focus", startPageSpacingEdit); input.addEventListener("change", finishPageSpacingEdit); });
+    sqStudio.querySelectorAll("[data-sq-page-gutter], [data-sq-page-column-gap]").forEach((input) => { input.addEventListener("pointerdown", startPageSpacingEdit); input.addEventListener("focus", startPageSpacingEdit); if (!input.hasAttribute('data-sq-page-column-gap')) input.addEventListener("change", finishPageSpacingEdit); });
     sqStudio.querySelectorAll("[data-sq-page-gutter]").forEach((input) => input.addEventListener("input", () => {
       const gutter = Math.max(0, Number(input.value) || 0);
       applyPageGutter(input.dataset.sqPageGutter, gutter);
@@ -6720,13 +6752,16 @@
       if (selectedElement?.isConnected) refreshElementOverlay();
       markSqChanged();
     }));
-    sqStudio.querySelector("[data-sq-page-column-gap]")?.addEventListener("input", (event) => {
+    sqStudio.querySelector("[data-sq-page-column-gap]")?.addEventListener("change", (event) => {
+      if (!event.currentTarget.value || !event.currentTarget.validity.valid) { syncPageSpacingControls(); pageSpacingSnapshot=null; return; }
+      startPageSpacingEdit();
       pageSpacingState.columnGap = Math.max(0, Number(event.currentTarget.value) || 0);
       previewRoot?.style.setProperty("--sq-builder-column-gap", `${pageSpacingState.columnGap}px`);
       syncPageSpacingControls(); syncPageGridControls(); applyFluidLayouts();
       revealLayoutGrid();
       if (selectedElement?.isConnected) refreshElementOverlay();
       markSqChanged();
+      finishPageSpacingEdit();
     });
     sqStudio.querySelector("[data-sq-page-spacing-reset]")?.addEventListener("click", () => {
       remember();

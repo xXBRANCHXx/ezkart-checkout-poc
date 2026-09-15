@@ -288,3 +288,183 @@ test("flow elements use the visible grid at each device size and hidden guides s
     );
     await drag(node, grid.locator("i").nth(12 * 4), false, true);
   }));
+
+test("grid settings change the rendered snap cells, persist across devices and stay below content", async () =>
+  fixture(async ({ page, invoke, settle, select, drag }) => {
+    await invoke("nativeInsert", {
+      section: "blank",
+      node: {
+        id: "blank",
+        type: "container",
+        props: {
+          minHeight: "700px",
+          backgroundColor: "#f7f0d8",
+          paddingTop: "40px",
+          paddingLeft: "40px",
+          paddingRight: "40px",
+        },
+        children: [
+          {
+            id: "content",
+            type: "button",
+            text: "Content above the grid",
+            props: {
+              width: "300px",
+              height: "120px",
+              backgroundColor: "#153e70",
+              color: "#fff",
+            },
+          },
+        ],
+      },
+    });
+    const node = page.locator("[data-native-id=content]");
+    await select(node);
+    const grid = page.locator(
+      "[data-section-id=blank] > .sq-layout-grid-overlay",
+    );
+    const paintOrder = async (content, guides) => {
+      // Hit testing reflects paint order when guides temporarily accept events.
+      await guides.evaluate((n) =>
+        n.style.setProperty("pointer-events", "auto", "important"),
+      );
+      const top = await content.evaluate((n) => {
+        const r = n.getBoundingClientRect();
+        return n.contains(
+          document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2),
+        );
+      });
+      assert.ok(top, "Content paints above the grid");
+      await guides.evaluate((n) => n.style.removeProperty("pointer-events"));
+    };
+    await paintOrder(node, grid);
+    const button = page.getByRole("button", {
+      name: "Grid settings",
+      exact: true,
+    });
+    const panel = page.getByRole("dialog", {
+      name: "Grid settings",
+      exact: true,
+    });
+    await button.click();
+    assert.ok(await panel.isVisible());
+    const set = async (selector, value) => {
+      const input = panel.locator(selector);
+      await input.fill(String(value));
+      await input.dispatchEvent("change");
+      await settle();
+    };
+    const density = panel.locator("[data-sq-grid-density]");
+    await density.focus();
+    await page.keyboard.press("ArrowRight");
+    assert.equal(
+      await grid.evaluate(
+        (n) => getComputedStyle(n).gridTemplateColumns.split(" ").length,
+      ),
+      16,
+    );
+    await set("[data-sq-grid-cell-width]", 150);
+    assert.equal(
+      await panel.locator("[data-sq-grid-density-output]").textContent(),
+      "Custom",
+    );
+    await set("[data-sq-grid-cell-height]", 38);
+    await set("[data-sq-page-column-gap]", 20);
+    const geometry = () =>
+      grid.evaluate((n) => {
+        const s = getComputedStyle(n);
+        return {
+          columns: s.gridTemplateColumns,
+          rows: s.gridTemplateRows,
+          gap: s.gap,
+        };
+      });
+    const saved = await geometry();
+    const sectionBox = await page
+      .locator("[data-sq-block][data-section-id=blank]")
+      .boundingBox();
+    const gridBox = await grid.boundingBox();
+    assert.ok(
+      gridBox.y + gridBox.height <= sectionBox.y + sectionBox.height + 1,
+      "The grid stays inside its section",
+    );
+    assert.equal(saved.gap, "20px");
+    assert.ok(Math.abs(parseFloat(saved.rows) - 38) < 0.1);
+    await invoke("undo");
+    assert.equal((await geometry()).gap, "10px");
+    await invoke("redo");
+    await page.keyboard.press("Escape");
+    assert.equal(await panel.isVisible(), false);
+    await select(node);
+    const columns = saved.columns.split(" ").length;
+    await drag(node, grid.locator("i").nth(columns * 3 + 1));
+    await invoke("save");
+    await page.reload();
+    await page.waitForFunction(() => globalThis.EzkartBuilder);
+    await select(node);
+    assert.deepEqual(await geometry(), saved);
+    await invoke("setDevice", { device: "mobile" });
+    await settle();
+    assert.ok(Math.abs(parseFloat((await geometry()).rows) - 24) < 0.1);
+    assert.equal((await geometry()).gap, "20px");
+    await invoke("setDevice", { device: "desktop" });
+    await settle();
+    await button.click();
+    await panel.getByRole("button", { name: "Reset grid" }).click();
+    assert.ok(Math.abs(parseFloat((await geometry()).rows) - 24) < 0.1);
+    assert.equal((await geometry()).gap, "10px");
+    assert.equal(
+      await page
+        .locator("[data-sq-block][data-section-id=blank]")
+        .evaluate((n) => getComputedStyle(n).paddingLeft),
+      "40px",
+      "Resetting the grid preserves section padding",
+    );
+    await panel.getByRole("button", { name: "Close grid settings" }).click();
+
+    await invoke("addSection", {
+      component: "feature-showcase",
+      id: "flow-layer",
+    });
+    const copy = page.locator("#flow-layer .ezm-section-copy");
+    await select(copy);
+    await paintOrder(
+      copy,
+      page.locator("#flow-layer > .sq-layout-grid-overlay"),
+    );
+
+    await invoke("addSection", { component: "blank", id: "gradient-layer" });
+    await invoke("updateSection", {
+      id: "gradient-layer",
+      gradient: { kind: "linear", from: "#ffe0bb", to: "#bbcaff" },
+    });
+    await invoke("addElement", {
+      section: "gradient-layer",
+      type: "button",
+      id: "above-gradient",
+    });
+    await invoke("updateElement", {
+      id: "above-gradient",
+      text: "Above grid and gradient",
+      layout: { x: 1, y: 1, width: 4, height: 2 },
+    });
+    const fluidContent = page.locator('[data-sq-element-id="above-gradient"]');
+    await select(fluidContent);
+    const fluidGrid = page.locator(
+      '[data-section-id="gradient-layer"] > .sq-layout-grid-overlay',
+    );
+    await paintOrder(fluidContent, fluidGrid);
+    await fluidGrid.evaluate((n) =>
+      n.style.setProperty("pointer-events", "auto", "important"),
+    );
+    const empty = fluidGrid.locator("i").nth(10);
+    assert.ok(
+      await empty.evaluate((n) => {
+        const r = n.getBoundingClientRect();
+        return (
+          document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2) === n
+        );
+      }),
+      "Grid remains visible above the section gradient in empty space",
+    );
+  }));
