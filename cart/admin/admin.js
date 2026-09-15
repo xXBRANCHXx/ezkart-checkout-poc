@@ -3520,6 +3520,8 @@
       if (blurOutput) blurOutput.textContent = `${section.dataset.sqNavBlur || "16"}px`;
     };
     const syncElementControls = () => {
+      const native=selectedElement?.matches('.sq-native');inspector?.classList.toggle('sq-native-selection',Boolean(native));
+      globalThis.EzkartNative?.select(native?selectedElement:null);if(native)return;
       const controls = sqStudio.querySelector("[data-sq-element-controls]");
       const selectedBackground = selectedElement?.matches?.(".sq-section-background");
       const valid = selectedElement?.isConnected && (selectedBackground || selectedElement.closest(`[data-section-id="${selectedSection}"]`));
@@ -3899,7 +3901,7 @@
       removeElementOverlay();
       if (!selectedElement?.isConnected) return;
       if (selectedElement.matches(".sq-page-background,.sq-section-background")) return;
-      const section = selectedElement.closest("[data-sq-fluid],.sq-flow");
+      const section = selectedElement.closest("[data-sq-fluid],.sq-flow,.sq-native-section");
       if (!section) return;
       const overlay = document.createElement("div");
       overlay.className = "sq-element-overlay";
@@ -3950,7 +3952,7 @@
       const copy = selectedElement.cloneNode(true);
       copy.classList.remove("sq-element-selected", "sq-element-hidden");
       copy.dataset.sqElementId = `element-${Date.now()}`;
-      if (!selectedElement.closest('.sq-flow')) ["desktop", "tablet", "mobile"].forEach((device) => {
+      if (!selectedElement.closest('.sq-flow,.sq-native-section')) ["desktop", "tablet", "mobile"].forEach((device) => {
         const layout = parseElementLayout(selectedElement, device);
         setElementLayout(copy, findOpenElementLayout(selectedElement.closest("[data-sq-fluid]"), layout, device), device);
       });
@@ -3958,6 +3960,7 @@
       const copiedIds=new Map();
       [copy,...copy.querySelectorAll('[id]')].forEach(node=>{if(node.id){const old=node.id;node.id=`${copy.dataset.sqElementId}--${old}`;copiedIds.set(old,node.id);}});
       copy.querySelectorAll('[aria-controls],[href^="#"]').forEach(node=>{for(const attr of ['aria-controls','href']){const value=node.getAttribute(attr);if(value&&copiedIds.has(value.replace(/^#/,'')))node.setAttribute(attr,(attr==='href'?'#':'')+copiedIds.get(value.replace(/^#/,'')));}});
+      if(copy.matches('.sq-native'))EzkartNative.remapTree(copy);
       selectedElement.after(copy);
       remember(snapshot);
       rebuildLayerList();
@@ -3969,7 +3972,7 @@
       if (!selectedElement?.isConnected) return;
       const deletingBackground = selectedElement.matches(".sq-section-background");
       remember();
-      const section = selectedElement.closest("[data-sq-fluid],.sq-flow");
+      const section = selectedElement.closest("[data-sq-fluid],.sq-flow,.sq-native-section");
       if (deletingBackground && section) section.dataset.sqBackgroundType = "solid";
       selectedElement.remove();
       selectedElement = null;
@@ -3992,8 +3995,9 @@
         event.preventDefault();
         event.stopPropagation();
         if (!selectedElement?.isConnected) return;
+        if(selectedElement.matches('.sq-native')){EzkartNative.startPointer(event,selectedElement,resizing);return;}
         if(selectedElement.closest('.sq-flow')){bindFlowPointer(event,selectedElement,resizing);return;}
-        const section = selectedElement.closest("[data-sq-fluid],.sq-flow");
+        const section = selectedElement.closest("[data-sq-fluid],.sq-flow,.sq-native-section");
         const startLayout = parseElementLayout(selectedElement);
         const snapshot = captureState();
         const startX = event.clientX;
@@ -4036,7 +4040,7 @@
     };
     const directDraggableElementTypes = new Set(["image", "divider", "spacer", "icon", "custom-code", "component-instance"]);
     const bindDirectElementDrag = (element) => {
-      const enabled = !element?.closest(".sq-flow") && directDraggableElementTypes.has(element?.dataset.sqElementType);
+      const enabled = !element?.closest(".sq-flow,.sq-native-section") && directDraggableElementTypes.has(element?.dataset.sqElementType);
       element?.classList.toggle("sq-direct-draggable", enabled);
       if (!enabled) return;
       element.onpointerdown = (event) => {
@@ -4341,7 +4345,7 @@
       ".sq-generated-faq>h2", ".sq-generated-faq summary", ".sq-generated-faq p",
       ".sq-generated-spacer>span",
       ".sq-free-heading>h1", ".sq-free-heading>h2", ".sq-free-heading>h3", ".sq-free-text>p", ".sq-free-marquee .sq-marquee-copy:not([aria-hidden])", ".sq-free-button>button", ".sq-free-form>h3", ".sq-free-form>p",
-      ".sq-composition-heading>h1", ".sq-composition-heading>h3", ".sq-composition-detail h3", ".sq-composition-detail p", ".sq-composition-faq summary", ".sq-composition-faq p", ".sq-composition-comparison th", ".sq-composition-comparison td", ".sq-composition-quote blockquote", ".sq-composition-quote p", ".sq-composition-footer-links>a",
+      '.sq-native[data-native-type="heading"][data-native-text-field],.sq-native[data-native-type="text"][data-native-text-field]', ".sq-composition-heading>h1", ".sq-composition-heading>h3", ".sq-composition-detail h3", ".sq-composition-detail p", ".sq-composition-faq summary", ".sq-composition-faq p", ".sq-composition-comparison th", ".sq-composition-comparison td", ".sq-composition-quote blockquote", ".sq-composition-quote p", ".sq-composition-footer-links>a",
     ].join(",");
     const editableNodesFor = (block) => block ? [...block.querySelectorAll(block.closest(".sq-flow") || block.matches(".sq-flow") ? "[data-sq-flow-text]" : editableContentSelector)].filter((node) => !node.closest(".sq-image-drag-handle,.sq-nav-mobile-menu")) : [];
     const contentFieldLabel = (node, index) => {
@@ -4385,7 +4389,7 @@
         input.addEventListener("focus", () => { before = captureState(); remembered = false; });
         input.addEventListener("input", () => {
           if (!before) before = captureState();
-          node.textContent = input.value;
+          if(node.matches(".sq-native")){const config=EzkartNative.editText(EzkartNative.read(node),input.value);EzkartNative.write(node,config);EzkartNative.renderText(node,config);}else node.textContent = input.value;
           syncMarqueeCopies(node.closest("[data-sq-element]"), input.value, node);
           if (!remembered) { remember(before); remembered = true; }
           markSqChanged();
@@ -4454,10 +4458,11 @@
       if (durationOutput) durationOutput.textContent = `${duration}ms`;
       if (delayOutput) delayOutput.textContent = `${delay}ms`;
       loadSpacingControls();
-      if (spacingState.has(spacingKey())) applySpacing();
+      if (!block?.matches(".sq-native-section")&&spacingState.has(spacingKey())) applySpacing();
       syncInspectorContent();
       syncElementControls();
       syncBackgroundManagers();
+      if(block?.matches('.sq-native-section')&&!selectedElement){inspector?.classList.add('sq-native-selection');EzkartNative.select(block);}
       if (selectedElement) requestAnimationFrame(refreshElementOverlay);
       else { sqStudio.querySelector(".sq-inspector-scroll")?.scrollTo({ top: 0, behavior: "smooth" }); requestAnimationFrame(refreshSectionToolbar); }
     };
@@ -4481,6 +4486,7 @@
       markSqChanged();
     };
     const bindSqInteractions = () => {
+      globalThis.EzkartNative?.refresh();
       previewRoot?.querySelectorAll('[data-sq-block]').forEach(EzkartBackgrounds.migrate);
       previewRoot?.querySelectorAll(".animating, .sq-element-animate").forEach((element) => element.classList.remove("animating", "sq-element-animate"));
       previewRoot?.querySelectorAll('[data-sq-element-type="review"]').forEach((element) => renderReviewStars(element));
@@ -4539,6 +4545,7 @@
       previewRoot?.querySelectorAll("[data-sq-block]").forEach((block) => {
         ensureSectionHeightHandle(block);
         block.onclick = (event) => {
+          if(block.matches(".sq-native-section")&&event.altKey)return;
           event.stopPropagation();
           const sectionId = block.dataset.sectionId;
           selectSqSection(sectionId, true);
@@ -4569,12 +4576,12 @@
       });
       applyFluidLayouts();
       previewRoot?.querySelectorAll(".sq-free-code").forEach(renderCodeElement);
-      previewRoot?.querySelectorAll("[data-sq-fluid] > [data-sq-element],.sq-flow [data-sq-element]").forEach((element, index) => {
+      previewRoot?.querySelectorAll("[data-sq-fluid] > [data-sq-element],.sq-flow [data-sq-element],.sq-native-section [data-sq-element]").forEach((element, index) => {
         if (!element.dataset.sqElementId) element.dataset.sqElementId = `element-${Date.now()}-${index}`;
-        if (!element.closest(".sq-flow") && (element.matches("button") || element.querySelector("button"))) {
+        if (!element.closest(".sq-flow,.sq-native-section") && (element.matches("button") || element.querySelector("button"))) {
           applyButtonRoleToElement(element, element.dataset.sqButtonRole || (element.dataset.sqElementType === "navigation" ? "secondary" : "primary"));
         }
-        if (element.dataset.sqElementType !== "product-grid" && !element.closest(".sq-flow")) {
+        if (element.dataset.sqElementType !== "product-grid" && !element.closest(".sq-flow,.sq-native-section")) {
           const actions = element.matches("button,a") ? [element] : [...element.querySelectorAll("button,a")];
           actions.forEach((action) => {
             if (!action.dataset.sqLinkType) action.dataset.sqLinkType = inferredActionType(action);
@@ -4586,7 +4593,8 @@
         element.querySelectorAll("img").forEach((image) => { image.draggable = false; });
         bindDirectElementDrag(element);
         element.onclick = (event) => {
-          if(element.closest('.sq-flow')&&event.target.closest('a'))event.preventDefault();
+          if(element.matches('.sq-native')&&event.altKey)return;
+          if(element.closest('.sq-flow,.sq-native-section')&&event.target.closest('a'))event.preventDefault();
           event.stopPropagation();
           if (directDragSuppressClicks.has(element)) return;
           const section = element.closest("[data-section-id]");
@@ -4720,6 +4728,7 @@
           };
           content.onpointerdown = (event) => { event.stopPropagation(); startInlineEdit(); };
           content.onclick = (event) => {
+            if(content.matches(".sq-native")&&event.altKey)return;
             event.stopPropagation();
             const isAction = content.matches("a,button");
             if (isAction) event.preventDefault();
@@ -6631,8 +6640,8 @@
       const groups = [...(previewRoot?.querySelectorAll(":scope > [data-sq-block]") || [])].map((section) => {
         const sectionId = section.dataset.sectionId;
         const detailKey = Object.keys(layerDetails).sort((a, b) => b.length - a.length).find((key) => sectionId === key || sectionId.startsWith(`${key}-`));
-        const details = section.dataset.sqSectionName ? [section.dataset.sqSectionName, "Editable section", "layers"] : layerDetails[detailKey] || ["Section", "Editable section", "layers"];
-        const elements = [...section.querySelectorAll(section.matches(".sq-flow") ? "[data-sq-element]" : ":scope > [data-sq-element]")];
+        const details = section.matches(".sq-native-section") ? [EzkartNative.read(section).name||"Container section","Native containers","layers"] : section.dataset.sqSectionName ? [section.dataset.sqSectionName, "Editable section", "layers"] : layerDetails[detailKey] || ["Section", "Editable section", "layers"];
+        const elements = [...section.querySelectorAll(section.matches(".sq-flow,.sq-native-section") ? "[data-sq-element]" : ":scope > [data-sq-element]")];
         const sectionBackground = section.querySelector(":scope > .sq-section-background");
         elements.forEach((element, index) => { if (!element.dataset.sqElementId) element.dataset.sqElementId = `element-${sectionId.replace(/[^a-z0-9-]/gi, "-")}-${index + 1}-${Date.now()}`; });
         const wrapper = document.createElement("div");
@@ -6640,7 +6649,8 @@
         wrapper.dataset.sqLayerGroup = "";
         wrapper.dataset.sectionId = sectionId;
         const backgroundEntry = sectionBackground ? `<button type="button" class="sq-background-layer-entry" data-sq-background-layer="section" data-section-id="${escapeHtml(sectionId)}"><span>${iconMarkup("image")}</span><div><b>Background image</b><small>Click to edit crop, overlay, filters, and motion</small></div>${iconMarkup("chevron-right")}</button>` : "";
-        wrapper.innerHTML = `<button type="button" draggable="true" data-sq-layer data-section-id="${escapeHtml(sectionId)}">${iconMarkup("grip")}<span>${iconMarkup(details[2])}</span><div><b>${escapeHtml(details[0])}</b><small>${elements.length} element${elements.length === 1 ? "" : "s"} · ${escapeHtml(details[1])}</small></div>${iconMarkup("chevron-right")}</button><div class="sq-layer-elements" aria-label="${escapeHtml(details[0])} elements">${backgroundEntry}${elements.map((element) => `<button type="button" draggable="true" class="${element.classList.contains("sq-element-hidden") ? "element-hidden" : ""}" data-sq-element-layer="${escapeHtml(element.dataset.sqElementId)}"><span>${iconMarkup(elementLayerIcon(element.dataset.sqElementType))}</span><div><b>${escapeHtml(elementTypeName(element))}</b><small>${escapeHtml(elementLayerPreview(element))}</small></div>${iconMarkup("chevron-right")}</button>`).join("")}</div>`;
+        wrapper.innerHTML = `<button type="button" draggable="true" data-sq-layer data-section-id="${escapeHtml(sectionId)}">${iconMarkup("grip")}<span>${iconMarkup(details[2])}</span><div><b>${escapeHtml(details[0])}</b><small>${elements.length} element${elements.length === 1 ? "" : "s"} · ${escapeHtml(details[1])}</small></div>${iconMarkup("chevron-right")}</button><div class="sq-layer-elements" aria-label="${escapeHtml(details[0])} elements">${backgroundEntry}${elements.map((element) => `<button type="button" draggable="true" class="${element.classList.contains("sq-element-hidden") ? "element-hidden" : ""}" data-sq-element-layer="${escapeHtml(element.dataset.sqElementId)}"><span>${iconMarkup(elementLayerIcon(element.dataset.sqElementType))}</span><div><b>${escapeHtml(element.matches(".sq-native")?EzkartNative.read(element).name||elementTypeName(element):elementTypeName(element))}</b><small>${escapeHtml(elementLayerPreview(element))}</small></div>${iconMarkup("chevron-right")}</button>`).join("")}</div>`;
+        if(section.matches('.sq-native-section'))elements.forEach(element=>{const layer=wrapper.querySelector(`[data-sq-element-layer="${CSS.escape(element.dataset.sqElementId)}"]`);let depth=0,parent=element.parentElement;while(parent&&parent!==section){if(parent.matches('.sq-native'))depth++;parent=parent.parentElement;}layer.style.paddingLeft=`${12+depth*12}px`;layer.setAttribute('aria-level',depth+1);});
         return wrapper;
       });
       layerList.replaceChildren(...groups);
@@ -6664,6 +6674,7 @@
       }));return wrapper.innerHTML;
     };
     const newBlockMarkup = (type, sectionId) => {
+      if(type==='container')return `<section class="sq-page-block sq-native sq-native-section" data-sq-block data-section-id="${sectionId}" data-native-id="${sectionId}" data-native-type="container" data-sq-native='${escapeHtml(JSON.stringify({id:sectionId,type:'container',props:{display:'flex',flexDirection:'column',gap:'24px',paddingTop:'64px',paddingRight:'48px',paddingBottom:'64px',paddingLeft:'48px'}}))}'></section>`;
       const aliases = { "full-image": "image-wide", gallery: "image-pair", text: "story-split", testimonials: "quote", faq: "faq-list", products: "product-collection", checkout: "call-to-action" };
       const componentId = aliases[type] || type;
       if (globalThis.EzkartComponents?.definitions.some((item) => item.id === componentId)) {
@@ -6768,6 +6779,11 @@
       if(preferredLayout){const cell=section.clientWidth/fluidColumns();setFlowPosition(element,{x:(preferredLayout.x-1)*cell,y:(preferredLayout.y-1)*34,width:preferredLayout.width*cell,height:preferredLayout.height*34});}
     };
     const addLibraryElement = (type, section, preferredLayout = null) => {
+      if(type.startsWith('native-')||section?.matches('.sq-native-section')){
+        const nativeType=type.replace(/^native-/,'');if(!EzkartNative.tags[nativeType]){showToast('Choose a native container element.');return null;}
+        const parent=selectedElement?.matches('.sq-native')&&section.contains(selectedElement)?(['container','accordion','summary','button'].includes(selectedElement.dataset.nativeType)&&EzkartNative.read(selectedElement).text===undefined?selectedElement:selectedElement.parentElement.closest('.sq-native')):section;
+        const id=`native-${Date.now()}`,node={id,type:nativeType,text:['text','heading','button','summary'].includes(nativeType)?'Edit this text':undefined,props:EzkartNative.defaults[nativeType]};if(nativeType==='accordion')node.children=[{id:id+'-question',type:'summary',text:'Your question',props:EzkartNative.defaults.summary},{id:id+'-answer',type:'text',text:'Write your answer here.',props:{...EzkartNative.defaults.text,paddingTop:'16px'}}];return addNativeNode({section:section.dataset.sectionId,parent:parent?.dataset.nativeId,node});
+      }
       if (!section) return null;
       remember();
       ensureElementSection(section);
@@ -7246,7 +7262,7 @@
       const copyIds=new Map();blockCopy.querySelectorAll('[id]').forEach(node=>{const old=node.id;node.id=`${newId}--${old}`;copyIds.set(old,node.id);});
       blockCopy.querySelectorAll('[href^="#"],[aria-controls],[aria-describedby]').forEach(node=>{for(const attr of ['href','aria-controls','aria-describedby']){const value=node.getAttribute(attr);if(value&&copyIds.has(value.replace(/^#/,'')))node.setAttribute(attr,(attr==='href'?'#':'')+copyIds.get(value.replace(/^#/,'')));}});
 
-      ["desktop", "tablet", "mobile"].forEach((device) => { if(!block.matches(".sq-flow")||spacingState.has(spacingKey(selectedSection,device)))spacingState.set(spacingKey(newId, device), { ...readSpacing(selectedSection, device) }); }); blockCopy.classList.remove("selected"); blockCopy.querySelectorAll("[data-sq-element-id]").forEach((element, index) => { element.dataset.sqElementId = `element-${newId}-${index + 1}`; }); block.after(blockCopy); rebuildLayerList(); bindSqInteractions(); selectSqSection(newId, true); markSqChanged();
+      ["desktop", "tablet", "mobile"].forEach((device) => { if(!block.matches(".sq-flow")||spacingState.has(spacingKey(selectedSection,device)))spacingState.set(spacingKey(newId, device), { ...readSpacing(selectedSection, device) }); }); blockCopy.classList.remove("selected"); blockCopy.querySelectorAll("[data-sq-element-id]").forEach((element, index) => { element.dataset.sqElementId = `element-${newId}-${index + 1}`; }); if(blockCopy.matches(".sq-native-section"))EzkartNative.remapTree(blockCopy,newId);block.after(blockCopy); rebuildLayerList(); bindSqInteractions(); selectSqSection(newId, true); markSqChanged();
     });
     sqStudio.querySelector("[data-sq-visibility]")?.addEventListener("click", () => {
       const block = previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`); if (!block) return;
@@ -7388,7 +7404,7 @@
       } catch (_) { /* The public asset URL remains the fallback. */ }
     }));
     const collectExportCss = () => {
-      const tokens = [".sq-page-preview", ".sq-page-block", ".sq-page-background", ".sq-section-background", ".sq-announcement", ".sq-store-nav", ".sq-site-logo", ".sq-navigation-template", ".sq-nav-", ".sq-hero", ".sq-product", ".sq-image-story", ".sq-image-blend", ".sq-image-crop", ".sq-benefit", ".sq-cart", ".sq-shipping", ".sq-generated", ".sq-composition", ".sq-authored-navigation", ".sq-navigation-", ".sq-step-number", ".sq-image-placeholder", ".sq-free", ".sq-marquee", ".sq-surface", ".sq-color", ".element-animation", ".hover-", ".button-", ".ez-fluid", "@keyframes sq", "@keyframes element", ".product-art", ".icon", ".svg-sprite"];
+      const tokens = [".sq-page-preview", ".sq-page-block", ".sq-page-background", ".sq-section-background", ".sq-announcement", ".sq-store-nav", ".sq-site-logo", ".sq-navigation-template", ".sq-nav-", ".sq-hero", ".sq-product", ".sq-image-story", ".sq-image-blend", ".sq-image-crop", ".sq-benefit", ".sq-cart", ".sq-shipping", ".sq-generated", ".sq-composition", ".sq-authored-navigation", ".sq-navigation-", ".sq-native", ".sq-step-number", ".sq-image-placeholder", ".sq-free", ".sq-marquee", ".sq-surface", ".sq-color", ".element-animation", ".hover-", ".button-", ".ez-fluid", "@keyframes sq", "@keyframes element", ".product-art", ".icon", ".svg-sprite"];
       const collect = (rules) => [...rules].map((rule) => {
         if (rule.type === CSSRule.KEYFRAMES_RULE) return tokens.some((token) => rule.cssText.includes(token)) ? rule.cssText : "";
         if (rule.cssRules && !rule.selectorText) { const nested = collect(rule.cssRules); return nested ? `${rule.cssText.slice(0, rule.cssText.indexOf("{"))}{${nested}}` : ""; }
@@ -7508,7 +7524,7 @@
       clone.querySelectorAll("[data-sq-element]").forEach((node) => {
         const hover = node.dataset.sqHover;
         if (hover && hover !== "none") node.classList.add(`hover-${hover}`);
-        if(!node.closest(".sq-flow"))node.classList.add("ez-fluid-element");
+        if(!node.closest(".sq-flow,.sq-native-section"))node.classList.add("ez-fluid-element");
         node.dataset.ezkartElement = node.dataset.sqElementId;
         if (node.closest('.sq-composition,.sq-generated-blank')) {
           if (node.dataset.sqAutoHeight === 'true' || node.dataset.sqElementType === 'product-grid') node.dataset.ezkartAutoHeight = 'true';
@@ -7558,9 +7574,9 @@
         const lineTops = new Set([...range.getClientRects()].filter((rect) => rect.width > 0 && rect.height > 0).map((rect) => Math.round(rect.top)));
         return lineTops.size <= 1;
       }).map((element) => element.dataset.sqElementId));
-      const spacingCssFor = (device) => [...previewRoot.querySelectorAll("[data-section-id]")].filter(node=>!node.matches(".sq-flow")||spacingState.has(spacingKey(node.dataset.sectionId,device))).map(node => { const section = node.dataset.sectionId, value = readSpacing(section, device); return `[data-ezkart-section="${section}"]{padding:${value.top}px ${value.right}px ${value.bottom}px ${value.left}px!important}`; }).join("\n");
+      const spacingCssFor = (device) => [...previewRoot.querySelectorAll("[data-section-id]")].filter(node=>!node.matches(".sq-native-section")&&(!node.matches(".sq-flow")||spacingState.has(spacingKey(node.dataset.sectionId,device)))).map(node => { const section = node.dataset.sectionId, value = readSpacing(section, device); return `[data-ezkart-section="${section}"]{padding:${value.top}px ${value.right}px ${value.bottom}px ${value.left}px!important}`; }).join("\n");
       const fluidCssFor = (device) => [...previewRoot.querySelectorAll("[data-sq-fluid]")].map((section) => { const spacing = readSpacing(section.dataset.sectionId, device); return `[data-ezkart-section="${section.dataset.sectionId}"]{--sq-fluid-row-height:${fluidRowHeight(section, device)}px;--sq-fluid-columns:${fluidColumns(device)};--sq-fluid-rows:${Math.max(fluidMinRows(section, device), sectionContentRows(section, device))};--sq-section-pad-left:${spacing.left}px;--sq-section-pad-right:${spacing.right}px}`; }).join("\n");
-      const elementCssFor = (device) => [...previewRoot.querySelectorAll("[data-sq-element]")].filter(node=>!node.closest(".sq-flow")).map((element) => { const layout = parseElementLayout(element, device); const inset = elementInsetFor(element, device); const padding = element.classList.contains("sq-custom-inset") ? `padding:${inset.top}px ${inset.right}px ${inset.bottom}px ${inset.left}px!important;` : ""; const headingWrap = !element.closest(".sq-composition") && singleLineDesktopHeadings.has(element.dataset.sqElementId) ? `white-space:${device === "desktop" ? "nowrap" : "normal"}!important;` : ""; return `.ez-fluid-element[data-ezkart-element="${element.dataset.sqElementId}"]{grid-column:${layout.x}/span ${layout.width}!important;grid-row:${layout.y}/span ${layout.height}!important;${padding}${headingWrap}${element.classList.contains("sq-responsive-type")?`font-size:${EzkartTypography.fontSize(element,device)}!important;`:""}}`; }).join("\n");
+      const elementCssFor = (device) => [...previewRoot.querySelectorAll("[data-sq-element]")].filter(node=>!node.closest(".sq-flow,.sq-native-section")).map((element) => { const layout = parseElementLayout(element, device); const inset = elementInsetFor(element, device); const padding = element.classList.contains("sq-custom-inset") ? `padding:${inset.top}px ${inset.right}px ${inset.bottom}px ${inset.left}px!important;` : ""; const headingWrap = !element.closest(".sq-composition") && singleLineDesktopHeadings.has(element.dataset.sqElementId) ? `white-space:${device === "desktop" ? "nowrap" : "normal"}!important;` : ""; return `.ez-fluid-element[data-ezkart-element="${element.dataset.sqElementId}"]{grid-column:${layout.x}/span ${layout.width}!important;grid-row:${layout.y}/span ${layout.height}!important;${padding}${headingWrap}${element.classList.contains("sq-responsive-type")?`font-size:${EzkartTypography.fontSize(element,device)}!important;`:""}}`; }).join("\n");
       const productCssFor = (device) => [...previewRoot.querySelectorAll('[data-sq-element-type="product-grid"]')].map((element) => {
         const settings = productGridSettings(element, device);
         const density = { compact: ["150px", "clamp(96px,58cqw,175px)", "11px", "none"], balanced: ["220px", "clamp(120px,62cqw,250px)", "18px", "block"], showcase: ["310px", "clamp(180px,70cqw,360px)", "18px", "block"] }[settings.density] || ["220px", "clamp(120px,62cqw,250px)", "18px", "block"];
@@ -7664,6 +7680,8 @@ const fit=()=>{frame=0;const next=innerWidth<=600?'mobile':innerWidth<=900?'tabl
 const schedule=()=>{if(!frame)frame=requestAnimationFrame(fit)};
 addEventListener('resize',schedule);document.addEventListener('toggle',schedule,true);document.addEventListener('load',schedule,true);document.fonts?.ready.then(schedule);schedule();
 })();<\/script>` : '';
+      const nativeScript = clone.querySelector('.sq-native') ? `<script>(${EzkartNative.mount.toString()})(document.querySelector('.sq-page-preview'));<\/script>` : '';
+      clone.removeAttribute('data-native-mounted');
       const showcaseScript = clone.querySelector('.sq-reference') && globalThis.EzkartShowcase ? `<script>(${globalThis.EzkartShowcase.mount.toString()})(document.querySelector('.sq-page-preview'));<\/script>` : '';
       const fontBase = exportFontData.get(400) || new URL("assets/fonts/poppins-400.woff2", exportBase).href;
       const fontMedium = exportFontData.get(500) || new URL("assets/fonts/poppins-500.woff2", exportBase).href;
@@ -7673,7 +7691,7 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
       const motionStyles = hasScrollMotion ? `<style>.ezkart-scroll-frame{position:relative!important;overflow:hidden!important;contain:paint}.ezkart-scroll-frame>.ezkart-scroll-media{width:100%!important;max-width:none!important;height:100%;position:absolute!important;left:0!important;top:50%!important;display:block;object-fit:cover;transform:translate3d(0,calc(-50% + var(--ezkart-scroll-y,0px)),0) scale(calc(var(--ezkart-scroll-scale,1) * var(--sq-image-crop-zoom,1)));transform-origin:center;will-change:transform;backface-visibility:hidden}@media(prefers-reduced-motion:reduce){.ezkart-scroll-frame>.ezkart-scroll-media{height:100%!important;transform:translate3d(0,-50%,0) scale(var(--sq-image-crop-zoom,1))!important;will-change:auto}}</style>` : "";
       const libraryPreviewStyles = libraryPreview ? `<style id="ezkart-library-preview-style">.sq-free-marquee .sq-marquee-track{animation:none!important;transform:translate3d(0,0,0)!important;will-change:auto!important}</style>` : "";
       const motionScripts = hasScrollMotion ? `<script>(()=>{const frames=[...document.querySelectorAll('.ezkart-scroll-frame')].map(frame=>({frame,media:frame.querySelector(':scope>.ezkart-scroll-media'),effect:frame.dataset.ezkartScrollEffect||'parallax',strength:Math.max(0,Math.min(100,Number(frame.dataset.ezkartScrollStrength)||0))/100,damping:frame.dataset.ezkartScrollDamping!=='false',y:null,yVelocity:0,scale:1,scaleVelocity:0,coverScale:1})).filter(item=>item.media);if(!frames.length)return;const reduced=matchMedia('(prefers-reduced-motion: reduce)');let raf=0,lastTime=0,viewportHeight=1;const clamp=value=>Math.max(0,Math.min(1,value));const damp=(value,velocity,target,delta,smoothTime)=>{const omega=2/smoothTime,x=omega*delta,decay=1/(1+x+.48*x*x+.235*x*x*x),change=value-target,temp=(velocity+omega*change)*delta;return[target+(change+temp)*decay,(velocity-omega*temp)*decay]};const render=time=>{raf=0;if(reduced.matches)return;const delta=Math.min(.05,lastTime?Math.max(0,(time-lastTime)/1000):1/60);lastTime=time;let moving=false;frames.forEach(item=>{const rect=item.frame.getBoundingClientRect();if(rect.bottom<-viewportHeight*.25||rect.top>viewportHeight*1.25)return;const progress=clamp((viewportHeight-rect.top)/(viewportHeight+rect.height)),reverse=item.effect==='parallax-reverse',rate=reverse?item.strength*.35:item.strength,zoom=item.effect==='zoom';const yTarget=zoom?0:(progress-.5)*(viewportHeight+rect.height)*rate*(reverse?-1:1),scaleTarget=zoom?1+progress*item.strength*.3:item.coverScale;if(item.y===null){item.y=yTarget;item.scale=scaleTarget}else if(item.damping){[item.y,item.yVelocity]=damp(item.y,item.yVelocity,yTarget,delta,.11);if(zoom)[item.scale,item.scaleVelocity]=damp(item.scale,item.scaleVelocity,scaleTarget,delta,.11);else{item.scale=scaleTarget;item.scaleVelocity=0}}else{item.y=yTarget;item.yVelocity=0;item.scale=scaleTarget;item.scaleVelocity=0}item.media.style.setProperty('--ezkart-scroll-y',item.y.toFixed(3)+'px');item.media.style.setProperty('--ezkart-scroll-scale',item.scale.toFixed(5));if(item.damping&&(Math.abs(yTarget-item.y)>.02||Math.abs(item.yVelocity)>.02||zoom&&(Math.abs(scaleTarget-item.scale)>.0001||Math.abs(item.scaleVelocity)>.0001)))moving=true});if(moving)raf=requestAnimationFrame(render)};const schedule=()=>{if(!raf){lastTime=0;raf=requestAnimationFrame(render)}};const measure=()=>{viewportHeight=Math.max(1,document.documentElement.clientHeight||innerHeight);frames.forEach(item=>{const frameHeight=Math.max(1,item.frame.clientHeight),reverse=item.effect==='parallax-reverse',rate=reverse?item.strength*.35:item.strength,overscan=reverse?(viewportHeight+frameHeight)*rate:Math.max(0,viewportHeight-frameHeight)*rate;item.coverScale=item.effect==='zoom'||reduced.matches||!rate?1:1+(overscan+4)/frameHeight;if(item.scale<item.coverScale){item.scale=item.coverScale;item.scaleVelocity=0}if(reduced.matches){item.y=null;item.yVelocity=0;item.scale=1;item.scaleVelocity=0;item.media.style.removeProperty('--ezkart-scroll-y');item.media.style.removeProperty('--ezkart-scroll-scale')}});schedule()};addEventListener('scroll',schedule,{passive:true});addEventListener('touchmove',schedule,{passive:true});addEventListener('resize',measure,{passive:true});addEventListener('orientationchange',measure,{passive:true});addEventListener('pageshow',measure);window.visualViewport?.addEventListener('resize',measure,{passive:true});reduced.addEventListener?.('change',measure);if(typeof ResizeObserver==='function'){const observer=new ResizeObserver(measure);frames.forEach(item=>observer.observe(item.frame))}document.fonts?.ready.then(measure);measure()})();<\/script>` : "";
-      return `<!doctype html>\n<html lang="id">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1">\n<title>${escapeHtml(pageName)}</title>\n<meta name="description" content="${escapeHtml(pageDescription)}">\n${motionStyles}\n<style>@font-face{font-family:Poppins;src:url('${fontBase}') format('woff2');font-weight:400}@font-face{font-family:Poppins;src:url('${fontMedium}') format('woff2');font-weight:500}@font-face{font-family:Poppins;src:url('${fontSemibold}') format('woff2');font-weight:600}@font-face{font-family:Poppins;src:url('${fontBold}') format('woff2');font-weight:700}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:#fff;font-family:Poppins,Arial,sans-serif}.svg-sprite{width:0;height:0;position:absolute;overflow:hidden}@media(prefers-reduced-motion:reduce){*{animation:none!important;scroll-behavior:auto!important}}\n${css}\n${responsiveSpacing}\n</style>\n${commerceStyles}\n${libraryPreviewStyles}\n</head>\n<body>\n${sprite}\n${clone.outerHTML}\n${pinnedNavigationHtml}\n${selectedProducts().length ? commerceMarkup : ""}\n${motionScripts}\n${commerceScript}\n${compositionScript}\n${showcaseScript}\n</body>\n</html>`;
+      return `<!doctype html>\n<html lang="id">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1">\n<title>${escapeHtml(pageName)}</title>\n<meta name="description" content="${escapeHtml(pageDescription)}">\n${motionStyles}\n<style>@font-face{font-family:Poppins;src:url('${fontBase}') format('woff2');font-weight:400}@font-face{font-family:Poppins;src:url('${fontMedium}') format('woff2');font-weight:500}@font-face{font-family:Poppins;src:url('${fontSemibold}') format('woff2');font-weight:600}@font-face{font-family:Poppins;src:url('${fontBold}') format('woff2');font-weight:700}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:#fff;font-family:Poppins,Arial,sans-serif}.svg-sprite{width:0;height:0;position:absolute;overflow:hidden}@media(prefers-reduced-motion:reduce){*{animation:none!important;scroll-behavior:auto!important}}\n${css}\n${responsiveSpacing}\n</style>\n${commerceStyles}\n${libraryPreviewStyles}\n</head>\n<body>\n${sprite}\n${clone.outerHTML}\n${pinnedNavigationHtml}\n${selectedProducts().length ? commerceMarkup : ""}\n${motionScripts}\n${commerceScript}\n${compositionScript}\n${nativeScript}\n${showcaseScript}\n</body>\n</html>`;
     };
     sqStudio.querySelector("[data-sq-export]")?.addEventListener("click", async () => {
       await exportFontsReady;
@@ -7861,6 +7879,23 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
         lastCanvasWidth=width;setZoom(fitZoomForDevice());
       }).observe(sqStudio.querySelector('.sq-canvas-scroll'));
     }
+    const nativeFind=id=>previewRoot.querySelector(`[data-native-id="${CSS.escape(id)}"]`);
+    const addNativeNode=({section:sectionId,parent,node,sectionProps}={})=>{
+      const section=previewRoot.querySelector(`[data-section-id="${CSS.escape(sectionId)}"]`);if(!section)throw Error('Choose a section.');
+      EzkartNative.validate(node);const pending=[];const walk=n=>{pending.push(n.id);(n.children||[]).forEach(walk);};walk(node);
+      if(pending.some(id=>nativeFind(id)))throw Error('An element ID is already in use.');
+      if(!section.matches('.sq-native-section')&&section.querySelector('[data-sq-element]'))throw Error('Start with a blank section or choose an existing container.');
+      if(parent){const target=nativeFind(parent);if(!target||!section.contains(target)||!['container','accordion','summary','button'].includes(target.dataset.nativeType)||EzkartNative.read(target).text!==undefined)throw Error('Choose a parent container in this section.');}
+      remember();
+      if(node.id===sectionId&&!parent){const element=EzkartNative.create(node);element.classList.add('sq-page-block','sq-native-section');element.dataset.sqBlock='';element.dataset.sectionId=sectionId;element.removeAttribute('data-sq-element');section.replaceWith(element);EzkartNative.refresh();rebuildLayerList();bindSqInteractions();markSqChanged();return element;}
+      if(!section.matches('.sq-native-section')){
+        section.className='sq-page-block sq-native sq-native-section';section.removeAttribute('data-sq-fluid');section.removeAttribute('style');section.replaceChildren();section.dataset.nativeId=sectionId;section.dataset.nativeType='container';
+        EzkartNative.write(section,{id:sectionId,type:'container',props:sectionProps||{display:'block',fontFamily:'Poppins, sans-serif',fontSize:'14px',color:'#222222'}});
+      }
+      const target=parent?nativeFind(parent):section;if(!target||!section.contains(target)&&target!==section)throw Error('Choose a parent in this section.');
+      const element=EzkartNative.create(node);target.append(element);EzkartNative.refresh();rebuildLayerList();bindSqInteractions();markSqChanged();return element;
+    };
+    EzkartNative.init({root:previewRoot,inspector,remember,changed:markSqChanged,rebind:()=>{rebuildLayerList();bindSqInteractions();},move:args=>globalThis.EzkartBuilder.nativeMove(args),toast:showToast,select:node=>{if(node?.matches('.sq-native-section'))selectSqSection(node.dataset.sectionId,true);else if(node)selectSqElement(node);}});
     let nativeFitFrame = 0;
     const fitNativeContent = () => {
       nativeFitFrame = 0;
@@ -7905,13 +7940,22 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
       sections:[...previewRoot.querySelectorAll(':scope > [data-sq-block]')].map(section=>({
         id:section.dataset.sectionId,name:section.dataset.sqSectionName || sectionNames[section.dataset.sectionId] || 'Section',component:section.dataset.sqComposition || section.dataset.sqNavTemplate || null,
         spacing:readSpacing(section.dataset.sectionId),background:{type:EzkartBackgrounds.type(section),color:sectionBackgroundColor(section),gradient:EzkartBackgrounds.read(section)},
-        elements:[...section.querySelectorAll(section.matches('.sq-flow')?'[data-sq-element]':':scope > [data-sq-element]')].map(element=>({id:element.dataset.sqElementId,type:element.dataset.sqElementType,text:element.textContent.trim().slice(0,600),layout:element.closest('.sq-flow')?{mode:'flow',...readFlowPosition(element)}:parseElementLayout(element),image:element.querySelector('img')?.getAttribute('src') || null,fields:editableNodesFor(section).filter(node=>element.contains(node)).map(node=>({tag:node.tagName.toLowerCase(),text:node.textContent}))}))
+        elements:[...section.querySelectorAll(section.matches('.sq-flow,.sq-native-section')?'[data-sq-element]':':scope > [data-sq-element]')].map(element=>({id:element.dataset.sqElementId,type:element.dataset.sqElementType,text:element.textContent.trim().slice(0,600),layout:element.matches('.sq-native')?{mode:'container',...EzkartNative.read(element).props}:element.closest('.sq-flow')?{mode:'flow',...readFlowPosition(element)}:parseElementLayout(element),image:element.querySelector('img')?.getAttribute('src') || null,fields:editableNodesFor(section).filter(node=>element.contains(node)).map(node=>({tag:node.tagName.toLowerCase(),text:node.textContent}))}))
       }))
     });
     globalThis.EzkartBuilder = Object.freeze({
       version:1,
       inspect:inspectBuilder,
       catalog:()=>readCatalogProducts(),
+      nativeInsert(args){const element=addNativeNode(args);return {id:element.dataset.nativeId,count:1+element.querySelectorAll('.sq-native').length};},
+      nativeUpdate({id,props,fill,responsive,text,marks,action,states,src,poster,captions,captionsText,open,fit,scrollMotion,name,alt,label,icon,iconFill,iconStroke,iconWeight,muted,controls,loop,autoplay,collapsed}={}){
+        const element=nativeFind(id);if(!element)throw Error('Native element not found.');const old=EzkartNative.read(element),next={...old,...Object.fromEntries(Object.entries({fill,responsive,text,marks,action,states,src,poster,captions,captionsText,open,fit,scrollMotion,name,alt,label,icon,iconFill,iconStroke,iconWeight,muted,controls,loop,autoplay,collapsed}).filter(([,value])=>value!==undefined)),props:{...old.props,...props}};
+        if(text!==undefined&&marks===undefined){const updated=EzkartNative.editText({...old},text);next.marks=updated.marks;}EzkartNative.validate(next);remember();EzkartNative.write(element,next);if(text!==undefined||marks!==undefined)EzkartNative.renderText(element,next);
+        if(src!==undefined)element.src=src;if(element.tagName==='VIDEO')EzkartNative.syncMedia(element,next);if(poster!==undefined)element.poster=poster;if(open!==undefined)element.open=open;if(collapsed!==undefined){element.hidden=collapsed;element.toggleAttribute('data-native-collapsed',collapsed);}if(alt!==undefined&&element.tagName==='IMG')element.alt=alt;if(label!==undefined)element.setAttribute('aria-label',label);if(icon!==undefined&&element.tagName.toLowerCase()==='svg')element.innerHTML=EzkartNativeIcons[icon]||'';if(action?.type==='link'&&element.tagName==='A')element.href=action.target;
+        EzkartNative.refresh();markSqChanged();return {id,config:next};
+      },
+      nativeInspect({id}={}){const element=id?nativeFind(id):previewRoot;if(!element)throw Error('Native element not found.');return id?EzkartNative.read(element):[...element.querySelectorAll('.sq-native')].map(n=>({id:n.dataset.nativeId,parent:n.parentElement.closest('.sq-native')?.dataset.nativeId,...EzkartNative.read(n)}));},
+      nativeMove({id,parent,before}={}){const element=nativeFind(id),target=nativeFind(parent),anchor=before?nativeFind(before):null;if(!element||!target||element.matches('.sq-native-section')||!['container','accordion','summary','button'].includes(target.dataset.nativeType)||EzkartNative.read(target).text!==undefined||element===target||element.contains(target))throw Error('Choose a valid parent container.');if(anchor&&anchor.parentElement!==target)throw Error('The before element must be in the target container.');remember();target.insertBefore(element,anchor);rebuildLayerList();bindSqInteractions();markSqChanged();return {id,parent};},
       components:()=>({sections:globalThis.EzkartComponents?.definitions || [],navigation:globalThis.EzkartComponents?.navDefinitions || []}),
       async settle(){await settleBuilder();return inspectBuilder();},
       async addSection({component,id,content={},productId,after}={}) {
@@ -7921,7 +7965,7 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
         const product=productId ? catalog.find(item=>item.id===productId) : catalog[0];
         if(productId && !product) throw new Error('Choose a product connected to this page.');
         const wrapper=document.createElement('div');
-        wrapper.innerHTML=component==='blank'?newBlockMarkup('blank',sectionId):nativeComponentMarkup(component,{sectionId,content,product,products:catalog});
+        wrapper.innerHTML=['blank','container'].includes(component)?newBlockMarkup(component,sectionId):nativeComponentMarkup(component,{sectionId,content,product,products:catalog});
         const section=wrapper.firstElementChild;
         const anchor=after ? builderSection(after) : null;
         remember(); if(anchor) anchor.after(section); else previewRoot.append(section);

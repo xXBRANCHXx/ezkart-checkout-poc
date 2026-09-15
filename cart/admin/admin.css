@@ -690,10 +690,10 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .dashboard-page .order-link,
 .dashboard-page .upgrade-card a,
 .dashboard-page .payout-panel footer a { font-weight: 500 !important; }
-.dashboard-page strong,
-.dashboard-page h1,
-.dashboard-page h2,
-.dashboard-page h3 { font-weight: 600 !important; }
+.dashboard-page strong:not(.sq-native),
+.dashboard-page h1:not(.sq-native),
+.dashboard-page h2:not(.sq-native),
+.dashboard-page h3:not(.sq-native) { font-weight: 600 !important; }
 .dashboard-page .primary-nav a b,
 .dashboard-page .kpi-grid em,
 .dashboard-page .payout-body em,

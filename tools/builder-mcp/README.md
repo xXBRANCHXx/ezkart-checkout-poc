@@ -37,6 +37,7 @@ Place `catalog.json` in the workspace with the same product objects returned by 
 - `catalog_list`, `project_list`, `project_create`, `project_open`
 - `component_list`, `page_inspect`
 - `section_add`, `section_update`, `section_move`, `section_remove`
+- `native_add`, `native_update`, `native_inspect`, `native_move`
 - `element_add`, `element_update`, `product_grid_update`, `navigation_set`, `theme_update`
 - `device_set`, `page_audit`, `page_screenshot`
 - `undo`, `redo`, `project_save`, `page_export`
@@ -51,8 +52,18 @@ The completed ZERO example can be recreated through the MCP protocol with `node 
 
 **Legacy reference import:** the previous Ezkart.id remake used source-derived HTML/CSS registered as components. That preserves the appearance but does not demonstrate construction from the builder’s ordinary controls. Keep it for compatibility with saved drafts; do not use it as the builder-only authoring example.
 
-The Ezkart.id reference can be recreated with `node examples/ezkart-id.mjs unique-project-id`. It builds nine native sections through MCP, uses the original marketing illustrations, and attaches no catalog products. Exported fonts and captions are self-contained. Navigation, the responsive demonstration, FAQ disclosures, and the accessible film dialog share their runtime with the editor.
+The current Ezkart.id reconstruction uses `node examples/ezkart-id.mjs unique-project-id`. It starts with blank sections and calls `native_add` for typed containers, rich text, buttons, icons, images, accordions and video. The editable recipe is `examples/ezkart-native.json`; it contains content and inspector properties, without source HTML, CSS selectors, source classes, or custom JavaScript. The example records its public MCP calls under workspace `logs/` and creates a new draft, refusing to overwrite an existing project.
 
+The **Flexible elements** group in Add exposes these same primitives. Their inspector includes:
+
+- Nested flex/grid containers, exact sizing, margins, padding, alignment, positioning and container sizing.
+- Rich text ranges: select words on the canvas or in the Text field, then apply a solid color or gradient. Other words keep their existing style.
+- Background or text gradients with up to eight layers and twelve stops per layer, editable angles, radial centers and stop positions. These fills apply to buttons too.
+- Custom minimum/maximum width breakpoints and named interaction states, with separate responsive overrides for each state.
+- Show/hide controls, state switches, links, accordions, accessible video dialogs and play/pause controls. Video includes poster, captions URL or embedded WebVTT, loop, mute and autoplay controls.
+- Proportional composition scaling and scroll tilt/travel that respect reduced motion.
+
+`native_inspect` returns the hierarchy and saved control values. `native_update` edits those values, and `native_move` reparents a node. Canvas selection, drag/resize, duplication, history, save/reload and export use the same typed model. The native section exporter preserves its own spacing and breakpoints instead of applying grid defaults.
 Component thumbnails are screenshots of these actual components, using the existing Ezkart marketing illustration. To regenerate them, run `node scripts/build-previews.mjs` (requires ImageMagick). Its illustrative product fixture exists only in a temporary workspace. To refresh the reference source, run `node scripts/build-showcase.mjs`; an optional directory argument reads a previously retrieved `index.html`, `styles.css`, and `overview-id.vtt` instead. Review any upstream content changes before committing generated files.
 
 ## Authoring from a blank canvas
