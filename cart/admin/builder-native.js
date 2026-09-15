@@ -68,6 +68,7 @@
       marginRight: "length",
       marginBottom: "length",
       marginLeft: "length",
+      scrollMarginTop: "length",
     },
     Typography: {
       fontFamily: "text",
@@ -185,6 +186,7 @@
     button: ["a", "button"],
     image: ["img"],
     product: ["div"],
+    commerce: ["div"],
     icon: ["svg"],
     video: ["video"],
     accordion: ["details"],
@@ -192,6 +194,7 @@
     break: ["br"],
   };
   const defaults = {
+    commerce: { display: "block", width: "100%", fontSize: "14px" },
     product: {
       display: "grid",
       gridTemplateColumns: "minmax(0, 1fr)",
@@ -249,6 +252,7 @@
       container: "Layout group",
       text: "Paragraph",
       product: "Product card",
+      commerce: "Product control",
       accordion: "Expandable answer",
       summary: "Answer heading",
     })[type] || label(type);
@@ -395,6 +399,45 @@
         !Number.isFinite(config.fit.extra))
     )
       throw Error("Enter valid frame dimensions.");
+    if (config.type === "commerce") {
+      if (
+        ![
+          "image",
+          "options",
+          "price",
+          "title",
+          "description",
+          "add",
+          "cart",
+        ].includes(config.part)
+      )
+        throw Error("Choose a product control.");
+      if (
+        config.part !== "cart" &&
+        !/^[a-zA-Z0-9_-]{1,120}$/.test(config.productId || "")
+      )
+        throw Error("Choose a catalog product.");
+      if (config.group && !identifier(config.group))
+        throw Error(
+          "Use letters, numbers and hyphens for the shared selection name.",
+        );
+      if (
+        config.optionLayout &&
+        !["compact", "detailed"].includes(config.optionLayout)
+      )
+        throw Error("Choose compact or detailed options.");
+    }
+    if (config.scrollVisibility) {
+      const v = config.scrollVisibility;
+      if (
+        (v.after && !identifier(v.after)) ||
+        !Array.isArray(v.hideWhile || []) ||
+        (v.hideWhile || []).some((id) => !identifier(id))
+      )
+        throw Error(
+          "Choose valid section or element IDs for scroll visibility.",
+        );
+    }
     if (config.src) safeUrl(config.src);
     if (config.poster) safeUrl(config.poster);
     if (config.captions) safeUrl(config.captions);
@@ -643,7 +686,42 @@
     const find = (id) =>
       root.querySelector(`[data-native-id="${CSS.escape(id)}"]`);
     let opener, dialog;
-    const motion = () =>
+    const visibility = () => {
+      root
+        .querySelectorAll("[data-native-scroll-visibility]")
+        .forEach((node) => {
+          const v = JSON.parse(node.dataset.nativeScrollVisibility);
+          const viewport = editing
+            ? root.closest(".sq-canvas-scroll")?.getBoundingClientRect()
+            : { top: 0, bottom: innerHeight };
+          if (!viewport) return;
+          const after = find(v.after)?.getBoundingClientRect();
+          const covered = (v.hideWhile || []).some((id) => {
+            const rect = find(id)?.getBoundingClientRect();
+            return (
+              rect && rect.top < viewport.bottom && rect.bottom > viewport.top
+            );
+          });
+          const visible =
+            (!after || after.bottom < viewport.top) &&
+            !covered &&
+            !document.body.classList.contains("ezkart-cart-open");
+          if (
+            !editing &&
+            node.showPopover &&
+            getComputedStyle(node).position === "fixed"
+          ) {
+            node.hidden = false;
+            node.setAttribute("popover", "manual");
+            if (visible && !node.matches(":popover-open")) node.showPopover();
+            if (!visible && node.matches(":popover-open")) node.hidePopover();
+          } else
+            node.hidden =
+              !visible && !node.classList.contains("sq-element-selected");
+        });
+    };
+    const motion = () => {
+      visibility();
       root.querySelectorAll("[data-native-motion]").forEach((node) => {
         const m = JSON.parse(node.dataset.nativeMotion),
           f = node.dataset.nativeFit
@@ -662,6 +740,7 @@
           progress = Math.min(1, Math.max(0, (viewport - top) / viewport));
         node.style.transform = `rotateX(${m.tilt * (1 - progress)}deg) translateY(${m.travel * progress}px)`;
       });
+    };
     let pending = false;
     const scheduleMotion = () => {
       if (pending) return;
@@ -672,11 +751,20 @@
       });
     };
     window.addEventListener("scroll", scheduleMotion, { passive: true });
+    document.addEventListener("ezkart:cart-visibility", scheduleMotion);
+    window.addEventListener("resize", scheduleMotion);
     root
       .closest(".sq-canvas-scroll")
       ?.addEventListener("scroll", scheduleMotion, { passive: true });
     const fit = () => {
       root.style.setProperty("--native-vw", `${root.clientWidth / 100}px`);
+      const stickyHeight = Math.max(
+        0,
+        ...[...root.children]
+          .filter((node) => getComputedStyle(node).position === "sticky")
+          .map((node) => node.getBoundingClientRect().height),
+      );
+      root.style.setProperty("--native-sticky-inset", `${stickyHeight + 20}px`);
       root.querySelectorAll("[data-native-fit]").forEach((node) => {
         const f = JSON.parse(node.dataset.nativeFit),
           parent = node.parentElement;
@@ -792,9 +880,10 @@
         root
           .querySelectorAll("[data-native-collapsed]")
           .forEach((n) => (n.hidden = true));
-        root
-          .querySelectorAll(".sq-native[aria-expanded=true]")
-          .forEach((n) => n.setAttribute("aria-expanded", "false"));
+        root.querySelectorAll(".sq-native[aria-expanded=true]").forEach((n) => {
+          n.setAttribute("aria-expanded", "false");
+          n.focus();
+        });
       }
     });
     if (!editing && typeof IntersectionObserver === "function") {
@@ -939,6 +1028,13 @@
     sheet.textContent = stylesheet(hooks.root);
     hooks.root.querySelectorAll(".sq-native").forEach((node) => {
       const config = read(node);
+      node.toggleAttribute(
+        "data-native-pinned",
+        [
+          config.props,
+          ...(config.responsive || []).map((rule) => rule.props),
+        ].some((props) => ["sticky", "fixed"].includes(props?.position)),
+      );
       if (config.type === "product")
         hooks.renderProduct?.(node, config.productId);
       if (config.action)
@@ -947,6 +1043,15 @@
       node.dataset.nativeAutoplay = String(Boolean(config.autoplay));
       if (config.fit) node.dataset.nativeFit = JSON.stringify(config.fit);
       else delete node.dataset.nativeFit;
+      if (config.scrollVisibility)
+        node.dataset.nativeScrollVisibility = JSON.stringify(
+          config.scrollVisibility,
+        );
+      else if (node.hasAttribute("data-native-scroll-visibility")) {
+        delete node.dataset.nativeScrollVisibility;
+        node.removeAttribute("popover");
+        node.hidden = Boolean(config.collapsed);
+      }
       if (config.scrollMotion)
         node.dataset.nativeMotion = JSON.stringify(config.scrollMotion);
       else delete node.dataset.nativeMotion;
@@ -957,6 +1062,11 @@
         if (target) node.setAttribute("aria-controls", target.id);
       }
     });
+    globalThis.EzkartCommerce?.mount(
+      hooks.root,
+      hooks.products?.() || [],
+      true,
+    );
     mount(hooks.root, true);
     hooks.root.dispatchEvent(new Event("native-refresh"));
   }
@@ -970,7 +1080,12 @@
   function change(patch) {
     if (!selected) return;
     const config = read(selected);
-    if (patch.text !== undefined && config.text === undefined) return;
+    if (
+      patch.text !== undefined &&
+      (config.text === undefined || patch.text === config.text) &&
+      Object.keys(patch).length === 1
+    )
+      return;
     const target = getContext(config);
     if (patch.text !== undefined) editText(config, patch.text);
     Object.assign(target, patch, {
@@ -1707,8 +1822,8 @@
     if (!selected) return;
     const config = read(selected);
     panel.querySelector("[data-native-product-controls]").hidden =
-      config.type !== "product";
-    if (config.type === "product") {
+      !["product", "commerce"].includes(config.type) || config.part === "cart";
+    if (["product", "commerce"].includes(config.type)) {
       const products = hooks.products?.() || [];
       const field = panel.querySelector("[data-native-product-id]");
       field.replaceChildren(
@@ -1719,6 +1834,38 @@
           new Option("Product no longer available", config.productId),
         );
       field.value = config.productId;
+    }
+    panel.querySelector("[data-native-commerce-controls]").hidden =
+      config.type !== "commerce";
+    if (config.type === "commerce") {
+      for (const key of [
+        "part",
+        "group",
+        "label",
+        "prefix",
+        "suffix",
+        "priceSuffix",
+        "optionLayout",
+      ])
+        panel.querySelector(`[data-commerce-setting="${key}"]`).value =
+          config[key] || (key === "optionLayout" ? "compact" : "");
+      panel.querySelector('[data-commerce-setting="showPrice"]').checked =
+        Boolean(config.showPrice);
+      const visible = {
+        part: true,
+        group: config.part !== "cart",
+        label: ["options", "add", "cart"].includes(config.part),
+        optionLayout: config.part === "options",
+        prefix: ["price", "title", "description"].includes(config.part),
+        suffix: ["price", "title", "description"].includes(config.part),
+        priceSuffix:
+          config.part === "options" && config.optionLayout === "detailed",
+        showPrice: config.part === "add",
+      };
+      for (const [key, show] of Object.entries(visible))
+        panel
+          .querySelector(`[data-commerce-setting="${key}"]`)
+          .closest("label").hidden = !show;
     }
     panel.querySelector("[data-native-content-title]").textContent =
       config.text !== undefined ? "Text" : label(config.type);
@@ -1945,6 +2092,11 @@
     for (const key of ["tilt", "travel"])
       panel.querySelector(`[data-native-motion-${key}]`).value =
         config.scrollMotion?.[key] ?? "";
+    panel.querySelector("[data-native-visible-after]").value =
+      config.scrollVisibility?.after || "";
+    panel.querySelector("[data-native-hide-while]").value = (
+      config.scrollVisibility?.hideWhile || []
+    ).join(", ");
     panel.querySelector("[data-native-collapsed]").checked = Boolean(
       config.collapsed,
     );
@@ -1964,7 +2116,13 @@
         <label>Apply layout changes to<select data-native-breakpoint><option value="base">All screen sizes</option></select></label>
         <p class="sq-native-help" data-native-context-note>Layout and appearance settings affect all screen sizes.</p>
       </div>
-      <details open data-native-product-controls hidden><summary>Product card</summary><label>Product shown in this card<select data-native-product-id></select></label><p class="sq-native-help">Changing this product affects only this card. Height adjusts to show all product details.</p><button type="button" class="sq-native-wide" data-native-another-product>+ Add another product card</button></details>
+      <details open data-native-product-controls hidden><summary>Connected product</summary><label>Product shown here<select data-native-product-id></select></label><p class="sq-native-help">Choose a product for this element. Other placements keep their own product.</p><button type="button" class="sq-native-wide" data-native-another-product>+ Add another product card</button></details>
+      <details open data-native-commerce-controls hidden><summary>Product control</summary>
+      <label>Show<select data-commerce-setting="part"><option value="image">Product image</option><option value="options">Variant choices</option><option value="price">Selected price</option><option value="title">Selected name</option><option value="description">Selected description</option><option value="add">Add to cart button</option><option value="cart">Open cart button</option></select></label>
+      <label>Shared selection name<input data-commerce-setting="group" placeholder="e.g. main-product"></label><p class="sq-native-help">Use the same name and product on controls that should share a selected variant. Leave blank for independent choices.</p>
+      <label>Label<input data-commerce-setting="label"></label><label>Options layout<select data-commerce-setting="optionLayout"><option value="compact">Side by side</option><option value="detailed">Stacked with details</option></select></label>
+      <label>Text before value<input data-commerce-setting="prefix"></label><label>Text after value<input data-commerce-setting="suffix"></label><label>Option price suffix<input data-commerce-setting="priceSuffix" placeholder=" / pack"></label><label><input type="checkbox" data-commerce-setting="showPrice"> Show price on the button</label>
+      </details>
       <details open data-native-content><summary data-native-content-title>Text</summary>
         <label>Your text<textarea rows="3" data-native-text></textarea></label>
         <p class="sq-native-help" data-native-text-help>Edit your copy here. Select words to change their color.</p>
@@ -2013,7 +2171,7 @@
       </details>`;
     panel.insertAdjacentHTML(
       "beforeend",
-      `<details data-native-structure><summary>Structure &amp; accessibility</summary><label>Name<input data-native-name></label><label>Section anchor<input data-native-anchor></label><label>HTML element<select data-native-tag></select></label><label>Parent container<select data-native-move-parent></select></label><button type="button" data-native-move>Move into container</button><div class="sq-native-pair"><button type="button" data-native-earlier>Move earlier</button><button type="button" data-native-later>Move later</button></div><label><input type="checkbox" data-native-collapsed>Initially hidden (toggle target)</label><label><input type="checkbox" data-native-open>Accordion initially open</label></details><details data-native-media><summary>Video</summary><label>Poster image URL<input data-native-media-poster></label><label>Captions URL<input data-native-media-captions></label><label>Captions (WebVTT)<textarea rows="5" data-native-media-captionsText></textarea></label>${["muted", "controls", "loop", "autoplay"].map((k) => `<label><input type="checkbox" data-native-media-${k}>${label(k)}</label>`).join("")}</details><details data-native-icon-options><summary>Icon appearance</summary>${["iconFill", "iconStroke", "iconWeight"].map((k) => `<label>${label(k)}<input data-native-setting="${k}"></label>`).join("")}</details><details><summary>Scroll motion</summary><label>Starting tilt (degrees)<input type="number" data-native-motion-tilt></label><label>Vertical travel (px)<input type="number" data-native-motion-travel></label><button type="button" data-native-motion-apply>Apply motion</button><button type="button" data-native-motion-clear>Remove motion</button></details><details><summary>Scale to fit</summary><p>Keep a detailed composition proportional below a screen width. Its parent reserves the scaled height.</p>${["max", "width", "height", "extra"].map((k) => `<label>${{ max: "Below screen width", width: "Design width", height: "Design height", extra: "Extra space below" }[k]}<input type="number" data-native-fit-${k}></label>`).join("")}<button type="button" data-native-fit-apply>Apply frame</button><button type="button" data-native-fit-clear>Remove scaling</button></details>`,
+      `<details data-native-structure><summary>Structure &amp; accessibility</summary><label>Name<input data-native-name></label><label>Section anchor<input data-native-anchor></label><label>HTML element<select data-native-tag></select></label><label>Parent container<select data-native-move-parent></select></label><button type="button" data-native-move>Move into container</button><div class="sq-native-pair"><button type="button" data-native-earlier>Move earlier</button><button type="button" data-native-later>Move later</button></div><label><input type="checkbox" data-native-collapsed>Initially hidden (toggle target)</label><label><input type="checkbox" data-native-open>Accordion initially open</label></details><details data-native-media><summary>Video</summary><label>Poster image URL<input data-native-media-poster></label><label>Captions URL<input data-native-media-captions></label><label>Captions (WebVTT)<textarea rows="5" data-native-media-captionsText></textarea></label>${["muted", "controls", "loop", "autoplay"].map((k) => `<label><input type="checkbox" data-native-media-${k}>${label(k)}</label>`).join("")}</details><details data-native-icon-options><summary>Icon appearance</summary>${["iconFill", "iconStroke", "iconWeight"].map((k) => `<label>${label(k)}<input data-native-setting="${k}"></label>`).join("")}</details><details><summary>Show while scrolling</summary><label>Show after element or section<input data-native-visible-after placeholder="e.g. hero"></label><label>Hide while these are visible<input data-native-hide-while placeholder="e.g. purchase, footer"></label><p class="sq-native-help">Enter element IDs separated by commas. Useful for a purchase bar that appears after the hero.</p><button type="button" data-native-visibility-apply>Apply visibility</button><button type="button" data-native-visibility-clear>Always show</button></details><details><summary>Scroll motion</summary><label>Starting tilt (degrees)<input type="number" data-native-motion-tilt></label><label>Vertical travel (px)<input type="number" data-native-motion-travel></label><button type="button" data-native-motion-apply>Apply motion</button><button type="button" data-native-motion-clear>Remove motion</button></details><details><summary>Scale to fit</summary><p>Keep a detailed composition proportional below a screen width. Its parent reserves the scaled height.</p>${["max", "width", "height", "extra"].map((k) => `<label>${{ max: "Below screen width", width: "Design width", height: "Design height", extra: "Extra space below" }[k]}<input type="number" data-native-fit-${k}></label>`).join("")}<button type="button" data-native-fit-apply>Apply frame</button><button type="button" data-native-fit-clear>Remove scaling</button></details>`,
     );
     const advanced = document.createElement("details");
     advanced.dataset.nativeAdvanced = "";
@@ -2023,7 +2181,7 @@
         (node) =>
           node.matches("details") &&
           !node.matches(
-            "[data-native-content], [data-native-fill-section], [data-native-product-controls], [data-native-media], [data-native-icon-options]",
+            "[data-native-content], [data-native-fill-section], [data-native-product-controls], [data-native-commerce-controls], [data-native-media], [data-native-icon-options]",
           ),
       )
       .forEach((node) => advanced.append(node));
@@ -2119,6 +2277,8 @@
           );
         else input.type = "text";
         input.dataset.nativeProp = key;
+        if (key === "fontFamily")
+          input.setAttribute("list", "sq-native-font-families");
         input.placeholder =
           type === "length" ? "24px, 100%, auto" : "Automatic";
         wrap.append(input);
@@ -2137,6 +2297,16 @@
       '<details><summary>Click action</summary><label>On click<select data-native-action-type><option value="">None</option><option value="link">Open link</option><option value="toggle">Show / hide element</option><option value="state">Switch state</option><option value="video-dialog">Open video dialog</option><option value="video-toggle">Play / pause video</option></select></label><label>Destination or target ID<input data-native-action-target></label><button type="button" data-native-action-apply>Apply action</button></details><p class="sq-native-help">Hold Alt and click an element to try its interaction.</p>',
     );
     panel.append(advanced);
+    const fontOptions = document.createElement("datalist");
+    fontOptions.id = "sq-native-font-families";
+    for (const family of ["Poppins", "Anton", "DM Sans", "Arial", "Georgia"])
+      fontOptions.append(
+        new Option(
+          family,
+          `"${family}", ${family === "Georgia" ? "serif" : "sans-serif"}`,
+        ),
+      );
+    panel.append(fontOptions);
     panel.querySelectorAll("label").forEach((wrap) => {
       if (wrap.querySelector('input[type="checkbox"]'))
         wrap.classList.add("sq-native-check");
@@ -2186,6 +2356,29 @@
       hooks.changed();
       select(selected);
     });
+    panel.querySelectorAll("[data-commerce-setting]").forEach((input) =>
+      input.addEventListener("change", () => {
+        const config = read(selected);
+        const value = input.type === "checkbox" ? input.checked : input.value;
+        if (
+          (config[input.dataset.commerceSetting] ??
+            (input.type === "checkbox" ? false : "")) === value
+        )
+          return;
+        config[input.dataset.commerceSetting] = value;
+        try {
+          validate(config);
+          hooks.remember();
+          write(selected, config);
+          refresh();
+          hooks.changed();
+          select(selected);
+        } catch (error) {
+          hooks.toast(error.message);
+          select(selected);
+        }
+      }),
+    );
     listen("[data-native-another-product]", "click", () =>
       hooks.openProducts?.(),
     );
@@ -2409,6 +2602,23 @@
           value,
         );
       });
+    listen("[data-native-visibility-apply]", "click", () =>
+      change({
+        scrollVisibility: {
+          after: panel
+            .querySelector("[data-native-visible-after]")
+            .value.trim(),
+          hideWhile: panel
+            .querySelector("[data-native-hide-while]")
+            .value.split(",")
+            .map((s) => s.trim())
+            .filter(Boolean),
+        },
+      }),
+    );
+    listen("[data-native-visibility-clear]", "click", () =>
+      change({ scrollVisibility: null }),
+    );
     listen("[data-native-motion-apply]", "click", () => {
       change({
         scrollMotion: Object.fromEntries(

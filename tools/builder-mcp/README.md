@@ -63,6 +63,36 @@ The **Flexible elements** group in Add exposes these same primitives. Their insp
 - Show/hide controls, state switches, links, accordions, accessible video dialogs and play/pause controls. Video includes poster, captions URL or embedded WebVTT, loop, mute and autoplay controls.
 - Proportional composition scaling and scroll tilt/travel that respect reduced motion.
 
+### Product controls for custom layouts
+
+Add → **Product control** exposes catalog-bound images, variant choices, selected
+names/descriptions/prices, add-to-cart buttons and cart buttons as separate native
+elements. Use `native_add` with `type: "commerce"`, a `productId`, and a `part` of
+`image`, `options`, `title`, `description`, `price`, `add` or `cart`. Layout and
+typography use the same `props` and `responsive` controls as other elements.
+
+Set the same `group` on controls that should share a variant. The product ID is
+also part of that connection: placing a different product with the same group
+does not change the first product. Leave `group` blank for independent selections.
+The inspector exposes the group, product, label, compact/detailed `optionLayout`,
+price prefix/suffix and `showPrice` on purchase buttons. These controls export
+through the existing cart and checkout flow; they contain no custom page code.
+
+Native containers also expose **Show while scrolling**. `scrollVisibility` accepts
+an `after` element ID and `hideWhile` IDs. Combined with ordinary fixed positioning,
+this supports an editable purchase bar that hides around other purchase controls.
+The exporter uses the browser's popover layer for fixed bars and hides them while
+the cart is open. Native sticky headers retain their configured stacking order.
+
+Anton and DM Sans are available in the native font field alongside Poppins.
+Licensed font files are embedded in exports when used.
+
+For a **local fictional concept only**, the explicit workspace catalog may set
+`demoCheckout: true`, `currency` and `locale`. Product media uses the normal
+`media: [{id}]` and variant `imageUploadId` fields, resolved against `mediaBase`.
+Demo checkout collects no payment or personal information and never navigates to
+a live checkout. These workspace settings do not change a hosted merchant store.
+
 `native_inspect` returns the hierarchy and saved control values. `native_update` edits those values, and `native_move` reparents a node. Canvas selection, drag/resize, duplication, history, save/reload and export use the same typed model. The native section exporter preserves its own spacing and breakpoints instead of applying grid defaults.
 Component thumbnails are screenshots of these actual components, using the existing Ezkart marketing illustration. To regenerate them, run `node scripts/build-previews.mjs` (requires ImageMagick). Its illustrative product fixture exists only in a temporary workspace. To refresh the reference source, run `node scripts/build-showcase.mjs`; an optional directory argument reads a previously retrieved `index.html`, `styles.css`, and `overview-id.vtt` instead. Review any upstream content changes before committing generated files.
 
