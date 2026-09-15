@@ -108,7 +108,14 @@ test("native inspector creates editable word gradients, layered button fills, ne
     await panel.locator("[data-native-fill-type]").selectOption("gradient");
     await panel.locator("[data-native-add-stop]").click();
     await panel.locator("[data-native-apply-fill]").click();
+    await panel.locator("[data-native-layers] > summary").click();
     await panel.locator("[data-native-layer-add]").click();
+    assert.equal(
+      (await invoke("nativeInspect", { id: "gradient-button" })).fill.layers
+        .length,
+      1,
+      "Adding a layer previews the change until Apply",
+    );
     await panel.locator("[data-native-gradient-x]").fill("20");
     await panel.locator("[data-native-apply-fill]").click();
     config = await invoke("nativeInspect", { id: "gradient-button" });
