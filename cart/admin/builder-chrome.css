@@ -1,0 +1,355 @@
+/* Editor controls. Storefront colors and product styles belong to the page. */
+.page-site-editor .sq-studio {
+  --sq-control-accent: #d34331;
+  --sq-control-accent-end: #d34331;
+  --sq-control-focus: #59647220;
+  --sq-control-track: #e4e7eb;
+  --sq-control-border: #dce1e7;
+  --sq-style-pink: #c74130;
+  --sq-style-orange: #c74130;
+}
+
+.page-site-editor .sq-studio input[type="range"] {
+  --sq-control-accent: #596472;
+  --sq-control-accent-end: #596472;
+}
+.page-site-editor .sq-grid-settings input[type="range"] {
+  --sq-control-accent: #5b45f6;
+  --sq-control-accent-end: #5b45f6;
+}
+.page-site-editor .sq-command-actions button.primary {
+  background: #c74130;
+  box-shadow: 0 1px 2px #18212d12;
+}
+.page-site-editor .sq-commandbar button:focus-visible,
+.page-site-editor .sq-inspector button:focus-visible {
+  outline: 2px solid #596472;
+  outline-offset: 2px;
+}
+.page-site-editor .sq-tool-rail button:is(:hover, .active) {
+  color: #303744;
+  background: #fff;
+  box-shadow: 0 1px 5px #18212d12;
+}
+.page-site-editor .sq-tool-panel > header button,
+.page-site-editor .sq-layer-list > button:is(:hover, .active),
+.page-site-editor .sq-layer-group > button:hover,
+.page-site-editor .sq-layer-group.active > button,
+.page-site-editor .sq-layer-elements > button:is(:hover, .active),
+.page-site-editor .sq-canvas-section-tools [data-sq-canvas-add-section] {
+  color: #414b5a;
+  background: #f1f3f5;
+  border-color: #dce1e7;
+}
+.page-site-editor .sq-canvas-section-tools [data-sq-canvas-add-section]:hover {
+  color: #252b34;
+  background: #e5e9ef;
+}
+
+/* Tabs share a baseline with the panel they open. */
+.page-site-editor .sq-element-controls > .sq-inspector-back {
+  padding: 15px 16px 13px;
+  color: #616b79;
+  font-weight: 500;
+}
+.page-site-editor .sq-element-tabs {
+  padding: 5px 12px 0;
+  gap: 2px;
+  align-items: end;
+  background: #f5f6f8;
+  border-bottom: 1px solid #dce1e7;
+}
+.page-site-editor .sq-element-tabs button {
+  position: relative;
+  min-width: 0;
+  height: 40px;
+  margin-bottom: -1px;
+  padding: 0 8px;
+  color: #697382;
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom-color: #dce1e7;
+  border-radius: 7px 7px 0 0;
+  box-shadow: none;
+  font-size: 11px;
+  font-weight: 500;
+}
+.page-site-editor .sq-element-tabs button:hover {
+  color: #303744;
+  background: #eceff3;
+  border-color: transparent transparent #dce1e7;
+}
+.page-site-editor .sq-element-tabs button.active {
+  color: #252b34;
+  background: #fff;
+  border-color: #dce1e7 #dce1e7 #fff;
+  box-shadow: none;
+  font-weight: 600;
+}
+.page-site-editor .sq-element-tabs button:focus-visible {
+  outline-offset: -4px;
+}
+
+/* Quiet secondary controls and selected states. */
+.page-site-editor .sq-inspector-heading > span {
+  padding: 4px 7px;
+  color: #66707e;
+  background: #f2f4f6;
+  border-radius: 4px;
+  font-weight: 500;
+}
+.page-site-editor .sq-hover-options button:is(:hover, .active),
+.page-site-editor .sq-surface-choices button:is(:hover, .active),
+.page-site-editor .sq-radius-presets button:is(:hover, .active) {
+  color: #303744;
+  background: #f1f3f5;
+  border-color: #9aa4b1;
+  box-shadow: none;
+}
+.page-site-editor .sq-style-segmented {
+  background: #f1f3f5;
+  border-color: #e2e6eb;
+}
+.page-site-editor .sq-style-segmented button.active {
+  color: #303744;
+  background: #fff;
+  box-shadow: 0 1px 3px #18212d20;
+}
+.page-site-editor .sq-role-choices button.active {
+  box-shadow: 0 0 0 2px #697382;
+}
+.page-site-editor .sq-upload-image {
+  color: #414b5a !important;
+  background: #f5f6f8 !important;
+  border-color: #dce1e7 !important;
+}
+.page-site-editor .sq-replay-button:hover {
+  color: #303744;
+  background: #f5f6f8;
+  border-color: #b9c1cc;
+}
+.page-site-editor .sq-button-brand-summary,
+.page-site-editor .sq-brand-intro {
+  background: #f7f8fa;
+  border-color: #e2e6eb;
+}
+.page-site-editor .sq-button-brand-summary > button {
+  color: #414b5a;
+  background: #fff;
+  border-color: #dce1e7;
+}
+.page-site-editor .sq-button-brand-summary > button:hover {
+  color: #252b34;
+  background: #f1f3f5;
+  border-color: #b9c1cc;
+}
+.page-site-editor .sq-brand-intro > span {
+  color: #596472;
+  background: #fff;
+  border-color: #dce1e7;
+}
+.page-site-editor
+  .sq-inspector
+  .sq-native-inspector
+  .sq-native-selection-note.has-selection,
+.page-site-editor
+  .sq-inspector
+  .sq-native-inspector
+  [data-native-word-styles]
+  > button[aria-pressed="true"] {
+  color: #414b5a;
+  background: #f1f3f5;
+  border-color: #9aa4b1;
+}
+.page-site-editor .sq-native-inspector [data-native-word-styles] button small {
+  color: #697382;
+}
+.page-site-editor .sq-inspector :is(.sq-element-actions, footer) button.danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 10px;
+  color: #b6382b;
+  background: #fff;
+  border-color: #dce1e7;
+}
+.page-site-editor
+  .sq-inspector
+  :is(.sq-element-actions, footer)
+  button.danger:hover {
+  background: #f5f6f8;
+  border-color: #b9c1cc;
+}
+.page-site-editor
+  :is(.sq-native-stop, .sq-word-stop, .sq-navigation-link-row)
+  > button {
+  display: grid;
+  place-items: center;
+}
+.page-site-editor
+  :is(.sq-native-stop, .sq-word-stop, .sq-navigation-link-row)
+  > button
+  .icon {
+  width: 14px;
+  height: 14px;
+}
+
+/* Header shortcuts have two complete, consistently sized actions. */
+.page-site-editor .sq-site-header-shortcuts {
+  margin: 12px 0 16px;
+  padding: 14px;
+  background: #f7f8fa;
+  border-color: #e2e6eb;
+  border-radius: 9px;
+}
+.page-site-editor .sq-site-header-shortcuts > div:first-child {
+  align-items: flex-start;
+  gap: 10px;
+}
+.page-site-editor .sq-site-header-shortcuts > div:first-child > span {
+  flex-shrink: 0;
+  color: #596472;
+  background: #fff;
+  border-color: #dce1e7;
+}
+.page-site-editor .sq-site-header-shortcuts small {
+  margin-top: 4px;
+  color: #77818e;
+  line-height: 1.6;
+}
+.page-site-editor .sq-site-header-shortcuts > div:last-child {
+  margin-top: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.page-site-editor .sq-site-header-shortcuts button {
+  min-width: 0;
+  height: 38px;
+  padding: 0 8px;
+  color: #414b5a;
+  background: #fff;
+  border-color: #dce1e7;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.page-site-editor .sq-site-header-shortcuts button:hover {
+  color: #252b34;
+  background: #f1f3f5;
+  border-color: #b9c1cc;
+}
+
+/* Color names, swatches and hex values each get their own row. */
+.page-site-editor .sq-inspector .sq-gradient-colors {
+  margin: 14px 0;
+  gap: 10px;
+}
+.page-site-editor .sq-inspector .sq-gradient-colors label {
+  min-width: 0;
+  grid-template-rows: auto 38px auto;
+  gap: 7px;
+}
+.page-site-editor .sq-inspector .sq-gradient-colors label > span {
+  margin: 0;
+  font-size: 11px;
+}
+.page-site-editor .sq-inspector .sq-gradient-colors input[type="color"] {
+  width: 100%;
+  height: 38px;
+  padding: 4px;
+  border-color: #dce1e7;
+}
+.page-site-editor .sq-inspector .sq-gradient-colors label > output {
+  position: static;
+  display: block;
+  min-width: 0;
+  color: #697382;
+  text-align: center;
+  font:
+    11px/1.5 ui-monospace,
+    monospace;
+}
+
+/* Fit is named; Grid is one split control with a rotating chevron. */
+.page-site-editor .sq-device-tools [data-sq-fit] {
+  width: auto;
+  min-width: 56px;
+  padding: 0 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font:
+    500 11px Poppins,
+    sans-serif;
+}
+.page-site-editor .sq-grid-quick-control {
+  gap: 0;
+  height: 29px;
+  overflow: hidden;
+  color: #596472;
+  background: #fff;
+  border: 1px solid #dce1e7;
+  border-radius: 7px;
+}
+.page-site-editor .sq-grid-quick-control:has(.active) {
+  color: #fff;
+  background: #5b45f6;
+  border-color: #5b45f6;
+}
+.page-site-editor .sq-grid-quick-control > button {
+  position: relative;
+  height: 27px;
+  margin: 0;
+  color: inherit !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0;
+  box-shadow: none;
+}
+.page-site-editor .sq-grid-quick-control > .sq-grid-quick-toggle {
+  padding: 0 10px;
+  gap: 6px;
+  font-size: 10px;
+}
+.page-site-editor .sq-grid-quick-toggle span {
+  display: inline;
+}
+.page-site-editor .sq-grid-settings-toggle {
+  width: 29px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+}
+.page-site-editor .sq-grid-settings-toggle::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 7px;
+  width: 1px;
+  height: 13px;
+  background: currentColor;
+  opacity: 0.28;
+}
+.page-site-editor .sq-grid-quick-control > button:hover {
+  background: #0000000d !important;
+}
+.page-site-editor .sq-grid-quick-control > button:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: -3px;
+}
+.page-site-editor .sq-grid-settings-toggle .icon {
+  width: 16px;
+  height: 16px;
+  color: inherit;
+  transition: transform 0.16s ease;
+}
+.page-site-editor .sq-grid-settings-toggle[aria-expanded="true"] .icon {
+  transform: rotate(180deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .page-site-editor .sq-grid-settings-toggle .icon {
+    transition: none;
+  }
+}

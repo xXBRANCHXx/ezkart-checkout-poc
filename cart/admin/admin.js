@@ -3594,6 +3594,7 @@
         const movement = { ArrowLeft: -1, ArrowRight: 1, Home: -index, End: elementTabs.length - index - 1 }[event.key];
         if (movement == null) return;
         event.preventDefault();
+        event.stopPropagation();
         const target = elementTabs[(index + movement + elementTabs.length) % elementTabs.length];
         showElementPanel(target.dataset.sqElementTab);
         target.focus();
@@ -3969,7 +3970,7 @@
       if (isNavigation) {
         const links = [...selectedElement.querySelectorAll(":scope > a")];
         const list = sqStudio.querySelector("[data-sq-navigation-link-list]");
-        if (list) list.innerHTML = links.map((link, index) => `<div class="sq-navigation-link-row" data-sq-navigation-link-row="${index}"><input type="text" maxlength="40" value="${escapeHtml(link.textContent.trim())}" aria-label="Navigation label"><input type="text" maxlength="200" value="${escapeHtml(link.getAttribute("href") || "#")}" aria-label="Navigation destination"><button type="button" aria-label="Remove ${escapeHtml(link.textContent.trim())}">×</button></div>`).join("");
+        if (list) list.innerHTML = links.map((link, index) => `<div class="sq-navigation-link-row" data-sq-navigation-link-row="${index}"><input type="text" maxlength="40" value="${escapeHtml(link.textContent.trim())}" aria-label="Navigation label"><input type="text" maxlength="200" value="${escapeHtml(link.getAttribute("href") || "#")}" aria-label="Navigation destination"><button type="button" aria-label="Remove ${escapeHtml(link.textContent.trim())}">${iconMarkup("trash")}</button></div>`).join("");
         const cta = selectedElement.querySelector(":scope > button:not(.sq-nav-menu-toggle)");
         const ctaVisible = sqStudio.querySelector("[data-sq-navigation-cta-visible]");
         const ctaLabel = sqStudio.querySelector("[data-sq-navigation-cta-label]");
@@ -4169,7 +4170,7 @@
       if (!section) return;
       const overlay = document.createElement("div");
       overlay.className = "sq-element-overlay";
-      overlay.innerHTML = `<div class="sq-element-toolbar"><button type="button" data-sq-element-move aria-label="Move element">${iconMarkup("grip")}</button><span>${escapeHtml(elementTypeName(selectedElement))}</span><button type="button" data-sq-overlay-duplicate aria-label="Duplicate element">${iconMarkup("layers")}</button><button type="button" data-sq-overlay-delete aria-label="Delete element">${iconMarkup("x")}</button></div><button class="sq-element-resize" type="button" data-sq-element-resize aria-label="Resize element"></button>`;
+      overlay.innerHTML = `<div class="sq-element-toolbar"><button type="button" data-sq-element-move aria-label="Move element">${iconMarkup("grip")}</button><span>${escapeHtml(elementTypeName(selectedElement))}</span><button type="button" data-sq-overlay-duplicate aria-label="Duplicate element">${iconMarkup("layers")}</button><button type="button" data-sq-overlay-delete aria-label="Delete element">${iconMarkup("trash")}</button></div><button class="sq-element-resize" type="button" data-sq-element-resize aria-label="Resize element"></button>`;
       section.append(overlay);
       const sectionRect = section.getBoundingClientRect();
       const elementRect = selectedElement.getBoundingClientRect();
@@ -4681,7 +4682,7 @@
       if (!block) return;
       const toolbar = document.createElement("div");
       toolbar.className = "sq-section-toolbar";
-      toolbar.innerHTML = `<span>${iconMarkup("layers")} ${escapeHtml(sectionNames[selectedSection] || "Section")}</span><button type="button" data-sq-toolbar-duplicate>${iconMarkup("layers")} Duplicate</button><button type="button" data-sq-toolbar-delete>${iconMarkup("x")} Delete</button>`;
+      toolbar.innerHTML = `<span>${iconMarkup("layers")} ${escapeHtml(sectionNames[selectedSection] || "Section")}</span><button type="button" data-sq-toolbar-duplicate>${iconMarkup("layers")} Duplicate</button><button type="button" data-sq-toolbar-delete>${iconMarkup("trash")} Delete</button>`;
       toolbar.onclick = (event) => event.stopPropagation();
       toolbar.querySelector("[data-sq-toolbar-duplicate]").onclick = () => sqStudio.querySelector("[data-sq-duplicate]")?.click();
       toolbar.querySelector("[data-sq-toolbar-delete]").onclick = () => sqStudio.querySelector("[data-sq-delete]")?.click();

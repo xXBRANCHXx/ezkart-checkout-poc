@@ -1336,7 +1336,7 @@
         const row = document.createElement("div");
         row.className = words ? "sq-word-stop" : "sq-native-stop";
         row.innerHTML =
-          '<input type="color" data-stop-picker><input type="text" spellcheck="false" data-stop-color><div class="sq-native-unit"><input type="number" min="0" max="100" step="any" data-stop-position><span aria-hidden="true">%</span></div><button type="button">×</button>';
+          '<input type="color" data-stop-picker><input type="text" spellcheck="false" data-stop-color><div class="sq-native-unit"><input type="number" min="0" max="100" step="any" data-stop-position><span aria-hidden="true">%</span></div><button type="button" aria-label="Remove color stop" title="Remove color stop"><svg class="icon" aria-hidden="true"><use href="#icon-trash"></use></svg></button>';
         const field = row.querySelector("[data-stop-color]"),
           picker = row.querySelector("[data-stop-picker]");
         field.value = stop.color;

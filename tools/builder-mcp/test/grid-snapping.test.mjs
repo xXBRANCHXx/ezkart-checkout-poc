@@ -237,6 +237,20 @@ test("flow elements use the visible grid at each device size and hidden guides s
     });
     const node = page.locator("#feature > .ezm-section-copy");
     await select(node);
+    const positionBeforeTabs = await node.getAttribute("data-flow-desktop");
+    await page.locator('[data-sq-element-tab="content"]').focus();
+    await page.keyboard.press("ArrowRight");
+    assert.equal(
+      await page
+        .locator('[data-sq-element-tab="style"]')
+        .getAttribute("aria-selected"),
+      "true",
+    );
+    assert.equal(
+      await node.getAttribute("data-flow-desktop"),
+      positionBeforeTabs,
+      "Keyboard tab navigation must not move the selected element",
+    );
     const grid = page.locator("#feature > .sq-layout-grid-overlay");
     await drag(node, grid.locator("i").nth(12 * 7 + 1));
     const id = await node.getAttribute("data-sq-element-id");
