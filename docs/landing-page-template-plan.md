@@ -76,7 +76,7 @@ Draw from product packaging, print advertising, sports editorials, and launch ca
 ### Page structure
 
 1. Compact announcement strip for a real offer or shipping fact.
-2. Navigation with brand, essential links, cart, and one purchase action.
+2. Navigation with brand, essential links, and one purchase action.
 3. Hero with dominant product photography, a short promise, price, variant choice when applicable, and add-to-cart.
 4. Immediate proof using factual product attributes rather than invented metrics.
 5. Product-in-use sequence with close crop and contextual image.
@@ -121,7 +121,7 @@ Draw from independent magazines, fashion lookbooks, museum publishing, and quiet
 
 ### Page structure
 
-1. Minimal navigation with collection access, brand, search when useful, and cart.
+1. Minimal navigation with collection access, brand, and search when useful.
 2. Editorial hero led by one strong photograph and a concise title.
 3. Collection introduction with a short, specific point of view.
 4. Featured products presented as an asymmetric lookbook.
@@ -166,7 +166,7 @@ Draw from food journals, farmers' markets, recipe books, documentary photography
 ### Page structure
 
 1. Useful shipping, harvest, batch, or availability notice.
-2. Friendly navigation with shop, story, use or recipes, and cart.
+2. Friendly navigation with shop, story, and use or recipes.
 3. Product-and-context hero with real product selection and purchase action.
 4. Short origin story anchored to a place, maker, or process.
 5. Ingredient, source, or material map.
@@ -209,7 +209,7 @@ Draw from museum catalogs, architecture books, Swiss grids, and independent desi
 
 ### Page structure
 
-1. Utility navigation with search, collection access, and cart.
+1. Utility navigation with search and collection access.
 2. Modular hero that can feature one collection or a small curated set.
 3. Shop-by-collection index.
 4. Featured catalog grid tied to real products.
@@ -287,6 +287,7 @@ Target no more than 20 MB packaged.
 
 ## Commerce and data rules
 
+- Use the [shared storefront cart pattern](storefront-cart-pattern.md): one consistent floating cart outside template navigation, connected to Ezkart's existing cart and checkout.
 - A template declares the product counts, media types, and optional data it can use, then adapts gracefully when a merchant supplies less.
 - Applied pages bind to real product names, descriptions, prices, variants, availability, stock behavior, images, and checkout actions.
 - Demo assets are preview-only. They must be clearly separated from merchant data in storage and rendering.

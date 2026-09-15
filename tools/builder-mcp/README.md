@@ -78,6 +78,11 @@ The inspector exposes the group, product, label, compact/detailed `optionLayout`
 price prefix/suffix and `showPrice` on purchase buttons. These controls export
 through the existing cart and checkout flow; they contain no custom page code.
 
+New templates use the [shared floating cart](../../docs/storefront-cart-pattern.md)
+outside navigation. The exporter supplies it when no merchant-placed cart control
+exists. It uses the shared drawer, maintains its item count and stays clear of
+native fixed purchase bars.
+
 Native containers also expose **Show while scrolling**. `scrollVisibility` accepts
 an `after` element ID and `hideWhile` IDs. Combined with ordinary fixed positioning,
 this supports an editable purchase bar that hides around other purchase controls.
