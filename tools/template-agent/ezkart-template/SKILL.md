@@ -7,6 +7,14 @@ description: "Create Ezkart landing-page concepts with fictional branding and pr
 
 Make one distinctive, complete storefront at a time. The user wants to review a coded concept first, then have it recreated with Ezkart's editable elements, then approve it as a template.
 
+## Current collection direction
+
+- Plan for roughly **15 templates**; the count is provisional. Build one at a time.
+- Future designs should be highly professional, clear and practical for ordinary merchants. Use restrained branding, disciplined spacing and familiar navigation. Reserve a more formal tone for only **one or two** templates; the rest should feel approachable and polished.
+- **Queued next concept:** generous whitespace, a clean sans-serif font and simple, restrained backgrounds, taking cues from the Ezkart website. Study the actual Ezkart design when this concept is commissioned. Preserve a complete shopping journey and a distinctive composition without making it eccentric.
+- PITH is the approved bold launch design. Its oversized condensed typography and citrus palette are not the default for subsequent templates.
+- The next concept is **saved for later**, not commissioned yet. Start it when the user asks to begin the next concept or step one. A request to package the current template does not also start the next design.
+
 ## Find the project and current stage
 
 This skill is maintained at `tools/template-agent/ezkart-template` inside the Ezkart repository. Resolve this skill directory's symlink to find that repository, or use the user's selected Ezkart checkout. Read its `AGENTS.md` and the complete `docs/landing-page-template-plan.md` before designing or changing the builder.
@@ -15,7 +23,7 @@ Use a concept folder under `~/.local/share/ezkart-templates/<slug>/` unless the 
 
 Record the concept's name, genre, locale, fictional products, art direction, responsive behavior, asset sources and remaining work in the brief. In `concept.json`, keep the current stage, site path, preview URL, builder workspace/project when created, and approvals tied to the version reviewed. Update these records when resuming work. Preserve previous approved versions before substantial revisions.
 
-Infer the requested stage from the conversation and these files. A request to create or install this agent creates the skill; it does not also commission a first concept. “Start step one” commissions the first concept. If the user gives no genre, start with **Impact** from the design brief and invent the brand and product without making them fill out a questionnaire. Existing direction and feedback take precedence over defaults.
+Infer the requested stage from the conversation and these files. A request to create or install this agent creates the skill; it does not also commission a first concept. “Start step one” commissions a concept. Follow the queued concept direction above when it is commissioned; invent a suitable fictional brand and product without making the user fill out a questionnaire. Existing direction and feedback take precedence over defaults.
 
 ## Step one — design and open a concept
 

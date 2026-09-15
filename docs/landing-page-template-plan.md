@@ -8,7 +8,11 @@ Concept work is open under the user's approved three-stage workflow: first desig
 
 Shipping templates remains gated on the builder's reusable elements being able to create, edit and reproduce every required composition from scratch with a polished user experience. Standalone concepts are design references, not published templates. Do not import their HTML/CSS, patch exports, or add template-only rendering code to bypass builder recreation. The designs below remain reference targets until their native builder versions pass review.
 
-Templates are complete, polished, long-form storefront sites—not isolated sections, skeletal blueprints, or the same layout with different colors. Ezkart needs at least five templates spanning meaningfully different genres. We will design and build them one at a time with an unusually high quality bar.
+Templates are complete, polished, long-form storefront sites—not isolated sections, skeletal blueprints, or the same layout with different colors. The current target is roughly **15 templates**, with the final count still open. We will design and build them one at a time with an unusually high quality bar.
+
+Future templates should be highly professional and practical for ordinary merchants. Favor clear shopping journeys, disciplined whitespace, clean typography, restrained backgrounds and familiar navigation. Only one or two should take a more formal direction; the majority should remain approachable and polished. PITH is the approved bold launch design, not the visual default for the collection.
+
+The **next concept**, saved for later at the user's request, should take cues from the Ezkart website: generous whitespace, a clean sans-serif font, simple backgrounds and a refined professional appearance. Do not start it while packaging PITH. Follow this queued direction when the user commissions the next concept.
 
 Every future template must be composed from the same reusable, merchant-editable element system available on a blank canvas. A template may provide a composition and art direction, but it must not introduce a parallel editing model or template-only behavior.
 
@@ -36,7 +40,7 @@ Each complete template package has a hard maximum size of 50 MB.
 - No animation on every section and no endless marquees.
 - No generic AI-written copy such as "elevate your journey," "unlock your potential," or claims without evidence.
 - No fake or sample products after a merchant applies the template.
-- No five-template collection that is one shared structure with palette swaps.
+- No collection that is one shared structure with palette swaps.
 
 ### Positive principles
 
@@ -51,9 +55,9 @@ Each complete template package has a hard maximum size of 50 MB.
 - Give every template one memorable interaction or compositional detail without turning it into a gimmick.
 - Finish the whole site, including navigation, commerce states, reassurance, and footer—not only the hero.
 
-## The five-template collection
+## Genre references for the collection
 
-Build in this order:
+These five genres remain useful reference directions, rather than a fixed build order or final collection size:
 
 1. **Impact** — bold single-product or product-drop launch.
 2. **Atelier** — editorial luxury and craft.
@@ -61,7 +65,7 @@ Build in this order:
 4. **Gallery** — modern minimal multi-product catalog.
 5. **Signal** — digital product, course, download, or membership.
 
-This sequence starts with the template most naturally tested with the current ZERO catalog products, then deliberately moves across different visual systems and merchant needs.
+PITH fulfills the bold Impact direction. The next commissioned concept follows the professional, whitespace-led brief above before returning to these other genre references.
 
 ## Template 1: Impact
 
