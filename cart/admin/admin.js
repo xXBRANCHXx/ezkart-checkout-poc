@@ -3554,13 +3554,14 @@
     };
     const syncElementControls = () => {
       const native=selectedElement?.matches('.sq-native');inspector?.classList.toggle('sq-native-selection',Boolean(native));
-      globalThis.EzkartNative?.select(native?selectedElement:null);if(native)return;
+      if(native){globalThis.EzkartNative?.select(selectedElement);return;}
       const controls = sqStudio.querySelector("[data-sq-element-controls]");
       const selectedBackground = selectedElement?.matches?.(".sq-section-background");
       const valid = selectedElement?.isConnected && (selectedBackground || selectedElement.closest(`[data-section-id="${selectedSection}"]`));
       if (controls) controls.hidden = !valid;
       inspector?.classList.toggle("element-selected", Boolean(valid));
       if (!valid) {
+        globalThis.EzkartNative?.select(null);
         const context = sqStudio.querySelector("[data-sq-inspector-context]");
         if (context) context.textContent = "Section settings";
         const productControls = sqStudio.querySelector("[data-sq-product-layout-controls]");
@@ -3578,6 +3579,16 @@
       const isComponentInstance = selectedElement.dataset.sqElementType === "component-instance";
       const isMarquee = selectedElement.dataset.sqElementType === "marquee";
       const elementType = selectedElement.dataset.sqElementType || "";
+      const wordHost = sqStudio.querySelector('[data-sq-word-color-host]');
+      const textSource = selectedContent?.isConnected && selectedElement.contains(selectedContent)
+        ? selectedContent : ['heading','text','copy','button'].includes(elementType)
+          ? selectedElement.querySelector('h1,h2,h3,h4,h5,h6,p,button,a') : null;
+      const wordTarget = textSource?.closest('h1,h2,h3,h4,h5,h6,p,summary,blockquote,a,button') || textSource;
+      const canColorWords = wordTarget && selectedElement.contains(wordTarget) && !wordTarget.closest('[data-product-card],svg') && wordTarget.textContent.trim();
+      if (wordHost) wordHost.hidden = !canColorWords;
+      if (canColorWords && document.querySelector('[data-sq-native-inspector]')) {
+        EzkartNative.selectTextColors(wordTarget,wordHost,()=>{showElementPanel('style');wordHost.scrollIntoView({block:'nearest'});});
+      } else globalThis.EzkartNative?.select(null);
       const headingControl=sqStudio.querySelector('[data-sq-heading-level-control]');
       if(headingControl){headingControl.hidden=elementType!=='heading'||!selectedElement.matches('.sq-free-heading');headingControl.querySelector('select').value=selectedElement.querySelector('h1,h2,h3')?.tagName.toLowerCase()||'h2';}
       const typeDevice=sqStudio.querySelector('[data-sq-type-device]');if(typeDevice)typeDevice.textContent=activeDevice;
@@ -3596,7 +3607,7 @@
       const image = isLogo || isProductGrid ? null : imageForElement();
       const autoHeightControl=sqStudio.querySelector('[data-sq-auto-height-control]');
       if(autoHeightControl){autoHeightControl.hidden=!selectedElement.closest('.sq-composition,.sq-generated-blank')||!['heading','text','copy','faq','comparison','quote','button'].includes(elementType);autoHeightControl.querySelector('input').checked=selectedElement.dataset.sqAutoHeight==='true';}
-      const contentName = selectedContent?.matches("h1,h2,h3") ? "Heading" : selectedContent ? "Text" : "";
+      const contentName = selectedContent?.closest("h1,h2,h3,h4,h5,h6") ? "Heading" : selectedContent ? "Text" : "";
       const contextualName = isBackgroundImage ? "Section background" : isLogo ? "Logo" : selectedAction && action ? "Button" : selectedImage && image ? "Image" : contentName || elementTypeName(selectedElement);
       const context = sqStudio.querySelector("[data-sq-inspector-context]");
       const title = sqStudio.querySelector("[data-sq-inspector-title]");
@@ -5321,6 +5332,7 @@
     const finishElementStyle = () => { if (elementStyleSnapshot) remember(elementStyleSnapshot); elementStyleSnapshot = null; };
     const updateElementColor = (property, value) => {
       if (!selectedElement?.isConnected) return;
+      if (property === "color") EzkartNative.preserveTextColors();
       selectedElement.style[property] = value;
       if (property === "color") {
         selectedElement.classList.add("sq-color-override");

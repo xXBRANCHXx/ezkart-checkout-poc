@@ -533,3 +533,70 @@
 .sq-native-inspector [data-native-word-status][data-invalid] {
   color: #b22f24;
 }
+
+/* The same word-color editor also serves existing authored text. */
+.page-site-editor .sq-inspector section.sq-word-colors-only {
+  padding: 0;
+}
+.sq-word-colors-only > :not([data-native-content]),
+.sq-word-colors-only
+  > [data-native-content]
+  > :not([data-native-word-controls]) {
+  display: none !important;
+}
+.page-site-editor .sq-inspector .sq-word-colors-only > [data-native-content] {
+  padding: 0;
+  border: 0;
+  margin: 0;
+}
+.page-site-editor
+  .sq-inspector
+  .sq-word-colors-only
+  [data-native-word-controls] {
+  padding: 0 0 18px;
+  margin: 0;
+  border-top: 0;
+}
+.page-site-editor
+  .sq-inspector
+  .sq-word-colors-only
+  [data-native-word-controls]
+  > summary {
+  font-size: 12px;
+  color: #303440;
+}
+.page-site-editor .sq-style-color-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+.page-site-editor .sq-style-color-list .sq-style-color {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) 24px;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+}
+.page-site-editor .sq-style-color-list .sq-style-color > input[type="color"] {
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
+}
+.page-site-editor .sq-style-color-list .sq-style-color > label {
+  min-width: 0;
+  margin: 0;
+}
+.page-site-editor .sq-style-color-list .sq-style-color label > span {
+  white-space: normal;
+  overflow: visible;
+  font-size: 11px;
+}
+.page-site-editor .sq-style-color-list .sq-style-color label > input {
+  width: 100%;
+  padding: 3px 0;
+  text-align: left;
+  font-size: 11px;
+}
+.page-site-editor .sq-style-color-list .sq-style-color > button {
+  position: static;
+}

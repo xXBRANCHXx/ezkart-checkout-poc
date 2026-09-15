@@ -306,7 +306,10 @@
       })
       .join(",");
   }
+  let textColorAdapter = null;
   const read = (node) => {
+    if (node && node === textColorAdapter?.node)
+      return structuredClone(textColorAdapter.config);
     try {
       return JSON.parse(node.dataset.sqNative || "{}");
     } catch {
@@ -314,6 +317,10 @@
     }
   };
   const write = (node, config) => {
+    if (node === textColorAdapter?.node) {
+      textColorAdapter.config = structuredClone(config);
+      return;
+    }
     node.dataset.sqNative = JSON.stringify(config);
   };
   const safeUrl = (value) => {
@@ -458,6 +465,10 @@
     return config;
   }
   function renderText(node, config) {
+    if (node === textColorAdapter?.node) {
+      renderDOMColors(node, config);
+      return;
+    }
     node.replaceChildren();
     const text = String(config.text || ""),
       marks = config.marks || [],
@@ -1369,7 +1380,305 @@
         layer[key] ?? value;
     renderStops(panel, layer.stops);
   }
+  // Existing authored text uses the same range model and word-color controls.
+  // Keep its elements and layout intact; only replace the paint on text runs.
+  function splitCSSList(value) {
+    const parts = [];
+    let depth = 0,
+      start = 0;
+    for (let i = 0; i < value.length; i++) {
+      if (value[i] === "(") depth++;
+      else if (value[i] === ")") depth--;
+      else if (value[i] === "," && depth === 0) {
+        parts.push(value.slice(start, i).trim());
+        start = i + 1;
+      }
+    }
+    parts.push(value.slice(start).trim());
+    return parts;
+  }
+  function readCSSGradients(value) {
+    const layers = splitCSSList(value).map((value) => {
+      const match = value.match(/^(linear|radial)-gradient\((.*)\)$/);
+      if (!match) return null;
+      const parts = splitCSSList(match[2]),
+        layer = { kind: match[1] };
+      if (layer.kind === "linear") {
+        const direction = parts[0];
+        const angles = {
+          "to top": 0,
+          "to right": 90,
+          "to bottom": 180,
+          "to left": 270,
+          "to top right": 45,
+          "to right top": 45,
+          "to bottom right": 135,
+          "to right bottom": 135,
+          "to bottom left": 225,
+          "to left bottom": 225,
+          "to top left": 315,
+          "to left top": 315,
+        };
+        layer.angle = 180;
+        if (/^-?[\d.]+deg$/.test(direction)) {
+          layer.angle = parseFloat(parts.shift());
+        } else if (direction in angles) {
+          layer.angle = angles[parts.shift()];
+        }
+      } else {
+        layer.shape = "ellipse";
+        layer.x = 50;
+        layer.y = 50;
+        if (/^(circle|ellipse|at |closest-|farthest-)/.test(parts[0])) {
+          const geometry = parts.shift();
+          layer.shape = geometry.startsWith("circle") ? "circle" : "ellipse";
+          const position = geometry.match(/at ([\d.]+)% ([\d.]+)%/);
+          if (position) {
+            layer.x = Number(position[1]);
+            layer.y = Number(position[2]);
+          }
+        }
+      }
+      layer.stops = parts.map((part) => {
+        const positioned = part.match(/^(.*)\s+(-?[\d.]+)%$/);
+        return positioned
+          ? { color: positioned[1], position: Number(positioned[2]) }
+          : { color: part };
+      });
+      if (
+        layer.stops.length < 2 ||
+        layer.stops.some((stop) => !CSS.supports("color", stop.color))
+      )
+        return null;
+      layer.stops[0].position ??= 0;
+      layer.stops.at(-1).position ??= 100;
+      for (let i = 1; i < layer.stops.length - 1; i++) {
+        if (layer.stops[i].position !== undefined) continue;
+        let end = i + 1;
+        while (layer.stops[end].position === undefined) end++;
+        const left = layer.stops[i - 1].position,
+          right = layer.stops[end].position;
+        for (let j = i; j < end; j++)
+          layer.stops[j].position =
+            left + ((right - left) * (j - i + 1)) / (end - i + 1);
+        i = end;
+      }
+      return layer;
+    });
+    return layers.length && layers.every(Boolean) ? layers : null;
+  }
+  const clipsText = (style) =>
+    style.backgroundClip === "text" || style.webkitBackgroundClip === "text";
+  function domTextNodes(root) {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT),
+      nodes = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+    return nodes;
+  }
+  function readDOMColors(node) {
+    let base = getComputedStyle(node).color;
+    for (
+      let parent = node.parentElement;
+      /^(transparent|rgba\([^)]*,\s*0\))$/.test(base) && parent;
+      parent = parent.parentElement
+    )
+      base = getComputedStyle(parent).color;
+    const config = {
+      id: "existing-text",
+      type: /^H[1-6]$/.test(node.tagName) ? "heading" : "text",
+      text: node.textContent,
+      props: { color: base },
+      marks: [],
+    };
+    let offset = 0;
+    for (const text of domTextNodes(node)) {
+      const start = offset;
+      offset += text.length;
+      if (!text.length) continue;
+      let gradient;
+      for (
+        let parent = text.parentElement;
+        parent && (parent === node || node.contains(parent));
+        parent = parent.parentElement
+      ) {
+        const style = getComputedStyle(parent);
+        if (clipsText(style) && style.backgroundImage !== "none") {
+          gradient = readCSSGradients(style.backgroundImage);
+          break;
+        }
+      }
+      const color = getComputedStyle(text.parentElement).color;
+      const appearance = gradient
+        ? { gradient }
+        : color !== base
+          ? { color }
+          : null;
+      if (!appearance) continue;
+      const previous = config.marks.at(-1);
+      if (
+        previous &&
+        previous.end === start &&
+        JSON.stringify(previous.gradient || previous.color) ===
+          JSON.stringify(gradient || color)
+      )
+        previous.end = offset;
+      else config.marks.push({ start, end: offset, ...appearance });
+    }
+    return config;
+  }
+  function renderDOMColors(node, config) {
+    node
+      .querySelectorAll("[data-sq-word-run]")
+      .forEach((run) => run.replaceWith(...run.childNodes));
+    node.normalize();
+    const nodes = domTextNodes(node),
+      ancestors = new Set([node]);
+    for (const text of nodes)
+      for (
+        let p = text.parentElement;
+        p && (p === node || node.contains(p));
+        p = p.parentElement
+      )
+        ancestors.add(p);
+    for (const element of ancestors) {
+      const style = getComputedStyle(element),
+        gradient = clipsText(style);
+      if (gradient) {
+        element.style.backgroundImage = "none";
+        element.style.backgroundClip = "border-box";
+        element.style.webkitBackgroundClip = "border-box";
+        element.style.webkitTextFillColor = "currentColor";
+      }
+      if (gradient || (element !== node && style.color !== config.props.color))
+        element.style.setProperty("color", "inherit", "important");
+    }
+    let offset = 0;
+    for (const text of nodes) {
+      const start = offset,
+        end = offset + text.length;
+      offset = end;
+      const cuts = [
+        ...new Set([
+          start,
+          end,
+          ...(config.marks || [])
+            .flatMap((mark) => [mark.start, mark.end])
+            .filter((n) => n > start && n < end),
+        ]),
+      ].sort((a, b) => a - b);
+      const fragment = document.createDocumentFragment();
+      for (let i = 0; i < cuts.length - 1; i++) {
+        const from = cuts[i],
+          to = cuts[i + 1],
+          mark = (config.marks || [])
+            .filter((m) => m.start <= from && m.end >= to)
+            .at(-1);
+        const copy = text.textContent.slice(from - start, to - start);
+        if (!mark?.gradient && !mark?.color) {
+          fragment.append(document.createTextNode(copy));
+          continue;
+        }
+        const span = document.createElement("span");
+        span.dataset.sqWordRun = "";
+        span.textContent = copy;
+        span.style.setProperty("display", "inline", "important");
+        span.style.setProperty(
+          "color",
+          mark.gradient ? "transparent" : mark.color,
+          "important",
+        );
+        span.style.webkitTextFillColor = "currentColor";
+        if (mark.gradient) {
+          span.style.backgroundImage = gradientCss(mark.gradient);
+          span.style.backgroundClip = "text";
+          span.style.webkitBackgroundClip = "text";
+        }
+        fragment.append(span);
+      }
+      text.replaceWith(fragment);
+    }
+  }
+  function selectTextColors(node, host, onSelect) {
+    const changed = selected !== node || !textColorAdapter;
+    if (changed) {
+      selection = null;
+      wordSelectionKey = "";
+    }
+    selected = node;
+    context = "base";
+    state = "";
+    textColorAdapter = { node, host, onSelect, config: readDOMColors(node) };
+    const panel = document.querySelector("[data-sq-native-inspector]");
+    host.append(panel);
+    panel.hidden = false;
+    panel.classList.add("sq-word-colors-only");
+    const content = panel.querySelector("[data-native-content]");
+    content.hidden = false;
+    content.open = true;
+    const words = panel.querySelector("[data-native-word-controls]");
+    words.hidden = false;
+    words.open = true;
+    renderWordStyles(panel, textColorAdapter.config);
+    syncWordSelection(panel);
+    if (changed && textColorAdapter.config.marks.some((mark) => mark.gradient))
+      onSelect?.();
+  }
+  function renderWordStyles(panel, config) {
+    const wordStyles = panel.querySelector("[data-native-word-styles]");
+    wordStyles.replaceChildren();
+    if (config.marks?.some((mark) => mark.color || mark.gradient)) {
+      const caption = document.createElement("small");
+      caption.textContent = "Words with custom colors";
+      wordStyles.append(caption);
+      for (const mark of config.marks.filter(
+        (mark) => mark.color || mark.gradient,
+      )) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.dataset.start = mark.start;
+        button.dataset.end = mark.end;
+        const swatch = document.createElement("span");
+        swatch.className = "sq-word-swatch";
+        swatch.setAttribute("aria-hidden", "true");
+        swatch.style.background = mark.gradient
+          ? gradientCss(mark.gradient)
+          : mark.color;
+        const name = document.createElement("span");
+        name.textContent = `“${config.text.slice(mark.start, mark.end)}”`;
+        const action = document.createElement("small");
+        action.textContent = mark.gradient ? "Edit gradient" : "Edit color";
+        button.append(swatch, name, action);
+        button.onclick = () => {
+          selection = {
+            node: selected,
+            start: mark.start,
+            end: mark.end,
+            text: config.text.slice(mark.start, mark.end),
+          };
+          panel.querySelector("[data-native-word-controls]").open = true;
+          wordSelectionKey = "";
+          syncWordSelection(panel);
+          panel
+            .querySelector("[data-native-word-editor]")
+            .focus({ preventScroll: true });
+        };
+        wordStyles.append(button);
+      }
+    }
+  }
   function select(node) {
+    if (node && node === textColorAdapter?.node) {
+      selectTextColors(node, textColorAdapter.host, textColorAdapter.onSelect);
+      return;
+    }
+    textColorAdapter = null;
+    const sharedPanel = document.querySelector("[data-sq-native-inspector]");
+    if (sharedPanel && hooks) {
+      sharedPanel.classList.remove("sq-word-colors-only");
+      hooks.inspector
+        .querySelector(".sq-inspector-scroll")
+        .prepend(sharedPanel);
+    }
     if (node !== selected) {
       selection = null;
       layerIndex = 0;
@@ -1473,47 +1782,7 @@
     const text = panel.querySelector("[data-native-text]");
     text.parentElement.hidden = config.text === undefined;
     text.value = config.text || "";
-    const wordStyles = panel.querySelector("[data-native-word-styles]");
-    wordStyles.replaceChildren();
-    if (config.marks?.some((mark) => mark.color || mark.gradient)) {
-      const caption = document.createElement("small");
-      caption.textContent = "Words with custom colors";
-      wordStyles.append(caption);
-      for (const mark of config.marks.filter(
-        (mark) => mark.color || mark.gradient,
-      )) {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.dataset.start = mark.start;
-        button.dataset.end = mark.end;
-        const swatch = document.createElement("span");
-        swatch.className = "sq-word-swatch";
-        swatch.setAttribute("aria-hidden", "true");
-        swatch.style.background = mark.gradient
-          ? gradientCss(mark.gradient)
-          : mark.color;
-        const name = document.createElement("span");
-        name.textContent = `“${config.text.slice(mark.start, mark.end)}”`;
-        const action = document.createElement("small");
-        action.textContent = mark.gradient ? "Edit gradient" : "Edit color";
-        button.append(swatch, name, action);
-        button.onclick = () => {
-          selection = {
-            node: selected,
-            start: mark.start,
-            end: mark.end,
-            text: config.text.slice(mark.start, mark.end),
-          };
-          panel.querySelector("[data-native-word-controls]").open = true;
-          wordSelectionKey = "";
-          syncWordSelection(panel);
-          panel
-            .querySelector("[data-native-word-editor]")
-            .focus({ preventScroll: true });
-        };
-        wordStyles.append(button);
-      }
-    }
+    renderWordStyles(panel, config);
 
     panel.querySelector("[data-native-src]").value = config.src || "";
     panel.querySelector("[data-native-src]").parentElement.hidden = ![
@@ -2266,6 +2535,11 @@
       write(selected, config);
       renderText(selected, config);
       hooks.changed();
+      if (textColorAdapter) {
+        wordSelectionKey = "";
+        select(selected);
+        return;
+      }
       // Refresh the phrase list without replacing an unrelated element-color draft.
       const draft = inspectorFill(panel),
         editingLayer = layerIndex,
@@ -2313,14 +2587,21 @@
       refresh();
     });
     document.addEventListener("selectionchange", () => {
+      // Sidebar focus can leave an old canvas range behind. Only a canvas
+      // selection should replace the phrase currently being edited.
+      const focus = document.activeElement;
+      if (focus && focus !== document.body && !hooks.root.contains(focus))
+        return;
       const s = getSelection();
       if (!s || s.isCollapsed || !s.rangeCount) return;
       const range = s.getRangeAt(0),
-        node = (
+        ancestor =
           range.commonAncestorContainer.nodeType === 3
             ? range.commonAncestorContainer.parentElement
-            : range.commonAncestorContainer
-        ).closest(".sq-native");
+            : range.commonAncestorContainer,
+        node = textColorAdapter?.node.contains(ancestor)
+          ? textColorAdapter.node
+          : ancestor.closest(".sq-native");
       if (!node || node !== selected || read(node).text === undefined) return;
       const before = range.cloneRange();
       before.selectNodeContents(node);
@@ -2333,9 +2614,17 @@
       };
       panel.querySelector("[data-native-content]").open = true;
       panel.querySelector("[data-native-word-controls]").open = true;
+      if (textColorAdapter) textColorAdapter.onSelect?.();
       syncWordSelection(panel);
     });
     hooks.root.addEventListener("input", (event) => {
+      if (textColorAdapter?.node.contains(event.target)) {
+        textColorAdapter.config = readDOMColors(textColorAdapter.node);
+        selection = null;
+        wordSelectionKey = "";
+        renderWordStyles(panel, textColorAdapter.config);
+        syncWordSelection(panel);
+      }
       const node = event.target.closest(".sq-native[data-native-text-field]");
       if (!node) return;
       const config = read(node);
@@ -2351,6 +2640,14 @@
     refresh();
   }
   globalThis.EzkartNative = {
+    selectTextColors,
+    preserveTextColors: () => {
+      if (
+        textColorAdapter?.node.isConnected &&
+        textColorAdapter.config.marks.length
+      )
+        renderDOMColors(textColorAdapter.node, textColorAdapter.config);
+    },
     typeName,
     groups,
     schema,

@@ -223,6 +223,7 @@ declare(strict_types=1);
           </div>
           <div class="sq-element-panel" id="sq-element-panel-style" role="tabpanel" aria-labelledby="sq-element-tab-style" data-sq-element-panel="style" hidden>
           <div class="sq-element-appearance">
+            <div data-sq-word-color-host hidden></div>
             <section class="sq-style-card" aria-labelledby="sq-style-type-title" data-sq-typography-controls>
               <div class="sq-style-card-heading"><h3 id="sq-style-type-title">Typography</h3><span>Text</span></div>
               <div class="sq-style-two-column">
@@ -242,7 +243,7 @@ declare(strict_types=1);
             <section class="sq-style-card" aria-labelledby="sq-style-colors-title">
               <div class="sq-style-card-heading"><h3 id="sq-style-colors-title">Colors</h3><span>Fill &amp; outline</span></div>
               <div class="sq-style-color-list">
-                <div class="sq-style-color" data-sq-color-card="color"><input type="color" value="#24262b" aria-label="Choose text color" data-sq-element-color="color"><label><span>Text</span><input type="text" value="#24262B" maxlength="7" spellcheck="false" data-sq-element-color-hex="color"></label></div>
+                <div class="sq-style-color" data-sq-color-card="color"><input type="color" value="#24262b" aria-label="Choose default text color" data-sq-element-color="color"><label><span>Default text color</span><input type="text" value="#24262B" maxlength="7" spellcheck="false" data-sq-element-color-hex="color"></label></div>
                 <div class="sq-style-color" data-sq-color-card="backgroundColor"><input type="color" value="#ffffff" aria-label="Choose background color" data-sq-element-color="backgroundColor"><label><span>Background</span><input type="text" value="#FFFFFF" maxlength="7" spellcheck="false" data-sq-element-color-hex="backgroundColor"></label><button type="button" aria-label="Remove background color" title="No background" data-sq-element-color-clear="backgroundColor">×</button></div>
                 <div class="sq-style-color" data-sq-color-card="borderColor"><input type="color" value="#e3e5e7" aria-label="Choose border color" data-sq-element-color="borderColor"><label><span>Border</span><input type="text" value="#E3E5E7" maxlength="7" spellcheck="false" data-sq-element-color-hex="borderColor"></label><button type="button" aria-label="Remove border color" title="No border color" data-sq-element-color-clear="borderColor">×</button></div>
               </div>
