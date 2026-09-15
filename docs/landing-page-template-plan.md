@@ -4,7 +4,9 @@
 
 This document preserves the future art-direction brief for Ezkart's landing-page template program. Read it before planning or implementing template, renderer, template-selection, or builder work.
 
-The template program is paused. No complete templates, template selector, template generator, or template-specific assets should ship until the builder's reusable elements can create, edit, and reproduce every required composition from scratch with a polished user experience. The designs below are reference targets for that later phase, not currently available products.
+Concept work is open under the user's approved three-stage workflow: first design a standalone HTML/CSS/JavaScript landing page with fictional products, logo and branding and open it locally for review; then recreate the chosen design through the actual builder's CLI/MCP editing operations; then prepare it as a template after the user approves the builder result. The reusable agent for this workflow is [ezkart-template](../tools/template-agent/ezkart-template/SKILL.md).
+
+Shipping templates remains gated on the builder's reusable elements being able to create, edit and reproduce every required composition from scratch with a polished user experience. Standalone concepts are design references, not published templates. Do not import their HTML/CSS, patch exports, or add template-only rendering code to bypass builder recreation. The designs below remain reference targets until their native builder versions pass review.
 
 Templates are complete, polished, long-form storefront sites—not isolated sections, skeletal blueprints, or the same layout with different colors. Ezkart needs at least five templates spanning meaningfully different genres. We will design and build them one at a time with an unusually high quality bar.
 
@@ -359,6 +361,6 @@ Any failed answer requires another design pass before approval.
 
 ## Element-system prerequisite
 
-Before template work resumes, finish and validate the element library, direct manipulation, responsive controls, layers, discoverability, accessibility, undo/redo, persistence, preview, and export behavior. A merchant must be able to reproduce every meaningful part of a proposed template from a blank canvas without hidden template-only code.
+Before a builder reconstruction is promoted to a template, finish and validate the element library, direct manipulation, responsive controls, layers, discoverability, accessibility, undo/redo, persistence, preview, and export behavior needed for that composition. Standalone concept design may proceed first under the staged workflow above. A merchant must be able to reproduce every meaningful part of a proposed template from a blank canvas without hidden template-only code.
 
-When templates return, preserve their distinctive composition, responsive behavior, and art direction by combining those proven elements. Do not flatten the designs into palette swaps, and do not bypass the shared element system to achieve them.
+Preserve each template's distinctive composition, responsive behavior, and art direction by combining those proven elements. Do not flatten the designs into palette swaps, and do not bypass the shared element system to achieve them.

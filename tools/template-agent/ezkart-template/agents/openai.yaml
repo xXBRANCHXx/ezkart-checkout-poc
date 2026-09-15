@@ -1,0 +1,4 @@
+interface:
+  display_name: "Ezkart Template Agent"
+  short_description: "Design concepts, rebuild in Ezkart, prepare templates"
+  default_prompt: "Use $ezkart-template to start step one: invent a brand and product, build a polished landing page, and open it in my browser."
