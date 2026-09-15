@@ -223,8 +223,8 @@ body:has(>.sq-authored-navigation)>.sq-page-preview.sq-has-pinned-navigation{pad
 
 /* Each product card sizes its content from its own width. */
 .sq-page-preview .sq-product-grid > article { container: ezkart-product-card / inline-size; grid-template-columns: minmax(0,1fr); width: 100%; min-width: 0; }
-.sq-page-preview .sq-product-grid > article > .product-art { display: block; width: 100%; max-width: none; flex: none; padding: 0; }
-.sq-page-preview .sq-product-grid > article > .product-art img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.sq-page-preview .sq-product-grid > article > .product-art { display: block; width: 100%; max-width: none; flex: none; padding: 0; border: 0; }
+.sq-page-preview .sq-product-grid > article > .product-art img { display: block; width: 100%; height: 100%; padding: 0; object-fit: contain; }
 .sq-page-preview .sq-product-grid > article h3 { display: block; overflow: visible; -webkit-line-clamp: unset; font-size: 18px; line-height: 1.4; text-wrap: wrap; overflow-wrap: anywhere; }
 .sq-page-preview .sq-product-grid > article footer b { min-width: 0; font-size: 18px; overflow-wrap: anywhere; }
 .sq-page-preview .sq-product-grid .sq-product-option-trigger { min-height: 42px; height: auto; font-size: 12px; padding: 9px 10px; }
