@@ -1604,7 +1604,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
   z-index: 1 !important;
   display: grid !important;
   grid-template-columns: repeat(var(--sq-grid-columns, 12), minmax(0, 1fr)) !important;
-  grid-template-rows: repeat(var(--sq-grid-rows, 12), minmax(0, 1fr)) !important;
+  grid-template-rows: repeat(var(--sq-grid-rows, 12), var(--sq-grid-cell-height, 24px)) !important;
   column-gap: var(--sq-grid-column-gap, 10px) !important;
   row-gap: var(--sq-grid-row-gap, 10px) !important;
   pointer-events: none !important;

@@ -118,7 +118,7 @@ test("existing product blocks fit after resizing, reflow narrow columns, and pre
           .locator("[data-sq-grid-toggle]")
           .first()
           .getAttribute("aria-pressed"),
-        "false",
+        "true",
       );
       await invoke("addSection", {
         component: "product-collection",

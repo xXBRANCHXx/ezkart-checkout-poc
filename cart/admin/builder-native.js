@@ -868,10 +868,12 @@
       };
     let props,
       remembered = false;
+    const guides = hooks.beginPointer?.(node, resizing);
     const move = (e) => {
-      const dx = (e.clientX - start.x) / scale,
-        dy = (e.clientY - start.y) / scale;
-      if (Math.abs(dx) + Math.abs(dy) < 1) return;
+      const rawX = (e.clientX - start.x) / scale,
+        rawY = (e.clientY - start.y) / scale;
+      if (Math.abs(rawX) + Math.abs(rawY) < 1) return;
+      const { dx, dy } = guides?.snap(rawX, rawY, e) || { dx: rawX, dy: rawY };
       if (!remembered) {
         hooks.remember();
         remembered = true;
@@ -890,6 +892,7 @@
           };
       if (config.type === "product" && resizing) props.height = "auto";
       Object.assign(node.style, props);
+      guides?.update();
     };
     const end = () => {
       window.removeEventListener("pointermove", move);
@@ -906,10 +909,24 @@
         hooks.rebind?.();
         hooks.select(node);
       }
+      guides?.end();
     };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", end, { once: true });
     window.addEventListener("pointercancel", end, { once: true });
+  }
+  function nudge(dx, dy) {
+    if (!selected) return;
+    const style = getComputedStyle(selected);
+    change({
+      props: {
+        position: style.position === "static" ? "relative" : style.position,
+        left: `${(parseFloat(style.left) || 0) + dx}px`,
+        top: `${(parseFloat(style.top) || 0) + dy}px`,
+        right: "auto",
+        bottom: "auto",
+      },
+    });
   }
   function refresh() {
     if (!hooks) return;
@@ -2679,5 +2696,6 @@
     syncMedia,
     remapTree,
     startPointer,
+    nudge,
   };
 })();

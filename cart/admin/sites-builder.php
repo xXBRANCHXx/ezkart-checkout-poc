@@ -19,7 +19,7 @@ declare(strict_types=1);
       <button type="button" data-sq-device="tablet" aria-label="Tablet preview"><?= ez_admin_icon('layout') ?></button>
       <button type="button" data-sq-device="mobile" aria-label="Mobile preview"><?= ez_admin_icon('smartphone') ?></button>
       <button type="button" data-sq-fit aria-label="Fit canvas to window"><?= ez_admin_icon('refund') ?></button>
-      <button type="button" data-sq-grid-toggle aria-label="Show rectangle grid" aria-pressed="false" title="Show rectangle grid"><?= ez_admin_icon('layers') ?></button>
+      <button type="button" data-sq-grid-toggle aria-label="Hide grid" aria-pressed="true" title="Hide grid"><?= ez_admin_icon('layers') ?></button>
     </div>
     <div class="sq-command-actions">
       <button type="button" data-sq-preview aria-label="Preview page" title="Preview page"><?= ez_admin_icon('eye') ?><span>Preview</span></button>
@@ -145,7 +145,7 @@ declare(strict_types=1);
         <span class="sq-stage-ready"><i></i> Editable canvas</span>
         <div class="sq-stage-scale">
           <span class="sq-stage-size" data-sq-stage-size>Desktop · 1440px</span>
-          <button class="sq-grid-quick-toggle" type="button" data-sq-grid-toggle aria-pressed="false"><?= ez_admin_icon('layers') ?> <span>Grid</span></button>
+          <button class="sq-grid-quick-toggle" type="button" data-sq-grid-toggle aria-pressed="true"><?= ez_admin_icon('layers') ?> <span>Grid</span></button>
           <label>
             <span>Zoom</span>
             <input type="range" min="10" max="100" step="1" value="90" data-sq-zoom-slider aria-label="Canvas zoom">

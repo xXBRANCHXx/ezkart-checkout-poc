@@ -2486,7 +2486,8 @@
     let libraryDropPreview = null;
     let draggedImageSnapshot = null;
     let scheduleSectionTools = () => {};
-    let showLayoutGrid = false;
+    let showLayoutGrid = true;
+    try { showLayoutGrid = localStorage.getItem("ezkart-builder-grid-visible") !== "false"; } catch (_) {}
     let layoutGridDragging = false;
     let layoutGridTransient = false;
     let layoutGridTimer = 0;
@@ -2751,11 +2752,14 @@
     const bindFlowPointer=(event,element,resizing)=>{
       const snapshot=captureState(),start=readFlowPosition(element),rect=element.getBoundingClientRect();
       const scale=rect.width/Math.max(1,element.offsetWidth),x=event.clientX,y=event.clientY;
+      const guides = beginCanvasPointer(element, resizing);
       let changed=false;
-      const move=next=>{const dx=(next.clientX-x)/scale,dy=(next.clientY-y)/scale;
+      const move=next=>{const rawX=(next.clientX-x)/scale,rawY=(next.clientY-y)/scale;
+        if (Math.abs(rawX)+Math.abs(rawY)<1) return;
+        const {dx,dy}=guides.snap(rawX,rawY,next);
         setFlowPosition(element,resizing?{width:rect.width/scale+dx,height:rect.height/scale+dy}:{x:(start.x||0)+dx,y:(start.y||0)+dy});
-        refreshElementOverlay();changed ||= Math.abs(dx)+Math.abs(dy)>1;};
-      const end=()=>{window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',end);window.removeEventListener('pointercancel',end);if(changed){remember(snapshot);markSqChanged();}};
+        guides.update();changed ||= Math.abs(dx)+Math.abs(dy)>1;};
+      const end=()=>{window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',end);window.removeEventListener('pointercancel',end);guides.end();if(changed){remember(snapshot);markSqChanged();}};
       window.addEventListener('pointermove',move);window.addEventListener('pointerup',end,{once:true});window.addEventListener('pointercancel',end,{once:true});
     };
     const parseElementLayout = (element, device = activeDevice) => {
@@ -3227,16 +3231,47 @@
       grid.classList.add("is-hiding");
       window.setTimeout(() => { if (grid.classList.contains("is-hiding")) grid.remove(); }, duration);
     });
+    const activeGridSection = () => sectionHeightResizeTarget || selectedElement?.closest("[data-sq-block]") || previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`);
+    const layoutGridGeometry = section => {
+      const computed = getComputedStyle(section), fluid = section.matches('[data-sq-fluid]');
+      const left = parseFloat(computed.paddingLeft) || 0, top = parseFloat(computed.paddingTop) || 0;
+      const right = parseFloat(computed.paddingRight) || 0, bottom = parseFloat(computed.paddingBottom) || 0;
+      const width = Math.max(1, section.clientWidth-left-right), height = Math.max(1, section.clientHeight-top-bottom);
+      const columnGap = fluid ? parseFloat(computed.columnGap) || 0 : pageSpacingState.columnGap;
+      const rowGap = fluid ? parseFloat(computed.rowGap) || 0 : pageSpacingState.columnGap;
+      const columns = fluidColumns(), rowStep = fluidRowHeight(section);
+      const rows = fluid ? Math.max(1, section === sectionHeightResizeTarget && sectionHeightPreviewRows > 0 ? sectionHeightPreviewRows : Number.parseInt(section.dataset.sqRows || section.dataset.sqMinRows || '12',10)) : Math.max(1,Math.ceil((height+rowGap)/rowStep));
+      return {left,top,right,bottom,width,height,columnGap,rowGap,columns,rows,rowStep,columnStep:(width+columnGap)/columns};
+    };
+    // Use the rendered section grid for both free-positioned and native elements.
+    const beginCanvasPointer = (element, resizing) => {
+      const section = element.closest('[data-sq-block]'), geometry = layoutGridGeometry(section);
+      const rect = element.getBoundingClientRect(), sectionRect = section.getBoundingClientRect();
+      const scale = rect.width/Math.max(1,element.offsetWidth), sectionScale = sectionRect.width/Math.max(1,section.offsetWidth);
+      const originX = sectionRect.left+(section.clientLeft+geometry.left)*sectionScale;
+      const originY = sectionRect.top+(section.clientTop+geometry.top)*sectionScale;
+      layoutGridDragging = true; refreshLayoutGrid();
+      return {
+        snap(dx,dy,event) {
+          if(event.altKey)return {dx,dy};
+          const snapEdge = (position,origin,step,gap) => origin+Math.round((position-origin+gap)/step)*step-gap;
+          const x = resizing ? rect.right : rect.left, y = resizing ? rect.bottom : rect.top;
+          return {
+            dx:(snapEdge(x+dx*scale,originX,geometry.columnStep*sectionScale,resizing?geometry.columnGap*sectionScale:0)-x)/scale,
+            dy:(snapEdge(y+dy*scale,originY,geometry.rowStep*sectionScale,resizing?geometry.rowGap*sectionScale:0)-y)/scale,
+          };
+        },
+        update(){refreshElementOverlay();refreshLayoutGrid();scheduleSectionTools();},
+        end(){layoutGridDragging=false;revealLayoutGrid(650);refreshElementOverlay();scheduleSectionTools();},
+      };
+    };
     const refreshLayoutGrid = () => {
       const visible = showLayoutGrid || layoutGridDragging || layoutGridTransient;
       if (!visible) { removeLayoutGrid(true); return; }
-      const section = sectionHeightResizeTarget || selectedElement?.closest("[data-sq-fluid]") || previewRoot?.querySelector(`[data-section-id="${selectedSection}"][data-sq-fluid]`) || previewRoot?.querySelector("[data-sq-fluid]");
-      if (!section) return;
+      const section = activeGridSection();
+      if (!section?.isConnected) { removeLayoutGrid(); return; }
       previewRoot?.querySelectorAll(".sq-layout-grid-overlay").forEach((candidate) => { if (candidate.parentElement !== section) candidate.remove(); });
-      const rows = Math.max(1, section === sectionHeightResizeTarget && sectionHeightPreviewRows > 0
-        ? sectionHeightPreviewRows
-        : Number.parseInt(section.dataset.sqRows || section.dataset.sqMinRows || "12", 10));
-      const computed = getComputedStyle(section);
+      const geometry = layoutGridGeometry(section), {rows,columns} = geometry;
       let grid = section.querySelector(":scope > .sq-layout-grid-overlay");
       if (!grid) {
         grid = document.createElement("div");
@@ -3245,15 +3280,16 @@
         section.prepend(grid);
       }
       grid.classList.remove("is-hiding");
-      grid.style.left = computed.paddingLeft || "0px";
-      grid.style.right = computed.paddingRight || "0px";
-      grid.style.top = computed.paddingTop || "0px";
-      grid.style.bottom = computed.paddingBottom || "0px";
+      grid.style.left = `${geometry.left}px`;
+      grid.style.right = `${geometry.right}px`;
+      grid.style.top = `${geometry.top}px`;
+      grid.style.bottom = `${geometry.bottom}px`;
       grid.style.setProperty("--sq-grid-rows", String(rows));
-      grid.style.setProperty("--sq-grid-column-gap", computed.columnGap || "0px");
-      grid.style.setProperty("--sq-grid-row-gap", computed.rowGap || "0px");
-      grid.style.setProperty("--sq-grid-columns", String(fluidColumns()));
-      const cellCount = rows * fluidColumns();
+      grid.style.setProperty("--sq-grid-column-gap", `${geometry.columnGap}px`);
+      grid.style.setProperty("--sq-grid-row-gap", `${geometry.rowGap}px`);
+      grid.style.setProperty("--sq-grid-cell-height", `${geometry.rowStep-geometry.rowGap}px`);
+      grid.style.setProperty("--sq-grid-columns", String(columns));
+      const cellCount = rows * columns;
       if (grid.childElementCount !== cellCount) {
         const cells = document.createDocumentFragment();
         for (let index = 0; index < cellCount; index += 1) cells.append(document.createElement("i"));
@@ -3271,6 +3307,8 @@
         removeLayoutGrid(true, Math.max(260, duration - hold));
       }, hold);
     };
+    previewRoot?.addEventListener('native-refresh', () => requestAnimationFrame(refreshLayoutGrid));
+    if (typeof ResizeObserver === 'function' && previewRoot) new ResizeObserver(() => requestAnimationFrame(refreshLayoutGrid)).observe(previewRoot);
     const elementTypeName = (element) => element?.dataset.sqElementType === "component-instance"
       ? `${element.dataset.sqComponentName || "Component"} instance`
       : element?.dataset.nativeType ? EzkartNative.read(element).name || EzkartNative.typeName(element.dataset.nativeType)
@@ -4138,6 +4176,10 @@
       overlay.style.top = `${(elementRect.top - sectionRect.top) / renderedScale}px`;
       overlay.style.width = `${elementRect.width / renderedScale}px`;
       overlay.style.height = `${elementRect.height / renderedScale}px`;
+      if (selectedElement.matches('.sq-native') || selectedElement.closest('.sq-flow')) {
+        overlay.querySelector('[data-sq-element-move]').title = 'Drag to move · Hold Alt to move without snapping';
+        overlay.querySelector('[data-sq-element-resize]').title = 'Drag to resize · Hold Alt to resize without snapping';
+      }
       overlay.querySelector("[data-sq-overlay-duplicate]").onclick = (event) => { event.stopPropagation(); duplicateSelectedElement(); };
       overlay.querySelector("[data-sq-overlay-delete]").onclick = (event) => { event.stopPropagation(); deleteSelectedElement(); };
       bindElementPointerControl(overlay.querySelector("[data-sq-element-move]"), false);
@@ -4171,6 +4213,7 @@
       const elementType = element.dataset.sqElementType || "";
       showElementPanel(action ? "content" : elementType === "product-grid" ? "layout" : ["divider", "spacer", "icon"].includes(elementType) ? "style" : "content");
       syncElementControls();
+      refreshLayoutGrid();
       requestAnimationFrame(refreshElementOverlay);
     };
     const duplicateSelectedElement = () => {
@@ -4376,7 +4419,7 @@
       syncBuilderRanges();
     };
     const gridContentWidth = (device = activeDevice) => {
-      const section = device === activeDevice ? previewRoot?.querySelector(`[data-section-id="${selectedSection}"][data-sq-fluid]`) || previewRoot?.querySelector("[data-sq-fluid]") : null;
+      const section = device === activeDevice ? activeGridSection() : null;
       if (section?.clientWidth) {
         const computed = getComputedStyle(section);
         return Math.max(120, section.clientWidth - (Number.parseFloat(computed.paddingLeft) || 0) - (Number.parseFloat(computed.paddingRight) || 0));
@@ -4397,8 +4440,8 @@
       if (density) density.value = String(gridDensityState[activeDevice]);
       const matchingDensity = matchingGridDensity();
       if (densityOutput) densityOutput.textContent = matchingDensity ? gridDensityLabel(matchingDensity) : "Custom";
-      const section = previewRoot?.querySelector(`[data-section-id="${selectedSection}"][data-sq-fluid]`) || previewRoot?.querySelector("[data-sq-fluid]");
-      const rows = Math.max(1, Number.parseInt(section?.dataset.sqRows || section?.dataset.sqMinRows || "12", 10));
+      const section = activeGridSection();
+      const rows = section ? layoutGridGeometry(section).rows : 1;
       if (countOutput) countOutput.textContent = `${fluidColumns()} columns × ${rows} rows`;
       if (device) device.textContent = activeDevice[0].toUpperCase() + activeDevice.slice(1);
       if (width) width.value = String(gridCellWidth());
@@ -4406,7 +4449,7 @@
       if (height) height.value = String(gridCellHeightState[activeDevice]);
       if (heightOutput) heightOutput.textContent = `${gridCellHeightState[activeDevice]}px`;
       if (visibility) visibility.checked = showLayoutGrid;
-      sqStudio.querySelectorAll("[data-sq-grid-toggle]").forEach((button) => { button.classList.toggle("active", showLayoutGrid); button.setAttribute("aria-pressed", String(showLayoutGrid)); button.setAttribute("aria-label", showLayoutGrid ? "Hide rectangle grid" : "Show rectangle grid"); });
+      sqStudio.querySelectorAll("[data-sq-grid-toggle]").forEach((button) => { button.classList.toggle("active", showLayoutGrid); button.setAttribute("aria-pressed", String(showLayoutGrid)); button.setAttribute("aria-label", showLayoutGrid ? "Hide grid" : "Show grid"); button.title = `${showLayoutGrid ? 'Hide' : 'Show'} grid · Snapping stays on while dragging`; });
       syncBuilderRanges();
     };
     const applyPageGutter = (device, gutter) => {
@@ -4695,6 +4738,8 @@
       syncElementControls();
       syncBackgroundManagers();
       if(block?.matches('.sq-native-section')&&!selectedElement){inspector?.classList.add('sq-native-selection');EzkartNative.select(block);}
+      syncPageGridControls();
+      refreshLayoutGrid();
       if (selectedElement) requestAnimationFrame(refreshElementOverlay);
       else { sqStudio.querySelector(".sq-inspector-scroll")?.scrollTo({ top: 0, behavior: "smooth" }); requestAnimationFrame(refreshSectionToolbar); }
     };
@@ -5390,8 +5435,13 @@
       applyFluidLayouts(); syncPageGridControls(); revealLayoutGrid(); markSqChanged();
     });
     sqStudio.querySelectorAll("[data-sq-grid-density], [data-sq-grid-cell-width], [data-sq-grid-cell-height]").forEach((input) => input.addEventListener("change", () => { if (gridDensitySnapshot) remember(gridDensitySnapshot); gridDensitySnapshot = null; }));
-    sqStudio.querySelector("[data-sq-show-layout-grid]")?.addEventListener("change", (event) => { showLayoutGrid = event.currentTarget.checked; syncPageGridControls(); refreshLayoutGrid(); });
-    sqStudio.querySelectorAll("[data-sq-grid-toggle]").forEach((button) => button.addEventListener("click", () => { showLayoutGrid = !showLayoutGrid; syncPageGridControls(); refreshLayoutGrid(); }));
+    const setGridVisible = visible => {
+      showLayoutGrid = visible;
+      try { localStorage.setItem("ezkart-builder-grid-visible", String(visible)); } catch (_) {}
+      syncPageGridControls(); refreshLayoutGrid();
+    };
+    sqStudio.querySelector("[data-sq-show-layout-grid]")?.addEventListener("change", (event) => setGridVisible(event.currentTarget.checked));
+    sqStudio.querySelectorAll("[data-sq-grid-toggle]").forEach((button) => button.addEventListener("click", () => setGridVisible(!showLayoutGrid)));
 
     let spacingSnapshot;
     sqStudio.querySelectorAll("[data-sq-spacing]").forEach((input) => {
@@ -7670,8 +7720,9 @@
       const movements = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
       if (!movements[event.key]) return;
       event.preventDefault();
-      remember();
       const [x, y] = movements[event.key];
+      if(selectedElement.matches('.sq-native')){EzkartNative.nudge(x*(event.shiftKey?10:1),y*(event.shiftKey?10:1));refreshElementOverlay();revealLayoutGrid();return;}
+      remember();
       if(selectedElement.closest('.sq-flow')){const current=readFlowPosition(selectedElement);setFlowPosition(selectedElement,{x:(current.x||0)+x*(event.shiftKey?10:1),y:(current.y||0)+y*(event.shiftKey?10:1)});refreshElementOverlay();markSqChanged();return;}
       const layout = parseElementLayout(selectedElement);
       setElementLayout(selectedElement, { ...layout, x: layout.x + x, y: layout.y + y });
@@ -8217,7 +8268,7 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
       }
       updateProductView();
     };
-    EzkartNative.init({root:previewRoot,inspector,remember,products:readCatalogProducts,renderProduct:renderNativeProduct,openProducts:()=>openSqPanel("products",{pin:true}),syncSelects:container=>container.querySelectorAll("select").forEach(select=>{enhanceBuilderSelect(select);syncBuilderSelect(select);}),changed:markSqChanged,rebind:()=>{rebuildLayerList();bindSqInteractions();},move:args=>globalThis.EzkartBuilder.nativeMove(args),toast:showToast,select:node=>{if(node?.matches('.sq-native-section'))selectSqSection(node.dataset.sectionId,true);else if(node)selectSqElement(node);}});
+    EzkartNative.init({root:previewRoot,inspector,remember,beginPointer:beginCanvasPointer,products:readCatalogProducts,renderProduct:renderNativeProduct,openProducts:()=>openSqPanel("products",{pin:true}),syncSelects:container=>container.querySelectorAll("select").forEach(select=>{enhanceBuilderSelect(select);syncBuilderSelect(select);}),changed:markSqChanged,rebind:()=>{rebuildLayerList();bindSqInteractions();},move:args=>globalThis.EzkartBuilder.nativeMove(args),toast:showToast,select:node=>{if(node?.matches('.sq-native-section'))selectSqSection(node.dataset.sectionId,true);else if(node)selectSqElement(node);}});
     let nativeFitFrame = 0;
     const fitNativeContent = () => {
       nativeFitFrame = 0;
