@@ -1742,7 +1742,9 @@
     const current = getContext(config),
       props = current.props || {};
     hooks.inspector.querySelector("[data-sq-inspector-context]").textContent =
-      "Selected element";
+      selected.matches(".sq-native-section")
+        ? "Selected section"
+        : "Selected element";
     hooks.inspector.querySelector("[data-sq-inspector-title]").textContent =
       config.name ||
       (selected.matches(".sq-native-section")
@@ -1860,7 +1862,14 @@
         ? "Affects the entire element. Use “Color specific words” to change a phrase."
         : `Applies to this ${config.type === "product" ? "product card" : "element"}.`;
     panel.querySelector("[data-native-fill-section] > summary").textContent =
-      config.text !== undefined ? "Background & text color" : "Background";
+      selected.matches(".sq-native-section")
+        ? "Section background"
+        : config.text !== undefined
+          ? "Background & text color"
+          : "Background";
+    if (selected.matches(".sq-native-section"))
+      panel.querySelector("[data-native-fill-status]").textContent =
+        `Applies to the “${config.name || "selected"}” section.`;
     loadGradient(panel, layer);
     syncFillControls(panel);
     panel.querySelector("[data-native-name]").value = config.name || "";

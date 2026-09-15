@@ -136,6 +136,11 @@ declare(strict_types=1);
           <button class="sq-page-height-handle" type="button" role="slider" aria-orientation="vertical" aria-valuemin="0" aria-valuemax="6000" aria-valuenow="0" data-sq-page-height-handle aria-label="Extra page height" title="Drag to extend the page downward"><span></span></button>
         </div>
       </div>
+      <div class="sq-canvas-section-tools" data-sq-section-tools role="group" aria-label="Section actions" hidden>
+        <span class="sq-canvas-section-name" data-sq-canvas-section-name></span>
+        <button type="button" data-sq-section-height-handle role="slider" aria-orientation="vertical" aria-valuemin="0" aria-valuemax="6000" aria-valuenow="0" aria-label="Resize section" title="Drag to resize this section"><span aria-hidden="true">↕</span></button>
+        <button type="button" data-sq-canvas-add-section title="Add a blank section below"><span aria-hidden="true">+</span><span>Add section</span></button>
+      </div>
       <footer class="sq-stage-footer">
         <span class="sq-stage-ready"><i></i> Editable canvas</span>
         <div class="sq-stage-scale">
