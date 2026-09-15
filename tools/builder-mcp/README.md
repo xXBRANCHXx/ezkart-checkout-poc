@@ -113,6 +113,12 @@ Commands are serialized. Switching projects saves the current project first. Wri
 
 This server saves local drafts and HTML exports. It does not publish or deploy pages. The native editor can open a project once its JSON is saved to the authorized store's existing landing-page storage. The current local backend supports catalog reads and page saves; cloud uploads and custom-code library writes require the hosted editor.
 
+The editor's **Preview** button renders the current canvas through the same
+sandboxed preview shell as the hosted editor, including changes made since the
+last save. Desktop, tablet, mobile and **Open tab** work locally. Configure
+`mediaBase` to allow images and video from a separate local asset server in the
+embedded preview.
+
 `page_audit` checks section bounds, missing images, headings, and section destinations. It supplements browser review; it is not a complete accessibility or commerce audit.
 
 ## Verification

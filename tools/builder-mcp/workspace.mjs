@@ -58,6 +58,21 @@ export class Workspace {
     }
     if(url.pathname==='/cart/admin/'||url.pathname==='/cart/admin/index.php')return send(200,await this.markup(),'text/html; charset=utf-8');
     if(url.pathname==='/cart/api/health.php')return send(200,{ok:true,commerce_environment:'test'});
+    if(url.pathname==='/cart/admin/page-preview.php'){
+     // Use the hosted editor's message-driven renderer so Preview always shows
+     // the current canvas, including edits that have not been saved/exported.
+     const shell=await readFile(join(repoRoot,'cart/admin/page-preview.php'),'utf8');
+     let mediaSource='';
+     try{
+      const mediaBase=(await this.catalog()).mediaBase;
+      const mediaUrl=mediaBase?new URL(mediaBase,this.url):null;
+      if(mediaUrl&&['http:','https:'].includes(mediaUrl.protocol))mediaSource=` ${mediaUrl.origin}`;
+     }catch{/* An absent media base needs no additional source. */}
+     // Keep the preview isolated; explicitly allow the configured local media
+     // server as well as the HTTPS assets supported by the hosted preview.
+     res.setHeader('Content-Security-Policy',`default-src 'none'; img-src 'self' data: https:${mediaSource}; media-src 'self' data: https:${mediaSource}; style-src 'unsafe-inline' https:; script-src 'unsafe-inline' https:; font-src 'self' data: https:; connect-src 'self' https:; form-action 'self' https:; frame-ancestors 'self'; base-uri 'none'; sandbox allow-scripts allow-forms allow-popups allow-top-navigation-by-user-activation`);
+     return send(200,shell.replace(/<\?[\s\S]*?\?>/g,''),'text/html; charset=utf-8');
+    }
     if(url.pathname.startsWith('/cart/admin/')){
      const file=resolve(repoRoot,`.${decodeURIComponent(url.pathname)}`);
      if(!file.startsWith(join(repoRoot,'cart/admin/') )||!/\.(js|css|woff2|webp|png|svg|jpg)$/.test(file))return send(404,{ok:false,error:'File not found.'});
