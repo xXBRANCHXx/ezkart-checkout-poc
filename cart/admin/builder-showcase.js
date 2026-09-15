@@ -46,7 +46,7 @@
     const film=section?.querySelector('.ezm-film-shell video');if(film){if(film.paused)playFilm(film);else film.pause();}
    }
   },true);
-  root.addEventListener('keydown',event=>{if(event.key==='Escape'){root.querySelectorAll('.ezm-menu-toggle[aria-expanded=true]').forEach(toggle=>{root.querySelector(`[id="${toggle.getAttribute('aria-controls')}"]`)?.setAttribute('hidden','');toggle.setAttribute('aria-expanded','false');toggle.focus();});}});
+  root.addEventListener('keydown',event=>{if(event.key==='Escape'){root.querySelectorAll('.ezm-menu-toggle[aria-expanded=true]').forEach(toggle=>{root.querySelector(`[id="${toggle.getAttribute('aria-controls')}"]`)?.setAttribute('hidden','');toggle.setAttribute('aria-expanded','false');toggle.setAttribute('aria-label','Buka navigasi');toggle.focus();});}});
   const refresh=()=>{menus();bindFilms();root.querySelectorAll('track[data-ezm-captions]').forEach(track=>{if(preparedTracks.has(track))return;preparedTracks.add(track);track.src=URL.createObjectURL(new Blob([track.dataset.ezmCaptions],{type:'text/vtt'}));});root.querySelectorAll('[data-open-film],.ezm-film-toggle').forEach(button=>button.hidden=false);root.querySelectorAll('.ezm-reveal').forEach(node=>node.classList.add('ezm-is-visible'));resize();};
   new ResizeObserver(resize).observe(root);
   new MutationObserver(records=>{if(records.some(r=>[...r.addedNodes].some(n=>n.nodeType===1&&n.matches?.('.sq-reference'))))refresh();}).observe(root,{childList:true});

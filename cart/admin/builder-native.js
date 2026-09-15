@@ -716,7 +716,7 @@
           .querySelectorAll("[data-native-collapsed]")
           .forEach((n) => (n.hidden = true));
         root
-          .querySelectorAll("[aria-expanded=true]")
+          .querySelectorAll(".sq-native[aria-expanded=true]")
           .forEach((n) => n.setAttribute("aria-expanded", "false"));
         if (actionNode.tagName === "A") return;
         event.preventDefault();
@@ -793,7 +793,7 @@
           .querySelectorAll("[data-native-collapsed]")
           .forEach((n) => (n.hidden = true));
         root
-          .querySelectorAll("[aria-expanded=true]")
+          .querySelectorAll(".sq-native[aria-expanded=true]")
           .forEach((n) => n.setAttribute("aria-expanded", "false"));
       }
     });
@@ -1774,11 +1774,12 @@
       context === "base" && !state
         ? "Layout and appearance settings affect all screen sizes."
         : `Editing ${responsive.selectedOptions[0].text.toLowerCase()}${state ? ` · ${state} version` : ""}.`;
-    panel
-      .querySelectorAll("[data-native-prop]")
-      .forEach(
-        (input) => (input.value = props[input.dataset.nativeProp] ?? ""),
-      );
+    panel.querySelectorAll("[data-native-prop]").forEach((input) => {
+      input.value = props[input.dataset.nativeProp] ?? "";
+      input.closest("label").hidden =
+        config.type === "product" &&
+        ["height", "maxHeight"].includes(input.dataset.nativeProp);
+    });
     const text = panel.querySelector("[data-native-text]");
     text.parentElement.hidden = config.text === undefined;
     text.value = config.text || "";
@@ -1937,7 +1938,7 @@
         <label>Apply layout changes to<select data-native-breakpoint><option value="base">All screen sizes</option></select></label>
         <p class="sq-native-help" data-native-context-note>Layout and appearance settings affect all screen sizes.</p>
       </div>
-      <details open data-native-product-controls hidden><summary>Product card</summary><label>Product shown in this card<select data-native-product-id></select></label><p class="sq-native-help">Changing this product affects only this card.</p><button type="button" class="sq-native-wide" data-native-another-product>+ Add another product card</button></details>
+      <details open data-native-product-controls hidden><summary>Product card</summary><label>Product shown in this card<select data-native-product-id></select></label><p class="sq-native-help">Changing this product affects only this card. Height adjusts to show all product details.</p><button type="button" class="sq-native-wide" data-native-another-product>+ Add another product card</button></details>
       <details open data-native-content><summary data-native-content-title>Text</summary>
         <label>Your text<textarea rows="3" data-native-text></textarea></label>
         <p class="sq-native-help" data-native-text-help>Edit your copy here. Select words to change their color.</p>
@@ -1971,12 +1972,12 @@
         <div data-native-solid-controls><label>Background color<div class="sq-native-color-field"><input type="color" value="#ffffff" data-native-solid-picker aria-label="Choose background color"><input type="text" value="transparent" spellcheck="false" data-native-solid-color aria-label="Background color value"></div></label></div>
         <div data-native-gradient-controls hidden>
           <div class="sq-native-pair">
-            <label>Gradient style<select data-native-gradient-kind><option value="linear">Linear</option><option value="radial">Radial</option></select></label>
+            <label>Gradient direction<select data-native-gradient-kind><option value="linear">Straight</option><option value="radial">From a center</option></select></label>
             <label data-native-linear-controls>Angle<div class="sq-native-unit"><input type="number" value="105" data-native-gradient-angle><span aria-hidden="true">°</span></div></label>
-            <label data-native-radial-shape hidden>Shape<select data-native-gradient-shape><option value="ellipse">Ellipse</option><option value="circle">Circle</option></select></label>
+            <label data-native-radial-shape hidden>Shape<select data-native-gradient-shape><option value="ellipse">Oval</option><option value="circle">Circle</option></select></label>
           </div>
           <div data-native-radial-controls hidden><div class="sq-native-pair"><label>Horizontal center (%)<input type="number" data-native-gradient-x value="50"></label><label>Vertical center (%)<input type="number" data-native-gradient-y value="50"></label></div></div>
-          <div class="sq-native-stop-heading"><span>Colors</span><span>Position</span><span></span></div>
+          <div class="sq-native-stop-heading"><span>Gradient colors</span><span>At (%)</span><span></span></div>
           <div data-native-gradient-stops></div>
           <button type="button" class="sq-native-wide" data-native-add-stop>+ Add color</button>
           <details class="sq-native-subsection" data-native-layers><summary>Gradient layers <span data-native-layer-count>1</span></summary><p class="sq-native-help">Combine up to 8 gradients. The first layer sits on top.</p><label>Editing layer<select data-native-layer></select></label><div class="sq-native-pair sq-native-actions"><button type="button" data-native-layer-add>+ Add layer</button><button type="button" data-native-layer-remove>Remove layer</button></div></details>

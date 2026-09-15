@@ -232,7 +232,7 @@ body:has(>.sq-authored-navigation)>.sq-page-preview.sq-has-pinned-navigation{pad
 .sq-page-preview .sq-product-grid .sq-product-option > span:first-child { font-size: 11px; }
 .sq-page-preview .sq-native[data-native-type=product] > article { background: transparent; }
 .sq-page-preview .sq-native[data-native-type=product] { height: auto; }
-@container ezkart-product-card (max-width: 330px) {
+@container ezkart-product-card (max-width: 380px) {
   .sq-page-preview .sq-product-grid > article footer { grid-template-columns: minmax(0,1fr); gap: 12px; }
   .sq-page-preview .sq-product-grid > article footer button { width: 100%; min-width: 0; font-size: 12px; }
   .sq-page-preview .sq-product-grid .sq-product-options { grid-template-columns: minmax(0,1fr); }
@@ -249,3 +249,26 @@ body:has(>.sq-authored-navigation)>.sq-page-preview.sq-has-pinned-navigation{pad
 .sq-product-choices [data-sq-block-product-list] { max-height: 260px; overflow: auto; }
 .page-site-editor .sq-inspector .sq-product-choices label { display: flex; align-items: start; gap: 8px; margin: 10px 0 0; font-size: 12px; }
 .page-site-editor .sq-inspector .sq-product-choices input { width: 16px; height: 16px; flex: 0 0 auto; margin-top: 2px; }
+
+/* Keep the editor's selection box aligned with the actual product content. */
+.page-site-editor .sq-page-preview .sq-product-grid > article:hover { transform: none; }
+.page-site-editor .sq-page-preview .sq-product-grid > article:hover > .product-art img { transform: none; }
+.sq-page-preview .sq-product-grid > article { min-height: max-content; }
+
+/* Column choices are a maximum; narrower product blocks keep readable cards. */
+.sq-page-preview .sq-product-grid:is(.product-layout-auto,.product-layout-fixed) { grid-template-columns: var(--sq-product-template,repeat(auto-fit,minmax(min(100%,220px),1fr))) !important; }
+.sq-page-preview .sq-native[data-native-type="product"] { height: auto !important; max-height: none !important; }
+/* A page header has its own layer above every content section. */
+.sq-page-preview > .sq-page-block:is(header,nav,.ezm-site-header,.sq-navigation-template-section) { z-index: 1000 !important; isolation: isolate; overflow: visible; }
+/* Editing tools stay readable when the canvas is zoomed out. */
+.page-site-editor .sq-element-toolbar { top: auto; bottom: calc(100% + 6px); transform: scale(var(--sq-editor-ui-scale,1)); transform-origin: left bottom; }
+.page-site-editor .sq-element-toolbar > span { font-size: 11px; }
+.page-site-editor .sq-element-toolbar button { width: 32px; }
+.page-site-editor .sq-element-toolbar .icon { width: 14px; }
+.page-site-editor .sq-element-resize { transform: scale(var(--sq-editor-ui-scale,1)); }
+.page-site-editor .sq-page-block.selected:has(.sq-element-selected) { outline-color: transparent; box-shadow: none; }
+
+.sq-page-preview .sq-product-grid:is([data-sq-element],.ez-fluid-element) { max-width: none; }
+
+.page-site-editor [data-sq-auto-height-control][hidden] { display: none !important; }
+.sq-page-preview .sq-native-section:is(header,nav) { position: relative; }

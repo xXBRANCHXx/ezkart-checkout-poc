@@ -2485,7 +2485,7 @@
     let libraryDrag = null;
     let libraryDropPreview = null;
     let draggedImageSnapshot = null;
-    let showLayoutGrid = true;
+    let showLayoutGrid = false;
     let layoutGridDragging = false;
     let layoutGridTransient = false;
     let layoutGridTimer = 0;
@@ -2801,6 +2801,12 @@
       columns: element?.dataset[productSettingKey("Columns", device)] || "auto",
       density: element?.dataset[productSettingKey("Density", device)] || "balanced",
     });
+    const productColumnTemplate = (settings, gap = 28) => {
+      const minimum = {compact:150, balanced:220, showcase:310}[settings.density] || 220;
+      const count = Math.max(1, Math.min(4, Number(settings.columns) || 1));
+      const track = settings.columns === "auto" ? `${minimum}px` : `max(${minimum}px,calc((100% - ${gap * (count - 1)}px) / ${count}))`;
+      return `repeat(auto-fit,minmax(min(100%,${track}),1fr))`;
+    };
     const applyProductGridLayout = (element, device = activeDevice) => {
       if (element?.dataset.sqElementType !== "product-grid") return;
       const settings = productGridSettings(element, device);
@@ -2808,6 +2814,7 @@
       element.classList.add(settings.columns === "auto" ? "product-layout-auto" : "product-layout-fixed", `product-density-${settings.density}`);
       if (settings.columns === "auto") element.style.removeProperty("--sq-product-columns");
       else element.style.setProperty("--sq-product-columns", settings.columns);
+      element.style.setProperty("--sq-product-template", productColumnTemplate(settings, parseFloat(getComputedStyle(element).columnGap) || 0));
     };
     const layoutsOverlap = (first, second) => !(
       first.x + first.width <= second.x ||
@@ -2929,6 +2936,7 @@
         heightHandle.setAttribute("aria-valuenow", String(rows));
         heightHandle.setAttribute("aria-valuetext", `${rows} grid rows`);
       }
+      if (section.querySelector('[data-sq-product-grid]')) scheduleProductGridFit();
     };
     const applyFluidLayouts = () => {
       previewRoot?.querySelectorAll("[data-sq-fluid]").forEach(applyFluidSection);
@@ -3046,17 +3054,31 @@
       if (!section || !cards.length) return false;
       const gridRect = grid.getBoundingClientRect();
       const renderedScale = grid.offsetWidth ? gridRect.width / grid.offsetWidth : 1;
-      const contentHeight = Math.max(...cards.map((card) => (card.getBoundingClientRect().bottom - gridRect.top) / Math.max(.01, renderedScale)));
+      const scale = Math.max(.01, renderedScale);
+      const contentHeight = Math.max(...cards.map(card => {
+        const details = card.querySelector(':scope > div');
+        const padding = Number.parseFloat(details && getComputedStyle(details).paddingBottom) || 0;
+        const contentBottom = Math.max(card.getBoundingClientRect().bottom, ...[...(details?.children || [])].filter(child=>!child.hidden).map(child=>child.getBoundingClientRect().bottom + padding * scale));
+        return (contentBottom - gridRect.top) / scale;
+      }));
       const rowGap = Number.parseFloat(getComputedStyle(section).rowGap) || 0;
       const requiredRows = Math.max(1, Math.min(maximumFluidRows, Math.ceil((contentHeight + rowGap) / fluidRowHeight(section))));
       const layout = parseElementLayout(grid);
       if (requiredRows === layout.height) return false;
+      const growth = requiredRows - layout.height;
+      if (growth > 0) section.querySelectorAll(':scope > [data-sq-element]').forEach(sibling => {
+        if (sibling === grid) return;
+        const next = parseElementLayout(sibling);
+        if (next.y >= layout.y + layout.height && next.x < layout.x + layout.width && next.x + next.width > layout.x)
+          setElementLayout(sibling,{...next,y:next.y+growth});
+      });
       setElementLayout(grid, { ...layout, height: requiredRows });
       return true;
     };
     scheduleProductGridFit = () => {
-      window.cancelAnimationFrame(productGridFitFrame);
+      if (productGridFitFrame) return;
       productGridFitFrame = window.requestAnimationFrame(() => {
+        productGridFitFrame = 0;
         const changedSections = new Set();
         previewRoot?.querySelectorAll("[data-sq-product-grid]").forEach((grid) => {
           grid.querySelectorAll(":scope > [data-product-card]").forEach((card) => {
@@ -3125,6 +3147,7 @@
       ? `${element.dataset.sqComponentName || "Component"} instance`
       : element?.dataset.nativeType ? EzkartNative.read(element).name || EzkartNative.typeName(element.dataset.nativeType)
       : element?.dataset.sqElementType === "navigation" ? "Navigation bar"
+      : element?.dataset.sqElementType === "product-grid" ? (element.querySelectorAll(':scope > [data-product-card]:not([hidden])').length === 1 ? "Product card" : "Product collection")
       : (element?.dataset.sqElementType || "element").replace(/-/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
     const reviewRating = (element) => Math.max(1, Math.min(5, Math.round(Number(element?.dataset.sqReviewRating) || 5)));
     const renderReviewStars = (element, value = reviewRating(element)) => {
@@ -3457,6 +3480,28 @@
         section.classList.toggle("sq-nav-menu-open", open);
       };
     };
+    const closeEditorNavigationMenu = (section) => {
+      const menu = section.querySelector(":scope > .sq-nav-mobile-menu");
+      const toggle = section.querySelector(".sq-nav-menu-toggle");
+      if (!menu || menu.hidden) return null;
+      menu.hidden = true;
+      section.classList.remove("sq-nav-menu-open");
+      toggle?.setAttribute("aria-expanded", "false");
+      toggle?.setAttribute("aria-label", "Open navigation menu");
+      return toggle;
+    };
+    sqStudio.addEventListener("keydown", event => {
+      if (event.key !== "Escape") return;
+      const open = previewRoot?.querySelector(".sq-nav-menu-open");
+      if (!open) return;
+      event.preventDefault(); event.stopPropagation();
+      closeEditorNavigationMenu(open)?.focus();
+    });
+    document.addEventListener("pointerdown", event => {
+      previewRoot?.querySelectorAll(".sq-nav-menu-open").forEach(section => {
+        if (!section.contains(event.target)) closeEditorNavigationMenu(section);
+      });
+    });
     const navigationScrollRoot = sqStudio.querySelector(".sq-canvas-scroll");
     let editorNavigationFrame = 0;
     const syncEditorNavigation = () => {
@@ -3621,7 +3666,13 @@
       if (isBackgroundImage && ["style", "layout"].includes(activeElementPanel)) showElementPanel("content");
       [["x", layout.x], ["y", layout.y], ["w", layout.width], ["h", layout.height]].forEach(([field, value]) => {
         const input = sqStudio.querySelector(`[data-sq-element-${field}]`);
-        if (input) input.value = String(value);
+        if (input) {
+          input.value = String(value);
+          if (field === "h") {
+            input.disabled = isProductGrid;
+            input.closest("label").querySelector("span").textContent = isProductGrid ? "Height (automatic)" : "Height";
+          }
+        }
       });
       const inset = elementInsetFor(selectedElement);
       sqStudio.querySelectorAll("[data-sq-element-inset]").forEach((input) => { input.value = String(inset[input.dataset.sqElementInset]); });
@@ -4392,7 +4443,7 @@
       ".sq-free-heading>h1", ".sq-free-heading>h2", ".sq-free-heading>h3", ".sq-free-text>p", ".sq-free-marquee .sq-marquee-copy:not([aria-hidden])", ".sq-free-button>button", ".sq-free-form>h3", ".sq-free-form>p",
       '.sq-native[data-native-type="heading"][data-native-text-field],.sq-native[data-native-type="text"][data-native-text-field]', ".sq-composition-heading>h1", ".sq-composition-heading>h3", ".sq-composition-detail h3", ".sq-composition-detail p", ".sq-composition-faq summary", ".sq-composition-faq p", ".sq-composition-comparison th", ".sq-composition-comparison td", ".sq-composition-quote blockquote", ".sq-composition-quote p", ".sq-composition-footer-links>a",
     ].join(",");
-    const editableNodesFor = (block) => block ? [...block.querySelectorAll(block.closest(".sq-flow") || block.matches(".sq-flow") ? "[data-sq-flow-text]" : editableContentSelector)].filter((node) => !node.closest('.sq-image-drag-handle,.sq-nav-mobile-menu,[data-native-type="product"]')) : [];
+    const editableNodesFor = (block) => block ? [...block.querySelectorAll(block.closest(".sq-flow") || block.matches(".sq-flow") ? "[data-sq-flow-text]" : editableContentSelector)].filter((node) => !node.closest('.sq-image-drag-handle,.sq-nav-mobile-menu,[data-product-card]')) : [];
     const contentFieldLabel = (node, index) => {
       const article = node.closest("article");
       const group = article?.parentElement ? [...article.parentElement.children].filter((item) => item.matches("article")).indexOf(article) + 1 : 0;
@@ -4720,6 +4771,7 @@
         let draggedCard = null;
         let productOrderSnapshot = null;
         [...grid.querySelectorAll(":scope > [data-product-card]")].forEach((card) => {
+          card.querySelectorAll('[contenteditable],[data-sq-editable]').forEach(text => { text.removeAttribute('contenteditable'); text.removeAttribute('data-sq-editable'); text.removeAttribute('spellcheck'); text.onpointerdown = null; text.onclick = null; text.oninput = null; text.onblur = null; });
           card.draggable = true;
           card.tabIndex = 0;
           card.ondragstart = (event) => {
@@ -7369,7 +7421,10 @@
       const minimum = Number(zoomSlider?.min || 10);
       zoom = Math.max(minimum, Math.min(100, Math.round(Number(value) || 100)));
       deviceFrame?.classList.remove("zoom-60", "zoom-70", "zoom-80", "zoom-90");
-      if (deviceFrame) deviceFrame.style.zoom = zoom === 100 ? "" : String(zoom / 100);
+      if (deviceFrame) {
+        deviceFrame.style.zoom = zoom === 100 ? "" : String(zoom / 100);
+        deviceFrame.style.setProperty("--sq-editor-ui-scale", String(100 / zoom));
+      }
       sqStudio.querySelectorAll("[data-sq-zoom]").forEach((output) => { output.textContent = `${zoom}%`; });
       if (zoomSlider) {
         zoomSlider.value = String(zoom);
@@ -7668,7 +7723,7 @@
       const productCssFor = (device) => [...previewRoot.querySelectorAll('[data-sq-element-type="product-grid"]')].map((element) => {
         const settings = productGridSettings(element, device);
         const density = { compact: ["150px", "clamp(96px,58cqw,175px)", "11px", "none"], balanced: ["220px", "clamp(120px,62cqw,250px)", "18px", "block"], showcase: ["310px", "clamp(180px,70cqw,360px)", "18px", "block"] }[settings.density] || ["220px", "clamp(120px,62cqw,250px)", "18px", "block"];
-        const columns = settings.columns === "auto" ? `repeat(auto-fit,minmax(min(100%,${density[0]}),1fr))` : `repeat(${settings.columns},minmax(0,1fr))`;
+        const columns = productColumnTemplate(settings, parseFloat(getComputedStyle(element).columnGap) || 0);
         const id = `[data-ezkart-element="${element.dataset.sqElementId}"]`;
         return `.sq-page-preview ${id}.sq-product-grid{grid-template-columns:${columns}!important}${id}>article>.product-art{height:auto!important;aspect-ratio:1/1!important}${id}>article>div{padding:${density[2]}!important}${id} p{display:${density[3]}}`;
       }).join("\n");
