@@ -17,10 +17,10 @@
 </section>
 
 <dialog class="page-creator-dialog" id="library-page-creator-dialog"><form method="dialog" data-library-page-form>
-  <header><span><?= ez_admin_icon('layout') ?></span><div><small>Create a landing page</small><h2>Start with at least one product.</h2><p>Choose from the real products already saved in your Ezkart catalog.</p></div><button type="button" data-creator-close aria-label="Close"><?= ez_admin_icon('x') ?></button></header>
+  <header><span><?= ez_admin_icon('layout') ?></span><div><small>Create a landing page</small><h2>Start with a blank canvas.</h2><p>Add products now, or start with your story and connect products later.</p></div><button type="button" data-creator-close aria-label="Close"><?= ez_admin_icon('x') ?></button></header>
   <section>
     <label><span>Page name</span><input name="page_name" required maxlength="60" placeholder="Example: Ramadan Collection"></label>
-    <fieldset data-creator-products><legend>Starting products</legend><p class="creator-products-empty" data-creator-products-empty>No products are available yet. <a href="?page=products">Create a product first</a>.</p></fieldset>
+    <fieldset data-creator-products><legend>Starting products · optional</legend><p class="creator-products-empty" data-creator-products-empty>You can build your page now and add products later.</p></fieldset>
     <label><span>Free Ezkart URL</span><div class="slug-field"><input name="slug" required pattern="[a-z0-9]+(?:-[a-z0-9]+)*" placeholder="ramadan-collection"><em>.ezkart.site</em></div></label>
   </section>
   <footer><button type="button" data-creator-close>Cancel</button><button class="primary" value="default">Create &amp; edit</button></footer>

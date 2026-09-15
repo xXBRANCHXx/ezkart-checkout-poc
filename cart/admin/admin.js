@@ -1860,7 +1860,6 @@
       if (event.submitter?.value === "cancel") return;
       event.preventDefault();
       const products = [...form.querySelectorAll('input[name="starter_products[]"]:checked')].map((input) => input.value);
-      if (!products.length) { showToast("Select at least one starting product"); return; }
       if (!form.reportValidity()) return;
       const site = { name: String(nameInput.value).trim(), url: `${makePageSlug(slugInput.value)}.ezkart.site`, products, customProducts: [] };
       if (customSites.some((item) => item.url === site.url) || landingLibrary.querySelector(`[data-site-url="${CSS.escape(site.url)}"]`)) { showToast("A page with this URL already exists"); return; }
@@ -3392,6 +3391,7 @@
         toggle.setAttribute("aria-expanded", "false");
         toggle.innerHTML = "<i></i><i></i><i></i>";
       }
+      toggle.dataset.sqLinkType="none";toggle.dataset.sqLink="";toggle.dataset.sqNewTab="false";
       const cta = target.querySelector(":scope > button:not(.sq-nav-menu-toggle)");
       if (cta) target.insertBefore(toggle, cta); else target.append(toggle);
       let menu = section.querySelector(":scope > .sq-nav-mobile-menu");
@@ -3542,6 +3542,9 @@
       const isComponentInstance = selectedElement.dataset.sqElementType === "component-instance";
       const isMarquee = selectedElement.dataset.sqElementType === "marquee";
       const elementType = selectedElement.dataset.sqElementType || "";
+      const headingControl=sqStudio.querySelector('[data-sq-heading-level-control]');
+      if(headingControl){headingControl.hidden=elementType!=='heading'||!selectedElement.matches('.sq-free-heading');headingControl.querySelector('select').value=selectedElement.querySelector('h1,h2,h3')?.tagName.toLowerCase()||'h2';}
+      const typeDevice=sqStudio.querySelector('[data-sq-type-device]');if(typeDevice)typeDevice.textContent=activeDevice;
       const isNavigation = elementType === "navigation";
       const isBackgroundImage = elementType === "image-background";
       const typographyControls = sqStudio.querySelector("[data-sq-typography-controls]");
@@ -3556,7 +3559,7 @@
       if(isFlow){const position=readFlowPosition(selectedElement);sqStudio.querySelectorAll('[data-sq-flow-position]').forEach(input=>input.value=position[input.dataset.sqFlowPosition]??'');}
       const image = isLogo || isProductGrid ? null : imageForElement();
       const autoHeightControl=sqStudio.querySelector('[data-sq-auto-height-control]');
-      if(autoHeightControl){autoHeightControl.hidden=!selectedElement.closest('.sq-composition')||!['heading','text','copy','faq','comparison','quote'].includes(elementType);autoHeightControl.querySelector('input').checked=selectedElement.dataset.sqAutoHeight==='true';}
+      if(autoHeightControl){autoHeightControl.hidden=!selectedElement.closest('.sq-composition,.sq-generated-blank')||!['heading','text','copy','faq','comparison','quote','button'].includes(elementType);autoHeightControl.querySelector('input').checked=selectedElement.dataset.sqAutoHeight==='true';}
       const contentName = selectedContent?.matches("h1,h2,h3") ? "Heading" : selectedContent ? "Text" : "";
       const contextualName = isBackgroundImage ? "Section background" : isLogo ? "Logo" : selectedAction && action ? "Button" : selectedImage && image ? "Image" : contentName || elementTypeName(selectedElement);
       const context = sqStudio.querySelector("[data-sq-inspector-context]");
@@ -3600,6 +3603,7 @@
       const hideButton = sqStudio.querySelector("[data-sq-element-hide]");
       if (hideButton) hideButton.lastChild.textContent = selectedElement.classList.contains("sq-element-hidden") ? " Show" : " Hide";
       const computed = getComputedStyle(selectedElement);
+      const vertical=sqStudio.querySelector("[data-sq-element-vertical-align]");if(vertical)vertical.value=selectedElement.style.alignItems||"center";
       const colorFallbacks = { color: "#24262b", backgroundColor: "#ffffff", borderColor: "#e3e5e7" };
       sqStudio.querySelectorAll("[data-sq-element-color]").forEach((input) => {
         const property = input.dataset.sqElementColor;
@@ -4336,7 +4340,7 @@
       ".sq-generated-reviews b", ".sq-generated-reviews small",
       ".sq-generated-faq>h2", ".sq-generated-faq summary", ".sq-generated-faq p",
       ".sq-generated-spacer>span",
-      ".sq-free-heading>h2", ".sq-free-text>p", ".sq-free-marquee .sq-marquee-copy:not([aria-hidden])", ".sq-free-button>button", ".sq-free-form>h3", ".sq-free-form>p",
+      ".sq-free-heading>h1", ".sq-free-heading>h2", ".sq-free-heading>h3", ".sq-free-text>p", ".sq-free-marquee .sq-marquee-copy:not([aria-hidden])", ".sq-free-button>button", ".sq-free-form>h3", ".sq-free-form>p",
       ".sq-composition-heading>h1", ".sq-composition-heading>h3", ".sq-composition-detail h3", ".sq-composition-detail p", ".sq-composition-faq summary", ".sq-composition-faq p", ".sq-composition-comparison th", ".sq-composition-comparison td", ".sq-composition-quote blockquote", ".sq-composition-quote p", ".sq-composition-footer-links>a",
     ].join(",");
     const editableNodesFor = (block) => block ? [...block.querySelectorAll(block.closest(".sq-flow") || block.matches(".sq-flow") ? "[data-sq-flow-text]" : editableContentSelector)].filter((node) => !node.closest(".sq-image-drag-handle,.sq-nav-mobile-menu")) : [];
@@ -4477,6 +4481,7 @@
       markSqChanged();
     };
     const bindSqInteractions = () => {
+      previewRoot?.querySelectorAll('[data-sq-block]').forEach(EzkartBackgrounds.migrate);
       previewRoot?.querySelectorAll(".animating, .sq-element-animate").forEach((element) => element.classList.remove("animating", "sq-element-animate"));
       previewRoot?.querySelectorAll('[data-sq-element-type="review"]').forEach((element) => renderReviewStars(element));
       previewRoot?.querySelectorAll('[data-sq-element-type="component-instance"]').forEach(syncComponentInstance);
@@ -5317,6 +5322,12 @@
       if (property === "borderColor") selectedElement.style.borderWidth = "0px";
       syncElementControls(); markSqChanged();
     }));
+    const setHeadingLevel=(element,level)=>{
+      const old=element.querySelector(':scope > h1,:scope > h2,:scope > h3');
+      if(!old||old.tagName.toLowerCase()===level)return;
+      const next=document.createElement(level);for(const attribute of old.attributes)next.setAttribute(attribute.name,attribute.value);next.replaceChildren(...old.childNodes);old.replaceWith(next);selectedContent=next;
+    };
+    sqStudio.querySelector('[data-sq-heading-level]')?.addEventListener('change',event=>{if(!selectedElement?.matches('.sq-free-heading'))return;remember();setHeadingLevel(selectedElement,event.target.value);bindSqInteractions();syncElementControls();markSqChanged();});
     const bindElementStyleSelect = (selector, property) => sqStudio.querySelector(selector)?.addEventListener("change", (event) => {
       if (!selectedElement?.isConnected) return;
       remember(); selectedElement.style[property] = event.currentTarget.value; refreshElementOverlay(); markSqChanged(); syncElementControls();
@@ -5324,6 +5335,7 @@
     bindElementStyleSelect("[data-sq-element-font-family]", "fontFamily");
     bindElementStyleSelect("[data-sq-element-font-weight]", "fontWeight");
     bindElementStyleSelect("[data-sq-element-border-style]", "borderStyle");
+    bindElementStyleSelect("[data-sq-element-vertical-align]", "alignItems");
     const bindElementStyleRange = (selector, property, unit, outputSelector, formatter = (value) => `${value}${unit}`) => {
       const input = sqStudio.querySelector(selector);
       input?.addEventListener("pointerdown", rememberElementStyle);
@@ -5332,7 +5344,8 @@
         if (!selectedElement?.isConnected) return;
         rememberElementStyle();
         const value = event.currentTarget.value;
-        selectedElement.style[property] = `${value}${unit}`;
+        if(property==='fontSize')EzkartTypography.setFontSize(selectedElement,`${value}${unit}`,activeDevice);
+        else selectedElement.style[property] = `${value}${unit}`;
         if (property === "borderWidth" && Number(value) > 0 && getComputedStyle(selectedElement).borderStyle === "none") selectedElement.style.borderStyle = sqStudio.querySelector("[data-sq-element-border-style]")?.value || "solid";
         if (property === "borderWidth" && Number(value) > 0 && isTransparentColor(getComputedStyle(selectedElement).borderColor)) selectedElement.style.borderColor = sqStudio.querySelector('[data-sq-element-color="borderColor"]')?.value || "#e3e5e7";
         const output = sqStudio.querySelector(outputSelector);
@@ -5606,6 +5619,7 @@
       section.classList.add("section-bg-custom");
       section.classList.toggle("section-bg-custom-dark", luminance < .36);
       section.style.setProperty("--sq-section-background-color", color);
+      EzkartBackgrounds.render(section);
     };
     const syncBackgroundManagers = () => {
       previewRoot?.querySelectorAll("[data-sq-block] > .sq-section-background").forEach(prepareBackgroundLayer);
@@ -5613,7 +5627,8 @@
         const section = backgroundTargetFor();
         const layer = backgroundLayerFor();
         const image = layer?.querySelector("img");
-        const type = section?.dataset.sqBackgroundType === "image" ? "image" : "solid";
+        const type = EzkartBackgrounds.type(section);
+        EzkartBackgrounds.render(section);
         if (section) section.dataset.sqBackgroundType = type;
         const thumbnail = manager.querySelector("[data-sq-background-thumbnail]");
         const title = manager.querySelector("[data-sq-background-title]");
@@ -5621,7 +5636,7 @@
         const url = manager.querySelector("[data-sq-background-url]");
         const edit = manager.querySelector("[data-sq-background-edit]");
         const remove = manager.querySelector("[data-sq-background-remove]");
-        const sectionName = sectionNames[selectedSection] || "Section";
+        const sectionName = section?.dataset.sqSectionName || sectionNames[selectedSection] || "Section";
         const sectionNameLabel = manager.querySelector("[data-sq-section-background-name]");
         if (sectionNameLabel) sectionNameLabel.textContent = sectionName;
         manager.querySelectorAll("[data-sq-section-background-type]").forEach((button) => {
@@ -5630,6 +5645,15 @@
           button.setAttribute("aria-pressed", String(active));
         });
         manager.querySelectorAll("[data-sq-section-background-panel]").forEach((panel) => { panel.hidden = panel.dataset.sqSectionBackgroundPanel !== type; });
+        const gradient = EzkartBackgrounds.read(section);
+        manager.querySelectorAll('[data-sq-gradient]').forEach(input=>{
+          const key=input.dataset.sqGradient;if(document.activeElement!==input)input.value=gradient[key];
+          const output=manager.querySelector(`[data-sq-gradient-output="${key}"]`);if(output)output.textContent=String(gradient[key])+(key==='angle'?'°':['opacity','x','y'].includes(key)?'%':'');
+        });
+        manager.querySelector('[data-sq-gradient-angle]')?.toggleAttribute('hidden',gradient.kind!=='linear');
+        manager.querySelector('[data-sq-gradient-center]')?.toggleAttribute('hidden',gradient.kind!=='radial');
+        const gradientPreview=manager.querySelector('[data-sq-gradient-preview]');
+        if(gradientPreview){gradientPreview.style.backgroundColor=gradient.base;gradientPreview.style.backgroundImage=section?.querySelector('.sq-gradient-surface')?.style.backgroundImage||'';}
         const color = sectionBackgroundColor(section);
         const colorInput = manager.querySelector("[data-sq-section-background-color]");
         const colorOutput = manager.querySelector("[data-sq-section-background-color-output]");
@@ -5721,13 +5745,21 @@
     sqStudio.querySelectorAll("[data-sq-section-background-type]").forEach((button) => button.addEventListener("click", () => {
       const section = backgroundTargetFor();
       if (!section) return;
-      const type = button.dataset.sqSectionBackgroundType === "image" ? "image" : "solid";
+      const type = button.dataset.sqSectionBackgroundType;
       if (section.dataset.sqBackgroundType === type) return;
       remember();
       section.dataset.sqBackgroundType = type;
       syncBackgroundManagers();
       markSqChanged();
     }));
+    let gradientSnapshot=null;
+    sqStudio.querySelectorAll('[data-sq-gradient]').forEach(input=>{
+      const start=()=>{if(!gradientSnapshot)gradientSnapshot=captureState();};
+      input.addEventListener('focus',start);input.addEventListener('pointerdown',start);
+      const update=()=>{const section=backgroundTargetFor();if(!section)return;start();EzkartBackgrounds.set(section,{...EzkartBackgrounds.read(section),[input.dataset.sqGradient]:input.value});syncBackgroundManagers();markSqChanged();};
+      input.addEventListener('input',update);
+      input.addEventListener('change',()=>{update();if(gradientSnapshot)remember(gradientSnapshot);gradientSnapshot=null;});
+    });
     let sectionBackgroundColorSnapshot = null;
     const backgroundColorInput = sqStudio.querySelector("[data-sq-section-background-color]");
     const startSectionBackgroundColor = () => { if (!sectionBackgroundColorSnapshot) sectionBackgroundColorSnapshot = captureState(); };
@@ -6651,10 +6683,10 @@
       return `<section class="sq-page-block sq-generated-text" draggable="true" data-sq-block data-section-id="${sectionId}">${handle}<h2>New section</h2></section>`;
     };
     const newElementMarkup = (type) => {
-      if (type === "heading") return `<div class="sq-free-element sq-free-heading" data-sq-element data-sq-element-type="heading"><h2>Write a powerful heading.</h2></div>`;
-      if (type === "text") return `<div class="sq-free-element sq-free-text" data-sq-element data-sq-element-type="text"><p>Add your story, product details, or supporting copy here.</p></div>`;
+      if (type === "heading") return `<div class="sq-free-element sq-free-heading sq-native-typography" style="font-size:48px;line-height:1.1;font-weight:600" data-sq-element data-sq-element-type="heading"><h2>Write a powerful heading.</h2></div>`;
+      if (type === "text") return `<div class="sq-free-element sq-free-text sq-native-typography" style="font-size:16px;line-height:1.65" data-sq-element data-sq-element-type="text"><p>Add your story, product details, or supporting copy here.</p></div>`;
       if (type === "marquee") return `<div class="sq-free-element sq-free-marquee" data-sq-element data-sq-element-type="marquee" data-sq-marquee-mode="auto" data-sq-marquee-speed="60"><div class="sq-marquee-track"><span class="sq-marquee-copy">NEW ARRIVALS ✦ SHOP THE DROP ✦ MADE FOR YOUR EVERYDAY ✦</span><span class="sq-marquee-copy" aria-hidden="true">NEW ARRIVALS ✦ SHOP THE DROP ✦ MADE FOR YOUR EVERYDAY ✦</span></div></div>`;
-      if (type === "button") return `<div class="sq-free-element sq-free-button" data-sq-element data-sq-element-type="button"><button type="button">Call to action</button></div>`;
+      if (type === "button") return `<div class="sq-free-element sq-free-button sq-native-typography" style="font-size:14px;line-height:1.4" data-sq-element data-sq-element-type="button"><button type="button">Call to action</button></div>`;
       if (type === "navigation") return `<nav class="sq-free-element sq-free-navigation" data-sq-element data-sq-element-type="navigation"><a href="#products">Shop</a><a href="#story">Our story</a><a href="#contact">Contact</a><button type="button">Buy now</button></nav>`;
       if (type === "image") return `<div class="sq-free-element sq-free-image" data-sq-element data-sq-element-type="image"><img src="${productImages.granola}" alt="Product image"></div>`;
       if (type === "divider") return `<div class="sq-free-element sq-free-divider" data-sq-element data-sq-element-type="divider"><span></span></div>`;
@@ -7367,7 +7399,7 @@
     const generateHtml = ({ libraryPreview = false } = {}) => {
       const exportBase = document.body.dataset.adminPublicBase || window.location.href;
       const clone = previewRoot.cloneNode(true);
-      clone.querySelectorAll('[data-sq-background-type="solid"]').forEach((section) => {
+      clone.querySelectorAll('[data-sq-background-type]:not([data-sq-background-type="image"])').forEach((section) => {
         section.querySelector(":scope > .sq-section-background")?.remove();
       });
       clone.querySelectorAll("img[data-sq-image-blend-mode],img[data-sq-image-blend-source],img[data-sq-image-blend-color]").forEach(applyImageBlend);
@@ -7428,7 +7460,7 @@
         node.dataset.ezkartNavShadow = node.dataset.sqNavShadow || "true";
       });
       clone.querySelectorAll("[data-sq-nav-slot]").forEach((node) => { node.dataset.ezkartNavSlot = node.dataset.sqNavSlot; });
-      clone.querySelectorAll("[data-section-id]").forEach((node) => { node.dataset.ezkartSection = node.dataset.sectionId; });
+      clone.querySelectorAll("[data-section-id]").forEach((node) => { node.dataset.ezkartSection = node.dataset.sectionId; if(!node.id)node.id=node.dataset.sectionId; });
       clone.querySelectorAll("[draggable], [contenteditable], [data-sq-block], [data-section-id]").forEach((node) => { node.removeAttribute("draggable"); node.removeAttribute("contenteditable"); node.removeAttribute("data-sq-block"); node.removeAttribute("data-section-id"); node.classList.remove("selected", "dragging", "drag-over", "animating"); });
       clone.querySelectorAll("[data-sq-image-list], [data-sq-image-item]").forEach((node) => { node.removeAttribute("data-sq-image-list"); node.removeAttribute("data-sq-image-item"); node.removeAttribute("tabindex"); node.classList.remove("sq-image-selected", "sq-image-dragging", "sq-image-drop-target"); });
       clone.querySelectorAll("[data-sq-editable], [data-sq-content]").forEach((node) => { node.removeAttribute("data-sq-editable"); node.removeAttribute("data-sq-content"); });
@@ -7478,7 +7510,7 @@
         if (hover && hover !== "none") node.classList.add(`hover-${hover}`);
         if(!node.closest(".sq-flow"))node.classList.add("ez-fluid-element");
         node.dataset.ezkartElement = node.dataset.sqElementId;
-        if (node.closest('.sq-composition')) {
+        if (node.closest('.sq-composition,.sq-generated-blank')) {
           if (node.dataset.sqAutoHeight === 'true' || node.dataset.sqElementType === 'product-grid') node.dataset.ezkartAutoHeight = 'true';
           ["desktop", "tablet", "mobile"].forEach(device => node.setAttribute(`data-ezkart-layout-${device}`, node.getAttribute(`data-layout-${device}`)));
         }
@@ -7528,7 +7560,7 @@
       }).map((element) => element.dataset.sqElementId));
       const spacingCssFor = (device) => [...previewRoot.querySelectorAll("[data-section-id]")].filter(node=>!node.matches(".sq-flow")||spacingState.has(spacingKey(node.dataset.sectionId,device))).map(node => { const section = node.dataset.sectionId, value = readSpacing(section, device); return `[data-ezkart-section="${section}"]{padding:${value.top}px ${value.right}px ${value.bottom}px ${value.left}px!important}`; }).join("\n");
       const fluidCssFor = (device) => [...previewRoot.querySelectorAll("[data-sq-fluid]")].map((section) => { const spacing = readSpacing(section.dataset.sectionId, device); return `[data-ezkart-section="${section.dataset.sectionId}"]{--sq-fluid-row-height:${fluidRowHeight(section, device)}px;--sq-fluid-columns:${fluidColumns(device)};--sq-fluid-rows:${Math.max(fluidMinRows(section, device), sectionContentRows(section, device))};--sq-section-pad-left:${spacing.left}px;--sq-section-pad-right:${spacing.right}px}`; }).join("\n");
-      const elementCssFor = (device) => [...previewRoot.querySelectorAll("[data-sq-element]")].filter(node=>!node.closest(".sq-flow")).map((element) => { const layout = parseElementLayout(element, device); const inset = elementInsetFor(element, device); const padding = element.classList.contains("sq-custom-inset") ? `padding:${inset.top}px ${inset.right}px ${inset.bottom}px ${inset.left}px!important;` : ""; const headingWrap = !element.closest(".sq-composition") && singleLineDesktopHeadings.has(element.dataset.sqElementId) ? `white-space:${device === "desktop" ? "nowrap" : "normal"}!important;` : ""; return `[data-ezkart-element="${element.dataset.sqElementId}"]{grid-column:${layout.x}/span ${layout.width}!important;grid-row:${layout.y}/span ${layout.height}!important;${padding}${headingWrap}}`; }).join("\n");
+      const elementCssFor = (device) => [...previewRoot.querySelectorAll("[data-sq-element]")].filter(node=>!node.closest(".sq-flow")).map((element) => { const layout = parseElementLayout(element, device); const inset = elementInsetFor(element, device); const padding = element.classList.contains("sq-custom-inset") ? `padding:${inset.top}px ${inset.right}px ${inset.bottom}px ${inset.left}px!important;` : ""; const headingWrap = !element.closest(".sq-composition") && singleLineDesktopHeadings.has(element.dataset.sqElementId) ? `white-space:${device === "desktop" ? "nowrap" : "normal"}!important;` : ""; return `.ez-fluid-element[data-ezkart-element="${element.dataset.sqElementId}"]{grid-column:${layout.x}/span ${layout.width}!important;grid-row:${layout.y}/span ${layout.height}!important;${padding}${headingWrap}${element.classList.contains("sq-responsive-type")?`font-size:${EzkartTypography.fontSize(element,device)}!important;`:""}}`; }).join("\n");
       const productCssFor = (device) => [...previewRoot.querySelectorAll('[data-sq-element-type="product-grid"]')].map((element) => {
         const settings = productGridSettings(element, device);
         const density = { compact: ["150px", "clamp(96px,58cqw,175px)", "11px", "none"], balanced: ["220px", "clamp(120px,62cqw,250px)", "18px", "block"], showcase: ["310px", "clamp(180px,70cqw,360px)", "18px", "block"] }[settings.density] || ["220px", "clamp(120px,62cqw,250px)", "18px", "block"];
@@ -7538,8 +7570,8 @@
       }).join("\n");
       const flowCssFor=(device)=>[...previewRoot.querySelectorAll('.sq-flow [data-sq-element]')].map(element=>{
         const value=readFlowPosition(element,device),id=element.dataset.sqElementId;
-        if(!Object.keys(value).length)return '';
-        return `.sq-page-preview [data-ezkart-element="${id}"]{--sq-flow-x:${value.x||0}px;--sq-flow-y:${value.y||0}px;${value.width?`width:${value.width}px!important;`:''}${value.height?`height:${value.height}px!important;`:''}}`;
+        if(!Object.keys(value).length&&!element.classList.contains('sq-responsive-type'))return '';
+        return `.sq-page-preview [data-ezkart-element="${id}"]{--sq-flow-x:${value.x||0}px;--sq-flow-y:${value.y||0}px;${value.width?`width:${value.width}px!important;`:''}${value.height?`height:${value.height}px!important;`:''}${element.classList.contains("sq-responsive-type")?`font-size:${EzkartTypography.fontSize(element,device)}!important;`:""}}`;
       }).join('\n');
       clone.querySelectorAll('.sq-flow .sq-flow-element').forEach(element=>['x','y','width','height'].forEach(key=>element.style.removeProperty('--sq-flow-'+key)));
       const responsiveSpacing = `@media(min-width:901px){${flowCssFor("desktop")}}\n@media(min-width:601px) and (max-width:900px){${flowCssFor("tablet")}}\n@media(max-width:600px){${flowCssFor("mobile")}}\n${spacingCssFor("desktop")}\n${fluidCssFor("desktop")}\n${elementCssFor("desktop")}\n${productCssFor("desktop")}\n@media(max-width:900px){${spacingCssFor("tablet")}\n${fluidCssFor("tablet")}\n${elementCssFor("tablet")}\n${productCssFor("tablet")}}\n@media(max-width:600px){${spacingCssFor("mobile")}\n${fluidCssFor("mobile")}\n${elementCssFor("mobile")}\n${productCssFor("mobile")}}`;
@@ -7622,7 +7654,7 @@ const write=(element,layout)=>{layouts.set(element,layout);element.style.setProp
 const fit=()=>{frame=0;const next=innerWidth<=600?'mobile':innerWidth<=900?'tablet':'desktop';
  const pinned=document.querySelector('body>.sq-authored-navigation'),root=document.querySelector('body>.sq-page-preview');
  if(pinned&&root)root.style.setProperty('--sq-pinned-nav-height',(pinned.offsetHeight+(parseFloat(getComputedStyle(pinned).top)||0))+'px');
- document.querySelectorAll('.sq-composition').forEach(section=>{
+ document.querySelectorAll('.sq-composition,.sq-generated-blank').forEach(section=>{
   const elements=[...section.querySelectorAll(':scope>.ez-fluid-element')];
   if(next!==device)elements.forEach(element=>{const [x,y,width,height]=(element.getAttribute('data-ezkart-layout-'+next)||'1,1,12,1').split(',').map(Number);write(element,{x,y,width,height})});
   const rowHeight=parseFloat(getComputedStyle(section).getPropertyValue('--sq-fluid-row-height'))||34;
@@ -7761,7 +7793,6 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
       if (event.submitter?.value === "cancel") return;
       event.preventDefault(); event.stopImmediatePropagation();
       const starters = [...newPageForm.querySelectorAll('input[name="starter_products[]"]:checked')];
-      if (!starters.length) { showToast("Select at least one starting product"); newPageForm.querySelector('input[name="starter_products[]"]')?.focus(); return; }
       if (!newPageForm.reportValidity()) return;
       const name = String(newPageForm.elements.page_name.value).trim();
       const siteUrl = `${String(newPageForm.elements.slug.value).trim()}.ezkart.site`;
@@ -7812,7 +7843,7 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
     syncCommerceStatus();
     baseSiteState = captureState();
     baseSiteState.preview='<section class="sq-page-block sq-generated-blank" data-sq-block data-sq-fluid data-sq-min-rows="1" data-sq-rows="12" data-section-id="blank" draggable="true"></section>';
-    baseSiteState.selectedSection='blank';baseSiteState.spacing='[]';
+    baseSiteState.selectedSection='blank';baseSiteState.spacing='[]';baseSiteState.products=[];
     let requestedSiteButton = [...sqStudio.querySelectorAll("[data-sq-site]")].find((site) => site.dataset.siteUrl === requestedSiteUrl);
     if (!requestedSiteButton && /^[a-z0-9]+(?:-[a-z0-9]+)*\.ezkart\.site$/.test(requestedSiteUrl)) {
       const recoveryName = landingPageId(requestedSiteUrl).split("-").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
@@ -7834,7 +7865,7 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
     const fitNativeContent = () => {
       nativeFitFrame = 0;
       let changed = false;
-      previewRoot.querySelectorAll('.sq-composition').forEach((section) => {
+      previewRoot.querySelectorAll('.sq-composition,.sq-generated-blank').forEach((section) => {
         if (globalThis.EzkartComponents?.fitContent(section, parseElementLayout, setElementLayout, fluidRowHeight(section))) { applyFluidSection(section); changed = true; }
       });
       if (changed && selectedElement?.isConnected) refreshElementOverlay();
@@ -7843,7 +7874,7 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
     new MutationObserver(records => {
       if (records.some(record => {
         const target = record.target.nodeType === Node.TEXT_NODE ? record.target.parentElement : record.target;
-        return target?.closest('.sq-composition') && !target.closest('.sq-element-overlay,.sq-layout-grid-overlay,.sq-section-toolbar');
+        return target?.closest('.sq-composition,.sq-generated-blank') && !target.closest('.sq-element-overlay,.sq-layout-grid-overlay,.sq-section-toolbar');
       })) scheduleNativeFit();
     }).observe(previewRoot, {childList:true,subtree:true,characterData:true});
     previewRoot.addEventListener('toggle',scheduleNativeFit,true);
@@ -7873,7 +7904,7 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
       version:1,page:{id:activeSiteDocument?.id,name:activeSiteDocument?.name,url:activeSiteKey},device:activeDevice,
       sections:[...previewRoot.querySelectorAll(':scope > [data-sq-block]')].map(section=>({
         id:section.dataset.sectionId,name:section.dataset.sqSectionName || sectionNames[section.dataset.sectionId] || 'Section',component:section.dataset.sqComposition || section.dataset.sqNavTemplate || null,
-        spacing:readSpacing(section.dataset.sectionId),
+        spacing:readSpacing(section.dataset.sectionId),background:{type:EzkartBackgrounds.type(section),color:sectionBackgroundColor(section),gradient:EzkartBackgrounds.read(section)},
         elements:[...section.querySelectorAll(section.matches('.sq-flow')?'[data-sq-element]':':scope > [data-sq-element]')].map(element=>({id:element.dataset.sqElementId,type:element.dataset.sqElementType,text:element.textContent.trim().slice(0,600),layout:element.closest('.sq-flow')?{mode:'flow',...readFlowPosition(element)}:parseElementLayout(element),image:element.querySelector('img')?.getAttribute('src') || null,fields:editableNodesFor(section).filter(node=>element.contains(node)).map(node=>({tag:node.tagName.toLowerCase(),text:node.textContent}))}))
       }))
     });
@@ -7890,27 +7921,43 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
         const product=productId ? catalog.find(item=>item.id===productId) : catalog[0];
         if(productId && !product) throw new Error('Choose a product connected to this page.');
         const wrapper=document.createElement('div');
-        wrapper.innerHTML=nativeComponentMarkup(component,{sectionId,content,product,products:catalog});
+        wrapper.innerHTML=component==='blank'?newBlockMarkup('blank',sectionId):nativeComponentMarkup(component,{sectionId,content,product,products:catalog});
         const section=wrapper.firstElementChild;
         const anchor=after ? builderSection(after) : null;
         remember(); if(anchor) anchor.after(section); else previewRoot.append(section);
         readCatalogProducts().forEach(item=>installCustomProduct(item,selectedProducts().includes(item.id)));
         refreshNativeBuilder(); selectSqSection(sectionId,true); await settleBuilder(); return inspectBuilder();
       },
-      async updateElement({id,text,field=0,src,alt,style={},layout,autoHeight,device=activeDevice}={}) {
+      async addElement({section:sectionId,type,id}={}) {
+        if(!['heading','text','image','button','divider','marquee','navigation'].includes(type))throw new Error('Choose a native element from the Add panel.');
+        if(!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id)||previewRoot.querySelector(`[data-sq-element-id="${CSS.escape(id)}"]`))throw new Error('Choose a unique element ID.');
+        const element=addLibraryElement(type,builderSection(sectionId));element.dataset.sqElementId=id;refreshNativeBuilder();await settleBuilder();return inspectBuilder();
+      },
+      async updateElement({id,text,field=0,src,alt,style={},layout,autoHeight,headingLevel,action,inset,buttonRole,device=activeDevice}={}) {
         const element=builderElement(id);
         const fields=editableNodesFor(element.closest('[data-sq-block]')).filter(node=>element===node || element.contains(node));
         const target=fields[field];
         if(text!==undefined && !target) throw new Error('Select an editable text field from inspect().');
         if(src!==undefined && src && !/^https?:\/\//i.test(src) && !/^\/(?!\/)/.test(src)) throw new Error('Use an HTTPS image URL or a site-relative image path.');
-        const allowed=new Set(['color','backgroundColor','fontSize','fontWeight','lineHeight','letterSpacing','textAlign','borderRadius','objectFit','opacity']);
+        const allowed=new Set(['color','backgroundColor','fontSize','fontWeight','lineHeight','letterSpacing','textAlign','borderRadius','objectFit','opacity','alignItems']);
         for(const key of Object.keys(style)) if(!allowed.has(key)) throw new Error(`Unsupported style: ${key}`);
+        if(style.fontSize!==undefined&&(!/^\d+(?:\.\d+)?px$/.test(String(style.fontSize))||parseFloat(style.fontSize)<8||parseFloat(style.fontSize)>160))throw new Error('Font size must be between 8px and 160px.');
+        if(style.alignItems!==undefined&&!['flex-start','center','flex-end'].includes(style.alignItems))throw new Error('Choose top, center, or bottom alignment.');
         if(!['desktop','tablet','mobile'].includes(device)) throw new Error('Unknown device.');
+        if(buttonRole&&!['primary','secondary','tertiary'].includes(buttonRole))throw new Error('Choose a button role.');
+        if(headingLevel&&(!['h1','h2','h3'].includes(headingLevel)||!element.matches('.sq-free-heading')))throw new Error('Heading level applies to native headings.');
+        if(action&&(!['none','section','url','email','phone','checkout'].includes(action.type)||!element.querySelector('a,button')||(action.type==='url'&&!/^https?:\/\//i.test(action.target))))throw new Error('Choose a valid button action and destination.');
+        if(inset&&Object.values(inset).some(value=>!Number.isFinite(value)||value<0||value>240))throw new Error('Insets must be between 0 and 240 pixels.');
         remember();
         if(text!==undefined) target.textContent=String(text);
-        if(src!==undefined){let img=element.querySelector('img');if(!img){element.querySelector('.sq-image-placeholder')?.remove();img=document.createElement('img');element.append(img);}img.src=src;}
+        if(src!==undefined&&element.dataset.sqElementType==='logo')setLogoSource(src,logoPartsFor(element));
+        else if(src!==undefined){let img=element.querySelector('img');if(!img){element.querySelector('.sq-image-placeholder')?.remove();img=document.createElement('img');element.append(img);}img.src=src;}
         if(alt!==undefined && element.querySelector('img')) element.querySelector('img').alt=String(alt);
-        Object.assign(element.style,style);
+        for(const [key,value] of Object.entries(style)){if(key==='fontSize')EzkartTypography.setFontSize(element,String(value),device);else element.style[key]=value;}
+        if(headingLevel)setHeadingLevel(element,headingLevel);
+        if(buttonRole)applyButtonRoleToElement(element,buttonRole);
+        if(inset)setElementInset(element,{...elementInsetFor(element,device),...inset},device);
+        if(action){selectSqElement(element);sqStudio.querySelector('[data-sq-button-link-type]').value=action.type;sqStudio.querySelector('[data-sq-button-link]').value=action.target||'';sqStudio.querySelector('[data-sq-button-new-tab]').checked=Boolean(action.newTab);applyActionSettings();}
         if(style.objectFit && element.querySelector("img"))element.querySelector("img").style.objectFit=style.objectFit;
         if(autoHeight!==undefined)element.dataset.sqAutoHeight=String(Boolean(autoHeight));
         if(layout){if(element.closest('.sq-flow'))setFlowPosition(element,layout,device);else setElementLayout(element,{...parseElementLayout(element,device),...layout},device);}
@@ -7923,17 +7970,19 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
         remember();element.dataset[productSettingKey('Columns',device)]=String(columns);element.dataset[productSettingKey('Density',device)]=density;
         refreshNativeBuilder();scheduleProductGridFit();await settleBuilder();return inspectBuilder();
       },
-      async updateSection({id,spacing,device=activeDevice,background,color,name,fitHeight=false}={}) {
+      async updateSection({id,spacing,device=activeDevice,background,gradient,color,name,fitHeight=false}={}) {
         const section=builderSection(id);
+        if(gradient)EzkartBackgrounds.normalize(gradient);
         if(!['desktop','tablet','mobile'].includes(device))throw new Error('Unknown device.');
         if(spacing && Object.entries(spacing).some(([side,value])=>!['top','right','bottom','left'].includes(side)||!Number.isFinite(value)||value<0||value>240))throw new Error('Padding must be between 0 and 240 pixels.');
         remember();
         if(spacing)spacingState.set(spacingKey(id,device),{...readSpacing(id,device),...spacing});
         if(background!==undefined){section.style.removeProperty("background-color");setSectionBackgroundColor(section,background);}
+        if(gradient)EzkartBackgrounds.set(section,gradient);
         if(color!==undefined){section.style.color=color;section.style.setProperty("--site-ink",color);}
         if(name!==undefined)section.dataset.sqSectionName=String(name);
         if(fitHeight)setSectionHeightRows(section,sectionContentRows(section,device),device);
-        refreshNativeBuilder();await settleBuilder();return inspectBuilder();
+        refreshNativeBuilder();selectSqSection(id,true);await settleBuilder();return inspectBuilder();
       },
       async navigation({layout='studio',brand,links,actionLabel='Shop now',actionTarget='products',sticky=false}={}) {
         if(!globalThis.EzkartComponents.navDefinitions.some(item=>item.id===layout))throw new Error('Unknown navigation layout.');

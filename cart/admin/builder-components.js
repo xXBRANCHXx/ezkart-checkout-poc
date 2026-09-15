@@ -104,7 +104,7 @@
       const children = [...element.children].filter(child => child.getClientRects().length);
       if (!children.length || scale <= 0) continue;
       const style = getComputedStyle(element);
-      const bottom = Math.max(...children.map(child => child.getBoundingClientRect().bottom));
+      const bottom = Math.max(...children.map(child => child.getBoundingClientRect().top + Math.max(child.offsetHeight, child.scrollHeight) * scale));
       const height = (bottom - rect.top) / scale + (parseFloat(style.paddingBottom) || 0);
       const layout = readLayout(element);
       const rows = Math.max(1, Math.min(80, Math.ceil((height + (parseFloat(getComputedStyle(section).rowGap) || 0) - .5) / rowHeight)));

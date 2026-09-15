@@ -37,7 +37,7 @@ Place `catalog.json` in the workspace with the same product objects returned by 
 - `catalog_list`, `project_list`, `project_create`, `project_open`
 - `component_list`, `page_inspect`
 - `section_add`, `section_update`, `section_move`, `section_remove`
-- `element_update`, `product_grid_update`, `navigation_set`, `theme_update`
+- `element_add`, `element_update`, `product_grid_update`, `navigation_set`, `theme_update`
 - `device_set`, `page_audit`, `page_screenshot`
 - `undo`, `redo`, `project_save`, `page_export`
 
@@ -49,9 +49,22 @@ The completed ZERO example can be recreated through the MCP protocol with `node 
 
 `element_update` also accepts `autoHeight: false` when you want a manually sized text element. The inspector exposes the same “Fit height to content” control.
 
+**Legacy reference import:** the previous Ezkart.id remake used source-derived HTML/CSS registered as components. That preserves the appearance but does not demonstrate construction from the builder’s ordinary controls. Keep it for compatibility with saved drafts; do not use it as the builder-only authoring example.
+
 The Ezkart.id reference can be recreated with `node examples/ezkart-id.mjs unique-project-id`. It builds nine native sections through MCP, uses the original marketing illustrations, and attaches no catalog products. Exported fonts and captions are self-contained. Navigation, the responsive demonstration, FAQ disclosures, and the accessible film dialog share their runtime with the editor.
 
 Component thumbnails are screenshots of these actual components, using the existing Ezkart marketing illustration. To regenerate them, run `node scripts/build-previews.mjs` (requires ImageMagick). Its illustrative product fixture exists only in a temporary workspace. To refresh the reference source, run `node scripts/build-showcase.mjs`; an optional directory argument reads a previously retrieved `index.html`, `styles.css`, and `overview-id.vtt` instead. Review any upstream content changes before committing generated files.
+
+## Authoring from a blank canvas
+
+Run `node examples/buatanmu.mjs unique-project-id` to create the original Ezkart page using only public MCP calls. The example adds empty sections and individual native elements, plus the ordinary Studio navigation. It supplies content, images, links, palette values and grid positions; no page HTML, CSS, iframe or source-derived component. Its call log is saved under `logs/` in the workspace.
+
+- `section_add` with `component: "blank"` matches Add → Blank section.
+- `element_add` matches the Add panel's native heading, text, button, image, divider, marquee and navigation elements.
+- Section background → Gradient exposes linear, radial and soft blends, two colors, base color, angle, strength and radial center. `section_update.gradient` uses those same saved values. The old imported closing gradient migrates into these controls when opened.
+- Typography exposes heading levels, vertical alignment and separate font sizes for desktop, tablet and mobile. `element_update.headingLevel`, `style.alignItems` and device-specific `style.fontSize` match those controls.
+- `element_update.action`, `buttonRole`, `inset` and logo `src` expose the existing link, button role, padding and logo image settings.
+- Fit height to content works in blank sections as well as compositions, including exported text wrapping and buttons. Section anchors, solid colors and responsive type survive export.
 
 ## Local behavior
 
