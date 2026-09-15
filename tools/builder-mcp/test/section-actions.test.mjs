@@ -68,15 +68,20 @@ async function fixture(run) {
     );
     await invoke("settle");
   };
-  const clickGutter = async (id) => {
+  const clickGutter = async (id, { insideSection = false } = {}) => {
     await show(id);
     const point = await section(id).evaluate((n) => {
       const r = n.getBoundingClientRect(),
         p = n.parentElement.getBoundingClientRect();
-      return { x: p.left + 8, y: r.top + 45, sectionLeft: r.left };
+      return {
+        x: p.left + 8,
+        y: r.top + 45,
+        sectionLeft: r.left,
+        contentLeft: r.left + parseFloat(getComputedStyle(n).paddingLeft),
+      };
     });
     assert.ok(
-      point.x < point.sectionLeft,
+      point.x < (insideSection ? point.contentLeft : point.sectionLeft),
       "Click is outside the section’s content box",
     );
     await page.mouse.click(point.x, point.y);
@@ -159,7 +164,7 @@ test("side margins select the adjacent section; closing and reopening never edit
         component: "journey-timeline",
         id: "journey",
       });
-      await clickGutter("journey");
+      await clickGutter("journey", { insideSection: true });
       const manager = page.locator("[data-sq-background-manager=section]");
       assert.equal(await manager.isVisible(), true);
       assert.equal(
@@ -327,3 +332,151 @@ test("section controls stay above content and add a blank section directly after
       }
     },
   ));
+
+test("section backgrounds cover both page edges and preserve content spacing in the editor and export", async () =>
+  fixture(async ({ page, invoke, ws, section, clickGutter }) => {
+    for (const [component, id] of [
+      ["feature-showcase", "feature"],
+      ["journey-timeline", "journey"],
+      ["brand-footer", "footer"],
+    ])
+      await invoke("addSection", { component, id });
+    await invoke("removeSection", { id: "blank" });
+
+    const checkBounds = async () => {
+      const deviceFrame = page.locator(".sq-device-frame");
+      if (await deviceFrame.count())
+        await deviceFrame.evaluate(async (node) => {
+          await Promise.all(
+            node.getAnimations().map((animation) => animation.finished),
+          );
+        });
+      const measurements = await page
+        .locator(".sq-page-preview")
+        .evaluate((root) => {
+          const pageRect = root.getBoundingClientRect();
+          const scale = pageRect.width / root.offsetWidth;
+          return {
+            width: root.offsetWidth,
+            sections: [...root.querySelectorAll(":scope > .sq-reference")].map(
+              (section) => {
+                const rect = section.getBoundingClientRect();
+                const content = section
+                  .querySelector(
+                    ":scope > .ezm-section-copy, :scope > .ezm-journey-intro, :scope > .ezm-footer-top",
+                  )
+                  .getBoundingClientRect();
+                const fill = section
+                  .querySelector(
+                    ":scope > .sq-gradient-layer:not([hidden]), :scope > .sq-section-background",
+                  )
+                  ?.getBoundingClientRect();
+                return {
+                  name: section.dataset.sqSectionName,
+                  left: (rect.left - pageRect.left) / scale,
+                  right: (rect.right - pageRect.right) / scale,
+                  contentLeft: (content.left - pageRect.left) / scale,
+                  innerWidth:
+                    section.clientWidth -
+                    parseFloat(getComputedStyle(section).paddingLeft) -
+                    parseFloat(getComputedStyle(section).paddingRight),
+                  fillLeft: fill ? (fill.left - pageRect.left) / scale : 0,
+                  fillRight: fill ? (fill.right - pageRect.right) / scale : 0,
+                };
+              },
+            ),
+          };
+        });
+      const { width } = measurements;
+      const gutter =
+        width <= 580
+          ? 20
+          : width <= 1100
+            ? 32
+            : Math.max(48, (width - 1200) / 2);
+      for (const s of measurements.sections) {
+        for (const key of ["left", "right", "fillLeft", "fillRight"])
+          assert.ok(
+            Math.abs(s[key]) < 1,
+            `${s.name} ${key} reaches the page edge at ${width}px: ${s[key]}`,
+          );
+        assert.ok(
+          Math.abs(s.contentLeft - gutter) < 1,
+          `${s.name} content keeps its ${gutter}px inset at ${width}px`,
+        );
+        assert.ok(
+          Math.abs(s.innerWidth - (width - gutter * 2)) < 1,
+          `${s.name} content width is preserved at ${width}px`,
+        );
+      }
+    };
+
+    await checkBounds();
+    // Selecting an empty side inset targets the full section directly.
+    await clickGutter("feature", { insideSection: true });
+    const manager = page.locator("[data-sq-background-manager=section]");
+    assert.equal(
+      await manager.getAttribute("data-sq-target-section"),
+      "feature",
+    );
+    const color = manager.locator("[data-sq-section-background-color]");
+    await color.fill("#e2efe8");
+    await color.dispatchEvent("input");
+    await color.dispatchEvent("change");
+    await invoke("updateSection", {
+      id: "journey",
+      gradient: { kind: "linear", from: "#e1ebf3", to: "#e5e1f3", angle: 90 },
+    });
+    await clickGutter("footer", { insideSection: true });
+    await manager.locator("[data-sq-section-background-type=image]").click();
+    await manager
+      .locator("[data-sq-background-url]")
+      .fill(ws.url + "/cart/admin/assets/products/kopi-susu.webp");
+    await manager.locator("[data-sq-background-apply]").click();
+    await page.waitForFunction(
+      () =>
+        document.querySelector("#footer > .sq-section-background img")
+          ?.naturalWidth > 0,
+    );
+    for (const device of ["mobile", "tablet", "desktop"]) {
+      await invoke("setDevice", { device });
+      await invoke("settle");
+      await checkBounds();
+    }
+    await invoke("save");
+    await page.reload();
+    await page.waitForFunction(() => globalThis.EzkartBuilder);
+    await invoke("settle");
+    await checkBounds();
+    assert.equal(
+      await section("feature").evaluate(
+        (n) => getComputedStyle(n).backgroundColor,
+      ),
+      "rgb(226, 239, 232)",
+    );
+    assert.match(
+      await section("journey")
+        .locator(".sq-gradient-surface")
+        .evaluate((n) => getComputedStyle(n).backgroundImage),
+      /linear-gradient\(90deg/,
+    );
+
+    const html = await invoke("exportHtml");
+    await page.route("**/background-export", (r) =>
+      r.fulfill({ body: html, contentType: "text/html" }),
+    );
+    await page.goto(ws.url + "/background-export");
+    for (const width of [320, 390, 580, 768, 1100, 1440, 1920]) {
+      await page.setViewportSize({ width, height: 1000 });
+      await page.evaluate(async () => {
+        await document.fonts.ready;
+        await new Promise(requestAnimationFrame);
+      });
+      await checkBounds();
+      assert.equal(
+        await page.evaluate(() => document.documentElement.scrollWidth),
+        width,
+        `No horizontal overflow at ${width}px`,
+      );
+    }
+  }));

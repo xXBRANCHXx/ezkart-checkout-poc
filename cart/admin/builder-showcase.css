@@ -19,6 +19,8 @@
 .sq-page-preview :where(.sq-reference) a:focus-visible,.sq-page-preview :where(.sq-reference) button:focus-visible,.sq-page-preview :where(.sq-reference) summary:focus-visible{outline: rgb(231, 43, 84) solid 3px; outline-offset: 5px; border-radius: 5px;}
 .sq-page-preview :where(.sq-reference) button:disabled{cursor: default;}
 .sq-page-preview .ezm-wrap{width: min(1200px, 100% - 96px); margin-inline: auto;}
+/* A section owns the full background; its content width comes from inner spacing. */
+.sq-page-preview > .sq-reference.ezm-wrap{box-sizing:border-box;width:100%;margin-inline:0;padding-inline:max(48px,calc((100% - 1200px)/2));}
 .sq-page-preview .ezm-section-space{padding-block: 120px;}
 .sq-page-preview .ezm-eyebrow{font-size: 10px; letter-spacing: 1.8px; font-weight: 600; line-height: 1.7;}
 .sq-page-preview .ezm-gradient-text{background-image: var(--gradient); background-clip: text; color: transparent;}
@@ -354,6 +356,7 @@
 .sq-page-preview .ezm-hero-stage{margin-top: 85px;}
 .sq-page-preview .ezm-builder-body{min-height: 440px;}}
 @container ezkart-page (max-width: 1100px){.sq-page-preview .ezm-wrap{width: calc(100% - 64px);}
+.sq-page-preview > .sq-reference.ezm-wrap{padding-inline:32px;}
 .sq-page-preview .ezm-hero-stage{width: calc(100% - 34px); padding-inline: 25px;}
 .sq-page-preview .ezm-hero h1{font-size: 64px; letter-spacing: -3px;}
 .sq-page-preview .ezm-layers-panel{width: 145px;}
@@ -460,6 +463,7 @@
 .sq-page-preview .ezm-closing-section{padding: 85px 0px;}
 .sq-page-preview .ezm-closing-content h2{font-size: 41px; letter-spacing: -1.8px;}}
 @container ezkart-page (max-width: 580px){.sq-page-preview .ezm-wrap{width: calc(100% - 40px);}
+.sq-page-preview > .sq-reference.ezm-wrap{padding-inline:20px;}
 .sq-page-preview .ezm-desktop-nav{display: none;}
 .sq-page-preview .ezm-nav-cta{margin-left: auto; margin-right: 17px; min-height: 35px; font-size: 9px; padding: 0px 12px; gap: 9px;}
 .sq-page-preview .ezm-nav-cta .ezm-icon{width: 13px; height: 13px;}
