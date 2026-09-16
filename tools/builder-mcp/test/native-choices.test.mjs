@@ -93,6 +93,23 @@ test("scoped filters and keyboard tabs preserve independent state; editable dial
               }),
             ),
           }),
+          n("measurements", "container", {
+            initialState: "off",
+            children: ["off", "on"].map((state) =>
+              n("measurements-" + state, "container", {
+                props: { display: "none" },
+                stateScope: "measurements",
+                states: { [state]: { props: { display: "block" } } },
+                children: [
+                  choice(
+                    state === "off" ? "show-measures" : "hide-measures",
+                    "measurements",
+                    state === "off" ? "on" : "off",
+                  ),
+                ],
+              }),
+            ),
+          }),
           n("filter", "container", {
             initialState: "all",
             stateMode: "filter",
@@ -231,6 +248,19 @@ test("scoped filters and keyboard tabs preserve independent state; editable dial
     assert.equal(
       await p.locator("#native-portions").getAttribute("data-native-state"),
       "two",
+    );
+    await p.locator("#native-show-measures").focus();
+    await p.keyboard.press("Enter");
+    assert.equal(await p.locator("#native-show-measures").isVisible(), false);
+    assert.equal(
+      await p.evaluate(() => document.activeElement.id),
+      "native-hide-measures",
+    );
+    await p.keyboard.press("Enter");
+    assert.equal(await p.locator("#native-hide-measures").isVisible(), false);
+    assert.equal(
+      await p.evaluate(() => document.activeElement.id),
+      "native-show-measures",
     );
     await p.locator("#native-dropdown select").selectOption("large");
     assert.equal(await p.locator("#native-set-total").innerText(), "Rp175.000");

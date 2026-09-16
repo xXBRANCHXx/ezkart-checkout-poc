@@ -94,7 +94,8 @@ groups keep independent choices, including after duplication. Tabs support
 arrow keys, Home/End, and correctly connected accessible panels. State actions can set
 `disableWhenActive: true` (Click action → Disable when this state is selected)
 for bounded controls such as one/two-portion selectors. Focus moves to an enabled
-sibling when the selected button becomes disabled.
+sibling when the selected button becomes disabled. If a state change hides its trigger,
+focus moves to an available visible control in the same group.
 
 Choose the `dialog` HTML element on a native container under **Structure &
 accessibility**, then use **Click action → Open dialog / Close dialog** with its

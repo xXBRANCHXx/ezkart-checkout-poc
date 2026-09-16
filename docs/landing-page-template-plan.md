@@ -22,18 +22,24 @@ Each complete template package has a hard maximum size of 50 MB.
 
 ## Design constitution
 
+### Current user art direction — September 16, 2026
+
+**Lintas (Cross)** has been recreated through the builder and is ready for native review. See [the validation report](templates/lintas-builder-validation.md). Template preparation awaits native approval. For the **following commissioned concept**, use Ezkart’s own marketing website as the primary visual reference: rounded sections and controls, soft gradients, clean sans-serif typography, generous whitespace and an approachable, professional shopping experience. The user explicitly rejected the repeated studio/designer/editorial look with sharp corners. Do not turn every new merchant genre into another fine-rule, rectangular-photo editorial layout.
+
+This direction overrides earlier blanket restrictions on gradient backgrounds and rounded containers. Use these features deliberately and visibly; keep contrast, hierarchy and purchase controls clear. Preserve the prior approved designs. Save this direction for the next commission; continuing Cross does not start the following concept.
+
 ### Absolute prohibitions
 
 - No eyebrows, kickers, or tiny uppercase pre-headings above section titles. Do not include an eyebrow field in the eventual section schema.
-- No gradient blobs, auroras, mesh gradients, glowing background shapes, or decorative color clouds.
+- No aimless decorative color clouds or glowing effects. Soft, composed gradients are encouraged for the next Ezkart-inspired concept.
 - No neon, glow effects, cyberpunk styling, or familiar purple-blue AI gradients.
 - No glassmorphism.
 - No floating decorative spheres, stars, sparkles, or meaningless geometric clutter.
 - No generic bento grids.
 - No centered hero surrounded by floating feature cards.
 - No obligatory three-card benefit row.
-- No pill styling everywhere. Pills are reserved for controls or information that is genuinely categorical.
-- No excessive rounded containers. Radius must follow the template's art direction rather than serve as a default.
+- Rounded controls and sections should form a consistent system; avoid a different arbitrary shape on every element.
+- Radius follows the art direction. The next Ezkart-inspired concept should be visibly rounded and approachable.
 - No fabricated dashboards, statistics, ratings, testimonials, press mentions, or trust metrics.
 - No generic icon collections where typography, photography, or composition can communicate the idea.
 - No automatic carousels.
@@ -359,7 +365,7 @@ Ask these questions at the end of every design pass:
 3. Is the design relying on gradients, cards, decorative shapes, or animation to rescue an ordinary composition?
 4. Does every section have a concrete reason to exist?
 5. Does the copy sound like a specific real merchant rather than a generated brand exercise?
-6. Is there a recognizable human art direction with references beyond contemporary SaaS sites?
+6. Is there a recognizable art direction that follows the user’s chosen references, including Ezkart’s own website for the next concept?
 7. Is the page still beautiful, legible, and persuasive with motion disabled?
 8. Would the template remain distinctive with an ordinary merchant product photo rather than perfect campaign imagery?
 

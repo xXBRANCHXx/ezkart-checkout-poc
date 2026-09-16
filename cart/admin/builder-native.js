@@ -791,10 +791,18 @@
           }
         }
       });
-      if (!editing && focused?.disabled && buttons.includes(focused)) {
-        buttons
-          .find((n) => n.parentElement === focused.parentElement && !n.disabled)
-          ?.focus({ preventScroll: true });
+      if (
+        !editing &&
+        buttons.includes(focused) &&
+        (focused.disabled || !focused.getClientRects().length)
+      ) {
+        const available = buttons.filter(
+          (n) => !n.disabled && n.getClientRects().length,
+        );
+        (
+          available.find((n) => n.parentElement === focused.parentElement) ||
+          available[0]
+        )?.focus({ preventScroll: true });
       }
       if (persist && settings.param && !editing)
         try {
