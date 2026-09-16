@@ -10,9 +10,17 @@
         "grid",
         "inline",
         "inline-block",
+        "table",
+        "table-header-group",
+        "table-row-group",
+        "table-footer-group",
+        "table-row",
+        "table-cell",
+        "table-caption",
         "contents",
         "none",
       ],
+      tableLayout: ["auto", "fixed"],
       flexDirection: ["row", "column", "row-reverse", "column-reverse"],
       flexWrap: ["nowrap", "wrap", "wrap-reverse"],
       alignItems: [
@@ -87,6 +95,8 @@
       color: "color",
     },
     Surface: {
+      borderCollapse: ["collapse", "separate"],
+      borderSpacing: "length",
       backgroundColor: "color",
       borderTopWidth: "length",
       borderRightWidth: "length",
@@ -183,8 +193,24 @@
       "main",
       "label",
       "dialog",
+      "table",
+      "thead",
+      "tbody",
+      "tfoot",
+      "tr",
     ],
-    text: ["p", "span", "small", "strong", "b", "em", "i"],
+    text: [
+      "p",
+      "span",
+      "small",
+      "strong",
+      "b",
+      "em",
+      "i",
+      "th",
+      "td",
+      "caption",
+    ],
     heading: ["h1", "h2", "h3", "h4"],
     button: ["a", "button"],
     image: ["img"],
@@ -347,6 +373,8 @@
         !/^[a-zA-Z0-9_-]{1,120}$/.test(config.productId))
     )
       throw Error("Choose a product from your catalog.");
+    if (config.tableScope && !["row", "col"].includes(config.tableScope))
+      throw Error("Choose row or column table headers.");
     if (config.tag && !tags[config.type].includes(config.tag))
       throw Error("Choose a supported semantic role.");
     if (
@@ -423,6 +451,8 @@
         !/^[a-zA-Z0-9_-]{1,120}$/.test(config.productId || "")
       )
         throw Error("Choose a catalog product.");
+      if (config.variantId && !/^[a-zA-Z0-9_-]{1,120}$/.test(config.variantId))
+        throw Error("Choose a catalog variant.");
       if (config.group && !identifier(config.group))
         throw Error(
           "Use letters, numbers and hyphens for the shared selection name.",
@@ -620,6 +650,26 @@
       node.append(track);
     }
   }
+  function syncScrollRegion(node, config) {
+    if (config.type !== "container" || config.tag === "dialog") return;
+    const scrollable = [
+      config.props,
+      ...(config.responsive || []).map((r) => r.props),
+    ].some((props) =>
+      ["overflow", "overflowX", "overflowY"].some((key) =>
+        ["auto", "scroll"].includes(props?.[key]),
+      ),
+    );
+    if (scrollable) {
+      node.tabIndex = 0;
+      if (config.label) node.setAttribute("role", "region");
+      node.dataset.nativeScrollRegion = "true";
+    } else if (node.dataset.nativeScrollRegion) {
+      node.removeAttribute("tabindex");
+      if (node.getAttribute("role") === "region") node.removeAttribute("role");
+      delete node.dataset.nativeScrollRegion;
+    }
+  }
   function create(config) {
     const tag = config.tag || tags[config.type][0];
     let node;
@@ -685,6 +735,9 @@
     }
     if (config.type === "button" && tag === "button") node.type = "button";
     if (config.label) node.setAttribute("aria-label", config.label);
+    syncScrollRegion(node, config);
+    if (tag === "th" && config.tableScope)
+      node.setAttribute("scope", config.tableScope);
     if (config.open) node.open = true;
     if (config.action?.type === "toggle") {
       node.setAttribute("aria-expanded", "false");
@@ -784,6 +837,15 @@
           n.disabled = !editing && active;
           n.setAttribute("aria-disabled", String(active));
         }
+        n.removeAttribute(
+          settings.mode === "tabs" ? "aria-pressed" : "aria-selected",
+        );
+        if (settings.mode !== "tabs" && n.getAttribute("role") === "tab") {
+          n.removeAttribute("role");
+          n.removeAttribute("tabindex");
+          n.removeAttribute("aria-controls");
+          n.parentElement.removeAttribute("role");
+        }
         n.setAttribute(
           settings.mode === "tabs" ? "aria-selected" : "aria-pressed",
           String(active),
@@ -792,6 +854,12 @@
           n.setAttribute("role", "tab");
           n.tabIndex = active ? 0 : -1;
           n.parentElement.setAttribute("role", "tablist");
+          n.parentElement.setAttribute(
+            "aria-orientation",
+            getComputedStyle(n.parentElement).flexDirection === "column"
+              ? "vertical"
+              : "horizontal",
+          );
           n.parentElement.setAttribute(
             "aria-label",
             settings.label || "Choose a view",
@@ -854,7 +922,14 @@
       const tab = event.target.closest('[role="tab"][data-native-action]');
       if (
         !tab ||
-        !["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)
+        ![
+          "ArrowLeft",
+          "ArrowRight",
+          "ArrowUp",
+          "ArrowDown",
+          "Home",
+          "End",
+        ].includes(event.key)
       )
         return;
       const a = JSON.parse(tab.dataset.nativeAction),
@@ -867,7 +942,9 @@
             ? 0
             : event.key === "End"
               ? buttons.length - 1
-              : (i + (event.key === "ArrowRight" ? 1 : -1) + buttons.length) %
+              : (i +
+                  (["ArrowRight", "ArrowDown"].includes(event.key) ? 1 : -1) +
+                  buttons.length) %
                 buttons.length;
       buttons[next].click();
       buttons[next].focus();
@@ -1294,6 +1371,7 @@
     sheet.textContent = stylesheet(hooks.root);
     hooks.root.querySelectorAll(".sq-native").forEach((node) => {
       const config = read(node);
+      syncScrollRegion(node, config);
       // Fixed-size empty containers can be swatches, rules or spacers. Editor
       // guidance must not add content or an outline to those authored shapes.
       const appearances = [config, ...Object.values(config.states || {})];
@@ -1323,6 +1401,9 @@
           ...(config.responsive || []).map((rule) => rule.props),
         ].some((props) => ["sticky", "fixed"].includes(props?.position)),
       );
+      if (node.tagName === "TH" && config.tableScope)
+        node.setAttribute("scope", config.tableScope);
+      else node.removeAttribute("scope");
       if (config.type === "product")
         hooks.renderProduct?.(node, config.productId);
       if (config.initialState)
@@ -1393,6 +1474,8 @@
         "statePanel",
         "productIds",
         "variantColors",
+        "variantId",
+        "tableScope",
       ].includes(k),
     )
       ? config
@@ -2160,6 +2243,30 @@
       ])
         panel.querySelector(`[data-commerce-setting="${key}"]`).value =
           config[key] || (key === "optionLayout" ? "compact" : "");
+      const variantField = panel.querySelector(
+        '[data-commerce-setting="variantId"]',
+      );
+      const variants =
+        (hooks.products?.() || [])
+          .find((p) => p.id === config.productId)
+          ?.variants?.filter((v) => !v.hidden) || [];
+      variantField.replaceChildren(
+        new Option("Use shopper’s choice", ""),
+        ...variants.map(
+          (v) =>
+            new Option(
+              v.name ||
+                (v.options || []).map((o) => o.value).join(" / ") ||
+                v.id,
+              v.id,
+            ),
+        ),
+      );
+      if (config.variantId && !variants.some((v) => v.id === config.variantId))
+        variantField.append(
+          new Option("Variant no longer available", config.variantId),
+        );
+      variantField.value = config.variantId || "";
       panel.querySelector('[data-commerce-setting="showPrice"]').checked =
         Boolean(config.showPrice);
       const setProducts = panel.querySelector("[data-native-set-products]");
@@ -2228,6 +2335,9 @@
         group: config.part !== "cart",
         label: ["options", "add", "cart", "set-add"].includes(config.part),
         optionLayout: config.part === "options",
+        variantId: ["image", "price", "title", "description", "add"].includes(
+          config.part,
+        ),
         prefix: [
           "price",
           "title",
@@ -2444,6 +2554,10 @@
     syncFillControls(panel);
     panel.querySelector("[data-native-name]").value = config.name || "";
     panel.querySelector("[data-native-anchor]").value = config.anchor || "";
+    panel.querySelector("[data-native-table-scope]").closest("label").hidden =
+      config.tag !== "th";
+    panel.querySelector("[data-native-table-scope]").value =
+      config.tableScope || "";
     panel
       .querySelector("[data-native-tag]")
       .replaceChildren(...tags[config.type].map((t) => new Option(t, t)));
@@ -2527,6 +2641,7 @@
       <label>Show<select data-commerce-setting="part"><option value="image">Product image</option><option value="options">Variant choices</option><option value="price">Selected price</option><option value="title">Selected name</option><option value="product-name">Product name</option><option value="set-price">Combined price</option><option value="set-add">Add a set of products</option><option value="description">Selected description</option><option value="add">Add to cart button</option><option value="cart">Open cart button</option></select></label>
       <div data-native-set-products></div><label>Shared selection name<input data-commerce-setting="group" placeholder="e.g. main-product"></label><p class="sq-native-help">Use the same name and product on controls that should share a selected variant. Leave blank for independent choices.</p>
       <label>Label<input data-commerce-setting="label"></label><label>Options layout<select data-commerce-setting="optionLayout"><option value="compact">Side by side</option><option value="detailed">Stacked with details</option><option value="select">Dropdown</option><option value="swatches">Color swatches</option></select></label>
+      <label>Variant shown here<select data-commerce-setting="variantId"></select></label>
       <div data-native-variant-colors hidden></div>
       <label>Text before value<input data-commerce-setting="prefix"></label><label>Text after value<input data-commerce-setting="suffix"></label><label>Option price suffix<input data-commerce-setting="priceSuffix" placeholder=" / pack"></label><label><input type="checkbox" data-commerce-setting="showPrice"> Show price on the button</label>
       </details>
@@ -2578,7 +2693,7 @@
       </details>`;
     panel.insertAdjacentHTML(
       "beforeend",
-      `<details data-native-structure><summary>Structure &amp; accessibility</summary><label>Name<input data-native-name></label><label>Section anchor<input data-native-anchor></label><label>HTML element<select data-native-tag></select></label><label>Parent container<select data-native-move-parent></select></label><button type="button" data-native-move>Move into container</button><div class="sq-native-pair"><button type="button" data-native-earlier>Move earlier</button><button type="button" data-native-later>Move later</button></div><label><input type="checkbox" data-native-collapsed>Initially hidden (toggle target)</label><label><input type="checkbox" data-native-open>Accordion initially open</label></details><details data-native-media><summary>Video</summary><label>Poster image URL<input data-native-media-poster></label><label>Captions URL<input data-native-media-captions></label><label>Captions (WebVTT)<textarea rows="5" data-native-media-captionsText></textarea></label>${["muted", "controls", "loop", "autoplay"].map((k) => `<label><input type="checkbox" data-native-media-${k}>${label(k)}</label>`).join("")}</details><details data-native-icon-options><summary>Icon appearance</summary>${["iconFill", "iconStroke", "iconWeight"].map((k) => `<label>${label(k)}<input data-native-setting="${k}"></label>`).join("")}</details><details><summary>Show while scrolling</summary><label>Show after element or section<input data-native-visible-after placeholder="e.g. hero"></label><label>Hide while these are visible<input data-native-hide-while placeholder="e.g. purchase, footer"></label><p class="sq-native-help">Enter element IDs separated by commas. Useful for a purchase bar that appears after the hero.</p><button type="button" data-native-visibility-apply>Apply visibility</button><button type="button" data-native-visibility-clear>Always show</button></details><details><summary>Scroll motion</summary><label>Starting tilt (degrees)<input type="number" data-native-motion-tilt></label><label>Vertical travel (px)<input type="number" data-native-motion-travel></label><button type="button" data-native-motion-apply>Apply motion</button><button type="button" data-native-motion-clear>Remove motion</button></details><details><summary>Scale to fit</summary><p>Keep a detailed composition proportional below a screen width. Its parent reserves the scaled height.</p>${["max", "width", "height", "extra"].map((k) => `<label>${{ max: "Below screen width", width: "Design width", height: "Design height", extra: "Extra space below" }[k]}<input type="number" data-native-fit-${k}></label>`).join("")}<button type="button" data-native-fit-apply>Apply frame</button><button type="button" data-native-fit-clear>Remove scaling</button></details>`,
+      `<details data-native-structure><summary>Structure &amp; accessibility</summary><label>Name<input data-native-name></label><label>Section anchor<input data-native-anchor></label><label>HTML element<select data-native-tag></select></label><label>Table header for<select data-native-table-scope><option value="">Automatic</option><option value="col">Column</option><option value="row">Row</option></select></label><label>Parent container<select data-native-move-parent></select></label><button type="button" data-native-move>Move into container</button><div class="sq-native-pair"><button type="button" data-native-earlier>Move earlier</button><button type="button" data-native-later>Move later</button></div><label><input type="checkbox" data-native-collapsed>Initially hidden (toggle target)</label><label><input type="checkbox" data-native-open>Accordion initially open</label></details><details data-native-media><summary>Video</summary><label>Poster image URL<input data-native-media-poster></label><label>Captions URL<input data-native-media-captions></label><label>Captions (WebVTT)<textarea rows="5" data-native-media-captionsText></textarea></label>${["muted", "controls", "loop", "autoplay"].map((k) => `<label><input type="checkbox" data-native-media-${k}>${label(k)}</label>`).join("")}</details><details data-native-icon-options><summary>Icon appearance</summary>${["iconFill", "iconStroke", "iconWeight"].map((k) => `<label>${label(k)}<input data-native-setting="${k}"></label>`).join("")}</details><details><summary>Show while scrolling</summary><label>Show after element or section<input data-native-visible-after placeholder="e.g. hero"></label><label>Hide while these are visible<input data-native-hide-while placeholder="e.g. purchase, footer"></label><p class="sq-native-help">Enter element IDs separated by commas. Useful for a purchase bar that appears after the hero.</p><button type="button" data-native-visibility-apply>Apply visibility</button><button type="button" data-native-visibility-clear>Always show</button></details><details><summary>Scroll motion</summary><label>Starting tilt (degrees)<input type="number" data-native-motion-tilt></label><label>Vertical travel (px)<input type="number" data-native-motion-travel></label><button type="button" data-native-motion-apply>Apply motion</button><button type="button" data-native-motion-clear>Remove motion</button></details><details><summary>Scale to fit</summary><p>Keep a detailed composition proportional below a screen width. Its parent reserves the scaled height.</p>${["max", "width", "height", "extra"].map((k) => `<label>${{ max: "Below screen width", width: "Design width", height: "Design height", extra: "Extra space below" }[k]}<input type="number" data-native-fit-${k}></label>`).join("")}<button type="button" data-native-fit-apply>Apply frame</button><button type="button" data-native-fit-clear>Remove scaling</button></details>`,
     );
     panel.insertAdjacentHTML(
       "beforeend",
@@ -2787,6 +2902,7 @@
       const config = read(selected);
       config.productId = productId;
       delete config.variantColors;
+      delete config.variantId;
       validate(config);
       hooks.remember();
       write(selected, config);
@@ -2973,6 +3089,11 @@
         change({ [key]: value });
         if (key === "anchor") selected.id = value;
       });
+    listen("[data-native-table-scope]", "change", () =>
+      change({
+        tableScope: panel.querySelector("[data-native-table-scope]").value,
+      }),
+    );
     listen("[data-native-tag]", "change", () => {
       const config = read(selected),
         tag = panel.querySelector("[data-native-tag]").value;

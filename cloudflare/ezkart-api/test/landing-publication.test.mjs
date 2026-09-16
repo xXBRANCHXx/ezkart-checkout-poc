@@ -46,6 +46,42 @@ test("Worker publication rules parse real purchase elements and require an owned
     /Add one of your products/,
   );
   assert.equal(await check(node()), "");
+  const variants = [
+    {
+      ...item,
+      variants: [
+        { id: "full", stock: 4 },
+        { id: "empty", stock: 0 },
+        { id: "hidden", hidden: true, stock: 4 },
+      ],
+    },
+  ];
+  const fixed = (id) =>
+    `<div data-native-commerce='${JSON.stringify({ type: "commerce", part: "add", productId: "mine", variantId: id })}'><button data-commerce-add>Buy</button></div>`;
+  assert.equal(await check(fixed("full"), variants), "");
+  for (const id of ["empty", "hidden", "missing"])
+    assert.match(await check(fixed(id), variants), /Add stock/);
+  assert.match(
+    await check(fixed("full"), variants, fixed("empty")),
+    /Add one of your products/,
+  );
+  assert.match(
+    await check(
+      '<button data-ezkart-add="mine" data-ezkart-variant="empty">Buy</button>',
+      variants,
+      node(),
+    ),
+    /Add stock/,
+  );
+  assert.equal(
+    await check(
+      '<button data-ezkart-add="mine" data-ezkart-variant="full">Buy</button>',
+      variants,
+      node(),
+    ),
+    "",
+  );
+
   assert.match(
     await check("<h1>Free website</h1>"),
     /Add one of your products/,

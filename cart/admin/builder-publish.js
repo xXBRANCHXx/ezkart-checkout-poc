@@ -1,10 +1,18 @@
 /* Shared publication rules. Catalog ownership is checked again by the server. */
 (() => {
-  const available = (product) => {
+  const available = (product, variantId = "") => {
     if (!product || ![undefined, "active"].includes(product.status))
       return false;
     const variants = (product.variants || []).filter((item) => !item.hidden);
     if (product.variants?.length && !variants.length) return false;
+    if (variantId) {
+      const variant = variants.find((v) => v.id === variantId);
+      if (!variant) return false;
+      return (
+        ["digital", "subscription"].includes(product.type) ||
+        Number(variant.stock ?? product.stock) >= 1
+      );
+    }
     if (["digital", "subscription"].includes(product.type)) return true;
     return variants.length
       ? variants.some((item) => Number(item.stock ?? product.stock) >= 1)
@@ -12,18 +20,31 @@
   };
   const purchase = (config) => {
     if (config.type === "product" || config.part === "add")
-      return config.productId ? [config.productId] : [];
+      return config.productId
+        ? [
+            config.part === "add" && config.variantId
+              ? `${config.productId}::${config.variantId}`
+              : config.productId,
+          ]
+        : [];
     if (config.part === "set-add") return config.productIds || [];
     return [];
   };
   const check = (groups, products) => {
     const catalog = new Map(products.map((p) => [p.id, p]));
     const owned = groups.filter(
-      (ids) => ids.length && ids.every((id) => catalog.has(id)),
+      (ids) => ids.length && ids.every((id) => catalog.has(id.split("::")[0])),
     );
     if (!owned.length)
       return "Add one of your products to the page before publishing.";
-    if (!owned.some((ids) => ids.every((id) => available(catalog.get(id)))))
+    if (
+      !owned.some((ids) =>
+        ids.every((id) => {
+          const [productId, variantId] = id.split("::");
+          return available(catalog.get(productId), variantId);
+        }),
+      )
+    )
       return "Add stock to a product on this page before publishing. At least one product or visible variant must be available to buy.";
     return "";
   };
@@ -49,7 +70,12 @@
   };
   const fromAttributes = (get) => {
     const legacy = get("data-ezkart-add") || get("data-product-card");
-    if (legacy) return [legacy];
+    if (legacy)
+      return [
+        get("data-ezkart-variant")
+          ? `${legacy}::${get("data-ezkart-variant")}`
+          : legacy,
+      ];
     try {
       return purchase(
         JSON.parse(

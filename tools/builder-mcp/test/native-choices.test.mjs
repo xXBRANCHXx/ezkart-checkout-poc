@@ -185,6 +185,12 @@ test("scoped filters and keyboard tabs preserve independent state; editable dial
         call("nativeUpdate", { id: "set-total", productIds: ["desk", "desk"] }),
       /different catalog products/,
     );
+    await call("nativeUpdate", { id: "setup", stateMode: "filter" });
+    await call("nativeUpdate", { id: "setup", stateMode: "tabs" });
+    assert.equal(
+      await page.locator("#native-work").getAttribute("aria-pressed"),
+      null,
+    );
     await page.locator("[data-sq-tab=layers]").click();
     await page.locator("[data-sq-layer][data-section-id=blank]").click();
     await page.locator("[data-sq-toolbar-duplicate]").click();
@@ -276,6 +282,15 @@ test("scoped filters and keyboard tabs preserve independent state; editable dial
     await p.locator("#native-work").focus();
     await p.keyboard.press("ArrowRight");
     assert.equal(await p.locator("#native-write-panel").isVisible(), true);
+    await p.keyboard.press("ArrowUp");
+    assert.equal(await p.locator("#native-write-panel").isVisible(), false);
+    await p.keyboard.press("ArrowDown");
+    assert.equal(await p.locator("#native-write-panel").isVisible(), true);
+    assert.equal(
+      await p.locator("#native-write").getAttribute("aria-pressed"),
+      null,
+    );
+
     assert.equal(await p.locator("#native-felt").isVisible(), false);
     await p.locator("#native-all").click();
     assert.equal(await p.locator("#native-felt").isVisible(), true);

@@ -85,6 +85,22 @@ text choice. Unmapped variants keep their readable names. Swatches use native
 radio controls with 44px targets, keyboard selection and a visible selected name.
 Changing the connected product in the inspector clears its old color mapping.
 
+**Variant shown here** pins an image, price, name, description or purchase button
+to a real catalog variant. Set `variantId` to that variant's ID, or leave it empty
+to follow the shopper's choice. This supports side-by-side sizes, licenses and
+pack options without hardcoded prices. Missing or hidden variants are unavailable;
+sold-out physical variants disable purchase. Changing the connected product in
+the inspector clears the old variant. Publication and export recheck that specific
+variant's availability and ownership on the server.
+
+Native comparison tables use container tags `table`, `thead`, `tbody`, `tfoot`
+and `tr`, plus text tags `th`, `td` and `caption`. Set matching Layout → Display
+values (`table`, `table-row`, `table-cell`, etc.). `tableScope: "row" | "col"`
+identifies a header; the inspector exposes **Table header for**. Table layout,
+border collapse and spacing are ordinary property controls. Containers with
+scrolling overflow become keyboard-focusable; add an accessible label to give a
+scrollable comparison region a useful name.
+
 New templates use the [shared floating cart](../../docs/storefront-cart-pattern.md)
 outside navigation. The exporter supplies it when no merchant-placed cart control
 exists. It uses the shared drawer, maintains its item count and stays clear of

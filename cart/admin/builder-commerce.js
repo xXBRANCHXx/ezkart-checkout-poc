@@ -146,11 +146,30 @@
           .join(" / ") ||
         product.name;
       const variants = (product.variants || []).filter((v) => !v.hidden);
-      const selected =
-        variants.find((v) => v.id === selections.get(key(c))) ||
-        variants[0] ||
-        product;
-      selections.set(key(c), selected.id);
+      const fixed =
+        c.variantId &&
+        ["image", "price", "title", "description", "add"].includes(c.part);
+      const selected = fixed
+        ? variants.find((v) => v.id === c.variantId)
+        : variants.find((v) => v.id === selections.get(key(c))) ||
+          variants[0] ||
+          product;
+      if (!selected) {
+        delete node.dataset.commerceVariant;
+        if (c.part === "add") {
+          const button = element(
+            "button",
+            "Variant unavailable",
+            "sq-native-commerce-button",
+          );
+          button.type = "button";
+          button.disabled = true;
+          node.replaceChildren(button);
+        } else
+          node.textContent = c.part === "price" ? "—" : "Variant unavailable";
+        return;
+      }
+      if (!fixed) selections.set(key(c), selected.id);
       const available =
         product.type !== "physical" ||
         Number(selected.stock ?? product.stock) > 0;

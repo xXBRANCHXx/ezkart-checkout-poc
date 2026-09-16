@@ -34,7 +34,7 @@ export async function purchaseGroups(html, draft = false) {
           key === "data-product-card" && !draft ? null : get(key),
         );
         if (!blocked && element.tagName === "button") {
-          if (get("data-ezkart-add")) groups.push([get("data-ezkart-add")]);
+          if (get("data-ezkart-add")) groups.push(ids);
           if (
             get("data-commerce-add") !== null ||
             get("data-commerce-set") !== null ||
@@ -68,7 +68,9 @@ export async function validatePublication({ html, state, products }) {
   const draftGroups = await purchaseGroups(state?.preview, true);
   const draftIds = new Set(draftGroups.flat());
   return EzkartPublish.check(
-    groups.filter((ids) => ids.every((id) => draftIds.has(id))),
+    groups.filter((ids) =>
+      ids.every((id) => draftIds.has(id) || draftIds.has(id.split("::")[0])),
+    ),
     products,
   );
 }

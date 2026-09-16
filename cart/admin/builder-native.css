@@ -14,6 +14,7 @@
 .sq-native[data-native-type="commerce"] {
   min-width: 0;
   overflow-wrap: anywhere;
+  justify-content: space-between;
 }
 .sq-native[data-native-type="commerce"] > img {
   display: block;
@@ -26,7 +27,7 @@
 .sq-native .sq-native-commerce-button {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: inherit;
   gap: 12px;
   width: 100%;
   min-height: 44px;
