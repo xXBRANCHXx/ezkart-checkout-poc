@@ -120,6 +120,7 @@
       hasFilters = availability.some(Boolean) && availability.some((v) => !v);
     Object.assign(data, {
       productCount: products.length,
+      hasSingleProduct: products.length === 1,
       hasCollectionSets: products.length > 1,
       hasCollectionTabs: products.length > 2,
       hasCollectionFilters: hasFilters,

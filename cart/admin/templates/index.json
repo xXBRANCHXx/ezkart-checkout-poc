@@ -8,6 +8,10 @@
     {
       "id": "sela",
       "manifest": "sela/manifest.json"
+    },
+    {
+      "id": "takar",
+      "manifest": "takar/manifest.json"
     }
   ]
 }

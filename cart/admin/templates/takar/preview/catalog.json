@@ -1,0 +1,84 @@
+{
+  "demoCheckout": true,
+  "currency": "IDR",
+  "locale": "id-ID",
+  "storageScope": "takar-fictional-review",
+  "mediaBase": "http://127.0.0.1:40027",
+  "products": [
+    {
+      "id": "bawang",
+      "name": "Sambal Bawang",
+      "description": "Bawang yang gurih, cabai yang terasa. Pas untuk nasi dan lauk hangat.",
+      "type": "physical",
+      "price": 42000,
+      "stock": 8,
+      "status": "active",
+      "currency": "IDR",
+      "media": [
+        {
+          "id": "bawang"
+        }
+      ],
+      "variants": [
+        {
+          "id": "sedang",
+          "name": "Pedas sedang",
+          "price": 42000,
+          "stock": 8
+        },
+        {
+          "id": "pedas",
+          "name": "Lebih pedas",
+          "price": 44000,
+          "stock": 8
+        }
+      ]
+    },
+    {
+      "id": "tomat",
+      "name": "Sambal Tomat",
+      "description": "Tomat yang asam manis, dengan pedas yang lebih ringan.",
+      "type": "physical",
+      "price": 39000,
+      "stock": 8,
+      "status": "active",
+      "currency": "IDR",
+      "media": [
+        {
+          "id": "tomat"
+        }
+      ],
+      "variants": [
+        {
+          "id": "ringan",
+          "name": "Pedas ringan",
+          "price": 39000,
+          "stock": 8
+        }
+      ]
+    },
+    {
+      "id": "renyah",
+      "name": "Bawang Renyah",
+      "description": "Irisan bawang merah yang tipis dan garing. Taburkan paling akhir.",
+      "type": "physical",
+      "price": 32000,
+      "stock": 8,
+      "status": "active",
+      "currency": "IDR",
+      "media": [
+        {
+          "id": "renyah"
+        }
+      ],
+      "variants": [
+        {
+          "id": "original",
+          "name": "Original",
+          "price": 32000,
+          "stock": 8
+        }
+      ]
+    }
+  ]
+}

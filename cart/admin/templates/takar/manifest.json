@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "id": "takar",
+  "version": "1.0.0",
+  "name": "Takar",
+  "description": "A welcoming storefront with panoramic photography, deep green accents and a clear product shelf.",
+  "recipe": "recipe.json",
+  "thumbnail": "preview/desktop.png",
+  "previews": [
+    "preview/desktop.png",
+    "preview/mobile.png",
+    "preview/footer.png"
+  ],
+  "previewLabel": "Fictional pantry branding shown. Your store name, products, photos and prices replace the demo content.",
+  "requirements": {
+    "minProducts": 1,
+    "maxProducts": 3,
+    "images": "optional",
+    "variants": "optional",
+    "description": "optional"
+  },
+  "theme": {
+    "accent": "#9d3e28",
+    "page": "#fffefb",
+    "ink": "#233e32",
+    "surface": "#f0f2eb",
+    "headingFont": "DM Sans, Arial, sans-serif",
+    "bodyFont": "DM Sans, Arial, sans-serif",
+    "buttonBackground": "#233e32",
+    "buttonText": "#ffffff",
+    "radius": 4
+  },
+  "approval": {
+    "version": "takar-native-v1.0",
+    "instruction": "ok, cool. Make it a template too",
+    "recipeSha256": "e521d003e46f46fb1a7f4a80e8cc4164e87b27cef314c470b471f581fa2818a2"
+  },
+  "optionalSections": {
+    "takar-recipes": "Two or more catalog products; native product comparison replaces fictional recipes",
+    "takar-story": "Featured product description"
+  },
+  "demoContent": "preview/ only. Never applied to a merchant page."
+}

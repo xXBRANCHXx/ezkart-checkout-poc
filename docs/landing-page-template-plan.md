@@ -12,7 +12,7 @@ Templates are complete, polished, long-form storefront sites—not isolated sect
 
 Future templates should be highly professional and practical for ordinary merchants. Favor clear shopping journeys, disciplined whitespace, clean typography, restrained backgrounds and familiar navigation. Only one or two should take a more formal direction; the majority should remain approachable and polished. PITH is the approved bold launch design, not the visual default for the collection.
 
-**Sela** is the commissioned result of the whitespace-led direction: a professional desk-accessories shop with clean sans-serif typography, restrained backgrounds and a practical multi-product shopping journey. Its native builder reconstruction is approved and installed as a template supporting one to four catalog products. **Takar**, the pantry storefront, has a native reconstruction ready for review. Subsequent concepts retain the professional direction while using distinct merchant stories and compositions. Start the next concept only when the user commissions it; opening its terminal does not start design work.
+**Sela** is the commissioned result of the whitespace-led direction: a professional desk-accessories shop with clean sans-serif typography, restrained backgrounds and a practical multi-product shopping journey. Its native builder reconstruction is approved and installed as a template supporting one to four catalog products. **Takar**, the pantry storefront, is also approved and installed as an editable template for one to three catalog products. Subsequent concepts retain the professional direction while using distinct merchant stories and compositions. Start the next concept only when the user commissions it; opening its terminal does not start design work.
 
 Every future template must be composed from the same reusable, merchant-editable element system available on a blank canvas. A template may provide a composition and art direction, but it must not introduce a parallel editing model or template-only behavior.
 
@@ -65,7 +65,7 @@ These five genres remain useful reference directions, rather than a fixed build 
 4. **Gallery** — modern minimal multi-product catalog.
 5. **Signal** — digital product, course, download, or membership.
 
-PITH fulfills the bold Impact direction. Sela fulfills the professional, whitespace-led Gallery direction. The other genres remain available for subsequent commissions.
+PITH fulfills the bold Impact direction. Sela fulfills the professional, whitespace-led Gallery direction. Takar fulfills the approachable pantry-focused Harvest direction. Atelier and Signal remain available for subsequent commissions.
 
 ## Template 1: Impact
 

@@ -1,0 +1,52 @@
+[
+  {
+    "name": "hero",
+    "source": "/home/branch/.codex/generated_images/01a0a81a-91d0-7822-b503-19b38c167369/exec-56f07459-e395-43d0-a212-f5c24d873751.png",
+    "method": "OpenAI built-in image_gen",
+    "prompt_file": "prompts.json",
+    "fictional": true
+  },
+  {
+    "name": "bawang",
+    "source": "/home/branch/.codex/generated_images/01a0a81a-91d0-7822-b503-19b38c167369/exec-2d608d18-72a4-4cc0-bbb2-e536d5b6443a.png",
+    "method": "OpenAI built-in image_gen",
+    "prompt_file": "prompts.json",
+    "fictional": true
+  },
+  {
+    "name": "tomat",
+    "source": "/home/branch/.codex/generated_images/01a0a81a-91d0-7822-b503-19b38c167369/exec-2d797fb6-1c9c-44ef-86eb-f1be77f88b3d.png",
+    "method": "OpenAI built-in image_gen",
+    "prompt_file": "prompts.json",
+    "fictional": true
+  },
+  {
+    "name": "renyah",
+    "source": "/home/branch/.codex/generated_images/01a0a81a-91d0-7822-b503-19b38c167369/exec-8e67c1b7-a519-4feb-b6a8-f8edaa1d312c.png",
+    "method": "OpenAI built-in image_gen",
+    "prompt_file": "prompts.json",
+    "fictional": true
+  },
+  {
+    "name": "noodles",
+    "source": "/home/branch/.codex/generated_images/01a0a81a-91d0-7822-b503-19b38c167369/exec-698f2790-5cec-4041-ac60-dabdc012e842.png",
+    "method": "OpenAI built-in image_gen",
+    "prompt_file": "prompts.json",
+    "fictional": true
+  },
+  {
+    "name": "ingredients",
+    "source": "/home/branch/.codex/generated_images/01a0a81a-91d0-7822-b503-19b38c167369/exec-4187b210-7ded-4085-9cd8-83b36ef2a3bc.png",
+    "method": "OpenAI built-in image_gen",
+    "prompt_file": "prompts.json",
+    "fictional": true
+  },
+  {
+    "name": "hero-v2",
+    "source": "/home/branch/.codex/generated_images/01a0a81a-91d0-7822-b503-19b38c167369/exec-f37f919e-da45-439c-93b8-e04ecceabc98.png",
+    "method": "OpenAI built-in image_gen edit",
+    "edit": "Only label typography changed to heavy geometric sans-serif. Other photograph details preserved.",
+    "reference": "hero.png",
+    "selected": true
+  }
+]
