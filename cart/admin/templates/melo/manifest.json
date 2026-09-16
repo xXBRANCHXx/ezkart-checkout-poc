@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "id": "melo",
+  "version": "1.0.0",
+  "name": "Melo",
+  "description": "Warm coral and paper tones, arched photography and open product cards with editable details and shopping guidance.",
+  "recipe": "recipe.json",
+  "thumbnail": "preview/desktop.png",
+  "previews": [
+    "preview/desktop.png",
+    "preview/mobile.png",
+    "preview/full-page.png"
+  ],
+  "previewLabel": "Design imagery is included and editable. Start with an empty product card and connect your products before publishing or exporting code.",
+  "requirements": {
+    "minProducts": 1,
+    "maxProducts": 3,
+    "images": "optional",
+    "variants": "optional",
+    "description": "optional",
+    "draftProducts": 0
+  },
+  "theme": {
+    "accent": "#b64c36",
+    "page": "#fffaf4",
+    "ink": "#432e29",
+    "surface": "#f3eee6",
+    "headingFont": "DM Sans, Arial, sans-serif",
+    "bodyFont": "DM Sans, Arial, sans-serif",
+    "buttonBackground": "#432e29",
+    "buttonText": "#fffaf4",
+    "radius": 26
+  },
+  "approval": {
+    "version": "melo-native-v1",
+    "instruction": "ok, make that a template",
+    "recipeSha256": "2b48a6a1aeec0b16bf99f950f47395c913a90fcc99422bfd67ec5212ff7904a7"
+  },
+  "optionalSections": {
+    "melo-unbox": "Actual details and prices of up to two connected products; hidden for empty drafts",
+    "project-picker": "Availability filters appear when connected products include available and sold-out items"
+  },
+  "demoContent": "Fictional catalog, kit contents, specifications and promises stay in preview/. Applied pages use merchant products and normal Ezkart checkout.",
+  "productSlot": "card-mekar"
+}

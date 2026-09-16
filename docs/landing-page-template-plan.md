@@ -387,7 +387,7 @@ Hue (Rona) is approved and installed as a native template for one to three produ
 
 Lane (Lajur) version 2 has been recreated and is ready for native review. See [the native validation report](templates/lajur-builder-validation.md). Its open photographic composition supersedes the rejected framed, rounded first version. Preserve that specific feedback for this formal business-document storefront. Do not include simulated-purchase claims in merchant-facing copy. Real storefronts use normal Ezkart checkout; fictional catalog review fixtures remain explicitly simulated at checkout.
 
-Melo is ready for native review at `~/.local/share/ezkart-templates/melo-punch-20260916`. See [the native validation report](templates/melo-builder-validation.md). Its approved craft-shop design has been preserved. Native approval must precede template packaging.
+Melo is approved and installed as an editable template for one to three products, starting with an empty product card. Its native craft-shop composition and design imagery are preserved; shop data comes from the merchant's catalog. See [the template validation report](templates/melo-template-validation.md).
 
 Tilu was canceled by the user for repeating existing layouts. Preserve it as a rejected concept and do not recreate or package it. The replacement concept receives a minimal functional brief: create an original, creative storefront with fictional branding/products, use Ezkart's universal cart, make product choices work, and open a responsive browser preview. Leave visual choices to the agent. Keep Melo's native work separate.
 

@@ -20,6 +20,10 @@
     {
       "id": "rona",
       "manifest": "rona/manifest.json"
+    },
+    {
+      "id": "melo",
+      "manifest": "melo/manifest.json"
     }
   ]
 }

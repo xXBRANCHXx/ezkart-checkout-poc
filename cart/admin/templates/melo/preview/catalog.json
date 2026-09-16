@@ -1,0 +1,102 @@
+{
+  "products": [
+    {
+      "id": "melo-mekar",
+      "name": "Mekar",
+      "description": "Sepasang bunga untuk teman minum teh.",
+      "type": "physical",
+      "status": "active",
+      "currency": "IDR",
+      "price": 189000,
+      "stock": 20,
+      "media": [
+        {
+          "id": "mekar"
+        }
+      ],
+      "variants": [
+        {
+          "id": "full",
+          "name": "Kit lengkap \u2014 dengan alat",
+          "price": 189000,
+          "stock": 8,
+          "description": "Hoop kayu, jarum punch needle, benang akrilik, kain berpola, kain pelapis, lem tekstil, dan panduan cetak. Siapkan gunting sendiri."
+        },
+        {
+          "id": "refill",
+          "name": "Isi ulang \u2014 tanpa alat",
+          "price": 109000,
+          "stock": 12,
+          "description": "Benang akrilik, kain berpola, kain pelapis, lem tekstil, dan panduan cetak. Tidak termasuk hoop dan jarum. Siapkan gunting sendiri."
+        }
+      ]
+    },
+    {
+      "id": "melo-alun",
+      "name": "Alun",
+      "description": "Sedikit ombak di sudut meja kerjamu.",
+      "type": "physical",
+      "status": "active",
+      "currency": "IDR",
+      "price": 189000,
+      "stock": 16,
+      "media": [
+        {
+          "id": "alun"
+        }
+      ],
+      "variants": [
+        {
+          "id": "full",
+          "name": "Kit lengkap \u2014 dengan alat",
+          "price": 189000,
+          "stock": 6,
+          "description": "Hoop kayu, jarum punch needle, benang akrilik, kain berpola, kain pelapis, lem tekstil, dan panduan cetak. Siapkan gunting sendiri."
+        },
+        {
+          "id": "refill",
+          "name": "Isi ulang \u2014 tanpa alat",
+          "price": 109000,
+          "stock": 10,
+          "description": "Benang akrilik, kain berpola, kain pelapis, lem tekstil, dan panduan cetak. Tidak termasuk hoop dan jarum. Siapkan gunting sendiri."
+        }
+      ]
+    },
+    {
+      "id": "melo-teduh",
+      "name": "Teduh",
+      "description": "Tempat empuk untuk benda kesayangan.",
+      "type": "physical",
+      "status": "active",
+      "currency": "IDR",
+      "price": 229000,
+      "stock": 5,
+      "media": [
+        {
+          "id": "teduh"
+        }
+      ],
+      "variants": [
+        {
+          "id": "full",
+          "name": "Kit lengkap \u2014 dengan alat",
+          "price": 229000,
+          "stock": 5,
+          "description": "Hoop kayu, jarum punch needle, benang akrilik, kain berpola, kain pelapis, lem tekstil, dan panduan cetak. Siapkan gunting sendiri."
+        },
+        {
+          "id": "refill",
+          "name": "Isi ulang \u2014 tanpa alat",
+          "price": 149000,
+          "stock": 0,
+          "description": "Benang akrilik, kain berpola, kain pelapis, lem tekstil, dan panduan cetak. Tidak termasuk hoop dan jarum. Siapkan gunting sendiri."
+        }
+      ]
+    }
+  ],
+  "currency": "IDR",
+  "locale": "id-ID",
+  "mediaBase": "http://127.0.0.1:46381",
+  "storageScope": "melo-fictional-review",
+  "demoCheckout": true
+}
