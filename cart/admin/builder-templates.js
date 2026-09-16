@@ -88,6 +88,10 @@
         (product.variants || []).filter((v) => !v.hidden).length > 6
           ? "select"
           : "detailed",
+      colorOptionLayout:
+        (product.variants || []).filter((v) => !v.hidden).length > 6
+          ? "select"
+          : "swatches",
       heroColumns: images.length
         ? "minmax(0,1.03fr) minmax(0,1fr)"
         : "minmax(0,1fr)",

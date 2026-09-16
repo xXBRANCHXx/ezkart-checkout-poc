@@ -379,6 +379,8 @@ Preserve each template's distinctive composition, responsive behavior, and art d
 
 ## Current queue — September 16, 2026
 
-Hue (Rona) has been recreated through the native builder and is ready for review. See [the native validation report](templates/rona-builder-validation.md). Its concept approval does not yet approve template packaging.
+Hue (Rona) is approved and installed as a native template for one to three products. See [the template validation report](templates/rona-template-validation.md).
 
-The separate terminal for the professional-business concept is open in the Ezkart workspace with full access; its working folder is `~/.local/share/ezkart-templates/lajur/`. This commissioned concept is one of the one-or-two more formal designs: professional business branding, clean typography, generous whitespace and approachable polish. Avoid repeating sharp editorial/studio layouts. It inherits the empty product section, required catalog product/stock before publish or export, and shared Ezkart cart protocol. Do not start another copy of this commission.
+Lane (Lajur) version 2 is approved for native reconstruction. Its open photographic composition supersedes the rejected framed, rounded first version. Preserve that specific feedback for this formal business-document storefront. Do not include simulated-purchase claims in merchant-facing copy. Real storefronts use normal Ezkart checkout; fictional catalog review fixtures remain explicitly simulated at checkout.
+
+After Lane's native reconstruction is ready for review, the user has commissioned a new visible full-access terminal in the Ezkart workspace to create a more creative step-one concept. Choose a different merchant story and composition, retaining professional clarity and practical shopping. The broader Ezkart-inspired rounded and gradient direction still applies to new concepts; avoid excessive boxed cards. Native Lane approval and template packaging remain separate stages.

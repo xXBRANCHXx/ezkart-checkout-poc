@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "id": "rona",
+  "version": "1.0.0",
+  "name": "Rona (Hue)",
+  "description": "Warm peach gradients, rounded sections and clear product choices for an approachable everyday shop.",
+  "recipe": "recipe.json",
+  "thumbnail": "preview/desktop.png",
+  "previews": [
+    "preview/desktop.png",
+    "preview/mobile.png",
+    "preview/full-page.png"
+  ],
+  "previewLabel": "Design imagery is included and editable. Your page starts with an empty product card. Connect your products before publishing or exporting code.",
+  "requirements": {
+    "minProducts": 1,
+    "maxProducts": 3,
+    "images": "optional",
+    "variants": "optional",
+    "description": "optional",
+    "draftProducts": 0
+  },
+  "theme": {
+    "accent": "#b7442b",
+    "page": "#fbf9f5",
+    "ink": "#252c29",
+    "surface": "#eaf0e6",
+    "headingFont": "Poppins, Arial, sans-serif",
+    "bodyFont": "Poppins, Arial, sans-serif",
+    "buttonBackground": "#252c29",
+    "buttonText": "#ffffff",
+    "radius": 28
+  },
+  "approval": {
+    "version": "rona-native-v1",
+    "instruction": "Go agead and make Rona(pretty sure it was called Hue) a template",
+    "recipeSha256": "d52fc3385d81f59829797d0c08b87b70c03d11d46f4e63d82f098956c14eb872"
+  },
+  "optionalSections": {
+    "rona-material": "Featured product description",
+    "rona-size-guide": "Two or more selected products; actual photos and details replace fictional towel dimensions"
+  },
+  "demoContent": "Fictional catalog and notices stay in preview/. Applied pages use real catalog products and normal Ezkart checkout.",
+  "productSlot": "card-bath"
+}

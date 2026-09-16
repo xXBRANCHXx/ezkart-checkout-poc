@@ -16,6 +16,10 @@
     {
       "id": "lintas",
       "manifest": "lintas/manifest.json"
+    },
+    {
+      "id": "rona",
+      "manifest": "rona/manifest.json"
     }
   ]
 }

@@ -1,0 +1,32 @@
+[
+  {
+    "key": "hero",
+    "prompt": "Use case: product-mockup. Create one exceptionally realistic retail campaign photograph for the fictional Indonesian bath linen brand Rona. Landscape 3:2 composition, NOT a website, absolutely no typography or text. A close, tactile composition of three thick cotton terry bath towels folded neatly on a low warm travertine bathroom bench: peach/apricot towel on top, pale sage green in the middle, soft ivory below. One peach towel end gently drapes over the front edge showing a subtle simple ribbed border. A small matte ivory ceramic soap dish with oval soap on the right, soft daylight entering from the left, out-of-focus warm white plaster wall and a narrow slice of bathroom background. The towels fill most of the image with exceptionally believable fine cotton terry loops, gentle folds, beautiful soft sunlit shadows. Color direction warm apricot, cream, pale sage, light neutral beige stone. Premium yet everyday approachable home goods photography, relaxed, bright and soft, not austere editorial styling. Tight enough crop that objects feel substantial. No pedestals, no people, no plants, no text, no watermark, no borders, no frames, no layout padding.",
+    "tool": "built-in imagegen",
+    "source": "/home/branch/.codex/generated_images/01a0a8dc-844c-7673-992b-89fa4c9ff249/exec-44998c0d-941d-4740-ae7e-1100ca67488d.png"
+  },
+  {
+    "key": "towel-peach",
+    "prompt": "Use case: product-mockup. Create one photorealistic ecommerce catalog photograph for Rona bath linens. Square composition, no text. One thick peach/apricot cotton terry bath towel, neatly folded into a generous rectangle with a simple narrow ribbed border near the visible end, shown at a slightly elevated three-quarter camera angle, filling 80% of the frame, on a very pale warm peach seamless matte tabletop and background. Beautiful fine cotton loops and soft textile edges, gently rounded folded corners, high material detail, natural soft shadow under towel, diffuse daylight, clean approachable professional catalog photography. Towel color muted apricot peach #df9d83. Absolutely no labels, no other objects, no people, no frames, no graphic design, no borders.",
+    "tool": "built-in imagegen",
+    "source": "/home/branch/.codex/generated_images/01a0a8dc-844c-7673-992b-89fa4c9ff249/exec-1d12db8c-99dd-4166-bf53-aa6b0b118183.png"
+  },
+  {
+    "key": "towel-sage",
+    "prompt": "Use case: product-mockup. Create one photorealistic ecommerce catalog photograph for Rona bath linens. Square composition, no text. One thick pale sage green cotton terry bath towel, neatly folded into a generous rectangle with a simple narrow ribbed border near the visible end, shown at a slightly elevated three-quarter camera angle, filling 80% of the frame, on a very pale warm sage seamless matte tabletop and background. Beautiful fine cotton loops and soft textile edges, gently rounded folded corners, high material detail, natural soft shadow under towel, diffuse daylight, clean approachable professional catalog photography. Towel color muted sage #a5b6a0. Absolutely no labels, no other objects, no people, no frames, no graphic design, no borders.",
+    "tool": "built-in imagegen",
+    "source": "/home/branch/.codex/generated_images/01a0a8dc-844c-7673-992b-89fa4c9ff249/exec-b88460cd-b23a-4ec1-9e62-99eb15cd73a8.png"
+  },
+  {
+    "key": "bathroom",
+    "prompt": "Use case: photorealistic-natural. Create a premium approachable home goods lifestyle photograph for the fictional Indonesian Rona bath linen shop. Portrait 4:5 composition, no text. A thick peach/apricot cotton terry bath towel with a narrow simple ribbed border hanging over a horizontal brushed steel rail beside a warm ivory bathroom sink. On the right, a partial softly rounded wall mirror, reflected diffuse morning window light. Pale sage green square tiles in the lower half of the wall, warm white plaster above. One small simple ceramic soap dish next to the sink, no logos, no bottles, no extra decorative props. Extremely believable cotton terry texture with fine loops, thick weight and real folds. Warm daylight, calm lived-in feeling, bright and welcoming, soft shadows, a little film grain, photography of an ordinary beautiful modern home, not a hotel or sterile showroom. Focus on the towel and its texture. No people, no words, no watermarks, no frames, no borders.",
+    "tool": "built-in imagegen",
+    "source": "/home/branch/.codex/generated_images/01a0a8dc-844c-7673-992b-89fa4c9ff249/exec-8706330e-961f-4b37-b763-62bbde9caab3.png"
+  },
+  {
+    "key": "set",
+    "prompt": "Use case: product-mockup. Create one photorealistic ecommerce product photograph for the fictional Rona bath linen brand, square image. Exactly TWO thick cotton terry bath towels neatly folded and stacked together: one peach/apricot on top, one pale sage green below. Both have a simple narrow ribbed border at their visible ends. A broad cream paper belly band wraps around the center of the stack as simple retail packaging. The band has just the small lowercase sans-serif word 'rona.' in dark terracotta and a tiny line below 'set berdua'. Professional retail catalog product shot from a slightly elevated three-quarter angle. Entire set substantial, centered, filling 85% of frame, realistically fine terry loops and soft cloth edges. Very pale warm ivory seamless background, daylight and natural soft contact shadow. Photorealistic, no illustration, no people, no other objects, no third towel, no frame, no borders, no collage or split panels. Colors consistent with muted apricot #df9d83 and sage #a5b6a0.",
+    "tool": "built-in imagegen",
+    "source": "/home/branch/.codex/generated_images/01a0a8dc-844c-7673-992b-89fa4c9ff249/exec-20f24ec6-fa6a-4a27-a98c-bb0e22e4a018.png"
+  }
+]

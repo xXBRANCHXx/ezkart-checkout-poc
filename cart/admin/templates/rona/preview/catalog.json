@@ -1,0 +1,87 @@
+{
+  "demoCheckout": true,
+  "currency": "IDR",
+  "locale": "id-ID",
+  "storageScope": "rona-fictional-review",
+  "mediaBase": "http://127.0.0.1:46361",
+  "products": [
+    {
+      "id": "bath",
+      "name": "Handuk Mandi",
+      "description": "Untuk membungkus diri setelah mandi.",
+      "type": "physical",
+      "price": 189000,
+      "stock": 16,
+      "status": "active",
+      "currency": "IDR",
+      "media": [
+        {
+          "id": "peach"
+        }
+      ],
+      "variants": [
+        {
+          "id": "bath-peach",
+          "name": "Peach",
+          "price": 189000,
+          "stock": 8,
+          "imageUploadId": "peach"
+        },
+        {
+          "id": "bath-sage",
+          "name": "Sage",
+          "price": 189000,
+          "stock": 8,
+          "imageUploadId": "sage"
+        }
+      ]
+    },
+    {
+      "id": "hand",
+      "name": "Handuk Tangan",
+      "description": "Teman kecil di sisi wastafel.",
+      "type": "physical",
+      "price": 79000,
+      "stock": 16,
+      "status": "active",
+      "currency": "IDR",
+      "media": [
+        {
+          "id": "sage"
+        }
+      ],
+      "variants": [
+        {
+          "id": "hand-sage",
+          "name": "Sage",
+          "price": 79000,
+          "stock": 8,
+          "imageUploadId": "sage"
+        },
+        {
+          "id": "hand-peach",
+          "name": "Peach",
+          "price": 79000,
+          "stock": 8,
+          "imageUploadId": "peach"
+        }
+      ]
+    },
+    {
+      "id": "set",
+      "name": "Set Berdua",
+      "description": "Dua warna, satu tempat pulang.",
+      "type": "physical",
+      "price": 349000,
+      "stock": 8,
+      "status": "active",
+      "currency": "IDR",
+      "media": [
+        {
+          "id": "set"
+        }
+      ],
+      "variants": []
+    }
+  ]
+}

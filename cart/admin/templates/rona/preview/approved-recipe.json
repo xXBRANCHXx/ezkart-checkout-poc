@@ -1,0 +1,7715 @@
+[
+  {
+    "id": "rona-navigation",
+    "type": "container",
+    "name": "Rona navigation",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "0px",
+      "width": "100%",
+      "backgroundColor": "#fbf9f5",
+      "color": "#252c29",
+      "paddingTop": "0px",
+      "paddingBottom": "0px",
+      "position": "relative",
+      "zIndex": "1000"
+    },
+    "tag": "header",
+    "responsive": [],
+    "anchor": "top"
+  },
+  {
+    "id": "nav-content",
+    "parent": "rona-navigation",
+    "type": "container",
+    "name": "Nav content",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "row",
+      "gap": "28px",
+      "width": "calc(100% - 64px)",
+      "maxWidth": "1320px",
+      "marginLeft": "auto",
+      "marginRight": "auto",
+      "position": "relative",
+      "alignItems": "center",
+      "justifyContent": "space-between",
+      "height": "108px"
+    },
+    "responsive": [
+      {
+        "max": 1200,
+        "props": {
+          "width": "calc(100% - 64px)"
+        }
+      },
+      {
+        "max": 900,
+        "props": {
+          "width": "calc(100% - 40px)"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "width": "calc(100% - 24px)"
+        }
+      },
+      {
+        "max": 900,
+        "props": {
+          "height": "88px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "height": "82px",
+          "paddingLeft": "8px",
+          "paddingRight": "8px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "nav-brand",
+    "parent": "nav-content",
+    "type": "button",
+    "name": "Nav brand",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "inline-flex",
+      "alignItems": "center",
+      "justifyContent": "space-between",
+      "gap": "10px",
+      "minHeight": "44px",
+      "width": "fit-content",
+      "fontSize": "12px",
+      "fontWeight": "500",
+      "lineHeight": "1.5",
+      "color": "#252c29",
+      "backgroundColor": "transparent",
+      "borderRadius": "0px",
+      "textDecoration": "none",
+      "textAlign": "left",
+      "paddingTop": "0px",
+      "paddingRight": "0px",
+      "paddingBottom": "0px",
+      "paddingLeft": "0px"
+    },
+    "text": "",
+    "tag": "a",
+    "action": {
+      "type": "link",
+      "target": "#top"
+    },
+    "label": "Rona, kembali ke atas"
+  },
+  {
+    "id": "nav-brand-mark",
+    "parent": "nav-brand",
+    "type": "image",
+    "name": "Nav brand mark",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "width": "36px",
+      "height": "36px",
+      "objectFit": "contain"
+    },
+    "src": "http://127.0.0.1:46361/assets/mark.svg",
+    "alt": "",
+    "responsive": [
+      {
+        "max": 620,
+        "props": {
+          "width": "32px",
+          "height": "32px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "nav-brand-name",
+    "parent": "nav-brand",
+    "type": "text",
+    "name": "Nav brand name",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "38px",
+      "fontWeight": "600",
+      "color": "#252c29",
+      "lineHeight": "1",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere",
+      "letterSpacing": "-2px"
+    },
+    "text": "rona.",
+    "marks": [
+      {
+        "start": 4,
+        "end": 5,
+        "color": "#b7442b"
+      }
+    ],
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "fontSize": "34px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "fontSize": "32px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "nav-links",
+    "parent": "nav-content",
+    "type": "container",
+    "name": "Nav links",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "row",
+      "gap": "34px"
+    },
+    "tag": "nav",
+    "label": "Navigasi utama",
+    "responsive": [
+      {
+        "max": 1200,
+        "props": {
+          "gap": "22px"
+        }
+      },
+      {
+        "max": 900,
+        "props": {
+          "gap": "20px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "display": "none"
+        }
+      }
+    ]
+  },
+  {
+    "id": "nav-0",
+    "parent": "nav-links",
+    "type": "button",
+    "name": "Nav 0",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "inline-flex",
+      "alignItems": "center",
+      "justifyContent": "space-between",
+      "gap": "20px",
+      "minHeight": "44px",
+      "width": "fit-content",
+      "fontSize": "12px",
+      "fontWeight": "500",
+      "lineHeight": "1.5",
+      "color": "#252c29",
+      "backgroundColor": "transparent",
+      "borderRadius": "0px",
+      "textDecoration": "none",
+      "textAlign": "left",
+      "paddingTop": "0px",
+      "paddingRight": "0px",
+      "paddingBottom": "0px",
+      "paddingLeft": "0px"
+    },
+    "text": "Koleksi",
+    "tag": "a",
+    "action": {
+      "type": "link",
+      "target": "#koleksi"
+    }
+  },
+  {
+    "id": "nav-1",
+    "parent": "nav-links",
+    "type": "button",
+    "name": "Nav 1",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "inline-flex",
+      "alignItems": "center",
+      "justifyContent": "space-between",
+      "gap": "20px",
+      "minHeight": "44px",
+      "width": "fit-content",
+      "fontSize": "12px",
+      "fontWeight": "500",
+      "lineHeight": "1.5",
+      "color": "#252c29",
+      "backgroundColor": "transparent",
+      "borderRadius": "0px",
+      "textDecoration": "none",
+      "textAlign": "left",
+      "paddingTop": "0px",
+      "paddingRight": "0px",
+      "paddingBottom": "0px",
+      "paddingLeft": "0px"
+    },
+    "text": "Tentang handuk",
+    "tag": "a",
+    "action": {
+      "type": "link",
+      "target": "#bahan"
+    }
+  },
+  {
+    "id": "nav-2",
+    "parent": "nav-links",
+    "type": "button",
+    "name": "Nav 2",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "inline-flex",
+      "alignItems": "center",
+      "justifyContent": "space-between",
+      "gap": "20px",
+      "minHeight": "44px",
+      "width": "fit-content",
+      "fontSize": "12px",
+      "fontWeight": "500",
+      "lineHeight": "1.5",
+      "color": "#252c29",
+      "backgroundColor": "transparent",
+      "borderRadius": "0px",
+      "textDecoration": "none",
+      "textAlign": "left",
+      "paddingTop": "0px",
+      "paddingRight": "0px",
+      "paddingBottom": "0px",
+      "paddingLeft": "0px"
+    },
+    "text": "Panduan ukuran",
+    "tag": "a",
+    "action": {
+      "type": "link",
+      "target": "#panduan"
+    }
+  },
+  {
+    "id": "nav-shop",
+    "parent": "nav-content",
+    "type": "button",
+    "name": "Nav shop",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "inline-flex",
+      "alignItems": "center",
+      "justifyContent": "space-between",
+      "gap": "24px",
+      "minHeight": "44px",
+      "width": "fit-content",
+      "fontSize": "12px",
+      "fontWeight": "500",
+      "lineHeight": "1.5",
+      "color": "#b7442b",
+      "backgroundColor": "transparent",
+      "borderRadius": "99px",
+      "textDecoration": "none",
+      "textAlign": "left",
+      "paddingTop": "10px",
+      "paddingRight": "21px",
+      "paddingBottom": "10px",
+      "paddingLeft": "21px",
+      "borderTopWidth": "1px",
+      "borderTopStyle": "solid",
+      "borderTopColor": "#ccb6a9",
+      "borderRightWidth": "1px",
+      "borderRightStyle": "solid",
+      "borderRightColor": "#ccb6a9",
+      "borderBottomWidth": "1px",
+      "borderBottomStyle": "solid",
+      "borderBottomColor": "#ccb6a9",
+      "borderLeftWidth": "1px",
+      "borderLeftStyle": "solid",
+      "borderLeftColor": "#ccb6a9"
+    },
+    "text": "",
+    "tag": "a",
+    "action": {
+      "type": "link",
+      "target": "#koleksi"
+    },
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "display": "none"
+        }
+      }
+    ]
+  },
+  {
+    "id": "nav-shop-label",
+    "parent": "nav-shop",
+    "type": "text",
+    "name": "Nav shop label",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "inherit",
+      "fontWeight": "inherit",
+      "color": "inherit",
+      "lineHeight": "inherit",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere"
+    },
+    "text": "Pilih warna harimu"
+  },
+  {
+    "id": "nav-shop-icon",
+    "parent": "nav-shop",
+    "type": "text",
+    "name": "Nav shop icon",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "21px",
+      "fontWeight": "400",
+      "color": "inherit",
+      "lineHeight": "1",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere",
+      "flexShrink": "0"
+    },
+    "text": "↗"
+  },
+  {
+    "id": "nav-menu",
+    "parent": "nav-content",
+    "type": "button",
+    "name": "Nav menu",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "none",
+      "alignItems": "center",
+      "justifyContent": "space-between",
+      "gap": "14px",
+      "minHeight": "44px",
+      "width": "fit-content",
+      "fontSize": "14px",
+      "fontWeight": "500",
+      "lineHeight": "1.5",
+      "color": "#252c29",
+      "backgroundColor": "transparent",
+      "borderRadius": "0px",
+      "textDecoration": "none",
+      "textAlign": "left",
+      "paddingTop": "0px",
+      "paddingRight": "0px",
+      "paddingBottom": "0px",
+      "paddingLeft": "0px"
+    },
+    "text": "",
+    "tag": "button",
+    "action": {
+      "type": "toggle",
+      "target": "mobile-nav"
+    },
+    "label": "Buka menu",
+    "responsive": [
+      {
+        "max": 620,
+        "props": {
+          "display": "inline-flex"
+        }
+      }
+    ]
+  },
+  {
+    "id": "nav-menu-label",
+    "parent": "nav-menu",
+    "type": "text",
+    "name": "Nav menu label",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "inherit",
+      "fontWeight": "inherit",
+      "color": "inherit",
+      "lineHeight": "inherit",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere"
+    },
+    "text": "Menu"
+  },
+  {
+    "id": "nav-menu-icon",
+    "parent": "nav-menu",
+    "type": "text",
+    "name": "Nav menu icon",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "21px",
+      "fontWeight": "400",
+      "color": "inherit",
+      "lineHeight": "1",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere",
+      "flexShrink": "0"
+    },
+    "text": "☰"
+  },
+  {
+    "id": "mobile-nav",
+    "parent": "nav-content",
+    "type": "container",
+    "name": "Mobile nav",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "0px",
+      "position": "absolute",
+      "top": "72px",
+      "left": "0px",
+      "right": "0px",
+      "backgroundColor": "#fbf9f5",
+      "borderRadius": "22px",
+      "zIndex": "1100",
+      "borderTopWidth": "1px",
+      "borderTopStyle": "solid",
+      "borderTopColor": "#deded5",
+      "borderRightWidth": "1px",
+      "borderRightStyle": "solid",
+      "borderRightColor": "#deded5",
+      "borderBottomWidth": "1px",
+      "borderBottomStyle": "solid",
+      "borderBottomColor": "#deded5",
+      "borderLeftWidth": "1px",
+      "borderLeftStyle": "solid",
+      "borderLeftColor": "#deded5",
+      "paddingTop": "14px",
+      "paddingRight": "22px",
+      "paddingBottom": "14px",
+      "paddingLeft": "22px"
+    },
+    "tag": "nav",
+    "collapsed": true,
+    "label": "Navigasi seluler"
+  },
+  {
+    "id": "mobile-nav-0",
+    "parent": "mobile-nav",
+    "type": "button",
+    "name": "Mobile nav 0",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "inline-flex",
+      "alignItems": "center",
+      "justifyContent": "space-between",
+      "gap": "20px",
+      "minHeight": "49px",
+      "width": "100%",
+      "fontSize": "13px",
+      "fontWeight": "500",
+      "lineHeight": "1.5",
+      "color": "#252c29",
+      "backgroundColor": "transparent",
+      "borderRadius": "0px",
+      "textDecoration": "none",
+      "textAlign": "left",
+      "paddingTop": "0px",
+      "paddingRight": "0px",
+      "paddingBottom": "0px",
+      "paddingLeft": "0px"
+    },
+    "text": "Koleksi",
+    "tag": "a",
+    "action": {
+      "type": "link",
+      "target": "#koleksi"
+    }
+  },
+  {
+    "id": "mobile-nav-1",
+    "parent": "mobile-nav",
+    "type": "button",
+    "name": "Mobile nav 1",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "inline-flex",
+      "alignItems": "center",
+      "justifyContent": "space-between",
+      "gap": "20px",
+      "minHeight": "49px",
+      "width": "100%",
+      "fontSize": "13px",
+      "fontWeight": "500",
+      "lineHeight": "1.5",
+      "color": "#252c29",
+      "backgroundColor": "transparent",
+      "borderRadius": "0px",
+      "textDecoration": "none",
+      "textAlign": "left",
+      "paddingTop": "0px",
+      "paddingRight": "0px",
+      "paddingBottom": "0px",
+      "paddingLeft": "0px"
+    },
+    "text": "Tentang handuk",
+    "tag": "a",
+    "action": {
+      "type": "link",
+      "target": "#bahan"
+    }
+  },
+  {
+    "id": "mobile-nav-2",
+    "parent": "mobile-nav",
+    "type": "button",
+    "name": "Mobile nav 2",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "inline-flex",
+      "alignItems": "center",
+      "justifyContent": "space-between",
+      "gap": "20px",
+      "minHeight": "49px",
+      "width": "100%",
+      "fontSize": "13px",
+      "fontWeight": "500",
+      "lineHeight": "1.5",
+      "color": "#252c29",
+      "backgroundColor": "transparent",
+      "borderRadius": "0px",
+      "textDecoration": "none",
+      "textAlign": "left",
+      "paddingTop": "0px",
+      "paddingRight": "0px",
+      "paddingBottom": "0px",
+      "paddingLeft": "0px"
+    },
+    "text": "Panduan ukuran",
+    "tag": "a",
+    "action": {
+      "type": "link",
+      "target": "#panduan"
+    }
+  },
+  {
+    "id": "mobile-nav-3",
+    "parent": "mobile-nav",
+    "type": "button",
+    "name": "Mobile nav 3",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "inline-flex",
+      "alignItems": "center",
+      "justifyContent": "space-between",
+      "gap": "20px",
+      "minHeight": "49px",
+      "width": "100%",
+      "fontSize": "13px",
+      "fontWeight": "500",
+      "lineHeight": "1.5",
+      "color": "#252c29",
+      "backgroundColor": "transparent",
+      "borderRadius": "0px",
+      "textDecoration": "none",
+      "textAlign": "left",
+      "paddingTop": "0px",
+      "paddingRight": "0px",
+      "paddingBottom": "0px",
+      "paddingLeft": "0px"
+    },
+    "text": "Pertanyaan umum",
+    "tag": "a",
+    "action": {
+      "type": "link",
+      "target": "#bantuan"
+    }
+  },
+  {
+    "id": "rona-hero",
+    "type": "container",
+    "name": "Rona hero",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "0px",
+      "width": "100%",
+      "backgroundColor": "#fbf9f5",
+      "color": "#252c29",
+      "paddingTop": "0px",
+      "paddingBottom": "0px"
+    },
+    "tag": "section",
+    "responsive": []
+  },
+  {
+    "id": "hero-panel",
+    "parent": "rona-hero",
+    "type": "container",
+    "name": "Hero panel",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "grid",
+      "flexDirection": "column",
+      "gap": "0px",
+      "width": "calc(100% - 64px)",
+      "maxWidth": "1320px",
+      "marginLeft": "auto",
+      "marginRight": "auto",
+      "gridTemplateColumns": "1fr 1.04fr",
+      "minHeight": "572px",
+      "borderRadius": "36px",
+      "overflow": "hidden"
+    },
+    "responsive": [
+      {
+        "max": 1200,
+        "props": {
+          "width": "calc(100% - 64px)"
+        }
+      },
+      {
+        "max": 900,
+        "props": {
+          "width": "calc(100% - 40px)"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "width": "calc(100% - 24px)"
+        }
+      },
+      {
+        "max": 1200,
+        "props": {
+          "minHeight": "530px"
+        }
+      },
+      {
+        "max": 900,
+        "props": {
+          "gridTemplateColumns": "1fr 1fr",
+          "minHeight": "505px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "display": "flex",
+          "minHeight": "0px",
+          "borderRadius": "28px"
+        }
+      }
+    ],
+    "fill": {
+      "clip": "background",
+      "layers": [
+        {
+          "kind": "linear",
+          "angle": 118,
+          "stops": [
+            {
+              "color": "#fbede1",
+              "position": 0
+            },
+            {
+              "color": "#f7dfd2",
+              "position": 65
+            },
+            {
+              "color": "#f1d1c7",
+              "position": 100
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "hero-copy",
+    "parent": "hero-panel",
+    "type": "container",
+    "name": "Hero copy",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "0px",
+      "alignSelf": "center",
+      "paddingTop": "76px",
+      "paddingRight": "36px",
+      "paddingBottom": "53px",
+      "paddingLeft": "64px"
+    },
+    "responsive": [
+      {
+        "min": 1600,
+        "props": {
+          "paddingLeft": "72px"
+        }
+      },
+      {
+        "max": 1200,
+        "props": {
+          "paddingTop": "58px",
+          "paddingRight": "30px",
+          "paddingBottom": "45px",
+          "paddingLeft": "42px"
+        }
+      },
+      {
+        "max": 900,
+        "props": {
+          "paddingTop": "42px",
+          "paddingRight": "25px",
+          "paddingBottom": "36px",
+          "paddingLeft": "32px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "paddingTop": "37px",
+          "paddingRight": "25px",
+          "paddingBottom": "30px",
+          "paddingLeft": "25px"
+        }
+      },
+      {
+        "max": 360,
+        "props": {
+          "paddingTop": "31px",
+          "paddingRight": "21px",
+          "paddingBottom": "27px",
+          "paddingLeft": "21px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "hero-title",
+    "parent": "hero-copy",
+    "type": "heading",
+    "name": "Hero title",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "25px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "clamp(46px,4.7vw,68px)",
+      "fontWeight": "600",
+      "color": "#252c29",
+      "lineHeight": "1.11",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere",
+      "letterSpacing": "-.058em"
+    },
+    "text": "Mulai hari\nlebih lembut.",
+    "tag": "h1",
+    "marks": [
+      {
+        "start": 11,
+        "end": 24,
+        "gradient": [
+          {
+            "kind": "linear",
+            "angle": 110,
+            "stops": [
+              {
+                "color": "#a44227",
+                "position": 0
+              },
+              {
+                "color": "#bf4c33",
+                "position": 75
+              },
+              {
+                "color": "#a9404a",
+                "position": 100
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "responsive": [
+      {
+        "min": 1600,
+        "props": {
+          "fontSize": "72px"
+        }
+      },
+      {
+        "max": 1200,
+        "props": {
+          "fontSize": "54px"
+        }
+      },
+      {
+        "max": 900,
+        "props": {
+          "fontSize": "43px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "fontSize": "48px",
+          "lineHeight": "1.12",
+          "marginBottom": "20px"
+        }
+      },
+      {
+        "max": 360,
+        "props": {
+          "fontSize": "41px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "hero-description",
+    "parent": "hero-copy",
+    "type": "text",
+    "name": "Hero description",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "14px",
+      "fontWeight": "400",
+      "color": "#53564e",
+      "lineHeight": "1.95",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere"
+    },
+    "text": "Sehabis mandi, sebelum dunia ramai.\nTemani jeda kecilmu dengan handuk katun\nyang nyaman, dalam warna yang kamu suka.",
+    "responsive": [
+      {
+        "max": 1200,
+        "props": {
+          "fontSize": "13px",
+          "whiteSpace": "normal"
+        }
+      },
+      {
+        "max": 900,
+        "props": {
+          "fontSize": "12px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "fontSize": "14px",
+          "lineHeight": "1.85"
+        }
+      }
+    ]
+  },
+  {
+    "id": "hero-action",
+    "parent": "hero-copy",
+    "type": "container",
+    "name": "Hero action",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "30px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "11px",
+      "alignItems": "flex-start"
+    },
+    "responsive": [
+      {
+        "max": 620,
+        "props": {
+          "marginTop": "24px",
+          "gap": "10px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "hero-shop",
+    "parent": "hero-action",
+    "type": "button",
+    "name": "Hero shop",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "inline-flex",
+      "alignItems": "center",
+      "justifyContent": "space-between",
+      "gap": "32px",
+      "minHeight": "54px",
+      "width": "fit-content",
+      "fontSize": "12px",
+      "fontWeight": "500",
+      "lineHeight": "1.5",
+      "color": "#ffffff",
+      "backgroundColor": "#b7442b",
+      "borderRadius": "99px",
+      "textDecoration": "none",
+      "textAlign": "left",
+      "paddingTop": "14px",
+      "paddingRight": "24px",
+      "paddingBottom": "14px",
+      "paddingLeft": "24px"
+    },
+    "text": "",
+    "tag": "a",
+    "action": {
+      "type": "link",
+      "target": "#koleksi"
+    },
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "fontSize": "12px",
+          "gap": "15px",
+          "paddingLeft": "17px",
+          "paddingRight": "17px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "minHeight": "50px",
+          "paddingLeft": "20px",
+          "paddingRight": "20px",
+          "gap": "24px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "hero-shop-label",
+    "parent": "hero-shop",
+    "type": "text",
+    "name": "Hero shop label",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "inherit",
+      "fontWeight": "inherit",
+      "color": "inherit",
+      "lineHeight": "inherit",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere"
+    },
+    "text": "Temukan handukmu"
+  },
+  {
+    "id": "hero-shop-icon",
+    "parent": "hero-shop",
+    "type": "text",
+    "name": "Hero shop icon",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "21px",
+      "fontWeight": "400",
+      "color": "inherit",
+      "lineHeight": "1",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere",
+      "flexShrink": "0"
+    },
+    "text": "↗"
+  },
+  {
+    "id": "hero-price",
+    "parent": "hero-action",
+    "type": "commerce",
+    "name": "Hero price",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "width": "100%",
+      "fontSize": "12px",
+      "color": "#53564e",
+      "paddingLeft": "4px"
+    },
+    "productId": "hand",
+    "part": "price",
+    "group": "rona-shop",
+    "prefix": "Mulai ",
+    "responsive": [
+      {
+        "max": 620,
+        "props": {
+          "fontSize": "11px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "hero-note",
+    "parent": "hero-copy",
+    "type": "container",
+    "name": "Hero note",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "42px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "row",
+      "gap": "10px",
+      "alignItems": "center"
+    },
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "marginTop": "28px",
+          "gap": "7px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "display": "none"
+        }
+      }
+    ]
+  },
+  {
+    "id": "hero-note-line",
+    "parent": "hero-note",
+    "type": "container",
+    "name": "Hero note line",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "0px",
+      "width": "22px",
+      "height": "2px",
+      "backgroundColor": "#a58e71"
+    }
+  },
+  {
+    "id": "hero-note-text",
+    "parent": "hero-note",
+    "type": "text",
+    "name": "Hero note text",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "11px",
+      "fontWeight": "400",
+      "color": "#53564e",
+      "lineHeight": "1.8",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere"
+    },
+    "text": "Untuk dipakai. Dicuci. Disayangi lagi.",
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "fontSize": "10px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "hero-media",
+    "parent": "hero-panel",
+    "type": "container",
+    "name": "Hero media",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "0px",
+      "position": "relative"
+    },
+    "responsive": [
+      {
+        "max": 620,
+        "props": {
+          "aspectRatio": "1.32",
+          "maxHeight": "380px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "hero-image",
+    "parent": "hero-media",
+    "type": "image",
+    "name": "Hero image",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "width": "100%",
+      "height": "100%",
+      "objectFit": "cover",
+      "position": "absolute",
+      "top": "0px",
+      "left": "0px",
+      "objectPosition": "46% center"
+    },
+    "src": "http://127.0.0.1:46361/assets/hero-1200.webp",
+    "alt": "Tumpukan handuk katun Peach, Sage, dan krem di bangku batu dalam cahaya pagi.",
+    "loading": "eager",
+    "responsive": [
+      {
+        "max": 620,
+        "props": {
+          "objectPosition": "center"
+        }
+      }
+    ]
+  },
+  {
+    "id": "material-line",
+    "parent": "rona-hero",
+    "type": "container",
+    "name": "Material line",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "row",
+      "gap": "100px",
+      "width": "calc(100% - 64px)",
+      "maxWidth": "1320px",
+      "marginLeft": "auto",
+      "marginRight": "auto",
+      "justifyContent": "center",
+      "paddingTop": "30px",
+      "paddingRight": "20px",
+      "paddingBottom": "30px",
+      "paddingLeft": "20px"
+    },
+    "responsive": [
+      {
+        "max": 1200,
+        "props": {
+          "width": "calc(100% - 64px)"
+        }
+      },
+      {
+        "max": 900,
+        "props": {
+          "width": "calc(100% - 40px)"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "width": "calc(100% - 24px)"
+        }
+      },
+      {
+        "max": 1200,
+        "props": {
+          "gap": "55px"
+        }
+      },
+      {
+        "max": 900,
+        "props": {
+          "gap": "24px",
+          "paddingTop": "25px",
+          "paddingRight": "10px",
+          "paddingBottom": "25px",
+          "paddingLeft": "10px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "flexWrap": "wrap",
+          "columnGap": "20px",
+          "rowGap": "10px",
+          "paddingTop": "24px",
+          "paddingRight": "8px",
+          "paddingBottom": "0px",
+          "paddingLeft": "8px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "material-point-0",
+    "parent": "material-line",
+    "type": "container",
+    "name": "Material point 0",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "row",
+      "gap": "14px",
+      "alignItems": "center"
+    },
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "gap": "8px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "point-0",
+    "parent": "material-point-0",
+    "type": "container",
+    "name": "Point 0",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "0px",
+      "width": "5px",
+      "height": "5px",
+      "backgroundColor": "#919f87",
+      "borderRadius": "50%",
+      "flexShrink": "0"
+    }
+  },
+  {
+    "id": "point-text-0",
+    "parent": "material-point-0",
+    "type": "text",
+    "name": "Point text 0",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "12px",
+      "fontWeight": "400",
+      "color": "#626359",
+      "lineHeight": "1.8",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere"
+    },
+    "text": "100% katun",
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "fontSize": "10px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "material-point-1",
+    "parent": "material-line",
+    "type": "container",
+    "name": "Material point 1",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "row",
+      "gap": "14px",
+      "alignItems": "center"
+    },
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "gap": "8px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "point-1",
+    "parent": "material-point-1",
+    "type": "container",
+    "name": "Point 1",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "0px",
+      "width": "5px",
+      "height": "5px",
+      "backgroundColor": "#919f87",
+      "borderRadius": "50%",
+      "flexShrink": "0"
+    }
+  },
+  {
+    "id": "point-text-1",
+    "parent": "material-point-1",
+    "type": "text",
+    "name": "Point text 1",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "12px",
+      "fontWeight": "400",
+      "color": "#626359",
+      "lineHeight": "1.8",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere"
+    },
+    "text": "Tekstur terry 500 gsm",
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "fontSize": "10px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "material-point-2",
+    "parent": "material-line",
+    "type": "container",
+    "name": "Material point 2",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "row",
+      "gap": "14px",
+      "alignItems": "center"
+    },
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "gap": "8px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "width": "100%",
+          "justifyContent": "center"
+        }
+      }
+    ]
+  },
+  {
+    "id": "point-2",
+    "parent": "material-point-2",
+    "type": "container",
+    "name": "Point 2",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "0px",
+      "width": "5px",
+      "height": "5px",
+      "backgroundColor": "#919f87",
+      "borderRadius": "50%",
+      "flexShrink": "0"
+    }
+  },
+  {
+    "id": "point-text-2",
+    "parent": "material-point-2",
+    "type": "text",
+    "name": "Point text 2",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "12px",
+      "fontWeight": "400",
+      "color": "#626359",
+      "lineHeight": "1.8",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere"
+    },
+    "text": "Dua warna yang mudah dipadukan",
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "fontSize": "10px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "rona-collection",
+    "type": "container",
+    "name": "Rona collection",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "0px",
+      "width": "100%",
+      "backgroundColor": "#fbf9f5",
+      "color": "#252c29",
+      "paddingTop": "69px",
+      "paddingBottom": "0px"
+    },
+    "tag": "section",
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "paddingTop": "54px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "paddingTop": "56px"
+        }
+      }
+    ],
+    "anchor": "koleksi"
+  },
+  {
+    "id": "collection-content",
+    "parent": "rona-collection",
+    "type": "container",
+    "name": "Collection content",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "0px",
+      "width": "calc(100% - 112px)",
+      "maxWidth": "1200px",
+      "marginLeft": "auto",
+      "marginRight": "auto"
+    },
+    "responsive": [
+      {
+        "max": 1200,
+        "props": {
+          "width": "calc(100% - 96px)"
+        }
+      },
+      {
+        "max": 900,
+        "props": {
+          "width": "calc(100% - 64px)"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "width": "calc(100% - 40px)"
+        }
+      }
+    ]
+  },
+  {
+    "id": "collection-heading",
+    "parent": "collection-content",
+    "type": "container",
+    "name": "Collection heading",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "40px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "row",
+      "gap": "40px",
+      "justifyContent": "space-between",
+      "alignItems": "flex-end"
+    },
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "alignItems": "flex-start",
+          "gap": "24px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "flexDirection": "column",
+          "gap": "18px",
+          "marginBottom": "29px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "collection-heading-title",
+    "parent": "collection-heading",
+    "type": "heading",
+    "name": "Collection heading title",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "44px",
+      "fontWeight": "600",
+      "color": "#252c29",
+      "lineHeight": "1.17",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere",
+      "letterSpacing": "-.05em"
+    },
+    "text": "Sedikit warna.\nBanyak nyamannya.",
+    "tag": "h2",
+    "responsive": [
+      {
+        "max": 1200,
+        "props": {
+          "fontSize": "38px"
+        }
+      },
+      {
+        "max": 900,
+        "props": {
+          "fontSize": "33px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "collection-heading-intro",
+    "parent": "collection-heading",
+    "type": "text",
+    "name": "Collection heading intro",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "14px",
+      "fontWeight": "400",
+      "color": "#616660",
+      "lineHeight": "1.9",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere",
+      "paddingBottom": "4px",
+      "maxWidth": "410px"
+    },
+    "text": "Satu untuk dirimu, sepasang untuk berbagi.\nPilih ukuran dan warna yang pas di rumah.",
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "fontSize": "12px",
+          "maxWidth": "275px",
+          "whiteSpace": "normal"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "fontSize": "14px",
+          "maxWidth": "100%",
+          "lineHeight": "1.85"
+        }
+      }
+    ]
+  },
+  {
+    "id": "product-grid",
+    "parent": "collection-content",
+    "type": "container",
+    "name": "Product grid",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "grid",
+      "flexDirection": "column",
+      "gap": "28px",
+      "gridTemplateColumns": "repeat(3,minmax(0,1fr))"
+    },
+    "responsive": [
+      {
+        "max": 1200,
+        "props": {
+          "gap": "22px"
+        }
+      },
+      {
+        "max": 900,
+        "props": {
+          "gridTemplateColumns": "repeat(2,minmax(0,1fr))",
+          "gap": "20px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "gridTemplateColumns": "1fr",
+          "gap": "35px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "card-bath",
+    "parent": "product-grid",
+    "type": "container",
+    "name": "Card bath",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "0px"
+    },
+    "tag": "article",
+    "anchor": "product-bath",
+    "responsive": []
+  },
+  {
+    "id": "card-bath-photo",
+    "parent": "card-bath",
+    "type": "container",
+    "name": "Card bath photo",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "0px",
+      "position": "relative",
+      "borderRadius": "25px",
+      "overflow": "hidden",
+      "aspectRatio": "1.13"
+    },
+    "responsive": [
+      {
+        "max": 620,
+        "props": {
+          "borderRadius": "23px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "card-bath-image",
+    "parent": "card-bath-photo",
+    "type": "commerce",
+    "name": "Card bath image",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "width": "100%",
+      "fontSize": "14px",
+      "color": "#252c29",
+      "height": "100%",
+      "objectFit": "cover"
+    },
+    "productId": "bath",
+    "part": "image",
+    "group": "rona-shop"
+  },
+  {
+    "id": "card-bath-size",
+    "parent": "card-bath-photo",
+    "type": "text",
+    "name": "Card bath size",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "10px",
+      "fontWeight": "400",
+      "color": "#535d51",
+      "lineHeight": "1.8",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere",
+      "position": "absolute",
+      "top": "18px",
+      "left": "18px",
+      "backgroundColor": "#fbf9f5",
+      "borderRadius": "99px",
+      "paddingTop": "6px",
+      "paddingRight": "12px",
+      "paddingBottom": "6px",
+      "paddingLeft": "12px"
+    },
+    "text": "70 × 140 cm"
+  },
+  {
+    "id": "card-bath-title-row",
+    "parent": "card-bath",
+    "type": "container",
+    "name": "Card bath title row",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "22px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "5px"
+    },
+    "responsive": [
+      {
+        "max": 620,
+        "props": {
+          "marginTop": "18px",
+          "alignSelf": "stretch",
+          "flexDirection": "row",
+          "justifyContent": "space-between",
+          "alignItems": "baseline",
+          "gap": "10px"
+        }
+      },
+      {
+        "max": 360,
+        "props": {
+          "flexDirection": "column",
+          "gap": "1px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "card-bath-name",
+    "parent": "card-bath-title-row",
+    "type": "commerce",
+    "name": "Card bath name",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "width": "100%",
+      "fontSize": "20px",
+      "color": "#252c29",
+      "fontWeight": "500",
+      "letterSpacing": "-.025em",
+      "lineHeight": "1.5"
+    },
+    "productId": "bath",
+    "part": "product-name",
+    "group": "rona-shop",
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "fontSize": "19px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "fontSize": "18px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "card-bath-price",
+    "parent": "card-bath-title-row",
+    "type": "commerce",
+    "name": "Card bath price",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "width": "fit-content",
+      "fontSize": "15px",
+      "color": "#252c29",
+      "fontWeight": "500",
+      "whiteSpace": "nowrap",
+      "flexShrink": "0"
+    },
+    "productId": "bath",
+    "part": "price",
+    "group": "rona-shop",
+    "responsive": [
+      {
+        "max": 620,
+        "props": {
+          "fontSize": "13px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "card-bath-description",
+    "parent": "card-bath",
+    "type": "commerce",
+    "name": "Card bath description",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "4px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "width": "100%",
+      "fontSize": "12px",
+      "color": "#616660",
+      "lineHeight": "1.8"
+    },
+    "productId": "bath",
+    "part": "description",
+    "group": "rona-shop",
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "fontSize": "11px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "fontSize": "13px",
+          "marginTop": "7px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "card-bath-options",
+    "parent": "card-bath",
+    "type": "commerce",
+    "name": "Card bath options",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "14px",
+      "marginBottom": "17px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "width": "100%",
+      "fontSize": "13px",
+      "color": "#252c29"
+    },
+    "productId": "bath",
+    "part": "options",
+    "group": "rona-shop",
+    "label": "Warna Handuk Mandi",
+    "optionLayout": "swatches",
+    "variantColors": {
+      "bath-peach": "#dda385",
+      "bath-sage": "#a5b19a"
+    },
+    "responsive": [
+      {
+        "max": 620,
+        "props": {
+          "marginTop": "11px",
+          "marginBottom": "12px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "card-bath-add",
+    "parent": "card-bath",
+    "type": "commerce",
+    "name": "Card bath add",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "width": "100%",
+      "fontSize": "12px",
+      "color": "#252c29",
+      "minHeight": "50px",
+      "borderRadius": "99px",
+      "backgroundColor": "transparent",
+      "fontWeight": "500",
+      "paddingLeft": "20px",
+      "paddingRight": "20px",
+      "borderTopWidth": "1px",
+      "borderTopStyle": "solid",
+      "borderTopColor": "#bfc3b7",
+      "borderRightWidth": "1px",
+      "borderRightStyle": "solid",
+      "borderRightColor": "#bfc3b7",
+      "borderBottomWidth": "1px",
+      "borderBottomStyle": "solid",
+      "borderBottomColor": "#bfc3b7",
+      "borderLeftWidth": "1px",
+      "borderLeftStyle": "solid",
+      "borderLeftColor": "#bfc3b7"
+    },
+    "productId": "bath",
+    "part": "add",
+    "group": "rona-shop",
+    "label": "Tambah ke keranjang  +",
+    "states": {
+      "hover": {
+        "props": {
+          "backgroundColor": "#252c29",
+          "color": "#ffffff"
+        }
+      }
+    },
+    "responsive": [
+      {
+        "max": 620,
+        "props": {
+          "fontSize": "13px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "card-hand",
+    "parent": "product-grid",
+    "type": "container",
+    "name": "Card hand",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "0px"
+    },
+    "tag": "article",
+    "anchor": "product-hand",
+    "responsive": []
+  },
+  {
+    "id": "card-hand-photo",
+    "parent": "card-hand",
+    "type": "container",
+    "name": "Card hand photo",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "0px",
+      "position": "relative",
+      "borderRadius": "25px",
+      "overflow": "hidden",
+      "aspectRatio": "1.13"
+    },
+    "responsive": [
+      {
+        "max": 620,
+        "props": {
+          "borderRadius": "23px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "card-hand-image",
+    "parent": "card-hand-photo",
+    "type": "commerce",
+    "name": "Card hand image",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "width": "100%",
+      "fontSize": "14px",
+      "color": "#252c29",
+      "height": "100%",
+      "objectFit": "cover"
+    },
+    "productId": "hand",
+    "part": "image",
+    "group": "rona-shop"
+  },
+  {
+    "id": "card-hand-size",
+    "parent": "card-hand-photo",
+    "type": "text",
+    "name": "Card hand size",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "10px",
+      "fontWeight": "400",
+      "color": "#535d51",
+      "lineHeight": "1.8",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere",
+      "position": "absolute",
+      "top": "18px",
+      "left": "18px",
+      "backgroundColor": "#fbf9f5",
+      "borderRadius": "99px",
+      "paddingTop": "6px",
+      "paddingRight": "12px",
+      "paddingBottom": "6px",
+      "paddingLeft": "12px"
+    },
+    "text": "35 × 75 cm"
+  },
+  {
+    "id": "card-hand-title-row",
+    "parent": "card-hand",
+    "type": "container",
+    "name": "Card hand title row",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "22px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "5px"
+    },
+    "responsive": [
+      {
+        "max": 620,
+        "props": {
+          "marginTop": "18px",
+          "alignSelf": "stretch",
+          "flexDirection": "row",
+          "justifyContent": "space-between",
+          "alignItems": "baseline",
+          "gap": "10px"
+        }
+      },
+      {
+        "max": 360,
+        "props": {
+          "flexDirection": "column",
+          "gap": "1px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "card-hand-name",
+    "parent": "card-hand-title-row",
+    "type": "commerce",
+    "name": "Card hand name",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "width": "100%",
+      "fontSize": "20px",
+      "color": "#252c29",
+      "fontWeight": "500",
+      "letterSpacing": "-.025em",
+      "lineHeight": "1.5"
+    },
+    "productId": "hand",
+    "part": "product-name",
+    "group": "rona-shop",
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "fontSize": "19px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "fontSize": "18px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "card-hand-price",
+    "parent": "card-hand-title-row",
+    "type": "commerce",
+    "name": "Card hand price",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "width": "fit-content",
+      "fontSize": "15px",
+      "color": "#252c29",
+      "fontWeight": "500",
+      "whiteSpace": "nowrap",
+      "flexShrink": "0"
+    },
+    "productId": "hand",
+    "part": "price",
+    "group": "rona-shop",
+    "responsive": [
+      {
+        "max": 620,
+        "props": {
+          "fontSize": "13px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "card-hand-description",
+    "parent": "card-hand",
+    "type": "commerce",
+    "name": "Card hand description",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "4px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "width": "100%",
+      "fontSize": "12px",
+      "color": "#616660",
+      "lineHeight": "1.8"
+    },
+    "productId": "hand",
+    "part": "description",
+    "group": "rona-shop",
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "fontSize": "11px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "fontSize": "13px",
+          "marginTop": "7px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "card-hand-options",
+    "parent": "card-hand",
+    "type": "commerce",
+    "name": "Card hand options",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "14px",
+      "marginBottom": "17px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "width": "100%",
+      "fontSize": "13px",
+      "color": "#252c29"
+    },
+    "productId": "hand",
+    "part": "options",
+    "group": "rona-shop",
+    "label": "Warna Handuk Tangan",
+    "optionLayout": "swatches",
+    "variantColors": {
+      "hand-sage": "#a5b19a",
+      "hand-peach": "#dda385"
+    },
+    "responsive": [
+      {
+        "max": 620,
+        "props": {
+          "marginTop": "11px",
+          "marginBottom": "12px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "card-hand-add",
+    "parent": "card-hand",
+    "type": "commerce",
+    "name": "Card hand add",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "width": "100%",
+      "fontSize": "12px",
+      "color": "#252c29",
+      "minHeight": "50px",
+      "borderRadius": "99px",
+      "backgroundColor": "transparent",
+      "fontWeight": "500",
+      "paddingLeft": "20px",
+      "paddingRight": "20px",
+      "borderTopWidth": "1px",
+      "borderTopStyle": "solid",
+      "borderTopColor": "#bfc3b7",
+      "borderRightWidth": "1px",
+      "borderRightStyle": "solid",
+      "borderRightColor": "#bfc3b7",
+      "borderBottomWidth": "1px",
+      "borderBottomStyle": "solid",
+      "borderBottomColor": "#bfc3b7",
+      "borderLeftWidth": "1px",
+      "borderLeftStyle": "solid",
+      "borderLeftColor": "#bfc3b7"
+    },
+    "productId": "hand",
+    "part": "add",
+    "group": "rona-shop",
+    "label": "Tambah ke keranjang  +",
+    "states": {
+      "hover": {
+        "props": {
+          "backgroundColor": "#252c29",
+          "color": "#ffffff"
+        }
+      }
+    },
+    "responsive": [
+      {
+        "max": 620,
+        "props": {
+          "fontSize": "13px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "card-set",
+    "parent": "product-grid",
+    "type": "container",
+    "name": "Card set",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "0px"
+    },
+    "tag": "article",
+    "anchor": "product-set",
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "display": "grid",
+          "gridColumn": "1 / -1",
+          "gridTemplateColumns": "1fr 1fr",
+          "columnGap": "28px",
+          "alignItems": "center"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "display": "flex",
+          "alignItems": "stretch",
+          "gridColumn": "auto"
+        }
+      }
+    ]
+  },
+  {
+    "id": "card-set-photo",
+    "parent": "card-set",
+    "type": "container",
+    "name": "Card set photo",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "0px",
+      "position": "relative",
+      "borderRadius": "25px",
+      "overflow": "hidden",
+      "aspectRatio": "1.13"
+    },
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "gridRow": "1 / 6",
+          "aspectRatio": "1.1"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "gridRow": "auto",
+          "aspectRatio": "1.13",
+          "borderRadius": "23px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "card-set-image",
+    "parent": "card-set-photo",
+    "type": "commerce",
+    "name": "Card set image",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "width": "100%",
+      "fontSize": "14px",
+      "color": "#252c29",
+      "height": "100%",
+      "objectFit": "cover"
+    },
+    "productId": "set",
+    "part": "image",
+    "group": "rona-shop"
+  },
+  {
+    "id": "card-set-size",
+    "parent": "card-set-photo",
+    "type": "text",
+    "name": "Card set size",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "10px",
+      "fontWeight": "400",
+      "color": "#535d51",
+      "lineHeight": "1.8",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere",
+      "position": "absolute",
+      "top": "18px",
+      "left": "18px",
+      "backgroundColor": "#fbf9f5",
+      "borderRadius": "99px",
+      "paddingTop": "6px",
+      "paddingRight": "12px",
+      "paddingBottom": "6px",
+      "paddingLeft": "12px"
+    },
+    "text": "2 handuk mandi"
+  },
+  {
+    "id": "card-set-title-row",
+    "parent": "card-set",
+    "type": "container",
+    "name": "Card set title row",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "22px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "5px"
+    },
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "marginTop": "0px",
+          "alignSelf": "flex-end"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "marginTop": "18px",
+          "alignSelf": "stretch",
+          "flexDirection": "row",
+          "justifyContent": "space-between",
+          "alignItems": "baseline",
+          "gap": "10px"
+        }
+      },
+      {
+        "max": 360,
+        "props": {
+          "flexDirection": "column",
+          "gap": "1px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "card-set-name",
+    "parent": "card-set-title-row",
+    "type": "commerce",
+    "name": "Card set name",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "width": "100%",
+      "fontSize": "20px",
+      "color": "#252c29",
+      "fontWeight": "500",
+      "letterSpacing": "-.025em",
+      "lineHeight": "1.5"
+    },
+    "productId": "set",
+    "part": "product-name",
+    "group": "rona-shop",
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "fontSize": "19px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "fontSize": "18px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "card-set-price",
+    "parent": "card-set-title-row",
+    "type": "commerce",
+    "name": "Card set price",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "width": "fit-content",
+      "fontSize": "15px",
+      "color": "#252c29",
+      "fontWeight": "500",
+      "whiteSpace": "nowrap",
+      "flexShrink": "0"
+    },
+    "productId": "set",
+    "part": "price",
+    "group": "rona-shop",
+    "responsive": [
+      {
+        "max": 620,
+        "props": {
+          "fontSize": "13px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "card-set-description",
+    "parent": "card-set",
+    "type": "commerce",
+    "name": "Card set description",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "4px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "width": "100%",
+      "fontSize": "12px",
+      "color": "#616660",
+      "lineHeight": "1.8"
+    },
+    "productId": "set",
+    "part": "description",
+    "group": "rona-shop",
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "fontSize": "11px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "fontSize": "13px",
+          "marginTop": "7px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "card-set-colors",
+    "parent": "card-set",
+    "type": "container",
+    "name": "Card set colors",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "14px",
+      "marginBottom": "17px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "row",
+      "gap": "11px",
+      "alignItems": "center",
+      "minHeight": "44px"
+    },
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "marginTop": "5px",
+          "marginBottom": "5px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "marginTop": "11px",
+          "marginBottom": "12px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "pair-dots",
+    "parent": "card-set-colors",
+    "type": "container",
+    "name": "Pair dots",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "row",
+      "gap": "0px",
+      "paddingLeft": "5px",
+      "paddingRight": "5px"
+    }
+  },
+  {
+    "id": "pair-peach",
+    "parent": "pair-dots",
+    "type": "container",
+    "name": "Pair peach",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "0px",
+      "width": "22px",
+      "height": "22px",
+      "borderRadius": "50%",
+      "backgroundColor": "#dda385",
+      "borderTopWidth": "1px",
+      "borderTopStyle": "solid",
+      "borderTopColor": "#fbf9f5",
+      "borderRightWidth": "1px",
+      "borderRightStyle": "solid",
+      "borderRightColor": "#fbf9f5",
+      "borderBottomWidth": "1px",
+      "borderBottomStyle": "solid",
+      "borderBottomColor": "#fbf9f5",
+      "borderLeftWidth": "1px",
+      "borderLeftStyle": "solid",
+      "borderLeftColor": "#fbf9f5"
+    }
+  },
+  {
+    "id": "pair-sage",
+    "parent": "pair-dots",
+    "type": "container",
+    "name": "Pair sage",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "0px",
+      "width": "22px",
+      "height": "22px",
+      "borderRadius": "50%",
+      "backgroundColor": "#a5b19a",
+      "marginLeft": "-7px",
+      "borderTopWidth": "1px",
+      "borderTopStyle": "solid",
+      "borderTopColor": "#fbf9f5",
+      "borderRightWidth": "1px",
+      "borderRightStyle": "solid",
+      "borderRightColor": "#fbf9f5",
+      "borderBottomWidth": "1px",
+      "borderBottomStyle": "solid",
+      "borderBottomColor": "#fbf9f5",
+      "borderLeftWidth": "1px",
+      "borderLeftStyle": "solid",
+      "borderLeftColor": "#fbf9f5"
+    }
+  },
+  {
+    "id": "pair-name",
+    "parent": "card-set-colors",
+    "type": "text",
+    "name": "Pair name",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "11px",
+      "fontWeight": "400",
+      "color": "#616660",
+      "lineHeight": "1.8",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere"
+    },
+    "text": "Peach + Sage"
+  },
+  {
+    "id": "card-set-add",
+    "parent": "card-set",
+    "type": "commerce",
+    "name": "Card set add",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "width": "100%",
+      "fontSize": "12px",
+      "color": "#252c29",
+      "minHeight": "50px",
+      "borderRadius": "99px",
+      "backgroundColor": "transparent",
+      "fontWeight": "500",
+      "paddingLeft": "20px",
+      "paddingRight": "20px",
+      "borderTopWidth": "1px",
+      "borderTopStyle": "solid",
+      "borderTopColor": "#bfc3b7",
+      "borderRightWidth": "1px",
+      "borderRightStyle": "solid",
+      "borderRightColor": "#bfc3b7",
+      "borderBottomWidth": "1px",
+      "borderBottomStyle": "solid",
+      "borderBottomColor": "#bfc3b7",
+      "borderLeftWidth": "1px",
+      "borderLeftStyle": "solid",
+      "borderLeftColor": "#bfc3b7"
+    },
+    "productId": "set",
+    "part": "add",
+    "group": "rona-shop",
+    "label": "Tambah ke keranjang  +",
+    "states": {
+      "hover": {
+        "props": {
+          "backgroundColor": "#252c29",
+          "color": "#ffffff"
+        }
+      }
+    },
+    "responsive": [
+      {
+        "max": 620,
+        "props": {
+          "fontSize": "13px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "catalog-note",
+    "parent": "collection-content",
+    "type": "text",
+    "name": "Catalog note",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "26px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "11px",
+      "fontWeight": "400",
+      "color": "#616660",
+      "lineHeight": "1.8",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere",
+      "textAlign": "center"
+    },
+    "text": "Koleksi fiktif untuk pratinjau desain. Semua pembelian adalah simulasi.",
+    "responsive": [
+      {
+        "max": 620,
+        "props": {
+          "fontSize": "10px",
+          "marginTop": "24px",
+          "paddingLeft": "12px",
+          "paddingRight": "12px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "rona-material",
+    "type": "container",
+    "name": "Rona material",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "0px",
+      "width": "100%",
+      "backgroundColor": "#fbf9f5",
+      "color": "#252c29",
+      "paddingTop": "118px",
+      "paddingBottom": "0px"
+    },
+    "tag": "section",
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "paddingTop": "84px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "paddingTop": "72px"
+        }
+      }
+    ],
+    "anchor": "bahan"
+  },
+  {
+    "id": "material-panel",
+    "parent": "rona-material",
+    "type": "container",
+    "name": "Material panel",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "grid",
+      "flexDirection": "column",
+      "gap": "0px",
+      "width": "calc(100% - 64px)",
+      "maxWidth": "1320px",
+      "marginLeft": "auto",
+      "marginRight": "auto",
+      "gridTemplateColumns": "1fr 1fr",
+      "borderRadius": "36px",
+      "overflow": "hidden"
+    },
+    "responsive": [
+      {
+        "max": 1200,
+        "props": {
+          "width": "calc(100% - 64px)"
+        }
+      },
+      {
+        "max": 900,
+        "props": {
+          "width": "calc(100% - 40px)"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "width": "calc(100% - 24px)"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "display": "flex",
+          "borderRadius": "28px"
+        }
+      }
+    ],
+    "fill": {
+      "clip": "background",
+      "layers": [
+        {
+          "kind": "linear",
+          "angle": 125,
+          "stops": [
+            {
+              "color": "#e3e9dc",
+              "position": 0
+            },
+            {
+              "color": "#eff2e8",
+              "position": 100
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "material-photo",
+    "parent": "material-panel",
+    "type": "container",
+    "name": "Material photo",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "0px",
+      "position": "relative",
+      "minHeight": "700px"
+    },
+    "responsive": [
+      {
+        "max": 1200,
+        "props": {
+          "minHeight": "590px"
+        }
+      },
+      {
+        "max": 900,
+        "props": {
+          "minHeight": "560px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "minHeight": "0px",
+          "height": "355px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "material-image",
+    "parent": "material-photo",
+    "type": "image",
+    "name": "Material image",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "width": "100%",
+      "height": "100%",
+      "objectFit": "cover",
+      "position": "absolute",
+      "top": "0px",
+      "left": "0px",
+      "maxHeight": "700px"
+    },
+    "src": "http://127.0.0.1:46361/assets/bathroom-960.webp",
+    "alt": "Handuk Peach digantung di samping wastafel dengan ubin Sage dan cermin bersudut bulat.",
+    "loading": "lazy",
+    "responsive": [
+      {
+        "max": 620,
+        "props": {
+          "objectPosition": "center 44%"
+        }
+      }
+    ]
+  },
+  {
+    "id": "material-copy",
+    "parent": "material-panel",
+    "type": "container",
+    "name": "Material copy",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "0px",
+      "alignSelf": "center",
+      "paddingTop": "65px",
+      "paddingRight": "68px",
+      "paddingBottom": "65px",
+      "paddingLeft": "68px"
+    },
+    "responsive": [
+      {
+        "max": 1200,
+        "props": {
+          "paddingTop": "45px",
+          "paddingRight": "42px",
+          "paddingBottom": "45px",
+          "paddingLeft": "42px"
+        }
+      },
+      {
+        "max": 900,
+        "props": {
+          "paddingTop": "34px",
+          "paddingRight": "28px",
+          "paddingBottom": "34px",
+          "paddingLeft": "28px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "paddingTop": "32px",
+          "paddingRight": "26px",
+          "paddingBottom": "36px",
+          "paddingLeft": "26px"
+        }
+      },
+      {
+        "max": 360,
+        "props": {
+          "paddingLeft": "22px",
+          "paddingRight": "22px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "material-title",
+    "parent": "material-copy",
+    "type": "heading",
+    "name": "Material title",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "44px",
+      "fontWeight": "600",
+      "color": "#252c29",
+      "lineHeight": "1.17",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere",
+      "letterSpacing": "-.05em"
+    },
+    "text": "Yang terasa beda,\njustru hal kecil.",
+    "tag": "h2",
+    "responsive": [
+      {
+        "max": 1200,
+        "props": {
+          "fontSize": "38px"
+        }
+      },
+      {
+        "max": 900,
+        "props": {
+          "fontSize": "33px"
+        }
+      },
+      {
+        "max": 900,
+        "props": {
+          "fontSize": "32px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "fontSize": "33px"
+        }
+      },
+      {
+        "max": 360,
+        "props": {
+          "fontSize": "30px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "material-intro",
+    "parent": "material-copy",
+    "type": "text",
+    "name": "Material intro",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "23px",
+      "marginBottom": "28px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "14px",
+      "fontWeight": "400",
+      "color": "#55604f",
+      "lineHeight": "1.9",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere",
+      "maxWidth": "415px"
+    },
+    "text": "Sentuhan katun di kulit. Lipatan yang pas di rak. Warna lembut yang menyapa setiap pagi. Rona dibuat untuk jadi bagian dari keseharianmu.",
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "fontSize": "13px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "fontSize": "14px",
+          "lineHeight": "1.85",
+          "marginTop": "20px",
+          "marginBottom": "25px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "material-facts",
+    "parent": "material-copy",
+    "type": "container",
+    "name": "Material facts",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "26px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "0px"
+    }
+  },
+  {
+    "id": "material-fact-0",
+    "parent": "material-facts",
+    "type": "container",
+    "name": "Material fact 0",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "grid",
+      "flexDirection": "column",
+      "gap": "12px",
+      "gridTemplateColumns": "128px 1fr",
+      "borderTopWidth": "1px",
+      "borderTopStyle": "solid",
+      "borderTopColor": "#c8d0bf",
+      "paddingTop": "18px",
+      "paddingRight": "0px",
+      "paddingBottom": "18px",
+      "paddingLeft": "0px"
+    },
+    "responsive": [
+      {
+        "max": 1200,
+        "props": {
+          "gridTemplateColumns": "105px 1fr"
+        }
+      },
+      {
+        "max": 900,
+        "props": {
+          "gridTemplateColumns": "1fr",
+          "gap": "4px",
+          "paddingTop": "13px",
+          "paddingBottom": "13px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "gridTemplateColumns": "107px 1fr",
+          "gap": "16px",
+          "paddingTop": "17px",
+          "paddingBottom": "17px"
+        }
+      },
+      {
+        "max": 360,
+        "props": {
+          "gridTemplateColumns": "93px 1fr",
+          "gap": "13px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "fact-name-0",
+    "parent": "material-fact-0",
+    "type": "text",
+    "name": "Fact name 0",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "15px",
+      "fontWeight": "500",
+      "color": "#252c29",
+      "lineHeight": "1.6",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere"
+    },
+    "text": "100% katun",
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "fontSize": "13px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "fact-copy-0",
+    "parent": "material-fact-0",
+    "type": "text",
+    "name": "Fact copy 0",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "12px",
+      "fontWeight": "400",
+      "color": "#55604f",
+      "lineHeight": "1.8",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere"
+    },
+    "text": "Serat katun dengan permukaan terry bertekstur."
+  },
+  {
+    "id": "material-fact-1",
+    "parent": "material-facts",
+    "type": "container",
+    "name": "Material fact 1",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "grid",
+      "flexDirection": "column",
+      "gap": "12px",
+      "gridTemplateColumns": "128px 1fr",
+      "borderTopWidth": "1px",
+      "borderTopStyle": "solid",
+      "borderTopColor": "#c8d0bf",
+      "paddingTop": "18px",
+      "paddingRight": "0px",
+      "paddingBottom": "18px",
+      "paddingLeft": "0px"
+    },
+    "responsive": [
+      {
+        "max": 1200,
+        "props": {
+          "gridTemplateColumns": "105px 1fr"
+        }
+      },
+      {
+        "max": 900,
+        "props": {
+          "gridTemplateColumns": "1fr",
+          "gap": "4px",
+          "paddingTop": "13px",
+          "paddingBottom": "13px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "gridTemplateColumns": "107px 1fr",
+          "gap": "16px",
+          "paddingTop": "17px",
+          "paddingBottom": "17px"
+        }
+      },
+      {
+        "max": 360,
+        "props": {
+          "gridTemplateColumns": "93px 1fr",
+          "gap": "13px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "fact-name-1",
+    "parent": "material-fact-1",
+    "type": "text",
+    "name": "Fact name 1",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "15px",
+      "fontWeight": "500",
+      "color": "#252c29",
+      "lineHeight": "1.6",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere"
+    },
+    "text": "500 gsm",
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "fontSize": "13px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "fact-copy-1",
+    "parent": "material-fact-1",
+    "type": "text",
+    "name": "Fact copy 1",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "12px",
+      "fontWeight": "400",
+      "color": "#55604f",
+      "lineHeight": "1.8",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere"
+    },
+    "text": "Ketebalan sedang, nyaman untuk rutinitas mandi."
+  },
+  {
+    "id": "material-fact-2",
+    "parent": "material-facts",
+    "type": "container",
+    "name": "Material fact 2",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "grid",
+      "flexDirection": "column",
+      "gap": "12px",
+      "gridTemplateColumns": "128px 1fr",
+      "borderTopWidth": "1px",
+      "borderTopStyle": "solid",
+      "borderTopColor": "#c8d0bf",
+      "paddingTop": "18px",
+      "paddingRight": "0px",
+      "paddingBottom": "18px",
+      "paddingLeft": "0px"
+    },
+    "responsive": [
+      {
+        "max": 1200,
+        "props": {
+          "gridTemplateColumns": "105px 1fr"
+        }
+      },
+      {
+        "max": 900,
+        "props": {
+          "gridTemplateColumns": "1fr",
+          "gap": "4px",
+          "paddingTop": "13px",
+          "paddingBottom": "13px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "gridTemplateColumns": "107px 1fr",
+          "gap": "16px",
+          "paddingTop": "17px",
+          "paddingBottom": "17px"
+        }
+      },
+      {
+        "max": 360,
+        "props": {
+          "gridTemplateColumns": "93px 1fr",
+          "gap": "13px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "fact-name-2",
+    "parent": "material-fact-2",
+    "type": "text",
+    "name": "Fact name 2",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "15px",
+      "fontWeight": "500",
+      "color": "#252c29",
+      "lineHeight": "1.6",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere"
+    },
+    "text": "Tepi berjalur",
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "fontSize": "13px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "fact-copy-2",
+    "parent": "material-fact-2",
+    "type": "text",
+    "name": "Fact copy 2",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "12px",
+      "fontWeight": "400",
+      "color": "#55604f",
+      "lineHeight": "1.8",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere"
+    },
+    "text": "Detail sederhana pada setiap ukuran dan warna."
+  },
+  {
+    "id": "material-care",
+    "parent": "material-copy",
+    "type": "button",
+    "name": "Material care",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "inline-flex",
+      "alignItems": "center",
+      "justifyContent": "space-between",
+      "gap": "20px",
+      "minHeight": "44px",
+      "width": "fit-content",
+      "fontSize": "12px",
+      "fontWeight": "500",
+      "lineHeight": "1.5",
+      "color": "#252c29",
+      "backgroundColor": "transparent",
+      "borderRadius": "0px",
+      "textDecoration": "none",
+      "textAlign": "left",
+      "paddingTop": "0px",
+      "paddingRight": "0px",
+      "paddingBottom": "0px",
+      "paddingLeft": "0px",
+      "borderBottomWidth": "1px",
+      "borderBottomStyle": "solid",
+      "borderBottomColor": "#9faaa0"
+    },
+    "text": "",
+    "tag": "a",
+    "action": {
+      "type": "link",
+      "target": "#rawat"
+    },
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "fontSize": "10px",
+          "gap": "10px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "fontSize": "12px",
+          "gap": "20px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "material-care-label",
+    "parent": "material-care",
+    "type": "text",
+    "name": "Material care label",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "inherit",
+      "fontWeight": "inherit",
+      "color": "inherit",
+      "lineHeight": "inherit",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere"
+    },
+    "text": "Biar tetap nyaman, rawat begini"
+  },
+  {
+    "id": "material-care-icon",
+    "parent": "material-care",
+    "type": "text",
+    "name": "Material care icon",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "21px",
+      "fontWeight": "400",
+      "color": "inherit",
+      "lineHeight": "1",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere",
+      "flexShrink": "0"
+    },
+    "text": "↗"
+  },
+  {
+    "id": "rona-size-guide",
+    "type": "container",
+    "name": "Rona size guide",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "0px",
+      "width": "100%",
+      "backgroundColor": "#fbf9f5",
+      "color": "#252c29",
+      "paddingTop": "118px",
+      "paddingBottom": "0px"
+    },
+    "tag": "section",
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "paddingTop": "84px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "paddingTop": "72px"
+        }
+      }
+    ],
+    "anchor": "panduan"
+  },
+  {
+    "id": "size-scope",
+    "parent": "rona-size-guide",
+    "type": "container",
+    "name": "Size scope",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "grid",
+      "flexDirection": "column",
+      "gap": "90px",
+      "width": "calc(100% - 112px)",
+      "maxWidth": "1200px",
+      "marginLeft": "auto",
+      "marginRight": "auto",
+      "gridTemplateColumns": "1fr 1.06fr",
+      "alignItems": "center"
+    },
+    "responsive": [
+      {
+        "max": 1200,
+        "props": {
+          "width": "calc(100% - 96px)"
+        }
+      },
+      {
+        "max": 900,
+        "props": {
+          "width": "calc(100% - 64px)"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "width": "calc(100% - 40px)"
+        }
+      },
+      {
+        "max": 1200,
+        "props": {
+          "gap": "48px"
+        }
+      },
+      {
+        "max": 900,
+        "props": {
+          "gap": "32px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "gridTemplateColumns": "1fr",
+          "gap": "29px"
+        }
+      }
+    ],
+    "stateScope": "size-scope",
+    "initialState": "bath",
+    "stateMode": "tabs"
+  },
+  {
+    "id": "size-copy",
+    "parent": "size-scope",
+    "type": "container",
+    "name": "Size copy",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "0px"
+    }
+  },
+  {
+    "id": "size-title",
+    "parent": "size-copy",
+    "type": "heading",
+    "name": "Size title",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "44px",
+      "fontWeight": "600",
+      "color": "#252c29",
+      "lineHeight": "1.17",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere",
+      "letterSpacing": "-.05em"
+    },
+    "text": "Pas ukurannya.\nPas rutinitasnya.",
+    "tag": "h2",
+    "responsive": [
+      {
+        "max": 1200,
+        "props": {
+          "fontSize": "38px"
+        }
+      },
+      {
+        "max": 900,
+        "props": {
+          "fontSize": "33px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "size-intro",
+    "parent": "size-copy",
+    "type": "text",
+    "name": "Size intro",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "24px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "14px",
+      "fontWeight": "400",
+      "color": "#616660",
+      "lineHeight": "1.8",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere",
+      "maxWidth": "390px"
+    },
+    "text": "Untuk mengeringkan tangan atau membungkus badan? Lihat perbandingannya sebelum memilih.",
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "fontSize": "12px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "fontSize": "14px",
+          "marginTop": "20px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "size-tabs",
+    "parent": "size-copy",
+    "type": "container",
+    "name": "Size tabs",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "28px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "row",
+      "gap": "4px",
+      "backgroundColor": "#eeede7",
+      "borderRadius": "99px",
+      "width": "fit-content",
+      "maxWidth": "100%",
+      "paddingTop": "5px",
+      "paddingRight": "5px",
+      "paddingBottom": "5px",
+      "paddingLeft": "5px"
+    },
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "flexDirection": "column",
+          "borderRadius": "22px",
+          "width": "100%",
+          "maxWidth": "270px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "flexDirection": "row",
+          "borderRadius": "99px",
+          "width": "fit-content",
+          "maxWidth": "100%",
+          "marginTop": "23px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "size-tab-bath",
+    "parent": "size-tabs",
+    "type": "button",
+    "name": "Size tab bath",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "inline-flex",
+      "alignItems": "center",
+      "justifyContent": "center",
+      "gap": "20px",
+      "minHeight": "44px",
+      "width": "fit-content",
+      "fontSize": "12px",
+      "fontWeight": "500",
+      "lineHeight": "1.5",
+      "color": "#252c29",
+      "backgroundColor": "transparent",
+      "borderRadius": "99px",
+      "textDecoration": "none",
+      "textAlign": "left",
+      "paddingTop": "10px",
+      "paddingRight": "18px",
+      "paddingBottom": "10px",
+      "paddingLeft": "18px",
+      "whiteSpace": "nowrap"
+    },
+    "text": "Handuk Mandi",
+    "tag": "button",
+    "action": {
+      "type": "state",
+      "scope": "size-scope",
+      "target": "bath"
+    },
+    "states": {
+      "bath": {
+        "props": {
+          "backgroundColor": "#252c29",
+          "color": "#ffffff"
+        }
+      }
+    },
+    "stateScope": "size-scope",
+    "responsive": [
+      {
+        "max": 1200,
+        "props": {
+          "fontSize": "11px",
+          "paddingLeft": "13px",
+          "paddingRight": "13px"
+        }
+      },
+      {
+        "max": 900,
+        "props": {
+          "width": "100%"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "width": "auto",
+          "paddingLeft": "15px",
+          "paddingRight": "15px"
+        }
+      },
+      {
+        "max": 360,
+        "props": {
+          "fontSize": "10px",
+          "paddingLeft": "12px",
+          "paddingRight": "12px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "size-tab-hand",
+    "parent": "size-tabs",
+    "type": "button",
+    "name": "Size tab hand",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "inline-flex",
+      "alignItems": "center",
+      "justifyContent": "center",
+      "gap": "20px",
+      "minHeight": "44px",
+      "width": "fit-content",
+      "fontSize": "12px",
+      "fontWeight": "500",
+      "lineHeight": "1.5",
+      "color": "#252c29",
+      "backgroundColor": "transparent",
+      "borderRadius": "99px",
+      "textDecoration": "none",
+      "textAlign": "left",
+      "paddingTop": "10px",
+      "paddingRight": "18px",
+      "paddingBottom": "10px",
+      "paddingLeft": "18px",
+      "whiteSpace": "nowrap"
+    },
+    "text": "Handuk Tangan",
+    "tag": "button",
+    "action": {
+      "type": "state",
+      "scope": "size-scope",
+      "target": "hand"
+    },
+    "states": {
+      "hand": {
+        "props": {
+          "backgroundColor": "#252c29",
+          "color": "#ffffff"
+        }
+      }
+    },
+    "stateScope": "size-scope",
+    "responsive": [
+      {
+        "max": 1200,
+        "props": {
+          "fontSize": "11px",
+          "paddingLeft": "13px",
+          "paddingRight": "13px"
+        }
+      },
+      {
+        "max": 900,
+        "props": {
+          "width": "100%"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "width": "auto",
+          "paddingLeft": "15px",
+          "paddingRight": "15px"
+        }
+      },
+      {
+        "max": 360,
+        "props": {
+          "fontSize": "10px",
+          "paddingLeft": "12px",
+          "paddingRight": "12px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "size-panel-bath",
+    "parent": "size-copy",
+    "type": "container",
+    "name": "Size panel bath",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "none",
+      "flexDirection": "column",
+      "gap": "0px"
+    },
+    "stateScope": "size-scope",
+    "statePanel": "bath",
+    "states": {
+      "bath": {
+        "props": {
+          "display": "flex"
+        }
+      }
+    }
+  },
+  {
+    "id": "size-result-bath",
+    "parent": "size-panel-bath",
+    "type": "container",
+    "name": "Size result bath",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "22px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "0px",
+      "minHeight": "103px"
+    },
+    "responsive": [
+      {
+        "max": 620,
+        "props": {
+          "marginTop": "20px",
+          "minHeight": "94px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "size-name-bath",
+    "parent": "size-result-bath",
+    "type": "heading",
+    "name": "Size name bath",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "21px",
+      "fontWeight": "500",
+      "color": "#252c29",
+      "lineHeight": "1.5",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere",
+      "letterSpacing": "-.025em"
+    },
+    "text": "70 × 140 cm",
+    "tag": "h3"
+  },
+  {
+    "id": "size-description-bath",
+    "parent": "size-result-bath",
+    "type": "text",
+    "name": "Size description bath",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "6px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "13px",
+      "fontWeight": "400",
+      "color": "#616660",
+      "lineHeight": "1.8",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere",
+      "maxWidth": "365px"
+    },
+    "text": "Ukuran penuh untuk sehabis mandi. Cukup panjang untuk disampirkan di bahu.",
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "fontSize": "12px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "fontSize": "14px",
+          "maxWidth": "100%"
+        }
+      }
+    ]
+  },
+  {
+    "id": "size-shop-bath",
+    "parent": "size-panel-bath",
+    "type": "button",
+    "name": "Size shop bath",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "14px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "inline-flex",
+      "alignItems": "center",
+      "justifyContent": "space-between",
+      "gap": "20px",
+      "minHeight": "44px",
+      "width": "fit-content",
+      "fontSize": "12px",
+      "fontWeight": "500",
+      "lineHeight": "1.5",
+      "color": "#252c29",
+      "backgroundColor": "transparent",
+      "borderRadius": "0px",
+      "textDecoration": "none",
+      "textAlign": "left",
+      "paddingTop": "0px",
+      "paddingRight": "0px",
+      "paddingBottom": "0px",
+      "paddingLeft": "0px",
+      "borderBottomWidth": "1px",
+      "borderBottomStyle": "solid",
+      "borderBottomColor": "#9faaa0"
+    },
+    "text": "",
+    "tag": "a",
+    "action": {
+      "type": "link",
+      "target": "#product-bath"
+    },
+    "responsive": [
+      {
+        "max": 620,
+        "props": {
+          "marginTop": "0px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "size-shop-bath-label",
+    "parent": "size-shop-bath",
+    "type": "text",
+    "name": "Size shop bath label",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "inherit",
+      "fontWeight": "inherit",
+      "color": "inherit",
+      "lineHeight": "inherit",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere"
+    },
+    "text": "Pilih Handuk Mandi"
+  },
+  {
+    "id": "size-shop-bath-icon",
+    "parent": "size-shop-bath",
+    "type": "text",
+    "name": "Size shop bath icon",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "21px",
+      "fontWeight": "400",
+      "color": "inherit",
+      "lineHeight": "1",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere",
+      "flexShrink": "0"
+    },
+    "text": "↗"
+  },
+  {
+    "id": "size-panel-hand",
+    "parent": "size-copy",
+    "type": "container",
+    "name": "Size panel hand",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "none",
+      "flexDirection": "column",
+      "gap": "0px"
+    },
+    "stateScope": "size-scope",
+    "statePanel": "hand",
+    "states": {
+      "hand": {
+        "props": {
+          "display": "flex"
+        }
+      }
+    }
+  },
+  {
+    "id": "size-result-hand",
+    "parent": "size-panel-hand",
+    "type": "container",
+    "name": "Size result hand",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "22px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "0px",
+      "minHeight": "103px"
+    },
+    "responsive": [
+      {
+        "max": 620,
+        "props": {
+          "marginTop": "20px",
+          "minHeight": "94px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "size-name-hand",
+    "parent": "size-result-hand",
+    "type": "heading",
+    "name": "Size name hand",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "21px",
+      "fontWeight": "500",
+      "color": "#252c29",
+      "lineHeight": "1.5",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere",
+      "letterSpacing": "-.025em"
+    },
+    "text": "35 × 75 cm",
+    "tag": "h3"
+  },
+  {
+    "id": "size-description-hand",
+    "parent": "size-result-hand",
+    "type": "text",
+    "name": "Size description hand",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "6px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "13px",
+      "fontWeight": "400",
+      "color": "#616660",
+      "lineHeight": "1.8",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere",
+      "maxWidth": "365px"
+    },
+    "text": "Ukuran ringkas untuk mengeringkan tangan. Pas di sisi wastafel atau dibawa saat bepergian.",
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "fontSize": "12px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "fontSize": "14px",
+          "maxWidth": "100%"
+        }
+      }
+    ]
+  },
+  {
+    "id": "size-shop-hand",
+    "parent": "size-panel-hand",
+    "type": "button",
+    "name": "Size shop hand",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "14px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "inline-flex",
+      "alignItems": "center",
+      "justifyContent": "space-between",
+      "gap": "20px",
+      "minHeight": "44px",
+      "width": "fit-content",
+      "fontSize": "12px",
+      "fontWeight": "500",
+      "lineHeight": "1.5",
+      "color": "#252c29",
+      "backgroundColor": "transparent",
+      "borderRadius": "0px",
+      "textDecoration": "none",
+      "textAlign": "left",
+      "paddingTop": "0px",
+      "paddingRight": "0px",
+      "paddingBottom": "0px",
+      "paddingLeft": "0px",
+      "borderBottomWidth": "1px",
+      "borderBottomStyle": "solid",
+      "borderBottomColor": "#9faaa0"
+    },
+    "text": "",
+    "tag": "a",
+    "action": {
+      "type": "link",
+      "target": "#product-hand"
+    },
+    "responsive": [
+      {
+        "max": 620,
+        "props": {
+          "marginTop": "0px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "size-shop-hand-label",
+    "parent": "size-shop-hand",
+    "type": "text",
+    "name": "Size shop hand label",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "inherit",
+      "fontWeight": "inherit",
+      "color": "inherit",
+      "lineHeight": "inherit",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere"
+    },
+    "text": "Pilih Handuk Tangan"
+  },
+  {
+    "id": "size-shop-hand-icon",
+    "parent": "size-shop-hand",
+    "type": "text",
+    "name": "Size shop hand icon",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "21px",
+      "fontWeight": "400",
+      "color": "inherit",
+      "lineHeight": "1",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere",
+      "flexShrink": "0"
+    },
+    "text": "↗"
+  },
+  {
+    "id": "size-visual",
+    "parent": "size-scope",
+    "type": "container",
+    "name": "Size visual",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "row",
+      "gap": "43px",
+      "position": "relative",
+      "justifyContent": "center",
+      "alignItems": "center",
+      "minHeight": "455px",
+      "borderRadius": "30px",
+      "paddingTop": "55px",
+      "paddingRight": "44px",
+      "paddingBottom": "83px",
+      "paddingLeft": "44px"
+    },
+    "fill": {
+      "clip": "background",
+      "layers": [
+        {
+          "kind": "linear",
+          "angle": 130,
+          "stops": [
+            {
+              "color": "#f8e8d9",
+              "position": 0
+            },
+            {
+              "color": "#f6ded4",
+              "position": 100
+            }
+          ]
+        }
+      ]
+    },
+    "responsive": [
+      {
+        "max": 1200,
+        "props": {
+          "paddingLeft": "30px",
+          "paddingRight": "30px",
+          "gap": "35px"
+        }
+      },
+      {
+        "max": 900,
+        "props": {
+          "minHeight": "380px",
+          "gap": "30px",
+          "paddingTop": "40px",
+          "paddingRight": "24px",
+          "paddingBottom": "70px",
+          "paddingLeft": "24px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "minHeight": "368px",
+          "gap": "50px",
+          "paddingTop": "35px"
+        }
+      },
+      {
+        "max": 360,
+        "props": {
+          "gap": "42px",
+          "paddingLeft": "20px",
+          "paddingRight": "20px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "diagram-bath",
+    "parent": "size-visual",
+    "type": "container",
+    "name": "Diagram bath",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "0px",
+      "position": "relative",
+      "width": "146px",
+      "height": "292px",
+      "flexShrink": "0",
+      "borderRadius": "9px",
+      "backgroundColor": "#d8a084",
+      "borderTopWidth": "1px",
+      "borderTopStyle": "solid",
+      "borderTopColor": "#ab775e",
+      "borderRightWidth": "1px",
+      "borderRightStyle": "solid",
+      "borderRightColor": "#ab775e",
+      "borderBottomWidth": "1px",
+      "borderBottomStyle": "solid",
+      "borderBottomColor": "#ab775e",
+      "borderLeftWidth": "1px",
+      "borderLeftStyle": "solid",
+      "borderLeftColor": "#ab775e"
+    },
+    "stateScope": "size-scope",
+    "states": {
+      "bath": {
+        "props": {
+          "boxShadow": "0 0 0 4px #f8e8d9, 0 0 0 6px #75644f, 0 10px 18px #6a482211",
+          "transform": "translateY(-5px)"
+        }
+      }
+    },
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "width": "108px",
+          "height": "216px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "width": "119px",
+          "height": "238px"
+        }
+      },
+      {
+        "max": 360,
+        "props": {
+          "width": "105px",
+          "height": "210px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "diagram-bath-height",
+    "parent": "diagram-bath",
+    "type": "text",
+    "name": "Diagram bath height",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "11px",
+      "fontWeight": "500",
+      "color": "#3f4538",
+      "lineHeight": "1.8",
+      "whiteSpace": "nowrap",
+      "overflowWrap": "anywhere",
+      "position": "absolute",
+      "top": "50%",
+      "left": "-44px",
+      "transform": "translateY(-50%) rotate(-90deg)"
+    },
+    "text": "140 cm",
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "fontSize": "9px",
+          "left": "-30px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "fontSize": "10px",
+          "left": "-33px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "diagram-bath-width",
+    "parent": "diagram-bath",
+    "type": "text",
+    "name": "Diagram bath width",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "11px",
+      "fontWeight": "500",
+      "color": "#3f4538",
+      "lineHeight": "1.8",
+      "whiteSpace": "nowrap",
+      "overflowWrap": "anywhere",
+      "position": "absolute",
+      "bottom": "-32px",
+      "left": "50%",
+      "transform": "translateX(-50%)"
+    },
+    "text": "70 cm",
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "fontSize": "9px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "fontSize": "10px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "diagram-bath-stripes",
+    "parent": "diagram-bath",
+    "type": "container",
+    "name": "Diagram bath stripes",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "3px",
+      "position": "absolute",
+      "left": "0px",
+      "right": "0px",
+      "bottom": "15px"
+    }
+  },
+  {
+    "id": "diagram-bath-stripe-0",
+    "parent": "diagram-bath-stripes",
+    "type": "container",
+    "name": "Diagram bath stripe 0",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "0px",
+      "height": "1px",
+      "backgroundColor": "#5a361926"
+    }
+  },
+  {
+    "id": "diagram-bath-stripe-1",
+    "parent": "diagram-bath-stripes",
+    "type": "container",
+    "name": "Diagram bath stripe 1",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "0px",
+      "height": "1px",
+      "backgroundColor": "#5a361926"
+    }
+  },
+  {
+    "id": "diagram-bath-stripe-2",
+    "parent": "diagram-bath-stripes",
+    "type": "container",
+    "name": "Diagram bath stripe 2",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "0px",
+      "height": "1px",
+      "backgroundColor": "#5a361926"
+    }
+  },
+  {
+    "id": "diagram-bath-stripe-3",
+    "parent": "diagram-bath-stripes",
+    "type": "container",
+    "name": "Diagram bath stripe 3",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "0px",
+      "height": "1px",
+      "backgroundColor": "#5a361926"
+    }
+  },
+  {
+    "id": "diagram-hand",
+    "parent": "size-visual",
+    "type": "container",
+    "name": "Diagram hand",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "0px",
+      "position": "relative",
+      "width": "73px",
+      "height": "156.5px",
+      "flexShrink": "0",
+      "borderRadius": "9px",
+      "backgroundColor": "#aab69f",
+      "borderTopWidth": "1px",
+      "borderTopStyle": "solid",
+      "borderTopColor": "#728468",
+      "borderRightWidth": "1px",
+      "borderRightStyle": "solid",
+      "borderRightColor": "#728468",
+      "borderBottomWidth": "1px",
+      "borderBottomStyle": "solid",
+      "borderBottomColor": "#728468",
+      "borderLeftWidth": "1px",
+      "borderLeftStyle": "solid",
+      "borderLeftColor": "#728468"
+    },
+    "stateScope": "size-scope",
+    "states": {
+      "hand": {
+        "props": {
+          "boxShadow": "0 0 0 4px #f8e8d9, 0 0 0 6px #75644f, 0 10px 18px #6a482211",
+          "transform": "translateY(-5px)"
+        }
+      }
+    },
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "width": "54px",
+          "height": "115.7px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "width": "59.5px",
+          "height": "127.5px"
+        }
+      },
+      {
+        "max": 360,
+        "props": {
+          "width": "52.5px",
+          "height": "112.5px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "diagram-hand-height",
+    "parent": "diagram-hand",
+    "type": "text",
+    "name": "Diagram hand height",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "11px",
+      "fontWeight": "500",
+      "color": "#3f4538",
+      "lineHeight": "1.8",
+      "whiteSpace": "nowrap",
+      "overflowWrap": "anywhere",
+      "position": "absolute",
+      "top": "50%",
+      "left": "-44px",
+      "transform": "translateY(-50%) rotate(-90deg)"
+    },
+    "text": "75 cm",
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "fontSize": "9px",
+          "left": "-30px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "fontSize": "10px",
+          "left": "-33px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "diagram-hand-width",
+    "parent": "diagram-hand",
+    "type": "text",
+    "name": "Diagram hand width",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "11px",
+      "fontWeight": "500",
+      "color": "#3f4538",
+      "lineHeight": "1.8",
+      "whiteSpace": "nowrap",
+      "overflowWrap": "anywhere",
+      "position": "absolute",
+      "bottom": "-32px",
+      "left": "50%",
+      "transform": "translateX(-50%)"
+    },
+    "text": "35 cm",
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "fontSize": "9px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "fontSize": "10px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "diagram-hand-stripes",
+    "parent": "diagram-hand",
+    "type": "container",
+    "name": "Diagram hand stripes",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "3px",
+      "position": "absolute",
+      "left": "0px",
+      "right": "0px",
+      "bottom": "15px"
+    }
+  },
+  {
+    "id": "diagram-hand-stripe-0",
+    "parent": "diagram-hand-stripes",
+    "type": "container",
+    "name": "Diagram hand stripe 0",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "0px",
+      "height": "1px",
+      "backgroundColor": "#5a361926"
+    }
+  },
+  {
+    "id": "diagram-hand-stripe-1",
+    "parent": "diagram-hand-stripes",
+    "type": "container",
+    "name": "Diagram hand stripe 1",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "0px",
+      "height": "1px",
+      "backgroundColor": "#5a361926"
+    }
+  },
+  {
+    "id": "diagram-hand-stripe-2",
+    "parent": "diagram-hand-stripes",
+    "type": "container",
+    "name": "Diagram hand stripe 2",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "0px",
+      "height": "1px",
+      "backgroundColor": "#5a361926"
+    }
+  },
+  {
+    "id": "diagram-hand-stripe-3",
+    "parent": "diagram-hand-stripes",
+    "type": "container",
+    "name": "Diagram hand stripe 3",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "0px",
+      "height": "1px",
+      "backgroundColor": "#5a361926"
+    }
+  },
+  {
+    "id": "size-caption",
+    "parent": "size-visual",
+    "type": "text",
+    "name": "Size caption",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "11px",
+      "fontWeight": "400",
+      "color": "#6a6057",
+      "lineHeight": "1.8",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere",
+      "position": "absolute",
+      "bottom": "23px",
+      "left": "12px",
+      "right": "12px",
+      "textAlign": "center"
+    },
+    "text": "Ukuran berbeda. Nyamannya sama."
+  },
+  {
+    "id": "rona-care",
+    "type": "container",
+    "name": "Rona care",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "0px",
+      "width": "100%",
+      "backgroundColor": "#fbf9f5",
+      "color": "#252c29",
+      "paddingTop": "118px",
+      "paddingBottom": "0px"
+    },
+    "tag": "section",
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "paddingTop": "84px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "paddingTop": "72px"
+        }
+      }
+    ],
+    "anchor": "rawat"
+  },
+  {
+    "id": "care-content",
+    "parent": "rona-care",
+    "type": "container",
+    "name": "Care content",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "0px",
+      "width": "calc(100% - 112px)",
+      "maxWidth": "1200px",
+      "marginLeft": "auto",
+      "marginRight": "auto"
+    },
+    "responsive": [
+      {
+        "max": 1200,
+        "props": {
+          "width": "calc(100% - 96px)"
+        }
+      },
+      {
+        "max": 900,
+        "props": {
+          "width": "calc(100% - 64px)"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "width": "calc(100% - 40px)"
+        }
+      }
+    ]
+  },
+  {
+    "id": "care-heading",
+    "parent": "care-content",
+    "type": "container",
+    "name": "Care heading",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "40px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "row",
+      "gap": "40px",
+      "justifyContent": "space-between",
+      "alignItems": "flex-end"
+    },
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "alignItems": "flex-start",
+          "gap": "24px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "flexDirection": "column",
+          "gap": "18px",
+          "marginBottom": "29px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "care-heading-title",
+    "parent": "care-heading",
+    "type": "heading",
+    "name": "Care heading title",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "44px",
+      "fontWeight": "600",
+      "color": "#252c29",
+      "lineHeight": "1.17",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere",
+      "letterSpacing": "-.05em"
+    },
+    "text": "Lembutnya dirawat.\nNyamannya berlanjut.",
+    "tag": "h2",
+    "responsive": [
+      {
+        "max": 1200,
+        "props": {
+          "fontSize": "38px"
+        }
+      },
+      {
+        "max": 900,
+        "props": {
+          "fontSize": "33px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "care-heading-intro",
+    "parent": "care-heading",
+    "type": "text",
+    "name": "Care heading intro",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "14px",
+      "fontWeight": "400",
+      "color": "#616660",
+      "lineHeight": "1.9",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere",
+      "paddingBottom": "4px",
+      "maxWidth": "410px"
+    },
+    "text": "Kebiasaan kecil untuk menjaga handuk\ntetap enak dipakai, hari demi hari.",
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "fontSize": "12px",
+          "maxWidth": "275px",
+          "whiteSpace": "normal"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "fontSize": "14px",
+          "maxWidth": "100%",
+          "lineHeight": "1.85"
+        }
+      }
+    ]
+  },
+  {
+    "id": "care-steps",
+    "parent": "care-content",
+    "type": "container",
+    "name": "Care steps",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "grid",
+      "flexDirection": "column",
+      "gap": "48px",
+      "gridTemplateColumns": "repeat(3,minmax(0,1fr))",
+      "paddingTop": "34px",
+      "borderTopWidth": "1px",
+      "borderTopStyle": "solid",
+      "borderTopColor": "#deded5"
+    },
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "gap": "24px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "gridTemplateColumns": "1fr",
+          "gap": "0px",
+          "paddingTop": "0px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "care-step-0",
+    "parent": "care-steps",
+    "type": "container",
+    "name": "Care step 0",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "0px"
+    },
+    "responsive": [
+      {
+        "max": 620,
+        "props": {
+          "display": "grid",
+          "gridTemplateColumns": "42px 1fr",
+          "rowGap": "7px",
+          "columnGap": "18px",
+          "paddingTop": "25px",
+          "paddingBottom": "25px",
+          "borderBottomWidth": "1px",
+          "borderBottomStyle": "solid",
+          "borderBottomColor": "#deded5"
+        }
+      }
+    ]
+  },
+  {
+    "id": "step-number-0",
+    "parent": "care-step-0",
+    "type": "text",
+    "name": "Step number 0",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "18px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "12px",
+      "fontWeight": "400",
+      "color": "#90513a",
+      "lineHeight": "1.8",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere",
+      "display": "flex",
+      "alignItems": "center",
+      "justifyContent": "center",
+      "width": "42px",
+      "height": "42px",
+      "borderRadius": "14px",
+      "backgroundColor": "#f3e4d8"
+    },
+    "text": "01",
+    "responsive": [
+      {
+        "max": 620,
+        "props": {
+          "gridRow": "1 / 3",
+          "marginBottom": "0px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "step-title-0",
+    "parent": "care-step-0",
+    "type": "heading",
+    "name": "Step title 0",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "12px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "17px",
+      "fontWeight": "500",
+      "color": "#252c29",
+      "lineHeight": "1.5",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere",
+      "letterSpacing": "-.025em"
+    },
+    "text": "Cuci sebelum dipakai",
+    "tag": "h3",
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "fontSize": "15px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "fontSize": "16px",
+          "marginBottom": "0px",
+          "alignSelf": "center"
+        }
+      }
+    ]
+  },
+  {
+    "id": "step-copy-0",
+    "parent": "care-step-0",
+    "type": "text",
+    "name": "Step copy 0",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "14px",
+      "fontWeight": "400",
+      "color": "#616660",
+      "lineHeight": "1.9",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere"
+    },
+    "text": "Pisahkan warna saat pencucian pertama. Gunakan air dingin dan deterjen secukupnya.",
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "fontSize": "13px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "fontSize": "14px",
+          "gridColumn": "2",
+          "lineHeight": "1.85"
+        }
+      }
+    ]
+  },
+  {
+    "id": "care-step-1",
+    "parent": "care-steps",
+    "type": "container",
+    "name": "Care step 1",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "0px"
+    },
+    "responsive": [
+      {
+        "max": 620,
+        "props": {
+          "display": "grid",
+          "gridTemplateColumns": "42px 1fr",
+          "rowGap": "7px",
+          "columnGap": "18px",
+          "paddingTop": "25px",
+          "paddingBottom": "25px",
+          "borderBottomWidth": "1px",
+          "borderBottomStyle": "solid",
+          "borderBottomColor": "#deded5"
+        }
+      }
+    ]
+  },
+  {
+    "id": "step-number-1",
+    "parent": "care-step-1",
+    "type": "text",
+    "name": "Step number 1",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "18px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "12px",
+      "fontWeight": "400",
+      "color": "#90513a",
+      "lineHeight": "1.8",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere",
+      "display": "flex",
+      "alignItems": "center",
+      "justifyContent": "center",
+      "width": "42px",
+      "height": "42px",
+      "borderRadius": "14px",
+      "backgroundColor": "#f3e4d8"
+    },
+    "text": "02",
+    "responsive": [
+      {
+        "max": 620,
+        "props": {
+          "gridRow": "1 / 3",
+          "marginBottom": "0px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "step-title-1",
+    "parent": "care-step-1",
+    "type": "heading",
+    "name": "Step title 1",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "12px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "17px",
+      "fontWeight": "500",
+      "color": "#252c29",
+      "lineHeight": "1.5",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere",
+      "letterSpacing": "-.025em"
+    },
+    "text": "Lewati pelembut",
+    "tag": "h3",
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "fontSize": "15px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "fontSize": "16px",
+          "marginBottom": "0px",
+          "alignSelf": "center"
+        }
+      }
+    ]
+  },
+  {
+    "id": "step-copy-1",
+    "parent": "care-step-1",
+    "type": "text",
+    "name": "Step copy 1",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "14px",
+      "fontWeight": "400",
+      "color": "#616660",
+      "lineHeight": "1.9",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere"
+    },
+    "text": "Hindari pemutih dan pelembut pakaian. Bilas hingga tidak ada deterjen yang tertinggal.",
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "fontSize": "13px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "fontSize": "14px",
+          "gridColumn": "2",
+          "lineHeight": "1.85"
+        }
+      }
+    ]
+  },
+  {
+    "id": "care-step-2",
+    "parent": "care-steps",
+    "type": "container",
+    "name": "Care step 2",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "0px"
+    },
+    "responsive": [
+      {
+        "max": 620,
+        "props": {
+          "display": "grid",
+          "gridTemplateColumns": "42px 1fr",
+          "rowGap": "7px",
+          "columnGap": "18px",
+          "paddingTop": "25px",
+          "paddingBottom": "25px",
+          "borderBottomWidth": "1px",
+          "borderBottomStyle": "solid",
+          "borderBottomColor": "#deded5"
+        }
+      }
+    ]
+  },
+  {
+    "id": "step-number-2",
+    "parent": "care-step-2",
+    "type": "text",
+    "name": "Step number 2",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "18px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "12px",
+      "fontWeight": "400",
+      "color": "#90513a",
+      "lineHeight": "1.8",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere",
+      "display": "flex",
+      "alignItems": "center",
+      "justifyContent": "center",
+      "width": "42px",
+      "height": "42px",
+      "borderRadius": "14px",
+      "backgroundColor": "#f3e4d8"
+    },
+    "text": "03",
+    "responsive": [
+      {
+        "max": 620,
+        "props": {
+          "gridRow": "1 / 3",
+          "marginBottom": "0px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "step-title-2",
+    "parent": "care-step-2",
+    "type": "heading",
+    "name": "Step title 2",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "12px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "17px",
+      "fontWeight": "500",
+      "color": "#252c29",
+      "lineHeight": "1.5",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere",
+      "letterSpacing": "-.025em"
+    },
+    "text": "Beri ruang untuk kering",
+    "tag": "h3",
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "fontSize": "15px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "fontSize": "16px",
+          "marginBottom": "0px",
+          "alignSelf": "center"
+        }
+      }
+    ]
+  },
+  {
+    "id": "step-copy-2",
+    "parent": "care-step-2",
+    "type": "text",
+    "name": "Step copy 2",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "14px",
+      "fontWeight": "400",
+      "color": "#616660",
+      "lineHeight": "1.9",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere"
+    },
+    "text": "Bentangkan setelah dipakai. Jemur di tempat berventilasi, lalu simpan saat benar-benar kering.",
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "fontSize": "13px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "fontSize": "14px",
+          "gridColumn": "2",
+          "lineHeight": "1.85"
+        }
+      }
+    ]
+  },
+  {
+    "id": "rona-faq",
+    "type": "container",
+    "name": "Rona faq",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "0px",
+      "width": "100%",
+      "backgroundColor": "#fbf9f5",
+      "color": "#252c29",
+      "paddingTop": "118px",
+      "paddingBottom": "0px"
+    },
+    "tag": "section",
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "paddingTop": "84px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "paddingTop": "72px"
+        }
+      }
+    ],
+    "anchor": "bantuan"
+  },
+  {
+    "id": "faq-content",
+    "parent": "rona-faq",
+    "type": "container",
+    "name": "Faq content",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "grid",
+      "flexDirection": "column",
+      "gap": "95px",
+      "width": "calc(100% - 112px)",
+      "maxWidth": "1200px",
+      "marginLeft": "auto",
+      "marginRight": "auto",
+      "gridTemplateColumns": "1fr 1.35fr"
+    },
+    "responsive": [
+      {
+        "max": 1200,
+        "props": {
+          "width": "calc(100% - 96px)"
+        }
+      },
+      {
+        "max": 900,
+        "props": {
+          "width": "calc(100% - 64px)"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "width": "calc(100% - 40px)"
+        }
+      },
+      {
+        "max": 1200,
+        "props": {
+          "gap": "60px"
+        }
+      },
+      {
+        "max": 900,
+        "props": {
+          "gridTemplateColumns": ".85fr 1.15fr",
+          "gap": "40px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "gridTemplateColumns": "1fr",
+          "gap": "26px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "faq-intro",
+    "parent": "faq-content",
+    "type": "container",
+    "name": "Faq intro",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "0px"
+    }
+  },
+  {
+    "id": "faq-title",
+    "parent": "faq-intro",
+    "type": "heading",
+    "name": "Faq title",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "44px",
+      "fontWeight": "600",
+      "color": "#252c29",
+      "lineHeight": "1.17",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere",
+      "letterSpacing": "-.05em"
+    },
+    "text": "Sebelum memilih,\nmungkin kamu\ningin tahu.",
+    "tag": "h2",
+    "responsive": [
+      {
+        "max": 1200,
+        "props": {
+          "fontSize": "38px"
+        }
+      },
+      {
+        "max": 900,
+        "props": {
+          "fontSize": "33px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "faq-intro-copy",
+    "parent": "faq-intro",
+    "type": "text",
+    "name": "Faq intro copy",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "23px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "13px",
+      "fontWeight": "400",
+      "color": "#616660",
+      "lineHeight": "1.8",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere"
+    },
+    "text": "Hal-hal kecil seputar koleksi Rona.",
+    "responsive": [
+      {
+        "max": 620,
+        "props": {
+          "marginTop": "18px",
+          "fontSize": "12px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "faq-list",
+    "parent": "faq-content",
+    "type": "container",
+    "name": "Faq list",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "0px",
+      "borderTopWidth": "1px",
+      "borderTopStyle": "solid",
+      "borderTopColor": "#deded5"
+    }
+  },
+  {
+    "id": "faq-0",
+    "parent": "faq-list",
+    "type": "accordion",
+    "name": "Faq 0",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "color": "#252c29",
+      "borderBottomWidth": "1px",
+      "borderBottomStyle": "solid",
+      "borderBottomColor": "#deded5"
+    }
+  },
+  {
+    "id": "faq-question-0",
+    "parent": "faq-0",
+    "type": "summary",
+    "name": "Faq question 0",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "alignItems": "center",
+      "justifyContent": "space-between",
+      "gap": "22px",
+      "minHeight": "72px",
+      "fontSize": "13px",
+      "fontWeight": "500",
+      "lineHeight": "1.8",
+      "listStyleType": "none",
+      "paddingTop": "23px",
+      "paddingRight": "2px",
+      "paddingBottom": "23px",
+      "paddingLeft": "2px"
+    },
+    "text": "Apa bedanya handuk mandi dan tangan?",
+    "responsive": [
+      {
+        "max": 620,
+        "props": {
+          "paddingTop": "21px",
+          "paddingBottom": "21px",
+          "gap": "20px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "faq-answer-0",
+    "parent": "faq-0",
+    "type": "text",
+    "name": "Faq answer 0",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "14px",
+      "fontWeight": "400",
+      "color": "#616660",
+      "lineHeight": "1.95",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere",
+      "paddingTop": "0px",
+      "paddingRight": "35px",
+      "paddingBottom": "23px",
+      "paddingLeft": "2px"
+    },
+    "text": "Bahannya sama: katun terry 500 gsm. Handuk Mandi berukuran 70 × 140 cm, sedangkan Handuk Tangan 35 × 75 cm. Pilih sesuai pemakaian dan ruang penyimpananmu.",
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "fontSize": "13px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "fontSize": "14px",
+          "lineHeight": "1.85",
+          "paddingRight": "20px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "faq-1",
+    "parent": "faq-list",
+    "type": "accordion",
+    "name": "Faq 1",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "color": "#252c29",
+      "borderBottomWidth": "1px",
+      "borderBottomStyle": "solid",
+      "borderBottomColor": "#deded5"
+    }
+  },
+  {
+    "id": "faq-question-1",
+    "parent": "faq-1",
+    "type": "summary",
+    "name": "Faq question 1",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "alignItems": "center",
+      "justifyContent": "space-between",
+      "gap": "22px",
+      "minHeight": "72px",
+      "fontSize": "13px",
+      "fontWeight": "500",
+      "lineHeight": "1.8",
+      "listStyleType": "none",
+      "paddingTop": "23px",
+      "paddingRight": "2px",
+      "paddingBottom": "23px",
+      "paddingLeft": "2px"
+    },
+    "text": "Apa saja isi Set Berdua?",
+    "responsive": [
+      {
+        "max": 620,
+        "props": {
+          "paddingTop": "21px",
+          "paddingBottom": "21px",
+          "gap": "20px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "faq-answer-1",
+    "parent": "faq-1",
+    "type": "text",
+    "name": "Faq answer 1",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "14px",
+      "fontWeight": "400",
+      "color": "#616660",
+      "lineHeight": "1.95",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere",
+      "paddingTop": "0px",
+      "paddingRight": "35px",
+      "paddingBottom": "23px",
+      "paddingLeft": "2px"
+    },
+    "text": "Dua Handuk Mandi berukuran 70 × 140 cm: satu Peach dan satu Sage. Bahan dan ketebalannya sama dengan handuk satuan. Handuk Tangan tidak termasuk dalam set.",
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "fontSize": "13px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "fontSize": "14px",
+          "lineHeight": "1.85",
+          "paddingRight": "20px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "faq-2",
+    "parent": "faq-list",
+    "type": "accordion",
+    "name": "Faq 2",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "color": "#252c29",
+      "borderBottomWidth": "1px",
+      "borderBottomStyle": "solid",
+      "borderBottomColor": "#deded5"
+    }
+  },
+  {
+    "id": "faq-question-2",
+    "parent": "faq-2",
+    "type": "summary",
+    "name": "Faq question 2",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "alignItems": "center",
+      "justifyContent": "space-between",
+      "gap": "22px",
+      "minHeight": "72px",
+      "fontSize": "13px",
+      "fontWeight": "500",
+      "lineHeight": "1.8",
+      "listStyleType": "none",
+      "paddingTop": "23px",
+      "paddingRight": "2px",
+      "paddingBottom": "23px",
+      "paddingLeft": "2px"
+    },
+    "text": "Apakah warna foto sama dengan aslinya?",
+    "responsive": [
+      {
+        "max": 620,
+        "props": {
+          "paddingTop": "21px",
+          "paddingBottom": "21px",
+          "gap": "20px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "faq-answer-2",
+    "parent": "faq-2",
+    "type": "text",
+    "name": "Faq answer 2",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "14px",
+      "fontWeight": "400",
+      "color": "#616660",
+      "lineHeight": "1.95",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere",
+      "paddingTop": "0px",
+      "paddingRight": "35px",
+      "paddingBottom": "23px",
+      "paddingLeft": "2px"
+    },
+    "text": "Foto di halaman ini adalah visual konsep yang dibuat dengan AI. Produk Rona bersifat fiktif. Pada toko sungguhan, foto dan keterangan warna perlu disesuaikan dengan produk penjual.",
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "fontSize": "13px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "fontSize": "14px",
+          "lineHeight": "1.85",
+          "paddingRight": "20px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "faq-3",
+    "parent": "faq-list",
+    "type": "accordion",
+    "name": "Faq 3",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "color": "#252c29",
+      "borderBottomWidth": "1px",
+      "borderBottomStyle": "solid",
+      "borderBottomColor": "#deded5"
+    }
+  },
+  {
+    "id": "faq-question-3",
+    "parent": "faq-3",
+    "type": "summary",
+    "name": "Faq question 3",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "alignItems": "center",
+      "justifyContent": "space-between",
+      "gap": "22px",
+      "minHeight": "72px",
+      "fontSize": "13px",
+      "fontWeight": "500",
+      "lineHeight": "1.8",
+      "listStyleType": "none",
+      "paddingTop": "23px",
+      "paddingRight": "2px",
+      "paddingBottom": "23px",
+      "paddingLeft": "2px"
+    },
+    "text": "Bagaimana pengiriman dan pengembaliannya?",
+    "responsive": [
+      {
+        "max": 620,
+        "props": {
+          "paddingTop": "21px",
+          "paddingBottom": "21px",
+          "gap": "20px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "faq-answer-3",
+    "parent": "faq-3",
+    "type": "text",
+    "name": "Faq answer 3",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "14px",
+      "fontWeight": "400",
+      "color": "#616660",
+      "lineHeight": "1.95",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere",
+      "paddingTop": "0px",
+      "paddingRight": "35px",
+      "paddingBottom": "23px",
+      "paddingLeft": "2px"
+    },
+    "text": "Ini adalah pratinjau toko, jadi tidak ada barang yang dikirim. Ongkir, estimasi waktu, dan ketentuan pengembalian akan mengikuti informasi penjual saat template dipakai oleh toko sungguhan.",
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "fontSize": "13px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "fontSize": "14px",
+          "lineHeight": "1.85",
+          "paddingRight": "20px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "faq-4",
+    "parent": "faq-list",
+    "type": "accordion",
+    "name": "Faq 4",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "color": "#252c29",
+      "borderBottomWidth": "1px",
+      "borderBottomStyle": "solid",
+      "borderBottomColor": "#deded5"
+    }
+  },
+  {
+    "id": "faq-question-4",
+    "parent": "faq-4",
+    "type": "summary",
+    "name": "Faq question 4",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "alignItems": "center",
+      "justifyContent": "space-between",
+      "gap": "22px",
+      "minHeight": "72px",
+      "fontSize": "13px",
+      "fontWeight": "500",
+      "lineHeight": "1.8",
+      "listStyleType": "none",
+      "paddingTop": "23px",
+      "paddingRight": "2px",
+      "paddingBottom": "23px",
+      "paddingLeft": "2px"
+    },
+    "text": "Bisakah saya membeli dari halaman ini?",
+    "responsive": [
+      {
+        "max": 620,
+        "props": {
+          "paddingTop": "21px",
+          "paddingBottom": "21px",
+          "gap": "20px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "faq-answer-4",
+    "parent": "faq-4",
+    "type": "text",
+    "name": "Faq answer 4",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "14px",
+      "fontWeight": "400",
+      "color": "#616660",
+      "lineHeight": "1.95",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere",
+      "paddingTop": "0px",
+      "paddingRight": "35px",
+      "paddingBottom": "23px",
+      "paddingLeft": "2px"
+    },
+    "text": "Kamu bisa mencoba memilih warna, menambahkan ke keranjang, dan melihat ringkasan checkout simulasi. Tidak ada pesanan, pembayaran, atau data pribadi yang dikirim.",
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "fontSize": "13px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "fontSize": "14px",
+          "lineHeight": "1.85",
+          "paddingRight": "20px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "rona-closing",
+    "type": "container",
+    "name": "Rona closing",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "0px",
+      "width": "100%",
+      "backgroundColor": "#fbf9f5",
+      "color": "#252c29",
+      "paddingTop": "118px",
+      "paddingBottom": "0px"
+    },
+    "tag": "section",
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "paddingTop": "84px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "paddingTop": "72px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "closing-panel",
+    "parent": "rona-closing",
+    "type": "container",
+    "name": "Closing panel",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "row",
+      "gap": "36px",
+      "width": "calc(100% - 64px)",
+      "maxWidth": "1320px",
+      "marginLeft": "auto",
+      "marginRight": "auto",
+      "alignItems": "center",
+      "justifyContent": "space-between",
+      "borderRadius": "36px",
+      "paddingTop": "61px",
+      "paddingRight": "64px",
+      "paddingBottom": "61px",
+      "paddingLeft": "64px"
+    },
+    "responsive": [
+      {
+        "max": 1200,
+        "props": {
+          "width": "calc(100% - 64px)"
+        }
+      },
+      {
+        "max": 900,
+        "props": {
+          "width": "calc(100% - 40px)"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "width": "calc(100% - 24px)"
+        }
+      },
+      {
+        "max": 900,
+        "props": {
+          "paddingTop": "42px",
+          "paddingRight": "42px",
+          "paddingBottom": "42px",
+          "paddingLeft": "42px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "flexDirection": "column",
+          "alignItems": "flex-start",
+          "gap": "24px",
+          "borderRadius": "28px",
+          "paddingTop": "35px",
+          "paddingRight": "26px",
+          "paddingBottom": "35px",
+          "paddingLeft": "26px"
+        }
+      }
+    ],
+    "fill": {
+      "clip": "background",
+      "layers": [
+        {
+          "kind": "linear",
+          "angle": 112,
+          "stops": [
+            {
+              "color": "#f8e9d7",
+              "position": 0
+            },
+            {
+              "color": "#f5d8ca",
+              "position": 65
+            },
+            {
+              "color": "#eedbd5",
+              "position": 100
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "closing-copy",
+    "parent": "closing-panel",
+    "type": "container",
+    "name": "Closing copy",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "0px"
+    }
+  },
+  {
+    "id": "closing-title",
+    "parent": "closing-copy",
+    "type": "heading",
+    "name": "Closing title",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "40px",
+      "fontWeight": "600",
+      "color": "#252c29",
+      "lineHeight": "1.17",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere",
+      "letterSpacing": "-.05em"
+    },
+    "text": "Sediakan sedikit nyaman\nuntuk dirimu.",
+    "tag": "h2",
+    "responsive": [
+      {
+        "max": 1200,
+        "props": {
+          "fontSize": "35px"
+        }
+      },
+      {
+        "max": 900,
+        "props": {
+          "fontSize": "32px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "fontSize": "31px",
+          "whiteSpace": "normal"
+        }
+      },
+      {
+        "max": 360,
+        "props": {
+          "fontSize": "30px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "closing-intro",
+    "parent": "closing-copy",
+    "type": "text",
+    "name": "Closing intro",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "17px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "13px",
+      "fontWeight": "400",
+      "color": "#545951",
+      "lineHeight": "1.8",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere"
+    },
+    "text": "Mulai dari handuk yang kamu pakai setiap hari.",
+    "responsive": [
+      {
+        "max": 620,
+        "props": {
+          "fontSize": "14px",
+          "lineHeight": "1.85",
+          "maxWidth": "235px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "closing-shop",
+    "parent": "closing-panel",
+    "type": "button",
+    "name": "Closing shop",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "inline-flex",
+      "alignItems": "center",
+      "justifyContent": "space-between",
+      "gap": "32px",
+      "minHeight": "54px",
+      "width": "fit-content",
+      "fontSize": "12px",
+      "fontWeight": "500",
+      "lineHeight": "1.5",
+      "color": "#ffffff",
+      "backgroundColor": "#252c29",
+      "borderRadius": "99px",
+      "textDecoration": "none",
+      "textAlign": "left",
+      "paddingTop": "14px",
+      "paddingRight": "24px",
+      "paddingBottom": "14px",
+      "paddingLeft": "24px",
+      "flexShrink": "0"
+    },
+    "text": "",
+    "tag": "a",
+    "action": {
+      "type": "link",
+      "target": "#koleksi"
+    },
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "fontSize": "12px",
+          "paddingLeft": "20px",
+          "paddingRight": "20px",
+          "gap": "16px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "minHeight": "50px",
+          "paddingLeft": "22px",
+          "paddingRight": "22px",
+          "gap": "26px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "closing-shop-label",
+    "parent": "closing-shop",
+    "type": "text",
+    "name": "Closing shop label",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "inherit",
+      "fontWeight": "inherit",
+      "color": "inherit",
+      "lineHeight": "inherit",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere"
+    },
+    "text": "Pilih Rona-mu"
+  },
+  {
+    "id": "closing-shop-icon",
+    "parent": "closing-shop",
+    "type": "text",
+    "name": "Closing shop icon",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "21px",
+      "fontWeight": "400",
+      "color": "inherit",
+      "lineHeight": "1",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere",
+      "flexShrink": "0"
+    },
+    "text": "↗"
+  },
+  {
+    "id": "rona-footer",
+    "type": "container",
+    "name": "Rona footer",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "0px",
+      "width": "100%",
+      "backgroundColor": "#fbf9f5",
+      "color": "#252c29",
+      "paddingTop": "74px",
+      "paddingBottom": "100px"
+    },
+    "tag": "footer",
+    "responsive": [
+      {
+        "max": 620,
+        "props": {
+          "paddingTop": "50px",
+          "paddingBottom": "108px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "footer-content",
+    "parent": "rona-footer",
+    "type": "container",
+    "name": "Footer content",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "0px",
+      "width": "calc(100% - 112px)",
+      "maxWidth": "1200px",
+      "marginLeft": "auto",
+      "marginRight": "auto"
+    },
+    "responsive": [
+      {
+        "max": 1200,
+        "props": {
+          "width": "calc(100% - 96px)"
+        }
+      },
+      {
+        "max": 900,
+        "props": {
+          "width": "calc(100% - 64px)"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "width": "calc(100% - 40px)"
+        }
+      }
+    ]
+  },
+  {
+    "id": "footer-main",
+    "parent": "footer-content",
+    "type": "container",
+    "name": "Footer main",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "grid",
+      "flexDirection": "column",
+      "gap": "50px",
+      "gridTemplateColumns": "1.8fr 1fr 1.15fr",
+      "paddingBottom": "47px"
+    },
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "gap": "28px",
+          "gridTemplateColumns": "1.3fr .9fr 1.1fr"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "gridTemplateColumns": "1fr",
+          "gap": "10px",
+          "paddingBottom": "30px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "footer-brand",
+    "parent": "footer-main",
+    "type": "container",
+    "name": "Footer brand",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "0px"
+    },
+    "responsive": [
+      {
+        "max": 620,
+        "props": {
+          "marginBottom": "16px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "footer-logo",
+    "parent": "footer-brand",
+    "type": "button",
+    "name": "Footer logo",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "inline-flex",
+      "alignItems": "center",
+      "justifyContent": "space-between",
+      "gap": "10px",
+      "minHeight": "44px",
+      "width": "fit-content",
+      "fontSize": "12px",
+      "fontWeight": "500",
+      "lineHeight": "1.5",
+      "color": "#252c29",
+      "backgroundColor": "transparent",
+      "borderRadius": "0px",
+      "textDecoration": "none",
+      "textAlign": "left",
+      "paddingTop": "0px",
+      "paddingRight": "0px",
+      "paddingBottom": "0px",
+      "paddingLeft": "0px"
+    },
+    "text": "",
+    "tag": "a",
+    "action": {
+      "type": "link",
+      "target": "#top"
+    },
+    "label": "Rona, kembali ke atas"
+  },
+  {
+    "id": "footer-logo-mark",
+    "parent": "footer-logo",
+    "type": "image",
+    "name": "Footer logo mark",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "width": "36px",
+      "height": "36px",
+      "objectFit": "contain"
+    },
+    "src": "http://127.0.0.1:46361/assets/mark.svg",
+    "alt": "",
+    "responsive": [
+      {
+        "max": 620,
+        "props": {
+          "width": "32px",
+          "height": "32px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "footer-logo-name",
+    "parent": "footer-logo",
+    "type": "text",
+    "name": "Footer logo name",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "38px",
+      "fontWeight": "600",
+      "color": "#252c29",
+      "lineHeight": "1",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere",
+      "letterSpacing": "-2px"
+    },
+    "text": "rona.",
+    "marks": [
+      {
+        "start": 4,
+        "end": 5,
+        "color": "#b7442b"
+      }
+    ],
+    "responsive": [
+      {
+        "max": 900,
+        "props": {
+          "fontSize": "34px"
+        }
+      },
+      {
+        "max": 620,
+        "props": {
+          "fontSize": "32px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "footer-tagline",
+    "parent": "footer-brand",
+    "type": "text",
+    "name": "Footer tagline",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "20px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "12px",
+      "fontWeight": "400",
+      "color": "#616660",
+      "lineHeight": "1.8",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere"
+    },
+    "text": "Warna kecil untuk hari-harimu.",
+    "responsive": [
+      {
+        "max": 620,
+        "props": {
+          "marginTop": "14px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "footer-collection",
+    "parent": "footer-main",
+    "type": "container",
+    "name": "Footer collection",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "0px"
+    },
+    "tag": "nav",
+    "label": "Tautan koleksi"
+  },
+  {
+    "id": "footer-collection-0",
+    "parent": "footer-collection",
+    "type": "button",
+    "name": "Footer collection 0",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "inline-flex",
+      "alignItems": "center",
+      "justifyContent": "space-between",
+      "gap": "20px",
+      "minHeight": "44px",
+      "width": "fit-content",
+      "fontSize": "12px",
+      "fontWeight": "500",
+      "lineHeight": "1.5",
+      "color": "#252c29",
+      "backgroundColor": "transparent",
+      "borderRadius": "0px",
+      "textDecoration": "none",
+      "textAlign": "left",
+      "paddingTop": "0px",
+      "paddingRight": "0px",
+      "paddingBottom": "0px",
+      "paddingLeft": "0px"
+    },
+    "text": "Koleksi handuk",
+    "tag": "a",
+    "action": {
+      "type": "link",
+      "target": "#koleksi"
+    }
+  },
+  {
+    "id": "footer-collection-1",
+    "parent": "footer-collection",
+    "type": "button",
+    "name": "Footer collection 1",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "inline-flex",
+      "alignItems": "center",
+      "justifyContent": "space-between",
+      "gap": "20px",
+      "minHeight": "44px",
+      "width": "fit-content",
+      "fontSize": "12px",
+      "fontWeight": "500",
+      "lineHeight": "1.5",
+      "color": "#252c29",
+      "backgroundColor": "transparent",
+      "borderRadius": "0px",
+      "textDecoration": "none",
+      "textAlign": "left",
+      "paddingTop": "0px",
+      "paddingRight": "0px",
+      "paddingBottom": "0px",
+      "paddingLeft": "0px"
+    },
+    "text": "Panduan ukuran",
+    "tag": "a",
+    "action": {
+      "type": "link",
+      "target": "#panduan"
+    }
+  },
+  {
+    "id": "footer-collection-2",
+    "parent": "footer-collection",
+    "type": "button",
+    "name": "Footer collection 2",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "inline-flex",
+      "alignItems": "center",
+      "justifyContent": "space-between",
+      "gap": "20px",
+      "minHeight": "44px",
+      "width": "fit-content",
+      "fontSize": "12px",
+      "fontWeight": "500",
+      "lineHeight": "1.5",
+      "color": "#252c29",
+      "backgroundColor": "transparent",
+      "borderRadius": "0px",
+      "textDecoration": "none",
+      "textAlign": "left",
+      "paddingTop": "0px",
+      "paddingRight": "0px",
+      "paddingBottom": "0px",
+      "paddingLeft": "0px"
+    },
+    "text": "Cara merawat",
+    "tag": "a",
+    "action": {
+      "type": "link",
+      "target": "#rawat"
+    }
+  },
+  {
+    "id": "footer-info",
+    "parent": "footer-main",
+    "type": "container",
+    "name": "Footer info",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "0px"
+    },
+    "tag": "nav",
+    "label": "Informasi toko"
+  },
+  {
+    "id": "footer-info-0",
+    "parent": "footer-info",
+    "type": "button",
+    "name": "Footer info 0",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "inline-flex",
+      "alignItems": "center",
+      "justifyContent": "space-between",
+      "gap": "20px",
+      "minHeight": "44px",
+      "width": "fit-content",
+      "fontSize": "12px",
+      "fontWeight": "500",
+      "lineHeight": "1.5",
+      "color": "#252c29",
+      "backgroundColor": "transparent",
+      "borderRadius": "0px",
+      "textDecoration": "none",
+      "textAlign": "left",
+      "paddingTop": "0px",
+      "paddingRight": "0px",
+      "paddingBottom": "0px",
+      "paddingLeft": "0px"
+    },
+    "text": "Pertanyaan umum",
+    "tag": "a",
+    "action": {
+      "type": "link",
+      "target": "#bantuan"
+    }
+  },
+  {
+    "id": "footer-info-1",
+    "parent": "footer-info",
+    "type": "button",
+    "name": "Footer info 1",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "inline-flex",
+      "alignItems": "center",
+      "justifyContent": "space-between",
+      "gap": "20px",
+      "minHeight": "44px",
+      "width": "fit-content",
+      "fontSize": "12px",
+      "fontWeight": "500",
+      "lineHeight": "1.5",
+      "color": "#252c29",
+      "backgroundColor": "transparent",
+      "borderRadius": "0px",
+      "textDecoration": "none",
+      "textAlign": "left",
+      "paddingTop": "0px",
+      "paddingRight": "0px",
+      "paddingBottom": "0px",
+      "paddingLeft": "0px"
+    },
+    "text": "Pengiriman & pengembalian",
+    "tag": "button",
+    "action": {
+      "type": "dialog",
+      "target": "info-shipping"
+    }
+  },
+  {
+    "id": "footer-info-2",
+    "parent": "footer-info",
+    "type": "button",
+    "name": "Footer info 2",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "inline-flex",
+      "alignItems": "center",
+      "justifyContent": "space-between",
+      "gap": "20px",
+      "minHeight": "44px",
+      "width": "fit-content",
+      "fontSize": "12px",
+      "fontWeight": "500",
+      "lineHeight": "1.5",
+      "color": "#252c29",
+      "backgroundColor": "transparent",
+      "borderRadius": "0px",
+      "textDecoration": "none",
+      "textAlign": "left",
+      "paddingTop": "0px",
+      "paddingRight": "0px",
+      "paddingBottom": "0px",
+      "paddingLeft": "0px"
+    },
+    "text": "Privasi & tentang demo",
+    "tag": "button",
+    "action": {
+      "type": "dialog",
+      "target": "info-privacy"
+    }
+  },
+  {
+    "id": "footer-bottom",
+    "parent": "footer-content",
+    "type": "container",
+    "name": "Footer bottom",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "row",
+      "gap": "30px",
+      "justifyContent": "space-between",
+      "paddingTop": "26px",
+      "borderTopWidth": "1px",
+      "borderTopStyle": "solid",
+      "borderTopColor": "#deded5"
+    },
+    "responsive": [
+      {
+        "max": 620,
+        "props": {
+          "flexDirection": "column",
+          "gap": "8px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "copyright",
+    "parent": "footer-bottom",
+    "type": "text",
+    "name": "Copyright",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "10px",
+      "fontWeight": "400",
+      "color": "#616660",
+      "lineHeight": "1.8",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere"
+    },
+    "text": "© 2026 Rona. Konsep toko fiktif."
+  },
+  {
+    "id": "footer-signoff",
+    "parent": "footer-bottom",
+    "type": "text",
+    "name": "Footer signoff",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "10px",
+      "fontWeight": "400",
+      "color": "#616660",
+      "lineHeight": "1.8",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere"
+    },
+    "text": "Dirancang untuk keseharian yang lebih nyaman."
+  },
+  {
+    "id": "info-shipping",
+    "parent": "rona-footer",
+    "type": "container",
+    "name": "Info shipping",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "0px",
+      "width": "590px",
+      "maxWidth": "calc(100vw - 32px)",
+      "maxHeight": "calc(100dvh - 32px)",
+      "backgroundColor": "#fbf9f5",
+      "color": "#252c29",
+      "borderRadius": "28px",
+      "overflow": "auto",
+      "paddingTop": "40px",
+      "paddingRight": "40px",
+      "paddingBottom": "30px",
+      "paddingLeft": "40px"
+    },
+    "tag": "dialog",
+    "anchor": "info-shipping",
+    "label": "Pengiriman & pengembalian",
+    "responsive": [
+      {
+        "max": 620,
+        "props": {
+          "paddingLeft": "23px",
+          "paddingRight": "23px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "info-shipping-close",
+    "parent": "info-shipping",
+    "type": "button",
+    "name": "Info shipping close",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "inline-flex",
+      "alignItems": "center",
+      "justifyContent": "center",
+      "gap": "20px",
+      "minHeight": "44px",
+      "width": "44px",
+      "fontSize": "28px",
+      "fontWeight": "500",
+      "lineHeight": "1.5",
+      "color": "#252c29",
+      "backgroundColor": "transparent",
+      "borderRadius": "0px",
+      "textDecoration": "none",
+      "textAlign": "left",
+      "paddingTop": "0px",
+      "paddingRight": "0px",
+      "paddingBottom": "0px",
+      "paddingLeft": "0px",
+      "position": "absolute",
+      "right": "8px",
+      "top": "8px",
+      "height": "44px"
+    },
+    "text": "×",
+    "tag": "button",
+    "action": {
+      "type": "close-dialog",
+      "target": "info-shipping"
+    },
+    "label": "Tutup informasi"
+  },
+  {
+    "id": "info-shipping-title",
+    "parent": "info-shipping",
+    "type": "heading",
+    "name": "Info shipping title",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "30px",
+      "fontWeight": "600",
+      "color": "#252c29",
+      "lineHeight": "1.17",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere",
+      "letterSpacing": "-.05em",
+      "paddingRight": "20px"
+    },
+    "text": "Pengiriman & pengembalian",
+    "tag": "h2",
+    "responsive": [
+      {
+        "max": 620,
+        "props": {
+          "fontSize": "24px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "info-shipping-p0",
+    "parent": "info-shipping",
+    "type": "text",
+    "name": "Info shipping p0",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "23px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "14px",
+      "fontWeight": "400",
+      "color": "#616660",
+      "lineHeight": "1.8",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere"
+    },
+    "text": "Rona adalah toko fiktif untuk pratinjau desain. Tidak ada barang yang dikirim atau pembayaran yang diterima."
+  },
+  {
+    "id": "info-shipping-p1",
+    "parent": "info-shipping",
+    "type": "text",
+    "name": "Info shipping p1",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "23px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "14px",
+      "fontWeight": "400",
+      "color": "#616660",
+      "lineHeight": "1.8",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere"
+    },
+    "text": "Pada toko sungguhan, ongkir, estimasi waktu, dan ketentuan pengembalian mengikuti informasi penjual yang tersedia sebelum pembelian."
+  },
+  {
+    "id": "info-shipping-done",
+    "parent": "info-shipping",
+    "type": "button",
+    "name": "Info shipping done",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "25px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "inline-flex",
+      "alignItems": "center",
+      "justifyContent": "space-between",
+      "gap": "32px",
+      "minHeight": "54px",
+      "width": "fit-content",
+      "fontSize": "12px",
+      "fontWeight": "500",
+      "lineHeight": "1.5",
+      "color": "#ffffff",
+      "backgroundColor": "#b7442b",
+      "borderRadius": "99px",
+      "textDecoration": "none",
+      "textAlign": "left",
+      "paddingTop": "14px",
+      "paddingRight": "24px",
+      "paddingBottom": "14px",
+      "paddingLeft": "24px"
+    },
+    "text": "Kembali ke toko",
+    "tag": "button",
+    "action": {
+      "type": "close-dialog",
+      "target": "info-shipping"
+    }
+  },
+  {
+    "id": "info-privacy",
+    "parent": "rona-footer",
+    "type": "container",
+    "name": "Info privacy",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": "0px",
+      "width": "590px",
+      "maxWidth": "calc(100vw - 32px)",
+      "maxHeight": "calc(100dvh - 32px)",
+      "backgroundColor": "#fbf9f5",
+      "color": "#252c29",
+      "borderRadius": "28px",
+      "overflow": "auto",
+      "paddingTop": "40px",
+      "paddingRight": "40px",
+      "paddingBottom": "30px",
+      "paddingLeft": "40px"
+    },
+    "tag": "dialog",
+    "anchor": "info-privacy",
+    "label": "Privasi & tentang demo",
+    "responsive": [
+      {
+        "max": 620,
+        "props": {
+          "paddingLeft": "23px",
+          "paddingRight": "23px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "info-privacy-close",
+    "parent": "info-privacy",
+    "type": "button",
+    "name": "Info privacy close",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "inline-flex",
+      "alignItems": "center",
+      "justifyContent": "center",
+      "gap": "20px",
+      "minHeight": "44px",
+      "width": "44px",
+      "fontSize": "28px",
+      "fontWeight": "500",
+      "lineHeight": "1.5",
+      "color": "#252c29",
+      "backgroundColor": "transparent",
+      "borderRadius": "0px",
+      "textDecoration": "none",
+      "textAlign": "left",
+      "paddingTop": "0px",
+      "paddingRight": "0px",
+      "paddingBottom": "0px",
+      "paddingLeft": "0px",
+      "position": "absolute",
+      "right": "8px",
+      "top": "8px",
+      "height": "44px"
+    },
+    "text": "×",
+    "tag": "button",
+    "action": {
+      "type": "close-dialog",
+      "target": "info-privacy"
+    },
+    "label": "Tutup informasi"
+  },
+  {
+    "id": "info-privacy-title",
+    "parent": "info-privacy",
+    "type": "heading",
+    "name": "Info privacy title",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "0px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "30px",
+      "fontWeight": "600",
+      "color": "#252c29",
+      "lineHeight": "1.17",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere",
+      "letterSpacing": "-.05em",
+      "paddingRight": "20px"
+    },
+    "text": "Privasi & tentang demo",
+    "tag": "h2",
+    "responsive": [
+      {
+        "max": 620,
+        "props": {
+          "fontSize": "24px"
+        }
+      }
+    ]
+  },
+  {
+    "id": "info-privacy-p0",
+    "parent": "info-privacy",
+    "type": "text",
+    "name": "Info privacy p0",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "23px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "14px",
+      "fontWeight": "400",
+      "color": "#616660",
+      "lineHeight": "1.8",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere"
+    },
+    "text": "Keranjang disimpan di browser perangkat ini agar pilihanmu tetap ada saat halaman dimuat ulang. Isinya hanya kode produk, varian, dan jumlah."
+  },
+  {
+    "id": "info-privacy-p1",
+    "parent": "info-privacy",
+    "type": "text",
+    "name": "Info privacy p1",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "23px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "14px",
+      "fontWeight": "400",
+      "color": "#616660",
+      "lineHeight": "1.8",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere"
+    },
+    "text": "Checkout ini hanya simulasi. Tidak ada pembayaran, pesanan nyata, atau data pribadi yang dikirim. Foto dibuat dengan AI, dan font disajikan secara lokal."
+  },
+  {
+    "id": "info-privacy-p2",
+    "parent": "info-privacy",
+    "type": "text",
+    "name": "Info privacy p2",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "23px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "fontSize": "14px",
+      "fontWeight": "400",
+      "color": "#616660",
+      "lineHeight": "1.8",
+      "whiteSpace": "pre-line",
+      "overflowWrap": "anywhere"
+    },
+    "text": "Untuk menghapus pilihan yang tersimpan, kosongkan keranjang atau hapus data situs ini melalui pengaturan browser."
+  },
+  {
+    "id": "info-privacy-done",
+    "parent": "info-privacy",
+    "type": "button",
+    "name": "Info privacy done",
+    "props": {
+      "minWidth": "0px",
+      "marginTop": "25px",
+      "marginBottom": "0px",
+      "fontFamily": "Poppins, Arial, sans-serif",
+      "fontOpticalSizing": "none",
+      "display": "inline-flex",
+      "alignItems": "center",
+      "justifyContent": "space-between",
+      "gap": "32px",
+      "minHeight": "54px",
+      "width": "fit-content",
+      "fontSize": "12px",
+      "fontWeight": "500",
+      "lineHeight": "1.5",
+      "color": "#ffffff",
+      "backgroundColor": "#b7442b",
+      "borderRadius": "99px",
+      "textDecoration": "none",
+      "textAlign": "left",
+      "paddingTop": "14px",
+      "paddingRight": "24px",
+      "paddingBottom": "14px",
+      "paddingLeft": "24px"
+    },
+    "text": "Kembali ke toko",
+    "tag": "button",
+    "action": {
+      "type": "close-dialog",
+      "target": "info-privacy"
+    }
+  }
+]
