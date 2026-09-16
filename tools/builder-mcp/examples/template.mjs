@@ -8,8 +8,9 @@ import { repoRoot } from "../workspace.mjs";
 const [templateId, id, productId, brandName] = process.argv.slice(2);
 if (!templateId || !id || !productId || !brandName)
   throw Error(
-    'Usage: node examples/template.mjs TEMPLATE PAGE_ID PRODUCT_ID "Store name"',
+    'Usage: node examples/template.mjs TEMPLATE PAGE_ID PRODUCT_ID[,PRODUCT_ID...] "Store name"',
   );
+const productIds = productId.split(",").filter(Boolean);
 const directory =
   process.env.EZKART_WORKSPACE ||
   join(homedir(), ".local/share/ezkart-builder");
@@ -35,9 +36,9 @@ try {
   await call("project_create", {
     id,
     name: brandName.slice(0, 60),
-    productIds: [productId],
+    productIds,
   });
-  await call("template_apply", { templateId, productId, brandName });
+  await call("template_apply", { templateId, productIds, brandName });
   await call("project_save");
   const exported = await call("page_export");
   const audit = await call("page_audit");

@@ -8392,11 +8392,11 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
       inspect:inspectBuilder,
       catalog:()=>readCatalogProducts(),
       templates:()=>EzkartTemplates.list(),
-      async applyTemplate({templateId,productId,brandName}={}) {
+      async applyTemplate({templateId,productId,productIds,brandName}={}) {
         if (previewRoot.querySelector('[data-sq-element],.sq-native-section')) throw Error('Create a blank page before applying a template.');
-        const prepared = await EzkartTemplates.prepare({templateId,productId,brandName,products:readCatalogProducts()});
+        const prepared = await EzkartTemplates.prepare({templateId,productId,productIds,brandName,products:readCatalogProducts()});
         remember(); restoreState(prepared.state); refreshNativeBuilder(); await settleBuilder();
-        return {templateId:prepared.template.id,version:prepared.template.version,sections:prepared.recipe.length,productId};
+        return {templateId:prepared.template.id,version:prepared.template.version,sections:prepared.recipe.length,productId:prepared.state.products[0],productIds:prepared.state.products};
       },
       nativeInsert(args){const element=addNativeNode(args);return {id:element.dataset.nativeId,count:1+element.querySelectorAll('.sq-native').length};},
       nativeUpdate({id,props,fill,responsive,text,marks,action,states,productId,productIds,stateScope,initialState,stateParam,stateMode,statePanel,part,group,optionLayout,prefix,suffix,priceSuffix,showPrice,src,poster,captions,captionsText,open,fit,scrollMotion,scrollVisibility,name,alt,label,icon,iconFill,iconStroke,iconWeight,muted,controls,loop,autoplay,collapsed}={}){

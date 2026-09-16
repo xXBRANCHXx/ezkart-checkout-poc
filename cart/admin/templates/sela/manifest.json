@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "id": "sela",
+  "version": "1.0.0",
+  "name": "Sela",
+  "description": "Generous whitespace, clean typography and a considered product collection.",
+  "recipe": "recipe.json",
+  "thumbnail": "preview/desktop.png",
+  "previews": [
+    "preview/desktop.png",
+    "preview/mobile.png",
+    "preview/footer.png"
+  ],
+  "previewLabel": "Fictional branding shown. Your store name, catalog products, images and prices replace the demo content.",
+  "requirements": {
+    "minProducts": 1,
+    "maxProducts": 4,
+    "images": "optional",
+    "variants": "optional",
+    "description": "optional"
+  },
+  "theme": {
+    "accent": "#a74432",
+    "page": "#ffffff",
+    "ink": "#252724",
+    "surface": "#f5f5f1",
+    "headingFont": "Plus Jakarta Sans, Arial, sans-serif",
+    "bodyFont": "Plus Jakarta Sans, Arial, sans-serif",
+    "buttonBackground": "#252724",
+    "buttonText": "#ffffff",
+    "radius": 3
+  },
+  "approval": {
+    "version": "sela-native-v1.0",
+    "instruction": "ok, I think I like Sela. let's make it a template.",
+    "recipeSha256": "06c4f74dcb011affdcc56b8337da0f069707139720b6835a87f8bc1a28aadf20"
+  },
+  "optionalSections": {
+    "sela-story": "Featured product description",
+    "sela-setup": "Two or more selected products",
+    "sela-guide": "Selected product descriptions"
+  },
+  "demoContent": "preview/ only. Never applied to a merchant page."
+}

@@ -1,0 +1,181 @@
+{
+  "products": [
+    {
+      "id": "riser",
+      "name": "Riser Kayu",
+      "description": "Beri layar tempat yang lebih tinggi, dan sisakan ruang di bawahnya untuk buku atau keyboard. Bentuk sederhana dengan serat kayu yang tetap terlihat.",
+      "type": "physical",
+      "price": 389000,
+      "currency": "IDR",
+      "stock": 8,
+      "weightGrams": 500,
+      "media": [
+        {
+          "id": "riser-720.webp"
+        }
+      ],
+      "variants": [
+        {
+          "id": "standard",
+          "name": "60 cm",
+          "price": 389000,
+          "stock": 8,
+          "description": "60 \u00d7 22 \u00d7 10 cm",
+          "imageUploadId": "riser-720.webp",
+          "options": [
+            {
+              "option": "Ukuran",
+              "value": "60 cm"
+            }
+          ]
+        },
+        {
+          "id": "wide",
+          "name": "80 cm",
+          "price": 469000,
+          "stock": 0,
+          "description": "80 \u00d7 22 \u00d7 10 cm \u00b7 Belum tersedia",
+          "imageUploadId": "riser-720.webp",
+          "options": [
+            {
+              "option": "Ukuran",
+              "value": "80 cm"
+            }
+          ]
+        }
+      ],
+      "options": [
+        {
+          "name": "Ukuran",
+          "values": [
+            "60 cm",
+            "80 cm"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mat",
+      "name": "Alas Meja",
+      "description": "Satu permukaan lembut untuk keyboard, mouse, atau buku catatan. Bentuk lebar dengan sudut yang halus membantu membagi area kerja di mejamu.",
+      "type": "physical",
+      "price": 219000,
+      "currency": "IDR",
+      "stock": 8,
+      "weightGrams": 500,
+      "media": [
+        {
+          "id": "mat-720.webp"
+        }
+      ],
+      "variants": [
+        {
+          "id": "standard",
+          "name": "Abu-abu",
+          "price": 219000,
+          "stock": 8,
+          "description": "80 \u00d7 40 cm \u00b7 tebal 3 mm",
+          "imageUploadId": "mat-720.webp",
+          "options": [
+            {
+              "option": "Pilihan",
+              "value": "Abu-abu"
+            }
+          ]
+        }
+      ],
+      "options": [
+        {
+          "name": "Pilihan",
+          "values": [
+            "Abu-abu"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tray",
+      "name": "Baki Serbaguna",
+      "description": "Tempat singgah untuk pena, kunci, dan benda kecil yang ingin mudah ditemukan. Baki rendah dari kayu oak, untuk meja kerja maupun meja dekat pintu.",
+      "type": "physical",
+      "price": 129000,
+      "currency": "IDR",
+      "stock": 8,
+      "weightGrams": 500,
+      "media": [
+        {
+          "id": "tray-720.webp"
+        }
+      ],
+      "variants": [
+        {
+          "id": "standard",
+          "name": "Natural",
+          "price": 129000,
+          "stock": 8,
+          "description": "24 \u00d7 12 \u00d7 2 cm",
+          "imageUploadId": "tray-720.webp",
+          "options": [
+            {
+              "option": "Pilihan",
+              "value": "Natural"
+            }
+          ]
+        }
+      ],
+      "options": [
+        {
+          "name": "Pilihan",
+          "values": [
+            "Natural"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cup",
+      "name": "Wadah Pena",
+      "description": "Simpan pena dan pensil dalam jangkauan. Wadah kayu beralas persegi yang mengambil sedikit ruang. Alat tulis pada foto tidak termasuk.",
+      "type": "physical",
+      "price": 99000,
+      "currency": "IDR",
+      "stock": 8,
+      "weightGrams": 500,
+      "media": [
+        {
+          "id": "cup-720.webp"
+        }
+      ],
+      "variants": [
+        {
+          "id": "standard",
+          "name": "Natural",
+          "price": 99000,
+          "stock": 8,
+          "description": "8 \u00d7 8 \u00d7 10 cm",
+          "imageUploadId": "cup-720.webp",
+          "options": [
+            {
+              "option": "Pilihan",
+              "value": "Natural"
+            }
+          ]
+        }
+      ],
+      "options": [
+        {
+          "name": "Pilihan",
+          "values": [
+            "Natural"
+          ]
+        }
+      ]
+    }
+  ],
+  "storageScope": "sela-preview-only",
+  "locale": "id-ID",
+  "currency": "IDR",
+  "demoCheckout": true,
+  "mediaBase": "http://127.0.0.1:46332",
+  "publicBase": ""
+}

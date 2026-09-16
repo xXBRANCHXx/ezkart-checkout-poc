@@ -193,3 +193,46 @@
   box-shadow: 0 0 0 2px #6d77871a;
   outline: none;
 }
+
+.page-creator-dialog .sq-template-settings [data-template-additional] {
+  display: block;
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  margin: 8px 0;
+}
+.page-creator-dialog .sq-template-settings [data-template-additional][hidden] {
+  display: none;
+}
+.sq-template-settings [data-template-product-help] {
+  margin-top: 8px;
+}
+.sq-template-settings [data-template-product-list] {
+  display: grid;
+  gap: 8px;
+  max-height: 190px;
+  overflow: auto;
+}
+.sq-template-settings [data-template-product-list] label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border: 1px solid #e2e4e8;
+  border-radius: 6px;
+}
+.page-creator-dialog .sq-template-settings [data-template-product-list] input {
+  position: static;
+  opacity: 1;
+  padding: 0;
+  margin: 0;
+  accent-color: #303745;
+  width: 18px;
+  min-height: 18px;
+  height: 18px;
+  flex: none;
+}
+.sq-template-settings [data-template-product-list] label:has(input:checked) {
+  background: #f5f6f8;
+  border-color: #6d7787;
+}

@@ -85,9 +85,15 @@ export async function inspectPackage(id, root = repo) {
     if (
       node.type === "commerce" &&
       node.part !== "cart" &&
-      node.productId?.$bind !== "productId"
+      !["set-price", "set-add"].includes(node.part) &&
+      !/^product(?:[1-4]Product)?Id$/.test(node.productId?.$bind || "")
     )
       throw Error("Commerce must bind the merchant product.");
+    if (
+      ["set-price", "set-add"].includes(node.part) &&
+      !/^set[1-3]ProductIds$/.test(node.productIds?.$bind || "")
+    )
+      throw Error("Product sets must bind merchant products.");
     if (
       typeof node.src === "string" &&
       /127\.0\.0\.1|localhost|\/preview\//.test(node.src)

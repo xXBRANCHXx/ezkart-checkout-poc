@@ -750,7 +750,8 @@
       if (
         !buttons.some(
           (n) => JSON.parse(n.dataset.nativeAction).target === value,
-        )
+        ) &&
+        !(buttons.length === 0 && value === settings.initial)
       )
         return;
       scope.dataset.nativeState = value;

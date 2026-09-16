@@ -1,0 +1,59 @@
+# Sela · 1.0.0
+
+Approved native design: **Sela**, a whitespace-led product collection with Plus
+Jakarta Sans, white and quiet neutral surfaces, clay accents and an editable
+product-pair chooser. The exact approved 10-section, 354-element builder recipe,
+fictional catalog, screenshots, photography provenance and licensed font are
+preserved in `preview/`.
+
+## Apply
+
+Choose **New page → Sela**, enter your store name, select a featured catalog
+product and optionally choose up to three more products. The page stays editable
+with the ordinary element, section, responsive and product controls. Both the
+library and editor use the shared applicator; public CLI tools use the same path.
+
+```
+node tools/builder-mcp/examples/template.mjs sela my-collection PRODUCT_A,PRODUCT_B "My store"
+```
+
+The recipe uses native elements constructed through `EzkartNative.create`.
+It does not import concept HTML/CSS or add custom storefront scripts.
+
+## Catalog behavior
+
+- One to four different active products, all in the same currency.
+- Product names, photos, descriptions, prices, variants, availability and cart
+  actions bind independently to the selected real catalog products.
+- Real descriptions become optional editorial and detail sections. Missing media
+  removes the photo and recomposes the layout; it does not leave a placeholder.
+- Catalog density adapts to the product count. Availability filters appear only
+  when there are both available and sold-out products.
+- Two or more products enable the pair chooser. Two products show one pair without
+  redundant tabs; three or four products offer two or three choices. Each product
+  keeps its own variant selection, and totals use the selected variants' prices.
+- Pair purchases add ordinary product lines to the shared floating Ezkart cart.
+  Stock validation remains atomic. There are no invented discounts or bundles.
+- The store name replaces the demo branding. Fictional desk materials, dimensions,
+  packaging, product stories and policies never become merchant content.
+
+The applied page has seven to ten sections depending on available content.
+The merchant recipe has at most 298 native elements before optional nodes are
+removed. The original composition remains available in the approval archive.
+
+## Provenance and package
+
+`preview/approved-recipe.json` preserves the approved native inspection, including
+historical source-local asset URLs. Asset basenames map to `preview/assets/`.
+`preview/catalog.json` is a fictional fixture and is never loaded by the
+applicator. Generated photographs include prompts and provenance; the authored
+SVG logo and Plus Jakarta Sans OFL notice remain with the preview assets.
+Preview assets do not ship with applied customer pages.
+
+```
+node tools/templates/package.mjs sela /path/to/sela-1.0.0.tar.gz
+```
+
+The versioned package includes the shared runtime and fonts. The packager rejects
+anything above 50,000,000 bytes. See the repository validation report for measured
+commerce, responsive, accessibility and performance checks.

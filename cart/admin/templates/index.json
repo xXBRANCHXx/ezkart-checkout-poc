@@ -4,6 +4,10 @@
     {
       "id": "pith",
       "manifest": "pith/manifest.json"
+    },
+    {
+      "id": "sela",
+      "manifest": "sela/manifest.json"
     }
   ]
 }

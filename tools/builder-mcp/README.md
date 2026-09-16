@@ -163,7 +163,7 @@ Integration tests run the MCP protocol and the real browser editor. They cover p
 ## Installed landing-page templates
 
 **New page** in both the editor and landing-page library offers a blank canvas or
-an installed template. PITH is the first approved template. Select a real product
+an installed template. PITH supports one featured product; Sela supports a collection of one to four products. Select real catalog products
 and enter a store name; the resulting composition uses ordinary native elements.
 Unsupported demo recipes, claims and policies are omitted. Every purchase
 placement shares the real product's variant selection and Ezkart cart.
@@ -172,11 +172,12 @@ CLI example (uses the catalog in `EZKART_WORKSPACE`):
 
 ```sh
 node examples/template.mjs pith my-launch REAL_PRODUCT_ID "My store"
+node examples/template.mjs sela my-collection PRODUCT_A,PRODUCT_B "My store"
 ```
 
 This calls `project_create`, `template_apply`, `project_save`, `page_export` and
 `page_audit` and saves a tool-call log. `template_list` describes installed designs
-and their catalog requirements. `template_apply` requires a blank page, validates
+and their catalog requirements. Pass `productIds` in display order, with the featured product first; legacy `productId` remains supported. All selected products must use the same currency. `template_apply` requires a blank page, validates
 all content before applying, and participates in normal undo/redo. It never
-changes the catalog or publishes a page. Read [PITH's package notes](../../cart/admin/templates/pith/README.md)
+changes the catalog or publishes a page. Read [Sela's package notes](../../cart/admin/templates/sela/README.md) or [PITH's package notes](../../cart/admin/templates/pith/README.md)
 for the approved design, provenance, merchant-data behavior and package command.
