@@ -429,9 +429,24 @@
         );
       if (
         config.optionLayout &&
-        !["compact", "detailed", "select"].includes(config.optionLayout)
+        !["compact", "detailed", "select", "swatches"].includes(
+          config.optionLayout,
+        )
       )
-        throw Error("Choose side-by-side, detailed, or dropdown options.");
+        throw Error(
+          "Choose side-by-side, detailed, dropdown, or color swatch options.",
+        );
+      if (
+        config.variantColors &&
+        (typeof config.variantColors !== "object" ||
+          Array.isArray(config.variantColors) ||
+          Object.entries(config.variantColors).some(
+            ([id, color]) =>
+              !/^[a-zA-Z0-9_-]{1,120}$/.test(id) ||
+              !/^#[0-9a-f]{6}$/i.test(color),
+          ))
+      )
+        throw Error("Choose a six-digit hex color for each variant swatch.");
     }
     for (const key of [
       "stateScope",
@@ -1377,6 +1392,7 @@
         "stateMode",
         "statePanel",
         "productIds",
+        "variantColors",
       ].includes(k),
     )
       ? config
@@ -2147,6 +2163,54 @@
       panel.querySelector('[data-commerce-setting="showPrice"]').checked =
         Boolean(config.showPrice);
       const setProducts = panel.querySelector("[data-native-set-products]");
+      const swatches = panel.querySelector("[data-native-variant-colors]");
+      swatches.hidden =
+        config.part !== "options" || config.optionLayout !== "swatches";
+      swatches.replaceChildren(
+        ...(
+          (hooks.products?.() || []).find((p) => p.id === config.productId)
+            ?.variants || []
+        )
+          .filter((v) => !v.hidden)
+          .map((variant) => {
+            const row = document.createElement("label"),
+              field = document.createElement("input"),
+              clear = document.createElement("button");
+            row.className = "sq-native-swatch-setting";
+            field.type = "color";
+            field.value = config.variantColors?.[variant.id] || "#ffffff";
+            field.setAttribute(
+              "aria-label",
+              `${variant.name || variant.id} swatch color`,
+            );
+            field.addEventListener("change", () => {
+              if (read(selected).variantColors?.[variant.id] === field.value)
+                return;
+              change({
+                variantColors: {
+                  ...read(selected).variantColors,
+                  [variant.id]: field.value,
+                },
+              });
+              select(selected);
+            });
+            clear.type = "button";
+            clear.textContent = "Use name";
+            clear.disabled = !config.variantColors?.[variant.id];
+            clear.addEventListener("click", () => {
+              const colors = { ...read(selected).variantColors };
+              delete colors[variant.id];
+              change({ variantColors: colors });
+              select(selected);
+            });
+            row.append(
+              document.createTextNode(variant.name || variant.id),
+              field,
+              clear,
+            );
+            return row;
+          }),
+      );
       setProducts.replaceChildren(
         ...(hooks.products?.() || []).map((p) => {
           const label = document.createElement("label"),
@@ -2462,7 +2526,8 @@
       <details open data-native-commerce-controls hidden><summary>Product control</summary>
       <label>Show<select data-commerce-setting="part"><option value="image">Product image</option><option value="options">Variant choices</option><option value="price">Selected price</option><option value="title">Selected name</option><option value="product-name">Product name</option><option value="set-price">Combined price</option><option value="set-add">Add a set of products</option><option value="description">Selected description</option><option value="add">Add to cart button</option><option value="cart">Open cart button</option></select></label>
       <div data-native-set-products></div><label>Shared selection name<input data-commerce-setting="group" placeholder="e.g. main-product"></label><p class="sq-native-help">Use the same name and product on controls that should share a selected variant. Leave blank for independent choices.</p>
-      <label>Label<input data-commerce-setting="label"></label><label>Options layout<select data-commerce-setting="optionLayout"><option value="compact">Side by side</option><option value="detailed">Stacked with details</option><option value="select">Dropdown</option></select></label>
+      <label>Label<input data-commerce-setting="label"></label><label>Options layout<select data-commerce-setting="optionLayout"><option value="compact">Side by side</option><option value="detailed">Stacked with details</option><option value="select">Dropdown</option><option value="swatches">Color swatches</option></select></label>
+      <div data-native-variant-colors hidden></div>
       <label>Text before value<input data-commerce-setting="prefix"></label><label>Text after value<input data-commerce-setting="suffix"></label><label>Option price suffix<input data-commerce-setting="priceSuffix" placeholder=" / pack"></label><label><input type="checkbox" data-commerce-setting="showPrice"> Show price on the button</label>
       </details>
       <details open data-native-content><summary data-native-content-title>Text</summary>
@@ -2721,6 +2786,7 @@
         throw Error("Choose an available catalog product.");
       const config = read(selected);
       config.productId = productId;
+      delete config.variantColors;
       validate(config);
       hooks.remember();
       write(selected, config);

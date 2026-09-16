@@ -121,10 +121,21 @@
       }
       if (!product) {
         if (c.part === "add") {
-          const button = element("button", "Choose a product", "sq-native-commerce-button");
-          button.type = "button"; button.disabled = true;
+          const button = element(
+            "button",
+            "Choose a product",
+            "sq-native-commerce-button",
+          );
+          button.type = "button";
+          button.disabled = true;
           node.replaceChildren(button);
-        } else node.replaceChildren(element("p", c.part === "price" ? "—" : "Connect a product in Products."));
+        } else
+          node.replaceChildren(
+            element(
+              "p",
+              c.part === "price" ? "—" : "Connect a product in Products.",
+            ),
+          );
         return;
       }
       const variantName = (variant) =>
@@ -167,7 +178,8 @@
         field.append(legend);
         if (
           c.optionLayout === "select" ||
-          (variants.length > 6 && c.optionLayout !== "detailed")
+          (variants.length > 6 &&
+            !["detailed", "swatches"].includes(c.optionLayout))
         ) {
           const select = element("select", null, "sq-native-commerce-select");
           select.dataset.commerceOption = "";
@@ -199,7 +211,14 @@
           input.dataset.commerceOption = "";
           input.setAttribute("aria-label", variantName(variant));
           const content = element("span", null, "sq-native-commerce-choice");
-          content.append(element("strong", variantName(variant)));
+          const swatch =
+            c.optionLayout === "swatches" && c.variantColors?.[variant.id];
+          if (swatch && /^#[0-9a-f]{6}$/i.test(swatch)) {
+            content.classList.add("sq-native-commerce-swatch");
+            content.style.backgroundColor = swatch;
+            content.setAttribute("aria-hidden", "true");
+            label.title = variantName(variant);
+          } else content.append(element("strong", variantName(variant)));
           if (c.optionLayout === "detailed") {
             if (variant.description)
               content.append(element("small", variant.description));
@@ -213,12 +232,27 @@
           if (
             product.type === "physical" &&
             Number(variant.stock ?? product.stock) <= 0
-          )
-            content.append(element("small", "Sold out"));
+          ) {
+            input.setAttribute(
+              "aria-label",
+              variantName(variant) + " — Sold out",
+            );
+            label.dataset.soldOut = "true";
+            if (!swatch) content.append(element("small", "Sold out"));
+          }
           label.append(input, content);
           list.append(label);
         });
         field.append(list);
+        if (c.optionLayout === "swatches") {
+          const value = element(
+            "span",
+            variantName(selected) + (!available ? " — Sold out" : ""),
+            "sq-native-commerce-selection",
+          );
+          value.setAttribute("aria-live", "polite");
+          field.append(value);
+        }
         node.replaceChildren(field);
       } else if (c.part === "add") {
         const button = element(
@@ -258,6 +292,26 @@
         const owner = input.closest('[data-native-type="commerce"]'),
           c = config(owner);
         selections.set(key(c), input.value);
+        const selectionLabel = owner.querySelector(
+          ".sq-native-commerce-selection",
+        );
+        if (selectionLabel) {
+          const product = catalog.get(c.productId);
+          const variant =
+            product?.variants?.find((v) => v.id === input.value) || product;
+          if (variant)
+            selectionLabel.textContent =
+              (variant.name ||
+                (variant.options || [])
+                  .map((option) => option.value)
+                  .filter(Boolean)
+                  .join(" / ") ||
+                product.name) +
+              (product.type === "physical" &&
+              Number(variant.stock ?? product.stock) <= 0
+                ? " — Sold out"
+                : "");
+        }
         nodes
           .filter(
             (node) =>

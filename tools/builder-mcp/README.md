@@ -74,9 +74,16 @@ typography use the same `props` and `responsive` controls as other elements.
 Set the same `group` on controls that should share a variant. The product ID is
 also part of that connection: placing a different product with the same group
 does not change the first product. Leave `group` blank for independent selections.
-The inspector exposes the group, product, label, `optionLayout` (`compact`, `detailed` or `select`),
+The inspector exposes the group, product, label, `optionLayout` (`compact`, `detailed`, `select` or `swatches`),
 price prefix/suffix and `showPrice` on purchase buttons. These controls export
 through the existing cart and checkout flow; they contain no custom page code.
+
+Color swatches use `variantColors`, a map of actual variant IDs to six-digit hex
+colors, for example `{"peach":"#dda385","sage":"#a5b19a"}`. The inspector
+provides a color picker for each visible variant and **Use name** to return to a
+text choice. Unmapped variants keep their readable names. Swatches use native
+radio controls with 44px targets, keyboard selection and a visible selected name.
+Changing the connected product in the inspector clears its old color mapping.
 
 New templates use the [shared floating cart](../../docs/storefront-cart-pattern.md)
 outside navigation. The exporter supplies it when no merchant-placed cart control

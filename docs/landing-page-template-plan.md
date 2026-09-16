@@ -379,4 +379,6 @@ Preserve each template's distinctive composition, responsive behavior, and art d
 
 ## Current queue — September 16, 2026
 
-The user commissioned Hue (Rona) for native builder recreation after Lintas and the shared product/output changes. Open a separate terminal for the next professional business concept first. That next concept is one of the one-or-two more formal designs: professional business branding, clean typography, generous whitespace and approachable polish. Avoid repeating sharp editorial/studio layouts. It inherits the empty product section, required catalog product/stock before publish or export, and shared Ezkart cart protocol.
+Hue (Rona) has been recreated through the native builder and is ready for review. See [the native validation report](templates/rona-builder-validation.md). Its concept approval does not yet approve template packaging.
+
+The separate terminal for the professional-business concept is open in the Ezkart workspace with full access; its working folder is `~/.local/share/ezkart-templates/lajur/`. This commissioned concept is one of the one-or-two more formal designs: professional business branding, clean typography, generous whitespace and approachable polish. Avoid repeating sharp editorial/studio layouts. It inherits the empty product section, required catalog product/stock before publish or export, and shared Ezkart cart protocol. Do not start another copy of this commission.
