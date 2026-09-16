@@ -7,19 +7,21 @@ description: "Create Ezkart landing-page concepts with fictional branding and pr
 
 Make one distinctive, complete storefront at a time. The user wants to review a coded concept first, then have it recreated with Ezkart's editable elements, then approve it as a template.
 
-## Current collection direction
+## Current instructions
 
-- Plan for roughly **15 templates**; the count is provisional. Build one at a time.
-- Future designs should be highly professional, clear and practical for ordinary merchants. Use restrained branding, disciplined spacing and familiar navigation. Reserve a more formal tone for only **one or two** templates; the rest should feel approachable and polished.
-- **Sela fulfills the whitespace-led direction:** clean Plus Jakarta Sans, restrained backgrounds, an Indonesian desk-accessories catalog, and a practical setup chooser. Its native builder version is approved and installed as a template for one to four real catalog products. See `cart/admin/templates/sela/README.md` and its concept record for the approval and package.
-- **Takar** is the approved pantry storefront, saved at `~/.local/share/ezkart-templates/takar/concept.json`. It is installed as an editable template for one to three real catalog products. See `cart/admin/templates/takar/README.md` for catalog adaptation, the approval archive and package.
-- **Lintas (Cross)** is approved and installed as a native template for one to three real products. See `cart/admin/templates/lintas/README.md` and `docs/templates/lintas-template-validation.md`.
-- **Hue (Rona) is approved and installed** as an editable native template for one to three real products. See `cart/admin/templates/rona/README.md` and `docs/templates/rona-template-validation.md`. New drafts start with an empty product card.
-- **Lane (Lajur) version 2 has been recreated and is ready for native review**, at `~/.local/share/ezkart-templates/lajur/`. Preserve the revised open photographic design: the user specifically rejected the earlier framed hero and excessive rounded cards. This is one of the one-or-two formal business templates. Its merchant-facing page must not claim purchases are simulated. Normal applied storefronts use real Ezkart checkout; isolated fictional catalog review fixtures remain explicitly simulated before checkout. See `docs/templates/lajur-builder-validation.md`. Wait for approval of this native version before template packaging; do not launch a duplicate.
-- **A more creative step-one concept is commissioned and running in its own terminal.** The `ezkart-template-creative` window was launched in the Ezkart repository with full access and approvals set to never after Lane reached native review. Do not launch a duplicate. Choose a distinct merchant story and composition, with character, practical shopping and professional execution. Do not repeat the formal business-document design. Follow the user's broader rounded, gradient, Ezkart-inspired direction where appropriate without returning to excessive boxed cards. Keep new work in its own concept folder.
-- **Collection direction — updated September 16, 2026:** use Ezkart’s own marketing website as the primary visual reference. Make new designs visibly rounder, with soft gradients, clean sans-serif typography, generous whitespace and an approachable, professional shopping journey. Stop repeating sharp-corner, studio/designer/editorial layouts. This explicit user direction overrides older blanket restrictions on rounded containers and gradient backgrounds; use them with clear hierarchy and readable contrast. Choose a distinct merchant story and composition for each separately commissioned concept.
-- PITH is the approved bold launch design. Its oversized condensed typography and citrus palette are not the default for subsequent templates.
-- A following concept is **saved for later** until the user commissions it. Start it when the user asks to begin the next concept or step one. A request to package the current template does not also start the next design.
+For new concepts, give the design agent a short brief containing the user's request and Ezkart's functional requirements. Let it choose the visual design. Do not add a palette, font, layout formula, genre, reference site, list of aesthetic prohibitions, or accumulated taste instructions unless the user asks for them for that concept.
+
+The user canceled **Tilu** because it repeated the existing designs. Do not resume, rebuild or package it. The next concept should be creative and original; PITH was a reference for creativity, not a requested style to copy. Earlier collection-wide prescriptions for rounded sections, gradients, whitespace and Ezkart's marketing-site style are no longer defaults for new commissions. Existing approved designs remain unchanged.
+
+Required for every concept: a complete responsive storefront, fictional brand and products for review, Ezkart's universal cart, working product choices and honest demo checkout. Keep editable content and assets separate so the approved concept can later be recreated through the builder. The three-stage workflow and product/stock publishing requirements below still apply.
+
+## Current work
+
+- PITH, Sela, Takar, Lintas and Rona are approved and installed templates.
+- Lajur (Lane) version 2 is ready for native review. See `docs/templates/lajur-builder-validation.md`. Its approved open photographic composition supersedes its rejected first concept. Keep normal merchant checkout copy.
+- Melo (`~/.local/share/ezkart-templates/melo-punch-20260916`) is ready for native review. See `docs/templates/melo-builder-validation.md`. Native approval must precede template packaging.
+- Tilu (`~/.local/share/ezkart-templates/tilu-evening-20260916-01`) is canceled. Its files are retained as a rejected concept.
+- The replacement concept is running in the `ezkart-template-open-creative` terminal, in the Ezkart repository with full access and approvals set to never. It received a minimal functional brief and chooses its own design. Do not launch a duplicate or add a design prescription.
 
 ## Find the project and current stage
 
@@ -33,9 +35,9 @@ Infer the requested stage from the conversation and these files. A request to cr
 
 ## Step one — design and open a concept
 
-Create a finished landing page in HTML, CSS and JavaScript with an original fictional brand, logo, product, packaging, copy and a coherent visual identity. Build the whole shopping story through the footer. Choose a design suited to the product rather than imposing a common starter layout.
+Create a finished landing page in HTML, CSS and JavaScript with an original fictional brand, logo, product, packaging, copy and a coherent visual identity. Build the whole shopping story through the footer. Let the agent choose the visual direction.
 
-- Follow the design constitution in the repository brief. Fictional merchandise and branding are authorized here; fabricated ratings, customer quotes and trust claims are not.
+- Fictional merchandise and branding are authorized for review. Do not fabricate ratings, customer quotes or trust claims. The current instructions above supersede historical aesthetic rules in the repository brief.
 - Create useful assets instead of leaving placeholders. A custom SVG wordmark or symbol is appropriate for a logo. Use image generation when product photography or illustrations need it and the capability is available; follow that tool's instructions. Save assets locally and document their origin. Keep product images free of incidental borders or padding baked in by the layout.
 - Use a consistent grid and deliberate typography. Design the mobile composition explicitly. Menus, section links, product choices, cart feedback and disclosures must work wherever they appear. Demo purchase flows must clearly identify their simulated checkout before any payment or order submission.
 - The concept may use authored HTML/CSS/JS. Document any effect likely to need a new shared builder control later; do not let today's library force every concept into the same layout.

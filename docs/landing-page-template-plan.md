@@ -1,5 +1,9 @@
 # Ezkart landing-page template program
 
+## Current instruction — requirements-only concept briefs
+
+The user canceled Tilu because its composition repeated existing designs. New design-agent briefs must contain only the requested task and the Ezkart integration requirements. Let the agent choose the design. Do not impose palettes, typography, layouts, a marketing-site reference or lists of aesthetic restrictions. Earlier visual prescriptions in this document are historical references, not defaults or gates for new concepts. Preserve existing approved designs and all functional requirements: universal cart, native builder reconstruction, empty product slot on template application, product/stock gates for publish and code export, responsive usability, honest content and the package limit.
+
 ## Status and scope
 
 This document preserves the future art-direction brief for Ezkart's landing-page template program. Read it before planning or implementing template, renderer, template-selection, or builder work.
@@ -383,4 +387,8 @@ Hue (Rona) is approved and installed as a native template for one to three produ
 
 Lane (Lajur) version 2 has been recreated and is ready for native review. See [the native validation report](templates/lajur-builder-validation.md). Its open photographic composition supersedes the rejected framed, rounded first version. Preserve that specific feedback for this formal business-document storefront. Do not include simulated-purchase claims in merchant-facing copy. Real storefronts use normal Ezkart checkout; fictional catalog review fixtures remain explicitly simulated at checkout.
 
-Lane is ready for native review. The commissioned creative-concept terminal (`ezkart-template-creative`) is open in the Ezkart workspace with full access and approvals set to never, and has started step one. Do not launch a duplicate. Choose a different merchant story and composition, retaining professional clarity and practical shopping. The broader Ezkart-inspired rounded and gradient direction still applies to new concepts; avoid excessive boxed cards. Native Lane approval and template packaging remain separate stages.
+Melo is ready for native review at `~/.local/share/ezkart-templates/melo-punch-20260916`. See [the native validation report](templates/melo-builder-validation.md). Its approved craft-shop design has been preserved. Native approval must precede template packaging.
+
+Tilu was canceled by the user for repeating existing layouts. Preserve it as a rejected concept and do not recreate or package it. The replacement concept receives a minimal functional brief: create an original, creative storefront with fictional branding/products, use Ezkart's universal cart, make product choices work, and open a responsive browser preview. Leave visual choices to the agent. Keep Melo's native work separate.
+
+The replacement concept is running in `ezkart-template-open-creative` with the minimal functional brief and no prescribed art direction. Do not open a duplicate terminal.

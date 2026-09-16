@@ -100,6 +100,7 @@ test("the shared floating cart remains reachable above purchase bars and preserv
       route.fulfill({ body: html, contentType: "text/html" }),
     );
     await page.goto(ws.url + "/cart-pattern-export");
+    assert.equal(await page.locator('main,[role="main"]').count(), 1);
     const cart = page.locator(".ezkart-cart-trigger");
     assert.equal(await cart.count(), 1);
     assert.equal(await cart.locator("svg").count(), 1);
@@ -107,7 +108,21 @@ test("the shared floating cart remains reachable above purchase bars and preserv
       await cart.evaluate((n) => getComputedStyle(n).backgroundColor),
       "rgb(255, 255, 255)",
     );
+    await page.evaluate(() => {
+      const existing = document.createElement("div");
+      existing.id = "already-inert";
+      existing.inert = true;
+      document.body.append(existing);
+    });
     await cart.click();
+    assert.equal(
+      await page.locator(".sq-page-preview").evaluate((n) => n.inert),
+      true,
+    );
+    assert.equal(
+      await page.locator(".ezkart-cart-backdrop").getAttribute("tabindex"),
+      "-1",
+    );
     assert.match(
       await page.locator("[data-ezkart-cart-items]").innerText(),
       /Your cart is empty/,
@@ -120,6 +135,14 @@ test("the shared floating cart remains reachable above purchase bars and preserv
     await page.locator("[data-ezkart-cart-layer]").waitFor({ state: "hidden" });
     assert.equal(
       await cart.evaluate((n) => n === document.activeElement),
+      true,
+    );
+    assert.equal(
+      await page.locator(".sq-page-preview").evaluate((n) => n.inert),
+      false,
+    );
+    assert.equal(
+      await page.locator("#already-inert").evaluate((n) => n.inert),
       true,
     );
     for (const width of [320, 390, 768, 1440]) {
@@ -160,6 +183,32 @@ test("the shared floating cart remains reachable above purchase bars and preserv
       await page.locator("[data-ezkart-cart-subtotal]").innerText(),
       "$48",
     );
+    assert.equal(
+      await page
+        .locator('[data-ezkart-cart-quantity="1"]')
+        .evaluate((n) => n === document.activeElement),
+      true,
+    );
+    await page.locator('[data-ezkart-cart-quantity="1"]').click();
+    assert.equal(
+      await page.locator('[data-ezkart-cart-quantity="1"]').isDisabled(),
+      true,
+    );
+    assert.equal(
+      await page
+        .locator('[data-ezkart-cart-quantity="-1"]')
+        .evaluate((n) => n === document.activeElement),
+      true,
+    );
+    assert.equal(
+      await page.locator("[data-ezkart-cart-subtotal]").innerText(),
+      "$72",
+    );
+    await page.locator('[data-ezkart-cart-quantity="-1"]').click();
+    assert.equal(
+      await page.locator('[data-ezkart-cart-quantity="1"]').isDisabled(),
+      false,
+    );
     await page.keyboard.press("Escape");
     await page.locator("[data-ezkart-cart-layer]").waitFor({ state: "hidden" });
     await cart.click();
@@ -173,8 +222,18 @@ test("the shared floating cart remains reachable above purchase bars and preserv
       await page.locator("[data-ezkart-cart-items]").innerText(),
       /Your cart is empty/,
     );
+    assert.equal(
+      await page
+        .locator(".ezkart-cart-drawer [data-ezkart-cart-close]")
+        .evaluate((n) => n === document.activeElement),
+      true,
+    );
     await page.keyboard.press("Escape");
     await page.locator("[data-ezkart-cart-layer]").waitFor({ state: "hidden" });
+    assert.equal(
+      await page.locator(".sq-page-preview").evaluate((n) => n.inert),
+      false,
+    );
     await page.evaluate(() => scrollTo({ top: 0, behavior: "instant" }));
     await page.waitForFunction(
       () =>
@@ -184,14 +243,12 @@ test("the shared floating cart remains reachable above purchase bars and preserv
     );
     // Ordinary purchase controls must remain clickable when they cross the corner.
     await page.locator("#native-purchase").evaluate((n) => (n.hidden = true));
-    await page
-      .locator("#native-inline-add")
-      .evaluate((n) =>
-        scrollTo({
-          top: scrollY + n.getBoundingClientRect().top - innerHeight + 70,
-          behavior: "instant",
-        }),
-      );
+    await page.locator("#native-inline-add").evaluate((n) =>
+      scrollTo({
+        top: scrollY + n.getBoundingClientRect().top - innerHeight + 70,
+        behavior: "instant",
+      }),
+    );
     await page.waitForFunction(
       () =>
         document.querySelector(".ezkart-cart-trigger").getBoundingClientRect()

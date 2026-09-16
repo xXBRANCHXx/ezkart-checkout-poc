@@ -177,6 +177,11 @@ test("scoped filters and keyboard tabs preserve independent state; editable dial
           }),
           bound("independent", "price", { group: "independent" }),
           bound("dropdown", "options", { optionLayout: "select" }),
+          n("reveal-link", "button", {
+            tag: "a",
+            text: "View every material",
+            action: { type: "link", target: "#native-felt" },
+          }),
         ],
       }),
     });
@@ -220,6 +225,32 @@ test("scoped filters and keyboard tabs preserve independent state; editable dial
       (await call("nativeInspect", { id: "set-buy" })).productIds,
       ["desk", "mat"],
     );
+    await assert.rejects(
+      () =>
+        call("nativeUpdate", {
+          id: "reveal-link",
+          action: { type: "link", target: "#native-felt", revealState: "all" },
+        }),
+      /Choose a group/,
+    );
+    await page.locator("#native-reveal-link").click();
+    await panel.locator("[data-native-action-reveal]").evaluate((n) => {
+      for (let p = n.parentElement; p; p = p.parentElement)
+        if (p.tagName === "DETAILS") p.open = true;
+    });
+    await panel.locator("[data-native-action-scope]").fill("filter");
+    await panel.locator("[data-native-action-reveal]").fill("all");
+    await panel.locator("[data-native-action-apply]").click();
+    assert.equal(
+      (await call("nativeInspect", { id: "reveal-link" })).action.revealState,
+      "all",
+    );
+    await call("undo");
+    assert.equal(
+      (await call("nativeInspect", { id: "reveal-link" })).action.revealState,
+      undefined,
+    );
+    await call("redo");
     await call("save");
     await page.reload();
     await page.waitForFunction(() => globalThis.EzkartBuilder);
@@ -227,6 +258,10 @@ test("scoped filters and keyboard tabs preserve independent state; editable dial
     assert.equal(
       await page.locator("#native-detail").evaluate((n) => n.open),
       true,
+    );
+    assert.equal(
+      (await call("nativeInspect", { id: "reveal-link" })).action.revealState,
+      "all",
     );
     const html = await call("previewHtml");
     const p = await browser.newPage({
@@ -292,7 +327,7 @@ test("scoped filters and keyboard tabs preserve independent state; editable dial
     );
 
     assert.equal(await p.locator("#native-felt").isVisible(), false);
-    await p.locator("#native-all").click();
+    await p.locator("#native-reveal-link").click();
     assert.equal(await p.locator("#native-felt").isVisible(), true);
     assert.equal(await p.locator("#native-write-panel").isVisible(), true);
     assert.match(p.url(), /material=all/);

@@ -120,6 +120,13 @@ for bounded controls such as one/two-portion selectors. Focus moves to an enable
 sibling when the selected button becomes disabled. If a state change hides its trigger,
 focus moves to an available visible control in the same group.
 
+Links can reset a filtered group before navigating. In **Click action**, choose
+**Open link**, enter the **Interaction group ID**, and set **Show group version
+before opening link**. The tool model is
+`action: {type: "link", target: "#product", scope: "collection", revealState: "all"}`.
+This reveals the destination before anchor scrolling and updates the group's URL
+choice without changing unrelated tabs or filters.
+
 Choose the `dialog` HTML element on a native container under **Structure &
 accessibility**, then use **Click action → Open dialog / Close dialog** with its
 ID. Fill it with ordinary editable text, images and product controls. Alt-click

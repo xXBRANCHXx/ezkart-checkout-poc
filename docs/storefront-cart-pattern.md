@@ -10,10 +10,13 @@ across different storefront palettes. Keep the empty state accessible too.
 - Product buttons, variant controls and repeated placements use the existing
   catalog bindings and shared cart. Templates do not implement their own cart.
 - Adding a product opens the shared drawer with that variant, quantity and price.
-- The floating control stays clear of fixed purchase bars, ordinary catalog purchase buttons, variant selectors, and device safe areas.
+- The floating control stays clear of fixed purchase bars, ordinary catalog purchase buttons, variant selectors, native action buttons, disclosure controls, and device safe areas.
 - Desktop uses a right-side drawer; mobile uses the full available width.
 - Closing the drawer preserves the cart and returns focus to the opener.
-  Escape, Tab and Shift+Tab work throughout the drawer.
+  Escape, Tab and Shift+Tab work throughout the drawer. Background page controls
+  are inert while it is open; their previous inert state is restored when closed.
+- Quantity buttons retain keyboard focus after updates. Increase is disabled at
+  the stock limit; removing the last item moves focus to the drawer's close button.
 - Quantity and subtotal changes update the same cart count everywhere. Checkout
   follows the store's existing checkout flow; local fictional concepts use the
   explicitly configured simulated checkout.

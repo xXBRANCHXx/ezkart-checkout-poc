@@ -168,6 +168,9 @@ test("color swatches support keyboard selection, stock, independent products, an
     await preview.locator("#native-buy button").click();
     assert.match(await preview.locator(".ezkart-cart-row").innerText(), /Sage/);
     await preview.keyboard.press("Escape");
+    await preview
+      .locator("[data-ezkart-cart-layer]")
+      .waitFor({ state: "hidden" });
     await preview.getByRole("radio", { name: "Sage", exact: true }).focus();
     await preview.keyboard.press("ArrowRight");
     assert.equal(

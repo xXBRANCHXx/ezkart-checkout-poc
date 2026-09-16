@@ -253,6 +253,9 @@ test("fixed variants preserve prices and stock independently; semantic table hea
       "Rp200",
     );
     await preview.keyboard.press("Escape");
+    await preview
+      .locator("[data-ezkart-cart-layer]")
+      .waitFor({ state: "hidden" });
     assert.equal(
       await preview
         .getByRole("columnheader", { name: "Team", exact: true })

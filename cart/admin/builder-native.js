@@ -528,6 +528,15 @@
         ].includes(config.action.type)
       )
         throw Error("Choose an interaction.");
+      if (
+        config.action.revealState &&
+        (config.action.type !== "link" ||
+          !identifier(config.action.revealState) ||
+          !config.action.scope)
+      )
+        throw Error(
+          "Choose a group and valid version to show before opening the link.",
+        );
       if (config.action.scope && !identifier(config.action.scope))
         throw Error("Choose a valid interaction group.");
       if (
@@ -1137,6 +1146,8 @@
       const action = config.action || config;
       if (!action?.type || (editing && !event.altKey)) return;
       if (action.type === "link") {
+        if (action.revealState)
+          setState(find(action.scope), action.revealState, true);
         root
           .querySelectorAll("[data-native-collapsed]")
           .forEach((n) => (n.hidden = true));
@@ -2494,6 +2505,10 @@
       panel.querySelector(`[data-state-setting="${key}"]`).value =
         config[key] || "";
     const action = config.action || {};
+    panel.querySelector("[data-native-action-reveal]").value =
+      action.revealState || "";
+    panel.querySelector("[data-native-action-reveal]").closest("label").hidden =
+      action.type !== "link";
     panel.querySelector("[data-native-action-scope]").value =
       action.scope || "";
     panel.querySelector("[data-native-action-type]").value = action.type || "";
@@ -2820,7 +2835,7 @@
     }
     panel.insertAdjacentHTML(
       "beforeend",
-      '<details><summary>Click action</summary><label>On click<select data-native-action-type><option value="">None</option><option value="link">Open link</option><option value="toggle">Show / hide element</option><option value="state">Switch state</option><option value="dialog">Open dialog</option><option value="close-dialog">Close dialog</option><option value="video-dialog">Open video dialog</option><option value="video-toggle">Play / pause video</option></select></label><label>Destination or target ID<input data-native-action-target></label><label>Interaction group ID<input data-native-action-scope placeholder="Optional: collection or setup group"></label><label><input type="checkbox" data-native-action-disable-active> Disable when this state is selected</label><button type="button" data-native-action-apply>Apply action</button></details><p class="sq-native-help">Hold Alt and click an element to try its interaction.</p>',
+      '<details><summary>Click action</summary><label>On click<select data-native-action-type><option value="">None</option><option value="link">Open link</option><option value="toggle">Show / hide element</option><option value="state">Switch state</option><option value="dialog">Open dialog</option><option value="close-dialog">Close dialog</option><option value="video-dialog">Open video dialog</option><option value="video-toggle">Play / pause video</option></select></label><label>Destination or target ID<input data-native-action-target></label><label>Interaction group ID<input data-native-action-scope placeholder="Optional: collection or setup group"></label><label>Show group version before opening link<input data-native-action-reveal placeholder="Optional: e.g. all"></label><label><input type="checkbox" data-native-action-disable-active> Disable when this state is selected</label><button type="button" data-native-action-apply>Apply action</button></details><p class="sq-native-help">Hold Alt and click an element to try its interaction.</p>',
     );
     panel.append(advanced);
     const fontOptions = document.createElement("datalist");
@@ -3388,6 +3403,10 @@
     });
     listen("[data-native-action-type]", "change", () => {
       panel
+        .querySelector("[data-native-action-reveal]")
+        .closest("label").hidden =
+        panel.querySelector("[data-native-action-type]").value !== "link";
+      panel
         .querySelector("[data-native-action-disable-active]")
         .closest("label").hidden =
         panel.querySelector("[data-native-action-type]").value !== "state";
@@ -3403,6 +3422,11 @@
               scope:
                 panel.querySelector("[data-native-action-scope]").value ||
                 undefined,
+              revealState:
+                type === "link"
+                  ? panel.querySelector("[data-native-action-reveal]").value ||
+                    undefined
+                  : undefined,
               disableWhenActive:
                 type === "state" &&
                 panel.querySelector("[data-native-action-disable-active]")
