@@ -223,7 +223,7 @@ test("existing product blocks fit after resizing, reflow narrow columns, and pre
       await page.waitForFunction(() => globalThis.EzkartBuilder);
       await invoke("settle");
       await checkProductBounds(grid);
-      const html = await invoke("exportHtml");
+      const html = await invoke("previewHtml");
       await page.route("**/polish-export", (r) =>
         r.fulfill({ body: html, contentType: "text/html" }),
       );
@@ -389,7 +389,7 @@ for (const kind of ["native", "native-fixed", "authored", "reference"])
       await page.reload();
       await page.waitForFunction(() => globalThis.EzkartBuilder);
       await invoke("settle");
-      const html = await invoke("exportHtml");
+      const html = await invoke("previewHtml");
       await page.route("**/navigation-export", (r) =>
         r.fulfill({ body: html, contentType: "text/html" }),
       );

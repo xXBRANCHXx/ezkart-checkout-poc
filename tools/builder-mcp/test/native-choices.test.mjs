@@ -222,7 +222,7 @@ test("scoped filters and keyboard tabs preserve independent state; editable dial
       await page.locator("#native-detail").evaluate((n) => n.open),
       true,
     );
-    const html = await call("exportHtml");
+    const html = await call("previewHtml");
     const p = await browser.newPage({
       viewport: { width: 390, height: 900 },
       reducedMotion: "reduce",

@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "id": "lintas",
+  "version": "1.0.0",
+  "name": "Lintas",
+  "description": "A clear everyday storefront with spacious photography, navy accents and a useful product comparison.",
+  "recipe": "recipe.json",
+  "thumbnail": "preview/desktop.png",
+  "previews": [
+    "preview/desktop.png",
+    "preview/mobile.png",
+    "preview/footer.png"
+  ],
+  "previewLabel": "Design imagery is included and editable. Your page starts with an empty product card. Connect your own products and add stock before publishing or exporting code.",
+  "requirements": {
+    "minProducts": 1,
+    "maxProducts": 3,
+    "images": "optional",
+    "variants": "optional",
+    "description": "optional",
+    "draftProducts": 0
+  },
+  "theme": {
+    "accent": "#172b3b",
+    "page": "#ffffff",
+    "ink": "#172b3b",
+    "surface": "#eff3f5",
+    "headingFont": "DM Sans, Arial, sans-serif",
+    "bodyFont": "DM Sans, Arial, sans-serif",
+    "buttonBackground": "#172b3b",
+    "buttonText": "#ffffff",
+    "radius": 4
+  },
+  "approval": {
+    "version": "lintas-native-v1.0",
+    "instruction": "ok, I like it. You know what to do",
+    "recipeSha256": "bfff583a32a171c53637d3514f9cbc591d349e27dec66dcef9af7dde795e30a1"
+  },
+  "optionalSections": {
+    "lintas-size": "Two or more selected products; real photos and descriptions replace fictional bag dimensions",
+    "lintas-story": "Featured product description"
+  },
+  "demoContent": "Fictional catalog stays in preview/. Design photography in design/ may remain on merchant pages.",
+  "productSlot": "card-tote"
+}

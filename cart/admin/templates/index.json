@@ -12,6 +12,10 @@
     {
       "id": "takar",
       "manifest": "takar/manifest.json"
+    },
+    {
+      "id": "lintas",
+      "manifest": "lintas/manifest.json"
     }
   ]
 }

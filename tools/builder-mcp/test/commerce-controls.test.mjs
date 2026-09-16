@@ -115,7 +115,7 @@ test("separate product controls share variants, preserve independent products, a
       (await invoke("nativeInspect", { id: "price" })).suffix,
       " USD",
     );
-    const html = await invoke("exportHtml");
+    const html = await invoke("previewHtml");
     assert.ok(!html.includes('"digitalFile"'));
     const preview = await browser.newPage({
       viewport: { width: 390, height: 900 },
@@ -283,7 +283,7 @@ test("native sticky navigation remains clickable above later sections and condit
       1,
     );
     await invoke("undo");
-    const html = await invoke("exportHtml");
+    const html = await invoke("previewHtml");
     await page.route("**/sticky-export", (r) =>
       r.fulfill({ body: html, contentType: "text/html" }),
     );

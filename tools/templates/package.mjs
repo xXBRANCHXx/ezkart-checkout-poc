@@ -112,6 +112,8 @@ export async function inspectPackage(id, root = repo) {
     (node.children || []).forEach(check);
   }
   recipe.forEach(check);
+  if (!manifest.productSlot || !ids.has(manifest.productSlot))
+    throw Error("Every template needs an editable product section and an empty product slot.");
   return {
     id,
     version: manifest.version,

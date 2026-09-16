@@ -1,4 +1,4 @@
-# Sela · 1.1.0
+# Sela · 1.2.0
 
 Approved native design: **Sela**, a whitespace-led product collection with Plus
 Jakarta Sans, white and quiet neutral surfaces, clay accents and an editable
@@ -8,8 +8,7 @@ preserved in `preview/`.
 
 ## Apply
 
-Choose **New page → Sela** and start editing. Store name and products can be
-filled in now or later. Connect a featured product and up to three more when ready.
+Choose **New page → Sela** and start editing. Enter the store name now or later, then choose products from the empty card in the editor. Connect a featured product and up to three more when ready.
 The page stays editable
 with the ordinary element, section, responsive and product controls. Both the
 library and editor use the shared applicator; public CLI tools use the same path.
@@ -52,7 +51,7 @@ SVG logo and Plus Jakarta Sans OFL notice remain with the preview assets.
 The fictional preview catalog stays isolated. Licensed artwork copied to `design/` may remain on applied pages.
 
 ```
-node tools/templates/package.mjs sela /path/to/sela-1.1.0.tar.gz
+node tools/templates/package.mjs sela /path/to/sela-1.2.0.tar.gz
 ```
 
 The versioned package includes the shared runtime and fonts. The packager rejects
@@ -67,7 +66,7 @@ shop slots while preserving authored headlines, layout, colors and added content
 The template's licensed design photos remain editable; product cards and purchase
 controls use the selected catalog products.
 
-Publishing requires at least one owned, active product with a purchase action on
+Publishing and exporting code require at least one owned, active product with a purchase action on
 the page and available stock (including visible variants). Stock and ownership
 are rechecked on the server. Digital products and subscriptions use their existing
 availability behavior. An empty or sold-out draft can still be saved and previewed.
@@ -75,3 +74,11 @@ availability behavior. An empty or sold-out draft can still be saved and preview
 For a product-free CLI draft, use `-` instead of product IDs. After editing, call
 `template_products` with real product IDs to connect the slots without rebuilding
 the design. Original approval archives remain unchanged.
+
+## Empty product card and code export
+
+New pages now start with an empty product card. Click **Choose a product** to
+connect your catalog in the editor. Design and Preview work without products.
+Publishing, copying HTML, downloading HTML and public CLI export require an
+owned active product with stock. The server rechecks both ownership and stock.
+The `productSlot` manifest field identifies the editable native card.

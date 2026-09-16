@@ -16,7 +16,7 @@ Future templates should be highly professional and practical for ordinary mercha
 
 Every future template must be composed from the same reusable, merchant-editable element system available on a blank canvas. A template may provide a composition and art direction, but it must not introduce a parallel editing model or template-only behavior.
 
-Merchants can open, edit, preview and save any template without selecting a product. Licensed template design imagery can remain on the page. Shop cards, variants, prices and purchases use the merchant's selected catalog products. Publishing requires at least one of that merchant's active products on the page with an available purchase action. Physical products need positive stock in the product or a visible variant. A product selected only in settings does not qualify; the server rechecks ownership and current availability before accepting a published snapshot.
+Every template must contain a product section that starts with an empty product card. Merchants can open, edit, preview and save it without selecting a product. The card opens the catalog picker. Licensed template design imagery can remain on the page. Shop cards, variants, prices and purchases use the merchant's selected catalog products. Publishing or copying/downloading page code requires at least one of that merchant's active products on the page with an available purchase action. Physical products need positive stock in the product or a visible variant. A product selected only in settings does not qualify; the server rechecks ownership and current availability before accepting a published snapshot or authorizing code export.
 
 Each complete template package has a hard maximum size of 50 MB.
 
@@ -24,7 +24,7 @@ Each complete template package has a hard maximum size of 50 MB.
 
 ### Current user art direction — September 16, 2026
 
-**Lintas (Cross)** has been recreated through the builder and is ready for native review. See [the validation report](templates/lintas-builder-validation.md). Template preparation awaits native approval. For the **following commissioned concept**, use Ezkart’s own marketing website as the primary visual reference: rounded sections and controls, soft gradients, clean sans-serif typography, generous whitespace and an approachable, professional shopping experience. The user explicitly rejected the repeated studio/designer/editorial look with sharp corners. Do not turn every new merchant genre into another fine-rule, rectangular-photo editorial layout.
+**Lintas (Cross)** is approved and installed as a native template for one to three products. See [the template validation report](templates/lintas-template-validation.md). For the **following commissioned concept**, use Ezkart’s own marketing website as the primary visual reference: rounded sections and controls, soft gradients, clean sans-serif typography, generous whitespace and an approachable, professional shopping experience. The user explicitly rejected the repeated studio/designer/editorial look with sharp corners. Do not turn every new merchant genre into another fine-rule, rectangular-photo editorial layout.
 
 This direction overrides earlier blanket restrictions on gradient backgrounds and rounded containers. Use these features deliberately and visibly; keep contrast, hierarchy and purchase controls clear. Preserve the prior approved designs. Save this direction for the next commission; continuing Cross does not start the following concept.
 
@@ -301,7 +301,7 @@ Target no more than 20 MB packaged.
 - A template declares the product counts, media types, and optional data it can use, then adapts gracefully when a merchant supplies less.
 - Applied pages bind to real product names, descriptions, prices, variants, availability, stock behavior, images, and checkout actions.
 - Licensed template design imagery may remain in applied pages and stays editable. Keep it separate from catalog product media and the fictional preview catalog. Product sections use selected merchant products.
-- Product selection is optional for drafts and required for publication. Connect products later without overwriting design edits; always validate the publish requirement on the server. Digital products and subscriptions use their existing active/available commerce behavior rather than a physical inventory count.
+- New template pages start with an empty product card. Product selection is optional for drafts and required for publication and code export. Connect products later without overwriting design edits; always validate the publish requirement on the server. Digital products and subscriptions use their existing active/available commerce behavior rather than a physical inventory count.
 - Missing optional content should remove or recompose a section; it should not leave placeholders, blank cards, or invented facts.
 - Long names, multiple price formats, sale states, sold-out products, missing secondary images, and sparse descriptions are first-class cases.
 - A template cannot depend on reviews, press, subscriptions, guarantees, or shipping claims that the merchant does not have.
@@ -376,3 +376,7 @@ Any failed answer requires another design pass before approval.
 Before a builder reconstruction is promoted to a template, finish and validate the element library, direct manipulation, responsive controls, layers, discoverability, accessibility, undo/redo, persistence, preview, and export behavior needed for that composition. Standalone concept design may proceed first under the staged workflow above. A merchant must be able to reproduce every meaningful part of a proposed template from a blank canvas without hidden template-only code.
 
 Preserve each template's distinctive composition, responsive behavior, and art direction by combining those proven elements. Do not flatten the designs into palette swaps, and do not bypass the shared element system to achieve them.
+
+## Current queue — September 16, 2026
+
+The user commissioned Hue (Rona) for native builder recreation after Lintas and the shared product/output changes. Open a separate terminal for the next professional business concept first. That next concept is one of the one-or-two more formal designs: professional business branding, clean typography, generous whitespace and approachable polish. Avoid repeating sharp editorial/studio layouts. It inherits the empty product section, required catalog product/stock before publish or export, and shared Ezkart cart protocol.

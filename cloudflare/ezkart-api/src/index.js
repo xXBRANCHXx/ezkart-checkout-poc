@@ -1229,6 +1229,20 @@ async function deleteDraft(request, env, draftId) {
   await cleanupUnusedMedia(env, seller.id, removedMedia);
 }
 
+async function authorizeLandingExport(request, env, id) {
+  const { seller } = await sellerContext(request, env);
+  await landingPageObject(env, seller.id, cleanLandingPageId(id));
+  const payload = await requestJson(request, maximumLandingPageBytes);
+  const html = String(payload.html || "");
+  if (new TextEncoder().encode(html).length > 12 * 1024 * 1024) throw new Response("Page is too large.", {status:413});
+  const result = await env.DB.prepare("SELECT * FROM products WHERE seller_id = ? AND status = 'active'").bind(seller.id).all();
+  const variants = await env.DB.prepare("SELECT * FROM product_variants WHERE seller_id = ?").bind(seller.id).all();
+  const products = result.results.map(row => shapeProduct(row, [], variants.results.filter(v => v.product_id === row.id)));
+  const error = await validatePublication({html,state:payload.state,products});
+  if (error) throw new Response(error.replaceAll("before publishing", "before copying or exporting code"), {status:422});
+  return {ok:true};
+}
+
 export default {
   async fetch(request, env, context) {
     const cors = corsHeaders(request, env);
@@ -1240,6 +1254,8 @@ export default {
       if (request.method === "GET" && url.pathname === "/v1/storefront/products") return json({ ok: true, products: await storefrontProducts(url, env) }, 200, cors);
       if (request.method === "GET" && url.pathname === "/v1/catalog") return json({ ok: true, ...(await catalog(request, env)) }, 200, cors);
       if (request.method === "GET" && url.pathname === "/v1/landing-pages") return json({ ok: true, pages: await landingPages(request, env) }, 200, cors);
+      const landingExportMatch = /^\/v1\/landing-pages\/([a-z0-9-]+)\/export$/.exec(url.pathname);
+      if (request.method === "POST" && landingExportMatch) return json(await authorizeLandingExport(request, env, landingExportMatch[1]), 200, cors);
       const landingPagePreviewMatch = /^\/v1\/landing-pages\/([a-z0-9-]+)\/preview$/.exec(url.pathname);
       if (request.method === "GET" && landingPagePreviewMatch) {
         const response = await landingPagePreview(request, env, landingPagePreviewMatch[1]);

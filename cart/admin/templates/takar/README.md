@@ -1,4 +1,4 @@
-# Takar · 1.1.0
+# Takar · 1.2.0
 
 Approved native design: **Takar**, an approachable storefront with DM Sans,
 restrained green accents, a wide hero image, a product shelf and a tabbed shopping
@@ -7,8 +7,7 @@ catalog, screenshots, image provenance and licensed font remain in `preview/`.
 
 ## Apply
 
-Choose **New page → Takar** and start editing. Store name and products can be
-filled in now or later. Connect a featured product and up to two more when ready.
+Choose **New page → Takar** and start editing. Enter the store name now or later, then choose products from the empty card in the editor. Connect a featured product and up to two more when ready.
 The page remains editable with
 ordinary section, element, responsive and product controls. The editor, page
 library and public CLI all use the same native applicator.
@@ -53,7 +52,7 @@ the authored logo and DM Sans OFL notice remain with the archived assets.
 Applied pages may keep the licensed imagery in `design/`; shop media binds to real products.
 
 ```
-node tools/templates/package.mjs takar /path/to/takar-1.1.0.tar.gz
+node tools/templates/package.mjs takar /path/to/takar-1.2.0.tar.gz
 ```
 
 The package includes shared runtime and licensed fonts. Its enforced limit is
@@ -68,7 +67,7 @@ shop slots while preserving authored headlines, layout, colors and added content
 The template's licensed design photos remain editable; product cards and purchase
 controls use the selected catalog products.
 
-Publishing requires at least one owned, active product with a purchase action on
+Publishing and exporting code require at least one owned, active product with a purchase action on
 the page and available stock (including visible variants). Stock and ownership
 are rechecked on the server. Digital products and subscriptions use their existing
 availability behavior. An empty or sold-out draft can still be saved and previewed.
@@ -76,3 +75,11 @@ availability behavior. An empty or sold-out draft can still be saved and preview
 For a product-free CLI draft, use `-` instead of product IDs. After editing, call
 `template_products` with real product IDs to connect the slots without rebuilding
 the design. Original approval archives remain unchanged.
+
+## Empty product card and code export
+
+New pages now start with an empty product card. Click **Choose a product** to
+connect your catalog in the editor. Design and Preview work without products.
+Publishing, copying HTML, downloading HTML and public CLI export require an
+owned active product with stock. The server rechecks both ownership and stock.
+The `productSlot` manifest field identifies the editable native card.

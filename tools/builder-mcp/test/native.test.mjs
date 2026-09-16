@@ -184,7 +184,7 @@ test("native inspector creates editable word gradients, layered button fills, ne
         .length,
       2,
     );
-    const html = await invoke("exportHtml");
+    const html = await invoke("previewHtml");
     assert.doesNotMatch(
       html,
       /<[^>]+class="[^"]*sq-(?:reference|flow)|data-sq-native=/,
@@ -289,7 +289,7 @@ test("Ezkart reference uses editable primitives and preserves measured layout, m
       "400",
       "Dashboard typography must not override editable canvas values",
     );
-    const html = await page.evaluate(() => EzkartBuilder.exportHtml());
+    const html = await page.evaluate(() => EzkartBuilder.previewHtml());
     await page.route("**/reference-output", (r) =>
       r.fulfill({ body: html, contentType: "text/html" }),
     );

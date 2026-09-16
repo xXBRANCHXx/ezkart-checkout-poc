@@ -1,4 +1,4 @@
-# PITH · 1.1.0
+# PITH · 1.2.0
 
 Approved design: **PITH — Take a Thip**, native polish v2. The user approved making
 this version a template. Its original 14-section, 196-element builder recipe,
@@ -47,7 +47,7 @@ photographs in `design/` may remain on merchant pages.
 Build and check the full package, including shared runtime and fonts:
 
 ```
-node tools/templates/package.mjs pith /path/to/pith-1.1.0.tar.gz
+node tools/templates/package.mjs pith /path/to/pith-1.2.0.tar.gz
 ```
 
 The build rejects packages above 50,000,000 bytes. The archive is a versioned
@@ -61,7 +61,7 @@ shop slots while preserving authored headlines, layout, colors and added content
 The template's licensed design photos remain editable; product cards and purchase
 controls use the selected catalog products.
 
-Publishing requires at least one owned, active product with a purchase action on
+Publishing and exporting code require at least one owned, active product with a purchase action on
 the page and available stock (including visible variants). Stock and ownership
 are rechecked on the server. Digital products and subscriptions use their existing
 availability behavior. An empty or sold-out draft can still be saved and previewed.
@@ -69,3 +69,11 @@ availability behavior. An empty or sold-out draft can still be saved and preview
 For a product-free CLI draft, use `-` instead of product IDs. After editing, call
 `template_products` with real product IDs to connect the slots without rebuilding
 the design. Original approval archives remain unchanged.
+
+## Empty product card and code export
+
+New pages now start with an empty product card. Click **Choose a product** to
+connect your catalog in the editor. Design and Preview work without products.
+Publishing, copying HTML, downloading HTML and public CLI export require an
+owned active product with stock. The server rechecks both ownership and stock.
+The `productSlot` manifest field identifies the editable native card.

@@ -641,7 +641,8 @@
             "label": "Add to cart",
             "showPrice": true
           }
-        ]
+        ],
+        "$when": "hasProducts"
       }
     ],
     "tag": "section"
@@ -2021,6 +2022,7 @@
         "label": "Add to cart"
       }
     ],
-    "tag": "aside"
+    "tag": "aside",
+    "$when": "hasProducts"
   }
 ]

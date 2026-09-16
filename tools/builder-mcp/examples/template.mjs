@@ -40,7 +40,7 @@ try {
   });
   await call("template_apply", { templateId, productIds, brandName });
   await call("project_save");
-  const exported = await call("page_export");
+  const exported = productIds.length ? await call("page_export") : null;
   const audit = await call("page_audit");
   await mkdir(join(directory, "logs"), { recursive: true });
   await writeFile(

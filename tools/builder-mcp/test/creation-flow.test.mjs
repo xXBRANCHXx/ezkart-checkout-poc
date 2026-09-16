@@ -251,7 +251,7 @@ test("products can be placed and changed independently, including beside an exis
       await collection.locator("[data-product-card=coffee]").isVisible(),
       false,
     );
-    const html = await invoke("exportHtml");
+    const html = await invoke("previewHtml");
     await page.route("**/placement-export", (route) =>
       route.fulfill({ body: html, contentType: "text/html" }),
     );
@@ -386,7 +386,7 @@ test("background overrides clear gradients and preserve readable text across scr
       "rgb(18, 52, 86)",
     );
     await invoke("undo");
-    const html = await invoke("exportHtml");
+    const html = await invoke("previewHtml");
     await page.route("**/colors-export", (r) =>
       r.fulfill({ body: html, contentType: "text/html" }),
     );

@@ -1894,6 +1894,40 @@
       }
       showToast(message);
     };
+    const openCartCode = (product) => {
+      const variants = (product.variants || []).filter(v => !v.hidden);
+      const available = item => [undefined,"active"].includes(product.status) && !(product.variants?.length && !variants.length) && (product.type !== "physical" || Number(item.stock ?? product.stock) > 0);
+      const dialog = document.createElement("dialog"); dialog.className = "product-embed-dialog";
+      dialog.innerHTML = `<header><div><h2>Add-to-cart code</h2><p>${escapeHtml(product.name)}</p></div><button type="button" data-embed-close aria-label="Close"><svg class="icon" aria-hidden="true"><use href="#icon-x"></use></svg></button></header><p>Paste this HTML into your website. It opens Ezkart’s cart with this product. On an Ezkart page, it uses the shared cart drawer.</p><label data-embed-variant-label>Product option<select data-embed-variant></select></label><div class="product-embed-fields"><label>Quantity<input type="number" min="1" max="99" value="1" data-embed-quantity></label><label>Button text<input maxlength="80" value="Add to cart" data-embed-text></label></div><label>HTML<textarea readonly spellcheck="false" data-embed-code></textarea></label><p role="status" data-embed-status></p><footer><button type="button" data-embed-copy>Copy code</button></footer>`;
+      const variant = dialog.querySelector('[data-embed-variant]'),quantity = dialog.querySelector('[data-embed-quantity]'),label = dialog.querySelector('[data-embed-text]'),code = dialog.querySelector('[data-embed-code]'),copy = dialog.querySelector('[data-embed-copy]'),status = dialog.querySelector('[data-embed-status]');
+      (variants.length ? variants : [product]).forEach(item => { const option = new Option((item.name || 'Standard') + (available(item) ? '' : ' — Sold out'),item.id);option.disabled=!available(item);variant.add(option); });
+      dialog.querySelector('[data-embed-variant-label]').hidden = !variants.length;
+      variant.value = (variants.length ? variants : [product]).find(available)?.id || '';
+      const update = () => {
+        const choice = variants.length ? variants.find(v => v.id === variant.value) : product;
+        const maximum = Math.min(99,product.type === 'physical' ? Math.max(0,Number(choice?.stock ?? product.stock) || 0) : 99);
+        quantity.max=String(maximum);const count=Number(quantity.value);
+        const valid=choice&&available(choice)&&Number.isSafeInteger(count)&&count>=1&&count<=maximum;
+        copy.disabled=!valid;status.textContent=valid?'Style this link with your own CSS. Product prices and stock are checked by Ezkart.':maximum?'Choose an available option and a quantity within its stock.':'Add stock before copying purchase code.';
+        if(!valid){code.value='';return;}
+        const url=new URL(checkoutLink());const variantId=variants.length?choice.id:'';url.searchParams.set('add',product.id+(variantId?'~'+variantId:'')+':'+count);
+        code.value='<a class="ezkart-add-to-cart" href="'+escapeHtml(url.href)+'" data-ezkart-add="'+escapeHtml(product.id)+'"'+(variantId?' data-ezkart-variant="'+escapeHtml(variantId)+'"':'')+' data-ezkart-quantity="'+count+'">'+escapeHtml(label.value.trim()||'Add to cart')+'</a>';
+      };
+      dialog.addEventListener('input',update);dialog.addEventListener('change',update);
+      dialog.querySelector('[data-embed-close]').onclick=()=>dialog.close();
+      copy.onclick=async()=>{
+        update();if(copy.disabled)return;copy.disabled=true;
+        try {
+          if(cloudEnabled){
+            const fresh=await cloudRequest('GET','/v1/catalog');const current=(fresh.products||[]).map(normalizeCloudProduct).find(p=>p.id===product.id);
+            const option=variants.length?current?.variants?.find(v=>v.id===variant.value&&!v.hidden):current;
+            if(!current||![undefined,'active'].includes(current.status)||!option||(current.variants?.length&&!current.variants.some(v=>!v.hidden))||(current.type==='physical'&&!(Number(option.stock??current.stock)>=Number(quantity.value)))){code.value='';status.textContent='This option is no longer available. Add stock or choose another product.';return;}
+          }
+          await copyCheckoutLink(code.value,'Add-to-cart code copied');status.textContent='Code copied. Paste it into your HTML.';
+        }catch(error){status.textContent=error.message;}finally{copy.disabled=!code.value;}
+      };
+      const opener=document.activeElement;dialog.addEventListener('close',()=>{dialog.remove();opener?.focus();});document.body.append(dialog);update();dialog.showModal();
+    };
     document.querySelector("[data-copy-cart-link]")?.addEventListener("click", () => {
       void copyCheckoutLink(checkoutLink(), "Cart link copied");
     });
@@ -2057,7 +2091,7 @@
         card.className = `product-card${archived ? " is-archived" : ""}`; card.dataset.customProduct = product.id; card.dataset.productStatus = archived ? "archived" : "active";
         card.dataset.searchRow = normalize([product.name, product.sku, product.category, typeName(type)].join(" "));
         const imageMarkup = image ? `<img src="${image}" alt="${escapeHtml(product.name)}" loading="${productIndex < 6 ? "eager" : "lazy"}" fetchpriority="${productIndex < 2 ? "high" : "auto"}" decoding="async">` : '<svg class="icon" aria-hidden="true"><use href="#icon-image"></use></svg>';
-        card.innerHTML = `<span class="product-art">${imageMarkup}<em>${product.images?.length || 1} image${(product.images?.length || 1) === 1 ? "" : "s"}</em></span><div class="product-card-body"><div class="product-card-identity"><header><span class="product-card-type">${escapeHtml(String(product.category || typeName(type)).split(" > ").at(-1))}</span><em>${archived ? "Archived" : "Active"}</em></header><h2>${escapeHtml(product.name)}</h2><p>${escapeHtml(product.sku)}</p></div><div class="product-card-commerce"><strong>${escapeHtml(formatCreatorPrice(product.price))}</strong><small>${escapeHtml(availability)}</small></div><div class="product-card-meta"><div><small>Type</small><b>${escapeHtml(typeName(type))}</b></div><div><small>Revenue</small><b>Rp0</b></div></div><footer class="product-card-actions"><div class="product-card-proof" aria-label="${rating === "—" ? "No ratings yet" : `Rated ${rating} out of 5`}; ${escapeHtml(soldLabel(product.soldCount))}"><svg class="icon" aria-hidden="true"><use href="#icon-star"></use></svg><b>${rating}</b><span>·</span><span>${escapeHtml(soldLabel(product.soldCount))}</span></div><a class="product-edit-icon" href="?page=product-new&amp;product=${encodeURIComponent(product.id)}" aria-label="Edit ${escapeHtml(product.name)}" title="Edit"><svg class="icon" aria-hidden="true"><use href="#icon-pencil"></use></svg></a><div class="product-more"><button type="button" data-product-more aria-label="More actions for ${escapeHtml(product.name)}" title="More actions" aria-haspopup="menu" aria-expanded="false"><svg class="icon" aria-hidden="true"><use href="#icon-more-vertical"></use></svg></button><div class="product-action-menu" data-product-action-menu role="menu" hidden><button class="product-checkout-link" type="button" role="menuitem"><svg class="icon" aria-hidden="true"><use href="#icon-link"></use></svg><span>Copy checkout link</span></button><button class="product-duplicate" type="button" role="menuitem"><svg class="icon" aria-hidden="true"><use href="#icon-copy"></use></svg><span>Duplicate</span></button><button class="product-archive" type="button" role="menuitem"><svg class="icon" aria-hidden="true"><use href="#icon-${archived ? "eye" : "eye-off"}"></use></svg><span>${archived ? "Restore" : "Archive"}</span></button><button class="product-delete" type="button" role="menuitem"><svg class="icon" aria-hidden="true"><use href="#icon-trash"></use></svg><span>Delete</span></button></div></div></footer></div>`;
+        card.innerHTML = `<span class="product-art">${imageMarkup}<em>${product.images?.length || 1} image${(product.images?.length || 1) === 1 ? "" : "s"}</em></span><div class="product-card-body"><div class="product-card-identity"><header><span class="product-card-type">${escapeHtml(String(product.category || typeName(type)).split(" > ").at(-1))}</span><em>${archived ? "Archived" : "Active"}</em></header><h2>${escapeHtml(product.name)}</h2><p>${escapeHtml(product.sku)}</p></div><div class="product-card-commerce"><strong>${escapeHtml(formatCreatorPrice(product.price))}</strong><small>${escapeHtml(availability)}</small></div><div class="product-card-meta"><div><small>Type</small><b>${escapeHtml(typeName(type))}</b></div><div><small>Revenue</small><b>Rp0</b></div></div><footer class="product-card-actions"><div class="product-card-proof" aria-label="${rating === "—" ? "No ratings yet" : `Rated ${rating} out of 5`}; ${escapeHtml(soldLabel(product.soldCount))}"><svg class="icon" aria-hidden="true"><use href="#icon-star"></use></svg><b>${rating}</b><span>·</span><span>${escapeHtml(soldLabel(product.soldCount))}</span></div><a class="product-edit-icon" href="?page=product-new&amp;product=${encodeURIComponent(product.id)}" aria-label="Edit ${escapeHtml(product.name)}" title="Edit"><svg class="icon" aria-hidden="true"><use href="#icon-pencil"></use></svg></a><div class="product-more"><button type="button" data-product-more aria-label="More actions for ${escapeHtml(product.name)}" title="More actions" aria-haspopup="menu" aria-expanded="false"><svg class="icon" aria-hidden="true"><use href="#icon-more-vertical"></use></svg></button><div class="product-action-menu" data-product-action-menu role="menu" hidden><button class="product-checkout-link" type="button" role="menuitem"><svg class="icon" aria-hidden="true"><use href="#icon-link"></use></svg><span>Copy checkout link</span></button><button class="product-cart-code" type="button" role="menuitem"><svg class="icon" aria-hidden="true"><use href="#icon-code"></use></svg><span>Copy add-to-cart code</span></button><button class="product-duplicate" type="button" role="menuitem"><svg class="icon" aria-hidden="true"><use href="#icon-copy"></use></svg><span>Duplicate</span></button><button class="product-archive" type="button" role="menuitem"><svg class="icon" aria-hidden="true"><use href="#icon-${archived ? "eye" : "eye-off"}"></use></svg><span>${archived ? "Restore" : "Archive"}</span></button><button class="product-delete" type="button" role="menuitem"><svg class="icon" aria-hidden="true"><use href="#icon-trash"></use></svg><span>Delete</span></button></div></div></footer></div>`;
         const moreTrigger = card.querySelector("[data-product-more]");
         const actionMenu = card.querySelector("[data-product-action-menu]");
         moreTrigger.addEventListener("click", (event) => {
@@ -2073,6 +2107,11 @@
           const index = options.indexOf(document.activeElement);
           const next = event.key === "Home" ? 0 : event.key === "End" ? options.length - 1 : (index + (event.key === "ArrowDown" ? 1 : -1) + options.length) % options.length;
           options[next]?.focus();
+        });
+        card.querySelector(".product-cart-code").addEventListener("click", () => {
+          card.querySelector("[data-product-action-menu]").hidden = true;
+          card.querySelector("[data-product-more]").setAttribute("aria-expanded", "false");
+          openCartCode(product);
         });
         card.querySelector(".product-checkout-link").addEventListener("click", () => {
           closeProductActionMenus();
@@ -2516,6 +2555,16 @@
       await settleBuilder();
       return {productIds};
     }
+    previewRoot.addEventListener('click', event => {
+      const trigger = event.target.closest('[data-native-id="template-product-choose"]');
+      if (!trigger || !templateState) return;
+      event.preventDefault(); event.stopImmediatePropagation();
+      openSqPanel('products', {pin:true});
+      const host = sqStudio.querySelector('[data-template-page-products]');
+      EzkartTemplates.productForm(host, templateState, readCatalogProducts(), connectTemplateProducts)
+        .then(() => host.querySelector('[data-template-slot="0"]')?.focus())
+        .catch(error => showToast(error.message));
+    }, true);
     function syncTemplateProducts() {
       const host = sqStudio.querySelector('[data-template-page-products]');
       if (host) EzkartTemplates.productForm(host, templateState, readCatalogProducts(), connectTemplateProducts).catch(error => showToast(error.message));
@@ -8039,7 +8088,7 @@ const positionFloatingCart=()=>{
 };
 const scheduleCartPosition=()=>{if(!cartPositionFrame)cartPositionFrame=requestAnimationFrame(positionFloatingCart)};
 if(floatingCart){addEventListener('scroll',scheduleCartPosition,{passive:true});addEventListener('resize',scheduleCartPosition,{passive:true});document.addEventListener('toggle',scheduleCartPosition,true);document.fonts?.ready.then(scheduleCartPosition);document.addEventListener('native-state-change',scheduleCartPosition,true);new ResizeObserver(scheduleCartPosition).observe(document.body);scheduleCartPosition();}
-const renderCart=()=>{if(!cartLayer)return;document.querySelector('#ezkart-cart-title').textContent=${JSON.stringify(document.body.dataset.adminDemoCheckout==='true'?'Your demo cart':'Your cart')};const entries=cartEntries(),count=cartCount();document.querySelectorAll('[data-ezkart-cart-count]').forEach(target=>{target.textContent=String(count);target.classList.remove('ezkart-cart-bump');void target.offsetWidth;if(count)target.classList.add('ezkart-cart-bump')});document.querySelectorAll('[data-ezkart-cart-open]').forEach(button=>button.setAttribute('aria-label','Open cart, '+count+' '+(count===1?'item':'items')));document.querySelector('[data-ezkart-cart-summary]').textContent=count+' '+(count===1?'item':'items');document.querySelector('[data-ezkart-cart-subtotal]').textContent=money(cartSubtotal());cartGo.disabled=!count;cartItems.innerHTML=entries.length?entries.map(([id,quantity])=>{const product=lineProduct(id),thumb=product.image?'<img src="'+escapeHtml(product.image)+'" alt="">':'<span class="ezkart-cart-thumb" aria-hidden="true">EZ</span>';return '<article class="ezkart-cart-row" data-ezkart-cart-row="'+escapeHtml(id)+'">'+thumb+'<div><h3>'+escapeHtml(product.name)+'</h3><p>'+money(product.price)+' each</p><div class="ezkart-cart-quantity" aria-label="Quantity for '+escapeHtml(product.name)+'"><button type="button" data-ezkart-cart-quantity="-1" aria-label="Decrease quantity">−</button><span>'+quantity+'</span><button type="button" data-ezkart-cart-quantity="1" aria-label="Increase quantity">+</button></div></div><strong>'+money(product.price*quantity)+'</strong></article>'}).join(''):'<div class="ezkart-cart-empty"><b>Your cart is empty</b><p>Add something you like, then come back here to review it before checkout.</p></div>';document.querySelectorAll('[data-ezkart-add]').forEach(button=>{const productId=button.dataset.ezkartAdd,quantity=entries.filter(([id])=>lineProduct(id)?.productId===productId).reduce((sum,[,value])=>sum+value,0);button.textContent=quantity?'Added · '+quantity:'Add to cart'});document.querySelectorAll('[data-ezkart-basket-lines]').forEach(list=>{list.innerHTML=entries.length?entries.map(([id,quantity])=>{const product=lineProduct(id);return'<li><span>'+escapeHtml(product.name)+' × '+quantity+'</span><b>'+money(product.price*quantity)+'</b></li>'}).join(''):'<li class="ezkart-basket-empty">Your cart is empty</li>'});document.querySelectorAll('[data-ezkart-basket-total]').forEach(total=>{total.textContent=money(cartSubtotal())});saveCart()};
+const renderCart=()=>{if(!cartLayer)return;document.querySelector('#ezkart-cart-title').textContent=${JSON.stringify(document.body.dataset.adminDemoCheckout==='true'?'Your demo cart':'Your cart')};const entries=cartEntries(),count=cartCount();document.querySelectorAll('[data-ezkart-cart-count]').forEach(target=>{target.textContent=String(count);target.classList.remove('ezkart-cart-bump');void target.offsetWidth;if(count)target.classList.add('ezkart-cart-bump')});document.querySelectorAll('[data-ezkart-cart-open]').forEach(button=>button.setAttribute('aria-label','Open cart, '+count+' '+(count===1?'item':'items')));document.querySelector('[data-ezkart-cart-summary]').textContent=count+' '+(count===1?'item':'items');document.querySelector('[data-ezkart-cart-subtotal]').textContent=money(cartSubtotal());cartGo.disabled=!count;cartItems.innerHTML=entries.length?entries.map(([id,quantity])=>{const product=lineProduct(id),thumb=product.image?'<img src="'+escapeHtml(product.image)+'" alt="">':'<span class="ezkart-cart-thumb" aria-hidden="true">EZ</span>';return '<article class="ezkart-cart-row" data-ezkart-cart-row="'+escapeHtml(id)+'">'+thumb+'<div><h3>'+escapeHtml(product.name)+'</h3><p>'+money(product.price)+' each</p><div class="ezkart-cart-quantity" aria-label="Quantity for '+escapeHtml(product.name)+'"><button type="button" data-ezkart-cart-quantity="-1" aria-label="Decrease quantity">−</button><span>'+quantity+'</span><button type="button" data-ezkart-cart-quantity="1" aria-label="Increase quantity">+</button></div></div><strong>'+money(product.price*quantity)+'</strong></article>'}).join(''):'<div class="ezkart-cart-empty"><b>Your cart is empty</b><p>Add something you like, then come back here to review it before checkout.</p></div>';document.querySelectorAll('[data-ezkart-add]').forEach(button=>{const productId=button.dataset.ezkartAdd,quantity=entries.filter(([id])=>lineProduct(id)?.productId===productId).reduce((sum,[,value])=>sum+value,0);button.dataset.ezkartAdded=String(quantity);if(button.closest('[data-product-card]'))button.textContent=quantity?'Added · '+quantity:'Add to cart'});document.querySelectorAll('[data-ezkart-basket-lines]').forEach(list=>{list.innerHTML=entries.length?entries.map(([id,quantity])=>{const product=lineProduct(id);return'<li><span>'+escapeHtml(product.name)+' × '+quantity+'</span><b>'+money(product.price*quantity)+'</b></li>'}).join(''):'<li class="ezkart-basket-empty">Your cart is empty</li>'});document.querySelectorAll('[data-ezkart-basket-total]').forEach(total=>{total.textContent=money(cartSubtotal())});saveCart()};
 const openCart=()=>{if(!cartLayer)return;clearTimeout(cartCloseTimer);cartReturnFocus=document.activeElement;cartLayer.hidden=false;document.body.classList.add('ezkart-cart-open');document.dispatchEvent(new Event('ezkart:cart-visibility'));requestAnimationFrame(()=>{cartLayer.classList.add('is-open');cartDrawer?.focus()})};
 const closeCart=()=>{if(!cartLayer||cartLayer.hidden)return;cartLayer.classList.remove('is-open');document.body.classList.remove('ezkart-cart-open');document.dispatchEvent(new Event('ezkart:cart-visibility'));cartCloseTimer=setTimeout(()=>{cartLayer.hidden=true;cartReturnFocus?.focus?.()},240)};
 const changeCart=(id,change)=>{const product=lineProduct(id);if(!product)return;const stock=product.stock==null?Number.MAX_SAFE_INTEGER:Number(product.stock),maximum=Number.isFinite(stock)?Math.max(0,stock):Number.MAX_SAFE_INTEGER;cart[id]=Math.max(0,Math.min(maximum,(cart[id]||0)+change));if(!cart[id])delete cart[id];renderCart()};
@@ -8071,7 +8120,9 @@ document.querySelectorAll('[data-ezkart-variants]').forEach(controls=>{
   controls.addEventListener('focusout',event=>{if(controls.contains(event.relatedTarget))return;closeMenus();controls.closest('.sq-product-grid')?.classList.remove('sq-option-menu-open')});
   sync();
 });
-document.querySelectorAll('[data-ezkart-add]').forEach(button=>button.addEventListener('click',()=>{const productId=button.dataset.ezkartAdd,variantId=button.closest('[data-product-card]')?.dataset.ezkartVariant||'';changeCart(selectionId(productId,variantId),1)}));
+const addProductToCart=({productId,variantId='',quantity=1}={})=>{quantity=Number(quantity);const product=lineProduct(selectionId(productId,variantId));if(!product||!Number.isSafeInteger(quantity)||quantity<1)return false;const id=selectionId(productId,product.variantId),maximum=product.stock==null?Number.MAX_SAFE_INTEGER:Number(product.stock);if(!Number.isFinite(maximum)||maximum<1||(cart[id]||0)+quantity>maximum)return false;changeCart(id,quantity);openCart();return true};
+globalThis.EzkartCart=Object.freeze({add:addProductToCart,open:openCart});
+document.addEventListener('click',event=>{const button=event.target.closest('a[data-ezkart-add],button[data-ezkart-add]');if(!button||button.disabled||button.getAttribute('aria-disabled')==='true'||event.defaultPrevented)return;if(button.tagName==='A'&&(event.metaKey||event.ctrlKey||event.shiftKey||event.altKey||event.button!==0))return;const productId=button.dataset.ezkartAdd,variantId=button.dataset.ezkartVariant||button.closest('[data-product-card]')?.dataset.ezkartVariant||'',quantity=Number(button.dataset.ezkartQuantity||1);if(!catalog[productId])return;event.preventDefault();if(!addProductToCart({productId,variantId,quantity})){openCart();const notice=document.createElement('p');notice.setAttribute('role','status');notice.textContent='This quantity or option is unavailable. Review your cart or choose another option.';cartItems?.prepend(notice);}});
 document.querySelectorAll('[data-ezkart-checkout]').forEach(button=>button.addEventListener('click',openCart));
 document.querySelectorAll('[data-ezkart-action]').forEach(button=>button.addEventListener('click',()=>{const type=button.dataset.ezkartAction,target=button.dataset.ezkartTarget||'';if(type==='checkout'){openCart();return}if(type==='section'){document.getElementById(target.replace(/^#/,''))?.scrollIntoView({behavior:'smooth'});return}const href=type==='email'?'mailto:'+target:type==='phone'?'tel:'+target:target;if(type==='url'&&button.dataset.ezkartNewTab==='true')window.open(href,'_blank','noopener');else if(href)location.href=href}));
 renderCart();
@@ -8113,33 +8164,59 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
       const motionScripts = hasScrollMotion ? `<script>(()=>{const frames=[...document.querySelectorAll('.ezkart-scroll-frame')].map(frame=>({frame,media:frame.querySelector(':scope>.ezkart-scroll-media'),effect:frame.dataset.ezkartScrollEffect||'parallax',strength:Math.max(0,Math.min(100,Number(frame.dataset.ezkartScrollStrength)||0))/100,damping:frame.dataset.ezkartScrollDamping!=='false',y:null,yVelocity:0,scale:1,scaleVelocity:0,coverScale:1})).filter(item=>item.media);if(!frames.length)return;const reduced=matchMedia('(prefers-reduced-motion: reduce)');let raf=0,lastTime=0,viewportHeight=1;const clamp=value=>Math.max(0,Math.min(1,value));const damp=(value,velocity,target,delta,smoothTime)=>{const omega=2/smoothTime,x=omega*delta,decay=1/(1+x+.48*x*x+.235*x*x*x),change=value-target,temp=(velocity+omega*change)*delta;return[target+(change+temp)*decay,(velocity-omega*temp)*decay]};const render=time=>{raf=0;if(reduced.matches)return;const delta=Math.min(.05,lastTime?Math.max(0,(time-lastTime)/1000):1/60);lastTime=time;let moving=false;frames.forEach(item=>{const rect=item.frame.getBoundingClientRect();if(rect.bottom<-viewportHeight*.25||rect.top>viewportHeight*1.25)return;const progress=clamp((viewportHeight-rect.top)/(viewportHeight+rect.height)),reverse=item.effect==='parallax-reverse',rate=reverse?item.strength*.35:item.strength,zoom=item.effect==='zoom';const yTarget=zoom?0:(progress-.5)*(viewportHeight+rect.height)*rate*(reverse?-1:1),scaleTarget=zoom?1+progress*item.strength*.3:item.coverScale;if(item.y===null){item.y=yTarget;item.scale=scaleTarget}else if(item.damping){[item.y,item.yVelocity]=damp(item.y,item.yVelocity,yTarget,delta,.11);if(zoom)[item.scale,item.scaleVelocity]=damp(item.scale,item.scaleVelocity,scaleTarget,delta,.11);else{item.scale=scaleTarget;item.scaleVelocity=0}}else{item.y=yTarget;item.yVelocity=0;item.scale=scaleTarget;item.scaleVelocity=0}item.media.style.setProperty('--ezkart-scroll-y',item.y.toFixed(3)+'px');item.media.style.setProperty('--ezkart-scroll-scale',item.scale.toFixed(5));if(item.damping&&(Math.abs(yTarget-item.y)>.02||Math.abs(item.yVelocity)>.02||zoom&&(Math.abs(scaleTarget-item.scale)>.0001||Math.abs(item.scaleVelocity)>.0001)))moving=true});if(moving)raf=requestAnimationFrame(render)};const schedule=()=>{if(!raf){lastTime=0;raf=requestAnimationFrame(render)}};const measure=()=>{viewportHeight=Math.max(1,document.documentElement.clientHeight||innerHeight);frames.forEach(item=>{const frameHeight=Math.max(1,item.frame.clientHeight),reverse=item.effect==='parallax-reverse',rate=reverse?item.strength*.35:item.strength,overscan=reverse?(viewportHeight+frameHeight)*rate:Math.max(0,viewportHeight-frameHeight)*rate;item.coverScale=item.effect==='zoom'||reduced.matches||!rate?1:1+(overscan+4)/frameHeight;if(item.scale<item.coverScale){item.scale=item.coverScale;item.scaleVelocity=0}if(reduced.matches){item.y=null;item.yVelocity=0;item.scale=1;item.scaleVelocity=0;item.media.style.removeProperty('--ezkart-scroll-y');item.media.style.removeProperty('--ezkart-scroll-scale')}});schedule()};addEventListener('scroll',schedule,{passive:true});addEventListener('touchmove',schedule,{passive:true});addEventListener('resize',measure,{passive:true});addEventListener('orientationchange',measure,{passive:true});addEventListener('pageshow',measure);window.visualViewport?.addEventListener('resize',measure,{passive:true});reduced.addEventListener?.('change',measure);if(typeof ResizeObserver==='function'){const observer=new ResizeObserver(measure);frames.forEach(item=>observer.observe(item.frame))}document.fonts?.ready.then(measure);measure()})();<\/script>` : "";
       return `<!doctype html>\n<html lang="${escapeHtml(document.body.dataset.adminLocale||'id')}">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1">\n<title>${escapeHtml(pageName)}</title>\n<meta name="description" content="${escapeHtml(pageDescription)}">\n${motionStyles}\n<style>@font-face{font-family:Poppins;src:url('${fontBase}') format('woff2');font-weight:400}@font-face{font-family:Poppins;src:url('${fontMedium}') format('woff2');font-weight:500}@font-face{font-family:Poppins;src:url('${fontSemibold}') format('woff2');font-weight:600}@font-face{font-family:Poppins;src:url('${fontBold}') format('woff2');font-weight:700}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:#fff;font-family:Poppins,Arial,sans-serif}.svg-sprite{width:0;height:0;position:absolute;overflow:hidden}@media(prefers-reduced-motion:reduce){*{animation:none!important;scroll-behavior:auto!important}}\n${extraFontCss}\n${css}\n${responsiveSpacing}\n</style>\n${commerceStyles}\n${libraryPreviewStyles}\n</head>\n<body>\n${sprite}\n${clone.outerHTML}\n${pinnedNavigationHtml}\n${selectedProducts().length ? commerceMarkup : ""}\n${motionScripts}\n${commerceScript}\n${compositionScript}\n${nativeScript}\n${boundScript}\n${showcaseScript}\n</body>\n</html>`;
     };
-    sqStudio.querySelector("[data-sq-export]")?.addEventListener("click", async () => {
-      await exportFontsReady;
-      const html = generateHtml(); const output = exportDialog?.querySelector("[data-sq-html-output]"); if (output) output.value = html; const size = exportDialog?.querySelector("[data-sq-html-size]"); if (size) size.textContent = `${new Blob([html]).size.toLocaleString("id-ID")} bytes · ready to host`; exportDialog?.showModal();
-    });
-    exportDialog?.querySelector("[data-sq-copy-html]")?.addEventListener("click", async () => {
-      const output = exportDialog.querySelector("[data-sq-html-output]"); try { await navigator.clipboard.writeText(output.value); showToast("Complete HTML copied"); } catch (_) { output.select(); document.execCommand("copy"); showToast("Complete HTML copied"); }
-    });
-    exportDialog?.querySelector("[data-sq-download-html]")?.addEventListener("click", () => {
-      const html = exportDialog.querySelector("[data-sq-html-output]")?.value || generateHtml(); const url = URL.createObjectURL(new Blob([html], { type: "text/html" })); const link = document.createElement("a"); link.href = url; link.download = `${normalize(document.querySelector("[data-current-site-name]")?.textContent).replace(/[^a-z0-9]+/g, "-") || "ezkart-page"}.html`; link.click(); window.setTimeout(() => URL.revokeObjectURL(url), 1000); showToast("HTML file downloaded");
-    });
-    const publishPage = async () => {
+    const requireProductForOutput = async (action = 'publishing') => {
       await settleBuilder();
-      // Re-read stock immediately before publishing; the server checks it again.
       if (cloudEnabled) {
         const fresh = await cloudRequest('GET', '/v1/catalog');
         cloudCatalogProducts = (fresh.products || []).map(normalizeCloudProduct);
         cloudCatalogProducts.forEach(product => installCustomProduct(product, selectedProducts().includes(product.id)));
         EzkartNative.refresh();
       }
-      const error = EzkartPublish.check(EzkartPublish.groupsInDocument(previewRoot), readCatalogProducts());
+      const issue = EzkartPublish.check(EzkartPublish.groupsInDocument(previewRoot), readCatalogProducts());
       const message = sqStudio.querySelector('[data-sq-publish-message]');
-      if (error) {
+      if (issue) {
+        const error = issue.replaceAll('before publishing', 'before ' + action);
         if (message) { message.textContent = error; message.hidden = false; }
         openSqPanel('products', {pin:true}); syncTemplateProducts();
         throw Error(error);
       }
       if (message) message.hidden = true;
+    };
+    const exportPageHtml = async () => {
+      await requireProductForOutput('copying or exporting code');
+      const html = generateHtml();
+      if (cloudEnabled) {
+        const id = landingPageId(activeSiteDocument?.id || activeSiteKey);
+        await cloudRequest('POST', `/v1/landing-pages/${encodeURIComponent(id)}/export`, {html,state:captureState()});
+      }
+      return html;
+    };
+    sqStudio.querySelector("[data-sq-export]")?.addEventListener("click", async () => {
+      try {
+        const html = await exportPageHtml();
+        const output = exportDialog?.querySelector("[data-sq-html-output]"); if (output) output.value = html;
+        const size = exportDialog?.querySelector("[data-sq-html-size]"); if (size) size.textContent = `${new Blob([html]).size.toLocaleString("id-ID")} bytes · ready to host`;
+        exportDialog?.showModal();
+      } catch (error) { showToast(error.message); }
+    });
+    exportDialog?.querySelector("[data-sq-copy-html]")?.addEventListener("click", async () => {
+      try {
+        const html = await exportPageHtml();
+        const output = exportDialog.querySelector("[data-sq-html-output]"); output.value = html;
+        try { await navigator.clipboard.writeText(html); } catch (_) { output.select(); document.execCommand("copy"); }
+        showToast("Complete HTML copied");
+      } catch (error) { exportDialog.close(); showToast(error.message); }
+    });
+    exportDialog?.querySelector("[data-sq-download-html]")?.addEventListener("click", async () => {
+      try {
+        const html = await exportPageHtml();
+        const url = URL.createObjectURL(new Blob([html], {type:"text/html"})), link = document.createElement("a");
+        link.href = url; link.download = `${normalize(document.querySelector("[data-current-site-name]")?.textContent).replace(/[^a-z0-9]+/g,"-") || "ezkart-page"}.html`; link.click();
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000); showToast("HTML file downloaded");
+      } catch (error) { exportDialog.close(); showToast(error.message); }
+    });
+    const publishPage = async () => {
+      await requireProductForOutput();
       clearTimeout(saveTimer);
       const saved = await persistCurrentState({ status: "published", publishedHtml: generateHtml() });
       if (saveState) saveState.textContent = saved ? "Published just now" : "Publish failed";
@@ -8578,7 +8655,8 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
       undo(){undoBuilderChange();return inspectBuilder();},
       redo(){redoBuilderChange();return inspectBuilder();},
       async save(){await settleBuilder();clearTimeout(saveTimer);const saved=await persistCurrentState();if(!saved)throw new Error('The page could not be saved.');saveState.textContent='Saved just now';return {saved:true,page:activeSiteDocument.id};},
-      async exportHtml(){await settleBuilder();return generateHtml();},
+      exportHtml:exportPageHtml,
+      ...(document.body.dataset.adminLocalWorkspace === "true" ? {async previewHtml(){await settleBuilder();return generateHtml();}} : {}),
       snapshot:()=>captureState(),
       async audit(){
         await settleBuilder();const issues=[];

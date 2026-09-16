@@ -137,7 +137,7 @@ test("empty-group guidance preserves swatches, dividers and spacers while new la
       (await guidance(group.id)).hint,
       /Add an element to this group/,
     );
-    const html = await call("exportHtml");
+    const html = await call("previewHtml");
     const storefront = await browser.newPage();
     await storefront.route(ws.url + "/empty-group-review", (route) =>
       route.fulfill({ body: html, contentType: "text/html" }),

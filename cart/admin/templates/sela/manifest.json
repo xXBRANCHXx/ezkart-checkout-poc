@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "sela",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "name": "Sela",
   "description": "Generous whitespace, clean typography and a considered product collection.",
   "recipe": "recipe.json",
@@ -11,7 +11,7 @@
     "preview/mobile.png",
     "preview/footer.png"
   ],
-  "previewLabel": "Template design imagery is included and editable. Shop items use your selected catalog products. You can start a draft without products; publishing requires an available product.",
+  "previewLabel": "Design imagery is included and editable. Your page starts with an empty product card. Connect your own products and add stock before publishing or exporting code.",
   "requirements": {
     "minProducts": 1,
     "maxProducts": 4,
@@ -41,5 +41,6 @@
     "sela-setup": "Two or more selected products",
     "sela-guide": "Selected product descriptions"
   },
-  "demoContent": "Fictional catalog stays in preview/. Licensed design imagery in design/ may remain on merchant pages."
+  "demoContent": "Fictional catalog stays in preview/. Licensed design imagery in design/ may remain on merchant pages.",
+  "productSlot": "card-riser"
 }

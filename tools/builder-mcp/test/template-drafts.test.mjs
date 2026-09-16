@@ -45,10 +45,7 @@ test("Templates start without products; connecting products preserves edits and 
     .locator(".sq-template-choice")
     .filter({ hasText: "Takar" })
     .click();
-  assert.equal(
-    await form.locator("[name=template_product]").evaluate((n) => n.required),
-    false,
-  );
+  assert.equal(await form.locator("[name=template_product]").count(), 0);
   await form.locator("[data-create-page]").click();
   await page.waitForURL("**edit=draft-takar.ezkart.site");
   await page.waitForFunction(() => globalThis.EzkartBuilder);
@@ -134,6 +131,7 @@ test("Templates start without products; connecting products preserves edits and 
     "My edited headline",
   );
   await assert.rejects(call("publish"), /Add stock/);
+  await assert.rejects(call("exportHtml"), /Add stock/);
   assert.equal((await ws.read("draft-takar")).status, "draft");
 
   // Stock changes after the editor loads must be rechecked, including visible variants.
@@ -143,8 +141,10 @@ test("Templates start without products; connecting products preserves edits and 
   ];
   await catalog();
   await assert.rejects(call("publish"), /Add stock/);
+  await assert.rejects(call("exportHtml"), /Add stock/);
   products[0].variants[1].stock = 2;
   await catalog();
+  assert.match(await call("exportHtml"), /<!doctype html>/i);
   assert.equal((await call("publish")).published, true);
   assert.equal((await ws.read("draft-takar")).status, "published");
   await call("connectTemplateProducts", { productIds: [] });
@@ -160,13 +160,13 @@ test("Templates start without products; connecting products preserves edits and 
   );
   await call("redo");
   assert.equal(
-    (await call("nativeInspect", { id: "card-bawang-add" })).productId,
-    "template-product-1",
+    (await call("nativeInspect", { id: "template-product-empty-title" })).text,
+    "Add your product",
   );
   await call("save"); // A blocked publication must not prevent draft edits from saving.
 
   // The other templates also work with no selected products through the CLI path.
-  for (const templateId of ["pith", "sela"]) {
+  for (const templateId of ["pith", "sela", "lintas"]) {
     await ws.create({ id: templateId, name: templateId });
     await page.goto(
       ws.url + `/cart/admin/?page=sites&edit=${templateId}.ezkart.site`,
@@ -180,6 +180,15 @@ test("Templates start without products; connecting products preserves edits and 
     await call("save");
     assert.deepEqual((await ws.read(templateId)).products, []);
     await assert.rejects(call("publish"), /Add one of your products/);
+    await assert.rejects(
+      call("exportHtml"),
+      /before copying or exporting code/,
+    );
+    await page.locator("[data-native-id=template-product-choose]").click();
+    assert.equal(
+      await page.locator('[data-template-slot="0"]').isVisible(),
+      true,
+    );
     await call("connectTemplateProducts", { productIds: ["owned-one"] });
     assert.equal(
       (await call("nativeInspect"))

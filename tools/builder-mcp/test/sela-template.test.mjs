@@ -74,24 +74,14 @@ test("Sela picker applies four independent catalog products; sparse catalogs rec
   await form.locator("[name=page_name]").fill("Sela merchant");
   await form.locator(".sq-template-choice").filter({ hasText: "Sela" }).click();
   await form.locator("[name=template_brand]").fill("Merchant Studio");
-  await form.locator("[name=template_product]").selectOption("product-1");
-  assert.deepEqual(
-    await form
-      .locator("[name=template_products]")
-      .first()
-      .evaluate((n) => ({
-        opacity: getComputedStyle(n).opacity,
-        position: getComputedStyle(n).position,
-        width: n.getBoundingClientRect().width,
-      })),
-    { opacity: "1", position: "static", width: 18 },
-  );
-  for (const p of products.slice(1))
-    await form.locator(`[name=template_products][value="${p.id}"]`).check();
   await form.locator("[data-create-page]").click();
   await page.waitForURL("**edit=sela-merchant.ezkart.site");
   await page.waitForFunction(() => globalThis.EzkartBuilder);
   await call("settle");
+  await call("connectTemplateProducts", {
+    productIds: products.map((p) => p.id),
+  });
+  await call("save");
   assert.deepEqual(
     (await ws.read("sela-merchant")).products,
     products.map((p) => p.id),

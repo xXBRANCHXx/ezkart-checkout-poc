@@ -210,7 +210,7 @@ test("native elements snap to their own section grid, including nested scaling, 
       resized.props,
     );
     await invoke("removeSection", { id: "blank" });
-    const html = await invoke("exportHtml");
+    const html = await invoke("previewHtml");
     await page.route("**/grid-export", (route) =>
       route.fulfill({ body: html, contentType: "text/html" }),
     );

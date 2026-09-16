@@ -222,6 +222,19 @@ test("Authenticated page saves allow empty drafts and reject publish bypasses ag
     );
     return { status: r.status, body: await r.json() };
   };
+  const exportPage = async (html, state = { preview: html }) =>
+    mf.dispatchFetch("http://worker.test/v1/landing-pages/my-page/export", {
+      method: "POST",
+      headers: {
+        authorization: "Bearer " + token,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        html,
+        state,
+        customProducts: [{ id: "owned", stock: 999 }],
+      }),
+    });
   const buy = (id) =>
     `<div data-native-commerce='{"type":"commerce","part":"add","productId":"${id}"}'><button data-commerce-add>Buy</button></div>`;
   const published = (id) => ({
@@ -237,6 +250,9 @@ test("Authenticated page saves allow empty drafts and reject publish bypasses ag
     state: { preview: "<h1>Draft without products</h1>" },
   });
   assert.equal(initial.status, 200, JSON.stringify(initial.body));
+  assert.equal((await exportPage("<h1>Empty</h1>")).status, 422);
+  assert.equal((await exportPage(buy("foreign"))).status, 422);
+  assert.equal((await exportPage(buy("owned"))).status, 422);
   assert.equal((await save(published("foreign"))).status, 422);
   assert.equal((await save(published("owned"))).status, 422);
   assert.equal(
@@ -252,6 +268,12 @@ test("Authenticated page saves allow empty drafts and reject publish bypasses ag
   await db
     .prepare("UPDATE products SET stock_quantity=2 WHERE id='owned'")
     .run();
+  assert.equal((await exportPage(buy("owned"))).status, 200);
+  assert.equal(
+    (await exportPage(buy("owned"), { preview: "<h1>Not on page</h1>" }))
+      .status,
+    422,
+  );
   assert.equal((await save(published("owned"))).status, 200);
   // Replacing published HTML without sending a status must still run the gate.
   assert.equal(
@@ -267,6 +289,7 @@ test("Authenticated page saves allow empty drafts and reject publish bypasses ag
     .prepare("UPDATE products SET stock_quantity=0 WHERE id='owned'")
     .run();
   assert.equal((await save(published("owned"))).status, 422);
+  assert.equal((await exportPage(buy("owned"))).status, 422);
   // Working on a sold-out page remains possible; autosave cannot replace its publication.
   assert.equal(
     (await save({ state: { preview: "<h1>My next draft</h1>" }, products: [] }))

@@ -101,7 +101,6 @@ test("New page applies PITH with merchant content, preserves the original page, 
   await form.locator("[name=page_name]").fill("Merchant launch");
   await form.locator(".sq-template-choice").filter({ hasText: "PITH" }).click();
   await form.locator("[name=template_brand]").fill("Merchant Studio");
-  await form.locator("[name=template_product]").selectOption(product.id);
   await form.locator("[data-template-preview]").click();
   await page.locator(".sq-template-preview").waitFor();
   await page.keyboard.press("Escape");
@@ -129,6 +128,7 @@ test("New page applies PITH with merchant content, preserves the original page, 
       throw e;
     });
   await invoke("settle");
+  await invoke("connectTemplateProducts", { productIds: [product.id] });
   assert.equal(
     (await invoke("nativeInspect", { id: "hero-headline" })).text,
     product.name,
@@ -256,7 +256,8 @@ test("CLI template application handles sparse products, rejects invalid bindings
   await invoke("undo");
   assert.equal((await invoke("nativeInspect")).length, 0);
   await invoke("redo");
-  const html = await invoke("exportHtml");
+  await assert.rejects(invoke("exportHtml"), /Add stock/);
+  const html = await invoke("previewHtml");
   await page.route("**/sparse-export", (r) =>
     r.fulfill({ contentType: "text/html", body: html }),
   );
@@ -294,10 +295,14 @@ test("Library creates a template page with the same native mechanism", async (t)
   await form.locator("[name=page_name]").fill("Library launch");
   await form.locator(".sq-template-choice").filter({ hasText: "PITH" }).click();
   await form.locator("[name=template_brand]").fill("Merchant");
-  await form.locator("[name=template_product]").selectOption("sparse");
   await form.locator("button[value=default]").click();
   await page.waitForURL("**edit=library-launch.ezkart.site");
   await page.waitForFunction(() => globalThis.EzkartBuilder);
+  assert.deepEqual((await ws.read("library-launch")).products, []);
+  await page.evaluate(() =>
+    EzkartBuilder.connectTemplateProducts({ productIds: ["sparse"] }),
+  );
+  await page.evaluate(() => EzkartBuilder.save());
   assert.equal(
     await page.locator("[data-native-id=hero-headline]").textContent(),
     "AnUnbrokenProductNameThatMustWrapWithoutClippingOrHidingThePurchaseAction",

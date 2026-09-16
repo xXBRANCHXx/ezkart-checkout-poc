@@ -84,6 +84,10 @@
       image3: images[2] || "",
       hasImage: images.length > 0,
       hasVariants: (product.variants || []).filter((v) => !v.hidden).length > 1,
+      optionLayout:
+        (product.variants || []).filter((v) => !v.hidden).length > 6
+          ? "select"
+          : "detailed",
       heroColumns: images.length
         ? "minmax(0,1.03fr) minmax(0,1fr)"
         : "minmax(0,1fr)",
@@ -240,6 +244,98 @@
     }
     return result;
   }
+  // An empty shop slot is still ordinary, editable native content.
+  function emptyProductCard(slot, theme) {
+    const font = theme.bodyFont || "Arial, sans-serif";
+    const text = (id, value, props = {}) => ({
+      id,
+      type: "text",
+      name: value,
+      text: value,
+      props: {
+        fontFamily: font,
+        fontSize: "14px",
+        lineHeight: "1.6",
+        color: "#53616a",
+        marginTop: "0px",
+        marginBottom: "0px",
+        overflowWrap: "anywhere",
+        ...props,
+      },
+    });
+    return {
+      ...slot,
+      name: "Empty product card",
+      props: {
+        ...slot.props,
+        display: "flex",
+        flexDirection: "column",
+        gap: "16px",
+        width: "100%",
+        maxWidth: "480px",
+        paddingTop: "28px",
+        paddingRight: "24px",
+        paddingBottom: "28px",
+        paddingLeft: "24px",
+        borderTopWidth: "1px",
+        borderTopStyle: "dashed",
+        borderTopColor: "#cbd2db",
+        borderRightWidth: "1px",
+        borderRightStyle: "dashed",
+        borderRightColor: "#cbd2db",
+        borderBottomWidth: "1px",
+        borderBottomStyle: "dashed",
+        borderBottomColor: "#cbd2db",
+        borderLeftWidth: "1px",
+        borderLeftStyle: "dashed",
+        borderLeftColor: "#cbd2db",
+        borderRadius: "12px",
+        backgroundColor: "#ffffff",
+        color: "#222b36",
+      },
+      children: [
+        {
+          id: "template-product-empty-icon",
+          type: "icon",
+          name: "Product placeholder",
+          icon: "package",
+          label: "",
+          props: { width: "36px", height: "36px", color: "#64748b" },
+        },
+        text("template-product-empty-title", "Add your product", {
+          fontSize: "20px",
+          fontWeight: "600",
+          color: "#222b36",
+        }),
+        text(
+          "template-product-empty-description",
+          "Choose a product from your catalog. Add stock before publishing or exporting this page.",
+        ),
+        {
+          id: "template-product-choose",
+          type: "button",
+          tag: "button",
+          name: "Choose a product",
+          text: "Choose a product",
+          label: "Choose a product",
+          props: {
+            fontFamily: font,
+            fontSize: "14px",
+            fontWeight: "500",
+            minHeight: "44px",
+            width: "100%",
+            paddingTop: "12px",
+            paddingBottom: "12px",
+            paddingLeft: "16px",
+            paddingRight: "16px",
+            borderRadius: "6px",
+            backgroundColor: "#222b36",
+            color: "#ffffff",
+          },
+        },
+      ],
+    };
+  }
   async function prepare({
     templateId,
     productId,
@@ -285,7 +381,29 @@
           ],
       String(brandName || "").trim() || template.name,
     );
+    data.hasProducts = selectedIds.length > 0;
+    if (!data.hasProducts) {
+      data.productCount = 0;
+      data.collectionIntroduction =
+        "Tambahkan produk pertamamu untuk mulai berjualan.";
+      data.allProductsLabel = "Semua · 0";
+    }
     const recipe = materialize(await json(template.recipeUrl), data);
+    if (!selectedIds.length) {
+      let found = false;
+      const empty = (nodes) =>
+        nodes.forEach((node, i) => {
+          if (node.id === template.productSlot) {
+            nodes[i] = emptyProductCard(node, template.theme);
+            found = true;
+          } else if (node.children) empty(node.children);
+        });
+      empty(recipe);
+      if (!found)
+        throw Error(
+          "This template needs a product section before it can be used.",
+        );
+    }
     const ids = new Set(),
       commerce = [];
     const check = (node) => {
@@ -411,86 +529,20 @@
     settings.className = "sq-template-settings";
     settings.hidden = true;
     settings.innerHTML =
-      '<label><span>Store name</span><input name="template_brand" maxlength="80" autocomplete="organization" placeholder="Your store name"></label><label><span>Featured product (optional for drafts)</span><select name="template_product"><option value="">Choose a product</option></select></label><fieldset data-template-additional hidden><legend>More products</legend><div data-template-product-list></div><p data-template-product-help></p></fieldset><p>Start designing now. Template imagery stays editable; shop items use your selected products. Add an available product before publishing.</p><button type="button" data-template-preview>Preview design</button>';
-    const brand = settings.querySelector("input"),
-      product = settings.querySelector("select");
-    brand.value = document.body.dataset.adminCheckoutBrand || "";
-    const populateProducts = () => {
-      const previous = product.value;
-      product.replaceChildren(new Option("Choose a product", ""));
-      getProducts()
-        .filter((p) => p.status !== "archived")
-        .forEach((p) => product.add(new Option(p.name, p.id)));
-      product.value = previous;
-    };
-    populateProducts();
-    const empty = document.createElement("p");
-    empty.textContent =
-      "You can use this template now. Create a product and connect it before publishing.";
-    empty.hidden = product.options.length > 1;
-    settings.append(empty);
+      '<label><span>Store name</span><input name="template_brand" maxlength="80" autocomplete="organization" placeholder="Your store name"></label><p>Your page starts with an empty product card. Design first, then choose your products in the editor. At least one product with stock is required to publish or export code.</p><button type="button" data-template-preview>Preview design</button>';
+    const brand = settings.querySelector("input");
     host.append(settings);
-    const additional = settings.querySelector("[data-template-additional]"),
-      extraList = settings.querySelector("[data-template-product-list]");
-    const populateAdditional = () => {
-      const template = templates.find(
-          (t) => t.id === form.elements.template_id.value,
-        ),
-        max = template?.requirements.maxProducts || 1,
-        checked = new Set(
-          [...extraList.querySelectorAll("input:checked")].map((n) => n.value),
-        );
-      additional.hidden = max <= 1 || !product.value;
-      extraList.replaceChildren(
-        ...getProducts()
-          .filter((p) => p.status !== "archived" && p.id !== product.value)
-          .map((p) => {
-            const label = document.createElement("label"),
-              input = document.createElement("input");
-            input.type = "checkbox";
-            input.name = "template_products";
-            input.value = p.id;
-            input.checked = checked.has(p.id);
-            input.disabled = !product.value || max <= 1;
-            label.append(input, document.createTextNode(p.name));
-            return label;
-          }),
-      );
-      additional.querySelector("[data-template-product-help]").textContent =
-        `Optional: choose up to ${Math.max(0, max - 1)} more products. Each keeps its own variants and price.`;
-      const inputs = [...extraList.querySelectorAll("input")],
-        count = inputs.filter((n) => n.checked).length;
-      inputs.forEach(
-        (n) =>
-          (n.disabled =
-            !product.value || max <= 1 || (!n.checked && count >= max - 1)),
-      );
-    };
-    extraList.addEventListener("change", () => {
-      const max =
-        templates.find((t) => t.id === form.elements.template_id.value)
-          ?.requirements.maxProducts || 1;
-      const inputs = [...extraList.querySelectorAll("input")],
-        count = inputs.filter((n) => n.checked).length;
-      inputs.forEach(
-        (n) =>
-          (n.disabled = !product.value || (!n.checked && count >= max - 1)),
-      );
-    });
-    product.addEventListener("change", populateAdditional);
     let templates = [];
     const sync = () => {
       const selected = form.elements.template_id.value;
       settings.hidden = !selected;
-      brand.required = product.required = false;
-      brand.disabled = product.disabled = !selected;
+      brand.required = false;
+      brand.disabled = !selected;
       const products = form.querySelector("[data-creator-products]");
       const optional = products?.closest("details") || products;
       if (optional) optional.hidden = Boolean(selected);
     };
     options.addEventListener("change", () => {
-      populateProducts();
-      populateAdditional();
       sync();
     });
     form.addEventListener("reset", () => setTimeout(sync));
@@ -547,14 +599,7 @@
     if (!templateId) return null;
     return prepare({
       templateId,
-      productIds: [
-        form.elements.template_product.value,
-        ...[
-          ...form.querySelectorAll(
-            '[name="template_products"]:checked:not(:disabled)',
-          ),
-        ].map((n) => n.value),
-      ].filter(Boolean),
+      productIds: [],
       brandName: form.elements.template_brand.value,
       products,
     });
@@ -693,7 +738,7 @@
         const currentStatus = host.querySelector('[role="status"]') || status;
         currentStatus.textContent = productIds.length
           ? "Products connected."
-          : "Saved as a draft. Add a product before publishing.";
+          : "Saved as a draft. Add a product with stock before publishing or exporting.";
         if (restoreFocus) host.querySelector('button[type="submit"]')?.focus();
       } catch (error) {
         status.textContent = error.message;

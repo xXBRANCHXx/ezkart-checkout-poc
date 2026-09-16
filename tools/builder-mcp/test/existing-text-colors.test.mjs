@@ -140,7 +140,7 @@ test("existing hero text exposes its actual gradient in Style and preserves comp
     await phrase.click();
     assert.equal(await savedPhrase.isVisible(), true);
     assert.equal(await panel.locator("[data-native-text]").isVisible(), false);
-    const html = await invoke("exportHtml");
+    const html = await invoke("previewHtml");
     await page.route("**/existing-export", (r) =>
       r.fulfill({ body: html, contentType: "text/html" }),
     );

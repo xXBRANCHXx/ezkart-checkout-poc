@@ -310,7 +310,7 @@ test("section controls stay above content and add a blank section directly after
       await page.waitForFunction(() => globalThis.EzkartBuilder);
       await invoke("settle");
       assert.equal((await invoke("inspect")).sections[1].id, added);
-      const html = await invoke("exportHtml");
+      const html = await invoke("previewHtml");
       assert.doesNotMatch(
         html,
         /data-sq-canvas-add-section|data-sq-section-tools/,
@@ -461,7 +461,7 @@ test("section backgrounds cover both page edges and preserve content spacing in 
       /linear-gradient\(90deg/,
     );
 
-    const html = await invoke("exportHtml");
+    const html = await invoke("previewHtml");
     await page.route("**/background-export", (r) =>
       r.fulfill({ body: html, contentType: "text/html" }),
     );

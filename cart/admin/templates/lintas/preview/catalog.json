@@ -1,0 +1,90 @@
+{
+  "demoCheckout": true,
+  "currency": "IDR",
+  "locale": "id-ID",
+  "storageScope": "lintas-fictional-review",
+  "mediaBase": "http://127.0.0.1:46351",
+  "products": [
+    {
+      "id": "tote",
+      "name": "Hari Tote",
+      "description": "Laptop, botol minum, dan barang kecil punya tempatnya. Satu tote dengan bukaan ritsleting dan saku depan yang mudah dijangkau.",
+      "type": "physical",
+      "price": 389000,
+      "stock": 8,
+      "status": "active",
+      "currency": "IDR",
+      "media": [
+        {
+          "id": "tote"
+        }
+      ],
+      "variants": [
+        {
+          "id": "tote-harian",
+          "name": "Harian · 14 L",
+          "price": 389000,
+          "stock": 8
+        },
+        {
+          "id": "tote-lapang",
+          "name": "Lapang · 18 L",
+          "price": 449000,
+          "stock": 0
+        }
+      ]
+    },
+    {
+      "id": "sling",
+      "name": "Saku Sling",
+      "description": "Pas untuk mampir ke kedai atau jalan sore. Bentuk melengkung mengikuti badan, dengan tali lebar yang bisa diatur dan bukaan ritsleting.",
+      "type": "physical",
+      "price": 249000,
+      "stock": 7,
+      "status": "active",
+      "currency": "IDR",
+      "media": [
+        {
+          "id": "sling"
+        }
+      ],
+      "variants": [
+        {
+          "id": "sling-reguler",
+          "name": "Tali Reguler",
+          "price": 249000,
+          "stock": 5
+        },
+        {
+          "id": "sling-panjang",
+          "name": "Tali Panjang",
+          "price": 269000,
+          "stock": 2
+        }
+      ]
+    },
+    {
+      "id": "pouch",
+      "name": "Teman Pouch",
+      "description": "Satukan kabel, alat tulis, atau barang kecil dalam satu tempat. Alas berlipat memberi ruang, sementara ritsleting menjaga isinya tetap bersama.",
+      "type": "physical",
+      "price": 119000,
+      "stock": 12,
+      "status": "active",
+      "currency": "IDR",
+      "media": [
+        {
+          "id": "pouch"
+        }
+      ],
+      "variants": [
+        {
+          "id": "pouch-tunggal",
+          "name": "Tunggal",
+          "price": 119000,
+          "stock": 12
+        }
+      ]
+    }
+  ]
+}

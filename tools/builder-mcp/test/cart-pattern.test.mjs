@@ -95,7 +95,7 @@ test("the shared floating cart remains reachable above purchase bars and preserv
       await invoke("nativeInsert", { section: node.id, node });
     }
     await invoke("removeSection", { id: "blank" });
-    const html = await invoke("exportHtml");
+    const html = await invoke("previewHtml");
     await page.route("**/cart-pattern-export", (route) =>
       route.fulfill({ body: html, contentType: "text/html" }),
     );

@@ -101,13 +101,11 @@ test("Takar applies real product collections with independent choices, editable 
     .filter({ hasText: "Takar" })
     .click();
   await form.locator("[name=template_brand]").fill("Merchant Store");
-  await form.locator("[name=template_product]").selectOption("p1");
-  await form.locator("[name=template_products][value=p2]").check();
-  await form.locator("[name=template_products][value=p3]").check();
   await form.locator("[data-create-page]").click();
   await p.waitForURL("**edit=takar-merchant.ezkart.site");
   await p.waitForFunction(() => globalThis.EzkartBuilder);
   await call("settle");
+  await call("connectTemplateProducts", { productIds: ["p1", "p2", "p3"] });
   await call("save");
   await p.reload();
   await p.waitForFunction(() => globalThis.EzkartBuilder);

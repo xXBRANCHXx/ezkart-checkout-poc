@@ -14,8 +14,9 @@ test('MCP edits survive project switching and restart; undo, validation and expo
  const connect=async()=>{client=new Client({name:'integration-test',version:'1'});await client.connect(new StdioClientTransport({command:process.execPath,args:[join(repoRoot,'tools/builder-mcp/server.mjs')],env:{...process.env,EZKART_WORKSPACE:directory}}));};
  const call=async(name,args={})=>{const result=await client.callTool({name,arguments:args});assert.ok(!result.isError,JSON.stringify(result));return JSON.parse(result.content[0].text);};
  try{
+  await writeFile(join(directory,'catalog.json'),JSON.stringify({products:[{id:'owned-product',name:'Merchant product',type:'physical',status:'active',stock:4,price:10000}]}));
   await connect();const availableTools=(await client.listTools()).tools;assert.equal(availableTools.length,29);assert.ok(availableTools.some(tool=>tool.name==='template_products'));
-  await call('project_create',{id:'first',name:'First'});
+  await call('project_create',{id:'first',name:'First',productIds:['owned-product']});
   await call('section_add',{component:'hero-split',id:'hero',content:{title:'One main heading',body:'Editable content'}});
   await call('section_remove',{id:'blank'});
   await call('element_update',{id:'hero-title',text:'Changed heading'});
@@ -30,6 +31,8 @@ test('MCP edits survive project switching and restart; undo, validation and expo
   await call('device_set',{device:'mobile'});
   let state=await call('page_inspect');assert.equal(state.sections[0].spacing.top,17);assert.equal(state.sections[0].spacing.left,23);
   const invalid=await client.callTool({name:'element_update',arguments:{id:'hero-title',src:'javascript:alert(1)'}});assert.equal(invalid.isError,true);
+  const blocked=await client.callTool({name:'page_export',arguments:{}});assert.equal(blocked.isError,true);
+  await call('section_add',{component:'product-collection',id:'shop',productId:'owned-product'});
   const exported=await call('page_export');const html=await readFile(exported.path,'utf8');assert.match(html,/Changed heading/);assert.match(html,/data-ezkart-auto-height/);assert.doesNotMatch(html,/data-sq-element=/);
   await client.close();await connect();await call('project_open',{id:'first'});state=await call('page_inspect');assert.equal(state.sections[0].elements[0].fields[0].text,'Changed heading');
  }finally{await client?.close();await rm(directory,{recursive:true,force:true});}
@@ -56,7 +59,7 @@ test('all native compositions, navigation changes, responsive export, FAQ reflow
   const geometry=await page.evaluate(()=>{const sidebar=document.querySelector('.sq-builder-sidebar').getBoundingClientRect(),canvas=document.querySelector('.sq-canvas-scroll').getBoundingClientRect(),frame=document.querySelector('.sq-device-frame').getBoundingClientRect();return {sidebar:sidebar.right,canvas:canvas.left,frame:frame.right,right:canvas.right};});assert.ok(geometry.sidebar<=geometry.canvas+1);assert.ok(geometry.frame<=geometry.right+1);
   await invoke('navigation',{layout:'studio',sticky:true});
   await invoke('updateSection',{id:'faq-list',background:'#242822',color:'#ffffff'});
-  const html=await invoke('exportHtml');await page.route('**/export',route=>route.fulfill({body:html,contentType:'text/html'}));await page.goto(ws.url+'/export');await page.evaluate(()=>document.fonts.ready);
+  const html=await invoke('previewHtml');await page.route('**/export',route=>route.fulfill({body:html,contentType:'text/html'}));await page.goto(ws.url+'/export');await page.evaluate(()=>document.fonts.ready);
   for(const width of [320,390,600,768,900,1120,1440,1920]){
    await page.setViewportSize({width,height:1000});await page.waitForTimeout(100);
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth),width,`horizontal overflow at ${width}`);
@@ -88,7 +91,7 @@ test('reference sections stay editable, preserve device-specific sizing, and exp
   await page.locator(`[data-sq-element-id="${field.id}"]`).click();await page.locator('[data-sq-overlay-duplicate]').click();assert.equal(await page.locator('#top h1').count(),2);await invoke('undo');
   await invoke('setDevice',{device:'mobile'});assert.equal(await page.locator('#top h1').evaluate(n=>n.style.getPropertyValue('--sq-flow-width')),'');await invoke('setDevice',{device:'desktop'});await invoke('save');
   await page.reload();await page.waitForFunction(()=>globalThis.EzkartBuilder);await invoke('settle');assert.equal((await invoke('inspect')).sections.find(s=>s.id==='top').elements.find(e=>e.id===field.id).layout.x,18);
-  const html=await invoke('exportHtml');assert.match(html,/@container ezkart-page/);assert.match(html,/data:font\/woff2;base64/);assert.doesNotMatch(html,/<iframe/);
+  const html=await invoke('previewHtml');assert.match(html,/@container ezkart-page/);assert.match(html,/data:font\/woff2;base64/);assert.doesNotMatch(html,/<iframe/);
   await page.route('**/flow-export',r=>r.fulfill({body:html,contentType:'text/html'}));await page.setViewportSize({width:1440,height:1000});await page.goto(ws.url+'/flow-export');await page.evaluate(()=>document.fonts.ready);
   assert.equal(await page.locator('#top h1').evaluate(n=>n.offsetWidth),1000);assert.equal(await page.locator('[data-ezkart-cart-open]').count(),0);assert.equal(await page.evaluate(()=>[...document.fonts].every(f=>f.status==='loaded')),true);
   await page.locator('.ezm-watch-button').click();assert.equal(await page.locator('.ezm-film-dialog').evaluate(n=>n.open),true);await page.keyboard.press('Escape');assert.equal(await page.locator('.ezm-film-dialog').evaluate(n=>n.open),false);
@@ -106,7 +109,7 @@ test('catalog photos keep a square aspect ratio instead of the admin thumbnail f
   await page.route('**/preview-media/**',r=>r.fulfill({body:'<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="#f44b34"/></svg>',contentType:'image/svg+xml'}));await page.goto(ws.url+'/cart/admin/?page=sites&edit=photos.ezkart.site');await page.waitForFunction(()=>globalThis.EzkartBuilder);
   await page.evaluate(async()=>{await EzkartBuilder.addSection({component:'product-collection',id:'products'});await EzkartBuilder.removeSection({id:'blank'});});
   const check=async()=>{const size=await page.locator('.sq-product-grid .product-art').evaluate(n=>({width:n.offsetWidth,height:n.offsetHeight,flex:getComputedStyle(n).flexBasis}));assert.ok(size.width>100);assert.ok(Math.abs(size.width-size.height)<2);assert.notEqual(size.flex,'36px');};
-  await check();const html=await page.evaluate(()=>EzkartBuilder.exportHtml());await page.route('**/photo-export',r=>r.fulfill({body:html,contentType:'text/html'}));await page.goto(ws.url+'/photo-export');await check();
+  await check();const html=await page.evaluate(()=>EzkartBuilder.previewHtml());await page.route('**/photo-export',r=>r.fulfill({body:html,contentType:'text/html'}));await page.goto(ws.url+'/photo-export');await check();
  }finally{await browser.close();await ws.stop();await rm(directory,{recursive:true,force:true});}
 });
 
@@ -138,7 +141,7 @@ test('blank-canvas primitives expose gradients, responsive type and semantic hea
   await invoke('addElement',{section:'blank',id:'link',type:'button'});await invoke('updateElement',{id:'link',text:'Read more',action:{type:'section',target:'dark'}});
   await invoke('addElement',{section:'dark',id:'body',type:'text'});await invoke('updateElement',{id:'body',text:'A real text block',style:{color:'#ffffff'}});
   const snapshot=await invoke('snapshot');assert.doesNotMatch(snapshot.preview,/sq-reference|sq-flow|sq-free-code|<iframe|<style|<script/);
-  const html=await invoke('exportHtml');await page.route('**/native-export',r=>r.fulfill({body:html,contentType:'text/html'}));await page.goto(ws.url+'/native-export');await page.evaluate(()=>document.fonts.ready);
+  const html=await invoke('previewHtml');await page.route('**/native-export',r=>r.fulfill({body:html,contentType:'text/html'}));await page.goto(ws.url+'/native-export');await page.evaluate(()=>document.fonts.ready);
   assert.equal(await page.locator('#dark').count(),1);assert.equal(await page.locator('[data-ezkart-element=link] button').getAttribute('data-ezkart-target'),'dark');
   assert.equal(await page.locator('[data-ezkart-section=dark]').evaluate(n=>getComputedStyle(n).backgroundColor),'rgb(39, 39, 36)');
   assert.equal(await page.locator('.sq-gradient-surface').evaluate(n=>getComputedStyle(n).backgroundImage.includes('radial-gradient')),true);
