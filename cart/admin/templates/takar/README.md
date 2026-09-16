@@ -1,4 +1,4 @@
-# Takar · 1.0.0
+# Takar · 1.1.0
 
 Approved native design: **Takar**, an approachable storefront with DM Sans,
 restrained green accents, a wide hero image, a product shelf and a tabbed shopping
@@ -7,8 +7,9 @@ catalog, screenshots, image provenance and licensed font remain in `preview/`.
 
 ## Apply
 
-Choose **New page → Takar**, enter your store name, select a featured catalog
-product and optionally add two more products. The page remains editable with
+Choose **New page → Takar** and start editing. Store name and products can be
+filled in now or later. Connect a featured product and up to two more when ready.
+The page remains editable with
 ordinary section, element, responsive and product controls. The editor, page
 library and public CLI all use the same native applicator.
 
@@ -49,12 +50,29 @@ including historical source-local asset URLs. Asset basenames map to
 `preview/assets/`. The fictional `preview/catalog.json` is never loaded by the
 applicator. Image prompts and provenance accompany the generated photographs;
 the authored logo and DM Sans OFL notice remain with the archived assets.
-Applied merchant pages do not load demo assets.
+Applied pages may keep the licensed imagery in `design/`; shop media binds to real products.
 
 ```
-node tools/templates/package.mjs takar /path/to/takar-1.0.0.tar.gz
+node tools/templates/package.mjs takar /path/to/takar-1.1.0.tar.gz
 ```
 
 The package includes shared runtime and licensed fonts. Its enforced limit is
 50,000,000 bytes. The repository validation report documents the real-catalog,
 responsive, accessibility, commerce and editor Preview checks.
+
+## Drafts and publication
+
+You can choose this template and start editing with no products selected. Use
+**Products → Template products** later to connect your catalog. That updates the
+shop slots while preserving authored headlines, layout, colors and added content.
+The template's licensed design photos remain editable; product cards and purchase
+controls use the selected catalog products.
+
+Publishing requires at least one owned, active product with a purchase action on
+the page and available stock (including visible variants). Stock and ownership
+are rechecked on the server. Digital products and subscriptions use their existing
+availability behavior. An empty or sold-out draft can still be saved and previewed.
+
+For a product-free CLI draft, use `-` instead of product IDs. After editing, call
+`template_products` with real product IDs to connect the slots without rebuilding
+the design. Original approval archives remain unchanged.

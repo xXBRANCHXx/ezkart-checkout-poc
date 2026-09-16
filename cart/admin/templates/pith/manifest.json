@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "pith",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "name": "PITH",
   "description": "Bold product photography, oversized type and decisive citrus color.",
   "recipe": "recipe.json",
@@ -11,13 +11,14 @@
     "preview/mobile.png",
     "preview/footer.png"
   ],
-  "previewLabel": "Fictional branding shown. Your page uses your store name and product.",
+  "previewLabel": "Template design imagery is included and editable. Shop items use your selected catalog products. You can start a draft without products; publishing requires an available product.",
   "requirements": {
     "minProducts": 1,
     "maxProducts": 1,
     "images": "optional",
     "variants": "optional",
-    "description": "optional"
+    "description": "optional",
+    "draftProducts": 0
   },
   "theme": {
     "accent": "#eae653",
@@ -40,5 +41,5 @@
     "serve": "Second product photo",
     "pack-story": "Third product photo"
   },
-  "demoContent": "preview/ only. Never applied to a merchant page."
+  "demoContent": "Fictional catalog stays in preview/. Licensed design imagery in design/ may remain on merchant pages."
 }

@@ -169,8 +169,9 @@ Integration tests run the MCP protocol and the real browser editor. They cover p
 ## Installed landing-page templates
 
 **New page** in both the editor and landing-page library offers a blank canvas or
-an installed template. PITH supports one featured product; Sela supports a collection of one to four products. Select real catalog products
-and enter a store name; the resulting composition uses ordinary native elements.
+an installed template. PITH supports one featured product, Sela one to four, and
+Takar one to three. Product selection is optional for drafts. Enter a store name
+now or edit it later; the composition uses ordinary native elements.
 Unsupported demo recipes, claims and policies are omitted. Every purchase
 placement shares the real product's variant selection and Ezkart cart.
 
@@ -187,3 +188,14 @@ and their catalog requirements. Pass `productIds` in display order, with the fea
 all content before applying, and participates in normal undo/redo. It never
 changes the catalog or publishes a page. Read [Sela's package notes](../../cart/admin/templates/sela/README.md) or [PITH's package notes](../../cart/admin/templates/pith/README.md)
 for the approved design, provenance, merchant-data behavior and package command.
+
+### Product-free template drafts
+
+All templates can be applied with `productIds: []`. The CLI example accepts `-`
+in place of its product-ID argument. These are private editable drafts. Licensed
+template design images remain, and purchase slots wait for a real product.
+`template_products` connects selected catalog IDs later while preserving design
+edits. The editor exposes the same action in **Products → Template products**.
+Publication requires an owned active product on the page with an available
+purchase action; physical products need stock in a visible variant or the base
+product. The Worker rechecks the authoritative catalog on every publish request.

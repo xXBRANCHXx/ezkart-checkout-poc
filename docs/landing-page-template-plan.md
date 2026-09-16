@@ -16,7 +16,7 @@ Future templates should be highly professional and practical for ordinary mercha
 
 Every future template must be composed from the same reusable, merchant-editable element system available on a blank canvas. A template may provide a composition and art direction, but it must not introduce a parallel editing model or template-only behavior.
 
-When a merchant applies a template, commerce content must come from real products in the merchant's Ezkart catalog. Preview/demo content can illustrate a template before selection, but it must not survive as fake merchandise in an applied page.
+Merchants can open, edit, preview and save any template without selecting a product. Licensed template design imagery can remain on the page. Shop cards, variants, prices and purchases use the merchant's selected catalog products. Publishing requires at least one of that merchant's active products on the page with an available purchase action. Physical products need positive stock in the product or a visible variant. A product selected only in settings does not qualify; the server rechecks ownership and current availability before accepting a published snapshot.
 
 Each complete template package has a hard maximum size of 50 MB.
 
@@ -39,7 +39,7 @@ Each complete template package has a hard maximum size of 50 MB.
 - No automatic carousels.
 - No animation on every section and no endless marquees.
 - No generic AI-written copy such as "elevate your journey," "unlock your potential," or claims without evidence.
-- No fake or sample products after a merchant applies the template.
+- No fake or sample merchandise can satisfy the publish requirement or be purchased. Unconnected draft slots are clearly labeled and disabled.
 - No collection that is one shared structure with palette swaps.
 
 ### Positive principles
@@ -294,7 +294,8 @@ Target no more than 20 MB packaged.
 - Use the [shared storefront cart pattern](storefront-cart-pattern.md): one consistent floating cart outside template navigation, connected to Ezkart's existing cart and checkout.
 - A template declares the product counts, media types, and optional data it can use, then adapts gracefully when a merchant supplies less.
 - Applied pages bind to real product names, descriptions, prices, variants, availability, stock behavior, images, and checkout actions.
-- Demo assets are preview-only. They must be clearly separated from merchant data in storage and rendering.
+- Licensed template design imagery may remain in applied pages and stays editable. Keep it separate from catalog product media and the fictional preview catalog. Product sections use selected merchant products.
+- Product selection is optional for drafts and required for publication. Connect products later without overwriting design edits; always validate the publish requirement on the server. Digital products and subscriptions use their existing active/available commerce behavior rather than a physical inventory count.
 - Missing optional content should remove or recompose a section; it should not leave placeholders, blank cards, or invented facts.
 - Long names, multiple price formats, sale states, sold-out products, missing secondary images, and sparse descriptions are first-class cases.
 - A template cannot depend on reviews, press, subscriptions, guarantees, or shipping claims that the merchant does not have.

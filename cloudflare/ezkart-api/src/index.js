@@ -1,3 +1,4 @@
+import { validatePublication } from "./landing-publication.js";
 const json = (payload, status = 200, headers = {}) => new Response(JSON.stringify(payload), {
   status,
   headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...headers },
@@ -535,6 +536,15 @@ async function saveLandingPage(request, env, rawId) {
   const publishedHtml = Object.hasOwn(payload, "publishedHtml")
     ? String(payload.publishedHtml || "")
     : String(existing?.publishedHtml || "");
+  // Autosaving a draft never republishes its HTML. Every publication or replacement
+  // of a published snapshot must use the seller's current authoritative catalog.
+  if (status === "published" && (payload.status === "published" || Object.hasOwn(payload, "publishedHtml"))) {
+    const result = await env.DB.prepare("SELECT * FROM products WHERE seller_id = ? AND status = 'active'").bind(seller.id).all();
+    const variants = await env.DB.prepare("SELECT * FROM product_variants WHERE seller_id = ?").bind(seller.id).all();
+    const catalogProducts = result.results.map((row) => shapeProduct(row, [], variants.results.filter((v) => v.product_id === row.id)));
+    const error = await validatePublication({ html: publishedHtml, state, products: catalogProducts });
+    if (error) throw new Response(error, { status: 422 });
+  }
   const now = new Date().toISOString();
   const page = {
     id,

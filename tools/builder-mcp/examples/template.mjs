@@ -8,9 +8,9 @@ import { repoRoot } from "../workspace.mjs";
 const [templateId, id, productId, brandName] = process.argv.slice(2);
 if (!templateId || !id || !productId || !brandName)
   throw Error(
-    'Usage: node examples/template.mjs TEMPLATE PAGE_ID PRODUCT_ID[,PRODUCT_ID...] "Store name"',
+    'Usage: node examples/template.mjs TEMPLATE PAGE_ID PRODUCT_ID[,PRODUCT_ID...]|- "Store name"',
   );
-const productIds = productId.split(",").filter(Boolean);
+const productIds = productId === "-" ? [] : productId.split(",").filter(Boolean);
 const directory =
   process.env.EZKART_WORKSPACE ||
   join(homedir(), ".local/share/ezkart-builder");

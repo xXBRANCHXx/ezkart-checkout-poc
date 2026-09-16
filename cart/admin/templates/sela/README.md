@@ -1,4 +1,4 @@
-# Sela · 1.0.0
+# Sela · 1.1.0
 
 Approved native design: **Sela**, a whitespace-led product collection with Plus
 Jakarta Sans, white and quiet neutral surfaces, clay accents and an editable
@@ -8,8 +8,9 @@ preserved in `preview/`.
 
 ## Apply
 
-Choose **New page → Sela**, enter your store name, select a featured catalog
-product and optionally choose up to three more products. The page stays editable
+Choose **New page → Sela** and start editing. Store name and products can be
+filled in now or later. Connect a featured product and up to three more when ready.
+The page stays editable
 with the ordinary element, section, responsive and product controls. Both the
 library and editor use the shared applicator; public CLI tools use the same path.
 
@@ -48,12 +49,29 @@ historical source-local asset URLs. Asset basenames map to `preview/assets/`.
 `preview/catalog.json` is a fictional fixture and is never loaded by the
 applicator. Generated photographs include prompts and provenance; the authored
 SVG logo and Plus Jakarta Sans OFL notice remain with the preview assets.
-Preview assets do not ship with applied customer pages.
+The fictional preview catalog stays isolated. Licensed artwork copied to `design/` may remain on applied pages.
 
 ```
-node tools/templates/package.mjs sela /path/to/sela-1.0.0.tar.gz
+node tools/templates/package.mjs sela /path/to/sela-1.1.0.tar.gz
 ```
 
 The versioned package includes the shared runtime and fonts. The packager rejects
 anything above 50,000,000 bytes. See the repository validation report for measured
 commerce, responsive, accessibility and performance checks.
+
+## Drafts and publication
+
+You can choose this template and start editing with no products selected. Use
+**Products → Template products** later to connect your catalog. That updates the
+shop slots while preserving authored headlines, layout, colors and added content.
+The template's licensed design photos remain editable; product cards and purchase
+controls use the selected catalog products.
+
+Publishing requires at least one owned, active product with a purchase action on
+the page and available stock (including visible variants). Stock and ownership
+are rechecked on the server. Digital products and subscriptions use their existing
+availability behavior. An empty or sold-out draft can still be saved and previewed.
+
+For a product-free CLI draft, use `-` instead of product IDs. After editing, call
+`template_products` with real product IDs to connect the slots without rebuilding
+the design. Original approval archives remain unchanged.

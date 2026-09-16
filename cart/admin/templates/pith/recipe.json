@@ -189,11 +189,9 @@
                   "textDecoration": "none",
                   "color": "inherit"
                 },
-                "marks": [],
-                "$when": "image2"
+                "marks": []
               }
-            ],
-            "$when": "hasDetailsNavigation"
+            ]
           },
           {
             "id": "nav-actions",
@@ -287,8 +285,7 @@
                     }
                   }
                 ],
-                "marks": [],
-                "$when": "hasDetailsNavigation"
+                "marks": []
               }
             ]
           }
@@ -385,11 +382,9 @@
               "textDecoration": "none",
               "color": "inherit"
             },
-            "marks": [],
-            "$when": "image2"
+            "marks": []
           }
-        ],
-        "$when": "hasDetailsNavigation"
+        ]
       }
     ],
     "tag": "header"
@@ -831,16 +826,14 @@
             "type": "image",
             "name": "Product photo",
             "src": {
-              "$bind": "image2"
+              "$asset": "pith/design/serve-1600.webp"
             },
-            "alt": {
-              "$bind": "productName"
-            },
+            "alt": "Template lifestyle photograph",
             "props": {
               "display": "block",
               "width": "100%",
               "height": "100%",
-              "objectFit": "contain",
+              "objectFit": "cover",
               "minHeight": "630px"
             },
             "responsive": [
@@ -927,7 +920,6 @@
         ]
       }
     ],
-    "$when": "image2",
     "tag": "section"
   },
   {
@@ -1355,23 +1347,20 @@
             "type": "image",
             "name": "Product photo",
             "src": {
-              "$bind": "image3"
+              "$asset": "pith/design/pack-1100.webp"
             },
-            "alt": {
-              "$bind": "productName"
-            },
+            "alt": "Template packaging photograph",
             "props": {
               "display": "block",
               "width": "100%",
               "height": "auto",
-              "objectFit": "contain"
+              "objectFit": "cover"
             },
             "responsive": []
           }
         ]
       }
     ],
-    "$when": "image3",
     "tag": "section"
   },
   {
@@ -1818,8 +1807,7 @@
                   "textDecoration": "none",
                   "color": "inherit"
                 },
-                "marks": [],
-                "$when": "image2"
+                "marks": []
               }
             ]
           }

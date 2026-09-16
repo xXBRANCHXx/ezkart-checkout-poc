@@ -44,6 +44,7 @@ export async function inspectPackage(id, root = repo) {
     "cart/admin/builder-commerce.js",
     "cart/admin/builder-backgrounds.js",
     "cart/admin/builder-templates.js",
+    "cart/admin/builder-publish.js",
     "cart/admin/builder-templates.css",
   ];
   dependencies.push("cart/admin/templates/index.json");
@@ -82,6 +83,15 @@ export async function inspectPackage(id, root = repo) {
     if (!node.id || ids.has(node.id))
       throw Error("Duplicate or missing element ID.");
     ids.add(node.id);
+    if (node.src?.$asset) {
+      const path = node.src.$asset;
+      if (
+        !path.startsWith(id + "/design/") ||
+        path.includes("..") ||
+        !records.some((file) => file.path === "cart/admin/templates/" + path)
+      )
+        throw Error("Template design image is missing or outside its package.");
+    }
     if (
       node.type === "commerce" &&
       node.part !== "cart" &&

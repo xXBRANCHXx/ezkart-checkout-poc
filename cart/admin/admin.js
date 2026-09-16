@@ -2503,6 +2503,23 @@
     const previewRepairMode = new URLSearchParams(window.location.search).get("preview-repair") === "1";
     let activeSiteKey = requestedSiteUrl;
     let activeSiteDocument = null;
+    let templateState = null;
+    async function connectTemplateProducts(productIds) {
+      if (!templateState) throw Error('This page has no template product slots.');
+      const prepared = await EzkartTemplates.prepare({templateId:templateState.id,productIds,brandName:templateState.brandName,products:readCatalogProducts()});
+      remember();
+      EzkartTemplates.reconnect(previewRoot, templateState, prepared);
+      templateState = prepared.state.template;
+      sqStudio.querySelectorAll('[data-sq-product]').forEach(input => { input.checked = productIds.includes(input.value); });
+      refreshNativeBuilder();
+      syncTemplateProducts();
+      await settleBuilder();
+      return {productIds};
+    }
+    function syncTemplateProducts() {
+      const host = sqStudio.querySelector('[data-template-page-products]');
+      if (host) EzkartTemplates.productForm(host, templateState, readCatalogProducts(), connectTemplateProducts).catch(error => showToast(error.message));
+    }
     let siteLoadRequest = 0;
     let cloudSavePromise = Promise.resolve(true);
     let baseSiteState = null;
@@ -2613,7 +2630,7 @@
       sqStudio.classList.remove("mobile-panel-open");
     });
 
-    const selectedProducts = () => [...new Set([...sqStudio.querySelectorAll("[data-sq-product]:checked")].map(input=>input.value).concat([...previewRoot.querySelectorAll('[data-native-type="commerce"],[data-native-type="product"]')].map(node=>EzkartNative.read(node).productId).filter(Boolean)))];
+    const selectedProducts = () => [...new Set([...sqStudio.querySelectorAll("[data-sq-product]:checked")].map(input=>input.value).concat([...previewRoot.querySelectorAll('[data-native-type="commerce"],[data-native-type="product"]')].flatMap(node=>{const c=EzkartNative.read(node);return c.productIds || [c.productId];}).filter(id=>id && !id.startsWith('template-product-'))))];
     const previewSnapshotHtml = () => {
       if (!previewRoot) return "";
       const clone = previewRoot.cloneNode(true);
@@ -2633,6 +2650,7 @@
       return clone.innerHTML;
     };
     const captureState = () => ({
+      template: templateState ? structuredClone(templateState) : null,
       preview: previewSnapshotHtml(),
       previewClass: previewRoot?.className || "",
       previewStyle: previewRoot?.getAttribute("style") || "",
@@ -5062,6 +5080,8 @@
       selectedAction = null;
       selectedImage = null;
       selectedContent = null;
+      templateState = state.template ? structuredClone(state.template) : null;
+      syncTemplateProducts();
       previewRoot.innerHTML = state.preview;
       previewRoot.className = state.previewClass;
       if (state.previewStyle) previewRoot.setAttribute("style", state.previewStyle); else previewRoot.removeAttribute("style");
@@ -8103,10 +8123,34 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
     exportDialog?.querySelector("[data-sq-download-html]")?.addEventListener("click", () => {
       const html = exportDialog.querySelector("[data-sq-html-output]")?.value || generateHtml(); const url = URL.createObjectURL(new Blob([html], { type: "text/html" })); const link = document.createElement("a"); link.href = url; link.download = `${normalize(document.querySelector("[data-current-site-name]")?.textContent).replace(/[^a-z0-9]+/g, "-") || "ezkart-page"}.html`; link.click(); window.setTimeout(() => URL.revokeObjectURL(url), 1000); showToast("HTML file downloaded");
     });
-    sqStudio.querySelector("[data-sq-publish]")?.addEventListener("click", async () => {
+    const publishPage = async () => {
+      await settleBuilder();
+      // Re-read stock immediately before publishing; the server checks it again.
+      if (cloudEnabled) {
+        const fresh = await cloudRequest('GET', '/v1/catalog');
+        cloudCatalogProducts = (fresh.products || []).map(normalizeCloudProduct);
+        cloudCatalogProducts.forEach(product => installCustomProduct(product, selectedProducts().includes(product.id)));
+        EzkartNative.refresh();
+      }
+      const error = EzkartPublish.check(EzkartPublish.groupsInDocument(previewRoot), readCatalogProducts());
+      const message = sqStudio.querySelector('[data-sq-publish-message]');
+      if (error) {
+        if (message) { message.textContent = error; message.hidden = false; }
+        openSqPanel('products', {pin:true}); syncTemplateProducts();
+        throw Error(error);
+      }
+      if (message) message.hidden = true;
+      clearTimeout(saveTimer);
       const saved = await persistCurrentState({ status: "published", publishedHtml: generateHtml() });
       if (saveState) saveState.textContent = saved ? "Published just now" : "Publish failed";
-      if (saved) showToast("Landing page published");
+      if (!saved) throw Error('The page could not be published. Check the message and try again.');
+      showToast("Landing page published");
+      return {published:true};
+    };
+    sqStudio.querySelector("[data-sq-publish]")?.addEventListener("click", async (event) => {
+      const button = event.currentTarget; button.disabled = true;
+      try { await publishPage(); } catch(error) { showToast(error.message); }
+      finally { button.disabled = false; }
     });
     const cloneBaseSiteState = () => JSON.parse(JSON.stringify(baseSiteState || captureState()));
     const loadSite = async (site, force = false) => {
@@ -8393,6 +8437,8 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
       inspect:inspectBuilder,
       catalog:()=>readCatalogProducts(),
       templates:()=>EzkartTemplates.list(),
+      connectTemplateProducts:({productIds=[]}={})=>connectTemplateProducts(productIds),
+      publish:publishPage,
       async applyTemplate({templateId,productId,productIds,brandName}={}) {
         if (previewRoot.querySelector('[data-sq-element],.sq-native-section')) throw Error('Create a blank page before applying a template.');
         const prepared = await EzkartTemplates.prepare({templateId,productId,productIds,brandName,products:readCatalogProducts()});

@@ -224,6 +224,7 @@
         .map((v) => materialize(v, data, depth + 1))
         .filter((v) => v !== null);
     if (!value || typeof value !== "object") return value;
+    if (value.$asset) return asset(value.$asset);
     const get = (key) => {
       if (!Object.hasOwn(data, key))
         throw Error("Unknown template data field.");
@@ -252,7 +253,7 @@
     const { minProducts = 1, maxProducts = 1 } = template.requirements;
     if (
       !Array.isArray(selectedIds) ||
-      selectedIds.length < minProducts ||
+      (selectedIds.length > 0 && selectedIds.length < minProducts) ||
       selectedIds.length > maxProducts ||
       new Set(selectedIds).size !== selectedIds.length
     )
@@ -268,7 +269,22 @@
       ).size > 1
     )
       throw Error("Choose products using the same currency.");
-    const data = collectionContext(selected, brandName);
+    const data = collectionContext(
+      selected.length
+        ? selected
+        : [
+            {
+              id: "template-product-1",
+              name: "Your product",
+              type: "physical",
+              stock: 0,
+              description: "",
+              images: [],
+              variants: [],
+            },
+          ],
+      String(brandName || "").trim() || template.name,
+    );
     const recipe = materialize(await json(template.recipeUrl), data);
     const ids = new Set(),
       commerce = [];
@@ -288,8 +304,16 @@
           node.part !== "cart" &&
           (["set-price", "set-add"].includes(node.part)
             ? !node.productIds?.length ||
-              node.productIds.some((id) => !selectedIds.includes(id))
-            : !selectedIds.includes(node.productId)),
+              node.productIds.some(
+                (id) =>
+                  !selectedIds.includes(id) &&
+                  !(selectedIds.length === 0 && id === "template-product-1"),
+              )
+            : !selectedIds.includes(node.productId) &&
+              !(
+                selectedIds.length === 0 &&
+                node.productId === "template-product-1"
+              )),
       )
     )
       throw Error("Template product binding is invalid.");
@@ -326,6 +350,12 @@
       recipe,
       state: {
         version: 6,
+        template: {
+          id: template.id,
+          brandName: data.brandName,
+          productIds: selectedIds,
+          baseline: recipe,
+        },
         preview: root.innerHTML,
         previewClass: root.className,
         previewStyle: root.getAttribute("style"),
@@ -381,7 +411,7 @@
     settings.className = "sq-template-settings";
     settings.hidden = true;
     settings.innerHTML =
-      '<label><span>Store name</span><input name="template_brand" maxlength="80" autocomplete="organization" placeholder="Your store name"></label><label><span>Featured product</span><select name="template_product"><option value="">Choose a product</option></select></label><fieldset data-template-additional hidden><legend>More products</legend><div data-template-product-list></div><p data-template-product-help></p></fieldset><p>Your product, photos and prices replace the demo content. Every section stays editable.</p><button type="button" data-template-preview>Preview design</button>';
+      '<label><span>Store name</span><input name="template_brand" maxlength="80" autocomplete="organization" placeholder="Your store name"></label><label><span>Featured product (optional for drafts)</span><select name="template_product"><option value="">Choose a product</option></select></label><fieldset data-template-additional hidden><legend>More products</legend><div data-template-product-list></div><p data-template-product-help></p></fieldset><p>Start designing now. Template imagery stays editable; shop items use your selected products. Add an available product before publishing.</p><button type="button" data-template-preview>Preview design</button>';
     const brand = settings.querySelector("input"),
       product = settings.querySelector("select");
     brand.value = document.body.dataset.adminCheckoutBrand || "";
@@ -392,12 +422,11 @@
         .filter((p) => p.status !== "archived")
         .forEach((p) => product.add(new Option(p.name, p.id)));
       product.value = previous;
-      if (product.options.length === 2) product.selectedIndex = 1;
     };
     populateProducts();
     const empty = document.createElement("p");
     empty.textContent =
-      "Add a product to your catalog to use a template. You can start with a blank page now.";
+      "You can use this template now. Create a product and connect it before publishing.";
     empty.hidden = product.options.length > 1;
     settings.append(empty);
     host.append(settings);
@@ -411,7 +440,7 @@
         checked = new Set(
           [...extraList.querySelectorAll("input:checked")].map((n) => n.value),
         );
-      additional.hidden = max <= 1;
+      additional.hidden = max <= 1 || !product.value;
       extraList.replaceChildren(
         ...getProducts()
           .filter((p) => p.status !== "archived" && p.id !== product.value)
@@ -422,7 +451,7 @@
             input.name = "template_products";
             input.value = p.id;
             input.checked = checked.has(p.id);
-            input.disabled = max <= 1;
+            input.disabled = !product.value || max <= 1;
             label.append(input, document.createTextNode(p.name));
             return label;
           }),
@@ -432,7 +461,9 @@
       const inputs = [...extraList.querySelectorAll("input")],
         count = inputs.filter((n) => n.checked).length;
       inputs.forEach(
-        (n) => (n.disabled = max <= 1 || (!n.checked && count >= max - 1)),
+        (n) =>
+          (n.disabled =
+            !product.value || max <= 1 || (!n.checked && count >= max - 1)),
       );
     };
     extraList.addEventListener("change", () => {
@@ -441,14 +472,17 @@
           ?.requirements.maxProducts || 1;
       const inputs = [...extraList.querySelectorAll("input")],
         count = inputs.filter((n) => n.checked).length;
-      inputs.forEach((n) => (n.disabled = !n.checked && count >= max - 1));
+      inputs.forEach(
+        (n) =>
+          (n.disabled = !product.value || (!n.checked && count >= max - 1)),
+      );
     });
     product.addEventListener("change", populateAdditional);
     let templates = [];
     const sync = () => {
       const selected = form.elements.template_id.value;
       settings.hidden = !selected;
-      brand.required = product.required = Boolean(selected);
+      brand.required = product.required = false;
       brand.disabled = product.disabled = !selected;
       const products = form.querySelector("[data-creator-products]");
       const optional = products?.closest("details") || products;
@@ -520,15 +554,161 @@
             '[name="template_products"]:checked:not(:disabled)',
           ),
         ].map((n) => n.value),
-      ],
+      ].filter(Boolean),
       brandName: form.elements.template_brand.value,
       products,
     });
+  }
+  // Refresh catalog bindings while keeping edits to text, spacing, colors and layout.
+  function reconnect(root, previous, prepared) {
+    const old = new Map(),
+      next = new Map();
+    const index = (nodes, map, parent = null) =>
+      nodes.forEach((node) => {
+        map.set(node.id, { ...node, parent });
+        index(node.children || [], map, node.id);
+      });
+    index(previous.baseline || [], old);
+    index(prepared.recipe, next);
+    const find = (id) =>
+      root.querySelector(`[data-native-id="${CSS.escape(id)}"]`);
+    const equal = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+    const merge = (current, before, after) => {
+      if (equal(current, before)) return structuredClone(after);
+      if (
+        !current ||
+        !before ||
+        !after ||
+        Array.isArray(current) ||
+        typeof current !== "object"
+      )
+        return current;
+      const result = { ...current };
+      for (const key of new Set([
+        ...Object.keys(before),
+        ...Object.keys(after),
+      ])) {
+        if (equal(current[key], before[key])) {
+          if (after[key] === undefined) delete result[key];
+          else result[key] = structuredClone(after[key]);
+        } else if (after[key] !== undefined)
+          result[key] = merge(current[key], before[key], after[key]);
+      }
+      return result;
+    };
+    for (const [id] of old) if (!next.has(id)) find(id)?.remove();
+    const insert = (nodes, parent) => {
+      nodes.forEach((node, position) => {
+        let element = find(node.id);
+        if (!element && old.has(node.id)) return; // Keep a merchant's deleted element deleted.
+        const { children, ...config } = node;
+        if (element) {
+          const {
+            children: ignored,
+            parent: ignoredParent,
+            ...before
+          } = old.get(node.id) || {};
+          const merged = merge(EzkartNative.read(element), before, config);
+          // Product choices are explicitly being changed in this operation.
+          if (config.productId) merged.productId = config.productId;
+          if (config.productIds) merged.productIds = config.productIds;
+          const replacement = EzkartNative.create(merged);
+          if (children) replacement.append(...element.children);
+          if (element.matches(".sq-native-section")) {
+            replacement.classList.add("sq-page-block", "sq-native-section");
+            replacement.dataset.sqBlock = "";
+            replacement.dataset.sectionId = node.id;
+            replacement.removeAttribute("data-sq-element");
+          }
+          element.replaceWith(replacement);
+          element = replacement;
+        } else {
+          element = EzkartNative.create(config);
+          if (parent === root) {
+            element.classList.add("sq-page-block", "sq-native-section");
+            element.dataset.sqBlock = "";
+            element.dataset.sectionId = node.id;
+            element.removeAttribute("data-sq-element");
+          }
+          const anchor = nodes
+            .slice(position + 1)
+            .map((n) => find(n.id))
+            .find((n) => n?.parentElement === parent);
+          parent.insertBefore(element, anchor || null);
+        }
+        if (children) insert(children, element);
+      });
+    };
+    insert(prepared.recipe, root);
+  }
+  async function productForm(host, metadata, products, onApply) {
+    const render = Symbol();
+    host.templateRender = render;
+    host.replaceChildren();
+    host.hidden = !metadata;
+    if (!metadata) return;
+    const template = (await list()).find((item) => item.id === metadata.id);
+    if (!template || !host.isConnected || host.templateRender !== render)
+      return;
+    const form = document.createElement("form");
+    form.className = "sq-template-product-form";
+    const heading = document.createElement("h3");
+    heading.textContent = "Template products";
+    const note = document.createElement("p");
+    note.textContent =
+      "Connect your products here. Your design edits and template photos stay in place.";
+    form.append(heading, note);
+    const selects = [];
+    for (let i = 0; i < template.requirements.maxProducts; i++) {
+      const label = document.createElement("label"),
+        title = document.createElement("span"),
+        select = document.createElement("select");
+      title.textContent =
+        i === 0 ? "Featured product" : `Product ${i + 1} (optional)`;
+      select.setAttribute("data-template-slot", String(i));
+      select.append(new Option(i === 0 ? "Choose a product" : "None", ""));
+      products
+        .filter((p) => p.status !== "archived")
+        .forEach((p) => select.append(new Option(p.name, p.id)));
+      select.value = metadata.productIds[i] || "";
+      label.append(title, select);
+      form.append(label);
+      selects.push(select);
+    }
+    const button = document.createElement("button");
+    button.type = "submit";
+    button.textContent = "Use these products";
+    const status = document.createElement("p");
+    status.setAttribute("role", "status");
+    form.append(button, status);
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      button.disabled = true;
+      const restoreFocus = form.contains(document.activeElement);
+      try {
+        const productIds = selects
+          .map((select) => select.value)
+          .filter(Boolean);
+        await onApply(productIds);
+        const currentStatus = host.querySelector('[role="status"]') || status;
+        currentStatus.textContent = productIds.length
+          ? "Products connected."
+          : "Saved as a draft. Add a product before publishing.";
+        if (restoreFocus) host.querySelector('button[type="submit"]')?.focus();
+      } catch (error) {
+        status.textContent = error.message;
+      } finally {
+        button.disabled = false;
+      }
+    });
+    host.replaceChildren(form);
   }
   globalThis.EzkartTemplates = Object.freeze({
     list,
     prepare,
     attach,
     fromForm,
+    reconnect,
+    productForm,
   });
 })();

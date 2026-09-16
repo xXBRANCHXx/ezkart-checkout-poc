@@ -123,7 +123,7 @@ test("Takar applies real product collections with independent choices, editable 
   let html = await call("exportHtml");
   assert.doesNotMatch(
     html,
-    /Sambal Bawang|Bawang Renyah|Nasi hangat|Cabai merah|Toko konsep|hero-v2|ingredients-720|1 porsi|sesuai selera/,
+    /Sambal Bawang|Bawang Renyah|Nasi hangat|Cabai merah|Toko konsep|ingredients-720|1 porsi|sesuai selera/,
   );
   await p.route("**/merchant-export", (r) =>
     r.fulfill({ body: html, contentType: "text/html" }),
@@ -218,7 +218,7 @@ test("Takar applies real product collections with independent choices, editable 
     if (ids.length === 1) {
       assert.equal(await p.locator("#native-takar-recipes").count(), 0);
       assert.equal(await p.locator("#native-takar-story").count(), 0);
-      assert.equal(await p.locator("#native-hero-image").count(), 0);
+      assert.equal(await p.locator("#native-hero-image").count(), 1);
       assert.equal(
         await p.locator("#native-closing-single-add button").isEnabled(),
         true,

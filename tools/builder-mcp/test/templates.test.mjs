@@ -271,7 +271,8 @@ test("CLI template application handles sparse products, rejects invalid bindings
       `Sparse product wraps at ${width}`,
     );
   }
-  assert.equal(await page.locator("img").count(), 0);
+  assert.equal(await page.locator("img").count(), 2);
+  assert.equal(await page.locator('img[src*="/design/"]').count(), 2);
   assert.equal(
     await page.locator("[data-native-id=hero-add] button").isDisabled(),
     true,

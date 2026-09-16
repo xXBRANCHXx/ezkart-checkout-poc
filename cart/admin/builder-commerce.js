@@ -120,7 +120,11 @@
         return;
       }
       if (!product) {
-        node.replaceChildren(element("p", "Choose a product in the sidebar."));
+        if (c.part === "add") {
+          const button = element("button", "Choose a product", "sq-native-commerce-button");
+          button.type = "button"; button.disabled = true;
+          node.replaceChildren(button);
+        } else node.replaceChildren(element("p", c.part === "price" ? "—" : "Connect a product in Products."));
         return;
       }
       const variantName = (variant) =>

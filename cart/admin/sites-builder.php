@@ -82,6 +82,8 @@ declare(strict_types=1);
 
         <section class="sq-tool-panel" data-sq-panel="products">
           <header><div><h2>Your products</h2></div><a href="?page=products">Manage products</a></header>
+          <p class="sq-panel-intro" data-sq-publish-message role="alert" hidden></p>
+          <div data-template-page-products hidden></div>
           <p class="sq-panel-intro">Add a product card to the selected area. Each card has its own product choice, so you can feature different products anywhere on your page.</p>
           <div class="sq-product-picker">
             <p class="sq-products-empty" data-sq-products-empty>Your catalog is empty. <a href="?page=products">Create a product</a> to add a product card. You can keep building the rest of your page.</p>

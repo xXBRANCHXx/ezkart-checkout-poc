@@ -790,9 +790,7 @@
           "maxWidth": "1280px",
           "marginLeft": "auto",
           "marginRight": "auto",
-          "gridTemplateColumns": {
-            "$bind": "collectionHeroColumns"
-          },
+          "gridTemplateColumns": "minmax(0,.88fr) minmax(0,1.2fr)",
           "gridTemplateRows": "auto 1fr auto",
           "columnGap": "60px",
           "paddingBottom": "38px",
@@ -939,7 +937,7 @@
             "children": [
               {
                 "id": "hero-photo-image",
-                "type": "commerce",
+                "type": "image",
                 "name": "Product image",
                 "props": {
                   "minWidth": "0px",
@@ -948,17 +946,16 @@
                   "fontFamily": "Plus Jakarta Sans, Arial, sans-serif",
                   "width": "100%",
                   "height": "100%",
-                  "objectFit": "contain",
+                  "objectFit": "cover",
                   "position": "absolute",
                   "top": "0px",
                   "left": "0px"
                 },
                 "loading": "eager",
-                "part": "image",
-                "productId": {
-                  "$bind": "product1ProductId"
+                "src": {
+                  "$asset": "sela/design/hero-1280.webp"
                 },
-                "group": "store"
+                "alt": "Desk accessories arranged in a workspace"
               },
               {
                 "id": "hero-product",
@@ -994,10 +991,10 @@
                   "bottom": "24px",
                   "maxWidth": "calc(100% - 48px)"
                 },
-                "tag": "button",
+                "tag": "a",
                 "action": {
-                  "type": "dialog",
-                  "target": "detail-riser"
+                  "type": "link",
+                  "target": "#koleksi"
                 },
                 "responsive": [
                   {
@@ -1015,9 +1012,7 @@
                     "id": "hero-product-label",
                     "type": "text",
                     "tag": "span",
-                    "text": {
-                      "$bind": "product1ProductName"
-                    },
+                    "text": "Lihat koleksi",
                     "props": {
                       "fontSize": "inherit",
                       "fontWeight": "inherit",
@@ -1042,8 +1037,7 @@
                   }
                 ]
               }
-            ],
-            "$when": "hasImage"
+            ]
           },
           {
             "id": "hero-copy",
@@ -1219,9 +1213,7 @@
                   "fontSize": "11px",
                   "overflowWrap": "anywhere"
                 },
-                "text": {
-                  "$bind": "product1ProductName"
-                },
+                "text": "Ruang untuk keseharianmu.",
                 "responsive": [
                   {
                     "max": 700,
@@ -1231,8 +1223,7 @@
                   }
                 ]
               }
-            ],
-            "$when": "hasImage"
+            ]
           }
         ]
       }

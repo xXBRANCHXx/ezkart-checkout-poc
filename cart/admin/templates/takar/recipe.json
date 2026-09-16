@@ -1047,7 +1047,7 @@
           },
           {
             "id": "hero-image",
-            "type": "commerce",
+            "type": "image",
             "name": "Hero image",
             "props": {
               "minWidth": "0px",
@@ -1056,7 +1056,7 @@
               "fontFamily": "DM Sans, Arial, sans-serif",
               "width": "100%",
               "height": "clamp(360px,34.5vw,480px)",
-              "objectFit": "contain",
+              "objectFit": "cover",
               "objectPosition": "50% 46%",
               "backgroundColor": "#f0f2eb"
             },
@@ -1073,12 +1073,10 @@
                 }
               }
             ],
-            "part": "image",
-            "productId": {
-              "$bind": "product1ProductId"
+            "src": {
+              "$asset": "takar/design/hero-v2-1280.webp"
             },
-            "group": "store",
-            "$when": "product1HasImage"
+            "alt": "Pantry ingredients and a prepared meal"
           },
           {
             "id": "hero-purchase",

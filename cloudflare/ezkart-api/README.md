@@ -55,6 +55,10 @@ access token, or refresh token in this repository.
 - `GET /v1/landing-pages` lists the active seller's R2-backed page projects.
   `GET|PUT|DELETE /v1/landing-pages/:id` loads, saves, or removes one private
   project, including its responsive builder state and published HTML snapshot.
+  Drafts may omit products. Publishing checks the current seller-owned active
+  catalog and rejects pages without an available product purchase control.
+  Physical product stock includes visible variants; client-supplied prices and
+  stock do not authorize publication.
 
 Each seller may publish up to 10 products. The Worker returns a readable limit
 error and D1 also enforces the cap to cover concurrent create requests.
