@@ -1279,6 +1279,28 @@
     sheet.textContent = stylesheet(hooks.root);
     hooks.root.querySelectorAll(".sq-native").forEach((node) => {
       const config = read(node);
+      // Fixed-size empty containers can be swatches, rules or spacers. Editor
+      // guidance must not add content or an outline to those authored shapes.
+      const appearances = [config, ...Object.values(config.states || {})];
+      const sized = appearances
+        .flatMap((appearance) => [appearance, ...(appearance.responsive || [])])
+        .some(
+          ({ props = {} }) =>
+            ["height", "maxHeight", "aspectRatio"].some(
+              (key) =>
+                props[key] != null &&
+                !/^(|auto|none|initial|unset)$/.test(String(props[key])),
+            ) ||
+            ["width", "maxWidth"].some(
+              (key) =>
+                /^(0|\d+(\.\d+)?px)$/.test(String(props[key] ?? "")) &&
+                parseFloat(props[key]) < 128,
+            ),
+        );
+      node.toggleAttribute(
+        "data-native-empty-layout",
+        config.type === "container" && !sized,
+      );
       node.toggleAttribute(
         "data-native-pinned",
         [

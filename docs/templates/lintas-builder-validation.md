@@ -34,3 +34,11 @@ The full builder regression suite passes: **41 tests, zero failures** (`node --t
 ## Following concept
 
 The skill and collection brief now preserve the user’s updated direction: Ezkart-inspired rounded sections and controls, soft gradients, clean typography, generous whitespace and an approachable professional storefront. This overrides older blanket gradient/radius restrictions and the repeated sharp-corner studio/editorial direction. The following concept awaits its own commission.
+
+## Editor placeholder correction
+
+The user’s review exposed an editor-only issue missed by the first visual pass: empty decorative containers inherited the “Add an element to this group” helper. A 10px product color swatch therefore contained a 96px-high pseudo-element that overlapped the product action. The shared editor now reserves that guidance for content-sized layout groups and leaves explicitly sized shapes, rules and spacers alone. Normal Add → Layout group still shows its guidance.
+
+The actual Lintas editor was checked again on desktop, tablet and mobile: all three swatches remain 10 × 10px, with no overflowing helper or dashed placeholder outline. Coverage includes creation, sizing, responsive/state dimensions, undo, save/reload and storefront rendering. Evidence: `lintas/builder/empty-group-review/`.
+
+After this correction, the complete builder suite passes **42 tests, zero failures**.
