@@ -83,6 +83,32 @@ outside navigation. The exporter supplies it when no merchant-placed cart contro
 exists. It uses the shared drawer, maintains its item count and stays clear of
 native fixed purchase bars.
 
+### Tabs, filters, dialogs and product sets
+
+Containers expose **Advanced settings → Tabs & filters**. Set `initialState`,
+`stateMode` (`tabs` or `filter`) and an optional `stateParam` to remember a filter
+in the URL. Buttons use `action: {type: "state", scope: "container-id", target:
+"version"}`. Elements whose alternate appearances follow that container use
+`stateScope`; a tab panel also sets `statePanel` to its version name. Separate
+groups keep independent choices, including after duplication. Tabs support
+arrow keys, Home/End, and correctly connected accessible panels.
+
+Choose the `dialog` HTML element on a native container under **Structure &
+accessibility**, then use **Click action → Open dialog / Close dialog** with its
+ID. Fill it with ordinary editable text, images and product controls. Alt-click
+opens it modelessly in the editor, allowing sidebar edits. Storefront dialogs
+use modal focus, Escape/backdrop dismissal, scroll locking and focus restoration.
+An anchor provides direct URL access. An editor-open dialog exports closed.
+
+**Product control → Show** includes **Product name**, **Combined price** and
+**Add a set of products**. Select the included catalog products using the
+checkboxes. Public tools expose `productIds`, with the same `group` used by
+individual variant controls. Prices sum the selected variants; unavailable or
+mixed-currency sets disable purchase. Adding a set creates separate ordinary
+cart lines, and a stock limit rejects the whole addition without partial changes.
+Plus Jakarta Sans is bundled under its included SIL license and embedded in
+ordinary exports when used.
+
 Native containers also expose **Show while scrolling**. `scrollVisibility` accepts
 an `after` element ID and `hideWhile` IDs. Combined with ordinary fixed positioning,
 this supports an editable purchase bar that hides around other purchase controls.

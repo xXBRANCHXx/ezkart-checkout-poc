@@ -11,9 +11,10 @@ Make one distinctive, complete storefront at a time. The user wants to review a 
 
 - Plan for roughly **15 templates**; the count is provisional. Build one at a time.
 - Future designs should be highly professional, clear and practical for ordinary merchants. Use restrained branding, disciplined spacing and familiar navigation. Reserve a more formal tone for only **one or two** templates; the rest should feel approachable and polished.
-- **Queued next concept:** generous whitespace, a clean sans-serif font and simple, restrained backgrounds, taking cues from the Ezkart website. Study the actual Ezkart design when this concept is commissioned. Preserve a complete shopping journey and a distinctive composition without making it eccentric.
+- **Sela fulfills the whitespace-led direction:** clean Plus Jakarta Sans, restrained backgrounds, an Indonesian desk-accessories catalog, and a practical setup chooser. Its native builder version is awaiting review. Resume its stage from `~/.local/share/ezkart-templates/sela/concept.json`; do not confuse its concept approval with template approval.
+- **Following concepts:** keep the professional, approachable direction while choosing a distinct merchant story and composition. Do not repeat Sela’s layout or PITH’s art direction. Preserve the complete shopping journey. The user will commission the next concept in a separate terminal.
 - PITH is the approved bold launch design. Its oversized condensed typography and citrus palette are not the default for subsequent templates.
-- The next concept is **saved for later**, not commissioned yet. Start it when the user asks to begin the next concept or step one. A request to package the current template does not also start the next design.
+- A following concept is **saved for later** until the user commissions it. Start it when the user asks to begin the next concept or step one. A request to package the current template does not also start the next design.
 
 ## Find the project and current stage
 

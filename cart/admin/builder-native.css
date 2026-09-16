@@ -751,3 +751,40 @@
   outline: 2px solid currentColor;
   outline-offset: 3px;
 }
+
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  src: url("assets/fonts/plus-jakarta-sans.woff2") format("woff2");
+  font-weight: 400 800;
+  font-display: swap;
+}
+.sq-page-preview dialog.sq-native:not([open]) {
+  display: none !important;
+}
+.sq-page-preview dialog.sq-native[open] {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  max-height: calc(100dvh - 24px);
+  overflow: auto;
+  border: 0;
+  overscroll-behavior: contain;
+  z-index: 2000;
+}
+.sq-page-preview dialog.sq-native::backdrop {
+  background: #22282066;
+}
+[data-native-set-products] {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+[data-native-set-products] label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+[data-native-set-products] input {
+  width: auto;
+  min-height: 0;
+}

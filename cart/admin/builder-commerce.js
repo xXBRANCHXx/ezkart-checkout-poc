@@ -45,6 +45,67 @@
         node.replaceChildren(button);
         return;
       }
+      if (["set-price", "set-add"].includes(c.part)) {
+        const items = (c.productIds || []).map((id) => {
+          const product = catalog.get(id);
+          if (!product) return null;
+          const variants = (product.variants || []).filter((v) => !v.hidden),
+            selection =
+              variants.find(
+                (v) => v.id === selections.get(key({ ...c, productId: id })),
+              ) ||
+              variants[0] ||
+              product;
+          return { product, selection };
+        });
+        const complete = items.length > 0 && items.every(Boolean),
+          currency = items.find(Boolean)?.product.currency || "IDR";
+        const sameCurrency =
+          complete &&
+          items.every(
+            ({ product }) => (product.currency || "IDR") === currency,
+          );
+        const available =
+          sameCurrency &&
+          items.every(
+            ({ product, selection }) =>
+              product.type !== "physical" ||
+              Number(selection.stock ?? product.stock) > 0,
+          );
+        if (c.part === "set-price") {
+          node.textContent = sameCurrency
+            ? (c.prefix || "") +
+              money(
+                items.reduce(
+                  (sum, item) =>
+                    sum +
+                    Number(item.selection.price ?? item.product.price ?? 0),
+                  0,
+                ),
+                items[0].product,
+              ) +
+              (c.suffix || "")
+            : "Products unavailable";
+          node.setAttribute("aria-live", "polite");
+        } else {
+          const button = element(
+            "button",
+            available ? c.label || "Add selected products" : "Set unavailable",
+            "sq-native-commerce-button",
+          );
+          button.type = "button";
+          button.disabled = !available;
+          button.dataset.commerceSet = "";
+          node.replaceChildren(button);
+          node.__commerceSet = complete
+            ? items.map(({ product, selection }) => ({
+                productId: product.id,
+                variantId: selection === product ? "" : selection.id,
+              }))
+            : [];
+        }
+        return;
+      }
       if (!product) {
         node.replaceChildren(element("p", "Choose a product in the sidebar."));
         return;
@@ -91,13 +152,21 @@
           const select = element("select", null, "sq-native-commerce-select");
           select.dataset.commerceOption = "";
           select.setAttribute("aria-label", c.label || "Choose an option");
-          variants.forEach(variant => {
-            const soldOut = product.type === "physical" && Number(variant.stock ?? product.stock) <= 0;
-            const option = element("option", variantName(variant) + (soldOut ? " — Sold out" : ""));
-            option.value = variant.id; option.selected = variant.id === selected.id;
+          variants.forEach((variant) => {
+            const soldOut =
+              product.type === "physical" &&
+              Number(variant.stock ?? product.stock) <= 0;
+            const option = element(
+              "option",
+              variantName(variant) + (soldOut ? " — Sold out" : ""),
+            );
+            option.value = variant.id;
+            option.selected = variant.id === selected.id;
             select.append(option);
           });
-          field.append(select); node.replaceChildren(field); return;
+          field.append(select);
+          node.replaceChildren(field);
+          return;
         }
         const list = element("div", null, "sq-native-commerce-choices");
         (variants.length ? variants : [product]).forEach((variant) => {
@@ -149,7 +218,9 @@
             ? money(selected.price, product)
             : c.part === "description"
               ? selected.description || product.description
-              : variantName(selected);
+              : c.part === "product-name"
+                ? product.name
+                : variantName(selected);
         node.textContent = (c.prefix || "") + (text || "") + (c.suffix || "");
         if (c.part === "price") node.setAttribute("aria-live", "polite");
       }
@@ -168,7 +239,12 @@
           c = config(owner);
         selections.set(key(c), input.value);
         nodes
-          .filter((node) => key(config(node)) === key(c))
+          .filter(
+            (node) =>
+              key(config(node)) === key(c) ||
+              (["set-price", "set-add"].includes(config(node).part) &&
+                config(node).group === c.group),
+          )
           .forEach((node) => {
             if (node !== owner) render(node);
           });
@@ -179,18 +255,22 @@
       "click",
       (event) => {
         const button = event.target.closest(
-          "[data-commerce-add],[data-commerce-cart]",
+          "[data-commerce-add],[data-commerce-cart],[data-commerce-set]",
         );
         if (!button || (editing && !event.altKey)) return;
         event.preventDefault();
         const node = button.closest('[data-native-type="commerce"]'),
           c = config(node);
+        node.closest("dialog[open]")?.close();
         document.dispatchEvent(
           new CustomEvent("ezkart:commerce", {
             detail: {
-              action: button.hasAttribute("data-commerce-cart")
-                ? "cart"
-                : "add",
+              items: node.__commerceSet,
+              action: button.hasAttribute("data-commerce-set")
+                ? "add-set"
+                : button.hasAttribute("data-commerce-cart")
+                  ? "cart"
+                  : "add",
               productId: c.productId,
               variantId: node.dataset.commerceVariant || "",
             },

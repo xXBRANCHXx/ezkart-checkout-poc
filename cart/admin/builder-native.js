@@ -181,6 +181,7 @@
       "li",
       "main",
       "label",
+      "dialog",
     ],
     text: ["p", "span", "small", "strong", "b", "em", "i"],
     heading: ["h1", "h2", "h3", "h4"],
@@ -410,11 +411,14 @@
           "description",
           "add",
           "cart",
+          "product-name",
+          "set-price",
+          "set-add",
         ].includes(config.part)
       )
         throw Error("Choose a product control.");
       if (
-        config.part !== "cart" &&
+        !["cart", "set-price", "set-add"].includes(config.part) &&
         !/^[a-zA-Z0-9_-]{1,120}$/.test(config.productId || "")
       )
         throw Error("Choose a catalog product.");
@@ -428,6 +432,29 @@
       )
         throw Error("Choose compact or detailed options.");
     }
+    for (const key of [
+      "stateScope",
+      "initialState",
+      "stateParam",
+      "statePanel",
+    ])
+      if (config[key] && !identifier(config[key]))
+        throw Error("Use a short name for the state or group.");
+    if (config.stateMode && !["tabs", "filter"].includes(config.stateMode))
+      throw Error("Choose tabs or filters.");
+    if (
+      config.productIds &&
+      (!Array.isArray(config.productIds) ||
+        config.productIds.length > 24 ||
+        config.productIds.some((id) => !/^[a-zA-Z0-9_-]{1,120}$/.test(id)) ||
+        new Set(config.productIds).size !== config.productIds.length)
+    )
+      throw Error("Choose up to 24 different catalog products.");
+    if (
+      ["set-price", "set-add"].includes(config.part) &&
+      !config.productIds?.length
+    )
+      throw Error("Choose products for this set.");
     if (config.scrollVisibility) {
       const v = config.scrollVisibility;
       if (
@@ -444,11 +471,19 @@
     if (config.captions) safeUrl(config.captions);
     if (config.action) {
       if (
-        !["link", "toggle", "state", "video-dialog", "video-toggle"].includes(
-          config.action.type,
-        )
+        ![
+          "link",
+          "toggle",
+          "state",
+          "dialog",
+          "close-dialog",
+          "video-dialog",
+          "video-toggle",
+        ].includes(config.action.type)
       )
         throw Error("Choose an interaction.");
+      if (config.action.scope && !identifier(config.action.scope))
+        throw Error("Choose a valid interaction group.");
       if (config.action.type === "link") safeUrl(config.action.target);
       else if (!identifier(config.action.target))
         throw Error("Choose a target element or state.");
@@ -598,6 +633,7 @@
       node.src = config.src || "";
       node.alt = config.alt || "";
       node.draggable = false;
+      node.loading = config.loading || "lazy";
     }
     if (config.type === "video") {
       node.src = config.src || "";
@@ -672,7 +708,9 @@
         for (const rule of config.responsive || [])
           css += query(selector, rule);
         for (const [state, value] of Object.entries(config.states || {})) {
-          const variant = `.sq-page-preview[data-native-state="${state}"] .sq-native[data-native-id="${config.id}"]`;
+          const variant = config.stateScope
+            ? `.sq-page-preview [data-native-id="${config.stateScope}"][data-native-state="${state}"] .sq-native[data-native-id="${config.id}"]`
+            : `.sq-page-preview[data-native-state="${state}"] .sq-native[data-native-id="${config.id}"]`;
           css += `${variant}{${declarations(value)}}`;
           for (const rule of value.responsive || [])
             css += query(variant, rule);
@@ -687,6 +725,187 @@
     const find = (id) =>
       root.querySelector(`[data-native-id="${CSS.escape(id)}"]`);
     let opener, dialog;
+    const stateConfig = (node) => {
+      try {
+        return JSON.parse(node.dataset.nativeStateConfig || "{}");
+      } catch {
+        return {};
+      }
+    };
+    const actions = (scope) =>
+      [...root.querySelectorAll("[data-native-action]")].filter((n) => {
+        try {
+          const a = JSON.parse(n.dataset.nativeAction);
+          return (
+            a.type === "state" && (a.scope ? find(a.scope) : root) === scope
+          );
+        } catch {
+          return false;
+        }
+      });
+    const setState = (scope, value, persist = false) => {
+      if (!scope) return;
+      const buttons = actions(scope),
+        settings = stateConfig(scope);
+      if (
+        !buttons.some(
+          (n) => JSON.parse(n.dataset.nativeAction).target === value,
+        )
+      )
+        return;
+      scope.dataset.nativeState = value;
+      buttons.forEach((n) => {
+        const a = JSON.parse(n.dataset.nativeAction),
+          active = a.target === value;
+        n.setAttribute(
+          settings.mode === "tabs" ? "aria-selected" : "aria-pressed",
+          String(active),
+        );
+        if (settings.mode === "tabs") {
+          n.setAttribute("role", "tab");
+          n.tabIndex = active ? 0 : -1;
+          n.parentElement.setAttribute("role", "tablist");
+          n.parentElement.setAttribute(
+            "aria-label",
+            settings.label || "Choose a view",
+          );
+          const panel = [
+            ...scope.querySelectorAll("[data-native-state-panel]"),
+          ].find((p) => p.dataset.nativeStatePanel === a.target);
+          if (panel) {
+            n.setAttribute("aria-controls", panel.id);
+            panel.setAttribute("role", "tabpanel");
+            panel.setAttribute("aria-labelledby", n.id);
+          }
+        }
+      });
+      if (persist && settings.param && !editing)
+        try {
+          const url = new URL(location.href);
+          url.searchParams.set(settings.param, value);
+          history.replaceState(null, "", url);
+        } catch {}
+      root.dispatchEvent(new Event("native-state-change"));
+    };
+    const initStates = () =>
+      root.querySelectorAll("[data-native-state-config]").forEach((scope) => {
+        const c = stateConfig(scope),
+          fromUrl =
+            !editing && c.param
+              ? new URL(location.href).searchParams.get(c.param)
+              : null;
+        const requested = scope.dataset.nativeState || fromUrl || c.initial;
+        setState(
+          scope,
+          actions(scope).some(
+            (n) => JSON.parse(n.dataset.nativeAction).target === requested,
+          )
+            ? requested
+            : c.initial,
+        );
+      });
+    if (!editing)
+      root
+        .querySelectorAll("[data-native-state-config]")
+        .forEach((n) => delete n.dataset.nativeState);
+    root.addEventListener("native-refresh", initStates);
+    initStates();
+    root.addEventListener("keydown", (event) => {
+      const tab = event.target.closest('[role="tab"][data-native-action]');
+      if (
+        !tab ||
+        !["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)
+      )
+        return;
+      const a = JSON.parse(tab.dataset.nativeAction),
+        scope = a.scope ? find(a.scope) : root,
+        buttons = actions(scope);
+      event.preventDefault();
+      const i = buttons.indexOf(tab),
+        next =
+          event.key === "Home"
+            ? 0
+            : event.key === "End"
+              ? buttons.length - 1
+              : (i + (event.key === "ArrowRight" ? 1 : -1) + buttons.length) %
+                buttons.length;
+      buttons[next].click();
+      buttons[next].focus();
+    });
+    const openDialog = (target, trigger) => {
+      if (target?.tagName !== "DIALOG" || target.open) return;
+      target.__nativeOpener = trigger || document.activeElement;
+      if (editing) target.show();
+      else target.showModal();
+      if (!editing) {
+        target.__previousOverflow = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+      }
+      (
+        target.querySelector('button,[href],input,select,[tabindex="0"]') ||
+        target
+      ).focus();
+    };
+    root.addEventListener(
+      "close",
+      (event) => {
+        const d = event.target;
+        if (d.tagName !== "DIALOG") return;
+        if (!editing) document.body.style.overflow = d.__previousOverflow || "";
+        d.__nativeOpener?.focus({ preventScroll: true });
+      },
+      true,
+    );
+    root.addEventListener("click", (event) => {
+      if (event.target.tagName !== "DIALOG") return;
+      const box = event.target.getBoundingClientRect();
+      if (
+        event.clientX < box.left ||
+        event.clientX > box.right ||
+        event.clientY < box.top ||
+        event.clientY > box.bottom
+      )
+        event.target.close();
+    });
+    root.addEventListener("keydown", (event) => {
+      const d = event.target.closest("dialog[open]");
+      if (!d) return;
+      if (event.key === "Escape" && editing) {
+        event.preventDefault();
+        d.close();
+      }
+      if (event.key !== "Tab" || editing) return;
+      const nodes = [
+        ...d.querySelectorAll(
+          'button:not(:disabled),a[href],input:not(:disabled),select,[tabindex="0"]',
+        ),
+      ].filter((n) => n.getClientRects().length);
+      const first = nodes[0],
+        last = nodes.at(-1);
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first?.focus();
+      }
+    });
+    if (!editing) {
+      const deepLink = () => {
+        let id;
+        try {
+          id = decodeURIComponent(location.hash.slice(1));
+        } catch {
+          return;
+        }
+        const target = [...root.querySelectorAll("dialog")].find(
+          (n) => n.id === id,
+        );
+        if (target) openDialog(target);
+      };
+      window.addEventListener("hashchange", deepLink);
+      deepLink();
+    }
     const visibility = () => {
       root
         .querySelectorAll("[data-native-scroll-visibility]")
@@ -822,17 +1041,15 @@
       }
       if (action.type === "state") {
         event.preventDefault();
-        root.dataset.nativeState = action.target;
-        root.querySelectorAll("[data-native-action]").forEach((n) => {
-          try {
-            const a = JSON.parse(n.dataset.nativeAction);
-            if (a.type === "state")
-              n.setAttribute(
-                "aria-pressed",
-                String(a.target === action.target),
-              );
-          } catch {}
-        });
+        setState(action.scope ? find(action.scope) : root, action.target, true);
+      }
+      if (action.type === "dialog") {
+        event.preventDefault();
+        openDialog(find(action.target), actionNode);
+      }
+      if (action.type === "close-dialog") {
+        event.preventDefault();
+        find(action.target)?.close();
       }
       if (action.type === "video-toggle") {
         event.preventDefault();
@@ -928,12 +1145,20 @@
       const c = read(n);
       c.id = ids.get(c.id);
       if (c.anchor) c.anchor = n.id;
-      if (c.action?.target && ids.has(c.action.target))
+      if (
+        c.action?.type !== "state" &&
+        c.action?.target &&
+        ids.has(c.action.target)
+      )
         c.action.target = ids.get(c.action.target);
       if (c.action?.type === "link" && c.action.target.startsWith("#")) {
         const old = c.action.target.slice(1);
         if (anchors.has(old)) c.action.target = "#" + anchors.get(old);
       }
+      if (c.action?.scope && ids.has(c.action.scope))
+        c.action.scope = ids.get(c.action.scope);
+      if (c.stateScope && ids.has(c.stateScope))
+        c.stateScope = ids.get(c.stateScope);
       n.dataset.nativeId = c.id;
       n.dataset.sqElementId = c.id;
       if (c.action?.type === "link" && n.tagName === "A")
@@ -1038,6 +1263,16 @@
       );
       if (config.type === "product")
         hooks.renderProduct?.(node, config.productId);
+      if (config.initialState)
+        node.dataset.nativeStateConfig = JSON.stringify({
+          initial: config.initialState,
+          param: config.stateParam,
+          mode: config.stateMode,
+          label: config.label || config.name,
+        });
+      else delete node.dataset.nativeStateConfig;
+      if (config.statePanel) node.dataset.nativeStatePanel = config.statePanel;
+      else delete node.dataset.nativeStatePanel;
       if (config.action)
         node.dataset.nativeAction = JSON.stringify(config.action);
       else delete node.dataset.nativeAction;
@@ -1087,7 +1322,18 @@
       Object.keys(patch).length === 1
     )
       return;
-    const target = getContext(config);
+    const target = Object.keys(patch).some((k) =>
+      [
+        "initialState",
+        "stateScope",
+        "stateParam",
+        "stateMode",
+        "statePanel",
+        "productIds",
+      ].includes(k),
+    )
+      ? config
+      : getContext(config);
     if (patch.text !== undefined) editText(config, patch.text);
     Object.assign(target, patch, {
       props: { ...target.props, ...patch.props },
@@ -1823,7 +2069,8 @@
     if (!selected) return;
     const config = read(selected);
     panel.querySelector("[data-native-product-controls]").hidden =
-      !["product", "commerce"].includes(config.type) || config.part === "cart";
+      !["product", "commerce"].includes(config.type) ||
+      ["cart", "set-price", "set-add"].includes(config.part);
     if (["product", "commerce"].includes(config.type)) {
       const products = hooks.products?.() || [];
       const field = panel.querySelector("[data-native-product-id]");
@@ -1852,13 +2099,38 @@
           config[key] || (key === "optionLayout" ? "compact" : "");
       panel.querySelector('[data-commerce-setting="showPrice"]').checked =
         Boolean(config.showPrice);
+      const setProducts = panel.querySelector("[data-native-set-products]");
+      setProducts.replaceChildren(
+        ...(hooks.products?.() || []).map((p) => {
+          const label = document.createElement("label"),
+            input = document.createElement("input");
+          input.type = "checkbox";
+          input.value = p.id;
+          input.checked = (config.productIds || []).includes(p.id);
+          label.append(input, document.createTextNode(p.name));
+          return label;
+        }),
+      );
+      setProducts.hidden = !["set-price", "set-add"].includes(config.part);
       const visible = {
         part: true,
         group: config.part !== "cart",
-        label: ["options", "add", "cart"].includes(config.part),
+        label: ["options", "add", "cart", "set-add"].includes(config.part),
         optionLayout: config.part === "options",
-        prefix: ["price", "title", "description"].includes(config.part),
-        suffix: ["price", "title", "description"].includes(config.part),
+        prefix: [
+          "price",
+          "title",
+          "description",
+          "product-name",
+          "set-price",
+        ].includes(config.part),
+        suffix: [
+          "price",
+          "title",
+          "description",
+          "product-name",
+          "set-price",
+        ].includes(config.part),
         priceSuffix:
           config.part === "options" && config.optionLayout === "detailed",
         showPrice: config.part === "add",
@@ -1936,7 +2208,13 @@
     );
     variants.value = state;
     if (variants.value !== state) state = "";
-    hooks.root.dataset.nativeState = state;
+    if (config.stateScope) {
+      const scope = hooks.root.querySelector(
+        `[data-native-id="${CSS.escape(config.stateScope)}"]`,
+      );
+      if (scope)
+        scope.dataset.nativeState = state || read(scope).initialState || "";
+    } else hooks.root.dataset.nativeState = state;
     panel.querySelector("[data-native-context-note]").textContent =
       context === "base" && !state
         ? "Layout and appearance settings affect all screen sizes."
@@ -1985,7 +2263,18 @@
       ),
     );
     icons.value = config.icon || "arrow-right";
+    for (const key of [
+      "stateScope",
+      "initialState",
+      "stateParam",
+      "stateMode",
+      "statePanel",
+    ])
+      panel.querySelector(`[data-state-setting="${key}"]`).value =
+        config[key] || "";
     const action = config.action || {};
+    panel.querySelector("[data-native-action-scope]").value =
+      action.scope || "";
     panel.querySelector("[data-native-action-type]").value = action.type || "";
     panel.querySelector("[data-native-action-target]").value =
       action.target || "";
@@ -2119,8 +2408,8 @@
       </div>
       <details open data-native-product-controls hidden><summary>Connected product</summary><label>Product shown here<select data-native-product-id></select></label><p class="sq-native-help">Choose a product for this element. Other placements keep their own product.</p><button type="button" class="sq-native-wide" data-native-another-product>+ Add another product card</button></details>
       <details open data-native-commerce-controls hidden><summary>Product control</summary>
-      <label>Show<select data-commerce-setting="part"><option value="image">Product image</option><option value="options">Variant choices</option><option value="price">Selected price</option><option value="title">Selected name</option><option value="description">Selected description</option><option value="add">Add to cart button</option><option value="cart">Open cart button</option></select></label>
-      <label>Shared selection name<input data-commerce-setting="group" placeholder="e.g. main-product"></label><p class="sq-native-help">Use the same name and product on controls that should share a selected variant. Leave blank for independent choices.</p>
+      <label>Show<select data-commerce-setting="part"><option value="image">Product image</option><option value="options">Variant choices</option><option value="price">Selected price</option><option value="title">Selected name</option><option value="product-name">Product name</option><option value="set-price">Combined price</option><option value="set-add">Add a set of products</option><option value="description">Selected description</option><option value="add">Add to cart button</option><option value="cart">Open cart button</option></select></label>
+      <div data-native-set-products></div><label>Shared selection name<input data-commerce-setting="group" placeholder="e.g. main-product"></label><p class="sq-native-help">Use the same name and product on controls that should share a selected variant. Leave blank for independent choices.</p>
       <label>Label<input data-commerce-setting="label"></label><label>Options layout<select data-commerce-setting="optionLayout"><option value="compact">Side by side</option><option value="detailed">Stacked with details</option></select></label>
       <label>Text before value<input data-commerce-setting="prefix"></label><label>Text after value<input data-commerce-setting="suffix"></label><label>Option price suffix<input data-commerce-setting="priceSuffix" placeholder=" / pack"></label><label><input type="checkbox" data-commerce-setting="showPrice"> Show price on the button</label>
       </details>
@@ -2173,6 +2462,10 @@
     panel.insertAdjacentHTML(
       "beforeend",
       `<details data-native-structure><summary>Structure &amp; accessibility</summary><label>Name<input data-native-name></label><label>Section anchor<input data-native-anchor></label><label>HTML element<select data-native-tag></select></label><label>Parent container<select data-native-move-parent></select></label><button type="button" data-native-move>Move into container</button><div class="sq-native-pair"><button type="button" data-native-earlier>Move earlier</button><button type="button" data-native-later>Move later</button></div><label><input type="checkbox" data-native-collapsed>Initially hidden (toggle target)</label><label><input type="checkbox" data-native-open>Accordion initially open</label></details><details data-native-media><summary>Video</summary><label>Poster image URL<input data-native-media-poster></label><label>Captions URL<input data-native-media-captions></label><label>Captions (WebVTT)<textarea rows="5" data-native-media-captionsText></textarea></label>${["muted", "controls", "loop", "autoplay"].map((k) => `<label><input type="checkbox" data-native-media-${k}>${label(k)}</label>`).join("")}</details><details data-native-icon-options><summary>Icon appearance</summary>${["iconFill", "iconStroke", "iconWeight"].map((k) => `<label>${label(k)}<input data-native-setting="${k}"></label>`).join("")}</details><details><summary>Show while scrolling</summary><label>Show after element or section<input data-native-visible-after placeholder="e.g. hero"></label><label>Hide while these are visible<input data-native-hide-while placeholder="e.g. purchase, footer"></label><p class="sq-native-help">Enter element IDs separated by commas. Useful for a purchase bar that appears after the hero.</p><button type="button" data-native-visibility-apply>Apply visibility</button><button type="button" data-native-visibility-clear>Always show</button></details><details><summary>Scroll motion</summary><label>Starting tilt (degrees)<input type="number" data-native-motion-tilt></label><label>Vertical travel (px)<input type="number" data-native-motion-travel></label><button type="button" data-native-motion-apply>Apply motion</button><button type="button" data-native-motion-clear>Remove motion</button></details><details><summary>Scale to fit</summary><p>Keep a detailed composition proportional below a screen width. Its parent reserves the scaled height.</p>${["max", "width", "height", "extra"].map((k) => `<label>${{ max: "Below screen width", width: "Design width", height: "Design height", extra: "Extra space below" }[k]}<input type="number" data-native-fit-${k}></label>`).join("")}<button type="button" data-native-fit-apply>Apply frame</button><button type="button" data-native-fit-clear>Remove scaling</button></details>`,
+    );
+    panel.insertAdjacentHTML(
+      "beforeend",
+      `<details data-native-state-controls><summary>Tabs &amp; filters</summary><p class="sq-native-help">Give a container a starting version. Connect its buttons and alternate appearances to that container’s ID.</p><label>Starting version<input data-state-setting="initialState" placeholder="e.g. all"></label><label>Control style<select data-state-setting="stateMode"><option value="">Buttons</option><option value="tabs">Tabs</option><option value="filter">Filters</option></select></label><label>Remember choice in URL<input data-state-setting="stateParam" placeholder="e.g. material"></label><label>Appearance follows group ID<input data-state-setting="stateScope"></label><label>Tab panel version<input data-state-setting="statePanel"></label></details>`,
     );
     const advanced = document.createElement("details");
     advanced.dataset.nativeAdvanced = "";
@@ -2295,7 +2588,7 @@
     }
     panel.insertAdjacentHTML(
       "beforeend",
-      '<details><summary>Click action</summary><label>On click<select data-native-action-type><option value="">None</option><option value="link">Open link</option><option value="toggle">Show / hide element</option><option value="state">Switch state</option><option value="video-dialog">Open video dialog</option><option value="video-toggle">Play / pause video</option></select></label><label>Destination or target ID<input data-native-action-target></label><button type="button" data-native-action-apply>Apply action</button></details><p class="sq-native-help">Hold Alt and click an element to try its interaction.</p>',
+      '<details><summary>Click action</summary><label>On click<select data-native-action-type><option value="">None</option><option value="link">Open link</option><option value="toggle">Show / hide element</option><option value="state">Switch state</option><option value="dialog">Open dialog</option><option value="close-dialog">Close dialog</option><option value="video-dialog">Open video dialog</option><option value="video-toggle">Play / pause video</option></select></label><label>Destination or target ID<input data-native-action-target></label><label>Interaction group ID<input data-native-action-scope placeholder="Optional: collection or setup group"></label><button type="button" data-native-action-apply>Apply action</button></details><p class="sq-native-help">Hold Alt and click an element to try its interaction.</p>',
     );
     panel.append(advanced);
     const fontOptions = document.createElement("datalist");
@@ -2342,6 +2635,32 @@
         }
       }),
     );
+    panel.querySelectorAll("[data-state-setting]").forEach((field) =>
+      field.addEventListener("change", () => {
+        try {
+          change({ [field.dataset.stateSetting]: field.value });
+        } catch (error) {
+          hooks.toast(error.message);
+          select(selected);
+        }
+      }),
+    );
+    panel
+      .querySelector("[data-native-set-products]")
+      .addEventListener("change", () => {
+        try {
+          change({
+            productIds: [
+              ...panel.querySelectorAll(
+                "[data-native-set-products] input:checked",
+              ),
+            ].map((n) => n.value),
+          });
+        } catch (error) {
+          hooks.toast(error.message);
+          select(selected);
+        }
+      });
     listen("[data-native-product-id]", "change", () => {
       const productId = panel.querySelector("[data-native-product-id]").value;
       if (
@@ -2367,6 +2686,14 @@
         )
           return;
         config[input.dataset.commerceSetting] = value;
+        if (
+          input.dataset.commerceSetting === "part" &&
+          ["set-price", "set-add"].includes(value) &&
+          !config.productIds?.length
+        )
+          config.productIds = [
+            config.productId || hooks.products?.()[0]?.id,
+          ].filter(Boolean);
         try {
           validate(config);
           hooks.remember();
@@ -2535,6 +2862,9 @@
       hooks.remember();
       config.tag = tag;
       const replacement = create(config);
+      for (const attr of selected.attributes)
+        if (attr.name !== "data-sq-native")
+          replacement.setAttribute(attr.name, attr.value);
       replacement.replaceChildren(...selected.childNodes);
       selected.replaceWith(replacement);
       selected = replacement;
@@ -2820,7 +3150,17 @@
     listen("[data-native-action-apply]", "click", () => {
       const type = panel.querySelector("[data-native-action-type]").value,
         target = panel.querySelector("[data-native-action-target]").value;
-      change({ action: type ? { type, target } : null });
+      change({
+        action: type
+          ? {
+              type,
+              target,
+              scope:
+                panel.querySelector("[data-native-action-scope]").value ||
+                undefined,
+            }
+          : null,
+      });
       if (selected.tagName === "A" && type === "link") selected.href = target;
       refresh();
     });
