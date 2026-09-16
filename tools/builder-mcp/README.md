@@ -74,14 +74,14 @@ typography use the same `props` and `responsive` controls as other elements.
 Set the same `group` on controls that should share a variant. The product ID is
 also part of that connection: placing a different product with the same group
 does not change the first product. Leave `group` blank for independent selections.
-The inspector exposes the group, product, label, compact/detailed `optionLayout`,
+The inspector exposes the group, product, label, `optionLayout` (`compact`, `detailed` or `select`),
 price prefix/suffix and `showPrice` on purchase buttons. These controls export
 through the existing cart and checkout flow; they contain no custom page code.
 
 New templates use the [shared floating cart](../../docs/storefront-cart-pattern.md)
 outside navigation. The exporter supplies it when no merchant-placed cart control
 exists. It uses the shared drawer, maintains its item count and stays clear of
-native fixed purchase bars.
+native fixed purchase bars and ordinary catalog purchase controls.
 
 ### Tabs, filters, dialogs and product sets
 
@@ -91,7 +91,10 @@ in the URL. Buttons use `action: {type: "state", scope: "container-id", target:
 "version"}`. Elements whose alternate appearances follow that container use
 `stateScope`; a tab panel also sets `statePanel` to its version name. Separate
 groups keep independent choices, including after duplication. Tabs support
-arrow keys, Home/End, and correctly connected accessible panels.
+arrow keys, Home/End, and correctly connected accessible panels. State actions can set
+`disableWhenActive: true` (Click action → Disable when this state is selected)
+for bounded controls such as one/two-portion selectors. Focus moves to an enabled
+sibling when the selected button becomes disabled.
 
 Choose the `dialog` HTML element on a native container under **Structure &
 accessibility**, then use **Click action → Open dialog / Close dialog** with its
@@ -103,11 +106,14 @@ An anchor provides direct URL access. An editor-open dialog exports closed.
 **Product control → Show** includes **Product name**, **Combined price** and
 **Add a set of products**. Select the included catalog products using the
 checkboxes. Public tools expose `productIds`, with the same `group` used by
-individual variant controls. Prices sum the selected variants; unavailable or
+individual variant controls. Set purchase buttons can display their total with `showPrice: true`.
+Prices sum the selected variants; unavailable or
 mixed-currency sets disable purchase. Adding a set creates separate ordinary
 cart lines, and a stock limit rejects the whole addition without partial changes.
 Plus Jakarta Sans is bundled under its included SIL license and embedded in
-ordinary exports when used.
+ordinary exports when used. Typography exposes `fontOpticalSizing: "auto" | "none"`
+so a variable font can preserve a chosen design size instead of changing its shapes
+as heading sizes grow.
 
 Native containers also expose **Show while scrolling**. `scrollVisibility` accepts
 an `after` element ID and `hideWhile` IDs. Combined with ordinary fixed positioning,

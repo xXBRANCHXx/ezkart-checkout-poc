@@ -46,7 +46,20 @@ test("the shared floating cart remains reachable above purchase bars and preserv
     await page.waitForFunction(() => globalThis.EzkartBuilder);
     for (const node of [
       { id: "hero", type: "container", props: { height: "1100px" } },
-      { id: "story", type: "container", props: { height: "1700px" } },
+      {
+        id: "story",
+        type: "container",
+        props: { height: "1700px", paddingTop: "600px" },
+        children: [
+          {
+            id: "inline-add",
+            type: "commerce",
+            part: "add",
+            productId: "soda",
+            props: { width: "100%" },
+          },
+        ],
+      },
       {
         id: "purchase",
         type: "container",
@@ -168,6 +181,24 @@ test("the shared floating cart remains reachable above purchase bars and preserv
         document.querySelector(".ezkart-cart-trigger").getBoundingClientRect()
           .bottom >=
         innerHeight - 21,
+    );
+    // Ordinary purchase controls must remain clickable when they cross the corner.
+    await page.locator("#native-purchase").evaluate((n) => (n.hidden = true));
+    await page
+      .locator("#native-inline-add")
+      .evaluate((n) =>
+        scrollTo({
+          top: scrollY + n.getBoundingClientRect().top - innerHeight + 70,
+          behavior: "instant",
+        }),
+      );
+    await page.waitForFunction(
+      () =>
+        document.querySelector(".ezkart-cart-trigger").getBoundingClientRect()
+          .bottom <=
+        document.querySelector("#native-inline-add").getBoundingClientRect()
+          .top -
+          10,
     );
     assert.deepEqual(errors, []);
   } finally {

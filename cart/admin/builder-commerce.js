@@ -96,6 +96,19 @@
           button.type = "button";
           button.disabled = !available;
           button.dataset.commerceSet = "";
+          if (available && c.showPrice) {
+            const price = money(
+              items.reduce(
+                (sum, item) =>
+                  sum + Number(item.selection.price ?? item.product.price ?? 0),
+                0,
+              ),
+              items[0].product,
+            );
+            button.append(
+              element("span", price, "sq-native-commerce-button-price"),
+            );
+          }
           node.replaceChildren(button);
           node.__commerceSet = complete
             ? items.map(({ product, selection }) => ({
@@ -148,11 +161,14 @@
         field.dataset.layout = c.optionLayout || "compact";
         const legend = element("legend", c.label || "Choose an option");
         field.append(legend);
-        if (variants.length > 6 && c.optionLayout !== "detailed") {
+        if (
+          c.optionLayout === "select" ||
+          (variants.length > 6 && c.optionLayout !== "detailed")
+        ) {
           const select = element("select", null, "sq-native-commerce-select");
           select.dataset.commerceOption = "";
           select.setAttribute("aria-label", c.label || "Choose an option");
-          variants.forEach((variant) => {
+          (variants.length ? variants : [product]).forEach((variant) => {
             const soldOut =
               product.type === "physical" &&
               Number(variant.stock ?? product.stock) <= 0;

@@ -52,7 +52,7 @@ page and open product dialog at 390 and 1440. The local unthrottled merchant
 initial transfer is **652,958 bytes**, measured CLS **0**. Merchant media comes
 from the normal catalog media service; demo photography is absent from the page.
 
-Complete package: **3,700,284 bytes**, including preview media, shared runtime and
+Complete package: **3,702,713 bytes**, including preview media, shared runtime and
 licensed fonts. The build enforces the 50,000,000-byte limit. Rebuilds may change
 this exact byte count when shared code changes.
 

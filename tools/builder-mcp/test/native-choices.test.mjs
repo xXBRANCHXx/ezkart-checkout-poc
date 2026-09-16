@@ -76,7 +76,23 @@ test("scoped filters and keyboard tabs preserve independent state; editable dial
     await call("nativeInsert", {
       section: "blank",
       node: n("layout", "container", {
+        props: { fontOpticalSizing: "none" },
         children: [
+          n("portions", "container", {
+            initialState: "one",
+            children: ["one", "two"].map((target) =>
+              n("portion-" + target, "button", {
+                tag: "button",
+                text: target,
+                action: {
+                  type: "state",
+                  scope: "portions",
+                  target,
+                  disableWhenActive: true,
+                },
+              }),
+            ),
+          }),
           n("filter", "container", {
             initialState: "all",
             stateMode: "filter",
@@ -140,8 +156,10 @@ test("scoped filters and keyboard tabs preserve independent state; editable dial
           bound("set-buy", "set-add", {
             productIds: ["desk", "mat"],
             label: "Add both",
+            showPrice: true,
           }),
           bound("independent", "price", { group: "independent" }),
+          bound("dropdown", "options", { optionLayout: "select" }),
         ],
       }),
     });
@@ -197,6 +215,29 @@ test("scoped filters and keyboard tabs preserve independent state; editable dial
       r.fulfill({ body: html, contentType: "text/html" }),
     );
     await p.goto("http://choices.test/?material=wood");
+    assert.equal(
+      await p
+        .locator("#native-layout")
+        .evaluate((n) => getComputedStyle(n).fontOpticalSizing),
+      "none",
+    );
+    assert.equal(await p.locator("#native-portion-one").isDisabled(), true);
+    await p.locator("#native-portion-two").click();
+    assert.equal(await p.locator("#native-portion-two").isDisabled(), true);
+    assert.equal(
+      await p.evaluate(() => document.activeElement.id),
+      "native-portion-one",
+    );
+    assert.equal(
+      await p.locator("#native-portions").getAttribute("data-native-state"),
+      "two",
+    );
+    await p.locator("#native-dropdown select").selectOption("large");
+    assert.equal(await p.locator("#native-set-total").innerText(), "Rp175.000");
+    assert.match(
+      await p.locator("#native-set-buy button").innerText(),
+      /Rp175.000/,
+    );
     assert.equal(await p.locator("#native-felt").isVisible(), false);
     assert.equal(
       await p.locator("#native-detail").evaluate((n) => n.open),

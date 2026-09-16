@@ -72,6 +72,7 @@
     },
     Typography: {
       fontFamily: "text",
+      fontOpticalSizing: ["auto", "none"],
       fontSize: "length",
       fontWeight: "number",
       lineHeight: "length",
@@ -428,9 +429,9 @@
         );
       if (
         config.optionLayout &&
-        !["compact", "detailed"].includes(config.optionLayout)
+        !["compact", "detailed", "select"].includes(config.optionLayout)
       )
-        throw Error("Choose compact or detailed options.");
+        throw Error("Choose side-by-side, detailed, or dropdown options.");
     }
     for (const key of [
       "stateScope",
@@ -484,6 +485,11 @@
         throw Error("Choose an interaction.");
       if (config.action.scope && !identifier(config.action.scope))
         throw Error("Choose a valid interaction group.");
+      if (
+        config.action.disableWhenActive != null &&
+        typeof config.action.disableWhenActive !== "boolean"
+      )
+        throw Error("Disable when selected must be on or off.");
       if (config.action.type === "link") safeUrl(config.action.target);
       else if (!identifier(config.action.target))
         throw Error("Choose a target element or state.");
@@ -755,9 +761,14 @@
       )
         return;
       scope.dataset.nativeState = value;
+      const focused = document.activeElement;
       buttons.forEach((n) => {
         const a = JSON.parse(n.dataset.nativeAction),
           active = a.target === value;
+        if (a.disableWhenActive && n.tagName === "BUTTON") {
+          n.disabled = !editing && active;
+          n.setAttribute("aria-disabled", String(active));
+        }
         n.setAttribute(
           settings.mode === "tabs" ? "aria-selected" : "aria-pressed",
           String(active),
@@ -780,6 +791,11 @@
           }
         }
       });
+      if (!editing && focused?.disabled && buttons.includes(focused)) {
+        buttons
+          .find((n) => n.parentElement === focused.parentElement && !n.disabled)
+          ?.focus({ preventScroll: true });
+      }
       if (persist && settings.param && !editing)
         try {
           const url = new URL(location.href);
@@ -2134,7 +2150,7 @@
         ].includes(config.part),
         priceSuffix:
           config.part === "options" && config.optionLayout === "detailed",
-        showPrice: config.part === "add",
+        showPrice: ["add", "set-add"].includes(config.part),
       };
       for (const [key, show] of Object.entries(visible))
         panel
@@ -2279,6 +2295,11 @@
     panel.querySelector("[data-native-action-type]").value = action.type || "";
     panel.querySelector("[data-native-action-target]").value =
       action.target || "";
+    panel.querySelector("[data-native-action-disable-active]").checked =
+      Boolean(action.disableWhenActive);
+    panel
+      .querySelector("[data-native-action-disable-active]")
+      .closest("label").hidden = action.type !== "state";
     const layers = current.fill?.layers || [];
     draftLayers = structuredClone(layers);
     layerIndex = Math.min(layerIndex, Math.max(0, layers.length - 1));
@@ -2411,7 +2432,7 @@
       <details open data-native-commerce-controls hidden><summary>Product control</summary>
       <label>Show<select data-commerce-setting="part"><option value="image">Product image</option><option value="options">Variant choices</option><option value="price">Selected price</option><option value="title">Selected name</option><option value="product-name">Product name</option><option value="set-price">Combined price</option><option value="set-add">Add a set of products</option><option value="description">Selected description</option><option value="add">Add to cart button</option><option value="cart">Open cart button</option></select></label>
       <div data-native-set-products></div><label>Shared selection name<input data-commerce-setting="group" placeholder="e.g. main-product"></label><p class="sq-native-help">Use the same name and product on controls that should share a selected variant. Leave blank for independent choices.</p>
-      <label>Label<input data-commerce-setting="label"></label><label>Options layout<select data-commerce-setting="optionLayout"><option value="compact">Side by side</option><option value="detailed">Stacked with details</option></select></label>
+      <label>Label<input data-commerce-setting="label"></label><label>Options layout<select data-commerce-setting="optionLayout"><option value="compact">Side by side</option><option value="detailed">Stacked with details</option><option value="select">Dropdown</option></select></label>
       <label>Text before value<input data-commerce-setting="prefix"></label><label>Text after value<input data-commerce-setting="suffix"></label><label>Option price suffix<input data-commerce-setting="priceSuffix" placeholder=" / pack"></label><label><input type="checkbox" data-commerce-setting="showPrice"> Show price on the button</label>
       </details>
       <details open data-native-content><summary data-native-content-title>Text</summary>
@@ -2589,7 +2610,7 @@
     }
     panel.insertAdjacentHTML(
       "beforeend",
-      '<details><summary>Click action</summary><label>On click<select data-native-action-type><option value="">None</option><option value="link">Open link</option><option value="toggle">Show / hide element</option><option value="state">Switch state</option><option value="dialog">Open dialog</option><option value="close-dialog">Close dialog</option><option value="video-dialog">Open video dialog</option><option value="video-toggle">Play / pause video</option></select></label><label>Destination or target ID<input data-native-action-target></label><label>Interaction group ID<input data-native-action-scope placeholder="Optional: collection or setup group"></label><button type="button" data-native-action-apply>Apply action</button></details><p class="sq-native-help">Hold Alt and click an element to try its interaction.</p>',
+      '<details><summary>Click action</summary><label>On click<select data-native-action-type><option value="">None</option><option value="link">Open link</option><option value="toggle">Show / hide element</option><option value="state">Switch state</option><option value="dialog">Open dialog</option><option value="close-dialog">Close dialog</option><option value="video-dialog">Open video dialog</option><option value="video-toggle">Play / pause video</option></select></label><label>Destination or target ID<input data-native-action-target></label><label>Interaction group ID<input data-native-action-scope placeholder="Optional: collection or setup group"></label><label><input type="checkbox" data-native-action-disable-active> Disable when this state is selected</label><button type="button" data-native-action-apply>Apply action</button></details><p class="sq-native-help">Hold Alt and click an element to try its interaction.</p>',
     );
     panel.append(advanced);
     const fontOptions = document.createElement("datalist");
@@ -3148,6 +3169,12 @@
       wordSelectionKey = "";
       select(selected);
     });
+    listen("[data-native-action-type]", "change", () => {
+      panel
+        .querySelector("[data-native-action-disable-active]")
+        .closest("label").hidden =
+        panel.querySelector("[data-native-action-type]").value !== "state";
+    });
     listen("[data-native-action-apply]", "click", () => {
       const type = panel.querySelector("[data-native-action-type]").value,
         target = panel.querySelector("[data-native-action-target]").value;
@@ -3159,6 +3186,10 @@
               scope:
                 panel.querySelector("[data-native-action-scope]").value ||
                 undefined,
+              disableWhenActive:
+                type === "state" &&
+                panel.querySelector("[data-native-action-disable-active]")
+                  .checked,
             }
           : null,
       });
