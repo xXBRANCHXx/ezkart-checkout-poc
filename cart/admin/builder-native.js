@@ -215,7 +215,7 @@
     button: ["a", "button"],
     image: ["img"],
     product: ["div"],
-    commerce: ["div"],
+    commerce: ["div", "span"],
     icon: ["svg"],
     video: ["video"],
     accordion: ["details"],
@@ -443,6 +443,8 @@
           "product-name",
           "set-price",
           "set-add",
+          "quantity",
+          "availability",
         ].includes(config.part)
       )
         throw Error("Choose a product control.");
@@ -459,12 +461,12 @@
         );
       if (
         config.optionLayout &&
-        !["compact", "detailed", "select", "swatches"].includes(
+        !["compact", "detailed", "cards", "select", "swatches"].includes(
           config.optionLayout,
         )
       )
         throw Error(
-          "Choose side-by-side, detailed, dropdown, or color swatch options.",
+          "Choose side-by-side, detailed cards, stacked details, dropdown, or color swatch options.",
         );
       if (
         config.variantColors &&
@@ -2344,7 +2346,14 @@
       const visible = {
         part: true,
         group: config.part !== "cart",
-        label: ["options", "add", "cart", "set-add"].includes(config.part),
+        label: [
+          "options",
+          "add",
+          "cart",
+          "set-add",
+          "quantity",
+          "availability",
+        ].includes(config.part),
         optionLayout: config.part === "options",
         variantId: ["image", "price", "title", "description", "add"].includes(
           config.part,
@@ -2364,7 +2373,8 @@
           "set-price",
         ].includes(config.part),
         priceSuffix:
-          config.part === "options" && config.optionLayout === "detailed",
+          config.part === "options" &&
+          ["detailed", "cards"].includes(config.optionLayout),
         showPrice: ["add", "set-add"].includes(config.part),
       };
       for (const [key, show] of Object.entries(visible))
@@ -2653,9 +2663,9 @@
       </div>
       <details open data-native-product-controls hidden><summary>Connected product</summary><label>Product shown here<select data-native-product-id></select></label><p class="sq-native-help">Choose a product for this element. Other placements keep their own product.</p><button type="button" class="sq-native-wide" data-native-another-product>+ Add another product card</button></details>
       <details open data-native-commerce-controls hidden><summary>Product control</summary>
-      <label>Show<select data-commerce-setting="part"><option value="image">Product image</option><option value="options">Variant choices</option><option value="price">Selected price</option><option value="title">Selected name</option><option value="product-name">Product name</option><option value="set-price">Combined price</option><option value="set-add">Add a set of products</option><option value="description">Selected description</option><option value="add">Add to cart button</option><option value="cart">Open cart button</option></select></label>
-      <div data-native-set-products></div><label>Shared selection name<input data-commerce-setting="group" placeholder="e.g. main-product"></label><p class="sq-native-help">Use the same name and product on controls that should share a selected variant. Leave blank for independent choices.</p>
-      <label>Label<input data-commerce-setting="label"></label><label>Options layout<select data-commerce-setting="optionLayout"><option value="compact">Side by side</option><option value="detailed">Stacked with details</option><option value="select">Dropdown</option><option value="swatches">Color swatches</option></select></label>
+      <label>Show<select data-commerce-setting="part"><option value="image">Product image</option><option value="options">Variant choices</option><option value="price">Selected price</option><option value="title">Selected name</option><option value="product-name">Product name</option><option value="set-price">Combined price</option><option value="set-add">Add a set of products</option><option value="description">Selected description</option><option value="quantity">Quantity selector</option><option value="availability">Stock availability</option><option value="add">Add to cart button</option><option value="cart">Open cart button</option></select></label>
+      <div data-native-set-products></div><label>Shared selection name<input data-commerce-setting="group" placeholder="e.g. main-product"></label><p class="sq-native-help">Use the same name and product on controls that should share variant and quantity choices. Leave blank for independent choices.</p>
+      <label>Label<input data-commerce-setting="label"></label><label>Options layout<select data-commerce-setting="optionLayout"><option value="compact">Side by side</option><option value="cards">Side by side with prices</option><option value="detailed">Stacked with details</option><option value="select">Dropdown</option><option value="swatches">Color swatches</option></select></label>
       <label>Variant shown here<select data-commerce-setting="variantId"></select></label>
       <div data-native-variant-colors hidden></div>
       <label>Text before value<input data-commerce-setting="prefix"></label><label>Text after value<input data-commerce-setting="suffix"></label><label>Option price suffix<input data-commerce-setting="priceSuffix" placeholder=" / pack"></label><label><input type="checkbox" data-commerce-setting="showPrice"> Show price on the button</label>
@@ -2840,7 +2850,15 @@
     panel.append(advanced);
     const fontOptions = document.createElement("datalist");
     fontOptions.id = "sq-native-font-families";
-    for (const family of ["Poppins", "Anton", "DM Sans", "Arial", "Georgia"])
+    for (const family of [
+      "Poppins",
+      "Anton",
+      "DM Sans",
+      "Plus Jakarta Sans",
+      "Manrope",
+      "Arial",
+      "Georgia",
+    ])
       fontOptions.append(
         new Option(
           family,

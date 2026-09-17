@@ -68,15 +68,26 @@ The **Flexible elements** group in Add exposes these same primitives. Their insp
 Add → **Product control** exposes catalog-bound images, variant choices, selected
 names/descriptions/prices, add-to-cart buttons and cart buttons as separate native
 elements. Use `native_add` with `type: "commerce"`, a `productId`, and a `part` of
-`image`, `options`, `title`, `description`, `price`, `add` or `cart`. Layout and
+`image`, `options`, `title`, `description`, `price`, `quantity`, `availability`, `add` or `cart`. Layout and
 typography use the same `props` and `responsive` controls as other elements.
 
-Set the same `group` on controls that should share a variant. The product ID is
+Set the same `group` on controls that should share variant and quantity choices. The product ID is
 also part of that connection: placing a different product with the same group
 does not change the first product. Leave `group` blank for independent selections.
-The inspector exposes the group, product, label, `optionLayout` (`compact`, `detailed`, `select` or `swatches`),
+The inspector exposes the group, product, label, `optionLayout` (`compact`, `cards`, `detailed`, `select` or `swatches`),
 price prefix/suffix and `showPrice` on purchase buttons. These controls export
 through the existing cart and checkout flow; they contain no custom page code.
+
+**Quantity selector** (`part: "quantity"`) provides labeled minus/plus buttons and
+an editable whole-number field. It clamps to the selected physical variant's stock,
+disables sold-out choices, and shares quantities with purchase buttons in the same
+product/group. Quantities remain independent between variants and products.
+The shared cart adds the exact quantity or reports that the remaining stock is
+insufficient; it does not silently add fewer items. **Stock availability**
+(`part: "availability"`) shows the configured label for available stock and
+“Sold out” otherwise. **Side by side with prices** (`optionLayout: "cards"`)
+shows variant names and prices in compact cards. `detailed` keeps stacked descriptions.
+Text-only product controls can use `tag: "span"` inside a native heading or table cell.
 
 Color swatches use `variantColors`, a map of actual variant IDs to six-digit hex
 colors, for example `{"peach":"#dda385","sage":"#a5b19a"}`. The inspector
@@ -152,7 +163,7 @@ this supports an editable purchase bar that hides around other purchase controls
 The exporter uses the browser's popover layer for fixed bars and hides them while
 the cart is open. Native sticky headers retain their configured stacking order.
 
-Anton and DM Sans are available in the native font field alongside Poppins.
+Anton, DM Sans, Plus Jakarta Sans and Manrope are available in the native font field alongside Poppins.
 Licensed font files are embedded in exports when used.
 
 For a **local fictional concept only**, the explicit workspace catalog may set

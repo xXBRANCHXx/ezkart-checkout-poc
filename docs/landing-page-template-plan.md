@@ -391,4 +391,4 @@ Melo is approved and installed as an editable template for one to three products
 
 Tilu was canceled by the user for repeating existing layouts. Preserve it as a rejected concept and do not recreate or package it. The replacement concept receives a minimal functional brief: create an original, creative storefront with fictional branding/products, use Ezkart's universal cart, make product choices work, and open a responsive browser preview. Leave visual choices to the agent. Keep Melo's native work separate.
 
-The replacement concept is running in `ezkart-template-open-creative` with the minimal functional brief and no prescribed art direction. Do not open a duplicate terminal.
+The replacement concept, **Soft Signal**, has been recreated through native builder controls and is ready for review. See [its native validation report](templates/soft-signal-builder-validation.md). Preserve its approved lighting-store concept. Template packaging requires the user’s separate approval of the native result.

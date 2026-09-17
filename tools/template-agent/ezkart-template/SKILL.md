@@ -21,7 +21,7 @@ Required for every concept: a complete responsive storefront, fictional brand an
 - Lajur (Lane) version 2 is ready for native review. See `docs/templates/lajur-builder-validation.md`. Its approved open photographic composition supersedes its rejected first concept. Keep normal merchant checkout copy.
 - Melo (`~/.local/share/ezkart-templates/melo-punch-20260916`) is approved and installed for one to three real products, starting with an empty product card. See `cart/admin/templates/melo/README.md` and `docs/templates/melo-template-validation.md`.
 - Tilu (`~/.local/share/ezkart-templates/tilu-evening-20260916-01`) is canceled. Its files are retained as a rejected concept.
-- The replacement concept is running in the `ezkart-template-open-creative` terminal, in the Ezkart repository with full access and approvals set to never. It received a minimal functional brief and chooses its own design. Do not launch a duplicate or add a design prescription.
+- Soft Signal (`~/.local/share/ezkart-templates/soft-signal-20260916`) is recreated through native builder controls and ready for builder review. See `docs/templates/soft-signal-builder-validation.md`. It is not template-approved yet. Preserve its blue-hour lighting design, independent model/package/quantity choices, brightness preview and universal cart. Do not launch another concept without a request.
 
 ## Find the project and current stage
 

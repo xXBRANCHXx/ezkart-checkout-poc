@@ -5,7 +5,8 @@
     previous?.abort.abort();
     const abort = new AbortController();
     const selections = previous?.selections || new Map();
-    root.__commerce = { abort, selections };
+    const quantities = previous?.quantities || new Map();
+    root.__commerce = { abort, selections, quantities };
     const nodes = [...root.querySelectorAll('[data-native-type="commerce"]')];
     const catalog = new Map(products.map((product) => [product.id, product]));
     const config = (node) =>
@@ -19,6 +20,12 @@
             maximumFractionDigits: Number.isInteger(Number(value)) ? 0 : 2,
           }).format(Number(value) || 0);
     const key = (c) => `${c.productId}:${c.group || c.id}`;
+    const quantityKey = (c, variant) => `${key(c)}:${variant || ""}`;
+    const quantity = (c, variant, maximum = Number.MAX_SAFE_INTEGER) =>
+      Math.min(
+        Math.max(1, maximum),
+        quantities.get(quantityKey(c, variant)) || 1,
+      );
     const element = (tag, text, className) => {
       const node = document.createElement(tag);
       if (text != null) node.textContent = text;
@@ -177,6 +184,14 @@
         selected.image || product.images?.[0] || product.image;
       node.dataset.commerceVariant =
         selected.id === product.id ? "" : selected.id;
+      node.dataset.commerceMaximum = String(
+        product.type === "physical"
+          ? Math.max(
+              0,
+              Math.floor(Number(selected.stock ?? product.stock) || 0),
+            )
+          : Number.MAX_SAFE_INTEGER,
+      );
       if (c.part === "image") {
         if (!selectedImage) {
           node.replaceChildren(element("span", "No product photo"));
@@ -190,6 +205,46 @@
         }
         if (img.getAttribute("src") !== selectedImage) img.src = selectedImage;
         img.alt = `${product.name}${selected !== product ? " — " + variantName(selected) : ""}`;
+      } else if (c.part === "quantity") {
+        let field = node.querySelector(".sq-native-commerce-quantity");
+        if (!field) {
+          field = element("div", null, "sq-native-commerce-quantity");
+          field.setAttribute("role", "group");
+          const decrease = element("button", "−"),
+            input = element("input"),
+            increase = element("button", "+");
+          for (const [button, step, label] of [
+            [decrease, -1, "Decrease quantity"],
+            [increase, 1, "Increase quantity"],
+          ]) {
+            button.type = "button";
+            button.dataset.commerceStep = step;
+            button.setAttribute("aria-label", label);
+          }
+          input.type = "number";
+          input.min = "1";
+          input.step = "1";
+          input.inputMode = "numeric";
+          input.dataset.commerceQuantity = "";
+          field.append(decrease, input, increase);
+          node.replaceChildren(field);
+        }
+        field.setAttribute("aria-label", c.label || "Quantity");
+        const input = field.querySelector("input"),
+          maximum = Number(node.dataset.commerceMaximum),
+          value = quantity(c, node.dataset.commerceVariant, maximum);
+        quantities.set(quantityKey(c, node.dataset.commerceVariant), value);
+        input.setAttribute("aria-label", c.label || "Quantity");
+        input.max = String(Math.max(1, maximum));
+        input.value = value;
+        input.disabled = !available;
+        field.querySelector('[data-commerce-step="-1"]').disabled =
+          !available || value <= 1;
+        field.querySelector('[data-commerce-step="1"]').disabled =
+          !available || value >= maximum;
+      } else if (c.part === "availability") {
+        node.textContent = available ? c.label || "In stock" : "Sold out";
+        node.setAttribute("aria-live", "polite");
       } else if (c.part === "options" || !c.part) {
         const field = element("fieldset", null, "sq-native-commerce-options");
         field.dataset.layout = c.optionLayout || "compact";
@@ -198,7 +253,7 @@
         if (
           c.optionLayout === "select" ||
           (variants.length > 6 &&
-            !["detailed", "swatches"].includes(c.optionLayout))
+            !["detailed", "cards", "swatches"].includes(c.optionLayout))
         ) {
           const select = element("select", null, "sq-native-commerce-select");
           select.dataset.commerceOption = "";
@@ -238,8 +293,8 @@
             content.setAttribute("aria-hidden", "true");
             label.title = variantName(variant);
           } else content.append(element("strong", variantName(variant)));
-          if (c.optionLayout === "detailed") {
-            if (variant.description)
+          if (["detailed", "cards"].includes(c.optionLayout)) {
+            if (c.optionLayout === "detailed" && variant.description)
               content.append(element("small", variant.description));
             content.append(
               element(
@@ -299,6 +354,21 @@
       }
     }
     nodes.forEach(render);
+    function changeQuantity(owner, value) {
+      const c = config(owner),
+        maximum = Number(owner.dataset.commerceMaximum);
+      value = Number.isFinite(value) ? Math.trunc(value) : 1;
+      quantities.set(
+        quantityKey(c, owner.dataset.commerceVariant),
+        Math.min(Math.max(1, maximum), Math.max(1, value)),
+      );
+      nodes
+        .filter(
+          (node) =>
+            config(node).part === "quantity" && key(config(node)) === key(c),
+        )
+        .forEach(render);
+    }
     if (!editing)
       document.dispatchEvent(
         new CustomEvent("ezkart:commerce", { detail: { action: "refresh" } }),
@@ -306,6 +376,13 @@
     root.addEventListener(
       "change",
       (event) => {
+        if (event.target.matches("[data-commerce-quantity]")) {
+          changeQuantity(
+            event.target.closest('[data-native-type="commerce"]'),
+            Number(event.target.value),
+          );
+          return;
+        }
         const input = event.target.closest("[data-commerce-option]");
         if (!input) return;
         const owner = input.closest('[data-native-type="commerce"]'),
@@ -347,6 +424,20 @@
     root.addEventListener(
       "click",
       (event) => {
+        const step = event.target.closest("[data-commerce-step]");
+        if (step) {
+          if (editing && !event.altKey) return;
+          event.preventDefault();
+          const owner = step.closest('[data-native-type="commerce"]');
+          changeQuantity(
+            owner,
+            Number(owner.querySelector("input").value) +
+              Number(step.dataset.commerceStep),
+          );
+          if (step.disabled)
+            owner.querySelector("input").focus({ preventScroll: true });
+          return;
+        }
         const button = event.target.closest(
           "[data-commerce-add],[data-commerce-cart],[data-commerce-set]",
         );
@@ -366,6 +457,11 @@
                   : "add",
               productId: c.productId,
               variantId: node.dataset.commerceVariant || "",
+              quantity: quantity(
+                c,
+                node.dataset.commerceVariant,
+                Number(node.dataset.commerceMaximum),
+              ),
             },
           }),
         );

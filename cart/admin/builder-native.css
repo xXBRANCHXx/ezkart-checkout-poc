@@ -865,3 +865,56 @@
   width: auto;
   min-height: 0;
 }
+
+@font-face {
+  font-family: Manrope;
+  src: url("assets/fonts/manrope.woff2") format("woff2");
+  font-weight: 400 800;
+  font-display: swap;
+}
+.sq-native .sq-native-commerce-quantity {
+  display: flex;
+  align-items: stretch;
+  min-height: 44px;
+  height: 100%;
+  border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
+  border-radius: inherit;
+}
+.sq-native .sq-native-commerce-quantity button {
+  background: transparent;
+  color: inherit;
+  border: 0;
+  padding: 0;
+  width: 34px;
+  min-height: 44px;
+  font: inherit;
+  cursor: pointer;
+}
+.sq-native .sq-native-commerce-quantity input {
+  min-width: 0;
+  width: 32px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: center;
+  font: inherit;
+  appearance: textfield;
+}
+.sq-native .sq-native-commerce-quantity input::-webkit-inner-spin-button,
+.sq-native .sq-native-commerce-quantity input::-webkit-outer-spin-button {
+  appearance: none;
+  margin: 0;
+}
+.sq-native .sq-native-commerce-quantity button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.sq-native .sq-native-commerce-quantity :focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+.sq-native [data-layout="cards"] .sq-native-commerce-choice {
+  min-height: 76px;
+  border-radius: 4px;
+}
