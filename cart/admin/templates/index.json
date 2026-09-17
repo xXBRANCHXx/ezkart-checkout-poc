@@ -24,6 +24,10 @@
     {
       "id": "melo",
       "manifest": "melo/manifest.json"
+    },
+    {
+      "id": "soft-signal",
+      "manifest": "soft-signal/manifest.json"
     }
   ]
 }

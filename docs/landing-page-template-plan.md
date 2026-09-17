@@ -381,7 +381,7 @@ Before a builder reconstruction is promoted to a template, finish and validate t
 
 Preserve each template's distinctive composition, responsive behavior, and art direction by combining those proven elements. Do not flatten the designs into palette swaps, and do not bypass the shared element system to achieve them.
 
-## Current queue — September 16, 2026
+## Current queue — September 17, 2026
 
 Hue (Rona) is approved and installed as a native template for one to three products. See [the template validation report](templates/rona-template-validation.md).
 
@@ -391,4 +391,6 @@ Melo is approved and installed as an editable template for one to three products
 
 Tilu was canceled by the user for repeating existing layouts. Preserve it as a rejected concept and do not recreate or package it. The replacement concept receives a minimal functional brief: create an original, creative storefront with fictional branding/products, use Ezkart's universal cart, make product choices work, and open a responsive browser preview. Leave visual choices to the agent. Keep Melo's native work separate.
 
-The replacement concept, **Soft Signal**, has been recreated through native builder controls and is ready for review. See [its native validation report](templates/soft-signal-builder-validation.md). Preserve its approved lighting-store concept. Template packaging requires the user’s separate approval of the native result.
+**Soft Signal** is approved and installed as an editable template for one or two products, starting with an empty product card. Its evening composition, independent product/variant/quantity choices, scene preview and universal cart are preserved; shopping data comes from the merchant’s catalog. See [its template validation report](templates/soft-signal-template-validation.md).
+
+The user paused this batch after Soft Signal: “this will be the last one for a bit.” No next concept or terminal is queued. Start another only after a new request, using the minimal functional brief above.

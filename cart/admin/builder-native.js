@@ -794,7 +794,9 @@
           css += query(selector, rule);
         for (const [state, value] of Object.entries(config.states || {})) {
           const variant = config.stateScope
-            ? `.sq-page-preview [data-native-id="${config.stateScope}"][data-native-state="${state}"] .sq-native[data-native-id="${config.id}"]`
+            ? config.stateScope === config.id
+              ? `${selector}[data-native-state="${state}"]`
+              : `.sq-page-preview [data-native-id="${config.stateScope}"][data-native-state="${state}"] .sq-native[data-native-id="${config.id}"]`
             : `.sq-page-preview[data-native-state="${state}"] .sq-native[data-native-id="${config.id}"]`;
           css += `${variant}{${declarations(value)}}`;
           for (const rule of value.responsive || [])

@@ -1,0 +1,71 @@
+{
+  "products": [
+    {
+      "id": "signal-lamp",
+      "name": "The Signal",
+      "description": "Our take on the table lamp. A generous shade, a warm downward glow, and just enough presence to make a corner feel like a place.",
+      "type": "physical",
+      "status": "active",
+      "currency": "IDR",
+      "price": 690000,
+      "stock": 18,
+      "media": [
+        {
+          "id": "signal"
+        }
+      ],
+      "variants": [
+        {
+          "id": "lamp-only",
+          "name": "Lamp only",
+          "price": 690000,
+          "stock": 12,
+          "description": "The Signal lamp, USB-C cable and care card. Power adapter sold separately."
+        },
+        {
+          "id": "with-dock",
+          "name": "With dock",
+          "price": 790000,
+          "stock": 6,
+          "description": "The Signal lamp, matching charging dock, USB-C cable and care card. Power adapter sold separately."
+        }
+      ]
+    },
+    {
+      "id": "carry-lamp",
+      "name": "The Carry",
+      "description": "A soft glow with a handle. Pick it up, find your spot, and put a little light where the conversation goes.",
+      "type": "physical",
+      "status": "active",
+      "currency": "IDR",
+      "price": 790000,
+      "stock": 8,
+      "media": [
+        {
+          "id": "carry"
+        }
+      ],
+      "variants": [
+        {
+          "id": "lamp-only",
+          "name": "Lamp only",
+          "price": 790000,
+          "stock": 8,
+          "description": "The Carry lamp, USB-C cable and care card. Power adapter sold separately."
+        },
+        {
+          "id": "with-dock",
+          "name": "With dock",
+          "price": 890000,
+          "stock": 0,
+          "description": "The Carry lamp, matching charging dock, USB-C cable and care card. Power adapter sold separately."
+        }
+      ]
+    }
+  ],
+  "currency": "IDR",
+  "locale": "en",
+  "mediaBase": "http://127.0.0.1:46391",
+  "storageScope": "soft-signal-fictional-review",
+  "demoCheckout": true
+}

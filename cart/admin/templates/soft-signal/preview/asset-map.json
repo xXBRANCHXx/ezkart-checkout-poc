@@ -1,0 +1,7 @@
+{
+  "http://127.0.0.1:46391/assets/hero.webp": "assets/hero.webp",
+  "http://127.0.0.1:46391/assets/table.webp": "assets/table.webp",
+  "http://127.0.0.1:46391/assets/lamp-mark.svg": "assets/lamp-mark.svg",
+  "http://127.0.0.1:46391/v1/public/media/signal": "assets/signal.webp",
+  "http://127.0.0.1:46391/v1/public/media/carry": "assets/carry.webp"
+}

@@ -125,13 +125,16 @@
       );
     };
     const availability = products.map(available),
-      hasFilters = availability.some(Boolean) && availability.some((v) => !v);
+      hasFilters = availability.some(Boolean) && availability.some((v) => !v),
+      initialProduct = Math.max(0, availability.findIndex(Boolean));
     Object.assign(data, {
       productCount: products.length,
       hasSingleProduct: products.length === 1,
       hasCollectionSets: products.length > 1,
       hasCollectionTabs: products.length > 2,
       hasCollectionFilters: hasFilters,
+      collectionInitialProduct: `product${initialProduct + 1}`,
+      collectionInitialShopColumns: slots[initialProduct].shopColumns,
       allProductsLabel: `Semua · ${products.length}`,
       availableProductsLabel: `Tersedia · ${availability.filter(Boolean).length}`,
       soldOutProductsLabel: `Habis · ${availability.filter((v) => !v).length}`,
@@ -170,6 +173,7 @@
       const p = slots[i],
         prefix = `product${i + 1}`;
       data[prefix + "Exists"] = Boolean(p);
+      data[prefix + "InitialDisplay"] = i === initialProduct ? "flex" : "none";
       for (const [key, value] of Object.entries(
         p ||
           Object.fromEntries(
@@ -180,6 +184,7 @@
           ),
       ))
         data[prefix + key[0].toUpperCase() + key.slice(1)] = value;
+      data[prefix + "ShopColumns"] ||= "minmax(0,1fr)";
       data[prefix + "Filters"] = p
         ? {
             [availability[i] ? "soldout" : "available"]: {

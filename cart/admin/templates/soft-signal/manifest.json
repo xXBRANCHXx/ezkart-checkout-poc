@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "id": "soft-signal",
+  "version": "1.0.0",
+  "name": "Soft Signal",
+  "description": "An atmospheric evening storefront with open product selection, warm photography and an interactive scene preview.",
+  "recipe": "recipe.json",
+  "thumbnail": "preview/desktop.png",
+  "previews": [
+    "preview/desktop.png",
+    "preview/mobile.png",
+    "preview/full-page.png"
+  ],
+  "previewLabel": "Design imagery is included and editable. Start with an empty product card and connect your products before publishing or exporting code.",
+  "requirements": {
+    "minProducts": 1,
+    "maxProducts": 2,
+    "images": "optional",
+    "variants": "optional",
+    "description": "optional",
+    "draftProducts": 0
+  },
+  "theme": {
+    "accent": "#bf5b32",
+    "page": "#f4f1e9",
+    "ink": "#172a3c",
+    "surface": "#faf8f2",
+    "headingFont": "Manrope, Arial, sans-serif",
+    "bodyFont": "Manrope, Arial, sans-serif",
+    "buttonBackground": "#172a3c",
+    "buttonText": "#faf8f2",
+    "radius": 4
+  },
+  "approval": {
+    "version": "soft-signal-native-v1",
+    "instruction": "ok, make it a template. this will be the last one for a bit.",
+    "recipeSha256": "f463fafca69e4140acfc97b0049b19c9956672cbca0d26a9dce66ff39cec8cee"
+  },
+  "optionalSections": {
+    "soft-signal-compare": "Compares actual selected products; omitted with fewer than two products",
+    "model-tabs": "Product selector is omitted with one product",
+    "photo-dialog-signal": "Product photos and enlargement are omitted when unavailable"
+  },
+  "demoContent": "Fictional lamps, specifications and review policies stay in preview/. Applied pages use merchant catalog data and normal Ezkart checkout.",
+  "productSlot": "studio"
+}
