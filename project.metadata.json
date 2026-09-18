@@ -12,6 +12,8 @@
       "status": "blocked_pending_cv_approval_and_doku_onboarding",
       "merchantDisbursementRequired": true,
       "sandboxStatus": "bca_sandbox_checkout_and_signed_payment_confirmation_verified_delivery_skipped",
+      "sandboxBrandingStatus": "logo_and_palette_verified_registered_brand_name_unchanged",
+      "sellerWalletStatus": "sandbox_demo_sub_account_created_fee_policy_checkout_routing_and_payout_integration_pending",
       "environmentSwitch": "commerce_environment"
     },
     "midtrans": {

@@ -176,6 +176,64 @@ event for a nonexistent shipment received HTTP 401 without the token and HTTP
 provider delivery updating a persisted Ezkart shipment remains a separate
 shipping acceptance test.
 
+## Sandbox checkout branding
+
+On 2026-09-18, the sandbox dashboard's **Settings → Checkout Appearance →
+Interface Settings** was configured with `assets/ezkart-logo-email.png` and a
+custom palette named **Ezkart sandbox**. It uses Ezkart coral `#FF3926`, navy
+`#081424`, pale background `#F7F8FA`, white cards, and the existing checkout text
+colors. The payment countdown remains enabled. The logo and countdown were
+read back after reloading the dashboard.
+
+A fresh checkout from `test.ezkart.id` created invoice
+`EZK-S-D2C22F49C39DBA6643BCC08C` for IDR 58,000. DOKU's actual staging payment
+page displayed the saved logo and palette at desktop and 390 px mobile widths.
+This branding-only acceptance order remains unpaid and has no seller routing.
+See the [desktop preview](commerce/doku-sandbox-desktop.png) and
+[mobile preview](commerce/doku-sandbox-mobile.png).
+
+The registered merchant name underneath the logo still reads **branch vincent**.
+DOKU documents changing this through Business Info, with provider review. That
+entry was absent from this sandbox's Settings page, and the documented business
+account route redirected to its dashboard. The registered name has not been
+changed. Logo/palette configuration does not rename the registered brand.
+
+## Seller wallets, fee rules and payouts
+
+The requested wallet model is **seller sub-accounts, Ezkart fees and merchant
+payouts**. It is separate from the verified payment-collection integration.
+
+On 2026-09-18, DOKU's sandbox service list showed **Collect and Route / Deposit
+System / Fund Oversight** as **ACTIVE**. The Sub Account V2 page initially showed
+an activation prompt while loading; after its account requests completed it
+showed the active merchant profile and **Create Sub-Account**. Do not infer
+activation status from that initial loading screen.
+
+The dashboard successfully created this isolated test seller:
+
+| Field | Sandbox value |
+| --- | --- |
+| Name | Ezkart Sandbox Demo Seller |
+| Profile ID | `SAC-5716-1789721857135` |
+| Parent profile | `BRN-0209-1789715193397` |
+| Type / status | DEFAULT / ACTIVE |
+| Available IDR account | `2010182315`, balance 0.00 |
+| Pending IDR account | `2030068155`, balance 0.00 |
+
+These are sandbox identifiers, not credentials. The account has not been mapped
+to an Ezkart seller, and no payment has been routed to it. Creating this account
+through DOKU's dashboard does not establish that API registration, fee splitting,
+settlement or payout works through Ezkart.
+
+The Ezkart fee amount, calculation basis and withdrawal/release policy remain
+unconfirmed. No split rule or payout was created. DOKU's Collect and Route guide
+describes percentage or flat split rules applied at settlement, after provider
+payment fees. Attaching a seller profile and split rule to checkout, persisting
+environment-specific seller mappings, showing provider balances, and verifying
+payouts are still implementation and acceptance work. Invalid routing identifiers
+can be accepted without the expected routing or split, so a successful checkout
+response alone will not establish success for this flow.
+
 ## Production switch
 
 Complete `production-commerce-checklist.md` before accepting public orders.
@@ -227,6 +285,10 @@ provider sandbox acceptance.
 - [DOKU notification URL setup](https://developers.doku.com/get-started-with-doku-api/notification/setup-notification-url)
 - [DOKU override URL requirements](https://developers.doku.com/get-started-with-doku-api/notification/override-notification-url)
 - [DOKU simulator guide](https://developers.doku.com/accept-payments/doku-checkout/integration-guide/simulate-payment-and-notification)
+- [DOKU checkout customization](https://docs.doku.com/accept-payments/integration-tools/doku-checkout/customize-checkout-page)
+- [DOKU business data changes](https://docs.doku.com/get-started/manage-business/update-business-data)
+- [DOKU seller account management](https://docs.doku.com/wallet-as-a-service/sub-account/account-management)
+- [DOKU Collect and Route / split rules](https://docs.doku.com/wallet-as-a-service/sub-account/collect-and-route)
 - [Biteship sandbox](https://biteship.com/en/docs/sandbox)
 - [Biteship base URL and mode selection](https://biteship.com/en/docs/api/base_url)
 - [Biteship testing-mode fee policy](https://help.biteship.com/hc/en-us/articles/58286997471513-Testing-Mode-Fee-Policy)
