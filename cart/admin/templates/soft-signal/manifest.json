@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "name": "Soft Signal",
   "description": "An atmospheric evening storefront with open product selection, warm photography and an interactive scene preview.",
+  "styleLabel": "Dark & atmospheric",
   "recipe": "recipe.json",
   "thumbnail": "preview/desktop.png",
   "previews": [

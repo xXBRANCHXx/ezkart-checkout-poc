@@ -4,6 +4,7 @@
   "version": "1.2.0",
   "name": "PITH",
   "description": "Bold product photography, oversized type and decisive citrus color.",
+  "styleLabel": "Bold & graphic",
   "recipe": "recipe.json",
   "thumbnail": "preview/desktop.png",
   "previews": [

@@ -99,7 +99,7 @@ test("New page applies PITH with merchant content, preserves the original page, 
   await page.locator("[data-open-page-creator]").first().click();
   const form = page.locator("[data-page-creator-form]");
   await form.locator("[name=page_name]").fill("Merchant launch");
-  await form.locator(".sq-template-choice").filter({ hasText: "PITH" }).click();
+  await form.locator('.sq-template-choice:has(input[value="pith"])').click();
   await form.locator("[name=template_brand]").fill("Merchant Studio");
   await form.locator("[data-template-preview]").click();
   await page.locator(".sq-template-preview").waitFor();
@@ -293,7 +293,7 @@ test("Library creates a template page with the same native mechanism", async (t)
   await page.locator("[data-library-create-card]").first().click();
   const form = page.locator("[data-library-page-form]");
   await form.locator("[name=page_name]").fill("Library launch");
-  await form.locator(".sq-template-choice").filter({ hasText: "PITH" }).click();
+  await form.locator('.sq-template-choice:has(input[value="pith"])').click();
   await form.locator("[name=template_brand]").fill("Merchant");
   await form.locator("button[value=default]").click();
   await page.waitForURL("**edit=library-launch.ezkart.site");

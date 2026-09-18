@@ -503,14 +503,45 @@
     fieldset.className = "sq-template-picker";
     fieldset.append(title, options);
     host.append(fieldset);
-    const add = (id, name, description, template) => {
+    const showPreview = (template, trigger) => {
+      const dialog = document.createElement("dialog");
+      dialog.className = "sq-template-preview";
+      dialog.setAttribute("aria-label", `${template.styleLabel || template.name} preview`);
+      const header = document.createElement("header"),
+        heading = document.createElement("h2");
+      heading.textContent = template.styleLabel || template.name;
+      const close = document.createElement("button");
+      close.type = "button";
+      close.textContent = "Close preview";
+      close.addEventListener("click", () => dialog.close());
+      header.append(heading, close);
+      const caption = document.createElement("p");
+      caption.textContent = template.previewLabel;
+      dialog.append(header, caption);
+      template.previewUrls.forEach((url, index) => {
+        const img = document.createElement("img");
+        img.src = url;
+        img.alt = `${template.styleLabel || template.name} ${index === 0 ? "desktop" : index === 1 ? "mobile" : "page detail"} preview`;
+        img.loading = "lazy";
+        dialog.append(img);
+      });
+      dialog.addEventListener("close", () => {
+        dialog.remove();
+        trigger.focus({ preventScroll: true });
+      });
+      document.body.append(dialog);
+      dialog.showModal();
+    };
+    const add = (id, style, template) => {
+      const item = document.createElement("div");
+      item.className = "sq-template-item";
       const label = document.createElement("label");
       label.className = "sq-template-choice";
       const input = document.createElement("input");
       input.type = "radio";
       input.name = "template_id";
       input.value = id;
-      input.checked = !id;
+      input.defaultChecked = !id;
       const card = document.createElement("span");
       card.className = "sq-template-card";
       if (template) {
@@ -518,29 +549,41 @@
         img.src = template.thumbnailUrl;
         img.alt = "";
         img.loading = "lazy";
+        img.width = 1440;
+        img.height = 1000;
         card.append(img);
       } else {
         const visual = document.createElement("span");
         visual.className = "sq-template-blank";
         visual.textContent = "+";
+        visual.setAttribute("aria-hidden", "true");
         card.append(visual);
       }
-      const strong = document.createElement("strong");
-      strong.textContent = name;
-      const detail = document.createElement("small");
-      detail.textContent = description;
-      card.append(strong, detail);
+      const caption = document.createElement("span");
+      caption.className = "sq-template-style";
+      caption.textContent = style;
+      card.append(caption);
       label.append(input, card);
-      options.append(label);
+      item.append(label);
+      if (template) {
+        const preview = document.createElement("button");
+        preview.type = "button";
+        preview.className = "sq-template-quick-preview";
+        preview.textContent = "Preview";
+        preview.setAttribute("aria-label", `Preview ${style}`);
+        preview.addEventListener("click", () => showPreview(template, preview));
+        item.append(preview);
+      }
+      options.append(item);
     };
-    add("", "Blank page", "Start with an empty canvas.");
+    add("", "Blank page");
     const settings = document.createElement("div");
     settings.className = "sq-template-settings";
     settings.hidden = true;
     settings.innerHTML =
       '<label><span>Store name</span><input name="template_brand" maxlength="80" autocomplete="organization" placeholder="Your store name"></label><p>Your page starts with an empty product card. Design first, then choose your products in the editor. At least one product with stock is required to publish or export code.</p><button type="button" data-template-preview>Preview design</button>';
     const brand = settings.querySelector("input");
-    host.append(settings);
+    (form.querySelector("[data-template-settings]") || host).append(settings);
     let templates = [];
     const sync = () => {
       const selected = form.elements.template_id.value;
@@ -560,7 +603,7 @@
       .then((items) => {
         templates = items;
         items.forEach((item) =>
-          add(item.id, item.name, item.description, item),
+          add(item.id, item.styleLabel || item.description || item.name, item),
         );
       })
       .catch(() => {
@@ -576,31 +619,7 @@
           (item) => item.id === form.elements.template_id.value,
         );
         if (!template) return;
-        const dialog = document.createElement("dialog");
-        dialog.className = "sq-template-preview";
-        const header = document.createElement("header"),
-          heading = document.createElement("h2");
-        heading.textContent = template.name;
-        const close = document.createElement("button");
-        close.type = "button";
-        close.textContent = "Close preview";
-        close.addEventListener("click", () => dialog.close());
-        header.append(heading, close);
-        const caption = document.createElement("p");
-        caption.textContent = template.previewLabel;
-        dialog.append(header, caption);
-        template.previewUrls.forEach((url, index) => {
-          const img = document.createElement("img");
-          img.src = url;
-          img.alt = `${template.name} ${["desktop", "mobile", "footer"][index] || "design"} preview`;
-          dialog.append(img);
-        });
-        dialog.addEventListener("close", () => {
-          dialog.remove();
-          settings.querySelector("button").focus();
-        });
-        document.body.append(dialog);
-        dialog.showModal();
+        showPreview(template, settings.querySelector("[data-template-preview]"));
       });
   }
   async function fromForm(form, products) {

@@ -72,7 +72,7 @@ test("Sela picker applies four independent catalog products; sparse catalogs rec
   await page.locator("[data-open-page-creator]").first().click();
   const form = page.locator("[data-page-creator-form]");
   await form.locator("[name=page_name]").fill("Sela merchant");
-  await form.locator(".sq-template-choice").filter({ hasText: "Sela" }).click();
+  await form.locator('.sq-template-choice:has(input[value="sela"])').click();
   await form.locator("[name=template_brand]").fill("Merchant Studio");
   await form.locator("[data-create-page]").click();
   await page.waitForURL("**edit=sela-merchant.ezkart.site");

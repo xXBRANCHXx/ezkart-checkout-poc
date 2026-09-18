@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "name": "Melo",
   "description": "Warm coral and paper tones, arched photography and open product cards with editable details and shopping guidance.",
+  "styleLabel": "Warm & handcrafted",
   "recipe": "recipe.json",
   "thumbnail": "preview/desktop.png",
   "previews": [

@@ -42,8 +42,7 @@ test("Templates start without products; connecting products preserves edits and 
   const form = page.locator("[data-page-creator-form]");
   await form.locator("[name=page_name]").fill("Draft Takar");
   await form
-    .locator(".sq-template-choice")
-    .filter({ hasText: "Takar" })
+    .locator('.sq-template-choice:has(input[value="takar"])')
     .click();
   assert.equal(await form.locator("[name=template_product]").count(), 0);
   await form.locator("[data-create-page]").click();

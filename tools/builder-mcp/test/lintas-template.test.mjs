@@ -101,8 +101,7 @@ test("Lintas supports product-free drafts, preserved edits, real independent var
   const form = p.locator("[data-page-creator-form]");
   await form.locator("[name=page_name]").fill("Lintas merchant");
   await form
-    .locator(".sq-template-choice")
-    .filter({ hasText: "Lintas" })
+    .locator('.sq-template-choice:has(input[value="lintas"])')
     .click();
   await form.locator("[name=template_brand]").fill("Merchant Store");
   await form.locator("[data-create-page]").click();

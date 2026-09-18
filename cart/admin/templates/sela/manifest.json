@@ -4,6 +4,7 @@
   "version": "1.2.0",
   "name": "Sela",
   "description": "Generous whitespace, clean typography and a considered product collection.",
+  "styleLabel": "Clean & minimal",
   "recipe": "recipe.json",
   "thumbnail": "preview/desktop.png",
   "previews": [

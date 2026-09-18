@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "name": "Rona (Hue)",
   "description": "Warm peach gradients, rounded sections and clear product choices for an approachable everyday shop.",
+  "styleLabel": "Soft & rounded",
   "recipe": "recipe.json",
   "thumbnail": "preview/desktop.png",
   "previews": [

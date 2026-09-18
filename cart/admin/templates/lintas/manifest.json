@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "name": "Lintas",
   "description": "A clear everyday storefront with spacious photography, navy accents and a useful product comparison.",
+  "styleLabel": "Modern & structured",
   "recipe": "recipe.json",
   "thumbnail": "preview/desktop.png",
   "previews": [

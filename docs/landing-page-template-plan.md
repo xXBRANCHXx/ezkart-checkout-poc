@@ -12,7 +12,9 @@ Concept work is open under the user's approved three-stage workflow: first desig
 
 Shipping templates remains gated on the builder's reusable elements being able to create, edit and reproduce every required composition from scratch with a polished user experience. Standalone concepts are design references, not published templates. Do not import their HTML/CSS, patch exports, or add template-only rendering code to bypass builder recreation. The designs below remain reference targets until their native builder versions pass review.
 
-Templates are complete, polished, long-form storefront sites—not isolated sections, skeletal blueprints, or the same layout with different colors. The current target is roughly **15 templates**, with the final count still open. We will design and build them one at a time with an unusually high quality bar.
+Templates are complete, polished, long-form storefront sites—not isolated sections, skeletal blueprints, or the same layout with different colors. The current target is roughly **12 templates**, with the final count still open. We will design and build them one at a time with an unusually high quality bar.
+
+The template picker uses a large, near-viewport-size gallery with four previews per desktop row and fewer columns on smaller screens. Show the full desktop preview with a short style label below it, without separate template-name headings or descriptive paragraphs. Keep the catalog length flexible, and avoid a nested scrolling area around the gallery. Templates declare their gallery caption in `styleLabel`.
 
 Future templates should be highly professional and practical for ordinary merchants. Favor clear shopping journeys, disciplined whitespace, clean typography, restrained backgrounds and familiar navigation. Only one or two should take a more formal direction; the majority should remain approachable and polished. PITH is the approved bold launch design, not the visual default for the collection.
 

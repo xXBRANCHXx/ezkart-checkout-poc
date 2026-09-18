@@ -4,6 +4,7 @@
   "version": "1.2.0",
   "name": "Takar",
   "description": "A welcoming storefront with panoramic photography, deep green accents and a clear product shelf.",
+  "styleLabel": "Fresh & natural",
   "recipe": "recipe.json",
   "thumbnail": "preview/desktop.png",
   "previews": [

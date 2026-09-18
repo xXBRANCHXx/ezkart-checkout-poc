@@ -97,8 +97,7 @@ test("Takar applies real product collections with independent choices, editable 
   const form = p.locator("[data-page-creator-form]");
   await form.locator("[name=page_name]").fill("Takar merchant");
   await form
-    .locator(".sq-template-choice")
-    .filter({ hasText: "Takar" })
+    .locator('.sq-template-choice:has(input[value="takar"])')
     .click();
   await form.locator("[name=template_brand]").fill("Merchant Store");
   await form.locator("[data-create-page]").click();
