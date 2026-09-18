@@ -3312,7 +3312,10 @@
       const columns = fluidColumns();
       const cellHeight = fluid ? parseFloat(computed.gridTemplateRows) || Math.max(4, fluidRowHeight(section)-rowGap) : gridCellHeightState[activeDevice];
       const rowStep = cellHeight + rowGap;
-      const rows = fluid ? Math.max(1, section === sectionHeightResizeTarget && sectionHeightPreviewRows > 0 ? sectionHeightPreviewRows : Number.parseInt(section.dataset.sqRows || section.dataset.sqMinRows || '12',10)) : Math.max(1,Math.ceil((height+rowGap)/rowStep));
+      // A section's minimum height can leave space beyond its explicit tracks.
+      // Cover that rendered space with the same cells used for snapping.
+      const visibleRows = Math.max(1, Math.ceil(height / rowStep));
+      const rows = fluid ? Math.max(visibleRows, section === sectionHeightResizeTarget && sectionHeightPreviewRows > 0 ? sectionHeightPreviewRows : Number.parseInt(section.dataset.sqRows || section.dataset.sqMinRows || '12',10)) : visibleRows;
       return {left,top,right,bottom,width,height,columnGap,rowGap,columns,rows,rowStep,columnStep:(width+columnGap)/columns};
     };
     // Use the rendered section grid for both free-positioned and native elements.
