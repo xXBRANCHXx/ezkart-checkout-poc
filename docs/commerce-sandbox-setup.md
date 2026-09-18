@@ -105,6 +105,14 @@ The Rates API rejected the request because the account had insufficient balance,
 so rate lookup and the full checkout flow remain unverified. A Biteship balance
 top-up, actual pickup details and private hosted configuration are still needed.
 
+Biteship accepted registration of sandbox webhook `6aaceb8083fe22646422e72f`
+for all three events at the test endpoint, using `X-Ezkart-Webhook-Token`.
+It replaces the earlier Ezkart sandbox webhook targeting the old
+`admin.jenanggemi.com` application. Deployed commit `54951d1` returns HTTP 200
+for the empty installation probe and HTTP 401 for an unauthenticated event.
+Authenticated event delivery remains pending installation of the same private
+webhook token on the test server.
+
 ## Production switch
 
 Complete `production-commerce-checklist.md` before accepting public orders.
