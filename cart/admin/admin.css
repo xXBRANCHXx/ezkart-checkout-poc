@@ -2484,8 +2484,25 @@ body>.sq-page-preview.sq-has-pinned-navigation:not(.sq-has-announcement-navigati
 @media(prefers-reduced-motion:reduce){.sq-navigation-template-section,.sq-navigation-behavior-toggle>i,.sq-navigation-behavior-toggle>i:after{transition:none}}
 .sq-site-header-shortcuts>div:last-child{grid-template-columns:repeat(3,minmax(0,1fr))}
 
+/* Fit the canvas in its own column, including beside a tablet-width inspector. */
+.page-site-editor .sq-canvas-stage{grid-template-columns:minmax(0,1fr);container:ezkart-editor / inline-size}
+@container ezkart-editor (max-width:760px){
+  .sq-stage-footer{grid-template-columns:minmax(0,1fr)}
+  .sq-stage-footer>.sq-stage-ready,.sq-stage-footer>[data-sq-commerce-status]{display:none}
+  .sq-stage-scale{justify-self:center}
+}
+@container ezkart-editor (max-width:480px){
+  .sq-stage-size,.sq-stage-scale label>span{display:none}
+  .sq-stage-scale label{grid-template-columns:116px 31px}
+  .sq-stage-footer .sq-stage-scale input[type=range]{width:116px}
+}
 /* Section settings and element settings share the compact inspector drawer. */
-@media(max-width:1120px){
+@media(min-width:721px) and (max-width:1120px){
+  .page-site-editor .sq-studio:not(.preview-mode) .sq-editor-grid{grid-template-columns:52px minmax(0,1fr) 320px}
+  .page-site-editor .sq-studio.inspector-closed .sq-editor-grid{grid-template-columns:52px minmax(0,1fr)}
+  .page-site-editor .sq-studio:not(.preview-mode) .sq-inspector:not(.collapsed){display:grid}
+}
+@media(max-width:720px){
   .page-site-editor .sq-studio:not(.preview-mode) .sq-inspector:not(.collapsed){
     width:min(320px,calc(100vw - 52px));
     max-height:calc(100dvh - var(--sq-commandbar-height));

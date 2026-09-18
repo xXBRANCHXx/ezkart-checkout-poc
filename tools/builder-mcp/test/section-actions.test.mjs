@@ -101,6 +101,55 @@ async function fixture(run) {
   }
 }
 
+test("tablet-width editors fit every canvas beside the inspector and keep resizing reachable", async () =>
+  fixture(async ({ page, invoke }) => {
+    await invoke("nativeInsert", { section: "blank", node: {
+      id: "blank", type: "container", props: { minHeight: "600px" },
+      children: [{ id: "wide-heading", type: "heading", text: "Edit this text",
+        props: { width: "100%", height: "196px", position: "relative", top: "140px", fontSize: "48px" } }],
+    } });
+    const heading = page.locator('[data-native-id="wide-heading"]');
+    const inspector = page.locator('.sq-inspector');
+    const root = page.locator('[data-sq-preview-root]');
+    const handle = page.locator('[data-sq-element-resize]');
+    for (const width of [941, 768, 1120]) {
+      await page.setViewportSize({ width, height: 904 });
+      for (const device of ["desktop", "tablet", "mobile"]) {
+        await invoke("setDevice", { device });
+        await invoke("settle");
+        await heading.click({ position: { x: 12, y: 12 } });
+        await invoke("settle");
+        const pageBox = await root.boundingBox(), panelBox = await inspector.boundingBox();
+        assert.ok(pageBox.x + pageBox.width <= panelBox.x,
+          `${device} canvas stays entirely beside the inspector at ${width}px: ${JSON.stringify({ pageBox, panelBox })}`);
+        assert.ok(pageBox.x >= 52, "The canvas stays to the right of the tool rail");
+        const zoom = await page.locator('[data-sq-zoom-slider]').boundingBox();
+        assert.ok(zoom.x >= 52 && zoom.x + zoom.width <= panelBox.x,
+          "Zoom controls remain beside the inspector too");
+        const grid = await page.locator('.sq-grid-quick-toggle').boundingBox();
+        assert.ok(grid.y + grid.height <= 904, "Footer controls stay fully inside the viewport");
+        assert.equal(await handle.evaluate(node => {
+          const r = node.getBoundingClientRect();
+          return document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2) === node;
+        }), true, "The resize handle receives pointer input with the inspector open");
+        const before = await heading.boundingBox(), grip = await handle.boundingBox();
+        await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+        await page.mouse.down();
+        await page.mouse.move(grip.x + grip.width / 2 - 45, grip.y + grip.height / 2 - 25, { steps: 5 });
+        await page.mouse.up();
+        await invoke("settle");
+        const after = await heading.boundingBox();
+        assert.ok(after.width < before.width - 15 && after.height < before.height - 10,
+          `The text box shrinks in ${device} mode at ${width}px`);
+        await invoke("undo");
+        await page.locator('[data-sq-close-inspector]').click();
+        await invoke("settle");
+        const closed = await root.boundingBox();
+        assert.ok(closed.width >= pageBox.width, "Closing the inspector gives the canvas its space back");
+      }
+    }
+  }));
+
 test("short pages end at their sections, and page background never edits the section above it", async () =>
   fixture(async ({ page, invoke, section, show }) => {
     await page.setViewportSize({ width: 941, height: 904 });
