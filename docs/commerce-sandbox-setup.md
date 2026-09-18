@@ -225,8 +225,12 @@ to an Ezkart seller, and no payment has been routed to it. Creating this account
 through DOKU's dashboard does not establish that API registration, fee splitting,
 settlement or payout works through Ezkart.
 
-The Ezkart fee amount, calculation basis and withdrawal/release policy remain
-unconfirmed. No split rule or payout was created. DOKU's Collect and Route guide
+The user's pricing mockup now specifies Basic / Advanced / Marketplace
+commissions of 5% / 6% / 7% of product subtotal, Rp1,250 admin per order, and an
+estimated transaction fee. See [seller fees and payouts](seller-fees-and-payouts.md)
+for the checked example and proposed DOKU mapping. Withdrawal timing and handling
+differences between estimated and actual provider fees remain unconfirmed.
+No split rule or payout was created. DOKU's Collect and Route guide
 describes percentage or flat split rules applied at settlement, after provider
 payment fees. Attaching a seller profile and split rule to checkout, persisting
 environment-specific seller mappings, showing provider balances, and verifying
