@@ -2514,6 +2514,7 @@
     const defaultGridCellHeight = { desktop: 24, tablet: 24, mobile: 24 };
     const gridCellHeightState = { ...defaultGridCellHeight };
     const inlineEditSnapshots = new WeakMap();
+    const nativeTextEditing = new WeakSet();
     const directDragSuppressClicks = new WeakSet();
     let selectedSection = "announcement";
     let selectedElement = null;
@@ -3133,14 +3134,10 @@
         const rect = node.getBoundingClientRect();
         return rect.height > 0 && !['sticky','fixed'].includes(getComputedStyle(node).position);
       });
-      // Side margins belong to the section alongside them, even when its
-      // content is narrower than the page. Never reuse an old selection here.
+      // Side margins belong to the section alongside them. Space outside
+      // those bounds belongs to the page, never to the nearest section.
       const within = sections.filter(node => { const rect = node.getBoundingClientRect(); return y >= rect.top && y < rect.bottom; });
-      if (within.length) return within.at(-1);
-      return sections.sort((a,b) => {
-        const distance = node => { const rect = node.getBoundingClientRect(); return Math.min(Math.abs(y-rect.top),Math.abs(y-rect.bottom)); };
-        return distance(a)-distance(b);
-      })[0] || previewRoot.querySelector(':scope > [data-sq-block]');
+      return within.at(-1) || null;
     };
     const sectionContentHeight = section => {
       const rect = section.getBoundingClientRect(), scale = rect.width / Math.max(1, section.offsetWidth);
@@ -3337,7 +3334,16 @@
           };
         },
         update(){refreshElementOverlay();refreshLayoutGrid();scheduleSectionTools();},
-        end(){layoutGridDragging=false;revealLayoutGrid(650);refreshElementOverlay();scheduleSectionTools();},
+        end(){
+          if (section.matches('.sq-native-section[data-sq-auto-grow]')) {
+            const minimum = Math.ceil(sectionContentHeight(section));
+            if (minimum > section.offsetHeight) {
+              setSectionContentHeight(section, minimum);
+              markSqChanged();
+            }
+          }
+          layoutGridDragging=false;revealLayoutGrid(650);refreshElementOverlay();scheduleSectionTools();
+        },
       };
     };
     const refreshLayoutGrid = () => {
@@ -4252,6 +4258,11 @@
       overlay.style.top = `${(elementRect.top - sectionRect.top) / renderedScale}px`;
       overlay.style.width = `${elementRect.width / renderedScale}px`;
       overlay.style.height = `${elementRect.height / renderedScale}px`;
+      const toolbar = overlay.querySelector(".sq-element-toolbar");
+      const canvasTop = Math.max(previewRoot.getBoundingClientRect().top, sqStudio.querySelector(".sq-canvas-scroll").getBoundingClientRect().top);
+      if (toolbar.getBoundingClientRect().top < canvasTop + 4) {
+        toolbar.style.top = `${elementRect.height / renderedScale + 6}px`;
+      }
       if (selectedElement.matches('.sq-native') || selectedElement.closest('.sq-flow')) {
         overlay.querySelector('[data-sq-element-move]').title = 'Drag to move · Hold Alt to move without snapping';
         overlay.querySelector('[data-sq-element-resize]').title = 'Drag to resize · Hold Alt to resize without snapping';
@@ -4386,9 +4397,49 @@
     };
     const directDraggableElementTypes = new Set(["image", "divider", "spacer", "icon", "custom-code", "component-instance"]);
     const bindDirectElementDrag = (element) => {
-      const enabled = !element?.closest(".sq-flow,.sq-native-section") && directDraggableElementTypes.has(element?.dataset.sqElementType);
+      const native = element?.matches(".sq-native");
+      const enabled = native || !element?.closest(".sq-flow,.sq-native-section") && directDraggableElementTypes.has(element?.dataset.sqElementType);
       element?.classList.toggle("sq-direct-draggable", enabled);
       if (!enabled) return;
+      if (native) {
+        // Native browser dragging would hand this gesture to the section's
+        // drag-and-drop handler, cancelling the element's pointer gesture.
+        element.ondragstart = event => { event.preventDefault(); event.stopPropagation(); };
+        element.onpointerdown = (event) => {
+          if (event.button !== 0 || cropEditingImage || event.target.closest('.sq-native') !== element || event.target.closest('input,textarea,select,[contenteditable=true]')) return;
+          if (event.altKey && element.closest('[data-native-action]')) return;
+          const control = event.target.closest('button,a,video,audio');
+          if (control && control !== element) return;
+          event.stopPropagation();
+          const startX = event.clientX, startY = event.clientY;
+          let dragging = false;
+          element.setPointerCapture?.(event.pointerId);
+          const move = (next) => {
+            if (Math.hypot(next.clientX - startX, next.clientY - startY) < 5) return;
+            window.removeEventListener('pointermove', move);
+            dragging = true;
+            next.preventDefault();
+            window.getSelection()?.removeAllRanges();
+            selectSqElement(element);
+            element.classList.add('sq-direct-dragging');
+            EzkartNative.startPointer(event, element, false, next);
+          };
+          const end = () => {
+            window.removeEventListener('pointermove', move);
+            window.removeEventListener('pointerup', end);
+            window.removeEventListener('pointercancel', end);
+            element.classList.remove('sq-direct-dragging');
+            if (dragging) {
+              directDragSuppressClicks.add(element);
+              window.setTimeout(() => directDragSuppressClicks.delete(element), 0);
+            }
+          };
+          window.addEventListener('pointermove', move);
+          window.addEventListener('pointerup', end, { once: true });
+          window.addEventListener('pointercancel', end, { once: true });
+        };
+        return;
+      }
       element.onpointerdown = (event) => {
         if (event.button !== 0 || cropEditingImage || event.target.closest?.("button,a,input,textarea,select,[contenteditable=true],.sq-element-toolbar,.sq-element-resize")) return;
         const section = element.closest("[data-sq-fluid]");
@@ -5076,25 +5127,51 @@
       previewRoot?.querySelectorAll("[data-sq-block]").forEach((block) => {
         editableNodesFor(block).forEach((content, index) => {
           if (!content.dataset.sqEditable) content.dataset.sqEditable = `copy-${index + 1}`;
-          content.contentEditable = content.matches("button,a") ? "false" : "true";
+          const nativeText = content.matches('.sq-native[data-native-text-field]');
+          content.contentEditable = content.matches("button,a") || nativeText && !nativeTextEditing.has(content) ? "false" : "true";
+          if (nativeText) content.tabIndex = 0;
           content.spellcheck = true;
           content.draggable = false;
           const startInlineEdit = () => {
             if (!inlineEditSnapshots.has(content)) inlineEditSnapshots.set(content, { state: captureState(), text: content.textContent, remembered: false });
           };
-          content.onpointerdown = (event) => { event.stopPropagation(); startInlineEdit(); };
+          const dragPointerDown = content.onpointerdown;
+          content.onpointerdown = (event) => {
+            if (nativeText && !nativeTextEditing.has(content)) { dragPointerDown?.(event); return; }
+            event.stopPropagation(); startInlineEdit();
+          };
+          if (nativeText) {
+            const edit = () => {
+              startInlineEdit();
+              nativeTextEditing.add(content);
+              content.contentEditable = "true";
+              content.focus({ preventScroll: true });
+            };
+            content.ondblclick = (event) => { event.stopPropagation(); edit(); };
+            content.onkeydown = (event) => {
+              if (event.key === 'Enter' && !nativeTextEditing.has(content)) {
+                event.preventDefault(); event.stopPropagation(); edit();
+              } else if (event.key === 'Escape' && nativeTextEditing.has(content)) {
+                event.preventDefault(); event.stopPropagation(); content.blur();
+              }
+            };
+          }
           content.onclick = (event) => {
             if(content.matches(".sq-native")&&event.altKey)return;
             event.stopPropagation();
             const isAction = content.matches("a,button");
             if (isAction) event.preventDefault();
             const element = content.closest("[data-sq-element]");
+            if (directDragSuppressClicks.has(element)) return;
             if (!isAction && selectedElement === element) return;
             if (isAction && selectedElement === element && selectedAction === content) return;
             selectSqSection(block.dataset.sectionId);
             selectSqElement(element, isAction ? content : null, null, isAction ? null : content);
           };
-          content.ondragstart = (event) => event.stopPropagation();
+          content.ondragstart = (event) => {
+            if (nativeText && !nativeTextEditing.has(content)) event.preventDefault();
+            event.stopPropagation();
+          };
           content.onfocus = startInlineEdit;
           content.onbeforeinput = startInlineEdit;
           content.oninput = () => {
@@ -5105,7 +5182,10 @@
             if (inspectorField) inspectorField.value = content.textContent.trim();
             markSqChanged();
           };
-          content.onblur = () => inlineEditSnapshots.delete(content);
+          content.onblur = () => {
+            inlineEditSnapshots.delete(content);
+            if (nativeText) { nativeTextEditing.delete(content); content.contentEditable = "false"; }
+          };
         });
       });
       scheduleSectionTools();
@@ -5113,6 +5193,16 @@
         if (event.target.closest?.("[data-sq-element], [data-sq-block]")) return;
         const section = sectionAtClientY(event.clientY);
         if (section) deselectSqItem(section.dataset.sectionId);
+        else {
+          closeSqInspector();
+          selectedSection = "";
+          previewRoot.querySelectorAll("[data-sq-block].selected").forEach(node => node.classList.remove("selected"));
+          sqStudio.querySelectorAll("[data-sq-layer].active,[data-sq-layer-group].active").forEach(node => node.classList.remove("active"));
+          removeSectionToolbar();
+          removeLayoutGrid();
+          openSqPanel("brand", { pin: true });
+          sqStudio.querySelector('[data-sq-brand-color="page"]')?.focus({ preventScroll: true });
+        }
       };
     };
 
@@ -7213,7 +7303,7 @@
       if(native){
         const nativeType=type.replace(/^native-/,'');if(!EzkartNative.tags[nativeType]){showToast('Choose a native container element.');return null;}
         const parent=selectedElement?.matches('.sq-native')&&section.contains(selectedElement)?(['container','accordion','summary','button'].includes(selectedElement.dataset.nativeType)&&EzkartNative.read(selectedElement).text===undefined?selectedElement:selectedElement.parentElement.closest('.sq-native')):section;
-        const id=`native-${Date.now()}`,node={id,type:nativeType,text:['text','heading','button','summary'].includes(nativeType)?'Edit this text':undefined,props:{...EzkartNative.defaults[nativeType],...(nativeType==='container'?{minHeight:'120px',width:'100%'}:{})}};if(nativeType==='commerce'){const product=readCatalogProducts()[0];if(!product){showToast('Add a catalog product first.');return null;}node.productId=product.id;node.part='options';node.group='';}if(nativeType==='accordion')node.children=[{id:id+'-question',type:'summary',text:'Your question',props:EzkartNative.defaults.summary},{id:id+'-answer',type:'text',text:'Write your answer here.',props:{...EzkartNative.defaults.text,paddingTop:'16px'}}];const element = addNativeNode({section:section.dataset.sectionId,parent:parent?.dataset.nativeId,node}); undoStack[undoStack.length-1]=before; bindSqInteractions();rebuildLayerList();selectSqSection(section.dataset.sectionId);selectSqElement(element);markSqChanged();return element;
+        const id=`native-${Date.now()}`,node={id,type:nativeType,text:['text','heading','button','summary'].includes(nativeType)?'Edit this text':undefined,props:{...EzkartNative.defaults[nativeType],...(['heading','text'].includes(nativeType)?{width:'fit-content',maxWidth:'100%'}:{}),...(nativeType==='image'?{width:'320px',height:'240px'}:{}),...(nativeType==='container'?{minHeight:'120px',width:'100%'}:{})}};if(nativeType==='commerce'){const product=readCatalogProducts()[0];if(!product){showToast('Add a catalog product first.');return null;}node.productId=product.id;node.part='options';node.group='';}if(nativeType==='accordion')node.children=[{id:id+'-question',type:'summary',text:'Your question',props:EzkartNative.defaults.summary},{id:id+'-answer',type:'text',text:'Write your answer here.',props:{...EzkartNative.defaults.text,paddingTop:'16px'}}];const element = addNativeNode({section:section.dataset.sectionId,parent:parent?.dataset.nativeId,node}); undoStack[undoStack.length-1]=before; bindSqInteractions();rebuildLayerList();selectSqSection(section.dataset.sectionId);selectSqElement(element);markSqChanged();return element;
       }
       if (!section) return null;
       remember(before);
@@ -8424,8 +8514,9 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
       remember();
       if(node.id===sectionId&&!parent){const element=EzkartNative.create(node);element.classList.add('sq-page-block','sq-native-section');element.dataset.sqBlock='';element.dataset.sectionId=sectionId;element.removeAttribute('data-sq-element');section.replaceWith(element);EzkartNative.refresh();rebuildLayerList();bindSqInteractions();markSqChanged();return element;}
       if(!section.matches('.sq-native-section')){
+        if (section.matches('.sq-generated-blank')) section.dataset.sqAutoGrow = 'true';
         const appearance = getComputedStyle(section);
-        const props = {display:'block',fontFamily:'Poppins, sans-serif',fontSize:'14px',color:appearance.color,backgroundColor:appearance.backgroundColor,...sectionProps};
+        const props = {display:'block',minHeight:`${section.offsetHeight}px`,fontFamily:'Poppins, sans-serif',fontSize:'14px',color:appearance.color,backgroundColor:appearance.backgroundColor,...sectionProps};
         let fill;
         if (EzkartBackgrounds.type(section) === 'gradient') {
           const gradient = EzkartBackgrounds.read(section);
@@ -8438,8 +8529,8 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
           fill = {clip:'background',layers};
         }
         const paddingProps = device => Object.fromEntries(Object.entries(readSpacing(sectionId,device)).map(([side,value])=>['padding'+side[0].toUpperCase()+side.slice(1),value+'px']));
-        if (spacingState.has(spacingKey(sectionId,'desktop'))) Object.assign(props,paddingProps('desktop'));
-        const responsive = ['tablet','mobile'].filter(device=>spacingState.has(spacingKey(sectionId,device))).map(device=>({max:device==='tablet'?900:600,props:paddingProps(device)}));
+        if (!sectionProps || spacingState.has(spacingKey(sectionId,'desktop'))) Object.assign(props,paddingProps('desktop'));
+        const responsive = ['tablet','mobile'].filter(device=>!sectionProps||spacingState.has(spacingKey(sectionId,device))).map(device=>({max:device==='tablet'?900:600,props:paddingProps(device)}));
         section.className='sq-page-block sq-native sq-native-section';section.removeAttribute('data-sq-fluid');section.removeAttribute('style');section.replaceChildren();section.dataset.nativeId=sectionId;section.dataset.nativeType='container';
         delete section.dataset.sqBackgroundType;delete section.dataset.sqGradient;
         EzkartNative.write(section,{id:sectionId,type:'container',props,...(fill?{fill}:{}),...(responsive.length?{responsive}:{})});

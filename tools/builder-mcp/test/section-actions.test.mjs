@@ -101,6 +101,78 @@ async function fixture(run) {
   }
 }
 
+test("short pages end at their sections, and page background never edits the section above it", async () =>
+  fixture(async ({ page, invoke, section, show }) => {
+    await page.setViewportSize({ width: 941, height: 904 });
+    await invoke("settle");
+    const root = page.locator("[data-sq-preview-root]");
+    const bounds = await root.evaluate((node) => ({
+      pageBottom: node.getBoundingClientRect().bottom,
+      sectionBottom: node.querySelector(":scope > [data-sq-block]").getBoundingClientRect().bottom,
+    }));
+    assert.ok(Math.abs(bounds.pageBottom - bounds.sectionBottom) < 1,
+      "A blank page has no automatic area masquerading as another section");
+
+    // Deliberately added page space remains editable through page settings.
+    await page.locator("[data-sq-page-height-handle]").focus();
+    await page.keyboard.press("ArrowDown");
+    await page.keyboard.press("ArrowDown");
+    const clickPageBackground = async () => {
+      await root.evaluate(node => node.scrollIntoView({ block: "end", behavior: "instant" }));
+      const box = await root.boundingBox();
+      await page.mouse.click(box.x + 20, box.y + box.height - 10);
+      await invoke("settle");
+    };
+    await clickPageBackground();
+    assert.equal(await page.locator('.sq-builder-sidebar.sq-panel-pinned [data-sq-panel="brand"]').isVisible(), true);
+    assert.equal(await root.locator("[data-sq-block].selected").count(), 0);
+    const pageColor = page.locator('[data-sq-brand-color="page"]');
+    await pageColor.fill("#ffeedd");
+    await pageColor.dispatchEvent("input");
+    await pageColor.dispatchEvent("change");
+    const background = (id) => section(id).evaluate(node => getComputedStyle(node).backgroundColor);
+    assert.equal(await background("blank"), "rgb(255, 255, 255)");
+    assert.equal(await root.evaluate(node => getComputedStyle(node).backgroundColor), "rgb(255, 238, 221)");
+    await page.locator('[data-sq-tab="brand"]').click();
+
+    await invoke("addSection", { component: "blank", id: "second" });
+    const manager = page.locator('[data-sq-background-manager="section"]');
+    const selectSection = async (id) => {
+      await show(id);
+      const box = await section(id).boundingBox();
+      await page.mouse.click(box.x + box.width / 2, box.y + 60);
+      await invoke("settle");
+      assert.equal(await manager.getAttribute("data-sq-target-section"), id);
+      assert.equal(await section(id).evaluate(node => node.classList.contains("selected")), true);
+    };
+    const setColor = async (color) => {
+      const input = manager.locator("[data-sq-section-background-color]");
+      await input.fill(color);
+      await input.dispatchEvent("input");
+      await input.dispatchEvent("change");
+    };
+    await selectSection("blank");
+    await setColor("#d2ffe6");
+    await selectSection("second");
+    await setColor("#cce6ff");
+    assert.equal(await background("blank"), "rgb(210, 255, 230)");
+    assert.equal(await background("second"), "rgb(204, 230, 255)");
+    await page.locator("[data-sq-close-inspector]").click();
+    await clickPageBackground();
+    await page.locator('[data-sq-tab="brand"]').focus();
+    await page.keyboard.press("Delete");
+    assert.equal(await root.locator(":scope > [data-sq-block]").count(), 2,
+      "Page background selection cannot delete the previous section");
+    await invoke("save");
+    await page.reload();
+    await page.waitForFunction(() => globalThis.EzkartBuilder);
+    await invoke("settle");
+    await selectSection("second");
+    assert.equal(await background("blank"), "rgb(210, 255, 230)");
+    assert.equal(await background("second"), "rgb(204, 230, 255)");
+    assert.equal(await root.evaluate(node => node.style.getPropertyValue("--sq-page-extra-height")), "80px");
+  }));
+
 test("side margins select the adjacent section; closing and reopening never edits the previous background", async () =>
   fixture(
     async ({ page, invoke, ws, section, addNative, show, clickGutter }) => {
@@ -470,6 +542,8 @@ test("section backgrounds cover both page edges and preserve content spacing in 
       await page.setViewportSize({ width, height: 1000 });
       await page.evaluate(async () => {
         await document.fonts.ready;
+        // ResizeObserver and scheduled responsive layout run after the first frame.
+        await new Promise(requestAnimationFrame);
         await new Promise(requestAnimationFrame);
       });
       await checkBounds();

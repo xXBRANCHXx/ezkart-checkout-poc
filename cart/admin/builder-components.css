@@ -203,6 +203,8 @@ body:has(>.sq-authored-navigation)>.sq-page-preview.sq-has-pinned-navigation{pad
 .sq-page-preview .sq-native-typography.sq-free-button>button{min-height:48px!important;padding:12px 22px;white-space:normal}
 
 /* Task-focused builder library and page creation. */
+.sq-direct-draggable[contenteditable="true"] { cursor: text; }
+.page-site-editor .sq-native[data-native-type="image"][src=""] { background: #f5f6f8; border: 1px dashed #9ca3af; }
 .page-site-editor .sq-page-identity > .sq-new-page-shortcut { flex: 0 0 auto; width: auto; min-height: 34px; padding: 7px 10px; border: 1px solid #dce0e5; border-radius: 6px; background: #fff; color: #424b58; font: 500 11px Poppins, sans-serif; }
 .page-site-editor .sq-page-identity > .sq-new-page-shortcut:hover { background: #f5f6f8; border-color: #aeb6c2; }
 .sq-library-categories { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 4px; margin: 14px 16px; padding: 4px; background: #f1f3f6; border-radius: 7px; }

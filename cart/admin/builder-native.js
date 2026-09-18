@@ -1298,7 +1298,7 @@
       write(n, c);
     }
   }
-  function startPointer(event, node, resizing) {
+  function startPointer(event, node, resizing, currentEvent) {
     if (!hooks) return;
     const config = read(node),
       originalStyle = node.getAttribute("style"),
@@ -1361,6 +1361,7 @@
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", end, { once: true });
     window.addEventListener("pointercancel", end, { once: true });
+    if (currentEvent) move(currentEvent);
   }
   function nudge(dx, dy) {
     if (!selected) return;
@@ -2405,6 +2406,10 @@
       config.text === undefined;
     panel.querySelector("[data-native-text-help]").hidden =
       config.text === undefined;
+    panel.querySelector("[data-native-text-help]").textContent =
+      ["heading", "text"].includes(config.type)
+        ? "Drag text on the canvas to move it. Double-click to edit, or type here. Select words here to change their color."
+        : "Edit your copy here. Select words to change their color.";
     panel.querySelector("[data-native-group=Typography]").hidden = [
       "image",
       "video",
