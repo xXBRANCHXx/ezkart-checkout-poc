@@ -179,14 +179,31 @@ shipping acceptance test.
 ## Sandbox checkout branding
 
 On 2026-09-18, the sandbox dashboard's **Settings → Checkout Appearance →
-Interface Settings** was configured with `assets/ezkart-logo-email.png` and a
-custom palette named **Ezkart sandbox**. It uses Ezkart coral `#FF3926`, navy
-`#081424`, pale background `#F7F8FA`, white cards, and the existing checkout text
-colors. The payment countdown remains enabled. The logo and countdown were
-read back after reloading the dashboard.
+Interface Settings** was configured with `assets/ezkart-logo-doku.png` and a
+custom palette named **Ezkart neutral**. It uses background `#F8F9FA`, white
+cards, dark text/actions `#111827`, muted text `#6B7280`, and a neutral gray
+countdown background `#4B5563` with white text. The existing multicolor logo
+provides the brand accent.
+
+DOKU displays the uploaded logo in a fixed-height area and provides no logo-size
+slider in this sandbox. The padded `assets/ezkart-logo-doku.svg` retains the
+existing Ezkart vector artwork and is rendered at 720 × 480 px for upload. Its
+image box renders at 180 × 120 px, with the visible mark about half the width of
+the initial email-logo upload. Regenerate the PNG with:
+
+```sh
+rsvg-convert --width 720 --height 480 \
+  --output assets/ezkart-logo-doku.png assets/ezkart-logo-doku.svg
+```
+
+The payment countdown remains enabled with the neutral background. DOKU hardcodes
+red number boxes, so white countdown text preserves their readability. Its toggle
+also hides the **Pay Before** deadline on the virtual-account page, so disabling
+it would remove useful payment information. The 60-minute payment expiry is
+unchanged.
 
 A fresh checkout from `test.ezkart.id` created invoice
-`EZK-S-D2C22F49C39DBA6643BCC08C` for IDR 58,000. DOKU's actual staging payment
+`EZK-S-FBA28F2F9EEFDDA6A76AA68D` for IDR 58,000. DOKU's actual staging payment
 page displayed the saved logo and palette at desktop and 390 px mobile widths.
 This branding-only acceptance order remains unpaid and has no seller routing.
 See the [desktop preview](commerce/doku-sandbox-desktop.png) and
@@ -197,6 +214,12 @@ DOKU documents changing this through Business Info, with provider review. That
 entry was absent from this sandbox's Settings page, and the documented business
 account route redirected to its dashboard. The registered name has not been
 changed. Logo/palette configuration does not rename the registered brand.
+
+The hosted appearance settings allow logo upload, palette colors, language and
+countdown options. They do not expose custom CSS, font-family selection or page
+layout controls. An Ezkart-owned payment screen using DOKU Direct API is a
+separate integration option for full layout control; the current checkout
+continues to use DOKU's hosted page.
 
 ## Seller wallets, fee rules and payouts
 
@@ -296,6 +319,7 @@ provider sandbox acceptance.
 - [DOKU override URL requirements](https://developers.doku.com/get-started-with-doku-api/notification/override-notification-url)
 - [DOKU simulator guide](https://developers.doku.com/accept-payments/doku-checkout/integration-guide/simulate-payment-and-notification)
 - [DOKU checkout customization](https://docs.doku.com/accept-payments/integration-tools/doku-checkout/customize-checkout-page)
+- [DOKU Direct API and custom payment pages](https://docs.doku.com/accept-payments/integration-tools/direct-api)
 - [DOKU business data changes](https://docs.doku.com/get-started/manage-business/update-business-data)
 - [DOKU seller account management](https://docs.doku.com/wallet-as-a-service/sub-account/account-management)
 - [DOKU Collect and Route / split rules](https://docs.doku.com/wallet-as-a-service/sub-account/collect-and-route)
