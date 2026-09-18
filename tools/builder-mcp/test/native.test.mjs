@@ -32,6 +32,7 @@ test("native inspector creates editable word gradients, layered button fills, ne
     assert.ok(heading, "Add panel creates a native heading");
     await page.locator(`[data-native-id="${heading.id}"]`).click();
     const panel = page.locator("[data-sq-native-inspector]");
+    await panel.locator("[data-native-breakpoint]").selectOption("base");
     await panel.locator("[data-native-text]").fill("Made for your brand.");
     await panel.locator("[data-native-text]").dispatchEvent("change");
     await panel.locator("[data-native-text]").evaluate((n) => {

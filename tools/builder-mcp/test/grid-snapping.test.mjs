@@ -176,19 +176,20 @@ test("native elements snap to their own section grid, including nested scaling, 
       0,
       "No grid in the previous section",
     );
+    const desktopProps = config => ({ ...config.props, ...config.responsive?.find(rule => rule.device === "desktop")?.props });
     const before = await invoke("nativeInspect", { id: "box" });
     await drag(node, grid.locator("i").nth(12 * 3 + 2));
     const moved = await invoke("nativeInspect", { id: "box" });
-    assert.notEqual(moved.props.left, before.props.left);
+    assert.notEqual(desktopProps(moved).left, desktopProps(before).left);
     await invoke("undo");
     assert.equal(
-      (await invoke("nativeInspect", { id: "box" })).props.left,
-      before.props.left,
+      desktopProps(await invoke("nativeInspect", { id: "box" })).left,
+      desktopProps(before).left,
     );
     await invoke("redo");
     assert.equal(
-      (await invoke("nativeInspect", { id: "box" })).props.left,
-      moved.props.left,
+      desktopProps(await invoke("nativeInspect", { id: "box" })).left,
+      desktopProps(moved).left,
     );
     await select(node);
     await drag(node, grid.locator("i").nth(12 * 7 + 4), true);
@@ -196,8 +197,8 @@ test("native elements snap to their own section grid, including nested scaling, 
     await page.locator("[data-sq-element-move]").focus();
     await page.keyboard.press("ArrowRight");
     assert.equal(
-      parseFloat((await invoke("nativeInspect", { id: "box" })).props.left),
-      parseFloat(resized.props.left) + 1,
+      parseFloat(desktopProps(await invoke("nativeInspect", { id: "box" })).left),
+      parseFloat(desktopProps(resized).left) + 1,
       "Native keyboard movement saves native position",
     );
     await invoke("undo");
@@ -206,8 +207,8 @@ test("native elements snap to their own section grid, including nested scaling, 
     await page.waitForFunction(() => globalThis.EzkartBuilder);
     await settle();
     assert.deepEqual(
-      (await invoke("nativeInspect", { id: "box" })).props,
-      resized.props,
+      await invoke("nativeInspect", { id: "box" }),
+      resized,
     );
     await invoke("removeSection", { id: "blank" });
     const html = await invoke("previewHtml");
@@ -221,11 +222,11 @@ test("native elements snap to their own section grid, including nested scaling, 
     );
     assert.equal(
       await node.evaluate((n) => getComputedStyle(n).left),
-      resized.props.left,
+      desktopProps(resized).left,
     );
     assert.equal(
       await node.evaluate((n) => getComputedStyle(n).width),
-      resized.props.width,
+      desktopProps(resized).width,
     );
   }));
 

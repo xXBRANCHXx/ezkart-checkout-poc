@@ -773,10 +773,29 @@
       : fill
         ? ";background-image:none;background-clip:border-box;-webkit-background-clip:border-box;color:var(--native-text-color,inherit);"
         : "");
+  const deviceRanges = {
+    desktop: { min: 900 },
+    tablet: { min: 600, max: 900 },
+    mobile: { max: 600 },
+  };
+  const responsiveRules = host => [
+    ...(host.responsive || []).filter(rule => !rule.device),
+    ...(host.responsive || []).filter(rule => rule.device),
+  ];
+  function deviceContext(host, device, create = true) {
+    const range = deviceRanges[device];
+    if (!range) throw Error("Choose desktop, tablet, or mobile.");
+    let rule = (host.responsive || []).find(rule => rule.device === device);
+    if (!rule && create) {
+      rule = { device, ...range, props: {} };
+      (host.responsive ||= []).push(rule);
+    }
+    return rule || {};
+  }
   function stylesheet(root, exported = false) {
     const query = (selector, rule) => {
       const conditions = [
-        rule.min != null ? `(min-width:${rule.min}px)` : "",
+        rule.min != null ? (rule.device ? `(width > ${rule.min}px)` : `(min-width:${rule.min}px)`) : "",
         rule.max != null ? `(max-width:${rule.max}px)` : "",
       ]
         .filter(Boolean)
@@ -790,7 +809,7 @@
         const config = read(node),
           selector = `.sq-page-preview .sq-native[data-native-id="${config.id}"]`;
         let css = `${selector}{${declarations(config)}${config.type === "icon" ? `;fill:${config.iconFill || "none"};stroke:${config.iconStroke || "currentColor"};stroke-width:${config.iconWeight ?? 1.6};stroke-linecap:round;stroke-linejoin:round;` : ""}}`;
-        for (const rule of config.responsive || [])
+        for (const rule of responsiveRules(config))
           css += query(selector, rule);
         for (const [state, value] of Object.entries(config.states || {})) {
           const variant = config.stateScope
@@ -799,7 +818,7 @@
               : `.sq-page-preview [data-native-id="${config.stateScope}"][data-native-state="${state}"] .sq-native[data-native-id="${config.id}"]`
             : `.sq-page-preview[data-native-state="${state}"] .sq-native[data-native-id="${config.id}"]`;
           css += `${variant}{${declarations(value)}}`;
-          for (const rule of value.responsive || [])
+          for (const rule of responsiveRules(value))
             css += query(variant, rule);
         }
         return css;
@@ -1254,7 +1273,7 @@
   }
   let hooks,
     selected,
-    context = "base",
+    context = "device",
     state = "",
     selection,
     draftLayers = [],
@@ -1348,8 +1367,7 @@
       if (originalStyle === null) node.removeAttribute("style");
       else node.setAttribute("style", originalStyle);
       if (props) {
-        const target = getContext(config);
-        target.props = { ...target.props, ...props };
+        changeAppearance(config, { props });
         write(node, config);
         refresh();
         hooks.changed();
@@ -1466,12 +1484,42 @@
     hooks.root.dispatchEvent(new Event("native-refresh"));
   }
   const getHost = (config) => (state ? config.states?.[state] || {} : config);
-  const getContext = (config) =>
-    context === "base"
+  const currentDevice = () => hooks?.device?.() || "desktop";
+  const getContext = (config, create = false) =>
+    context === "device"
+      ? deviceContext(getHost(config), currentDevice(), create)
+      : context === "base"
       ? getHost(config)
       : (getHost(config).responsive || []).find(
-          (r) => `${r.min ?? ""}:${r.max ?? ""}` === context,
+          (r) => !r.device && `${r.min ?? ""}:${r.max ?? ""}` === context,
         ) || {};
+  const currentAppearance = config => {
+    if (context !== "device") return getContext(config);
+    const width = { desktop: 1440, tablet: 768, mobile: 390 }[currentDevice()];
+    const appearance = { props: {} };
+    const merge = source => {
+      Object.assign(appearance.props, source.props);
+      if (source.fill !== undefined) appearance.fill = source.fill;
+    };
+    for (const host of [config, ...(state ? [getHost(config)] : [])]) {
+      merge(host);
+      responsiveRules(host).filter(rule =>
+        (rule.min == null || (rule.device ? width > rule.min : width >= rule.min)) && (rule.max == null || width <= rule.max)
+      ).forEach(merge);
+    }
+    return appearance;
+  };
+  function changeAppearance(config, { props, fill }) {
+    const target = getContext(config, true);
+    if (props !== undefined) target.props = { ...target.props, ...props };
+    if (fill !== undefined) target.fill = fill;
+    if (context === "base") {
+      for (const rule of target.responsive || []) {
+        for (const key of Object.keys(props || {})) delete rule.props?.[key];
+        if (fill !== undefined) delete rule.fill;
+      }
+    }
+  }
   function change(patch) {
     if (!selected) return;
     const config = read(selected);
@@ -1481,25 +1529,13 @@
       Object.keys(patch).length === 1
     )
       return;
-    const target = Object.keys(patch).some((k) =>
-      [
-        "initialState",
-        "stateScope",
-        "stateParam",
-        "stateMode",
-        "statePanel",
-        "productIds",
-        "variantColors",
-        "variantId",
-        "tableScope",
-      ].includes(k),
-    )
-      ? config
-      : getContext(config);
+    const { props, fill, ...shared } = patch;
     if (patch.text !== undefined) editText(config, patch.text);
-    Object.assign(target, patch, {
-      props: { ...target.props, ...patch.props },
-    });
+    // Content and actions stay shared; only appearance belongs to a screen size.
+    Object.assign(config, shared);
+    if (props !== undefined || fill !== undefined) {
+      changeAppearance(config, { props, fill });
+    }
     validate({ ...config, children: [] });
     hooks.remember();
     write(selected, config);
@@ -1530,7 +1566,7 @@
     };
   }
   function wordStylesInRange(config, start, end) {
-    const current = getContext(config);
+    const current = currentAppearance(config);
     const fill = current.fill ?? config.fill;
     const base =
       fill?.clip === "text" && fill.layers?.length
@@ -2212,6 +2248,7 @@
       selectTextColors(node, textColorAdapter.host, textColorAdapter.onSelect);
       return;
     }
+    if (textColorAdapter) context = "device";
     textColorAdapter = null;
     const sharedPanel = document.querySelector("[data-sq-native-inspector]");
     if (sharedPanel && hooks) {
@@ -2419,13 +2456,13 @@
       config.type !== "accordion";
     if (!config.states?.[state]) state = "";
     if (
-      context !== "base" &&
+      !["base", "device"].includes(context) &&
       !(getHost(config).responsive || []).some(
-        (r) => `${r.min ?? ""}:${r.max ?? ""}` === context,
+        (r) => !r.device && `${r.min ?? ""}:${r.max ?? ""}` === context,
       )
     )
-      context = "base";
-    const current = getContext(config),
+      context = "device";
+    const current = currentAppearance(config),
       props = current.props || {};
     hooks.inspector.querySelector("[data-sq-inspector-context]").textContent =
       selected.matches(".sq-native-section")
@@ -2438,8 +2475,9 @@
         : typeName(config.type));
     const responsive = panel.querySelector("[data-native-breakpoint]");
     responsive.replaceChildren(
+      new Option(`${label(currentDevice())} only`, "device"),
       new Option("All screen sizes", "base"),
-      ...(getHost(config).responsive || []).map(
+      ...(getHost(config).responsive || []).filter(r => !r.device).map(
         (r) =>
           new Option(
             r.min != null ? `At least ${r.min}px` : `Up to ${r.max}px`,
@@ -2448,7 +2486,7 @@
       ),
     );
     if (![...responsive.options].some((o) => o.value === context))
-      context = "base";
+      context = "device";
     responsive.value = context;
     const variants = panel.querySelector("[data-native-variant]");
     variants.replaceChildren(
@@ -2465,7 +2503,9 @@
         scope.dataset.nativeState = state || read(scope).initialState || "";
     } else hooks.root.dataset.nativeState = state;
     panel.querySelector("[data-native-context-note]").textContent =
-      context === "base" && !state
+      context === "device"
+        ? `Layout and appearance changes affect ${currentDevice()} only. Text, images, and links are shared across screen sizes.`
+        : context === "base" && !state
         ? "Layout and appearance settings affect all screen sizes."
         : `Editing ${responsive.selectedOptions[0].text.toLowerCase()}${state ? ` · ${state} version` : ""}.`;
     panel.querySelectorAll("[data-native-prop]").forEach((input) => {
@@ -2665,7 +2705,7 @@
     panel.innerHTML = `
       <div class="sq-native-context">
         <div class="sq-native-context-heading"><span data-native-element-kind>Element</span><button type="button" class="sq-native-text-button" data-native-parent>↑ Edit layout group</button></div>
-        <label>Apply layout changes to<select data-native-breakpoint><option value="base">All screen sizes</option></select></label>
+        <label>Apply layout changes to<select data-native-breakpoint><option value="device">Current screen size only</option><option value="base">All screen sizes</option></select></label>
         <p class="sq-native-help" data-native-context-note>Layout and appearance settings affect all screen sizes.</p>
       </div>
       <details open data-native-product-controls hidden><summary>Connected product</summary><label>Product shown here<select data-native-product-id></select></label><p class="sq-native-help">Choose a product for this element. Other placements keep their own product.</p><button type="button" class="sq-native-wide" data-native-another-product>+ Add another product card</button></details>
@@ -2897,6 +2937,7 @@
             write(selected, config);
             refresh();
             hooks.changed();
+            select(selected);
           } else
             change({
               props: validateProps({ [input.dataset.nativeProp]: input.value }),
@@ -3025,7 +3066,7 @@
         host = getHost(config);
       host.responsive ||= [];
       const kind = panel.querySelector("[data-native-breakpoint-kind]").value;
-      if (host.responsive.some((rule) => rule[kind] === max))
+      if (host.responsive.some((rule) => !rule.device && rule[kind] === max))
         throw Error(
           "This screen size already exists. Select it at the top of the panel.",
         );
@@ -3546,5 +3587,10 @@
     remapTree,
     startPointer,
     nudge,
+    deviceContext,
+    setDevice: () => {
+      context = "device";
+      if (selected && !textColorAdapter) select(selected);
+    },
   };
 })();

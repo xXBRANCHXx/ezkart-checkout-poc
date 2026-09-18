@@ -43,6 +43,7 @@ test("sidebar guides fill and word editing, validates drafts, and preserves undo
     });
     await page.locator("[data-native-id=headline]").click();
     const panel = page.locator("[data-sq-native-inspector]");
+    await panel.locator("[data-native-breakpoint]").selectOption("base");
     const field = (name) => panel.locator(`[data-native-${name}]`);
     const config = () => invoke("nativeInspect", { id: "headline" });
     assert.equal(

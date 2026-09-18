@@ -220,3 +220,49 @@ test("the editor Preview renders current edits, local media and commerce at ever
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+test("saving a new edit waits for an in-flight library preview and refreshes its source version", { timeout: 30000 }, async () => {
+  const directory = await mkdtemp(join(tmpdir(), "ezkart-preview-race-"));
+  const ws = await new Workspace(directory).init();
+  await ws.create({ id: "preview-race", name: "Preview race" });
+  await ws.start();
+  const browser = await chromium.launch();
+  const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, reducedMotion: "reduce" });
+  const call = (method, args = {}) => page.evaluate(({ method, args }) => EzkartBuilder[method](args), { method, args });
+  let releasePreview, held = false, saves = 0;
+  const conflicts = [];
+  const previewStarted = new Promise(resolve => { releasePreview = resolve; });
+  page.on("request", request => {
+    if (request.method() === "PUT" && new URL(request.url()).searchParams.get("cloud") === "/v1/landing-pages/preview-race") saves++;
+  });
+  page.on("response", response => { if (response.status() === 409) conflicts.push(response.url()); });
+  await page.route(url => url.searchParams.get("cloud") === "/v1/landing-pages/preview-race/preview", async route => {
+    if (!held) { held = true; releasePreview(route); }
+    else await route.continue();
+  });
+  try {
+    await page.goto(ws.url + "/cart/admin/?page=sites&edit=preview-race.ezkart.site");
+    await page.waitForFunction(() => globalThis.EzkartBuilder);
+    await call("nativeInsert", { section: "blank", node: { id: "race-heading", type: "heading", text: "First version" } });
+    await call("save");
+    const pendingPreview = await previewStarted;
+    await page.locator("[data-native-id=race-heading]").click();
+    await page.locator("[data-native-text]").fill("Latest saved version");
+    await page.locator("[data-native-text]").press("Tab");
+    const savesBefore = saves;
+    const saving = call("save");
+    await call("settle");
+    assert.equal(saves, savesBefore, "The new save must not invalidate a preview already being uploaded");
+    await pendingPreview.continue();
+    await saving;
+    const saved = await ws.read("preview-race");
+    const nextPreview = await page.waitForResponse(response => new URL(response.url()).searchParams.get("cloud") === "/v1/landing-pages/preview-race/preview" && response.request().postDataJSON()?.sourceUpdatedAt === saved.updatedAt);
+    assert.equal(nextPreview.status(), 200);
+    assert.deepEqual(conflicts, []);
+    assert.match(saved.state.preview, /Latest saved version/);
+  } finally {
+    await browser.close();
+    await ws.stop();
+    await rm(directory, { recursive: true, force: true });
+  }
+});

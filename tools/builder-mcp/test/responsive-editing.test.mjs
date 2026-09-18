@@ -1,0 +1,187 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { chromium } from "playwright";
+import { Workspace } from "../workspace.mjs";
+
+async function fixture(run) {
+  const dir = await mkdtemp(join(tmpdir(), "ezkart-responsive-"));
+  const ws = await new Workspace(dir).init();
+  await ws.create({ id: "responsive", name: "Independent layouts" });
+  await ws.start();
+  const browser = await chromium.launch();
+  const page = await browser.newPage({ viewport: { width: 1600, height: 1000 }, reducedMotion: "reduce" });
+  page.setDefaultTimeout(6000);
+  const errors = [];
+  page.on("pageerror", e => errors.push(e.message));
+  const call = (method, args = {}) => page.evaluate(({ method, args }) => EzkartBuilder[method](args), { method, args });
+  const panel = page.locator("[data-sq-native-inspector]");
+  const device = async size => {
+    await page.locator(`[data-sq-device=${size}]`).click();
+    await call("settle");
+    assert.equal(await panel.locator("[data-native-breakpoint]").inputValue(), "device");
+    assert.match(await panel.locator("[data-native-context-note]").textContent(), new RegExp(`${size} only`));
+  };
+  const prop = async (key, value) => {
+    const input = panel.locator(`[data-native-prop=${key}]`);
+    const group = input.locator("xpath=ancestor::details[1]");
+    if (await group.count() && await group.getAttribute("open") === null) await group.locator(":scope > summary").click();
+    await input.fill(value);
+    await input.press("Tab");
+    await call("settle");
+  };
+  const appearance = node => node.evaluate(n => {
+    const css = getComputedStyle(n);
+    return Object.fromEntries(["fontSize", "width", "height", "left", "top", "paddingLeft", "backgroundColor"].map(key => [key, css[key]]));
+  });
+  try {
+    await page.goto(ws.url + "/cart/admin/?page=sites&edit=responsive.ezkart.site");
+    await page.waitForFunction(() => globalThis.EzkartBuilder);
+    await call("settle");
+    await run({ page, panel, call, device, prop, appearance, ws });
+    assert.deepEqual(errors, []);
+  } finally {
+    await browser.close();
+    await ws.stop();
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
+test("screen-specific text, drag, resize and section layout survive history, reopening and export", async () => fixture(async ({ page, panel, call, device, prop, appearance, ws }) => {
+  await page.locator("[data-sq-tab=add]").click();
+  await page.locator("[data-sq-add-element=native-heading]").click();
+  const headingId = (await call("nativeInspect")).find(n => n.type === "heading").id;
+  const heading = page.locator(`[data-native-id="${headingId}"]`);
+  if (await page.locator(".sq-builder-sidebar.sq-panel-pinned").count()) await page.locator("[data-sq-tab=add]").click();
+  await heading.click();
+  await call("settle");
+  await prop("fontSize", "56px");
+  await prop("width", "480px");
+  const desktop = await appearance(heading);
+  await device("mobile");
+  await prop("fontSize", "28px");
+  await prop("width", "240px");
+  await prop("paddingLeft", "12px");
+  await heading.click();
+  const start = await heading.boundingBox();
+  await page.keyboard.down("Alt");
+  await page.mouse.move(start.x + 35, start.y + 15);
+  await page.mouse.down();
+  await page.mouse.move(start.x + 65, start.y + 55, { steps: 8 });
+  await page.mouse.up();
+  await page.keyboard.up("Alt");
+  await call("settle");
+  const moved = await appearance(heading);
+  assert.ok(parseFloat(moved.left) > 15 && parseFloat(moved.top) > 20);
+  const grip = await page.locator("[data-sq-element-resize]").boundingBox();
+  await page.keyboard.down("Alt");
+  await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(grip.x + grip.width / 2 + 35, grip.y + grip.height / 2 + 25, { steps: 6 });
+  await page.mouse.up();
+  await page.keyboard.up("Alt");
+  await call("settle");
+  const mobile = await appearance(heading);
+  assert.ok(parseFloat(mobile.width) > parseFloat(moved.width) + 20);
+  await call("undo");
+  assert.deepEqual(await appearance(heading), moved);
+  await call("redo");
+  assert.deepEqual(await appearance(heading), mobile);
+  await heading.click();
+  await device("desktop");
+  assert.deepEqual(await appearance(heading), desktop, "Mobile drag, resize and typography leave desktop unchanged");
+  await device("tablet");
+  await prop("fontSize", "40px");
+  await prop("width", "360px");
+  const tablet = await appearance(heading);
+  await device("mobile");
+  assert.deepEqual(await appearance(heading), mobile, "Tablet changes do not leak into mobile");
+  assert.equal(await panel.locator("[data-native-prop=fontSize]").inputValue(), "28px");
+  await panel.locator("[data-native-text]").fill("One shared heading");
+  await panel.locator("[data-native-text]").press("Tab");
+  await device("desktop");
+  assert.equal(await heading.textContent(), "One shared heading");
+  await prop("fontSize", "60px");
+  await device("mobile");
+  assert.equal((await appearance(heading)).fontSize, "28px", "Later desktop changes stay on desktop too");
+  const section = page.locator('.sq-page-preview > [data-section-id="blank"]');
+  await panel.locator("[data-native-parent]").click();
+  await prop("paddingLeft", "20px");
+  await prop("minHeight", "400px");
+  await panel.locator("[data-native-solid-color]").fill("#e7f5ed");
+  await panel.locator("[data-native-apply-fill]").click();
+  const mobileSection = await appearance(section);
+  await device("desktop");
+  assert.notEqual((await appearance(section)).paddingLeft, "20px");
+  assert.notEqual((await appearance(section)).backgroundColor, mobileSection.backgroundColor);
+  await device("tablet");
+  assert.notEqual((await appearance(section)).height, mobileSection.height);
+  await heading.click();
+  assert.equal((await appearance(heading)).fontSize, tablet.fontSize);
+  await call("save");
+  const saved = await call("nativeInspect");
+  await page.reload();
+  await page.waitForFunction(() => globalThis.EzkartBuilder);
+  await call("settle");
+  assert.deepEqual(await call("nativeInspect"), saved);
+  await heading.click();
+  await page.setViewportSize({ width: 941, height: 904 });
+  await device("mobile");
+  assert.equal((await appearance(heading)).fontSize, "28px");
+  assert.deepEqual(await appearance(section), mobileSection);
+  await page.screenshot({ path: "/tmp/ezkart-responsive-mobile.png" });
+  await device("desktop");
+  assert.equal((await appearance(heading)).fontSize, "60px");
+  await page.screenshot({ path: "/tmp/ezkart-responsive-desktop.png" });
+  const html = await call("previewHtml");
+  await page.route("**/responsive-export", route => route.fulfill({ body: html, contentType: "text/html" }));
+  await page.goto(ws.url + "/responsive-export");
+  for (const [width, font, elementWidth] of [[320, "28px", mobile.width], [390, "28px", mobile.width], [600, "28px", mobile.width], [601, "40px", tablet.width], [768, "40px", tablet.width], [900, "40px", tablet.width], [901, "60px", desktop.width], [1440, "60px", desktop.width]]) {
+    await page.setViewportSize({ width, height: 1000 });
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    const result = await appearance(heading);
+    const frame = await page.locator(".sq-page-preview").evaluate(n => ({width:n.getBoundingClientRect().width, innerWidth, styles: getComputedStyle(n).width}));
+    assert.equal(result.fontSize, font, `Published typography at ${width}px: ${JSON.stringify(frame)}`);
+    assert.ok(Math.abs(parseFloat(result.width) - parseFloat(elementWidth)) < 0.1, `Published dimensions at ${width}px`);
+    assert.equal(await heading.textContent(), "One shared heading");
+  }
+}));
+
+test("device edits inherit template rules, shared appearance is explicit, and content remains shared", async () => fixture(async ({ page, panel, call, device, prop, appearance }) => {
+  const rules = [{ max: 900, props: { fontSize: "36px", paddingLeft: "16px" } }, { max: 600, props: { fontSize: "24px" } }];
+  await call("nativeInsert", { section: "blank", node: { id: "inherited", type: "heading", text: "Template heading", props: { fontSize: "48px", width: "280px" }, responsive: rules } });
+  const heading = page.locator("[data-native-id=inherited]");
+  await heading.click();
+  await device("mobile");
+  assert.equal(await panel.locator("[data-native-prop=fontSize]").inputValue(), "24px");
+  assert.equal(await panel.locator("[data-native-prop=paddingLeft]").inputValue(), "16px");
+  await prop("fontSize", "30px");
+  assert.equal((await appearance(heading)).fontSize, "30px");
+  assert.deepEqual((await call("nativeInspect", { id: "inherited" })).responsive.filter(r => !r.device), rules);
+  await prop("fontSize", "");
+  assert.equal((await appearance(heading)).fontSize, "24px", "Clearing the override restores template styling");
+  assert.equal(await panel.locator("[data-native-prop=fontSize]").inputValue(), "24px");
+  await prop("fontSize", "30px");
+  await device("tablet");
+  assert.equal((await appearance(heading)).fontSize, "36px");
+  await prop("fontSize", "42px");
+  await device("desktop");
+  assert.equal((await appearance(heading)).fontSize, "48px");
+  await panel.locator("[data-native-breakpoint]").selectOption("base");
+  await prop("fontSize", "38px");
+  for (const size of ["mobile", "tablet", "desktop"]) {
+    await device(size);
+    assert.equal((await appearance(heading)).fontSize, "38px", "All screen sizes changes the chosen property everywhere");
+  }
+  await device("mobile");
+  await call("nativeInsert", { section: "blank", node: { id: "shared-image", type: "image", src: "/cart/admin/assets/products/kopi-susu.webp", props: { width: "120px", height: "100px" } } });
+  const image = page.locator("[data-native-id=shared-image]");
+  await image.click();
+  await panel.locator("[data-native-src]").fill("/cart/admin/assets/products/kopi-susu.webp?changed=1");
+  await panel.locator("[data-native-src]").press("Tab");
+  assert.match((await call("nativeInspect", { id: "shared-image" })).src, /changed=1$/);
+  await device("desktop");
+  assert.match(await image.getAttribute("src"), /changed=1$/);
+}));

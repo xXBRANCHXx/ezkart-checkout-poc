@@ -2572,6 +2572,7 @@
     }
     let siteLoadRequest = 0;
     let cloudSavePromise = Promise.resolve(true);
+    let cloudSavesPending = 0;
     let baseSiteState = null;
     let previewSavePromise = null;
     let previewScheduleTimer = 0;
@@ -2579,6 +2580,8 @@
     let previewRetryCount = 0;
     let previewRetrySource = "";
     const refreshLandingPreviewIfDue = () => {
+      // The completed save schedules a preview using its new source version.
+      if (cloudSavesPending) return Promise.resolve(false);
       if (previewSavePromise) {
         previewRefreshPending = true;
         return previewSavePromise;
@@ -2729,8 +2732,12 @@
       const site = readLandingSites().find((page) => page.url === activeSiteKey);
       if (!site || !activeSiteDocument || landingPageId(activeSiteDocument.id) !== landingPageId(activeSiteKey)) return Promise.resolve(false);
       const state = captureState();
+      cloudSavesPending += 1;
+      window.clearTimeout(previewScheduleTimer);
       cloudSavePromise = cloudSavePromise.catch(() => false).then(async () => {
         try {
+          // Finish an in-flight preview before replacing the version it uses.
+          await previewSavePromise;
           activeSiteDocument = await saveCloudLandingPage(site, { state, products: state.products, ...changes });
           scheduleLandingPreviewRefresh();
           return true;
@@ -2738,6 +2745,8 @@
           if (saveState) saveState.textContent = "Save failed";
           showToast(error instanceof Error ? error.message : "The landing page could not be saved.");
           return false;
+        } finally {
+          cloudSavesPending -= 1;
         }
       });
       return cloudSavePromise;
@@ -3147,14 +3156,7 @@
     const setSectionContentHeight = (section, height) => {
       if (section.matches('.sq-native-section')) {
         const config = EzkartNative.read(section);
-        let target = config;
-        if (activeDevice !== 'desktop') {
-          const maximum = activeDevice === 'mobile' ? 600 : 900;
-          config.responsive ||= [];
-          target = config.responsive.find(rule => rule.max === maximum && rule.min == null);
-          if (!target) { target = {max: maximum, props: {}}; config.responsive.push(target); }
-          config.responsive.sort((a,b) => (b.max ?? Infinity) - (a.max ?? Infinity));
-        }
+        const target = EzkartNative.deviceContext(config, activeDevice);
         target.props = {...target.props, height: 'auto', minHeight: `${height}px`};
         EzkartNative.write(section, config); EzkartNative.refresh();
       } else {
@@ -3846,8 +3848,10 @@
       if (blurOutput) blurOutput.textContent = `${section.dataset.sqNavBlur || "16"}px`;
     };
     const syncElementControls = () => {
-      const native=selectedElement?.matches('.sq-native');inspector?.classList.toggle('sq-native-selection',Boolean(native));
-      if(native){globalThis.EzkartNative?.select(selectedElement);return;}
+      const native = selectedElement?.matches('.sq-native') ? selectedElement
+        : !selectedElement ? previewRoot?.querySelector('.sq-native-section.selected') : null;
+      inspector?.classList.toggle('sq-native-selection', Boolean(native));
+      if (native) { globalThis.EzkartNative?.select(native); return; }
       const controls = sqStudio.querySelector("[data-sq-element-controls]");
       const selectedBackground = selectedElement?.matches?.(".sq-section-background");
       const valid = selectedElement?.isConnected && (selectedBackground || selectedElement.closest(`[data-section-id="${selectedSection}"]`));
@@ -4866,7 +4870,6 @@
       syncInspectorContent();
       syncElementControls();
       syncBackgroundManagers();
-      if(block?.matches('.sq-native-section')&&!selectedElement){inspector?.classList.add('sq-native-selection');EzkartNative.select(block);}
       syncPageGridControls();
       refreshLayoutGrid();
       if (selectedElement) requestAnimationFrame(refreshElementOverlay);
@@ -5566,6 +5569,7 @@
       sqStudio.querySelectorAll("[data-sq-device]").forEach((item) => item.classList.toggle("active", item === button));
       deviceFrame?.classList.remove("device-tablet", "device-mobile");
       if (activeDevice !== "desktop") deviceFrame?.classList.add(`device-${activeDevice}`);
+      EzkartNative.setDevice();
       const sizes = { desktop: "Desktop · 1440px", tablet: "Tablet · 768px", mobile: "Mobile · 390px" };
       const stageSize = sqStudio.querySelector("[data-sq-stage-size]");
       if (stageSize) stageSize.textContent = sizes[activeDevice];
@@ -8553,7 +8557,7 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
       }
       updateProductView();
     };
-    EzkartNative.init({root:previewRoot,inspector,remember,beginPointer:beginCanvasPointer,products:readCatalogProducts,renderProduct:renderNativeProduct,openProducts:()=>openSqPanel("products",{pin:true}),syncSelects:container=>container.querySelectorAll("select").forEach(select=>{enhanceBuilderSelect(select);syncBuilderSelect(select);}),changed:markSqChanged,rebind:()=>{rebuildLayerList();bindSqInteractions();},move:args=>globalThis.EzkartBuilder.nativeMove(args),toast:showToast,select:node=>{if(node?.matches('.sq-native-section'))selectSqSection(node.dataset.sectionId,true);else if(node)selectSqElement(node);}});
+    EzkartNative.init({root:previewRoot,inspector,remember,device:()=>activeDevice,beginPointer:beginCanvasPointer,products:readCatalogProducts,renderProduct:renderNativeProduct,openProducts:()=>openSqPanel("products",{pin:true}),syncSelects:container=>container.querySelectorAll("select").forEach(select=>{enhanceBuilderSelect(select);syncBuilderSelect(select);}),changed:markSqChanged,rebind:()=>{rebuildLayerList();bindSqInteractions();},move:args=>globalThis.EzkartBuilder.nativeMove(args),toast:showToast,select:node=>{if(node?.matches('.sq-native-section'))selectSqSection(node.dataset.sectionId,true);else if(node)selectSqElement(node);}});
     let nativeFitFrame = 0;
     const fitNativeContent = () => {
       nativeFitFrame = 0;
@@ -8705,7 +8709,7 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
           if(color!==undefined)config.props.color=color;
           if(name!==undefined)config.name=String(name);
           if(fitHeight)config.props.height='auto';
-          if(spacing){const props=Object.fromEntries(Object.entries(spacing).map(([side,value])=>['padding'+side[0].toUpperCase()+side.slice(1),value+'px']));if(device==='desktop')Object.assign(config.props,props);else{const max=device==='mobile'?600:900;config.responsive ||= [];let rule=config.responsive.find(rule=>rule.max===max&&rule.min==null);if(!rule){rule={max,props:{}};config.responsive.push(rule);}Object.assign(rule.props,props);}}
+          if(spacing){const props=Object.fromEntries(Object.entries(spacing).map(([side,value])=>['padding'+side[0].toUpperCase()+side.slice(1),value+'px']));Object.assign(EzkartNative.deviceContext(config,device).props,props);}
           EzkartNative.validate(config);remember();EzkartNative.write(section,config);section.style.removeProperty('background-color');section.style.removeProperty('--sq-section-background-color');section.classList.remove('section-bg-custom','section-bg-custom-dark');delete section.dataset.sqBackgroundType;delete section.dataset.sqGradient;EzkartNative.refresh();refreshNativeBuilder();selectSqSection(id,true);await settleBuilder();return inspectBuilder();
         }
         remember();

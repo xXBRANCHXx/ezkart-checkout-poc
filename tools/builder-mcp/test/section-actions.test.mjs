@@ -111,7 +111,6 @@ test("tablet-width editors fit every canvas beside the inspector and keep resizi
     const heading = page.locator('[data-native-id="wide-heading"]');
     const inspector = page.locator('.sq-inspector');
     const root = page.locator('[data-sq-preview-root]');
-    const handle = page.locator('[data-sq-element-resize]');
     for (const width of [941, 768, 1120]) {
       await page.setViewportSize({ width, height: 904 });
       for (const device of ["desktop", "tablet", "mobile"]) {
@@ -128,11 +127,18 @@ test("tablet-width editors fit every canvas beside the inspector and keep resizi
           "Zoom controls remain beside the inspector too");
         const grid = await page.locator('.sq-grid-quick-toggle').boundingBox();
         assert.ok(grid.y + grid.height <= 904, "Footer controls stay fully inside the viewport");
-        assert.equal(await handle.evaluate(node => {
+        assert.equal(await page.evaluate(() => {
+          const node = document.querySelector("[data-sq-element-resize]");
           const r = node.getBoundingClientRect();
           return document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2) === node;
         }), true, "The resize handle receives pointer input with the inspector open");
-        const before = await heading.boundingBox(), grip = await handle.boundingBox();
+        const before = await heading.boundingBox();
+        // The overlay is recreated on animation frames; read its geometry in one
+        // browser operation so a detached Playwright handle cannot return null.
+        const grip = await page.evaluate(() => {
+          const r = document.querySelector("[data-sq-element-resize]").getBoundingClientRect();
+          return { x: r.x, y: r.y, width: r.width, height: r.height };
+        });
         await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
         await page.mouse.down();
         await page.mouse.move(grip.x + grip.width / 2 - 45, grip.y + grip.height / 2 - 25, { steps: 5 });
@@ -140,7 +146,7 @@ test("tablet-width editors fit every canvas beside the inspector and keep resizi
         await invoke("settle");
         const after = await heading.boundingBox();
         assert.ok(after.width < before.width - 15 && after.height < before.height - 10,
-          `The text box shrinks in ${device} mode at ${width}px`);
+          `The text box shrinks in ${device} mode at ${width}px: ${JSON.stringify({before, after, grip})}`);
         await invoke("undo");
         await page.locator('[data-sq-close-inspector]').click();
         await invoke("settle");
