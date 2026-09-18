@@ -21,7 +21,8 @@
     },
     "shippingProvider": {
       "productionTarget": "Biteship",
-      "status": "approved_configuration_pending"
+      "status": "approved_configuration_pending",
+      "sandboxStatus": "simulated_order_verified_rates_balance_and_hosted_configuration_pending"
     }
   },
   "releaseGates": [

@@ -374,6 +374,35 @@ test("invalid mode, live key in sandbox, absent DOKU slots, and provider errors 
   assert.equal((await app.request("/cart/api/start.php")).status, 405);
 });
 
+test("Biteship installation probes succeed without allowing unauthenticated events", async (t) => {
+  const app = await setup({ EZKART_BITESHIP_SANDBOX_WEBHOOK_TOKEN: "" });
+  t.after(() => app.close());
+  const path = "/cart/api/biteship-webhook.php?environment=sandbox";
+  for (const body of ["", "{}", " { \n } "])
+    assert.deepEqual(await app.request(path, body), {
+      status: 200,
+      data: { ok: true, matched: false },
+    });
+  for (const body of [
+    "null",
+    "[]",
+    '{"event":null}',
+    { event: "order.status", order_id: "test", status: "delivered" },
+  ])
+    assert.equal((await app.request(path, body)).status, 401);
+  assert.equal((await app.request(path)).status, 405);
+  assert.equal(
+    (await app.request("/cart/api/biteship-webhook.php?environment=invalid", {})).status,
+    400,
+  );
+  assert.equal((await app.request(path, " ".repeat(262145))).status, 400);
+  assert.equal(
+    app.cli("echo count(glob(ez_order_directory() . '/*.json') ?: []);"),
+    "0",
+  );
+  assert.deepEqual(await app.calls(), []);
+});
+
 test("payment URLs reject lookalike hosts, credentials and cross-environment targets", async (t) => {
   const app = await setup();
   t.after(() => app.close());

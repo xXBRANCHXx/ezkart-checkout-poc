@@ -9,11 +9,18 @@ try {
     }
     $environment = (string) ($_GET['environment'] ?? ez_commerce_environment());
     if (!in_array($environment, ['sandbox', 'production'], true)) throw new InvalidArgumentException('Invalid webhook environment.');
+    $body = (string) file_get_contents('php://input', false, null, 0, 262145);
+    if (strlen($body) > 262144) throw new InvalidArgumentException('Webhook body is too large.');
+    // Biteship checks reachability with an empty POST when registering a webhook.
+    // This probe cannot read or change orders; every event still requires authentication.
+    if (trim($body) === '' || preg_match('/^\s*\{\s*\}\s*$/D', $body) === 1) {
+        ez_api_json(['ok' => true, 'matched' => false]);
+    }
     if (!ez_biteship_webhook_authorized($environment)) {
         error_log('Ezkart Biteship webhook rejected: invalid authorization.');
         ez_api_json(['ok' => false], 401);
     }
-    $payload = json_decode((string) file_get_contents('php://input'), true);
+    $payload = json_decode($body, true);
     if (!is_array($payload)) {
         throw new InvalidArgumentException('Invalid webhook body.');
     }

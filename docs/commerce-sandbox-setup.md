@@ -56,7 +56,9 @@ a separate production requirement, as described in `database-environments.md`.
    `https://test.ezkart.id/cart/api/biteship-webhook.php?environment=sandbox`.
    Authenticate deliveries with `Authorization: Bearer <sandbox webhook token>`
    (HTTP Basic password or `X-Ezkart-Webhook-Token` is also accepted). Exempt this
-   endpoint from hosting password protection too.
+   endpoint from hosting password protection too. Registration sends an empty
+   POST to verify reachability; Ezkart acknowledges that probe without accessing
+   orders. Every nonempty event payload still requires webhook authentication.
 
 Biteship sandbox orders are simulated, but rate checks, Maps and public tracking
 may still incur API fees. The application currently requests rates when showing
@@ -94,6 +96,14 @@ at `staging.doku.com/checkout-link-v2/`. The application adapter created invoice
 IDR 10,000, customer details, bank transfer and card options. No payment was
 completed. Hosted runtime configuration and a full payment-notification/Biteship
 acceptance run remain pending.
+
+On the same date, the actual Biteship test API accepted the shipping adapter's
+isolated sample order `EZK-S-EA075F0E1CC5993FD8718311` and returned simulated
+shipment `6aace9e7e558e47fb0412fd9` with status `confirmed`. This adapter fixture
+used temporary sample addresses and was not saved as a paid Ezkart order.
+The Rates API rejected the request because the account had insufficient balance,
+so rate lookup and the full checkout flow remain unverified. A Biteship balance
+top-up, actual pickup details and private hosted configuration are still needed.
 
 ## Production switch
 
