@@ -53,8 +53,11 @@ function ez_doku_checkout_payload(array $order, string $publicUrl): array
         ],
         'payment' => [
             'payment_due_date' => 60,
-            // These channels support the customer information collected by checkout.
-            'payment_method_types' => ['VIRTUAL_ACCOUNT_BCA', 'VIRTUAL_ACCOUNT_BANK_MANDIRI', 'VIRTUAL_ACCOUNT_BRI', 'VIRTUAL_ACCOUNT_BNI', 'VIRTUAL_ACCOUNT_DOKU', 'QRIS', 'CREDIT_CARD'],
+            // Sandbox exposes the channel with a configured and verified callback.
+            // Other channels require their own DOKU notification configuration.
+            'payment_method_types' => ($order['commerce_environment'] ?? '') === 'sandbox'
+                ? ['VIRTUAL_ACCOUNT_BCA']
+                : ['VIRTUAL_ACCOUNT_BCA', 'VIRTUAL_ACCOUNT_BANK_MANDIRI', 'VIRTUAL_ACCOUNT_BRI', 'VIRTUAL_ACCOUNT_BNI', 'VIRTUAL_ACCOUNT_DOKU', 'QRIS', 'CREDIT_CARD'],
         ],
         'customer' => [
             'name' => $customer['name'], 'email' => $customer['email'], 'phone' => $phone,

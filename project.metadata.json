@@ -11,7 +11,7 @@
       "productionTarget": "DOKU",
       "status": "blocked_pending_cv_approval_and_doku_onboarding",
       "merchantDisbursementRequired": true,
-      "sandboxStatus": "doku_sandbox_payment_creation_verified_checkout_acceptance_pending",
+      "sandboxStatus": "bca_sandbox_checkout_and_signed_payment_confirmation_verified_delivery_skipped",
       "environmentSwitch": "commerce_environment"
     },
     "midtrans": {
@@ -22,7 +22,7 @@
     "shippingProvider": {
       "productionTarget": "Biteship",
       "status": "approved_configuration_pending",
-      "sandboxStatus": "simulated_order_verified_rates_balance_and_hosted_configuration_pending"
+      "sandboxStatus": "simulated_order_verified_hosted_credentials_and_webhook_auth_configured_rates_balance_and_pickup_pending"
     }
   },
   "releaseGates": [

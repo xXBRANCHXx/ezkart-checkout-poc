@@ -16,6 +16,11 @@ and simulated pickup flow. The server's commerce environment controls the rule.
 
 Copy the relevant entries from `config.example.php` into the test website's
 ignored `config.runtime.php` (preserve its existing Auth/Worker settings).
+The loader also merges `config.runtime.php` from the parent of the web document
+root, with those values taking precedence. On Hostinger, the test site's private
+parent file contains only the sandbox provider settings; its existing
+`public_html/config.runtime.php` retains Auth/Worker settings. Keep the private
+file readable and writable by its owner only (`0600`).
 Alternatively use environment variables prefixed with `EZKART_` and uppercase
 keys. Credentials must never appear in browser code or Git.
 Only the first four entries below are needed to test sandbox payments; the
@@ -52,12 +57,17 @@ a separate production requirement, as described in `database-environments.md`.
 1. Create/sign in to the [DOKU sandbox dashboard](https://sandbox.doku.com/).
    Retrieve its **Client ID** and **Secret Key** under **Settings → API Keys** and put
    them in the sandbox slots. These are Checkout/non-SNAP credentials.
-2. Ezkart supplies the DOKU notification URL
-   `https://test.ezkart.id/cart/api/doku-webhook.php` in each payment request
-   using `additional_info.override_notification_url`. No global dashboard
-   notification URL change is needed for these sessions. The endpoint
-   must be publicly reachable by DOKU; hosting password protection must exempt
-   this webhook. It authenticates each request by its DOKU signature.
+2. In the sandbox dashboard's **Settings → Payment Settings**, configure
+   `https://test.ezkart.id/cart/api/doku-webhook.php` as the payment notification
+   URL for every channel enabled in checkout. Virtual accounts have separate
+   SNAP and non-SNAP configurations; this Checkout integration uses non-SNAP
+   notifications. Configure cards separately under their payment settings.
+   Ezkart also supplies the URL in each payment request through
+   `additional_info.override_notification_url`, but DOKU requires a dashboard
+   URL first, with the same path as the override. An accepted payment-creation
+   request alone does not prove notifications are configured. The endpoint must
+   be publicly reachable by DOKU; hosting password protection must exempt this
+   webhook. It authenticates each request by its DOKU signature.
 3. In Biteship, turn on **Mode Testing** and generate a test API key. Both modes
    use `https://api.biteship.com`; the API key determines the mode.
 4. Configure Biteship `order.status`, `order.price`, and `order.waybill_id`
@@ -85,10 +95,15 @@ these lookups unless an API caller explicitly supplies a shipping selection.
    selection is required, and the total contains only the products.
 3. Confirm the browser opens `https://staging.doku.com/...` (or DOKU's documented
    `https://sandbox.doku.com/...`) with the exact
-   product total. The enabled channels are VA, QRIS and credit
-   card; the DOKU account must have the chosen channel enabled.
+   product total. Sandbox currently offers **BCA Virtual Account**, whose
+   notification URL is configured and whose payment flow is tested. Configure
+   and verify each additional channel's notification before enabling it in the
+   sandbox payment-method list. Production has its own method list and requires
+   separate channel configuration and acceptance.
 4. Complete the payment through the
-   [DOKU simulator](https://sandbox.doku.com/integration/simulator/).
+   [DOKU BCA simulator](https://sandbox.doku.com/integration/simulator/bca/inquiry)
+   using the virtual account number shown on the payment page. Then click
+   **Check Payment Status** on the DOKU payment tab to return to Ezkart.
 5. Verify the Ezkart return page says **Payment confirmed** and `PAID (test)`.
    It should also say **Delivery skipped (sandbox)**. Merely returning to Ezkart
    does not mark the order paid.
@@ -108,14 +123,37 @@ credentials, echoed the exact invoice and amount, and returned a checkout URL
 at `staging.doku.com/checkout-link-v2/`. The application adapter created invoice
 `EZK-S-238856F1010F5D0E6183C773`, and its hosted checkout displayed the expected
 IDR 10,000, customer details, bank transfer and card options. No payment was
-completed. Hosted runtime configuration and a full payment-notification/Biteship
-acceptance run remain pending.
+completed in that initial local test.
 
 The updated sandbox browser flow also created invoice
 `EZK-S-986B672736303125FCB00262` through the normal checkout endpoint, with
 Biteship credentials deliberately unavailable in the local test server. DOKU
 displayed exactly IDR 58,000 for one granola item, with zero shipping charge.
-The session remained pending; no provider payment confirmation was simulated.
+That local session remained pending; no provider payment confirmation was
+simulated for it.
+
+Later on 2026-09-18, the private sandbox credentials were installed on
+`test.ezkart.id` outside `public_html`, with file permissions `0600`. The health
+endpoint confirmed sandbox DOKU, the Biteship key and webhook token, and the
+existing Cloudflare database connection. The DOKU sandbox BCA non-SNAP payment
+notification URL was saved in its dashboard and read back successfully.
+
+The public checkout then created invoice `EZK-S-6FBD8C86BA8CBCF023A5E6AC`
+for one granola item at IDR 58,000, without a delivery selection or charge.
+DOKU's BCA simulator completed the payment and the actual signed provider
+notification changed the hosted order to `PAID`, payment status `SUCCESS`,
+channel `VIRTUAL_ACCOUNT_BCA`, and fulfillment `NOT_REQUIRED`. No Biteship order
+or fulfillment deadline was created. The browser returned to Ezkart and showed
+**Payment confirmed**, `PAID (test)` and **Delivery skipped (sandbox)**.
+This verifies the BCA sandbox payment
+path; other payment channels and the shipping flow need separate acceptance.
+
+An earlier hosted test, `EZK-S-0B13E875C68E175126FC5A27`, was paid in the DOKU
+simulator before the BCA notification URL was configured, so Ezkart retained
+`PENDING`. This exposed the dashboard configuration requirement above. No
+payment status was manually changed to simulate a successful callback. BNI's
+simulators did not find that test's BNI virtual account; BNI is not enabled in
+the sandbox checkout's verified channel list.
 
 On the same date, the actual Biteship test API accepted the shipping adapter's
 isolated sample order `EZK-S-EA075F0E1CC5993FD8718311` and returned simulated
@@ -123,16 +161,20 @@ shipment `6aace9e7e558e47fb0412fd9` with status `confirmed`. This adapter fixtur
 used temporary sample addresses and was not saved as a paid Ezkart order.
 The Rates API rejected the request because the account had insufficient balance,
 so rate lookup and the full shipping flow remain unverified. A Biteship balance
-top-up, actual pickup details and private hosted configuration are still needed
-for shipping tests. They do not block the sandbox checkout that skips delivery.
+top-up and actual pickup details are still needed for shipping tests. Hosted
+test credentials are installed. Shipping tests do not block the sandbox
+checkout that skips delivery.
 
 Biteship accepted registration of sandbox webhook `6aaceb8083fe22646422e72f`
 for all three events at the test endpoint, using `X-Ezkart-Webhook-Token`.
 It replaces the earlier Ezkart sandbox webhook targeting the old
 `admin.jenanggemi.com` application. Deployed commit `54951d1` returns HTTP 200
 for the empty installation probe and HTTP 401 for an unauthenticated event.
-Authenticated event delivery remains pending installation of the same private
-webhook token on the test server.
+The same private webhook token is now installed on the test server. A synthetic
+event for a nonexistent shipment received HTTP 401 without the token and HTTP
+200 with `matched=false` when authenticated, without changing an order. Actual
+provider delivery updating a persisted Ezkart shipment remains a separate
+shipping acceptance test.
 
 ## Production switch
 
@@ -182,6 +224,8 @@ provider sandbox acceptance.
 
 - [DOKU backend integration](https://developers.doku.com/accept-payments/doku-checkout/integration-guide/backend-integration)
 - [DOKU notification handling](https://developers.doku.com/get-started-with-doku-api/notification/best-practice)
+- [DOKU notification URL setup](https://developers.doku.com/get-started-with-doku-api/notification/setup-notification-url)
+- [DOKU override URL requirements](https://developers.doku.com/get-started-with-doku-api/notification/override-notification-url)
 - [DOKU simulator guide](https://developers.doku.com/accept-payments/doku-checkout/integration-guide/simulate-payment-and-notification)
 - [Biteship sandbox](https://biteship.com/en/docs/sandbox)
 - [Biteship base URL and mode selection](https://biteship.com/en/docs/api/base_url)

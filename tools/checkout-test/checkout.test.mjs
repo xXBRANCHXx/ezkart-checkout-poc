@@ -188,6 +188,7 @@ test("sandbox checkout, signed callbacks, merchant acceptance, idempotent pickup
     signature(request.body, headers, "/checkout/v1/payment"),
   );
   const payload = JSON.parse(request.body);
+  assert.deepEqual(payload.payment.payment_method_types, ["VIRTUAL_ACCOUNT_BCA"]);
   assert.equal(
     payload.order.amount,
     payload.order.line_items.reduce((n, x) => n + x.price * x.quantity, 0),
