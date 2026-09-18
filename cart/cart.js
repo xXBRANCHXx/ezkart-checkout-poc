@@ -480,6 +480,12 @@
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.error || "Payment could not start.");
       const orderId = String(payload.order_id || "");
+      if (payload.provider === "doku" && payload.payment_flow === "direct_bca"
+          && payload.environment === "sandbox" && /^EZK-S-[A-F0-9]{24}$/.test(orderId)) {
+        // Construct the route locally; a provider response cannot choose a redirect host.
+        window.location.assign("payment.php?order=" + encodeURIComponent(orderId));
+        return;
+      }
       const paymentUrl = new URL(String(payload.payment_url || ""));
       const hosts = payload.environment === "production" ? ["jokul.doku.com"] : ["sandbox.doku.com", "staging.doku.com"];
       if (payload.provider !== "doku" || !["sandbox", "production"].includes(payload.environment)

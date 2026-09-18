@@ -18,6 +18,62 @@ function ez_doku_api_url(string $environment): string
     return $environment === 'production' ? 'https://api.doku.com/checkout/v1/payment' : 'https://api-sandbox.doku.com/checkout/v1/payment';
 }
 
+function ez_doku_payment_flow(string $environment): string
+{
+    $flow = ez_provider_config('doku', 'payment_flow', $environment);
+    if ($flow === '') $flow = 'direct_bca';
+    if (!in_array($flow, ['direct_bca', 'hosted'], true)) throw new RuntimeException('Invalid DOKU payment flow.');
+    // The legacy direct API is available for sandbox evaluation only. DOKU requires
+    // SNAP migration for production virtual accounts; never silently change the UI.
+    if ($flow === 'direct_bca' && $environment !== 'sandbox') {
+        throw new RuntimeException('Direct bank-transfer production payments require DOKU SNAP migration.');
+    }
+    return $flow;
+}
+
+function ez_create_doku_direct_bca_payment(array $order): array
+{
+    if (($order['commerce_environment'] ?? '') !== 'sandbox') throw new RuntimeException('Legacy direct BCA is sandbox only.');
+    $credentials = ez_doku_credentials('sandbox');
+    $target = '/bca-virtual-account/v2/payment-code';
+    $payload = [
+        'order' => ['invoice_number' => $order['order_id'], 'amount' => (int) $order['total']],
+        'virtual_account_info' => ['billing_type' => 'FIX_BILL', 'expired_time' => 60, 'reusable_status' => false, 'info1' => 'Ezkart', 'info2' => 'Thank you for your order'],
+        'customer' => ['name' => mb_substr($order['customer']['name'], 0, 64), 'email' => $order['customer']['email']],
+    ];
+    $timestamp = gmdate('Y-m-d\TH:i:s\Z');
+    $requestId = $order['payment_request_id'];
+    $signature = ez_doku_signature($credentials['client_id'], $requestId, $timestamp, $target, ez_json_encode($payload), $credentials['secret_key']);
+    $response = ez_http_json('https://api-sandbox.doku.com' . $target, $payload, [
+        'Accept: application/json', 'Content-Type: application/json', 'Client-Id: ' . $credentials['client_id'],
+        'Request-Id: ' . $requestId, 'Request-Timestamp: ' . $timestamp, 'Signature: ' . $signature,
+    ], 'DOKU');
+    $info = $response['virtual_account_info'] ?? [];
+    $number = (string) ($info['virtual_account_number'] ?? '');
+    $utcExpiry = (string) ($info['expired_date_utc'] ?? '');
+    $localExpiry = (string) ($info['expired_date'] ?? '');
+    $expiry = null;
+    if (preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/D', $utcExpiry)) {
+        $expiry = DateTimeImmutable::createFromFormat('!Y-m-d\TH:i:s\Z', $utcExpiry, new DateTimeZone('UTC'));
+        if ($expiry && $expiry->format('Y-m-d\TH:i:s\Z') !== $utcExpiry) $expiry = null;
+    } elseif (preg_match('/^\d{14}$/D', $localExpiry)) {
+        $expiry = DateTimeImmutable::createFromFormat('!YmdHis', $localExpiry, new DateTimeZone('Asia/Jakarta'));
+        if ($expiry && $expiry->format('YmdHis') !== $localExpiry) $expiry = null;
+    }
+    if (($response['order']['invoice_number'] ?? '') !== $order['order_id']
+        || (isset($response['order']['amount']) && !ez_doku_amount_matches($response['order']['amount'], (int) $order['total']))
+        || (isset($response['order']['currency']) && $response['order']['currency'] !== 'IDR')
+        || preg_match('/^\d{8,23}$/D', $number) !== 1 || !$expiry || $expiry->getTimestamp() <= time()) {
+        throw new RuntimeException('DOKU did not return a matching virtual account.');
+    }
+    return [
+        'payment_url' => ez_checkout_public_url() . '/cart/payment.php?' . http_build_query(['order' => $order['order_id']]),
+        'payment_expires_at' => $expiry->format(DATE_ATOM),
+        'payment_type' => 'VIRTUAL_ACCOUNT_BCA',
+        'payment_details' => ['method' => 'VIRTUAL_ACCOUNT_BCA', 'account_number' => $number, 'expires_at' => $expiry->format(DATE_ATOM)],
+    ];
+}
+
 function ez_doku_signature(string $clientId, string $requestId, string $timestamp, string $target, string $body, string $secret): string
 {
     $components = 'Client-Id:' . $clientId . "\nRequest-Id:" . $requestId
@@ -70,6 +126,9 @@ function ez_doku_checkout_payload(array $order, string $publicUrl): array
 
 function ez_create_doku_payment(array $order): array
 {
+    if (($order['payment_flow'] ?? ez_doku_payment_flow($order['commerce_environment'])) === 'direct_bca') {
+        return ez_create_doku_direct_bca_payment($order);
+    }
     $credentials = ez_doku_credentials($order['commerce_environment']);
     $payload = ez_doku_checkout_payload($order, ez_checkout_public_url());
     $timestamp = gmdate('Y-m-d\TH:i:s\Z');
@@ -124,6 +183,15 @@ function ez_apply_doku_notification(string $body, array $headers, string $target
             throw new InvalidArgumentException('Notification order mismatch.');
         }
         $status = strtoupper((string) ($notification['transaction']['status'] ?? ''));
+        if (($order['payment_flow'] ?? '') === 'direct_bca') {
+            $number = (string) ($notification['virtual_account_info']['virtual_account_number'] ?? '');
+            if (($notification['channel']['id'] ?? '') !== 'VIRTUAL_ACCOUNT_BCA' || preg_match('/^\d{8,23}$/D', $number) !== 1
+                || (isset($order['payment_details']['account_number']) && !hash_equals($order['payment_details']['account_number'], $number))) {
+                throw new InvalidArgumentException('Notification virtual account mismatch.');
+            }
+            // A callback may arrive before the create response. Bind it for response validation.
+            $order['notified_account_number'] = $number;
+        }
         // Checkout can retry another method after FAILED; neither failure nor a stale pending event reverses payment.
         if ($status !== 'SUCCESS' || ($order['status'] ?? '') === 'PAID') return;
         if (isset($notification['transaction']['type']) && !in_array($notification['transaction']['type'], ['SALE', 'CAPTURE'], true)) return;

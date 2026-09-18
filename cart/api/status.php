@@ -13,6 +13,18 @@ try {
         'order_id' => $order['order_id'],
         'status' => $order['status'],
         'total' => $order['total'],
+        'subtotal' => $order['subtotal'] ?? $order['total'],
+        'shipping_price' => $order['shipping_price'] ?? 0,
+        'shipping_skipped' => ez_order_skips_shipping($order),
+        'shop' => $order['shop'] ?? '',
+        'items' => array_values(array_map(static fn(array $item): array => [
+            'name' => (string) $item['name'], 'price' => (int) $item['price'], 'quantity' => (int) $item['quantity'],
+        ], array_filter($order['items'] ?? [], static fn(array $item): bool => ($item['id'] ?? '') !== 'EZK-SHIPPING'))),
+        'payment_details' => isset($order['payment_details']) ? [
+            'method' => $order['payment_details']['method'],
+            'account_number' => $order['payment_details']['account_number'],
+            'expires_at' => $order['payment_details']['expires_at'],
+        ] : null,
         'payment_provider' => $order['payment_provider'] ?? 'midtrans',
         'payment_reference' => $order['payment_reference'] ?? $order['midtrans_transaction_id'] ?? '',
         'payment_status' => $order['payment_status'] ?? $order['midtrans_status'] ?? '',

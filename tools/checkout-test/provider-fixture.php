@@ -9,6 +9,21 @@ function curl_exec(object $handle): string {
     $payload = json_decode($handle->options[CURLOPT_POSTFIELDS] ?? '{}', true);
     file_put_contents(getenv('EZKART_TEST_CAPTURE'), json_encode(['url' => $handle->url, 'body' => $handle->options[CURLOPT_POSTFIELDS] ?? '', 'headers' => $handle->options[CURLOPT_HTTPHEADER] ?? []]) . "\n", FILE_APPEND | LOCK_EX);
     if ($handle->url === 'https://api.biteship.com/v1/rates/couriers') return json_encode(['success' => true, 'pricing' => [['courier_code' => 'jne', 'courier_service_code' => 'reg', 'courier_name' => 'JNE', 'courier_service_name' => 'Regular', 'price' => 18000, 'duration' => '2-3', 'shipment_duration_unit' => 'days']]]);
+    if ($handle->url === 'https://api-sandbox.doku.com/bca-virtual-account/v2/payment-code') {
+        if (getenv('EZKART_TEST_DOKU_FAILURE')) { $handle->status = 503; return '{"error_messages":["Fixture unavailable"]}'; }
+        // DOKU's direct response echoes the invoice; it does not normally echo an amount.
+        $response = ['order' => ['invoice_number' => $payload['order']['invoice_number']], 'virtual_account_info' => ['virtual_account_number' => '1900800000999999', 'expired_date_utc' => gmdate('Y-m-d\TH:i:s\Z', time() + 3600)]];
+        switch (getenv('EZKART_TEST_DIRECT_RESPONSE')) {
+            case 'invoice': $response['order']['invoice_number'] = 'WRONG'; break;
+            case 'amount': $response['order']['amount'] = 1; break;
+            case 'currency': $response['order']['currency'] = 'USD'; break;
+            case 'number': $response['virtual_account_info']['virtual_account_number'] = '<script>123</script>'; break;
+            case 'expiry': $response['virtual_account_info']['expired_date_utc'] = '2026-99-99T12:00:00Z'; break;
+            case 'expired': $response['virtual_account_info']['expired_date_utc'] = '2020-01-01T00:00:00Z'; break;
+            case 'local_expiry': unset($response['virtual_account_info']['expired_date_utc']); $response['virtual_account_info']['expired_date'] = (new DateTimeImmutable('+1 hour', new DateTimeZone('Asia/Jakarta')))->format('YmdHis'); break;
+        }
+        return json_encode($response);
+    }
     if (in_array($handle->url, ['https://api-sandbox.doku.com/checkout/v1/payment', 'https://api.doku.com/checkout/v1/payment'], true)) {
         if (getenv('EZKART_TEST_DOKU_FAILURE')) { $handle->status = 503; return '{"error_messages":["Fixture unavailable"]}'; }
         $host = str_contains($handle->url, 'api-sandbox') ? 'staging.doku.com' : 'jokul.doku.com';

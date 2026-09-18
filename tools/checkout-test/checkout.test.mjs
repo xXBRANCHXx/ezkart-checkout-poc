@@ -46,6 +46,9 @@ async function setup(overrides = {}) {
     EZKART_ORDER_STORAGE: join(directory, "orders"),
     EZKART_DOKU_SANDBOX_CLIENT_ID: "MCH-SANDBOX-TEST",
     EZKART_DOKU_SANDBOX_SECRET_KEY: secret,
+    // Keep the original hosted integration covered as an explicit legacy configuration.
+    EZKART_DOKU_SANDBOX_PAYMENT_FLOW: "hosted",
+    EZKART_DOKU_PRODUCTION_PAYMENT_FLOW: "hosted",
     EZKART_DOKU_PRODUCTION_CLIENT_ID: "MCH-PRODUCTION-TEST",
     EZKART_DOKU_PRODUCTION_SECRET_KEY: "fixture-doku-production-secret",
     EZKART_BITESHIP_SANDBOX_API_KEY: "biteship_test.fixture",
@@ -137,6 +140,13 @@ async function notify(app, id, status = "SUCCESS", changes = {}, options = {}) {
     order: { invoice_number: id, amount: 134000, ...changes },
     transaction: { status, original_request_id: "doku-channel-reference" },
     channel: { id: "VIRTUAL_ACCOUNT_BCA" },
+    ...(options.virtualAccount
+      ? {
+          virtual_account_info: {
+            virtual_account_number: options.virtualAccount,
+          },
+        }
+      : {}),
   };
   const body = JSON.stringify(payload);
   const target = options.target || "/cart/api/doku-webhook.php";
@@ -188,7 +198,9 @@ test("sandbox checkout, signed callbacks, merchant acceptance, idempotent pickup
     signature(request.body, headers, "/checkout/v1/payment"),
   );
   const payload = JSON.parse(request.body);
-  assert.deepEqual(payload.payment.payment_method_types, ["VIRTUAL_ACCOUNT_BCA"]);
+  assert.deepEqual(payload.payment.payment_method_types, [
+    "VIRTUAL_ACCOUNT_BCA",
+  ]);
   assert.equal(
     payload.order.amount,
     payload.order.line_items.reduce((n, x) => n + x.price * x.quantity, 0),
@@ -299,7 +311,10 @@ test("sandbox payment skips rates and fulfillment without Biteship configuration
     EZKART_BITESHIP_ORIGIN_POSTAL_CODE: "REPLACE_MISSING",
   });
   t.after(() => app.close());
-  assert.equal((await app.request("/cart/api/checkout-config.php")).data.shipping_required, false);
+  assert.equal(
+    (await app.request("/cart/api/checkout-config.php")).data.shipping_required,
+    false,
+  );
   const { shipping_id, ...withoutShipping } = input;
   const started = await app.request("/cart/api/start.php", withoutShipping);
   assert.equal(started.status, 201);
@@ -307,12 +322,20 @@ test("sandbox payment skips rates and fulfillment without Biteship configuration
   const id = started.data.order_id;
   const calls = await app.calls();
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].url, "https://api-sandbox.doku.com/checkout/v1/payment");
+  assert.equal(
+    calls[0].url,
+    "https://api-sandbox.doku.com/checkout/v1/payment",
+  );
   const payload = JSON.parse(calls[0].body);
   assert.equal(payload.order.amount, 116000);
   assert.equal(payload.order.line_items.length, 1);
-  assert.equal((await notify(app, id, "SUCCESS", { amount: 116000 })).status, 200);
-  const order = JSON.parse(app.cli(`echo json_encode(ez_load_order('${id}'));`));
+  assert.equal(
+    (await notify(app, id, "SUCCESS", { amount: 116000 })).status,
+    200,
+  );
+  const order = JSON.parse(
+    app.cli(`echo json_encode(ez_load_order('${id}'));`),
+  );
   assert.equal(order.shipping_skipped, true);
   assert.equal(order.shipping_price, 0);
   assert.equal(order.shipping, null);
@@ -320,11 +343,15 @@ test("sandbox payment skips rates and fulfillment without Biteship configuration
   assert.equal(order.fulfillment_deadline_at, "");
   app.cli(`ez_accept_paid_order('${id}');`);
   assert.match(
-    app.cli(`try { ez_arrange_paid_order_pickup('${id}'); } catch (RuntimeException $e) { echo $e->getMessage(); }`),
+    app.cli(
+      `try { ez_arrange_paid_order_pickup('${id}'); } catch (RuntimeException $e) { echo $e->getMessage(); }`,
+    ),
     /Delivery is skipped/,
   );
   assert.match(
-    app.cli(`try { ez_create_biteship_order(ez_load_order('${id}')); } catch (RuntimeException $e) { echo $e->getMessage(); }`),
+    app.cli(
+      `try { ez_create_biteship_order(ez_load_order('${id}')); } catch (RuntimeException $e) { echo $e->getMessage(); }`,
+    ),
     /Delivery is skipped/,
   );
   assert.equal((await app.calls()).length, 1);
@@ -336,10 +363,16 @@ test("production switch requires shipping, selects live slots and preserves sand
     EZKART_COMMERCE_ENVIRONMENT: "production",
   });
   t.after(() => app.close());
-  assert.equal((await app.request("/cart/api/checkout-config.php")).data.shipping_required, true);
+  assert.equal(
+    (await app.request("/cart/api/checkout-config.php")).data.shipping_required,
+    true,
+  );
   const { shipping_id, ...withoutShipping } = input;
   const rejected = await app.request("/cart/api/start.php", {
-    ...withoutShipping, environment: "sandbox", shipping_skipped: true, shipping_price: 0,
+    ...withoutShipping,
+    environment: "sandbox",
+    shipping_skipped: true,
+    shipping_price: 0,
   });
   assert.equal(rejected.status, 422);
   assert.match(rejected.data.error, /shipping service/);
@@ -439,7 +472,12 @@ test("Biteship installation probes succeed without allowing unauthenticated even
     assert.equal((await app.request(path, body)).status, 401);
   assert.equal((await app.request(path)).status, 405);
   assert.equal(
-    (await app.request("/cart/api/biteship-webhook.php?environment=invalid", {})).status,
+    (
+      await app.request(
+        "/cart/api/biteship-webhook.php?environment=invalid",
+        {},
+      )
+    ).status,
     400,
   );
   assert.equal((await app.request(path, " ".repeat(262145))).status, 400);
@@ -490,9 +528,307 @@ test("payment URLs reject lookalike hosts, credentials and cross-environment tar
     );
 });
 
+test("direct BCA API keeps checkout on Ezkart and binds signed confirmation to the account", async (t) => {
+  const app = await setup({ EZKART_DOKU_SANDBOX_PAYMENT_FLOW: "" });
+  t.after(() => app.close());
+  const started = await app.request("/cart/api/start.php", {
+    ...input,
+    shipping_id: "",
+  });
+  assert.equal(started.status, 201);
+  assert.equal(started.data.payment_flow, "direct_bca");
+  assert.equal(new URL(started.data.payment_url).pathname, "/cart/payment.php");
+  const id = started.data.order_id;
+  const calls = await app.calls();
+  assert.equal(calls.length, 1);
+  assert.equal(
+    calls[0].url,
+    "https://api-sandbox.doku.com/bca-virtual-account/v2/payment-code",
+  );
+  const headers = Object.fromEntries(
+    calls[0].headers.map((h) => h.split(/: (.*)/s).slice(0, 2)),
+  );
+  assert.equal(
+    headers.Signature,
+    signature(calls[0].body, headers, "/bca-virtual-account/v2/payment-code"),
+  );
+  const payload = JSON.parse(calls[0].body);
+  assert.equal(payload.order.amount, 116000);
+  assert.equal(payload.virtual_account_info.billing_type, "FIX_BILL");
+  assert.equal(payload.virtual_account_info.reusable_status, false);
+  const before = await app.request(
+    "/cart/api/status.php?order=" + id + "&status=PAID",
+  );
+  assert.equal(before.data.status, "PENDING");
+  assert.equal(before.data.payment_details.account_number, "1900800000999999");
+  assert.equal(before.data.items.length, 1);
+  assert.equal(before.data.items[0].quantity, 2);
+  assert.equal(before.data.shipping_skipped, true);
+  assert.equal(before.data.total, 116000);
+  assert.equal("customer" in before.data, false);
+  assert.equal(JSON.stringify(before.data).includes(secret), false);
+  assert.equal(
+    (await notify(app, id, "SUCCESS", { amount: 116000 })).status,
+    400,
+  );
+  assert.equal(
+    (
+      await notify(
+        app,
+        id,
+        "SUCCESS",
+        { amount: 116000 },
+        { virtualAccount: "1900800000000001" },
+      )
+    ).status,
+    400,
+  );
+  assert.equal(
+    (
+      await notify(
+        app,
+        id,
+        "SUCCESS",
+        { amount: 1 },
+        { virtualAccount: "1900800000999999" },
+      )
+    ).status,
+    400,
+  );
+  assert.equal(
+    (
+      await notify(
+        app,
+        id,
+        "SUCCESS",
+        { amount: 116000 },
+        { virtualAccount: "1900800000999999", tamper: true },
+      )
+    ).status,
+    400,
+  );
+  assert.equal(
+    (await app.request("/cart/api/status.php?order=" + id)).data.status,
+    "PENDING",
+  );
+  for (let retry = 0; retry < 2; retry++)
+    assert.equal(
+      (
+        await notify(
+          app,
+          id,
+          "SUCCESS",
+          { amount: 116000 },
+          { virtualAccount: "1900800000999999" },
+        )
+      ).status,
+      200,
+    );
+  const paid = await app.request("/cart/api/status.php?order=" + id);
+  assert.equal(paid.data.status, "PAID");
+  assert.equal(paid.data.fulfillment_status, "NOT_REQUIRED");
+  assert.equal(
+    (
+      await notify(
+        app,
+        id,
+        "FAILED",
+        { amount: 116000 },
+        { virtualAccount: "1900800000999999" },
+      )
+    ).status,
+    200,
+  );
+  assert.equal(
+    (await app.request("/cart/api/status.php?order=" + id)).data.status,
+    "PAID",
+  );
+});
+
+test("direct BCA rejects mismatched or unusable provider details and cannot use production", async (t) => {
+  for (const variant of [
+    "invoice",
+    "amount",
+    "currency",
+    "number",
+    "expiry",
+    "expired",
+    "local_expiry",
+  ]) {
+    const app = await setup({
+      EZKART_DOKU_SANDBOX_PAYMENT_FLOW: "",
+      EZKART_TEST_DIRECT_RESPONSE: variant,
+    });
+    try {
+      const result = await app.request("/cart/api/start.php", {
+        ...input,
+        shipping_id: "",
+      });
+      assert.equal(
+        result.status,
+        variant === "local_expiry" ? 201 : 503,
+        variant,
+      );
+    } finally {
+      await app.close();
+    }
+  }
+  const app = await setup({
+    EZKART_DEPLOYMENT_ENVIRONMENT: "production",
+    EZKART_COMMERCE_ENVIRONMENT: "production",
+    EZKART_DOKU_PRODUCTION_PAYMENT_FLOW: "",
+  });
+  t.after(() => app.close());
+  assert.equal((await app.request("/cart/api/start.php", input)).status, 503);
+  assert.equal(
+    (await app.calls()).length,
+    0,
+    "Production must stop before provider or paid rate requests.",
+  );
+});
+
+test("own payment UI: checkout, copy, reload, expiry, recovery and confirmed payment on desktop and mobile", async (t) => {
+  const { chromium } = await import(
+    "../builder-mcp/node_modules/playwright/index.mjs"
+  );
+  const app = await setup({ EZKART_DOKU_SANDBOX_PAYMENT_FLOW: "" });
+  t.after(() => app.close());
+  const browser = await chromium.launch({ headless: true });
+  t.after(() => browser.close());
+  for (const width of [1280, 390]) {
+    const context = await browser.newContext({
+      viewport: { width, height: 960 },
+      permissions: ["clipboard-read", "clipboard-write"],
+    });
+    const page = await context.newPage();
+    const errors = [],
+      external = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    page.on("request", (request) => {
+      if (/doku\.com/.test(request.url())) external.push(request.url());
+    });
+    await page.goto(app.base + "/cart/?shop=test-shop&cart=granola:2");
+    await page.locator("#to-checkout").click();
+    for (const [name, value] of Object.entries(input.customer))
+      if (value) await page.locator(`[name="${name}"]`).fill(value);
+    await page.locator("#pay-button").click();
+    await page.waitForURL(/\/cart\/payment\.php\?order=EZK-S-/);
+    await page.locator("#transfer-details").waitFor({ state: "visible" });
+    const id = new URL(page.url()).searchParams.get("order");
+    assert.equal(new URL(page.url()).origin, app.base);
+    assert.equal(
+      await page.locator("#account-number").inputValue(),
+      "1900800000999999",
+    );
+    assert.match(
+      await page.locator("#payment-amount").textContent(),
+      /116\.000/,
+    );
+    assert.equal(
+      (await page
+        .locator(".brand")
+        .evaluate((el) => el.getBoundingClientRect().width)) <= 112,
+      true,
+    );
+    await page.locator('[data-copy="account"]').click();
+    assert.equal(
+      await page.evaluate(() => navigator.clipboard.readText()),
+      "1900800000999999",
+    );
+    await page.locator('[data-copy="amount"]').click();
+    assert.equal(
+      await page.evaluate(() => navigator.clipboard.readText()),
+      "116000",
+    );
+    await page.locator("#check-payment").click();
+    await page.waitForFunction(() =>
+      document
+        .querySelector("#check-message")
+        .textContent.includes("No payment"),
+    );
+    assert.equal(
+      await page.locator("#payment").getAttribute("data-state"),
+      "PENDING",
+    );
+    if (process.env.EZKART_TEST_SCREENSHOTS)
+      await page.screenshot({
+        path: join(process.env.EZKART_TEST_SCREENSHOTS, `payment-${width}.png`),
+        fullPage: true,
+      });
+    const creates = (await app.calls()).length;
+    await page.reload();
+    await page.locator("#transfer-details").waitFor({ state: "visible" });
+    assert.equal(
+      (await app.calls()).length,
+      creates,
+      "Reload must not create another payment.",
+    );
+    await page.route("**/api/status.php*", (route) =>
+      route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        body: '{"ok":false}',
+      }),
+    );
+    await page.locator("#check-payment").click();
+    await page.locator("#page-notice").waitFor({ state: "visible" });
+    assert.equal(
+      await page.locator("#payment").getAttribute("data-state"),
+      "PENDING",
+    );
+    await page.unroute("**/api/status.php*");
+    app.cli(
+      `$o=ez_load_order('${id}'); $o['payment_details']['expires_at']='2020-01-01T00:00:00Z'; ez_save_order($o);`,
+    );
+    await page.locator("#check-payment").click();
+    await page.waitForFunction(
+      () => document.querySelector("#payment").dataset.state === "EXPIRED",
+    );
+    assert.equal(await page.locator("#transfer-details").isVisible(), false);
+    assert.equal(
+      (
+        await notify(
+          app,
+          id,
+          "SUCCESS",
+          { amount: 116000 },
+          { virtualAccount: "1900800000999999" },
+        )
+      ).status,
+      200,
+    );
+    await page.locator("#check-payment").click();
+    await page
+      .getByRole("heading", { name: "Payment received", exact: true })
+      .waitFor();
+    assert.equal(await page.locator("#check-payment").isVisible(), false);
+    assert.equal(await page.locator("#order-link").isVisible(), true);
+    assert.equal(
+      await page.evaluate(() =>
+        localStorage.getItem("ezkart.checkout.cart.v1:test-shop"),
+      ),
+      null,
+    );
+    assert.equal(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth > innerWidth + 1,
+      ),
+      false,
+    );
+    assert.deepEqual(errors, []);
+    assert.deepEqual(
+      external,
+      [],
+      "Customers must never load DOKU hosted pages or scripts.",
+    );
+    await context.close();
+  }
+});
+
 test("browser checkout redirects to DOKU and shows only server-confirmed payment", async (t) => {
-  const { chromium } =
-    await import("../builder-mcp/node_modules/playwright/index.mjs");
+  const { chromium } = await import(
+    "../builder-mcp/node_modules/playwright/index.mjs"
+  );
   const app = await setup({
     EZKART_BITESHIP_SANDBOX_API_KEY: "REPLACE_MISSING",
     EZKART_BITESHIP_ORIGIN_POSTAL_CODE: "REPLACE_MISSING",
@@ -508,7 +844,9 @@ test("browser checkout redirects to DOKU and shows only server-confirmed payment
     const errors = [];
     const rateRequests = [];
     page.on("pageerror", (e) => errors.push(e.message));
-    page.on("request", (r) => { if (r.url().includes("/api/rates.php")) rateRequests.push(r.url()); });
+    page.on("request", (r) => {
+      if (r.url().includes("/api/rates.php")) rateRequests.push(r.url());
+    });
     await page.route("https://staging.doku.com/**", (r) =>
       r.fulfill({
         contentType: "text/html",
@@ -520,9 +858,15 @@ test("browser checkout redirects to DOKU and shows only server-confirmed payment
     assert.equal(await page.locator("#get-rates").isVisible(), false);
     assert.equal(await page.locator("#delivery-method").isVisible(), false);
     assert.equal(await page.locator("#pay-button").isEnabled(), true);
-    assert.equal(await page.locator("#shipping-total").textContent(), "Skipped in sandbox");
+    assert.equal(
+      await page.locator("#shipping-total").textContent(),
+      "Skipped in sandbox",
+    );
     await page.locator("#pay-button").click();
-    assert.equal(await page.locator('[name="fullName"]').getAttribute("class"), "invalid");
+    assert.equal(
+      await page.locator('[name="fullName"]').getAttribute("class"),
+      "invalid",
+    );
     for (const [name, value] of Object.entries(input.customer))
       if (value) await page.locator(`[name="${name}"]`).fill(value);
     if (process.env.EZKART_TEST_SCREENSHOTS)
@@ -541,7 +885,10 @@ test("browser checkout redirects to DOKU and shows only server-confirmed payment
     const id = JSON.parse(created.body).order.invoice_number;
     assert.equal(JSON.parse(created.body).order.amount, 116000);
     assert.deepEqual(rateRequests, []);
-    assert.equal((await notify(app, id, "SUCCESS", { amount: 116000 })).status, 200);
+    assert.equal(
+      (await notify(app, id, "SUCCESS", { amount: 116000 })).status,
+      200,
+    );
     await page.goto(app.base + `/cart/return.php?order=${id}&shop=test-shop`);
     await page
       .getByRole("heading", { name: "Payment confirmed", exact: true })
@@ -550,8 +897,14 @@ test("browser checkout redirects to DOKU and shows only server-confirmed payment
       await page.locator("#return-status").textContent(),
       "PAID (test)",
     );
-    assert.equal(await page.locator("#return-fulfillment").textContent(), "Delivery skipped (sandbox)");
-    assert.match(await page.locator("#return-message").textContent(), /Delivery was skipped/);
+    assert.equal(
+      await page.locator("#return-fulfillment").textContent(),
+      "Delivery skipped (sandbox)",
+    );
+    assert.match(
+      await page.locator("#return-message").textContent(),
+      /Delivery was skipped/,
+    );
     assert.equal(
       await page.evaluate(() =>
         localStorage.getItem("ezkart.checkout.cart.v1:test-shop"),
@@ -570,7 +923,9 @@ test("browser checkout redirects to DOKU and shows only server-confirmed payment
 });
 
 test("production browser checkout still requires a delivery quote before payment", async (t) => {
-  const { chromium } = await import("../builder-mcp/node_modules/playwright/index.mjs");
+  const { chromium } = await import(
+    "../builder-mcp/node_modules/playwright/index.mjs"
+  );
   const app = await setup({
     EZKART_DEPLOYMENT_ENVIRONMENT: "production",
     EZKART_COMMERCE_ENVIRONMENT: "production",
@@ -579,7 +934,9 @@ test("production browser checkout still requires a delivery quote before payment
   const browser = await chromium.launch({ headless: true });
   t.after(() => browser.close());
   const page = await browser.newPage({ viewport: { width: 390, height: 900 } });
-  await page.route("https://jokul.doku.com/**", (r) => r.fulfill({ body: "Production payment fixture" }));
+  await page.route("https://jokul.doku.com/**", (r) =>
+    r.fulfill({ body: "Production payment fixture" }),
+  );
   await page.goto(app.base + "/cart/?shop=test-shop&cart=granola:2");
   await page.locator("#to-checkout").click();
   assert.equal(await page.locator("#get-rates").isVisible(), true);
@@ -592,13 +949,17 @@ test("production browser checkout still requires a delivery quote before payment
   await page.locator("#pay-button").click();
   await page.waitForURL("https://jokul.doku.com/checkout-link-v2/fixture");
   const calls = await app.calls();
-  assert.equal(calls.filter((c) => c.url.endsWith("/rates/couriers")).length, 2);
+  assert.equal(
+    calls.filter((c) => c.url.endsWith("/rates/couriers")).length,
+    2,
+  );
   assert.equal(JSON.parse(calls.at(-1).body).order.amount, 134000);
 });
 
 test("merchant dashboard displays DOKU orders and accepts and arranges pickup through its UI", async (t) => {
-  const { chromium } =
-    await import("../builder-mcp/node_modules/playwright/index.mjs");
+  const { chromium } = await import(
+    "../builder-mcp/node_modules/playwright/index.mjs"
+  );
   const app = await setup();
   t.after(() => app.close());
   const browser = await chromium.launch({ headless: true });
@@ -612,7 +973,10 @@ test("merchant dashboard displays DOKU orders and accepts and arranges pickup th
   await page.locator("#password").fill("fixture-admin-password");
   await page.getByRole("button", { name: "Enter dashboard" }).click();
   await page.goto(app.base + "/cart/admin/?page=orders");
-  const row = page.getByRole("button", { name: "#" + id.replace("EZK-", ""), exact: true });
+  const row = page.getByRole("button", {
+    name: "#" + id.replace("EZK-", ""),
+    exact: true,
+  });
   await row.click();
   await page.getByRole("button", { name: "Accept order", exact: true }).click();
   await row.click();

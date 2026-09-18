@@ -29,6 +29,8 @@ return [
     'commerce_environment' => 'sandbox',
     'doku_sandbox_client_id' => 'REPLACE_WITH_DOKU_SANDBOX_CLIENT_ID',
     'doku_sandbox_secret_key' => 'REPLACE_WITH_DOKU_SANDBOX_SECRET_KEY',
+    'doku_sandbox_payment_flow' => 'direct_bca', // Ezkart UI; non-SNAP BCA sandbox API.
+    'doku_production_payment_flow' => '', // Direct production VA requires SNAP migration; never falls back to hosted.
     'doku_production_client_id' => '',
     'doku_production_secret_key' => '',
     'biteship_sandbox_api_key' => 'biteship_test.REPLACE_WITH_TEST_API_KEY',

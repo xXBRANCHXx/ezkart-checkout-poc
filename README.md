@@ -33,11 +33,13 @@ disbursement flow is a hard release requirement. Midtrans has been rejected for
 production because the evaluated setup did not provide the merchant
 disbursement flow Ezkart requires.
 
-Checkout now uses DOKU hosted payment pages and signed DOKU notifications.
+Sandbox checkout uses Ezkart's own payment page and DOKU's non-SNAP BCA direct
+API, with signed DOKU notifications confirming payment.
 Sandbox checkout skips delivery selection and shipping charges, so payment
 tests do not need a funded Biteship account. Production still requires shipping.
-The sandbox adapter is implemented; provider credentials and a real sandbox
-acceptance run are still required. Setup, testing, and the explicit production
+The non-SNAP direct adapter is restricted to sandbox: DOKU requires SNAP
+migration for direct production virtual accounts. It never silently redirects
+customers to hosted checkout. Setup, testing, and the explicit production
 switch are documented in [DOKU and Biteship setup](docs/commerce-sandbox-setup.md).
 The authoritative release status remains in `project.metadata.json`.
 Production refunds, reconciliation, and verified merchant disbursement remain

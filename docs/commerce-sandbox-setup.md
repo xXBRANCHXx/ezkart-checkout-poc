@@ -1,11 +1,38 @@
 # DOKU + Biteship sandbox checkout
 
-Sandbox checkout creates a DOKU hosted payment session for the server-calculated
-product total, with no delivery selection or shipping charge. It does not call
+Sandbox checkout creates a BCA virtual account through DOKU's non-SNAP direct
+API and opens **Ezkart's own payment page** at `/cart/payment.php?order=…`.
+The server calculates the product total, with no delivery selection or shipping charge. It does not call
 Biteship or require its credentials, pickup address or balance. Customer contact
 and address fields remain available for the payment session. Only a verified
 DOKU success notification marks an order paid; delivery is then marked skipped,
 with no pickup action or deadline.
+
+The page has a compact Ezkart logo, neutral cards, an orange action button,
+copyable account number and exact amount, a WIB deadline, bank instructions,
+order summary and automatically refreshed confirmation. Reloading only reads
+the saved order; it does not create another account. No hosted DOKU pages or
+scripts are loaded. Query parameters and the Check payment button cannot mark
+orders paid. A verified callback can still confirm a payment after the UI's
+deadline passes. Existing hosted orders retain their signed callback handling.
+
+**Production limitation:** this integration honors the requested non-SNAP API
+for sandbox. DOKU's [migration documentation](https://docs.doku.com/miscellaneous/snap-migration)
+requires SNAP for production direct virtual accounts. `direct_bca` therefore
+fails closed in production before any provider/rate calls. Switching commerce
+mode alone does not enable this direct adapter live. The UI is independent of
+the API adapter and can remain Ezkart-owned after a supported production
+adapter is configured and verified. An explicit environment-specific
+`doku_<environment>_payment_flow=hosted` setting retains the earlier integration
+for rollback; there is no automatic fallback.
+
+API contract: [DOKU BCA direct API](https://jokul.doku.com/docs/docs/jokul-direct/virtual-account/bca-va-guide/),
+`POST /bca-virtual-account/v2/payment-code`, HMAC-SHA256, fixed amount,
+non-reusable account, 60-minute expiry. Invoice, optional echoed amount/currency,
+account number and deadline are validated before exposing payment details.
+Callbacks must also match the BCA channel and account number. The actual sandbox
+API accepted this endpoint with the existing account credentials on 2026-09-18.
+Payment instructions follow [BCA's guide](https://www.bca.co.id/en/informasi/edukatips/2022/07/07/09/19/cara-bayar-menggunakan-bca-virtual-account).
 
 Production checkout still requires a delivery selection and a fresh Biteship
 rate. The shipping API can also be tested in sandbox by explicitly supplying a
@@ -31,6 +58,7 @@ Biteship entries are needed when testing shipping separately.
 'commerce_environment' => 'sandbox',
 'doku_sandbox_client_id' => 'YOUR_DOKU_SANDBOX_CLIENT_ID',
 'doku_sandbox_secret_key' => 'YOUR_DOKU_SANDBOX_SECRET_KEY',
+'doku_sandbox_payment_flow' => 'direct_bca', // Default; sandbox only.
 'biteship_sandbox_api_key' => 'biteship_test.YOUR_TEST_KEY',
 'biteship_sandbox_webhook_token' => 'YOUR_RANDOM_SECRET_AT_LEAST_32_CHARACTERS',
 'biteship_origin_postal_code' => 'YOUR_FIVE_DIGIT_POSTCODE',
@@ -60,9 +88,9 @@ a separate production requirement, as described in `database-environments.md`.
 2. In the sandbox dashboard's **Settings → Payment Settings**, configure
    `https://test.ezkart.id/cart/api/doku-webhook.php` as the payment notification
    URL for every channel enabled in checkout. Virtual accounts have separate
-   SNAP and non-SNAP configurations; this Checkout integration uses non-SNAP
+   SNAP and non-SNAP configurations; this sandbox integration uses non-SNAP
    notifications. Configure cards separately under their payment settings.
-   Ezkart also supplies the URL in each payment request through
+   The legacy hosted adapter also supplies the URL in each payment request through
    `additional_info.override_notification_url`, but DOKU requires a dashboard
    URL first, with the same path as the override. An accepted payment-creation
    request alone does not prove notifications are configured. The endpoint must
@@ -93,20 +121,20 @@ these lookups unless an API caller explicitly supplies a shipping selection.
 2. Open `https://test.ezkart.id/cart/?shop=ezkart-demo&cart=granola:1`.
    Enter test customer/address details and click **Pay**. No delivery lookup or
    selection is required, and the total contains only the products.
-3. Confirm the browser opens `https://staging.doku.com/...` (or DOKU's documented
-   `https://sandbox.doku.com/...`) with the exact
-   product total. Sandbox currently offers **BCA Virtual Account**, whose
+3. Confirm the browser stays on `https://test.ezkart.id/cart/payment.php?order=…`
+   with the exact product total and a copyable BCA account number. Sandbox
+   currently offers **BCA Virtual Account**, whose
    notification URL is configured and whose payment flow is tested. Configure
    and verify each additional channel's notification before enabling it in the
-   sandbox payment-method list. Production has its own method list and requires
-   separate channel configuration and acceptance.
+   sandbox payment-method list. Production direct APIs require a supported
+   adapter plus separate channel configuration and acceptance.
 4. Complete the payment through the
    [DOKU BCA simulator](https://sandbox.doku.com/integration/simulator/bca/inquiry)
-   using the virtual account number shown on the payment page. Then click
-   **Check Payment Status** on the DOKU payment tab to return to Ezkart.
-5. Verify the Ezkart return page says **Payment confirmed** and `PAID (test)`.
-   It should also say **Delivery skipped (sandbox)**. Merely returning to Ezkart
-   does not mark the order paid.
+   using the virtual account number shown on the Ezkart payment page.
+5. Verify the Ezkart payment page automatically shows **Payment received**.
+   **View order** opens the existing confirmation page with **Payment confirmed**
+   and **Delivery skipped (sandbox)**. Merely loading either page or clicking
+   Check payment does not mark the order paid.
 6. For a separate shipping integration test, first configure Biteship and create
    an order with an explicitly quoted shipping service. In the privileged order
    dashboard, accept that paid order and arrange pickup.

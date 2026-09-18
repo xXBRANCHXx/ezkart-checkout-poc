@@ -18,6 +18,7 @@ try {
     // Validate credentials before requesting a paid Biteship rate lookup.
     $environment = ez_commerce_environment();
     ez_doku_credentials();
+    $paymentFlow = ez_doku_payment_flow($environment);
     $checkout = ez_checkout_request($input);
     $orderId = 'EZK-' . ($environment === 'production' ? 'P' : 'S') . '-' . strtoupper(bin2hex(random_bytes(12)));
     $shop = strtolower(trim((string) ($input['shop'] ?? '')));
@@ -27,6 +28,7 @@ try {
         'status' => 'CREATING',
         'commerce_environment' => $environment,
         'payment_provider' => 'doku',
+        'payment_flow' => $paymentFlow,
         'payment_request_id' => bin2hex(random_bytes(16)),
         'payment_reference' => '',
         'payment_status' => '',
@@ -70,6 +72,10 @@ try {
     $stateLock = ez_lock_order_state($orderId);
     try {
         $order = ez_load_order($orderId);
+        if (isset($order['notified_account_number'], $payment['payment_details']['account_number'])
+            && !hash_equals($order['notified_account_number'], $payment['payment_details']['account_number'])) {
+            throw new RuntimeException('DOKU virtual account response did not match the notification.');
+        }
         if (strtoupper((string) ($order['status'] ?? '')) === 'CREATING') {
             $order['status'] = 'PENDING';
         }
@@ -85,6 +91,7 @@ try {
         'payment_url' => $payment['payment_url'],
         'environment' => $environment,
         'provider' => 'doku',
+        'payment_flow' => $paymentFlow,
         'payment_total' => $checkout['total'],
     ], 201);
 } catch (InvalidArgumentException $error) {
