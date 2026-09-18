@@ -41,11 +41,12 @@ a separate production requirement, as described in `database-environments.md`.
 ## Provider dashboards
 
 1. Create/sign in to the [DOKU sandbox dashboard](https://sandbox.doku.com/).
-   Retrieve its **Client ID** and **Secret Key** under API integration and put
+   Retrieve its **Client ID** and **Secret Key** under **Settings → API Keys** and put
    them in the sandbox slots. These are Checkout/non-SNAP credentials.
-2. Set the DOKU HTTP notification URL to
-   `https://test.ezkart.id/cart/api/doku-webhook.php`. The request also supplies
-   this URL using `additional_info.override_notification_url`. The endpoint
+2. Ezkart supplies the DOKU notification URL
+   `https://test.ezkart.id/cart/api/doku-webhook.php` in each payment request
+   using `additional_info.override_notification_url`. No global dashboard
+   notification URL change is needed for these sessions. The endpoint
    must be publicly reachable by DOKU; hosting password protection must exempt
    this webhook. It authenticates each request by its DOKU signature.
 3. In Biteship, turn on **Mode Testing** and generate a test API key. Both modes
@@ -69,7 +70,8 @@ shipping choices and again when validating checkout.
    configuration only; they do not prove provider account activation.
 2. Open `https://test.ezkart.id/cart/?shop=ezkart-demo&cart=granola:1`.
    Enter test customer/delivery details, request shipping and continue to pay.
-3. Confirm the browser opens `https://sandbox.doku.com/...` with the exact
+3. Confirm the browser opens `https://staging.doku.com/...` (or DOKU's documented
+   `https://sandbox.doku.com/...`) with the exact
    product-plus-shipping total. The enabled channels are VA, QRIS and credit
    card; the DOKU account must have the chosen channel enabled.
 4. Complete the payment through the
@@ -84,8 +86,14 @@ shipping choices and again when validating checkout.
    the same order. Failed attempts must not undo a successful payment.
 
 Record the DOKU invoice, Biteship order ID, deployed commit and the results before
-calling the provider integration verified. No real provider acceptance run was
-possible during implementation because the runtime credentials were absent.
+calling the provider integration verified. On 2026-09-18, the actual DOKU sandbox
+API accepted a signed payment-creation request with the locally configured
+credentials, echoed the exact invoice and amount, and returned a checkout URL
+at `staging.doku.com/checkout-link-v2/`. The application adapter created invoice
+`EZK-S-238856F1010F5D0E6183C773`, and its hosted checkout displayed the expected
+IDR 10,000, customer details, bank transfer and card options. No payment was
+completed. Hosted runtime configuration and a full payment-notification/Biteship
+acceptance run remain pending.
 
 ## Production switch
 

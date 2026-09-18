@@ -452,10 +452,10 @@
       if (!response.ok) throw new Error(payload.error || "Payment could not start.");
       const orderId = String(payload.order_id || "");
       const paymentUrl = new URL(String(payload.payment_url || ""));
-      const host = payload.environment === "production" ? "jokul.doku.com" : "sandbox.doku.com";
+      const hosts = payload.environment === "production" ? ["jokul.doku.com"] : ["sandbox.doku.com", "staging.doku.com"];
       if (payload.provider !== "doku" || !["sandbox", "production"].includes(payload.environment)
           || !/^EZK-[SP]-[A-F0-9]{24}$/.test(orderId) || paymentUrl.protocol !== "https:"
-          || paymentUrl.hostname !== host || paymentUrl.username || paymentUrl.password || paymentUrl.port
+          || !hosts.includes(paymentUrl.hostname) || paymentUrl.username || paymentUrl.password || paymentUrl.port
           || !/^\/(?:checkout-link(?:-v2)?\/|checkout\/link\/).+/.test(paymentUrl.pathname)) {
         throw new Error("The payment service returned an invalid session.");
       }

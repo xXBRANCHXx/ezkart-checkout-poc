@@ -29,8 +29,8 @@ function ez_doku_signature(string $clientId, string $requestId, string $timestam
 function ez_doku_payment_url_valid(string $url, string $environment): bool
 {
     $parts = parse_url($url);
-    $host = $environment === 'production' ? 'jokul.doku.com' : 'sandbox.doku.com';
-    return is_array($parts) && ($parts['scheme'] ?? '') === 'https' && ($parts['host'] ?? '') === $host
+    $hosts = $environment === 'production' ? ['jokul.doku.com'] : ['sandbox.doku.com', 'staging.doku.com'];
+    return is_array($parts) && ($parts['scheme'] ?? '') === 'https' && in_array($parts['host'] ?? '', $hosts, true)
         && !isset($parts['user']) && !isset($parts['pass']) && !isset($parts['port'])
         && preg_match('~^/(?:checkout-link(?:-v2)?/|checkout/link/).+~D', (string) ($parts['path'] ?? '')) === 1;
 }

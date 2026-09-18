@@ -11,7 +11,7 @@
       "productionTarget": "DOKU",
       "status": "blocked_pending_cv_approval_and_doku_onboarding",
       "merchantDisbursementRequired": true,
-      "sandboxStatus": "adapter_implemented_credentials_and_provider_acceptance_pending",
+      "sandboxStatus": "doku_sandbox_payment_creation_verified_checkout_acceptance_pending",
       "environmentSwitch": "commerce_environment"
     },
     "midtrans": {

@@ -172,7 +172,7 @@ test("sandbox checkout, signed callbacks, merchant acceptance, idempotent pickup
   assert.equal(started.status, 201);
   assert.equal(started.data.payment_total, 134000);
   assert.match(started.data.order_id, /^EZK-S-[A-F0-9]{24}$/);
-  assert.match(started.data.payment_url, /^https:\/\/sandbox.doku.com\//);
+  assert.match(started.data.payment_url, /^https:\/\/staging\.doku\.com\//);
   const id = started.data.order_id;
   const calls = await app.calls();
   assert.equal(calls.length, 2);
@@ -379,7 +379,9 @@ test("payment URLs reject lookalike hosts, credentials and cross-environment tar
   t.after(() => app.close());
   for (const url of [
     "https://sandbox.doku.com.attacker.example/checkout-link-v2/test",
+    "https://staging.doku.com.attacker.example/checkout-link-v2/test",
     "https://user@sandbox.doku.com/checkout-link-v2/test",
+    "https://user@staging.doku.com/checkout-link-v2/test",
     "http://sandbox.doku.com/checkout-link-v2/test",
     "https://jokul.doku.com/checkout-link-v2/test",
     "https://sandbox.doku.com:8443/checkout-link-v2/test",
@@ -391,16 +393,24 @@ test("payment URLs reject lookalike hosts, credentials and cross-environment tar
       ),
       "no",
     );
-  for (const path of [
-    "/checkout-link/test",
-    "/checkout-link-v2/test",
-    "/checkout/link/test",
-  ])
+  for (const host of ["sandbox.doku.com", "staging.doku.com"])
+    for (const path of [
+      "/checkout-link/test",
+      "/checkout-link-v2/test",
+      "/checkout/link/test",
+    ])
+      assert.equal(
+        app.cli(
+          `echo ez_doku_payment_url_valid('https://${host}${path}', 'sandbox') ? 'yes' : 'no';`,
+        ),
+        "yes",
+      );
+  for (const host of ["sandbox.doku.com", "staging.doku.com"])
     assert.equal(
       app.cli(
-        `echo ez_doku_payment_url_valid('https://sandbox.doku.com${path}', 'sandbox') ? 'yes' : 'no';`,
+        `echo ez_doku_payment_url_valid('https://${host}/checkout-link-v2/test', 'production') ? 'yes' : 'no';`,
       ),
-      "yes",
+      "no",
     );
 });
 
@@ -418,7 +428,7 @@ test("browser checkout redirects to DOKU and shows only server-confirmed payment
     const page = await context.newPage();
     const errors = [];
     page.on("pageerror", (e) => errors.push(e.message));
-    await page.route("https://sandbox.doku.com/**", (r) =>
+    await page.route("https://staging.doku.com/**", (r) =>
       r.fulfill({
         contentType: "text/html",
         body: "<h1>DOKU sandbox fixture</h1>",
@@ -439,7 +449,7 @@ test("browser checkout redirects to DOKU and shows only server-confirmed payment
         fullPage: true,
       });
     await page.locator("#pay-button").click();
-    await page.waitForURL("https://sandbox.doku.com/checkout-link-v2/fixture");
+    await page.waitForURL("https://staging.doku.com/checkout-link-v2/fixture");
     const created = (await app.calls())
       .filter((x) => x.url.includes("api-sandbox.doku.com"))
       .at(-1);
