@@ -226,10 +226,16 @@ through DOKU's dashboard does not establish that API registration, fee splitting
 settlement or payout works through Ezkart.
 
 The user's pricing mockup now specifies Basic / Advanced / Marketplace
-commissions of 5% / 6% / 7% of product subtotal, Rp1,250 admin per order, and an
-estimated transaction fee. See [seller fees and payouts](seller-fees-and-payouts.md)
-for the checked example and proposed DOKU mapping. Withdrawal timing and handling
-differences between estimated and actual provider fees remain unconfirmed.
+commissions of 5% / 6% / 7% of product subtotal and Rp1,250 admin per order.
+The seller pays DOKU's actual processing fee, with an estimate shown beforehand.
+See [seller fees and payouts](seller-fees-and-payouts.md)
+for the checked example and proposed DOKU mapping. The user also specified a
+Rp250,000 minimum seller withdrawal. The Rp2,500 BI-FAST recipient charge applies
+only to withdrawals below Rp250,000; withdrawals at or above that amount carry
+no recipient withdrawal fee. Ezkart covers the provider's transfer fee on seller
+withdrawals. Future affiliates have no Ezkart minimum and pay the fee only when
+withdrawing below the threshold. The event that releases seller earnings for
+withdrawal remains unconfirmed.
 No split rule or payout was created. DOKU's Collect and Route guide
 describes percentage or flat split rules applied at settlement, after provider
 payment fees. Attaching a seller profile and split rule to checkout, persisting

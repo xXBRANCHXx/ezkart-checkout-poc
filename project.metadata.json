@@ -15,7 +15,7 @@
       "sandboxBrandingStatus": "logo_and_palette_verified_registered_brand_name_unchanged",
       "sellerWalletStatus": "sandbox_demo_sub_account_created_checkout_routing_and_payout_integration_pending",
       "sellerFeeSpecification": "docs/seller-fees-and-payouts.md",
-      "sellerFeePolicyStatus": "pricing_mockup_recorded_actual_fee_reconciliation_and_withdrawal_timing_pending",
+      "sellerFeePolicyStatus": "pricing_actual_processing_fee_and_withdrawal_fees_confirmed_release_timing_pending",
       "environmentSwitch": "commerce_environment"
     },
     "midtrans": {
