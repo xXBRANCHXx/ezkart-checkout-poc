@@ -16,7 +16,7 @@ ez_api_json([
     'environment' => ez_config('deployment_environment') ?: 'unset',
     'commerce_environment' => $commerceEnvironment,
     'database' => $database,
-    'midtrans' => ['configured' => $status['midtrans'], 'mode' => $commerceEnvironment],
+    'doku' => ['configured' => $status['doku'], 'mode' => $commerceEnvironment],
     'biteship' => [
         'configured' => $status['biteship'],
         'fulfillment_configured' => $status['biteship_fulfillment'],

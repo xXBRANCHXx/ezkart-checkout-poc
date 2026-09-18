@@ -3,8 +3,9 @@
 > **Payment launch is blocked.** Ezkart is awaiting CV approval and subsequent
 > DOKU merchant onboarding. DOKU is the production payment-provider target, and
 > merchant disbursement must pass an end-to-end test before public orders are
-> accepted. Midtrans is rejected for production; its current adapter is legacy
-> sandbox scaffolding only.
+> accepted. The DOKU checkout adapter supports sandbox and production credentials.
+> Sandbox acceptance, refunds, reconciliation, and disbursements still need
+> verification before launch.
 
 Production provider credentials stay in the ignored `config.runtime.php`; they
 are never committed or merged with a Git branch. The current machine-readable
@@ -12,22 +13,24 @@ decision is in [`../project.metadata.json`](../project.metadata.json).
 
 ## Runtime configuration
 
-Do not configure production payment credentials until the DOKU integration has
-replaced the legacy sandbox adapter. Biteship configuration will use:
+Complete [sandbox acceptance](commerce-sandbox-setup.md) first. Keep sandbox and
+production credential slots separate in the private runtime configuration:
 
 ```php
-'biteship_api_key' => 'biteship_live.YOUR_LIVE_KEY',
-'biteship_webhook_token' => 'A_RANDOM_SECRET_AT_LEAST_32_CHARACTERS_LONG',
+'deployment_environment' => 'production',
+'commerce_environment' => 'production',
+'doku_production_client_id' => 'YOUR_PRODUCTION_CLIENT_ID',
+'doku_production_secret_key' => 'YOUR_PRODUCTION_SECRET_KEY',
+'biteship_production_api_key' => 'biteship_live.YOUR_LIVE_KEY',
+'biteship_production_webhook_token' => 'A_RANDOM_SECRET_AT_LEAST_32_CHARACTERS_LONG',
 ```
 
-Keep the existing Biteship origin postcode, contact, telephone, email, complete
-pickup address, organization, and courier list. Before enabling live Biteship,
-decouple its environment selection from the legacy Midtrans credential check.
-
-When real transactions run on the workbench, the existing
-`deployment_environment => test` setting keeps callback and return URLs on
-`https://test.ezkart.id`. After merge, `deployment_environment => production`
-keeps them on `https://ezkart.id`.
+The test deployment rejects production commerce. A switch selects both
+providers together, with no inference from old Midtrans credentials. Test
+orders remain separate and cannot be sent to live Biteship. Keep sandbox
+credentials available for delayed notifications; do not move sandbox order
+files into the production directory. Confirm the real pickup contact and
+address before creating a production shipment.
 
 ## Provider dashboards
 
@@ -40,7 +43,7 @@ keeps them on `https://ezkart.id`.
 5. Submit and obtain activation for the Biteship live Order API. Live rates may
    work before live order creation is authorized.
 6. Fund the Biteship balance and confirm the pickup address and contact.
-7. Add `https://YOUR-WEBSITE/cart/api/biteship-webhook.php` for the
+7. Add `https://YOUR-WEBSITE/cart/api/biteship-webhook.php?environment=production` for the
    `order.status`, `order.price`, and `order.waybill_id` events. Configure its
    authorization with the same private webhook token stored on the server.
 

@@ -1,8 +1,6 @@
 <?php
 declare(strict_types=1);
 
-const EZ_MIDTRANS_SNAP_SANDBOX_URL = 'https://app.sandbox.midtrans.com/snap/v1/transactions';
-const EZ_MIDTRANS_SNAP_PRODUCTION_URL = 'https://app.midtrans.com/snap/v1/transactions';
 const EZ_BITESHIP_RATES_URL = 'https://api.biteship.com/v1/rates/couriers';
 const EZ_BITESHIP_ORDERS_URL = 'https://api.biteship.com/v1/orders';
 
@@ -64,67 +62,21 @@ function ez_config(string $key): string
     return is_string($value) ? trim($value) : '';
 }
 
-function ez_midtrans_key_environment(string $clientKey, string $serverKey): string
-{
-    $clientEnvironment = str_starts_with($clientKey, 'SB-Mid-client-')
-        ? 'sandbox'
-        : (str_starts_with($clientKey, 'Mid-client-') ? 'production' : '');
-    $serverEnvironment = str_starts_with($serverKey, 'SB-Mid-server-')
-        ? 'sandbox'
-        : (str_starts_with($serverKey, 'Mid-server-') ? 'production' : '');
-    if ($clientEnvironment === '' || $serverEnvironment === '') {
-        throw new RuntimeException('Midtrans keys are not recognized as Sandbox or Production keys.');
-    }
-    if ($clientEnvironment !== $serverEnvironment) {
-        throw new RuntimeException('Midtrans Client Key and Server Key are from different environments.');
-    }
-    return $clientEnvironment;
-}
-
 function ez_commerce_environment(): string
 {
-    $detected = [];
-    $midtransClientKey = ez_config('midtrans_client_key');
-    $midtransServerKey = ez_config('midtrans_server_key');
-    $hasUsableMidtransKeys = $midtransClientKey !== '' && $midtransServerKey !== ''
-        && !str_contains(strtoupper($midtransClientKey . $midtransServerKey), 'REPLACE');
-    if ($hasUsableMidtransKeys) {
-        $detected[] = ez_midtrans_key_environment($midtransClientKey, $midtransServerKey);
+    $environment = strtolower(ez_config('commerce_environment')) ?: 'sandbox';
+    if (!in_array($environment, ['sandbox', 'production'], true)) {
+        throw new RuntimeException('commerce_environment must be sandbox or production.');
     }
-
-    $biteshipKey = ez_config('biteship_api_key');
-    if ($biteshipKey !== '' && !str_contains(strtoupper($biteshipKey), 'REPLACE')) {
-        if (str_starts_with($biteshipKey, 'biteship_test.')) {
-            $detected[] = 'sandbox';
-        } elseif (str_starts_with($biteshipKey, 'biteship_live.')) {
-            $detected[] = 'production';
-        } else {
-            throw new RuntimeException('Biteship API key is not a recognized test or live key.');
-        }
+    if ($environment === 'production' && ez_config('deployment_environment') !== 'production') {
+        throw new RuntimeException('Production commerce requires the production website deployment.');
     }
-
-    $detected = array_values(array_unique($detected));
-    if (count($detected) > 1) {
-        throw new RuntimeException('Midtrans and Biteship credentials are from different environments.');
-    }
-    return $detected[0] ?? 'sandbox';
+    return $environment;
 }
 
 function ez_commerce_is_production(): bool
 {
     return ez_commerce_environment() === 'production';
-}
-
-function ez_midtrans_snap_api_url(): string
-{
-    return ez_commerce_is_production() ? EZ_MIDTRANS_SNAP_PRODUCTION_URL : EZ_MIDTRANS_SNAP_SANDBOX_URL;
-}
-
-function ez_midtrans_snap_script_url(): string
-{
-    return ez_commerce_is_production()
-        ? 'https://app.midtrans.com/snap/snap.js'
-        : 'https://app.sandbox.midtrans.com/snap/snap.js';
 }
 
 function ez_checkout_public_url(): string
@@ -143,34 +95,21 @@ function ez_checkout_public_url(): string
     return 'https://' . $host;
 }
 
-function ez_midtrans_credentials(): array
+function ez_provider_config(string $provider, string $key, string $environment): string
 {
-    $environment = ez_commerce_environment();
-    $merchantId = ez_config('midtrans_merchant_id');
-    $clientKey = ez_config('midtrans_client_key');
-    $serverKey = ez_config('midtrans_server_key');
-    if (
-        $merchantId === '' || $clientKey === '' || $serverKey === ''
-        || str_contains(strtoupper($merchantId), 'REPLACE')
-        || str_contains(strtoupper($clientKey), 'REPLACE')
-        || str_contains(strtoupper($serverKey), 'REPLACE')
-    ) {
-        throw new RuntimeException('Midtrans ' . $environment . ' credentials are not configured on this server.');
+    if (!in_array($environment, ['sandbox', 'production'], true)) throw new RuntimeException('Invalid provider environment.');
+    $value = ez_config($provider . '_' . $environment . '_' . $key);
+    // Old sandbox settings may be reused. Production always requires its own slots.
+    if ($value === '' && $provider === 'biteship' && $environment === 'sandbox') {
+        $value = ez_config($provider . '_' . $key);
     }
-    if (ez_midtrans_key_environment($clientKey, $serverKey) !== $environment) {
-        throw new RuntimeException('Midtrans credentials do not match the inferred commerce environment.');
-    }
-    return [
-        'merchant_id' => $merchantId,
-        'client_key' => $clientKey,
-        'server_key' => $serverKey,
-    ];
+    return $value;
 }
 
-function ez_biteship_credentials(): array
+function ez_biteship_credentials(?string $environment = null): array
 {
-    $environment = ez_commerce_environment();
-    $apiKey = ez_config('biteship_api_key');
+    $environment ??= ez_commerce_environment();
+    $apiKey = ez_provider_config('biteship', 'api_key', $environment);
     $originPostalCode = ez_config('biteship_origin_postal_code');
     if (
         $apiKey === '' || str_contains(strtoupper($apiKey), 'REPLACE')
@@ -190,9 +129,9 @@ function ez_biteship_credentials(): array
     ];
 }
 
-function ez_biteship_fulfillment_credentials(): array
+function ez_biteship_fulfillment_credentials(?string $environment = null): array
 {
-    $credentials = ez_biteship_credentials();
+    $credentials = ez_biteship_credentials($environment);
     $originName = ez_config('biteship_origin_contact_name');
     $originPhone = preg_replace('/[^\d+]/', '', ez_config('biteship_origin_contact_phone')) ?? '';
     $originAddress = ez_config('biteship_origin_address');
@@ -214,16 +153,21 @@ function ez_biteship_fulfillment_credentials(): array
     ];
 }
 
-function ez_biteship_webhook_configured(): bool
+function ez_biteship_webhook_configured(?string $environment = null): bool
 {
-    $token = ez_config('biteship_webhook_token');
+    try {
+        $token = ez_provider_config('biteship', 'webhook_token', $environment ?? ez_commerce_environment());
+    } catch (Throwable) {
+        return false;
+    }
     return strlen($token) >= 32 && !str_contains(strtoupper($token), 'REPLACE');
 }
 
-function ez_biteship_webhook_authorized(): bool
+function ez_biteship_webhook_authorized(?string $environment = null): bool
 {
-    $expected = ez_config('biteship_webhook_token');
-    if (!ez_biteship_webhook_configured()) return false;
+    $environment ??= ez_commerce_environment();
+    $expected = ez_provider_config('biteship', 'webhook_token', $environment);
+    if (!ez_biteship_webhook_configured($environment)) return false;
 
     $authorization = trim((string) (
         $_SERVER['HTTP_AUTHORIZATION']
@@ -247,10 +191,10 @@ function ez_biteship_webhook_authorized(): bool
 function ez_integration_status(): array
 {
     try {
-        ez_midtrans_credentials();
-        $midtrans = true;
+        ez_doku_credentials();
+        $doku = true;
     } catch (Throwable) {
-        $midtrans = false;
+        $doku = false;
     }
     try {
         ez_biteship_credentials();
@@ -270,7 +214,7 @@ function ez_integration_status(): array
     } catch (Throwable) {
         $environment = 'invalid';
     }
-    return ['midtrans' => $midtrans, 'biteship' => $biteship, 'biteship_fulfillment' => $biteshipFulfillment, 'environment' => $environment];
+    return ['doku' => $doku, 'biteship' => $biteship, 'biteship_fulfillment' => $biteshipFulfillment, 'environment' => $environment];
 }
 
 function ez_remote_storefront_products(array $ids): array
@@ -457,7 +401,7 @@ function ez_biteship_quotes(array $cart, string $destinationPostalCode): array
     ], [
         'Accept: application/json',
         'Content-Type: application/json',
-        'Authorization: Bearer ' . $credentials['api_key'],
+        'Authorization: ' . $credentials['api_key'],
     ], ez_commerce_is_production() ? 'Biteship production' : 'Biteship test-mode');
     $pricing = is_array($response['pricing'] ?? null) ? $response['pricing'] : [];
     $quotes = ez_normalize_biteship_quotes($pricing);
@@ -573,7 +517,11 @@ function ez_create_biteship_order(array $order): array
     if (strtoupper((string) ($order['status'] ?? '')) !== 'PAID') {
         throw new InvalidArgumentException('Only paid orders can be handed to Biteship.');
     }
-    $credentials = ez_biteship_fulfillment_credentials();
+    $environment = (string) ($order['commerce_environment'] ?? 'sandbox');
+    if ($environment !== ez_commerce_environment()) {
+        throw new RuntimeException('Switch back to this order\'s environment before arranging pickup.');
+    }
+    $credentials = ez_biteship_fulfillment_credentials($environment);
     $customer = is_array($order['customer'] ?? null) ? $order['customer'] : [];
     $shipping = is_array($order['shipping'] ?? null) ? $order['shipping'] : [];
     $items = is_array($order['shipping_items'] ?? null) ? $order['shipping_items'] : [];
@@ -615,8 +563,8 @@ function ez_create_biteship_order(array $order): array
         'courier_type' => $type,
         'delivery_type' => 'now',
         'reference_id' => (string) $order['order_id'],
-        'tags' => ['ezkart', 'midtrans-' . ez_commerce_environment()],
-        'metadata' => ['midtrans_status' => (string) ($order['midtrans_status'] ?? ''), 'environment' => ez_commerce_environment()],
+        'tags' => ['ezkart', 'doku-' . $environment],
+        'metadata' => ['payment_status' => (string) ($order['payment_status'] ?? ''), 'environment' => $environment],
         'items' => $items,
     ];
     foreach ([
@@ -633,7 +581,7 @@ function ez_create_biteship_order(array $order): array
         $response = ez_http_json(EZ_BITESHIP_ORDERS_URL, $payload, [
             'Accept: application/json',
             'Content-Type: application/json',
-            'Authorization: Bearer ' . $credentials['api_key'],
+            'Authorization: ' . $credentials['api_key'],
         ], ez_commerce_is_production() ? 'Biteship production order' : 'Biteship test-mode order');
     } catch (EzProviderException $error) {
         $duplicate = $error->providerPayload;
@@ -663,15 +611,29 @@ function ez_create_biteship_order(array $order): array
     ];
 }
 
-function ez_order_directory(): string
+function ez_order_directory(?string $environment = null): string
 {
-    $configured = ez_config('midtrans_order_storage');
+    $environment ??= ez_commerce_environment();
+    if (!in_array($environment, ['sandbox', 'production'], true)) throw new RuntimeException('Invalid order environment.');
+    $configured = ez_config('order_storage');
     $documentRoot = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/');
-    $path = $configured !== ''
-        ? $configured
-        : (($documentRoot !== '' ? dirname($documentRoot) : sys_get_temp_dir()) . '/ezkart-midtrans-orders-' . ez_commerce_environment());
+    $deployment = ez_config('deployment_environment') === 'production' ? 'production' : 'test';
+    $base = $configured !== '' ? rtrim($configured, '/') : (($documentRoot !== '' ? dirname($documentRoot) : sys_get_temp_dir()) . '/ezkart-orders');
+    $path = $base . '/' . $deployment . '/' . $environment;
+    if ($configured === '' && $environment === 'sandbox') {
+        $legacy = ez_config('midtrans_order_storage');
+        $legacyDefault = ($documentRoot !== '' ? dirname($documentRoot) : sys_get_temp_dir()) . '/ezkart-midtrans-orders-sandbox';
+        if ($legacy !== '') $path = $legacy;
+        elseif (is_dir($legacyDefault)) $path = $legacyDefault;
+    }
+    if ($path === '' || $path[0] !== '/') throw new RuntimeException('Order storage must be an absolute private path.');
     if (!is_dir($path) && !mkdir($path, 0700, true) && !is_dir($path)) {
         throw new RuntimeException('Unable to create secure order storage.');
+    }
+    $resolvedPath = realpath($path);
+    $resolvedRoot = $documentRoot !== '' ? realpath($documentRoot) : false;
+    if ($resolvedRoot !== false && ($resolvedPath === $resolvedRoot || str_starts_with((string) $resolvedPath, $resolvedRoot . '/'))) {
+        throw new RuntimeException('Order storage must be outside the public web root.');
     }
     return $path;
 }
@@ -681,17 +643,24 @@ function ez_order_path(string $orderId): string
     if (preg_match('/^EZK-[A-Z0-9-]{8,70}$/', $orderId) !== 1) {
         throw new InvalidArgumentException('Invalid order reference.');
     }
-    return ez_order_directory() . '/' . hash('sha256', $orderId) . '.json';
+    $environment = str_starts_with($orderId, 'EZK-P-') ? 'production' : 'sandbox';
+    return ez_order_directory($environment) . '/' . hash('sha256', $orderId) . '.json';
 }
 
 function ez_save_order(array $order): void
 {
     $path = ez_order_path((string) $order['order_id']);
-    $json = json_encode($order, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-    if (!is_string($json) || file_put_contents($path, $json, LOCK_EX) === false) {
-        throw new RuntimeException('Unable to save the order.');
+    $json = ez_json_encode($order);
+    $temporary = tempnam(dirname($path), '.order-');
+    if ($temporary === false) throw new RuntimeException('Unable to save the order.');
+    try {
+        chmod($temporary, 0600);
+        if (file_put_contents($temporary, $json, LOCK_EX) === false || !rename($temporary, $path)) {
+            throw new RuntimeException('Unable to save the order.');
+        }
+    } finally {
+        if (is_file($temporary)) unlink($temporary);
     }
-    chmod($path, 0600);
 }
 
 function ez_load_order(string $orderId): array
@@ -707,11 +676,11 @@ function ez_load_order(string $orderId): array
     return $order;
 }
 
-function ez_find_order_id_by_biteship_id(string $biteshipOrderId): string
+function ez_find_order_id_by_biteship_id(string $biteshipOrderId, ?string $environment = null): string
 {
     $biteshipOrderId = trim($biteshipOrderId);
     if ($biteshipOrderId === '' || strlen($biteshipOrderId) > 160) return '';
-    $paths = glob(ez_order_directory() . '/*.json') ?: [];
+    $paths = glob(ez_order_directory($environment) . '/*.json') ?: [];
     foreach ($paths as $path) {
         if (!is_file($path)) continue;
         $order = json_decode((string) file_get_contents($path), true);
@@ -724,14 +693,14 @@ function ez_find_order_id_by_biteship_id(string $biteshipOrderId): string
     return '';
 }
 
-function ez_apply_biteship_webhook(array $payload): bool
+function ez_apply_biteship_webhook(array $payload, ?string $environment = null): bool
 {
     $event = strtolower(trim((string) ($payload['event'] ?? '')));
     if (!in_array($event, ['order.status', 'order.price', 'order.waybill_id'], true)) {
         throw new InvalidArgumentException('Unsupported Biteship webhook event.');
     }
     $biteshipOrderId = trim((string) ($payload['order_id'] ?? ''));
-    $orderId = ez_find_order_id_by_biteship_id($biteshipOrderId);
+    $orderId = ez_find_order_id_by_biteship_id($biteshipOrderId, $environment);
     if ($orderId === '') return false;
 
     $lock = ez_lock_order_state($orderId);
@@ -863,13 +832,18 @@ function ez_arrange_paid_order_pickup(string $orderId): array
     }
 }
 
-function ez_http_json(string $url, array $payload, array $headers, string $provider = 'Midtrans'): array
+function ez_json_encode(array $payload): string
+{
+    return json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+}
+
+function ez_http_json(string $url, array $payload, array $headers, string $provider = 'Provider'): array
 {
     $curl = curl_init($url);
     if ($curl === false) throw new RuntimeException('Unable to start ' . $provider . ' request.');
     curl_setopt_array($curl, [
         CURLOPT_POST => true,
-        CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+        CURLOPT_POSTFIELDS => ez_json_encode($payload),
         CURLOPT_HTTPHEADER => $headers,
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_CONNECTTIMEOUT => 10,
@@ -898,6 +872,8 @@ function ez_http_json(string $url, array $payload, array $headers, string $provi
     }
     return $decoded;
 }
+
+require_once __DIR__ . '/doku.php';
 
 function ez_request_origin_allowed(): bool
 {

@@ -24,13 +24,19 @@ return [
     // Optional absolute path outside the public web root. When omitted, Ezkart
     // creates a private, environment-specific sibling of the document root.
     'admin_session_storage' => '',
-    'midtrans_merchant_id' => 'REPLACE_WITH_SANDBOX_MERCHANT_ID',
-    'midtrans_client_key' => 'REPLACE_WITH_SANDBOX_CLIENT_KEY',
-    'midtrans_server_key' => 'REPLACE_WITH_SANDBOX_SERVER_KEY',
-    'biteship_api_key' => 'biteship_test.REPLACE_WITH_TEST_API_KEY',
-    // Use a separate random value of at least 32 characters to authenticate
-    // Biteship webhook deliveries. Never reuse the API key here.
-    'biteship_webhook_token' => 'REPLACE_WITH_A_RANDOM_WEBHOOK_SECRET',
+    // The server-side switch selects BOTH providers. Default is sandbox.
+    // Production also requires deployment_environment=production.
+    'commerce_environment' => 'sandbox',
+    'doku_sandbox_client_id' => 'REPLACE_WITH_DOKU_SANDBOX_CLIENT_ID',
+    'doku_sandbox_secret_key' => 'REPLACE_WITH_DOKU_SANDBOX_SECRET_KEY',
+    'doku_production_client_id' => '',
+    'doku_production_secret_key' => '',
+    'biteship_sandbox_api_key' => 'biteship_test.REPLACE_WITH_TEST_API_KEY',
+    'biteship_production_api_key' => '',
+    // Separate random values of at least 32 characters for each webhook mode.
+    // Never reuse a provider API key as a webhook token.
+    'biteship_sandbox_webhook_token' => 'REPLACE_WITH_A_RANDOM_WEBHOOK_SECRET',
+    'biteship_production_webhook_token' => '',
     'biteship_origin_postal_code' => '12345',
     // Biteship needs a pickup contact and full address before it can create the
     // test shipment after the merchant accepts the paid order and explicitly
@@ -45,5 +51,6 @@ return [
     'biteship_couriers' => 'jne,sicepat,jnt',
     'sandbox_admin_password' => 'REPLACE_WITH_A_STRONG_ADMIN_PASSWORD',
     // Optional absolute path outside the public web root.
-    'midtrans_order_storage' => '',
+    // Ezkart appends /<deployment>/<sandbox|production> to this root.
+    'order_storage' => '',
 ];

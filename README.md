@@ -33,22 +33,25 @@ disbursement flow is a hard release requirement. Midtrans has been rejected for
 production because the evaluated setup did not provide the merchant
 disbursement flow Ezkart requires.
 
-The existing Midtrans adapter is legacy sandbox scaffolding only. Do not add
-production Midtrans credentials, treat Midtrans health as launch readiness, or
-promote that adapter to production. Replace it atomically with the DOKU payment,
-callback, refund, reconciliation, and merchant-disbursement flow after CV
-approval and DOKU onboarding. The authoritative machine-readable status is in
-[`project.metadata.json`](project.metadata.json).
+Checkout now uses DOKU hosted payment pages and signed DOKU notifications.
+The sandbox adapter is implemented; provider credentials and a real sandbox
+acceptance run are still required. Setup, testing, and the explicit production
+switch are documented in [DOKU and Biteship setup](docs/commerce-sandbox-setup.md).
+The authoritative release status remains in `project.metadata.json`.
+Production refunds, reconciliation, and verified merchant disbursement remain
+release requirements; configuring the payment adapter does not complete them.
 
 Biteship remains the production shipping target and can be configured
-independently once payment/shipping environment inference is decoupled from the
-legacy sandbox adapter. Biteship requires the live Order API to be activated
+with environment-specific credentials. `commerce_environment` selects
+`sandbox` (the default) or `production` for both providers; live mode also
+requires `deployment_environment=production`. Biteship requires the live Order API to be activated
 separately; having a `biteship_live.` key does not by itself prove that order
 creation is approved. Keep enough Biteship balance available and confirm the
 pickup address before arranging the first real pickup.
 
 Configure Biteship's `order.status`, `order.price`, and `order.waybill_id`
-webhooks to POST to `/cart/api/biteship-webhook.php`. Protect the endpoint with
+webhooks to POST to `/cart/api/biteship-webhook.php?environment=sandbox`
+(or `environment=production` for the live dashboard). Protect the endpoint with
 the same webhook token using a Bearer authorization value, HTTP Basic password,
 or `X-Ezkart-Webhook-Token` header. Shipment updates are matched to the private
 Ezkart order by the Biteship order ID and replay safely.
@@ -85,7 +88,7 @@ closed if an enrolled session has not reached `aal2`.
 
 Privileged legacy accounts can read the private JSON order store and display order IDs,
 customers, line items, product subtotal, shipping charge, final total,
-shipping service, legacy sandbox payment reference/status, Biteship fulfillment reference,
+shipping service, payment provider reference/status, Biteship fulfillment reference,
 and signed-notification result. Other beta accounts receive an empty order view
 and cannot read the shared records. The dashboard's
 “paid volume” is an aggregate of sandbox orders marked `PAID`; it is not a real

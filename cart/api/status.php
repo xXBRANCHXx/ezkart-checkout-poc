@@ -13,8 +13,10 @@ try {
         'order_id' => $order['order_id'],
         'status' => $order['status'],
         'total' => $order['total'],
-        'midtrans_transaction_id' => $order['midtrans_transaction_id'],
-        'midtrans_status' => $order['midtrans_status'],
+        'payment_provider' => $order['payment_provider'] ?? 'midtrans',
+        'payment_reference' => $order['payment_reference'] ?? $order['midtrans_transaction_id'] ?? '',
+        'payment_status' => $order['payment_status'] ?? $order['midtrans_status'] ?? '',
+        'environment' => $order['commerce_environment'] ?? 'sandbox',
         'payment_type' => $order['payment_type'],
         'customer_name' => $order['customer']['name'],
         'fulfillment_status' => $order['fulfillment_status'] ?? 'AWAITING_PAYMENT',
@@ -26,6 +28,6 @@ try {
 } catch (InvalidArgumentException $error) {
     ez_api_json(['ok' => false, 'error' => 'Order not found.'], 404);
 } catch (Throwable $error) {
-    error_log('Ezkart Midtrans status error: ' . $error->getMessage());
+    error_log('Ezkart payment status error: ' . $error->getMessage());
     ez_api_json(['ok' => false, 'error' => 'Unable to read payment status.'], 500);
 }

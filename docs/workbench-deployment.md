@@ -19,7 +19,7 @@ The workbench is dependency-free PHP/HTML and should deploy from the repository 
 3. Connect GitHub and select `Radish-Labs/Ezkart`.
 4. Select the `agent/ezkart-workbench` branch and deploy to the workbench site's `public_html` root.
 5. Enable auto-deployment only for that branch.
-6. Add the same sandbox-only runtime configuration used by the current test environment. Do not copy production Midtrans server keys into a browser-visible file.
+6. Add the same sandbox-only runtime configuration used by the current test environment. Use the DOKU/Biteship sandbox credential slots described in [commerce setup](commerce-sandbox-setup.md).
 7. Password-protect the subdomain and add `X-Robots-Tag: noindex, nofollow` at the hosting layer before sharing it.
 
 Hostinger keeps following the branch selected for each website after a merge. You do not reconnect Git. Continue pushing test work to `agent/ezkart-workbench`; merge approved commits into `main`; `test.ezkart.id` and `ezkart.id` remain separate deployments.

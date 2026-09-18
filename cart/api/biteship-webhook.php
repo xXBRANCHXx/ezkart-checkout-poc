@@ -7,7 +7,9 @@ try {
     if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
         ez_api_json(['ok' => false, 'error' => 'Method not allowed.'], 405);
     }
-    if (!ez_biteship_webhook_authorized()) {
+    $environment = (string) ($_GET['environment'] ?? ez_commerce_environment());
+    if (!in_array($environment, ['sandbox', 'production'], true)) throw new InvalidArgumentException('Invalid webhook environment.');
+    if (!ez_biteship_webhook_authorized($environment)) {
         error_log('Ezkart Biteship webhook rejected: invalid authorization.');
         ez_api_json(['ok' => false], 401);
     }
@@ -15,7 +17,7 @@ try {
     if (!is_array($payload)) {
         throw new InvalidArgumentException('Invalid webhook body.');
     }
-    $matched = ez_apply_biteship_webhook($payload);
+    $matched = ez_apply_biteship_webhook($payload, $environment);
     ez_api_json(['ok' => true, 'matched' => $matched]);
 } catch (InvalidArgumentException $error) {
     error_log('Ezkart Biteship webhook rejected: ' . $error->getMessage());

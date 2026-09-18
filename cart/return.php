@@ -101,7 +101,7 @@ if (preg_match('/^EZK-[A-Z0-9-]{8,70}$/', $orderId) !== 1) {
           const data = await response.json();
           if (!response.ok) throw new Error(data.error || 'Order status is unavailable.');
           document.getElementById('return-total').textContent = money.format(data.total);
-          document.getElementById('return-reference').textContent = data.midtrans_transaction_id || 'Waiting';
+          document.getElementById('return-reference').textContent = data.payment_reference || 'Waiting';
           document.getElementById('return-status').textContent = data.status;
           const fulfillment = document.getElementById('return-fulfillment');
           fulfillment.textContent = data.fulfillment_status === 'CONFIRMED'
@@ -111,6 +111,7 @@ if (preg_match('/^EZK-[A-Z0-9-]{8,70}$/', $orderId) !== 1) {
             : data.fulfillment_status === 'RETRY_REQUIRED' ? 'Delivery setup needs attention'
             : 'Waiting for payment';
 
+          if (data.environment === 'sandbox') document.getElementById('return-status').textContent += ' (test)';
           if (data.status === 'PAID') {
             if (scope) {
               try { localStorage.removeItem('ezkart.checkout.cart.v1:' + scope); } catch (_) {}
@@ -138,7 +139,7 @@ if (preg_match('/^EZK-[A-Z0-9-]{8,70}$/', $orderId) !== 1) {
         if (attempts < 30) {
           window.setTimeout(check, 2000);
         } else {
-          document.getElementById('return-message').textContent = 'Confirmation is taking longer than usual. Keep the order number above for support.';
+          if (!shell.classList.contains('confirmed')) document.getElementById('return-message').textContent = 'Confirmation is taking longer than usual. Keep the order number above for support.';
         }
       }
       check();

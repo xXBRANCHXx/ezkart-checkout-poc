@@ -41,7 +41,6 @@
     .reduce((sum, [id, quantity]) => sum + state.products[id].price * quantity, 0);
   const shippingPrice = () => Number(state.shipping?.price) || 0;
   const total = () => subtotal() + shippingPrice();
-  let paymentLoader = null;
 
   const validSelectionId = (value) => /^[a-z0-9][a-z0-9_-]{2,95}(?:~[a-z0-9][a-z0-9_-]{2,95})?$/i.test(value);
   const safeShopScope = (value) => {
@@ -431,38 +430,6 @@
     renderTotals();
   }
 
-  async function ensurePaymentWindow() {
-    if (window.snap?.pay) return;
-    if (paymentLoader) return paymentLoader;
-    paymentLoader = (async () => {
-      const response = await fetch("api/checkout-config.php", {
-        headers: { Accept: "application/json" },
-        cache: "no-store",
-      });
-      const payload = await response.json().catch(() => ({}));
-      const expected = payload.environment === "production"
-        ? "https://app.midtrans.com/snap/snap.js"
-        : "https://app.sandbox.midtrans.com/snap/snap.js";
-      if (!response.ok || !payload.client_key || payload.snap_url !== expected) {
-        throw new Error(payload.error || "Secure payment is not configured.");
-      }
-      await new Promise((resolve, reject) => {
-        const script = document.createElement("script");
-        script.src = payload.snap_url;
-        script.dataset.clientKey = payload.client_key;
-        script.async = true;
-        script.onload = resolve;
-        script.onerror = () => reject(new Error("The secure payment window could not load."));
-        document.head.append(script);
-      });
-      if (!window.snap?.pay) throw new Error("The secure payment window is not ready.");
-    })().catch((error) => {
-      paymentLoader = null;
-      throw error;
-    });
-    return paymentLoader;
-  }
-
   async function startPayment() {
     if (!state.shipping || !itemCount()) return;
     const button = byId("pay-button");
@@ -471,39 +438,28 @@
     button.textContent = "Opening secure payment…";
 
     try {
-      await ensurePaymentWindow();
       const response = await fetch("api/start.php", {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({
           cart: state.cart,
+          shop: state.shop,
           customer: state.customer,
           shipping_id: state.shipping.id,
         }),
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.error || "Payment could not start.");
-      const token = String(payload.snap_token || "");
       const orderId = String(payload.order_id || "");
-      if (!token || !/^EZK-MIDTRANS-[A-Z0-9-]+$/.test(orderId)) {
+      const paymentUrl = new URL(String(payload.payment_url || ""));
+      const host = payload.environment === "production" ? "jokul.doku.com" : "sandbox.doku.com";
+      if (payload.provider !== "doku" || !["sandbox", "production"].includes(payload.environment)
+          || !/^EZK-[SP]-[A-F0-9]{24}$/.test(orderId) || paymentUrl.protocol !== "https:"
+          || paymentUrl.hostname !== host || paymentUrl.username || paymentUrl.password || paymentUrl.port
+          || !/^\/(?:checkout-link(?:-v2)?\/|checkout\/link\/).+/.test(paymentUrl.pathname)) {
         throw new Error("The payment service returned an invalid session.");
       }
-
-      const returnUrl = `return.php?order=${encodeURIComponent(orderId)}&shop=${encodeURIComponent(state.shop)}`;
-      window.snap.pay(token, {
-        onSuccess: () => window.location.assign(returnUrl),
-        onPending: () => window.location.assign(returnUrl),
-        onError: () => {
-          showToast("Payment was not completed.");
-          button.disabled = false;
-          button.textContent = original;
-        },
-        onClose: () => {
-          showToast("Payment window closed. Your cart is still here.");
-          button.disabled = false;
-          button.textContent = original;
-        },
-      });
+      window.location.assign(paymentUrl.href);
     } catch (error) {
       showToast(friendlyError(
         error instanceof Error ? error.message : "",
