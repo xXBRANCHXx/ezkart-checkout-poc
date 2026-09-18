@@ -57,13 +57,13 @@ test("blank-page editing supports direct dragging, inline text, resize, history 
         `Dragging the element itself moves it in both directions: ${JSON.stringify({ start, end })}`);
     };
     await drag(heading);
-    const desktopProps = config => config.responsive?.find(rule => rule.device === "desktop")?.props || {};
-    const moved = desktopProps(await call("nativeInspect", { id: headingId }));
+    const sharedProps = config => config.props || {};
+    const moved = sharedProps(await call("nativeInspect", { id: headingId }));
     assert.ok(parseFloat(moved.left) > 0 && parseFloat(moved.top) > 0);
     await call("undo");
-    assert.equal(desktopProps(await call("nativeInspect", { id: headingId })).left, undefined);
+    assert.equal(sharedProps(await call("nativeInspect", { id: headingId })).left, undefined);
     await call("redo");
-    assert.deepEqual(desktopProps(await call("nativeInspect", { id: headingId })), moved);
+    assert.deepEqual(sharedProps(await call("nativeInspect", { id: headingId })), moved);
     await heading.click();
     await page.locator("[data-native-text]").fill("Edited from settings");
     await heading.click();

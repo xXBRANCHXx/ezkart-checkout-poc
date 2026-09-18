@@ -21,8 +21,8 @@ async function fixture(run) {
   const device = async size => {
     await page.locator(`[data-sq-device=${size}]`).click();
     await call("settle");
-    assert.equal(await panel.locator("[data-native-breakpoint]").inputValue(), "device");
-    assert.match(await panel.locator("[data-native-context-note]").textContent(), new RegExp(`${size} only`));
+    assert.equal(await panel.locator("[data-native-breakpoint]").inputValue(), size === "desktop" ? "base" : "device");
+    assert.match(await panel.locator("[data-native-context-note]").textContent(), size === "desktop" ? /all screen sizes/ : new RegExp(`${size} only`));
   };
   const prop = async (key, value) => {
     const input = panel.locator(`[data-native-prop=${key}]`);
@@ -57,10 +57,12 @@ test("screen-specific text, drag, resize and section layout survive history, reo
   if (await page.locator(".sq-builder-sidebar.sq-panel-pinned").count()) await page.locator("[data-sq-tab=add]").click();
   await heading.click();
   await call("settle");
+  assert.equal(await panel.locator("[data-native-breakpoint]").inputValue(), "base", "Desktop starts with All screen sizes selected");
   await prop("fontSize", "56px");
   await prop("width", "480px");
   const desktop = await appearance(heading);
   await device("mobile");
+  assert.equal((await appearance(heading)).fontSize, "56px", "The initial desktop edit applies to mobile too");
   await prop("fontSize", "28px");
   await prop("width", "240px");
   await prop("paddingLeft", "12px");
@@ -103,9 +105,10 @@ test("screen-specific text, drag, resize and section layout survive history, reo
   await panel.locator("[data-native-text]").press("Tab");
   await device("desktop");
   assert.equal(await heading.textContent(), "One shared heading");
+  await panel.locator("[data-native-breakpoint]").selectOption("device");
   await prop("fontSize", "60px");
   await device("mobile");
-  assert.equal((await appearance(heading)).fontSize, "28px", "Later desktop changes stay on desktop too");
+  assert.equal((await appearance(heading)).fontSize, "28px", "Explicit Desktop only changes stay on desktop");
   const section = page.locator('.sq-page-preview > [data-section-id="blank"]');
   await panel.locator("[data-native-parent]").click();
   await prop("paddingLeft", "20px");
@@ -127,6 +130,7 @@ test("screen-specific text, drag, resize and section layout survive history, reo
   await call("settle");
   assert.deepEqual(await call("nativeInspect"), saved);
   await heading.click();
+  assert.equal(await panel.locator("[data-native-breakpoint]").inputValue(), "base", "Reopening defaults desktop to All screen sizes again");
   await page.setViewportSize({ width: 941, height: 904 });
   await device("mobile");
   assert.equal((await appearance(heading)).fontSize, "28px");
@@ -149,7 +153,7 @@ test("screen-specific text, drag, resize and section layout survive history, reo
   }
 }));
 
-test("device edits inherit template rules, shared appearance is explicit, and content remains shared", async () => fixture(async ({ page, panel, call, device, prop, appearance }) => {
+test("device edits inherit template rules, desktop defaults to shared appearance, and content remains shared", async () => fixture(async ({ page, panel, call, device, prop, appearance }) => {
   const rules = [{ max: 900, props: { fontSize: "36px", paddingLeft: "16px" } }, { max: 600, props: { fontSize: "24px" } }];
   await call("nativeInsert", { section: "blank", node: { id: "inherited", type: "heading", text: "Template heading", props: { fontSize: "48px", width: "280px" }, responsive: rules } });
   const heading = page.locator("[data-native-id=inherited]");
@@ -169,7 +173,6 @@ test("device edits inherit template rules, shared appearance is explicit, and co
   await prop("fontSize", "42px");
   await device("desktop");
   assert.equal((await appearance(heading)).fontSize, "48px");
-  await panel.locator("[data-native-breakpoint]").selectOption("base");
   await prop("fontSize", "38px");
   for (const size of ["mobile", "tablet", "desktop"]) {
     await device(size);

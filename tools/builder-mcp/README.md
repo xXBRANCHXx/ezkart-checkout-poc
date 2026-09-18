@@ -63,11 +63,12 @@ The **Flexible elements** group in Add exposes these same primitives. Their insp
 - Show/hide controls, state switches, links, accordions, accessible video dialogs and play/pause controls. Video includes poster, captions URL or embedded WebVTT, loop, mute and autoplay controls.
 - Proportional composition scaling and scroll tilt/travel that respect reduced motion.
 
-Canvas and inspector appearance edits default to the current preview: desktop,
-tablet or mobile. Font size, dimensions, dragging, resizing, padding and section
-height are independent; text, images and links stay shared. Switching previews
-resets the inspector to that screen size. Choose **All screen sizes** explicitly
-to change a property everywhere, including removing its existing overrides.
+Canvas and inspector appearance edits default to **All screen sizes** in desktop
+preview, **Tablet only** in tablet preview, and **Mobile only** in mobile preview.
+Switching previews restores that preview's default. Choose **Desktop only** when
+a desktop change should stay independent. Text, images and links stay shared.
+**All screen sizes** changes a property everywhere, including removing its
+existing overrides. Section height handles remain specific to the active preview.
 Managed device rules live in `responsive` with a `device` marker and render after
 authored breakpoints: mobile through 600px, tablet above 600px through 900px, and
 desktop above 900px. Existing template rules remain intact until edited.

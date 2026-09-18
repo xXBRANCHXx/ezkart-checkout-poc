@@ -1273,7 +1273,7 @@
   }
   let hooks,
     selected,
-    context = "device",
+    context = "base",
     state = "",
     selection,
     draftLayers = [],
@@ -1485,6 +1485,7 @@
   }
   const getHost = (config) => (state ? config.states?.[state] || {} : config);
   const currentDevice = () => hooks?.device?.() || "desktop";
+  const defaultContext = () => currentDevice() === "desktop" ? "base" : "device";
   const getContext = (config, create = false) =>
     context === "device"
       ? deviceContext(getHost(config), currentDevice(), create)
@@ -2248,7 +2249,7 @@
       selectTextColors(node, textColorAdapter.host, textColorAdapter.onSelect);
       return;
     }
-    if (textColorAdapter) context = "device";
+    if (textColorAdapter) context = defaultContext();
     textColorAdapter = null;
     const sharedPanel = document.querySelector("[data-sq-native-inspector]");
     if (sharedPanel && hooks) {
@@ -2461,7 +2462,7 @@
         (r) => !r.device && `${r.min ?? ""}:${r.max ?? ""}` === context,
       )
     )
-      context = "device";
+      context = defaultContext();
     const current = currentAppearance(config),
       props = current.props || {};
     hooks.inspector.querySelector("[data-sq-inspector-context]").textContent =
@@ -2486,7 +2487,7 @@
       ),
     );
     if (![...responsive.options].some((o) => o.value === context))
-      context = "device";
+      context = defaultContext();
     responsive.value = context;
     const variants = panel.querySelector("[data-native-variant]");
     variants.replaceChildren(
@@ -2698,6 +2699,7 @@
   }
   function init(callbacks) {
     hooks = callbacks;
+    context = defaultContext();
     const panel = document.createElement("section");
     panel.dataset.sqNativeInspector = "";
     panel.className = "sq-native-inspector";
@@ -3589,7 +3591,7 @@
     nudge,
     deviceContext,
     setDevice: () => {
-      context = "device";
+      context = defaultContext();
       if (selected && !textColorAdapter) select(selected);
     },
   };
