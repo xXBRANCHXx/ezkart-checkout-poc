@@ -6,6 +6,7 @@
     cart: {},
     customer: {},
     shipping: null,
+    shippingRequired: true,
     step: "confirm",
     loaded: false,
     shop: "store",
@@ -210,10 +211,29 @@
     }
 
     try {
-      const response = await fetch(`api/catalog.php?products=${encodeURIComponent(ids.join(","))}`, {
-        headers: { Accept: "application/json" },
-        cache: "no-store",
-      });
+      const [response, configResponse] = await Promise.all([
+        fetch(`api/catalog.php?products=${encodeURIComponent(ids.join(","))}`, {
+          headers: { Accept: "application/json" },
+          cache: "no-store",
+        }),
+        fetch("api/checkout-config.php", {
+          headers: { Accept: "application/json" },
+          cache: "no-store",
+        }),
+      ]);
+      const config = await configResponse.json().catch(() => ({}));
+      if (!configResponse.ok || !["sandbox", "production"].includes(config.environment)
+          || config.shipping_required !== (config.environment === "production")) {
+        throw new Error("Checkout settings could not load. Please try again.");
+      }
+      state.shippingRequired = config.shipping_required;
+      byId("get-rates").hidden = !state.shippingRequired;
+      byId("delivery-method").hidden = !state.shippingRequired;
+      byId("checkout-title").textContent = state.shippingRequired ? "Delivery & payment" : "Details & payment";
+      byId("checkout-description").textContent = state.shippingRequired
+        ? "Tell us where to send your order, then choose the delivery option that works for you."
+        : "Enter your details to test payment. Delivery is skipped in sandbox checkout.";
+      document.querySelector('[data-progress-step="checkout"] b').textContent = state.shippingRequired ? "Delivery" : "Details";
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.error || "The selected products are unavailable.");
 
@@ -232,6 +252,7 @@
       cleanAddParameter();
       state.loaded = true;
       byId("catalog-loading").hidden = true;
+      resetDelivery();
       renderCart();
     } catch (error) {
       byId("catalog-loading").hidden = true;
@@ -256,11 +277,11 @@
 
   function renderTotals() {
     byId("cart-subtotal").textContent = money(subtotal());
-    byId("shipping-total").textContent = state.shipping
+    byId("shipping-total").textContent = !state.shippingRequired ? "Skipped in sandbox" : state.shipping
       ? money(shippingPrice())
       : state.step === "confirm" ? "Calculated next" : "Not selected";
     byId("grand-total").textContent = money(total());
-    if (state.shipping) byId("pay-button").textContent = `Pay ${money(total())}`;
+    if (state.shipping || !state.shippingRequired) byId("pay-button").textContent = `Pay ${money(total())}`;
   }
 
   function renderSummary() {
@@ -312,8 +333,8 @@
 
   function resetDelivery() {
     state.shipping = null;
-    byId("pay-button").disabled = true;
-    byId("pay-button").textContent = "Choose a delivery method";
+    byId("pay-button").disabled = state.shippingRequired || !itemCount();
+    byId("pay-button").textContent = state.shippingRequired ? "Choose a delivery method" : `Pay ${money(total())}`;
     byId("shipping-options").innerHTML = '<div class="quote-state"><span class="delivery-illustration" aria-hidden="true"></span><b>Delivery options will appear here</b><small>Rates are calculated for your destination and order weight.</small></div>';
     byId("quote-location").textContent = "Enter your address to see available options.";
   }
@@ -372,6 +393,7 @@
   }
 
   async function buildShippingQuotes() {
+    if (!state.shippingRequired) return;
     const button = byId("get-rates");
     state.shipping = null;
     byId("pay-button").disabled = true;
@@ -431,7 +453,14 @@
   }
 
   async function startPayment() {
-    if (!state.shipping || !itemCount()) return;
+    if ((state.shippingRequired && !state.shipping) || !state.loaded || !itemCount() || byId("pay-button").disabled) return;
+    const form = byId("customer-form");
+    const result = validateForm(form);
+    if (!result.valid) {
+      form.querySelector(".invalid")?.focus();
+      return;
+    }
+    state.customer = result.values;
     const button = byId("pay-button");
     const original = button.textContent;
     button.disabled = true;
@@ -445,7 +474,7 @@
           cart: state.cart,
           shop: state.shop,
           customer: state.customer,
-          shipping_id: state.shipping.id,
+          shipping_id: state.shipping?.id || "",
         }),
       });
       const payload = await response.json().catch(() => ({}));
@@ -496,6 +525,10 @@
   });
   byId("customer-form").addEventListener("submit", async (event) => {
     event.preventDefault();
+    if (!state.shippingRequired) {
+      await startPayment();
+      return;
+    }
     const result = validateForm(event.currentTarget);
     if (!result.valid) {
       event.currentTarget.querySelector(".invalid")?.focus();

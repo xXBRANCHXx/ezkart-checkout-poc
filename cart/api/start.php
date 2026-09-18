@@ -18,7 +18,6 @@ try {
     // Validate credentials before requesting a paid Biteship rate lookup.
     $environment = ez_commerce_environment();
     ez_doku_credentials();
-    ez_biteship_credentials();
     $checkout = ez_checkout_request($input);
     $orderId = 'EZK-' . ($environment === 'production' ? 'P' : 'S') . '-' . strtoupper(bin2hex(random_bytes(12)));
     $shop = strtolower(trim((string) ($input['shop'] ?? '')));

@@ -1,9 +1,16 @@
 # DOKU + Biteship sandbox checkout
 
-The checkout creates a DOKU hosted payment session using server-calculated
-product prices and a fresh Biteship rate. Only a verified DOKU success
-notification marks an order paid. The merchant then accepts the order and
-chooses **Arrange pickup** to create the simulated Biteship shipment.
+Sandbox checkout creates a DOKU hosted payment session for the server-calculated
+product total, with no delivery selection or shipping charge. It does not call
+Biteship or require its credentials, pickup address or balance. Customer contact
+and address fields remain available for the payment session. Only a verified
+DOKU success notification marks an order paid; delivery is then marked skipped,
+with no pickup action or deadline.
+
+Production checkout still requires a delivery selection and a fresh Biteship
+rate. The shipping API can also be tested in sandbox by explicitly supplying a
+valid `shipping_id` to `start.php`; those orders follow the merchant acceptance
+and simulated pickup flow. The server's commerce environment controls the rule.
 
 ## Private server configuration
 
@@ -11,6 +18,8 @@ Copy the relevant entries from `config.example.php` into the test website's
 ignored `config.runtime.php` (preserve its existing Auth/Worker settings).
 Alternatively use environment variables prefixed with `EZKART_` and uppercase
 keys. Credentials must never appear in browser code or Git.
+Only the first four entries below are needed to test sandbox payments; the
+Biteship entries are needed when testing shipping separately.
 
 ```php
 'deployment_environment' => 'test',
@@ -61,26 +70,31 @@ a separate production requirement, as described in `database-environments.md`.
    orders. Every nonempty event payload still requires webhook authentication.
 
 Biteship sandbox orders are simulated, but rate checks, Maps and public tracking
-may still incur API fees. The application currently requests rates when showing
-shipping choices and again when validating checkout.
+may still incur API fees. Production checkout requests rates when showing
+shipping choices and again when validating checkout. Sandbox checkout skips
+these lookups unless an API caller explicitly supplies a shipping selection.
 
 ## Acceptance run
 
 1. Open `https://test.ezkart.id/cart/api/health.php`. Confirm
-   `commerce_environment=sandbox`, `doku.configured=true`, and the Biteship
-   credential, fulfillment and webhook flags are all true. These flags validate
-   configuration only; they do not prove provider account activation.
+   `commerce_environment=sandbox` and `doku.configured=true`. These flags validate
+   configuration only; they do not prove provider account activation. Biteship
+   flags may be false for a sandbox payment test.
 2. Open `https://test.ezkart.id/cart/?shop=ezkart-demo&cart=granola:1`.
-   Enter test customer/delivery details, request shipping and continue to pay.
+   Enter test customer/address details and click **Pay**. No delivery lookup or
+   selection is required, and the total contains only the products.
 3. Confirm the browser opens `https://staging.doku.com/...` (or DOKU's documented
    `https://sandbox.doku.com/...`) with the exact
-   product-plus-shipping total. The enabled channels are VA, QRIS and credit
+   product total. The enabled channels are VA, QRIS and credit
    card; the DOKU account must have the chosen channel enabled.
 4. Complete the payment through the
    [DOKU simulator](https://sandbox.doku.com/integration/simulator/).
 5. Verify the Ezkart return page says **Payment confirmed** and `PAID (test)`.
-   Merely returning to Ezkart does not mark the order paid.
-6. In the privileged order dashboard, accept the order and arrange pickup.
+   It should also say **Delivery skipped (sandbox)**. Merely returning to Ezkart
+   does not mark the order paid.
+6. For a separate shipping integration test, first configure Biteship and create
+   an order with an explicitly quoted shipping service. In the privileged order
+   dashboard, accept that paid order and arrange pickup.
    Verify one simulated shipment and its reference in Biteship Testing Mode.
    Repeat Arrange pickup/notification delivery and confirm no duplicate order.
 7. Verify a Biteship webhook updates the shipment reference/status. Check a
@@ -97,13 +111,20 @@ IDR 10,000, customer details, bank transfer and card options. No payment was
 completed. Hosted runtime configuration and a full payment-notification/Biteship
 acceptance run remain pending.
 
+The updated sandbox browser flow also created invoice
+`EZK-S-986B672736303125FCB00262` through the normal checkout endpoint, with
+Biteship credentials deliberately unavailable in the local test server. DOKU
+displayed exactly IDR 58,000 for one granola item, with zero shipping charge.
+The session remained pending; no provider payment confirmation was simulated.
+
 On the same date, the actual Biteship test API accepted the shipping adapter's
 isolated sample order `EZK-S-EA075F0E1CC5993FD8718311` and returned simulated
 shipment `6aace9e7e558e47fb0412fd9` with status `confirmed`. This adapter fixture
 used temporary sample addresses and was not saved as a paid Ezkart order.
 The Rates API rejected the request because the account had insufficient balance,
-so rate lookup and the full checkout flow remain unverified. A Biteship balance
-top-up, actual pickup details and private hosted configuration are still needed.
+so rate lookup and the full shipping flow remain unverified. A Biteship balance
+top-up, actual pickup details and private hosted configuration are still needed
+for shipping tests. They do not block the sandbox checkout that skips delivery.
 
 Biteship accepted registration of sandbox webhook `6aaceb8083fe22646422e72f`
 for all three events at the test endpoint, using `X-Ezkart-Webhook-Token`.

@@ -65,7 +65,7 @@
             <button class="text-button back-to-cart" type="button" data-go="confirm">Back to cart</button>
             <header class="page-heading">
               <h1 id="checkout-title">Delivery & payment</h1>
-              <p>Tell us where to send your order, then choose the delivery option that works for you.</p>
+              <p id="checkout-description">Tell us where to send your order, then choose the delivery option that works for you.</p>
             </header>
 
             <form id="customer-form" novalidate>
@@ -95,7 +95,7 @@
                 <button class="outline-button rate-button" id="get-rates" type="submit">Find delivery options</button>
               </section>
 
-              <section class="form-card delivery-card" aria-labelledby="shipping-title">
+              <section class="form-card delivery-card" id="delivery-method" aria-labelledby="shipping-title">
                 <header class="section-heading">
                   <span>03</span>
                   <div><h2 id="shipping-title">Delivery method</h2><p id="quote-location">Enter your address to see available options.</p></div>
@@ -134,6 +134,6 @@
     </footer>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="cart.js?v=doku-staging-5061dcd"></script>
+    <script src="cart.js?v=sandbox-delivery-optional-1"></script>
   </body>
 </html>

@@ -482,24 +482,27 @@ function ez_checkout_request(array $input): array
     }
 
     $shippingId = trim((string) ($input['shipping_id'] ?? ''));
-    $quotes = ez_biteship_quotes($cart, $postalCode);
+    $shippingSkipped = !ez_commerce_is_production() && $shippingId === '';
     $shipping = null;
-    foreach ($quotes as $quote) {
-        if (hash_equals((string) $quote['id'], $shippingId)) {
-            $shipping = $quote;
-            break;
+    $shippingPrice = 0;
+    if (!$shippingSkipped) {
+        if ($shippingId === '') throw new InvalidArgumentException('Select a valid shipping service.');
+        $quotes = ez_biteship_quotes($cart, $postalCode);
+        foreach ($quotes as $quote) {
+            if (hash_equals((string) $quote['id'], $shippingId)) {
+                $shipping = $quote;
+                break;
+            }
         }
+        if (!is_array($shipping)) throw new InvalidArgumentException('Select a valid shipping service.');
+        $shippingPrice = (int) $shipping['price'];
+        $items[] = [
+            'id' => 'EZK-SHIPPING',
+            'name' => mb_substr('Shipping - ' . $shipping['courier'] . ' ' . $shipping['service'], 0, 50),
+            'price' => $shippingPrice,
+            'quantity' => 1,
+        ];
     }
-    if (!is_array($shipping)) {
-        throw new InvalidArgumentException('Select a valid shipping service.');
-    }
-    $shippingPrice = (int) $shipping['price'];
-    $items[] = [
-        'id' => 'EZK-SHIPPING',
-        'name' => mb_substr('Shipping - ' . $shipping['courier'] . ' ' . $shipping['service'], 0, 50),
-        'price' => $shippingPrice,
-        'quantity' => 1,
-    ];
     return [
         'items' => $items,
         'subtotal' => $subtotal,
@@ -509,7 +512,13 @@ function ez_checkout_request(array $input): array
         'shipping_items' => $shippingItems,
         'customer' => compact('name', 'email', 'phone', 'location', 'address', 'postalCode', 'note'),
         'shipping' => $shipping,
+        'shipping_skipped' => $shippingSkipped,
     ];
+}
+
+function ez_order_skips_shipping(array $order): bool
+{
+    return ($order['commerce_environment'] ?? '') === 'sandbox' && ($order['shipping_skipped'] ?? false) === true;
 }
 
 function ez_create_biteship_order(array $order): array
@@ -521,6 +530,7 @@ function ez_create_biteship_order(array $order): array
     if ($environment !== ez_commerce_environment()) {
         throw new RuntimeException('Switch back to this order\'s environment before arranging pickup.');
     }
+    if (ez_order_skips_shipping($order)) throw new RuntimeException('Delivery is skipped for this sandbox order.');
     $credentials = ez_biteship_fulfillment_credentials($environment);
     $customer = is_array($order['customer'] ?? null) ? $order['customer'] : [];
     $shipping = is_array($order['shipping'] ?? null) ? $order['shipping'] : [];
@@ -776,6 +786,7 @@ function ez_accept_paid_order(string $orderId): array
         if (strtoupper((string) ($order['status'] ?? '')) !== 'PAID') {
             throw new InvalidArgumentException('Only paid orders can be accepted.');
         }
+        if (ez_order_skips_shipping($order)) return $order;
         if (trim((string) ($order['biteship_order_id'] ?? '')) !== '') return $order;
         if (trim((string) ($order['accepted_at'] ?? '')) === '') {
             $order['accepted_at'] = gmdate(DATE_ATOM);
@@ -796,6 +807,7 @@ function ez_arrange_paid_order_pickup(string $orderId): array
     try {
         $order = ez_load_order($orderId);
         if (strtoupper((string) ($order['status'] ?? '')) !== 'PAID') return $order;
+        if (ez_order_skips_shipping($order)) throw new RuntimeException('Delivery is skipped for this sandbox order.');
         if (trim((string) ($order['biteship_order_id'] ?? '')) !== '') {
             $order['fulfillment_status'] = 'CONFIRMED';
             return $order;

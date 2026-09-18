@@ -109,6 +109,7 @@ if (preg_match('/^EZK-[A-Z0-9-]{8,70}$/', $orderId) !== 1) {
             : data.fulfillment_status === 'AWAITING_PICKUP_ARRANGEMENT' ? 'Seller arranging pickup'
             : data.fulfillment_status === 'AWAITING_ACCEPTANCE' ? 'Waiting for seller confirmation'
             : data.fulfillment_status === 'RETRY_REQUIRED' ? 'Delivery setup needs attention'
+            : data.fulfillment_status === 'NOT_REQUIRED' ? 'Delivery skipped (sandbox)'
             : 'Waiting for payment';
 
           if (data.environment === 'sandbox') document.getElementById('return-status').textContent += ' (test)';
@@ -119,6 +120,10 @@ if (preg_match('/^EZK-[A-Z0-9-]{8,70}$/', $orderId) !== 1) {
             shell.classList.add('confirmed');
             document.getElementById('return-icon').textContent = '✓';
             document.getElementById('return-title').textContent = 'Payment confirmed';
+            if (data.fulfillment_status === 'NOT_REQUIRED') {
+              document.getElementById('return-message').textContent = 'Your test payment is confirmed. Delivery was skipped for this sandbox order.';
+              return;
+            }
             if (data.fulfillment_status === 'CONFIRMED') {
               const firstName = String(data.customer_name || '').split(' ')[0];
               document.getElementById('return-message').textContent = (firstName ? 'Thank you, ' + firstName + '. ' : '') + 'Your order is confirmed and pickup has been arranged.';

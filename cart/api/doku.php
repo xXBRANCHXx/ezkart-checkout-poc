@@ -131,8 +131,10 @@ function ez_apply_doku_notification(string $body, array $headers, string $target
         $order['payment_notification_id'] = $headers['request-id'];
         $order['payment_notification_verified'] = true;
         $order['paid_at'] = gmdate(DATE_ATOM);
-        $order['fulfillment_deadline_at'] = ez_fulfillment_deadline($order);
-        if (empty($order['biteship_order_id']) && empty($order['accepted_at'])) $order['fulfillment_status'] = 'AWAITING_ACCEPTANCE';
+        $order['fulfillment_deadline_at'] = ez_order_skips_shipping($order) ? '' : ez_fulfillment_deadline($order);
+        if (empty($order['biteship_order_id']) && empty($order['accepted_at'])) {
+            $order['fulfillment_status'] = ez_order_skips_shipping($order) ? 'NOT_REQUIRED' : 'AWAITING_ACCEPTANCE';
+        }
         $order['updated_at'] = gmdate(DATE_ATOM);
         ez_save_order($order);
     } finally {

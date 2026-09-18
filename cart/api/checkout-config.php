@@ -7,14 +7,15 @@ try {
     if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET') {
         ez_api_json(['ok' => false, 'error' => 'Method not allowed.'], 405);
     }
-    ez_doku_credentials();
-    ez_biteship_credentials();
+    // Public checkout behavior is available before provider credentials are installed.
+    $environment = ez_commerce_environment();
     ez_api_json([
         'ok' => true,
-        'environment' => ez_commerce_environment(),
+        'environment' => $environment,
         'provider' => 'doku',
+        'shipping_required' => $environment === 'production',
     ]);
 } catch (Throwable $error) {
     error_log('Ezkart checkout config error: ' . $error->getMessage());
-    ez_api_json(['ok' => false, 'error' => 'DOKU checkout is not configured on this server.'], 503);
+    ez_api_json(['ok' => false, 'error' => 'Checkout settings are unavailable.'], 503);
 }

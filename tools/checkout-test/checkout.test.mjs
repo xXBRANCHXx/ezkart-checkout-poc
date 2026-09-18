@@ -167,6 +167,7 @@ test("sandbox checkout, signed callbacks, merchant acceptance, idempotent pickup
     ok: true,
     environment: "sandbox",
     provider: "doku",
+    shipping_required: false,
   });
   const started = await app.request("/cart/api/start.php", input);
   assert.equal(started.status, 201);
@@ -291,12 +292,57 @@ test("sandbox checkout, signed callbacks, merchant acceptance, idempotent pickup
   );
 });
 
-test("production switch selects live slots and preserves sandbox order identity", async (t) => {
+test("sandbox payment skips rates and fulfillment without Biteship configuration", async (t) => {
+  const app = await setup({
+    EZKART_BITESHIP_SANDBOX_API_KEY: "REPLACE_MISSING",
+    EZKART_BITESHIP_ORIGIN_POSTAL_CODE: "REPLACE_MISSING",
+  });
+  t.after(() => app.close());
+  assert.equal((await app.request("/cart/api/checkout-config.php")).data.shipping_required, false);
+  const { shipping_id, ...withoutShipping } = input;
+  const started = await app.request("/cart/api/start.php", withoutShipping);
+  assert.equal(started.status, 201);
+  assert.equal(started.data.payment_total, 116000);
+  const id = started.data.order_id;
+  const calls = await app.calls();
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, "https://api-sandbox.doku.com/checkout/v1/payment");
+  const payload = JSON.parse(calls[0].body);
+  assert.equal(payload.order.amount, 116000);
+  assert.equal(payload.order.line_items.length, 1);
+  assert.equal((await notify(app, id, "SUCCESS", { amount: 116000 })).status, 200);
+  const order = JSON.parse(app.cli(`echo json_encode(ez_load_order('${id}'));`));
+  assert.equal(order.shipping_skipped, true);
+  assert.equal(order.shipping_price, 0);
+  assert.equal(order.shipping, null);
+  assert.equal(order.fulfillment_status, "NOT_REQUIRED");
+  assert.equal(order.fulfillment_deadline_at, "");
+  app.cli(`ez_accept_paid_order('${id}');`);
+  assert.match(
+    app.cli(`try { ez_arrange_paid_order_pickup('${id}'); } catch (RuntimeException $e) { echo $e->getMessage(); }`),
+    /Delivery is skipped/,
+  );
+  assert.match(
+    app.cli(`try { ez_create_biteship_order(ez_load_order('${id}')); } catch (RuntimeException $e) { echo $e->getMessage(); }`),
+    /Delivery is skipped/,
+  );
+  assert.equal((await app.calls()).length, 1);
+});
+
+test("production switch requires shipping, selects live slots and preserves sandbox order identity", async (t) => {
   const app = await setup({
     EZKART_DEPLOYMENT_ENVIRONMENT: "production",
     EZKART_COMMERCE_ENVIRONMENT: "production",
   });
   t.after(() => app.close());
+  assert.equal((await app.request("/cart/api/checkout-config.php")).data.shipping_required, true);
+  const { shipping_id, ...withoutShipping } = input;
+  const rejected = await app.request("/cart/api/start.php", {
+    ...withoutShipping, environment: "sandbox", shipping_skipped: true, shipping_price: 0,
+  });
+  assert.equal(rejected.status, 422);
+  assert.match(rejected.data.error, /shipping service/);
+  assert.equal((await app.calls()).length, 0);
   const started = await app.request("/cart/api/start.php", input);
   assert.equal(started.status, 201);
   assert.match(started.data.order_id, /^EZK-P-/);
@@ -446,7 +492,10 @@ test("payment URLs reject lookalike hosts, credentials and cross-environment tar
 test("browser checkout redirects to DOKU and shows only server-confirmed payment", async (t) => {
   const { chromium } =
     await import("../builder-mcp/node_modules/playwright/index.mjs");
-  const app = await setup();
+  const app = await setup({
+    EZKART_BITESHIP_SANDBOX_API_KEY: "REPLACE_MISSING",
+    EZKART_BITESHIP_ORIGIN_POSTAL_CODE: "REPLACE_MISSING",
+  });
   t.after(() => app.close());
   const browser = await chromium.launch({ headless: true });
   t.after(() => browser.close());
@@ -456,7 +505,9 @@ test("browser checkout redirects to DOKU and shows only server-confirmed payment
     });
     const page = await context.newPage();
     const errors = [];
+    const rateRequests = [];
     page.on("pageerror", (e) => errors.push(e.message));
+    page.on("request", (r) => { if (r.url().includes("/api/rates.php")) rateRequests.push(r.url()); });
     await page.route("https://staging.doku.com/**", (r) =>
       r.fulfill({
         contentType: "text/html",
@@ -465,10 +516,14 @@ test("browser checkout redirects to DOKU and shows only server-confirmed payment
     );
     await page.goto(app.base + "/cart/?shop=test-shop&cart=granola:2");
     await page.locator("#to-checkout").click();
+    assert.equal(await page.locator("#get-rates").isVisible(), false);
+    assert.equal(await page.locator("#delivery-method").isVisible(), false);
+    assert.equal(await page.locator("#pay-button").isEnabled(), true);
+    assert.equal(await page.locator("#shipping-total").textContent(), "Skipped in sandbox");
+    await page.locator("#pay-button").click();
+    assert.equal(await page.locator('[name="fullName"]').getAttribute("class"), "invalid");
     for (const [name, value] of Object.entries(input.customer))
       if (value) await page.locator(`[name="${name}"]`).fill(value);
-    await page.locator("#get-rates").click();
-    await page.locator('input[name="shipping"]').waitFor();
     if (process.env.EZKART_TEST_SCREENSHOTS)
       await page.screenshot({
         path: join(
@@ -483,7 +538,9 @@ test("browser checkout redirects to DOKU and shows only server-confirmed payment
       .filter((x) => x.url.includes("api-sandbox.doku.com"))
       .at(-1);
     const id = JSON.parse(created.body).order.invoice_number;
-    assert.equal((await notify(app, id)).status, 200);
+    assert.equal(JSON.parse(created.body).order.amount, 116000);
+    assert.deepEqual(rateRequests, []);
+    assert.equal((await notify(app, id, "SUCCESS", { amount: 116000 })).status, 200);
     await page.goto(app.base + `/cart/return.php?order=${id}&shop=test-shop`);
     await page
       .getByRole("heading", { name: "Payment confirmed", exact: true })
@@ -492,6 +549,8 @@ test("browser checkout redirects to DOKU and shows only server-confirmed payment
       await page.locator("#return-status").textContent(),
       "PAID (test)",
     );
+    assert.equal(await page.locator("#return-fulfillment").textContent(), "Delivery skipped (sandbox)");
+    assert.match(await page.locator("#return-message").textContent(), /Delivery was skipped/);
     assert.equal(
       await page.evaluate(() =>
         localStorage.getItem("ezkart.checkout.cart.v1:test-shop"),
@@ -507,6 +566,33 @@ test("browser checkout redirects to DOKU and shows only server-confirmed payment
     assert.deepEqual(errors, []);
     await context.close();
   }
+});
+
+test("production browser checkout still requires a delivery quote before payment", async (t) => {
+  const { chromium } = await import("../builder-mcp/node_modules/playwright/index.mjs");
+  const app = await setup({
+    EZKART_DEPLOYMENT_ENVIRONMENT: "production",
+    EZKART_COMMERCE_ENVIRONMENT: "production",
+  });
+  t.after(() => app.close());
+  const browser = await chromium.launch({ headless: true });
+  t.after(() => browser.close());
+  const page = await browser.newPage({ viewport: { width: 390, height: 900 } });
+  await page.route("https://jokul.doku.com/**", (r) => r.fulfill({ body: "Production payment fixture" }));
+  await page.goto(app.base + "/cart/?shop=test-shop&cart=granola:2");
+  await page.locator("#to-checkout").click();
+  assert.equal(await page.locator("#get-rates").isVisible(), true);
+  assert.equal(await page.locator("#delivery-method").isVisible(), true);
+  assert.equal(await page.locator("#pay-button").isEnabled(), false);
+  for (const [name, value] of Object.entries(input.customer))
+    if (value) await page.locator(`[name="${name}"]`).fill(value);
+  await page.locator("#get-rates").click();
+  await page.locator('input[name="shipping"]').waitFor();
+  await page.locator("#pay-button").click();
+  await page.waitForURL("https://jokul.doku.com/checkout-link-v2/fixture");
+  const calls = await app.calls();
+  assert.equal(calls.filter((c) => c.url.endsWith("/rates/couriers")).length, 2);
+  assert.equal(JSON.parse(calls.at(-1).body).order.amount, 134000);
 });
 
 test("merchant dashboard displays DOKU orders and accepts and arranges pickup through its UI", async (t) => {

@@ -34,6 +34,8 @@ production because the evaluated setup did not provide the merchant
 disbursement flow Ezkart requires.
 
 Checkout now uses DOKU hosted payment pages and signed DOKU notifications.
+Sandbox checkout skips delivery selection and shipping charges, so payment
+tests do not need a funded Biteship account. Production still requires shipping.
 The sandbox adapter is implemented; provider credentials and a real sandbox
 acceptance run are still required. Setup, testing, and the explicit production
 switch are documented in [DOKU and Biteship setup](docs/commerce-sandbox-setup.md).
