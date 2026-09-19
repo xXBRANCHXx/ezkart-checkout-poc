@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createHash, createHmac } from "node:crypto";
+import { createHash, createHmac, randomBytes } from "node:crypto";
 import { spawn, spawnSync } from "node:child_process";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -44,6 +44,7 @@ async function setup(overrides = {}) {
     EZKART_DEPLOYMENT_ENVIRONMENT: "test",
     EZKART_COMMERCE_ENVIRONMENT: "sandbox",
     EZKART_ORDER_STORAGE: join(directory, "orders"),
+    EZKART_EXECUTIVE_STORAGE: join(directory, "executive"),
     EZKART_DOKU_SANDBOX_CLIENT_ID: "MCH-SANDBOX-TEST",
     EZKART_DOKU_SANDBOX_SECRET_KEY: secret,
     // Keep the original hosted integration covered as an explicit legacy configuration.
@@ -357,7 +358,7 @@ test("sandbox payment skips rates and fulfillment without Biteship configuration
   assert.equal((await app.calls()).length, 1);
 });
 
-test("production switch requires shipping, selects live slots and preserves sandbox order identity", async (t) => {
+test("production requires shipping and live slots and rejects sandbox provider events", async (t) => {
   const app = await setup({
     EZKART_DEPLOYMENT_ENVIRONMENT: "production",
     EZKART_COMMERCE_ENVIRONMENT: "production",
@@ -405,12 +406,12 @@ test("production switch requires shipping, selects live slots and preserves sand
   app.cli(
     `ez_save_order(['order_id'=>'${sandboxId}','status'=>'PAID','commerce_environment'=>'sandbox','payment_provider'=>'doku','total'=>134000]);`,
   );
-  assert.equal((await notify(app, sandboxId)).status, 200);
+  assert.equal((await notify(app, sandboxId)).status, 400);
   assert.match(
     app.cli(
       `try { ez_create_biteship_order(ez_load_order('${sandboxId}')); } catch (RuntimeException $e) { echo $e->getMessage(); }`,
     ),
-    /Switch back/,
+    /Sandbox orders cannot be fulfilled/,
   );
   assert.notEqual(
     app.cli(`echo ez_order_path('${sandboxId}');`),
@@ -421,7 +422,7 @@ test("production switch requires shipping, selects live slots and preserves sand
 test("invalid mode, live key in sandbox, absent DOKU slots, and provider errors fail closed", async (t) => {
   for (const overrides of [
     { EZKART_COMMERCE_ENVIRONMENT: "typo" },
-    { EZKART_COMMERCE_ENVIRONMENT: "production" },
+    { EZKART_DEPLOYMENT_ENVIRONMENT: "production", EZKART_COMMERCE_ENVIRONMENT: "sandbox" },
     { EZKART_BITESHIP_SANDBOX_API_KEY: "biteship_live.wrong" },
     { EZKART_DOKU_SANDBOX_CLIENT_ID: "REPLACE_MISSING" },
   ]) {
@@ -996,4 +997,47 @@ test("merchant dashboard displays DOKU orders and accepts and arranges pickup th
       .getAttribute("href"),
     "../api/health.php",
   );
+});
+
+
+const bridgeSecret = "fixture-executive-bridge-secret-43-characters-minimum";
+function bridgeHeaders(input, overrides = {}) {
+  const body = JSON.stringify(input), timestamp = String(Math.floor(Date.now() / 1000)), nonce = randomBytes(24).toString("hex");
+  return {
+    "X-Executive-Time": timestamp,
+    "X-Executive-Nonce": nonce,
+    "X-Executive-Signature": createHmac("sha256", bridgeSecret).update(["ezkart-executive-bridge", "POST", "/cart/api/executive.php", timestamp, nonce, createHash("sha256").update(body).digest("hex")].join("\n")).digest("hex"),
+    ...overrides,
+  };
+}
+test("executive bridge requires signed requests, rejects replay, and exports only the requested environment", async t => {
+  const app = await setup({EZKART_EXECUTIVE_BRIDGE_SECRET: bridgeSecret});t.after(() => app.close());
+  const path = "/cart/api/executive.php", query = {action:"orders",environment:"sandbox"};
+  assert.equal((await app.request(path, query)).status,401);
+  assert.equal((await app.request(path, query, bridgeHeaders(query,{"X-Executive-Signature":"0".repeat(64)}))).status,403);
+  const started = await app.request("/cart/api/start.php", input);assert.equal(started.status,201);
+  const headers = bridgeHeaders(query);const exportResult=await app.request(path,query,headers);assert.equal(exportResult.status,200);assert.equal(exportResult.data.orders.length,1);assert.equal(exportResult.data.orders[0].seller_id,"demo");
+  for(const key of ["phone","address","payment_url","payment_details","secret","raw_event_json"])assert.ok(!(key in exportResult.data.orders[0]));
+  assert.equal((await app.request(path,query,headers)).status,409);
+  const live={...query,environment:"production"};assert.equal((await app.request(path,live,bridgeHeaders(query))).status,403);
+  assert.equal((await app.request(path,live,bridgeHeaders(live))).data.orders.length,0);
+  const status={action:"status",environment:"sandbox"};assert.equal((await app.request(path,status,bridgeHeaders(status))).data.mode,"sandbox");
+});
+test("workbench mode switches both providers while preserving existing order environment and pinning each request", async t => {
+  const app = await setup({EZKART_EXECUTIVE_BRIDGE_SECRET:bridgeSecret});t.after(()=>app.close());
+  const path="/cart/api/executive.php";
+  const older=await app.request("/cart/api/start.php",input);assert.equal(older.status,201);
+  const stale={action:"set-mode",environment:"sandbox",target:"production",expected_mode:"production"};assert.equal((await app.request(path,stale,bridgeHeaders(stale))).status,409);
+  const change={...stale,expected_mode:"sandbox"};const changed=await app.request(path,change,bridgeHeaders(change));assert.equal(changed.status,200);assert.equal(changed.data.mode,"production");
+  const newer=await app.request("/cart/api/start.php",input);assert.equal(newer.status,201);assert.match(newer.data.order_id,/^EZK-P-/);assert.match(newer.data.payment_url,/jokul\.doku\.com/);
+  const calls=await app.calls();assert.equal(calls.at(-1).url,"https://api.doku.com/checkout/v1/payment");assert.ok(calls.at(-2).headers.includes("Authorization: biteship_live.fixture"));
+  assert.equal((await notify(app,older.data.order_id)).status,200,"Original sandbox payment still verifies after mode switch.");
+  app.cli(`ez_create_biteship_order(ez_load_order('${older.data.order_id}'));`);
+  assert.ok((await app.calls()).at(-1).headers.includes("Authorization: biteship_test.fixture"),"Old order keeps its sandbox shipping key.");
+  const pin=app.cli(`require_once ${JSON.stringify(join(root,"cart/api/executive-bridge.php"))};$path=ez_executive_directory().'/mode.json';file_put_contents($path,json_encode(['mode'=>'sandbox']));echo ez_commerce_environment();file_put_contents($path,json_encode(['mode'=>'production']));echo ':'.ez_commerce_environment();`);assert.equal(pin,"sandbox:sandbox");
+});
+test("production mode remains unavailable when the payment integration is not ready; live storefront exposes no switch",async t=>{
+  const app=await setup({EZKART_EXECUTIVE_BRIDGE_SECRET:bridgeSecret,EZKART_DOKU_PRODUCTION_PAYMENT_FLOW:"direct_bca"});t.after(()=>app.close());
+  const input={action:"set-mode",environment:"sandbox",target:"production",expected_mode:"sandbox"};assert.equal((await app.request('/cart/api/executive.php',input,bridgeHeaders(input))).status,422);assert.equal((await app.request('/cart/api/checkout-config.php')).data.environment,'sandbox');
+  const live=await setup({EZKART_DEPLOYMENT_ENVIRONMENT:'production',EZKART_COMMERCE_ENVIRONMENT:'production',EZKART_EXECUTIVE_BRIDGE_SECRET:bridgeSecret});t.after(()=>live.close());assert.equal((await live.request('/cart/api/executive.php',input,bridgeHeaders(input))).status,403);
 });

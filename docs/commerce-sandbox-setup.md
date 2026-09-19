@@ -408,3 +408,13 @@ provider sandbox acceptance.
 - [Biteship sandbox](https://biteship.com/en/docs/sandbox)
 - [Biteship base URL and mode selection](https://biteship.com/en/docs/api/base_url)
 - [Biteship testing-mode fee policy](https://help.biteship.com/hc/en-us/articles/58286997471513-Testing-Mode-Fee-Policy)
+
+## Executive dashboard bridge and workbench mode
+
+The Executive Dashboard uses `cart/api/executive.php` only on the test deployment. Install a separate random 32-byte-or-longer bridge secret in `../.ezkart-executive-bridge/secret.php` as `<?php return ['secret' => '...'];`, with private directory mode 0700 and file mode 0600. The same key lives in the Executive Dashboard's private `access.php` under `workbench_secret`. Keep both outside public_html and Git.
+
+Bridge requests are POST JSON and signed over the method, exact target, timestamp, nonce, and body hash. They expire after 90 seconds and cannot replay. The fixed allowlist contains order reporting, readiness status, and workbench mode changes. Exported orders omit addresses, phone numbers, virtual account numbers, payment URLs, and provider payloads. A server-validated catalog seller ID is now persisted on new orders; old client-supplied shop labels are never treated as ownership.
+
+Workbench mode is stored atomically in private `mode.json`, and selects DOKU and Biteship together for new checkout requests. It requires matching current mode and complete provider readiness. Each request pins the selected mode so a concurrent switch cannot mix providers. Existing orders retain their own provider environment for callbacks and fulfillment. Production deployments and the ezkart.id hosts reject sandbox provider credentials even if a configuration file mistakenly requests them. The separate legacy production branch needs its own lockout patch until the new checkout is released.
+
+The dashboard view switch only selects data and tools. The workbench's database remains separate even when testing live providers; production promotion is a separate release. Current direct BCA production readiness remains blocked by the payment integration requirement. Neither the bridge nor the dashboard activates live payments automatically.

@@ -25,8 +25,11 @@ return [
     // creates a private, environment-specific sibling of the document root.
     'admin_session_storage' => '',
     // The server-side switch selects BOTH providers. Default is sandbox.
-    // Production also requires deployment_environment=production.
+    // ezkart.id / production deployments reject sandbox settings.
+    // The test deployment may use either mode, after all provider checks pass.
     'commerce_environment' => 'sandbox',
+    // Private dashboard bridge key, or ../.ezkart-executive-bridge/secret.php.
+    'executive_bridge_secret' => '',
     'doku_sandbox_client_id' => 'REPLACE_WITH_DOKU_SANDBOX_CLIENT_ID',
     'doku_sandbox_secret_key' => 'REPLACE_WITH_DOKU_SANDBOX_SECRET_KEY',
     'doku_sandbox_payment_flow' => 'direct_bca', // Ezkart UI; non-SNAP BCA sandbox API.

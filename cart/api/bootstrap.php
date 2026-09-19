@@ -64,14 +64,26 @@ function ez_config(string $key): string
 
 function ez_commerce_environment(): string
 {
-    $environment = strtolower(ez_config('commerce_environment')) ?: 'sandbox';
-    if (!in_array($environment, ['sandbox', 'production'], true)) {
-        throw new RuntimeException('commerce_environment must be sandbox or production.');
+    // Pin provider selection for the whole request; an admin switch cannot mix a checkout mid-flight.
+    static $resolved;
+    if (is_string($resolved)) return $resolved;
+    $deployment = strtolower(ez_config('deployment_environment'));
+    $host = strtolower(preg_replace('/:\d+$/', '', (string) ($_SERVER['HTTP_HOST'] ?? '')) ?? '');
+    $productionHost = in_array($host, ['ezkart.id', 'www.ezkart.id'], true);
+    $configured = strtolower(ez_config('commerce_environment'));
+    if ($deployment === 'production' || $productionHost) {
+        // A production deployment can never fall back to test providers.
+        if ($configured !== '' && $configured !== 'production') throw new RuntimeException('The production storefront requires production commerce settings.');
+        return $resolved = 'production';
     }
-    if ($environment === 'production' && ez_config('deployment_environment') !== 'production') {
-        throw new RuntimeException('Production commerce requires the production website deployment.');
+    $environment = $configured ?: 'sandbox';
+    if ($deployment === 'test') {
+        require_once __DIR__ . '/executive-bridge.php';
+        $environment = ez_executive_workbench_mode() ?? $environment;
     }
-    return $environment;
+    if (!in_array($environment, ['sandbox', 'production'], true)) throw new RuntimeException('commerce_environment must be sandbox or production.');
+    if ($environment === 'production' && $deployment !== 'test') throw new RuntimeException('Production testing is only allowed on the configured workbench.');
+    return $resolved = $environment;
 }
 
 function ez_commerce_is_production(): bool
@@ -98,6 +110,8 @@ function ez_checkout_public_url(): string
 function ez_provider_config(string $provider, string $key, string $environment): string
 {
     if (!in_array($environment, ['sandbox', 'production'], true)) throw new RuntimeException('Invalid provider environment.');
+    $host = strtolower(preg_replace('/:\d+$/', '', (string) ($_SERVER['HTTP_HOST'] ?? '')) ?? '');
+    if ($environment === 'sandbox' && (ez_config('deployment_environment') === 'production' || in_array($host, ['ezkart.id', 'www.ezkart.id'], true))) throw new InvalidArgumentException('Sandbox providers are disabled on the production storefront.');
     $value = ez_config($provider . '_' . $environment . '_' . $key);
     // Old sandbox settings may be reused. Production always requires its own slots.
     if ($value === '' && $provider === 'biteship' && $environment === 'sandbox') {
@@ -365,6 +379,7 @@ function ez_biteship_quotes(array $cart, string $destinationPostalCode): array
     }
     $items = [];
     $itemCount = 0;
+    $sellerIds = [];
     $catalog = ez_catalog(array_keys($cart));
     foreach ($catalog as $id => $product) {
         if (!is_array($product)) throw new InvalidArgumentException('A selected product is unavailable.');
@@ -420,6 +435,7 @@ function ez_checkout_request(array $input): array
     $subtotal = 0;
     $weight = 0;
     $itemCount = 0;
+    $sellerIds = [];
     $catalog = ez_catalog(array_keys($cart));
     foreach ($catalog as $id => $product) {
         if (!is_array($product)) throw new InvalidArgumentException('A selected product is unavailable.');
@@ -435,6 +451,7 @@ function ez_checkout_request(array $input): array
         if (isset($product['stock']) && $quantity > (int) $product['stock']) {
             throw new InvalidArgumentException('A selected quantity is no longer available.');
         }
+        $sellerIds[] = (string) ($product['seller_id'] ?? '');
         $lineTotal = $product['price'] * $quantity;
         $items[] = [
             'id' => $product['sku'],
@@ -503,7 +520,10 @@ function ez_checkout_request(array $input): array
             'quantity' => 1,
         ];
     }
+    $sellerIds = array_values(array_unique($sellerIds));
+    if (count($sellerIds) !== 1 || $sellerIds[0] === '') throw new InvalidArgumentException('The cart must belong to one verified store.');
     return [
+        'seller_id' => $sellerIds[0],
         'items' => $items,
         'subtotal' => $subtotal,
         'shipping_price' => $shippingPrice,
@@ -527,9 +547,8 @@ function ez_create_biteship_order(array $order): array
         throw new InvalidArgumentException('Only paid orders can be handed to Biteship.');
     }
     $environment = (string) ($order['commerce_environment'] ?? 'sandbox');
-    if ($environment !== ez_commerce_environment()) {
-        throw new RuntimeException('Switch back to this order\'s environment before arranging pickup.');
-    }
+    if (!in_array($environment, ['sandbox', 'production'], true)) throw new RuntimeException('Invalid order environment.');
+    if (ez_config('deployment_environment') === 'production' && $environment !== 'production') throw new RuntimeException('Sandbox orders cannot be fulfilled on the production storefront.');
     if (ez_order_skips_shipping($order)) throw new RuntimeException('Delivery is skipped for this sandbox order.');
     $credentials = ez_biteship_fulfillment_credentials($environment);
     $customer = is_array($order['customer'] ?? null) ? $order['customer'] : [];
@@ -592,7 +611,7 @@ function ez_create_biteship_order(array $order): array
             'Accept: application/json',
             'Content-Type: application/json',
             'Authorization: ' . $credentials['api_key'],
-        ], ez_commerce_is_production() ? 'Biteship production order' : 'Biteship test-mode order');
+        ], $environment === 'production' ? 'Biteship production order' : 'Biteship test-mode order');
     } catch (EzProviderException $error) {
         $duplicate = $error->providerPayload;
         $details = is_array($duplicate['details'] ?? null) ? $duplicate['details'] : [];
