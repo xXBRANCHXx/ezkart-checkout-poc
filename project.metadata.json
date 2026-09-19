@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-18T00:00:00+07:00",
+  "updatedAt": "2026-09-19T00:00:00+07:00",
   "legalEntity": {
     "type": "CV",
     "name": "Ezkart",
@@ -11,8 +11,9 @@
       "productionTarget": "DOKU",
       "status": "blocked_pending_cv_approval_and_doku_onboarding",
       "merchantDisbursementRequired": true,
-      "sandboxStatus": "bca_sandbox_checkout_and_signed_payment_confirmation_verified_delivery_skipped",
-      "sandboxBrandingStatus": "logo_and_palette_verified_registered_brand_name_unchanged",
+      "sandboxStatus": "ezkart_ui_non_snap_direct_bca_and_signed_payment_confirmation_verified_delivery_skipped",
+      "sandboxBrandingStatus": "ezkart_owned_payment_ui_desktop_and_mobile_verified",
+      "directProductionStatus": "non_snap_adapter_sandbox_only_supported_production_api_migration_pending",
       "sellerWalletStatus": "sandbox_demo_sub_account_created_checkout_routing_and_payout_integration_pending",
       "sellerFeeSpecification": "docs/seller-fees-and-payouts.md",
       "sellerFeePolicyStatus": "pricing_actual_processing_fee_and_withdrawal_fees_confirmed_release_timing_pending",

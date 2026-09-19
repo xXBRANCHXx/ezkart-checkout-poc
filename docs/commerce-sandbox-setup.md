@@ -204,7 +204,42 @@ event for a nonexistent shipment received HTTP 401 without the token and HTTP
 provider delivery updating a persisted Ezkart shipment remains a separate
 shipping acceptance test.
 
-## Sandbox checkout branding
+## Ezkart payment UI acceptance — 2026-09-19
+
+Deployed implementation commit: `4a9ba48` on `agent/ezkart-workbench`.
+The ordinary checkout at `test.ezkart.id` created direct API invoice
+`EZK-S-BE8FCEB4C93F369D1F84419C`, BCA VA `1900800000347140`, for one granola
+item at IDR 58,000. It opened `/cart/payment.php` on Ezkart with the expected
+amount, no delivery selection/charge, and no browser requests to DOKU domains.
+The desktop and 390px mobile page had no JavaScript errors or horizontal
+overflow; the logo was 112px desktop / 100px mobile.
+
+DOKU's actual BCA simulator found that account and exact amount, and completed
+the simulated payment. The signed provider notification changed Ezkart's order
+to `PAID` / `SUCCESS` / `VIRTUAL_ACCOUNT_BCA`; the open Ezkart page automatically
+displayed **Payment received**. No manual status edits or synthetic callbacks
+were used for this deployed acceptance. Fulfillment was `NOT_REQUIRED`, with no
+Biteship order, acceptance timestamp or fulfillment deadline. **View order**
+opened the existing confirmation page, showing **Payment confirmed**,
+`PAID (test)` and **Delivery skipped (sandbox)**.
+
+Screenshots: [desktop payment](commerce/ezkart-payment-desktop.png),
+[mobile payment](commerce/ezkart-payment-mobile.png),
+[confirmed payment](commerce/ezkart-payment-confirmed.png).
+A separate unpaid UI preview is invoice `EZK-S-568639B7C6935BB5BD9A3003`;
+its account expires after 60 minutes. Start a fresh order from
+`https://test.ezkart.id/cart/?shop=ezkart-demo&cart=granola:1` afterward.
+
+All 12 local checkout tests passed, covering the explicit legacy hosted mode,
+direct request signatures and fixed trusted amounts, malformed/mismatched
+provider responses, forged/mismatched/repeated payment notifications,
+production restrictions, clipboard buttons, mobile/desktop rendering, reload
+without another payment creation, failed status refresh recovery, expiry and
+late signed confirmation. Tests use isolated credentials and a fixture
+transport that cannot call providers; the deployed acceptance above is the
+separate real sandbox integration check.
+
+## Earlier hosted sandbox branding
 
 On 2026-09-18, the sandbox dashboard's **Settings → Checkout Appearance →
 Interface Settings** was configured with `assets/ezkart-logo-doku.png` and a
