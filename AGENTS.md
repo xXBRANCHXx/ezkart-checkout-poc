@@ -14,3 +14,11 @@ Use `blank-editor-workflow.test.mjs`, `section-actions.test.mjs`, and `grid-snap
 
 - Unless the user explicitly requests a local-only change, commit and push completed Ezkart changes to the current working branch after proportionate verification.
 - Changes to the test API should be deployed to the test Worker when deployment is required for cross-device testing. Never infer permission to deploy production.
+
+## Production release hold (owner decision, 19 September 2026)
+
+- Do not push to Ezkart's `main`, merge production PRs, or deploy changes to `ezkart.id` until the owner explicitly authorizes the final release.
+- The owner requires DOKU approval and roughly a month of sustained testing of financial protocols and wallet structure before that release. Passing the current automated checkout tests is not a substitute for those gates.
+- PR #3 (legacy sandbox lockout) must remain draft and unmerged during this hold. The owner explicitly declined deploying it now.
+- Continue authorized work on `agent/ezkart-workbench` / `test.ezkart.id` and the separate Executive Dashboard. Dashboard environment selection does not authorize a live storefront deployment or provider activation.
+- See `docs/production-release-gates.md` for the recorded release conditions and current validation limits.
