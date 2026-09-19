@@ -8,7 +8,7 @@ and address fields remain available for the payment session. Only a verified
 DOKU success notification marks an order paid; delivery is then marked skipped,
 with no pickup action or deadline.
 
-The page has a compact Ezkart logo, neutral cards, an orange action button,
+The page has a compact Ezkart logo, neutral cards, a dark navy action button,
 copyable account number and exact amount, a WIB deadline, bank instructions,
 order summary and automatically refreshed confirmation. Reloading only reads
 the saved order; it does not create another account. No hosted DOKU pages or
@@ -238,6 +238,25 @@ without another payment creation, failed status refresh recovery, expiry and
 late signed confirmation. Tests use isolated credentials and a fixture
 transport that cannot call providers; the deployed acceptance above is the
 separate real sandbox integration check.
+
+## Ezkart UI refinement — 2026-09-19
+
+The owned payment page now uses the actual BCA logo supplied by DOKU, identified
+in [asset provenance](../assets/payment/SOURCES.md), instead of a generic bank
+icon. Self-hosted Inter replaces Poppins on this page. The VA number uses
+tabular numerals, grouped into four digits for checking; the Copy number button
+still copies the exact raw account number. Labels and instructions are larger
+and darker, the main heading says **Complete payment**, and the primary action
+says **Check payment status**. A neutral lock replaces the colored shield.
+
+The existing payment UI regression check passed, including exact clipboard
+values, expiry and signed confirmation. Visual checks at 320, 390, 941, 1024
+and 1280px verified the bank image loads and the full VA remains visible without
+horizontal overflow. Payment-provider configuration and verification behavior
+are unchanged. The original acceptance screenshots above record the earlier
+appearance; the refined preview uses local fixture data:
+[desktop](commerce/ezkart-payment-refined-desktop.png) and
+[mobile](commerce/ezkart-payment-refined-mobile.png).
 
 ## Earlier hosted sandbox branding
 

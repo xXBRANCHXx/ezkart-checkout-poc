@@ -718,7 +718,7 @@ test("own payment UI: checkout, copy, reload, expiry, recovery and confirmed pay
     assert.equal(new URL(page.url()).origin, app.base);
     assert.equal(
       await page.locator("#account-number").inputValue(),
-      "1900800000999999",
+      "1900 8000 0099 9999",
     );
     assert.match(
       await page.locator("#payment-amount").textContent(),

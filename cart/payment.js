@@ -90,7 +90,10 @@
       PENDING: "Awaiting payment",
     }[state];
     if (available) {
-      byId("account-number").value = direct.account_number;
+      byId("account-number").value = direct.account_number.replace(
+        /(.{4})(?=.)/g,
+        "$1 ",
+      );
       // Display the actual bank recipient if provided; never substitute a brand for a bank-registered name.
       byId("account-name").hidden = !direct.account_name;
       byId("account-name").textContent = direct.account_name
@@ -109,7 +112,7 @@
         : `${Math.max(1, Math.ceil((expiry - Date.now()) / 60000))} minutes remaining`;
     }
     if (state === "PAID") {
-      byId("payment-title").textContent = "You’re all set.";
+      byId("payment-title").textContent = "Payment confirmed";
       byId("payment-description").textContent =
         "Your payment has been confirmed. Thank you for your order.";
       byId("result-icon").textContent = "✓";
