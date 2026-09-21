@@ -21,16 +21,19 @@
     const pickerMap = window.ezkartAddressPicker(pinContainer, {
       csrf: () => csrf,
       addressText: () => [...new Set(geoFields.map(key => form.elements[key].value.trim()).filter(Boolean))].join(", "),
-      onPlace: place => {
-        form.elements.address.value = place.address_line || place.name;
-        form.elements.location.value = place.location || "";
-        form.elements.postalCode.value = place.postalCode || "";
+      onPlace: (place, { preserveAddress }) => {
+        if (!preserveAddress || !form.elements.address.value.trim()) form.elements.address.value = place.address_line || place.name;
+        if (!preserveAddress || !form.elements.location.value.trim()) form.elements.location.value = place.location || "";
+        if (!preserveAddress || !form.elements.postalCode.value.trim()) form.elements.postalCode.value = place.postalCode || "";
       },
       onPin: () => { pinFields = readFields(); },
     });
     form.addEventListener("input", event => {
       const key = event.target.name;
-      if (geoFields.includes(key) && pinFields[key] && event.target.value.trim() !== pinFields[key]) pickerMap.clear();
+      if (geoFields.includes(key) && event.target.value.trim() !== (pinFields[key] || "")) {
+        pickerMap.addressChanged({ invalidate: Boolean(pinFields[key]) });
+        pinFields = readFields();
+      }
     });
     form.addEventListener("focusin", event => {
       if (!event.target.matches("input, textarea, select")) return;

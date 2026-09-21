@@ -1759,12 +1759,88 @@ test("customer-positioned pins validate identity and coordinates without a geoco
   assert.equal((await app.request(endpoint, { ...body, place: place.id }, headers)).status, 422);
 });
 
+test("address maps open immediately, auto-locate pasted details and remain optional on desktop/mobile", async t => {
+  const app = await setup({ EZKART_CLOUDFLARE_API_URL: 'https://ezkart-api-test.fixture.workers.dev' }); t.after(() => app.close());
+  const { chromium } = await import('../builder-mcp/node_modules/playwright/index.mjs');
+  const browser = await chromium.launch({ headless: true }); t.after(() => browser.close());
+  const raw = 'Jalan Pasar Kembang, Kota Yogyakarta (lat: -7.7892387, lng: 110.3634648)';
+  for (const width of [1280, 390]) {
+    await writeFile(join(app.directory, 'address-book.json'), JSON.stringify({ addresses: [], default_id: '', revision: 0, limit: 3 }));
+    const page = await browser.newPage({ viewport: { width, height: 950 } }); await prepareMap(page);
+    await page.context().addCookies([app.customerCookie()]);
+    await page.goto(app.base + '/cart/addresses.php?new=1');
+    const editor = page.getByRole('dialog');
+    await editor.locator('.address-picker-frame').waitFor();
+    await editor.locator('.address-picker-loading').waitFor({ state: 'hidden' });
+    assert.equal(await editor.getByRole('button', { name: 'Choose on map', exact: true }).count(), 0);
+    assert.equal(await editor.locator('.address-picker-pin').isVisible(), false, 'The default country view is not a chosen location.');
+    await editor.getByRole('button', { name: 'Zoom in', exact: true }).click();
+    assert.equal(await editor.locator('.address-picker-pin').isVisible(), false);
+    await editor.getByLabel('Full address', { exact: true }).fill(raw);
+    await editor.getByLabel('District / city', { exact: true }).fill('Yogyakarta');
+    await editor.getByLabel('Postcode', { exact: true }).fill('55271');
+    await page.waitForFunction(() => Math.abs(deliveryMapUnderTest.getCenter().lat + 7.7892387) < 1e-9 && deliveryMapUnderTest.getZoom() === 17);
+    assert.equal(await editor.getByLabel('Full address', { exact: true }).inputValue(), raw, 'Automatic lookup preserves the customer’s written details.');
+    assert.equal(await editor.locator('.address-picker-pin').isVisible(), true);
+    await editor.getByRole('button', { name: 'Save address', exact: true }).click();
+    await editor.waitFor({ state: 'hidden' });
+    let stored = JSON.parse(await readFile(join(app.directory, 'address-book.json'), 'utf8'));
+    assert.deepEqual(stored.addresses[0].coordinate, { latitude: -7.7892387, longitude: 110.3634648 });
+    assert.doesNotMatch(stored.addresses[0].address, /lat:|lng:/);
+    await page.getByRole('button', { name: 'Add address', exact: true }).click();
+    await editor.locator('.address-picker-loading').waitFor({ state: 'hidden' });
+    assert.equal(await page.evaluate(() => deliveryMapUnderTest.getZoom()), 4, 'A new draft does not inherit another address’s pin.');
+    await page.route('**/api/address-search.php', route => route.fulfill({ json: { ok: true, results: [] } }));
+    await editor.getByLabel('Full address', { exact: true }).fill('Unnamed building beside the station');
+    await editor.getByLabel('District / city', { exact: true }).fill('Yogyakarta');
+    await editor.getByLabel('Postcode', { exact: true }).fill('55271');
+    await editor.locator('.address-picker-status').filter({ hasText: 'No match found' }).waitFor();
+    await editor.getByRole('button', { name: 'Save address', exact: true }).click();
+    await editor.waitFor({ state: 'hidden' });
+    stored = JSON.parse(await readFile(join(app.directory, 'address-book.json'), 'utf8'));
+    assert.equal(stored.addresses[1].coordinate, null, 'An address can be saved without locating or adjusting a pin.');
+    await page.close();
+  }
+});
+
+test("late automatic address results cannot replace newer text or a customer-positioned pin", async t => {
+  const app = await setup({ EZKART_CLOUDFLARE_API_URL: 'https://ezkart-api-test.fixture.workers.dev' }); t.after(() => app.close());
+  const { chromium } = await import('../builder-mcp/node_modules/playwright/index.mjs');
+  const browser = await chromium.launch({ headless: true }); t.after(() => browser.close());
+  const page = await browser.newPage(); await prepareMap(page);
+  await page.context().addCookies([app.customerCookie()]);
+  await page.goto(app.base + '/cart/addresses.php?new=1');
+  const editor = page.getByRole('dialog');
+  const pending = [];
+  await page.route('**/api/address-search.php', async route => {
+    await new Promise(resolve => pending.push(resolve));
+    await route.fulfill({ json: { ok: true, results: [{ name: 'Old result', address_line: 'Old street 12', coordinate: { latitude: -6, longitude: 106 } }] } });
+  });
+  await editor.getByLabel('Full address', { exact: true }).fill('Old street 12');
+  await editor.getByLabel('District / city', { exact: true }).fill('Yogyakarta');
+  await editor.getByLabel('Postcode', { exact: true }).fill('55271');
+  await page.waitForRequest('**/api/address-search.php');
+  await editor.getByLabel('Full address', { exact: true }).fill('New street 34');
+  pending.shift()();
+  await page.waitForRequest('**/api/address-search.php');
+  const desired = { latitude: -7.7894, longitude: 110.3635 };
+  await page.evaluate(p => deliveryMapUnderTest.jumpTo({ center: [p.longitude, p.latitude], zoom: 17 }), desired);
+  pending.shift()(); await page.unrouteAll({ behavior: 'wait' });
+  assert.equal(await editor.getByLabel('Full address', { exact: true }).inputValue(), 'New street 34');
+  await editor.locator('.address-picker-status').filter({ hasText: 'Pin adjusted' }).waitFor();
+  await editor.getByRole('button', { name: 'Save address', exact: true }).click();
+  await editor.waitFor({ state: 'hidden' });
+  const stored = JSON.parse(await readFile(join(app.directory, 'address-book.json'), 'utf8'));
+  assert.deepEqual(stored.addresses[0].coordinate, desired);
+});
+
 test("closing an address draft ignores stale search results and map failures keep the form usable", async t => {
   const app = await setup({ EZKART_CLOUDFLARE_API_URL: 'https://ezkart-api-test.fixture.workers.dev' }); t.after(() => app.close());
   const { chromium } = await import('../builder-mcp/node_modules/playwright/index.mjs');
   const browser = await chromium.launch({ headless: true }); t.after(() => browser.close());
   const page = await browser.newPage({ viewport: { width: 390, height: 950 } });
   await page.context().addCookies([app.customerCookie()]);
+  await page.route('**/vendor/maplibre/maplibre-gl.js?*', route => route.abort());
   await page.goto(app.base + '/cart/addresses.php?new=1');
   const editor = page.getByRole('dialog');
   let release;
@@ -1777,11 +1853,12 @@ test("closing an address draft ignores stale search results and map failures kee
   await page.getByRole('button', { name: 'Add address', exact: true }).click();
   release(); await page.unrouteAll({ behavior: 'wait' });
   assert.equal(await editor.getByLabel('Full address', { exact: true }).inputValue(), '');
-  assert.equal(await editor.locator('.address-picker-frame').isVisible(), false);
+  assert.equal(await editor.locator('.address-picker-frame').isVisible(), true);
   await page.route('**/vendor/maplibre/maplibre-gl.js?*', route => route.abort());
   await editor.getByLabel('Find your address', { exact: true }).fill('6P4G6967+894, Jalan Pasar Kembang, Kota Yogyakarta 55271');
   await editor.getByRole('button', { name: 'Find address', exact: true }).click();
-  await editor.locator('.address-picker-status').filter({ hasText: 'map is unavailable' }).waitFor();
+  await page.waitForFunction(() => document.querySelector('.address-book-form [name=postalCode]').value === '55271');
+  await editor.locator('.address-picker-loading').filter({ hasText: 'map is unavailable' }).waitFor();
   await editor.getByLabel('Full address', { exact: true }).fill('A different entrance at Jalan Example 12');
   await editor.getByRole('button', { name: 'Save address', exact: true }).click();
   await editor.waitFor({ state: 'hidden' });
@@ -1873,7 +1950,7 @@ test("unmatched addresses can be positioned during creation and failed saves ret
   await editor.getByLabel('Find your address', { exact: true }).fill('Unnamed entrance beside the station');
   await editor.getByRole('button', { name: 'Find address', exact: true }).click();
   await editor.locator('.address-picker-status').filter({ hasText: 'No match found' }).waitFor();
-  await editor.getByRole('button', { name: 'Choose on map', exact: true }).click();
+  assert.equal(await editor.getByRole('button', { name: 'Choose on map', exact: true }).count(), 0);
   await editor.locator('.address-picker-loading').waitFor({ state: 'hidden' });
   const zoom = await page.evaluate(() => deliveryMapUnderTest.getZoom());
   await editor.getByRole('button', { name: 'Zoom in', exact: true }).click();
