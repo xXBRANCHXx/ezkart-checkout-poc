@@ -20,7 +20,7 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-sr
   <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
   <link rel="preload" href="admin/assets/fonts/inter.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="payment.css?v=2">
-  <script src="payment.js?v=2" defer></script>
+  <script src="payment.js?v=3" defer></script>
   <title>Complete your payment · Ezkart</title>
 </head>
 <body>

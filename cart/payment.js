@@ -11,6 +11,7 @@
     }).format(value);
   let payment = null;
   let requestInFlight = false;
+  let manualCheck = false;
   let pollTimer;
   let feedbackTimer;
   let failures = 0;
@@ -78,6 +79,7 @@
       byId("checkout-link").href = "./?shop=" + encodeURIComponent(data.shop);
     }
     byId("order-link").href = "return.php?" + query.toString();
+    byId("order-link").textContent = data.shipping_skipped ? "View order" : "Track your order";
     byId("transfer-details").hidden = byId("payment-instructions").hidden =
       state !== "PENDING" || !available;
     byId("result-panel").hidden = state === "PENDING" && available;
@@ -141,6 +143,9 @@
           : "Payment unavailable";
       byId("result-message").textContent =
         "Do not transfer to this account. Return to checkout to try again, or keep your order number if you need help.";
+      if (!manualCheck) byId("check-message").textContent = state === "EXPIRED"
+        ? "If you already paid, we’ll keep checking for confirmation."
+        : "Keep your order number if you need help.";
     } else if (!available) {
       byId("result-icon").textContent = "…";
       byId("result-title").textContent = "Payment details unavailable";
@@ -149,13 +154,19 @@
     }
   }
   async function check(manual = false) {
-    if (requestInFlight || !orderId || payment?.status === "PAID") return;
+    if (!orderId || payment?.status === "PAID") return;
+    if (manual) {
+      manualCheck = true;
+      byId("check-payment").disabled = true;
+      byId("check-payment").setAttribute("aria-busy", "true");
+      byId("check-message").textContent = "Checking your payment…";
+    }
+    // A click during a background request joins that request without starting another.
+    if (requestInFlight) return;
     clearTimeout(pollTimer);
     requestInFlight = true;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 12000);
-    byId("check-payment").disabled = true;
-    if (manual) byId("check-message").textContent = "Checking your payment…";
     try {
       const response = await fetch(
         "api/status.php?order=" + encodeURIComponent(orderId),
@@ -175,7 +186,7 @@
       notice("");
       byId("retry-details").hidden = true;
       render();
-      if (manual && data.status !== "PAID")
+      if (manualCheck && data.status !== "PAID")
         byId("check-message").textContent =
           "No payment confirmation yet. We’ll keep checking automatically.";
     } catch (_) {
@@ -187,11 +198,18 @@
       );
       if (!payment) byId("payment-layout").hidden = true;
       byId("retry-details").hidden = !!payment;
-      if (manual) feedback("Unable to check right now. Please try again.");
+      if (manualCheck) {
+        byId("check-message").textContent = "Unable to check right now. We’ll try again automatically.";
+        feedback("Unable to check right now. Please try again.");
+      }
     } finally {
       clearTimeout(timeout);
       requestInFlight = false;
-      byId("check-payment").disabled = false;
+      if (manualCheck) {
+        byId("check-payment").disabled = false;
+        byId("check-payment").removeAttribute("aria-busy");
+        manualCheck = false;
+      }
       if (
         payment?.status !== "PAID" &&
         payment?.status !== "FAILED" &&

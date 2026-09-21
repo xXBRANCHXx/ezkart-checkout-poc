@@ -7,7 +7,21 @@ function curl_init(string $url): object { return (object) ['url' => $url, 'optio
 function curl_setopt_array(object $handle, array $options): bool { $handle->options = $options; return true; }
 function curl_exec(object $handle): string {
     $payload = json_decode($handle->options[CURLOPT_POSTFIELDS] ?? '{}', true);
-    file_put_contents(getenv('EZKART_TEST_CAPTURE'), json_encode(['url' => $handle->url, 'body' => $handle->options[CURLOPT_POSTFIELDS] ?? '', 'headers' => $handle->options[CURLOPT_HTTPHEADER] ?? []]) . "\n", FILE_APPEND | LOCK_EX);
+    file_put_contents(getenv('EZKART_TEST_CAPTURE'), json_encode(['url' => $handle->url, 'method' => !empty($handle->options[CURLOPT_POST]) ? 'POST' : 'GET', 'body' => $handle->options[CURLOPT_POSTFIELDS] ?? '', 'headers' => $handle->options[CURLOPT_HTTPHEADER] ?? []]) . "\n", FILE_APPEND | LOCK_EX);
+    if (str_starts_with($handle->url, 'https://api.biteship.com/v1/orders/')) {
+        // Simulate a webhook arriving while a provider read is in flight.
+        $eventPath = dirname(getenv('EZKART_TEST_CAPTURE')) . '/tracking-concurrent-event.json';
+        if (is_file($eventPath)) {
+            $event = json_decode((string) file_get_contents($eventPath), true);
+            unlink($eventPath);
+            ez_apply_biteship_webhook($event, 'sandbox');
+        }
+        $fixturePath = dirname(getenv('EZKART_TEST_CAPTURE')) . '/tracking-response.json';
+        if (!is_file($fixturePath)) { $handle->status = 503; return '{"success":false}'; }
+        $response = (string) file_get_contents($fixturePath);
+        if ($response === 'unavailable') { $handle->status = 503; return '{"success":false}'; }
+        return $response;
+    }
     if ($handle->url === 'https://api.biteship.com/v1/rates/couriers') return json_encode(['success' => true, 'pricing' => [['courier_code' => 'jne', 'courier_service_code' => 'reg', 'courier_name' => 'JNE', 'courier_service_name' => 'Regular', 'price' => 18000, 'duration' => '2-3', 'shipment_duration_unit' => 'days']]]);
     if ($handle->url === 'https://api-sandbox.doku.com/bca-virtual-account/v2/payment-code') {
         if (getenv('EZKART_TEST_DOKU_FAILURE')) { $handle->status = 503; return '{"error_messages":["Fixture unavailable"]}'; }

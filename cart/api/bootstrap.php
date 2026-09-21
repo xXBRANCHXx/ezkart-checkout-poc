@@ -737,15 +737,12 @@ function ez_apply_biteship_webhook(array $payload, ?string $environment = null):
         $order = ez_load_order($orderId);
         if (!hash_equals((string) ($order['biteship_order_id'] ?? ''), $biteshipOrderId)) return false;
 
-        $status = strtolower(trim((string) ($payload['status'] ?? '')));
-        if ($status !== '' && preg_match('/^[a-z0-9_-]{2,80}$/', $status) === 1) {
-            $order['biteship_status'] = $status;
-            $order['fulfillment_status'] = match ($status) {
-                'delivered' => 'DELIVERED',
-                'cancelled', 'canceled' => 'CANCELLED',
-                'picked', 'picked_up', 'courier_picked_up' => 'IN_TRANSIT',
-                default => strtoupper($status),
-            };
+        if ($event === 'order.status') {
+            $hash = hash('sha256', ez_json_encode($payload));
+            if (($order['biteship_last_status_event_hash'] ?? '') !== $hash) {
+                ez_apply_tracking_status($order, (string) ($payload['status'] ?? ''), (string) ($payload['updated_at'] ?? ''));
+                $order['biteship_last_status_event_hash'] = $hash;
+            }
         }
         $trackingId = mb_substr(trim((string) ($payload['courier_tracking_id'] ?? '')), 0, 160);
         $waybillId = mb_substr(trim((string) ($payload['courier_waybill_id'] ?? '')), 0, 160);
@@ -905,6 +902,7 @@ function ez_http_json(string $url, array $payload, array $headers, string $provi
 }
 
 require_once __DIR__ . '/doku.php';
+require_once __DIR__ . '/tracking.php';
 
 function ez_request_origin_allowed(): bool
 {

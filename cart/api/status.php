@@ -8,6 +8,8 @@ try {
         ez_api_json(['ok' => false, 'error' => 'Method not allowed.'], 405);
     }
     $order = ez_load_order(trim((string) ($_GET['order'] ?? '')));
+    // Only the tracking page requests courier data; payment polls stay local.
+    if (($_GET['tracking'] ?? '') === '1') $order = ez_refresh_order_tracking($order);
     ez_api_json([
         'ok' => true,
         'order_id' => $order['order_id'],
@@ -36,6 +38,7 @@ try {
         'biteship_waybill_id' => $order['biteship_waybill_id'] ?? '',
         'accepted_at' => $order['accepted_at'] ?? '',
         'fulfillment_deadline_at' => $order['fulfillment_deadline_at'] ?? '',
+        'tracking' => ez_public_order_tracking($order),
     ]);
 } catch (InvalidArgumentException $error) {
     ez_api_json(['ok' => false, 'error' => 'Order not found.'], 404);

@@ -1,0 +1,4 @@
+# Preserve upstream release bytes so the published integrity hashes remain valid.
+leaflet.css -text -whitespace
+leaflet.js -text -whitespace
+LICENSE -text -whitespace

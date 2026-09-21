@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createHash, createHmac, randomBytes } from "node:crypto";
 import { spawn, spawnSync } from "node:child_process";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -1040,4 +1040,212 @@ test("production mode remains unavailable when the payment integration is not re
   const app=await setup({EZKART_EXECUTIVE_BRIDGE_SECRET:bridgeSecret,EZKART_DOKU_PRODUCTION_PAYMENT_FLOW:"direct_bca"});t.after(()=>app.close());
   const input={action:"set-mode",environment:"sandbox",target:"production",expected_mode:"sandbox"};assert.equal((await app.request('/cart/api/executive.php',input,bridgeHeaders(input))).status,422);assert.equal((await app.request('/cart/api/checkout-config.php')).data.environment,'sandbox');
   const live=await setup({EZKART_DEPLOYMENT_ENVIRONMENT:'production',EZKART_COMMERCE_ENVIRONMENT:'production',EZKART_EXECUTIVE_BRIDGE_SECRET:bridgeSecret});t.after(()=>live.close());assert.equal((await live.request('/cart/api/executive.php',input,bridgeHeaders(input))).status,403);
+});
+
+function trackingResponse(id, status = "in_transit", extra = {}) {
+  return {
+    success: true, id: "test-shipment-" + id, status,
+    origin: { contact_name: "Private warehouse", address: "Private origin address", coordinate: { latitude: -6.2253114, longitude: 106.7993735 } },
+    destination: { contact_name: "Private customer", address: "Private destination address", coordinate: { latitude: -6.28927, longitude: 106.77492000000007 } },
+    courier: {
+      tracking_id: "test-tracking", waybill_id: "TEST-AWB", company: "jne", type: "reg",
+      driver_phone: "PRIVATE-PHONE", link: "https://track.biteship.com/fixture",
+      history: [
+        { status: "picked", updated_at: "2026-09-20T10:00:00+07:00", note: "Package collected from seller." },
+        { status: "inTransit", updated_at: "2026-09-20T12:00:00+07:00", note: "Arrived at the Jakarta sorting facility." },
+      ],
+    },
+    ...extra,
+  };
+}
+async function saveTrackingResponse(app, payload) {
+  await writeFile(join(app.directory, "tracking-response.json"), typeof payload === "string" ? payload : JSON.stringify(payload));
+}
+function expireTrackingCache(app, id) {
+  app.cli(`$o=ez_load_order('${id}'); $o['tracking_requested_at']=0; ez_save_order($o);`);
+}
+async function shippingEvent(app, id, status, extra = {}) {
+  return app.request("/cart/api/biteship-webhook.php?environment=sandbox", { event: "order.status", order_id: "test-shipment-" + id, status, ...extra }, { Authorization: "Bearer " + app.env.EZKART_BITESHIP_SANDBOX_WEBHOOK_TOKEN });
+}
+
+test("tracking follows seller processing and pickup, caches provider reads, and keeps customer output bounded", async (t) => {
+  const app = await setup(); t.after(() => app.close());
+  const id = (await app.request("/cart/api/start.php", input)).data.order_id;
+  const path = `/cart/api/status.php?order=${id}&tracking=1`;
+  assert.equal((await app.request(path)).data.tracking.stage, "awaiting_payment");
+  await notify(app, id);
+  let data = (await app.request(path)).data;
+  assert.equal(data.tracking.stage, "processing");
+  assert.equal(data.tracking.seller_accepted, false);
+  app.cli(`ez_accept_paid_order('${id}');`);
+  assert.equal((await app.request(path)).data.tracking.seller_accepted, true);
+  assert.equal((await app.calls()).length, 2, "No tracking requests before a shipment exists.");
+  app.cli(`ez_arrange_paid_order_pickup('${id}');`);
+  data = (await app.request(`/cart/api/status.php?order=${id}`)).data;
+  assert.equal(data.tracking.stage, "awaiting_pickup");
+  assert.equal(data.tracking.progress, 2, "A waybill does not mean the courier collected the package.");
+  const response = trackingResponse(id, "inTransit");
+  await saveTrackingResponse(app, response);
+  data = (await app.request(path)).data;
+  assert.equal(data.tracking.stage, "in_transit");
+  assert.equal(data.tracking.history.length, 2);
+  assert.equal(data.tracking.history[1].status, "in_transit");
+  assert.equal(data.tracking.waybill_id, "TEST-AWB");
+  assert.equal(data.tracking.locations.origin.latitude, -6.2253114);
+  for (const privateValue of ["PRIVATE-PHONE", "Private origin address", "Private destination address", "biteship_test.fixture"])
+    assert.equal(JSON.stringify(data).includes(privateValue), false);
+  const requests = (await app.calls()).filter((call) => call.url.includes("/v1/orders/"));
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].method, "GET");
+  assert.ok(requests[0].headers.includes("Authorization: biteship_test.fixture"));
+  for (let i = 0; i < 3; i++) await app.request(path);
+  assert.equal((await app.calls()).filter((call) => call.url.includes("/v1/orders/")).length, 1);
+  await saveTrackingResponse(app, "unavailable"); expireTrackingCache(app, id);
+  data = (await app.request(path)).data;
+  assert.equal(data.status, "PAID");
+  assert.equal(data.tracking.stage, "in_transit");
+  assert.equal(data.tracking.unavailable, true);
+  await app.request(path);
+  assert.equal((await app.calls()).filter((call) => call.url.includes("/v1/orders/")).length, 2, "Failed requests are throttled too.");
+  response.id = "wrong-shipment";
+  await saveTrackingResponse(app, response); expireTrackingCache(app, id);
+  assert.equal((await app.request(path)).data.tracking.unavailable, true, "Mismatched responses cannot overwrite an order.");
+  response.id = "test-shipment-" + id;
+  response.courier.link = "javascript:alert(1)";
+  response.origin.coordinate.latitude = 100;
+  await saveTrackingResponse(app, response); expireTrackingCache(app, id);
+  data = (await app.request(path)).data;
+  assert.equal(data.tracking.unavailable, false);
+  assert.equal(data.tracking.link, "");
+  assert.equal(data.tracking.locations.origin, null);
+  assert.equal((await app.request("/cart/api/status.php?order=bad&tracking=1")).status, 404);
+});
+
+test("courier events handle aliases, retries, delayed events, delivery exceptions and returns", async (t) => {
+  const app = await setup(); t.after(() => app.close());
+  const id = (await app.request("/cart/api/start.php", input)).data.order_id;
+  await notify(app, id); app.cli(`ez_accept_paid_order('${id}'); ez_arrange_paid_order_pickup('${id}');`);
+  const status = async () => (await app.request(`/cart/api/status.php?order=${id}`)).data;
+  for (const [event, stage] of [["pickingUp", "awaiting_pickup"], ["picked", "in_transit"], ["droppingOff", "out_for_delivery"], ["onHold", "attention"], ["droppingOff", "out_for_delivery"], ["delivered", "delivered"], ["returnInTransit", "returning"], ["returned", "returned"]]) {
+    assert.equal((await shippingEvent(app, id, event)).status, 200);
+    assert.equal((await status()).tracking.stage, stage, event);
+    const count = (await status()).tracking.history.length;
+    await shippingEvent(app, id, event);
+    assert.equal((await status()).tracking.history.length, count, "Duplicate callbacks do not add history.");
+    assert.equal((await status()).status, "PAID");
+  }
+  await shippingEvent(app, id, "picked", { updated_at: "2020-01-01T00:00:00Z" });
+  assert.equal((await status()).tracking.stage, "returned");
+  await shippingEvent(app, id, "return_in_transit");
+  assert.equal((await status()).tracking.stage, "returned", "An un-timestamped retry cannot undo a completed return.");
+  const before = (await status()).tracking.shipment_status;
+  await app.request("/cart/api/biteship-webhook.php?environment=sandbox", { event: "order.price", order_id: "test-shipment-" + id, status: "confirmed", price: 19000 }, { Authorization: "Bearer " + app.env.EZKART_BITESHIP_SANDBOX_WEBHOOK_TOKEN });
+  assert.equal((await status()).tracking.shipment_status, before, "A price event cannot reset shipping progress.");
+  assert.equal((await status()).tracking.progress < 4, true);
+  for (const event of ["cancelled", "courierNotFound", "rejected", "disposed", "on_hold", "new_provider_status"]) {
+    app.cli(`$o=ez_load_order('${id}'); unset($o['biteship_status_at'], $o['biteship_last_status_event_hash']); $o['biteship_status']='confirmed'; ez_save_order($o);`);
+    await shippingEvent(app, id, event);
+    assert.equal((await status()).tracking.stage, event === "cancelled" ? "cancelled" : event === "new_provider_status" ? "shipment_update" : "attention");
+  }
+});
+
+test("automatic payment polling does not flash the button; a manual click joins a pending check", async (t) => {
+  const { chromium } = await import("../builder-mcp/node_modules/playwright/index.mjs");
+  const app = await setup({ EZKART_DOKU_SANDBOX_PAYMENT_FLOW: "" }); t.after(() => app.close());
+  const id = (await app.request("/cart/api/start.php", { ...input, shipping_id: "" })).data.order_id;
+  app.cli(`$o=ez_load_order('${id}'); $o['payment_details']['expires_at']='2020-01-01T00:00:00Z'; ez_save_order($o);`);
+  const browser = await chromium.launch({ headless: true }); t.after(() => browser.close());
+  const page = await browser.newPage();
+  await page.clock.install();
+  await page.goto(app.base + `/cart/payment.php?order=${id}`);
+  await page.waitForFunction(() => document.querySelector("#payment").dataset.state === "EXPIRED");
+  await page.evaluate(() => {
+    window.buttonMutations = [];
+    new MutationObserver((changes) => window.buttonMutations.push(...changes.map((change) => change.attributeName))).observe(document.querySelector("#check-payment"), { attributes: true, attributeFilter: ["disabled", "aria-busy"] });
+  });
+  let release, intercepted;
+  const pending = new Promise((resolve) => { intercepted = resolve; });
+  const gate = new Promise((resolve) => { release = resolve; });
+  let requests = 0;
+  await page.route("**/api/status.php*", async (route) => { requests++; intercepted(); await gate; await route.continue(); });
+  await page.clock.fastForward(5001);
+  await pending;
+  assert.equal(await page.locator("#check-payment").isEnabled(), true);
+  assert.deepEqual(await page.evaluate(() => window.buttonMutations), []);
+  await page.locator("#check-payment").click();
+  assert.equal(await page.locator("#check-payment").isDisabled(), true);
+  assert.equal(requests, 1);
+  release();
+  await page.waitForFunction(() => !document.querySelector("#check-payment").disabled);
+  assert.match(await page.locator("#check-message").textContent(), /No payment confirmation/);
+  assert.equal(requests, 1);
+});
+
+test("customer tracking UI follows fulfillment, preserves updates on failure, and conditionally displays maps on desktop and mobile", async (t) => {
+  const { chromium } = await import("../builder-mcp/node_modules/playwright/index.mjs");
+  const app = await setup(); t.after(() => app.close());
+  const browser = await chromium.launch({ headless: true }); t.after(() => browser.close());
+  for (const width of [1280, 390]) {
+    const id = (await app.request("/cart/api/start.php", input)).data.order_id;
+    await notify(app, id);
+    const page = await browser.newPage({ viewport: { width, height: 960 } });
+    const errors = []; page.on("pageerror", (error) => errors.push(error.message));
+    // Never request public map tiles in automated checks.
+    await page.route("https://tile.openstreetmap.org/**", (route) => route.fulfill({ contentType: "image/png", body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=", "base64") }));
+    await page.goto(app.base + `/cart/return.php?order=${id}&shop=test-shop`);
+    await page.getByRole("heading", { name: "Your order is with the seller", exact: true }).waitFor();
+    assert.equal(await page.locator("#delivery-map-section").isVisible(), false);
+    assert.equal(await page.locator("#courier-tracking-link").isVisible(), false);
+    app.cli(`ez_accept_paid_order('${id}');`);
+    await page.locator("#refresh-tracking").click();
+    await page.getByRole("heading", { name: "The seller is preparing your order", exact: true }).waitFor();
+    app.cli(`ez_arrange_paid_order_pickup('${id}');`);
+    const response = trackingResponse(id, "confirmed");
+    response.courier.history = [];
+    response.origin.coordinate = response.destination.coordinate = null;
+    await saveTrackingResponse(app, response);
+    await page.locator("#refresh-tracking").click();
+    await page.getByRole("heading", { name: "Your order is awaiting pickup", exact: true }).waitFor();
+    assert.match(await page.locator('[aria-current="step"]').textContent(), /Awaiting pickup/);
+    assert.equal(await page.locator("#delivery-map-section").isVisible(), false);
+    const inTransit = trackingResponse(id);
+    inTransit.courier.type = "instant";
+    inTransit.courier.history[1].note = '<img src=x onerror="window.injected=true"> Sorting facility update';
+    await saveTrackingResponse(app, inTransit); expireTrackingCache(app, id);
+    await page.locator("#refresh-tracking").click();
+    await page.getByRole("heading", { name: "Your order is on the way", exact: true }).waitFor();
+    assert.match(await page.locator("#tracking-history").textContent(), /Sorting facility update/);
+    assert.equal(await page.locator("#tracking-history img").count(), 0);
+    assert.equal(await page.locator("#courier-tracking-link").textContent(), "View courier live tracking ↗");
+    assert.equal(await page.locator("#courier-tracking-link").getAttribute("rel"), "noopener noreferrer");
+    await page.locator("#delivery-map").scrollIntoViewIfNeeded();
+    await page.locator('.delivery-pin').first().waitFor();
+    assert.equal(await page.locator('.delivery-pin').count(), 2);
+    assert.match(await page.locator("#delivery-map-section").textContent(), /Pickup and delivery locations/);
+    if (process.env.EZKART_TEST_SCREENSHOTS) await page.screenshot({ path: join(process.env.EZKART_TEST_SCREENSHOTS, `tracking-${width}.png`), fullPage: true });
+    await page.route("**/api/status.php*", (route) => route.fulfill({ status: 503, contentType: "application/json", body: '{"ok":false}' }));
+    await page.locator("#refresh-tracking").click();
+    await page.locator("#tracking-notice").waitFor({ state: "visible" });
+    assert.equal(await page.locator("#return-title").textContent(), "Your order is on the way");
+    await page.unroute("**/api/status.php*");
+    await shippingEvent(app, id, "delivered");
+    await page.locator("#refresh-tracking").click();
+    await page.getByRole("heading", { name: "Your order has been delivered", exact: true }).waitFor();
+    assert.match(await page.locator('[aria-current="step"]').textContent(), /Delivered/);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
+    assert.deepEqual(errors, []);
+    await page.close();
+  }
+});
+
+test("a courier webhook arriving during tracking refresh wins over the stale provider snapshot", async (t) => {
+  const app = await setup(); t.after(() => app.close());
+  const id = (await app.request("/cart/api/start.php", input)).data.order_id;
+  await notify(app, id); app.cli(`ez_accept_paid_order('${id}'); ez_arrange_paid_order_pickup('${id}');`);
+  await saveTrackingResponse(app, trackingResponse(id, "confirmed"));
+  await writeFile(join(app.directory, "tracking-concurrent-event.json"), JSON.stringify({ event: "order.status", order_id: "test-shipment-" + id, status: "delivered", courier_waybill_id: "LATEST-WAYBILL" }));
+  const data = (await app.request(`/cart/api/status.php?order=${id}&tracking=1`)).data;
+  assert.equal(data.status, "PAID");
+  assert.equal(data.tracking.stage, "delivered");
+  assert.equal(data.tracking.waybill_id, "LATEST-WAYBILL");
 });
