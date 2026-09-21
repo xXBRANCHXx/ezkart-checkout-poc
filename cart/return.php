@@ -3,8 +3,13 @@ declare(strict_types=1);
 require_once __DIR__ . '/api/customer-auth.php';
 header('Cache-Control: no-store');
 $customerNext = ez_customer_next((string) ($_SERVER['REQUEST_URI'] ?? '/cart/return.php'));
-$customerAccount = ez_customer_require_page($customerNext);
+try { $customerAccount = ez_customer_current(); }
+catch (Throwable) { $customerAccount = null; }
 $customerCsrf = ez_customer_csrf();
+if ($customerAccount === null || ($_GET['signin'] ?? '') === '1') {
+    require __DIR__ . '/tracking-gate.php';
+    exit;
+}
 session_write_close();
 $isTrackingSandbox = isset($trackingSandboxData) && is_array($trackingSandboxData);
 $orderId = $isTrackingSandbox ? 'EZK-S-000000000000000000000001' : trim((string) ($_GET['order'] ?? ''));
@@ -29,7 +34,7 @@ header('X-Content-Type-Options: nosniff');
   <link rel="stylesheet" href="tracking.css?v=3">
   <script src="vendor/leaflet/leaflet.js?v=1.9.4" defer></script>
   <?php if ($isTrackingSandbox): ?><script src="tracking-sandbox.js?v=1" defer></script><?php endif; ?>
-  <script src="tracking.js?v=3" defer></script>
+  <script src="tracking.js?v=4" defer></script>
   <title>Track your order · Ezkart</title>
 </head>
 <body>
@@ -58,7 +63,7 @@ header('X-Content-Type-Options: nosniff');
       <p>Keep this page for updates from payment to delivery.</p>
     </div>
     <p id="tracking-notice" class="notice" role="status">Loading your order…</p>
-    <a id="switch-tracking-account" class="copy-button courier-link" href="/cart/login.php?<?= htmlspecialchars(http_build_query(['switch' => '1', 'next' => $customerNext]), ENT_QUOTES, 'UTF-8') ?>" hidden>Use a different Google account</a>
+    <a id="switch-tracking-account" class="copy-button courier-link" href="<?= htmlspecialchars($customerNext . (str_contains($customerNext, '?') ? '&' : '?') . 'signin=1', ENT_QUOTES, 'UTF-8') ?>" hidden>Use a different Google account</a>
     <div id="tracking-content" hidden>
       <section class="tracking-card" aria-labelledby="return-title">
         <div class="tracking-heading"><span id="return-icon" class="tracking-icon" aria-hidden="true">…</span><div><h2 id="return-title">Confirming your payment</h2><p id="return-message" role="status">We’re checking your payment status.</p></div></div>

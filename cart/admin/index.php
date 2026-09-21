@@ -860,7 +860,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'GET' && (string) ($_GET['auth_callba
     }
 }
 
-if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && !isset($_GET['cloud'])) {
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && !isset($_GET['cloud']) && !defined('EZ_CUSTOMER_SESSION_BRIDGE')) {
     $submittedToken = (string) ($_POST['csrf_token'] ?? '');
     $submittedAction = (string) ($_POST['action'] ?? '');
     if (!hash_equals($csrfToken, $submittedToken)) {
@@ -1179,6 +1179,8 @@ $legacyDataAccess = $authenticated && (
 if ($authenticated) {
     $_SESSION['last_activity_at'] = time();
 }
+// The customer bridge reuses the session validation above and stops before any merchant data or actions.
+if (defined('EZ_CUSTOMER_SESSION_BRIDGE')) return;
 $cloudPath = trim((string) ($_GET['cloud'] ?? ''));
 if ($cloudPath !== '') {
     if (!$authenticated || $authenticationMethod !== 'supabase') {

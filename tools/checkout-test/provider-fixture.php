@@ -2,7 +2,7 @@
 declare(strict_types=1);
 // Test-only transport loaded by PHP -n. No provider network calls are possible.
 if (extension_loaded('curl') || !getenv('EZKART_TEST_CAPTURE')) throw new RuntimeException('Unsafe test transport setup.');
-foreach (['CURLOPT_POST', 'CURLOPT_POSTFIELDS', 'CURLOPT_HTTPHEADER', 'CURLOPT_RETURNTRANSFER', 'CURLOPT_CONNECTTIMEOUT', 'CURLOPT_TIMEOUT', 'CURLOPT_SSL_VERIFYPEER', 'CURLINFO_HTTP_CODE'] as $index => $constant) define($constant, $index + 1);
+foreach (['CURLOPT_POST', 'CURLOPT_POSTFIELDS', 'CURLOPT_HTTPHEADER', 'CURLOPT_RETURNTRANSFER', 'CURLOPT_CONNECTTIMEOUT', 'CURLOPT_TIMEOUT', 'CURLOPT_SSL_VERIFYPEER', 'CURLINFO_HTTP_CODE', 'CURLINFO_RESPONSE_CODE'] as $index => $constant) define($constant, $index + 1);
 function curl_init(string $url): object { return (object) ['url' => $url, 'options' => [], 'status' => 200]; }
 function curl_setopt_array(object $handle, array $options): bool { $handle->options = $options; return true; }
 function curl_exec(object $handle): string {

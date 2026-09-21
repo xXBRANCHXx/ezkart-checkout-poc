@@ -125,6 +125,7 @@ function ez_customer_store_session(array $tokens, array $user, bool $new): void
         'access_token' => $token, 'refresh_token' => $refresh,
         'expires_at' => time() + max(0, min(3600, (int) ($tokens['expires_in'] ?? 3600))),
         'signed_in_at' => $new ? time() : (int) ($old['signed_in_at'] ?? time()),
+        'version' => $new ? bin2hex(random_bytes(16)) : ($old['version'] ?? bin2hex(random_bytes(16))),
     ];
 }
 
@@ -135,6 +136,13 @@ function ez_customer_current(): ?array
     if (!is_array($auth) || (int) ($auth['signed_in_at'] ?? 0) + EZ_CUSTOMER_SESSION_LIFETIME <= time()) {
         unset($_SESSION['customer_auth']);
         return null;
+    }
+    $_SESSION['customer_auth']['version'] ??= bin2hex(random_bytes(16));
+    // Existing Ezkart Google sessions are verified by the admin-path bridge. Only that
+    // session rotates its refresh token; the customer session stores no shared tokens.
+    if (($auth['source'] ?? '') === 'existing_google') {
+        if ((int) ($auth['expires_at'] ?? 0) <= time()) { unset($_SESSION['customer_auth']); return null; }
+        return $auth['user'];
     }
     if ((int) ($auth['expires_at'] ?? 0) <= time() + 300) {
         try {
@@ -152,18 +160,6 @@ function ez_customer_current(): ?array
         }
     }
     return $_SESSION['customer_auth']['user'];
-}
-
-function ez_customer_require_page(string $next): array
-{
-    try {
-        $customer = ez_customer_current();
-        if ($customer !== null) return $customer;
-    } catch (Throwable $error) {
-        error_log('Ezkart customer session unavailable.');
-    }
-    header('Location: /cart/login.php?' . http_build_query(['next' => ez_customer_next($next)]), true, 303);
-    exit;
 }
 
 function ez_customer_owns_order(array $order, array $customer): bool

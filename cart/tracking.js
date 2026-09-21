@@ -210,7 +210,7 @@
         const response = await fetch("api/status.php?order=" + encodeURIComponent(order) + "&tracking=1", { cache: "no-store", signal: controller.signal });
         if (response.status === 401) {
           byId("tracking-content").hidden = true;
-          location.replace("/cart/login.php?next=" + encodeURIComponent(location.pathname + location.search));
+          location.reload();
           return;
         }
         notFound = response.status === 404;

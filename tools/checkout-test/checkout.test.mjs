@@ -119,6 +119,12 @@ async function setup(overrides = {}) {
       const sid = this.cli(`require ${JSON.stringify(join(root, "cart/api/customer-auth.php"))}; ez_customer_session(); $_SESSION['customer_auth']=['user'=>json_decode(base64_decode('${account}'),true),'access_token'=>str_repeat('x',64),'refresh_token'=>'fixture-refresh','expires_at'=>time()+${expiresIn},'signed_in_at'=>time()]; echo session_id(); session_write_close();`);
       return { name: "ezkart_customer", value: sid, domain: "127.0.0.1", path: "/cart", httpOnly: true, sameSite: "Lax" };
     },
+    adminCookie(changes = {}) {
+      const token = "fixture." + Buffer.from(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600, aal: "aal1" })).toString("base64url") + ".fixture-signature";
+      const data = Buffer.from(JSON.stringify({ authenticated: true, authentication_method: "supabase", authenticated_until: Math.floor(Date.now() / 1000) + 3600, signed_in_at: Math.floor(Date.now() / 1000), supabase_access_token: token, supabase_refresh_token: "fixture-admin-refresh", mfa_enabled: false, legacy_data_access: false, admin_user: { id: "fixture-google-customer", email: "checkout@example.com" }, ...changes })).toString("base64");
+      const sid = this.cli(`define('EZ_CUSTOMER_SESSION_BRIDGE', true); require ${JSON.stringify(join(root, "cart/admin/index.php"))}; $_SESSION=json_decode(base64_decode('${data}'),true); echo session_id(); session_write_close();`);
+      return { name: "ezkart_admin", value: sid, domain: "127.0.0.1", path: "/cart/admin", httpOnly: true, sameSite: "Lax" };
+    },
     async tracking(id, { refresh = false, cookie } = {}) {
       cookie ||= this.defaultCustomerCookie ||= this.customerCookie();
       return this.request(`/cart/api/status.php?order=${encodeURIComponent(id)}&tracking=1${refresh ? "" : "&refresh=0"}`, undefined, { Cookie: `${cookie.name}=${cookie.value}` });
@@ -1344,7 +1350,7 @@ test("interactive tracking walkthrough uses the customer renderer without orders
 
 async function beginCustomerLogin(page, next = "/cart/tracking-sandbox.php") {
   await page.goto(page.context()._ezkartBase + "/cart/login.php?next=" + encodeURIComponent(next));
-  const csrf = await page.locator('[name="csrf_token"]').inputValue();
+  const csrf = await page.locator('#tracking-signin [name="csrf_token"]').inputValue();
   const response = await page.request.post(page.context()._ezkartBase + "/cart/login.php", {
     form: { action: "google", csrf_token: csrf, next }, maxRedirects: 0,
   });
@@ -1369,8 +1375,10 @@ test("customer Google login uses PKCE, checks identity and order ownership, and 
   await notify(app, id); app.cli(`ez_accept_paid_order('${id}'); ez_arrange_paid_order_pickup('${id}');`);
   const path = `/cart/return.php?order=${id}&shop=test-shop`;
   const anonymous = await fetch(app.base + path, { redirect: "manual" });
-  assert.equal(anonymous.status, 303);
-  assert.equal(new URL(anonymous.headers.get("location"), app.base).searchParams.get("next"), path);
+  assert.equal(anonymous.status, 200);
+  const locked = await anonymous.text();
+  assert.ok(locked.includes('id="tracking-auth-dialog"'));
+  assert.equal(locked.includes('id="tracking-content"'), false);
   assert.equal((await app.request(`/cart/api/status.php?order=${id}&tracking=1`)).status, 401);
   const payment = (await app.request(`/cart/api/status.php?order=${id}`)).data;
   assert.equal(payment.status, "PAID");
@@ -1413,7 +1421,7 @@ test("customer Google login uses PKCE, checks identity and order ownership, and 
   await page.locator("#tracking-content").waitFor({ state: "visible" });
   assert.equal((await page.content()).includes("fixture-refresh-token"), false);
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
-  await page.getByRole("button", { name: "Continue with Google", exact: true }).waitFor();
+  await page.getByRole("button", { name: "Sign in to track", exact: true }).waitFor();
   assert.equal((await page.request.get(app.base + `/cart/api/status.php?order=${id}&tracking=1`)).status(), 401);
   assert.ok((await app.calls()).some((call) => call.url.endsWith("logout?scope=local")));
 });
@@ -1428,7 +1436,8 @@ test("Google login rejects unverified identities, enforces existing MFA and keep
     const page = await context.newPage();
     const flow = await beginCustomerLogin(page);
     await page.goto(app.base + flow.callback);
-    assert.match(await page.locator('[role="alert"]').textContent(), /verified Google account/);
+    await page.locator('#auth-message').waitFor({ state: "visible" });
+    assert.match(await page.locator('#auth-message').textContent(), /verified Google account/);
     assert.equal((await page.request.get(app.base + "/cart/api/status.php?order=bad&tracking=1")).status(), 401);
     await context.close();
   }
@@ -1437,13 +1446,13 @@ test("Google login rejects unverified identities, enforces existing MFA and keep
   const page = await context.newPage();
   const flow = await beginCustomerLogin(page);
   await page.goto(app.base + flow.callback);
-  await page.getByRole("heading", { name: "One more step", exact: true }).waitFor();
+  await page.getByRole("heading", { name: "Enter your verification code", exact: true }).waitFor();
   assert.equal((await page.request.get(app.base + "/cart/api/status.php?order=bad&tracking=1")).status(), 401);
   await page.locator("#customer-mfa").fill("000000");
-  await page.getByRole("button", { name: "Verify and continue", exact: true }).click();
+  await page.getByRole("button", { name: "Verify and track order", exact: true }).click();
   assert.equal((await page.request.get(app.base + "/cart/api/status.php?order=bad&tracking=1")).status(), 401);
   await page.locator("#customer-mfa").fill("123456");
-  await page.getByRole("button", { name: "Verify and continue", exact: true }).click();
+  await page.getByRole("button", { name: "Verify and track order", exact: true }).click();
   assert.equal(await page.locator('[role="alert"]').count(), 0, await page.locator("body").innerText());
   await page.getByRole("heading", { name: "The seller is preparing your order", exact: true }).waitFor();
   assert.equal((await page.request.get(app.base + "/cart/api/status.php?order=bad&tracking=1")).status(), 404);
@@ -1455,7 +1464,8 @@ test("Google login rejects unverified identities, enforces existing MFA and keep
   publicPage.on("console", (message) => { if (/form-action|Content Security Policy/.test(message.text())) cspErrors.push(message.text()); });
   await publicPage.goto(app.base + "/cart/login.php?next=%2Fcart%2Ftracking-sandbox.php");
   const external = publicPage.waitForRequest((request) => request.url().startsWith("https://auth.ezkart.test/auth/v1/authorize?"));
-  await publicPage.getByRole("button", { name: "Continue with Google" }).click();
+  await publicPage.evaluate(() => { window.open = () => null; });
+  await publicPage.getByRole("button", { name: "Sign in to track" }).click();
   assert.equal((await external).method(), "GET");
   assert.deepEqual(cspErrors, []);
 });
@@ -1501,4 +1511,155 @@ test("latest package location uses reported scans and confirmed stops, never rou
   assert.equal((await app.tracking(id, { refresh: true })).data.tracking.latest_location.source, "courier_scan", "A duplicate note without coordinates retains the known scan location.");
   await shippingEvent(app, id, "delivered");
   assert.equal((await app.tracking(id)).data.tracking.latest_location.source, "confirmed_stop");
+});
+
+test("tracking stays in place while Google opens in a popup, then loads only after verified completion", async (t) => {
+  const { chromium } = await import("../builder-mcp/node_modules/playwright/index.mjs");
+  const app = await setup(); t.after(() => app.close());
+  const browser = await chromium.launch({ headless: true }); t.after(() => browser.close());
+  for (const width of [1280, 390]) {
+    const context = await browser.newContext({ viewport: { width, height: 900 } });
+    const page = await context.newPage();
+    const errors = [], requests = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    page.on("request", (request) => requests.push(new URL(request.url()).pathname));
+    await context.route("https://tile.openstreetmap.org/**", (route) => route.abort());
+    // A real Google popup may sever its opener. The parent must still detect the verified session.
+    await context.route("https://auth.ezkart.test/**", (route) => route.fulfill({ headers: { "Cross-Origin-Opener-Policy": "same-origin" }, contentType: "text/html", body: "<h1>Google account chooser fixture</h1>" }));
+    const path = "/cart/tracking-sandbox.php?stage=transit";
+    await page.goto(app.base + path);
+    await page.getByRole("button", { name: "Sign in to track", exact: true }).waitFor();
+    assert.equal(page.url(), app.base + path);
+    assert.equal(await page.locator("#tracking-sandbox-data").count(), 0);
+    assert.equal(requests.some((path) => path.endsWith("/api/status.php")), false);
+    assert.equal((await page.locator("body").textContent()).includes("Your updates."), false);
+    if (process.env.EZKART_TEST_SCREENSHOTS) await page.screenshot({ path: join(process.env.EZKART_TEST_SCREENSHOTS, `tracking-gate-${width}.png`), fullPage: true });
+    const opened = page.waitForEvent("popup");
+    await page.getByRole("button", { name: "Sign in to track", exact: true }).click();
+    const popup = await opened;
+    await popup.getByRole("heading", { name: "Google account chooser fixture" }).waitFor();
+    assert.equal(page.url(), app.base + path);
+    assert.equal(await page.locator("#tracking-content").count(), 0);
+    const authorize = new URL(popup.url());
+    const callback = new URL(authorize.searchParams.get("redirect_to"));
+    await popup.goto(app.base + callback.pathname + callback.search + "&code=fixture-code").catch((error) => { if (!popup.isClosed()) throw error; });
+    await page.getByRole("heading", { name: "Your order is on the way", exact: true }).waitFor();
+    assert.equal(page.url(), app.base + path);
+    assert.equal(await page.locator("#tracking-auth-dialog").count(), 0);
+    assert.equal(await page.locator("#sandbox-stage").inputValue(), "transit");
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
+    // Stale polls from the pre-login session cannot overwrite the regenerated authenticated cookie.
+    const stale = await fetch(app.base + "/cart/api/customer-session.php", { headers: { Cookie: "ezkart_customer=missing-stale-session" } });
+    assert.equal(stale.headers.get("set-cookie"), null);
+    assert.deepEqual(errors, []);
+    await context.close();
+  }
+});
+
+test("cancelled Google popups recover on the tracking page without losing the order link", async (t) => {
+  const { chromium } = await import("../builder-mcp/node_modules/playwright/index.mjs");
+  const app = await setup(); t.after(() => app.close());
+  const browser = await chromium.launch({ headless: true }); t.after(() => browser.close());
+  const page = await browser.newPage();
+  await page.context().route("https://auth.ezkart.test/**", (route) => route.fulfill({ contentType: "text/html", body: "<h1>Google fixture</h1>" }));
+  const path = "/cart/tracking-sandbox.php?stage=processing";
+  await page.goto(app.base + path);
+  const opened = page.waitForEvent("popup");
+  await page.getByRole("button", { name: "Sign in to track" }).click();
+  const popup = await opened;
+  await popup.getByRole("heading", { name: "Google fixture" }).waitFor();
+  const callback = new URL(new URL(popup.url()).searchParams.get("redirect_to"));
+  await popup.goto(app.base + callback.pathname + callback.search + "&error=access_denied").catch((error) => { if (!popup.isClosed()) throw error; });
+  await page.waitForFunction(() => document.getElementById("auth-message").textContent.includes("cancelled"));
+  assert.equal(page.url(), app.base + path);
+  assert.equal(await page.getByRole("button", { name: "Sign in to track" }).isEnabled(), true);
+  assert.equal((await page.request.get(app.base + "/cart/api/customer-session.php")).status(), 200);
+  const again = page.waitForEvent("popup");
+  await page.getByRole("button", { name: "Sign in to track" }).click();
+  await (await again).getByRole("heading", { name: "Google fixture" }).waitFor();
+});
+
+test("an existing Google login automatically opens tracking without copying refresh tokens or granting merchant permissions", async (t) => {
+  const { chromium } = await import("../builder-mcp/node_modules/playwright/index.mjs");
+  const app = await setup(); t.after(() => app.close());
+  const browser = await chromium.launch({ headless: true }); t.after(() => browser.close());
+  const context = await browser.newContext();
+  await context.addCookies([app.adminCookie({ authenticated_until: Math.floor(Date.now() / 1000) - 1 })]);
+  const page = await context.newPage();
+  const requests = []; page.on("request", (r) => requests.push(r.url()));
+  await page.goto(app.base + "/cart/tracking-sandbox.php?stage=processing");
+  await page.getByRole("heading", { name: "The seller is preparing your order", exact: true }).waitFor();
+  assert.equal(requests.some((url) => url.includes("/auth/v1/authorize")), false);
+  assert.ok((await app.calls()).some((call) => call.url.endsWith("grant_type=refresh_token")), "Refresh the existing source session under its lock.");
+  const cookie = (await context.cookies()).find((c) => c.name === "ezkart_customer");
+  const raw = await readFile(join(app.env.EZKART_CUSTOMER_SESSION_STORAGE, "sess_" + cookie.value), "utf8");
+  assert.ok(raw.includes("existing_google"));
+  for (const secret of ["fixture-admin-refresh", "supabase_access_token", "supabase_refresh_token", "legacy_data_access"]) assert.equal(raw.includes(secret), false);
+  const id = (await app.request("/cart/api/start.php", input)).data.order_id;
+  assert.equal((await page.request.get(app.base + `/cart/api/status.php?order=${id}&tracking=1&refresh=0`)).status(), 200);
+  const wrong = (await app.request("/cart/api/start.php", { ...input, customer: { ...input.customer, email: "someone-else@example.com" } })).data.order_id;
+  assert.equal((await page.request.get(app.base + `/cart/api/status.php?order=${wrong}&tracking=1&refresh=0`)).status(), 404);
+  // A source-session refresh happens under the existing admin lock and remains automatic.
+  app.cli(`$p=getenv('EZKART_CUSTOMER_SESSION_STORAGE').'/sess_${cookie.value}'; $s=file_get_contents($p); $s=preg_replace('/"expires_at";i:\\d+;/', '"expires_at";i:1;', $s); file_put_contents($p,$s);`);
+  await page.reload();
+  await page.getByRole("heading", { name: "The seller is preparing your order", exact: true }).waitFor();
+  await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  await page.getByRole("button", { name: "Sign in to track", exact: true }).waitFor();
+  await page.reload();
+  await page.getByRole("button", { name: "Sign in to track", exact: true }).waitFor();
+  assert.equal((await page.request.get(app.base + `/cart/api/status.php?order=${id}&tracking=1`)).status(), 401, "Explicit sign-out must not be undone by the existing login.");
+  assert.equal((await app.calls()).some((call) => call.url.includes("logout?scope=local")), false, "Signing out of a borrowed customer session does not revoke the merchant refresh token.");
+});
+
+test("existing-login bridge rejects passwords, unfinished MFA, expired identities and cross-origin requests", async (t) => {
+  const { chromium } = await import("../builder-mcp/node_modules/playwright/index.mjs");
+  const app = await setup(); t.after(() => app.close());
+  const browser = await chromium.launch({ headless: true }); t.after(() => browser.close());
+  for (const changes of [
+    { authentication_method: "password" },
+    { pending_mfa: { expires_at: Math.floor(Date.now() / 1000) + 600 } },
+    { admin_user: { id: "wrong-user", email: "checkout@example.com" } },
+    { signed_in_at: Math.floor(Date.now() / 1000) - 2592001 },
+  ]) {
+    const context = await browser.newContext();
+    await context.addCookies([app.adminCookie(changes)]);
+    const page = await context.newPage();
+    await page.goto(app.base + "/cart/tracking-sandbox.php");
+    await page.getByRole("button", { name: "Sign in to track", exact: true }).waitFor();
+    assert.equal((await page.request.get(app.base + "/cart/api/status.php?order=bad&tracking=1")).status(), 401);
+    const csrf = await page.locator('#tracking-signin [name="csrf_token"]').inputValue();
+    assert.equal((await page.request.post(app.base + "/cart/admin/customer-session.php", { headers: { Origin: "https://evil.test", "X-Ezkart-CSRF": csrf } })).status(), 403);
+    assert.equal((await page.request.post(app.base + "/cart/admin/customer-session.php", { headers: { "X-Ezkart-CSRF": "wrong" } })).status(), 403);
+    assert.equal((await page.request.get(app.base + "/cart/admin/customer-session.php")).status(), 405);
+    await context.close();
+  }
+});
+
+test("switching Google accounts waits for the new identity and existing-login reuse honors verified MFA", async (t) => {
+  const { chromium } = await import("../builder-mcp/node_modules/playwright/index.mjs");
+  const app = await setup(); t.after(() => app.close());
+  const browser = await chromium.launch({ headless: true }); t.after(() => browser.close());
+  const page = await browser.newPage();
+  await page.context().addCookies([app.customerCookie("previous@example.com", "previous-customer")]);
+  await page.context().route("https://auth.ezkart.test/**", (route) => route.fulfill({ contentType: "text/html", body: "<h1>Choose account fixture</h1>" }));
+  await page.goto(app.base + "/cart/tracking-sandbox.php?stage=processing&signin=1");
+  const oldSession = await (await page.request.get(app.base + "/cart/api/customer-session.php")).json();
+  assert.ok(oldSession.version, "Existing sessions receive a version before attempting an account switch.");
+  const opened = page.waitForEvent("popup");
+  await page.getByRole("button", { name: "Sign in to track" }).click();
+  const popup = await opened;
+  await popup.getByRole("heading", { name: "Choose account fixture" }).waitFor();
+  await page.waitForTimeout(1700);
+  assert.equal(await page.locator("#tracking-content").count(), 0, "The previous account cannot complete the new sign-in attempt.");
+  const callback = new URL(new URL(popup.url()).searchParams.get("redirect_to"));
+  await popup.goto(app.base + callback.pathname + callback.search + "&code=fixture-code").catch((error) => { if (!popup.isClosed()) throw error; });
+  await page.getByRole("heading", { name: "The seller is preparing your order", exact: true }).waitFor();
+  assert.match(await page.locator(".customer-account").textContent(), /checkout@example.com/);
+  assert.notEqual((await (await page.request.get(app.base + "/cart/api/customer-session.php")).json()).version, oldSession.version);
+  const another = await browser.newPage();
+  await another.context().addCookies([app.adminCookie()]);
+  await writeFile(join(app.directory, "auth-response.json"), JSON.stringify({ user: { factors: [{ id: "fixture-totp", factor_type: "totp", status: "verified" }] } }));
+  await another.goto(app.base + "/cart/tracking-sandbox.php");
+  await another.getByRole("button", { name: "Sign in to track" }).waitFor();
+  assert.equal((await another.request.get(app.base + "/cart/api/status.php?order=bad&tracking=1")).status(), 401, "An existing AAL1 session cannot bypass a provider-verified second factor.");
 });
