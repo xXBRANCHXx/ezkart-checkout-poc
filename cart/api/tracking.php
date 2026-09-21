@@ -100,12 +100,7 @@ function ez_tracking_link(string $value): string
 
 function ez_tracking_coordinate(mixed $coordinate): ?array
 {
-    if (!is_array($coordinate)) return null;
-    $lat = $coordinate['latitude'] ?? null;
-    $lng = $coordinate['longitude'] ?? null;
-    if (!is_numeric($lat) || !is_numeric($lng) || !is_finite((float) $lat) || !is_finite((float) $lng)
-        || abs((float) $lat) > 90 || abs((float) $lng) > 180 || ((float) $lat === 0.0 && (float) $lng === 0.0)) return null;
-    return ['latitude' => (float) $lat, 'longitude' => (float) $lng];
+    return ez_delivery_coordinate($coordinate);
 }
 
 /** Read only from Biteship; never create a shipment or change payment state. */
@@ -245,7 +240,7 @@ function ez_public_order_tracking(array $order): array
         'live_tracking' => $paid && !$skipped && ($order['biteship_service_type'] ?? $order['shipping']['courier_type'] ?? '') === 'instant',
         'locations' => $paid && !$skipped ? [
             'origin' => ez_tracking_coordinate($order['biteship_locations']['origin'] ?? null),
-            'destination' => ez_tracking_coordinate($order['biteship_locations']['destination'] ?? null),
+            'destination' => ez_tracking_coordinate($order['customer']['coordinate'] ?? null) ?? ez_tracking_coordinate($order['biteship_locations']['destination'] ?? null),
         ] : ['origin' => null, 'destination' => null],
         'history' => $history,
         'latest_location' => $latestLocation,

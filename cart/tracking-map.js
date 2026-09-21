@@ -6,11 +6,13 @@
   const samePoint = (a, b) => a && b && a.latitude === b.latitude && a.longitude === b.longitude;
   let map, sdk, loading, ready = false, failedAt = 0, state, stateKey = "", overview = false, destinationFocus = false;
   let markers = [], routeKey = "", routePath = [], routeSequence = 0, viewSequence = 0;
+  let pinEdit = null;
   const routeCache = new Map();
   const truck = '<svg viewBox="0 0 64 46" width="64" height="46" fill="none" aria-hidden="true"><ellipse cx="33" cy="39" rx="25" ry="3" fill="#182b45" opacity=".12"/><path d="M7 9a4 4 0 0 1 4-4h27a4 4 0 0 1 4 4v5h7a5 5 0 0 1 4 2l7 10v7a3 3 0 0 1-3 3H7V9Z" fill="#fff" stroke="#fff" stroke-width="6" stroke-linejoin="round"/><path d="M7 9a4 4 0 0 1 4-4h27a4 4 0 0 1 4 4v25H7V9Z" fill="#ee563d"/><path d="M42 14h7a5 5 0 0 1 4 2l7 10v7a3 3 0 0 1-3 3H42V14Z" fill="#df462f"/><path d="M46 18h3a2 2 0 0 1 1.6.8L55 25h-9v-7Z" fill="#e7f0f4"/><path d="M7 29h35v6H7z" fill="#d9422c"/><path d="M15 15h16m-16 5h10" stroke="#fff" stroke-width="3" stroke-linecap="round"/><path d="M46 29h4" stroke="#a52f23" stroke-width="2" stroke-linecap="round"/><path d="M58 28h2v4h-2" fill="#fff3d5"/><path d="M6 35h54" stroke="#182b45" stroke-width="2.5" stroke-linecap="round"/><circle cx="17" cy="35" r="6" fill="#182b45" stroke="#fff" stroke-width="2"/><circle cx="50" cy="35" r="6" fill="#182b45" stroke="#fff" stroke-width="2"/><circle cx="17" cy="35" r="2" fill="#e3eaf0"/><circle cx="50" cy="35" r="2" fill="#e3eaf0"/></svg>';
   const destinationPin = '<svg viewBox="0 0 40 50" width="40" height="50" fill="none" aria-hidden="true"><path d="M20 47S3 29 3 20a17 17 0 1 1 34 0c0 9-17 27-17 27Z" fill="#182b45" stroke="#fff" stroke-width="3" stroke-linejoin="round"/><circle cx="20" cy="20" r="6" fill="#fff"/></svg>';
 
   function failMap() {
+    if (pinEdit) finishPinEdit(false);
     failedAt = Date.now();
     $("package-map-frame").hidden = true;
     $("map-tools").hidden = true;
@@ -54,13 +56,14 @@
   function paintMarkers() {
     markers.forEach((marker) => marker.remove());
     markers = [];
+    if (pinEdit) return;
     const { location, origin, destination, completed, returning } = state;
     if (destination && !samePoint(location, destination)) makeMarker(destination, "destination", returning ? "Seller" : "Delivery", returning ? "Return address" : "Delivery address");
     if ((overview || !location) && origin && !samePoint(origin, location) && !samePoint(origin, destination)) makeMarker(origin, "pickup", "Pickup", "Pickup address");
     if (location) makeMarker(location, completed ? "destination" : "truck", completed ? (returning ? "Returned" : "Delivered") : "Your package", "Last reported location: " + location.label);
   }
   function positionMap() {
-    if (!map || !state) return;
+    if (!map || !state || pinEdit) return;
     viewSequence++;
     if (destinationFocus && state.destination) {
       map.jumpTo({ center: point(state.destination), zoom: 16 });
@@ -144,7 +147,9 @@
         map.addLayer({ id: "delivery-route-line", type: "line", source: "delivery-route", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#ee563d", "line-width": 5 } });
         $("map-tools").hidden = false;
         $("map-loading").hidden = true;
-        paintMarkers(); positionMap(); void drawRoute();
+        paintMarkers();
+        if (pinEdit) preparePinEdit(); else positionMap();
+        void drawRoute();
       });
     } catch (_) { failMap(); }
     finally { loading = false; }
@@ -202,5 +207,81 @@
     $("package-map-frame").scrollIntoView({ block: "center", behavior: "smooth" });
     if (ready) { paintMarkers(); positionMap(); } else void drawMap();
   }
-  window.ezkartDeliveryMap = { update, validPoint, focusDestination };
+  function pinRouteVisibility(visible) {
+    for (const id of ["delivery-route-casing", "delivery-route-line"]) {
+      if (map?.getLayer(id)) map.setLayoutProperty(id, "visibility", visible ? "visible" : "none");
+    }
+  }
+  function preparePinEdit() {
+    if (!ready || !pinEdit) return;
+    map.stop(); map.resize();
+    const center = map.getCenter();
+    pinEdit.previousView = { center: center.toArray(), zoom: map.getZoom() };
+    const initial = pinEdit.coordinate;
+    // Keep a nearby view the customer has already panned to inspect.
+    const nearby = !initial || (Math.abs(center.lat - initial.latitude) < .03 && Math.abs(center.lng - initial.longitude) < .03);
+    map.jumpTo({ center: nearby ? center : point(initial), zoom: Math.max(17, map.getZoom()) });
+    paintMarkers(); pinRouteVisibility(false);
+    $("map-pin-save").disabled = false;
+    map.getCanvas().focus({ preventScroll: true });
+  }
+  function beginPinEdit(options) {
+    if (pinEdit || failedAt || !$("map-pin-editor")) return false;
+    pinEdit = { ...options, trigger: document.activeElement };
+    $("map-pin-symbol").innerHTML = destinationPin;
+    $("map-pin-editor").hidden = false;
+    $("map-pin-error").textContent = "";
+    $("map-pin-save").textContent = options.label || "Use this pin";
+    $("map-pin-save").disabled = true;
+    $("map-recenter").disabled = true;
+    $("map-route-toggle").disabled = true;
+    $("package-map-frame").classList.add("choosing-pin");
+    $("package-map-frame").scrollIntoView({ block: "center", behavior: "smooth" });
+    if (ready) preparePinEdit(); else void drawMap();
+    return true;
+  }
+  function finishPinEdit(saved) {
+    const previous = pinEdit; pinEdit = null;
+    $("map-pin-editor").hidden = true;
+    $("package-map-frame").classList.remove("choosing-pin", "saving-pin");
+    $("map-pin-cancel").disabled = false;
+    $("map-tools").inert = false;
+    $("delivery-map").inert = false;
+    $("map-recenter").disabled = false;
+    $("map-route-toggle").disabled = false;
+    if (ready) {
+      pinRouteVisibility(true); paintMarkers();
+      if (saved && state.destination) { overview = false; destinationFocus = true; map.jumpTo({ center: point(state.destination), zoom: Math.max(17, map.getZoom()) }); }
+      else if (previous.previousView) map.jumpTo(previous.previousView);
+    }
+    previous.onClose?.(saved);
+    previous.trigger?.focus({ preventScroll: true });
+  }
+  $("map-pin-cancel")?.addEventListener("click", () => { if (pinEdit && !pinEdit.saving) finishPinEdit(false); });
+  $("map-pin-save")?.addEventListener("click", async () => {
+    if (!pinEdit || !ready || pinEdit.saving) return;
+    map.stop();
+    const center = map.getCenter(), coordinate = { latitude: center.lat, longitude: center.lng };
+    if (!validPoint(coordinate)) { $("map-pin-error").textContent = "Move the pin to a valid location."; return; }
+    pinEdit.saving = true;
+    $("map-pin-save").disabled = true; $("map-pin-cancel").disabled = true;
+    $("map-pin-save").textContent = "Saving pin…";
+    $("map-pin-error").textContent = "";
+    $("map-tools").inert = true;
+    $("delivery-map").inert = true;
+    $("package-map-frame").classList.add("saving-pin");
+    // Remove keyboard focus as well as pointer input while the position is saved.
+    map.getCanvas().blur();
+    try { await pinEdit.onSave(coordinate); finishPinEdit(true); }
+    catch (error) {
+      pinEdit.saving = false;
+      $("map-pin-error").textContent = error.message || "The pin could not be saved. Please try again.";
+      $("map-pin-save").textContent = pinEdit.label || "Use this pin";
+      $("map-pin-save").disabled = false; $("map-pin-cancel").disabled = false;
+      $("map-tools").inert = false;
+      $("delivery-map").inert = false;
+      $("package-map-frame").classList.remove("saving-pin");
+    }
+  });
+  window.ezkartDeliveryMap = { update, validPoint, focusDestination, beginPinEdit };
 })();

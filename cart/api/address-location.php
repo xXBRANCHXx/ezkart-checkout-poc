@@ -38,7 +38,9 @@ function ez_address_with_location(array $address): array
     try { $parsed = ez_address_location((string) ($address['address'] ?? '')); }
     catch (InvalidArgumentException) { return $address; }
     if ($parsed['coordinate'] !== null) {
-        $address['coordinate'] = $parsed['coordinate'];
+        // An explicitly saved pin takes priority over older coordinates in the text.
+        // Editing the street/city/postcode clears this field before parsing again.
+        $address['coordinate'] = ez_delivery_coordinate($address['coordinate'] ?? null) ?? $parsed['coordinate'];
         if ($parsed['address'] !== '') $address['address'] = $parsed['address'];
     }
     return $address;

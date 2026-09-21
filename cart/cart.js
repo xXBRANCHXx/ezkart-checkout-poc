@@ -5,6 +5,7 @@
     products: {},
     cart: {},
     customer: {},
+    deliveryCoordinate: null,
     shipping: null,
     shippingRequired: true,
     step: "confirm",
@@ -481,7 +482,7 @@
         body: JSON.stringify({
           cart: state.cart,
           shop: state.shop,
-          customer: state.customer,
+          customer: { ...state.customer, ...(state.deliveryCoordinate ? { coordinate: state.deliveryCoordinate } : {}) },
           shipping_id: state.shipping?.id || "",
         }),
       });
@@ -553,7 +554,7 @@
   });
   byId("customer-form").addEventListener("input", (event) => {
     if (!event.target.matches("input, textarea")) return;
-    if (["address", "location", "postalCode"].includes(event.target.name)) { resetDelivery(); renderTotals(); }
+    if (["address", "location", "postalCode"].includes(event.target.name)) { state.deliveryCoordinate = null; resetDelivery(); renderTotals(); }
     event.target.classList.remove("invalid");
     const error = event.target.parentElement.querySelector(".field-error");
     if (error) error.textContent = "";
@@ -565,7 +566,7 @@
   byId("merchant-home").addEventListener("click", returnToStore);
 
   window.ezkartAddressBook(byId("checkout-address-book"), {
-    current: () => Object.fromEntries(new FormData(byId("customer-form")).entries()),
+    current: () => ({ ...Object.fromEntries(new FormData(byId("customer-form")).entries()), coordinate: state.deliveryCoordinate }),
     onAccount: ({ authenticated, email }) => {
       const field = byId("customer-form").elements.email;
       if (authenticated && !field.value) field.value = email;
@@ -584,6 +585,7 @@
         form.elements[key].dispatchEvent(new Event("input", { bubbles: true }));
       }
       state.customer = Object.fromEntries(new FormData(form).entries());
+      state.deliveryCoordinate = address.coordinate || null;
       resetDelivery(); renderTotals();
     },
   });

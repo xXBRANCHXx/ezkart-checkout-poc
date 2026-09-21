@@ -69,7 +69,7 @@
         if (!response.ok || !data.ok) { if ([401, 409].includes(response.status)) await read(); throw new Error(data.error || "The address could not be saved."); }
         const oldIds = book.addresses.map(address => address.id);
         book = data.book; csrf = data.csrf; email = data.email;
-        if (payload.action === "save") selected = payload.id || book.addresses.find(address => !oldIds.includes(address.id))?.id || book.default_id;
+        if (["save", "pin"].includes(payload.action)) selected = payload.id || book.addresses.find(address => !oldIds.includes(address.id))?.id || book.default_id;
         render(); status.textContent = payload.action === "delete" ? "Address removed." : payload.action === "default" ? "Default address updated." : "Address saved to your account.";
         return true;
       } catch (failure) { status.textContent = failure.message; error.textContent = failure.message; return false; }
@@ -79,7 +79,7 @@
       event.preventDefault();
       const address = Object.fromEntries(fields.map(field => [field, form.elements[field].value.trim()]));
       address.coordinate = ["address", "location", "postalCode"].every(key => !draft[key] || address[key] === draft[key]) ? draft.coordinate || null : null;
-      if (await mutate({ action: "save", id: editing || undefined, address, make_default: form.elements.make_default.checked })) dialog.close();
+      if (await mutate({ action: "save", id: editing || undefined, address, make_default: form.elements.make_default.checked })) { dialog.close(); options.onSaved?.(chosen()); }
     });
     dialog.querySelectorAll("[data-close]").forEach(button => button.addEventListener("click", () => dialog.close()));
     picker.addEventListener("change", () => { selected = picker.value; render(); });
@@ -127,6 +127,20 @@
     window.addEventListener("focus", () => { if (deadline) void pollLogin(); });
     status.textContent = "Loading saved addresses…";
     void read(true, true).then(() => { if (status.textContent === "Loading saved addresses…") status.textContent = ""; });
-    return { save: initial => openEditor(null, initial), reload: () => read(false, false) };
+    return {
+      save: (initial, id) => {
+        const existing = id ? book.addresses.find(address => address.id === id) : null;
+        if (id && !existing) { status.textContent = "This saved address was removed. Select an address again."; return; }
+        openEditor(existing, initial);
+      },
+      updatePin: async (id, coordinate, original) => {
+        const address = book.addresses.find(address => address.id === id);
+        if (!address) throw new Error("This saved address was removed. Select an address again.");
+        if (["address", "location", "postalCode"].some(key => address[key] !== original[key])) throw new Error("This address changed. Cancel and select it again before placing its pin.");
+        if (!await mutate({ action: "pin", id, coordinate })) throw new Error(status.textContent || "The pin could not be saved. Please try again.");
+        return chosen();
+      },
+      reload: () => read(false, false),
+    };
   };
 })();

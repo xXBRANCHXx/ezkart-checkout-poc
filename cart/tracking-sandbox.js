@@ -10,7 +10,7 @@
   const sequence = ["pending", "paid", "processing", "pickup", "picked", "transit", "delivery", "delivered"];
   const requested = new URLSearchParams(location.search).get("stage");
   let current = Object.hasOwn(scenarios, requested) ? requested : "processing";
-  let timer, selectedPlace = null, searchSequence = 0, searchController;
+  let timer, selectedPlace = null, searchSequence = 0, searchController, pendingAddress = null;
   window.ezkartTrackingSandbox = {
     place: () => selectedPlace,
     read: () => {
@@ -62,13 +62,22 @@
   const results = document.getElementById("sandbox-address-results");
   const chosen = document.getElementById("sandbox-address-selected");
   const searchButton = form.querySelector("button");
+  function savedPlace(address, coordinate = address.coordinate, id = address.preview_id) {
+    return { id, coordinate, name: address.label, address: `${address.address}, ${address.location} ${address.postalCode}`, address_line: address.address, location: address.location, postalCode: address.postalCode, kind: "Saved address", savedAddress: address };
+  }
+  function renderPlace() {
+    chosen.hidden = !selectedPlace;
+    if (!selectedPlace) return;
+    document.getElementById("sandbox-address-name").textContent = selectedPlace.name;
+    document.getElementById("sandbox-address-detail").textContent = selectedPlace.address;
+    document.getElementById("sandbox-address-save").textContent = selectedPlace.savedAddress ? "Edit address" : "Save this address";
+  }
   function choose(place) {
+    if (pendingAddress) { place = { ...place, ...savedPlace(pendingAddress, place.coordinate, place.id) }; pendingAddress = null; }
     selectedPlace = place;
     pause(); show("transit");
     results.hidden = true; results.replaceChildren();
-    chosen.hidden = false;
-    document.getElementById("sandbox-address-name").textContent = place.name;
-    document.getElementById("sandbox-address-detail").textContent = place.address;
+    renderPlace();
     status.textContent = place.resolved ? place.kind + " · Delivery pin placed on the map." : place.kind + " · Check the pin; address matches can be approximate.";
     window.ezkartDeliveryMap.focusDestination();
   }
@@ -89,7 +98,7 @@
       if (!response.ok || !data.ok || !Array.isArray(data.results)) throw new Error(response.status === 401 ? "Please reload and sign in to search for an address." : data.error || "Address search is temporarily unavailable. Please try again.");
       const places = data.results.filter(place => window.ezkartDeliveryMap.validPoint(place.coordinate));
       if (places.length === 1 && places[0].resolved) { choose(places[0]); return; }
-      status.textContent = places.length ? "Choose the address you want to test." : "No match found. Try the street and city, or a nearby landmark.";
+      status.textContent = places.length ? "Choose the address you want to test." : "No match found. Choose on map to place the pin yourself, or search a nearby landmark.";
       for (const place of places) {
         const row = document.createElement("li"), button = document.createElement("button"), name = document.createElement("strong"), detail = document.createElement("span"), kind = document.createElement("small");
         button.type = "button"; name.textContent = place.name; detail.textContent = place.address; kind.textContent = place.kind;
@@ -104,13 +113,14 @@
     }
   });
   input.addEventListener("input", () => {
+    pendingAddress = null;
     searchSequence++; searchController?.abort(); results.hidden = true; results.replaceChildren();
     searchButton.disabled = false; form.removeAttribute("aria-busy");
     status.textContent = "Search, then choose a match to see its delivery pin.";
   });
   document.getElementById("sandbox-address-focus").addEventListener("click", () => { pause(); show("transit"); window.ezkartDeliveryMap.focusDestination(); });
   document.getElementById("sandbox-address-reset").addEventListener("click", () => {
-    searchSequence++; searchController?.abort(); selectedPlace = null; chosen.hidden = true; results.hidden = true; results.replaceChildren(); input.value = "";
+    searchSequence++; searchController?.abort(); selectedPlace = null; pendingAddress = null; chosen.hidden = true; results.hidden = true; results.replaceChildren(); input.value = "";
     searchButton.disabled = false; form.removeAttribute("aria-busy"); status.textContent = "Using the sample delivery address.";
     pause(); show(current); document.getElementById("map-recenter").click();
   });
@@ -118,12 +128,13 @@
     current: () => selectedPlace ? ({ address: selectedPlace.address_line || selectedPlace.name, location: selectedPlace.location || "", postalCode: selectedPlace.postalCode || "", coordinate: selectedPlace.coordinate }) : {},
     onUse: (address, { automatic }) => {
       if (!address || (automatic && (selectedPlace || input.value.trim() || timer))) return;
+      searchSequence++; searchController?.abort(); pendingAddress = null;
+      searchButton.disabled = false; form.removeAttribute("aria-busy");
+      results.hidden = true; results.replaceChildren();
       if (address.coordinate && address.preview_id) {
-        const place = { id: address.preview_id, coordinate: address.coordinate, name: address.label, address: `${address.address}, ${address.location} ${address.postalCode}`, address_line: address.address, location: address.location, postalCode: address.postalCode, kind: "Saved address" };
+        const place = savedPlace(address);
         if (automatic) {
-          selectedPlace = place; show(current); chosen.hidden = false;
-          document.getElementById("sandbox-address-name").textContent = place.name;
-          document.getElementById("sandbox-address-detail").textContent = place.address;
+          selectedPlace = place; show(current); renderPlace();
           status.textContent = "Using your default delivery address.";
         } else choose(place);
       } else if (!automatic) {
@@ -132,10 +143,44 @@
           if (part && !parts.some(value => value.toLowerCase().includes(part.toLowerCase()))) parts.push(part);
         }
         input.value = parts.join(', ');
+        pendingAddress = address;
         form.requestSubmit();
       }
     },
+    onSaved: address => { if (address.coordinate && address.preview_id) { pendingAddress = null; choose(savedPlace(address)); } },
   });
-  document.getElementById("sandbox-address-save").addEventListener("click", () => savedAddresses.save());
+  document.getElementById("sandbox-address-save").addEventListener("click", () => savedAddresses.save(undefined, selectedPlace?.savedAddress?.id));
+  function editPin(place = null) {
+    const address = input.value.trim();
+    if (!place && (address.length < 3 || address.length > 500)) { input.reportValidity(); input.focus(); return; }
+    const original = place?.savedAddress || (!place ? pendingAddress : null);
+    searchSequence++; searchController?.abort(); searchButton.disabled = false; form.removeAttribute("aria-busy");
+    pause(); show("transit");
+    const controls = [...document.querySelectorAll(".sandbox-controls, .sandbox-address, #sandbox-address-book")];
+    const started = window.ezkartDeliveryMap.beginPinEdit({
+      coordinate: place?.coordinate,
+      label: original ? "Save delivery pin" : "Use this pin",
+      onClose: () => controls.forEach(element => { element.inert = false; }),
+      onSave: async coordinate => {
+        const response = await fetch("api/tracking-address.php", { method: "POST", cache: "no-store", headers: { "Content-Type": "application/json", "X-Ezkart-CSRF": form.dataset.csrf }, body: JSON.stringify({ action: "pin", place: place?.id, address, coordinate }), signal: AbortSignal.timeout(15000) });
+        const data = await response.json();
+        if (!response.ok || !data.ok || !data.results?.[0]) throw new Error(data.error || "The pin could not be saved. Please try again.");
+        let updated = { ...place, ...data.results[0] };
+        if (original) {
+          const saved = await savedAddresses.updatePin(original.id, coordinate, original);
+          updated = savedPlace(saved);
+        }
+        pendingAddress = null;
+        selectedPlace = updated; renderPlace();
+        results.hidden = true; results.replaceChildren();
+        show(current);
+        status.textContent = original ? "Delivery pin saved to this address. It will be used at checkout." : "Delivery pin set. Save this address to use it again at checkout.";
+      },
+    });
+    if (started) controls.forEach(element => { element.inert = true; });
+    else status.textContent = "The map is temporarily unavailable. Please reload and try again.";
+  }
+  document.getElementById("sandbox-address-adjust").addEventListener("click", () => { if (selectedPlace) editPin(selectedPlace); });
+  document.getElementById("sandbox-address-map").addEventListener("click", () => editPin());
   show(current);
 })();

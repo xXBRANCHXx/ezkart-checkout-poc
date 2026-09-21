@@ -21,7 +21,7 @@ try {
         $payload = json_decode($body, true);
         if (($payload['action'] ?? '') === 'save' && is_array($payload['address'] ?? null)) {
             // Keep pasted GPS coordinates in their own field, including older saved addresses.
-            ez_address_location((string) ($payload['address']['address'] ?? ''));
+            if (ez_delivery_coordinate($payload['address']['coordinate'] ?? null) === null) ez_address_location((string) ($payload['address']['address'] ?? ''));
             $payload['address'] = ez_address_with_location($payload['address']);
             $body = json_encode($payload, JSON_THROW_ON_ERROR);
         }

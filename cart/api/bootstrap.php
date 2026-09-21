@@ -498,6 +498,8 @@ function ez_checkout_request(array $input): array
         throw new InvalidArgumentException('A valid delivery location, address, and postcode are required.');
     }
 
+    $coordinate = ez_delivery_coordinate($customer['coordinate'] ?? null);
+    if (isset($customer['coordinate']) && $coordinate === null) throw new InvalidArgumentException('Choose a valid delivery pin.');
     $shippingId = trim((string) ($input['shipping_id'] ?? ''));
     $shippingSkipped = !ez_commerce_is_production() && $shippingId === '';
     $shipping = null;
@@ -530,10 +532,20 @@ function ez_checkout_request(array $input): array
         'total' => $subtotal + $shippingPrice,
         'weight' => $weight,
         'shipping_items' => $shippingItems,
-        'customer' => compact('name', 'email', 'phone', 'location', 'address', 'postalCode', 'note'),
+        'customer' => compact('name', 'email', 'phone', 'location', 'address', 'postalCode', 'note') + ($coordinate !== null ? ['coordinate' => $coordinate] : []),
         'shipping' => $shipping,
         'shipping_skipped' => $shippingSkipped,
     ];
+}
+
+function ez_delivery_coordinate(mixed $coordinate): ?array
+{
+    if (!is_array($coordinate)) return null;
+    $lat = $coordinate['latitude'] ?? null;
+    $lng = $coordinate['longitude'] ?? null;
+    if (!is_numeric($lat) || !is_numeric($lng) || !is_finite((float) $lat) || !is_finite((float) $lng)
+        || abs((float) $lat) > 90 || abs((float) $lng) > 180 || ((float) $lat === 0.0 && (float) $lng === 0.0)) return null;
+    return ['latitude' => (float) $lat, 'longitude' => (float) $lng];
 }
 
 function ez_order_skips_shipping(array $order): bool
@@ -596,6 +608,7 @@ function ez_create_biteship_order(array $order): array
         'metadata' => ['payment_status' => (string) ($order['payment_status'] ?? ''), 'environment' => $environment],
         'items' => $items,
     ];
+    if (($coordinate = ez_delivery_coordinate($customer['coordinate'] ?? null)) !== null) $payload['destination_coordinate'] = $coordinate;
     foreach ([
         'shipper_contact_email' => $credentials['origin_contact_email'],
         'origin_contact_email' => $credentials['origin_contact_email'],

@@ -19,7 +19,8 @@ function curl_exec(object $handle): string {
                 $address = $payload['address']; $address['id'] = $index === false ? bin2hex(random_bytes(12)) : $payload['id'];
                 if ($index === false) $book['addresses'][] = $address; else $book['addresses'][$index] = $address;
                 if ($book['default_id'] === '' || !empty($payload['make_default'])) $book['default_id'] = $address['id'];
-            } elseif ($index !== false && $payload['action'] === 'default') $book['default_id'] = $payload['id'];
+            } elseif ($index !== false && $payload['action'] === 'pin') $book['addresses'][$index]['coordinate'] = $payload['coordinate'];
+            elseif ($index !== false && $payload['action'] === 'default') $book['default_id'] = $payload['id'];
             elseif ($index !== false && $payload['action'] === 'delete') {
                 array_splice($book['addresses'], $index, 1);
                 if ($book['default_id'] === $payload['id']) $book['default_id'] = $book['addresses'][0]['id'] ?? '';

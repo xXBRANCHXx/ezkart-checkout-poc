@@ -47,6 +47,17 @@ test("customer addresses verify identity, isolate owners, enforce limits and rej
   assert.equal((await call(alice, { action: "delete", id: second.id, revision: 5 })).status, 409);
   assert.equal((await call(alice)).book.addresses.length, 2);
   assert.deepEqual((await call(await token("alice", { email: "changed@example.test" }))).book, (await call(alice)).book);
+  const before = (await call(alice)).book;
+  const pin = { latitude: -7.7894, longitude: 110.3635 };
+  assert.equal((await call(bob, { action: "pin", id: second.id, revision: 0, coordinate: pin })).status, 404);
+  for (const coordinate of [null, {}, { latitude: 0, longitude: 0 }, { latitude: 91, longitude: 110 }, { latitude: -7, longitude: 181 }, { latitude: "-7", longitude: 110 }]) {
+    assert.equal((await call(alice, { action: "pin", id: second.id, revision: before.revision, coordinate })).status, 422);
+  }
+  const pinned = await call(alice, { action: "pin", id: second.id, revision: before.revision, coordinate: pin, address: { label: "Ignored" }, make_default: true });
+  assert.equal(pinned.status, 200);
+  assert.deepEqual(pinned.book.addresses, before.addresses.map(a => a.id === second.id ? { ...a, coordinate: pin } : a));
+  assert.equal(pinned.book.default_id, before.default_id);
+  assert.equal((await call(alice, { action: "pin", id: second.id, revision: before.revision, coordinate: pin })).status, 409);
   await assert.rejects(db.prepare("INSERT INTO customer_address_books (auth_user_id,addresses_json,updated_at) VALUES ('limit','[{},{},{},{}]','now')").run(), /CHECK constraint/);
   assert.equal(await db.prepare("SELECT name FROM sqlite_master WHERE name = 'seller_memberships'").first(), null);
 });

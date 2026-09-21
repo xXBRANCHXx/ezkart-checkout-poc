@@ -3,6 +3,10 @@ const text = (value, maximum, name, minimum = 0) => {
   if (typeof value !== "string" || value.trim().length < minimum || value.trim().length > maximum) fail(`Enter a valid ${name}.`);
   return value.trim();
 };
+function cleanCoordinate(p) {
+  if (!p || !Number.isFinite(p.latitude) || !Number.isFinite(p.longitude) || Math.abs(p.latitude) > 90 || Math.abs(p.longitude) > 180 || (!p.latitude && !p.longitude)) fail("The map position is invalid.");
+  return { latitude: p.latitude, longitude: p.longitude };
+}
 function cleanAddress(input, id) {
   if (!input || typeof input !== "object" || Array.isArray(input)) fail("Enter an address.");
   const address = {
@@ -18,9 +22,7 @@ function cleanAddress(input, id) {
   if (!/^\d{5}$/.test(address.postalCode)) fail("Enter a five-digit postcode.");
   if (address.phone && !/^(?:\+62|62|0)8[1-9][0-9]{6,12}$/.test(address.phone.replace(/[\s-]/g, ""))) fail("Enter a valid Indonesian phone number.");
   if (input.coordinate != null) {
-    const p = input.coordinate;
-    if (!Number.isFinite(p.latitude) || !Number.isFinite(p.longitude) || Math.abs(p.latitude) > 90 || Math.abs(p.longitude) > 180 || (!p.latitude && !p.longitude)) fail("The map position is invalid.");
-    address.coordinate = { latitude: p.latitude, longitude: p.longitude };
+    address.coordinate = cleanCoordinate(input.coordinate);
   }
   return address;
 }
@@ -45,6 +47,9 @@ export async function changeCustomerAddressBook(env, owner, input) {
       addresses[index] = address;
     } else addresses.push(address);
     if (!defaultId || input.make_default === true) defaultId = id;
+  } else if (input.action === "pin") {
+    if (index < 0) fail("Address not found.", 404);
+    addresses[index] = { ...addresses[index], coordinate: cleanCoordinate(input.coordinate) };
   } else if (["delete", "default"].includes(input.action)) {
     if (index < 0) fail("Address not found.", 404);
     if (input.action === "default") defaultId = addresses[index].id;

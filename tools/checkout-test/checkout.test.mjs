@@ -1738,6 +1738,172 @@ test("sandbox saved map addresses persist across sessions and fill checkout", as
   assert.equal(await other.locator('#customer-form [name="postalCode"]').inputValue(), '10230');
 });
 
+test("customer-positioned pins validate identity and coordinates without a geocoder and bind preview routes", async t => {
+  const app = await setup(); t.after(() => app.close());
+  const cookie = app.customerCookie(), auth = { Cookie: `${cookie.name}=${cookie.value}` };
+  const html = await (await fetch(app.base + '/cart/tracking-sandbox.php?stage=transit', { headers: auth })).text();
+  const headers = { ...auth, 'X-Ezkart-CSRF': html.match(/id="sandbox-address-form" data-csrf="([a-f0-9]+)"/)[1] };
+  const endpoint = '/cart/api/tracking-address.php';
+  const coordinate = { latitude: -7.7894, longitude: 110.3635 };
+  const body = { action: 'pin', address: 'Station entrance, Yogyakarta', coordinate };
+  assert.equal((await app.request(endpoint, body)).status, 401);
+  assert.equal((await app.request(endpoint, body, auth)).status, 403);
+  assert.equal((await app.request(endpoint, body, { ...headers, Origin: 'https://wrong.example' })).status, 403);
+  for (const coordinate of [null, {}, [1, 2], { latitude: 91, longitude: 110 }, { latitude: -7, longitude: -181 }, { latitude: 0, longitude: 0 }, { latitude: 'NaN', longitude: 110 }]) {
+    assert.equal((await app.request(endpoint, { ...body, coordinate }, headers)).status, 422);
+  }
+  assert.equal((await app.request(endpoint, { ...body, place: 'unknown' }, headers)).status, 422);
+  const place = (await app.request(endpoint, body, headers)).data.results[0];
+  const adjusted = (await app.request(endpoint, { action: 'pin', place: place.id, coordinate: { ...coordinate, latitude: -7.7895 } }, headers)).data.results[0];
+  assert.notEqual(adjusted.id, place.id); assert.equal(adjusted.address, body.address);
+  assert.deepEqual(await app.calls(), [], 'Pin confirmation does not spend geocoder requests.');
+  const otherCookie = app.customerCookie('other@example.com', 'other-user');
+  const otherAuth = { Cookie: `${otherCookie.name}=${otherCookie.value}` };
+  const otherHtml = await (await fetch(app.base + '/cart/tracking-sandbox.php', { headers: otherAuth })).text();
+  const otherHeaders = { ...otherAuth, 'X-Ezkart-CSRF': otherHtml.match(/id="sandbox-address-form" data-csrf="([a-f0-9]+)"/)[1] };
+  assert.equal((await app.request(endpoint, { ...body, place: place.id }, otherHeaders)).status, 422);
+  const route = await app.request('/cart/api/tracking-route.php?sandbox=1&stage=transit&place=' + adjusted.id, undefined, auth);
+  assert.deepEqual(route.data.route.to, adjusted.coordinate);
+  assert.equal(route.data.route.from.latitude, -6.2441792);
+  app.cli(`require ${JSON.stringify(join(root, 'cart/api/customer-auth.php'))}; session_id('${cookie.value}'); ez_customer_session(); $_SESSION['tracking_preview_places']['${place.id}']['until']=time()-1; session_write_close();`);
+  assert.equal((await app.request(endpoint, { ...body, place: place.id }, headers)).status, 422);
+});
+
+test("adjusting saved delivery pins supports pointer, touch, cancel, conflict retry and checkout without duplicate addresses", async t => {
+  const app = await setup({ EZKART_CLOUDFLARE_API_URL: 'https://ezkart-api-test.fixture.workers.dev' }); t.after(() => app.close());
+  const { chromium } = await import('../builder-mcp/node_modules/playwright/index.mjs');
+  const browser = await chromium.launch({ headless: true }); t.after(() => browser.close());
+  const original = { latitude: -7.7892387, longitude: 110.3634648 };
+  for (const width of [1280, 390]) {
+    const station = { id: 'saved-station', label: 'Station', fullName: 'Checkout Tester', phone: '081234567890', address: '6P4G6967+894, Jalan Pasar Kembang (lat: -7.7892387, lng: 110.3634648)', location: 'Yogyakarta', postalCode: '55271', note: 'Front entrance', coordinate: null };
+    const book = { addresses: [station, { ...station, id: 'saved-office', label: 'Office' }, { ...station, id: 'saved-family', label: 'Family' }], default_id: station.id, revision: 1, limit: 3 };
+    await writeFile(join(app.directory, 'address-book.json'), JSON.stringify(book));
+    const page = await browser.newPage({ viewport: { width, height: 950 }, hasTouch: width === 390 }); await prepareMap(page);
+    const errors = []; page.on('pageerror', error => errors.push(error.message));
+    await page.context().addCookies([app.customerCookie()]);
+    await page.goto(app.base + '/cart/tracking-sandbox.php?stage=transit');
+    await page.getByRole('button', { name: 'Adjust delivery pin', exact: true }).click();
+    await page.waitForFunction(() => !document.getElementById('map-pin-save').disabled);
+    assert.equal(await page.locator('.shipment-pin').count(), 0);
+    assert.equal(await page.evaluate(() => deliveryMapUnderTest.getLayoutProperty('delivery-route-line', 'visibility')), 'none');
+    assert.equal(await page.locator('#sandbox-address-book').evaluate(el => el.inert), true);
+    const truck = await page.evaluate(() => window.ezkartTrackingSandbox.read().tracking.latest_location);
+    async function moveSouth() {
+      const box = await page.locator('#delivery-map').boundingBox();
+      const x = box.x + box.width / 2, y = box.y + box.height / 2 + 15;
+      const start = await page.evaluate(() => deliveryMapUnderTest.getCenter().lat);
+      if (width === 390) {
+        const cdp = await page.context().newCDPSession(page);
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+        for (let i = 1; i <= 8; i++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: y - i * 6 }] });
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); await cdp.detach();
+      } else {
+        await page.mouse.move(x, y); await page.mouse.down(); await page.mouse.move(x, y - 48, { steps: 8 }); await page.mouse.up();
+      }
+      await page.waitForFunction(lat => deliveryMapUnderTest.getCenter().lat < lat, start);
+      await page.waitForFunction(() => !deliveryMapUnderTest.isMoving());
+    }
+    await moveSouth();
+    await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+    assert.deepEqual(await page.evaluate(() => window.ezkartTrackingSandbox.place().coordinate), original);
+    assert.equal(JSON.parse(await readFile(join(app.directory, 'address-book.json'), 'utf8')).revision, 1);
+    await page.getByRole('button', { name: 'Adjust delivery pin', exact: true }).click();
+    await moveSouth();
+    if (width === 1280) {
+      await page.locator('#delivery-map canvas').focus(); await page.keyboard.press('ArrowDown');
+      await page.waitForFunction(() => !deliveryMapUnderTest.isMoving());
+    }
+    const desired = await page.evaluate(() => { const p = deliveryMapUnderTest.getCenter(); return { latitude: p.lat, longitude: p.lng }; });
+    assert.ok(desired.latitude < original.latitude);
+    // Another device changes a non-geographic field: reject the stale write, then
+    // retry only the pin against the refreshed record, preserving the new note.
+    book.revision++; book.addresses[0].note = 'Use the east entrance';
+    await writeFile(join(app.directory, 'address-book.json'), JSON.stringify(book));
+    await page.getByRole('button', { name: 'Save delivery pin', exact: true }).click();
+    await page.locator('#map-pin-error').filter({ hasText: 'Addresses changed' }).waitFor();
+    assert.deepEqual(await page.evaluate(() => window.ezkartTrackingSandbox.place().coordinate), original);
+    await page.getByRole('button', { name: 'Save delivery pin', exact: true }).click();
+    await page.locator('#map-pin-editor').waitFor({ state: 'hidden' });
+    const stored = JSON.parse(await readFile(join(app.directory, 'address-book.json'), 'utf8'));
+    assert.equal(stored.addresses.length, 3); assert.equal(stored.default_id, station.id);
+    assert.deepEqual(stored.addresses[0].coordinate, desired);
+    assert.equal(stored.addresses[0].note, 'Use the east entrance');
+    assert.equal(stored.addresses[0].phone, station.phone);
+    assert.equal(stored.addresses[1].coordinate, null);
+    assert.deepEqual(await page.evaluate(() => window.ezkartTrackingSandbox.read().tracking.latest_location), truck);
+    await page.reload();
+    await page.waitForFunction(() => window.ezkartTrackingSandbox?.place()?.id.startsWith('saved-'));
+    assert.deepEqual(await page.evaluate(() => window.ezkartTrackingSandbox.place().coordinate), desired, 'Stored pin wins over the older full Plus Code.');
+    await page.goto(app.base + '/cart/?shop=test-shop&cart=granola:1');
+    await page.waitForFunction(() => document.querySelector('#customer-form [name="address"]').value.startsWith('6P4G'));
+    await page.locator('#to-checkout').click();
+    const starts = [];
+    await page.route('**/api/start.php', route => { starts.push(route.request().postDataJSON()); return route.fulfill({ status: 503, json: { ok: false, error: 'Fixture: do not open payment.' } }); });
+    await page.locator('#pay-button').click();
+    await page.waitForFunction(() => !document.getElementById('pay-button').disabled);
+    assert.deepEqual(starts[0].customer.coordinate, desired);
+    await page.locator('#customer-form [name="address"]').fill('A different delivery street 25');
+    await page.locator('#pay-button').click();
+    await page.waitForFunction(() => !document.getElementById('pay-button').disabled);
+    assert.equal('coordinate' in starts[1].customer, false, 'Changing the delivery address clears its old pin.');
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
+    assert.deepEqual(errors, []); await page.close();
+  }
+});
+
+test("unmatched addresses can be placed on the map and failed pin saves remain editable", async t => {
+  const app = await setup({ EZKART_CLOUDFLARE_API_URL: 'https://ezkart-api-test.fixture.workers.dev' }); t.after(() => app.close());
+  await writeFile(join(app.directory, 'address-response.json'), JSON.stringify({ features: [] }));
+  const { chromium } = await import('../builder-mcp/node_modules/playwright/index.mjs');
+  const browser = await chromium.launch({ headless: true }); t.after(() => browser.close());
+  const page = await browser.newPage({ viewport: { width: 390, height: 950 } }); await prepareMap(page);
+  await page.context().addCookies([app.customerCookie()]);
+  await page.goto(app.base + '/cart/tracking-sandbox.php?stage=no-map');
+  await page.getByLabel('Try a delivery address').fill('Unnamed entrance beside the station');
+  await page.getByRole('button', { name: 'Find address', exact: true }).click();
+  await page.locator('#sandbox-address-status').filter({ hasText: 'No match found' }).waitFor();
+  await page.getByRole('button', { name: 'Choose on map', exact: true }).click();
+  await page.waitForFunction(() => !document.getElementById('map-pin-save').disabled);
+  const zoom = await page.evaluate(() => deliveryMapUnderTest.getZoom());
+  await page.getByRole('button', { name: 'Zoom in', exact: true }).click();
+  assert.equal(await page.evaluate(() => deliveryMapUnderTest.getZoom()), zoom + 1);
+  await page.route('**/api/tracking-address.php', route => route.fulfill({ status: 503, json: { ok: false, error: 'Please try again.' } }));
+  await page.getByRole('button', { name: 'Use this pin', exact: true }).click();
+  await page.locator('#map-pin-error').filter({ hasText: 'Please try again.' }).waitFor();
+  assert.equal(await page.evaluate(() => window.ezkartTrackingSandbox.place()), null);
+  assert.equal(await page.getByRole('button', { name: 'Cancel', exact: true }).isEnabled(), true);
+  await page.unroute('**/api/tracking-address.php');
+  await page.getByRole('button', { name: 'Use this pin', exact: true }).click();
+  await page.locator('#map-pin-editor').waitFor({ state: 'hidden' });
+  assert.equal(await page.evaluate(() => window.ezkartTrackingSandbox.place().address), 'Unnamed entrance beside the station');
+  await page.getByRole('button', { name: 'Save this address', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  assert.equal(await dialog.getByLabel('Full address', { exact: true }).inputValue(), 'Unnamed entrance beside the station');
+  await dialog.getByLabel('District / city', { exact: true }).fill('Jakarta');
+  await dialog.getByLabel('Postcode', { exact: true }).fill('10230');
+  await dialog.getByRole('button', { name: 'Save address', exact: true }).click();
+  await dialog.waitFor({ state: 'hidden' });
+  assert.ok(JSON.parse(await readFile(join(app.directory, 'address-book.json'), 'utf8')).addresses[0].coordinate);
+});
+
+test("checkout validates delivery pins and passes the chosen destination to Biteship booking and tracking", async t => {
+  const app = await setup(); t.after(() => app.close());
+  for (const coordinate of [{ latitude: 91, longitude: 110 }, { latitude: -7, longitude: 181 }, {}, { latitude: 0, longitude: 0 }]) {
+    assert.equal((await app.request('/cart/api/start.php', { ...input, customer: { ...input.customer, coordinate } })).status, 422);
+  }
+  const coordinate = { latitude: -7.7894, longitude: 110.3635 };
+  const start = await app.request('/cart/api/start.php', { ...input, customer: { ...input.customer, coordinate } });
+  assert.equal(start.status, 201);
+  const id = start.data.order_id;
+  await notify(app, id); app.cli(`ez_accept_paid_order('${id}'); ez_arrange_paid_order_pickup('${id}');`);
+  const shipment = (await app.calls()).find(call => call.url.endsWith('/v1/orders'));
+  assert.deepEqual(JSON.parse(shipment.body).destination_coordinate, coordinate);
+  await saveTrackingResponse(app, trackingResponse(id));
+  const tracking = (await app.tracking(id, { refresh: true })).data.tracking;
+  assert.deepEqual(tracking.locations.destination, coordinate);
+  assert.notDeepEqual(tracking.latest_location, coordinate, 'Choosing a destination never invents a courier location.');
+});
+
 test("road routes ignore stale results, use return destinations, and clear after delivery", async (t) => {
   const { chromium } = await import("../builder-mcp/node_modules/playwright/index.mjs");
   const app = await setup(); t.after(() => app.close());
