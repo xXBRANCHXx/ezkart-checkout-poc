@@ -12,7 +12,7 @@ function ez_tracking_address_search(string $query): array
     @chmod($directory . '/requests.lock', 0600);
     try {
         $cached = is_file($file) ? json_decode((string) file_get_contents($file), true) : null;
-        if (is_array($cached) && ($cached['until'] ?? 0) > time()) {
+        if (is_array($cached) && ($cached['schema'] ?? 0) === 2 && ($cached['until'] ?? 0) > time()) {
             if (isset($cached['results'])) return $cached['results'];
             throw new RuntimeException('Address search unavailable.');
         }
@@ -48,7 +48,7 @@ function ez_tracking_address_search(string $query): array
             $results[] = ['name' => $name, 'address' => mb_substr($address, 0, 500), 'kind' => $kind, 'coordinate' => $coordinate, 'address_line' => implode(', ', array_unique(array_filter([$name, $street]))), 'location' => implode(', ', array_unique(array_filter([$clean('district'), $clean('city') ?: $clean('county')]))), 'postalCode' => preg_match('/^\d{5}$/D', $clean('postcode')) === 1 ? $clean('postcode') : ''];
         }
         // Do not store the entered query itself; short, bounded caches include failures.
-        file_put_contents($file, json_encode(['until' => time() + ($valid ? 86400 : 300), 'results' => $valid ? $results : null], JSON_THROW_ON_ERROR), LOCK_EX);
+        file_put_contents($file, json_encode(['schema' => 2, 'until' => time() + ($valid ? 86400 : 300), 'results' => $valid ? $results : null], JSON_THROW_ON_ERROR), LOCK_EX);
         @chmod($file, 0600);
         foreach (glob($directory . '/*.json') ?: [] as $old) if ((int) filemtime($old) < time() - 172800) @unlink($old);
         if (!$valid) throw new RuntimeException('Address search unavailable.');

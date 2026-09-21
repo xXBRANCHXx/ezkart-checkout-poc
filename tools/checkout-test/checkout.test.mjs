@@ -1506,9 +1506,12 @@ test("sandbox address search authenticates, validates, caches, and binds route p
   assert.equal((await app.request(endpoint, { address: "Jakarta" }, { ...headers, Origin: "https://another.example" })).status, 403);
   for (const address of ["", "ab", "x".repeat(241), ["Jakarta"]]) assert.equal((await app.request(endpoint, { address }, headers)).status, 422);
   assert.deepEqual(await app.calls(), []);
+  const oldCacheDirectory = app.cli("$d = dirname(ez_order_directory('sandbox')) . '/tracking-addresses'; mkdir($d, 0700, true); echo $d;");
+  await writeFile(join(oldCacheDirectory, createHash('sha256').update('jalan teluk betung 12, jakarta').digest('hex') + '.json'), JSON.stringify({ until: Math.floor(Date.now()/1000) + 86400, results: [] }));
   const first = await app.request(endpoint, { address: "Jalan Teluk Betung 12, Jakarta" }, headers);
   assert.equal(first.status, 200); assert.equal(first.data.results.length, 2);
   const place = first.data.results[0];
+  assert.equal(place.address_line, 'Example delivery building, Jalan Teluk Betung 12', 'Legacy cached results refresh to include checkout address fields.');
   assert.match(place.id, /^[a-f0-9]{24}$/);
   assert.equal(place.kind, "Building match");
   assert.deepEqual(place.coordinate, { latitude: -6.1957601, longitude: 106.8214547 });
