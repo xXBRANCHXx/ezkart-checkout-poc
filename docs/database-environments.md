@@ -68,6 +68,7 @@ rows, R2 objects, Cloudflare bindings, or credentials.
 
 - Supabase Auth: sign-in method, canonical user ID, and active Auth session.
 - D1 `app_users`: safe profile fields needed by Ezkart.
+- D1 `customer_address_books`: up to three private delivery addresses per verified Auth user, with one default and revision-checked updates.
 - D1 seller tables: all structured records and R2 object keys.
 - Public R2 binding: product images, page assets, and published HTML. The bucket
   may remain private while the Worker serves approved objects.

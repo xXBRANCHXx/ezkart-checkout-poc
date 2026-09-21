@@ -38,6 +38,8 @@ access token, or refresh token in this repository.
 
 ## Current endpoints
 
+- `GET|POST /v1/customer/addresses` reads or changes the authenticated customer's three-address book in D1. It uses stable Auth identity, optimistic revisions, and a database count constraint; no seller account is provisioned. Apply `0006_customer_addresses.sql` before deploying this route.
+
 - `GET /health` checks D1 and both R2 bindings without exposing credentials.
 - `GET /v1/me` validates a Supabase bearer token, creates or refreshes the
   corresponding D1 profile, provisions an idempotent personal seller and owner

@@ -1,0 +1,43 @@
+.address-book { padding: 15px; margin-bottom: 18px; border: 1px solid #dce4ed; border-radius: 9px; background: #f8fafc; color: #182b45; }
+.address-book [hidden], .address-book-dialog [hidden] { display: none !important; }
+.address-book-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 12px; }
+.address-book-count { color: #65758a; font-size: 11px; }
+.address-book p, .address-book-guest span { font-size: 11px; line-height: 1.7; margin: 7px 0; color: #65758a; overflow-wrap: anywhere; }
+.address-book-account:empty, .address-book-status:empty { display: none; }
+.address-book-picker { display: flex; gap: 8px; margin-top: 12px; }
+.address-book-picker label { flex: 1; min-width: 0; margin: 0; }
+.address-book select { width: 100%; height: 39px; padding: 8px; border: 1px solid #cdd8e5; border-radius: 6px; background: #fff; font: inherit; font-size: 12px; color: #182b45; }
+.address-book button { border: 1px solid #cdd8e5; border-radius: 6px; background: #fff; padding: 8px 11px; font: inherit; font-size: 11px; color: #182b45; cursor: pointer; }
+.address-book button:disabled { opacity: .5; cursor: default; }
+.address-book button:hover:not(:disabled) { background: #edf2f7; }
+.address-book-actions { display: flex; gap: 5px; flex-wrap: wrap; }
+.address-book-actions button { padding: 5px 7px; border-color: transparent; background: transparent; font-size: 10px; }
+.address-book-actions button:last-child { margin-left: auto; border-color: #cdd8e5; background: #fff; }
+.address-book-guest { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 10px; }
+.address-book-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.address-book-dialog { box-sizing: border-box; width: min(550px, calc(100% - 28px)); max-height: calc(100dvh - 32px); border: 1px solid #dce4ed; border-radius: 14px; padding: 24px; background: #fff; color: #182b45; box-shadow: 0 20px 80px #182b4533; }
+.address-book-dialog::backdrop { background: #182b4566; }
+.address-book-dialog-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.address-book-dialog h2 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -.4px; }
+.address-book-dialog-heading button { background: none; border: 0; font-size: 26px; color: #65758a; cursor: pointer; }
+.address-book-dialog p { font-size: 12px; color: #65758a; line-height: 1.7; }
+.address-book-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 18px; }
+.address-book-fields label { display: flex; flex-direction: column; gap: 6px; min-width: 0; font-size: 12px; font-weight: 500; }
+.address-book-fields label.wide { grid-column: 1 / -1; }
+.address-book-fields small { display: inline; color: #65758a; font-size: 10px; font-weight: 400; }
+.address-book-fields :is(input,textarea) { width: 100%; box-sizing: border-box; border: 1px solid #cdd8e5; border-radius: 7px; padding: 10px; color: #182b45; background: #fff; font: inherit; font-size: 14px; }
+.address-book-fields textarea { min-height: 75px; resize: vertical; }
+.address-book-default { display: flex; align-items: center; gap: 8px; margin: 18px 0 10px; font-size: 12px; }
+.address-book-default input { accent-color: #182b45; width: 16px; height: 16px; }
+.address-book-dialog .address-book-error { color: #b93621; }
+.address-book-dialog-actions { display: flex; gap: 10px; justify-content: flex-end; }
+.address-book-dialog-actions button { font: inherit; font-size: 12px; padding: 10px 14px; border: 1px solid #cdd8e5; border-radius: 7px; background: #fff; color: #182b45; cursor: pointer; }
+.address-book-dialog-actions button[type=submit] { background: #182b45; color: #fff; border-color: #182b45; }
+.address-book-dialog-actions button:disabled { opacity: .6; cursor: wait; }
+:is(.address-book,.address-book-dialog) :is(input,textarea,select,button):focus-visible { outline: 2px solid #32557b; outline-offset: 2px; }
+@media(max-width:600px) {
+  .address-book-dialog { padding: 18px; }
+  .address-book-fields { grid-template-columns: 1fr; }
+  .address-book-fields :is(input,textarea), .address-book select { font-size: 16px; }
+  .address-book-actions button:last-child { margin-left: 0; }
+}

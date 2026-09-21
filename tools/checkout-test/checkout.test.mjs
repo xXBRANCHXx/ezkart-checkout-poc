@@ -749,7 +749,7 @@ test("own payment UI: checkout, copy, reload, expiry, recovery and confirmed pay
     await page.goto(app.base + "/cart/?shop=test-shop&cart=granola:2");
     await page.locator("#to-checkout").click();
     for (const [name, value] of Object.entries(input.customer))
-      if (value) await page.locator(`[name="${name}"]`).fill(value);
+      if (value) await page.locator(`#customer-form [name="${name}"]`).fill(value);
     await page.locator("#pay-button").click();
     await page.waitForURL(/\/cart\/payment\.php\?order=EZK-S-/);
     await page.locator("#transfer-details").waitFor({ state: "visible" });
@@ -903,11 +903,11 @@ test("browser checkout redirects to DOKU and shows only server-confirmed payment
     );
     await page.locator("#pay-button").click();
     assert.equal(
-      await page.locator('[name="fullName"]').getAttribute("class"),
+      await page.locator('#customer-form [name="fullName"]').getAttribute("class"),
       "invalid",
     );
     for (const [name, value] of Object.entries(input.customer))
-      if (value) await page.locator(`[name="${name}"]`).fill(value);
+      if (value) await page.locator(`#customer-form [name="${name}"]`).fill(value);
     if (process.env.EZKART_TEST_SCREENSHOTS)
       await page.screenshot({
         path: join(
@@ -983,7 +983,7 @@ test("production browser checkout still requires a delivery quote before payment
   assert.equal(await page.locator("#delivery-method").isVisible(), true);
   assert.equal(await page.locator("#pay-button").isEnabled(), false);
   for (const [name, value] of Object.entries(input.customer))
-    if (value) await page.locator(`[name="${name}"]`).fill(value);
+    if (value) await page.locator(`#customer-form [name="${name}"]`).fill(value);
   await page.locator("#get-rates").click();
   await page.locator('input[name="shipping"]').waitFor();
   await page.locator("#pay-button").click();
@@ -1372,6 +1372,127 @@ test("road routing authenticates owners, caches results and failures, and enforc
   assert.ok(calls.every(call => call.url.startsWith("https://routing.openstreetmap.de/")), "Routing cannot refresh Biteship or write to a provider.");
 });
 
+test("customer address proxy requires customer identity and CSRF and reuses verified Google sessions without sharing tokens", async t => {
+  const app = await setup({ EZKART_CLOUDFLARE_API_URL: "https://ezkart-api-test.fixture.workers.dev" }); t.after(() => app.close());
+  const endpoint = "/cart/admin/customer-addresses.php";
+  assert.equal((await app.request(endpoint)).data.authenticated, false);
+  assert.equal((await app.request(endpoint, {})).status, 401);
+  const cookie = app.customerCookie(); const headers = { Cookie: `${cookie.name}=${cookie.value}` };
+  const first = await app.request(endpoint, undefined, headers);
+  assert.equal(first.status, 200); assert.equal(first.data.authenticated, true); assert.equal(first.data.book.addresses.length, 0);
+  const address = { label: "Home", address: "Jalan Teluk Betung 12", location: "Jakarta", postalCode: "10230", fullName: "Checkout Tester", phone: "081234567890", note: "", coordinate: { latitude: -6.1957601, longitude: 106.8214547 } };
+  const payload = { action: "save", address, revision: 0 };
+  assert.equal((await app.request(endpoint, payload, headers)).status, 403);
+  assert.equal((await app.request(endpoint, payload, { ...headers, "X-Ezkart-CSRF": first.data.csrf, Origin: "https://wrong.example" })).status, 403);
+  const saved = await app.request(endpoint, payload, { ...headers, "X-Ezkart-CSRF": first.data.csrf });
+  assert.equal(saved.status, 200); assert.ok(saved.data.book.addresses[0].preview_id);
+  assert.equal(JSON.stringify(saved.data).includes("access_token"), false);
+  const preview = await app.request("/cart/api/tracking-route.php?sandbox=1&stage=transit&place=" + saved.data.book.addresses[0].preview_id, undefined, headers);
+  assert.deepEqual(preview.data.route.to, address.coordinate);
+  const { chromium } = await import("../builder-mcp/node_modules/playwright/index.mjs");
+  const browser = await chromium.launch({ headless: true }); t.after(() => browser.close());
+  const page = await browser.newPage(); await page.context().addCookies([app.adminCookie()]);
+  await page.goto(app.base + "/cart/tracking-sandbox.php?stage=processing");
+  await page.locator("#tracking-content").waitFor({ state: "visible" });
+  const bridged = await page.request.get(app.base + endpoint);
+  assert.equal(bridged.status(), 200); assert.equal((await bridged.json()).book.addresses.length, 1);
+  const session = (await page.context().cookies()).find(c => c.name === "ezkart_customer");
+  assert.equal(app.cli(`require ${JSON.stringify(join(root, "cart/api/customer-auth.php"))}; session_id('${session.value}'); ez_customer_session(); echo isset($_SESSION['customer_auth']['access_token']) ? 'token' : 'no-token'; session_write_close();`), "no-token");
+  const wrongAdmin = app.adminCookie({ admin_user: { id: "different-account", email: "different@example.com" } });
+  await page.context().addCookies([wrongAdmin]);
+  assert.equal((await page.request.get(app.base + endpoint)).status(), 401);
+  assert.equal(app.cli(`require ${JSON.stringify(join(root, "cart/api/customer-auth.php"))}; echo ez_customer_next('/cart/?shop=test-shop&return=https://bad.example');`), "/cart/?shop=test-shop");
+});
+
+test("saved addresses fill checkout, invalidate quotes, and support three named addresses, defaults and edits on desktop/mobile", async t => {
+  const app = await setup({ EZKART_CLOUDFLARE_API_URL: "https://ezkart-api-test.fixture.workers.dev", EZKART_COMMERCE_ENVIRONMENT: "production" }); t.after(() => app.close());
+  const { chromium } = await import("../builder-mcp/node_modules/playwright/index.mjs");
+  const browser = await chromium.launch({ headless: true }); t.after(() => browser.close());
+  for (const width of [1280, 390]) {
+    const home = { id: "saved-home", label: "Home", address: "Jalan Home Nomor 12", location: "Jakarta", postalCode: "10230", fullName: "Checkout Tester", phone: "081234567890", note: "Reception", coordinate: null };
+    await writeFile(join(app.directory, "address-book.json"), JSON.stringify({ addresses: [home], default_id: home.id, revision: 1, limit: 3 }));
+    const page = await browser.newPage({ viewport: { width, height: 950 } });
+    const errors = []; page.on("pageerror", e => errors.push(e.message));
+    await page.context().addCookies([app.customerCookie()]);
+    await page.goto(app.base + "/cart/?shop=test-shop&cart=granola:1");
+    await page.locator('#customer-form [name="address"]').waitFor({ state: "attached" });
+    await page.waitForFunction(() => document.querySelector('#customer-form [name="address"]').value === "Jalan Home Nomor 12");
+    await page.locator("#to-checkout").click();
+    assert.equal(await page.locator('#customer-form [name="email"]').inputValue(), "checkout@example.com");
+    await page.locator("#get-rates").click();
+    await page.locator('#shipping-options input[name="shipping"]').first().waitFor();
+    assert.equal(await page.locator('#shipping-options input[name="shipping"]').first().isChecked(), true);
+    assert.equal(await page.locator('#pay-button').isDisabled(), false);
+    await page.getByRole("button", { name: "Save current address", exact: true }).click();
+    const editor = page.getByRole("dialog", { name: "Save delivery address" });
+    await editor.getByLabel("Address name", { exact: true }).fill("Office");
+    await editor.getByLabel("Full address", { exact: true }).fill("Jalan Office Nomor 18");
+    await editor.getByLabel("Postcode", { exact: true }).fill("12345");
+    await editor.getByRole("button", { name: "Save address", exact: true }).click();
+    await editor.waitFor({ state: "hidden" });
+    await page.getByRole("button", { name: "Use address", exact: true }).click();
+    assert.equal(await page.locator('#customer-form [name="address"]').inputValue(), "Jalan Office Nomor 18");
+    assert.equal(await page.locator('#pay-button').isDisabled(), true);
+    assert.equal(await page.locator('#shipping-options input[name="shipping"]').count(), 0);
+    let releaseRates;
+    const heldRates = new Promise(resolve => { releaseRates = resolve; });
+    await page.route('**/api/rates.php', async route => {
+      const response = await route.fetch();
+      await heldRates;
+      await route.fulfill({ response });
+    });
+    const pendingRates = page.waitForRequest('**/api/rates.php');
+    await page.locator('#get-rates').click(); await pendingRates;
+    await page.getByLabel('Saved address', { exact: true }).selectOption(home.id);
+    await page.getByRole('button', { name: 'Use address', exact: true }).click();
+    releaseRates(); await page.waitForLoadState('networkidle');
+    assert.equal(await page.locator('#pay-button').isDisabled(), true, 'A quote for the previous address cannot restore payment.');
+    assert.equal(await page.locator('#shipping-options input[name="shipping"]').count(), 0);
+    await page.unroute('**/api/rates.php');
+    await page.getByLabel('Saved address', { exact: true }).selectOption({ label: 'Office' });
+    await page.getByRole('button', { name: 'Use address', exact: true }).click();
+    await page.getByRole("button", { name: "Set as default", exact: true }).click();
+    await page.getByRole("button", { name: "Default address", exact: true }).waitFor();
+    const other = await browser.newPage(); await other.context().addCookies([app.customerCookie()]);
+    await other.goto(app.base + "/cart/?shop=test-shop&cart=granola:1");
+    await other.waitForFunction(() => document.querySelector('#customer-form [name="address"]').value === "Jalan Office Nomor 18");
+    await other.close();
+    await page.getByRole("button", { name: "Save current address", exact: true }).click();
+    await editor.getByLabel("Address name", { exact: true }).fill("Family");
+    await editor.getByRole("button", { name: "Save address", exact: true }).click();
+    await editor.waitFor({ state: "hidden" });
+    assert.equal(await page.getByRole("button", { name: "Save current address", exact: true }).isDisabled(), true);
+    await page.getByRole("button", { name: "Edit", exact: true }).click();
+    await editor.getByLabel("Address name", { exact: true }).fill("Parents");
+    await editor.getByRole("button", { name: "Save address", exact: true }).click();
+    await editor.waitFor({ state: "hidden" });
+    assert.match(await page.getByLabel("Saved address", { exact: true }).textContent(), /Parents/);
+    await page.getByRole("button", { name: "Remove", exact: true }).click();
+    await page.waitForFunction(() => document.querySelector('.address-book-count').textContent === '2 / 3');
+    assert.equal(await page.getByRole("button", { name: "Save current address", exact: true }).isDisabled(), false);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+    assert.deepEqual(errors, []); await page.close();
+  }
+});
+
+test("checkout Google popup keeps typed delivery details and loads saved addresses after sign-in", async t => {
+  const app = await setup({ EZKART_CLOUDFLARE_API_URL: "https://ezkart-api-test.fixture.workers.dev" }); t.after(() => app.close());
+  const { chromium } = await import("../builder-mcp/node_modules/playwright/index.mjs");
+  const browser = await chromium.launch({ headless: true }); t.after(() => browser.close());
+  const page = await browser.newPage();
+  await page.context().route("https://auth.ezkart.test/auth/v1/authorize?*", route => route.fulfill({ contentType: "text/html", body: "<h1>Google chooser fixture</h1>" }));
+  await page.goto(app.base + "/cart/?shop=test-shop&cart=granola:1");
+  await page.locator("#to-checkout").click();
+  await page.locator('#customer-form [name="address"]').fill("Keep this typed street address");
+  const opened = page.waitForEvent("popup"); await page.getByRole("button", { name: "Sign in with Google", exact: true }).click();
+  const popup = await opened; await popup.getByRole("heading", { name: "Google chooser fixture" }).waitFor();
+  const callback = new URL(new URL(popup.url()).searchParams.get("redirect_to"));
+  await popup.goto(app.base + callback.pathname + callback.search + "&code=fixture-code").catch(error => { if (!popup.isClosed()) throw error; });
+  await page.getByRole("button", { name: "Save current address", exact: true }).waitFor();
+  assert.equal(await page.locator('#customer-form [name="address"]').inputValue(), "Keep this typed street address");
+  assert.match(page.url(), /cart\/\?shop=test-shop&cart=granola:1/);
+});
+
 test("sandbox address search authenticates, validates, caches, and binds route previews to its session", async (t) => {
   const app = await setup(); t.after(() => app.close());
   const cookie = app.customerCookie();
@@ -1488,6 +1609,37 @@ test("sandbox address entry previews a destination pin and route without moving 
     assert.deepEqual(errors, []);
     await page.close();
   }
+});
+
+test("sandbox saved map addresses persist across sessions and fill checkout", async t => {
+  const app = await setup({ EZKART_CLOUDFLARE_API_URL: "https://ezkart-api-test.fixture.workers.dev" }); t.after(() => app.close());
+  const { chromium } = await import("../builder-mcp/node_modules/playwright/index.mjs");
+  const browser = await chromium.launch({ headless: true }); t.after(() => browser.close());
+  const page = await browser.newPage(); await prepareMap(page);
+  await page.context().addCookies([app.customerCookie()]);
+  await page.goto(app.base + '/cart/tracking-sandbox.php?stage=transit');
+  await page.getByRole('button', { name: 'Save current address', exact: true }).waitFor();
+  await page.getByLabel('Try a delivery address').fill('Jalan Teluk Betung 12, Jakarta');
+  await page.getByRole('button', { name: 'Find address', exact: true }).click();
+  await page.getByRole('button', { name: /Example delivery building/ }).click();
+  await page.getByRole('button', { name: 'Save this address', exact: true }).click();
+  const editor = page.getByRole('dialog', { name: 'Save delivery address' });
+  assert.equal(await editor.getByLabel('Full address', { exact: true }).inputValue(), 'Example delivery building, Jalan Teluk Betung 12');
+  await editor.getByLabel('Address name', { exact: true }).fill('Office');
+  await editor.getByLabel('Postcode', { exact: true }).fill('10230');
+  await editor.getByRole('button', { name: 'Save address', exact: true }).click();
+  await editor.waitFor({ state: 'hidden' });
+  const stored = JSON.parse(await readFile(join(app.directory, 'address-book.json'), 'utf8'));
+  assert.deepEqual(stored.addresses[0].coordinate, { latitude: -6.1957601, longitude: 106.8214547 });
+  const other = await browser.newPage(); await prepareMap(other);
+  await other.context().addCookies([app.customerCookie()]);
+  await other.goto(app.base + '/cart/tracking-sandbox.php?stage=transit');
+  await other.waitForFunction(() => window.ezkartTrackingSandbox?.place()?.id.startsWith('saved-'));
+  assert.equal(await other.locator('#sandbox-address-name').textContent(), 'Office');
+  assert.equal(await other.evaluate(() => window.ezkartTrackingSandbox.read().tracking.locations.destination.latitude), -6.1957601);
+  await other.goto(app.base + '/cart/?shop=test-shop&cart=granola:1');
+  await other.waitForFunction(() => document.querySelector('#customer-form [name="address"]').value === 'Example delivery building, Jalan Teluk Betung 12');
+  assert.equal(await other.locator('#customer-form [name="postalCode"]').inputValue(), '10230');
 });
 
 test("road routes ignore stale results, use return destinations, and clear after delivery", async (t) => {
@@ -1741,7 +1893,7 @@ test("Google login rejects unverified identities, enforces existing MFA and keep
   assert.equal((await page.request.get(app.base + "/cart/api/status.php?order=bad&tracking=1")).status(), 401);
   await page.locator("#customer-mfa").fill("123456");
   await page.getByRole("button", { name: "Verify and track order", exact: true }).click();
-  assert.equal(await page.locator('[role="alert"]').count(), 0, await page.locator("body").innerText());
+  assert.equal(await page.locator('[role="alert"]:visible').count(), 0, await page.locator("body").innerText());
   await page.getByRole("heading", { name: "The seller is preparing your order", exact: true }).waitFor();
   assert.equal((await page.request.get(app.base + "/cart/api/status.php?order=bad&tracking=1")).status(), 404);
   assert.equal(app.cli(`require ${JSON.stringify(join(root, "cart/api/customer-auth.php"))}; foreach (['https://evil.test/cart/return.php', '//evil.test/cart/return.php', 'javascript:/cart/return.php', '/cart/admin/', '/cart/return.php?order=bad&next=https://evil.test'] as $next) echo ez_customer_next($next)."\\n";`), Array(5).fill("/cart/return.php").join("\n"));

@@ -113,5 +113,24 @@
     searchButton.disabled = false; form.removeAttribute("aria-busy"); status.textContent = "Using the sample delivery address.";
     pause(); show(current); document.getElementById("map-recenter").click();
   });
+  const savedAddresses = window.ezkartAddressBook(document.getElementById("sandbox-address-book"), {
+    current: () => selectedPlace ? ({ address: selectedPlace.address_line || selectedPlace.name, location: selectedPlace.location || "", postalCode: selectedPlace.postalCode || "", coordinate: selectedPlace.coordinate }) : {},
+    onUse: (address, { automatic }) => {
+      if (!address || (automatic && (selectedPlace || input.value.trim() || timer))) return;
+      if (address.coordinate && address.preview_id) {
+        const place = { id: address.preview_id, coordinate: address.coordinate, name: address.label, address: `${address.address}, ${address.location} ${address.postalCode}`, address_line: address.address, location: address.location, postalCode: address.postalCode, kind: "Saved address" };
+        if (automatic) {
+          selectedPlace = place; show(current); chosen.hidden = false;
+          document.getElementById("sandbox-address-name").textContent = place.name;
+          document.getElementById("sandbox-address-detail").textContent = place.address;
+          status.textContent = "Using your default delivery address.";
+        } else choose(place);
+      } else if (!automatic) {
+        input.value = `${address.address}, ${address.location} ${address.postalCode}`.slice(0, 240);
+        form.requestSubmit();
+      }
+    },
+  });
+  document.getElementById("sandbox-address-save").addEventListener("click", () => savedAddresses.save());
   show(current);
 })();

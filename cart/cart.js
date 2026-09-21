@@ -332,7 +332,10 @@
   }
 
   function resetDelivery() {
+    state.quoteVersion = (state.quoteVersion || 0) + 1;
     state.shipping = null;
+    byId("get-rates").disabled = false;
+    byId("get-rates").textContent = "Update delivery options";
     byId("pay-button").disabled = state.shippingRequired || !itemCount();
     byId("pay-button").textContent = state.shippingRequired ? "Choose a delivery method" : `Pay ${money(total())}`;
     byId("shipping-options").innerHTML = '<div class="quote-state"><span class="delivery-illustration" aria-hidden="true"></span><b>Delivery options will appear here</b><small>Rates are calculated for your destination and order weight.</small></div>';
@@ -394,6 +397,7 @@
 
   async function buildShippingQuotes() {
     if (!state.shippingRequired) return;
+    const version = state.quoteVersion = (state.quoteVersion || 0) + 1;
     const button = byId("get-rates");
     state.shipping = null;
     byId("pay-button").disabled = true;
@@ -411,6 +415,7 @@
         body: JSON.stringify({ cart: state.cart, postal_code: state.customer.postalCode }),
       });
       const payload = await response.json().catch(() => ({}));
+      if (version !== state.quoteVersion) return;
       if (!response.ok) throw new Error(payload.error || "Delivery options are unavailable.");
       const quotes = Array.isArray(payload.quotes)
         ? payload.quotes.filter((quote) => quote?.id && Number(quote.price) > 0)
@@ -431,6 +436,7 @@
         });
       });
     } catch (error) {
+      if (version !== state.quoteVersion) return;
       const message = friendlyError(
         error instanceof Error ? error.message : "",
         "Delivery options are unavailable.",
@@ -439,9 +445,11 @@
       byId("shipping-options").querySelector("[data-retry-rates]")?.addEventListener("click", buildShippingQuotes);
       showToast(message);
     } finally {
-      button.disabled = false;
-      button.textContent = "Update delivery options";
-      renderTotals();
+      if (version === state.quoteVersion) {
+        button.disabled = false;
+        button.textContent = "Update delivery options";
+        renderTotals();
+      }
     }
   }
 
@@ -545,6 +553,7 @@
   });
   byId("customer-form").addEventListener("input", (event) => {
     if (!event.target.matches("input, textarea")) return;
+    if (["address", "location", "postalCode"].includes(event.target.name)) { resetDelivery(); renderTotals(); }
     event.target.classList.remove("invalid");
     const error = event.target.parentElement.querySelector(".field-error");
     if (error) error.textContent = "";
@@ -554,6 +563,30 @@
   byId("back-to-store").addEventListener("click", returnToStore);
   byId("empty-back-to-store").addEventListener("click", returnToStore);
   byId("merchant-home").addEventListener("click", returnToStore);
+
+  window.ezkartAddressBook(byId("checkout-address-book"), {
+    current: () => Object.fromEntries(new FormData(byId("customer-form")).entries()),
+    onAccount: ({ authenticated, email }) => {
+      const field = byId("customer-form").elements.email;
+      if (authenticated && !field.value) field.value = email;
+      byId("checkout-account-note").textContent = authenticated
+        ? `Signed in as ${email}. Use this email at checkout to track your order.`
+        : "To track your order later, sign in with Google using your checkout email.";
+    },
+    onUse: (address, { automatic }) => {
+      if (!address) return;
+      const form = byId("customer-form");
+      if (automatic && ["address", "location", "postalCode"].some(key => form.elements[key].value.trim())) return;
+      for (const key of ["address", "location", "postalCode", "note", "fullName", "phone"]) {
+        if (automatic && form.elements[key].value.trim()) continue;
+        if (["fullName", "phone"].includes(key) && !address[key]) continue;
+        form.elements[key].value = address[key] || "";
+        form.elements[key].dispatchEvent(new Event("input", { bubbles: true }));
+      }
+      state.customer = Object.fromEntries(new FormData(form).entries());
+      resetDelivery(); renderTotals();
+    },
+  });
 
   byId("year").textContent = new Date().getFullYear();
   applyMerchantBrand();

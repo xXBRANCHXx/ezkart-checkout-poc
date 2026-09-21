@@ -29,7 +29,8 @@ function ez_database_configuration(): array
     }
 
     $requestHost = strtolower(preg_replace('/:\d+$/', '', (string) ($_SERVER['HTTP_HOST'] ?? '')) ?? '');
-    if ($requestHost !== '') {
+    $localTest = $environment === 'test' && in_array($requestHost, ['localhost', '127.0.0.1'], true) && in_array((string) ($_SERVER['REMOTE_ADDR'] ?? ''), ['127.0.0.1', '::1'], true);
+    if ($requestHost !== '' && !$localTest) {
         if ($environment === 'test' && $requestHost !== 'test.ezkart.id') {
             throw new RuntimeException('Test data configuration is only allowed on test.ezkart.id.');
         }

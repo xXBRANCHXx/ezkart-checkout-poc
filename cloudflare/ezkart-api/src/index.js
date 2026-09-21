@@ -1,3 +1,4 @@
+import { customerAddressBook, changeCustomerAddressBook } from "./customer-addresses.js";
 import { validatePublication } from "./landing-publication.js";
 const json = (payload, status = 200, headers = {}) => new Response(JSON.stringify(payload), {
   status,
@@ -1250,6 +1251,12 @@ export default {
     const url = new URL(request.url);
     try {
       if (request.method === "GET" && url.pathname === "/health") return json(await health(env), 200, cors);
+      if (url.pathname === "/v1/customer/addresses") {
+        if (!["GET", "POST"].includes(request.method)) return json({ ok: false, error: "Method not allowed." }, 405, cors);
+        const user = await authenticatedUser(request, env);
+        const book = request.method === "GET" ? await customerAddressBook(env, user.id) : await changeCustomerAddressBook(env, user.id, await requestJson(request, 6000));
+        return json({ ok: true, book }, 200, cors);
+      }
       if (request.method === "GET" && url.pathname === "/v1/me") return json({ ok: true, user: await currentUser(request, env) }, 200, cors);
       if (request.method === "GET" && url.pathname === "/v1/storefront/products") return json({ ok: true, products: await storefrontProducts(url, env) }, 200, cors);
       if (request.method === "GET" && url.pathname === "/v1/catalog") return json({ ok: true, ...(await catalog(request, env)) }, 200, cors);

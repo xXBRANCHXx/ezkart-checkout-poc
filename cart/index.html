@@ -9,6 +9,7 @@
     <link rel="canonical" href="https://ezkart.id/cart/" />
     <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="cart.css?v=checkout-rebuild-6" />
+    <link rel="stylesheet" href="customer-addresses.css?v=1" />
     <title>Checkout · Ezkart</title>
   </head>
   <body>
@@ -79,7 +80,7 @@
                   <label><span>WhatsApp number</span><input name="phone" inputmode="tel" autocomplete="tel" placeholder="08xxxxxxxxxx" required maxlength="20" /><small class="field-error"></small></label>
                   <label><span>Email address</span><input name="email" type="email" autocomplete="email" placeholder="name@email.com" required maxlength="120" /><small class="field-error"></small></label>
                 </div>
-                <p class="checkout-account-note">To track your order later, sign in with Google using your checkout email.</p>
+                <p class="checkout-account-note" id="checkout-account-note">To track your order later, sign in with Google using your checkout email.</p>
               </section>
 
               <section class="form-card" aria-labelledby="address-title">
@@ -87,6 +88,7 @@
                   <span>02</span>
                   <div><h2 id="address-title">Shipping address</h2><p>Use an address where someone can receive the package.</p></div>
                 </header>
+                <div id="checkout-address-book"></div>
                 <div class="field-grid">
                   <label class="full-field"><span>District / city</span><input name="location" autocomplete="address-level2" placeholder="Kebayoran Baru, Jakarta Selatan" required maxlength="120" /><small class="field-error"></small></label>
                   <label class="full-field"><span>Full address</span><textarea name="address" autocomplete="street-address" placeholder="Street, building or house number, RT/RW, and a nearby landmark" required maxlength="300"></textarea><small class="field-error"></small></label>
@@ -135,6 +137,7 @@
     </footer>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="cart.js?v=ezkart-direct-payment-1"></script>
+    <script src="customer-addresses.js?v=1"></script>
+    <script src="cart.js?v=saved-addresses-1"></script>
   </body>
 </html>

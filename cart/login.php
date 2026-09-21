@@ -111,6 +111,7 @@ if (!$mfa && !$complete) {
     $target = $next . (($_GET['switch'] ?? '') === '1' ? (str_contains($next, '?') ? '&' : '?') . 'signin=1' : '');
     ez_customer_login_return($target, false);
 }
+$checkoutReturn = in_array(parse_url($next, PHP_URL_PATH), ['/cart/', '/cart/index.html'], true);
 $csrf = ez_customer_csrf();
 session_write_close();
 ?>
@@ -118,6 +119,6 @@ session_write_close();
 <body><main class="auth-popup"><img class="brand" src="/assets/ezkart-logo.svg" width="1020" height="420" alt="Ezkart">
 <?php if ($mfa): ?><h1>Enter your verification code</h1><p>Use the code from your authenticator app.</p>
 <?php if ($error !== ''): ?><p class="notice" role="alert"><?= $escape($error) ?></p><?php endif; ?>
-<form method="post" action="/cart/login.php"><input type="hidden" name="csrf_token" value="<?= $escape($csrf) ?>"><input type="hidden" name="next" value="<?= $escape($next) ?>"><input type="hidden" name="action" value="mfa"><label for="customer-mfa">Authenticator code</label><input id="customer-mfa" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required autofocus><button class="primary-button" type="submit">Verify and track order</button></form>
-<?php else: ?><h1><?= ($_GET['complete'] ?? '') === '1' ? 'Signed in' : 'Sign-in wasn’t completed' ?></h1><p>Return to the tracking page to continue.</p><?php endif; ?>
-<a class="auth-return" href="<?= $escape($next) ?>">View order tracking</a></main></body></html>
+<form method="post" action="/cart/login.php"><input type="hidden" name="csrf_token" value="<?= $escape($csrf) ?>"><input type="hidden" name="next" value="<?= $escape($next) ?>"><input type="hidden" name="action" value="mfa"><label for="customer-mfa">Authenticator code</label><input id="customer-mfa" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required autofocus><button class="primary-button" type="submit"><?= $checkoutReturn ? 'Verify and continue' : 'Verify and track order' ?></button></form>
+<?php else: ?><h1><?= ($_GET['complete'] ?? '') === '1' ? 'Signed in' : 'Sign-in wasn’t completed' ?></h1><p><?= $checkoutReturn ? 'Return to checkout to continue.' : 'Return to the tracking page to continue.' ?></p><?php endif; ?>
+<a class="auth-return" href="<?= $escape($next) ?>"><?= $checkoutReturn ? 'Return to checkout' : 'View order tracking' ?></a></main></body></html>

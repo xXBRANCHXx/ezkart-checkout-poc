@@ -8,6 +8,26 @@ function curl_setopt_array(object $handle, array $options): bool { $handle->opti
 function curl_exec(object $handle): string {
     $payload = json_decode($handle->options[CURLOPT_POSTFIELDS] ?? '{}', true);
     file_put_contents(getenv('EZKART_TEST_CAPTURE'), json_encode(['url' => $handle->url, 'method' => !empty($handle->options[CURLOPT_POST]) ? 'POST' : 'GET', 'body' => $handle->options[CURLOPT_POSTFIELDS] ?? '', 'headers' => $handle->options[CURLOPT_HTTPHEADER] ?? []]) . "\n", FILE_APPEND | LOCK_EX);
+    if ($handle->url === 'https://ezkart-api-test.fixture.workers.dev/v1/customer/addresses') {
+        $file = dirname(getenv('EZKART_TEST_CAPTURE')) . '/address-book.json';
+        $book = is_file($file) ? json_decode((string) file_get_contents($file), true) : ['addresses' => [], 'default_id' => '', 'revision' => 0, 'limit' => 3];
+        if (!empty($handle->options[CURLOPT_POST])) {
+            if (($payload['revision'] ?? -1) !== $book['revision']) { $handle->status = 409; return '{"ok":false,"error":"Addresses changed. Please try again."}'; }
+            $index = array_search($payload['id'] ?? '', array_column($book['addresses'], 'id'), true);
+            if ($payload['action'] === 'save') {
+                if ($index === false && count($book['addresses']) >= 3) { $handle->status = 409; return '{"ok":false,"error":"Three addresses maximum."}'; }
+                $address = $payload['address']; $address['id'] = $index === false ? bin2hex(random_bytes(12)) : $payload['id'];
+                if ($index === false) $book['addresses'][] = $address; else $book['addresses'][$index] = $address;
+                if ($book['default_id'] === '' || !empty($payload['make_default'])) $book['default_id'] = $address['id'];
+            } elseif ($index !== false && $payload['action'] === 'default') $book['default_id'] = $payload['id'];
+            elseif ($index !== false && $payload['action'] === 'delete') {
+                array_splice($book['addresses'], $index, 1);
+                if ($book['default_id'] === $payload['id']) $book['default_id'] = $book['addresses'][0]['id'] ?? '';
+            }
+            $book['revision']++; file_put_contents($file, json_encode($book));
+        }
+        return json_encode(['ok' => true, 'book' => $book]);
+    }
     if (str_starts_with($handle->url, 'https://photon.komoot.io/api/?')) {
         $file = dirname(getenv('EZKART_TEST_CAPTURE')) . '/address-response.json';
         if (is_file($file)) return (string) file_get_contents($file);
