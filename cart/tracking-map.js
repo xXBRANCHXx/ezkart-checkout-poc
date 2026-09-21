@@ -1,12 +1,11 @@
 (() => {
   "use strict";
   const $ = (id) => document.getElementById(id);
-  const config = JSON.parse($("tracking-map-config").textContent);
   const validPoint = (p) => p && Number.isFinite(p.latitude) && Number.isFinite(p.longitude) && Math.abs(p.latitude) <= 90 && Math.abs(p.longitude) <= 180 && (p.latitude !== 0 || p.longitude !== 0);
-  const point = (p) => ({ lat: p.latitude, lng: p.longitude });
+  const point = (p) => [p.longitude, p.latitude];
   const samePoint = (a, b) => a && b && a.latitude === b.latitude && a.longitude === b.longitude;
-  let map, Marker, sdk, loading, failedAt = 0, state, stateKey = "", overview = false;
-  let markers = [], lines = [], routeKey = "", routePath = [], routeSequence = 0, viewSequence = 0;
+  let map, sdk, loading, ready = false, failedAt = 0, state, stateKey = "", overview = false;
+  let markers = [], routeKey = "", routePath = [], routeSequence = 0, viewSequence = 0;
   const routeCache = new Map();
   const truck = '<svg viewBox="0 0 48 36" width="43" height="33" fill="none" aria-hidden="true"><path d="M4 7a3 3 0 0 1 3-3h23v23H4V7Z" fill="#f3563c"/><path d="M30 13h8l7 9v5H30V13Z" fill="#182b45"/><path d="M33 16h4l5 6h-9v-6Z" fill="#dcecf6"/><path d="M1 14h9M1 19h7" stroke="#fff" stroke-width="2" stroke-linecap="round"/><path d="m15 12 5-3 5 3-5 3-5-3Zm0 0v6l5 3 5-3v-6m-5 3v6" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/><path d="M5 27h39" stroke="#182b45" stroke-width="2"/><circle cx="12" cy="28" r="5" fill="#182b45" stroke="#fff" stroke-width="2"/><circle cx="37" cy="28" r="5" fill="#182b45" stroke="#fff" stroke-width="2"/><circle cx="12" cy="28" r="1.5" fill="#fff"/><circle cx="37" cy="28" r="1.5" fill="#fff"/></svg>';
   const home = '<svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 11 9-8 9 8M5 10v11h14V10M9 21v-7h6v7"/></svg>';
@@ -19,16 +18,14 @@
     $("map-route-toggle").hidden = true;
     $("map-notice").hidden = false;
   }
-  function loadGoogle() {
+  function loadMapLibrary() {
     if (sdk) return sdk;
     sdk = new Promise((resolve, reject) => {
-      if (!config.key || !config.mapId) { reject(new Error("Maps is not configured")); return; }
       const script = document.createElement("script");
       const timeout = setTimeout(() => reject(new Error("Map loading timed out")), 12000);
-      window.ezkartGoogleMapsReady = () => { clearTimeout(timeout); resolve(); };
-      window.gm_authFailure = () => { clearTimeout(timeout); failMap(); reject(new Error("Maps authorization failed")); };
+      script.onload = () => { clearTimeout(timeout); window.maplibregl ? resolve() : reject(new Error("Map unavailable")); };
       script.onerror = () => { clearTimeout(timeout); reject(new Error("Map loading failed")); };
-      script.src = "https://maps.googleapis.com/maps/api/js?" + new URLSearchParams({ key: config.key, v: "weekly", loading: "async", callback: "ezkartGoogleMapsReady", auth_referrer_policy: "origin", language: "en", region: "ID" });
+      script.src = "vendor/maplibre/maplibre-gl.js?v=5.24.0";
       script.async = true;
       document.head.append(script);
     });
@@ -46,12 +43,16 @@
     caption.className = "shipment-pin-label";
     caption.textContent = label;
     content.append(symbol, caption);
-    const marker = new Marker({ map, position: point(coordinate), title, zIndex: kind === "truck" ? 30 : 10, anchorLeft: "-50%", anchorTop: "-50%" });
-    marker.append(content);
+    const element = document.createElement("div");
+    element.title = title;
+    element.setAttribute("aria-label", title);
+    element.style.zIndex = kind === "truck" ? "3" : "2";
+    element.append(content);
+    const marker = new maplibregl.Marker({ element, anchor: "center" }).setLngLat(point(coordinate)).addTo(map);
     markers.push(marker);
   }
   function paintMarkers() {
-    markers.forEach((marker) => { marker.map = null; });
+    markers.forEach((marker) => marker.remove());
     markers = [];
     const { location, origin, destination, completed, returning } = state;
     if (destination && !samePoint(location, destination)) makeMarker(destination, "home", returning ? "Seller" : "Delivery", returning ? "Return address" : "Delivery address");
@@ -62,20 +63,17 @@
     if (!map || !state) return;
     viewSequence++;
     if (overview || !state.location) {
-      const bounds = new google.maps.LatLngBounds();
+      const bounds = new maplibregl.LngLatBounds();
       const coordinates = [...routePath, ...[state.location, state.origin, state.destination].filter(Boolean).map(point)];
       if (!coordinates.length) return;
       coordinates.forEach((coordinate) => bounds.extend(coordinate));
-      map.fitBounds(bounds, { top: 80, bottom: 85, left: 70, right: 70 });
-      google.maps.event.addListenerOnce(map, "idle", () => { if (map.getZoom() > 16) map.setZoom(16); });
+      map.fitBounds(bounds, { padding: { top: 80, bottom: 85, left: 70, right: 70 }, maxZoom: 16, duration: 0 });
     } else {
-      map.setCenter(point(state.location));
-      map.setZoom(15);
+      map.jumpTo({ center: point(state.location), zoom: 15 });
     }
   }
   function clearRoute() {
-    lines.forEach((line) => line.setMap(null));
-    lines = [];
+    if (map?.getSource("delivery-route")) map.getSource("delivery-route").setData({ type: "FeatureCollection", features: [] });
     routePath = [];
   }
   function routeNote(text, drawn = false) {
@@ -84,7 +82,7 @@
     $("map-route-summary").classList.toggle("route-drawn", drawn);
   }
   async function drawRoute() {
-    if (!map) return;
+    if (!ready) return;
     const from = state.location || state.origin, to = state.destination;
     const key = !state.terminal && from && to && !samePoint(from, to) ? JSON.stringify([point(from), point(to)]) : "";
     if (key === routeKey) return;
@@ -96,20 +94,21 @@
     try {
       let path = routeCache.get(key);
       if (!path) {
-        const { Route } = await google.maps.importLibrary("routes");
-        const { routes } = await Route.computeRoutes({ origin: point(from), destination: point(to), travelMode: "DRIVING", fields: ["path"] });
-        path = routes?.[0]?.path;
-        if (!path?.length) throw new Error("No route available");
+        const params = new URLSearchParams({ order: document.querySelector(".return-shell").dataset.order });
+        if (window.ezkartTrackingSandbox) { params.delete("order"); params.set("sandbox", "1"); params.set("stage", new URLSearchParams(location.search).get("stage") || "processing"); }
+        const response = await fetch("api/tracking-route.php?" + params, { cache: "no-store", signal: AbortSignal.timeout(10000) });
+        const data = await response.json();
+        const route = data.route;
+        if (!response.ok || !data.ok || !samePoint(route?.from, from) || !samePoint(route?.to, to) || route.type !== "LineString") throw new Error("Route unavailable");
+        path = route.coordinates;
+        if (!Array.isArray(path) || path.length < 2 || path.length > 10000 || path.some((p) => !Array.isArray(p) || p.length !== 2 || !validPoint({ longitude: p[0], latitude: p[1] }))) throw new Error("No route available");
         routeCache.set(key, path);
         if (routeCache.size > 20) routeCache.delete(routeCache.keys().next().value);
       }
       // An older request must never draw over a newer shipment update.
       if (sequence !== routeSequence) return;
       routePath = path;
-      lines = [
-        new google.maps.Polyline({ map, path, strokeColor: "#ffffff", strokeOpacity: 1, strokeWeight: 9, zIndex: 1, clickable: false }),
-        new google.maps.Polyline({ map, path, strokeColor: "#ee563d", strokeOpacity: 1, strokeWeight: 5, zIndex: 2, clickable: false }),
-      ];
+      map.getSource("delivery-route").setData({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: path } });
       routeNote("Suggested road route · The courier’s actual route may differ.", true);
       if (overview && view === viewSequence) positionMap();
     } catch (_) {
@@ -122,22 +121,29 @@
     loading = true;
     $("map-loading").hidden = false;
     try {
-      await loadGoogle();
-      const [maps, markerLibrary] = await Promise.all([google.maps.importLibrary("maps"), google.maps.importLibrary("marker")]);
+      await loadMapLibrary();
       if ($("package-map-frame").hidden || $("delivery-map-section").hidden || failedAt) return;
-      Marker = markerLibrary.AdvancedMarkerElement;
-      map = new maps.Map($("delivery-map"), {
-        mapId: config.mapId, center: point(state.location || state.origin || state.destination), zoom: 15,
-        disableDefaultUI: true, clickableIcons: false, gestureHandling: "greedy", keyboardShortcuts: true,
-        minZoom: 3, maxZoom: 20, heading: 0, tilt: 0, colorScheme: maps.ColorScheme.LIGHT,
+      map = new maplibregl.Map({
+        container: "delivery-map", style: "tracking-map-style.json?v=1", center: point(state.location || state.origin || state.destination), zoom: 15,
+        attributionControl: { compact: true, customAttribution: '<a href="vendor/openfreemap/POSITRON-LICENSE.md" target="_blank" rel="noopener noreferrer">Positron</a>' }, dragRotate: false, touchPitch: false, pitchWithRotate: false,
+        minZoom: 3, maxZoom: 19, maxPitch: 0, renderWorldCopies: false,
       });
-      map.addListener("dragstart", () => { viewSequence++; });
-      map.addListener("zoom_changed", () => { viewSequence++; });
-      $("map-tools").hidden = false;
-      $("map-loading").hidden = true;
-      paintMarkers();
-      positionMap();
-      void drawRoute();
+      map.touchZoomRotate.disableRotation();
+      map.on("dragstart", () => { viewSequence++; });
+      map.on("zoomstart", () => { viewSequence++; });
+      const timeout = setTimeout(() => { if (!ready) failMap(); }, 20000);
+      map.on("error", () => { $("map-notice").hidden = false; });
+      map.once("load", () => {
+        clearTimeout(timeout);
+        if (failedAt) return;
+        ready = true;
+        map.addSource("delivery-route", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+        map.addLayer({ id: "delivery-route-casing", type: "line", source: "delivery-route", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#fff", "line-width": 9 } });
+        map.addLayer({ id: "delivery-route-line", type: "line", source: "delivery-route", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#ee563d", "line-width": 5 } });
+        $("map-tools").hidden = false;
+        $("map-loading").hidden = true;
+        paintMarkers(); positionMap(); void drawRoute();
+      });
     } catch (_) { failMap(); }
     finally { loading = false; }
   }
@@ -162,7 +168,8 @@
     $("map-location-badge").textContent = location ? (location.source === "confirmed_stop" ? "Confirmed by courier" : "Last reported location") : "Pickup & delivery";
     $("map-notice").hidden = true;
     if (failedAt) { failMap(); return; }
-    if (map) {
+    if (ready) {
+      map.resize();
       paintMarkers();
       if (firstLocation) positionMap();
       void drawRoute();
@@ -178,10 +185,10 @@
   $("map-route-toggle").addEventListener("click", () => {
     overview = !overview;
     $("map-route-toggle").textContent = overview ? "Back to package" : "View full route";
-    if (map) { paintMarkers(); positionMap(); }
+    if (ready) { paintMarkers(); positionMap(); }
     else { $("package-map-frame").scrollIntoView({ block: "center", behavior: "smooth" }); void drawMap(); }
   });
-  $("map-zoom-in").addEventListener("click", () => { if (map) map.setZoom(Math.min(20, map.getZoom() + 1)); });
+  $("map-zoom-in").addEventListener("click", () => { if (map) map.setZoom(Math.min(19, map.getZoom() + 1)); });
   $("map-zoom-out").addEventListener("click", () => { if (map) map.setZoom(Math.max(3, map.getZoom() - 1)); });
   new IntersectionObserver((entries) => { if (entries.some((entry) => entry.isIntersecting)) void drawMap(); }).observe($("package-map-frame"));
   window.ezkartDeliveryMap = { update, validPoint };

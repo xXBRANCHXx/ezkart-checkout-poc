@@ -8,6 +8,13 @@ function curl_setopt_array(object $handle, array $options): bool { $handle->opti
 function curl_exec(object $handle): string {
     $payload = json_decode($handle->options[CURLOPT_POSTFIELDS] ?? '{}', true);
     file_put_contents(getenv('EZKART_TEST_CAPTURE'), json_encode(['url' => $handle->url, 'method' => !empty($handle->options[CURLOPT_POST]) ? 'POST' : 'GET', 'body' => $handle->options[CURLOPT_POSTFIELDS] ?? '', 'headers' => $handle->options[CURLOPT_HTTPHEADER] ?? []]) . "\n", FILE_APPEND | LOCK_EX);
+    if (str_starts_with($handle->url, 'https://routing.openstreetmap.de/routed-car/route/v1/driving/')) {
+        $file = dirname(getenv('EZKART_TEST_CAPTURE')) . '/route-response.json';
+        if (is_file($file)) return (string) file_get_contents($file);
+        $path = explode('/', parse_url($handle->url, PHP_URL_PATH));
+        $points = array_map(static fn($p) => array_map('floatval', explode(',', $p)), explode(';', end($path)));
+        return json_encode(['code' => 'Ok', 'routes' => [['geometry' => ['type' => 'LineString', 'coordinates' => $points]]]]);
+    }
     if (str_starts_with($handle->url, 'https://auth.ezkart.test/auth/v1/')) {
         $file = dirname(getenv('EZKART_TEST_CAPTURE')) . '/auth-response.json';
         $config = is_file($file) ? json_decode((string) file_get_contents($file), true) : [];

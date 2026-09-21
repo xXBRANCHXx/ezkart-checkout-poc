@@ -33,8 +33,25 @@ const signature = (body, headers, target, key = secret) =>
       `Client-Id:${headers["Client-Id"]}\nRequest-Id:${headers["Request-Id"]}\nRequest-Timestamp:${headers["Request-Timestamp"]}\nRequest-Target:${target}\nDigest:${createHash("sha256").update(body).digest("base64")}`,
     )
     .digest("base64");
-async function stubGoogleMaps(page) {
-  await page.route("https://maps.googleapis.com/maps/api/js?**", (route) => route.fulfill({ contentType: "text/javascript", path: join(root, "tools/checkout-test/google-maps-fixture.js") }));
+async function prepareMap(page) {
+  const control = { requests: [], pending: [], hold: false, fail: false };
+  const sdk = await readFile(join(root, "cart/vendor/maplibre/maplibre-gl.js"), "utf8");
+  await page.route("**/vendor/maplibre/maplibre-gl.js?*", (route) => route.fulfill({ contentType: "text/javascript", body: sdk + "\nmaplibregl.Map = class extends maplibregl.Map { constructor(options) { super(options); window.deliveryMapUnderTest = this; } };" }));
+  await page.route("**/tracking-map-style.json?*", (route) => route.fulfill({ json: { version: 8, sources: {}, layers: [{ id: "background", type: "background", paint: { "background-color": "#eef1f4" } }] } }));
+  await page.route("**/api/tracking-route.php?*", async (route) => {
+    const stage = new URL(route.request().url()).searchParams.get("stage");
+    const tracking = stage ? await page.evaluate((stage) => JSON.parse(document.querySelector("#tracking-sandbox-data").textContent)[stage].data.tracking, stage) : {
+      latest_location: { latitude: -6.2441792, longitude: 106.783529 },
+      locations: { destination: { latitude: -6.28927, longitude: 106.77492000000007 } },
+    };
+    const from = tracking.latest_location || tracking.locations.origin;
+    const to = tracking.locations[tracking.stage === "returning" ? "origin" : "destination"];
+    const data = { ok: true, route: { type: "LineString", from, to, coordinates: [[from.longitude, from.latitude], [to.longitude, to.latitude]] } };
+    control.requests.push(data.route);
+    if (control.hold) await new Promise((resolve) => control.pending.push(resolve));
+    await route.fulfill(control.fail ? { status: 503, json: { ok: false } } : { json: data });
+  });
+  return control;
 }
 async function setup(overrides = {}) {
   const directory = await mkdtemp(join(tmpdir(), "ezkart-checkout-test-"));
@@ -48,8 +65,6 @@ async function setup(overrides = {}) {
     EZKART_SUPABASE_URL: "https://auth.ezkart.test",
     EZKART_SUPABASE_PUBLISHABLE_KEY: "fixture-publishable-key",
     EZKART_DEPLOYMENT_ENVIRONMENT: "test",
-    EZKART_GOOGLE_MAPS_BROWSER_KEY: "fixture-google-maps-browser-key",
-    EZKART_GOOGLE_MAPS_MAP_ID: "DEMO_MAP_ID",
     EZKART_COMMERCE_ENVIRONMENT: "sandbox",
     EZKART_ORDER_STORAGE: join(directory, "orders"),
     EZKART_EXECUTIVE_STORAGE: join(directory, "executive"),
@@ -1214,8 +1229,8 @@ test("customer tracking UI follows fulfillment, preserves updates on failure, an
     await notify(app, id);
     const page = await browser.newPage({ viewport: { width, height: 960 }, hasTouch: width === 390 });
     const errors = []; page.on("pageerror", (error) => errors.push(error.message));
-    // Exercise our Google Maps integration without provider calls or billing.
-    await stubGoogleMaps(page);
+    // Exercise the real vendored renderer with local basemap/route data.
+    const routes = await prepareMap(page);
     await page.clock.install();
     await page.context().addCookies([app.customerCookie()]);
     await page.goto(app.base + `/cart/return.php?order=${id}&shop=test-shop`);
@@ -1260,27 +1275,27 @@ test("customer tracking UI follows fulfillment, preserves updates on failure, an
     assert.equal(centered, true, "The truck stays at the reported package location.");
     assert.match(await page.locator("#delivery-map-section").textContent(), /Last reported location/);
     assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('[aria-current="step"] .step-dot')).backgroundColor), "rgb(24, 43, 69)");
-    assert.equal(await page.evaluate(() => googleMapsFixture.maps[0].options.gestureHandling), "greedy");
-    assert.equal(await page.evaluate(() => googleMapsFixture.maps[0].getZoom()), 15);
+    assert.equal(await page.evaluate(() => deliveryMapUnderTest.scrollZoom.isEnabled() && deliveryMapUnderTest.touchZoomRotate.isEnabled()), true);
+    assert.equal(await page.evaluate(() => deliveryMapUnderTest.getZoom()), 15);
     await page.getByRole("button", { name: "Zoom in", exact: true }).click();
-    assert.equal(await page.evaluate(() => googleMapsFixture.maps[0].getZoom()), 16);
+    assert.equal(await page.evaluate(() => deliveryMapUnderTest.getZoom()), 16);
     await page.getByRole("button", { name: "Zoom out", exact: true }).click();
-    assert.equal(await page.evaluate(() => googleMapsFixture.maps[0].getZoom()), 15);
+    assert.equal(await page.evaluate(() => deliveryMapUnderTest.getZoom()), 15);
     assert.ok((await page.locator("#delivery-map").boundingBox()).height >= 400);
-    await page.waitForFunction(() => googleMapsFixture.lines.filter(line => line.map).length === 2);
+    await page.waitForFunction(() => deliveryMapUnderTest.getSource("delivery-route").serialize().data.geometry?.type === "LineString");
     assert.match(await page.locator("#map-route-note").textContent(), /Suggested road route/);
-    const requests = await page.evaluate(() => googleMapsFixture.routes);
+    const requests = routes.requests;
     assert.equal(requests.length, 1);
-    assert.deepEqual(requests[0].origin, { lat: -6.2441792, lng: 106.783529 });
-    assert.deepEqual(requests[0].fields, ["path"], "No inferred ETA or directions are requested.");
-    await page.evaluate(() => { googleMapsFixture.maps[0].setZoom(17); googleMapsFixture.maps[0].setCenter({ lat: -6.25, lng: 106.78 }); });
-    const viewport = await page.evaluate(() => ({ zoom: googleMapsFixture.maps[0].getZoom(), center: googleMapsFixture.maps[0].getCenter() }));
+    assert.equal(requests[0].from.latitude, -6.2441792);
+    assert.equal(requests[0].from.longitude, 106.783529);
+    await page.evaluate(() => { deliveryMapUnderTest.setZoom(17); deliveryMapUnderTest.setCenter([106.78, -6.25]); });
+    const viewport = await page.evaluate(() => ({ zoom: deliveryMapUnderTest.getZoom(), center: deliveryMapUnderTest.getCenter() }));
     inTransit.courier.history[1].updated_at = "2026-09-20T12:05:00+07:00";
     await saveTrackingResponse(app, inTransit); expireTrackingCache(app, id);
     await page.clock.fastForward(15001);
     await page.waitForFunction(() => document.querySelector("#package-location-time").textContent.includes("12:05"));
-    assert.deepEqual(await page.evaluate(() => ({ zoom: googleMapsFixture.maps[0].getZoom(), center: googleMapsFixture.maps[0].getCenter() })), viewport);
-    assert.equal(await page.evaluate(() => googleMapsFixture.routes.length), 1, "Polling doesn't recalculate an unchanged route.");
+    assert.deepEqual(await page.evaluate(() => ({ zoom: deliveryMapUnderTest.getZoom(), center: deliveryMapUnderTest.getCenter() })), viewport);
+    assert.equal(routes.requests.length, 1, "Polling doesn't recalculate an unchanged route.");
     const google = new URL(await page.locator("#google-maps-link").getAttribute("href"));
     assert.equal(google.origin, "https://www.google.com");
     assert.equal(google.searchParams.get("query"), "-6.2441792,106.783529");
@@ -1288,7 +1303,7 @@ test("customer tracking UI follows fulfillment, preserves updates on failure, an
     assert.equal(await page.locator('.shipment-pin-pickup').count(), 1);
     await page.locator("#map-recenter").click();
     assert.equal(await page.locator('.shipment-pin-truck').count(), 1);
-    assert.equal(await page.evaluate(() => googleMapsFixture.maps[0].getZoom()), 15);
+    assert.equal(await page.evaluate(() => deliveryMapUnderTest.getZoom()), 15);
     if (process.env.EZKART_TEST_SCREENSHOTS) await page.screenshot({ path: join(process.env.EZKART_TEST_SCREENSHOTS, `tracking-${width}.png`), fullPage: true });
     await page.route("**/api/status.php*", (route) => route.fulfill({ status: 503, contentType: "application/json", body: '{"ok":false}' }));
     await page.clock.fastForward(15001);
@@ -1305,72 +1320,116 @@ test("customer tracking UI follows fulfillment, preserves updates on failure, an
   }
 });
 
-test("Google routes ignore stale results, use return destinations, and clear after delivery", async (t) => {
+test("road routing authenticates owners, caches results and failures, and enforces free-provider limits", async (t) => {
+  const app = await setup(); t.after(() => app.close());
+  const id = (await app.request("/cart/api/start.php", input)).data.order_id;
+  await notify(app, id); app.cli(`ez_accept_paid_order('${id}'); ez_arrange_paid_order_pickup('${id}');`);
+  await saveTrackingResponse(app, trackingResponse(id));
+  await app.tracking(id, { refresh: true });
+  const cookie = app.customerCookie();
+  const headers = { Cookie: `${cookie.name}=${cookie.value}` };
+  const url = `/cart/api/tracking-route.php?order=${id}`;
+  const sample = stage => `/cart/api/tracking-route.php?sandbox=1&stage=${stage}`;
+  const route = path => app.request(path, undefined, headers);
+  const callsBefore = (await app.calls()).length;
+  assert.equal((await app.request(url)).status, 401);
+  assert.equal((await app.request(url, {}, headers)).status, 405);
+  const other = app.customerCookie("another@example.com", "another-user");
+  assert.equal((await app.request(url, undefined, { Cookie: `${other.name}=${other.value}` })).status, 404);
+  assert.equal((await route(sample("unknown"))).status, 404);
+  assert.equal((await app.calls()).length, callsBefore);
+  const first = await route(url + "&from=0,0&url=https://untrusted.example");
+  assert.equal(first.status, 200);
+  assert.equal(first.data.route.from.latitude, -6.2441792);
+  assert.equal(first.data.route.to.latitude, -6.28927);
+  assert.deepEqual(await route(url), first);
+  let calls = (await app.calls()).slice(callsBefore);
+  assert.equal(calls.length, 1);
+  assert.match(calls[0].url, /^https:\/\/routing\.openstreetmap\.de\/routed-car\/route\/v1\/driving\/106\.7835290,-6\.2441792;106\.7749200,-6\.2892700\?/);
+  assert.ok(calls[0].headers.includes("Referer: https://test.ezkart.id/"));
+  assert.equal(calls[0].body, "");
+  assert.equal(calls[0].url.includes(id), false);
+  const directory = app.cli("echo dirname(ez_order_directory('sandbox')) . '/tracking-routes';");
+  const allowance = join(directory, "requests.lock");
+  const setUsage = (count, last = 0) => writeFile(allowance, JSON.stringify({ day: new Date().toISOString().slice(0, 10), count, last }));
+  await setUsage(100);
+  assert.equal((await route(sample("pickup"))).status, 503);
+  assert.deepEqual(await route(url), first, "Cached routes remain available at the daily limit.");
+  await setUsage(1, Date.now() / 1000);
+  assert.equal((await route(sample("pickup"))).status, 503, "Uncached requests cannot exceed one per second.");
+  assert.equal((await app.calls()).length, callsBefore + 1);
+  await setUsage(1);
+  assert.equal((await route(sample("pickup"))).status, 200);
+  await setUsage(2);
+  await writeFile(join(app.directory, "route-response.json"), JSON.stringify({ code: "Ok", routes: [{ geometry: { type: "LineString", coordinates: [[106, -6], [999, -6]] } }] }));
+  assert.equal((await route(sample("returning"))).status, 503, "Invalid provider geometry is rejected.");
+  assert.equal((await route(sample("returning"))).status, 503, "Failures are cached too.");
+  for (const stage of ["pending", "paid", "processing", "delivered", "returned", "cancelled", "no-map"]) {
+    assert.deepEqual(await route(sample(stage)), { status: 200, data: { ok: true, route: null } });
+  }
+  calls = (await app.calls()).slice(callsBefore);
+  assert.equal(calls.length, 3);
+  assert.ok(calls.every(call => call.url.startsWith("https://routing.openstreetmap.de/")), "Routing cannot refresh Biteship or write to a provider.");
+});
+
+test("road routes ignore stale results, use return destinations, and clear after delivery", async (t) => {
   const { chromium } = await import("../builder-mcp/node_modules/playwright/index.mjs");
   const app = await setup(); t.after(() => app.close());
   const browser = await chromium.launch({ headless: true }); t.after(() => browser.close());
   const page = await browser.newPage();
-  await stubGoogleMaps(page);
+  const routes = await prepareMap(page);
   await page.context().addCookies([app.customerCookie()]);
   await page.goto(app.base + "/cart/tracking-sandbox.php?stage=transit");
   await page.locator("#delivery-map").scrollIntoViewIfNeeded();
-  await page.waitForFunction(() => window.googleMapsFixture?.lines.filter(line => line.map).length === 2);
-  await page.evaluate(() => { googleMapsFixture.holdRoutes = true; });
+  await page.waitForFunction(() => window.deliveryMapUnderTest?.getSource("delivery-route")?.serialize().data.geometry?.type === "LineString");
+  routes.hold = true;
   await page.locator("#sandbox-stage").selectOption("returning");
-  await page.waitForFunction(() => googleMapsFixture.pendingRoutes?.length === 1);
-  const pending = await page.evaluate(() => googleMapsFixture.pendingRoutes[0].request);
-  assert.deepEqual(pending.destination, { lat: -6.2253114, lng: 106.7993735 });
-  assert.equal(await page.evaluate(() => googleMapsFixture.lines.filter(line => line.map).length), 0);
+  await page.waitForFunction(() => document.querySelector("#map-route-note").textContent.startsWith("Finding"));
+  for (let i = 0; i < 100 && !routes.pending.length; i++) await new Promise(r => setTimeout(r, 20));
+  assert.equal(routes.pending.length, 1);
+  assert.equal(routes.requests[1].to.latitude, -6.2253114);
+  assert.equal(routes.requests[1].to.longitude, 106.7993735);
+  const routeData = () => page.evaluate(() => deliveryMapUnderTest.getSource("delivery-route").serialize().data);
+  assert.deepEqual((await routeData()).features, []);
   await page.locator("#sandbox-stage").selectOption("delivered");
-  await page.evaluate(() => {
-    const pending = googleMapsFixture.pendingRoutes[0];
-    pending.resolve({ routes: [{ path: [pending.request.origin, pending.request.destination] }] });
-  });
+  const response = page.waitForResponse("**/api/tracking-route.php?*");
+  routes.pending[0](); await response;
   await page.waitForFunction(() => document.querySelector("#return-title").textContent.includes("delivered"));
-  assert.equal(await page.evaluate(() => googleMapsFixture.lines.filter(line => line.map).length), 0, "An old route cannot reappear after delivery.");
+  assert.deepEqual((await routeData()).features, [], "An old route cannot reappear after delivery.");
   assert.equal(await page.locator(".shipment-pin-truck").count(), 0);
   assert.equal(await page.locator(".shipment-pin-home").count(), 1);
   assert.equal(await page.locator("#map-route-summary").isVisible(), false);
   await page.locator("#sandbox-stage").selectOption("cancelled");
   assert.equal(await page.locator(".shipment-pin-truck").count(), 1);
   assert.doesNotMatch(await page.locator("#delivery-map").textContent(), /Delivered/);
-  assert.equal(await page.evaluate(() => googleMapsFixture.lines.filter(line => line.map).length), 0);
+  assert.deepEqual((await routeData()).features, []);
   await page.locator("#sandbox-stage").selectOption("no-map");
   assert.equal(await page.locator(".shipment-pin").count(), 0);
   assert.equal(await page.locator("#google-maps-link").isVisible(), false);
 });
 
-test("tracking remains usable when Google Maps is unconfigured, blocked, or has no road route", async (t) => {
+test("tracking remains usable when the map SDK is blocked or road routing fails", async (t) => {
   const { chromium } = await import("../builder-mcp/node_modules/playwright/index.mjs");
   const app = await setup(); t.after(() => app.close());
   const browser = await chromium.launch({ headless: true }); t.after(() => browser.close());
-  for (const failure of ["no-key", "blocked", "no-route", "auth"]) {
+  for (const failure of ["blocked", "no-route"]) {
     const page = await browser.newPage();
-    const errors = [], requests = [];
+    const errors = [];
     page.on("pageerror", (error) => errors.push(error.message));
-    page.on("request", (request) => { if (request.url().startsWith("https://maps.googleapis.com/")) requests.push(request.url()); });
     await page.context().addCookies([app.customerCookie()]);
-    if (failure === "no-key") {
-      await page.route("**/cart/tracking-sandbox.php*", async (route) => {
-        const response = await route.fetch();
-        await route.fulfill({ response, body: (await response.text()).replace('"key":"fixture-google-maps-browser-key"', '"key":""') });
-      });
-    } else if (failure === "blocked") await page.route("https://maps.googleapis.com/**", (route) => route.abort());
-    else {
-      const sdk = await readFile(join(root, "tools/checkout-test/google-maps-fixture.js"), "utf8");
-      await page.route("https://maps.googleapis.com/maps/api/js?**", (route) => route.fulfill({ contentType: "text/javascript", body: sdk + (failure === "no-route" ? "googleMapsFixture.failRoutes = true;" : "window.gm_authFailure();") }));
-    }
+    const routes = await prepareMap(page);
+    routes.fail = true;
+    if (failure === "blocked") await page.route("**/vendor/maplibre/maplibre-gl.js?*", route => route.abort());
     await page.goto(app.base + "/cart/tracking-sandbox.php?stage=transit");
     await page.locator("#delivery-map-section").scrollIntoViewIfNeeded();
     if (failure === "no-route") {
       await page.waitForFunction(() => document.querySelector("#map-route-note").textContent.startsWith("Road route unavailable"));
       assert.equal(await page.locator(".shipment-pin-truck").count(), 1);
-      assert.equal(await page.evaluate(() => googleMapsFixture.lines.length), 0, "No fabricated straight-line route is substituted.");
+      assert.deepEqual(await page.evaluate(() => deliveryMapUnderTest.getSource("delivery-route").serialize().data.features), [], "No fabricated straight-line route is substituted.");
     } else {
       await page.locator("#map-notice").waitFor();
       assert.equal(await page.locator("#package-map-frame").isVisible(), false);
     }
-    if (failure === "no-key") assert.deepEqual(requests, [], "No credential means no Google request.");
     assert.equal(await page.locator("#return-title").textContent(), "Your order is on the way");
     assert.match(await page.locator("#tracking-history").textContent(), /Jakarta sorting facility/);
     assert.equal(await page.locator("#google-maps-link").isVisible(), true);
@@ -1391,7 +1450,7 @@ test("a courier webhook arriving during tracking refresh wins over the stale pro
   assert.equal(data.tracking.waybill_id, "LATEST-WAYBILL");
 });
 
-test("interactive tracking walkthrough uses the customer renderer without orders or provider calls and is sandbox-only", async (t) => {
+test("interactive tracking walkthrough uses the customer renderer without orders or payment/shipping calls and is sandbox-only", async (t) => {
   const { chromium } = await import("../builder-mcp/node_modules/playwright/index.mjs");
   const app = await setup(); t.after(() => app.close());
   const browser = await chromium.launch({ headless: true }); t.after(() => browser.close());
@@ -1400,7 +1459,7 @@ test("interactive tracking walkthrough uses the customer renderer without orders
     const errors = [], apiCalls = [];
     page.on("pageerror", (error) => errors.push(error.message));
     page.on("request", (request) => { if (request.url().startsWith(app.base + "/cart/api/")) apiCalls.push(request.url()); });
-    await stubGoogleMaps(page);
+    await prepareMap(page);
     await page.clock.install();
     await page.context().addCookies([app.customerCookie()]);
     await page.goto(app.base + "/cart/tracking-sandbox.php");
@@ -1437,7 +1496,7 @@ test("interactive tracking walkthrough uses the customer renderer without orders
     await page.locator("#sandbox-reset").click();
     assert.equal(await page.locator("#sandbox-stage").inputValue(), "pending");
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
-    assert.deepEqual(apiCalls, []);
+    assert.ok(apiCalls.every(url => new URL(url).pathname === "/cart/api/tracking-route.php"));
     assert.deepEqual(errors, []);
     await page.close();
   }
@@ -1450,7 +1509,11 @@ test("interactive tracking walkthrough uses the customer renderer without orders
     { EZKART_DEPLOYMENT_ENVIRONMENT: "test", EZKART_COMMERCE_ENVIRONMENT: "production" },
   ]) {
     const blocked = await setup(overrides);
-    try { assert.equal((await fetch(blocked.base + "/cart/tracking-sandbox.php")).status, 404); }
+    try {
+      assert.equal((await fetch(blocked.base + "/cart/tracking-sandbox.php")).status, 404);
+      const cookie = blocked.customerCookie();
+      assert.equal((await blocked.request("/cart/api/tracking-route.php?sandbox=1&stage=transit", undefined, { Cookie: `${cookie.name}=${cookie.value}` })).status, 404);
+    }
     finally { await blocked.close(); }
   }
 });

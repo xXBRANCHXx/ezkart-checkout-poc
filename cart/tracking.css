@@ -113,3 +113,13 @@
   .tracking-steps b { font-size: 10px; line-height: 1.5; }
   .tracking-steps small { display: none; }
 }
+
+#delivery-map .maplibregl-ctrl-attrib { font-family: inherit; font-size: 9px; color: #596879; }
+#delivery-map .maplibregl-ctrl-attrib a { color: #536377; }
+#delivery-map .maplibregl-canvas:focus-visible { outline: 2px solid #32557b; outline-offset: -2px; }
+.map-route-summary { flex-wrap: wrap; }
+.map-route-summary p { flex: 1; min-width: 150px; }
+.route-credit { margin-left: auto; font-size: 10px; line-height: 1.8; }
+.route-credit a { color: #64758a; text-decoration: none; }
+.route-credit a:hover { text-decoration: underline; }
+@media (max-width: 780px) { .route-credit { width: 100%; margin-left: 32px; } }

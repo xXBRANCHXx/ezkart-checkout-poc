@@ -26,11 +26,6 @@ return [
     'admin_session_storage' => '',
     // Customer Google sign-in uses the same provider, with a separate private session.
     'customer_session_storage' => '',
-    // Browser-restricted Google Maps key: enable Maps JavaScript API and Routes API.
-    // Restrict the test key to https://test.ezkart.id/*; use a separate production key.
-    'google_maps_browser_key' => '',
-    // JavaScript map ID, with your light map style. Test falls back to DEMO_MAP_ID.
-    'google_maps_map_id' => '',
     // The server-side switch selects BOTH providers. Default is sandbox.
     // ezkart.id / production deployments reject sandbox settings.
     // The test deployment may use either mode, after all provider checks pass.

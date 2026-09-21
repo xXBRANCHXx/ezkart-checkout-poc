@@ -12,10 +12,6 @@ if ($customerAccount === null || ($_GET['signin'] ?? '') === '1') {
 }
 session_write_close();
 $isTrackingSandbox = isset($trackingSandboxData) && is_array($trackingSandboxData);
-$trackingMapConfig = [
-    'key' => ez_config('google_maps_browser_key'),
-    'mapId' => ez_config('google_maps_map_id') ?: (ez_config('deployment_environment') === 'test' ? 'DEMO_MAP_ID' : ''),
-];
 $orderId = $isTrackingSandbox ? 'EZK-S-000000000000000000000001' : trim((string) ($_GET['order'] ?? ''));
 if (preg_match('/^EZK-[A-Z0-9-]{8,70}$/D', $orderId) !== 1) {
     http_response_code(400);
@@ -34,8 +30,9 @@ header('X-Content-Type-Options: nosniff');
   <meta name="theme-color" content="#ffffff">
   <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="payment.css?v=2">
-  <link rel="stylesheet" href="tracking.css?v=5">
-  <script src="tracking-map.js?v=1" defer></script>
+  <link rel="stylesheet" href="vendor/maplibre/maplibre-gl.css?v=5.24.0">
+  <link rel="stylesheet" href="tracking.css?v=6">
+  <script src="tracking-map.js?v=2" defer></script>
   <?php if ($isTrackingSandbox): ?><script src="tracking-sandbox.js?v=1" defer></script><?php endif; ?>
   <script src="tracking.js?v=6" defer></script>
   <title>Track your order · Ezkart</title>
@@ -46,7 +43,6 @@ header('X-Content-Type-Options: nosniff');
     <span class="secure-label">Order updates</span>
   </div></header>
   <main class="return-shell" data-order="<?= htmlspecialchars($orderId, ENT_QUOTES, 'UTF-8') ?>">
-    <script id="tracking-map-config" type="application/json"><?= json_encode($trackingMapConfig, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_THROW_ON_ERROR) ?></script>
     <div class="customer-account"><span>Signed in as <b><?= htmlspecialchars($customerAccount['email'], ENT_QUOTES, 'UTF-8') ?></b></span><form method="post" action="/cart/login.php"><input type="hidden" name="action" value="logout"><input type="hidden" name="csrf_token" value="<?= htmlspecialchars($customerCsrf, ENT_QUOTES, 'UTF-8') ?>"><input type="hidden" name="next" value="<?= htmlspecialchars($customerNext, ENT_QUOTES, 'UTF-8') ?>"><button type="submit">Sign out</button></form></div>
     <?php if ($isTrackingSandbox): ?>
     <section class="sandbox-controls" aria-label="Sandbox walkthrough controls">
@@ -95,7 +91,7 @@ header('X-Content-Type-Options: nosniff');
           </div>
           <p id="package-location-empty" class="location-empty" hidden>The courier hasn’t shared a package location yet. Follow the latest updates below.</p>
           <p id="map-notice" class="muted" role="status" hidden>The map is temporarily unavailable. Your order updates are still shown above.</p>
-          <div class="map-route-summary" id="map-route-summary" hidden><span class="route-line-key" aria-hidden="true"></span><p id="map-route-note" role="status"></p></div>
+          <div class="map-route-summary" id="map-route-summary" hidden><span class="route-line-key" aria-hidden="true"></span><p id="map-route-note" role="status"></p><span class="route-credit"><a href="https://routing.openstreetmap.de/about.html" target="_blank" rel="noopener noreferrer">Routing: FOSSGIS</a> · <a href="https://www.openstreetmap.org/fixthemap" target="_blank" rel="noopener noreferrer">Fix the map</a></span></div>
           <div class="package-map-actions"><button id="map-route-toggle" type="button" hidden>View full route</button><a id="google-maps-link" target="_blank" rel="noopener noreferrer" hidden>Open in Google Maps ↗</a><a id="courier-tracking-link" class="courier-link" target="_blank" rel="noopener noreferrer" hidden>View courier tracking ↗</a></div>
         </section>
         <section class="tracking-card journey-card" aria-labelledby="journey-title">
