@@ -12,6 +12,10 @@ if ($customerAccount === null || ($_GET['signin'] ?? '') === '1') {
 }
 session_write_close();
 $isTrackingSandbox = isset($trackingSandboxData) && is_array($trackingSandboxData);
+$trackingMapConfig = [
+    'key' => ez_config('google_maps_browser_key'),
+    'mapId' => ez_config('google_maps_map_id') ?: (ez_config('deployment_environment') === 'test' ? 'DEMO_MAP_ID' : ''),
+];
 $orderId = $isTrackingSandbox ? 'EZK-S-000000000000000000000001' : trim((string) ($_GET['order'] ?? ''));
 if (preg_match('/^EZK-[A-Z0-9-]{8,70}$/D', $orderId) !== 1) {
     http_response_code(400);
@@ -30,11 +34,10 @@ header('X-Content-Type-Options: nosniff');
   <meta name="theme-color" content="#ffffff">
   <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="payment.css?v=2">
-  <link rel="stylesheet" href="vendor/leaflet/leaflet.css?v=1.9.4">
-  <link rel="stylesheet" href="tracking.css?v=4">
-  <script src="vendor/leaflet/leaflet.js?v=1.9.4" defer></script>
+  <link rel="stylesheet" href="tracking.css?v=5">
+  <script src="tracking-map.js?v=1" defer></script>
   <?php if ($isTrackingSandbox): ?><script src="tracking-sandbox.js?v=1" defer></script><?php endif; ?>
-  <script src="tracking.js?v=5" defer></script>
+  <script src="tracking.js?v=6" defer></script>
   <title>Track your order · Ezkart</title>
 </head>
 <body>
@@ -43,6 +46,7 @@ header('X-Content-Type-Options: nosniff');
     <span class="secure-label">Order updates</span>
   </div></header>
   <main class="return-shell" data-order="<?= htmlspecialchars($orderId, ENT_QUOTES, 'UTF-8') ?>">
+    <script id="tracking-map-config" type="application/json"><?= json_encode($trackingMapConfig, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_THROW_ON_ERROR) ?></script>
     <div class="customer-account"><span>Signed in as <b><?= htmlspecialchars($customerAccount['email'], ENT_QUOTES, 'UTF-8') ?></b></span><form method="post" action="/cart/login.php"><input type="hidden" name="action" value="logout"><input type="hidden" name="csrf_token" value="<?= htmlspecialchars($customerCsrf, ENT_QUOTES, 'UTF-8') ?>"><input type="hidden" name="next" value="<?= htmlspecialchars($customerNext, ENT_QUOTES, 'UTF-8') ?>"><button type="submit">Sign out</button></form></div>
     <?php if ($isTrackingSandbox): ?>
     <section class="sandbox-controls" aria-label="Sandbox walkthrough controls">
@@ -78,13 +82,21 @@ header('X-Content-Type-Options: nosniff');
       </section>
       <div class="tracking-layout">
         <section id="delivery-map-section" class="tracking-card map-card" aria-labelledby="map-title" hidden>
-          <div class="package-map-heading"><div><span class="map-eyebrow">YOUR PACKAGE</span><h2 id="map-title">Latest delivery update</h2></div><button id="map-recenter" class="map-recenter" type="button" aria-label="Center map on package location" hidden>⌖</button></div>
+          <div class="package-map-heading"><div><span class="map-eyebrow">FOLLOW YOUR DELIVERY</span><h2 id="map-title">Delivery map</h2></div><span id="map-location-badge" class="map-location-badge">Last reported location</span></div>
           <p id="package-update" class="package-update"></p>
           <p id="package-location-time" class="package-location-time"></p>
-          <div class="package-map-frame" id="package-map-frame" hidden><span id="map-location-badge" class="map-location-badge">Last reported location</span><div id="delivery-map" role="region" aria-label="Map of the package’s last reported location"></div></div>
+          <div class="package-map-frame" id="package-map-frame" hidden>
+            <div id="delivery-map" role="region" aria-label="Delivery map showing the package’s last reported location and suggested road route"></div>
+            <div id="map-loading" class="map-loading" role="status">Loading delivery map…</div>
+            <div class="map-tools" id="map-tools" hidden>
+              <button id="map-recenter" type="button" aria-label="Center map on package location" title="Center on package"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4"/></svg></button>
+              <div class="map-zoom"><button id="map-zoom-in" type="button" aria-label="Zoom in">+</button><button id="map-zoom-out" type="button" aria-label="Zoom out">−</button></div>
+            </div>
+          </div>
           <p id="package-location-empty" class="location-empty" hidden>The courier hasn’t shared a package location yet. Follow the latest updates below.</p>
           <p id="map-notice" class="muted" role="status" hidden>The map is temporarily unavailable. Your order updates are still shown above.</p>
-          <div class="package-map-actions"><button id="map-route-toggle" type="button" hidden>View pickup & delivery</button><a id="google-maps-link" target="_blank" rel="noopener noreferrer" hidden>Open in Google Maps ↗</a><a id="courier-tracking-link" class="courier-link" target="_blank" rel="noopener noreferrer" hidden>View courier tracking ↗</a></div>
+          <div class="map-route-summary" id="map-route-summary" hidden><span class="route-line-key" aria-hidden="true"></span><p id="map-route-note" role="status"></p></div>
+          <div class="package-map-actions"><button id="map-route-toggle" type="button" hidden>View full route</button><a id="google-maps-link" target="_blank" rel="noopener noreferrer" hidden>Open in Google Maps ↗</a><a id="courier-tracking-link" class="courier-link" target="_blank" rel="noopener noreferrer" hidden>View courier tracking ↗</a></div>
         </section>
         <section class="tracking-card journey-card" aria-labelledby="journey-title">
           <h2 id="journey-title">Order journey</h2>

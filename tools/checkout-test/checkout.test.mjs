@@ -33,6 +33,9 @@ const signature = (body, headers, target, key = secret) =>
       `Client-Id:${headers["Client-Id"]}\nRequest-Id:${headers["Request-Id"]}\nRequest-Timestamp:${headers["Request-Timestamp"]}\nRequest-Target:${target}\nDigest:${createHash("sha256").update(body).digest("base64")}`,
     )
     .digest("base64");
+async function stubGoogleMaps(page) {
+  await page.route("https://maps.googleapis.com/maps/api/js?**", (route) => route.fulfill({ contentType: "text/javascript", path: join(root, "tools/checkout-test/google-maps-fixture.js") }));
+}
 async function setup(overrides = {}) {
   const directory = await mkdtemp(join(tmpdir(), "ezkart-checkout-test-"));
   const capture = join(directory, "calls.jsonl");
@@ -45,6 +48,8 @@ async function setup(overrides = {}) {
     EZKART_SUPABASE_URL: "https://auth.ezkart.test",
     EZKART_SUPABASE_PUBLISHABLE_KEY: "fixture-publishable-key",
     EZKART_DEPLOYMENT_ENVIRONMENT: "test",
+    EZKART_GOOGLE_MAPS_BROWSER_KEY: "fixture-google-maps-browser-key",
+    EZKART_GOOGLE_MAPS_MAP_ID: "DEMO_MAP_ID",
     EZKART_COMMERCE_ENVIRONMENT: "sandbox",
     EZKART_ORDER_STORAGE: join(directory, "orders"),
     EZKART_EXECUTIVE_STORAGE: join(directory, "executive"),
@@ -1209,8 +1214,8 @@ test("customer tracking UI follows fulfillment, preserves updates on failure, an
     await notify(app, id);
     const page = await browser.newPage({ viewport: { width, height: 960 }, hasTouch: width === 390 });
     const errors = []; page.on("pageerror", (error) => errors.push(error.message));
-    // Never request public map tiles in automated checks.
-    await page.route("https://tile.openstreetmap.org/**", (route) => route.fulfill({ contentType: "image/png", body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=", "base64") }));
+    // Exercise our Google Maps integration without provider calls or billing.
+    await stubGoogleMaps(page);
     await page.clock.install();
     await page.context().addCookies([app.customerCookie()]);
     await page.goto(app.base + `/cart/return.php?order=${id}&shop=test-shop`);
@@ -1218,7 +1223,6 @@ test("customer tracking UI follows fulfillment, preserves updates on failure, an
     assert.equal(await page.locator("#delivery-map-section").isVisible(), false);
     assert.equal(await page.locator("#courier-tracking-link").isVisible(), false);
     assert.equal(await page.locator("#refresh-tracking, #return-icon").count(), 0);
-    await page.evaluate(() => { L.Map.addInitHook(function () { window.deliveryMapUnderTest = this; }); });
     app.cli(`ez_accept_paid_order('${id}');`);
     await page.clock.fastForward(15001);
     await page.getByRole("heading", { name: "The seller is preparing your order", exact: true }).waitFor();
@@ -1244,56 +1248,47 @@ test("customer tracking UI follows fulfillment, preserves updates on failure, an
     assert.equal(await page.locator("#courier-tracking-link").textContent(), "View courier live tracking ↗");
     assert.equal(await page.locator("#courier-tracking-link").getAttribute("rel"), "noopener noreferrer");
     await page.locator("#delivery-map").scrollIntoViewIfNeeded();
-    await page.locator('.package-marker').waitFor();
-    assert.equal(await page.locator('.package-marker').count(), 1);
-    assert.equal(await page.locator('.delivery-pin').count(), 0);
-    await page.locator('.package-marker').hover();
-    assert.equal(await page.locator('.leaflet-tooltip img').count(), 0);
-    assert.equal(await page.evaluate(() => !!window.injected), false);
+    await page.locator('.shipment-pin-truck').waitFor();
+    assert.equal(await page.locator('.shipment-pin-truck').count(), 1);
+    assert.equal(await page.locator('.shipment-pin-home').count(), 1);
+    assert.equal(await page.locator('#delivery-map img').count(), 0, "Provider labels cannot inject HTML.");
+    assert.equal(await page.evaluate(() => window.injected), undefined);
     const centered = await page.evaluate(() => {
-      const map = document.querySelector('#delivery-map').getBoundingClientRect(), pin = document.querySelector('.package-marker').getBoundingClientRect();
-      return Math.abs(pin.x + pin.width / 2 - map.x - map.width / 2) < 2 && Math.abs(pin.y + pin.height / 2 - map.y - map.height / 2) < 2;
+      const map = document.querySelector('#delivery-map').getBoundingClientRect(), pin = document.querySelector('.shipment-pin-truck').getBoundingClientRect();
+      return Math.abs(map.x + map.width / 2 - pin.x - pin.width / 2) < 3 && Math.abs(map.y + map.height / 2 - pin.y - pin.height / 2) < 3;
     });
-    assert.equal(centered, true, "The package marker is centered in the map.");
+    assert.equal(centered, true, "The truck stays at the reported package location.");
     assert.match(await page.locator("#delivery-map-section").textContent(), /Last reported location/);
-    assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector(".leaflet-tile-pane")).filter), "none");
     assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('[aria-current="step"] .step-dot')).backgroundColor), "rgb(24, 43, 69)");
-    assert.equal(await page.evaluate(() => window.deliveryMapUnderTest.getZoom()), 15);
+    assert.equal(await page.evaluate(() => googleMapsFixture.maps[0].options.gestureHandling), "greedy");
+    assert.equal(await page.evaluate(() => googleMapsFixture.maps[0].getZoom()), 15);
     await page.getByRole("button", { name: "Zoom in", exact: true }).click();
-    await page.waitForFunction(() => window.deliveryMapUnderTest.getZoom() === 16 && !window.deliveryMapUnderTest._animatingZoom);
+    assert.equal(await page.evaluate(() => googleMapsFixture.maps[0].getZoom()), 16);
     await page.getByRole("button", { name: "Zoom out", exact: true }).click();
-    await page.waitForFunction(() => window.deliveryMapUnderTest.getZoom() === 15 && !window.deliveryMapUnderTest._animatingZoom);
-    const mapBox = await page.locator("#delivery-map").boundingBox();
-    assert.ok(mapBox.height >= 350);
-    await page.mouse.move(mapBox.x + mapBox.width / 3, mapBox.y + mapBox.height / 2);
-    await page.mouse.wheel(0, -400);
-    await page.waitForFunction(() => window.deliveryMapUnderTest.getZoom() > 15 && !window.deliveryMapUnderTest._animatingZoom);
-    const viewport = await page.evaluate(() => ({ zoom: window.deliveryMapUnderTest.getZoom(), center: window.deliveryMapUnderTest.getCenter() }));
+    assert.equal(await page.evaluate(() => googleMapsFixture.maps[0].getZoom()), 15);
+    assert.ok((await page.locator("#delivery-map").boundingBox()).height >= 400);
+    await page.waitForFunction(() => googleMapsFixture.lines.filter(line => line.map).length === 2);
+    assert.match(await page.locator("#map-route-note").textContent(), /Suggested road route/);
+    const requests = await page.evaluate(() => googleMapsFixture.routes);
+    assert.equal(requests.length, 1);
+    assert.deepEqual(requests[0].origin, { lat: -6.2441792, lng: 106.783529 });
+    assert.deepEqual(requests[0].fields, ["path"], "No inferred ETA or directions are requested.");
+    await page.evaluate(() => { googleMapsFixture.maps[0].setZoom(17); googleMapsFixture.maps[0].setCenter({ lat: -6.25, lng: 106.78 }); });
+    const viewport = await page.evaluate(() => ({ zoom: googleMapsFixture.maps[0].getZoom(), center: googleMapsFixture.maps[0].getCenter() }));
     inTransit.courier.history[1].updated_at = "2026-09-20T12:05:00+07:00";
     await saveTrackingResponse(app, inTransit); expireTrackingCache(app, id);
     await page.clock.fastForward(15001);
     await page.waitForFunction(() => document.querySelector("#package-location-time").textContent.includes("12:05"));
-    assert.equal(await page.evaluate(() => window.deliveryMapUnderTest.getZoom()), viewport.zoom);
-    assert.ok(await page.evaluate((center) => window.deliveryMapUnderTest.distance(window.deliveryMapUnderTest.getCenter(), center) < 0.1, viewport.center), "Background updates preserve the customer's map center within projection rounding.");
+    assert.deepEqual(await page.evaluate(() => ({ zoom: googleMapsFixture.maps[0].getZoom(), center: googleMapsFixture.maps[0].getCenter() })), viewport);
+    assert.equal(await page.evaluate(() => googleMapsFixture.routes.length), 1, "Polling doesn't recalculate an unchanged route.");
     const google = new URL(await page.locator("#google-maps-link").getAttribute("href"));
     assert.equal(google.origin, "https://www.google.com");
     assert.equal(google.searchParams.get("query"), "-6.2441792,106.783529");
     await page.locator("#map-route-toggle").click();
-    assert.equal(await page.locator('.delivery-pin').count(), 2);
+    assert.equal(await page.locator('.shipment-pin-pickup').count(), 1);
     await page.locator("#map-recenter").click();
-    assert.equal(await page.locator('.package-marker').count(), 1);
-    assert.equal(await page.evaluate(() => window.deliveryMapUnderTest.getZoom()), 15);
-    if (width === 390) {
-      const rect = await page.locator("#delivery-map").boundingBox();
-      const client = await page.context().newCDPSession(page);
-      const touches = (offset) => [-1, 1].map((direction, index) => ({ x: rect.x + rect.width / 2 + direction * offset, y: rect.y + rect.height / 2, id: index }));
-      await client.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: touches(30) });
-      await client.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: touches(65) });
-      await client.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: touches(100) });
-      await client.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
-      await page.waitForFunction(() => window.deliveryMapUnderTest.getZoom() > 15);
-      await client.detach();
-    }
+    assert.equal(await page.locator('.shipment-pin-truck').count(), 1);
+    assert.equal(await page.evaluate(() => googleMapsFixture.maps[0].getZoom()), 15);
     if (process.env.EZKART_TEST_SCREENSHOTS) await page.screenshot({ path: join(process.env.EZKART_TEST_SCREENSHOTS, `tracking-${width}.png`), fullPage: true });
     await page.route("**/api/status.php*", (route) => route.fulfill({ status: 503, contentType: "application/json", body: '{"ok":false}' }));
     await page.clock.fastForward(15001);
@@ -1305,6 +1300,80 @@ test("customer tracking UI follows fulfillment, preserves updates on failure, an
     await page.getByRole("heading", { name: "Your order has been delivered", exact: true }).waitFor();
     assert.match(await page.locator('[aria-current="step"]').textContent(), /Delivered/);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
+    assert.deepEqual(errors, []);
+    await page.close();
+  }
+});
+
+test("Google routes ignore stale results, use return destinations, and clear after delivery", async (t) => {
+  const { chromium } = await import("../builder-mcp/node_modules/playwright/index.mjs");
+  const app = await setup(); t.after(() => app.close());
+  const browser = await chromium.launch({ headless: true }); t.after(() => browser.close());
+  const page = await browser.newPage();
+  await stubGoogleMaps(page);
+  await page.context().addCookies([app.customerCookie()]);
+  await page.goto(app.base + "/cart/tracking-sandbox.php?stage=transit");
+  await page.locator("#delivery-map").scrollIntoViewIfNeeded();
+  await page.waitForFunction(() => window.googleMapsFixture?.lines.filter(line => line.map).length === 2);
+  await page.evaluate(() => { googleMapsFixture.holdRoutes = true; });
+  await page.locator("#sandbox-stage").selectOption("returning");
+  await page.waitForFunction(() => googleMapsFixture.pendingRoutes?.length === 1);
+  const pending = await page.evaluate(() => googleMapsFixture.pendingRoutes[0].request);
+  assert.deepEqual(pending.destination, { lat: -6.2253114, lng: 106.7993735 });
+  assert.equal(await page.evaluate(() => googleMapsFixture.lines.filter(line => line.map).length), 0);
+  await page.locator("#sandbox-stage").selectOption("delivered");
+  await page.evaluate(() => {
+    const pending = googleMapsFixture.pendingRoutes[0];
+    pending.resolve({ routes: [{ path: [pending.request.origin, pending.request.destination] }] });
+  });
+  await page.waitForFunction(() => document.querySelector("#return-title").textContent.includes("delivered"));
+  assert.equal(await page.evaluate(() => googleMapsFixture.lines.filter(line => line.map).length), 0, "An old route cannot reappear after delivery.");
+  assert.equal(await page.locator(".shipment-pin-truck").count(), 0);
+  assert.equal(await page.locator(".shipment-pin-home").count(), 1);
+  assert.equal(await page.locator("#map-route-summary").isVisible(), false);
+  await page.locator("#sandbox-stage").selectOption("cancelled");
+  assert.equal(await page.locator(".shipment-pin-truck").count(), 1);
+  assert.doesNotMatch(await page.locator("#delivery-map").textContent(), /Delivered/);
+  assert.equal(await page.evaluate(() => googleMapsFixture.lines.filter(line => line.map).length), 0);
+  await page.locator("#sandbox-stage").selectOption("no-map");
+  assert.equal(await page.locator(".shipment-pin").count(), 0);
+  assert.equal(await page.locator("#google-maps-link").isVisible(), false);
+});
+
+test("tracking remains usable when Google Maps is unconfigured, blocked, or has no road route", async (t) => {
+  const { chromium } = await import("../builder-mcp/node_modules/playwright/index.mjs");
+  const app = await setup(); t.after(() => app.close());
+  const browser = await chromium.launch({ headless: true }); t.after(() => browser.close());
+  for (const failure of ["no-key", "blocked", "no-route", "auth"]) {
+    const page = await browser.newPage();
+    const errors = [], requests = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    page.on("request", (request) => { if (request.url().startsWith("https://maps.googleapis.com/")) requests.push(request.url()); });
+    await page.context().addCookies([app.customerCookie()]);
+    if (failure === "no-key") {
+      await page.route("**/cart/tracking-sandbox.php*", async (route) => {
+        const response = await route.fetch();
+        await route.fulfill({ response, body: (await response.text()).replace('"key":"fixture-google-maps-browser-key"', '"key":""') });
+      });
+    } else if (failure === "blocked") await page.route("https://maps.googleapis.com/**", (route) => route.abort());
+    else {
+      const sdk = await readFile(join(root, "tools/checkout-test/google-maps-fixture.js"), "utf8");
+      await page.route("https://maps.googleapis.com/maps/api/js?**", (route) => route.fulfill({ contentType: "text/javascript", body: sdk + (failure === "no-route" ? "googleMapsFixture.failRoutes = true;" : "window.gm_authFailure();") }));
+    }
+    await page.goto(app.base + "/cart/tracking-sandbox.php?stage=transit");
+    await page.locator("#delivery-map-section").scrollIntoViewIfNeeded();
+    if (failure === "no-route") {
+      await page.waitForFunction(() => document.querySelector("#map-route-note").textContent.startsWith("Road route unavailable"));
+      assert.equal(await page.locator(".shipment-pin-truck").count(), 1);
+      assert.equal(await page.evaluate(() => googleMapsFixture.lines.length), 0, "No fabricated straight-line route is substituted.");
+    } else {
+      await page.locator("#map-notice").waitFor();
+      assert.equal(await page.locator("#package-map-frame").isVisible(), false);
+    }
+    if (failure === "no-key") assert.deepEqual(requests, [], "No credential means no Google request.");
+    assert.equal(await page.locator("#return-title").textContent(), "Your order is on the way");
+    assert.match(await page.locator("#tracking-history").textContent(), /Jakarta sorting facility/);
+    assert.equal(await page.locator("#google-maps-link").isVisible(), true);
     assert.deepEqual(errors, []);
     await page.close();
   }
@@ -1330,8 +1399,8 @@ test("interactive tracking walkthrough uses the customer renderer without orders
     const page = await browser.newPage({ viewport: { width, height: 960 } });
     const errors = [], apiCalls = [];
     page.on("pageerror", (error) => errors.push(error.message));
-    page.on("request", (request) => { if (/\/api\//.test(request.url())) apiCalls.push(request.url()); });
-    await page.route("https://tile.openstreetmap.org/**", (route) => route.fulfill({ contentType: "image/png", body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=", "base64") }));
+    page.on("request", (request) => { if (request.url().startsWith(app.base + "/cart/api/")) apiCalls.push(request.url()); });
+    await stubGoogleMaps(page);
     await page.clock.install();
     await page.context().addCookies([app.customerCookie()]);
     await page.goto(app.base + "/cart/tracking-sandbox.php");
@@ -1340,11 +1409,12 @@ test("interactive tracking walkthrough uses the customer renderer without orders
     assert.equal(await page.locator("#delivery-map-section").isVisible(), false);
     await page.locator("#sandbox-next").click();
     await page.getByRole("heading", { name: "Your order is awaiting pickup", exact: true }).waitFor();
-    assert.equal(await page.locator("#package-map-frame").isVisible(), false);
+    assert.equal(await page.locator("#package-location-empty").isVisible(), true);
     await page.locator("#map-route-toggle").click();
     await page.locator("#delivery-map").scrollIntoViewIfNeeded();
-    await page.locator(".delivery-pin").first().waitFor();
-    assert.equal(await page.locator(".delivery-pin").count(), 2);
+    await page.locator(".shipment-pin-home").waitFor();
+    assert.equal(await page.locator(".shipment-pin-pickup").count(), 1);
+    assert.equal(await page.locator(".shipment-pin-truck").count(), 0, "Booking never invents a package location.");
     assert.equal(await page.locator("#courier-tracking-link").isVisible(), false, "No fabricated live courier tracking URL.");
     await page.locator("#sandbox-stage").selectOption("unavailable");
     await page.locator("#tracking-notice").waitFor({ state: "visible" });
@@ -1560,7 +1630,7 @@ test("tracking stays in place while Google opens in a popup, then loads only aft
     const errors = [], requests = [];
     page.on("pageerror", (error) => errors.push(error.message));
     page.on("request", (request) => requests.push(new URL(request.url()).pathname));
-    await context.route("https://tile.openstreetmap.org/**", (route) => route.abort());
+    await context.route("https://maps.googleapis.com/**", (route) => route.abort());
     // A real Google popup may sever its opener. The parent must still detect the verified session.
     await context.route("https://auth.ezkart.test/**", (route) => route.fulfill({ headers: { "Cross-Origin-Opener-Policy": "same-origin" }, contentType: "text/html", body: "<h1>Google account chooser fixture</h1>" }));
     const path = "/cart/tracking-sandbox.php?stage=transit";

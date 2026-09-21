@@ -34,10 +34,6 @@
 .tracking-details dt { color: var(--muted); font-size: 11px; }
 .tracking-details dd { margin: 5px 0 0; font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; }
 .courier-link { display: block; text-align: center; text-decoration: none; margin-top: 20px; }
-.origin-dot { background: #182b45; }
-.destination-dot { background: #23845c; }
-.delivery-pin { display: grid; place-items: center; width: 30px; height: 30px; color: #fff; border: 2px solid #fff; border-radius: 50%; box-shadow: 0 1px 5px #0004; font-weight: 600; font-size: 12px; }
-.leaflet-container a { color: #245381; }
 .sandbox-controls { padding: 20px; margin-bottom: 28px; border: 1px solid #e8cfaa; border-radius: 10px; background: #fff9ef; }
 .sandbox-controls strong { font-size: 14px; }
 .sandbox-controls p { margin: 6px 0 0; color: #795b30; font-size: 12px; line-height: 1.8; }
@@ -65,29 +61,51 @@
 .customer-account span { overflow-wrap: anywhere; }
 .customer-account b { font-weight: 500; color: var(--ink); }
 .customer-account button { border: 0; border-left: 1px solid var(--line); padding: 0 0 0 12px; background: none; color: var(--muted); font-size: 11px; }
-/* Customer tracking focuses on the latest package update. */
-.map-card { grid-column: 1 / -1; padding: 24px; overflow: hidden; }
+/* The map is a delivery surface, with the package as the primary landmark. */
+.map-card { grid-column: 1 / -1; padding: 26px; overflow: hidden; }
 .order-card { grid-column: 2; }
 .package-map-heading { display: flex; justify-content: space-between; gap: 16px; align-items: center; }
-.package-map-heading h2 { font-size: 17px; letter-spacing: -.3px; margin-top: 5px; }
-.map-eyebrow { color: #c64b38; font-size: 9px; font-weight: 600; letter-spacing: 1.5px; }
-.package-update { margin: 18px 0 6px; font-size: 14px; line-height: 1.7; font-weight: 500; overflow-wrap: anywhere; }
-.package-location-time { color: var(--muted); font-size: 11px; line-height: 1.8; margin: 0 0 18px; }
-.package-map-frame { position: relative; border: 1px solid #e9e8e4; border-radius: 12px; overflow: hidden; }
-#delivery-map { height: 430px; margin: 0; border-radius: 0; background: #edf0f3; z-index: 0; font-family: inherit; }
-#delivery-map .leaflet-control-attribution { font-size: 9px; background: #ffffffda; }
-.map-location-badge { position: absolute; top: 13px; left: 13px; z-index: 1; background: #fffffff0; border: 1px solid #e4e5e6; border-radius: 20px; padding: 7px 11px; font-size: 10px; color: #596170; box-shadow: 0 2px 8px #18202e08; pointer-events: none; }
-.map-recenter { display: grid; place-items: center; width: 34px; height: 34px; border: 1px solid var(--line); border-radius: 8px; background: white; color: #6e7683; font-size: 22px; }
-.package-marker { display: grid; place-items: center; border: 6px solid #ed583226; border-radius: 50%; }
-.package-marker > span { display: grid; place-items: center; width: 38px; height: 38px; border: 3px solid white; border-radius: 50%; background: #ed5038; color: white; box-shadow: 0 3px 12px #a3393340; }
+.package-map-heading h2 { font-size: 21px; letter-spacing: -.5px; margin-top: 5px; }
+.map-eyebrow { color: #6b7788; font-size: 9px; font-weight: 600; letter-spacing: 1.4px; }
+.package-update { margin: 20px 0 5px; font-size: 14px; line-height: 1.7; font-weight: 500; overflow-wrap: anywhere; }
+.package-location-time { color: var(--muted); font-size: 11px; line-height: 1.8; margin: 0 0 20px; overflow-wrap: anywhere; }
+.package-map-frame { position: relative; border: 1px solid #e2e8ee; border-radius: 14px; overflow: hidden; isolation: isolate; }
+#delivery-map { height: 460px; margin: 0; background: #f1f4f6; font-family: inherit; }
+.map-location-badge { display: inline-flex; align-items: center; gap: 7px; flex-shrink: 0; background: #f1f5f9; border-radius: 20px; padding: 8px 12px; font-size: 10px; color: #445872; }
+.map-location-badge::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #587895; }
+.map-loading { position: absolute; inset: 0; display: grid; place-items: center; background: #f1f4f6; color: var(--muted); font-size: 12px; }
+.map-tools { position: absolute; right: 14px; bottom: 42px; display: grid; gap: 12px; }
+.map-tools button { display: grid; place-items: center; width: 44px; height: 44px; border: 0; background: #fff; color: #182b45; font: inherit; font-size: 24px; cursor: pointer; }
+.map-tools > button, .map-zoom { border: 1px solid #d8e0e7; border-radius: 10px; box-shadow: 0 3px 12px #182b4514; overflow: hidden; }
+.map-zoom button + button { border-top: 1px solid #e8edf2; }
+.map-tools button:hover { background: #f2f6fa; }
+.map-tools button:focus-visible { outline: 3px solid #32557b; outline-offset: -3px; }
+.shipment-pin { position: relative; display: grid; place-items: center; font-family: inherit; }
+.shipment-pin-symbol { display: grid; place-items: center; background: #fff; box-shadow: 0 4px 18px #182b4530; }
+.shipment-pin-truck .shipment-pin-symbol { width: 62px; height: 52px; border: 2px solid white; border-radius: 17px; box-shadow: 0 0 0 7px #ee563d1f, 0 5px 18px #182b4526; }
+.shipment-pin-home .shipment-pin-symbol { width: 36px; height: 36px; border: 3px solid #fff; border-radius: 50%; background: #182b45; color: #fff; }
+.shipment-pin-pickup .shipment-pin-symbol { width: 14px; height: 14px; border: 4px solid #fff; border-radius: 50%; background: #64758a; }
+.shipment-pin-label { position: absolute; top: calc(100% + 9px); left: 50%; transform: translateX(-50%); padding: 6px 10px; border-radius: 7px; background: #fff; box-shadow: 0 2px 8px #182b451c; color: #182b45; white-space: nowrap; font-size: 11px; font-weight: 600; }
+.shipment-pin-truck .shipment-pin-label { color: #b93621; }
+.map-route-summary { display: flex; align-items: flex-start; gap: 10px; margin-top: 17px; color: var(--muted); }
+.map-route-summary p { margin: 0; font-size: 11px; line-height: 1.7; }
+.route-line-key { width: 22px; height: 4px; margin-top: 7px; flex-shrink: 0; border-radius: 2px; background: #b3c0cf; }
+.route-drawn .route-line-key { background: #ee563d; }
 .location-empty { padding: 16px; background: #f8f9fb; border-radius: 8px; color: var(--muted); line-height: 1.8; font-size: 12px; }
-.package-map-actions { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px; margin-top: 16px; }
-.package-map-actions > button, .package-map-actions > a:not(.courier-link) { border: 0; padding: 0; background: none; color: var(--muted); font-size: 11px; text-decoration: underline; text-underline-offset: 3px; }
-.package-map-actions .courier-link { margin: 0; padding: 9px 12px; color: #cb4431; background: #fff2ec; border-radius: 7px; text-decoration: none; font-size: 11px; font-weight: 600; }
+.package-map-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 20px; margin-top: 20px; }
+.package-map-actions > button { border: 1px solid #d9e1eb; border-radius: 8px; padding: 9px 13px; background: #fff; color: #182b45; font-size: 11px; font-weight: 500; }
+.package-map-actions > button:hover { background: #f4f7fb; }
+.package-map-actions > a:not(.courier-link) { color: #5e6d80; font-size: 11px; text-decoration: none; }
+.package-map-actions > a:hover { text-decoration: underline; }
+.package-map-actions .courier-link { margin: 0 0 0 auto; padding: 9px 12px; color: #182b45; background: #edf2f8; border-radius: 8px; text-decoration: none; font-size: 11px; font-weight: 600; }
 @media (max-width: 780px) {
   .map-card, .order-card { grid-column: 1; grid-row: auto; }
   .map-card { padding: 20px; }
-  #delivery-map { height: 360px; }
+  #delivery-map { height: 400px; }
+  .package-map-heading { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .package-map-heading h2 { font-size: 20px; }
+  .map-location-badge { font-size: 10px; padding: 6px 10px; }
+  .package-map-actions .courier-link { margin-left: 0; }
   .tracking-steps { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; margin: 26px 0 20px; }
   .tracking-steps li { display: block; min-height: 0; padding: 0; }
   .tracking-steps li:not(:last-child)::after { width: auto; height: 2px; top: 12px; bottom: auto; left: 33px; right: 0; }
@@ -95,8 +113,3 @@
   .tracking-steps b { font-size: 10px; line-height: 1.5; }
   .tracking-steps small { display: none; }
 }
-
-#delivery-map .leaflet-control-zoom { border: 1px solid #cbd3df; box-shadow: 0 2px 9px #18202e1a; border-radius: 8px; overflow: hidden; }
-#delivery-map .leaflet-control-zoom a { width: 40px; height: 40px; line-height: 40px; color: #182b45; background: white; font-size: 24px; }
-#delivery-map .leaflet-control-zoom a:hover { background: #edf3fa; }
-#delivery-map .leaflet-control-zoom a:focus-visible { outline: 3px solid #32557b; outline-offset: -3px; }

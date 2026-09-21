@@ -57,80 +57,18 @@
       shipment_update: ["Waiting for a courier update", "Your shipment has been booked. Its latest delivery status will appear here when available."],
     })[t.stage] || ["Order update", "We’ll show the latest confirmed update here."];
   }
-  let map, markers, mapKey = "", locations, latestLocation, overview = false;
-  const validPoint = (point) => point && Number.isFinite(point.latitude) && Number.isFinite(point.longitude) && Math.abs(point.latitude) <= 90 && Math.abs(point.longitude) <= 180;
-  const point = (coordinate) => [coordinate.latitude, coordinate.longitude];
-  function positionMap(resetView = true) {
-    if (!map) return;
-    markers.clearLayers();
-    if (!overview && latestLocation) {
-      const icon = L.divIcon({ className: "package-marker", html: '<span><svg viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5Z M3 8v9l9 5 9-5V8 M12 13v9 M7.5 5.5l9 5"/></svg></span>', iconSize: [48, 48], iconAnchor: [24, 24] });
-      const tooltip = document.createElement("span");
-      tooltip.textContent = latestLocation.label;
-      L.marker(point(latestLocation), { icon, title: latestLocation.label, alt: "Package’s last reported location" }).addTo(markers).bindTooltip(tooltip, { direction: "top", offset: [0, -26] });
-      if (resetView) map.setView(point(latestLocation), 15, { animate: false });
-    } else if (locations) {
-      const bounds = [];
-      for (const [key, label, letter] of [["origin", "Pickup", "P"], ["destination", "Delivery", "D"]]) {
-        bounds.push(point(locations[key]));
-        L.marker(point(locations[key]), { title: label, alt: label, icon: L.divIcon({ className: "", html: `<span class="delivery-pin ${key}-dot">${letter}</span>`, iconSize: [30, 30], iconAnchor: [15, 15] }) }).addTo(markers).bindTooltip(label);
-      }
-      if (resetView) map.fitBounds(bounds, { padding: [48, 48], maxZoom: 14, animate: false });
-    }
-  }
-  function drawMap() {
-    if (byId("package-map-frame").hidden) return;
-    if (!window.L) { byId("map-notice").hidden = false; return; }
-    try {
-      if (!map) {
-        map = L.map("delivery-map", { scrollWheelZoom: true, touchZoom: true, zoomControl: false });
-        L.control.zoom({ position: "bottomright" }).addTo(map);
-        markers = L.layerGroup().addTo(map);
-        L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-          maxZoom: 19, referrerPolicy: "strict-origin-when-cross-origin",
-          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>',
-        }).on("tileerror", () => { byId("map-notice").hidden = false; }).addTo(map);
-        positionMap();
-      }
-      map.invalidateSize();
-    } catch (_) { byId("map-notice").hidden = false; }
-  }
-  const mapObserver = new IntersectionObserver((entries) => { if (entries.some((entry) => entry.isIntersecting)) drawMap(); });
-  mapObserver.observe(byId("package-map-frame"));
-  function updateMapView(resetView = true) {
-    byId("package-map-frame").hidden = !(latestLocation || (overview && locations));
-    byId("map-recenter").hidden = byId("package-map-frame").hidden;
-    byId("map-route-toggle").hidden = !locations;
-    setText("map-route-toggle", overview ? (latestLocation ? "Back to package location" : "Hide route overview") : "View pickup & delivery");
-    setText("map-location-badge", overview ? "Pickup & delivery overview" : latestLocation?.source === "confirmed_stop" ? "Confirmed by the courier" : "Last reported location");
-    byId("package-location-empty").hidden = !!latestLocation || overview;
-    if (map) { map.invalidateSize(); positionMap(resetView); }
-    const rect = byId("package-map-frame").getBoundingClientRect();
-    if (rect.bottom > 0 && rect.top < innerHeight) drawMap();
-  }
-  byId("map-recenter").addEventListener("click", () => { if (latestLocation) overview = false; updateMapView(); });
-  byId("map-route-toggle").addEventListener("click", () => { overview = !overview; updateMapView(); });
+  const deliveryMap = window.ezkartDeliveryMap;
   function renderMap(t) {
     byId("delivery-map-section").hidden = ["awaiting_payment", "not_required", "processing", "pickup_issue"].includes(t.stage);
     const latest = (t.history || []).at(-1);
     setText("package-update", latest?.note || labels[t.shipment_status] || "Waiting for the courier’s first update.");
-    const location = validPoint(t.latest_location) ? t.latest_location : null;
+    const location = deliveryMap.validPoint(t.latest_location) ? t.latest_location : null;
     const googleLink = byId("google-maps-link");
     googleLink.hidden = !location;
     if (location) googleLink.href = "https://www.google.com/maps/search/?" + new URLSearchParams({ api: "1", query: location.latitude + "," + location.longitude });
     else googleLink.removeAttribute("href");
     setText("package-location-time", location ? location.label + " · " + date(location.updated_at) : latest ? date(latest.updated_at) : "Updates appear as the courier shares them.");
-    const route = validPoint(t.locations?.origin) && validPoint(t.locations?.destination) ? t.locations : null;
-    const key = JSON.stringify([location, route]);
-    if (key === mapKey) return;
-    mapKey = key;
-    const firstLocation = !latestLocation && !!location;
-    latestLocation = location;
-    locations = route;
-    if (!route) overview = false;
-    byId("map-notice").hidden = true;
-    // Keep the customer's zoom and pan when a background update changes the scan.
-    updateMapView(firstLocation);
+    deliveryMap.update(t);
   }
   let historyKey = "";
   function renderHistory(t) {
