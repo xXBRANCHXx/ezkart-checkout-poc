@@ -2,6 +2,7 @@
 declare(strict_types=1);
 require_once dirname(__DIR__) . '/api/customer-auth.php';
 require_once dirname(__DIR__) . '/api/database.php';
+require_once dirname(__DIR__) . '/api/address-location.php';
 
 try {
     $method = (string) ($_SERVER['REQUEST_METHOD'] ?? '');
@@ -16,6 +17,15 @@ try {
     if ($method === 'POST' && (!ez_request_origin_allowed() || !hash_equals($csrf, (string) ($_SERVER['HTTP_X_EZKART_CSRF'] ?? '')))) ez_api_json(['ok' => false], 403);
     $body = $method === 'POST' ? file_get_contents('php://input', false, null, 0, 6001) : '';
     if (!is_string($body) || strlen($body) > 6000) ez_api_json(['ok' => false, 'error' => 'Address request is too large.'], 413);
+    if ($method === 'POST') {
+        $payload = json_decode($body, true);
+        if (($payload['action'] ?? '') === 'save' && is_array($payload['address'] ?? null)) {
+            // Keep pasted GPS coordinates in their own field, including older saved addresses.
+            ez_address_location((string) ($payload['address']['address'] ?? ''));
+            $payload['address'] = ez_address_with_location($payload['address']);
+            $body = json_encode($payload, JSON_THROW_ON_ERROR);
+        }
+    }
     $customerSessionId = session_id();
     $customerVersion = $_SESSION['customer_auth']['version'];
     $token = (string) ($_SESSION['customer_auth']['access_token'] ?? '');
@@ -44,6 +54,7 @@ try {
     $data = is_string($raw) ? json_decode($raw, true) : null;
     if (!is_array($data)) throw new RuntimeException('Saved addresses unavailable.');
     if ($status < 200 || $status >= 300 || empty($data['ok'])) ez_api_json(['ok' => false, 'error' => is_string($data['error'] ?? null) ? $data['error'] : 'Saved addresses are unavailable.', 'csrf' => $csrf], in_array($status, [401, 403, 404, 409, 422], true) ? $status : 503);
+    $data['book']['addresses'] = array_map('ez_address_with_location', $data['book']['addresses']);
     // Register saved map positions as temporary, customer-owned sandbox previews.
     session_id($customerSessionId); $_SESSION = []; ez_customer_session();
     if (($_SESSION['customer_auth']['version'] ?? '') !== $customerVersion || ($_SESSION['customer_auth']['user']['id'] ?? '') !== $customer['id']) ez_api_json(['ok' => false, 'error' => 'Your sign-in changed. Reload this page.', 'csrf' => $csrf], 401);
@@ -60,6 +71,8 @@ try {
     }
     session_write_close();
     ez_api_json(['ok' => true, 'authenticated' => true, 'email' => $customer['email'], 'csrf' => $csrf, 'book' => $data['book']]);
+} catch (InvalidArgumentException $error) {
+    ez_api_json(['ok' => false, 'error' => $error->getMessage()], 422);
 } catch (Throwable) {
     ez_api_json(['ok' => false, 'error' => 'Saved addresses are temporarily unavailable. You can still enter an address.'], 503);
 }

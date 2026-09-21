@@ -1,7 +1,42 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__ . '/address-location.php';
 
 function ez_tracking_address_search(string $query): array
+{
+    $parsed = ez_address_location($query);
+    $code = $parsed['plus_code'];
+    if ($parsed['coordinate'] !== null) return [ez_tracking_resolved_address($parsed, $parsed['coordinate'], $parsed['source'] === 'plus_code' ? 'Plus Code location' : 'Coordinates from address')];
+    if ($code === null) return ez_tracking_photon_search($query);
+    // Photon searches the locality; the Plus Code determines the delivery pin.
+    $locality = trim(str_ireplace($code, '', $parsed['address']), " ,");
+    $locality = preg_replace('/\b(?:Kec(?:amatan)?\.?|Kab(?:upaten)?\.?|Kota|Daerah Istimewa|Provinsi|Indonesia)\b\.?/iu', ' ', $locality);
+    $locality = preg_replace('/\b\d{5}\b/u', '', $locality);
+    $locality = trim(preg_replace('/[\s,]+/u', ' ', $locality));
+    if (mb_strlen($locality) < 3) throw new InvalidArgumentException('Include the village or city after this short Plus Code, or paste its latitude and longitude.');
+    $results = [];
+    foreach (ez_tracking_photon_search($locality) as $reference) {
+        $coordinate = ez_plus_code_recover($code, $reference['coordinate']);
+        $key = sprintf('%.7F,%.7F', $coordinate['latitude'], $coordinate['longitude']);
+        $results[$key] = ez_tracking_resolved_address($parsed, $coordinate, 'Plus Code location');
+        $results[$key]['reference'] = $reference['name'] . ', ' . $reference['address'];
+    }
+    if (!$results) throw new InvalidArgumentException('We could not locate the locality for this Plus Code. Include the village and city, or paste its latitude and longitude.');
+    if (count($results) > 1) foreach ($results as &$result) $result['address'] .= ' · Near ' . $result['reference'];
+    return array_values($results);
+}
+
+function ez_tracking_resolved_address(array $parsed, array $coordinate, string $kind): array
+{
+    $address = $parsed['address'];
+    $label = $address !== '' ? $address : sprintf('%.6F, %.6F', $coordinate['latitude'], $coordinate['longitude']);
+    preg_match('/\b\d{5}\b/u', $address, $postcode);
+    $location = '';
+    if (preg_match('/\b(?:Kabupaten|Kota)\s+([^,\d]+)/iu', $address, $city)) $location = trim($city[1]);
+    return ['name' => $parsed['plus_code'] ?? 'Delivery location', 'address' => $label, 'address_line' => $label, 'location' => $location, 'postalCode' => $postcode[0] ?? '', 'kind' => $kind, 'coordinate' => $coordinate, 'resolved' => true];
+}
+
+function ez_tracking_photon_search(string $query): array
 {
     $directory = dirname(ez_order_directory('sandbox')) . '/tracking-addresses';
     if (!is_dir($directory) && !@mkdir($directory, 0700, true) && !is_dir($directory)) throw new RuntimeException('Address cache unavailable.');

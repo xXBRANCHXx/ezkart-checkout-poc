@@ -1493,6 +1493,99 @@ test("checkout Google popup keeps typed delivery details and loads saved address
   assert.match(page.url(), /cart\/\?shop=test-shop&cart=granola:1/);
 });
 
+test("Plus Code decoding and locality recovery match Google's published reference cases", async t => {
+  const app = await setup(); t.after(() => app.close());
+  const result = app.cli(`
+    require ${JSON.stringify(join(root, 'cart/api/plus-code.php'))};
+    $count = 0;
+    foreach (file(${JSON.stringify(join(root, 'tools/checkout-test/fixtures/plus-codes/decoding.csv'))}) as $line) {
+      if (str_starts_with(trim($line), '#') || trim($line) === '') continue;
+      $p = explode(',', trim($line)); $actual = ez_plus_code_center($p[0]);
+      if (abs($actual['latitude'] - ((float)$p[2] + (float)$p[4]) / 2) > 1e-9 || abs($actual['longitude'] - ((float)$p[3] + (float)$p[5]) / 2) > 1e-9) throw new RuntimeException('Decode mismatch: ' . $p[0]);
+      $count++;
+    }
+    foreach (file(${JSON.stringify(join(root, 'tools/checkout-test/fixtures/plus-codes/short-code.csv'))}) as $line) {
+      if (str_starts_with(trim($line), '#') || trim($line) === '') continue;
+      $p = explode(',', trim($line)); if ($p[4] === 'S') continue;
+      $expected = ez_plus_code_center($p[0]); $actual = ez_plus_code_recover($p[3], ['latitude'=>(float)$p[1], 'longitude'=>(float)$p[2]]);
+      if (abs($actual['latitude'] - $expected['latitude']) > 1e-9 || abs($actual['longitude'] - $expected['longitude']) > 1e-9) throw new RuntimeException('Recovery mismatch: ' . $p[0]);
+      $count++;
+    }
+    echo $count;
+  `);
+  assert.ok(Number(result) > 430, result);
+});
+
+test("pasted coordinates and Indonesian Plus Code addresses resolve to pins and session-bound routes", async t => {
+  const app = await setup(); t.after(() => app.close());
+  const cookie = app.customerCookie(); const auth = { Cookie: `${cookie.name}=${cookie.value}` };
+  const html = await (await fetch(app.base + '/cart/tracking-sandbox.php?stage=transit', { headers: auth })).text();
+  const headers = { ...auth, 'X-Ezkart-CSRF': html.match(/id="sandbox-address-form" data-csrf="([a-f0-9]+)"/)[1] };
+  const address = '6967+894, Jalan Pasar Kembang, Sosromenduran, Kota Yogyakarta, Daerah Istimewa Yogyakarta 55271, Indonesia';
+  const explicit = address + ' (lat: -7.7892387, lng: 110.3634648)';
+  const search = address => app.request('/cart/api/tracking-address.php', { address }, headers);
+  for (const query of [explicit, '-7.7892387, 110.3634648', 'longitude: 110.3634648, latitude: -7.7892387']) {
+    const r = await search(query); assert.equal(r.status, 200);
+    assert.deepEqual(r.data.results[0].coordinate, { latitude: -7.7892387, longitude: 110.3634648 });
+    assert.equal(r.data.results[0].resolved, true);
+    assert.doesNotMatch(r.data.results[0].address_line, /lat:|lng:/);
+  }
+  const full = await search('6P4G6967+894');
+  assert.ok(Math.abs(full.data.results[0].coordinate.latitude + 7.7892375) < 1e-9);
+  assert.ok(Math.abs(full.data.results[0].coordinate.longitude - 110.363453125) < 1e-9);
+  for (const query of ['lat: 91, lng: 110', 'lat: -7, lng: 181', 'lat: NaN, lng: 110', 'lat: -7', '6967+894', '696+894, Yogyakarta']) assert.equal((await search(query)).status, 422, query);
+  assert.equal((await app.calls()).length, 0, 'Explicit pins and invalid inputs do not call a geocoder.');
+  await writeFile(join(app.directory, 'address-response.json'), JSON.stringify({ features: [{ geometry: { type: 'Point', coordinates: [110.364, -7.79] }, properties: { name: 'Locality reference', district: 'Sosromenduran', city: 'Yogyakarta', countrycode: 'ID', type: 'house' } }] }));
+  const short = await search(address);
+  assert.equal(short.status, 200); assert.equal(short.data.results.length, 1);
+  assert.ok(Math.abs(short.data.results[0].coordinate.latitude + 7.7892375) < 1e-9);
+  assert.ok(Math.abs(short.data.results[0].coordinate.longitude - 110.363453125) < 1e-9);
+  assert.equal(short.data.results[0].postalCode, '55271');
+  const call = (await app.calls())[0];
+  assert.equal(new URL(call.url).searchParams.get('q'), 'Jalan Pasar Kembang Sosromenduran Yogyakarta Yogyakarta');
+  assert.equal((await search(address)).status, 200);
+  assert.equal((await app.calls()).length, 1, 'Locality lookups retain the shared cache and rate limit.');
+  const route = await app.request('/cart/api/tracking-route.php?sandbox=1&stage=transit&place=' + short.data.results[0].id, undefined, auth);
+  assert.equal(route.status, 200); assert.deepEqual(route.data.route.to, short.data.results[0].coordinate);
+});
+
+test("saved Google-formatted addresses and Plus Code searches place the delivery pin on desktop and mobile", async t => {
+  const app = await setup({ EZKART_CLOUDFLARE_API_URL: 'https://ezkart-api-test.fixture.workers.dev' }); t.after(() => app.close());
+  const { chromium } = await import('../builder-mcp/node_modules/playwright/index.mjs');
+  const browser = await chromium.launch({ headless: true }); t.after(() => browser.close());
+  const raw = '6967+894, Jalan Pasar Kembang, Sosromenduran, Kota Yogyakarta, Daerah Istimewa Yogyakarta 55271, Indonesia (lat: -7.7892387, lng: 110.3634648)';
+  await writeFile(join(app.directory, 'address-response.json'), JSON.stringify({ features: [{ geometry: { type: 'Point', coordinates: [110.364, -7.79] }, properties: { name: 'Locality reference', district: 'Sosromenduran', city: 'Yogyakarta', countrycode: 'ID', type: 'house' } }] }));
+  for (const width of [1280, 390]) {
+    const home = { id: 'existing-home', label: 'Home', address: raw, location: 'YOGYAKARTA', postalCode: '55271', coordinate: null };
+    await writeFile(join(app.directory, 'address-book.json'), JSON.stringify({ addresses: [home], default_id: home.id, revision: 1, limit: 3 }));
+    const page = await browser.newPage({ viewport: { width, height: 950 } }); await prepareMap(page);
+    const errors = []; page.on('pageerror', e => errors.push(e.message));
+    await page.context().addCookies([app.customerCookie()]);
+    await page.goto(app.base + '/cart/tracking-sandbox.php?stage=delivery');
+    await page.waitForFunction(() => window.ezkartTrackingSandbox?.place()?.id === 'saved-existing-home');
+    assert.doesNotMatch(await page.locator('.address-book-summary').textContent(), /lat:|lng:/);
+    await page.getByRole('button', { name: 'Use address', exact: true }).click();
+    await page.waitForFunction(() => Math.abs(window.deliveryMapUnderTest?.getCenter().lat + 7.7892387) < 1e-9);
+    assert.equal(await page.locator('.shipment-pin-destination').isVisible(), true);
+    await page.getByRole('button', { name: 'Edit', exact: true }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Save address', exact: true }).click();
+    await page.getByRole('dialog').waitFor({ state: 'hidden' });
+    const stored = JSON.parse(await readFile(join(app.directory, 'address-book.json'), 'utf8'));
+    assert.deepEqual(stored.addresses[0].coordinate, { latitude: -7.7892387, longitude: 110.3634648 });
+    assert.doesNotMatch(stored.addresses[0].address, /lat:|lng:/);
+    await page.getByLabel('Try a delivery address').fill(raw.split(' (lat:')[0]);
+    await page.getByRole('button', { name: 'Find address', exact: true }).click();
+    await page.waitForFunction(() => document.getElementById('sandbox-address-status').textContent.startsWith('Plus Code location'));
+    assert.ok(Math.abs(await page.evaluate(() => window.deliveryMapUnderTest.getCenter().lat) + 7.7892375) < 1e-9);
+    assert.equal(await page.evaluate(() => window.ezkartTrackingSandbox.read().tracking.latest_location.latitude), -6.2441792);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+    await page.goto(app.base + '/cart/?shop=test-shop&cart=granola:1');
+    await page.waitForFunction(() => document.querySelector('#customer-form [name="address"]').value.startsWith('6967+894'));
+    assert.doesNotMatch(await page.locator('#customer-form [name="address"]').inputValue(), /lat:|lng:/);
+    assert.deepEqual(errors, []); await page.close();
+  }
+});
+
 test("sandbox address search authenticates, validates, caches, and binds route previews to its session", async (t) => {
   const app = await setup(); t.after(() => app.close());
   const cookie = app.customerCookie();
@@ -1504,7 +1597,7 @@ test("sandbox address search authenticates, validates, caches, and binds route p
   assert.equal((await app.request(endpoint, { address: "Jakarta" })).status, 401);
   assert.equal((await app.request(endpoint, { address: "Jakarta" }, auth)).status, 403);
   assert.equal((await app.request(endpoint, { address: "Jakarta" }, { ...headers, Origin: "https://another.example" })).status, 403);
-  for (const address of ["", "ab", "x".repeat(241), ["Jakarta"]]) assert.equal((await app.request(endpoint, { address }, headers)).status, 422);
+  for (const address of ["", "ab", "x".repeat(501), ["Jakarta"]]) assert.equal((await app.request(endpoint, { address }, headers)).status, 422);
   assert.deepEqual(await app.calls(), []);
   const oldCacheDirectory = app.cli("$d = dirname(ez_order_directory('sandbox')) . '/tracking-addresses'; mkdir($d, 0700, true); echo $d;");
   await writeFile(join(oldCacheDirectory, createHash('sha256').update('jalan teluk betung 12, jakarta').digest('hex') + '.json'), JSON.stringify({ until: Math.floor(Date.now()/1000) + 86400, results: [] }));

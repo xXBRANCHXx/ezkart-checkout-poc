@@ -33,7 +33,7 @@ header('X-Content-Type-Options: nosniff');
   <link rel="stylesheet" href="vendor/maplibre/maplibre-gl.css?v=5.24.0">
   <link rel="stylesheet" href="tracking.css?v=7">
   <script src="tracking-map.js?v=3" defer></script>
-  <?php if ($isTrackingSandbox): ?><link rel="stylesheet" href="customer-addresses.css?v=1"><script src="customer-addresses.js?v=1" defer></script><script src="tracking-sandbox.js?v=3" defer></script><?php endif; ?>
+  <?php if ($isTrackingSandbox): ?><link rel="stylesheet" href="customer-addresses.css?v=1"><script src="customer-addresses.js?v=1" defer></script><script src="tracking-sandbox.js?v=4" defer></script><?php endif; ?>
   <script src="tracking.js?v=6" defer></script>
   <title>Track your order · Ezkart</title>
 </head>
@@ -86,7 +86,7 @@ header('X-Content-Type-Options: nosniff');
           <section class="sandbox-address" aria-label="Test a delivery address">
             <form id="sandbox-address-form" data-csrf="<?= htmlspecialchars($customerCsrf, ENT_QUOTES, 'UTF-8') ?>">
               <label for="sandbox-address-input">Try a delivery address</label>
-              <div class="address-search-row"><input id="sandbox-address-input" type="search" placeholder="Street address or place in Indonesia" minlength="3" maxlength="240" autocomplete="off" required><button type="submit">Find address</button></div>
+              <div class="address-search-row"><input id="sandbox-address-input" type="search" placeholder="Address, Plus Code, or latitude, longitude" minlength="3" maxlength="500" autocomplete="off" required><button type="submit">Find address</button></div>
             </form>
             <p id="sandbox-address-status" role="status">Search, then choose a match to see its delivery pin.</p>
             <ul id="sandbox-address-results" class="address-results" aria-label="Address matches" hidden></ul>

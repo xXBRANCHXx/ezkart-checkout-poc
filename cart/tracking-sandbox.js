@@ -69,7 +69,7 @@
     chosen.hidden = false;
     document.getElementById("sandbox-address-name").textContent = place.name;
     document.getElementById("sandbox-address-detail").textContent = place.address;
-    status.textContent = place.kind + " · Check the pin; address matches can be approximate.";
+    status.textContent = place.resolved ? place.kind + " · Delivery pin placed on the map." : place.kind + " · Check the pin; address matches can be approximate.";
     window.ezkartDeliveryMap.focusDestination();
   }
   form.addEventListener("submit", async (event) => {
@@ -88,6 +88,7 @@
       if (sequence !== searchSequence) return;
       if (!response.ok || !data.ok || !Array.isArray(data.results)) throw new Error(response.status === 401 ? "Please reload and sign in to search for an address." : data.error || "Address search is temporarily unavailable. Please try again.");
       const places = data.results.filter(place => window.ezkartDeliveryMap.validPoint(place.coordinate));
+      if (places.length === 1 && places[0].resolved) { choose(places[0]); return; }
       status.textContent = places.length ? "Choose the address you want to test." : "No match found. Try the street and city, or a nearby landmark.";
       for (const place of places) {
         const row = document.createElement("li"), button = document.createElement("button"), name = document.createElement("strong"), detail = document.createElement("span"), kind = document.createElement("small");
@@ -126,7 +127,11 @@
           status.textContent = "Using your default delivery address.";
         } else choose(place);
       } else if (!automatic) {
-        input.value = `${address.address}, ${address.location} ${address.postalCode}`.slice(0, 240);
+        const parts = [];
+        for (const part of [address.address, address.location, address.postalCode]) {
+          if (part && !parts.some(value => value.toLowerCase().includes(part.toLowerCase()))) parts.push(part);
+        }
+        input.value = parts.join(', ');
         form.requestSubmit();
       }
     },
