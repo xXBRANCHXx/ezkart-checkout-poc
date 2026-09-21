@@ -1249,3 +1249,62 @@ test("a courier webhook arriving during tracking refresh wins over the stale pro
   assert.equal(data.tracking.stage, "delivered");
   assert.equal(data.tracking.waybill_id, "LATEST-WAYBILL");
 });
+
+test("interactive tracking walkthrough uses the customer renderer without orders or provider calls and is sandbox-only", async (t) => {
+  const { chromium } = await import("../builder-mcp/node_modules/playwright/index.mjs");
+  const app = await setup(); t.after(() => app.close());
+  const browser = await chromium.launch({ headless: true }); t.after(() => browser.close());
+  for (const width of [1280, 390]) {
+    const page = await browser.newPage({ viewport: { width, height: 960 } });
+    const errors = [], apiCalls = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    page.on("request", (request) => { if (/\/api\//.test(request.url())) apiCalls.push(request.url()); });
+    await page.route("https://tile.openstreetmap.org/**", (route) => route.fulfill({ contentType: "image/png", body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=", "base64") }));
+    await page.clock.install();
+    await page.goto(app.base + "/cart/tracking-sandbox.php");
+    await page.getByRole("heading", { name: "The seller is preparing your order", exact: true }).waitFor();
+    assert.match(await page.locator(".sandbox-controls").textContent(), /Simulated order data/);
+    assert.equal(await page.locator("#delivery-map-section").isVisible(), false);
+    await page.locator("#sandbox-next").click();
+    await page.getByRole("heading", { name: "Your order is awaiting pickup", exact: true }).waitFor();
+    await page.locator("#delivery-map").scrollIntoViewIfNeeded();
+    await page.locator(".delivery-pin").first().waitFor();
+    assert.equal(await page.locator(".delivery-pin").count(), 2);
+    assert.equal(await page.locator("#courier-tracking-link").isVisible(), false, "No fabricated live courier tracking URL.");
+    await page.locator("#sandbox-stage").selectOption("unavailable");
+    await page.locator("#tracking-notice").waitFor({ state: "visible" });
+    assert.equal(await page.locator("#return-title").textContent(), "Your order is on the way");
+    await page.locator("#sandbox-stage").selectOption("no-map");
+    assert.equal(await page.locator("#delivery-map-section").isVisible(), false);
+    await page.locator("#sandbox-stage").selectOption("returned");
+    await page.getByRole("heading", { name: "Your order was returned to the seller", exact: true }).waitFor();
+    await page.reload();
+    await page.getByRole("heading", { name: "Your order was returned to the seller", exact: true }).waitFor();
+    await page.locator("#sandbox-play").click();
+    assert.equal(await page.locator("#sandbox-stage").inputValue(), "pending");
+    for (const stage of ["paid", "processing", "pickup", "picked", "transit", "delivery", "delivered"]) {
+      await page.clock.runFor(5001);
+      assert.equal(await page.locator("#sandbox-stage").inputValue(), stage);
+    }
+    assert.equal(await page.locator("#sandbox-play").textContent(), "Run walkthrough");
+    assert.equal(await page.locator("#sandbox-next").isDisabled(), true);
+    await page.locator("#sandbox-reset").click();
+    assert.equal(await page.locator("#sandbox-stage").inputValue(), "pending");
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
+    assert.deepEqual(apiCalls, []);
+    assert.deepEqual(errors, []);
+    await page.close();
+  }
+  assert.deepEqual(await app.calls(), []);
+  assert.equal(app.cli("echo count(glob(ez_order_directory() . '/*.json') ?: []);"), "0");
+  const normal = await fetch(app.base + "/cart/return.php?order=EZK-S-000000000000000000000001&stage=delivered&preview=sandbox");
+  assert.equal((await normal.text()).includes('id="tracking-sandbox-data"'), false);
+  for (const overrides of [
+    { EZKART_DEPLOYMENT_ENVIRONMENT: "production", EZKART_COMMERCE_ENVIRONMENT: "production" },
+    { EZKART_DEPLOYMENT_ENVIRONMENT: "test", EZKART_COMMERCE_ENVIRONMENT: "production" },
+  ]) {
+    const blocked = await setup(overrides);
+    try { assert.equal((await fetch(blocked.base + "/cart/tracking-sandbox.php")).status, 404); }
+    finally { await blocked.close(); }
+  }
+});

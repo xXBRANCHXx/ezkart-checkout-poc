@@ -46,6 +46,13 @@
 .destination-dot { background: #23845c; }
 .delivery-pin { display: grid; place-items: center; width: 30px; height: 30px; color: #fff; border: 2px solid #fff; border-radius: 50%; box-shadow: 0 1px 5px #0004; font-weight: 600; font-size: 12px; }
 .leaflet-container a { color: #245381; }
+.sandbox-controls { padding: 20px; margin-bottom: 28px; border: 1px solid #e8cfaa; border-radius: 10px; background: #fff9ef; }
+.sandbox-controls strong { font-size: 14px; }
+.sandbox-controls p { margin: 6px 0 0; color: #795b30; font-size: 12px; line-height: 1.8; }
+.sandbox-actions { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 10px; margin: 16px 0 12px; }
+.sandbox-actions label { display: grid; gap: 6px; font-size: 11px; color: var(--muted); }
+.sandbox-actions select { max-width: 100%; min-height: 36px; border: 1px solid #d5dce5; border-radius: 6px; padding: 8px 10px; font: inherit; font-size: 12px; background: #fff; color: var(--ink); }
+.sandbox-actions button:disabled { cursor: default; }
 @media (max-width: 780px) {
   .return-shell { padding: 0 20px; margin-top: 28px; }
   .tracking-intro h1 { font-size: 28px; }

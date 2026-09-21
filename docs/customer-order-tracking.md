@@ -27,3 +27,9 @@ Leaflet 1.9.4 is vendored under `cart/vendor/leaflet` with its BSD license. The 
 The provider transport uses fixtures and cannot contact payment or shipping providers. Coverage includes the existing checkout/payment/merchant flows plus seller-to-courier progression, provider throttling and outages, wrong-order payloads, invalid links/coordinates, webhook retries/status aliases/returns, and an in-flight automatic payment check joined by a manual click. Browser checks cover 1280px and 390px widths, map markers and conditional visibility, safe timeline text, delivery confirmation, request errors and horizontal overflow. Map tiles are stubbed in automated tests.
 
 These checks do not establish live courier GPS availability or production provider acceptance. Work remains on `agent/ezkart-workbench`; the existing production release hold applies.
+
+## Interactive sandbox walkthrough
+
+Open `/cart/tracking-sandbox.php` on `test.ezkart.id`. It renders the same customer page using sample orders projected through `ez_public_order_tracking`, without creating orders, modifying cart storage, calling payment/shipping providers, or writing payment/shipment state. The page is available only when deployment is `test` and commerce mode is `sandbox`; production returns 404.
+
+Choose a stage, advance one step, or run the eight-stage walkthrough at five-second intervals. It pauses when the tab is hidden and stops at delivery. Additional scenarios cover delays, cancellation, returns, provider unavailability, and absent coordinates. A `stage` query parameter preserves the selected view for sharing. The persistent banner identifies all order/map data as simulated. This is a UI walkthrough, not evidence of a completed DOKU/Biteship sandbox transaction.

@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
-$orderId = trim((string) ($_GET['order'] ?? ''));
+$isTrackingSandbox = isset($trackingSandboxData) && is_array($trackingSandboxData);
+$orderId = $isTrackingSandbox ? 'EZK-S-000000000000000000000001' : trim((string) ($_GET['order'] ?? ''));
 if (preg_match('/^EZK-[A-Z0-9-]{8,70}$/D', $orderId) !== 1) {
     http_response_code(400);
     $orderId = '';
@@ -19,9 +20,10 @@ header('X-Content-Type-Options: nosniff');
   <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="payment.css?v=2">
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css?v=1.9.4">
-  <link rel="stylesheet" href="tracking.css?v=1">
+  <link rel="stylesheet" href="tracking.css?v=2">
   <script src="vendor/leaflet/leaflet.js?v=1.9.4" defer></script>
-  <script src="tracking.js?v=1" defer></script>
+  <?php if ($isTrackingSandbox): ?><script src="tracking-sandbox.js?v=1" defer></script><?php endif; ?>
+  <script src="tracking.js?v=2" defer></script>
   <title>Track your order · Ezkart</title>
 </head>
 <body>
@@ -30,6 +32,19 @@ header('X-Content-Type-Options: nosniff');
     <span class="secure-label">Order updates</span>
   </div></header>
   <main class="return-shell" data-order="<?= htmlspecialchars($orderId, ENT_QUOTES, 'UTF-8') ?>">
+    <?php if ($isTrackingSandbox): ?>
+    <section class="sandbox-controls" aria-label="Sandbox walkthrough controls">
+      <div><strong>Sandbox walkthrough</strong><p>Simulated order data and sample map locations. No payment or courier booking is made.</p></div>
+      <div class="sandbox-actions">
+        <label for="sandbox-stage">View a stage<select id="sandbox-stage"><?php foreach ($trackingSandboxData as $key => $scenario): ?><option value="<?= htmlspecialchars($key, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($scenario['label'], ENT_QUOTES, 'UTF-8') ?></option><?php endforeach; ?></select></label>
+        <button id="sandbox-play" class="copy-button" type="button">Run walkthrough</button>
+        <button id="sandbox-next" class="copy-button" type="button">Next step</button>
+        <button id="sandbox-reset" class="copy-button" type="button">Restart</button>
+      </div>
+      <p id="sandbox-progress" role="status">Choose a stage, or run the order from payment to delivery.</p>
+    </section>
+    <script id="tracking-sandbox-data" type="application/json"><?= json_encode($trackingSandboxData, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_THROW_ON_ERROR) ?></script>
+    <?php endif; ?>
     <div class="tracking-intro">
       <div class="eyebrow"><span id="merchant-name-return">Your order</span><span id="tracking-sandbox" class="test-badge" hidden>Sandbox</span></div>
       <h1>Track your order</h1>

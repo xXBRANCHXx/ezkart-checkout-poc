@@ -3,6 +3,7 @@
   const byId = (id) => document.getElementById(id);
   const shell = document.querySelector(".return-shell");
   const order = shell.dataset.order;
+  const sandbox = document.getElementById("tracking-sandbox-data") ? window.ezkartTrackingSandbox : null;
   const params = new URLSearchParams(location.search);
   let scope = /^[a-z0-9][a-z0-9_-]{5,79}$/i.test(params.get("shop") || "") ? params.get("shop").toLowerCase() : "";
   const money = new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 });
@@ -14,6 +15,7 @@
     try { const url = new URL(value); return url.protocol === "https:" && !url.username && !url.password ? url.href : ""; } catch { return ""; }
   };
   function brand() {
+    if (sandbox) { setText("merchant-name-return", "Order from Sandbox store"); return; }
     if (scope) byId("return-checkout-link").href = "./?shop=" + encodeURIComponent(scope);
     try {
       const stored = scope ? localStorage.getItem("ezkart.checkout.shop.v1:" + scope) : sessionStorage.getItem("ezkart.checkout.brand");
@@ -152,7 +154,7 @@
     setText("tracking-updated", date(t.updated_at) ? "Last update: " + date(t.updated_at) : "Updates appear here automatically.");
     notice(t.unavailable ? "Courier updates are temporarily unavailable. Your last confirmed status is shown; we’ll try again automatically." : "");
     if (/^[a-z0-9][a-z0-9_-]{5,79}$/.test(data.shop || "") && scope !== data.shop) { scope = data.shop; brand(); }
-    if (data.status === "PAID" && data.shop) {
+    if (!sandbox && data.status === "PAID" && data.shop) {
       try { localStorage.removeItem("ezkart.checkout.cart.v1:" + data.shop); } catch (_) {}
     }
     byId("tracking-content").hidden = false;
@@ -174,10 +176,15 @@
     const timeout = setTimeout(() => controller.abort(), 12000);
     let notFound = false;
     try {
-      const response = await fetch("api/status.php?order=" + encodeURIComponent(order) + "&tracking=1", { cache: "no-store", signal: controller.signal });
-      notFound = response.status === 404;
-      const data = await response.json();
-      if (!response.ok || !data.ok || data.order_id !== order || !Number.isSafeInteger(data.total) || !data.tracking || !Array.isArray(data.tracking.history)) throw new Error("unavailable");
+      let data;
+      if (sandbox) data = sandbox.read();
+      else {
+        const response = await fetch("api/status.php?order=" + encodeURIComponent(order) + "&tracking=1", { cache: "no-store", signal: controller.signal });
+        notFound = response.status === 404;
+        if (!response.ok) throw new Error("unavailable");
+        data = await response.json();
+      }
+      if (!data.ok || data.order_id !== order || !Number.isSafeInteger(data.total) || !data.tracking || !Array.isArray(data.tracking.history)) throw new Error("unavailable");
       lastData = data;
       failures = 0;
       byId("retry-tracking").hidden = true;
@@ -194,12 +201,13 @@
         byId("refresh-tracking").removeAttribute("aria-busy");
         manualCheck = false;
       }
-      if (!notFound && !document.hidden) timer = setTimeout(check, Math.min(60000, (lastData?.status === "PAID" ? 15000 : 5000) * (failures + 1)));
+      if (!sandbox && !notFound && !document.hidden) timer = setTimeout(check, Math.min(60000, (lastData?.status === "PAID" ? 15000 : 5000) * (failures + 1)));
     }
   }
   byId("refresh-tracking").addEventListener("click", () => check(true));
   byId("retry-tracking").addEventListener("click", () => check(true));
   document.addEventListener("visibilitychange", () => { clearTimeout(timer); if (!document.hidden) check(); });
   window.addEventListener("online", () => check());
+  if (sandbox) window.addEventListener("ezkart:sandbox-update", () => check());
   if (order) check(); else notice("This order link is invalid. Use the link provided after checkout.");
 })();
