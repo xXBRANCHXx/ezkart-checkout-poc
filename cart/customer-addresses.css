@@ -8,11 +8,11 @@
 .address-book-picker label { flex: 1; min-width: 0; margin: 0; }
 .address-book select { width: 100%; height: 39px; padding: 8px; border: 1px solid #cdd8e5; border-radius: 6px; background: #fff; font: inherit; font-size: 12px; color: #182b45; }
 .address-book button { border: 1px solid #cdd8e5; border-radius: 6px; background: #fff; padding: 8px 11px; font: inherit; font-size: 11px; color: #182b45; cursor: pointer; }
-.address-book button:disabled { opacity: .5; cursor: default; }
 .address-book button:hover:not(:disabled) { background: #edf2f7; }
 .address-book-actions { display: flex; gap: 5px; flex-wrap: wrap; }
 .address-book-actions button { padding: 5px 7px; border-color: transparent; background: transparent; font-size: 10px; }
 .address-book-actions button:last-child { margin-left: auto; border-color: #cdd8e5; background: #fff; }
+.address-book button:disabled { opacity: 1; color: #52647a; background: #edf2f7; border-color: #cdd8e5; cursor: default; }
 .address-book-guest { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 10px; }
 .address-book-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 .address-book-dialog { box-sizing: border-box; width: min(640px, calc(100% - 28px)); max-height: calc(100dvh - 32px); border: 1px solid #dce4ed; border-radius: 14px; padding: 24px; background: #fff; color: #182b45; box-shadow: 0 20px 80px #182b4533; }
@@ -72,7 +72,8 @@
 .addresses-shell { width: min(700px, calc(100% - 32px)); margin: 46px auto; }
 .addresses-shell h1 { font-size: 26px; margin: 0 0 12px; letter-spacing: -.5px; }
 .addresses-shell > p { font-size: 13px; line-height: 1.7; color: #65758a; margin: 0 0 26px; }
-.addresses-shell [data-book-action="add"] { padding: 9px 12px; color: #fff; background: #182b45; border-color: #182b45; }
+.addresses-shell [data-book-action="add"] { padding: 9px 12px; }
+.addresses-shell .address-book-actions [data-book-action="add"]:not(:disabled) { color: #fff; background: #182b45; border-color: #182b45; }
 @media(min-width:850px) {
   .address-book-dialog { width: min(960px, calc(100% - 48px)); }
   .address-book-form { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 24px; }
