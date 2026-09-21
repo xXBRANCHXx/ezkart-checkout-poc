@@ -24,6 +24,8 @@ return [
     // Optional absolute path outside the public web root. When omitted, Ezkart
     // creates a private, environment-specific sibling of the document root.
     'admin_session_storage' => '',
+    // Customer Google sign-in uses the same provider, with a separate private session.
+    'customer_session_storage' => '',
     // The server-side switch selects BOTH providers. Default is sandbox.
     // ezkart.id / production deployments reject sandbox settings.
     // The test deployment may use either mode, after all provider checks pass.

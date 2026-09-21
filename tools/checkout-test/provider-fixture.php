@@ -8,6 +8,30 @@ function curl_setopt_array(object $handle, array $options): bool { $handle->opti
 function curl_exec(object $handle): string {
     $payload = json_decode($handle->options[CURLOPT_POSTFIELDS] ?? '{}', true);
     file_put_contents(getenv('EZKART_TEST_CAPTURE'), json_encode(['url' => $handle->url, 'method' => !empty($handle->options[CURLOPT_POST]) ? 'POST' : 'GET', 'body' => $handle->options[CURLOPT_POSTFIELDS] ?? '', 'headers' => $handle->options[CURLOPT_HTTPHEADER] ?? []]) . "\n", FILE_APPEND | LOCK_EX);
+    if (str_starts_with($handle->url, 'https://auth.ezkart.test/auth/v1/')) {
+        $file = dirname(getenv('EZKART_TEST_CAPTURE')) . '/auth-response.json';
+        $config = is_file($file) ? json_decode((string) file_get_contents($file), true) : [];
+        $path = substr($handle->url, strlen('https://auth.ezkart.test/auth/v1/'));
+        $tokens = static function (string $aal = 'aal1'): array {
+            $token = 'fixture.' . rtrim(strtr(base64_encode(json_encode(['aal' => $aal, 'exp' => time() + 3600, 'sub' => 'fixture-google-customer'])), '+/', '-_'), '=') . '.fixture-signature';
+            return ['access_token' => $token, 'refresh_token' => 'fixture-refresh-token', 'expires_in' => 3600];
+        };
+        if ($path === 'token?grant_type=refresh_token' && isset($config['refresh_error'])) {
+            $handle->status = $config['refresh_error']; return '{"error":"fixture_refresh_error"}';
+        }
+        if (str_starts_with($path, 'token?grant_type=')) return json_encode($tokens());
+        if ($path === 'user') return json_encode(array_replace([
+            'id' => 'fixture-google-customer', 'email' => 'checkout@example.com', 'email_confirmed_at' => '2026-09-01T00:00:00Z',
+            'identities' => [['provider' => 'google']], 'factors' => [],
+        ], $config['user'] ?? []));
+        if ($path === 'factors/fixture-totp/challenge') return '{"id":"fixture-challenge"}';
+        if ($path === 'factors/fixture-totp/verify') {
+            if (($payload['code'] ?? '') !== '123456') { $handle->status = 400; return '{"error":"bad_code"}'; }
+            return json_encode($tokens('aal2'));
+        }
+        if ($path === 'logout?scope=local') { $handle->status = 204; return ''; }
+        throw new RuntimeException('Unexpected auth fixture request: ' . $path);
+    }
     if (str_starts_with($handle->url, 'https://api.biteship.com/v1/orders/')) {
         // Simulate a webhook arriving while a provider read is in flight.
         $eventPath = dirname(getenv('EZKART_TEST_CAPTURE')) . '/tracking-concurrent-event.json';

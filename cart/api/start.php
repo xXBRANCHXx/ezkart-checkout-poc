@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/bootstrap.php';
+require_once __DIR__ . '/customer-auth.php';
 
 try {
     if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
@@ -14,6 +15,8 @@ try {
     if (!is_array($input)) {
         throw new InvalidArgumentException('Invalid checkout request.');
     }
+    $customerAccount = ez_customer_current();
+    if (session_status() === PHP_SESSION_ACTIVE) session_write_close();
 
     // Validate credentials before requesting a paid Biteship rate lookup.
     $environment = ez_commerce_environment();
@@ -26,6 +29,7 @@ try {
     $order = $checkout + [
         'order_id' => $orderId,
         'status' => 'CREATING',
+        'customer_auth_user_id' => $customerAccount['id'] ?? '',
         'commerce_environment' => $environment,
         'payment_provider' => 'doku',
         'payment_flow' => $paymentFlow,

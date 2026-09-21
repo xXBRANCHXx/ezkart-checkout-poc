@@ -57,45 +57,73 @@
       shipment_update: ["Waiting for a courier update", "Your shipment has been booked. Its latest delivery status will appear here when available."],
     })[t.stage] || ["Order update", "We’ll show the latest confirmed update here."];
   }
-  let map;
-  let mapKey = "";
-  let locations;
-  function drawMap() {
-    if (map || !locations) return;
-    if (!window.L) { byId("map-notice").hidden = false; return; }
-    try {
-      map = L.map("delivery-map", { scrollWheelZoom: false });
-      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        maxZoom: 19,
-        referrerPolicy: "strict-origin-when-cross-origin",
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors',
-      }).on("tileerror", () => { byId("map-notice").hidden = false; }).addTo(map);
+  let map, markers, mapKey = "", locations, latestLocation, overview = false;
+  const validPoint = (point) => point && Number.isFinite(point.latitude) && Number.isFinite(point.longitude) && Math.abs(point.latitude) <= 90 && Math.abs(point.longitude) <= 180;
+  const point = (coordinate) => [coordinate.latitude, coordinate.longitude];
+  function positionMap() {
+    if (!map) return;
+    markers.clearLayers();
+    if (!overview && latestLocation) {
+      const icon = L.divIcon({ className: "package-marker", html: '<span><svg viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5Z M3 8v9l9 5 9-5V8 M12 13v9 M7.5 5.5l9 5"/></svg></span>', iconSize: [48, 48], iconAnchor: [24, 24] });
+      const tooltip = document.createElement("span");
+      tooltip.textContent = latestLocation.label;
+      L.marker(point(latestLocation), { icon, title: latestLocation.label, alt: "Package’s last reported location" }).addTo(markers).bindTooltip(tooltip, { direction: "top", offset: [0, -26] });
+      map.setView(point(latestLocation), 13, { animate: false });
+    } else if (locations) {
       const bounds = [];
       for (const [key, label, letter] of [["origin", "Pickup", "P"], ["destination", "Delivery", "D"]]) {
-        const coordinate = locations[key];
-        const point = [coordinate.latitude, coordinate.longitude];
-        bounds.push(point);
-        L.marker(point, { title: label, alt: label, icon: L.divIcon({ className: "", html: `<span class="delivery-pin ${key}-dot">${letter}</span>`, iconSize: [30, 30], iconAnchor: [15, 15] }) }).addTo(map).bindPopup(label);
+        bounds.push(point(locations[key]));
+        L.marker(point(locations[key]), { title: label, alt: label, icon: L.divIcon({ className: "", html: `<span class="delivery-pin ${key}-dot">${letter}</span>`, iconSize: [30, 30], iconAnchor: [15, 15] }) }).addTo(markers).bindTooltip(label);
       }
-      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14, animate: false });
+      map.fitBounds(bounds, { padding: [48, 48], maxZoom: 13, animate: false });
+    }
+  }
+  function drawMap() {
+    if (byId("package-map-frame").hidden) return;
+    if (!window.L) { byId("map-notice").hidden = false; return; }
+    try {
+      if (!map) {
+        map = L.map("delivery-map", { scrollWheelZoom: false, zoomControl: false });
+        markers = L.layerGroup().addTo(map);
+        L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          maxZoom: 19, referrerPolicy: "strict-origin-when-cross-origin",
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>',
+        }).on("tileerror", () => { byId("map-notice").hidden = false; }).addTo(map);
+        positionMap();
+      }
+      map.invalidateSize();
     } catch (_) { byId("map-notice").hidden = false; }
   }
-  const mapObserver = new IntersectionObserver((entries) => {
-    if (entries.some((entry) => entry.isIntersecting)) drawMap();
-  });
-  mapObserver.observe(byId("delivery-map-section"));
+  const mapObserver = new IntersectionObserver((entries) => { if (entries.some((entry) => entry.isIntersecting)) drawMap(); });
+  mapObserver.observe(byId("package-map-frame"));
+  function updateMapView() {
+    byId("package-map-frame").hidden = !(latestLocation || (overview && locations));
+    byId("map-recenter").hidden = byId("package-map-frame").hidden;
+    byId("map-route-toggle").hidden = !locations;
+    setText("map-route-toggle", overview ? (latestLocation ? "Back to package location" : "Hide route overview") : "View pickup & delivery");
+    setText("map-location-badge", overview ? "Pickup & delivery overview" : latestLocation?.source === "confirmed_stop" ? "Confirmed by the courier" : "Last reported location");
+    byId("package-location-empty").hidden = !!latestLocation || overview;
+    if (map) { map.invalidateSize(); positionMap(); }
+    const rect = byId("package-map-frame").getBoundingClientRect();
+    if (rect.bottom > 0 && rect.top < innerHeight) drawMap();
+  }
+  byId("map-recenter").addEventListener("click", () => { if (latestLocation) overview = false; updateMapView(); });
+  byId("map-route-toggle").addEventListener("click", () => { overview = !overview; updateMapView(); });
   function renderMap(t) {
-    const valid = (point) => point && Number.isFinite(point.latitude) && Number.isFinite(point.longitude) && Math.abs(point.latitude) <= 90 && Math.abs(point.longitude) <= 180;
-    const available = valid(t.locations?.origin) && valid(t.locations?.destination);
-    byId("delivery-map-section").hidden = !available;
-    const key = available ? JSON.stringify(t.locations) : "";
+    byId("delivery-map-section").hidden = ["awaiting_payment", "not_required", "processing", "pickup_issue"].includes(t.stage);
+    const latest = (t.history || []).at(-1);
+    setText("package-update", latest?.note || labels[t.shipment_status] || "Waiting for the courier’s first update.");
+    const location = validPoint(t.latest_location) ? t.latest_location : null;
+    setText("package-location-time", location ? location.label + " · " + date(location.updated_at) : latest ? date(latest.updated_at) : "Updates appear as the courier shares them.");
+    const route = validPoint(t.locations?.origin) && validPoint(t.locations?.destination) ? t.locations : null;
+    const key = JSON.stringify([location, route]);
     if (key === mapKey) return;
-    if (map) { map.remove(); map = null; }
     mapKey = key;
-    locations = available ? t.locations : null;
+    latestLocation = location;
+    locations = route;
+    overview = false;
     byId("map-notice").hidden = true;
-    mapObserver.unobserve(byId("delivery-map-section"));
-    mapObserver.observe(byId("delivery-map-section"));
+    updateMapView();
   }
   let historyKey = "";
   function renderHistory(t) {
@@ -180,6 +208,11 @@
       if (sandbox) data = sandbox.read();
       else {
         const response = await fetch("api/status.php?order=" + encodeURIComponent(order) + "&tracking=1", { cache: "no-store", signal: controller.signal });
+        if (response.status === 401) {
+          byId("tracking-content").hidden = true;
+          location.replace("/cart/login.php?next=" + encodeURIComponent(location.pathname + location.search));
+          return;
+        }
         notFound = response.status === 404;
         if (!response.ok) throw new Error("unavailable");
         data = await response.json();
@@ -191,7 +224,8 @@
       render(data);
     } catch (_) {
       failures++;
-      notice(notFound ? "This order could not be found. Check the order link you received." : lastData ? "We couldn’t refresh your order. Your last confirmed update is still shown; we’ll try again automatically." : "Order updates are temporarily unavailable. Please try again.");
+      if (notFound) { lastData = null; byId("tracking-content").hidden = true; byId("switch-tracking-account").hidden = false; }
+      notice(notFound ? "This order isn’t linked to this account. Check your order link, or sign in with the Google account that uses your checkout email." : lastData ? "We couldn’t refresh your order. Your last confirmed update is still shown; we’ll try again automatically." : "Order updates are temporarily unavailable. Please try again.");
       byId("retry-tracking").hidden = !!lastData || notFound;
     } finally {
       clearTimeout(timeout);
@@ -208,6 +242,7 @@
   byId("retry-tracking").addEventListener("click", () => check(true));
   document.addEventListener("visibilitychange", () => { clearTimeout(timer); if (!document.hidden) check(); });
   window.addEventListener("online", () => check());
+  window.addEventListener("pageshow", (event) => { if (event.persisted) location.reload(); });
   if (sandbox) window.addEventListener("ezkart:sandbox-update", () => check());
   if (order) check(); else notice("This order link is invalid. Use the link provided after checkout.");
 })();

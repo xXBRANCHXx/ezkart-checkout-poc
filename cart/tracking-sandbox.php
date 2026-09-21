@@ -48,7 +48,7 @@ $sample['biteship_history'] = [['status' => 'picked', 'updated_at' => $time(20),
 $add('picked', 'Picked up', $sample);
 $sample['biteship_status'] = 'in_transit';
 $sample['biteship_status_at'] = $time(25);
-$sample['biteship_history'][] = ['status' => 'in_transit', 'updated_at' => $time(25), 'note' => 'Package received at the Jakarta sorting facility.'];
+$sample['biteship_history'][] = ['status' => 'in_transit', 'updated_at' => $time(25), 'note' => 'Package received at the Jakarta sorting facility.', 'coordinate' => ['latitude' => -6.2441792, 'longitude' => 106.783529], 'location_name' => 'Jakarta sorting facility (sample)'];
 $add('transit', 'In transit', $sample);
 $inTransit = $sample;
 $sample['biteship_status'] = 'dropping_off';
@@ -76,6 +76,8 @@ $unavailable['tracking_unavailable'] = true;
 $add('unavailable', 'Courier updates unavailable', $unavailable);
 $noMap = $inTransit;
 unset($noMap['biteship_locations']);
+foreach ($noMap['biteship_history'] as &$entry) unset($entry['coordinate']);
+unset($entry);
 $add('no-map', 'In transit without coordinates', $noMap);
 $trackingSandboxData = $scenarios;
 require __DIR__ . '/return.php';

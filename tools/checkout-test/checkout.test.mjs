@@ -41,6 +41,9 @@ async function setup(overrides = {}) {
     EZKART_TEST_CAPTURE: capture,
     EZKART_SANDBOX_ADMIN_PASSWORD: "fixture-admin-password",
     EZKART_ADMIN_SESSION_STORAGE: join(directory, "sessions"),
+    EZKART_CUSTOMER_SESSION_STORAGE: join(directory, "customer-sessions"),
+    EZKART_SUPABASE_URL: "https://auth.ezkart.test",
+    EZKART_SUPABASE_PUBLISHABLE_KEY: "fixture-publishable-key",
     EZKART_DEPLOYMENT_ENVIRONMENT: "test",
     EZKART_COMMERCE_ENVIRONMENT: "sandbox",
     EZKART_ORDER_STORAGE: join(directory, "orders"),
@@ -110,6 +113,15 @@ async function setup(overrides = {}) {
         .split("\n")
         .filter(Boolean)
         .map(JSON.parse);
+    },
+    customerCookie(email = "checkout@example.com", id = "fixture-google-customer", expiresIn = 3600) {
+      const account = Buffer.from(JSON.stringify({ id, email })).toString("base64");
+      const sid = this.cli(`require ${JSON.stringify(join(root, "cart/api/customer-auth.php"))}; ez_customer_session(); $_SESSION['customer_auth']=['user'=>json_decode(base64_decode('${account}'),true),'access_token'=>str_repeat('x',64),'refresh_token'=>'fixture-refresh','expires_at'=>time()+${expiresIn},'signed_in_at'=>time()]; echo session_id(); session_write_close();`);
+      return { name: "ezkart_customer", value: sid, domain: "127.0.0.1", path: "/cart", httpOnly: true, sameSite: "Lax" };
+    },
+    async tracking(id, { refresh = false, cookie } = {}) {
+      cookie ||= this.defaultCustomerCookie ||= this.customerCookie();
+      return this.request(`/cart/api/status.php?order=${encodeURIComponent(id)}&tracking=1${refresh ? "" : "&refresh=0"}`, undefined, { Cookie: `${cookie.name}=${cookie.value}` });
     },
     async request(path, data, headers = {}) {
       const r = await fetch(base + path, {
@@ -240,7 +252,7 @@ test("sandbox checkout, signed callbacks, merchant acceptance, idempotent pickup
     "PENDING",
   );
   assert.equal((await notify(app, id)).status, 200);
-  const paid = (await app.request(`/cart/api/status.php?order=${id}`)).data;
+  const paid = (await app.tracking(id)).data;
   assert.equal(paid.status, "PAID");
   assert.equal(paid.fulfillment_status, "AWAITING_ACCEPTANCE");
   assert.equal((await app.calls()).length, 2);
@@ -256,7 +268,7 @@ test("sandbox checkout, signed callbacks, merchant acceptance, idempotent pickup
   await notify(app, id, "FAILED");
   await notify(app, id, "PENDING");
   assert.equal(
-    (await app.request(`/cart/api/status.php?order=${id}`)).data
+    (await app.tracking(id)).data
       .fulfillment_status,
     "AWAITING_PICKUP_ARRANGEMENT",
   );
@@ -300,7 +312,7 @@ test("sandbox checkout, signed callbacks, merchant acceptance, idempotent pickup
     true,
   );
   assert.equal(
-    (await app.request(`/cart/api/status.php?order=${id}`)).data
+    (await app.tracking(id)).data
       .biteship_waybill_id,
     "UPDATED-TEST-AWB",
   );
@@ -625,7 +637,7 @@ test("direct BCA API keeps checkout on Ezkart and binds signed confirmation to t
       ).status,
       200,
     );
-  const paid = await app.request("/cart/api/status.php?order=" + id);
+  const paid = await app.tracking(id);
   assert.equal(paid.data.status, "PAID");
   assert.equal(paid.data.fulfillment_status, "NOT_REQUIRED");
   assert.equal(
@@ -890,6 +902,7 @@ test("browser checkout redirects to DOKU and shows only server-confirmed payment
       (await notify(app, id, "SUCCESS", { amount: 116000 })).status,
       200,
     );
+    await page.context().addCookies([app.customerCookie()]);
     await page.goto(app.base + `/cart/return.php?order=${id}&shop=test-shop`);
     await page
       .getByRole("heading", { name: "Payment confirmed", exact: true })
@@ -985,7 +998,7 @@ test("merchant dashboard displays DOKU orders and accepts and arranges pickup th
     .getByRole("button", { name: "Arrange pickup", exact: true })
     .click();
   assert.equal(
-    (await app.request(`/cart/api/status.php?order=${id}`)).data
+    (await app.tracking(id)).data
       .fulfillment_status,
     "CONFIRMED",
   );
@@ -1052,7 +1065,7 @@ function trackingResponse(id, status = "in_transit", extra = {}) {
       driver_phone: "PRIVATE-PHONE", link: "https://track.biteship.com/fixture",
       history: [
         { status: "picked", updated_at: "2026-09-20T10:00:00+07:00", note: "Package collected from seller." },
-        { status: "inTransit", updated_at: "2026-09-20T12:00:00+07:00", note: "Arrived at the Jakarta sorting facility." },
+        { status: "inTransit", updated_at: "2026-09-20T12:00:00+07:00", note: "Arrived at the Jakarta sorting facility.", coordinate: { latitude: -6.2441792, longitude: 106.783529 }, location_name: "Jakarta sorting facility" },
       ],
     },
     ...extra,
@@ -1071,22 +1084,22 @@ async function shippingEvent(app, id, status, extra = {}) {
 test("tracking follows seller processing and pickup, caches provider reads, and keeps customer output bounded", async (t) => {
   const app = await setup(); t.after(() => app.close());
   const id = (await app.request("/cart/api/start.php", input)).data.order_id;
-  const path = `/cart/api/status.php?order=${id}&tracking=1`;
-  assert.equal((await app.request(path)).data.tracking.stage, "awaiting_payment");
+  const tracking = () => app.tracking(id, { refresh: true });
+  assert.equal((await tracking()).data.tracking.stage, "awaiting_payment");
   await notify(app, id);
-  let data = (await app.request(path)).data;
+  let data = (await tracking()).data;
   assert.equal(data.tracking.stage, "processing");
   assert.equal(data.tracking.seller_accepted, false);
   app.cli(`ez_accept_paid_order('${id}');`);
-  assert.equal((await app.request(path)).data.tracking.seller_accepted, true);
+  assert.equal((await tracking()).data.tracking.seller_accepted, true);
   assert.equal((await app.calls()).length, 2, "No tracking requests before a shipment exists.");
   app.cli(`ez_arrange_paid_order_pickup('${id}');`);
-  data = (await app.request(`/cart/api/status.php?order=${id}`)).data;
+  data = (await app.tracking(id)).data;
   assert.equal(data.tracking.stage, "awaiting_pickup");
   assert.equal(data.tracking.progress, 2, "A waybill does not mean the courier collected the package.");
   const response = trackingResponse(id, "inTransit");
   await saveTrackingResponse(app, response);
-  data = (await app.request(path)).data;
+  data = (await tracking()).data;
   assert.equal(data.tracking.stage, "in_transit");
   assert.equal(data.tracking.history.length, 2);
   assert.equal(data.tracking.history[1].status, "in_transit");
@@ -1098,34 +1111,34 @@ test("tracking follows seller processing and pickup, caches provider reads, and 
   assert.equal(requests.length, 1);
   assert.equal(requests[0].method, "GET");
   assert.ok(requests[0].headers.includes("Authorization: biteship_test.fixture"));
-  for (let i = 0; i < 3; i++) await app.request(path);
+  for (let i = 0; i < 3; i++) await tracking();
   assert.equal((await app.calls()).filter((call) => call.url.includes("/v1/orders/")).length, 1);
   await saveTrackingResponse(app, "unavailable"); expireTrackingCache(app, id);
-  data = (await app.request(path)).data;
+  data = (await tracking()).data;
   assert.equal(data.status, "PAID");
   assert.equal(data.tracking.stage, "in_transit");
   assert.equal(data.tracking.unavailable, true);
-  await app.request(path);
+  await tracking();
   assert.equal((await app.calls()).filter((call) => call.url.includes("/v1/orders/")).length, 2, "Failed requests are throttled too.");
   response.id = "wrong-shipment";
   await saveTrackingResponse(app, response); expireTrackingCache(app, id);
-  assert.equal((await app.request(path)).data.tracking.unavailable, true, "Mismatched responses cannot overwrite an order.");
+  assert.equal((await tracking()).data.tracking.unavailable, true, "Mismatched responses cannot overwrite an order.");
   response.id = "test-shipment-" + id;
   response.courier.link = "javascript:alert(1)";
   response.origin.coordinate.latitude = 100;
   await saveTrackingResponse(app, response); expireTrackingCache(app, id);
-  data = (await app.request(path)).data;
+  data = (await tracking()).data;
   assert.equal(data.tracking.unavailable, false);
   assert.equal(data.tracking.link, "");
   assert.equal(data.tracking.locations.origin, null);
-  assert.equal((await app.request("/cart/api/status.php?order=bad&tracking=1")).status, 404);
+  assert.equal((await app.tracking("bad")).status, 404);
 });
 
 test("courier events handle aliases, retries, delayed events, delivery exceptions and returns", async (t) => {
   const app = await setup(); t.after(() => app.close());
   const id = (await app.request("/cart/api/start.php", input)).data.order_id;
   await notify(app, id); app.cli(`ez_accept_paid_order('${id}'); ez_arrange_paid_order_pickup('${id}');`);
-  const status = async () => (await app.request(`/cart/api/status.php?order=${id}`)).data;
+  const status = async () => (await app.tracking(id)).data;
   for (const [event, stage] of [["pickingUp", "awaiting_pickup"], ["picked", "in_transit"], ["droppingOff", "out_for_delivery"], ["onHold", "attention"], ["droppingOff", "out_for_delivery"], ["delivered", "delivered"], ["returnInTransit", "returning"], ["returned", "returned"]]) {
     assert.equal((await shippingEvent(app, id, event)).status, 200);
     assert.equal((await status()).tracking.stage, stage, event);
@@ -1192,6 +1205,7 @@ test("customer tracking UI follows fulfillment, preserves updates on failure, an
     const errors = []; page.on("pageerror", (error) => errors.push(error.message));
     // Never request public map tiles in automated checks.
     await page.route("https://tile.openstreetmap.org/**", (route) => route.fulfill({ contentType: "image/png", body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=", "base64") }));
+    await page.context().addCookies([app.customerCookie()]);
     await page.goto(app.base + `/cart/return.php?order=${id}&shop=test-shop`);
     await page.getByRole("heading", { name: "Your order is with the seller", exact: true }).waitFor();
     assert.equal(await page.locator("#delivery-map-section").isVisible(), false);
@@ -1207,10 +1221,12 @@ test("customer tracking UI follows fulfillment, preserves updates on failure, an
     await page.locator("#refresh-tracking").click();
     await page.getByRole("heading", { name: "Your order is awaiting pickup", exact: true }).waitFor();
     assert.match(await page.locator('[aria-current="step"]').textContent(), /Awaiting pickup/);
-    assert.equal(await page.locator("#delivery-map-section").isVisible(), false);
+    assert.equal(await page.locator("#package-map-frame").isVisible(), false);
+    assert.equal(await page.locator("#package-location-empty").isVisible(), true);
     const inTransit = trackingResponse(id);
     inTransit.courier.type = "instant";
     inTransit.courier.history[1].note = '<img src=x onerror="window.injected=true"> Sorting facility update';
+    inTransit.courier.history[1].location_name = '<img src=x onerror="window.injected=true"> Sorting facility';
     await saveTrackingResponse(app, inTransit); expireTrackingCache(app, id);
     await page.locator("#refresh-tracking").click();
     await page.getByRole("heading", { name: "Your order is on the way", exact: true }).waitFor();
@@ -1219,9 +1235,22 @@ test("customer tracking UI follows fulfillment, preserves updates on failure, an
     assert.equal(await page.locator("#courier-tracking-link").textContent(), "View courier live tracking ↗");
     assert.equal(await page.locator("#courier-tracking-link").getAttribute("rel"), "noopener noreferrer");
     await page.locator("#delivery-map").scrollIntoViewIfNeeded();
-    await page.locator('.delivery-pin').first().waitFor();
+    await page.locator('.package-marker').waitFor();
+    assert.equal(await page.locator('.package-marker').count(), 1);
+    assert.equal(await page.locator('.delivery-pin').count(), 0);
+    await page.locator('.package-marker').hover();
+    assert.equal(await page.locator('.leaflet-tooltip img').count(), 0);
+    assert.equal(await page.evaluate(() => !!window.injected), false);
+    const centered = await page.evaluate(() => {
+      const map = document.querySelector('#delivery-map').getBoundingClientRect(), pin = document.querySelector('.package-marker').getBoundingClientRect();
+      return Math.abs(pin.x + pin.width / 2 - map.x - map.width / 2) < 2 && Math.abs(pin.y + pin.height / 2 - map.y - map.height / 2) < 2;
+    });
+    assert.equal(centered, true, "The package marker is centered in the map.");
+    assert.match(await page.locator("#delivery-map-section").textContent(), /Last reported location/);
+    await page.locator("#map-route-toggle").click();
     assert.equal(await page.locator('.delivery-pin').count(), 2);
-    assert.match(await page.locator("#delivery-map-section").textContent(), /Pickup and delivery locations/);
+    await page.locator("#map-recenter").click();
+    assert.equal(await page.locator('.package-marker').count(), 1);
     if (process.env.EZKART_TEST_SCREENSHOTS) await page.screenshot({ path: join(process.env.EZKART_TEST_SCREENSHOTS, `tracking-${width}.png`), fullPage: true });
     await page.route("**/api/status.php*", (route) => route.fulfill({ status: 503, contentType: "application/json", body: '{"ok":false}' }));
     await page.locator("#refresh-tracking").click();
@@ -1244,7 +1273,7 @@ test("a courier webhook arriving during tracking refresh wins over the stale pro
   await notify(app, id); app.cli(`ez_accept_paid_order('${id}'); ez_arrange_paid_order_pickup('${id}');`);
   await saveTrackingResponse(app, trackingResponse(id, "confirmed"));
   await writeFile(join(app.directory, "tracking-concurrent-event.json"), JSON.stringify({ event: "order.status", order_id: "test-shipment-" + id, status: "delivered", courier_waybill_id: "LATEST-WAYBILL" }));
-  const data = (await app.request(`/cart/api/status.php?order=${id}&tracking=1`)).data;
+  const data = (await app.tracking(id, { refresh: true })).data;
   assert.equal(data.status, "PAID");
   assert.equal(data.tracking.stage, "delivered");
   assert.equal(data.tracking.waybill_id, "LATEST-WAYBILL");
@@ -1261,12 +1290,15 @@ test("interactive tracking walkthrough uses the customer renderer without orders
     page.on("request", (request) => { if (/\/api\//.test(request.url())) apiCalls.push(request.url()); });
     await page.route("https://tile.openstreetmap.org/**", (route) => route.fulfill({ contentType: "image/png", body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=", "base64") }));
     await page.clock.install();
+    await page.context().addCookies([app.customerCookie()]);
     await page.goto(app.base + "/cart/tracking-sandbox.php");
     await page.getByRole("heading", { name: "The seller is preparing your order", exact: true }).waitFor();
     assert.match(await page.locator(".sandbox-controls").textContent(), /Simulated order data/);
     assert.equal(await page.locator("#delivery-map-section").isVisible(), false);
     await page.locator("#sandbox-next").click();
     await page.getByRole("heading", { name: "Your order is awaiting pickup", exact: true }).waitFor();
+    assert.equal(await page.locator("#package-map-frame").isVisible(), false);
+    await page.locator("#map-route-toggle").click();
     await page.locator("#delivery-map").scrollIntoViewIfNeeded();
     await page.locator(".delivery-pin").first().waitFor();
     assert.equal(await page.locator(".delivery-pin").count(), 2);
@@ -1275,7 +1307,8 @@ test("interactive tracking walkthrough uses the customer renderer without orders
     await page.locator("#tracking-notice").waitFor({ state: "visible" });
     assert.equal(await page.locator("#return-title").textContent(), "Your order is on the way");
     await page.locator("#sandbox-stage").selectOption("no-map");
-    assert.equal(await page.locator("#delivery-map-section").isVisible(), false);
+    assert.equal(await page.locator("#package-map-frame").isVisible(), false);
+    assert.equal(await page.locator("#package-location-empty").isVisible(), true);
     await page.locator("#sandbox-stage").selectOption("returned");
     await page.getByRole("heading", { name: "Your order was returned to the seller", exact: true }).waitFor();
     await page.reload();
@@ -1307,4 +1340,165 @@ test("interactive tracking walkthrough uses the customer renderer without orders
     try { assert.equal((await fetch(blocked.base + "/cart/tracking-sandbox.php")).status, 404); }
     finally { await blocked.close(); }
   }
+});
+
+async function beginCustomerLogin(page, next = "/cart/tracking-sandbox.php") {
+  await page.goto(page.context()._ezkartBase + "/cart/login.php?next=" + encodeURIComponent(next));
+  const csrf = await page.locator('[name="csrf_token"]').inputValue();
+  const response = await page.request.post(page.context()._ezkartBase + "/cart/login.php", {
+    form: { action: "google", csrf_token: csrf, next }, maxRedirects: 0,
+  });
+  assert.equal(response.status(), 303);
+  const authorize = new URL(response.headers().location);
+  assert.equal(authorize.origin, "https://auth.ezkart.test");
+  assert.equal(authorize.searchParams.get("provider"), "google");
+  assert.equal(authorize.searchParams.get("code_challenge_method"), "s256");
+  const callback = new URL(authorize.searchParams.get("redirect_to"));
+  assert.equal(callback.origin, "https://test.ezkart.id");
+  assert.equal(callback.pathname, "/cart/admin/customer-auth.php");
+  return { authorize, callback: callback.pathname + callback.search + "&code=fixture-code" };
+}
+
+test("customer Google login uses PKCE, checks identity and order ownership, and keeps shipment data private", async (t) => {
+  const { chromium } = await import("../builder-mcp/node_modules/playwright/index.mjs");
+  const app = await setup(); t.after(() => app.close());
+  const browser = await chromium.launch({ headless: true }); t.after(() => browser.close());
+  const context = await browser.newContext(); context._ezkartBase = app.base;
+  const page = await context.newPage();
+  const id = (await app.request("/cart/api/start.php", input)).data.order_id;
+  await notify(app, id); app.cli(`ez_accept_paid_order('${id}'); ez_arrange_paid_order_pickup('${id}');`);
+  const path = `/cart/return.php?order=${id}&shop=test-shop`;
+  const anonymous = await fetch(app.base + path, { redirect: "manual" });
+  assert.equal(anonymous.status, 303);
+  assert.equal(new URL(anonymous.headers.get("location"), app.base).searchParams.get("next"), path);
+  assert.equal((await app.request(`/cart/api/status.php?order=${id}&tracking=1`)).status, 401);
+  const payment = (await app.request(`/cart/api/status.php?order=${id}`)).data;
+  assert.equal(payment.status, "PAID");
+  for (const key of ["tracking", "biteship_waybill_id", "biteship_order_id", "fulfillment_status", "customer_name", "customer_auth_user_id"]) assert.equal(key in payment, false);
+  await page.goto(app.base + "/cart/login.php?next=" + encodeURIComponent(path));
+  const invalid = await page.request.post(app.base + "/cart/login.php", { form: { action: "google", csrf_token: "wrong", next: path }, maxRedirects: 0 });
+  assert.equal(invalid.status(), 403);
+  const flow = await beginCustomerLogin(page, path);
+  const before = (await context.cookies()).find((cookie) => cookie.name === "ezkart_customer");
+  const result = await page.request.get(app.base + flow.callback, { maxRedirects: 0 });
+  assert.equal(result.status(), 303);
+  assert.equal(result.headers().location, path);
+  const cookie = (await context.cookies()).find((cookie) => cookie.name === "ezkart_customer");
+  assert.equal(cookie.httpOnly, true); assert.equal(cookie.sameSite, "Lax"); assert.equal(cookie.path, "/cart");
+  assert.notEqual(cookie.value, before.value, "Regenerate the session after login.");
+  assert.equal((await context.cookies()).some((cookie) => cookie.name === "ezkart_admin"), false);
+  const calls = (await app.calls()).filter((call) => call.url.includes("auth.ezkart.test"));
+  const exchange = JSON.parse(calls[0].body);
+  assert.equal(exchange.auth_code, "fixture-code");
+  assert.equal(createHash("sha256").update(exchange.code_verifier).digest("base64url"), flow.authorize.searchParams.get("code_challenge"));
+  assert.ok(calls[1].url.endsWith("/user"), "Verify identity through Supabase, not browser-provided metadata.");
+  const tracking = await page.request.get(app.base + `/cart/api/status.php?order=${id}&tracking=1&refresh=0`);
+  assert.equal(tracking.status(), 200); assert.equal((await tracking.json()).tracking.stage, "awaiting_pickup");
+  assert.equal(app.cli(`echo ez_load_order('${id}')['customer_auth_user_id'];`), "fixture-google-customer");
+  const mismatchedEmail = app.customerCookie("other@example.com", "other-google-account");
+  const sameEmailDifferentId = app.customerCookie("checkout@example.com", "another-google-account");
+  for (const other of [mismatchedEmail, sameEmailDifferentId]) {
+    const denied = await app.tracking(id, { cookie: other });
+    assert.deepEqual(denied, { status: 404, data: { ok: false, error: "Order not found." } });
+  }
+  assert.equal((await app.tracking(id, { cookie: app.customerCookie("updated@example.com") })).status, 200, "Account ownership remains attached to the immutable user ID.");
+  await page.request.get(app.base + flow.callback, { maxRedirects: 0 });
+  assert.equal((await app.calls()).filter((call) => call.url.includes("grant_type=pkce")).length, 1, "The callback cannot be replayed.");
+  // Signed-in checkout binds the authenticated account even when shipping contact information differs.
+  const created = await page.request.post(app.base + "/cart/api/start.php", { data: { ...input, customer_auth_user_id: "attacker", customer: { ...input.customer, email: "recipient@example.com" } } });
+  assert.equal(created.status(), 201);
+  const createdId = (await created.json()).order_id;
+  assert.equal(app.cli(`echo ez_load_order('${createdId}')['customer_auth_user_id'];`), "fixture-google-customer");
+  await page.goto(app.base + path);
+  await page.locator("#tracking-content").waitFor({ state: "visible" });
+  assert.equal((await page.content()).includes("fixture-refresh-token"), false);
+  await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  await page.getByRole("button", { name: "Continue with Google", exact: true }).waitFor();
+  assert.equal((await page.request.get(app.base + `/cart/api/status.php?order=${id}&tracking=1`)).status(), 401);
+  assert.ok((await app.calls()).some((call) => call.url.endsWith("logout?scope=local")));
+});
+
+test("Google login rejects unverified identities, enforces existing MFA and keeps redirects local", async (t) => {
+  const { chromium } = await import("../builder-mcp/node_modules/playwright/index.mjs");
+  const app = await setup(); t.after(() => app.close());
+  const browser = await chromium.launch({ headless: true }); t.after(() => browser.close());
+  for (const user of [{ email_confirmed_at: null }, { identities: [{ provider: "email" }], user_metadata: { provider: "google", email_verified: true } }]) {
+    await writeFile(join(app.directory, "auth-response.json"), JSON.stringify({ user }));
+    const context = await browser.newContext(); context._ezkartBase = app.base;
+    const page = await context.newPage();
+    const flow = await beginCustomerLogin(page);
+    await page.goto(app.base + flow.callback);
+    assert.match(await page.locator('[role="alert"]').textContent(), /verified Google account/);
+    assert.equal((await page.request.get(app.base + "/cart/api/status.php?order=bad&tracking=1")).status(), 401);
+    await context.close();
+  }
+  await writeFile(join(app.directory, "auth-response.json"), JSON.stringify({ user: { factors: [{ id: "fixture-totp", factor_type: "totp", status: "verified" }] } }));
+  const context = await browser.newContext(); context._ezkartBase = app.base;
+  const page = await context.newPage();
+  const flow = await beginCustomerLogin(page);
+  await page.goto(app.base + flow.callback);
+  await page.getByRole("heading", { name: "One more step", exact: true }).waitFor();
+  assert.equal((await page.request.get(app.base + "/cart/api/status.php?order=bad&tracking=1")).status(), 401);
+  await page.locator("#customer-mfa").fill("000000");
+  await page.getByRole("button", { name: "Verify and continue", exact: true }).click();
+  assert.equal((await page.request.get(app.base + "/cart/api/status.php?order=bad&tracking=1")).status(), 401);
+  await page.locator("#customer-mfa").fill("123456");
+  await page.getByRole("button", { name: "Verify and continue", exact: true }).click();
+  assert.equal(await page.locator('[role="alert"]').count(), 0, await page.locator("body").innerText());
+  await page.getByRole("heading", { name: "The seller is preparing your order", exact: true }).waitFor();
+  assert.equal((await page.request.get(app.base + "/cart/api/status.php?order=bad&tracking=1")).status(), 404);
+  assert.equal(app.cli(`require ${JSON.stringify(join(root, "cart/api/customer-auth.php"))}; foreach (['https://evil.test/cart/return.php', '//evil.test/cart/return.php', 'javascript:/cart/return.php', '/cart/admin/', '/cart/return.php?order=bad&next=https://evil.test'] as $next) echo ez_customer_next($next)."\\n";`), Array(5).fill("/cart/return.php").join("\n"));
+  // The native Google form must navigate to the configured external authorize endpoint under the page CSP.
+  // Playwright does not intercept later URLs in a server redirect chain; .test is deliberately non-routable.
+  const publicPage = await browser.newPage();
+  const cspErrors = [];
+  publicPage.on("console", (message) => { if (/form-action|Content Security Policy/.test(message.text())) cspErrors.push(message.text()); });
+  await publicPage.goto(app.base + "/cart/login.php?next=%2Fcart%2Ftracking-sandbox.php");
+  const external = publicPage.waitForRequest((request) => request.url().startsWith("https://auth.ezkart.test/auth/v1/authorize?"));
+  await publicPage.getByRole("button", { name: "Continue with Google" }).click();
+  assert.equal((await external).method(), "GET");
+  assert.deepEqual(cspErrors, []);
+});
+
+test("expired customer sessions refresh safely, and guest orders are claimed only by the matching verified email", async (t) => {
+  const app = await setup(); t.after(() => app.close());
+  const id = (await app.request("/cart/api/start.php", input)).data.order_id;
+  assert.equal((await app.tracking(id, { cookie: app.customerCookie("not-customer@example.com", "wrong") })).status, 404);
+  assert.equal(app.cli(`echo ez_load_order('${id}')['customer_auth_user_id'];`), "");
+  const cookie = app.customerCookie("checkout@example.com", "fixture-google-customer", -1);
+  assert.equal((await app.tracking(id, { cookie })).status, 200);
+  assert.ok((await app.calls()).some((call) => call.url.endsWith("grant_type=refresh_token")));
+  await writeFile(join(app.directory, "auth-response.json"), JSON.stringify({ refresh_error: 503 }));
+  const expired = app.customerCookie("checkout@example.com", "fixture-google-customer", -1);
+  assert.equal((await app.tracking(id, { cookie: expired })).status, 500);
+  const unexpired = app.customerCookie("checkout@example.com", "fixture-google-customer", 60);
+  assert.equal((await app.tracking(id, { cookie: unexpired })).status, 200);
+  await writeFile(join(app.directory, "auth-response.json"), JSON.stringify({ refresh_error: 401 }));
+  assert.equal((await app.tracking(id, { cookie: expired })).status, 401);
+  const calls = (await app.calls()).length;
+  assert.equal((await app.tracking(id, { cookie: expired })).status, 401);
+  assert.equal((await app.calls()).length, calls, "Rejected sessions do not retry the invalid refresh token.");
+});
+
+test("latest package location uses reported scans and confirmed stops, never route interpolation", async (t) => {
+  const app = await setup(); t.after(() => app.close());
+  const id = (await app.request("/cart/api/start.php", input)).data.order_id;
+  await notify(app, id); app.cli(`ez_accept_paid_order('${id}'); ez_arrange_paid_order_pickup('${id}');`);
+  const response = trackingResponse(id);
+  delete response.courier.history[1].coordinate;
+  await saveTrackingResponse(app, response);
+  let tracking = (await app.tracking(id, { refresh: true })).data.tracking;
+  assert.equal(tracking.latest_location, null, "Origin and destination do not locate a package in transit.");
+  response.courier.history[1].coordinate = { latitude: 95, longitude: 106.7 };
+  await saveTrackingResponse(app, response); expireTrackingCache(app, id);
+  assert.equal((await app.tracking(id, { refresh: true })).data.tracking.latest_location, null);
+  response.courier.history[1].coordinate = { latitude: -6.2441792, longitude: 106.783529 };
+  await saveTrackingResponse(app, response); expireTrackingCache(app, id);
+  tracking = (await app.tracking(id, { refresh: true })).data.tracking;
+  assert.deepEqual(tracking.latest_location, { latitude: -6.2441792, longitude: 106.783529, label: "Jakarta sorting facility", updated_at: "2026-09-20T05:00:00+00:00", source: "courier_scan" });
+  delete response.courier.history[1].coordinate;
+  await saveTrackingResponse(app, response); expireTrackingCache(app, id);
+  assert.equal((await app.tracking(id, { refresh: true })).data.tracking.latest_location.source, "courier_scan", "A duplicate note without coordinates retains the known scan location.");
+  await shippingEvent(app, id, "delivered");
+  assert.equal((await app.tracking(id)).data.tracking.latest_location.source, "confirmed_stop");
 });

@@ -20,6 +20,12 @@
   to `/cart/admin`.
 - Session files live outside the public web root in a private directory.
 
+## Customer tracking login
+
+The same Supabase Google provider also authenticates customers at `/cart/login.php`. The callback `/cart/admin/customer-auth.php` is inside the existing redirect allowlist, but does not load the merchant admin session. A separate `ezkart_customer` cookie is scoped to `/cart`; its private directory is set by `customer_session_storage`. Customer login uses the same PKCE, server token storage, verified Google identity, refresh, absolute lifetime and local logout protections described above. Verified TOTP factors are required before completing login. Customer sessions confer no merchant privileges.
+
+Tracking authorization is tied to each order's immutable Supabase user ID. Guest orders can be linked only through a matching verified account email. See [customer tracking](customer-order-tracking.md) for ownership and sandbox behavior.
+
 ## Test Supabase project settings
 
 1. Keep Google enabled under Authentication > Providers.

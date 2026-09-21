@@ -72,3 +72,43 @@
   #delivery-map { height: 270px; }
 }
 @media (max-width: 360px) { .return-shell { padding: 0 14px; } .tracking-card { padding: 18px; } }
+.customer-account { display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: 12px; margin: -12px 0 24px; color: var(--muted); font-size: 11px; }
+.customer-account span { overflow-wrap: anywhere; }
+.customer-account b { font-weight: 500; color: var(--ink); }
+.customer-account button { border: 0; border-left: 1px solid var(--line); padding: 0 0 0 12px; background: none; color: var(--muted); font-size: 11px; }
+/* Customer tracking focuses on the latest package update. */
+.tracking-icon { color: #e84735; background: #fff0eb; border-radius: 14px; }
+.tracking-steps .complete { color: #ba4435; }
+.tracking-steps .complete .step-dot { background: #fff0eb; border-color: #ffe0d7; }
+.tracking-steps .complete::after { background: #f8c7b9 !important; }
+.tracking-steps [aria-current="step"] .step-dot { background: #ec503b; border-color: #ec503b; box-shadow: 0 0 0 5px #fff1ec; }
+.map-card { grid-column: 1; padding: 24px; overflow: hidden; }
+.order-card { grid-column: 2; grid-row: 1 / span 2; }
+.package-map-heading { display: flex; justify-content: space-between; gap: 16px; align-items: center; }
+.package-map-heading h2 { font-size: 17px; letter-spacing: -.3px; margin-top: 5px; }
+.map-eyebrow { color: #c64b38; font-size: 9px; font-weight: 600; letter-spacing: 1.5px; }
+.package-update { margin: 18px 0 6px; font-size: 14px; line-height: 1.7; font-weight: 500; overflow-wrap: anywhere; }
+.package-location-time { color: var(--muted); font-size: 11px; line-height: 1.8; margin: 0 0 18px; }
+.package-map-frame { position: relative; border: 1px solid #e9e8e4; border-radius: 12px; overflow: hidden; }
+#delivery-map { height: 290px; margin: 0; border-radius: 0; background: #f2f1ed; }
+#delivery-map .leaflet-tile-pane { filter: saturate(.22) contrast(.94) brightness(1.04); }
+#delivery-map .leaflet-control-attribution { font-size: 9px; background: #ffffffda; }
+.map-location-badge { position: absolute; top: 13px; left: 13px; z-index: 1; background: #fffffff0; border: 1px solid #e4e5e6; border-radius: 20px; padding: 7px 11px; font-size: 10px; color: #596170; box-shadow: 0 2px 8px #18202e08; pointer-events: none; }
+.map-recenter { display: grid; place-items: center; width: 34px; height: 34px; border: 1px solid var(--line); border-radius: 8px; background: white; color: #6e7683; font-size: 22px; }
+.package-marker { display: grid; place-items: center; border: 6px solid #ed583226; border-radius: 50%; }
+.package-marker > span { display: grid; place-items: center; width: 38px; height: 38px; border: 3px solid white; border-radius: 50%; background: #ed5038; color: white; box-shadow: 0 3px 12px #a3393340; }
+.location-empty { padding: 16px; background: #f8f9fb; border-radius: 8px; color: var(--muted); line-height: 1.8; font-size: 12px; }
+.package-map-actions { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px; margin-top: 16px; }
+.package-map-actions > button { border: 0; padding: 0; background: none; color: var(--muted); font-size: 11px; text-decoration: underline; text-underline-offset: 3px; }
+.package-map-actions .courier-link { margin: 0; padding: 9px 12px; color: #cb4431; background: #fff2ec; border-radius: 7px; text-decoration: none; font-size: 11px; font-weight: 600; }
+@media (max-width: 780px) {
+  .map-card, .order-card { grid-column: 1; grid-row: auto; }
+  .map-card { padding: 20px; }
+  #delivery-map { height: 265px; }
+  .tracking-steps { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; margin: 26px 0 20px; }
+  .tracking-steps li { display: block; min-height: 0; padding: 0; }
+  .tracking-steps li:not(:last-child)::after { width: auto; height: 2px; top: 12px; bottom: auto; left: 33px; right: 0; }
+  .tracking-steps .step-dot { width: 26px; height: 26px; font-size: 10px; margin-bottom: 10px; }
+  .tracking-steps b { font-size: 10px; line-height: 1.5; }
+  .tracking-steps small { display: none; }
+}

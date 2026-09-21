@@ -48,7 +48,16 @@ function ez_tracking_history(array $entries): array
         if ($status === '' || $time === '') continue;
         $note = mb_substr(trim((string) ($entry['note'] ?? '')), 0, 500);
         $key = $status . ':' . $time;
-        if (!isset($result[$key]) || $note !== '') $result[$key] = ['status' => $status, 'updated_at' => $time, 'note' => $note];
+        $location = is_array($entry['location'] ?? null) ? $entry['location'] : [];
+        $coordinate = ez_tracking_coordinate($entry['coordinate'] ?? $location['coordinate'] ?? null);
+        $previous = $result[$key] ?? [];
+        $name = $entry['location_name'] ?? $location['name'] ?? '';
+        $name = is_string($name) ? mb_substr(trim($name), 0, 120) : '';
+        $result[$key] = [
+            'status' => $status, 'updated_at' => $time, 'note' => $note !== '' ? $note : ($previous['note'] ?? ''),
+            'coordinate' => $coordinate ?? $previous['coordinate'] ?? null,
+            'location_name' => $name !== '' ? $name : ($previous['location_name'] ?? ''),
+        ];
     }
     $result = array_values($result);
     usort($result, static fn(array $a, array $b): int => strcmp($a['updated_at'], $b['updated_at']));
@@ -209,6 +218,21 @@ function ez_public_order_tracking(array $order): array
     }
     // A returned or cancelled shipment must never present the delivered step as current.
     if ($shipment !== 'delivered') $progress = min($progress, 3);
+    $latestLocation = null;
+    foreach ($history as $entry) {
+        // Coordinates must be explicitly supplied with a scan. Never geocode or interpolate a route from a note.
+        if ($entry['coordinate'] !== null) $latestLocation = $entry['coordinate'] + [
+            'label' => $entry['location_name'] ?: 'Last reported package location',
+            'updated_at' => $entry['updated_at'], 'source' => 'courier_scan',
+        ];
+    }
+    if (in_array($shipment, ['picked', 'delivered'], true)) {
+        $coordinate = ez_tracking_coordinate($order['biteship_locations'][$shipment === 'picked' ? 'origin' : 'destination'] ?? null);
+        $confirmedAt = (string) ($order['biteship_status_at'] ?? '');
+        if ($coordinate !== null && $confirmedAt !== '' && ($latestLocation === null || $confirmedAt >= $latestLocation['updated_at'])) {
+            $latestLocation = $coordinate + ['label' => $shipment === 'picked' ? 'Picked up at the seller' : 'Delivered to the destination', 'updated_at' => $confirmedAt, 'source' => 'confirmed_stop'];
+        }
+    }
     return [
         'stage' => $stage, 'progress' => $progress, 'shipment_status' => $shipment,
         'seller_accepted' => $paid && !empty($order['accepted_at']),
@@ -224,6 +248,7 @@ function ez_public_order_tracking(array $order): array
             'destination' => ez_tracking_coordinate($order['biteship_locations']['destination'] ?? null),
         ] : ['origin' => null, 'destination' => null],
         'history' => $history,
+        'latest_location' => $latestLocation,
         'updated_at' => $order['biteship_status_at'] ?? $order['tracking_checked_at'] ?? $order['updated_at'] ?? '',
         'unavailable' => $paid && !$skipped && !empty($order['tracking_unavailable']),
     ];

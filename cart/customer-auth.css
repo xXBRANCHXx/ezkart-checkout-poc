@@ -1,0 +1,13 @@
+.customer-login { max-width: 440px; margin: 70px auto; padding: 0 24px; text-align: center; }
+.login-symbol { width: 56px; height: 56px; margin: 0 auto 28px; display: grid; place-items: center; border-radius: 18px; background: #fff0ed; color: #f04435; font-size: 28px; }
+.login-eyebrow { font-size: 10px; font-weight: 600; letter-spacing: 1.6px; color: #d94737; }
+.customer-login h1 { font-size: 38px; line-height: 1.18; letter-spacing: -1.4px; font-weight: 600; margin: 16px 0; }
+.customer-login > p { font-size: 14px; line-height: 1.8; color: var(--muted); }
+.customer-login form { margin: 30px 0 20px; }
+.google-button { width: 100%; display: flex; align-items: center; justify-content: center; gap: 12px; min-height: 50px; border: 1px solid #d6dce5; border-radius: 9px; background: white; font-size: 14px; font-weight: 600; }
+.google-button:hover { background: #f2f5f8; }
+.customer-login .login-hint { font-size: 12px; margin: 20px 0 30px; }
+.login-back { font-size: 12px; text-decoration: none; color: var(--muted); }
+.customer-login label { display: block; text-align: left; font-size: 12px; margin-bottom: 8px; }
+#customer-mfa { width: 100%; margin-bottom: 14px; padding: 14px; border: 1px solid var(--line); border-radius: 8px; font-size: 24px; text-align: center; letter-spacing: 8px; }
+@media (max-width: 480px) { .customer-login { margin: 48px auto; } .customer-login h1 { font-size: 34px; } }
