@@ -8,6 +8,14 @@ function curl_setopt_array(object $handle, array $options): bool { $handle->opti
 function curl_exec(object $handle): string {
     $payload = json_decode($handle->options[CURLOPT_POSTFIELDS] ?? '{}', true);
     file_put_contents(getenv('EZKART_TEST_CAPTURE'), json_encode(['url' => $handle->url, 'method' => !empty($handle->options[CURLOPT_POST]) ? 'POST' : 'GET', 'body' => $handle->options[CURLOPT_POSTFIELDS] ?? '', 'headers' => $handle->options[CURLOPT_HTTPHEADER] ?? []]) . "\n", FILE_APPEND | LOCK_EX);
+    if (str_starts_with($handle->url, 'https://photon.komoot.io/api/?')) {
+        $file = dirname(getenv('EZKART_TEST_CAPTURE')) . '/address-response.json';
+        if (is_file($file)) return (string) file_get_contents($file);
+        return json_encode(['type' => 'FeatureCollection', 'features' => [
+            ['type' => 'Feature', 'geometry' => ['type' => 'Point', 'coordinates' => [106.8214547, -6.1957601]], 'properties' => ['name' => 'Example delivery building', 'street' => 'Jalan Teluk Betung', 'housenumber' => '12', 'city' => 'Jakarta', 'countrycode' => 'ID', 'type' => 'house']],
+            ['type' => 'Feature', 'geometry' => ['type' => 'Point', 'coordinates' => [106.82, -6.19]], 'properties' => ['name' => '<img src=x onerror="window.addressInjected=true"> Example road', 'city' => 'Jakarta', 'countrycode' => 'ID', 'type' => 'street']],
+        ]]);
+    }
     if (str_starts_with($handle->url, 'https://routing.openstreetmap.de/routed-car/route/v1/driving/')) {
         $file = dirname(getenv('EZKART_TEST_CAPTURE')) . '/route-response.json';
         if (is_file($file)) return (string) file_get_contents($file);

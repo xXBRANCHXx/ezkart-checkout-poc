@@ -31,9 +31,9 @@ header('X-Content-Type-Options: nosniff');
   <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="payment.css?v=2">
   <link rel="stylesheet" href="vendor/maplibre/maplibre-gl.css?v=5.24.0">
-  <link rel="stylesheet" href="tracking.css?v=6">
-  <script src="tracking-map.js?v=2" defer></script>
-  <?php if ($isTrackingSandbox): ?><script src="tracking-sandbox.js?v=1" defer></script><?php endif; ?>
+  <link rel="stylesheet" href="tracking.css?v=7">
+  <script src="tracking-map.js?v=3" defer></script>
+  <?php if ($isTrackingSandbox): ?><script src="tracking-sandbox.js?v=2" defer></script><?php endif; ?>
   <script src="tracking.js?v=6" defer></script>
   <title>Track your order · Ezkart</title>
 </head>
@@ -81,6 +81,18 @@ header('X-Content-Type-Options: nosniff');
           <div class="package-map-heading"><div><span class="map-eyebrow">FOLLOW YOUR DELIVERY</span><h2 id="map-title">Delivery map</h2></div><span id="map-location-badge" class="map-location-badge">Last reported location</span></div>
           <p id="package-update" class="package-update"></p>
           <p id="package-location-time" class="package-location-time"></p>
+          <?php if ($isTrackingSandbox): ?>
+          <section class="sandbox-address" aria-label="Test a delivery address">
+            <form id="sandbox-address-form" data-csrf="<?= htmlspecialchars($customerCsrf, ENT_QUOTES, 'UTF-8') ?>">
+              <label for="sandbox-address-input">Try a delivery address</label>
+              <div class="address-search-row"><input id="sandbox-address-input" type="search" placeholder="Street address or place in Indonesia" minlength="3" maxlength="240" autocomplete="off" required><button type="submit">Find address</button></div>
+            </form>
+            <p id="sandbox-address-status" role="status">Search, then choose a match to see its delivery pin.</p>
+            <ul id="sandbox-address-results" class="address-results" aria-label="Address matches" hidden></ul>
+            <div id="sandbox-address-selected" class="address-selected" hidden><div><span>Deliver to</span><strong id="sandbox-address-name"></strong><p id="sandbox-address-detail"></p></div><div class="address-preview-actions"><button id="sandbox-address-focus" type="button">Show delivery pin</button><button id="sandbox-address-reset" type="button">Use sample address</button></div></div>
+            <p class="address-search-credit">Address search: <a href="https://photon.komoot.io/" target="_blank" rel="noopener noreferrer">Photon</a> · <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© OpenStreetMap</a></p>
+          </section>
+          <?php endif; ?>
           <div class="package-map-frame" id="package-map-frame" hidden>
             <div id="delivery-map" role="region" aria-label="Delivery map showing the package’s last reported location and suggested road route"></div>
             <div id="map-loading" class="map-loading" role="status">Loading delivery map…</div>

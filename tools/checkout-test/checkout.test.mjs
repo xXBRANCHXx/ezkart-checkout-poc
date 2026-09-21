@@ -40,7 +40,7 @@ async function prepareMap(page) {
   await page.route("**/tracking-map-style.json?*", (route) => route.fulfill({ json: { version: 8, sources: {}, layers: [{ id: "background", type: "background", paint: { "background-color": "#eef1f4" } }] } }));
   await page.route("**/api/tracking-route.php?*", async (route) => {
     const stage = new URL(route.request().url()).searchParams.get("stage");
-    const tracking = stage ? await page.evaluate((stage) => JSON.parse(document.querySelector("#tracking-sandbox-data").textContent)[stage].data.tracking, stage) : {
+    const tracking = stage ? await page.evaluate(() => window.ezkartTrackingSandbox.read().tracking) : {
       latest_location: { latitude: -6.2441792, longitude: 106.783529 },
       locations: { destination: { latitude: -6.28927, longitude: 106.77492000000007 } },
     };
@@ -1265,7 +1265,7 @@ test("customer tracking UI follows fulfillment, preserves updates on failure, an
     await page.locator("#delivery-map").scrollIntoViewIfNeeded();
     await page.locator('.shipment-pin-truck').waitFor();
     assert.equal(await page.locator('.shipment-pin-truck').count(), 1);
-    assert.equal(await page.locator('.shipment-pin-home').count(), 1);
+    assert.equal(await page.locator('.shipment-pin-destination').count(), 1);
     assert.equal(await page.locator('#delivery-map img').count(), 0, "Provider labels cannot inject HTML.");
     assert.equal(await page.evaluate(() => window.injected), undefined);
     const centered = await page.evaluate(() => {
@@ -1372,6 +1372,124 @@ test("road routing authenticates owners, caches results and failures, and enforc
   assert.ok(calls.every(call => call.url.startsWith("https://routing.openstreetmap.de/")), "Routing cannot refresh Biteship or write to a provider.");
 });
 
+test("sandbox address search authenticates, validates, caches, and binds route previews to its session", async (t) => {
+  const app = await setup(); t.after(() => app.close());
+  const cookie = app.customerCookie();
+  const auth = { Cookie: `${cookie.name}=${cookie.value}` };
+  const html = await (await fetch(app.base + "/cart/tracking-sandbox.php?stage=transit", { headers: auth })).text();
+  const csrf = html.match(/id="sandbox-address-form" data-csrf="([a-f0-9]+)"/)[1];
+  const headers = { ...auth, "X-Ezkart-CSRF": csrf };
+  const endpoint = "/cart/api/tracking-address.php";
+  assert.equal((await app.request(endpoint, { address: "Jakarta" })).status, 401);
+  assert.equal((await app.request(endpoint, { address: "Jakarta" }, auth)).status, 403);
+  assert.equal((await app.request(endpoint, { address: "Jakarta" }, { ...headers, Origin: "https://another.example" })).status, 403);
+  for (const address of ["", "ab", "x".repeat(241), ["Jakarta"]]) assert.equal((await app.request(endpoint, { address }, headers)).status, 422);
+  assert.deepEqual(await app.calls(), []);
+  const first = await app.request(endpoint, { address: "Jalan Teluk Betung 12, Jakarta" }, headers);
+  assert.equal(first.status, 200); assert.equal(first.data.results.length, 2);
+  const place = first.data.results[0];
+  assert.match(place.id, /^[a-f0-9]{24}$/);
+  assert.equal(place.kind, "Building match");
+  assert.deepEqual(place.coordinate, { latitude: -6.1957601, longitude: 106.8214547 });
+  const cached = await app.request(endpoint, { address: "Jalan Teluk Betung 12, Jakarta" }, headers);
+  assert.deepEqual(cached.data.results.map(({ id, ...p }) => p), first.data.results.map(({ id, ...p }) => p));
+  const calls = await app.calls(); assert.equal(calls.length, 1);
+  const provider = new URL(calls[0].url); assert.equal(provider.hostname, "photon.komoot.io");
+  assert.equal(provider.searchParams.get("q"), "Jalan Teluk Betung 12, Jakarta");
+  assert.equal(provider.searchParams.get("countrycode"), "ID");
+  const routeUrl = "/cart/api/tracking-route.php?sandbox=1&stage=transit&place=" + place.id;
+  const route = await app.request(routeUrl, undefined, auth);
+  assert.equal(route.status, 200); assert.deepEqual(route.data.route.to, place.coordinate);
+  assert.equal(route.data.route.from.latitude, -6.2441792);
+  const other = app.customerCookie("other@example.com", "other-user");
+  assert.equal((await app.request(routeUrl, undefined, { Cookie: `${other.name}=${other.value}` })).status, 422);
+  assert.equal((await app.request(routeUrl + "wrong", undefined, auth)).status, 422);
+  const directory = app.cli("echo dirname(ez_order_directory('sandbox')) . '/tracking-addresses';");
+  const usage = (count, last = 0) => writeFile(join(directory, "requests.lock"), JSON.stringify({ day: new Date().toISOString().slice(0,10), count, last }));
+  await usage(100);
+  assert.equal((await app.request(endpoint, { address: "Other street" }, headers)).status, 503);
+  assert.equal((await app.request(endpoint, { address: "Jalan Teluk Betung 12, Jakarta" }, headers)).status, 200);
+  await usage(1, Date.now()/1000);
+  assert.equal((await app.request(endpoint, { address: "Other street" }, headers)).status, 503);
+  await usage(1);
+  await writeFile(join(app.directory, "address-response.json"), JSON.stringify({ features: [
+    { geometry: { type: "Point", coordinates: [999, -6] }, properties: { name: "Invalid", countrycode: "ID" } },
+    { geometry: { type: "Point", coordinates: [106, -6] }, properties: { name: "Wrong country", countrycode: "DE" } },
+  ] }));
+  assert.deepEqual((await app.request(endpoint, { address: "Other street" }, headers)).data.results, []);
+  await usage(2);
+  await writeFile(join(app.directory, "address-response.json"), "invalid provider response");
+  assert.equal((await app.request(endpoint, { address: "Third street" }, headers)).status, 503);
+  assert.equal((await app.request(endpoint, { address: "Third street" }, headers)).status, 503);
+  assert.equal((await app.calls()).filter(call => call.url.includes("photon.komoot.io")).length, 3);
+  assert.equal(app.cli("echo count(glob(ez_order_directory() . '/*.json') ?: []);"), "0");
+  for (const overrides of [{ EZKART_DEPLOYMENT_ENVIRONMENT: "production" }, { EZKART_COMMERCE_ENVIRONMENT: "production" }]) {
+    const blocked = await setup(overrides);
+    try { assert.equal((await blocked.request(endpoint, { address: "Jakarta" })).status, 404); }
+    finally { await blocked.close(); }
+  }
+});
+
+test("sandbox address entry previews a destination pin and route without moving the reported truck", async (t) => {
+  const { chromium } = await import("../builder-mcp/node_modules/playwright/index.mjs");
+  const app = await setup(); t.after(() => app.close());
+  const browser = await chromium.launch({ headless: true }); t.after(() => browser.close());
+  for (const width of [1280, 390]) {
+    const page = await browser.newPage({ viewport: { width, height: 1000 } });
+    const errors = []; page.on("pageerror", error => errors.push(error.message));
+    const routes = await prepareMap(page);
+    await page.context().addCookies([app.customerCookie()]);
+    await page.goto(app.base + "/cart/tracking-sandbox.php?stage=transit");
+    await page.locator("#delivery-map").scrollIntoViewIfNeeded();
+    await page.locator(".shipment-pin-truck").waitFor();
+    const reported = await page.evaluate(() => window.ezkartTrackingSandbox.read().tracking.latest_location);
+    const entered = page.getByLabel("Try a delivery address");
+    await entered.fill("Jalan Teluk Betung 12, Jakarta");
+    await page.getByRole("button", { name: "Find address", exact: true }).click();
+    await page.locator("#sandbox-address-results button").first().waitFor();
+    assert.equal(await page.locator("#sandbox-address-results img").count(), 0);
+    assert.equal(await page.evaluate(() => window.addressInjected), undefined);
+    await page.getByRole("button", { name: /Example delivery building/ }).click();
+    await page.waitForFunction(() => document.querySelector("#map-route-note").textContent.startsWith("Suggested"));
+    const data = await page.evaluate(() => ({ center: deliveryMapUnderTest.getCenter(), tracking: window.ezkartTrackingSandbox.read().tracking, route: deliveryMapUnderTest.getSource("delivery-route").serialize().data.geometry }));
+    assert.equal(data.center.lat, -6.1957601); assert.equal(data.center.lng, 106.8214547);
+    assert.deepEqual(data.tracking.latest_location, reported);
+    assert.deepEqual(data.route.coordinates.at(-1), [106.8214547, -6.1957601]);
+    assert.equal(await page.locator(".shipment-pin-destination svg").count(), 1);
+    assert.equal(await page.locator(".shipment-pin-home").count(), 0);
+    assert.match(await page.locator("#sandbox-address-status").textContent(), /Building match/);
+    assert.match(await page.locator("#sandbox-address-name").textContent(), /Example delivery building/);
+    await page.locator("#map-route-toggle").click();
+    assert.ok(await page.locator(".shipment-pin-destination").isVisible());
+    const requestCount = routes.requests.length;
+    await page.getByRole("button", { name: "Show delivery pin", exact: true }).click();
+    assert.equal(routes.requests.length, requestCount, "Re-centering does not re-search or re-route.");
+    assert.equal(await page.evaluate(() => deliveryMapUnderTest.getCenter().lat), -6.1957601);
+    await page.locator("#sandbox-stage").selectOption("delivered");
+    assert.equal(await page.locator(".shipment-pin-truck").count(), 0);
+    assert.deepEqual(await page.evaluate(() => ({ latitude: window.ezkartTrackingSandbox.read().tracking.latest_location.latitude, longitude: window.ezkartTrackingSandbox.read().tracking.latest_location.longitude })), { latitude: -6.1957601, longitude: 106.8214547 });
+    await page.locator("#sandbox-stage").selectOption("returning");
+    await page.waitForFunction(() => document.querySelector("#map-route-note").textContent.startsWith("Suggested"));
+    assert.equal(routes.requests.at(-1).to.latitude, -6.2253114, "A return still goes to the seller.");
+    await page.locator("#sandbox-stage").selectOption("transit");
+    await page.getByRole("button", { name: "Use sample address", exact: true }).click();
+    assert.equal(await page.locator("#sandbox-address-selected").isVisible(), false);
+    assert.equal(await page.evaluate(() => window.ezkartTrackingSandbox.read().tracking.locations.destination.latitude), -6.28927);
+    await page.route("**/api/tracking-address.php", route => route.fulfill({ json: { ok: true, results: [] } }));
+    await entered.fill("Unknown address"); await page.getByRole("button", { name: "Find address", exact: true }).click();
+    await page.waitForFunction(() => document.querySelector("#sandbox-address-status").textContent.startsWith("No match"));
+    await page.unroute("**/api/tracking-address.php");
+    await page.route("**/api/tracking-address.php", route => route.fulfill({ status: 503, json: { ok: false, error: "Address search is temporarily unavailable." } }));
+    await entered.fill("Unavailable address"); await page.getByRole("button", { name: "Find address", exact: true }).click();
+    await page.waitForFunction(() => document.querySelector("#sandbox-address-status").textContent.includes("temporarily unavailable"));
+    assert.equal(await page.getByRole("button", { name: "Find address", exact: true }).isDisabled(), false);
+    assert.equal(await page.locator(".shipment-pin-truck").count(), 1);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+    assert.deepEqual(errors, []);
+    await page.close();
+  }
+});
+
 test("road routes ignore stale results, use return destinations, and clear after delivery", async (t) => {
   const { chromium } = await import("../builder-mcp/node_modules/playwright/index.mjs");
   const app = await setup(); t.after(() => app.close());
@@ -1397,7 +1515,7 @@ test("road routes ignore stale results, use return destinations, and clear after
   await page.waitForFunction(() => document.querySelector("#return-title").textContent.includes("delivered"));
   assert.deepEqual((await routeData()).features, [], "An old route cannot reappear after delivery.");
   assert.equal(await page.locator(".shipment-pin-truck").count(), 0);
-  assert.equal(await page.locator(".shipment-pin-home").count(), 1);
+  assert.equal(await page.locator(".shipment-pin-destination").count(), 1);
   assert.equal(await page.locator("#map-route-summary").isVisible(), false);
   await page.locator("#sandbox-stage").selectOption("cancelled");
   assert.equal(await page.locator(".shipment-pin-truck").count(), 1);
@@ -1471,7 +1589,7 @@ test("interactive tracking walkthrough uses the customer renderer without orders
     assert.equal(await page.locator("#package-location-empty").isVisible(), true);
     await page.locator("#map-route-toggle").click();
     await page.locator("#delivery-map").scrollIntoViewIfNeeded();
-    await page.locator(".shipment-pin-home").waitFor();
+    await page.locator(".shipment-pin-destination").waitFor();
     assert.equal(await page.locator(".shipment-pin-pickup").count(), 1);
     assert.equal(await page.locator(".shipment-pin-truck").count(), 0, "Booking never invents a package location.");
     assert.equal(await page.locator("#courier-tracking-link").isVisible(), false, "No fabricated live courier tracking URL.");

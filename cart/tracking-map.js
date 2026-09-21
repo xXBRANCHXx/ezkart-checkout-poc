@@ -4,11 +4,11 @@
   const validPoint = (p) => p && Number.isFinite(p.latitude) && Number.isFinite(p.longitude) && Math.abs(p.latitude) <= 90 && Math.abs(p.longitude) <= 180 && (p.latitude !== 0 || p.longitude !== 0);
   const point = (p) => [p.longitude, p.latitude];
   const samePoint = (a, b) => a && b && a.latitude === b.latitude && a.longitude === b.longitude;
-  let map, sdk, loading, ready = false, failedAt = 0, state, stateKey = "", overview = false;
+  let map, sdk, loading, ready = false, failedAt = 0, state, stateKey = "", overview = false, destinationFocus = false;
   let markers = [], routeKey = "", routePath = [], routeSequence = 0, viewSequence = 0;
   const routeCache = new Map();
-  const truck = '<svg viewBox="0 0 48 36" width="43" height="33" fill="none" aria-hidden="true"><path d="M4 7a3 3 0 0 1 3-3h23v23H4V7Z" fill="#f3563c"/><path d="M30 13h8l7 9v5H30V13Z" fill="#182b45"/><path d="M33 16h4l5 6h-9v-6Z" fill="#dcecf6"/><path d="M1 14h9M1 19h7" stroke="#fff" stroke-width="2" stroke-linecap="round"/><path d="m15 12 5-3 5 3-5 3-5-3Zm0 0v6l5 3 5-3v-6m-5 3v6" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/><path d="M5 27h39" stroke="#182b45" stroke-width="2"/><circle cx="12" cy="28" r="5" fill="#182b45" stroke="#fff" stroke-width="2"/><circle cx="37" cy="28" r="5" fill="#182b45" stroke="#fff" stroke-width="2"/><circle cx="12" cy="28" r="1.5" fill="#fff"/><circle cx="37" cy="28" r="1.5" fill="#fff"/></svg>';
-  const home = '<svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 11 9-8 9 8M5 10v11h14V10M9 21v-7h6v7"/></svg>';
+  const truck = '<svg viewBox="0 0 64 46" width="64" height="46" fill="none" aria-hidden="true"><ellipse cx="33" cy="39" rx="25" ry="3" fill="#182b45" opacity=".12"/><path d="M7 9a4 4 0 0 1 4-4h27a4 4 0 0 1 4 4v5h7a5 5 0 0 1 4 2l7 10v7a3 3 0 0 1-3 3H7V9Z" fill="#fff" stroke="#fff" stroke-width="6" stroke-linejoin="round"/><path d="M7 9a4 4 0 0 1 4-4h27a4 4 0 0 1 4 4v25H7V9Z" fill="#ee563d"/><path d="M42 14h7a5 5 0 0 1 4 2l7 10v7a3 3 0 0 1-3 3H42V14Z" fill="#df462f"/><path d="M46 18h3a2 2 0 0 1 1.6.8L55 25h-9v-7Z" fill="#e7f0f4"/><path d="M7 29h35v6H7z" fill="#d9422c"/><path d="M15 15h16m-16 5h10" stroke="#fff" stroke-width="3" stroke-linecap="round"/><path d="M46 29h4" stroke="#a52f23" stroke-width="2" stroke-linecap="round"/><path d="M58 28h2v4h-2" fill="#fff3d5"/><path d="M6 35h54" stroke="#182b45" stroke-width="2.5" stroke-linecap="round"/><circle cx="17" cy="35" r="6" fill="#182b45" stroke="#fff" stroke-width="2"/><circle cx="50" cy="35" r="6" fill="#182b45" stroke="#fff" stroke-width="2"/><circle cx="17" cy="35" r="2" fill="#e3eaf0"/><circle cx="50" cy="35" r="2" fill="#e3eaf0"/></svg>';
+  const destinationPin = '<svg viewBox="0 0 40 50" width="40" height="50" fill="none" aria-hidden="true"><path d="M20 47S3 29 3 20a17 17 0 1 1 34 0c0 9-17 27-17 27Z" fill="#182b45" stroke="#fff" stroke-width="3" stroke-linejoin="round"/><circle cx="20" cy="20" r="6" fill="#fff"/></svg>';
 
   function failMap() {
     failedAt = Date.now();
@@ -37,7 +37,7 @@
     const symbol = document.createElement("span");
     symbol.className = "shipment-pin-symbol";
     if (kind === "truck") symbol.innerHTML = truck;
-    else if (kind === "home") symbol.innerHTML = home;
+    else if (kind === "destination") symbol.innerHTML = destinationPin;
     else symbol.textContent = "";
     const caption = document.createElement("span");
     caption.className = "shipment-pin-label";
@@ -48,26 +48,28 @@
     element.setAttribute("aria-label", title);
     element.style.zIndex = kind === "truck" ? "3" : "2";
     element.append(content);
-    const marker = new maplibregl.Marker({ element, anchor: "center" }).setLngLat(point(coordinate)).addTo(map);
+    const marker = new maplibregl.Marker({ element, anchor: kind === "destination" ? "bottom" : "center" }).setLngLat(point(coordinate)).addTo(map);
     markers.push(marker);
   }
   function paintMarkers() {
     markers.forEach((marker) => marker.remove());
     markers = [];
     const { location, origin, destination, completed, returning } = state;
-    if (destination && !samePoint(location, destination)) makeMarker(destination, "home", returning ? "Seller" : "Delivery", returning ? "Return address" : "Delivery address");
+    if (destination && !samePoint(location, destination)) makeMarker(destination, "destination", returning ? "Seller" : "Delivery", returning ? "Return address" : "Delivery address");
     if ((overview || !location) && origin && !samePoint(origin, location) && !samePoint(origin, destination)) makeMarker(origin, "pickup", "Pickup", "Pickup address");
-    if (location) makeMarker(location, completed ? "home" : "truck", completed ? (returning ? "Returned" : "Delivered") : "Your package", "Last reported location: " + location.label);
+    if (location) makeMarker(location, completed ? "destination" : "truck", completed ? (returning ? "Returned" : "Delivered") : "Your package", "Last reported location: " + location.label);
   }
   function positionMap() {
     if (!map || !state) return;
     viewSequence++;
-    if (overview || !state.location) {
+    if (destinationFocus && state.destination) {
+      map.jumpTo({ center: point(state.destination), zoom: 16 });
+    } else if (overview || !state.location) {
       const bounds = new maplibregl.LngLatBounds();
       const coordinates = [...routePath, ...[state.location, state.origin, state.destination].filter(Boolean).map(point)];
       if (!coordinates.length) return;
       coordinates.forEach((coordinate) => bounds.extend(coordinate));
-      map.fitBounds(bounds, { padding: { top: 80, bottom: 85, left: 70, right: 70 }, maxZoom: 16, duration: 0 });
+      map.fitBounds(bounds, { padding: { top: 80, bottom: innerWidth <= 780 ? 115 : 85, left: 70, right: 70 }, maxZoom: 16, duration: 0 });
     } else {
       map.jumpTo({ center: point(state.location), zoom: 15 });
     }
@@ -95,7 +97,7 @@
       let path = routeCache.get(key);
       if (!path) {
         const params = new URLSearchParams({ order: document.querySelector(".return-shell").dataset.order });
-        if (window.ezkartTrackingSandbox) { params.delete("order"); params.set("sandbox", "1"); params.set("stage", new URLSearchParams(location.search).get("stage") || "processing"); }
+        if (window.ezkartTrackingSandbox) { params.delete("order"); params.set("sandbox", "1"); params.set("stage", new URLSearchParams(location.search).get("stage") || "processing"); if (window.ezkartTrackingSandbox.place()) params.set("place", window.ezkartTrackingSandbox.place().id); }
         const response = await fetch("api/tracking-route.php?" + params, { cache: "no-store", signal: AbortSignal.timeout(10000) });
         const data = await response.json();
         const route = data.route;
@@ -159,6 +161,7 @@
     const key = JSON.stringify(next);
     if (key === stateKey) return;
     const firstLocation = !state?.location && !!location;
+    if (state && (state.returning !== returning || state.completed !== completed)) destinationFocus = false;
     state = next; stateKey = key;
     if (!destination) overview = false;
     $("package-location-empty").hidden = !!location;
@@ -178,11 +181,12 @@
     if (rect.bottom > 0 && rect.top < innerHeight) void drawMap();
   }
   $("map-recenter").addEventListener("click", () => {
-    overview = false;
+    overview = false; destinationFocus = false;
     $("map-route-toggle").textContent = "View full route";
     paintMarkers(); positionMap();
   });
   $("map-route-toggle").addEventListener("click", () => {
+    destinationFocus = false;
     overview = !overview;
     $("map-route-toggle").textContent = overview ? "Back to package" : "View full route";
     if (ready) { paintMarkers(); positionMap(); }
@@ -191,5 +195,12 @@
   $("map-zoom-in").addEventListener("click", () => { if (map) map.setZoom(Math.min(19, map.getZoom() + 1)); });
   $("map-zoom-out").addEventListener("click", () => { if (map) map.setZoom(Math.max(3, map.getZoom() - 1)); });
   new IntersectionObserver((entries) => { if (entries.some((entry) => entry.isIntersecting)) void drawMap(); }).observe($("package-map-frame"));
-  window.ezkartDeliveryMap = { update, validPoint };
+  function focusDestination() {
+    if (!state?.destination) return;
+    overview = false; destinationFocus = true;
+    $("map-route-toggle").textContent = "View full route";
+    $("package-map-frame").scrollIntoView({ block: "center", behavior: "smooth" });
+    if (ready) { paintMarkers(); positionMap(); } else void drawMap();
+  }
+  window.ezkartDeliveryMap = { update, validPoint, focusDestination };
 })();
