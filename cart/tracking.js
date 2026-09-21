@@ -60,7 +60,7 @@
   let map, markers, mapKey = "", locations, latestLocation, overview = false;
   const validPoint = (point) => point && Number.isFinite(point.latitude) && Number.isFinite(point.longitude) && Math.abs(point.latitude) <= 90 && Math.abs(point.longitude) <= 180;
   const point = (coordinate) => [coordinate.latitude, coordinate.longitude];
-  function positionMap() {
+  function positionMap(resetView = true) {
     if (!map) return;
     markers.clearLayers();
     if (!overview && latestLocation) {
@@ -68,14 +68,14 @@
       const tooltip = document.createElement("span");
       tooltip.textContent = latestLocation.label;
       L.marker(point(latestLocation), { icon, title: latestLocation.label, alt: "Package’s last reported location" }).addTo(markers).bindTooltip(tooltip, { direction: "top", offset: [0, -26] });
-      map.setView(point(latestLocation), 13, { animate: false });
+      if (resetView) map.setView(point(latestLocation), 15, { animate: false });
     } else if (locations) {
       const bounds = [];
       for (const [key, label, letter] of [["origin", "Pickup", "P"], ["destination", "Delivery", "D"]]) {
         bounds.push(point(locations[key]));
         L.marker(point(locations[key]), { title: label, alt: label, icon: L.divIcon({ className: "", html: `<span class="delivery-pin ${key}-dot">${letter}</span>`, iconSize: [30, 30], iconAnchor: [15, 15] }) }).addTo(markers).bindTooltip(label);
       }
-      map.fitBounds(bounds, { padding: [48, 48], maxZoom: 13, animate: false });
+      if (resetView) map.fitBounds(bounds, { padding: [48, 48], maxZoom: 14, animate: false });
     }
   }
   function drawMap() {
@@ -83,7 +83,8 @@
     if (!window.L) { byId("map-notice").hidden = false; return; }
     try {
       if (!map) {
-        map = L.map("delivery-map", { scrollWheelZoom: false, zoomControl: false });
+        map = L.map("delivery-map", { scrollWheelZoom: true, touchZoom: true, zoomControl: false });
+        L.control.zoom({ position: "bottomright" }).addTo(map);
         markers = L.layerGroup().addTo(map);
         L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
           maxZoom: 19, referrerPolicy: "strict-origin-when-cross-origin",
@@ -96,14 +97,14 @@
   }
   const mapObserver = new IntersectionObserver((entries) => { if (entries.some((entry) => entry.isIntersecting)) drawMap(); });
   mapObserver.observe(byId("package-map-frame"));
-  function updateMapView() {
+  function updateMapView(resetView = true) {
     byId("package-map-frame").hidden = !(latestLocation || (overview && locations));
     byId("map-recenter").hidden = byId("package-map-frame").hidden;
     byId("map-route-toggle").hidden = !locations;
     setText("map-route-toggle", overview ? (latestLocation ? "Back to package location" : "Hide route overview") : "View pickup & delivery");
     setText("map-location-badge", overview ? "Pickup & delivery overview" : latestLocation?.source === "confirmed_stop" ? "Confirmed by the courier" : "Last reported location");
     byId("package-location-empty").hidden = !!latestLocation || overview;
-    if (map) { map.invalidateSize(); positionMap(); }
+    if (map) { map.invalidateSize(); positionMap(resetView); }
     const rect = byId("package-map-frame").getBoundingClientRect();
     if (rect.bottom > 0 && rect.top < innerHeight) drawMap();
   }
@@ -114,16 +115,22 @@
     const latest = (t.history || []).at(-1);
     setText("package-update", latest?.note || labels[t.shipment_status] || "Waiting for the courier’s first update.");
     const location = validPoint(t.latest_location) ? t.latest_location : null;
+    const googleLink = byId("google-maps-link");
+    googleLink.hidden = !location;
+    if (location) googleLink.href = "https://www.google.com/maps/search/?" + new URLSearchParams({ api: "1", query: location.latitude + "," + location.longitude });
+    else googleLink.removeAttribute("href");
     setText("package-location-time", location ? location.label + " · " + date(location.updated_at) : latest ? date(latest.updated_at) : "Updates appear as the courier shares them.");
     const route = validPoint(t.locations?.origin) && validPoint(t.locations?.destination) ? t.locations : null;
     const key = JSON.stringify([location, route]);
     if (key === mapKey) return;
     mapKey = key;
+    const firstLocation = !latestLocation && !!location;
     latestLocation = location;
     locations = route;
-    overview = false;
+    if (!route) overview = false;
     byId("map-notice").hidden = true;
-    updateMapView();
+    // Keep the customer's zoom and pan when a background update changes the scan.
+    updateMapView(firstLocation);
   }
   let historyKey = "";
   function renderHistory(t) {
@@ -156,7 +163,6 @@
     const [title, message] = presentation(data);
     setText("return-title", title);
     setText("return-message", message);
-    setText("return-icon", attention ? "!" : data.status === "PAID" ? "✓" : "◷");
     byId("tracking-sandbox").hidden = data.environment !== "sandbox";
     setText("return-total", money.format(data.total));
     setText("return-reference", data.payment_reference || "Waiting");
@@ -194,8 +200,8 @@
     if (!order) return;
     if (manual) {
       manualCheck = true;
-      byId("refresh-tracking").disabled = byId("retry-tracking").disabled = true;
-      byId("refresh-tracking").setAttribute("aria-busy", "true");
+      byId("retry-tracking").disabled = true;
+      byId("retry-tracking").setAttribute("aria-busy", "true");
     }
     if (requestInFlight) return;
     clearTimeout(timer);
@@ -231,14 +237,13 @@
       clearTimeout(timeout);
       requestInFlight = false;
       if (manualCheck) {
-        byId("refresh-tracking").disabled = byId("retry-tracking").disabled = false;
-        byId("refresh-tracking").removeAttribute("aria-busy");
+        byId("retry-tracking").disabled = false;
+        byId("retry-tracking").removeAttribute("aria-busy");
         manualCheck = false;
       }
       if (!sandbox && !notFound && !document.hidden) timer = setTimeout(check, Math.min(60000, (lastData?.status === "PAID" ? 15000 : 5000) * (failures + 1)));
     }
   }
-  byId("refresh-tracking").addEventListener("click", () => check(true));
   byId("retry-tracking").addEventListener("click", () => check(true));
   document.addEventListener("visibilitychange", () => { clearTimeout(timer); if (!document.hidden) check(); });
   window.addEventListener("online", () => check());

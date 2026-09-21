@@ -31,10 +31,10 @@ header('X-Content-Type-Options: nosniff');
   <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="payment.css?v=2">
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css?v=1.9.4">
-  <link rel="stylesheet" href="tracking.css?v=3">
+  <link rel="stylesheet" href="tracking.css?v=4">
   <script src="vendor/leaflet/leaflet.js?v=1.9.4" defer></script>
   <?php if ($isTrackingSandbox): ?><script src="tracking-sandbox.js?v=1" defer></script><?php endif; ?>
-  <script src="tracking.js?v=4" defer></script>
+  <script src="tracking.js?v=5" defer></script>
   <title>Track your order · Ezkart</title>
 </head>
 <body>
@@ -66,7 +66,7 @@ header('X-Content-Type-Options: nosniff');
     <a id="switch-tracking-account" class="copy-button courier-link" href="<?= htmlspecialchars($customerNext . (str_contains($customerNext, '?') ? '&' : '?') . 'signin=1', ENT_QUOTES, 'UTF-8') ?>" hidden>Use a different Google account</a>
     <div id="tracking-content" hidden>
       <section class="tracking-card" aria-labelledby="return-title">
-        <div class="tracking-heading"><span id="return-icon" class="tracking-icon" aria-hidden="true">…</span><div><h2 id="return-title">Confirming your payment</h2><p id="return-message" role="status">We’re checking your payment status.</p></div></div>
+        <div class="tracking-heading"><h2 id="return-title">Confirming your payment</h2><p id="return-message" role="status">We’re checking your payment status.</p></div>
         <ol id="tracking-steps" class="tracking-steps" aria-label="Order progress">
           <li><span class="step-dot" aria-hidden="true">1</span><div><b>Payment received</b><small>Payment confirmed</small></div></li>
           <li><span class="step-dot" aria-hidden="true">2</span><div><b>Seller processing</b><small id="processing-detail">Preparing your order</small></div></li>
@@ -74,7 +74,7 @@ header('X-Content-Type-Options: nosniff');
           <li><span class="step-dot" aria-hidden="true">4</span><div><b>On the way</b><small>Picked up by the courier</small></div></li>
           <li><span class="step-dot" aria-hidden="true">5</span><div><b>Delivered</b><small>Order received</small></div></li>
         </ol>
-        <div class="tracking-controls"><span id="tracking-updated">Updates appear here automatically.</span><button id="refresh-tracking" class="copy-button" type="button">Refresh status</button></div>
+        <div class="tracking-controls"><span id="tracking-updated">Updates appear here automatically.</span><span>Updates automatically</span></div>
       </section>
       <div class="tracking-layout">
         <section id="delivery-map-section" class="tracking-card map-card" aria-labelledby="map-title" hidden>
@@ -84,7 +84,7 @@ header('X-Content-Type-Options: nosniff');
           <div class="package-map-frame" id="package-map-frame" hidden><span id="map-location-badge" class="map-location-badge">Last reported location</span><div id="delivery-map" role="region" aria-label="Map of the package’s last reported location"></div></div>
           <p id="package-location-empty" class="location-empty" hidden>The courier hasn’t shared a package location yet. Follow the latest updates below.</p>
           <p id="map-notice" class="muted" role="status" hidden>The map is temporarily unavailable. Your order updates are still shown above.</p>
-          <div class="package-map-actions"><button id="map-route-toggle" type="button" hidden>View pickup & delivery</button><a id="courier-tracking-link" class="courier-link" target="_blank" rel="noopener noreferrer" hidden>View courier tracking ↗</a></div>
+          <div class="package-map-actions"><button id="map-route-toggle" type="button" hidden>View pickup & delivery</button><a id="google-maps-link" target="_blank" rel="noopener noreferrer" hidden>Open in Google Maps ↗</a><a id="courier-tracking-link" class="courier-link" target="_blank" rel="noopener noreferrer" hidden>View courier tracking ↗</a></div>
         </section>
         <section class="tracking-card journey-card" aria-labelledby="journey-title">
           <h2 id="journey-title">Order journey</h2>
