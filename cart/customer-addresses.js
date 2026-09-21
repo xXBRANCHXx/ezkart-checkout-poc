@@ -2,9 +2,9 @@
   "use strict";
   window.ezkartAddressBook = function (container, options = {}) {
     const endpoint = "/cart/admin/customer-addresses.php";
-    let book = { addresses: [], default_id: "", revision: 0 }, csrf = "", email = "", selected = "", authenticated = false, busy = false, editing = null, draft = {}, popup, deadline = 0, pollTimer, checking = false, starting = false;
+    let book = { addresses: [], default_id: "", revision: 0 }, csrf = "", email = "", selected = "", authenticated = false, busy = false, editing = null, draft = {}, popup, deadline = 0, pollTimer, checking = false, starting = false, editorRevision = 0, needsReview = false, pinFields = {};
     container.classList.add("address-book");
-    container.innerHTML = '<div class="address-book-heading"><strong>Saved addresses</strong><span class="address-book-count"></span></div><p class="address-book-account"></p><div class="address-book-guest" hidden><button type="button" class="address-book-signin">Sign in with Google</button><span>Save up to 3 addresses for next time.</span></div><div class="address-book-member" hidden><div class="address-book-picker"><label><span class="address-book-sr">Saved address</span><select aria-label="Saved address"></select></label><button type="button" data-book-action="use">Use address</button></div><p class="address-book-summary"></p><div class="address-book-actions"><button type="button" data-book-action="default">Set as default</button><button type="button" data-book-action="edit">Edit</button><button type="button" data-book-action="delete">Remove</button><button type="button" data-book-action="add">Save current address</button></div></div><p class="address-book-status" role="status"></p>';
+    container.innerHTML = '<div class="address-book-heading"><strong>Saved addresses</strong><span class="address-book-count"></span></div><p class="address-book-account"></p><div class="address-book-guest" hidden><button type="button" class="address-book-signin">Sign in with Google</button><span>Save up to 3 addresses for next time.</span></div><div class="address-book-member" hidden><div class="address-book-picker"><label><span class="address-book-sr">Saved address</span><select aria-label="Saved address"></select></label><button type="button" data-book-action="use">Use address</button></div><p class="address-book-summary"></p><div class="address-book-actions"><button type="button" data-book-action="default">Set as default</button><button type="button" data-book-action="edit">Edit</button><button type="button" data-book-action="delete">Remove</button><button type="button" data-book-action="add">Add address</button></div></div><p class="address-book-status" role="status"></p>';
     const $ = selector => container.querySelector(selector);
     const status = $(".address-book-status"), picker = $("select");
     const dialog = document.createElement("dialog"); dialog.className = "address-book-dialog";
@@ -14,6 +14,31 @@
     const form = dialog.querySelector("form"), error = dialog.querySelector(".address-book-error");
     const chosen = () => book.addresses.find(address => address.id === selected);
     const fields = ["label", "fullName", "phone", "address", "location", "postalCode", "note"];
+    const geoFields = ["address", "location", "postalCode"];
+    const readFields = () => Object.fromEntries(fields.map(field => [field, form.elements[field].value.trim()]));
+    const pinContainer = document.createElement("div");
+    form.querySelector(".address-book-fields").before(pinContainer);
+    const pickerMap = window.ezkartAddressPicker(pinContainer, {
+      csrf: () => csrf,
+      addressText: () => [...new Set(geoFields.map(key => form.elements[key].value.trim()).filter(Boolean))].join(", "),
+      onPlace: place => {
+        form.elements.address.value = place.address_line || place.name;
+        form.elements.location.value = place.location || "";
+        form.elements.postalCode.value = place.postalCode || "";
+      },
+      onPin: () => { pinFields = readFields(); },
+    });
+    form.addEventListener("input", event => {
+      const key = event.target.name;
+      if (geoFields.includes(key) && pinFields[key] && event.target.value.trim() !== pinFields[key]) pickerMap.clear();
+    });
+    form.addEventListener("focusin", event => {
+      if (!event.target.matches("input, textarea, select")) return;
+      const footer = form.querySelector(".address-book-dialog-actions").getBoundingClientRect();
+      if (event.target.getBoundingClientRect().bottom > footer.top) event.target.scrollIntoView({ block: "center" });
+    });
+    dialog.addEventListener("close", () => pickerMap.close());
+    dialog.addEventListener("cancel", event => { if (busy) event.preventDefault(); });
     function render() {
       $(".address-book-count").textContent = authenticated ? `${book.addresses.length} / 3` : "";
       $(".address-book-account").textContent = email ? `Saved to ${email}` : "";
@@ -23,6 +48,7 @@
       picker.replaceChildren(...book.addresses.map(address => { const option = document.createElement("option"); option.value = address.id; option.textContent = address.label + (address.id === book.default_id ? " · Default" : ""); return option; }));
       picker.value = selected;
       $(".address-book-picker").hidden = !book.addresses.length;
+      $('[data-book-action="use"]').hidden = !options.onUse;
       const address = chosen();
       $(".address-book-summary").textContent = address ? `${address.address}, ${address.location} ${address.postalCode}` : "No saved addresses yet.";
       for (const action of ["default", "edit", "delete"]) $(`[data-book-action="${action}"]`).hidden = !address;
@@ -58,28 +84,37 @@
       editing = address?.id || null; draft = { ...(address || initial || options.current?.() || {}) };
       for (const field of fields) form.elements[field].value = draft[field] || (field === "label" ? "Home" : "");
       form.elements.make_default.checked = !book.addresses.length || editing === book.default_id;
-      error.textContent = ""; dialog.showModal();
+      editorRevision = book.revision; needsReview = false; pinFields = readFields();
+      form.querySelector('[type="submit"]').disabled = false;
+      error.textContent = ""; dialog.showModal(); pickerMap.reset(draft);
     }
     async function mutate(payload) {
       if (busy) return false;
-      busy = true; render(); form.querySelector('[type="submit"]').disabled = true;
+      busy = true; form.inert = true; dialog.setAttribute("aria-busy", "true"); render(); form.querySelector('[type="submit"]').disabled = true;
       try {
-        const response = await fetch(endpoint, { method: "POST", cache: "no-store", headers: { "Content-Type": "application/json", "X-Ezkart-CSRF": csrf }, body: JSON.stringify({ ...payload, revision: book.revision }), signal: AbortSignal.timeout(15000) });
+        const response = await fetch(endpoint, { method: "POST", cache: "no-store", headers: { "Content-Type": "application/json", "X-Ezkart-CSRF": csrf }, body: JSON.stringify({ revision: book.revision, ...payload }), signal: AbortSignal.timeout(15000) });
         const data = await response.json();
-        if (!response.ok || !data.ok) { if ([401, 409].includes(response.status)) await read(); throw new Error(data.error || "The address could not be saved."); }
+        if (!response.ok || !data.ok) {
+          if ([401, 409].includes(response.status)) await read();
+          if (response.status === 409 && dialog.open) { needsReview = true; throw new Error("Saved addresses changed in another tab. Close this form and reopen it to review the latest details."); }
+          throw new Error(data.error || "The address could not be saved.");
+        }
         const oldIds = book.addresses.map(address => address.id);
         book = data.book; csrf = data.csrf; email = data.email;
         if (["save", "pin"].includes(payload.action)) selected = payload.id || book.addresses.find(address => !oldIds.includes(address.id))?.id || book.default_id;
         render(); status.textContent = payload.action === "delete" ? "Address removed." : payload.action === "default" ? "Default address updated." : "Address saved to your account.";
         return true;
       } catch (failure) { status.textContent = failure.message; error.textContent = failure.message; return false; }
-      finally { busy = false; render(); form.querySelector('[type="submit"]').disabled = false; }
+      finally { busy = false; form.inert = false; dialog.removeAttribute("aria-busy"); render(); form.querySelector('[type="submit"]').disabled = needsReview; }
     }
     form.addEventListener("submit", async event => {
       event.preventDefault();
-      const address = Object.fromEntries(fields.map(field => [field, form.elements[field].value.trim()]));
-      address.coordinate = ["address", "location", "postalCode"].every(key => !draft[key] || address[key] === draft[key]) ? draft.coordinate || null : null;
-      if (await mutate({ action: "save", id: editing || undefined, address, make_default: form.elements.make_default.checked })) { dialog.close(); options.onSaved?.(chosen()); }
+      if (busy || needsReview) return;
+      const address = readFields(), pin = pickerMap.read();
+      address.coordinate = pin.coordinate;
+      if (await mutate({ action: "save", id: editing || undefined, address, pin_confirmed: pin.confirmed, revision: editorRevision, make_default: form.elements.make_default.checked })) {
+        dialog.close(); options.onUse?.(chosen(), { automatic: false }); options.onSaved?.(chosen());
+      }
     });
     dialog.querySelectorAll("[data-close]").forEach(button => button.addEventListener("click", () => dialog.close()));
     picker.addEventListener("change", () => { selected = picker.value; render(); });
@@ -132,13 +167,6 @@
         const existing = id ? book.addresses.find(address => address.id === id) : null;
         if (id && !existing) { status.textContent = "This saved address was removed. Select an address again."; return; }
         openEditor(existing, initial);
-      },
-      updatePin: async (id, coordinate, original) => {
-        const address = book.addresses.find(address => address.id === id);
-        if (!address) throw new Error("This saved address was removed. Select an address again.");
-        if (["address", "location", "postalCode"].some(key => address[key] !== original[key])) throw new Error("This address changed. Cancel and select it again before placing its pin.");
-        if (!await mutate({ action: "pin", id, coordinate })) throw new Error(status.textContent || "The pin could not be saved. Please try again.");
-        return chosen();
       },
       reload: () => read(false, false),
     };

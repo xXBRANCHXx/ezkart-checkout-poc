@@ -31,9 +31,9 @@ header('X-Content-Type-Options: nosniff');
   <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="payment.css?v=2">
   <link rel="stylesheet" href="vendor/maplibre/maplibre-gl.css?v=5.24.0">
-  <link rel="stylesheet" href="tracking.css?v=8">
-  <script src="tracking-map.js?v=4" defer></script>
-  <?php if ($isTrackingSandbox): ?><link rel="stylesheet" href="customer-addresses.css?v=1"><script src="customer-addresses.js?v=2" defer></script><script src="tracking-sandbox.js?v=5" defer></script><?php endif; ?>
+  <link rel="stylesheet" href="tracking.css?v=9">
+  <script src="tracking-map.js?v=5" defer></script>
+  <?php if ($isTrackingSandbox): ?><script src="tracking-sandbox.js?v=6" defer></script><?php endif; ?>
   <script src="tracking.js?v=6" defer></script>
   <title>Track your order · Ezkart</title>
 </head>
@@ -82,29 +82,16 @@ header('X-Content-Type-Options: nosniff');
           <p id="package-update" class="package-update"></p>
           <p id="package-location-time" class="package-location-time"></p>
           <?php if ($isTrackingSandbox): ?>
-          <div id="sandbox-address-book"></div>
-          <section class="sandbox-address" aria-label="Test a delivery address">
-            <form id="sandbox-address-form" data-csrf="<?= htmlspecialchars($customerCsrf, ENT_QUOTES, 'UTF-8') ?>">
-              <label for="sandbox-address-input">Try a delivery address</label>
-              <div class="address-search-row"><input id="sandbox-address-input" type="search" placeholder="Address, Plus Code, or latitude, longitude" minlength="3" maxlength="500" autocomplete="off" required><button type="submit">Find address</button></div>
-              <button id="sandbox-address-map" class="address-map-choice" type="button">Choose on map</button>
-            </form>
-            <p id="sandbox-address-status" role="status">Search, then choose a match to see its delivery pin.</p>
-            <ul id="sandbox-address-results" class="address-results" aria-label="Address matches" hidden></ul>
-            <div id="sandbox-address-selected" class="address-selected" hidden><div><span>Deliver to</span><strong id="sandbox-address-name"></strong><p id="sandbox-address-detail"></p></div><div class="address-preview-actions"><button id="sandbox-address-adjust" type="button">Adjust delivery pin</button><button id="sandbox-address-save" type="button">Save this address</button><button id="sandbox-address-focus" type="button">Show delivery pin</button><button id="sandbox-address-reset" type="button">Use sample address</button></div></div>
-            <p class="address-search-credit">Address search: <a href="https://photon.komoot.io/" target="_blank" rel="noopener noreferrer">Photon</a> · <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© OpenStreetMap</a></p>
+          <section class="sandbox-destination" aria-label="Sandbox delivery address">
+            <label for="sandbox-destination">Preview destination</label>
+            <select id="sandbox-destination"><option value="">Sample delivery address</option></select>
+            <p id="sandbox-destination-detail" role="status">Using the sample delivery address.</p>
+            <div><button id="sandbox-address-focus" type="button">Show delivery pin</button><a href="addresses.php" target="_blank" rel="noopener">Manage saved addresses ↗</a></div>
           </section>
           <?php endif; ?>
           <div class="package-map-frame" id="package-map-frame" hidden>
             <div id="delivery-map" role="region" aria-label="Delivery map showing the package’s last reported location and suggested road route"></div>
             <div id="map-loading" class="map-loading" role="status">Loading delivery map…</div>
-            <?php if ($isTrackingSandbox): ?>
-            <div id="map-pin-editor" class="map-pin-editor" hidden>
-              <div class="map-pin-instruction"><strong>Pin your delivery entrance</strong><span>Move the map to position the pin. Zoom in for a closer look.</span></div>
-              <span id="map-pin-symbol" class="map-pin-center" aria-hidden="true"></span>
-              <div class="map-pin-footer"><p id="map-pin-error" role="alert"></p><div><button id="map-pin-cancel" type="button">Cancel</button><button id="map-pin-save" type="button">Use this pin</button></div></div>
-            </div>
-            <?php endif; ?>
             <div class="map-tools" id="map-tools" hidden>
               <button id="map-recenter" type="button" aria-label="Center map on package location" title="Center on package"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4"/></svg></button>
               <div class="map-zoom"><button id="map-zoom-in" type="button" aria-label="Zoom in">+</button><button id="map-zoom-out" type="button" aria-label="Zoom out">−</button></div>

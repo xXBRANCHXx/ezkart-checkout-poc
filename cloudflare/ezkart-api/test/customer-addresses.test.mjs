@@ -58,6 +58,11 @@ test("customer addresses verify identity, isolate owners, enforce limits and rej
   assert.deepEqual(pinned.book.addresses, before.addresses.map(a => a.id === second.id ? { ...a, coordinate: pin } : a));
   assert.equal(pinned.book.default_id, before.default_id);
   assert.equal((await call(alice, { action: "pin", id: second.id, revision: before.revision, coordinate: pin })).status, 409);
+  const created = await call(bob, { action: "save", revision: 0, address });
+  const editId = created.book.addresses[0].id;
+  const confirmed = await call(bob, { action: "save", revision: 1, id: editId, address: { ...address, address: "Jalan Updated entrance 18" }, pin_confirmed: true });
+  assert.equal(confirmed.status, 200);
+  assert.deepEqual(confirmed.book.addresses[0].coordinate, address.coordinate, "An explicit pin in the address form survives text changes in the same save.");
   await assert.rejects(db.prepare("INSERT INTO customer_address_books (auth_user_id,addresses_json,updated_at) VALUES ('limit','[{},{},{},{}]','now')").run(), /CHECK constraint/);
   assert.equal(await db.prepare("SELECT name FROM sqlite_master WHERE name = 'seller_memberships'").first(), null);
 });

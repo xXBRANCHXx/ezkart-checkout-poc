@@ -43,7 +43,7 @@ export async function changeCustomerAddressBook(env, owner, input) {
     const address = cleanAddress(input.address, id);
     if (index >= 0) {
       const old = addresses[index];
-      if (["address", "location", "postalCode"].some(key => old[key] !== address[key]) && JSON.stringify(old.coordinate) === JSON.stringify(address.coordinate)) address.coordinate = null;
+      if (input.pin_confirmed !== true && ["address", "location", "postalCode"].some(key => old[key] !== address[key]) && JSON.stringify(old.coordinate) === JSON.stringify(address.coordinate)) address.coordinate = null;
       addresses[index] = address;
     } else addresses.push(address);
     if (!defaultId || input.make_default === true) defaultId = id;

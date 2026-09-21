@@ -46,8 +46,9 @@ function ez_customer_next(string $value): string
 {
     $parts = parse_url($value);
     if (!is_array($parts) || isset($parts['scheme']) || isset($parts['host'])
-        || !in_array($parts['path'] ?? '', ['/cart/return.php', '/cart/tracking-sandbox.php', '/cart/', '/cart/index.html'], true)) return '/cart/return.php';
+        || !in_array($parts['path'] ?? '', ['/cart/return.php', '/cart/tracking-sandbox.php', '/cart/addresses.php', '/cart/', '/cart/index.html'], true)) return '/cart/return.php';
     parse_str($parts['query'] ?? '', $query);
+    if ($parts['path'] === '/cart/addresses.php') return '/cart/addresses.php' . (($query['new'] ?? '') === '1' ? '?new=1' : '');
     if (in_array($parts['path'], ['/cart/', '/cart/index.html'], true)) {
         $shop = is_string($query['shop'] ?? null) && preg_match('/^[a-z0-9][a-z0-9_-]{5,79}$/D', $query['shop']) === 1 ? $query['shop'] : '';
         return $parts['path'] . ($shop !== '' ? '?shop=' . rawurlencode($shop) : '');
