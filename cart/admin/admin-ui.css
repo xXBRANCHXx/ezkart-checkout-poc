@@ -16,11 +16,9 @@
   --ui-hover: #eceef1;
   --ui-focus: #697586;
   --ui-radius: 8px;
-  --ui-action-top: #df3224;
-  --ui-action-bottom: #d62936;
-  --ui-action-hover-top: #d62a1d;
-  --ui-action-hover-bottom: #c82030;
-  --ui-action-border: #c72926;
+  --ui-action: #ff4c16;
+  --ui-action-hover: #f23e0b;
+  --ui-action-active: #df3508;
   --ink: var(--ui-ink);
   --muted: var(--ui-muted);
   --line: var(--ui-line);
@@ -114,7 +112,7 @@ button, input, select, textarea { font-family: inherit; }
   background-color: var(--ui-field);
   border-color: transparent;
 }
-/* Shared action buttons: clear labels, recognizable icons, and tactile states. */
+/* Shared action buttons: flat Ezkart orange-red with recognizable icons. */
 .dashboard-page :is(.action-button, .ui-button, .sq-command-actions > button, .page-creator-dialog footer > button, .sq-component-dialog footer > button, .sq-export-dialog footer > button):not(:where(.sq-page-preview *, .shop-preview *, [hidden])) {
   min-height: 40px;
   padding: 10px 14px;
@@ -123,45 +121,49 @@ button, input, select, textarea { font-family: inherit; }
   justify-content: center;
   gap: 8px;
   color: var(--ui-ink);
-  background: linear-gradient(180deg, #fff, #fafbfc);
+  background: #fff;
   border: 1px solid #dce1e7;
   border-radius: 10px;
-  box-shadow: 0 1px 2px #18212d0a, inset 0 1px 0 #fff;
+  box-shadow: none;
   font-size: 12px;
   font-weight: 600 !important;
   line-height: 1.25;
   text-decoration: none;
   cursor: pointer;
-  transition: background .16s ease, border-color .16s ease, box-shadow .16s ease, transform .16s ease;
+  transition: background-color .16s ease, border-color .16s ease;
 }
 .dashboard-page :is(.action-button, .ui-button, .sq-command-actions > button, .page-creator-dialog footer > button, .sq-component-dialog footer > button, .sq-export-dialog footer > button):not(:where(.sq-page-preview *, .shop-preview *, [hidden])).primary {
   color: #fff;
-  background: linear-gradient(165deg, var(--ui-action-top), var(--ui-action-bottom));
-  border-color: var(--ui-action-border);
-  box-shadow: 0 2px 4px #c7292629, inset 0 1px 0 #ffffff30;
+  background: var(--ui-action);
+  border-color: transparent;
+  box-shadow: none;
 }
 @media (hover: hover) {
   .dashboard-page :is(.action-button, .ui-button, .sq-command-actions > button, .page-creator-dialog footer > button, .sq-component-dialog footer > button, .sq-export-dialog footer > button):not(:where(.sq-page-preview *, .shop-preview *, [hidden])):hover:not(:disabled):not([aria-disabled="true"]) {
     color: var(--ui-ink);
     background: #f0f2f5;
     border-color: #bdc5d0;
-    box-shadow: 0 3px 7px #18212d12, inset 0 1px 0 #ffffffb3;
-    transform: translateY(-1px);
+    box-shadow: none;
+    transform: none;
   }
   .dashboard-page :is(.action-button, .ui-button, .sq-command-actions > button, .page-creator-dialog footer > button, .sq-component-dialog footer > button, .sq-export-dialog footer > button):not(:where(.sq-page-preview *, .shop-preview *, [hidden])).primary:hover:not(:disabled):not([aria-disabled="true"]) {
     color: #fff;
-    background: linear-gradient(165deg, var(--ui-action-hover-top), var(--ui-action-hover-bottom));
-    border-color: #b92328;
-    box-shadow: 0 4px 9px #c7292633, inset 0 1px 0 #ffffff30;
+    background: var(--ui-action-hover);
+    border-color: transparent;
+    box-shadow: none;
   }
 }
 .dashboard-page :is(.action-button, .ui-button, .sq-command-actions > button, .page-creator-dialog footer > button, .sq-component-dialog footer > button, .sq-export-dialog footer > button):not(:where(.sq-page-preview *, .shop-preview *, [hidden])):focus-visible {
-  outline: 2px solid #d52b28;
+  outline: 2px solid var(--ui-action);
   outline-offset: 3px;
 }
 .dashboard-page :is(.action-button, .ui-button, .sq-command-actions > button, .page-creator-dialog footer > button, .sq-component-dialog footer > button, .sq-export-dialog footer > button):not(:where(.sq-page-preview *, .shop-preview *, [hidden])):active:not(:disabled):not([aria-disabled="true"]) {
-  transform: translateY(0);
-  box-shadow: inset 0 1px 3px #18212d26;
+  background: #e7ebf0;
+  transform: none;
+  box-shadow: none;
+}
+.dashboard-page :is(.action-button, .ui-button, .sq-command-actions > button, .page-creator-dialog footer > button, .sq-component-dialog footer > button, .sq-export-dialog footer > button):not(:where(.sq-page-preview *, .shop-preview *, [hidden])).primary:active:not(:disabled):not([aria-disabled="true"]) {
+  background: var(--ui-action-active);
 }
 .dashboard-page :is(.action-button, .ui-button, .sq-command-actions > button, .page-creator-dialog footer > button, .sq-component-dialog footer > button, .sq-export-dialog footer > button):not(:where(.sq-page-preview *, .shop-preview *, [hidden])):is(:disabled, [aria-disabled="true"]) {
   color: #8b929e;
