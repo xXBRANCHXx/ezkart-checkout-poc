@@ -93,6 +93,8 @@ test('all five navigation layouts fit, stay pinned and expose working menus in c
     await page.keyboard.press('Escape');
     assert.equal(await toggle.getAttribute('aria-expanded'), 'false');
     await invoke('setDevice', { device: 'desktop' });
+    await invoke('settle');
+    const editorHeight = await page.locator('.sq-authored-navigation').evaluate(n=>n.offsetHeight);
     html = await invoke('previewHtml');
     await render.goto(ws.url + '/nav-preview');
     await render.evaluate(() => document.fonts.ready);
@@ -121,7 +123,10 @@ test('all five navigation layouts fit, stay pinned and expose working menus in c
         await render.locator('.sq-nav-mobile-menu>a').first().click();
         assert.equal(await render.locator('.sq-nav-mobile-menu').isVisible(), false);
       }
-      if (width === 1440) await render.screenshot({ path: join(out, `${layout}-desktop.png`) });
+      if (width === 1440) {
+        assert.equal(await render.locator('.sq-authored-navigation').evaluate(n=>n.offsetHeight), editorHeight, `${layout} keeps its editor height in Preview`);
+        await render.screenshot({ path: join(out, `${layout}-desktop.png`) });
+      }
     }
   }
   // Longer translated links trigger the same usable menu before they overlap.
@@ -133,4 +138,35 @@ test('all five navigation layouts fit, stay pinned and expose working menus in c
   assert.equal(await render.locator('.sq-nav-menu-toggle').isVisible(), true);
   await render.locator('.sq-nav-menu-toggle').click();
   assert.equal(await render.locator('.sq-nav-mobile-menu>a').count(), 6);
+}));
+
+test('navigation height stays consistent with blurred surfaces and section backgrounds', () => fixture(async ({page,invoke,browser,ws})=>{
+  await addFromLibrary(page,'split');
+  await invoke('updateSection',{id:'navigation',gradient:{kind:'linear',from:'#ff8430',to:'#f82177',base:'#ffffff',opacity:100,angle:135}});
+  await invoke('updateSection',{id:'navigation',background:'#ffffff'});
+  await page.locator('.sq-navigation-advanced').evaluate(n=>n.open=true);
+  await page.locator('[data-sq-navigation-surface=blur]').click();
+  await page.locator('[data-sq-navigation-opacity]').fill('9');
+  await page.locator('[data-sq-navigation-opacity]').dispatchEvent('input');
+  await page.locator('[data-sq-navigation-blur]').fill('32');
+  await page.locator('[data-sq-navigation-blur]').dispatchEvent('input');
+  await page.locator('[data-sq-navigation-hide-scroll]').locator('..').click();
+  await invoke('settle');
+  const editor=await page.locator('.sq-authored-navigation').evaluate(n=>({height:n.offsetHeight,layerHidden:getComputedStyle(n.querySelector('.sq-gradient-layer')).display==='none'}));
+  const response=page.waitForResponse(r=>new URL(r.url()).pathname==='/cart/admin/page-preview.php');
+  await page.locator('[data-sq-preview]').click();await response;
+  const frame=await page.locator('[data-sq-live-preview-frame]').elementHandle().then(n=>n.contentFrame());
+  await frame.locator('.sq-authored-navigation').waitFor();
+  const preview=await frame.locator('.sq-authored-navigation').evaluate(n=>({height:n.offsetHeight,layerHidden:getComputedStyle(n.querySelector('.sq-gradient-layer')).display==='none'}));
+  assert.equal(preview.height,editor.height,'A hidden background must not add a grid row');
+  assert.equal(editor.layerHidden,true);
+  assert.equal(preview.layerHidden,true);
+  await page.locator('[data-sq-preview-close]').click();
+  await invoke('updateSection',{id:'navigation',gradient:{kind:'linear',from:'#ff8430',to:'#f82177',base:'#ffffff',opacity:100,angle:135}});
+  const html=await invoke('previewHtml');
+  const render=await browser.newPage({viewport:{width:1440,height:900},reducedMotion:'reduce'});
+  await render.route('**/nav-gradient',route=>route.fulfill({body:html,contentType:'text/html'}));
+  await render.goto(ws.url+'/nav-gradient');
+  assert.equal(await render.locator('.sq-authored-navigation').evaluate(n=>n.offsetHeight),editor.height,'An active gradient stays out of the header layout');
+  assert.equal(await render.locator('.sq-authored-navigation .sq-gradient-layer').evaluate(n=>getComputedStyle(n).position),'absolute');
 }));

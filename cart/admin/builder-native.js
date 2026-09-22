@@ -229,6 +229,7 @@
       gridTemplateColumns: "minmax(0, 1fr)",
       containerType: "inline-size",
       width: "360px",
+      flexShrink: "0",
       maxWidth: "100%",
       height: "auto",
       fontSize: "16px",
@@ -1356,7 +1357,10 @@
             right: "auto",
             bottom: "auto",
           };
-      if (config.type === "product" && resizing) props.height = "auto";
+      if (config.type === "product" && resizing) {
+        props.minHeight = props.height;
+        props.height = "auto";
+      }
       Object.assign(node.style, props);
       guides?.update();
     };
@@ -1438,8 +1442,15 @@
       if (node.tagName === "TH" && config.tableScope)
         node.setAttribute("scope", config.tableScope);
       else node.removeAttribute("scope");
-      if (config.type === "product")
+      if (config.type === "product") {
+        const appearances = [config, ...Object.values(config.states || {})];
+        const customSize = appearances.flatMap(appearance => [appearance, ...(appearance.responsive || [])])
+          .some(({props = {}}) => (props.width && props.width !== defaults.product.width)
+            || (props.height && props.height !== 'auto')
+            || (props.minHeight && !['0', '0px', 'auto'].includes(props.minHeight)));
+        node.toggleAttribute('data-product-default-size', !customSize);
         hooks.renderProduct?.(node, config.productId);
+      }
       if (config.initialState)
         node.dataset.nativeStateConfig = JSON.stringify({
           initial: config.initialState,

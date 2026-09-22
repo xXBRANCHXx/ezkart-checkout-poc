@@ -3282,6 +3282,7 @@
       if (productGridFitFrame) return;
       productGridFitFrame = window.requestAnimationFrame(() => {
         productGridFitFrame = 0;
+        const matchedCardsChanged = globalThis.EzkartComponents?.fitProductCards(previewRoot);
         const changedSections = new Set();
         previewRoot?.querySelectorAll("[data-sq-product-grid]").forEach((grid) => {
           grid.querySelectorAll(":scope > [data-product-card]").forEach((card) => {
@@ -3290,7 +3291,7 @@
           if (fitProductGridHeight(grid)) changedSections.add(grid.closest("[data-sq-fluid]"));
         });
         changedSections.forEach(applyFluidSection);
-        if (changedSections.size && selectedElement?.matches("[data-sq-product-grid]")) {
+        if ((changedSections.size || matchedCardsChanged) && selectedElement?.matches("[data-sq-product-grid]")) {
           syncElementControls();
           refreshElementOverlay();
         }
@@ -3392,7 +3393,10 @@
         removeLayoutGrid(true, Math.max(260, duration - hold));
       }, hold);
     };
-    previewRoot?.addEventListener('native-refresh', () => requestAnimationFrame(refreshLayoutGrid));
+    previewRoot?.addEventListener('native-refresh', () => requestAnimationFrame(() => {
+      refreshLayoutGrid();
+      if (selectedElement?.isConnected) refreshElementOverlay();
+    }));
     if (typeof ResizeObserver === 'function' && previewRoot) new ResizeObserver(() => requestAnimationFrame(refreshLayoutGrid)).observe(previewRoot);
     const elementTypeName = (element) => element?.dataset.sqElementType === "component-instance"
       ? `${element.dataset.sqComponentName || "Component"} instance`
@@ -4035,7 +4039,7 @@
         if (labelInput) labelInput.value = action.textContent.trim();
         if (typeInput) typeInput.value = linkType;
         if (linkInput) linkInput.value = link;
-        if (linkWrap) linkWrap.hidden = ["checkout", "none"].includes(linkType);
+        if (linkWrap) linkWrap.hidden = ["products", "checkout", "none"].includes(linkType);
         if (linkLabel) linkLabel.textContent = ({ section: "Section ID", url: "Web address", email: "Email address", phone: "Phone number" })[linkType] || "Destination";
         if (newTab) { newTab.checked = action.dataset.sqNewTab === "true" || action.target === "_blank"; newTab.closest("label").hidden = linkType !== "url"; }
         const checkoutTest = sqStudio.querySelector("[data-sq-checkout-test]");
@@ -4073,7 +4077,7 @@
         if (ctaTarget) {
           const ctaType = inferredActionType(cta);
           const ctaDestination = inferredActionTarget(cta, ctaType);
-          ctaTarget.value = ctaType === "checkout" ? "checkout" : ctaType === "section" ? `#${ctaDestination.replace(/^#/, "") || "products"}` : ctaDestination || "#products";
+          ctaTarget.value = ctaType === "products" ? "products" : ctaType === "checkout" ? "checkout" : ctaType === "section" ? `#${ctaDestination.replace(/^#/, "") || "products"}` : ctaDestination || "#products";
         }
       }
       const buttonRole = selectedElement.dataset.sqButtonRole || "primary";
@@ -5963,6 +5967,7 @@
       action.dataset.sqLink = target;
       action.dataset.sqNewTab = String(newTab);
       let href = "";
+      if (type === "products") href = "#products";
       if (type === "section") href = `#${target.replace(/^#/, "") || "products"}`;
       if (type === "url") href = target;
       if (type === "email") href = `mailto:${target}`;
@@ -6662,7 +6667,14 @@
     sqStudio.querySelectorAll("[data-sq-edit-logo]").forEach((button) => button.addEventListener("click", () => selectHeaderElement("logo")));
     sqStudio.querySelectorAll("[data-sq-edit-navigation]").forEach((button) => button.addEventListener("click", () => selectHeaderElement("navigation")));
     const setNavigationDestination = (action, rawValue) => {
-      const value = String(rawValue || "").trim() || "#products";
+      const value = String(rawValue || "").trim() || "products";
+      if (value.toLowerCase() === "products") {
+        action.dataset.sqLinkType = "products";
+        action.dataset.sqLink = "";
+        action.dataset.sqNewTab = "false";
+        if (action.matches("a")) action.setAttribute("href", "#products");
+        return;
+      }
       if (action.matches("button") && value.toLowerCase() === "checkout") {
         action.dataset.sqLinkType = "checkout";
         action.dataset.sqLink = "";
@@ -6716,7 +6728,7 @@
       if (!cta) { cta = document.createElement("button"); cta.type = "button"; const toggle = navigation.querySelector(":scope > .sq-nav-menu-toggle"); if (toggle) toggle.before(cta); else navigation.append(cta); }
       cta.hidden = !sqStudio.querySelector("[data-sq-navigation-cta-visible]")?.checked;
       cta.textContent = sqStudio.querySelector("[data-sq-navigation-cta-label]")?.value.trim() || "Buy now";
-      setNavigationDestination(cta, sqStudio.querySelector("[data-sq-navigation-cta-target]")?.value || "#products");
+      setNavigationDestination(cta, sqStudio.querySelector("[data-sq-navigation-cta-target]")?.value || "products");
       markSqChanged();
     };
     sqStudio.querySelectorAll("[data-sq-navigation-cta-visible], [data-sq-navigation-cta-label], [data-sq-navigation-cta-target]").forEach((input) => {
@@ -7422,7 +7434,7 @@
       const preservedAction=source?.closest('[data-sq-block]')?.dataset.sqCompactAction;
       if(preservedAction&&!editableItems.some(item=>item.matches('button'))){const saved=document.createElement('template');saved.innerHTML=preservedAction;const action=saved.content.querySelector('button');if(action)editableItems.push(action);}
       if (editableItems.length) editableItems.forEach((item) => navigation.append(item.cloneNode(true)));
-      else navigation.innerHTML = '<a href="#products" data-sq-link-type="section" data-sq-link="products" data-sq-new-tab="false">Shop</a><a href="#story" data-sq-link-type="section" data-sq-link="story" data-sq-new-tab="false">Our story</a><a href="#contact" data-sq-link-type="section" data-sq-link="contact" data-sq-new-tab="false">Contact</a><button type="button" data-sq-link-type="section" data-sq-link="products" data-sq-new-tab="false">Shop now</button>';
+      else navigation.innerHTML = '<a href="#products" data-sq-link-type="products" data-sq-link="" data-sq-new-tab="false">Shop</a><a href="#story" data-sq-link-type="section" data-sq-link="story" data-sq-new-tab="false">Our story</a><a href="#contact" data-sq-link-type="section" data-sq-link="contact" data-sq-new-tab="false">Contact</a><button type="button" data-sq-link-type="products" data-sq-link="" data-sq-new-tab="false">Shop now</button>';
       navigation.querySelectorAll(":scope > a").forEach((link) => {
         link.style.removeProperty("color");
         link.classList.remove("sq-color-override");
@@ -8104,9 +8116,13 @@
       clone.querySelectorAll("[data-sq-link-type]").forEach((action) => {
         let type = action.dataset.sqLinkType || "none";
         const target = safeActionTarget(type, action.dataset.sqLink || "");
-        if (!["checkout", "none"].includes(type) && !target) type = "none";
+        // Saved default navigation links should still work when the product lives
+        // in a differently named section. Explicit existing anchors keep their target.
+        if (type === "section" && target === "products" && action.closest('.sq-authored-navigation') && !clone.querySelector('#products,[data-section-id="products"]')) type = "products";
+        if (!["products", "checkout", "none"].includes(type) && !target) type = "none";
         const newTab = action.dataset.sqNewTab === "true";
         let href = "";
+        if (type === "products") { href = "#products"; action.dataset.ezkartAction = "products"; }
         if (type === "section") href = `#${target.replace(/^#/, "") || "products"}`;
         if (type === "url") href = target;
         if (type === "email") href = `mailto:${target}`;
@@ -8280,7 +8296,8 @@ const addProductToCart=({productId,variantId='',quantity=1}={})=>{quantity=Numbe
 globalThis.EzkartCart=Object.freeze({add:addProductToCart,open:openCart});
 document.addEventListener('click',event=>{const button=event.target.closest('a[data-ezkart-add],button[data-ezkart-add]');if(!button||button.disabled||button.getAttribute('aria-disabled')==='true'||event.defaultPrevented)return;if(button.tagName==='A'&&(event.metaKey||event.ctrlKey||event.shiftKey||event.altKey||event.button!==0))return;const productId=button.dataset.ezkartAdd,variantId=button.dataset.ezkartVariant||button.closest('[data-product-card]')?.dataset.ezkartVariant||'',quantity=Number(button.dataset.ezkartQuantity||1);if(!catalog[productId])return;event.preventDefault();if(!addProductToCart({productId,variantId,quantity})){openCart();const notice=document.createElement('p');notice.setAttribute('role','status');notice.textContent='This quantity or option is unavailable. Review your cart or choose another option.';cartItems?.prepend(notice);}});
 document.querySelectorAll('[data-ezkart-checkout]').forEach(button=>button.addEventListener('click',openCart));
-document.querySelectorAll('[data-ezkart-action]').forEach(button=>button.addEventListener('click',()=>{const type=button.dataset.ezkartAction,target=button.dataset.ezkartTarget||'';if(type==='checkout'){openCart();return}if(type==='section'){document.getElementById(target.replace(/^#/,''))?.scrollIntoView({behavior:'smooth'});return}const href=type==='email'?'mailto:'+target:type==='phone'?'tel:'+target:target;if(type==='url'&&button.dataset.ezkartNewTab==='true')window.open(href,'_blank','noopener');else if(href)location.href=href}));
+const scrollToProducts=${globalThis.EzkartComponents.scrollToProducts.toString()};
+document.querySelectorAll('[data-ezkart-action]').forEach(button=>button.addEventListener('click',event=>{const type=button.dataset.ezkartAction,target=button.dataset.ezkartTarget||'';if(type==='products'){event.preventDefault();scrollToProducts();return}if(type==='checkout'){openCart();return}if(type==='section'){document.getElementById(target.replace(/^#/,''))?.scrollIntoView({behavior:'smooth'});return}const href=type==='email'?'mailto:'+target:type==='phone'?'tel:'+target:target;if(type==='url'&&button.dataset.ezkartNewTab==='true')window.open(href,'_blank','noopener');else if(href)location.href=href}));
 renderCart();
 const observer=new IntersectionObserver(entries=>entries.forEach(entry=>{if(entry.isIntersecting){entry.target.classList.add(entry.target.matches('[class*="element-animation-"]')?'sq-element-animate':'animating');observer.unobserve(entry.target)}}),{threshold:.12});
 document.querySelectorAll('[class*="animation-"],[class*="element-animation-"]').forEach(element=>observer.observe(element))
@@ -8288,11 +8305,13 @@ document.querySelectorAll('[class*="animation-"],[class*="element-animation-"]')
       const compositionScript = globalThis.EzkartComponents ? `<script>(()=>{
 const fitContent=${globalThis.EzkartComponents.fitContent.toString()};
 const fitNavigation=${globalThis.EzkartComponents.fitNavigation.toString()};
+const fitProductCards=${globalThis.EzkartComponents.fitProductCards.toString()};
 let frame=0,device='';
 const layouts=new WeakMap();
 const write=(element,layout)=>{layouts.set(element,layout);element.style.setProperty('grid-column',layout.x+'/span '+layout.width,'important');element.style.setProperty('grid-row',layout.y+'/span '+layout.height,'important')};
 const fit=()=>{frame=0;const next=innerWidth<=600?'mobile':innerWidth<=900?'tablet':'desktop';
  document.querySelectorAll('.sq-authored-navigation').forEach(fitNavigation);
+ fitProductCards(document.querySelector('.sq-page-preview'));
  const pinned=document.querySelector('body>.sq-authored-navigation'),root=document.querySelector('body>.sq-page-preview');
  if(pinned&&root)root.style.setProperty('--sq-pinned-nav-height',(pinned.offsetHeight+(parseFloat(getComputedStyle(pinned).top)||0))+'px');
  document.querySelectorAll('.sq-composition,.sq-generated-blank').forEach(section=>{
@@ -8303,6 +8322,7 @@ const fit=()=>{frame=0;const next=innerWidth<=600?'mobile':innerWidth<=900?'tabl
   section.style.setProperty('--sq-fluid-rows',Math.max(1,...elements.filter(element=>getComputedStyle(element).display!=='none').map(element=>{const layout=layouts.get(element);return layout.y+layout.height-1})));
  });device=next};
 const schedule=()=>{if(!frame)frame=requestAnimationFrame(fit)};
+if(typeof ResizeObserver==='function'){const observer=new ResizeObserver(schedule);document.querySelectorAll('[data-native-type="product"]>[data-product-card]').forEach(card=>observer.observe(card))}
 addEventListener('resize',schedule);document.addEventListener('toggle',schedule,true);document.addEventListener('load',schedule,true);document.fonts?.ready.then(schedule);schedule();
 })();<\/script>` : '';
       // Provide one page landmark when the authored composition has none.
@@ -8647,6 +8667,7 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
       await Promise.all(transitions.map(animation=>animation.finished.catch(()=>{})));
       for (let i=0;i<3;i++) {
         await new Promise(requestAnimationFrame);
+        globalThis.EzkartComponents?.fitProductCards(previewRoot);
         previewRoot.querySelectorAll('[data-sq-product-grid]').forEach(grid=>{if(fitProductGridHeight(grid))applyFluidSection(grid.closest('[data-sq-fluid]'));});
         fitNativeContent();
       }
@@ -8793,7 +8814,7 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
           const left=navs.find(nav=>nav.dataset.sqNavSlot==='left');
           links.forEach((link,i)=>{const a=document.createElement('a');a.textContent=link.label;a.href=link.href;a.dataset.sqLinkType=link.href.startsWith('#')?'section':'url';a.dataset.sqLink=link.href.replace(/^#/,'');const nav=left&&i<Math.ceil(links.length/2)?left:right;nav.insertBefore(a,nav.querySelector('button'));});
           const action=section.querySelector('button:not(.sq-nav-menu-toggle)');
-          if(action){action.textContent=actionLabel;action.dataset.sqLinkType=actionTarget==='checkout'?'checkout':'section';action.dataset.sqLink=actionTarget==='checkout'?'':actionTarget.replace(/^#/,'');}
+          if(action){action.textContent=actionLabel;setNavigationDestination(action, actionTarget.startsWith('#') || actionTarget==='products' || actionTarget==='checkout' ? actionTarget : '#'+actionTarget);}
         }
         if(sticky!==undefined)section.dataset.sqNavPosition=sticky?'sticky':'static';applyNavigationSectionBehavior(section);
         refreshNativeBuilder();await settleBuilder();return inspectBuilder();

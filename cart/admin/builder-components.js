@@ -140,5 +140,39 @@
       toggle?.setAttribute('aria-label', 'Open navigation menu');
     }
   }
-  globalThis.EzkartComponents = {definitions,navDefinitions,thumbnail,create,fitContent,fitNavigation};
+  // Product navigation follows visible product content, independent of page names
+  // or generated section IDs. Keep the target clear of the pinned site header.
+  function scrollToProducts() {
+    const visible = node => node.getClientRects().length > 0 && getComputedStyle(node).visibility !== 'hidden'
+      && !node.closest('[hidden],[aria-hidden="true"]');
+    const target = [...document.querySelectorAll('.sq-page-preview [data-native-type="product"],.sq-page-preview .sq-product-grid,.sq-page-preview [data-product-card],.sq-page-preview [data-commerce-part]:not([data-commerce-part="cart"])')]
+      .find(node => {
+        if (!visible(node)) return false;
+        for (let parent = node; parent && parent !== document.body; parent = parent.parentElement) {
+          if (getComputedStyle(parent).position === 'fixed') return false;
+        }
+        return true;
+      });
+    if (!target) return false;
+    const inset = Math.max(0, ...[...document.querySelectorAll('.sq-navigation-template-section')]
+      .filter(node => visible(node) && ['sticky','fixed'].includes(getComputedStyle(node).position))
+      .map(node => node.offsetHeight + (parseFloat(getComputedStyle(node).top) || 0)));
+    const top = Math.max(0, scrollY + target.getBoundingClientRect().top - inset - 20);
+    if (!target.hasAttribute('tabindex')) target.setAttribute('tabindex', '-1');
+    target.focus({preventScroll:true});
+    window.scrollTo({top, behavior:matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'});
+    return true;
+  }
+  function fitProductCards(root) {
+    const cards = [...root.querySelectorAll('[data-native-type="product"] > [data-product-card]')];
+    const before = cards.map(card => card.offsetHeight);
+    // Measure natural content before sharing a minimum height. Never clip a long
+    // title or options, and leave individually resized cards independent.
+    cards.forEach(card => card.style.removeProperty('--sq-product-default-height'));
+    const defaults = cards.filter(card => card.parentElement.hasAttribute('data-product-default-size') && card.getClientRects().length && !card.hidden);
+    const height = Math.ceil(Math.max(0, ...defaults.map(card => card.offsetHeight)));
+    defaults.forEach(card => card.style.setProperty('--sq-product-default-height', height + 'px'));
+    return cards.some((card, index) => card.offsetHeight !== before[index]);
+  }
+  globalThis.EzkartComponents = {definitions,navDefinitions,thumbnail,create,fitContent,fitNavigation,scrollToProducts,fitProductCards};
 })();

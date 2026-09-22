@@ -188,11 +188,13 @@ body:has(>.sq-authored-navigation)>.sq-page-preview.sq-has-pinned-navigation{pad
 .page-site-editor .sq-native-component-card :is(b,small),.page-site-editor .sq-navigation-choice :is(b,small){letter-spacing:0;text-transform:none}
 
 /* Backgrounds are section settings, independent of any composition. */
-.sq-page-preview .sq-page-block.section-bg-gradient{background:var(--sq-gradient-base,#fff)!important}
-.sq-page-preview .sq-gradient-layer{position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none;border-radius:inherit}
-.sq-page-preview .sq-gradient-layer[hidden]{display:none}
-.sq-page-preview .sq-gradient-surface{position:absolute;inset:0}
-.sq-page-preview .sq-gradient-layer[data-gradient-kind=wash]>.sq-gradient-surface{inset:20% -20% -130%}
+.sq-page-preview .sq-page-block.section-bg-gradient,.sq-authored-navigation.section-bg-gradient{background:var(--sq-gradient-base,#fff)!important}
+/* Published sticky headers sit outside the page root. Background layers must
+   stay out of layout, including layers hidden after changing the fill. */
+:is(.sq-page-preview,.sq-authored-navigation) .sq-gradient-layer{position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none;border-radius:inherit}
+:is(.sq-page-preview,.sq-authored-navigation) .sq-gradient-layer[hidden]{display:none!important}
+:is(.sq-page-preview,.sq-authored-navigation) .sq-gradient-surface{position:absolute;inset:0}
+:is(.sq-page-preview,.sq-authored-navigation) .sq-gradient-layer[data-gradient-kind=wash]>.sq-gradient-surface{inset:20% -20% -130%}
 .page-site-editor .sq-section-background-gradient{display:grid;gap:16px;padding-top:16px}
 .page-site-editor .sq-section-background-gradient[hidden]{display:none}
 .page-site-editor .sq-gradient-preview{height:76px;border:1px solid #e6e7eb;border-radius:8px}
@@ -270,6 +272,9 @@ body:has(>.sq-authored-navigation)>.sq-page-preview.sq-has-pinned-navigation{pad
 /* Column choices are a maximum; narrower product blocks keep readable cards. */
 .sq-page-preview .sq-product-grid:is(.product-layout-auto,.product-layout-fixed) { grid-template-columns: var(--sq-product-template,repeat(auto-fit,minmax(min(100%,220px),1fr))) !important; }
 .sq-page-preview .sq-native[data-native-type="product"] { height: auto !important; max-height: none !important; }
+.sq-page-preview .sq-native[data-native-type="product"] > article { min-height: var(--sq-product-default-height, 100%); }
+.sq-page-preview .sq-native[data-native-type="product"] > article > div > footer { margin-top: auto; }
+.sq-page-preview .sq-native[data-native-type="product"] > article > div > :has(+ footer) { margin-bottom: 15px; }
 /* A page header has its own layer above every content section. */
 .sq-page-preview > .sq-page-block:is(header,nav,.ezm-site-header,.sq-navigation-template-section) { z-index: 1000 !important; isolation: isolate; overflow: visible; }
 /* Editing tools stay readable when the canvas is zoomed out. */
