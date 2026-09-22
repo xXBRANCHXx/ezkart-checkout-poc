@@ -4320,7 +4320,8 @@
       const overlay = document.createElement("div");
       overlay.className = "sq-element-overlay";
       overlay.onclick = (event) => event.stopPropagation();
-      overlay.innerHTML = `<div class="sq-element-toolbar"><button type="button" data-sq-element-move aria-label="Move element">${iconMarkup("grip")}</button><span>${escapeHtml(elementTypeName(selectedElement))}</span><button type="button" data-sq-overlay-duplicate aria-label="Duplicate element">${iconMarkup("layers")}</button><button type="button" data-sq-overlay-delete aria-label="Delete element">${iconMarkup("trash")}</button></div><button class="sq-element-resize" type="button" data-sq-element-resize aria-label="Resize element"></button>`;
+      const toolbarLabel = selectedElement.matches('[data-native-type="image"], [data-sq-element-type="image"]') ? "Image" : elementTypeName(selectedElement);
+      overlay.innerHTML = `<div class="sq-element-toolbar"><button type="button" data-sq-element-move aria-label="Move element">${iconMarkup("grip")}</button><span>${escapeHtml(toolbarLabel)}</span><button type="button" data-sq-overlay-duplicate aria-label="Duplicate element">${iconMarkup("layers")}</button><button type="button" data-sq-overlay-delete aria-label="Delete element">${iconMarkup("trash")}</button></div><button class="sq-element-resize" type="button" data-sq-element-resize aria-label="Resize element"></button>`;
       // Editor controls must escape section stacking contexts and backdrop blur.
       previewRoot.append(overlay);
       const rootRect = previewRoot.getBoundingClientRect();
