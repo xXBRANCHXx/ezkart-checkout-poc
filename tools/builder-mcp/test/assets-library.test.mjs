@@ -167,26 +167,31 @@ test('uploads are reusable across pages and sessions, with images embedded for p
   assert.ok(html.includes(photo.src));
 });
 
-test('expanded browsing persists, stays within narrow screens, and adds whole editable sections with one undo',async t=>{
+test('sidebar resizing persists, stays within narrow screens, and adds whole editable sections with one undo',async t=>{
   const {page,call,category,shot}=await fixture(t);
   await category('elements');
-  const panel=page.locator('[data-sq-panel=add]'),expand=page.locator('[data-sq-assets-expand]');
+  const panel=page.locator('[data-sq-panel=add]'),grip=page.getByRole('separator',{name:'Resize Assets sidebar'});
+  assert.equal(await panel.isVisible(),true,'Assets opens by default');
+  assert.equal(await page.locator('[data-sq-assets-expand]').count(),0,'Width is controlled by the edge, not a button');
   const before=(await panel.boundingBox()).width;
-  await expand.focus();await page.keyboard.press('Enter');
-  assert.equal(await expand.getAttribute('aria-expanded'),'true');
-  assert.ok((await panel.boundingBox()).width>before+250);
+  const handle=await grip.boundingBox();
+  await page.mouse.move(handle.x+handle.width/2,handle.y+handle.height/2);await page.mouse.down();
+  await page.mouse.move(handle.x+handle.width/2+320,handle.y+handle.height/2,{steps:10});await page.mouse.up();
+  const resized=(await panel.boundingBox()).width;
+  assert.ok(resized>before+250);
   assert.equal(await page.locator('[data-sq-asset-catalog=text]').evaluate(n=>getComputedStyle(n).gridTemplateColumns.split(' ').length),3);
-  await shot('expanded-library');
+  await shot('resized-library');
   await page.locator('[data-sq-asset=code-recipe]').scrollIntoViewIfNeeded();
-  const expandRect=await expand.boundingBox(),panelRect=await panel.boundingBox();
-  assert.ok(expandRect.y>=panelRect.y && expandRect.y+expandRect.height<=panelRect.y+panelRect.height,'Expansion stays reachable while browsing deep in the gallery');
-  await expand.click();assert.equal(await expand.getAttribute('aria-expanded'),'false');
-  await expand.click();assert.equal(await expand.getAttribute('aria-expanded'),'true');
+  assert.equal(await grip.isVisible(),true,'The edge remains reachable while browsing');
+  await grip.focus();await page.keyboard.press('ArrowLeft');
+  assert.equal(Number(await grip.getAttribute('aria-valuenow')),resized-16);
+  await page.keyboard.press('ArrowRight');
   await page.reload();await page.waitForFunction(()=>globalThis.EzkartBuilder);
   await category('reviews','sections');
-  assert.equal(await expand.getAttribute('aria-expanded'),'true','Expanded preference survives reopening');
+  assert.equal(Number(await grip.getAttribute('aria-valuenow')),resized,'The exact width survives reopening');
   assert.equal(await page.locator('[data-sq-add-block]:visible').count(),4,'Existing quote and new designs share one family');
-  await page.locator('[data-sq-add-block=asset-section-review-editorial]').dragTo(page.locator('.sq-page-preview > [data-section-id=blank]'),{targetPosition:{x:700,y:160}});
+  const target=page.locator('.sq-page-preview > [data-section-id=blank]'),bounds=await target.boundingBox();
+  await page.locator('[data-sq-add-block=asset-section-review-editorial]').dragTo(target,{targetPosition:{x:bounds.width*.7,y:bounds.height*.6}});
   await call('settle');
   const inserted=page.locator('.sq-page-preview > [data-section-id^="asset-section-review-editorial-"]');
   assert.equal(await inserted.count(),1);
@@ -209,6 +214,6 @@ test('expanded browsing persists, stays within narrow screens, and adds whole ed
     await page.setViewportSize({width,height:904});await category('contact','sections');
     const rect=await panel.boundingBox();assert.ok(rect.x>=0 && rect.x+rect.width<=width,'Expanded panel stays on screen');
     assert.equal(await panel.evaluate(n=>n.scrollWidth>n.clientWidth+1),false);
-    assert.ok(await expand.isVisible());await shot(`expanded-${width}`);
+    assert.ok(await grip.isVisible());await shot(`expanded-${width}`);
   }
 });

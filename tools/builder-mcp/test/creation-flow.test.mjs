@@ -1,3 +1,4 @@
+import {openAssets, chooseBasic} from "./asset-helpers.mjs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, writeFile, rm } from "node:fs/promises";
@@ -127,7 +128,7 @@ test("products can be placed and changed independently, including beside an exis
       "syrup",
     );
     // The ordinary Add panel has one version of each basic element.
-    await page.locator("[data-sq-tab=add]").click();
+    await openAssets(page);
     const add = page.locator("[data-sq-panel=add]");
     assert.equal(
       await add.getByRole("button", { name: "Heading", exact: true }).count(),
@@ -315,8 +316,8 @@ test("background overrides clear gradients and preserve readable text across scr
       background: "#e2f4ff",
       spacing: { top: 24, right: 24, bottom: 24, left: 24 },
     });
-    await page.locator("[data-sq-tab=add]").click();
-    await page.locator("[data-sq-add-element=native-heading]").click();
+    await openAssets(page);
+    await chooseBasic(page,"native-heading");
     const section = page.locator("[data-sq-block][data-section-id=blank]");
     assert.equal(
       await section.evaluate((n) => getComputedStyle(n).backgroundColor),

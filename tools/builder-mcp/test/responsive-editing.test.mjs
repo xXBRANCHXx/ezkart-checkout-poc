@@ -1,3 +1,4 @@
+import {openAssets, chooseBasic} from "./asset-helpers.mjs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -50,8 +51,8 @@ async function fixture(run) {
 }
 
 test("screen-specific text, drag, resize and section layout survive history, reopening and export", async () => fixture(async ({ page, panel, call, device, prop, appearance, ws }) => {
-  await page.locator("[data-sq-tab=add]").click();
-  await page.locator("[data-sq-add-element=native-heading]").click();
+  await openAssets(page);
+  await chooseBasic(page,"native-heading");
   const headingId = (await call("nativeInspect")).find(n => n.type === "heading").id;
   const heading = page.locator(`[data-native-id="${headingId}"]`);
   if (await page.locator(".sq-builder-sidebar.sq-panel-pinned").count()) await page.locator("[data-sq-tab=add]").click();

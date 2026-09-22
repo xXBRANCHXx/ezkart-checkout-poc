@@ -217,6 +217,7 @@
   display: block;
 }
 .sq-page-preview .sq-native[data-native-type="button"] {
+  display: inline-flex;
   text-decoration: none;
   cursor: pointer;
 }

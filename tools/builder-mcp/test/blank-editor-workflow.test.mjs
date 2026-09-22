@@ -1,3 +1,4 @@
+import {openAssets, chooseBasic} from "./asset-helpers.mjs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -28,8 +29,8 @@ test("blank-page editing supports direct dragging, inline text, resize, history 
     const section = page.locator('.sq-page-preview > [data-section-id="blank"]');
     const before = await section.evaluate(n => ({ height: n.offsetHeight, padding: getComputedStyle(n).padding }));
     const add = async type => {
-      await page.locator("[data-sq-tab=add]").click();
-      await page.locator(`[data-sq-add-element=native-${type}]`).click();
+      await openAssets(page);
+      await chooseBasic(page,`native-${type}`);
       const nodes = await call("nativeInspect");
       const node = nodes.filter(n => n.type === type).at(-1);
       assert.ok(node, `The Add panel inserts a ${type}`);

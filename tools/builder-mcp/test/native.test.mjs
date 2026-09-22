@@ -1,3 +1,4 @@
+import {openAssets, chooseBasic} from "./asset-helpers.mjs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -25,8 +26,8 @@ test("native inspector creates editable word gradients, layered button fills, ne
   try {
     await page.goto(ws.url + "/cart/admin/?page=sites&edit=native.ezkart.site");
     await page.waitForFunction(() => globalThis.EzkartBuilder);
-    await page.locator("[data-sq-tab=add]").click();
-    await page.locator("[data-sq-add-element=native-heading]").click();
+    await openAssets(page);
+    await chooseBasic(page,"native-heading");
     let nodes = await invoke("nativeInspect");
     const heading = nodes.find((n) => n.type === "heading");
     assert.ok(heading, "Add panel creates a native heading");

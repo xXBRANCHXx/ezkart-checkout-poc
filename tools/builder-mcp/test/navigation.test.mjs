@@ -1,3 +1,4 @@
+import {openAssets} from "./asset-helpers.mjs";
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, rm } from 'node:fs/promises';
@@ -30,7 +31,7 @@ async function fixture(run) {
 }
 
 const addFromLibrary = async (page, layout) => {
-  await page.locator('[data-sq-tab=add]').click();
+  await openAssets(page);
   await page.locator('[data-sq-library-category=sections]').click();
   await page.locator('[data-sq-open-library=navigation]').click();
   await page.locator(`[data-sq-add-navigation-template=${layout}]`).click();

@@ -38,6 +38,7 @@ declare(strict_types=1);
         <button type="button" data-sq-tab="brand" aria-label="Branding: colors, fonts, and buttons" title="Branding: colors, fonts, and buttons"><?= ez_admin_icon('swatch-book') ?><span>Branding</span></button>
       </nav>
 
+      <div class="sq-assets-resize" data-sq-assets-resize role="separator" tabindex="0" aria-label="Resize Assets sidebar" aria-orientation="vertical" aria-valuemin="270" aria-valuemax="720" aria-valuenow="320" title="Drag to resize Assets"><span></span></div>
       <div class="sq-tool-panels">
         <section class="sq-tool-panel active" data-sq-panel="layers">
           <header><div><small>Site structure</small><h2>Pages &amp; sections</h2></div><button type="button" data-sq-open-panel="add" aria-label="Add section"><?= ez_admin_icon('plus') ?></button></header>
@@ -49,7 +50,7 @@ declare(strict_types=1);
         </section>
 
         <section class="sq-tool-panel" data-sq-panel="add">
-          <header class="sq-assets-header"><div><h2>Assets</h2><p class="sq-assets-subtitle">Make it yours.</p></div><button type="button" class="sq-assets-expand" data-sq-assets-expand aria-label="Expand asset library" aria-expanded="false" title="Expand asset library"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M8 4H4v4m12-4h4v4M4 16v4h4m12-4v4h-4M4 4l5 5m11-5-5 5M4 20l5-5m11 5-5-5"/></svg></button></header>
+          <header class="sq-assets-header"><div><h2>Assets</h2><p class="sq-assets-subtitle">Make it yours.</p></div></header>
           <div class="sq-assets-browser-controls">
             <label class="sq-panel-search"><?= ez_admin_icon('search') ?><input type="search" placeholder="Find something for your page…" aria-label="Search assets, sections, and uploads" data-sq-block-search></label>
             <div class="sq-library-categories sq-asset-categories" role="group" aria-label="Asset libraries"><button type="button" data-sq-library-category="elements" aria-pressed="true">Elements</button><button type="button" data-sq-library-category="sections" aria-pressed="false">Sections</button><button type="button" data-sq-library-category="uploads" aria-pressed="false">Uploads</button><button type="button" data-sq-library-category="saved" aria-pressed="false">Saved</button></div>

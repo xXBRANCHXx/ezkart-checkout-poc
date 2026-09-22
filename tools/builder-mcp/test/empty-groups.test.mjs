@@ -1,3 +1,4 @@
+import {openAssets, chooseBasic} from "./asset-helpers.mjs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -108,10 +109,10 @@ test("empty-group guidance preserves swatches, dividers and spacers while new la
     assert.equal((await guidance("rule")).height, 1);
     assert.equal((await guidance("spacer")).height, 24);
 
-    await page.locator("[data-sq-tab=add]").click();
-    await page.locator("[data-sq-add-element=native-container]").click();
+    await openAssets(page);
+    await chooseBasic(page,"native-container");
     const group = (await call("nativeInspect")).find(
-      (node) => node.props?.minHeight === "120px",
+      (node) => node.type === "container" && node.name === "Column",
     );
     assert.ok(group, "Normal Add creates an empty layout group");
     assert.match(

@@ -1,3 +1,4 @@
+import {openAssets} from "./asset-helpers.mjs";
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtemp,readFile,rm,writeFile} from 'node:fs/promises';
@@ -55,7 +56,7 @@ test('all native compositions, navigation changes, responsive export, FAQ reflow
   await invoke('setDevice',{device:'desktop'});
   for(const {id} of library.navigation){await invoke('navigation',{layout:id,brand:'Test store',links:[{label:'Shop',href:'#product-collection'},{label:'About',href:'#story-split'},{label:'FAQ',href:'#faq-list'}]});const links=await page.locator('[data-section-id=navigation] > [data-sq-element-type=navigation] > a').allTextContents();assert.equal(links.length,3);const navHeight=await page.locator('.sq-authored-navigation').evaluate(n=>n.offsetHeight);assert.ok(['masthead','shop'].includes(id)?navHeight>=140:navHeight<100,`incorrect ${id} navigation height: ${navHeight}`);}
   await invoke('navigation',{layout:'split',brand:'Test store'});await invoke('navigation',{layout:'studio'});assert.equal(await page.locator('[data-section-id=navigation] > [data-sq-element-type=navigation] > a').count(),3);
-  await page.locator('[data-sq-tab=add]').click();await page.waitForTimeout(250);
+  await openAssets(page);await page.waitForTimeout(250);
   const geometry=await page.evaluate(()=>{const sidebar=document.querySelector('.sq-builder-sidebar').getBoundingClientRect(),canvas=document.querySelector('.sq-canvas-scroll').getBoundingClientRect(),frame=document.querySelector('.sq-device-frame').getBoundingClientRect();return {sidebar:sidebar.right,canvas:canvas.left,frame:frame.right,right:canvas.right};});assert.ok(geometry.sidebar<=geometry.canvas+1);assert.ok(geometry.frame<=geometry.right+1);
   await invoke('navigation',{layout:'studio',sticky:true});
   await invoke('updateSection',{id:'faq-list',background:'#242822',color:'#ffffff'});

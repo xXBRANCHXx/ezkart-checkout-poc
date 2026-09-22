@@ -1,3 +1,4 @@
+import {openAssets, chooseBasic} from "./asset-helpers.mjs";
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -60,8 +61,8 @@ test('section gradient position and height survive UI edits, native conversion, 
     assert.equal((await paint(surface)).size,'140% 64%');
     await invoke('redo');
     assert.deepEqual(await paint(surface),centeredPaint);
-    await page.locator('[data-sq-tab=add]').click();
-    await page.locator('[data-sq-add-element=native-heading]').click();
+    await openAssets(page);
+    await chooseBasic(page,"native-heading");
     if(await page.locator('.sq-builder-sidebar.sq-panel-pinned').count())await page.locator('[data-sq-tab=add]').click();
     await invoke('settle');
     assert.equal(await section.locator('.sq-gradient-surface').count(),0);

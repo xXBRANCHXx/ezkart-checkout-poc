@@ -4,7 +4,7 @@
   const fitPreview = frame => {
     const artwork = frame.firstElementChild;
     if (!artwork || !frame.clientWidth) return;
-    const scale = Math.min((frame.clientWidth - 30) / 520, (frame.clientHeight - 24) / artwork.scrollHeight);
+    const scale = Math.min((frame.clientWidth - 30) / Math.max(1,artwork.offsetWidth), (frame.clientHeight - 24) / artwork.scrollHeight);
     artwork.style.transform = `translate(-50%, -50%) scale(${scale})`;
   };
   const observer = new ResizeObserver(entries => entries.forEach(({target}) => fitPreview(target)));
@@ -33,7 +33,7 @@
       root.insertBefore(group,anchor);
     });
   }
-  function browse({root,componentCount,syncControls}) {
+  function browse({root,componentCount,syncControls,products}) {
     const search=root.querySelector('[data-sq-block-search]'),purpose=root.querySelector('[data-sq-asset-filter]');
     const purposeRow=root.querySelector('[data-sq-asset-filter-row]');
     const sectionList=root.querySelector('[data-sq-native-component-list]');
@@ -56,7 +56,36 @@
       family.innerHTML=`<h3>${escape(category.name)}<span>${cards.length} designs</span></h3><div class="sq-asset-grid"></div>`;
       cards.forEach(card=>family.lastElementChild.append(card));sectionList.append(family);
     });
-    let library='elements';
+    let library='elements',choiceFamily='';
+    const choiceView=document.createElement('div');choiceView.className='sq-asset-choice-view';choiceView.hidden=true;root.append(choiceView);
+    const closeChoices=()=>{choiceFamily='';search.value='';root.classList.remove('sq-asset-choosing');choiceView.hidden=true;search.placeholder='Find something for your page…';};
+    const choose=family=>{
+      const info=EzkartAssets.choiceFamilies[family];if(!info)return false;
+      choiceFamily=family;choiceView.dataset.family=family;search.value='';search.placeholder=`Search ${info.name.toLowerCase()}…`;
+      root.classList.add('sq-asset-choosing');choiceView.hidden=false;
+      choiceView.querySelectorAll('.sq-asset-preview').forEach(frame=>observer.unobserve(frame));
+      choiceView.innerHTML=`<header><button type="button" data-sq-choice-back aria-label="Back to all assets">←</button><h3>${escape(info.name)}</h3></header><p>${escape(info.description)}</p>${family==='image'?'<button type="button" class="sq-choice-uploads" data-sq-choice-uploads>Choose from uploads ↗</button>':''}${family==='commerce'?'<label class="sq-choice-product">Product<select data-sq-choice-product aria-label="Product for this control"></select></label>':''}<div class="sq-asset-grid sq-choice-grid ${family==='icon'?'sq-icon-choices':''}"></div><p data-sq-choice-empty hidden>No matching options.</p>`;
+      if(family==='commerce'){
+        const catalog=products();const select=choiceView.querySelector('select');
+        select.innerHTML=catalog.length?catalog.map(item=>`<option value="${escape(item.id)}">${escape(item.name)}</option>`).join(''):'<option value="">Add a product to your catalog first</option>';
+        syncControls();
+      }
+      const list=choiceView.querySelector('.sq-choice-grid');
+      EzkartAssets.choices.filter(item=>item.family===family).forEach(item=>{
+        const card=document.createElement('button');card.type='button';card.draggable=true;card.className='sq-asset-card';card.dataset.sqAssetChoice=item.id;card.dataset.search=item.name;
+        card.setAttribute('aria-label',`Add ${item.name}`);
+        card.innerHTML=`<span class="sq-asset-preview" aria-hidden="true"></span><span class="sq-asset-caption"><b>${escape(item.name)}</b><span class="sq-asset-add" aria-hidden="true">+</span></span>`;
+        const frame=card.firstElementChild;frame.append(EzkartAssets.previewChoice(item.id));list.append(card);observer.observe(frame);
+      });
+      root.scrollTop=0;filter();return true;
+    };
+    choiceView.addEventListener('click',event=>{
+      if(event.target.closest('[data-sq-choice-back]')){closeChoices();filter();root.querySelector(`[data-sq-add-element="native-${choiceView.dataset.family}"]`)?.focus();}
+      if(event.target.closest('[data-sq-choice-uploads]'))root.querySelector('[data-sq-library-category="uploads"]').click();
+    });
+    root.addEventListener('keydown',event=>{
+      if(event.key==='Escape'&&choiceFamily){event.preventDefault();event.stopPropagation();choiceView.querySelector('[data-sq-choice-back]').click();}
+    });
     const rememberedPurpose={elements:'all',sections:'all'};
     const options=()=>{
       const categories=library==='sections'?sectionCategories:[{id:'basics',name:'Essentials'},...EzkartAssets.categories];
@@ -68,6 +97,10 @@
     const normalize=value=>String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
     const filter=()=>{
       const query=normalize(search.value.trim()),terms=query.split(/\s+/).filter(Boolean);
+      if(choiceFamily){
+        let count=0;choiceView.querySelectorAll('[data-sq-asset-choice]').forEach(card=>{card.hidden=!terms.every(term=>normalize(card.dataset.search).includes(term));if(!card.hidden)count++;});
+        choiceView.querySelector('[data-sq-choice-empty]').hidden=count>0;return;
+      }
       let matches=0;
       root.querySelectorAll(':scope > .sq-block-group').forEach(group=>{
         let groupMatches=0;
@@ -91,26 +124,45 @@
       root.querySelector('.sq-assets-hint').hidden=library==='saved' || library==='uploads';
     };
     root.querySelectorAll('[data-sq-library-category]').forEach(button=>button.addEventListener('click',()=>{
-      library=button.dataset.sqLibraryCategory;search.value='';
+      closeChoices();library=button.dataset.sqLibraryCategory;search.value='';
       root.querySelectorAll('[data-sq-library-category]').forEach(item=>item.setAttribute('aria-pressed',String(item===button)));
       options();filter();
     }));
     purpose.addEventListener('change',()=>{rememberedPurpose[library]=purpose.value;filter();});
     search.addEventListener('input',filter);
     root.querySelector('[data-sq-clear-block-search]').addEventListener('click',()=>{search.value='';filter();search.focus();});
-    const sidebar=root.closest('.sq-builder-sidebar'),expand=root.querySelector('[data-sq-assets-expand]');
-    let expanded=false;
-    try{expanded=localStorage.getItem('ezkart-assets-expanded')==='true';}catch{}
-    const size=()=>{
-      sidebar.classList.toggle('sq-assets-expanded',expanded);
-      expand.setAttribute('aria-expanded',String(expanded));
-      expand.setAttribute('aria-label',`${expanded?'Collapse':'Expand'} asset library`);
-      expand.title=`${expanded?'Collapse':'Expand'} asset library`;
-      expand.querySelector('path').setAttribute('d',expanded?'M4 4l5 5m0-5v5H4m16-5-5 5m0-5v5h5M4 20l5-5m-5 0h5v5m11 0-5-5m0 5v-5h5':'M8 4H4v4m12-4h4v4M4 16v4h4m12-4v4h-4M4 4l5 5m11-5-5 5M4 20l5-5m11 5-5-5');
+    const sidebar=root.closest('.sq-builder-sidebar'),studio=root.closest('.sq-studio'),grip=sidebar.querySelector('[data-sq-assets-resize]');
+    let preferredWidth=320,drag=null;
+    try{preferredWidth=Number(localStorage.getItem('ezkart-assets-width')) || 320;}catch{}
+    const bounds=()=>{const max=Math.max(240,Math.min(720,innerWidth-studio.getBoundingClientRect().left-52-(innerWidth<=720?8:280)));return {min:Math.min(270,max),max};};
+    const size=(width=preferredWidth)=>{
+      const {min,max}=bounds(),value=Math.round(Math.max(min,Math.min(max,width)));
+      studio.style.setProperty('--sq-assets-width',`${value}px`);
+      grip.setAttribute('aria-valuemin',String(min));grip.setAttribute('aria-valuemax',String(max));grip.setAttribute('aria-valuenow',String(value));grip.setAttribute('aria-valuetext',`${value} pixels`);
+      return value;
     };
-    expand.addEventListener('click',()=>{expanded=!expanded;size();try{localStorage.setItem('ezkart-assets-expanded',String(expanded));}catch{}});
+    const save=()=>{try{localStorage.setItem('ezkart-assets-width',String(preferredWidth));}catch{}};
+    const finish=cancel=>{
+      if(!drag)return;const original=drag.width;drag=null;
+      if(cancel)preferredWidth=original;
+      document.body.classList.remove('sq-assets-resizing');size();save();
+    };
+    grip.addEventListener('pointerdown',event=>{
+      if(event.button!==0)return;event.preventDefault();
+      drag={x:event.clientX,width:preferredWidth,start:size()};grip.setPointerCapture(event.pointerId);sidebar.classList.add('sq-panel-pinned');document.body.classList.add('sq-assets-resizing');
+    });
+    grip.addEventListener('pointermove',event=>{if(drag)preferredWidth=size(drag.start+event.clientX-drag.x);});
+    grip.addEventListener('pointerup',()=>finish(false));grip.addEventListener('pointercancel',()=>finish(true));grip.addEventListener('lostpointercapture',()=>finish(false));
+    grip.addEventListener('dblclick',()=>{preferredWidth=320;size();save();});
+    grip.addEventListener('keydown',event=>{
+      if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();event.stopPropagation();
+      const {min,max}=bounds(),step=event.shiftKey?48:16;
+      preferredWidth=size(event.key==='Home'?min:event.key==='End'?max:size()+(event.key==='ArrowLeft'?-step:step));save();
+    });
+    document.addEventListener('keydown',event=>{if(event.key==='Escape'&&drag){event.preventDefault();event.stopPropagation();finish(true);}},true);
+    window.addEventListener('resize',()=>size());
     size();options();filter();
-    return {filter};
+    return {filter,choose};
   }
   function init({root,insert,beginDrag,endDrag,listUploads,upload,readUpload,filter,toast}) {
     const uploads = new Map();
@@ -156,18 +208,22 @@
       try {
         const item = asset.uploadId ? uploads.get(asset.uploadId) : null;
         if (asset.uploadId && !item) throw Error('Refresh uploads and choose the file again.');
-        const node = item ? {id:`asset-image-${crypto.randomUUID().replaceAll('-','').slice(0,12)}`,type:'image',name:item.name,alt:item.name,src:await readUpload(item),props:{display:'block',width:'360px',maxWidth:'100%',height:'auto',objectFit:'contain'}} : EzkartAssets.create(asset.id);
+        const node = asset.choiceId ? EzkartAssets.createChoice(asset.choiceId,{productId:asset.productId || root.querySelector('[data-sq-choice-product]')?.value}) : item ? {id:`asset-image-${crypto.randomUUID().replaceAll('-','').slice(0,12)}`,type:'image',name:item.name,alt:item.name,src:await readUpload(item),props:{display:'block',width:'360px',maxWidth:'100%',height:'auto',objectFit:'contain'}} : EzkartAssets.create(asset.id);
+        if(node.type==='commerce'){
+          node.productId=asset.productId || root.querySelector('[data-sq-choice-product]')?.value;
+          if(!node.productId)throw Error('Choose a catalog product before adding this control.');
+        }
         insert(node,section,event);
       } catch(error) { toast(error.message); }
     };
     root.addEventListener('click',event => {
-      const card = event.target.closest('[data-sq-asset],[data-sq-upload-asset]');
-      if(card) void add({id:card.dataset.sqAsset,uploadId:card.dataset.sqUploadAsset});
+      const card = event.target.closest('[data-sq-asset],[data-sq-upload-asset],[data-sq-asset-choice]');
+      if(card) void add({id:card.dataset.sqAsset,uploadId:card.dataset.sqUploadAsset,choiceId:card.dataset.sqAssetChoice});
     });
     root.addEventListener('dragstart',event => {
-      const card = event.target.closest('[data-sq-asset],[data-sq-upload-asset],[data-sq-add-block]');
+      const card = event.target.closest('[data-sq-asset],[data-sq-upload-asset],[data-sq-add-block],[data-sq-asset-choice]');
       if (!card) return;
-      const drag = {kind:card.dataset.sqAddBlock?'section':'asset',id:card.dataset.sqAsset,uploadId:card.dataset.sqUploadAsset,sectionType:card.dataset.sqAddBlock,label:card.querySelector('b')?.textContent || 'Asset'};
+      const drag = {kind:card.dataset.sqAddBlock?'section':'asset',id:card.dataset.sqAsset,uploadId:card.dataset.sqUploadAsset,sectionType:card.dataset.sqAddBlock,choiceId:card.dataset.sqAssetChoice,productId:root.querySelector('[data-sq-choice-product]')?.value,label:card.querySelector('b')?.textContent || 'Asset'};
       beginDrag(drag,event); card.classList.add('sq-library-drag-source');
     });
     root.addEventListener('dragend',event => { event.target.closest('.sq-library-drag-source')?.classList.remove('sq-library-drag-source'); endDrag(); });

@@ -194,9 +194,11 @@ test("existing product blocks fit after resizing, reflow narrow columns, and pre
       for (const zoom of [40, 100]) {
         await page.locator("[data-sq-zoom-slider]").fill(String(zoom));
         await page.locator("[data-sq-zoom-slider]").dispatchEvent("input");
-        heights.push(
-          (await page.locator(".sq-element-toolbar").boundingBox()).height,
-        );
+        await invoke("settle");
+        // Zoom rebuilds the overlay; resolve and measure it in one browser task.
+        heights.push(await page.evaluate(() =>
+          document.querySelector(".sq-element-toolbar").getBoundingClientRect().height,
+        ));
       }
       assert.ok(
         Math.abs(heights[0] - heights[1]) < 1,

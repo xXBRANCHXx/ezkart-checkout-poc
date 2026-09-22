@@ -206,5 +206,65 @@
     node.setAttribute('data-sq-block',''); node.dataset.sectionId=sectionId; node.dataset.sqSectionName=content.name;
     return node.outerHTML;
   }
-  globalThis.EzkartAssets = {definitions,categories,sectionDefinitions,create,preview,createSection};
+  const choiceFamilies = {
+    icon: {name:'Icons',description:'Choose an icon, then click or drag it onto your page.'},
+    button: {name:'Buttons',description:'Choose a style. Edit its label and destination on the page.'},
+    heading: {name:'Headings',description:'Choose the typography that fits your page.'},
+    text: {name:'Paragraphs',description:'Choose a text style before adding your copy.'},
+    container: {name:'Layouts',description:'Start with a column, row, or grid.'},
+    accordion: {name:'Accordions',description:'Choose how your questions and answers appear.'},
+    image: {name:'Images',description:'Use an upload or start with an image frame.'},
+    video: {name:'Video',description:'Choose a video frame, then set its source on the page.'},
+    commerce: {name:'Product controls',description:'Choose the part of your product you want to show.'},
+    divider: {name:'Dividers',description:'Choose a line style.'}
+  };
+  const choice = (id,family,name,make) => ({id,family,name,make});
+  const choices = [
+    ...Object.keys(EzkartNativeIcons).map(icon=>choice(`icon-${icon}`,'icon',icon.replaceAll('-',' ').replace(/^./,c=>c.toUpperCase()),()=>({type:'icon',icon,props:{...EzkartNative.defaults.icon,width:'40px',height:'40px',color:ink}}))),
+    ...['solid','outline','link'].map((style,i)=>choice(`button-${style}`,'button',['Solid button','Outline button','Text link'][i],()=>button('Learn more',style))),
+    ...['display','editorial','section'].map((style,i)=>choice(`heading-${style}`,'heading',['Display heading','Editorial heading','Section heading'][i],()=>({...title('Your heading',{fontFamily:i===1?'Georgia, serif':'Arial, Helvetica, sans-serif',fontSize:['48px','48px','32px'][i],fontWeight:i===1?'400':'600',width:'fit-content',maxWidth:'100%'}),tag:i===2?'h2':'h1'}))),
+    ...['body','lead','caption'].map((style,i)=>choice(`text-${style}`,'text',['Body text','Lead paragraph','Caption'][i],()=>text('Add your story or a useful detail.',{fontSize:['16px','22px','12px'][i],color:i===2?muted:ink,width:'fit-content',maxWidth:'100%'}))),
+    ...['column','row','grid'].map((style,i)=>choice(`layout-${style}`,'container',['Column','Row','Grid'][i],()=>group([],{display:i===2?'grid':'flex',flexDirection:i===1?'row':'column',...(i===2?{gridTemplateColumns:'repeat(2, minmax(0, 1fr))'}:{}),flexWrap:'wrap',minHeight:'160px',width:'520px',maxWidth:'100%',...pad('24px'),...border('#ded8d2'),borderRadius:'12px'}))),
+    ...['ruled','cards','numbered'].map(style=>choice(`faq-${style}`,'accordion',definitions.find(item=>item.id===`accordion-${style}`).name,()=>recipes.find(item=>item.id===`accordion-${style}`).make())),
+    ...['landscape','square','portrait'].map((shape,i)=>choice(`image-${shape}`,'image',['Landscape frame','Square frame','Portrait frame'][i],()=>({type:'image',alt:'',props:{...EzkartNative.defaults.image,width:['360px','280px','240px'][i],height:['240px','280px','320px'][i],backgroundColor:'#f3f1f4',borderRadius:'8px'}}))),
+    ...['wide','square','portrait'].map((shape,i)=>choice(`video-${shape}`,'video',['Wide video','Square video','Portrait video'][i],()=>({type:'video',controls:true,props:{...EzkartNative.defaults.video,width:['480px','320px','240px'][i],height:['270px','320px','426px'][i],maxWidth:'100%',backgroundColor:'#27232b',borderRadius:'12px'}}))),
+    ...['image','title','price','options','quantity','add'].map((part,i)=>choice(`commerce-${part}`,'commerce',['Product image','Product title','Price','Variant options','Quantity','Add to cart'][i],()=>({type:'commerce',part,props:{...EzkartNative.defaults.commerce,width:part==='image'?'320px':'fit-content',maxWidth:'100%'}}))),
+    ...['solid','dashed','dotted'].map(style=>choice(`divider-${style}`,'divider',style[0].toUpperCase()+style.slice(1)+' line',()=>group([],{width:'420px',maxWidth:'100%',height:'1px',borderTopWidth:'1px',borderTopStyle:style,borderTopColor:'#aaa3ad'})))
+  ];
+  function createChoice(id,options={}) {
+    const item=choices.find(item=>item.id===id);
+    if(!item)throw Error('Choose an option first.');
+    const node=item.make();if(node.type==='commerce')node.productId=options.productId;let index=0;const prefix=`choice-${crypto.randomUUID().replaceAll('-','').slice(0,12)}`;
+    const assign=n=>{n.id=`${prefix}-${++index}`;(n.children || []).forEach(assign);};assign(node);
+    node.name=item.name;node.props={fontFamily:'Arial, Helvetica, sans-serif',color:ink,flexShrink:'0',...node.props};
+    EzkartNative.validate(node);return node;
+  }
+  function previewChoice(id) {
+    const item=choices.find(item=>item.id===id),config=createChoice(id,{productId:'preview-product'});
+    const frame=document.createElement('div');
+    frame.style.cssText='display:flex;align-items:center;justify-content:center;width:520px;min-height:180px;padding:24px;box-sizing:border-box;color:#28272c;';
+    if(item.family==='icon'){
+      frame.style.width='80px';frame.style.minHeight='80px';frame.style.padding='8px';
+      frame.innerHTML=`<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${EzkartNativeIcons[config.icon]}</svg>`;
+    }else if(['container','image','video','commerce'].includes(item.family)){
+      const samples={container:config.props.display==='grid'?'▧':config.props.flexDirection==='row'?'▥':'▤',image:'▧',video:'▷',commerce:({image:'▧',title:'Product name',price:'Your price',options:'Size   ▾',quantity:'−   1   +',add:'Add to cart'})[config.part]};
+      if(item.family==='container'){
+        const grid=config.props.display==='grid',row=config.props.flexDirection==='row';
+        frame.innerHTML=`<span style="display:grid;grid-template-columns:${grid?'1fr 1fr':row?'1fr 1fr 1fr':'1fr'};gap:12px;width:360px;height:150px;padding:14px;border:2px solid #ded8d2;border-radius:12px;background:#fff">${Array.from({length:grid?4:3},()=>'<span style="display:block;min-height:16px;background:#e9e2dd;border:1px solid #d9d0c9;border-radius:5px"></span>').join('')}</span>`;
+      }else if(item.family==='image'||item.family==='video'){
+        frame.innerHTML=`<svg width="72" height="72" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">${EzkartNativeIcons[item.family==='video'?'play':'image']}</svg>`;
+      }else frame.innerHTML=`<span style="font:500 38px/1.4 Arial,sans-serif">${samples[item.family]}</span>`;
+      if(item.family==='image'||item.family==='video'){frame.style.width=config.props.width;frame.style.height=config.props.height;frame.style.background=config.props.backgroundColor;frame.style.color=item.family==='video'?'#fff':'#aea3b2';frame.style.borderRadius='12px';}
+    }else{
+      if(item.family==='button'){frame.style.width='160px';frame.style.minHeight='96px';frame.style.padding='8px';}
+      const node=EzkartNative.create(config);
+      const paint=(element,data)=>{
+        [...element.attributes].filter(a=>a.name==='id'||a.name==='class'||a.name.startsWith('data-')).forEach(a=>element.removeAttribute(a.name));
+        Object.assign(element.style,{boxSizing:'border-box',margin:'0',...EzkartNative.defaults[data.type],...data.props});
+        (data.children || []).forEach((child,i)=>paint(element.children[i],child));
+      };paint(node,config);frame.append(node);
+    }
+    frame.inert=true;return frame;
+  }
+  globalThis.EzkartAssets = {definitions,categories,sectionDefinitions,create,preview,createSection,choiceFamilies,choices:choices.map(({make,...item})=>item),createChoice,previewChoice};
 })();

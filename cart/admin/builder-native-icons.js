@@ -1,6 +1,16 @@
 /* Reusable vector icons for native elements. */
 (() => {
   globalThis.EzkartNativeIcons = {
+    star: '<path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9Z"></path>',
+    heart: '<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z"></path>',
+    mail: '<rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="m3 6 9 7 9-7"></path>',
+    phone: '<path d="M7 3H4a1 1 0 0 0-1 1c0 9.4 7.6 17 17 17a1 1 0 0 0 1-1v-3l-5-2-2 2a14 14 0 0 1-7-7l2-2Z"></path>',
+    pin: '<path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0Z"></path><circle cx="12" cy="10" r="2.5"></circle>',
+    user: '<circle cx="12" cy="7" r="4"></circle><path d="M4 21v-2a8 8 0 0 1 16 0v2"></path>',
+    calendar: '<rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M16 3v4M8 3v4M3 11h18M7 15h2m6 0h2m-10 3h2"></path>',
+    search: '<circle cx="10.5" cy="10.5" r="7.5"></circle><path d="m16 16 5 5"></path>',
+    clock: '<circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path>',
+    leaf: '<path d="M20 3c0 10-1 16-9 16a6 6 0 0 1-6-6C5 5 11 5 20 3ZM4 21l11-11"></path>',
     "arrow-right": '<path d="M5 12h14m-6-6 6 6-6 6"></path>',
     play: '<path d="m9 5 11 7-11 7Z"></path>',
     panels:

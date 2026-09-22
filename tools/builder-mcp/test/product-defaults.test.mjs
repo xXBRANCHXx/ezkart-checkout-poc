@@ -1,3 +1,4 @@
+import {openAssets} from "./asset-helpers.mjs";
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
@@ -94,7 +95,7 @@ test('catalog cards start at one size, allow independent pointer resizing, and r
 }));
 
 test('Shop now finds product elements on arbitrary pages in Preview and export, including saved default links', () => fixture(async ({page,invoke,browser,ws}) => {
-  await page.locator('[data-sq-tab=add]').click();
+  await openAssets(page);
   await page.locator('[data-sq-library-category=sections]').click();
   await page.locator('[data-sq-open-library=navigation]').click();
   await page.locator('[data-sq-add-navigation-template=studio]').click();

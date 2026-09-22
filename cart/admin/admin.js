@@ -2718,6 +2718,15 @@
       inspector?.classList.add("collapsed");
       sqStudio.classList.add("inspector-closed");
     };
+    const makeRoomForInspector = () => {
+      if(window.matchMedia('(max-width:1120px)').matches && builderSidebar?.querySelector('[data-sq-panel="add"].active')){
+        builderSidebar.classList.remove('sq-panel-pinned');
+        builderSidebar.classList.add('sq-panel-dismissed');
+      }
+    };
+    window.addEventListener('resize',()=>{
+      if(window.matchMedia('(max-width:1120px)').matches && builderSidebar?.classList.contains('sq-panel-pinned') && builderSidebar.querySelector('[data-sq-panel="add"].active')) closeSqInspector();
+    });
     const openSqPanel = (name, { pin = false } = {}) => {
       builderSidebar?.classList.remove("sq-panel-dismissed");
       if (pin && window.matchMedia("(max-width: 1120px)").matches) closeSqInspector();
@@ -2737,6 +2746,9 @@
     sqStudio.querySelectorAll("[data-sq-structure-view]").forEach((button) => button.addEventListener("click", () => openSqPanel(button.dataset.sqStructureView === "pages" ? "pages" : "layers", { pin: true })));
     document.addEventListener("pointerdown", (event) => {
       if (builderSidebar?.contains(event.target) || event.target.closest?.("[data-sq-edit-button-brand], [data-sq-open-panel], [data-sq-builder-select-menu]")) return;
+      // Assets reserves canvas space. Keep it stable until the click is
+      // handled; collapsing on pointerdown would move the intended target.
+      if (builderSidebar?.querySelector('[data-sq-panel="add"].active')) return;
       if (window.matchMedia("(min-width:1121px)").matches) return;
       builderSidebar?.classList.remove("sq-panel-pinned");
       sqStudio.classList.remove("mobile-panel-open");
@@ -4351,6 +4363,7 @@
       if (owner && owner.dataset.sectionId !== selectedSection) selectSqSection(owner.dataset.sectionId, true);
       if (!colorPicker.hidden && element !== selectedElement) closeColorPicker(true);
       inspector?.classList.remove("collapsed");
+      makeRoomForInspector();
       sqStudio.classList.remove("inspector-closed", "mobile-panel-open");
       if (cropEditingImage && (!element.contains(cropEditingImage) || image?.matches?.("img") && image !== cropEditingImage)) {
         imageVisualHostFor(cropEditingImage)?.classList.remove("sq-image-crop-editing");
@@ -4903,6 +4916,7 @@
       sectionToolsTarget = targetSection;
       scheduleSectionTools();
       sqStudio.classList.remove("mobile-panel-open");
+      makeRoomForInspector();
       sqStudio.classList.remove("inspector-closed");
       inspector?.classList.remove("collapsed");
       sqStudio.querySelectorAll("[data-sq-layer]").forEach((layer) => layer.classList.toggle("active", layer.dataset.sectionId === sectionId));
@@ -7283,7 +7297,8 @@
         const sectionAsset = libraryDrag.kind === 'section';
         libraryDropPreview.classList.add('sq-asset-drop-preview');
         libraryDropPreview.classList.toggle('sq-asset-section-drop',sectionAsset);
-        Object.assign(libraryDropPreview.style,{left:`${Math.max(0,(event.clientX-rect.left)/scale-120)}px`,top:`${sectionAsset ? (event.clientY < rect.top+rect.height/2 ? 0 : section.offsetHeight-4) : Math.max(0,(event.clientY-rect.top)/scale-40)}px`,width:'240px',height:'80px'});
+        libraryDropPreview.classList.toggle('sq-asset-drop-anchor',!sectionAsset);
+        Object.assign(libraryDropPreview.style,{left:`${(event.clientX-rect.left)/scale}px`,top:`${sectionAsset ? (event.clientY < rect.top+rect.height/2 ? 0 : section.offsetHeight-4) : (event.clientY-rect.top)/scale}px`,width:sectionAsset?'100%':'0px',height:sectionAsset?'4px':'0px'});
       }
       libraryDropPreview.dataset.layout = `${layout.x},${layout.y},${layout.width},${layout.height}`;
       libraryDropPreview.innerHTML = `<span>${escapeHtml(libraryDrag.label)}</span>`;
@@ -7328,16 +7343,15 @@
       if (button) addCatalogProductCard(button.dataset.sqPlaceProduct);
     });
     sqStudio.querySelectorAll("[data-sq-open-products]").forEach(button => button.addEventListener("click",()=>openSqPanel("products",{pin:true})));
-    const addLibraryElement = (type, section, preferredLayout = null) => {
+    const addLibraryElement = (type, section, preferredLayout = null, pointer = null) => {
       const before = captureState();
       const nativeTypeName = type.replace(/^native-/, "");
       const native = type.startsWith("native-") || section?.matches(".sq-native-section") && Boolean(EzkartNative.tags[nativeTypeName]);
-      section = compatibleSection(section, native);
       if(native){
         const nativeType=type.replace(/^native-/,'');if(!EzkartNative.tags[nativeType]){showToast('Choose a native container element.');return null;}
-        const parent=selectedElement?.matches('.sq-native')&&section.contains(selectedElement)?(['container','accordion','summary','button'].includes(selectedElement.dataset.nativeType)&&EzkartNative.read(selectedElement).text===undefined?selectedElement:selectedElement.parentElement.closest('.sq-native')):section;
-        const id=`native-${Date.now()}`,node={id,type:nativeType,text:['text','heading','button','summary'].includes(nativeType)?'Edit this text':undefined,props:{...EzkartNative.defaults[nativeType],...(['heading','text'].includes(nativeType)?{width:'fit-content',maxWidth:'100%'}:{}),...(nativeType==='image'?{width:'320px',height:'240px'}:{}),...(nativeType==='container'?{minHeight:'120px',width:'100%'}:{})}};if(nativeType==='commerce'){const product=readCatalogProducts()[0];if(!product){showToast('Add a catalog product first.');return null;}node.productId=product.id;node.part='options';node.group='';}if(nativeType==='accordion')node.children=[{id:id+'-question',type:'summary',text:'Your question',props:EzkartNative.defaults.summary},{id:id+'-answer',type:'text',text:'Write your answer here.',props:{...EzkartNative.defaults.text,paddingTop:'16px'}}];const element = addNativeNode({section:section.dataset.sectionId,parent:parent?.dataset.nativeId,node}); undoStack[undoStack.length-1]=before; bindSqInteractions();rebuildLayerList();selectSqSection(section.dataset.sectionId);selectSqElement(element);markSqChanged();return element;
+        const id=`native-${Date.now()}`,node={id,type:nativeType,text:['text','heading','button','summary'].includes(nativeType)?'Edit this text':undefined,props:{...EzkartNative.defaults[nativeType],...(['heading','text'].includes(nativeType)?{width:'fit-content',maxWidth:'100%'}:{}),...(nativeType==='image'?{width:'320px',height:'240px'}:{}),...(nativeType==='container'?{minHeight:'120px',width:'100%'}:{})}};if(nativeType==='commerce'){const product=readCatalogProducts()[0];if(!product){showToast('Add a catalog product first.');return null;}node.productId=product.id;node.part='options';node.group='';}if(nativeType==='accordion')node.children=[{id:id+'-question',type:'summary',text:'Your question',props:EzkartNative.defaults.summary},{id:id+'-answer',type:'text',text:'Write your answer here.',props:{...EzkartNative.defaults.text,paddingTop:'16px'}}];return insertAsset(node,section,pointer);
       }
+      section = compatibleSection(section,false);
       if (!section) return null;
       remember(before);
       ensureElementSection(section);
@@ -7527,8 +7541,10 @@
       const layout = libraryDropPreview?.dataset.layout?.split(",").map(Number);
       const preferredLayout = layout?.length === 4 ? { x: layout[0], y: layout[1], width: layout[2], height: layout[3] } : libraryPointerLayout(section, event);
       const dragged = libraryDrag;
+      const bounds=section.getBoundingClientRect(),scale=bounds.width/section.offsetWidth;
+      const pointer={clientX:event.clientX,clientY:event.clientY,target:event.target,x:(event.clientX-bounds.left)/scale,y:(event.clientY-bounds.top)/scale};
       clearLibraryDropPreview();
-      if (dragged.kind === "asset") void assetLibrary.add(dragged, section, {clientX:event.clientX,clientY:event.clientY,target:event.target});
+      if (dragged.kind === "asset") void assetLibrary.add(dragged, section, pointer);
       else if (dragged.kind === "section") {
         const rect = section.getBoundingClientRect();
         const before = event.clientY < rect.top + rect.height / 2;
@@ -7536,7 +7552,7 @@
         if (before) { section.before(added); rebuildLayerList(); markSqChanged(); }
       }
       else if (dragged.kind === "component") addComponentInstance(componentForId(dragged.componentId), section, preferredLayout);
-      else addLibraryElement(dragged.type, section, preferredLayout);
+      else addLibraryElement(dragged.type, section, preferredLayout, pointer);
       libraryDrag = null;
       layoutGridDragging = false;
       revealLayoutGrid(650);
@@ -7546,6 +7562,9 @@
       button.draggable = true;
       button.addEventListener("dragstart", (event) => {
         const type = button.dataset.sqAddElement;
+        if (globalThis.EzkartAssets?.choiceFamilies[type.replace(/^native-/, '')]) {
+          event.preventDefault(); assetBrowser.choose(type.replace(/^native-/, '')); return;
+        }
         libraryDrag = { kind: "element", type, label: button.querySelector("b")?.textContent.trim() || elementTypeName({ dataset: { sqElementType: type } }) };
         layoutGridDragging = true;
         refreshLayoutGrid();
@@ -7564,6 +7583,7 @@
         revealLayoutGrid(650);
       });
       button.addEventListener("click", () => {
+        if (assetBrowser.choose(button.dataset.sqAddElement.replace(/^native-/, ''))) return;
         const section = previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`);
         addLibraryElement(button.dataset.sqAddElement, section);
       });
@@ -7579,7 +7599,7 @@
     if (navigationCatalog && globalThis.EzkartComponents) {
       navigationCatalog.innerHTML = globalThis.EzkartComponents.navDefinitions.map((item) => `<button type="button" class="sq-navigation-choice" data-sq-add-navigation-template="${item.id}" aria-pressed="false">${globalThis.EzkartComponents.thumbnail(`nav-${item.id}`)}<span><b>${escapeHtml(item.name)}</b><small>${escapeHtml(item.description)}</small></span></button>`).join("");
     }
-    const assetBrowser = globalThis.EzkartAssets?.browse({root:addPanel,componentCount:()=>readComponents().length,syncControls:syncBuilderSelects});
+    const assetBrowser = globalThis.EzkartAssets?.browse({root:addPanel,componentCount:()=>readComponents().length,syncControls:syncBuilderSelects,products:readCatalogProducts});
     const filterBlockLibrary = () => assetBrowser?.filter();
     const libraryViews = [...sqStudio.querySelectorAll("[data-sq-library-view]")];
     const syncNavigationTemplateOptions = () => {
@@ -8978,6 +8998,9 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
       section ||= previewRoot.querySelector(`[data-section-id="${CSS.escape(selectedSection)}"]`) || previewRoot.querySelector('[data-sq-block]');
       EzkartNative.validate(config);
       const before = captureState();
+      const inspectorWasClosed=sqStudio.classList.contains('inspector-closed'),assetsWerePinned=builderSidebar.classList.contains('sq-panel-pinned');
+      const dropBounds=section?.getBoundingClientRect(),dropScale=section?dropBounds.width/section.offsetWidth:1;
+      if(pointer){pointer.x ??= (pointer.clientX-dropBounds.left)/dropScale;pointer.y ??= (pointer.clientY-dropBounds.top)/dropScale;}
       let element;
       if (!section || !section.matches('.sq-native-section') && !section.querySelector('[data-sq-element]')) {
         section = compatibleSection(section,true);
@@ -8993,9 +9016,14 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
         } else {
           ensureElementSection(section);
           element.classList.add('sq-asset-composition');
-          element.dataset.sqAutoHeight = 'true';
+          if(config.children?.length) element.dataset.sqAutoHeight = 'true';
           const dimensions = {width:12,height:8};
-          if (section.matches('.sq-flow')) prepareFlowElement(element,section,dimensions,pointer ? libraryPointerLayout(section,pointer,dimensions) : null);
+          if (section.matches('.sq-flow')) {
+            // Native assets already carry their own dimensions. Flow owns only
+            // their placement until the merchant explicitly resizes them.
+            element.classList.add('sq-flow-element','sq-flow-added');
+            ['desktop','tablet','mobile'].forEach(device=>setFlowPosition(element,{x:24,y:24},device));
+          }
           else {
             ['desktop','tablet','mobile'].forEach(device => setElementLayout(element,findOpenElementLayout(section,{...dimensions,width:device==='mobile'?fluidColumns(device):Math.min(12,fluidColumns(device))},device),device));
             if(pointer) setElementLayout(element,libraryPointerLayout(section,pointer,dimensions),activeDevice);
@@ -9005,25 +9033,60 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
         EzkartNative.refresh();
       }
       element.dataset.sqAssetName = config.name || 'Uploaded image';
-      if(pointer && section.matches('.sq-native-section')) {
-        const rect = element.getBoundingClientRect(), owner = section.getBoundingClientRect(), scale = owner.width/section.offsetWidth;
-        const data = EzkartNative.read(element), props = EzkartNative.deviceContext(data,activeDevice).props;
-        props.position = 'relative';
-        // Keep the entire asset within the selected section's horizontal bounds.
-        props.left = `${(Math.max(owner.left,Math.min(pointer.clientX-rect.width/2,owner.right-rect.width))-rect.left)/scale}px`;
-        props.top = `${(Math.max(owner.top,pointer.clientY-24*scale)-rect.top)/scale}px`;
-        EzkartNative.write(element,data); EzkartNative.refresh();
+      if(!pointer && section.matches('.sq-native-section')){
+        const parent=element.parentElement,style=getComputedStyle(parent);
+        if(style.display==='block' || style.display==='flex' && style.flexDirection==='column'){
+          const siblings=[...parent.children].filter(node=>node!==element && node.matches('.sq-native') && node.getClientRects().length);
+          if(siblings.length){
+            const rect=element.getBoundingClientRect(),scale=parent.getBoundingClientRect().width/parent.offsetWidth;
+            const bottom=Math.max(...siblings.map(node=>node.getBoundingClientRect().bottom));
+            if(rect.top<bottom+16*scale){const data=EzkartNative.read(element);data.props.marginTop=`${(parseFloat(getComputedStyle(element).marginTop)||0)+(bottom+16*scale-rect.top)/scale}px`;EzkartNative.write(element,data);EzkartNative.refresh();}
+          }
+        }
       }
       rebuildLayerList(); bindSqInteractions(); selectSqSection(section.dataset.sectionId,true); selectSqElement(element);
-      element.scrollIntoView({block:'nearest',inline:'nearest'}); markSqChanged();
+      if(pointer){
+        // Keep the canvas stable while placing. Opening an inspector must not move
+        // a freshly dropped item away from the pointer.
+        if(inspectorWasClosed){sqStudio.classList.add('inspector-closed');inspector?.classList.add('collapsed');if(assetsWerePinned){builderSidebar.classList.add('sq-panel-pinned');builderSidebar.classList.remove('sq-panel-dismissed');}}
+        const data=EzkartNative.read(element),props=EzkartNative.deviceContext(data,activeDevice).props;
+        const parent=element.parentElement;
+        if(section.matches('.sq-native-section')){
+          if(parent.matches('.sq-native') && getComputedStyle(parent).position==='static'){
+            const owner=EzkartNative.read(parent);EzkartNative.deviceContext(owner,activeDevice).props.position='relative';EzkartNative.write(parent,owner);
+          }
+          props.position='absolute';
+        }else if(!section.matches('.sq-flow'))props.position='relative';
+        props.left='0px';props.top='0px';EzkartNative.write(element,data);EzkartNative.refresh();
+        const owner=section.getBoundingClientRect(),scale=owner.width/section.offsetWidth,rect=element.getBoundingClientRect();
+        const parentRect=parent.getBoundingClientRect(),localScale=parentRect.width/parent.offsetWidth || scale;
+        const width=rect.width/scale,height=rect.height/scale;
+        const x=Math.max(0,Math.min(pointer.x-width/2,section.clientWidth-width));
+        const y=Math.max(0,pointer.y-height/2);
+        if(section.matches('.sq-flow')){
+          const current=readFlowPosition(element);setFlowPosition(element,{x:(current.x || 0)+(owner.left+x*scale-rect.left)/scale,y:(current.y || 0)+(owner.top+y*scale-rect.top)/scale});
+        }else{
+          props.left=`${(owner.left+x*scale-rect.left)/localScale}px`;
+          props.top=`${(owner.top+y*scale-rect.top)/localScale}px`;
+          EzkartNative.write(element,data);EzkartNative.refresh();
+        }
+        if(section.matches('.sq-native-section') && parent.matches('.sq-native')){
+          const ownerConfig=EzkartNative.read(parent),end=element.getBoundingClientRect();
+          const needed=Math.ceil((end.bottom-parentRect.top)/localScale+(parseFloat(getComputedStyle(parent).paddingBottom)||0));
+          if(needed>parent.clientHeight){EzkartNative.deviceContext(ownerConfig,activeDevice).props.minHeight=`${needed}px`;EzkartNative.write(parent,ownerConfig);EzkartNative.refresh();}
+        }
+        refreshElementOverlay();
+      }else element.scrollIntoView({block:'nearest',inline:'nearest'});
+      markSqChanged();
       showToast(`${config.name || 'Image'} added`);
+      return element;
     };
     assetLibrary = globalThis.EzkartAssets?.init({
       root:addPanel,insert:insertAsset,filter:filterBlockLibrary,toast:showToast,
       beginDrag:(drag,event) => {
         libraryDrag = drag; layoutGridDragging = true; refreshLayoutGrid();
         document.body.classList.add('sq-library-dragging');
-        event.dataTransfer.effectAllowed = 'copy'; event.dataTransfer.setData('application/x-ezkart-asset',drag.id || drag.uploadId || drag.sectionType); event.dataTransfer.setData('text/plain',drag.label);
+        event.dataTransfer.effectAllowed = 'copy'; event.dataTransfer.setData('application/x-ezkart-asset',drag.id || drag.uploadId || drag.choiceId || drag.sectionType); event.dataTransfer.setData('text/plain',drag.label);
       },
       endDrag:() => {clearLibraryDropPreview();libraryDrag=null;layoutGridDragging=false;document.body.classList.remove('sq-library-dragging');revealLayoutGrid(650);},
       listUploads:async () => {
@@ -9042,6 +9105,7 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
       upload:uploadBuilderAsset,
       readUpload:readBuilderUpload
     });
+    openSqPanel('add',{pin:true});
 
   }
 
