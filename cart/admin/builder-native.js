@@ -2643,7 +2643,7 @@
       .querySelector(
         mediaLabel ? "[data-native-content]" : "[data-native-structure]",
       )
-      .append(accessibleLabel);
+      .append(accessibleLabel.closest(".sq-setting-with-help") || accessibleLabel);
     panel.querySelector("[data-native-content]").hidden =
       config.text === undefined &&
       !["image", "video", "icon", "button"].includes(config.type);
@@ -3038,6 +3038,7 @@
       if (wrap.querySelector('input[type="checkbox"]'))
         wrap.classList.add("sq-native-check");
     });
+    globalThis.EzkartBuilderHelp?.attach(panel);
     callbacks.inspector.querySelector(".sq-inspector-scroll").prepend(panel);
     const listen = (selector, event, fn) =>
       panel.querySelector(selector).addEventListener(event, () => {

@@ -1,0 +1,150 @@
+/* The info button is a sibling of the label so it cannot toggle its field. */
+.page-site-editor .sq-inspector .sq-native-inspector .sq-setting-with-help {
+  position: relative;
+  min-width: 0;
+}
+.page-site-editor .sq-inspector .sq-native-inspector .sq-setting-with-help:has(> label[hidden]) {
+  display: none;
+}
+.page-site-editor .sq-inspector .sq-native-inspector .sq-setting-with-help > label {
+  margin: 10px 0;
+}
+.page-site-editor .sq-inspector .sq-native-inspector .sq-native-fields > .sq-setting-with-help > label {
+  margin: 6px 0;
+}
+.page-site-editor .sq-inspector .sq-native-inspector .sq-setting-label-text {
+  display: block;
+  padding-right: 26px;
+  min-height: 18px;
+  line-height: 1.6;
+}
+.page-site-editor .sq-inspector .sq-native-inspector .sq-native-check .sq-setting-label-text {
+  min-height: 0;
+}
+.page-site-editor .sq-inspector .sq-native-inspector .sq-setting-info {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  min-height: 26px;
+  padding: 0;
+  flex: 0 0 26px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #697386;
+}
+.page-site-editor .sq-inspector .sq-native-inspector .sq-setting-info > span {
+  display: grid;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  font: 600 11px/1 Georgia, serif;
+}
+.page-site-editor .sq-inspector .sq-native-inspector .sq-setting-info:hover,
+.page-site-editor .sq-inspector .sq-native-inspector .sq-setting-info[aria-expanded="true"] {
+  background: #fff0eb;
+  color: #a83e2f;
+}
+.page-site-editor .sq-inspector .sq-native-inspector .sq-setting-with-help > .sq-setting-info {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+}
+.page-site-editor .sq-inspector .sq-native-inspector .sq-native-fields .sq-setting-with-help > .sq-setting-info {
+  top: 2px;
+}
+.page-site-editor .sq-inspector .sq-native-inspector .sq-setting-action-help {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+.page-site-editor .sq-inspector .sq-native-inspector .sq-setting-action-help > button:first-child {
+  flex: 1;
+  min-width: 0;
+}
+.sq-setting-help-dialog {
+  box-sizing: border-box;
+  width: min(510px, calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
+  max-height: calc(100dvh - 32px);
+  margin: auto;
+  padding: 0;
+  border: 1px solid #e2e4e9;
+  border-radius: 16px;
+  background: #fff;
+  color: #343845;
+  box-shadow: 0 20px 80px #161c2b30;
+  overflow: auto;
+  overscroll-behavior: contain;
+  font: 13px/1.7 var(--ui-font, Poppins, sans-serif);
+}
+.sq-setting-help-dialog::backdrop { background: #161c2b66; }
+.sq-setting-help-dialog.sq-setting-help-expanded { width: min(760px, calc(100vw - 24px)); }
+.sq-setting-help-dialog > header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 18px 24px;
+  background: #fff;
+  border-bottom: 1px solid #e8eaee;
+}
+.sq-setting-help-dialog h2 { margin: 0; font-size: 19px; line-height: 1.4; font-weight: 600; }
+.sq-setting-help-dialog h3 { margin: 22px 0 10px; font-size: 13px; font-weight: 600; }
+.sq-setting-help-dialog button { cursor: pointer; font: inherit; }
+.sq-setting-help-dialog [data-setting-help-close] {
+  display: grid;
+  place-items: center;
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: #f2f3f5;
+  color: #596171;
+  font-size: 24px;
+}
+.sq-setting-help-dialog button:focus-visible { outline: 2px solid #b54433; outline-offset: 3px; }
+.sq-setting-help-body { padding: 12px 24px 24px; }
+.sq-setting-help-body > p { margin: 0; color: #596171; }
+.sq-setting-help-body ol { display: grid; gap: 10px; margin: 0 0 22px; padding-left: 22px; }
+.sq-setting-help-body li { padding-left: 5px; }
+.sq-setting-help-dialog .sq-setting-help-example-toggle {
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 1px solid #e7c9c2;
+  border-radius: 8px;
+  background: #fff4f0;
+  color: #9d3829;
+  font-weight: 600;
+}
+.sq-setting-help-dialog .sq-setting-help-example-toggle:hover { background: #fce7df; }
+.sq-setting-help-dialog figure { margin: 0; }
+.sq-setting-help-dialog #sq-setting-help-example { scroll-margin-top: 80px; }
+.sq-setting-help-dialog figure img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid #e2e4e9;
+  border-radius: 10px;
+  background: #f6f7f9;
+}
+.sq-setting-help-dialog figcaption { margin-top: 10px; color: #596171; }
+.sq-setting-help-dialog .sq-setting-help-full-size { display: inline-block; margin-top: 8px; color: #9d3829; text-underline-offset: 3px; }
+.sq-setting-help-dialog dl { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); margin: 18px 0; font-size: 12px; }
+.sq-setting-help-dialog :is(dt, dd) { margin: 0; padding: 8px 0; border-bottom: 1px solid #e8eaee; overflow-wrap: anywhere; }
+.sq-setting-help-dialog dt { padding-right: 16px; color: #596171; }
+.sq-setting-help-dialog dd { font-weight: 500; }
+.sq-setting-help-dialog .sq-setting-help-note { font-size: 11px; color: #737b8c; }
+@media (max-width: 480px) {
+  .sq-setting-help-dialog > header { padding: 16px 18px; }
+  .sq-setting-help-body { padding: 12px 18px 18px; }
+}
