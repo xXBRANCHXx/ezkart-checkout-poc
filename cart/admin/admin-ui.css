@@ -1,0 +1,132 @@
+/* Shared merchant UI. Keep authored storefronts in their own design system. */
+@font-face {
+  font-family: "Ezkart UI";
+  src: url("assets/fonts/inter.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+:root {
+  --ui-font: "Ezkart UI", Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --ui-ink: #292e37;
+  --ui-muted: #697382;
+  --ui-line: #e8ebef;
+  --ui-field: #f3f4f6;
+  --ui-hover: #eceef1;
+  --ui-focus: #697586;
+  --ui-radius: 8px;
+  --ink: var(--ui-ink);
+  --muted: var(--ui-muted);
+  --line: var(--ui-line);
+  --soft: var(--ui-field);
+  --shadow: none;
+}
+
+body { font-family: var(--ui-font); }
+button, input, select, textarea { font-family: inherit; }
+.dashboard-page :is(button, input, select, textarea):not(:where(
+  .sq-page-preview *, .shop-preview *, .sq-button-live-preview,
+  .sq-component-dialog textarea, [data-sq-code-editor])) {
+  font-family: var(--ui-font) !important;
+}
+
+.dashboard-page :is(.sidebar, .topbar, .surface-header, .surface-tools, dialog) {
+  font-family: var(--ui-font);
+}
+.dashboard-page :is(.sidebar, .topbar, .surface-header, .surface-tools, dialog) :is(button, input, select, textarea) {
+  font-family: var(--ui-font);
+}
+.dashboard-page .primary-nav a { font-weight: 500; }
+.dashboard-page .primary-nav a.active {
+  color: var(--ui-ink);
+  background: var(--ui-field);
+}
+.dashboard-page .primary-nav a.active .icon { color: #d34331; }
+.dashboard-page :is(.global-search, .store-switcher) {
+  background: var(--ui-field);
+  border-color: transparent;
+  box-shadow: none;
+}
+.dashboard-page .global-search input { background: transparent; }
+.dashboard-page :is(.panel, .surface, .product-card, .campaign-card) { box-shadow: none; }
+.dashboard-page .action-button.primary {
+  color: #fff;
+  background: #c74130;
+  border-color: transparent;
+  box-shadow: none;
+}
+.dashboard-page .action-button:hover {
+  color: var(--ui-ink);
+  background: var(--ui-field);
+  border-color: #dce1e7;
+  transform: none;
+}
+.dashboard-page .action-button.primary:hover { color: #fff; background: #ac3324; }
+.dashboard-page .upgrade-card {
+  color: var(--ui-ink);
+  background: var(--ui-field);
+}
+.dashboard-page .upgrade-card::after { display: none; }
+.dashboard-page .upgrade-card a { color: var(--ui-ink); }
+.dashboard-page .page-eyebrow { color: var(--ui-muted); letter-spacing: 0; text-transform: none; }
+.dashboard-page :is(.surface-header, .surface-tools, .chart-controls) :is(button, select) {
+  border-radius: var(--ui-radius);
+  box-shadow: none;
+}
+.dashboard-page :is(.surface-header, .surface-tools) select,
+.dashboard-page .chart-controls > div {
+  background-color: var(--ui-field);
+  border-color: transparent;
+}
+.dashboard-page :is(.settings-section, .product-creator-dialog, .page-creator-dialog,
+  .shop-settings-panel, .surface-tools) :is(input:not([type="color"]):not([type="range"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]), select, textarea) {
+  color: var(--ui-ink);
+  background-color: var(--ui-field);
+  border-color: transparent;
+  border-radius: var(--ui-radius);
+  box-shadow: none;
+}
+.dashboard-page :is(.settings-section, .product-creator-dialog, .page-creator-dialog,
+  .shop-settings-panel, .surface-tools) :is(input, select, textarea):focus-visible {
+  outline: 2px solid var(--ui-focus);
+  outline-offset: 2px;
+}
+.dashboard-page .settings-nav a.active {
+  color: var(--ui-ink);
+  background: var(--ui-field);
+}
+
+/* Every merchant color picker uses the same circular, keyboard-focusable chip.
+   The native input is retained so labels and platform color tools still work. */
+body.dashboard-page :is(.workspace, .sq-studio, dialog) input[type="color"]:not(.sq-page-preview input, .shop-preview input) {
+  flex: 0 0 32px;
+  width: 32px !important;
+  height: 32px !important;
+  min-height: 32px !important;
+  padding: 3px !important;
+  overflow: hidden;
+  background-color: #fff;
+  border: 1px solid #dce1e7 !important;
+  border-radius: 50% !important;
+  box-shadow: none;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+}
+body.dashboard-page :is(.workspace, .sq-studio, dialog) input[type="color"]:not(.sq-page-preview input, .shop-preview input)::-webkit-color-swatch-wrapper { padding: 0; }
+body.dashboard-page :is(.workspace, .sq-studio, dialog) input[type="color"]:not(.sq-page-preview input, .shop-preview input)::-webkit-color-swatch {
+  border: 1px solid #0000000c;
+  border-radius: 50%;
+}
+body.dashboard-page :is(.workspace, .sq-studio, dialog) input[type="color"]:not(.sq-page-preview input, .shop-preview input)::-moz-color-swatch {
+  border: 1px solid #0000000c;
+  border-radius: 50%;
+}
+body.dashboard-page :is(.workspace, .sq-studio, dialog) input[type="color"]:not(.sq-page-preview input, .shop-preview input):hover {
+  border-color: #aab3bf !important;
+}
+body.dashboard-page :is(.workspace, .sq-studio, dialog) input[type="color"]:not(.sq-page-preview input, .shop-preview input):focus-visible {
+  outline: 2px solid var(--ui-focus);
+  outline-offset: 3px;
+}

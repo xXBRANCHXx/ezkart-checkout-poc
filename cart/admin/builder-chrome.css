@@ -240,25 +240,20 @@
   border-color: #b9c1cc;
 }
 
-/* Color names, swatches and hex values each get their own row. */
+/* Gradient controls share the circular color inputs used throughout the UI. */
 .page-site-editor .sq-inspector .sq-gradient-colors {
   margin: 14px 0;
   gap: 10px;
 }
 .page-site-editor .sq-inspector .sq-gradient-colors label {
   min-width: 0;
-  grid-template-rows: auto 38px auto;
+  grid-template-rows: auto 32px auto;
+  justify-items: center;
   gap: 7px;
 }
 .page-site-editor .sq-inspector .sq-gradient-colors label > span {
   margin: 0;
   font-size: 11px;
-}
-.page-site-editor .sq-inspector .sq-gradient-colors input[type="color"] {
-  width: 100%;
-  height: 38px;
-  padding: 4px;
-  border-color: #dce1e7;
 }
 .page-site-editor .sq-inspector .sq-gradient-colors label > output {
   position: static;
@@ -352,4 +347,282 @@
   .page-site-editor .sq-grid-settings-toggle .icon {
     transition: none;
   }
+}
+
+/* One quiet control system across all editor panels and floating tools. */
+.page-site-editor :is(.sq-commandbar, .sq-builder-sidebar, .sq-inspector,
+  .sq-stage-footer, .sq-canvas-meta, .sq-builder-select-menu, .sq-grid-settings,
+  .sq-canvas-section-tools, .sq-element-toolbar, dialog),
+.page-site-editor :is(.sq-commandbar, .sq-builder-sidebar, .sq-inspector,
+  .sq-stage-footer, .sq-canvas-meta, .sq-builder-select-menu, .sq-grid-settings,
+  .sq-canvas-section-tools, .sq-element-toolbar, dialog) :is(button, input, select, textarea) {
+  font-family: var(--ui-font) !important;
+}
+.page-site-editor :is(.sq-component-dialog textarea, [data-sq-code-editor]) {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace !important;
+}
+.page-site-editor :is(.sq-tool-panel, .sq-inspector) {
+  color: var(--ui-ink);
+  scrollbar-width: thin;
+  scrollbar-color: #dfe3e8 transparent;
+}
+.page-site-editor .sq-tool-panel { padding-inline: 18px; }
+.page-site-editor .sq-tool-panel > header {
+  min-height: 65px;
+  padding: 0;
+  border-color: var(--ui-line);
+}
+.page-site-editor .sq-tool-panel > header h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -.025em;
+}
+.page-site-editor .sq-tool-panel > header small {
+  color: var(--ui-muted);
+  font-size: 11px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.page-site-editor :is(.sq-tool-panel, .sq-inspector) :is(h3, .sq-style-card-heading h3) {
+  color: var(--ui-ink);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.page-site-editor :is(.sq-tool-panel, .sq-inspector) label > span {
+  color: var(--ui-muted);
+  font-size: 11px;
+  font-weight: 400;
+}
+.page-site-editor :is(.sq-tool-panel, .sq-inspector) :is(small, .sq-field-note, .sq-panel-intro) {
+  color: var(--ui-muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+.page-site-editor :is(.sq-tool-panel, .sq-inspector) label > output {
+  color: var(--ui-muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.page-site-editor .sq-inspector-heading { gap: 8px; }
+.page-site-editor .sq-inspector-heading > span {
+  padding: 0;
+  color: var(--ui-muted);
+  background: transparent;
+  font-size: 10px;
+  font-weight: 400;
+}
+
+/* Filled fields echo the toolbar, with a visible focus treatment. */
+.page-site-editor .sq-studio :is(.sq-tool-panels, .sq-inspector) :is(
+  .sq-builder-select-trigger, select:not(.sq-builder-native-select),
+  input:not([type="range"]):not([type="color"]):not([type="checkbox"]):not([type="radio"]), textarea) {
+  color: var(--ui-ink) !important;
+  background-color: var(--ui-field) !important;
+  border: 1px solid transparent !important;
+  border-radius: var(--ui-radius) !important;
+  box-shadow: none;
+  font-size: 12px !important;
+  font-weight: 400;
+}
+.page-site-editor .sq-studio .sq-builder-select-trigger {
+  min-height: 36px;
+  padding-inline: 10px;
+}
+.page-site-editor .sq-studio :is(.sq-tool-panels, .sq-inspector) :is(
+  .sq-builder-select-trigger, select, input, textarea):focus-visible,
+.page-site-editor .sq-studio :is(.sq-tool-panels, .sq-inspector) :is(
+  select, input:not([type="range"]):not([type="checkbox"]):not([type="color"]), textarea):focus,
+.page-site-editor .sq-studio .sq-builder-select.open .sq-builder-select-trigger {
+  border-color: var(--ui-focus) !important;
+  outline: 2px solid #69758626;
+  outline-offset: 1px;
+  box-shadow: none !important;
+}
+.page-site-editor .sq-studio .sq-builder-select-trigger:hover {
+  background: var(--ui-hover) !important;
+}
+.page-site-editor .sq-builder-select-menu {
+  padding: 5px;
+  background: #fff;
+  border-color: var(--ui-line);
+  border-radius: 10px;
+  box-shadow: 0 8px 28px #18212d1a;
+  backdrop-filter: none;
+}
+.page-site-editor .sq-builder-select-option {
+  min-height: 36px;
+  font-size: 12px;
+  font-weight: 400;
+  border-radius: 6px;
+}
+.page-site-editor .sq-builder-select-option:is(:hover, :focus-visible, .selected) {
+  color: var(--ui-ink);
+  background: var(--ui-field);
+}
+.page-site-editor .sq-builder-select-option > i { color: var(--ui-ink); }
+.page-site-editor .sq-studio input[type="range"] {
+  --sq-control-accent: #697586;
+  --sq-control-accent-end: #697586;
+}
+
+/* Group by space and dividers, without nesting cards inside the sidebar. */
+.page-site-editor .sq-brand-panel .sq-control-section,
+.page-site-editor .sq-inspector :is(.sq-page-appearance-card, .sq-background-manager,
+  .sq-navigation-layout-controls, .sq-image-crop-editor, .sq-image-blend-editor,
+  .sq-image-scroll-editor, .sq-section-background-motion, .sq-review-editor) {
+  margin: 0;
+  padding: 20px 0 !important;
+  background: transparent;
+  border: 0 !important;
+  border-bottom: 1px solid var(--ui-line) !important;
+  border-radius: 0;
+  box-shadow: none;
+}
+.page-site-editor .sq-brand-panel .sq-control-section:last-child { border-bottom: 0 !important; }
+.page-site-editor .sq-brand-description {
+  margin: 16px 0 0;
+  color: var(--ui-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.page-site-editor .sq-brand-panel .sq-inspector-heading { margin-bottom: 16px; }
+.page-site-editor .sq-theme-presets {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.page-site-editor .sq-theme-presets > span { color: var(--ui-muted); font-size: 11px; }
+.page-site-editor .sq-theme-grid { display: flex; gap: 10px; }
+.page-site-editor .sq-theme-grid button {
+  flex: 0 0 26px;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px #dfe3e8;
+}
+.page-site-editor .sq-theme-grid button:is(:hover, .active) { box-shadow: 0 0 0 1.5px #697586; }
+.page-site-editor .sq-theme-grid button:focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 3px; }
+.page-site-editor .sq-brand-panel .sq-brand-colors {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  margin-top: 0;
+}
+.page-site-editor .sq-brand-panel .sq-brand-colors label {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 10px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+.page-site-editor .sq-brand-panel .sq-brand-colors label > span {
+  grid-column: 2;
+  grid-row: 1;
+  color: #495260;
+  font-size: 12px !important;
+}
+.page-site-editor .sq-brand-panel .sq-brand-colors input[type="color"] {
+  grid-column: 1;
+  grid-row: 1;
+}
+.page-site-editor .sq-brand-panel .sq-brand-colors output {
+  grid-column: 3;
+  grid-row: 1;
+  margin: 0;
+  font: 10px/1.5 var(--ui-font);
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-muted);
+}
+.page-site-editor .sq-brand-fonts { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+.page-site-editor .sq-brand-type-grid { gap: 12px; }
+.page-site-editor .sq-brand-panel .sq-button-color-row { margin: 16px 0; gap: 12px; }
+.page-site-editor .sq-brand-panel .sq-button-color-row label {
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+  gap: 7px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+.page-site-editor .sq-brand-panel .sq-button-color-row label > span { margin: 0; font-size: 10px !important; }
+.page-site-editor .sq-brand-panel .sq-brand-type-grid + .sq-brand-type-grid { margin-top: 14px; }
+.page-site-editor .sq-brand-panel .sq-button-live-preview { margin-top: 18px; }
+.page-site-editor .sq-site-header-shortcuts {
+  padding: 4px 0 16px;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--ui-line);
+  border-radius: 0;
+}
+.page-site-editor .sq-site-header-shortcuts > div:first-child > span { display: none; }
+.page-site-editor :is(.sq-structure-tabs, .sq-library-categories, .sq-style-segmented) {
+  background: var(--ui-field);
+  border-color: transparent;
+  border-radius: var(--ui-radius);
+}
+.page-site-editor :is(.sq-structure-tabs, .sq-library-categories) button {
+  color: var(--ui-muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+.page-site-editor :is(.sq-structure-tabs, .sq-library-categories) button:is(.active, [aria-pressed="true"]) {
+  color: var(--ui-ink);
+  background: #fff;
+  box-shadow: 0 1px 3px #18212d0d;
+}
+.page-site-editor .sq-block-grid > button {
+  background: var(--ui-field);
+  border-color: transparent;
+  border-radius: var(--ui-radius);
+  box-shadow: none;
+}
+.page-site-editor .sq-block-grid > button:hover {
+  color: var(--ui-ink);
+  background: var(--ui-hover);
+  border-color: transparent;
+}
+.page-site-editor .sq-block-grid > button > .icon { color: #697586; }
+.page-site-editor .sq-inspector .sq-native-inspector :is(input, select, textarea, button, summary):focus-visible {
+  outline-color: var(--ui-focus);
+}
+.page-site-editor .sq-inspector .sq-native-inspector input[type="color"] { flex-basis: 32px; }
+.page-site-editor .sq-inspector .sq-native-inspector .sq-native-context {
+  background: #fff;
+  border-color: var(--ui-line);
+}
+.page-site-editor .sq-inspector .sq-native-inspector .sq-native-selection-note {
+  border-color: var(--ui-line);
+  background: var(--ui-field);
+}
+.page-site-editor .sq-inspector section.sq-native-inspector { font-family: var(--ui-font); }
+.page-site-editor .sq-inspector .sq-inspector-scroll > :is(.sq-background-manager, .sq-navigation-layout-controls) {
+  padding: 20px 16px !important;
+}
+.page-site-editor .sq-inspector :is(.sq-section-background-solid, .sq-section-background-gradient) {
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+.page-site-editor .sq-inspector .sq-section-background-color {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.page-site-editor .sq-inspector .sq-section-background-color > output {
+  padding: 0;
+  color: var(--ui-muted);
+  background: transparent;
+  border: 0;
+  font: 11px/1.5 var(--ui-font);
 }
