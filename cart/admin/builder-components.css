@@ -159,7 +159,7 @@
 
 .sq-page-preview .sq-composition.section-bg-custom{background:var(--sq-section-background-color)!important}
 
-body:has(>.sq-authored-navigation)>.sq-page-preview.sq-has-pinned-navigation{padding-top:var(--sq-pinned-nav-height,72px)!important}
+body:has(>.sq-authored-navigation)>.sq-page-preview.sq-has-pinned-navigation:not(.sq-has-overlay-navigation){padding-top:var(--sq-pinned-nav-height,72px)!important}
 .sq-device-frame.device-mobile .sq-store-nav.sq-authored-navigation{grid-template-rows:repeat(2,32px)!important;grid-auto-rows:32px!important}
 
 .page-site-editor .sq-navigation-link-row{padding:8px;gap:8px}
@@ -338,3 +338,18 @@ body:has(>.sq-authored-navigation)>.sq-page-preview.sq-has-pinned-navigation{pad
 .sq-navigation-advanced { margin-top:16px; }
 .sq-navigation-advanced>summary { cursor:pointer; color:#69727e; font:500 11px/1.5 Poppins,sans-serif; }
 .sq-navigation-advanced>.sq-style-segmented { margin-top:12px; }
+
+/* Overlay keeps the actual hero background behind the header, including motion.
+   The saved navbar background remains available when the switch is turned off. */
+.sq-page-preview > .sq-navigation-template-section.sq-nav-over-hero {
+  margin-bottom: calc(-1 * var(--sq-nav-overlay-height, 72px)) !important;
+}
+.sq-page-block.sq-navigation-template-section.sq-nav-over-hero {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+.sq-navigation-template-section.sq-nav-over-hero > :is(.sq-gradient-layer, .sq-section-background) { display: none !important; }
+body > .sq-page-preview.sq-has-overlay-navigation { padding-top: 0 !important; }

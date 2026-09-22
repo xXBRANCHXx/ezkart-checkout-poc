@@ -3870,7 +3870,9 @@
       const surface = ["solid", "blur", "transparent"].includes(section.dataset.sqNavSurface) ? section.dataset.sqNavSurface : surfaceFallback;
       const opacity = Math.max(0, Math.min(100, Number(section.dataset.sqNavOpacity ?? (surface === "transparent" ? 0 : surface === "blur" ? 82 : 100))));
       const blur = Math.max(0, Math.min(32, Number(section.dataset.sqNavBlur ?? 16)));
-      if (position !== "static") moveNavigationSectionToTop(section);
+      const overlay = section.dataset.sqNavOverlay === "true";
+      section.classList.toggle("sq-nav-over-hero", overlay);
+      if (position !== "static" || overlay) moveNavigationSectionToTop(section);
       section.dataset.sqNavPosition = position;
       section.dataset.sqNavOffset = String(offset);
       section.dataset.sqNavOffsetCustomized = String(offsetWasCustomized);
@@ -3893,6 +3895,8 @@
       if (!section) return;
       applyNavigationSectionBehavior(section);
       const position = section.dataset.sqNavPosition || "static";
+      const overlay = sqStudio.querySelector('[data-sq-navigation-overlay]');
+      if (overlay) overlay.checked = section.dataset.sqNavOverlay === 'true';
       const sticky = sqStudio.querySelector('[data-sq-navigation-sticky]');
       if (sticky) sticky.checked = position !== 'static';
       sqStudio.querySelectorAll("[data-sq-navigation-position]").forEach((button) => {
@@ -6724,6 +6728,18 @@
     };
     sqStudio.querySelectorAll("[data-sq-navigation-position]").forEach((button) => button.addEventListener("click", () => setNavigationPosition(button.dataset.sqNavigationPosition)));
     sqStudio.querySelector('[data-sq-navigation-sticky]')?.addEventListener('change', event => setNavigationPosition(event.currentTarget.checked ? 'sticky' : 'static'));
+    sqStudio.querySelector('[data-sq-navigation-overlay]')?.addEventListener('change', event => {
+      const section = navigationSectionFor();
+      if (!section) return;
+      remember();
+      section.dataset.sqNavOverlay = String(event.currentTarget.checked);
+      applyNavigationSectionBehavior(section);
+      globalThis.EzkartComponents?.fitNavigation(section);
+      rebuildLayerList();
+      syncNavigationLayoutControls(true);
+      scheduleSectionTools();
+      markSqChanged();
+    });
     let navigationBehaviorSnapshot = null;
     const startNavigationBehaviorEdit = () => { if (!navigationBehaviorSnapshot) navigationBehaviorSnapshot = captureState(); };
     const finishNavigationBehaviorEdit = () => { if (navigationBehaviorSnapshot) remember(navigationBehaviorSnapshot); navigationBehaviorSnapshot = null; markSqChanged(); };
@@ -7418,7 +7434,7 @@
       if (!section) return;
       if (existing) {
         // Layout changes keep the merchant's explicit scrolling preferences.
-        ["sqNavPosition", "sqNavOffset", "sqNavOffsetCustomized", "sqNavSurface", "sqNavOpacity", "sqNavBlur", "sqNavShadow", "sqNavHideScroll"].forEach(key => {
+        ["sqNavPosition", "sqNavOverlay", "sqNavOffset", "sqNavOffsetCustomized", "sqNavSurface", "sqNavOpacity", "sqNavBlur", "sqNavShadow", "sqNavHideScroll"].forEach(key => {
           if (existing.dataset[key] !== undefined) section.dataset[key] = existing.dataset[key];
         });
         existing.replaceWith(section);
@@ -8019,6 +8035,7 @@
         node.style.removeProperty("--sq-nav-editor-shift");
         node.dataset.ezkartNavTemplate = node.dataset.sqNavTemplate || "current";
         node.dataset.ezkartNavPosition = node.dataset.sqNavPosition || "static";
+        node.dataset.ezkartNavOverlay = node.dataset.sqNavOverlay || "false";
         node.dataset.ezkartNavOffset = node.dataset.sqNavOffset || "0";
         node.dataset.ezkartNavSurface = node.dataset.sqNavSurface || (node.dataset.sqNavTemplate === "overlay" ? "transparent" : "solid");
         node.dataset.ezkartNavOpacity = node.dataset.sqNavOpacity || (node.dataset.ezkartNavSurface === "transparent" ? "0" : "100");
@@ -8106,7 +8123,7 @@
       if (pinnedNavigation) {
         clone.classList.add("sq-has-pinned-navigation");
         if (pinnedNavigation.dataset.ezkartNavTemplate === "announcement") clone.classList.add("sq-has-announcement-navigation");
-        if (pinnedNavigation.dataset.ezkartNavTemplate === "overlay") clone.classList.add("sq-has-overlay-navigation");
+        if (pinnedNavigation.dataset.ezkartNavTemplate === "overlay" || pinnedNavigation.dataset.ezkartNavOverlay === "true") clone.classList.add("sq-has-overlay-navigation");
         const pageStyle = getComputedStyle(previewRoot);
         const customProperties = new Set(Array.from(pageStyle).filter((property) => property.startsWith("--")));
         ["--site-accent", "--site-ink", "--site-page", "--site-surface", "--page-radius", "--button-primary-bg", "--button-primary-fg", "--button-primary-border", "--button-primary-border-width", "--button-primary-radius", "--button-primary-shadow"].forEach((property) => customProperties.add(property));
@@ -8245,7 +8262,7 @@ let frame=0,device='';
 const layouts=new WeakMap();
 const write=(element,layout)=>{layouts.set(element,layout);element.style.setProperty('grid-column',layout.x+'/span '+layout.width,'important');element.style.setProperty('grid-row',layout.y+'/span '+layout.height,'important')};
 const fit=()=>{frame=0;const next=innerWidth<=600?'mobile':innerWidth<=900?'tablet':'desktop';
- document.querySelectorAll('.sq-authored-navigation').forEach(fitNavigation);
+ document.querySelectorAll('.sq-navigation-template-section').forEach(fitNavigation);
  fitProductCards(document.querySelector('.sq-page-preview'));
  const pinned=document.querySelector('body>.sq-authored-navigation'),root=document.querySelector('body>.sq-page-preview');
  if(pinned&&root)root.style.setProperty('--sq-pinned-nav-height',(pinned.offsetHeight+(parseFloat(getComputedStyle(pinned).top)||0))+'px');

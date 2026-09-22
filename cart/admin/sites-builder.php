@@ -196,6 +196,7 @@ declare(strict_types=1);
       <div class="sq-inspector-scroll">
           <section class="sq-navigation-layout-controls" data-sq-navigation-layout-controls hidden>
             <div class="sq-inspector-heading"><h3>Navigation</h3><span>All screen sizes</span></div>
+            <label class="sq-navigation-behavior-toggle"><input type="checkbox" data-sq-navigation-overlay><i aria-hidden="true"></i><span><b>Overlay hero</b><small>Place the navbar over the first section and let its background show through.</small></span></label>
             <label class="sq-navigation-behavior-toggle"><input type="checkbox" data-sq-navigation-sticky checked><i aria-hidden="true"></i><span><b>Sticky navigation</b><small>Keep the header visible while scrolling.</small></span></label>
             <details class="sq-navigation-advanced"><summary>More navigation settings</summary>
             <div class="sq-style-segmented" role="group" aria-label="Navigation position"><button type="button" data-sq-navigation-position="static">Static</button><button type="button" data-sq-navigation-position="sticky">Sticky</button><button type="button" data-sq-navigation-position="fixed">Fixed</button></div>

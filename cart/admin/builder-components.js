@@ -123,7 +123,11 @@
   // Used by both the canvas and exported pages. Collapse crowded desktop menus
   // too, so a longer merchant name or translated links never overlap the logo.
   function fitNavigation(section) {
-    if (!section.matches('.sq-authored-navigation')) return;
+    const overlayHeight = () => {
+      if (section.classList.contains('sq-nav-over-hero')) section.style.setProperty('--sq-nav-overlay-height', section.offsetHeight + 'px');
+      else section.style.removeProperty('--sq-nav-overlay-height');
+    };
+    if (!section.matches('.sq-authored-navigation')) { overlayHeight(); return; }
     section.classList.remove('sq-nav-collapsed');
     const groups = [...section.querySelectorAll(':scope > .sq-template-navigation')];
     const logo = section.querySelector(':scope > .sq-site-logo');
@@ -139,6 +143,7 @@
       toggle?.setAttribute('aria-expanded', 'false');
       toggle?.setAttribute('aria-label', 'Open navigation menu');
     }
+    overlayHeight();
   }
   // Product navigation follows visible product content, independent of page names
   // or generated section IDs. Keep the target clear of the pinned site header.
