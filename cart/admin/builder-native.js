@@ -386,6 +386,8 @@
       throw Error("Each native element needs a unique ID.");
     ids.add(config.id);
     if (!tags[config.type]) throw Error("Choose a native element type.");
+    if (config.autoLayout != null && typeof config.autoLayout !== "boolean")
+      throw Error("Automatic layout must be on or off.");
     if (
       config.type === "product" &&
       (typeof config.productId !== "string" ||
@@ -812,6 +814,50 @@
     }
     return rule || {};
   }
+  // Merchant-added elements get a usable smaller-screen layout before any
+  // authored breakpoint rules. Older blank pages and uploads use the same
+  // fallback without rewriting their saved desktop geometry. Template
+  // internals and scale-to-fit compositions retain their authored layouts.
+  function automaticLayout(node, config) {
+    const freeSection = node.matches('.sq-native-section[data-sq-auto-grow]');
+    const freeChild = node.parentElement?.matches('.sq-native-section[data-sq-auto-grow]');
+    if (config.autoLayout === false || config.fit ||
+        !(config.autoLayout || node.hasAttribute('data-sq-asset-name') || freeSection || freeChild)) return [];
+    const base = config.props || {};
+    const props = { minWidth: '0px', maxWidth: '100%' };
+    if (base.maxWidth && CSS.supports('max-width', `min(100%, ${base.maxWidth})`))
+      props.maxWidth = `min(100%, ${base.maxWidth})`;
+    if (['absolute', 'relative'].includes(base.position) ||
+        !base.position && ['left','top','right','bottom'].some(key => base[key])) {
+      Object.assign(props, {position:'relative',left:'auto',top:'auto',right:'auto',bottom:'auto'});
+    }
+    if (freeChild) Object.assign(props, {marginLeft:'0px',marginRight:'0px',marginTop:'0px',marginBottom:'0px',gridColumn:'auto',gridRow:'auto'});
+    if (['image','video','icon'].includes(config.type)) {
+      props.height = 'auto';
+      // A resized frame keeps its proportions and image-fit choice; an upload
+      // with an automatic height keeps its intrinsic aspect ratio instead.
+      const pixels = value => /^\d+(\.\d+)?px$/.test(value || '') ? parseFloat(value) : 0;
+      const width = pixels(base.width), height = pixels(base.height);
+      if (!base.aspectRatio && width && height) props.aspectRatio = `${width} / ${height}`;
+    } else if (['heading','text','button','summary','accordion','product','commerce'].includes(config.type)) {
+      Object.assign(props, {height:'auto',maxHeight:'none',overflowWrap:'anywhere'});
+      if (base.whiteSpace === 'nowrap') props.whiteSpace = 'normal';
+      if (base.textWrap === 'nowrap') props.textWrap = 'wrap';
+      if (['button','summary'].includes(config.type)) props.minHeight = '44px';
+    } else if (config.type === 'container') {
+      const hasContent = node.querySelector('.sq-native') || config.text;
+      if (hasContent) Object.assign(props, {height:'auto',maxHeight:'none'});
+      if (freeSection && (!base.display || base.display === 'block')) {
+        Object.assign(props, {display:'flex',flexDirection:'column',alignItems:'flex-start',gap:base.gap || '24px'});
+      } else if (['flex','inline-flex'].includes(base.display) && !/column/.test(base.flexDirection || '')) {
+        props.flexWrap = 'wrap';
+      }
+    }
+    const rules = [{max:900,props}];
+    if (config.type === 'container' && base.display === 'grid')
+      rules.push({max:600,props:{gridTemplateColumns:'minmax(0,1fr)'}});
+    return rules;
+  }
   function stylesheet(root, exported = false) {
     const query = (selector, rule) => {
       const conditions = [
@@ -829,6 +875,8 @@
         const config = read(node),
           selector = `.sq-page-preview .sq-native[data-native-id="${config.id}"]`;
         let css = `${selector}{${declarations(config)}${config.type === "icon" ? `;fill:${config.iconFill || "none"};stroke:${config.iconStroke || "currentColor"};stroke-width:${config.iconWeight ?? 1.6};stroke-linecap:round;stroke-linejoin:round;` : ""}}`;
+        for (const rule of automaticLayout(node, config))
+          css += query(selector, rule);
         for (const rule of responsiveRules(config))
           css += query(selector, rule);
         for (const [state, value] of Object.entries(config.states || {})) {
@@ -1536,6 +1584,8 @@
     };
     for (const host of [config, ...(state ? [getHost(config)] : [])]) {
       merge(host);
+      if (host === config && selected?.dataset.nativeId === config.id)
+        automaticLayout(selected, config).filter(rule => width <= rule.max).forEach(merge);
       responsiveRules(host).filter(rule =>
         (rule.min == null || (rule.device ? width > rule.min : width >= rule.min)) && (rule.max == null || width <= rule.max)
       ).forEach(merge);
@@ -2545,7 +2595,7 @@
     } else hooks.root.dataset.nativeState = state;
     panel.querySelector("[data-native-context-note]").textContent =
       context === "device"
-        ? `Layout and appearance changes affect ${currentDevice()} only. Text, images, and links are shared across screen sizes.`
+        ? `Layout and appearance changes affect ${currentDevice()} only. Text, images, and links are shared across screen sizes.${currentDevice() !== 'desktop' && automaticLayout(selected, config).length ? ' Elements fit and reflow automatically unless you set a layout for this screen.' : ''}`
         : context === "base" && !state
         ? "Layout and appearance settings affect all screen sizes."
         : `Editing ${responsive.selectedOptions[0].text.toLowerCase()}${state ? ` · ${state} version` : ""}.`;

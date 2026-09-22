@@ -9009,6 +9009,7 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
     const insertAsset = (config, section, pointer) => {
       if (pointer && !section?.isConnected) throw Error('Choose an area on the page again.');
       section ||= previewRoot.querySelector(`[data-section-id="${CSS.escape(selectedSection)}"]`) || previewRoot.querySelector('[data-sq-block]');
+      config = {...config, autoLayout: config.autoLayout ?? true};
       EzkartNative.validate(config);
       const before = captureState();
       const inspectorWasClosed=sqStudio.classList.contains('inspector-closed'),assetsWerePinned=builderSidebar.classList.contains('sq-panel-pinned');
