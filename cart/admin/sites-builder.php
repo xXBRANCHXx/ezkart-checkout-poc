@@ -115,7 +115,7 @@ declare(strict_types=1);
     </aside>
 
     <main class="sq-canvas-stage">
-      <div class="sq-canvas-meta"><span><?= ez_admin_icon('shield') ?><b data-current-site-url>ezkart.site</b></span><div><button type="button" data-sq-zoom-out aria-label="Zoom out">−</button><output data-sq-zoom>80%</output><button type="button" data-sq-zoom-in aria-label="Zoom in">+</button></div></div>
+      <div class="sq-canvas-meta"><span><?= ez_admin_icon('shield') ?><b data-current-site-url>ezkart.site</b></span></div>
       <div class="sq-canvas-scroll">
         <div class="sq-site-loader" role="status" aria-live="polite" aria-atomic="true">
           <span class="sq-site-loader-worm" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>

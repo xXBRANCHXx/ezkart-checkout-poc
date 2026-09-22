@@ -7824,8 +7824,6 @@
       scheduleEditorNavigation();
       scheduleSectionTools();
     };
-    sqStudio.querySelector("[data-sq-zoom-out]")?.addEventListener("click", () => setZoom(zoom - 10));
-    sqStudio.querySelector("[data-sq-zoom-in]")?.addEventListener("click", () => setZoom(zoom + 10));
     zoomSlider?.addEventListener("input", () => setZoom(zoomSlider.value));
     sqStudio.querySelector("[data-sq-fit]")?.addEventListener("click", () => setZoom(fitZoomForDevice(activeDevice)));
     const setExtraPageHeight = (value) => {

@@ -216,11 +216,13 @@
 }
 .page-site-editor .sq-site-header-shortcuts > div:last-child {
   margin-top: 14px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 .page-site-editor .sq-site-header-shortcuts button {
-  min-width: 0;
+  flex: 1 0 auto;
+  min-width: max-content;
   height: 38px;
   padding: 0 8px;
   color: #414b5a;
