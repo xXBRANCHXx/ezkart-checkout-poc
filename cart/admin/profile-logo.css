@@ -1,0 +1,25 @@
+.profile[href] { color: inherit; text-decoration: none; }
+.profile[href]:focus-visible { outline: 2px solid #c74130; outline-offset: 4px; border-radius: 8px; }
+[data-admin-profile-avatar] { position: relative; flex-shrink: 0; overflow: hidden; }
+[data-admin-profile-avatar].has-logo { background: #fff; }
+[data-admin-profile-avatar] [data-admin-profile-image] { display: block; width: 100%; height: 100%; object-fit: contain; }
+[data-admin-profile-avatar] [hidden] { display: none !important; }
+.profile-logo-editor { padding: 24px; display: flex; align-items: flex-start; gap: 20px; border-bottom: 1px solid #e7ebf1; }
+.dashboard-page .profile-logo-preview { width: 80px; height: 80px; font-size: 22px; }
+.profile-logo-content { flex: 1; min-width: 0; }
+.profile-logo-content h3 { margin: 0 0 7px; font-size: 13px; }
+.profile-logo-content p { margin: 0; color: #737d90; font-size: 12px; line-height: 1.65; }
+.profile-logo-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 10px; }
+.profile-logo-actions button, .profile-logo-upload { position: relative; display: inline-flex; align-items: center; justify-content: center; min-height: 38px; padding: 8px 14px; border: 1px solid #dbe1eb; border-radius: 8px; color: #303440; background: #fff; font: inherit; font-size: 12px; font-weight: 500; line-height: 1.5; cursor: pointer; }
+.profile-logo-upload { overflow: hidden; color: #fff; border-color: #c74130; background: #c74130; }
+.profile-logo-upload input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.profile-logo-upload:has(input:disabled), .profile-logo-actions button:disabled { opacity: .55; cursor: default; }
+.profile-logo-upload:focus-within, .profile-logo-actions button:focus-visible { outline: 2px solid #c74130; outline-offset: 3px; }
+.profile-logo-actions [hidden] { display: none; }
+.profile-logo-content .profile-logo-help { font-size: 11px; }
+.profile-logo-content .profile-logo-status { margin-top: 8px; color: #50613e; }
+.profile-logo-status[data-error=true] { color: #b0382d; }
+@media (max-width: 580px) {
+  .profile-logo-editor { padding: 20px; gap: 14px; }
+  .dashboard-page .profile-logo-preview { width: 60px; height: 60px; font-size: 18px; }
+}

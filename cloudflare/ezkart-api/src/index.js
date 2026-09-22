@@ -1,6 +1,7 @@
 import { customerAddressBook, changeCustomerAddressBook } from "./customer-addresses.js";
 import { validatePublication } from "./landing-publication.js";
 import { merchantStorefront, publicStorefront } from "./storefront.js";
+import { adminProfile } from "./admin-profile.js";
 const json = (payload, status = 200, headers = {}) => new Response(JSON.stringify(payload), {
   status,
   headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...headers },
@@ -900,7 +901,8 @@ async function cleanupUnusedMedia(env, sellerId, ids) {
           AND NOT EXISTS (SELECT 1 FROM product_drafts WHERE seller_id = ? AND instr(snapshot_json, ?) > 0)
           AND NOT EXISTS (SELECT 1 FROM sellers WHERE id = media_uploads.seller_id
             AND (json_extract(settings_json, '$.storefront.logoId') = media_uploads.id
-              OR json_extract(settings_json, '$.storefront.backgroundId') = media_uploads.id))
+              OR json_extract(settings_json, '$.storefront.backgroundId') = media_uploads.id
+              OR json_extract(settings_json, '$.adminProfile.logoId') = media_uploads.id))
       `).bind(sellerId, mediaId, sellerId, mediaId, sellerId, mediaId, sellerId, mediaId).run();
       if (Number(result.meta?.changes || 0) < 1) continue;
       try {
@@ -1269,6 +1271,11 @@ export default {
         return json({ ok: true, book }, 200, cors);
       }
       if (request.method === "GET" && url.pathname === "/v1/me") return json({ ok: true, user: await currentUser(request, env) }, 200, cors);
+      if (url.pathname === "/v1/admin-profile") {
+        if (!["GET", "PUT"].includes(request.method)) return json({ ok: false, error: "Method not allowed." }, 405, cors);
+        const { seller } = await sellerContext(request, env);
+        return json({ ok: true, profile: await adminProfile(env, seller, request.method === "PUT" ? await requestJson(request, 2000) : null) }, 200, cors);
+      }
       if (request.method === "GET" && url.pathname === "/v1/storefront/products") return json({ ok: true, products: await storefrontProducts(url, env) }, 200, cors);
       if (request.method === "GET" && url.pathname === "/v1/storefront/view") return json({ ok: true, ...(await publicStorefront(env, url)) }, 200, cors);
       if (["GET", "PUT"].includes(request.method) && url.pathname === "/v1/storefront") {

@@ -694,7 +694,7 @@ function ez_admin_sync_cloudflare_user(string $accessToken): array
 
 function ez_admin_proxy_cloud_request(string $accessToken, string $path, string $method): never
 {
-    $allowedPath = preg_match('#^/v1/(?:catalog|storefront|media(?:/[a-zA-Z0-9_-]+)?|products/[a-zA-Z0-9_-]+(?:/duplicate)?|drafts/[a-zA-Z0-9_-]+|landing-pages(?:/[a-z0-9-]+(?:/(?:preview|export))?)?|components(?:/[a-z0-9-]+)?)$#', $path) === 1;
+    $allowedPath = preg_match('#^/v1/(?:catalog|storefront|admin-profile|media(?:/[a-zA-Z0-9_-]+)?|products/[a-zA-Z0-9_-]+(?:/duplicate)?|drafts/[a-zA-Z0-9_-]+|landing-pages(?:/[a-z0-9-]+(?:/(?:preview|export))?)?|components(?:/[a-z0-9-]+)?)$#', $path) === 1;
     if (!$allowedPath || str_contains($path, '?') || str_contains($path, '#')) {
         ez_admin_json(['ok' => false, 'error' => 'That saved-data path is not allowed.'], 400);
     }
@@ -1426,6 +1426,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
   <?php if ($authenticated && $page === 'sites' && $siteEditor): ?><link rel="stylesheet" href="builder-native.css?v=<?= (int) filemtime(__DIR__ . '/builder-native.css') ?>"><link rel="stylesheet" href="builder-components.css?v=<?= (int) filemtime(__DIR__ . '/builder-components.css') ?>"><link rel="stylesheet" href="builder-flow.css?v=<?= (int) filemtime(__DIR__ . '/builder-flow.css') ?>"><link rel="stylesheet" href="builder-showcase.css?v=<?= (int) filemtime(__DIR__ . '/builder-showcase.css') ?>"><link rel="stylesheet" href="builder-chrome.css?v=<?= (int) filemtime(__DIR__ . '/builder-chrome.css') ?>"><?php endif; ?>
   <?php if ($authenticated && $page === 'products'): ?><link rel="stylesheet" href="catalog.css?v=<?= ez_admin_escape($catalogCssVersion) ?>"><?php endif; ?>
   <link rel="stylesheet" href="admin-ui.css?v=<?= (int) filemtime(__DIR__ . '/admin-ui.css') ?>">
+  <link rel="stylesheet" href="profile-logo.css?v=<?= (int) filemtime(__DIR__ . '/profile-logo.css') ?>">
   <link rel="stylesheet" href="../select.css?v=<?= (int) filemtime(__DIR__ . '/../select.css') ?>">
   <title><?= $authenticated ? ez_admin_escape($pageTitles[$page]) : ($pendingMfa !== null ? 'Two-step verification' : 'Admin Login') ?> · Ezkart</title>
 </head>
@@ -1615,7 +1616,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
           <button class="icon-button" type="button" aria-label="Notifications"><?= ez_admin_icon('bell') ?><i><?= $metrics['pending_count'] ?></i></button>
           <button class="icon-button" type="button" aria-label="Messages"><?= ez_admin_icon('message') ?></button>
           <button class="icon-button" type="button" aria-label="Help"><?= ez_admin_icon('help') ?></button>
-          <div class="profile" id="account-menu"><span class="avatar"><?= ez_admin_escape(mb_substr($adminInitials, 0, 2)) ?></span><div><b><?= ez_admin_escape($adminDisplayName) ?></b><small><?= ez_admin_escape($adminDisplayEmail) ?></small></div><?= ez_admin_icon('chevron-down', 'chevron-icon') ?></div>
+          <a class="profile" id="account-menu" href="?page=settings#profile-logo" aria-label="Profile settings"><span class="avatar" data-admin-profile-avatar><span data-admin-profile-fallback><?= ez_admin_escape(mb_substr($adminInitials, 0, 2)) ?></span><img data-admin-profile-image alt="" hidden></span><div><b><?= ez_admin_escape($adminDisplayName) ?></b><small><?= ez_admin_escape($adminDisplayEmail) ?></small></div><?= ez_admin_icon('chevron-down', 'chevron-icon') ?></a>
           <form method="post" class="logout-form">
             <input type="hidden" name="action" value="logout"><input type="hidden" name="csrf_token" value="<?= ez_admin_escape($csrfToken) ?>">
             <button type="submit">Log out</button>
@@ -1708,6 +1709,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
   <?php if ($page === 'settings' && $mfaSetup !== null): ?><script src="assets/vendor/qrcode-generator.min.js"></script><?php endif; ?>
   <?php if ($page === 'sites'): ?><script src="builder-native-icons.js?v=<?= (int) filemtime(__DIR__ . '/builder-native-icons.js') ?>"></script><script src="builder-commerce.js?v=<?= (int) filemtime(__DIR__ . '/builder-commerce.js') ?>"></script><script src="builder-native.js?v=<?= (int) filemtime(__DIR__ . '/builder-native.js') ?>"></script><script src="builder-publish.js?v=<?= (int) filemtime(__DIR__ . '/builder-publish.js') ?>"></script><script src="builder-templates.js?v=<?= (int) filemtime(__DIR__ . '/builder-templates.js') ?>"></script><?php endif; ?><?php if ($page === 'sites' && $siteEditor): ?><script src="builder-backgrounds.js?v=<?= (int) filemtime(__DIR__ . '/builder-backgrounds.js') ?>"></script><script src="builder-components.js?v=<?= (int) filemtime(__DIR__ . '/builder-components.js') ?>"></script><script src="builder-showcase-data.js?v=<?= (int) filemtime(__DIR__ . '/builder-showcase-data.js') ?>"></script><script src="builder-showcase.js?v=<?= (int) filemtime(__DIR__ . '/builder-showcase.js') ?>"></script><?php endif; ?>
   <script src="admin.js?v=<?= ez_admin_escape($adminJsVersion) ?>"></script>
+  <script src="profile-logo.js?v=<?= (int) filemtime(__DIR__ . '/profile-logo.js') ?>"></script>
   <script src="../select.js?v=<?= (int) filemtime(__DIR__ . '/../select.js') ?>"></script>
   <?php if ($page === 'shop'): ?><script src="../storefront.js?v=1"></script><script src="shop.js?v=<?= (int) filemtime(__DIR__ . '/shop.js') ?>"></script><?php endif; ?>
 <?php endif; ?>

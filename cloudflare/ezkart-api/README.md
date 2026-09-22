@@ -41,6 +41,7 @@ access token, or refresh token in this repository.
 - `GET|POST /v1/customer/addresses` reads or changes the authenticated customer's three-address book in D1. It uses stable Auth identity, optimistic revisions, and a database count constraint; no seller account is provisioned. Apply `0006_customer_addresses.sql` before deploying this route.
 
 - `GET /health` checks D1 and both R2 bindings without exposing credentials.
+- `GET|PUT /v1/admin-profile` reads or saves the store logo used in the admin header and Settings. It accepts `{ "logoId": "media_..." }` (or an empty ID to remove it), checks image ownership, and stores only `adminProfile.logoId` in the seller settings. This logo uses authenticated media access, survives unused-image cleanup while selected, and is independent of shop appearance and landing-page logos. No database migration is needed.
 - `GET /v1/me` validates a Supabase bearer token, creates or refreshes the
   corresponding D1 profile, provisions an idempotent personal seller and owner
   membership when the account has none, and returns only that account's safe
