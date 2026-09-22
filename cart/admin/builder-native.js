@@ -304,6 +304,20 @@
       throw Error("Choose a valid color.");
     return String(value);
   };
+  // Size the painted background without changing section or content geometry.
+  function gradientArea(area) {
+    if (!area) return {backgroundSize:'auto',backgroundPosition:'0% 0%',backgroundRepeat:'repeat'};
+    if (typeof area.centered !== 'boolean' || !Number.isInteger(area.height) || area.height < 10 || area.height > 200 || (area.wide !== undefined && typeof area.wide !== 'boolean'))
+      throw Error('Gradient height must be a whole percentage from 10 to 200.');
+    const height = area.centered ? area.height : area.height * 2.1;
+    // Keep the original bottom blend at 100%; scale its visible band from there.
+    const y = area.centered ? 50 : (100 - area.height * .8) / (100 - height) * 100;
+    return {backgroundSize:`${area.wide ? 140 : 100}% ${height}%`,backgroundPosition:`50% ${y}%`,backgroundRepeat:'no-repeat'};
+  }
+  function validateFill(fill) {
+    if (fill?.layers) gradientCss(fill.layers);
+    if (fill?.area) gradientArea(fill.area);
+  }
   function gradientCss(layers) {
     if (!Array.isArray(layers) || layers.length > 8)
       throw Error("Use up to eight gradient layers.");
@@ -397,7 +411,7 @@
     )
       throw Error("Use an icon stroke weight from 0 to 24.");
     validateProps(config.props);
-    if (config.fill?.layers) gradientCss(config.fill.layers);
+    validateFill(config.fill);
     for (const rule of config.responsive || []) {
       if (
         (rule.min != null && (!Number.isFinite(rule.min) || rule.min < 0)) ||
@@ -405,15 +419,15 @@
       )
         throw Error("Enter numeric breakpoints.");
       validateProps(rule.props);
-      if (rule.fill?.layers) gradientCss(rule.fill.layers);
+      validateFill(rule.fill);
     }
     for (const [name, state] of Object.entries(config.states || {})) {
       if (!identifier(name)) throw Error("Use a short state name.");
       validateProps(state.props);
-      if (state.fill?.layers) gradientCss(state.fill.layers);
+      validateFill(state.fill);
       for (const rule of state.responsive || []) {
         validateProps(rule.props);
-        if (rule.fill?.layers) gradientCss(rule.fill.layers);
+        validateFill(rule.fill);
       }
     }
     if (
@@ -762,6 +776,7 @@
     for (const child of config.children || []) node.append(create(child));
     return node;
   }
+  const areaDeclarations = fill => Object.entries(gradientArea(fill?.clip === 'text' ? undefined : fill?.area)).map(([key,value])=>`${cssName(key)}:${value};`).join('');
   const declarations = ({ props = {}, fill } = {}) =>
     Object.entries(props)
       .map(
@@ -770,9 +785,9 @@
       )
       .join(";") +
     (fill?.layers?.length
-      ? `;background-image:${gradientCss(fill.layers)};${fill.clip === "text" ? "background-clip:text;-webkit-background-clip:text;color:transparent;" : "background-clip:border-box;-webkit-background-clip:border-box;color:var(--native-text-color,inherit);"}`
+      ? `;background-image:${gradientCss(fill.layers)};${areaDeclarations(fill)}${fill.clip === "text" ? "background-clip:text;-webkit-background-clip:text;color:transparent;" : "background-clip:border-box;-webkit-background-clip:border-box;color:var(--native-text-color,inherit);"}`
       : fill
-        ? ";background-image:none;background-clip:border-box;-webkit-background-clip:border-box;color:var(--native-text-color,inherit);"
+        ? `;background-image:none;${areaDeclarations()}background-clip:border-box;-webkit-background-clip:border-box;color:var(--native-text-color,inherit);`
         : "");
   const deviceRanges = {
     desktop: { min: 900 },
@@ -1575,6 +1590,11 @@
     return {
       clip: type === "text" ? "text" : "background",
       layers: type === "solid" ? [] : layers,
+      ...(type === 'gradient' && selected?.matches('.sq-native-section') ? {area:{
+        centered:panel.querySelector('[data-native-gradient-centered]').checked,
+        height:panel.querySelector('[data-native-gradient-height]').valueAsNumber,
+        wide:panel.querySelector('[data-native-gradient-area]').dataset.wide === 'true',
+      }} : {}),
     };
   }
   function wordStylesInRange(config, start, end) {
@@ -1817,6 +1837,8 @@
     panel.querySelector("[data-native-linear-controls]").hidden = radial;
     panel.querySelector("[data-native-radial-controls]").hidden = !radial;
     panel.querySelector("[data-native-radial-shape]").hidden = !radial;
+    panel.querySelector('[data-native-gradient-area]').hidden = !selected?.matches('.sq-native-section') || panel.querySelector('[data-native-fill-type]').value !== 'gradient';
+    panel.querySelector('[data-native-gradient-height-output]').textContent = panel.querySelector('[data-native-gradient-height]').value + '%';
     const rows = [...panel.querySelectorAll(".sq-native-stop")];
     rows.forEach((row, i) => {
       syncColorPicker(
@@ -1864,6 +1886,7 @@
         ? color(panel.querySelector("[data-native-solid-color]").value)
         : gradientCss(inspectorFill(panel).layers);
       preview.style.background = value;
+      Object.assign(preview.style,gradientArea(solid ? undefined : inspectorFill(panel).area));
       preview.dataset.text =
         panel.querySelector("[data-native-fill-type]").value === "text";
       preview.setAttribute(
@@ -2605,6 +2628,10 @@
         ? "text"
         : "gradient"
       : "solid";
+    const area = current.fill?.area;
+    panel.querySelector('[data-native-gradient-centered]').checked = area?.centered ?? true;
+    panel.querySelector('[data-native-gradient-height]').value = area?.height ?? 100;
+    panel.querySelector('[data-native-gradient-area]').dataset.wide = String(area?.wide ?? false);
     const computedBackground = getComputedStyle(selected).backgroundColor;
     const background =
       props.backgroundColor ||
@@ -2762,6 +2789,11 @@
         <div class="sq-native-preview-frame"><div data-native-fill-preview role="img"></div></div>
         <div data-native-solid-controls><label>Background color<div class="sq-native-color-field"><input type="color" value="#ffffff" data-native-solid-picker aria-label="Choose background color"><input type="text" value="transparent" spellcheck="false" data-native-solid-color aria-label="Background color value"></div></label></div>
         <div data-native-gradient-controls hidden>
+          <div data-native-gradient-area hidden>
+            <label class="sq-native-check"><input type="checkbox" data-native-gradient-centered checked>Center gradient</label>
+            <label>Gradient height <output data-native-gradient-height-output>100%</output><input type="range" min="10" max="200" step="1" value="100" data-native-gradient-height></label>
+            <p class="sq-native-help">Turn off to anchor the gradient at the bottom.</p>
+          </div>
           <div class="sq-native-pair">
             <label>Gradient direction<select data-native-gradient-kind><option value="linear">Straight</option><option value="radial">From a center</option></select></label>
             <label data-native-linear-controls>Angle<div class="sq-native-unit"><input type="number" value="105" data-native-gradient-angle><span aria-hidden="true">°</span></div></label>
@@ -3133,6 +3165,8 @@
       "gradient-x",
       "gradient-y",
       "gradient-shape",
+      "gradient-centered",
+      "gradient-height",
       "solid-color",
     ])
       listen(`[data-native-${key}]`, "input", () =>
@@ -3594,6 +3628,7 @@
     stylesheet,
     mount,
     gradientCss,
+    gradientArea,
     renderText,
     editText,
     syncMedia,

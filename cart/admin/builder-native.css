@@ -298,7 +298,7 @@
 .page-site-editor
   .sq-inspector
   .sq-native-inspector
-  :is(input, select, textarea) {
+  :is(input, select, textarea):where(:not([type="range"])) {
   min-width: 0;
   width: 100%;
   color: #303440;

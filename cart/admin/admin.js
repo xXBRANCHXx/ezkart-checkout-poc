@@ -6159,13 +6159,15 @@
         manager.querySelectorAll("[data-sq-section-background-panel]").forEach((panel) => { panel.hidden = panel.dataset.sqSectionBackgroundPanel !== type; });
         const gradient = EzkartBackgrounds.read(section);
         manager.querySelectorAll('[data-sq-gradient]').forEach(input=>{
-          const key=input.dataset.sqGradient;if(document.activeElement!==input)input.value=gradient[key];
-          const output=manager.querySelector(`[data-sq-gradient-output="${key}"]`);if(output)output.textContent=String(gradient[key])+(key==='angle'?'°':['opacity','x','y'].includes(key)?'%':'');
+          const key=input.dataset.sqGradient;
+          if(input.type==='checkbox')input.checked=gradient[key];else if(document.activeElement!==input)input.value=gradient[key];
+          const output=manager.querySelector(`[data-sq-gradient-output="${key}"]`);if(output)output.textContent=String(gradient[key])+(key==='angle'?'°':['opacity','x','y','height'].includes(key)?'%':'');
         });
         manager.querySelector('[data-sq-gradient-angle]')?.toggleAttribute('hidden',gradient.kind!=='linear');
         manager.querySelector('[data-sq-gradient-center]')?.toggleAttribute('hidden',gradient.kind!=='radial');
+        manager.querySelector('[data-sq-gradient-area]')?.toggleAttribute('hidden',gradient.kind!=='wash');
         const gradientPreview=manager.querySelector('[data-sq-gradient-preview]');
-        if(gradientPreview){gradientPreview.style.backgroundColor=gradient.base;gradientPreview.style.backgroundImage=section?.querySelector('.sq-gradient-surface')?.style.backgroundImage||'';}
+        if(gradientPreview){gradientPreview.style.backgroundColor=gradient.base;gradientPreview.style.backgroundImage=section?.querySelector('.sq-gradient-surface')?.style.backgroundImage||'';Object.assign(gradientPreview.style,EzkartNative.gradientArea(gradient.kind==='wash'?{centered:gradient.centered,height:gradient.height,wide:true}:undefined));}
         const color = sectionBackgroundColor(section);
         const colorInput = manager.querySelector("[data-sq-section-background-color]");
         const colorOutput = manager.querySelector("[data-sq-section-background-color-output]");
@@ -6268,7 +6270,7 @@
     sqStudio.querySelectorAll('[data-sq-gradient]').forEach(input=>{
       const start=()=>{if(!gradientSnapshot)gradientSnapshot=captureState();};
       input.addEventListener('focus',start);input.addEventListener('pointerdown',start);
-      const update=()=>{const section=backgroundTargetFor();if(!section)return;start();EzkartBackgrounds.set(section,{...EzkartBackgrounds.read(section),[input.dataset.sqGradient]:input.value});syncBackgroundManagers();markSqChanged();};
+      const update=()=>{const section=backgroundTargetFor();if(!section)return;start();EzkartBackgrounds.set(section,{...EzkartBackgrounds.read(section),[input.dataset.sqGradient]:input.type==='checkbox'?input.checked:input.value});syncBackgroundManagers();markSqChanged();};
       input.addEventListener('input',update);
       input.addEventListener('change',()=>{update();if(gradientSnapshot)remember(gradientSnapshot);gradientSnapshot=null;});
     });
@@ -8603,13 +8605,8 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
         let fill;
         if (EzkartBackgrounds.type(section) === 'gradient') {
           const gradient = EzkartBackgrounds.read(section);
-          const tint = hex => `rgba(${hex.slice(1).match(/../g).map(n=>parseInt(n,16)).join(',')},${gradient.opacity/100})`;
-          const stops = [{color:tint(gradient.from),position:0},{color:tint(gradient.to),position:100}];
-          const layers = gradient.kind === 'wash'
-            ? [gradient.from,gradient.to].map((value,index)=>({kind:'radial',shape:'ellipse',x:index?80:20,y:50,stops:[{color:tint(value),position:0},{color:'transparent',position:60}]}))
-            : [{kind:gradient.kind,angle:gradient.angle,shape:'ellipse',x:gradient.x,y:gradient.y,stops}];
           props.backgroundColor = gradient.base;
-          fill = {clip:'background',layers};
+          fill = EzkartBackgrounds.nativeFill(gradient);
         }
         const paddingProps = device => Object.fromEntries(Object.entries(readSpacing(sectionId,device)).map(([side,value])=>['padding'+side[0].toUpperCase()+side.slice(1),value+'px']));
         if (!sectionProps || spacingState.has(spacingKey(sectionId,'desktop'))) Object.assign(props,paddingProps('desktop'));
@@ -8781,10 +8778,8 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
           if(background!==undefined) { if(!/^#[0-9a-f]{6}$/i.test(background))throw Error('Use a six-digit background color.');config.props.backgroundColor=background;config.fill={clip:'background',layers:[]}; }
           if(gradient) {
             const value=EzkartBackgrounds.normalize(gradient);
-            const tint=hex=>`rgba(${hex.slice(1).match(/../g).map(n=>parseInt(n,16)).join(',')},${value.opacity/100})`;
-            const stops=[{color:tint(value.from),position:0},{color:tint(value.to),position:100}];
             config.props.backgroundColor=value.base;
-            config.fill={clip:'background',layers:value.kind==='wash'?[value.from,value.to].map((color,index)=>({kind:'radial',shape:'ellipse',x:index?80:20,y:50,stops:[{color:tint(color),position:0},{color:'transparent',position:60}]})):[{kind:value.kind,angle:value.angle,shape:'ellipse',x:value.x,y:value.y,stops}]};
+            config.fill=EzkartBackgrounds.nativeFill(value);
           }
           if(color!==undefined)config.props.color=color;
           if(name!==undefined)config.name=String(name);
