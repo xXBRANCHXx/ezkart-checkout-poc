@@ -649,3 +649,18 @@
   border: 0;
   font: 11px/1.5 var(--ui-font);
 }
+
+/* Let long element names take the space they need above the scrolling fields. */
+.page-site-editor .sq-inspector { grid-template-rows: minmax(64px, auto) minmax(0, 1fr) 58px; }
+.page-site-editor .sq-inspector:is(.element-selected, .page-spacing-open) { grid-template-rows: minmax(64px, auto) minmax(0, 1fr); }
+.page-site-editor .sq-inspector > header { padding: 16px; gap: 12px; align-items: flex-start; }
+.page-site-editor .sq-inspector > header > div { flex: 1; min-width: 0; }
+.page-site-editor .sq-inspector > header h2 { margin: 5px 0 0; line-height: 1.45; overflow-wrap: anywhere; }
+.page-site-editor .sq-inspector > header > button { flex: 0 0 29px; }
+.page-site-editor .sq-native-context-heading > span { min-width: 0; }
+.page-site-editor .sq-native-context-heading > button { flex-shrink: 0; }
+.page-site-editor .sq-native-image-source { margin: 10px 0 16px; }
+.page-site-editor .sq-native-image-replace { display: flex; align-items: center; gap: 12px; }
+.page-site-editor .sq-native-image-replace > img { flex: 0 0 64px; width: 64px; height: 64px; object-fit: contain; background: var(--ui-field); border: 1px solid var(--ui-line); border-radius: 8px; }
+.page-site-editor .sq-native-image-replace > button { flex: 1; }
+.page-site-editor .sq-native-image-source .sq-native-help[data-error] { color: #b32935; }

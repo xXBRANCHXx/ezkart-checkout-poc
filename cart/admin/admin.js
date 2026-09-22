@@ -8715,7 +8715,7 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
       }
       updateProductView();
     };
-    EzkartNative.init({root:previewRoot,inspector,remember,device:()=>activeDevice,beginPointer:beginCanvasPointer,products:readCatalogProducts,renderProduct:renderNativeProduct,openProducts:()=>openSqPanel("products",{pin:true}),syncSelects:container=>container.querySelectorAll("select").forEach(select=>{enhanceBuilderSelect(select);syncBuilderSelect(select);}),changed:markSqChanged,rebind:()=>{rebuildLayerList();bindSqInteractions();},move:args=>globalThis.EzkartBuilder.nativeMove(args),toast:showToast,select:node=>{if(node?.matches('.sq-native-section'))selectSqSection(node.dataset.sectionId,true);else if(node)selectSqElement(node);}});
+    EzkartNative.init({root:previewRoot,inspector,remember,uploadImage:async file=>readBuilderUpload(await uploadBuilderAsset(file)),device:()=>activeDevice,beginPointer:beginCanvasPointer,products:readCatalogProducts,renderProduct:renderNativeProduct,openProducts:()=>openSqPanel("products",{pin:true}),syncSelects:container=>container.querySelectorAll("select").forEach(select=>{enhanceBuilderSelect(select);syncBuilderSelect(select);}),changed:markSqChanged,rebind:()=>{rebuildLayerList();bindSqInteractions();},move:args=>globalThis.EzkartBuilder.nativeMove(args),toast:showToast,select:node=>{if(node?.matches('.sq-native-section'))selectSqSection(node.dataset.sectionId,true);else if(node)selectSqElement(node);}});
     let nativeFitFrame = 0;
     const fitNativeContent = () => {
       nativeFitFrame = 0;
@@ -8935,6 +8935,20 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
     });
 
     const assetUploadUrl = item => cloudUrl(`/v1/${item.media ? 'media' : 'assets'}/${encodeURIComponent(item.id)}`);
+    const uploadBuilderAsset = async file => {
+      if (!['image/png','image/jpeg','image/webp','image/gif','image/avif'].includes(file.type)) throw Error('Choose a PNG, JPEG, WebP, GIF, or AVIF image.');
+      if (file.size > 8*1024*1024) throw Error('Choose an image smaller than 8 MB.');
+      const dataUrl = await optimizeBuilderImage(file,2000,.84);
+      if (dataUrl.length > 2796204) throw Error('This image is still larger than 2 MB after optimization. Choose a smaller file.');
+      const result = await cloudRequest('POST','/v1/assets',{name:file.name,dataUrl});
+      return {...result.asset,src:assetUploadUrl(result.asset)};
+    };
+    const readBuilderUpload = async item => {
+      if(item.src.startsWith('data:')) return item.src;
+      const response = await fetch(item.src,{credentials:'same-origin'});
+      if(!response.ok) throw Error('That upload could not be opened. Refresh the library and try again.');
+      return readImageFile(await response.blob());
+    };
     const embeddedAssetSources = new Map();
     const collectPageAssets = async (markup, pageName, hashes) => {
       const doc = new DOMParser().parseFromString(markup || '', 'text/html');
@@ -9024,20 +9038,8 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
         }
         return files;
       },
-      upload:async file => {
-        if (!['image/png','image/jpeg','image/webp','image/gif','image/avif'].includes(file.type)) throw Error('Choose a PNG, JPEG, WebP, GIF, or AVIF image.');
-        if (file.size > 8*1024*1024) throw Error('Choose an image smaller than 8 MB.');
-        const dataUrl = await optimizeBuilderImage(file,2000,.84);
-        if (dataUrl.length > 2796204) throw Error('This image is still larger than 2 MB after optimization. Choose a smaller file.');
-        const result = await cloudRequest('POST','/v1/assets',{name:file.name,dataUrl});
-        return {...result.asset,src:assetUploadUrl(result.asset)};
-      },
-      readUpload:async item => {
-        if(item.src.startsWith('data:')) return item.src;
-        const response = await fetch(item.src,{credentials:'same-origin'});
-        if(!response.ok) throw Error('That upload could not be opened. Refresh the library and try again.');
-        return readImageFile(await response.blob());
-      }
+      upload:uploadBuilderAsset,
+      readUpload:readBuilderUpload
     });
 
   }

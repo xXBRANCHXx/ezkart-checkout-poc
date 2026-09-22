@@ -1301,6 +1301,8 @@
     wordLayers = [],
     wordLayerIndex = 0,
     wordSelectionKey = "";
+  let imageUpload = null;
+  const imageUploadFeedback = new WeakMap();
   function remapTree(root, rootId) {
     const nodes = [root, ...root.querySelectorAll(".sq-native")];
     const anchors = new Map(
@@ -2558,7 +2560,22 @@
     text.value = config.text || "";
     renderWordStyles(panel, config);
 
-    panel.querySelector("[data-native-src]").value = config.src || "";
+    const imageSource = panel.querySelector('[data-native-image-source]');
+    imageSource.hidden = config.type !== 'image';
+    const imageButton = panel.querySelector('[data-native-image-upload-button]');
+    imageButton.disabled = Boolean(imageUpload);
+    imageButton.textContent = imageUpload === selected ? 'Uploading…' : config.src ? 'Replace image' : 'Upload image';
+    const imagePreview = panel.querySelector('[data-native-image-preview]');
+    imagePreview.hidden = config.type !== 'image' || !config.src;
+    if (config.type === 'image' && config.src) imagePreview.src = config.src;
+    else imagePreview.removeAttribute('src');
+    const imageStatus = panel.querySelector('[data-native-image-upload-status]');
+    const feedback = imageUploadFeedback.get(selected);
+    imageStatus.textContent = imageUpload === selected ? 'Uploading your replacement…' : feedback?.text || 'PNG, JPEG, WebP, GIF or AVIF · up to 8 MB';
+    imageStatus.toggleAttribute('data-error', Boolean(feedback?.error));
+    panel.querySelector('[data-native-src-label]').textContent = config.type === 'image' ? 'Or paste an image URL' : 'Video URL';
+    panel.querySelector("[data-native-src]").value = config.src?.startsWith('data:') ? '' : config.src || '';
+    panel.querySelector("[data-native-src]").disabled = imageUpload === selected;
     panel.querySelector("[data-native-src]").parentElement.hidden = ![
       "image",
       "video",
@@ -2764,7 +2781,12 @@
       <details open data-native-content><summary data-native-content-title>Text</summary>
         <label>Your text<textarea rows="3" data-native-text></textarea></label>
         <p class="sq-native-help" data-native-text-help>Edit your copy here. Select words to change their color.</p>
-        <label>Image or video URL<input type="url" placeholder="https://…" data-native-src></label>
+        <div class="sq-native-image-source" data-native-image-source hidden>
+          <div class="sq-native-image-replace"><img data-native-image-preview alt="Current image" hidden><button type="button" data-native-image-upload-button>Upload image</button></div>
+          <input type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/avif" data-native-image-upload hidden aria-label="Upload replacement image">
+          <p class="sq-native-help" data-native-image-upload-status role="status" aria-live="polite"></p>
+        </div>
+        <label><span data-native-src-label>Image URL</span><input type="url" placeholder="https://…" data-native-src></label>
         <label>Image description / accessible label<input data-native-alt></label>
         <label>Icon<select data-native-icon></select></label>
         <details class="sq-native-subsection" data-native-word-controls><summary>Color specific words</summary>
@@ -3145,6 +3167,45 @@
     listen("[data-native-parent]", "click", () =>
       callbacks.select(selected.parentElement.closest(".sq-native")),
     );
+    let imagePickerTarget = null;
+    const imageInput = panel.querySelector('[data-native-image-upload]');
+    listen('[data-native-image-upload-button]', 'click', () => {
+      imagePickerTarget = selected;
+      imageInput.click();
+    });
+    imageInput.addEventListener('cancel', () => { imagePickerTarget = null; });
+    imageInput.addEventListener('change', async () => {
+      const file = imageInput.files?.[0], target = imagePickerTarget || selected;
+      imagePickerTarget = null;
+      imageInput.value = '';
+      if (!file || imageUpload || !target?.matches('.sq-native[data-native-type="image"]')) return;
+      const originalSource = read(target).src;
+      imageUpload = target;
+      imageUploadFeedback.delete(target);
+      select(selected);
+      try {
+        const src = safeMediaUrl(await callbacks.uploadImage(file));
+        const image = new Image();
+        image.src = src;
+        await image.decode();
+        if (!hooks.root.contains(target) || read(target).src !== originalSource) throw Error('The image changed while uploading. Your upload is saved in Assets.');
+        const config = { ...read(target), src };
+        validate({ ...config, children: [] });
+        hooks.remember();
+        write(target, config);
+        target.src = src;
+        refresh();
+        hooks.changed();
+        imageUploadFeedback.set(target, {text: 'Image replaced. Saved to your uploads.'});
+      } catch (error) {
+        const text = error.message || 'The image could not be replaced. Try another file.';
+        imageUploadFeedback.set(target, {text, error: true});
+        callbacks.toast(text);
+      } finally {
+        imageUpload = null;
+        select(selected);
+      }
+    });
     listen("[data-native-src]", "change", () => {
       const src = (selected.dataset.nativeType === "image" ? safeMediaUrl : safeUrl)(panel.querySelector("[data-native-src]").value);
       change({ src });
