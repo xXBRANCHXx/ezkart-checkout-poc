@@ -26,6 +26,30 @@ the product proceeds; they are not added on top of the customer's total.
 | Advanced | 6% | Rp1,250 | Actual DOKU fee; estimate shown beforehand |
 | Marketplace | 7% | Rp1,250 | Actual DOKU fee; estimate shown beforehand |
 
+## Advanced Mode — confirmed 22 September 2026
+
+The owner confirmed that Advanced adds **one percentage point per transaction**
+and includes up to **24 landing pages**, **50 products**, richer analytics, and
+custom domains for landing pages. Basic currently allows 6 pages and 10 products.
+The additional commission is Rp1,000 on Rp100,000 of product sales; shipping is
+excluded, and existing admin and actual payment-processing fees still apply.
+
+The merchant's Advanced Mode page explains these benefits and pricing. Its
+owner-only toggle persists `sellers.plan` as `standard` (Basic) or `advanced`.
+Header promotion disappears when enabled; Settings retains a link to manage it.
+The page and product creation limits follow the saved plan. Turning it off
+requires the store to fit within Basic's 6-page and 10-product limits. If it is
+above either limit, the change is rejected without deleting content or changing
+the plan. Existing content remains editable at the plan limit.
+
+Richer analytics entitlements and custom-domain setup are not implemented by
+this change and are labeled Coming soon on the page. The toggle does not create
+provider split rules, initiate charges, or rewrite existing orders. Per-order
+fee snapshots and actual billing still require the financial implementation
+and production release approval described below.
+
+## Commission calculation
+
 The commission basis is the product subtotal, before commission, admin and
 payment-processing deductions. Shipping is excluded from that basis and is set
 aside for shipping costs. It is not commission revenue or seller earnings.

@@ -41,6 +41,12 @@ access token, or refresh token in this repository.
 - `GET|POST /v1/customer/addresses` reads or changes the authenticated customer's three-address book in D1. It uses stable Auth identity, optimistic revisions, and a database count constraint; no seller account is provisioned. Apply `0006_customer_addresses.sql` before deploying this route.
 
 - `GET /health` checks D1 and both R2 bindings without exposing credentials.
+- `GET|PUT /v1/advanced-mode` reads the active store's plan or changes it for the
+  store owner. Enabling requires `{ "enabled": true, "commissionPercent": 6 }`;
+  disabling uses `{ "enabled": false }`. Basic permits 6 landing pages and 10
+  products; Advanced permits 24 and 50. Apply `0007_advanced_product_limit.sql`
+  before deploying. This saves the plan; payment fee routing is still governed
+  by the separate financial release gates.
 - `GET|PUT /v1/admin-profile` reads or saves the store logo used in the admin header and Settings. It accepts `{ "logoId": "media_..." }` (or an empty ID to remove it), checks image ownership, and stores only `adminProfile.logoId` in the seller settings. This logo uses authenticated media access, survives unused-image cleanup while selected, and is independent of shop appearance and landing-page logos. No database migration is needed.
 - `GET /v1/me` validates a Supabase bearer token, creates or refreshes the
   corresponding D1 profile, provisions an idempotent personal seller and owner
@@ -63,8 +69,11 @@ access token, or refresh token in this repository.
   Physical product stock includes visible variants; client-supplied prices and
   stock do not authorize publication.
 
-Each seller may publish up to 10 products. The Worker returns a readable limit
-error and D1 also enforces the cap to cover concurrent create requests.
+Each seller may create up to 10 products on Basic or 50 on Advanced. The Worker
+returns a readable limit error and D1 also enforces the cap to cover concurrent
+create requests. Editing existing products remains possible at the limit.
+Turning Advanced off requires the store to fit within Basic's limits first;
+the plan toggle never deletes content.
 
 The Hostinger admin proxies these calls with its server-side Supabase session,
 so access and refresh tokens are never placed in page markup or browser storage.

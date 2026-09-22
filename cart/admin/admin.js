@@ -516,7 +516,7 @@
       fieldset.append(label);
     });
   };
-  const maximumLandingPages = 6;
+  const maximumLandingPages = document.body.dataset.adminLandingLimit === "24" ? 24 : 6;
   const readLandingSites = () => [...cloudLandingPages];
   const landingPageId = (url) => String(url || "").toLowerCase().replace(/\.ezkart\.site$/, "");
   const replaceCloudLandingPage = (page) => {
@@ -1889,20 +1889,20 @@
     };
     const renderSummary = () => {
       const count = customSites.length;
-      const remaining = Math.max(0, 6 - count);
+      const remaining = Math.max(0, maximumLandingPages - count);
       landingLibrary.querySelector("[data-library-count]").textContent = String(count);
-      landingLibrary.querySelector("[data-library-limit]").textContent = "6";
-      landingLibrary.querySelector("[data-library-progress]").style.width = `${Math.min(100, count / 6 * 100)}%`;
+      landingLibrary.querySelector("[data-library-limit]").textContent = String(maximumLandingPages);
+      landingLibrary.querySelector("[data-library-progress]").style.width = `${Math.min(100, count / maximumLandingPages * 100)}%`;
       landingLibrary.querySelector("[data-library-cap-copy]").textContent = remaining ? `You can create ${remaining} more project${remaining === 1 ? "" : "s"}.` : "Project limit reached. Delete a project to make space.";
       const newCard = landingLibrary.querySelector("[data-library-create-card]");
-      newCard.disabled = count >= 6;
+      newCard.disabled = count >= maximumLandingPages;
       const newCardTitle = newCard.querySelector("b");
       if (newCardTitle) newCardTitle.textContent = count ? "Create another page" : "Create your first page";
-      landingLibrary.querySelector("[data-new-card-copy]").textContent = remaining ? `${remaining} project space${remaining === 1 ? "" : "s"} available` : "6-project limit reached";
+      landingLibrary.querySelector("[data-new-card-copy]").textContent = remaining ? `${remaining} project space${remaining === 1 ? "" : "s"} available` : `${maximumLandingPages}-project limit reached`;
       updateLandingCountBadges(count);
     };
     const openCreator = () => {
-      if (customSites.length >= 6) { showToast("Delete a project before creating another"); return; }
+      if (customSites.length >= maximumLandingPages) { showToast("Delete a project before creating another"); return; }
       dialog?.showModal();
     };
     customSites.forEach((site) => grid?.insertBefore(projectCard(site), landingLibrary.querySelector("[data-library-create-card]")));

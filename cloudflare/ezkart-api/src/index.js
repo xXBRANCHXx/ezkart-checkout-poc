@@ -2,6 +2,7 @@ import { customerAddressBook, changeCustomerAddressBook } from "./customer-addre
 import { validatePublication } from "./landing-publication.js";
 import { merchantStorefront, publicStorefront } from "./storefront.js";
 import { adminProfile } from "./admin-profile.js";
+import { advancedMode, sellerPlan } from "./advanced-mode.js";
 const json = (payload, status = 200, headers = {}) => new Response(JSON.stringify(payload), {
   status,
   headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...headers },
@@ -9,8 +10,6 @@ const json = (payload, status = 200, headers = {}) => new Response(JSON.stringif
 
 const privateImmutableImageCacheControl = "private, max-age=31536000, immutable";
 const publicImmutableImageCacheControl = "public, max-age=31536000, immutable";
-const maximumProductsPerSeller = 10;
-const maximumLandingPagesPerSeller = 6;
 const maximumLandingPageBytes = 16000000;
 const maximumLandingPagePreviewBytes = 16000000;
 const maximumLandingPagePreviewRequestBytes = 20000000;
@@ -523,6 +522,7 @@ async function saveLandingPage(request, env, rawId) {
     if (!(error instanceof Response) || error.status !== 404) throw error;
   }
   if (!existing) {
+    const maximumLandingPagesPerSeller = sellerPlan(seller).limits.landingPages;
     const listed = await env.PRIVATE_ASSETS.list({ prefix: landingPagePrefix(seller.id), limit: maximumLandingPagesPerSeller + 1 });
     if (listed.objects.filter((object) => object.key.endsWith(".json")).length >= maximumLandingPagesPerSeller) {
       throw new Response(`This store can have up to ${maximumLandingPagesPerSeller} landing pages`, { status: 409 });
@@ -861,7 +861,9 @@ async function ownedUploads(env, sellerId, ids) {
   return uploads;
 }
 
-async function assertProductCapacity(env, sellerId) {
+async function assertProductCapacity(env, seller) {
+  const sellerId = seller.id;
+  const maximumProductsPerSeller = sellerPlan(seller).limits.products;
   const result = await env.DB.prepare("SELECT COUNT(*) AS count FROM products WHERE seller_id = ?").bind(sellerId).first();
   if (Number(result?.count || 0) >= maximumProductsPerSeller) {
     throw new Response(`This store can have up to ${maximumProductsPerSeller} products. Delete a product before creating another one.`, { status: 409 });
@@ -957,7 +959,7 @@ async function saveProduct(request, env, rawId) {
   const id = cleanId(rawId || payload.id, "Product ID");
   const existing = await env.DB.prepare("SELECT seller_id, created_at FROM products WHERE id = ?").bind(id).first();
   if (existing && existing.seller_id !== seller.id) throw new Response("Product not found", { status: 404 });
-  if (!existing) await assertProductCapacity(env, seller.id);
+  if (!existing) await assertProductCapacity(env, seller);
   const type = ["physical", "digital", "subscription"].includes(payload.type) ? payload.type : "physical";
   const title = cleanText(payload.name, 160);
   if (title.length < 2) throw new Response("Product name must contain at least 2 characters", { status: 400 });
@@ -1108,7 +1110,7 @@ async function duplicateProduct(request, env, productId) {
     env.DB.prepare("SELECT * FROM product_variants WHERE seller_id = ? AND product_id = ? ORDER BY sort_order").bind(seller.id, sourceId).all(),
   ]);
   if (!product) throw new Response("Product not found", { status: 404 });
-  await assertProductCapacity(env, seller.id);
+  await assertProductCapacity(env, seller);
 
   const sourceMedia = Array.isArray(mediaResult.results) ? mediaResult.results : [];
   const sourceVariants = Array.isArray(variantsResult.results) ? variantsResult.results : [];
@@ -1273,6 +1275,11 @@ export default {
         return json({ ok: true, book }, 200, cors);
       }
       if (request.method === "GET" && url.pathname === "/v1/me") return json({ ok: true, user: await currentUser(request, env) }, 200, cors);
+      if (url.pathname === "/v1/advanced-mode") {
+        if (!["GET", "PUT"].includes(request.method)) return json({ ok: false, error: "Method not allowed." }, 405, cors);
+        const { seller } = await sellerContext(request, env);
+        return json({ ok: true, plan: await advancedMode(env, seller, request.method === "PUT" ? await requestJson(request, 2000) : null) }, 200, cors);
+      }
       if (url.pathname === "/v1/admin-profile") {
         if (!["GET", "PUT"].includes(request.method)) return json({ ok: false, error: "Method not allowed." }, 405, cors);
         const { seller } = await sellerContext(request, env);
@@ -1325,7 +1332,7 @@ export default {
       if (error instanceof Response) return json({ ok: false, error: await error.text() }, error.status, cors);
       const failure = `${error?.message || error || ""} ${error?.cause?.message || ""}`;
       if (failure.includes("seller_product_limit")) {
-        return json({ ok: false, error: `This store can have up to ${maximumProductsPerSeller} products. Delete a product before creating another one.` }, 409, cors);
+        return json({ ok: false, error: "Your store has reached its product limit. Review Advanced Mode or remove a product before creating another." }, 409, cors);
       }
       console.error("Ezkart Worker request failed", error);
       return json({ ok: false, error: "The API could not complete this request." }, 500, cors);
