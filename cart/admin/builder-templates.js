@@ -492,13 +492,13 @@
       },
     };
   }
-  function attach(form, getProducts) {
+  function attach(form, getProducts, { templatesOnly = false } = {}) {
     const host = form?.querySelector("[data-template-picker]");
     if (!host) return;
     const options = document.createElement("div");
     options.className = "sq-template-options";
     const title = document.createElement("legend");
-    title.textContent = "Choose a starting point";
+    title.textContent = templatesOnly ? "Choose a template" : "Choose a starting point";
     const fieldset = document.createElement("fieldset");
     fieldset.className = "sq-template-picker";
     fieldset.append(title, options);
@@ -576,7 +576,24 @@
       }
       options.append(item);
     };
-    add("", "Blank page");
+    if (!templatesOnly) add("", "Blank page");
+    let templates = [];
+    list()
+      .then((items) => {
+        templates = items;
+        items.forEach((item) =>
+          add(item.id, item.styleLabel || item.description || item.name, item),
+        );
+      })
+      .catch(() => {
+        const note = document.createElement("p");
+        note.setAttribute("role", "alert");
+        note.textContent = templatesOnly
+          ? "Templates are unavailable right now. Reload the editor to try again."
+          : "Templates are unavailable right now. You can still create a blank page.";
+        host.append(note);
+      });
+    if (templatesOnly) return;
     const settings = document.createElement("div");
     settings.className = "sq-template-settings";
     settings.hidden = true;
@@ -584,7 +601,6 @@
       '<label><span>Store name</span><input name="template_brand" maxlength="80" autocomplete="organization" placeholder="Your store name"></label><p>Your page starts with an empty product card. Design first, then choose your products in the editor. At least one product with stock is required to publish or export code.</p><button type="button" data-template-preview>Preview design</button>';
     const brand = settings.querySelector("input");
     (form.querySelector("[data-template-settings]") || host).append(settings);
-    let templates = [];
     const sync = () => {
       const selected = form.elements.template_id.value;
       settings.hidden = !selected;
@@ -599,19 +615,6 @@
     });
     form.addEventListener("reset", () => setTimeout(sync));
     sync();
-    list()
-      .then((items) => {
-        templates = items;
-        items.forEach((item) =>
-          add(item.id, item.styleLabel || item.description || item.name, item),
-        );
-      })
-      .catch(() => {
-        const note = document.createElement("p");
-        note.textContent =
-          "Templates are unavailable right now. You can still create a blank page.";
-        host.append(note);
-      });
     settings
       .querySelector("[data-template-preview]")
       .addEventListener("click", () => {

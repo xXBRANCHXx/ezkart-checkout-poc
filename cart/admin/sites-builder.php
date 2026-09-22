@@ -33,6 +33,7 @@ declare(strict_types=1);
       <nav class="sq-tool-rail" aria-label="Builder tools">
         <button class="active" type="button" data-sq-tab="layers" aria-label="Pages and sections"><?= ez_admin_icon('layout') ?><span>Site</span></button>
         <button type="button" data-sq-tab="add" aria-label="Add elements"><?= ez_admin_icon('plus') ?><span>Add</span></button>
+        <button type="button" data-sq-templates aria-label="Templates" title="Templates" aria-haspopup="dialog"><?= ez_admin_icon('grid') ?><span>Templates</span></button>
         <button type="button" data-sq-tab="products" aria-label="Products"><?= ez_admin_icon('box') ?><span>Products</span><i data-sq-product-count>0</i></button>
         <button type="button" data-sq-tab="brand" aria-label="Branding: colors, fonts, and buttons" title="Branding: colors, fonts, and buttons"><?= ez_admin_icon('swatch-book') ?><span>Branding</span></button>
       </nav>
@@ -349,6 +350,31 @@ declare(strict_types=1);
     <footer><button type="button" data-sq-component-delete hidden><?= ez_admin_icon('trash') ?> Delete main component</button><span></span><button type="button" data-sq-component-close>Cancel</button><button class="primary" type="submit" data-sq-component-save>Save component</button></footer>
   </form>
 </dialog>
+
+<dialog class="page-creator-dialog" id="builder-templates-dialog" aria-labelledby="builder-templates-title"><form data-builder-templates-form>
+  <header><div><h2 id="builder-templates-title">Templates</h2><p>Choose a design for your current project or a new landing page draft.</p></div><button type="button" data-creator-close aria-label="Close"><?= ez_admin_icon('x') ?></button></header>
+  <section><div data-template-picker></div></section>
+  <footer><button type="button" data-creator-close>Cancel</button><button class="primary" type="submit" data-template-choose disabled>Use template</button></footer>
+</form></dialog>
+
+<dialog class="page-creator-dialog sq-template-apply-dialog" id="template-apply-dialog" aria-labelledby="template-apply-title"><form data-template-apply-form>
+  <header><div><h2 id="template-apply-title">Use this template</h2><p data-template-apply-caption></p></div><button type="button" data-template-apply-close aria-label="Close"><?= ez_admin_icon('x') ?></button></header>
+  <section>
+    <fieldset class="sq-template-destinations">
+      <legend>Where would you like to use it?</legend>
+      <label><input type="radio" name="destination" value="replace" required><span><b>Replace current project</b><small>Replace this page’s design and product selections. Keep its name and URL. You can undo this change.</small></span></label>
+      <label><input type="radio" name="destination" value="new" required disabled aria-describedby="template-page-capacity"><span><b>New landing page draft</b><small>Save your current project and open the template as a separate draft.</small></span></label>
+    </fieldset>
+    <p id="template-page-capacity" data-template-capacity role="status"></p>
+    <button type="button" data-template-check-limit hidden>Check again</button>
+    <div class="sq-creator-details" data-template-draft-details hidden>
+      <label><span>Page name</span><input name="page_name" required maxlength="60" autocomplete="off" disabled></label>
+      <label><span>Free Ezkart URL</span><div class="slug-field"><input name="slug" required maxlength="48" pattern="[a-z0-9]+(?:-[a-z0-9]+)*" autocomplete="off" disabled><em>.ezkart.site</em></div></label>
+    </div>
+    <p data-template-apply-error role="alert" hidden></p>
+  </section>
+  <footer><button type="button" data-template-apply-close>Back</button><button class="primary" type="submit" data-template-apply-submit disabled>Use template</button></footer>
+</form></dialog>
 
 <dialog class="page-creator-dialog" id="page-creator-dialog" aria-labelledby="page-creator-title"><form method="dialog" data-page-creator-form>
   <header><div><h2 id="page-creator-title">Create a landing page</h2><p>Choose a design or start blank. Everything is yours to edit.</p></div><button type="button" data-creator-close aria-label="Close"><?= ez_admin_icon('x') ?></button></header>

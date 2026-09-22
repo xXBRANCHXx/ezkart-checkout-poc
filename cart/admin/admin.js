@@ -468,6 +468,7 @@
       fieldset.append(label);
     });
   };
+  const maximumLandingPages = 6;
   const readLandingSites = () => [...cloudLandingPages];
   const landingPageId = (url) => String(url || "").toLowerCase().replace(/\.ezkart\.site$/, "");
   const replaceCloudLandingPage = (page) => {
@@ -8537,6 +8538,155 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
       updateProductView(); markSqChanged();
       updateLandingCountBadges();
       showToast(`${name} created. ${prepared ? "Your design is ready to edit." : "Your blank page is ready."}`); newPageForm.reset(); newPageSlugEdited = false;
+    });
+
+    const templateGallery = document.getElementById("builder-templates-dialog");
+    const templateGalleryForm = templateGallery.querySelector("form");
+    const templateChoose = templateGallery.querySelector("[data-template-choose]");
+    const templateTrigger = sqStudio.querySelector("[data-sq-templates]");
+    const templateDialog = document.getElementById("template-apply-dialog");
+    const templateForm = templateDialog.querySelector("form");
+    const templateNew = templateForm.querySelector('[name="destination"][value="new"]');
+    const templateDetails = templateForm.querySelector("[data-template-draft-details]");
+    const templateSubmit = templateForm.querySelector("[data-template-apply-submit]");
+    const templateError = templateForm.querySelector("[data-template-apply-error]");
+    const templateCapacity = templateForm.querySelector("[data-template-capacity]");
+    const templateRetry = templateForm.querySelector("[data-template-check-limit]");
+    let selectedTemplate = null;
+    let templateBusy = false;
+    let templateSlugEdited = false;
+    let templateCapacityRequest = 0;
+    EzkartTemplates.attach(templateGalleryForm, readCatalogProducts, { templatesOnly: true });
+    templateTrigger.addEventListener("click", () => templateGallery.showModal());
+    templateGallery.addEventListener("close", () => templateTrigger.focus({ preventScroll: true }));
+    templateGalleryForm.addEventListener("change", () => { templateChoose.disabled = !templateGalleryForm.elements.template_id?.value; });
+    const syncTemplateDestination = () => {
+      const destination = templateForm.elements.destination.value;
+      templateDetails.hidden = destination !== "new";
+      templateDetails.querySelectorAll("input").forEach(input => { input.disabled = templateBusy || destination !== "new"; });
+      templateSubmit.disabled = templateBusy || !destination || destination === "new" && templateNew.disabled;
+      templateSubmit.textContent = templateBusy ? "Applying template…" : destination === "replace" ? "Replace current project" : destination === "new" ? "Create draft & edit" : "Use template";
+    };
+    const checkTemplateCapacity = async ({ selectNew = false } = {}) => {
+      const request = ++templateCapacityRequest;
+      templateNew.disabled = true;
+      templateCapacity.textContent = "Checking available landing pages…";
+      templateRetry.hidden = true;
+      syncTemplateDestination();
+      try {
+        const result = await cloudRequest("GET", "/v1/landing-pages");
+        if (!Array.isArray(result.pages)) throw Error("Landing pages could not be checked.");
+        if (request !== templateCapacityRequest) return null;
+        const pages = result.pages.map(normalizeCloudLandingPage);
+        cloudLandingPages = pages;
+        updateLandingCountBadges();
+        const remaining = Math.max(0, maximumLandingPages - pages.length);
+        templateNew.disabled = !remaining;
+        if (!remaining) templateNew.checked = false;
+        else if (selectNew && !templateForm.elements.destination.value) templateNew.checked = true;
+        templateCapacity.textContent = remaining
+          ? `${pages.length} of ${maximumLandingPages} landing pages used. ${remaining} draft space${remaining === 1 ? "" : "s"} available.`
+          : `All ${maximumLandingPages} landing pages are in use. Replace the current project, or delete a landing page before creating a new draft.`;
+        syncTemplateDestination();
+        return pages;
+      } catch (error) {
+        if (request !== templateCapacityRequest) return null;
+        templateNew.checked = false;
+        templateCapacity.textContent = "Could not check your landing page limit. You can still replace the current project.";
+        templateRetry.hidden = false;
+        syncTemplateDestination();
+        return null;
+      }
+    };
+    templateRetry.addEventListener("click", () => { void checkTemplateCapacity({ selectNew: true }); });
+    templateGalleryForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const id = templateGalleryForm.elements.template_id?.value;
+      if (!id) return;
+      selectedTemplate = (await EzkartTemplates.list()).find(item => item.id === id);
+      if (!selectedTemplate) return;
+      templateForm.reset();
+      templateSlugEdited = false;
+      templateError.hidden = true;
+      templateForm.querySelector("[data-template-apply-caption]").textContent = selectedTemplate.styleLabel || selectedTemplate.name;
+      templateForm.elements.page_name.value = selectedTemplate.name;
+      const slug = makePageSlug(selectedTemplate.name) || "landing-page";
+      let availableSlug = slug, suffix = 2;
+      while (readLandingSites().some(page => page.url === `${availableSlug}.ezkart.site`)) availableSlug = `${slug.slice(0, 44)}-${suffix++}`;
+      templateForm.elements.slug.value = availableSlug;
+      syncTemplateDestination();
+      templateDialog.showModal();
+      void checkTemplateCapacity({ selectNew: true });
+    });
+    templateForm.addEventListener("change", syncTemplateDestination);
+    templateForm.elements.page_name.addEventListener("input", () => {
+      if (!templateSlugEdited) templateForm.elements.slug.value = makePageSlug(templateForm.elements.page_name.value);
+    });
+    templateForm.elements.slug.addEventListener("input", () => {
+      templateSlugEdited = true;
+      templateForm.elements.slug.value = makePageSlug(templateForm.elements.slug.value);
+    });
+    templateDialog.querySelectorAll("[data-template-apply-close]").forEach(button => button.addEventListener("click", () => {
+      if (!templateBusy) templateDialog.close();
+    }));
+    templateDialog.addEventListener("cancel", event => { if (templateBusy) event.preventDefault(); });
+    templateDialog.addEventListener("close", () => {
+      templateCapacityRequest++;
+      if (templateGallery.open) templateChoose.focus({ preventScroll: true });
+    });
+    templateForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (templateBusy || !selectedTemplate || !templateForm.reportValidity()) return;
+      const destination = templateForm.elements.destination.value;
+      if (!destination || destination === "new" && templateNew.disabled) return;
+      const name = templateForm.elements.page_name.value.trim();
+      const url = `${templateForm.elements.slug.value.trim()}.ezkart.site`;
+      templateBusy = true;
+      templateError.hidden = true;
+      templateForm.querySelector("fieldset").disabled = true;
+      templateDialog.querySelectorAll("[data-template-apply-close], [data-template-check-limit]").forEach(button => { button.disabled = true; });
+      syncTemplateDestination();
+      try {
+        if (destination === "new") {
+          const pages = await checkTemplateCapacity();
+          if (!pages || pages.length >= maximumLandingPages) return;
+          if (!name) throw Error("Enter a page name.");
+          if (pages.some(page => page.url === url)) throw Error("A page with this URL already exists. Choose another URL.");
+        }
+        const prepared = await EzkartTemplates.prepare({ templateId: selectedTemplate.id, productIds: [], products: readCatalogProducts() });
+        await settleBuilder();
+        clearTimeout(saveTimer);
+        if (destination === "replace") {
+          remember();
+          closeSqInspector();
+          restoreState(prepared.state);
+          refreshNativeBuilder();
+          await settleBuilder();
+          clearTimeout(saveTimer);
+          const saved = await persistCurrentState();
+          if (saved) saveState.textContent = "Saved just now";
+          templateDialog.close();
+          templateGallery.close();
+          showToast(saved ? "Template applied. You can undo to restore your previous design." : "Template applied, but saving failed. Your changes are still in the editor.");
+        } else {
+          if (!await persistCurrentState()) throw Error("Your current project could not be saved. Try again before opening a new draft.");
+          const saved = await saveCloudLandingPage({ name, url, products: [], customProducts: [] }, { status: "draft", state: prepared.state });
+          const site = addSavedSiteButton(saved);
+          templateDialog.close();
+          templateGallery.close();
+          await loadSite(site);
+          updateLandingCountBadges();
+          showToast(`${name} created. Your template draft is ready to edit.`);
+        }
+      } catch (error) {
+        templateError.textContent = error instanceof Error ? error.message : "The template could not be applied. Please try again.";
+        templateError.hidden = false;
+      } finally {
+        templateBusy = false;
+        templateForm.querySelector("fieldset").disabled = false;
+        templateDialog.querySelectorAll("[data-template-apply-close], [data-template-check-limit]").forEach(button => { button.disabled = false; });
+        syncTemplateDestination();
+      }
     });
 
     const syncCommerceStatus = async () => {

@@ -400,3 +400,29 @@
   outline: 2px solid #6659e8;
   outline-offset: 2px;
 }
+
+.sq-template-apply-dialog {
+  width: min(640px, calc(100vw - 28px));
+  max-height: calc(100dvh - 28px);
+}
+.sq-template-apply-dialog > form { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; max-height: calc(100dvh - 28px); }
+.sq-template-apply-dialog header { grid-template-columns: minmax(0, 1fr) 44px; }
+.sq-template-apply-dialog header > button { width: 44px; height: 44px; }
+.sq-template-apply-dialog form > section { overflow-y: auto; }
+.sq-template-apply-dialog .sq-template-destinations { display: grid; grid-template-columns: 1fr; gap: 12px; }
+.sq-template-apply-dialog .sq-template-destinations legend { margin-bottom: 14px; font-size: 13px; }
+.sq-template-apply-dialog .sq-template-destinations label { cursor: pointer; }
+.sq-template-apply-dialog .sq-template-destinations label > span { min-height: 0; padding: 16px; }
+.sq-template-apply-dialog .sq-template-destinations b { margin: 0; font-size: 14px; }
+.sq-template-apply-dialog .sq-template-destinations small { color: #596273; font-size: 12px; line-height: 1.6; }
+.sq-template-apply-dialog .sq-template-destinations input { width: 1px; height: 1px; padding: 0; }
+.sq-template-apply-dialog .sq-template-destinations input:disabled + span { opacity: .55; cursor: not-allowed; }
+.sq-template-apply-dialog .sq-template-destinations input:focus-visible + span { outline: 2px solid #343b48; outline-offset: 3px; }
+.sq-template-apply-dialog .sq-creator-details { grid-template-columns: 1fr; margin-top: 20px; padding-top: 20px; }
+.sq-template-apply-dialog [hidden] { display: none !important; }
+.sq-template-apply-dialog [data-template-capacity] { margin: 12px 0 0; color: #596273; font-size: 12px; line-height: 1.6; }
+.sq-template-apply-dialog [data-template-apply-error] { color: #b42318; font-size: 13px; line-height: 1.6; }
+.sq-template-apply-dialog [data-template-check-limit] { margin-top: 10px; padding: 8px 12px; background: #fff; color: #303745; border: 1px solid #d8dce3; border-radius: 7px; }
+.sq-template-apply-dialog footer button { min-height: 44px; height: auto; font-size: 13px; cursor: pointer; }
+.sq-template-apply-dialog footer .primary { background: #c94030; }
+.page-creator-dialog button:disabled { opacity: .5; cursor: not-allowed; }
