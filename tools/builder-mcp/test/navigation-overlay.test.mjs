@@ -114,3 +114,66 @@ test('Overlay shares the hero background in live preview and export, including s
   const normal=await overlayGeometry(render);assert.ok(Math.abs(normal.navBottom-normal.heroTop)<=2);
   await render.close();
 }));
+
+test('Overlay keeps surface effects, opacity, sticky shadows and scroll visibility working in editor and preview',()=>fixture(async({page,browser,invoke,ws})=>{
+  const nav=page.locator('.sq-authored-navigation');
+  const overlay=page.locator('[data-sq-navigation-overlay]');
+  const effects=async target=>target.locator('.sq-authored-navigation').evaluate(n=>{
+    const css=getComputedStyle(n);
+    return {blur:css.backdropFilter,background:css.backgroundColor,shadow:css.boxShadow};
+  });
+  const slider=async(name,value)=>{
+    const input=page.locator(`[data-sq-navigation-${name}]`);
+    await input.fill(String(value));await input.dispatchEvent('input');await input.dispatchEvent('change');await invoke('settle');
+  };
+  await overlay.locator('..').click();
+  await page.locator('.sq-navigation-advanced>summary').click();
+  await page.locator('[data-sq-navigation-surface=blur]').click();
+  await slider('blur',24);await slider('opacity',20);
+  assert.match((await effects(page)).blur,/blur\(24px\)/,'Overlay must not disable the selected blur');
+  assert.notEqual((await effects(page)).background,'rgba(0, 0, 0, 0)','Opacity adds a translucent surface over the hero');
+  await page.locator('[data-sq-navigation-surface=transparent]').click();await invoke('settle');
+  assert.equal((await effects(page)).blur,'none');assertOverlay(await overlayGeometry(page));
+  await page.locator('[data-sq-navigation-surface=solid]').click();await invoke('settle');
+  assert.equal((await effects(page)).blur,'none');
+  assert.notEqual((await effects(page)).background,'rgba(0, 0, 0, 0)','Solid surface remains available over the hero');
+  await page.locator('[data-sq-navigation-surface=blur]').click();
+  await slider('opacity',20);
+  // Leave enough page to exercise the sticky state in the editor as well.
+  await invoke('nativeUpdate',{id:'blank',props:{minHeight:'2400px'}});
+  await nav.locator('.sq-site-logo').click();
+  await page.locator('.sq-navigation-advanced').evaluate(n=>n.open=true);
+  await page.locator('.sq-canvas-scroll').evaluate(n=>n.scrollTop=100);await invoke('settle');
+  assert.equal(await nav.evaluate(n=>n.classList.contains('sq-nav-is-stuck')),true,'Header is stuck after scrolling');
+  const shadow=page.locator('[data-sq-navigation-stuck-shadow]');
+  await shadow.locator('..').click();await invoke('settle');assert.equal((await effects(page)).shadow,'none');
+  await shadow.locator('..').click();await invoke('settle');
+  assert.notEqual((await effects(page)).shadow,'none','The selected sticky shadow is visible');
+  await invoke('navigation',{layout:'masthead'});await invoke('settle');
+  assert.match((await effects(page)).blur,/blur\(24px\)/,'Changing layouts keeps overlay effects');
+  await invoke('save');await page.reload();await page.waitForFunction(()=>globalThis.EzkartBuilder);await invoke('settle');
+  assert.match((await effects(page)).blur,/blur\(24px\)/,'Effects survive saving and reopening');
+  await nav.locator('.sq-site-logo').click();
+  await page.locator('.sq-navigation-advanced').evaluate(n=>n.open=true);
+  await page.locator('[data-sq-navigation-hide-scroll]').locator('..').click();
+  const html=await invoke('previewHtml');
+  const render=await browser.newPage({viewport:{width:1440,height:700},reducedMotion:'reduce'});
+  await render.route('**/overlay-effects',route=>route.fulfill({body:html,contentType:'text/html'}));
+  for(const width of [1440,390]) {
+    await render.setViewportSize({width,height:700});await render.goto(ws.url+'/overlay-effects');
+    await render.evaluate(async()=>{await document.fonts.ready;document.querySelector('.sq-page-preview').style.minHeight='2400px';for(let i=0;i<3;i++)await new Promise(requestAnimationFrame);});
+    assert.match((await effects(render)).blur,/blur\(24px\)/);
+    assert.match((await effects(render)).background,/0\.2\)/,'Preview uses the chosen surface opacity');
+    await render.evaluate(()=>scrollTo({top:250,behavior:'instant'}));
+    await render.waitForFunction(()=>document.querySelector('.sq-authored-navigation').getBoundingClientRect().bottom<=1);
+    await render.evaluate(()=>scrollTo({top:120,behavior:'instant'}));
+    await render.waitForFunction(()=>Math.abs(document.querySelector('.sq-authored-navigation').getBoundingClientRect().top)<1);
+    assert.match((await effects(render)).blur,/blur\(24px\)/);
+    await render.screenshot({path:`/tmp/ezkart-overlay-effects-${width}.png`,animations:'disabled'});
+  }
+  await render.close();
+  await overlay.locator('..').click();await invoke('settle');
+  assert.equal(await nav.getAttribute('data-sq-nav-surface'),'solid','The standalone header retains its surface');
+  await overlay.locator('..').click();await invoke('settle');
+  assert.match((await effects(page)).blur,/blur\(24px\)/,'Re-enabling overlay retains its effects');
+}));

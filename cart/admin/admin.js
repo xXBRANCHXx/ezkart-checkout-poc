@@ -3831,6 +3831,7 @@
       editorNavigationFrame = 0;
       if (!navigationScrollRoot || !previewRoot || !deviceFrame) return;
       const scrollRect = navigationScrollRoot.getBoundingClientRect();
+      const scrollInset = navigationScrollRoot.clientTop + (parseFloat(getComputedStyle(navigationScrollRoot).paddingTop) || 0);
       const renderedScale = deviceFrame.offsetWidth > 0 ? deviceFrame.getBoundingClientRect().width / deviceFrame.offsetWidth : zoom / 100;
       const scale = Number.isFinite(renderedScale) && renderedScale > 0 ? renderedScale : 1;
       previewRoot.querySelectorAll("[data-sq-nav-position]").forEach((navigation) => {
@@ -3842,7 +3843,7 @@
           return;
         }
         const offset = Math.max(0, Math.min(120, Number(navigation.dataset.sqNavOffset) || 0));
-        const stickyTop = scrollRect.top + offset * scale;
+        const stickyTop = scrollRect.top + scrollInset + offset * scale;
         navigation.style.removeProperty("--sq-nav-editor-shift");
         navigation.classList.toggle("sq-nav-is-stuck", navigation.getBoundingClientRect().top <= stickyTop + 1);
         navigation.classList.remove("sq-nav-hidden");
@@ -3863,6 +3864,13 @@
       if (firstPageSection === section) return;
       if (pageBackground) pageBackground.after(section); else previewRoot.prepend(section);
     };
+    const navigationSurfaceFor = (section) => {
+      const surface = section.dataset.sqNavSurface || (section.dataset.sqNavTemplate === 'overlay' ? 'transparent' : 'solid');
+      if (section.dataset.sqNavOverlay !== 'true') return surface;
+      // A new overlay starts clear, while an existing blur remains intentional.
+      // Keep its surface choice separate so disabling overlay restores the header.
+      return section.dataset.sqNavOverlaySurface || (surface === 'blur' ? 'blur' : 'transparent');
+    };
     const applyNavigationSectionBehavior = (section) => {
       if (!section) return;
       const position = ["static", "sticky", "fixed"].includes(section.dataset.sqNavPosition) ? section.dataset.sqNavPosition : "static";
@@ -3879,6 +3887,7 @@
       section.dataset.sqNavOffset = String(offset);
       section.dataset.sqNavOffsetCustomized = String(offsetWasCustomized);
       section.dataset.sqNavSurface = surface;
+      section.dataset.sqNavActiveSurface = navigationSurfaceFor(section);
       section.dataset.sqNavOpacity = String(opacity);
       section.dataset.sqNavBlur = String(blur);
       section.dataset.sqNavShadow ||= "true";
@@ -3914,7 +3923,7 @@
       const shadow = sqStudio.querySelector("[data-sq-navigation-stuck-shadow]");
       if (hideOnScroll) hideOnScroll.checked = section.dataset.sqNavHideScroll === "true";
       if (shadow) shadow.checked = section.dataset.sqNavShadow !== "false";
-      const surface = section.dataset.sqNavSurface || "solid";
+      const surface = navigationSurfaceFor(section);
       sqStudio.querySelectorAll("[data-sq-navigation-surface]").forEach((button) => {
         const active = button.dataset.sqNavigationSurface === surface;
         button.classList.toggle("active", active);
@@ -3924,8 +3933,8 @@
       const opacityOutput = sqStudio.querySelector("[data-sq-navigation-opacity-output]");
       const blur = sqStudio.querySelector("[data-sq-navigation-blur]");
       const blurOutput = sqStudio.querySelector("[data-sq-navigation-blur-output]");
-      if (opacity) { opacity.value = section.dataset.sqNavOpacity || "100"; opacity.disabled = surface === "transparent"; }
-      if (opacityOutput) opacityOutput.textContent = `${section.dataset.sqNavOpacity || "100"}%`;
+      if (opacity) { opacity.value = surface === "transparent" ? "0" : section.dataset.sqNavOpacity || "100"; opacity.disabled = surface === "transparent"; }
+      if (opacityOutput) opacityOutput.textContent = `${opacity?.value || "0"}%`;
       if (blur) { blur.value = section.dataset.sqNavBlur || "16"; blur.disabled = surface !== "blur"; }
       if (blurOutput) blurOutput.textContent = `${section.dataset.sqNavBlur || "16"}px`;
     };
@@ -6763,10 +6772,13 @@
       const section = navigationSectionFor();
       if (!section) return;
       remember();
-      section.dataset.sqNavSurface = button.dataset.sqNavigationSurface;
-      if (section.dataset.sqNavSurface === "transparent") section.dataset.sqNavOpacity = "0";
-      else if (section.dataset.sqNavSurface === "blur" && Number(section.dataset.sqNavOpacity) === 0) section.dataset.sqNavOpacity = "82";
-      else if (section.dataset.sqNavSurface === "solid" && Number(section.dataset.sqNavOpacity) === 0) section.dataset.sqNavOpacity = "100";
+      const previous = navigationSurfaceFor(section);
+      const surface = button.dataset.sqNavigationSurface;
+      section.dataset[section.dataset.sqNavOverlay === "true" ? "sqNavOverlaySurface" : "sqNavSurface"] = surface;
+      if (surface === "transparent") section.dataset.sqNavOpacity = "0";
+      else if (surface === "blur" && (previous === "transparent" || Number(section.dataset.sqNavOpacity) === 0)) section.dataset.sqNavOpacity = "82";
+      else if (surface === "solid" && Number(section.dataset.sqNavOpacity) === 0) section.dataset.sqNavOpacity = "100";
+      if (surface === "blur" && Number(section.dataset.sqNavBlur) === 0) section.dataset.sqNavBlur = "16";
       applyNavigationSectionBehavior(section);
       syncNavigationLayoutControls(true);
       markSqChanged();
@@ -7437,7 +7449,7 @@
       if (!section) return;
       if (existing) {
         // Layout changes keep the merchant's explicit scrolling preferences.
-        ["sqNavPosition", "sqNavOverlay", "sqNavOffset", "sqNavOffsetCustomized", "sqNavSurface", "sqNavOpacity", "sqNavBlur", "sqNavShadow", "sqNavHideScroll"].forEach(key => {
+        ["sqNavPosition", "sqNavOverlay", "sqNavOverlaySurface", "sqNavOffset", "sqNavOffsetCustomized", "sqNavSurface", "sqNavOpacity", "sqNavBlur", "sqNavShadow", "sqNavHideScroll"].forEach(key => {
           if (existing.dataset[key] !== undefined) section.dataset[key] = existing.dataset[key];
         });
         existing.replaceWith(section);
@@ -7999,7 +8011,7 @@
         node.dataset.ezkartNavPosition = node.dataset.sqNavPosition || "static";
         node.dataset.ezkartNavOverlay = node.dataset.sqNavOverlay || "false";
         node.dataset.ezkartNavOffset = node.dataset.sqNavOffset || "0";
-        node.dataset.ezkartNavSurface = node.dataset.sqNavSurface || (node.dataset.sqNavTemplate === "overlay" ? "transparent" : "solid");
+        node.dataset.ezkartNavSurface = navigationSurfaceFor(node);
         node.dataset.ezkartNavOpacity = node.dataset.sqNavOpacity || (node.dataset.ezkartNavSurface === "transparent" ? "0" : "100");
         node.dataset.ezkartNavBlur = node.dataset.sqNavBlur || "16";
         node.dataset.ezkartNavHideScroll = node.dataset.sqNavHideScroll || "false";
