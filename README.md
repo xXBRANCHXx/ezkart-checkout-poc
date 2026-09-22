@@ -14,7 +14,7 @@ In the merchant dashboard, **Shop** manages one catalog page per seller and a
 shared checkout appearance: store name, logo, accent/button/background colors,
 background image, and optional fade/rise animations. Enabling the shop publishes
 `/shop/?store=<seller-id>`. Customers choose products and variants, add quantities
-to one bag, and continue through the existing shipping and payment flow.
+to one cart, and continue through the existing shipping and payment flow.
 
 Every active product has one canonical checkout URL, `/cart/?product=<product-id>`,
 available from Products → Copy checkout link and from Shop. It works independently
