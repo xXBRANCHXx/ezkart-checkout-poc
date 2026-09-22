@@ -1,3 +1,4 @@
+import { listBuilderAssets, saveBuilderAsset, serveBuilderAsset } from "./builder-assets.js";
 import { customerAddressBook, changeCustomerAddressBook } from "./customer-addresses.js";
 import { validatePublication } from "./landing-publication.js";
 import { merchantStorefront, publicStorefront } from "./storefront.js";
@@ -1312,6 +1313,17 @@ export default {
       if (request.method === "GET" && componentMatch) return json({ ok: true, component: await component(request, env, componentMatch[1]) }, 200, cors);
       if (["PUT", "POST"].includes(request.method) && componentMatch) return json({ ok: true, component: await saveComponent(request, env, componentMatch[1]) }, 200, cors);
       if (request.method === "DELETE" && componentMatch) { await deleteComponent(request, env, componentMatch[1]); return json({ ok: true }, 200, cors); }
+      if (url.pathname === "/v1/assets" && ["GET", "POST"].includes(request.method)) {
+        const { seller } = await sellerContext(request, env);
+        if (request.method === "GET") return json({ok:true,assets:await listBuilderAssets(env,seller)},200,cors);
+        const payload = await requestJson(request,2900000);
+        return json({ok:true,asset:await saveBuilderAsset(env,seller,payload,decodeImageDataUrl(payload.dataUrl))},201,cors);
+      }
+      const builderAssetMatch = /^\/v1\/assets\/(asset_[a-f0-9]{32})$/.exec(url.pathname);
+      if (request.method === "GET" && builderAssetMatch) {
+        const { seller } = await sellerContext(request,env);
+        return await serveBuilderAsset(env,seller,builderAssetMatch[1]);
+      }
       if (request.method === "POST" && url.pathname === "/v1/media") return json({ ok: true, media: await uploadMedia(request, env) }, 201, cors);
       const publicMediaMatch = /^\/v1\/public\/media\/([a-zA-Z0-9_-]+)$/.exec(url.pathname);
       if (request.method === "GET" && publicMediaMatch) return await servePublicMedia(request, env, context, cleanId(publicMediaMatch[1], "Image ID"));

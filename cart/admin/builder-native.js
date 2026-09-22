@@ -376,6 +376,10 @@
       throw Error("Use a web, email, phone, or section destination.");
     return value;
   };
+  const safeMediaUrl = value => {
+    if (value.length <= 2796250 && /^data:image\/(?:png|jpeg|webp|gif|avif);base64,[a-zA-Z0-9+/]+={0,2}$/.test(value)) return value;
+    return safeUrl(value);
+  };
   function validate(config, depth = 0, ids = new Set()) {
     if (depth > 24) throw Error("Too many nested containers.");
     if (!identifier(config.id) || ids.has(config.id))
@@ -529,8 +533,8 @@
           "Choose valid section or element IDs for scroll visibility.",
         );
     }
-    if (config.src) safeUrl(config.src);
-    if (config.poster) safeUrl(config.poster);
+    if (config.src) (config.type === 'image' ? safeMediaUrl : safeUrl)(config.src);
+    if (config.poster) safeMediaUrl(config.poster);
     if (config.captions) safeUrl(config.captions);
     if (config.action) {
       if (
@@ -3142,7 +3146,7 @@
       callbacks.select(selected.parentElement.closest(".sq-native")),
     );
     listen("[data-native-src]", "change", () => {
-      const src = safeUrl(panel.querySelector("[data-native-src]").value);
+      const src = (selected.dataset.nativeType === "image" ? safeMediaUrl : safeUrl)(panel.querySelector("[data-native-src]").value);
       change({ src });
       selected.src = src;
     });
@@ -3276,7 +3280,7 @@
       listen(`[data-native-media-${key}]`, "change", () => {
         const input = panel.querySelector(`[data-native-media-${key}]`),
           value = input.type === "checkbox" ? input.checked : input.value;
-        if (value && ["poster", "captions"].includes(key)) safeUrl(value);
+        if (value && ["poster", "captions"].includes(key)) (key === "poster" ? safeMediaUrl : safeUrl)(value);
         change({ [key]: value });
         syncMedia(selected, read(selected));
       });

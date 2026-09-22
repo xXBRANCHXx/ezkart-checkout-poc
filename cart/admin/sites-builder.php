@@ -32,7 +32,7 @@ declare(strict_types=1);
     <aside class="sq-builder-sidebar">
       <nav class="sq-tool-rail" aria-label="Builder tools">
         <button class="active" type="button" data-sq-tab="layers" aria-label="Pages and sections"><?= ez_admin_icon('layout') ?><span>Site</span></button>
-        <button type="button" data-sq-tab="add" aria-label="Add elements"><?= ez_admin_icon('plus') ?><span>Add</span></button>
+        <button type="button" data-sq-tab="add" aria-label="Assets: elements, presets, and uploads"><?= ez_admin_icon('grid') ?><span>Assets</span></button>
         <button type="button" data-sq-templates aria-label="Templates" title="Templates" aria-haspopup="dialog"><?= ez_admin_icon('grid') ?><span>Templates</span></button>
         <button type="button" data-sq-tab="products" aria-label="Products"><?= ez_admin_icon('box') ?><span>Products</span><i data-sq-product-count>0</i></button>
         <button type="button" data-sq-tab="brand" aria-label="Branding: colors, fonts, and buttons" title="Branding: colors, fonts, and buttons"><?= ez_admin_icon('swatch-book') ?><span>Branding</span></button>
@@ -49,11 +49,18 @@ declare(strict_types=1);
         </section>
 
         <section class="sq-tool-panel" data-sq-panel="add">
-          <header><div><h2>Add to page</h2></div></header>
-          <label class="sq-panel-search"><?= ez_admin_icon('search') ?><input type="search" placeholder="Search elements or sections" aria-label="Search elements, sections, and components" data-sq-block-search></label>
+          <header><div><h2>Assets</h2><p class="sq-assets-subtitle">Good pieces. Your composition.</p></div></header>
+          <label class="sq-panel-search"><?= ez_admin_icon('search') ?><input type="search" placeholder="Search all assets…" aria-label="Search assets, sections, and uploads" data-sq-block-search></label>
           <p class="sq-library-search-status" data-sq-library-search-status role="status" hidden></p>
           <div class="sq-library-search-empty" data-sq-library-search-empty hidden><b>No matches found</b><p>Try a different name, such as image, button, or navigation.</p><button type="button" data-sq-clear-block-search>Clear search</button></div>
-          <div class="sq-library-categories" role="group" aria-label="Content library"><button type="button" data-sq-library-category="elements" aria-pressed="true">Elements</button><button type="button" data-sq-library-category="sections" aria-pressed="false">Sections</button><button type="button" data-sq-library-category="saved" aria-pressed="false">Saved</button></div>
+          <div class="sq-library-categories sq-asset-categories" role="group" aria-label="Asset categories"><button type="button" data-sq-library-category="elements" aria-pressed="true">Essentials</button><button type="button" data-sq-library-category="text" aria-pressed="false">Text</button><button type="button" data-sq-library-category="bulletins" aria-pressed="false">Bulletins</button><button type="button" data-sq-library-category="accordions" aria-pressed="false">Accordions</button><button type="button" data-sq-library-category="diagrams" aria-pressed="false">Diagrams</button><button type="button" data-sq-library-category="code" aria-pressed="false">Code artwork</button><button type="button" data-sq-library-category="sections" aria-pressed="false">Sections</button><button type="button" data-sq-library-category="uploads" aria-pressed="false">Uploads</button><button type="button" data-sq-library-category="saved" aria-pressed="false">Saved</button></div>
+          <p class="sq-assets-hint">Drag onto the page, or click to add to the selected area.</p>
+          <div class="sq-block-group sq-asset-group" data-sq-library-group="text" hidden><h3>Text</h3><div class="sq-asset-grid" data-sq-asset-catalog="text"></div></div>
+          <div class="sq-block-group sq-asset-group" data-sq-library-group="bulletins" hidden><h3>Bulletins</h3><div class="sq-asset-grid" data-sq-asset-catalog="bulletins"></div></div>
+          <div class="sq-block-group sq-asset-group" data-sq-library-group="accordions" hidden><h3>Accordions</h3><div class="sq-asset-grid" data-sq-asset-catalog="accordions"></div></div>
+          <div class="sq-block-group sq-asset-group" data-sq-library-group="diagrams" hidden><h3>Diagrams</h3><div class="sq-asset-grid" data-sq-asset-catalog="diagrams"></div></div>
+          <div class="sq-block-group sq-asset-group" data-sq-library-group="code" hidden><h3>Code artwork</h3><div class="sq-asset-grid" data-sq-asset-catalog="code"></div></div>
+
           <div class="sq-block-group" data-sq-library-group="elements"><div class="sq-block-grid sq-element-library">
             <button type="button" data-sq-add-element="native-commerce" data-search="product variant price image add cart binding"><?= ez_admin_icon('cart') ?><b>Product control</b><small>Image, variants, price or purchase</small></button>
             <button type="button" data-sq-add-element="native-heading" data-search="heading title headline rich text"><?= ez_admin_icon('message') ?><b>Heading</b><small>A title or headline</small></button>
@@ -73,6 +80,11 @@ declare(strict_types=1);
           </div></details></div>
           <div class="sq-block-group" data-sq-library-group="sections" hidden><div class="sq-block-grid"><button type="button" data-sq-add-block="blank" data-search="blank empty section canvas"><?= ez_admin_icon('plus') ?><b>Blank section</b><small>An empty area to build in</small></button><button type="button" data-sq-open-library="navigation" data-search="navigation navbar menu header"><b>Navigation</b><small>Logo and page links</small></button></div></div>
           <div class="sq-block-group sq-native-components" data-sq-library-group="sections" hidden><h3>Ready-made sections</h3><div class="sq-native-component-grid" data-sq-native-component-list></div></div>
+          <div class="sq-block-group sq-asset-uploads" data-sq-library-group="uploads" hidden>
+            <div class="sq-assets-upload-actions"><label class="sq-assets-upload-button"><input type="file" multiple accept="image/png,image/jpeg,image/webp,image/gif,image/avif" data-sq-asset-upload><?= ez_admin_icon('plus') ?> Upload files</label><button type="button" data-sq-assets-refresh aria-label="Refresh uploads">Refresh</button></div>
+            <p class="sq-assets-upload-status" data-sq-assets-upload-status role="status">Your uploads and images from saved pages appear here.</p>
+            <div class="sq-asset-grid sq-upload-grid" data-sq-asset-uploads></div>
+          </div>
           <div class="sq-block-group sq-components-library" data-sq-library-group="saved" hidden><div class="sq-components-heading"><h3>Your saved components</h3><span data-sq-component-count>0 / 20</span></div><button class="sq-create-component" type="button" data-sq-create-component><?= ez_admin_icon('plus') ?><span><b>Create component</b><small>Save reusable HTML, CSS &amp; JS</small></span></button><div class="sq-component-list" data-sq-component-list></div><p class="sq-component-empty" data-sq-component-empty>Your saved components will appear here.</p></div>
           <div class="sq-navigation-library" data-sq-library-view="navigation" hidden>
             <header><button type="button" data-sq-close-library aria-label="Back to content library"><?= ez_admin_icon('chevron-left') ?></button><div><h2>Navigation</h2></div></header>

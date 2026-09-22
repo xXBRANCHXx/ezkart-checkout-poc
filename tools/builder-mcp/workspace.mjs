@@ -2,13 +2,13 @@ import {createServer} from 'node:http';
 import {readFile,writeFile,rename,mkdir,readdir} from 'node:fs/promises';
 import {dirname,resolve,join,extname} from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {randomBytes} from 'node:crypto';
+import {randomBytes,createHash} from 'node:crypto';
 export const repoRoot=resolve(dirname(fileURLToPath(import.meta.url)),'../..');
 const htmlEscape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const slug=value=>{if(!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value)||value.length>48)throw new Error('Use a project ID of up to 48 lowercase letters, numbers, and hyphens.');return value;};
 export class Workspace {
  constructor(directory){this.directory=resolve(directory);this.csrf=randomBytes(24).toString('hex');}
- async init(){await mkdir(join(this.directory,'projects'),{recursive:true});await mkdir(join(this.directory,'exports'),{recursive:true});await mkdir(join(this.directory,'previews'),{recursive:true});return this;}
+ async init(){await mkdir(join(this.directory,'projects'),{recursive:true});await mkdir(join(this.directory,'exports'),{recursive:true});await mkdir(join(this.directory,'previews'),{recursive:true});await mkdir(join(this.directory,'uploads'),{recursive:true});return this;}
  async catalog(){try{return JSON.parse(await readFile(join(this.directory,'catalog.json'),'utf8'));}catch(error){if(error.code==='ENOENT')return {products:[],storageScope:'ezkart-local',mediaBase:''};throw error;}}
  async read(id){
   const page=JSON.parse(await readFile(join(this.directory,'projects',`${slug(id)}.json`),'utf8'));
@@ -29,7 +29,7 @@ export class Workspace {
    .replace(/<\?= ez_admin_product_art\('([^']+)'\) \?>/g,'<span class="product-art"></span>').replace(/<\?[\s\S]*?\?>/g,'');
   const index=await readFile(join(repoRoot,'cart/admin/index.php'),'utf8');const icons=(index.match(/<symbol\b[\s\S]*?<\/symbol>/g)||[]).join('');
   const catalog=await this.catalog();
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Ezkart builder workspace</title><link rel="stylesheet" href="admin.css"><link rel="stylesheet" href="builder-templates.css"><link rel="stylesheet" href="builder-native.css"><link rel="stylesheet" href="builder-components.css"><link rel="stylesheet" href="builder-flow.css"><link rel="stylesheet" href="builder-showcase.css"><link rel="stylesheet" href="builder-chrome.css"><link rel="stylesheet" href="admin-ui.css"><link rel="stylesheet" href="../select.css"></head><body class="dashboard-page page-sites ${library ? 'page-sites-library' : 'page-site-editor'}" data-admin-cloud-enabled="true" data-admin-local-workspace="true" data-admin-demo-checkout="${catalog.demoCheckout===true}" data-admin-currency="${htmlEscape(catalog.currency||'IDR')}" data-admin-locale="${htmlEscape(catalog.locale||'id-ID')}" data-admin-storage-scope="${htmlEscape(catalog.storageScope||'ezkart-local')}" data-admin-cloud-media-base="${htmlEscape(catalog.mediaBase||'')}" data-admin-public-base="${htmlEscape(catalog.publicBase||'')}" data-admin-csrf-token="${this.csrf}"><svg style="display:none">${icons}</svg>${view}<script src="builder-native-icons.js"></script><script src="builder-commerce.js"></script><script src="builder-native.js"></script><script src="builder-publish.js"></script><script src="builder-templates.js"></script><script src="builder-backgrounds.js"></script><script src="builder-components.js"></script><script src="builder-showcase-data.js"></script><script src="builder-showcase.js"></script><script src="admin.js"></script><script src="../select.js"></script></body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Ezkart builder workspace</title><link rel="stylesheet" href="admin.css"><link rel="stylesheet" href="builder-templates.css"><link rel="stylesheet" href="builder-native.css"><link rel="stylesheet" href="builder-components.css"><link rel="stylesheet" href="builder-flow.css"><link rel="stylesheet" href="builder-showcase.css"><link rel="stylesheet" href="builder-chrome.css"><link rel="stylesheet" href="builder-assets.css"><link rel="stylesheet" href="admin-ui.css"><link rel="stylesheet" href="../select.css"></head><body class="dashboard-page page-sites ${library ? 'page-sites-library' : 'page-site-editor'}" data-admin-cloud-enabled="true" data-admin-local-workspace="true" data-admin-demo-checkout="${catalog.demoCheckout===true}" data-admin-currency="${htmlEscape(catalog.currency||'IDR')}" data-admin-locale="${htmlEscape(catalog.locale||'id-ID')}" data-admin-storage-scope="${htmlEscape(catalog.storageScope||'ezkart-local')}" data-admin-cloud-media-base="${htmlEscape(catalog.mediaBase||'')}" data-admin-public-base="${htmlEscape(catalog.publicBase||'')}" data-admin-csrf-token="${this.csrf}"><svg style="display:none">${icons}</svg>${view}<script src="builder-native-icons.js"></script><script src="builder-commerce.js"></script><script src="builder-native.js"></script><script src="builder-publish.js"></script><script src="builder-templates.js"></script><script src="builder-backgrounds.js"></script><script src="builder-components.js"></script><script src="builder-assets.js"></script><script src="builder-assets-ui.js"></script><script src="builder-showcase-data.js"></script><script src="builder-showcase.js"></script><script src="admin.js"></script><script src="../select.js"></script></body></html>`;
  }
  async start(port=0){
   await this.init();
@@ -44,11 +44,31 @@ export class Workspace {
      if(req.method==='GET'){
       if(path==='/v1/catalog')return send(200,{ok:true,...await this.catalog(),drafts:[]});
       if(path==='/v1/components')return send(200,{ok:true,components:[]});
+      if(path==='/v1/assets'){
+       const files=(await readdir(join(this.directory,'uploads'))).filter(file=>file.endsWith('.json'));
+       const assets=await Promise.all(files.map(async file=>{const {dataUrl,...item}=JSON.parse(await readFile(join(this.directory,'uploads',file),'utf8'));return item;}));
+       return send(200,{ok:true,assets});
+      }
+      const assetMatch=/^\/v1\/assets\/(asset_[a-f0-9]{32})$/.exec(path);
+      if(assetMatch){
+       const item=JSON.parse(await readFile(join(this.directory,'uploads',assetMatch[1]+'.json'),'utf8'));
+       return send(200,Buffer.from(item.dataUrl.split(',')[1],'base64'),item.mimeType);
+      }
+
       if(path==='/v1/landing-pages')return send(200,{ok:true,pages:await this.list()});
       const previewMatch=/^\/v1\/landing-pages\/([a-z0-9-]+)\/preview$/.exec(path);
       if(previewMatch){res.setHeader('Content-Security-Policy',"default-src 'none'; img-src data: http: https:; style-src 'unsafe-inline'; font-src data:; sandbox");return send(200,await readFile(join(this.directory,'previews',`${slug(previewMatch[1])}.html`)),'text/html; charset=utf-8');}
       const match=/^\/v1\/landing-pages\/([a-z0-9-]+)$/.exec(path);
       if(match)return send(200,{ok:true,page:await this.read(match[1])});
+     }
+     if(req.method==='POST' && path==='/v1/assets'){
+      if(req.headers['x-ezkart-csrf']!==this.csrf)return send(403,{ok:false,error:'Invalid editor request.'});
+      let body='';for await(const chunk of req){body+=chunk;if(Buffer.byteLength(body)>2900000)return send(413,{ok:false,error:'Image exceeds 2 MB.'});}
+      const payload=JSON.parse(body),match=/^data:(image\/(?:png|jpeg|webp|gif|avif));base64,([a-zA-Z0-9+/=]+)$/.exec(payload.dataUrl||'');
+      if(!match || Buffer.from(match[2],'base64').length>2097152)return send(400,{ok:false,error:'Choose an image up to 2 MB.'});
+      const asset={id:'asset_'+randomBytes(16).toString('hex'),name:String(payload.name||'Uploaded image').slice(0,160),mimeType:match[1],sizeBytes:Buffer.from(match[2],'base64').length,createdAt:new Date().toISOString(),source:'Your uploads',sha256:createHash('sha256').update(Buffer.from(match[2],'base64')).digest('hex')};
+      await writeFile(join(this.directory,'uploads',asset.id+'.json'),JSON.stringify({...asset,dataUrl:payload.dataUrl}),{mode:0o600});
+      return send(201,{ok:true,asset});
      }
      if(req.method==='POST' && /^\/v1\/landing-pages\/[a-z0-9-]+\/export$/.test(path)){
       if(req.headers['x-ezkart-csrf']!==this.csrf)return send(403,{ok:false,error:'Invalid editor request.'});

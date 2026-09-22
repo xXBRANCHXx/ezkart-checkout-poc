@@ -2727,7 +2727,7 @@
       if (window.matchMedia("(max-width: 720px)").matches) sqStudio.classList.toggle("mobile-panel-open", pin);
     };
     sqStudio.querySelectorAll("[data-sq-tab]").forEach((button) => button.addEventListener("click", () => {
-      if (button.classList.contains('active') && builderSidebar?.classList.contains('sq-panel-pinned')) {
+      if (button.classList.contains('active') && (window.matchMedia('(max-width: 720px)').matches ? sqStudio.classList.contains('mobile-panel-open') : builderSidebar?.classList.contains('sq-panel-pinned'))) {
         builderSidebar.classList.remove('sq-panel-pinned');sqStudio.classList.remove('mobile-panel-open');button.blur();
       } else openSqPanel(button.dataset.sqTab, {pin:true});
     }));
@@ -5010,7 +5010,7 @@
         };
         block.ondragstart = (event) => { draggedSection = block.dataset.sectionId; block.classList.add("dragging"); event.dataTransfer.effectAllowed = "move"; };
         block.ondragover = (event) => {
-          if (["element", "component"].includes(libraryDrag?.kind)) {
+          if (["element", "component", "asset", "section"].includes(libraryDrag?.kind)) {
             event.preventDefault(); event.stopPropagation();
             event.dataTransfer.dropEffect = "copy";
             updateLibraryDropPreview(block, event);
@@ -5019,7 +5019,7 @@
           event.preventDefault(); block.classList.add("drag-over");
         };
         block.ondragleave = (event) => {
-          if (["element", "component"].includes(libraryDrag?.kind)) {
+          if (["element", "component", "asset", "section"].includes(libraryDrag?.kind)) {
             if (!block.contains(event.relatedTarget)) clearLibraryDropPreview();
             return;
           }
@@ -5027,14 +5027,14 @@
         };
         block.ondrop = (event) => {
           event.preventDefault(); block.classList.remove("drag-over");
-          if (["element", "component"].includes(libraryDrag?.kind)) { event.stopPropagation(); dropLibraryElement(block, event); return; }
+          if (["element", "component", "asset", "section"].includes(libraryDrag?.kind)) { event.stopPropagation(); dropLibraryElement(block, event); return; }
           const rect = block.getBoundingClientRect(); reorderSection(draggedSection, block.dataset.sectionId, event.clientY > rect.top + rect.height / 2);
         };
         block.ondragend = () => { block.classList.remove("dragging"); previewRoot.querySelectorAll(".drag-over").forEach((item) => item.classList.remove("drag-over")); };
       });
       applyFluidLayouts();
       previewRoot?.querySelectorAll(".sq-free-code").forEach(renderCodeElement);
-      previewRoot?.querySelectorAll("[data-sq-fluid] > [data-sq-element],.sq-flow [data-sq-element],.sq-native-section [data-sq-element]").forEach((element, index) => {
+      previewRoot?.querySelectorAll("[data-sq-fluid] > [data-sq-element],.sq-flow [data-sq-element],.sq-native-section [data-sq-element],.sq-asset-composition [data-sq-element]").forEach((element, index) => {
         if (!element.dataset.sqElementId) element.dataset.sqElementId = `element-${Date.now()}-${index}`;
         if (!element.closest(".sq-flow,.sq-native-section") && (element.matches("button") || element.querySelector("button"))) {
           applyButtonRoleToElement(element, element.dataset.sqButtonRole || (element.dataset.sqElementType === "navigation" ? "secondary" : "primary"));
@@ -7114,7 +7114,7 @@
         const sectionId = section.dataset.sectionId;
         const detailKey = Object.keys(layerDetails).sort((a, b) => b.length - a.length).find((key) => sectionId === key || sectionId.startsWith(`${key}-`));
         const details = section.matches(".sq-native-section") ? [EzkartNative.read(section).name||section.dataset.sqSectionName||"Section","Page content","layers"] : section.dataset.sqSectionName ? [section.dataset.sqSectionName, "Editable section", "layers"] : layerDetails[detailKey] || ["Section", "Editable section", "layers"];
-        const elements = [...section.querySelectorAll(section.matches(".sq-flow,.sq-native-section") ? "[data-sq-element]" : ":scope > [data-sq-element]")];
+        const elements = [...section.querySelectorAll(section.matches(".sq-flow,.sq-native-section") ? "[data-sq-element]" : ":scope > [data-sq-element], .sq-asset-composition [data-sq-element]")];
         const sectionBackground = section.querySelector(":scope > .sq-section-background");
         elements.forEach((element, index) => { if (!element.dataset.sqElementId) element.dataset.sqElementId = `element-${sectionId.replace(/[^a-z0-9-]/gi, "-")}-${index + 1}-${Date.now()}`; });
         const wrapper = document.createElement("div");
@@ -7238,6 +7238,13 @@
       libraryDropPreview.style.gridColumn = `${layout.x} / span ${layout.width}`;
       libraryDropPreview.style.gridRow = `${layout.y} / span ${layout.height}`;
       if(section.matches('.sq-flow')){const cell=section.clientWidth/fluidColumns();Object.assign(libraryDropPreview.style,{position:'absolute',left:`${(layout.x-1)*cell}px`,top:`${(layout.y-1)*34}px`,width:`${layout.width*cell}px`,height:`${layout.height*34}px`});}
+      if (['asset','section'].includes(libraryDrag.kind) || section.matches('.sq-native-section')) {
+        const rect = section.getBoundingClientRect(), scale = rect.width / section.offsetWidth;
+        const sectionAsset = libraryDrag.kind === 'section';
+        libraryDropPreview.classList.add('sq-asset-drop-preview');
+        libraryDropPreview.classList.toggle('sq-asset-section-drop',sectionAsset);
+        Object.assign(libraryDropPreview.style,{left:`${Math.max(0,(event.clientX-rect.left)/scale-120)}px`,top:`${sectionAsset ? (event.clientY < rect.top+rect.height/2 ? 0 : section.offsetHeight-4) : Math.max(0,(event.clientY-rect.top)/scale-40)}px`,width:'240px',height:'80px'});
+      }
       libraryDropPreview.dataset.layout = `${layout.x},${layout.y},${layout.width},${layout.height}`;
       libraryDropPreview.innerHTML = `<span>${escapeHtml(libraryDrag.label)}</span>`;
       previewRoot?.querySelectorAll(".sq-library-drop-section").forEach((candidate) => candidate.classList.toggle("sq-library-drop-section", candidate === section));
@@ -7474,13 +7481,21 @@
       showToast(`${component.name} instance added`);
       return element;
     };
+    let assetLibrary;
     const dropLibraryElement = (section, event) => {
       if (!libraryDrag) return;
       const layout = libraryDropPreview?.dataset.layout?.split(",").map(Number);
       const preferredLayout = layout?.length === 4 ? { x: layout[0], y: layout[1], width: layout[2], height: layout[3] } : libraryPointerLayout(section, event);
       const dragged = libraryDrag;
       clearLibraryDropPreview();
-      if (dragged.kind === "component") addComponentInstance(componentForId(dragged.componentId), section, preferredLayout);
+      if (dragged.kind === "asset") void assetLibrary.add(dragged, section, {clientX:event.clientX,clientY:event.clientY,target:event.target});
+      else if (dragged.kind === "section") {
+        const rect = section.getBoundingClientRect();
+        const before = event.clientY < rect.top + rect.height / 2;
+        const added = addCanvasSection(dragged.sectionType,section.dataset.sectionId);
+        if (before) { section.before(added); rebuildLayerList(); markSqChanged(); }
+      }
+      else if (dragged.kind === "component") addComponentInstance(componentForId(dragged.componentId), section, preferredLayout);
       else addLibraryElement(dragged.type, section, preferredLayout);
       libraryDrag = null;
       layoutGridDragging = false;
@@ -7515,6 +7530,7 @@
     });
 
     const addPanel = sqStudio.querySelector('[data-sq-panel="add"]');
+    globalThis.EzkartAssets?.renderCatalog(addPanel);
     const nativeComponentList = addPanel?.querySelector("[data-sq-native-component-list]");
     if (nativeComponentList && globalThis.EzkartComponents) {
       nativeComponentList.innerHTML = globalThis.EzkartComponents.definitions.map((item) => `<button type="button" class="sq-native-component-card" data-sq-add-block="${item.id}" data-search="${escapeHtml(`${item.name} ${item.category} ${item.description}`)}">${globalThis.EzkartComponents.thumbnail(item.id)}<span><b>${escapeHtml(item.name)}</b><small>${escapeHtml(item.description)}</small></span></button>`).join("");
@@ -7529,7 +7545,7 @@
       if (!addPanel) return;
       const query = normalize(blockSearch?.value);
       const terms = query.split(/\s+/).filter(Boolean);
-      const selector = "[data-sq-add-block], [data-sq-add-element], [data-sq-open-products], [data-sq-open-library], [data-sq-component], [data-sq-create-component]";
+      const selector = "[data-sq-asset], [data-sq-upload-asset], [data-sq-add-block], [data-sq-add-element], [data-sq-open-products], [data-sq-open-library], [data-sq-component], [data-sq-create-component]";
       let matches = 0;
       addPanel.querySelectorAll(":scope > .sq-block-group").forEach((group) => {
         let groupMatches = 0;
@@ -7780,7 +7796,7 @@
       newBlock.scrollIntoView({ behavior: "smooth", block: "center" }); markSqChanged();
       return newBlock;
     };
-    sqStudio.querySelectorAll("[data-sq-add-block]").forEach(button => button.addEventListener("click", () => addCanvasSection(button.dataset.sqAddBlock, selectedSection, true)));
+    sqStudio.querySelectorAll("[data-sq-add-block]").forEach(button => { button.draggable = true; button.addEventListener("click", () => addCanvasSection(button.dataset.sqAddBlock, selectedSection, true)); });
     sqStudio.querySelector("[data-sq-canvas-add-section]")?.addEventListener("click", () => {
       const section = sectionToolsTarget;
       if (section?.isConnected) addCanvasSection("blank", section.dataset.sectionId);
@@ -8916,6 +8932,112 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
         const h1=previewRoot.querySelectorAll('h1').length;if(h1!==1)issues.push({type:'heading-structure',message:`Page has ${h1} main headings; use one.`});
         previewRoot.querySelectorAll('a[href^="#"],button[data-sq-link-type="section"]').forEach(link=>{const id=(link.getAttribute('href')||link.dataset.sqLink||'').replace(/^#/,'');if(id&&!previewRoot.querySelector(`[id="${CSS.escape(id)}"],[data-section-id="${CSS.escape(id)}"]`))issues.push({type:'broken-section-link',target:id});});
         return {device:activeDevice,sections:inspectBuilder().sections.length,issues};
+      }
+    });
+
+    const assetUploadUrl = item => cloudUrl(`/v1/${item.media ? 'media' : 'assets'}/${encodeURIComponent(item.id)}`);
+    const embeddedAssetSources = new Map();
+    const collectPageAssets = async (markup, pageName, hashes) => {
+      const doc = new DOMParser().parseFromString(markup || '', 'text/html');
+      const candidates = new Map(), found = [];
+      const add = (src,name) => {
+        if (!/^data:image\/(?:png|jpeg|webp|gif|avif);base64,/.test(src || '') || embeddedAssetSources.has(src) || candidates.has(src)) return;
+        candidates.set(src,name || 'Page image');
+      };
+      doc.querySelectorAll('img').forEach(image => add(image.getAttribute('src'),image.getAttribute('alt')));
+      // Also collect image backgrounds from earlier page formats.
+      for (const match of (markup || '').matchAll(/data:image\/(?:png|jpeg|webp|gif|avif);base64,[a-zA-Z0-9+/=]+/g)) add(match[0],'Page image');
+      for (const [src,name] of candidates) {
+        embeddedAssetSources.set(src,true);
+        try {
+          const bytes = Uint8Array.from(atob(src.split(',')[1]),c=>c.charCodeAt(0));
+          const hash = [...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(n=>n.toString(16).padStart(2,'0')).join('');
+          if(hashes.has(hash)) continue;
+          hashes.add(hash);
+          found.push({id:`page-upload-${embeddedAssetSources.size}`,name,source:pageName,src});
+        } catch { /* A malformed image in an old draft is not a reusable upload. */ }
+      }
+      return found;
+    };
+    const insertAsset = (config, section, pointer) => {
+      if (pointer && !section?.isConnected) throw Error('Choose an area on the page again.');
+      section ||= previewRoot.querySelector(`[data-section-id="${CSS.escape(selectedSection)}"]`) || previewRoot.querySelector('[data-sq-block]');
+      EzkartNative.validate(config);
+      const before = captureState();
+      let element;
+      if (!section || !section.matches('.sq-native-section') && !section.querySelector('[data-sq-element]')) {
+        section = compatibleSection(section,true);
+        element = addNativeNode({section:section.dataset.sectionId,node:config});
+        undoStack[undoStack.length-1] = before;
+      } else {
+        remember(before);
+        element = EzkartNative.create(config);
+        if (section.matches('.sq-native-section')) {
+          const candidate = pointer ? pointer.target?.closest?.('.sq-native') : selectedElement;
+          const parent = candidate && section.contains(candidate) ? (candidate.matches('[data-native-type="container"]') && EzkartNative.read(candidate).text === undefined ? candidate : candidate.parentElement.closest('[data-native-type="container"]')) : section;
+          (parent && section.contains(parent) ? parent : section).append(element);
+        } else {
+          ensureElementSection(section);
+          element.classList.add('sq-asset-composition');
+          element.dataset.sqAutoHeight = 'true';
+          const dimensions = {width:12,height:8};
+          if (section.matches('.sq-flow')) prepareFlowElement(element,section,dimensions,pointer ? libraryPointerLayout(section,pointer,dimensions) : null);
+          else {
+            ['desktop','tablet','mobile'].forEach(device => setElementLayout(element,findOpenElementLayout(section,{...dimensions,width:device==='mobile'?fluidColumns(device):Math.min(12,fluidColumns(device))},device),device));
+            if(pointer) setElementLayout(element,libraryPointerLayout(section,pointer,dimensions),activeDevice);
+          }
+          section.append(element);
+        }
+        EzkartNative.refresh();
+      }
+      element.dataset.sqAssetName = config.name || 'Uploaded image';
+      if(pointer && section.matches('.sq-native-section')) {
+        const rect = element.getBoundingClientRect(), owner = section.getBoundingClientRect(), scale = owner.width/section.offsetWidth;
+        const data = EzkartNative.read(element), props = EzkartNative.deviceContext(data,activeDevice).props;
+        props.position = 'relative';
+        // Keep the entire asset within the selected section's horizontal bounds.
+        props.left = `${(Math.max(owner.left,Math.min(pointer.clientX-rect.width/2,owner.right-rect.width))-rect.left)/scale}px`;
+        props.top = `${(Math.max(owner.top,pointer.clientY-24*scale)-rect.top)/scale}px`;
+        EzkartNative.write(element,data); EzkartNative.refresh();
+      }
+      rebuildLayerList(); bindSqInteractions(); selectSqSection(section.dataset.sectionId,true); selectSqElement(element);
+      element.scrollIntoView({block:'nearest',inline:'nearest'}); markSqChanged();
+      showToast(`${config.name || 'Image'} added`);
+    };
+    assetLibrary = globalThis.EzkartAssets?.init({
+      root:addPanel,insert:insertAsset,filter:filterBlockLibrary,toast:showToast,
+      beginDrag:(drag,event) => {
+        libraryDrag = drag; layoutGridDragging = true; refreshLayoutGrid();
+        document.body.classList.add('sq-library-dragging');
+        event.dataTransfer.effectAllowed = 'copy'; event.dataTransfer.setData('application/x-ezkart-asset',drag.id || drag.uploadId || drag.sectionType); event.dataTransfer.setData('text/plain',drag.label);
+      },
+      endDrag:() => {clearLibraryDropPreview();libraryDrag=null;layoutGridDragging=false;document.body.classList.remove('sq-library-dragging');revealLayoutGrid(650);},
+      listUploads:async () => {
+        const result = await cloudRequest('GET','/v1/assets');
+        const files = result.assets.map(item => ({...item,src:assetUploadUrl(item)}));
+        embeddedAssetSources.clear();
+        const hashes = new Set(result.assets.map(item=>item.sha256).filter(Boolean));
+        files.push(...await collectPageAssets(previewRoot.innerHTML,activeSiteDocument?.name || 'This page',hashes));
+        for (const site of readLandingSites()) {
+          if (site.url === activeSiteDocument?.url) continue;
+          const result = await cloudRequest('GET',`/v1/landing-pages/${encodeURIComponent(landingPageId(site.url))}`);
+          files.push(...await collectPageAssets(result.page?.state?.preview,site.name,hashes));
+        }
+        return files;
+      },
+      upload:async file => {
+        if (!['image/png','image/jpeg','image/webp','image/gif','image/avif'].includes(file.type)) throw Error('Choose a PNG, JPEG, WebP, GIF, or AVIF image.');
+        if (file.size > 8*1024*1024) throw Error('Choose an image smaller than 8 MB.');
+        const dataUrl = await optimizeBuilderImage(file,2000,.84);
+        if (dataUrl.length > 2796204) throw Error('This image is still larger than 2 MB after optimization. Choose a smaller file.');
+        const result = await cloudRequest('POST','/v1/assets',{name:file.name,dataUrl});
+        return {...result.asset,src:assetUploadUrl(result.asset)};
+      },
+      readUpload:async item => {
+        if(item.src.startsWith('data:')) return item.src;
+        const response = await fetch(item.src,{credentials:'same-origin'});
+        if(!response.ok) throw Error('That upload could not be opened. Refresh the library and try again.');
+        return readImageFile(await response.blob());
       }
     });
 
