@@ -1827,7 +1827,7 @@
         const menu = document.createElement("div");
         menu.className = "landing-project-menu";
         menu.setAttribute("role", "menu");
-        menu.innerHTML = '<button type="button" role="menuitem">Delete landing page</button>';
+        menu.innerHTML = '<button type="button" role="menuitem" data-ui-icon="trash">Delete landing page</button>';
         button.setAttribute("aria-expanded", "true");
         const rect = button.getBoundingClientRect();
         menu.style.left = `${Math.max(8, rect.right - 160)}px`; menu.style.top = `${rect.bottom + 5}px`;

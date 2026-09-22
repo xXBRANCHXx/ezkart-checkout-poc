@@ -182,6 +182,7 @@ button, input, select, textarea { font-family: inherit; }
   justify-content: center;
   gap: 8px;
 }
+.dashboard-page .landing-project-menu [data-ui-icon] { justify-content: flex-start; }
 /* Empty generated content is decorative and survives dynamic text labels. */
 .dashboard-page [data-ui-icon]::before {
   content: "";
