@@ -3708,8 +3708,8 @@
         toggle.className = "sq-nav-menu-toggle";
         toggle.setAttribute("aria-label", "Open navigation menu");
         toggle.setAttribute("aria-expanded", "false");
-        toggle.innerHTML = "<i></i><i></i><i></i>";
       }
+      if (!toggle.querySelector('.sq-nav-menu-icon')) toggle.innerHTML = '<span class="sq-nav-menu-label" aria-hidden="true">Menu</span><span class="sq-nav-menu-icon" aria-hidden="true"><i></i><i></i></span>';
       toggle.dataset.sqLinkType="none";toggle.dataset.sqLink="";toggle.dataset.sqNewTab="false";
       const cta = target.querySelector(":scope > button:not(.sq-nav-menu-toggle)");
       if (cta) target.insertBefore(toggle, cta); else target.append(toggle);
