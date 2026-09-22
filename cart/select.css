@@ -1,0 +1,118 @@
+/* Native controls retain form, keyboard, and touch behavior. The preview selector
+   also includes these shared styles in standalone landing-page exports. */
+:is(body, .sq-page-preview) select {
+  color-scheme: light;
+}
+
+/* Equivalent menus for browsers without customizable native selects. */
+:is(body, .sq-page-preview) .ezkart-select { display: inline-grid; position: relative; width: 100%; min-width: 0; vertical-align: middle; }
+:is(body, .sq-page-preview) .ezkart-select-source { position: absolute !important; width: 1px !important; height: 1px !important; min-height: 1px !important; margin: 0 !important; padding: 0 !important; opacity: 0 !important; pointer-events: none !important; }
+:is(body, .sq-page-preview) .ezkart-select-trigger { width: 100%; min-width: 0; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px; color: #292e37; background: #fff; border: 1px solid #e1e5eb; border-radius: 8px; font: inherit; text-align: start; cursor: pointer; }
+:is(body, .sq-page-preview) .ezkart-select-trigger > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:is(body, .sq-page-preview) .ezkart-select-trigger::after { content: ""; flex: 0 0 6px; width: 6px; height: 6px; margin-top: -3px; color: #697382; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg); }
+:is(body, .sq-page-preview) .ezkart-select-trigger[aria-expanded="true"]::after { margin-top: 3px; transform: rotate(225deg); }
+:is(body, .sq-page-preview) .ezkart-select-trigger:hover { background: #f3f4f6; }
+:is(body, .sq-page-preview) .ezkart-select-trigger:focus-visible { outline: 2px solid #697382; outline-offset: 2px; }
+:is(body, .sq-page-preview) .ezkart-select-trigger:disabled { color: #9299a4; cursor: not-allowed; }
+:is(body, .sq-page-preview) .ezkart-select-error { margin-top: 6px; color: #b33428; font-size: 12px; line-height: 1.5; }
+:is(body, .sq-page-preview) .ezkart-select-menu { position: fixed; inset: auto; z-index: 2147483647; box-sizing: border-box; max-height: 320px; max-width: calc(100vw - 16px); margin: 0; padding: 5px; overflow: auto; overscroll-behavior: contain; scroll-padding: 5px; color: #292e37; background: #fff; border: 1px solid #e1e5eb; border-radius: 10px; box-shadow: 0 8px 28px #18212d1a; font-size: 13px; line-height: 1.5; scrollbar-width: thin; scrollbar-color: #cbd0d7 transparent; }
+:is(body, .sq-page-preview) .ezkart-select-menu[hidden], :is(body, .sq-page-preview) .ezkart-select[hidden] { display: none !important; }
+:is(body, .sq-page-preview) .ezkart-select-option { box-sizing: border-box; min-height: 38px; padding: 9px 11px; display: flex; align-items: center; gap: 12px; border-radius: 6px; font-size: 13px; font-weight: 400; line-height: 1.5; overflow-wrap: anywhere; cursor: pointer; }
+:is(body, .sq-page-preview) .ezkart-select-option[aria-selected="true"] { background: #f3f4f6; font-weight: 500; }
+:is(body, .sq-page-preview) .ezkart-select-option[aria-selected="true"]::after { content: "✓"; margin-inline-start: auto; color: #697382; }
+:is(body, .sq-page-preview) .ezkart-select-option:is(:hover, .is-active) { background: #eceef1; }
+:is(body, .sq-page-preview) .ezkart-select-option[aria-disabled="true"] { color: #9299a4; background: #fff; cursor: not-allowed; }
+
+@supports (appearance: base-select) {
+  :is(body, .sq-page-preview) select:not([multiple], [size]:not([size="1"]), .sq-builder-native-select, .product-type-native),
+  :is(body, .sq-page-preview) select:not([multiple], [size]:not([size="1"]), .sq-builder-native-select, .product-type-native)::picker(select) {
+    appearance: base-select;
+  }
+
+  :is(body, .sq-page-preview) select:not([multiple], [size]:not([size="1"]), .sq-builder-native-select, .product-type-native) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-inline-end: 14px;
+  }
+
+  :is(body, .sq-page-preview) select::picker(select) {
+    min-inline-size: anchor-size(inline);
+    max-inline-size: calc(100vw - 24px);
+    max-block-size: min(320px, calc(100dvh - 24px));
+    margin-block: 6px;
+    padding: 5px;
+    overflow: auto;
+    overscroll-behavior: contain;
+    scroll-padding: 5px;
+    color: #292e37;
+    background: #fff;
+    border: 1px solid #e1e5eb;
+    border-radius: 10px;
+    box-shadow: 0 8px 28px #18212d1a;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 1.5;
+    scrollbar-width: thin;
+    scrollbar-color: #cbd0d7 transparent;
+  }
+
+  :is(body, .sq-page-preview) select::picker-icon {
+    content: "";
+    flex: 0 0 6px;
+    width: 6px;
+    height: 6px;
+    margin: -3px 2px 0 12px;
+    color: #697382;
+    border-right: 1.5px solid currentColor;
+    border-bottom: 1.5px solid currentColor;
+    transform: rotate(45deg);
+  }
+
+  :is(body, .sq-page-preview) select:open::picker-icon {
+    margin-top: 3px;
+    transform: rotate(225deg);
+  }
+
+  :is(body, .sq-page-preview) select option {
+    min-block-size: 38px;
+    padding: 9px 11px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: #292e37;
+    background: #fff;
+    border: 0;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 1.5;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    cursor: pointer;
+  }
+
+  :is(body, .sq-page-preview) select option:checked {
+    background: #f3f4f6;
+    font-weight: 500;
+  }
+
+  :is(body, .sq-page-preview) select option:is(:hover, :focus-visible) {
+    color: #292e37;
+    background: #eceef1;
+    outline: none;
+  }
+
+  :is(body, .sq-page-preview) select option::checkmark {
+    order: 1;
+    margin-inline-start: auto;
+    color: #697382;
+  }
+
+  :is(body, .sq-page-preview) select option:disabled {
+    color: #9299a4;
+    background: #fff;
+    cursor: not-allowed;
+  }
+}
