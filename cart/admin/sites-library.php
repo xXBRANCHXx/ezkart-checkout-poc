@@ -1,7 +1,7 @@
 <?php declare(strict_types=1); ?>
 <section class="landing-library" data-landing-library>
-  <header class="landing-library-header">
-    <div><h1>Your landing pages</h1><p>Create a page, connect products, and shape the storefront around your brand.</p></div>
+  <header class="landing-library-header page-heading">
+    <div><h1>Landing pages</h1><p>Create and manage landing pages for your products.</p></div>
   </header>
 
   <div class="landing-library-summary">

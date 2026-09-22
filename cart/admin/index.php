@@ -1623,9 +1623,9 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
       </header>
       <?php if ($page === 'dashboard'): ?>
       <main class="dashboard page-canvas" id="overview">
-        <section class="welcome-row">
-          <div><h1>Welcome back <span class="welcome-mark"><?= ez_admin_icon('sparkles') ?></span></h1><p>Here is what is happening with your store today.</p></div>
-          <button class="date-button" type="button"><?= ez_admin_icon('calendar') ?><span><?= $dateRangeStart->format('M j') ?> – <?= $nowJakarta->format('M j, Y') ?></span><?= ez_admin_icon('chevron-down', 'chevron-icon') ?></button>
+        <section class="welcome-row page-heading">
+          <div><h1>Dashboard</h1><p>View your sales, orders, and store activity.</p></div>
+          <div class="page-actions"><button class="date-button" type="button"><?= ez_admin_icon('calendar') ?><span><?= $dateRangeStart->format('M j') ?> – <?= $nowJakarta->format('M j, Y') ?></span><?= ez_admin_icon('chevron-down', 'chevron-icon') ?></button></div>
         </section>
 
         <section class="kpi-grid" aria-label="Store overview">

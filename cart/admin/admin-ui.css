@@ -69,7 +69,54 @@ button, input, select, textarea { font-family: inherit; }
 }
 .dashboard-page .upgrade-card::after { display: none; }
 .dashboard-page .upgrade-card a { color: var(--ui-ink); }
-.dashboard-page .page-eyebrow { color: var(--ui-muted); letter-spacing: 0; text-transform: none; }
+/* Shared page headers: a clear title, useful description, and room for actions. */
+.dashboard-page .page-heading {
+  min-height: 0;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px 24px;
+}
+.dashboard-page .page-heading > div:first-child { min-width: 0; flex: 1 1 280px; }
+.dashboard-page .page-heading h1 {
+  margin: 0;
+  color: var(--ui-ink);
+  font-size: 34px;
+  line-height: 1.15;
+  letter-spacing: -.035em;
+}
+.dashboard-page .page-heading > div:first-child > p:last-child {
+  max-width: 680px;
+  margin: 10px 0 0;
+  color: var(--ui-muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.dashboard-page .page-heading .page-actions {
+  max-width: 100%;
+  padding-top: 4px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.dashboard-page .page-heading .action-button { min-height: 40px; padding: 10px 15px; white-space: nowrap; }
+.dashboard-page .product-editor-header > div:first-child > a { margin-bottom: 12px; }
+.dashboard-page .landing-library { max-width: none; padding: 0; }
+.dashboard-page .landing-library-summary { margin-top: 0; }
+@media (max-width: 980px) {
+  .dashboard-page .page-heading { flex-direction: column; }
+  .dashboard-page .page-heading > div:first-child { flex: none; }
+  .dashboard-page .page-heading .page-actions { padding-top: 0; }
+}
+@media (max-width: 680px) {
+  .dashboard-page .page-heading h1 { font-size: 28px; }
+  .dashboard-page .page-heading .page-actions { width: 100%; }
+  .dashboard-page .page-heading .action-button { flex: 1 1 auto; }
+  .dashboard-page .page-heading .page-actions > .action-button:first-child:nth-last-child(3) { flex-basis: 100%; }
+}
 .dashboard-page :is(.surface-header, .surface-tools, .chart-controls) :is(button, select) {
   border-radius: var(--ui-radius);
   box-shadow: none;
