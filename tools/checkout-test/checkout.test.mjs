@@ -2472,6 +2472,8 @@ async function shopImages(page) {
 
 test('shop appearance saves through merchant UI, public catalog shares a multi-product checkout and direct variant links', async t => {
   const app = await setup({ EZKART_CLOUDFLARE_API_URL: 'https://ezkart-api-test.fixture.workers.dev', EZKART_DOKU_SANDBOX_PAYMENT_FLOW: 'direct_bca' });
+  assert.equal(app.cli(`require ${JSON.stringify(join(root, 'cart/api/customer-auth.php'))}; echo ez_customer_next('/cart/?product=shop-coffee&store=seller_fixture&return=https://bad.example&add=foreign');`), '/cart/?store=seller_fixture&product=shop-coffee', 'Full-page Google sign-in must return to the same product checkout');
+  assert.equal(app.cli(`require ${JSON.stringify(join(root, 'cart/api/customer-auth.php'))}; echo ez_customer_next('/cart/?shop=shop-fixture&store[]=invalid&product=javascript:bad');`), '/cart/?shop=shop-fixture');
   const fixture = shopFixture();
   await writeFile(join(app.directory, 'storefront.json'), JSON.stringify(fixture));
   const { chromium } = await import('../builder-mcp/node_modules/playwright/index.mjs');

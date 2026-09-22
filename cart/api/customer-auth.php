@@ -50,8 +50,12 @@ function ez_customer_next(string $value): string
     parse_str($parts['query'] ?? '', $query);
     if ($parts['path'] === '/cart/addresses.php') return '/cart/addresses.php' . (($query['new'] ?? '') === '1' ? '?new=1' : '');
     if (in_array($parts['path'], ['/cart/', '/cart/index.html'], true)) {
-        $shop = is_string($query['shop'] ?? null) && preg_match('/^[a-z0-9][a-z0-9_-]{5,79}$/D', $query['shop']) === 1 ? $query['shop'] : '';
-        return $parts['path'] . ($shop !== '' ? '?shop=' . rawurlencode($shop) : '');
+        $safe = [];
+        if (is_string($query['shop'] ?? null) && preg_match('/^[a-z0-9][a-z0-9_-]{5,79}$/D', $query['shop']) === 1) $safe['shop'] = $query['shop'];
+        foreach (['store', 'product'] as $key) {
+            if (is_string($query[$key] ?? null) && preg_match('/^[a-zA-Z0-9][a-zA-Z0-9_-]{2,95}$/D', $query[$key]) === 1) $safe[$key] = $query[$key];
+        }
+        return $parts['path'] . ($safe !== [] ? '?' . http_build_query($safe) : '');
     }
     if ($parts['path'] === '/cart/tracking-sandbox.php') {
         $stage = is_string($query['stage'] ?? null) && preg_match('/^[a-z-]{2,30}$/D', $query['stage']) === 1 ? $query['stage'] : '';
