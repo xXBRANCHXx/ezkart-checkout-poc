@@ -2753,6 +2753,7 @@
     };
     const markSqChanged = () => {
       if (!saveState) return;
+      previewRoot?.querySelectorAll('.sq-authored-navigation').forEach(section => globalThis.EzkartComponents?.fitNavigation(section));
       saveState.textContent = "Saving…";
       window.clearTimeout(saveTimer);
       saveTimer = window.setTimeout(async () => { if (await persistCurrentState()) saveState.textContent = "Saved just now"; }, 550);
@@ -2951,6 +2952,7 @@
     const gridBaseRowHeight = (device = activeDevice) => gridCellHeightState[device] + pageSpacingState.columnGap;
     const fluidRowHeight = (section, device = activeDevice) => {
       const base = gridBaseRowHeight(device);
+      if (section?.classList.contains("sq-authored-navigation")) return device === "mobile" ? 36 : section.dataset.sqNavTemplate === "compact" ? 34 : 40;
       if (section?.classList.contains("sq-announcement")) return Math.max(7, Math.round(base * 10 / 34));
       if (section?.classList.contains("sq-store-nav")) return Math.max(24, Math.round(base * 36 / 34));
       if (section?.classList.contains("sq-benefit-row")) return Math.max(16, Math.round(base * (device === "mobile" ? 34 : 22) / 34));
@@ -3682,7 +3684,10 @@
       });
     });
     showElementPanel(activeElementPanel);
-    const navigationSectionFor = (element = selectedElement) => element?.dataset?.sqElementType === "navigation" ? element.closest("[data-sq-block]") : null;
+    const navigationSectionFor = (element = selectedElement) => {
+      const section = element?.closest('[data-sq-block]') || previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`);
+      return section?.matches('.sq-navigation-template-section') ? section : null;
+    };
     const ensureNavigationMobileMenu = (section) => {
       if (!section) return;
       const navigations = [...section.querySelectorAll(':scope > [data-sq-element-type="navigation"]')];
@@ -3708,6 +3713,8 @@
         menu.hidden = true;
         section.append(menu);
       }
+      menu.id = `sq-nav-menu-${section.dataset.sectionId}`;
+      toggle.setAttribute('aria-controls', menu.id);
       const renderLinks = () => {
         const links = navigations.flatMap((navigation) => [...navigation.querySelectorAll(":scope > a")]);
         menu.replaceChildren(...links.map((link) => {
@@ -3761,6 +3768,7 @@
       const renderedScale = deviceFrame.offsetWidth > 0 ? deviceFrame.getBoundingClientRect().width / deviceFrame.offsetWidth : zoom / 100;
       const scale = Number.isFinite(renderedScale) && renderedScale > 0 ? renderedScale : 1;
       previewRoot.querySelectorAll("[data-sq-nav-position]").forEach((navigation) => {
+        globalThis.EzkartComponents?.fitNavigation(navigation);
         const position = navigation.dataset.sqNavPosition || "static";
         if (position === "static") {
           navigation.classList.remove("sq-nav-is-stuck", "sq-nav-hidden");
@@ -3780,6 +3788,8 @@
     };
     navigationScrollRoot?.addEventListener("scroll", scheduleEditorNavigation, { passive: true });
     window.addEventListener("resize", scheduleEditorNavigation);
+    if (deviceFrame && typeof ResizeObserver === 'function') new ResizeObserver(scheduleEditorNavigation).observe(deviceFrame);
+    document.fonts?.ready.then(scheduleEditorNavigation);
     const moveNavigationSectionToTop = (section) => {
       if (!section || section.parentElement !== previewRoot) return;
       const pageBackground = [...previewRoot.querySelectorAll(":scope > .sq-page-background")].at(-1) || null;
@@ -3819,6 +3829,8 @@
       if (!section) return;
       applyNavigationSectionBehavior(section);
       const position = section.dataset.sqNavPosition || "static";
+      const sticky = sqStudio.querySelector('[data-sq-navigation-sticky]');
+      if (sticky) sticky.checked = position !== 'static';
       sqStudio.querySelectorAll("[data-sq-navigation-position]").forEach((button) => {
         const active = button.dataset.sqNavigationPosition === position;
         button.classList.toggle("active", active);
@@ -3848,6 +3860,7 @@
       if (blurOutput) blurOutput.textContent = `${section.dataset.sqNavBlur || "16"}px`;
     };
     const syncElementControls = () => {
+      syncNavigationLayoutControls(Boolean(navigationSectionFor()));
       const native = selectedElement?.matches('.sq-native') ? selectedElement
         : !selectedElement ? previewRoot?.querySelector('.sq-native-section.selected') : null;
       inspector?.classList.toggle('sq-native-selection', Boolean(native));
@@ -3863,8 +3876,6 @@
         if (context) context.textContent = "Section settings";
         const productControls = sqStudio.querySelector("[data-sq-product-layout-controls]");
         if (productControls) productControls.hidden = true;
-        const navigationLayoutControls = sqStudio.querySelector("[data-sq-navigation-layout-controls]");
-        if (navigationLayoutControls) navigationLayoutControls.hidden = true;
         syncBuilderRanges();
         return;
       }
@@ -4049,7 +4060,6 @@
       }
       const navigationControls = sqStudio.querySelector("[data-sq-navigation-controls]");
       if (navigationControls) navigationControls.hidden = !isNavigation;
-      syncNavigationLayoutControls(isNavigation);
       if (isNavigation) {
         const links = [...selectedElement.querySelectorAll(":scope > a")];
         const list = sqStudio.querySelector("[data-sq-navigation-link-list]");
@@ -6714,11 +6724,11 @@
       input.addEventListener("input", updateNavigationCta);
       input.addEventListener("change", finishNavigationEdit);
     });
-    sqStudio.querySelectorAll("[data-sq-navigation-position]").forEach((button) => button.addEventListener("click", () => {
+    const setNavigationPosition = (position) => {
       const section = navigationSectionFor();
       if (!section) return;
       remember();
-      section.dataset.sqNavPosition = button.dataset.sqNavigationPosition;
+      section.dataset.sqNavPosition = position;
       if (section.dataset.sqNavPosition !== "static") {
         moveNavigationSectionToTop(section);
         rebuildLayerList();
@@ -6727,7 +6737,9 @@
       applyNavigationSectionBehavior(section);
       syncNavigationLayoutControls(true);
       markSqChanged();
-    }));
+    };
+    sqStudio.querySelectorAll("[data-sq-navigation-position]").forEach((button) => button.addEventListener("click", () => setNavigationPosition(button.dataset.sqNavigationPosition)));
+    sqStudio.querySelector('[data-sq-navigation-sticky]')?.addEventListener('change', event => setNavigationPosition(event.currentTarget.checked ? 'sticky' : 'static'));
     let navigationBehaviorSnapshot = null;
     const startNavigationBehaviorEdit = () => { if (!navigationBehaviorSnapshot) navigationBehaviorSnapshot = captureState(); };
     const finishNavigationBehaviorEdit = () => { if (navigationBehaviorSnapshot) remember(navigationBehaviorSnapshot); navigationBehaviorSnapshot = null; markSqChanged(); };
@@ -7361,18 +7373,19 @@
     };
     const navigationLinksMarkup = (sourceLayouts) => {
       const layouts = responsiveNavigationLayouts(sourceLayouts);
-      const source = previewRoot?.querySelector('[data-section-id="navigation"] [data-sq-element-type="navigation"]');
+      const header = previewRoot?.querySelector(".sq-authored-navigation") || previewRoot?.querySelector('[data-section-id="navigation"]');
+      const source = header?.querySelector('[data-sq-element-type="navigation"]');
       const navigation = document.createElement("nav");
       navigation.className = "sq-template-navigation button-primary";
       navigation.dataset.sqElement = "";
       navigation.dataset.sqElementType = "navigation";
       navigation.dataset.sqButtonRole = source?.dataset.sqButtonRole || "primary";
-      const sources = [...previewRoot.querySelectorAll('[data-section-id="navigation"] > [data-sq-element-type="navigation"]')].sort((a,b) => (a.dataset.sqNavSlot === 'left' ? -1 : 0) - (b.dataset.sqNavSlot === 'left' ? -1 : 0));
+      const sources = [...(header?.querySelectorAll(':scope > [data-sq-element-type="navigation"]') || [])].sort((a,b) => (a.dataset.sqNavSlot === 'left' ? -1 : 0) - (b.dataset.sqNavSlot === 'left' ? -1 : 0));
       const editableItems = sources.flatMap(nav => [...nav.children]).filter((item) => item.matches("a, button:not(.sq-nav-menu-toggle)"));
       const preservedAction=source?.closest('[data-sq-block]')?.dataset.sqCompactAction;
       if(preservedAction&&!editableItems.some(item=>item.matches('button'))){const saved=document.createElement('template');saved.innerHTML=preservedAction;const action=saved.content.querySelector('button');if(action)editableItems.push(action);}
       if (editableItems.length) editableItems.forEach((item) => navigation.append(item.cloneNode(true)));
-      else navigation.innerHTML = '<a href="#products" data-sq-link-type="section" data-sq-link="products" data-sq-new-tab="false">Shop</a><a href="#story" data-sq-link-type="section" data-sq-link="story" data-sq-new-tab="false">Our story</a><a href="#contact" data-sq-link-type="section" data-sq-link="contact" data-sq-new-tab="false">Contact</a><button type="button" data-sq-link-type="checkout" data-sq-link="" data-sq-new-tab="false">Buy now</button>';
+      else navigation.innerHTML = '<a href="#products" data-sq-link-type="section" data-sq-link="products" data-sq-new-tab="false">Shop</a><a href="#story" data-sq-link-type="section" data-sq-link="story" data-sq-new-tab="false">Our story</a><a href="#contact" data-sq-link-type="section" data-sq-link="contact" data-sq-new-tab="false">Contact</a><button type="button" data-sq-link-type="section" data-sq-link="products" data-sq-new-tab="false">Shop now</button>';
       navigation.querySelectorAll(":scope > a").forEach((link) => {
         link.style.removeProperty("color");
         link.classList.remove("sq-color-override");
@@ -7386,7 +7399,8 @@
       const selected = aliases[template] || template;
       const kind = ["studio", "masthead", "split", "shop", "compact"].includes(selected) ? selected : "studio";
       const doubleRow = kind === "masthead" || kind === "shop";
-      const logoLayouts = kind === "split" ? {desktop:"5,1,4,2",tablet:"1,1,5,2",mobile:"1,1,5,2"}
+      const logoLayouts = kind === "masthead" ? {desktop:"1,1,12,2",tablet:"1,1,5,2",mobile:"1,1,5,2"}
+        : kind === "split" ? {desktop:"5,1,4,2",tablet:"1,1,5,2",mobile:"1,1,5,2"}
         : doubleRow ? {desktop:"1,1,8,2",tablet:"1,1,8,2",mobile:"1,1,5,2"}
         : {desktop:"1,1,4,2",tablet:"1,1,5,2",mobile:"1,1,5,2"};
       const navLayouts = doubleRow ? {desktop:"1,3,12,2",tablet:"1,3,12,2",mobile:"6,1,7,2"}
@@ -7413,9 +7427,9 @@
         links.slice(0, Math.max(1, Math.ceil(links.length / 2))).forEach(link => left.append(link));
         const layouts = responsiveNavigationLayouts({desktop:"1,1,4,2",tablet:"1,3,12,1",mobile:"1,3,12,1"});
         Object.entries(layouts).forEach(([device,layout]) => left.setAttribute(`data-layout-${device}`,layout));
-        holder.append(left);
+        holder.prepend(left);
       }
-      return `<header class="sq-page-block sq-store-nav sq-navigation-template-section sq-authored-navigation sq-navigation-${kind}" draggable="true" data-sq-block data-sq-fluid data-sq-min-rows="${doubleRow?4:2}" data-sq-min-rows-mobile="2" data-sq-rows="${doubleRow?4:2}" data-section-id="${sectionId}" data-sq-section-name="${globalThis.EzkartComponents?.navDefinitions.find(item=>item.id===kind)?.name || "Navigation"} navigation" data-sq-nav-template="${kind}" data-sq-compact-action="${escapeHtml(compactAction)}" data-sq-nav-position="static" data-sq-nav-offset="0" data-sq-nav-surface="solid" data-sq-nav-opacity="100" data-sq-nav-blur="0" data-sq-nav-shadow="false" data-sq-nav-hide-scroll="false">${holder.innerHTML}</header>`;
+      return `<header class="sq-page-block sq-store-nav sq-navigation-template-section sq-authored-navigation sq-navigation-${kind}" draggable="true" data-sq-block data-sq-fluid data-sq-min-rows="${doubleRow?4:2}" data-sq-min-rows-mobile="2" data-sq-rows="${doubleRow?4:2}" data-section-id="${sectionId}" data-sq-section-name="${globalThis.EzkartComponents?.navDefinitions.find(item=>item.id===kind)?.name || "Navigation"} navigation" data-sq-nav-template="${kind}" data-sq-compact-action="${escapeHtml(compactAction)}" data-sq-nav-position="sticky" data-sq-nav-offset="0" data-sq-nav-surface="solid" data-sq-nav-opacity="100" data-sq-nav-blur="0" data-sq-nav-shadow="true" data-sq-nav-hide-scroll="false">${holder.innerHTML}</header>`;
     };
     const addNavigationTemplate = (template) => {
       const existing = previewRoot?.querySelector('[data-section-id="navigation"]') || previewRoot?.querySelector(".sq-navigation-template-section");
@@ -7425,7 +7439,13 @@
       wrapper.innerHTML = navigationTemplateMarkup(template, sectionId);
       const section = wrapper.firstElementChild;
       if (!section) return;
-      if (existing) existing.replaceWith(section);
+      if (existing) {
+        // Layout changes keep the merchant's explicit scrolling preferences.
+        ["sqNavPosition", "sqNavOffset", "sqNavOffsetCustomized", "sqNavSurface", "sqNavOpacity", "sqNavBlur", "sqNavShadow", "sqNavHideScroll"].forEach(key => {
+          if (existing.dataset[key] !== undefined) section.dataset[key] = existing.dataset[key];
+        });
+        existing.replaceWith(section);
+      }
       else {
         const announcement = previewRoot?.querySelector('[data-section-id="announcement"]');
         if (announcement) announcement.after(section); else previewRoot?.prepend(section);
@@ -8230,10 +8250,12 @@ document.querySelectorAll('[class*="animation-"],[class*="element-animation-"]')
 })();<\/script>`;
       const compositionScript = globalThis.EzkartComponents ? `<script>(()=>{
 const fitContent=${globalThis.EzkartComponents.fitContent.toString()};
+const fitNavigation=${globalThis.EzkartComponents.fitNavigation.toString()};
 let frame=0,device='';
 const layouts=new WeakMap();
 const write=(element,layout)=>{layouts.set(element,layout);element.style.setProperty('grid-column',layout.x+'/span '+layout.width,'important');element.style.setProperty('grid-row',layout.y+'/span '+layout.height,'important')};
 const fit=()=>{frame=0;const next=innerWidth<=600?'mobile':innerWidth<=900?'tablet':'desktop';
+ document.querySelectorAll('.sq-authored-navigation').forEach(fitNavigation);
  const pinned=document.querySelector('body>.sq-authored-navigation'),root=document.querySelector('body>.sq-page-preview');
  if(pinned&&root)root.style.setProperty('--sq-pinned-nav-height',(pinned.offsetHeight+(parseFloat(getComputedStyle(pinned).top)||0))+'px');
  document.querySelectorAll('.sq-composition,.sq-generated-blank').forEach(section=>{
@@ -8721,7 +8743,7 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
         if(fitHeight)setSectionHeightRows(section,sectionContentRows(section,device),device);
         refreshNativeBuilder();selectSqSection(id,true);await settleBuilder();return inspectBuilder();
       },
-      async navigation({layout='studio',brand,links,actionLabel='Shop now',actionTarget='products',sticky=false}={}) {
+      async navigation({layout='studio',brand,links,actionLabel='Shop now',actionTarget='products',sticky}={}) {
         if(!globalThis.EzkartComponents.navDefinitions.some(item=>item.id===layout))throw new Error('Unknown navigation layout.');
         if(links && (!Array.isArray(links)||links.length>8||links.some(link=>!link.label||!/^#|^https?:\/\//i.test(link.href))))throw new Error('Use up to eight links with labels and section or HTTPS destinations.');
         addNavigationTemplate(layout);
@@ -8736,7 +8758,7 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
           const action=section.querySelector('button:not(.sq-nav-menu-toggle)');
           if(action){action.textContent=actionLabel;action.dataset.sqLinkType=actionTarget==='checkout'?'checkout':'section';action.dataset.sqLink=actionTarget==='checkout'?'':actionTarget.replace(/^#/,'');}
         }
-        section.dataset.sqNavPosition=sticky?'sticky':'static';applyNavigationSectionBehavior(section);
+        if(sticky!==undefined)section.dataset.sqNavPosition=sticky?'sticky':'static';applyNavigationSectionBehavior(section);
         refreshNativeBuilder();await settleBuilder();return inspectBuilder();
       },
       async theme({accent,page,ink,surface,headingFont,bodyFont,radius,buttonBackground,buttonText}={}) {

@@ -7,12 +7,13 @@ import {join} from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {Workspace,repoRoot} from '../workspace.mjs';
 const directory=await mkdtemp(join(tmpdir(),'ezkart-component-previews-'));
+const navigationOnly=process.argv.includes('--navigation');
 const asset='https://ezkart.id/assets/marketing/form-bottles.webp';
 const products=['red','rose'].map((color,i)=>({id:`preview-${color}`,name:i?'Botol harian — Rose':'Botol harian — Red',description:'500 ml · Stainless steel',price:189000,image:asset,images:[asset],media:[{id:`preview-${color}`}],stock:10,weightGrams:350,type:'physical'}));
 const ws=await new Workspace(directory).init();await writeFile(join(directory,'catalog.json'),JSON.stringify({products,mediaBase:'https://component-preview.invalid'}));await ws.create({id:'previews',name:'Component previews',productIds:products.map(p=>p.id)});await ws.start();
 const browser=await chromium.launch(),editor=await browser.newPage({viewport:{width:1600,height:1000}}),render=await browser.newPage({viewport:{width:1440,height:1000},reducedMotion:'reduce'});
 const out=join(repoRoot,'cart/admin/assets/components');await mkdir(out,{recursive:true});
-const photo=Buffer.from(await (await fetch(asset)).arrayBuffer());
+const photo=navigationOnly?Buffer.alloc(0):Buffer.from(await (await fetch(asset)).arrayBuffer());
 for(const page of [editor,render])await page.route('https://component-preview.invalid/**',route=>route.fulfill({body:photo,contentType:'image/webp'}));
 let html='';await render.route('**/component-preview',route=>route.fulfill({body:html,contentType:'text/html'}));
 try{
@@ -21,13 +22,14 @@ try{
  await invoke('theme',{accent:'#f44b34',page:'#ffffff',ink:'#222222',surface:'#ffffff',radius:9,buttonBackground:'#242424',buttonText:'#ffffff'});
  const library=await invoke('components');let previous='blank';
  const capture=async(id,selector)=>{
-  html=await invoke('exportHtml');await render.goto(ws.url+'/component-preview');await render.evaluate(()=>document.fonts.ready);
+  html=await invoke(navigationOnly?'previewHtml':'exportHtml');await render.goto(ws.url+'/component-preview');await render.evaluate(()=>document.fonts.ready);
   await render.locator(selector+' img').evaluateAll(images=>Promise.all(images.map(img=>{img.loading='eager';return img.decode().catch(()=>{});})));await render.waitForTimeout(80);
   await render.addStyleTag({content:'.sq-page-preview{min-height:0!important}.sq-page-block{outline:0!important}[data-ezkart-cart-open]{display:none!important}'});
   const file=join(directory,id+'.png');await render.locator(selector).screenshot({path:file});
-  execFileSync('magick',[file,'-resize','640x416','-background','#f7f8fa','-gravity','center','-extent','640x416','-quality','88',join(out,id+'.webp')]);console.log(id);
+  const size=id.startsWith('nav-')?'640x200':'640x416';
+  execFileSync('magick',[file,'-resize',size,'-background','#f7f8fa','-gravity','center','-extent',size,'-quality','88',join(out,id+'.webp')]);console.log(id);
  };
- for(const component of library.sections){
+ for(const component of navigationOnly?[]:library.sections){
   const content=component.id.includes('showcase')||['brand-navigation','journey-timeline','support-questions','contact-invitation','brand-footer'].includes(component.id)?{}:{title:'Teman setiap hari.',body:'Produk pilihan untuk aktivitasmu. Pilih yang paling pas untuk harimu.',image:asset,imageTwo:asset,alt:'Botol form. dari ilustrasi Ezkart',actionLabel:'Lihat koleksi',actionTarget:'products',brand:'Ezkart',caption:'Dibuat untuk keseharian.',captionTwo:'Temukan pilihanmu.'};
   await invoke('addSection',{component:component.id,id:'preview-'+component.id,content});await invoke('removeSection',{id:previous});previous='preview-'+component.id;
   await capture(component.id,`[data-ezkart-section="${previous}"]`);

@@ -24,15 +24,15 @@
     {id:'announcement',name:'Announcement',category:'Navigation',description:'A compact, editable notice without invented offers.',preview:'notice'},
   ];
   const navDefinitions = [
-    {id:'studio',name:'Studio',description:'Wordmark left. Links and a single action right.',preview:'nav-studio'},
-    {id:'masthead',name:'Masthead',description:'Large brand above a separate navigation row.',preview:'nav-masthead'},
-    {id:'split',name:'Centered brand',description:'A central wordmark with links on either side.',preview:'nav-split'},
-    {id:'shop',name:'Shop index',description:'Brand and checkout above collection links.',preview:'nav-shop'},
-    {id:'compact',name:'Essential',description:'A quiet wordmark and a short set of text links.',preview:'nav-compact'},
+    {id:'studio',name:'Classic',description:'Brand on the left, clear links and a primary action.',preview:'nav-studio'},
+    {id:'masthead',name:'Masthead',description:'A prominent centered brand with links below.',preview:'nav-masthead'},
+    {id:'split',name:'Centered',description:'A centered logo, balanced by links on both sides.',preview:'nav-split'},
+    {id:'shop',name:'Shop',description:'Brand and action above a full-width collection menu.',preview:'nav-shop'},
+    {id:'compact',name:'Minimal',description:'A slim header with a wordmark and simple text links.',preview:'nav-compact'},
   ];
   function thumbnail(id) {
     const known = definitions.some(item => item.id === id) || navDefinitions.some(item => `nav-${item.id}` === id);
-    return known ? `<img src="assets/components/${id}.webp" alt="" loading="lazy" decoding="async" class="sq-composition-thumbnail">` : '';
+    return known ? `<img src="assets/components/${id}.webp${id.startsWith('nav-') ? '?v=2' : ''}" alt="" loading="lazy" decoding="async" class="sq-composition-thumbnail">` : '';
   }
   function create(id, {sectionId, content = {}, product = null, products = []} = {}) {
     const definition = definitions.find(item => item.id === id);
@@ -120,5 +120,25 @@
     }
     return changed;
   }
-  globalThis.EzkartComponents = {definitions,navDefinitions,thumbnail,create,fitContent};
+  // Used by both the canvas and exported pages. Collapse crowded desktop menus
+  // too, so a longer merchant name or translated links never overlap the logo.
+  function fitNavigation(section) {
+    if (!section.matches('.sq-authored-navigation')) return;
+    section.classList.remove('sq-nav-collapsed');
+    const groups = [...section.querySelectorAll(':scope > .sq-template-navigation')];
+    const logo = section.querySelector(':scope > .sq-site-logo');
+    const crowded = groups.some(group => group.scrollWidth > group.clientWidth + 1)
+      || Boolean(logo && (logo.scrollWidth > logo.clientWidth + 1 || logo.scrollHeight > logo.clientHeight + 1));
+    const collapsed = section.clientWidth <= 900 || crowded;
+    section.classList.toggle('sq-nav-collapsed', collapsed);
+    if (!collapsed) {
+      section.classList.remove('sq-nav-menu-open');
+      const menu = section.querySelector('.sq-nav-mobile-menu');
+      const toggle = section.querySelector('.sq-nav-menu-toggle');
+      if (menu) menu.hidden = true;
+      toggle?.setAttribute('aria-expanded', 'false');
+      toggle?.setAttribute('aria-label', 'Open navigation menu');
+    }
+  }
+  globalThis.EzkartComponents = {definitions,navDefinitions,thumbnail,create,fitContent,fitNavigation};
 })();
