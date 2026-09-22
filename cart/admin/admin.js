@@ -3660,6 +3660,7 @@
     let activeElementPanel = "content";
     const showElementPanel = (panelName) => {
       const panels = [...sqStudio.querySelectorAll("[data-sq-element-panel]")];
+      if (sqStudio.querySelector(`[data-sq-element-tab="${panelName}"]`)?.hidden) panelName = "content";
       if (!panels.some((panel) => panel.dataset.sqElementPanel === panelName)) return;
       activeElementPanel = panelName;
       sqStudio.querySelectorAll("[data-sq-element-tab]").forEach((button) => {
@@ -3676,14 +3677,16 @@
       requestAnimationFrame(refreshLayoutGrid);
     };
     const elementTabs = [...sqStudio.querySelectorAll("[data-sq-element-tab]")];
-    elementTabs.forEach((button, index) => {
+    elementTabs.forEach((button) => {
       button.addEventListener("click", () => showElementPanel(button.dataset.sqElementTab));
       button.addEventListener("keydown", (event) => {
-        const movement = { ArrowLeft: -1, ArrowRight: 1, Home: -index, End: elementTabs.length - index - 1 }[event.key];
+        const visibleTabs = elementTabs.filter((tab) => !tab.hidden);
+        const index = visibleTabs.indexOf(button);
+        const movement = { ArrowLeft: -1, ArrowRight: 1, Home: -index, End: visibleTabs.length - index - 1 }[event.key];
         if (movement == null) return;
         event.preventDefault();
         event.stopPropagation();
-        const target = elementTabs[(index + movement + elementTabs.length) % elementTabs.length];
+        const target = visibleTabs[(index + movement + visibleTabs.length) % visibleTabs.length];
         showElementPanel(target.dataset.sqElementTab);
         target.focus();
       });
@@ -3869,7 +3872,12 @@
       const native = selectedElement?.matches('.sq-native') ? selectedElement
         : !selectedElement ? previewRoot?.querySelector('.sq-native-section.selected') : null;
       inspector?.classList.toggle('sq-native-selection', Boolean(native));
-      if (native) { globalThis.EzkartNative?.select(native); return; }
+      if (native) {
+        // The legacy element mode hides sibling panels, including the native inspector.
+        inspector?.classList.remove('element-selected');
+        globalThis.EzkartNative?.select(native);
+        return;
+      }
       const controls = sqStudio.querySelector("[data-sq-element-controls]");
       const selectedBackground = selectedElement?.matches?.(".sq-section-background");
       const valid = selectedElement?.isConnected && (selectedBackground || selectedElement.closest(`[data-section-id="${selectedSection}"]`));
@@ -3884,7 +3892,6 @@
         syncBuilderRanges();
         return;
       }
-      const layout = parseElementLayout(selectedElement);
       const isLogo = selectedElement.dataset.sqElementType === "logo";
       const isProductGrid = selectedElement.dataset.sqElementType === "product-grid";
       if (isProductGrid) renderProductChoices(selectedElement);
@@ -3913,13 +3920,9 @@
         ? (selectedAction?.isConnected && selectedElement.contains(selectedAction) ? selectedAction : null)
         : isNavigation ? selectedAction : actionForElement();
       const isFlow=Boolean(selectedElement.closest('.sq-flow'));
-      sqStudio.querySelector('.sq-advanced-layout')?.toggleAttribute('hidden',isFlow);
-      sqStudio.querySelector('.sq-element-inset-controls')?.toggleAttribute('hidden',isFlow);
       sqStudio.querySelector('[data-sq-flow-controls]')?.toggleAttribute('hidden',!isFlow);
       if(isFlow){const position=readFlowPosition(selectedElement);sqStudio.querySelectorAll('[data-sq-flow-position]').forEach(input=>input.value=position[input.dataset.sqFlowPosition]??'');}
       const image = isLogo || isProductGrid ? null : imageForElement();
-      const autoHeightControl=sqStudio.querySelector('[data-sq-auto-height-control]');
-      if(autoHeightControl){autoHeightControl.hidden=!selectedElement.closest('.sq-composition,.sq-generated-blank')||!['heading','text','copy','faq','comparison','quote','button'].includes(elementType);autoHeightControl.querySelector('input').checked=selectedElement.dataset.sqAutoHeight==='true';}
       const contentName = selectedContent?.closest("h1,h2,h3,h4,h5,h6") ? "Heading" : selectedContent ? "Text" : "";
       const contextualName = isBackgroundImage ? "Section background" : isLogo ? "Logo" : selectedAction && action ? "Button" : selectedImage && image ? "Image" : contentName || elementTypeName(selectedElement);
       const context = sqStudio.querySelector("[data-sq-inspector-context]");
@@ -3928,24 +3931,13 @@
       if (title) title.textContent = contextualName;
       const backButton = sqStudio.querySelector("[data-sq-select-section]");
       if (backButton?.lastChild) backButton.lastChild.textContent = " Back to section";
-      sqStudio.querySelectorAll("[data-sq-element-tab]").forEach((button) => { button.hidden = isBackgroundImage && ["style", "layout"].includes(button.dataset.sqElementTab); });
+      sqStudio.querySelectorAll("[data-sq-element-tab]").forEach((button) => {
+        const tab = button.dataset.sqElementTab;
+        button.hidden = (isBackgroundImage && ["style", "layout"].includes(tab)) || (tab === "layout" && !isProductGrid && !isFlow);
+      });
       const elementActions = sqStudio.querySelector("[data-sq-element-actions]");
       if (elementActions) elementActions.hidden = isBackgroundImage;
       if (isBackgroundImage && ["style", "layout"].includes(activeElementPanel)) showElementPanel("content");
-      [["x", layout.x], ["y", layout.y], ["w", layout.width], ["h", layout.height]].forEach(([field, value]) => {
-        const input = sqStudio.querySelector(`[data-sq-element-${field}]`);
-        if (input) {
-          input.value = String(value);
-          if (field === "h") {
-            input.disabled = isProductGrid;
-            input.closest("label").querySelector("span").textContent = isProductGrid ? "Height (automatic)" : "Height";
-          }
-        }
-      });
-      const inset = elementInsetFor(selectedElement);
-      sqStudio.querySelectorAll("[data-sq-element-inset]").forEach((input) => { input.value = String(inset[input.dataset.sqElementInset]); });
-      const insetDevice = sqStudio.querySelector("[data-sq-element-inset-device]");
-      if (insetDevice) insetDevice.textContent = activeDevice[0].toUpperCase() + activeDevice.slice(1);
       const gridDensity = sqStudio.querySelector("[data-sq-grid-density]");
       const gridDensityOutput = sqStudio.querySelector("[data-sq-grid-density-output]");
       const gridDensityDevice = sqStudio.querySelector("[data-sq-grid-density-device]");
@@ -3954,18 +3946,6 @@
       if (gridDensityOutput) gridDensityOutput.textContent = gridDensityLabel(matchingGridDensity());
       if (gridDensityDevice) gridDensityDevice.textContent = activeDevice[0].toUpperCase() + activeDevice.slice(1);
       if (gridVisibility) gridVisibility.checked = showLayoutGrid;
-      const columns = fluidColumns();
-      const centeredX = Math.max(1, Math.round((columns - layout.width + 2) / 2));
-      const position = layout.x === 1 ? "left" : layout.x === columns - layout.width + 1 ? "right" : layout.x === centeredX ? "center" : "";
-      sqStudio.querySelectorAll("[data-sq-element-position-choice]").forEach((button) => { const active = button.dataset.sqElementPositionChoice === position; button.classList.toggle("active", active); button.setAttribute("aria-pressed", String(active)); });
-      const quickWidth = sqStudio.querySelector("[data-sq-element-width-quick]");
-      const quickWidthOutput = sqStudio.querySelector("[data-sq-element-width-quick-output]");
-      if (quickWidth) { quickWidth.max = String(columns); quickWidth.value = String(layout.width); }
-      const exactX = sqStudio.querySelector("[data-sq-element-x]");
-      const exactWidth = sqStudio.querySelector("[data-sq-element-w]");
-      if (exactX) exactX.max = String(columns);
-      if (exactWidth) exactWidth.max = String(columns);
-      if (quickWidthOutput) quickWidthOutput.textContent = `${layout.width} ${layout.width === 1 ? "column" : "columns"}`;
       const hideButton = sqStudio.querySelector("[data-sq-element-hide]");
       if (hideButton) hideButton.lastChild.textContent = selectedElement.classList.contains("sq-element-hidden") ? " Show" : " Hide";
       const computed = getComputedStyle(selectedElement);
@@ -4248,10 +4228,8 @@
       if (isProductGrid) {
         const settings = productGridSettings(selectedElement);
         const columns = sqStudio.querySelector("[data-sq-product-columns]");
-        const density = sqStudio.querySelector("[data-sq-product-density]");
         const device = sqStudio.querySelector("[data-sq-product-layout-device]");
         if (columns) columns.value = settings.columns;
-        if (density) density.value = settings.density;
         if (device) device.textContent = activeDevice[0].toUpperCase() + activeDevice.slice(1);
       }
       const emptyContent = sqStudio.querySelector("[data-sq-element-content-empty]");
@@ -5692,37 +5670,6 @@
     sqStudio.querySelector("[data-sq-reset-section-spacing]")?.addEventListener("click", () => {
       remember(); spacingState.delete(spacingKey()); loadSpacingControls(); applySpacing(); markSqChanged();
     });
-    let elementControlSnapshot;
-    sqStudio.querySelectorAll("[data-sq-element-x], [data-sq-element-y], [data-sq-element-w], [data-sq-element-h]").forEach((input) => {
-      input.addEventListener("focus", () => { elementControlSnapshot = captureState(); });
-      input.addEventListener("input", () => {
-        if (!selectedElement) return;
-        const layout = parseElementLayout(selectedElement);
-        const field = input.hasAttribute("data-sq-element-x") ? "x" : input.hasAttribute("data-sq-element-y") ? "y" : input.hasAttribute("data-sq-element-w") ? "width" : "height";
-        setElementLayout(selectedElement, { ...layout, [field]: Number(input.value) });
-        applyFluidSection(selectedElement.closest("[data-sq-fluid]"));
-        requestAnimationFrame(refreshElementOverlay);
-        markSqChanged();
-      });
-      input.addEventListener("change", () => { if (elementControlSnapshot) remember(elementControlSnapshot); elementControlSnapshot = null; });
-    });
-    sqStudio.querySelector('[data-sq-auto-height-toggle]')?.addEventListener('change',event=>{
-      if(!selectedElement)return;remember();selectedElement.dataset.sqAutoHeight=String(event.target.checked);markSqChanged();scheduleNativeFit();
-    });
-    const quickWidth = sqStudio.querySelector("[data-sq-element-width-quick]");
-    quickWidth?.addEventListener("pointerdown", () => { if (!elementControlSnapshot) elementControlSnapshot = captureState(); });
-    quickWidth?.addEventListener("focus", () => { if (!elementControlSnapshot) elementControlSnapshot = captureState(); });
-    quickWidth?.addEventListener("input", () => {
-      if (!selectedElement?.isConnected) return;
-      const layout = parseElementLayout(selectedElement);
-      setElementLayout(selectedElement, { ...layout, width: Number(quickWidth.value) });
-      applyFluidSection(selectedElement.closest("[data-sq-fluid]"));
-      syncElementControls(); refreshElementOverlay(); markSqChanged();
-    });
-    quickWidth?.addEventListener("change", () => { if (elementControlSnapshot) remember(elementControlSnapshot); elementControlSnapshot = null; });
-    let elementInsetSnapshot;
-    const startElementInsetEdit = () => { if (!elementInsetSnapshot) elementInsetSnapshot = captureState(); };
-    const finishElementInsetEdit = () => { if (elementInsetSnapshot) remember(elementInsetSnapshot); elementInsetSnapshot = null; };
     sqStudio.querySelectorAll('[data-sq-flow-position]').forEach(input=>input.addEventListener('change',()=>{
       if(!selectedElement?.closest('.sq-flow'))return;
       remember();setFlowPosition(selectedElement,{[input.dataset.sqFlowPosition]:input.value===''?null:Number(input.value)});syncElementControls();refreshElementOverlay();markSqChanged();
@@ -5731,47 +5678,13 @@
       if(!selectedElement?.closest('.sq-flow'))return;
       remember();selectedElement.removeAttribute(`data-flow-${activeDevice}`);applyFlowPosition(selectedElement);syncElementControls();refreshElementOverlay();markSqChanged();
     });
-    sqStudio.querySelectorAll("[data-sq-element-inset]").forEach((input) => {
-      input.addEventListener("focus", startElementInsetEdit);
-      input.addEventListener("input", () => {
-        if (!selectedElement?.isConnected) return;
-        const side = input.dataset.sqElementInset;
-        const value = Math.max(0, Math.min(240, Number(input.value) || 0));
-        const values = elementInsetFor(selectedElement);
-        if (sqStudio.querySelector("[data-sq-link-element-inset]")?.checked) Object.keys(values).forEach((key) => { values[key] = value; });
-        else values[side] = value;
-        setElementInset(selectedElement, values);
-        sqStudio.querySelectorAll("[data-sq-element-inset]").forEach((field) => { field.value = String(values[field.dataset.sqElementInset]); });
-        refreshElementOverlay(); markSqChanged();
-      });
-      input.addEventListener("change", finishElementInsetEdit);
-    });
-    sqStudio.querySelectorAll("[data-sq-element-position-choice]").forEach((button) => button.addEventListener("click", () => {
-      if (!selectedElement?.isConnected) return;
+    sqStudio.querySelector("[data-sq-product-columns]")?.addEventListener("change", (event) => {
+      if (selectedElement?.dataset.sqElementType !== "product-grid") return;
       remember();
-      const layout = parseElementLayout(selectedElement);
-      const columns = fluidColumns();
-      const x = button.dataset.sqElementPositionChoice === "left" ? 1 : button.dataset.sqElementPositionChoice === "right" ? columns - layout.width + 1 : Math.max(1, Math.round((columns - layout.width + 2) / 2));
-      setElementLayout(selectedElement, { ...layout, x });
-      applyFluidSection(selectedElement.closest("[data-sq-fluid]"));
-      syncElementControls(); refreshElementOverlay(); markSqChanged();
-    }));
-    sqStudio.querySelector("[data-sq-element-inset-reset]")?.addEventListener("click", () => {
-      if (!selectedElement?.isConnected) return;
-      remember();
-      ["desktop", "tablet", "mobile"].forEach((device) => selectedElement.style.removeProperty(elementInsetProperty(device)));
-      selectedElement.classList.remove("sq-custom-inset");
-      syncElementControls(); refreshElementOverlay(); markSqChanged();
-    });
-    [["[data-sq-product-columns]", "Columns"], ["[data-sq-product-density]", "Density"]].forEach(([selector, setting]) => {
-      sqStudio.querySelector(selector)?.addEventListener("change", (event) => {
-        if (selectedElement?.dataset.sqElementType !== "product-grid") return;
-        remember();
-        selectedElement.dataset[productSettingKey(setting)] = event.currentTarget.value;
-        applyProductGridLayout(selectedElement);
-        refreshElementOverlay();
-        markSqChanged();
-      });
+      selectedElement.dataset[productSettingKey("Columns")] = event.currentTarget.value;
+      applyProductGridLayout(selectedElement);
+      refreshElementOverlay();
+      markSqChanged();
     });
     sqStudio.querySelector("[data-sq-element-duplicate]")?.addEventListener("click", duplicateSelectedElement);
     sqStudio.querySelector("[data-sq-element-delete]")?.addEventListener("click", deleteSelectedElement);
@@ -6854,57 +6767,6 @@
     sqStudio.querySelector("[data-sq-code-input]")?.addEventListener("focus", () => { codeSnapshot = captureState(); });
     sqStudio.querySelector("[data-sq-code-input]")?.addEventListener("change", () => { updateSelectedCode(); if (codeSnapshot) remember(codeSnapshot); codeSnapshot = null; });
     sqStudio.querySelector("[data-sq-run-code]")?.addEventListener("click", updateSelectedCode);
-    sqStudio.querySelector("[data-sq-layout-preset]")?.addEventListener("change", (event) => {
-      const section = previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`);
-      const elements = [...(section?.querySelectorAll(":scope > [data-sq-element]") || [])];
-      if (!section || !elements.length || event.currentTarget.value === "custom") return;
-      remember();
-      const images = elements.filter((element) => ["image", "collage"].includes(element.dataset.sqElementType));
-      const heroPieces = elements.filter((element) => ["eyebrow", "heading", "text", "button", "trust-note"].includes(element.dataset.sqElementType));
-      const panels = elements.filter((element) => element.dataset.sqElementType === "hero-panel");
-      const copy = elements.find((element) => ["copy", "text", "logo", "brand", "collection-heading"].includes(element.dataset.sqElementType)) || elements[0];
-      const columns = fluidColumns();
-      const leftWidth = Math.ceil(columns / 2);
-      const rightWidth = columns - leftWidth;
-      const placeHeroCopy = (region) => {
-        heroPieces.forEach((element) => {
-          const role = element.dataset.sqElementType === "trust-note" ? "trust" : element.dataset.sqElementType;
-          setElementLayout(element, heroPieceLayout(region, role));
-        });
-        panels.forEach((panel) => setElementLayout(panel, region));
-      };
-      elements.forEach((element) => element.classList.remove("sq-element-hidden", "sq-single-image"));
-      if (event.currentTarget.value === "text-only") {
-        [...images, ...panels].forEach((element) => element.classList.add("sq-element-hidden"));
-        if (heroPieces.length) placeHeroCopy({ x: Math.min(2, columns), y: 2, width: Math.max(1, columns - 2), height: Math.max(8, Number(section.dataset.sqRows || 12) - 2) });
-        else if (copy) setElementLayout(copy, { x: Math.min(2, columns), y: 1, width: Math.max(1, columns - 2), height: Math.max(6, Number(section.dataset.sqRows || 12)) });
-      } else if (event.currentTarget.value === "image-only") {
-        elements.forEach((element) => element.classList.toggle("sq-element-hidden", !images.includes(element)));
-        images.forEach((element, index) => setElementLayout(element, { x: 1, y: 1 + index * 6, width: columns, height: Math.max(6, Number(section.dataset.sqRows || 12)) }));
-      } else if (event.currentTarget.value === "single-image") {
-        if (heroPieces.length) placeHeroCopy({ x: 1, y: 2, width: leftWidth, height: 11 });
-        else if (copy) setElementLayout(copy, { x: 1, y: 1, width: leftWidth, height: 12 });
-        images.slice(0, 1).forEach((element) => { element.classList.add("sq-single-image"); setElementLayout(element, { x: leftWidth + 1, y: 1, width: rightWidth, height: 12 }); });
-        images.slice(1).forEach((element) => element.classList.add("sq-element-hidden"));
-      } else if (event.currentTarget.value === "stacked") {
-        if (heroPieces.length) {
-          placeHeroCopy({ x: 1, y: 1, width: columns, height: 8 });
-          images.forEach((element, index) => setElementLayout(element, { x: 1, y: 9 + index * 8, width: columns, height: 8 }));
-        } else {
-          let row = 1;
-          elements.forEach((element) => { setElementLayout(element, { x: 1, y: row, width: columns, height: 6 }); row += 6; });
-        }
-      } else {
-        if (heroPieces.length) placeHeroCopy({ x: 1, y: 2, width: leftWidth, height: 11 });
-        else if (copy) setElementLayout(copy, { x: 1, y: 1, width: leftWidth, height: 12 });
-        images.forEach((element, index) => { setElementLayout(element, { x: leftWidth + 1, y: 1 + index * 6, width: rightWidth, height: images.length > 1 ? 6 : 12 }); });
-      }
-      applyFluidSection(section);
-      rebuildLayerList(); bindSqInteractions();
-      syncElementControls();
-      refreshElementOverlay();
-      markSqChanged();
-    });
     sqStudio.querySelector("[data-sq-animation]")?.addEventListener("change", (event) => {
       remember();
       const block = previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`);

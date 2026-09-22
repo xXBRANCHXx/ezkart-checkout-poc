@@ -17,7 +17,7 @@
 
 .sq-page-preview>.sq-reference.ezm-site-header{z-index:30!important}
 .page-site-editor .sq-flow-controls{padding:14px 0}
-.page-site-editor :is(.sq-flow-controls,.sq-element-inset-controls,.sq-advanced-layout)[hidden]{display:none!important}
+.page-site-editor .sq-flow-controls[hidden]{display:none!important}
 
 .sq-page-preview .sq-flow>.sq-flow-added{position:absolute;left:0;top:0;z-index:3}
 
