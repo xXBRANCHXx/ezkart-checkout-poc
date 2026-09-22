@@ -6,7 +6,7 @@
   const upload = editor?.querySelector('[data-profile-logo-upload]');
   const remove = editor?.querySelector('[data-profile-logo-remove]');
   const retry = editor?.querySelector('[data-profile-logo-retry]');
-  let profile = { logoId: '', canEdit: false }, busy = false;
+  let profile = { logoId: '', canEdit: false }, busy = false, renderVersion = 0;
   const status = (message, error = false) => {
     const node = editor?.querySelector('[data-profile-logo-status]');
     if (node) { node.textContent = message; node.dataset.error = String(error); }
@@ -31,23 +31,47 @@
     return result;
   }
   function render() {
-    for (const avatar of avatars) {
-      const image = avatar.querySelector('[data-admin-profile-image]');
-      const fallback = avatar.querySelector('[data-admin-profile-fallback]');
-      const showImage = show => { image.hidden = !show; fallback.hidden = show; avatar.classList.toggle('has-logo', show); };
-      showImage(false);
-      image.onload = () => showImage(true);
-      image.onerror = () => {
-        showImage(false);
-        if (profile.logoId && !busy) {
-          status('The saved logo could not be displayed. Try again to reload it.', true);
-          if (retry) retry.hidden = false;
-        }
-      };
-      if (profile.logoId) image.src = url(`/v1/media/${encodeURIComponent(profile.logoId)}`);
-      else image.removeAttribute('src');
+    const version = ++renderVersion;
+    const current = () => version === renderVersion;
+    const failed = () => {
+      if (!current()) return;
+      for (const avatar of avatars) {
+        const image = avatar.querySelector('[data-admin-profile-image]');
+        if (!image.naturalWidth) avatar.dataset.logoState = 'initials';
+      }
+      status('The saved logo could not be displayed. Try again to reload it.', true);
+      if (retry) retry.hidden = false;
+    };
+    if (!profile.logoId) {
+      for (const avatar of avatars) {
+        avatar.dataset.logoState = 'initials';
+        avatar.querySelector('[data-admin-profile-image]').removeAttribute('src');
+      }
+    } else {
+      const src = url(`/v1/media/${profile.logoId}`);
+      const images = avatars.map(avatar => avatar.querySelector('[data-admin-profile-image]'));
+      if (images.every(image => image.getAttribute('src') === src && (!image.complete || image.naturalWidth))) {
+        // Keep the server-rendered image in place, including when it is still loading.
+        for (const image of images) image.onerror = failed;
+      } else {
+        // Decode the replacement before swapping, without flashing the initials badge.
+        const next = new Image();
+        next.src = src;
+        next.decode().then(() => {
+          if (!current()) return;
+          for (const avatar of avatars) {
+            const image = avatar.querySelector('[data-admin-profile-image]');
+            image.onerror = failed;
+            image.src = src;
+            avatar.dataset.logoState = 'image';
+          }
+        }, failed);
+      }
     }
     controls();
+  }
+  function loadedStatus() {
+    status(profile.canEdit ? (profile.logoId ? 'Your store logo is saved.' : 'Upload a logo to replace your initials.') : 'Your account cannot change the store logo.');
   }
   async function load() {
     if (busy) return;
@@ -57,8 +81,11 @@
     try {
       profile = (await request('GET', '/v1/admin-profile')).profile;
       render();
-      status(profile.canEdit ? (profile.logoId ? 'Your store logo is saved.' : 'Upload a logo to replace your initials.') : 'Your account cannot change the store logo.');
+      loadedStatus();
     } catch (error) {
+      for (const avatar of avatars) {
+        if (avatar.dataset.logoState === 'pending') avatar.dataset.logoState = 'initials';
+      }
       status(error.message, true);
       if (retry) retry.hidden = false;
     } finally { busy = false; controls(); }
@@ -104,6 +131,12 @@
   upload?.addEventListener('change', () => { const file = upload.files?.[0]; if (file) void save(file); });
   remove?.addEventListener('click', () => { void save(); });
   retry?.addEventListener('click', () => { void load(); });
-  if (document.body.dataset.adminCloudEnabled === 'true') void load();
+  if (document.body.dataset.adminCloudEnabled === 'true') {
+    let initial;
+    try { initial = JSON.parse(document.body.dataset.adminProfile || 'null'); } catch (_) { /* Fetch if page identity was unavailable. */ }
+    if (initial && typeof initial.logoId === 'string' && typeof initial.canEdit === 'boolean') {
+      profile = initial; render(); loadedStatus();
+    } else void load();
+  }
   else { status('Sign in with your account to upload a store logo.'); controls(); }
 })();

@@ -1202,12 +1202,20 @@ if ($cloudPath !== '') {
 $catalogData = [];
 $catalogError = '';
 $sellerId = '';
+$adminProfile = $authenticationMethod === 'supabase' ? null : ['logoId' => '', 'canEdit' => false];
 if ($authenticated && $authenticationMethod === 'supabase') {
     try {
         $apiUrl = rtrim(ez_config('cloudflare_api_url'), '/');
         $headers = ['Accept: application/json', 'Authorization: Bearer ' . $_SESSION['supabase_access_token']];
         $identity = ez_admin_get_json($apiUrl . '/v1/me', $headers, 'Ezkart account');
         $sellerId = (string) ($identity['user']['active_seller']['id'] ?? '');
+        $activeSeller = $identity['user']['active_seller'] ?? [];
+        if ($sellerId !== '' && is_string($activeSeller['admin_logo_id'] ?? null)) {
+            $adminProfile = [
+                'logoId' => preg_match('/^[a-zA-Z0-9][a-zA-Z0-9_-]{2,95}$/', $activeSeller['admin_logo_id']) === 1 ? $activeSeller['admin_logo_id'] : '',
+                'canEdit' => ($activeSeller['role'] ?? 'viewer') !== 'viewer',
+            ];
+        }
         $catalogData = ez_admin_get_json($apiUrl . '/v1/catalog', $headers, 'Ezkart catalog');
         if (($catalogData['ok'] ?? false) !== true || $sellerId === '') throw new RuntimeException('Catalog unavailable');
     } catch (Throwable $error) {
@@ -1283,6 +1291,9 @@ $adminInitials = implode('', array_map(
     static fn(string $part): string => mb_strtoupper(mb_substr($part, 0, 1)),
     array_slice(preg_split('/\s+/', $adminDisplayName) ?: [], 0, 2),
 )) ?: 'EA';
+$adminLogoId = $adminProfile['logoId'] ?? '';
+$adminLogoState = $adminLogoId !== '' ? 'image' : ($adminProfile === null ? 'pending' : 'initials');
+$adminLogoSrc = $adminLogoId !== '' ? './?cloud=' . rawurlencode('/v1/media/' . $adminLogoId) : '';
 $adminStorageIdentity = $authenticationMethod === 'supabase'
     ? (string) ($adminUser['id'] ?? '')
     : 'legacy-password-owner';
@@ -1465,7 +1476,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
   <link rel="stylesheet" href="../select.css?v=<?= (int) filemtime(__DIR__ . '/../select.css') ?>">
   <title><?= $authenticated ? ez_admin_escape($pageTitles[$page]) : ($pendingMfa !== null ? 'Two-step verification' : 'Admin Login') ?> · Ezkart</title>
 </head>
-<body class="<?= $authenticated ? 'dashboard-page page-' . ez_admin_escape($page) . ($page === 'sites' ? ($siteEditor ? ' page-site-editor' : ' page-sites-library') : '') : 'login-page' ?>" data-admin-storage-scope="<?= ez_admin_escape($adminStorageScope) ?>" data-admin-checkout-brand="<?= ez_admin_escape($adminDisplayName) ?>" data-admin-migrate-legacy-storage="<?= $legacyDataAccess ? 'true' : 'false' ?>" data-admin-cloud-enabled="<?= $authenticated && $authenticationMethod === 'supabase' ? 'true' : 'false' ?>" data-admin-cloud-media-base="<?= $authenticated && $authenticationMethod === 'supabase' ? ez_admin_escape($cloudMediaBase) : '' ?>" data-admin-csrf-token="<?= ez_admin_escape($csrfToken) ?>">
+<body class="<?= $authenticated ? 'dashboard-page page-' . ez_admin_escape($page) . ($page === 'sites' ? ($siteEditor ? ' page-site-editor' : ' page-sites-library') : '') : 'login-page' ?>" data-admin-profile="<?= ez_admin_escape(json_encode($adminProfile)) ?>" data-admin-storage-scope="<?= ez_admin_escape($adminStorageScope) ?>" data-admin-checkout-brand="<?= ez_admin_escape($adminDisplayName) ?>" data-admin-migrate-legacy-storage="<?= $legacyDataAccess ? 'true' : 'false' ?>" data-admin-cloud-enabled="<?= $authenticated && $authenticationMethod === 'supabase' ? 'true' : 'false' ?>" data-admin-cloud-media-base="<?= $authenticated && $authenticationMethod === 'supabase' ? ez_admin_escape($cloudMediaBase) : '' ?>" data-admin-csrf-token="<?= ez_admin_escape($csrfToken) ?>">
 <?php if (!$authenticated): ?>
   <main class="login-shell">
     <?php if ($pendingMfa !== null): ?>
@@ -1651,7 +1662,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
           <a class="icon-button" href="?page=orders" aria-label="Open orders"><?= ez_admin_icon('bell') ?></a>
           <a class="icon-button" href="?page=messages" aria-label="Messages"><?= ez_admin_icon('message') ?></a>
           <button class="icon-button" type="button" aria-label="Help"><?= ez_admin_icon('help') ?></button>
-          <a class="profile" id="account-menu" href="?page=settings#profile-logo" aria-label="Profile settings"><span class="avatar" data-admin-profile-avatar><span data-admin-profile-fallback><?= ez_admin_escape(mb_substr($adminInitials, 0, 2)) ?></span><img data-admin-profile-image alt="" hidden></span><div><b><?= ez_admin_escape($adminDisplayName) ?></b><small><?= ez_admin_escape($adminDisplayEmail) ?></small></div><?= ez_admin_icon('chevron-down', 'chevron-icon') ?></a>
+          <a class="profile" id="account-menu" href="?page=settings#profile-logo" aria-label="Profile settings"><span class="avatar" data-admin-profile-avatar data-logo-state="<?= ez_admin_escape($adminLogoState) ?>"><span data-admin-profile-fallback><?= ez_admin_escape(mb_substr($adminInitials, 0, 2)) ?></span><img data-admin-profile-image alt="" <?= $adminLogoSrc !== '' ? 'src="' . ez_admin_escape($adminLogoSrc) . '"' : '' ?>></span><div><b><?= ez_admin_escape($adminDisplayName) ?></b><small><?= ez_admin_escape($adminDisplayEmail) ?></small></div><?= ez_admin_icon('chevron-down', 'chevron-icon') ?></a>
           <form method="post" class="logout-form">
             <input type="hidden" name="action" value="logout"><input type="hidden" name="csrf_token" value="<?= ez_admin_escape($csrfToken) ?>">
             <button type="submit">Log out</button>

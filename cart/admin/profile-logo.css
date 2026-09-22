@@ -1,8 +1,11 @@
 .profile[href] { color: inherit; text-decoration: none; }
 .profile[href]:focus-visible { outline: 2px solid #c74130; outline-offset: 4px; border-radius: 8px; }
 [data-admin-profile-avatar] { position: relative; flex-shrink: 0; overflow: hidden; }
-[data-admin-profile-avatar].has-logo { background: #fff; }
+[data-admin-profile-avatar][data-logo-state=image] { background: #fff; }
+[data-admin-profile-avatar][data-logo-state=pending] { background: #f1f2f5; }
 [data-admin-profile-avatar] [data-admin-profile-image] { display: block; width: 100%; height: 100%; object-fit: contain; }
+[data-admin-profile-avatar]:not([data-logo-state=image]) [data-admin-profile-image],
+[data-admin-profile-avatar]:not([data-logo-state=initials]) [data-admin-profile-fallback] { display: none; }
 [data-admin-profile-avatar] [hidden] { display: none !important; }
 .profile-logo-editor { padding: 24px; display: flex; align-items: flex-start; gap: 20px; border-bottom: 1px solid #e7ebf1; }
 .dashboard-page .profile-logo-preview { width: 80px; height: 80px; font-size: 22px; }

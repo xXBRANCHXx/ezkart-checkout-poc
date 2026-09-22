@@ -164,7 +164,8 @@ async function currentUser(request, env) {
   ).run();
   const profile = await env.DB.prepare("SELECT id, auth_user_id, email, display_name, avatar_url, locale, created_at, updated_at FROM app_users WHERE auth_user_id = ?").bind(user.id).first();
   let memberships = await env.DB.prepare(`
-    SELECT s.id, s.slug, s.name, s.plan, s.status, sm.role
+    SELECT s.id, s.slug, s.name, s.plan, s.status, sm.role,
+      COALESCE(json_extract(s.settings_json, '$.adminProfile.logoId'), '') AS admin_logo_id
     FROM seller_memberships sm
     JOIN sellers s ON s.id = sm.seller_id
     WHERE sm.auth_user_id = ? AND s.status = 'active'
@@ -194,7 +195,8 @@ async function currentUser(request, env) {
       `).bind(sellerId, user.id, now),
     ]);
     memberships = await env.DB.prepare(`
-      SELECT s.id, s.slug, s.name, s.plan, s.status, sm.role
+      SELECT s.id, s.slug, s.name, s.plan, s.status, sm.role,
+        COALESCE(json_extract(s.settings_json, '$.adminProfile.logoId'), '') AS admin_logo_id
       FROM seller_memberships sm
       JOIN sellers s ON s.id = sm.seller_id
       WHERE sm.auth_user_id = ? AND s.status = 'active'

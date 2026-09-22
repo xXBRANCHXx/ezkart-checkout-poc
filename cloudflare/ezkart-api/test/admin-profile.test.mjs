@@ -35,6 +35,11 @@ test('admin profile logos persist privately, enforce ownership and keep storefro
     return head+'.'+body+'.'+Buffer.from(signature).toString('base64url');
   }
   const alice=await token('alice'),bob=await token('bob');
+  async function identity(access) {
+    const response=await mf.dispatchFetch('https://api.fixture.test/v1/me',{headers:{authorization:'Bearer '+access}});
+    assert.equal(response.status,200);
+    return (await response.json()).user;
+  }
   async function call(access='',payload) {
     const response=await mf.dispatchFetch('https://api.fixture.test/v1/admin-profile',{
       method:payload===undefined?'GET':'PUT',
@@ -45,6 +50,8 @@ test('admin profile logos persist privately, enforce ownership and keep storefro
   }
   assert.equal((await call()).status,401);
   assert.deepEqual((await call(alice)).profile,{logoId:'',canEdit:true});
+  assert.equal((await identity(alice)).active_seller.admin_logo_id,'');
+  assert.equal((await identity(await token('new-store'))).active_seller.admin_logo_id,'','New accounts include their initial logo state');
   assert.equal((await call(alice,{logoId:'logo_bob'})).status,422);
   for(const logoId of [null,12,'https://example.com/logo.png','../logo_bob'])assert.equal((await call(alice,{logoId})).status,422);
   assert.equal((await call(alice,{})).status,422);
@@ -52,6 +59,8 @@ test('admin profile logos persist privately, enforce ownership and keep storefro
   assert.equal(saved.status,200);
   assert.equal((await call(alice)).profile.logoId,'logo_alice');
   assert.equal((await call(bob)).profile.logoId,'');
+  assert.equal((await identity(alice)).active_seller.admin_logo_id,'logo_alice','Initial page identity includes the current store logo');
+  assert.equal((await identity(bob)).active_seller.admin_logo_id,'','Another store cannot inherit the logo');
   const settings=JSON.parse((await db.prepare("SELECT settings_json FROM sellers WHERE id='seller_alice'").first()).settings_json);
   assert.deepEqual(settings,{...branding,adminProfile:{logoId:'logo_alice'}});
   assert.equal((await mf.dispatchFetch('https://api.fixture.test/v1/public/media/logo_alice')).status,404,'Admin-only logo is not published as storefront media');
@@ -66,6 +75,7 @@ test('admin profile logos persist privately, enforce ownership and keep storefro
   assert.equal((await call(alice,{logoId:''})).status,403);
   await db.prepare("UPDATE seller_memberships SET role='owner' WHERE auth_user_id='alice'").run();
   assert.equal((await call(alice,{logoId:''})).profile.logoId,'');
+  assert.equal((await identity(alice)).active_seller.admin_logo_id,'','Removal is reflected on the next page load');
   assert.deepEqual(JSON.parse((await db.prepare("SELECT settings_json FROM sellers WHERE id='seller_alice'").first()).settings_json),{...branding,adminProfile:{logoId:''}});
   await (await mf.getWorker()).scheduled({cron:'17 * * * *'});
   assert.equal(await db.prepare("SELECT id FROM media_uploads WHERE id='logo_alice'").first(),null,'Removed logo can be cleaned up');

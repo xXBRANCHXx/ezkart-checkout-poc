@@ -1,7 +1,7 @@
 <div class="profile-logo-editor" id="profile-logo" data-profile-logo-editor>
-  <span class="avatar profile-logo-preview" data-admin-profile-avatar>
+  <span class="avatar profile-logo-preview" data-admin-profile-avatar data-logo-state="<?= ez_admin_escape($adminLogoState) ?>">
     <span data-admin-profile-fallback><?= ez_admin_escape(mb_substr($adminInitials, 0, 2)) ?></span>
-    <img data-admin-profile-image alt="Store store logo" hidden>
+    <img data-admin-profile-image alt="Store logo" <?= $adminLogoSrc !== '' ? 'src="' . ez_admin_escape($adminLogoSrc) . '"' : '' ?>>
   </span>
   <div class="profile-logo-content">
     <h3>Store logo</h3>
