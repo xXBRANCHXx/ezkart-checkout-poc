@@ -2730,9 +2730,9 @@
     const openSqPanel = (name, { pin = false } = {}) => {
       builderSidebar?.classList.remove("sq-panel-dismissed");
       if (pin && window.matchMedia("(max-width: 1120px)").matches) closeSqInspector();
-      sqStudio.querySelectorAll("[data-sq-tab]").forEach((button) => button.classList.toggle("active", button.dataset.sqTab === name || name === "pages" && button.dataset.sqTab === "layers"));
+      sqStudio.querySelectorAll("[data-sq-tab]").forEach((button) => button.classList.toggle("active", button.dataset.sqTab === name || ["pages", "settings"].includes(name) && button.dataset.sqTab === "layers"));
       sqStudio.querySelectorAll("[data-sq-panel]").forEach((panel) => panel.classList.toggle("active", panel.dataset.sqPanel === name));
-      sqStudio.querySelectorAll("[data-sq-structure-view]").forEach((button) => button.classList.toggle("active", button.dataset.sqStructureView === (name === "pages" ? "pages" : "sections")));
+      sqStudio.querySelectorAll("[data-sq-structure-view]").forEach((button) => button.classList.toggle("active", button.dataset.sqStructureView === (["pages", "settings"].includes(name) ? name : "sections")));
       builderSidebar?.classList.toggle("sq-panel-pinned", pin || builderSidebar.classList.contains("sq-panel-pinned"));
       if (window.matchMedia("(max-width: 720px)").matches) sqStudio.classList.toggle("mobile-panel-open", pin);
     };
@@ -2743,7 +2743,7 @@
     }));
     builderSidebar?.addEventListener("pointerleave", () => builderSidebar.classList.remove("sq-panel-dismissed"));
     sqStudio.querySelectorAll("[data-sq-open-panel]").forEach((button) => button.addEventListener("click", () => openSqPanel(button.dataset.sqOpenPanel, { pin: true })));
-    sqStudio.querySelectorAll("[data-sq-structure-view]").forEach((button) => button.addEventListener("click", () => openSqPanel(button.dataset.sqStructureView === "pages" ? "pages" : "layers", { pin: true })));
+    sqStudio.querySelectorAll("[data-sq-structure-view]").forEach((button) => button.addEventListener("click", () => openSqPanel(button.dataset.sqStructureView === "sections" ? "layers" : button.dataset.sqStructureView, { pin: true })));
     document.addEventListener("pointerdown", (event) => {
       if (builderSidebar?.contains(event.target) || event.target.closest?.("[data-sq-edit-button-brand], [data-sq-open-panel], [data-sq-builder-select-menu]")) return;
       // Assets reserves canvas space. Keep it stable until the click is
@@ -2773,7 +2773,9 @@
       });
       return clone.innerHTML;
     };
+    let siteSettings;
     const captureState = () => ({
+      favicons: siteSettings?.snapshot() || {light: "", dark: ""},
       template: templateState ? structuredClone(templateState) : null,
       preview: previewSnapshotHtml(),
       previewClass: previewRoot?.className || "",
@@ -2829,6 +2831,8 @@
       window.clearTimeout(saveTimer);
       saveTimer = window.setTimeout(async () => { if (await persistCurrentState()) saveState.textContent = "Saved just now"; }, 550);
     };
+
+    siteSettings = EzkartSiteSettings.create({root: document, remember, changed: markSqChanged, siteKey: () => activeSiteKey});
 
     const formatRupiah = (amount) => `Rp${new Intl.NumberFormat("id-ID").format(amount)}`;
     const productIdsForGrid = (grid) => {
@@ -5308,6 +5312,7 @@
 
     const restoreState = (state) => {
       if (!previewRoot || !layerList) return;
+      siteSettings.restore(state.favicons);
       selectedElement = null;
       selectedAction = null;
       selectedImage = null;
@@ -8298,7 +8303,7 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
       const motionStyles = hasScrollMotion ? `<style>.ezkart-scroll-frame{position:relative!important;overflow:hidden!important;contain:paint}.ezkart-scroll-frame>.ezkart-scroll-media{width:100%!important;max-width:none!important;height:100%;position:absolute!important;left:0!important;top:50%!important;display:block;object-fit:cover;transform:translate3d(0,calc(-50% + var(--ezkart-scroll-y,0px)),0) scale(calc(var(--ezkart-scroll-scale,1) * var(--sq-image-crop-zoom,1)));transform-origin:center;will-change:transform;backface-visibility:hidden}@media(prefers-reduced-motion:reduce){.ezkart-scroll-frame>.ezkart-scroll-media{height:100%!important;transform:translate3d(0,-50%,0) scale(var(--sq-image-crop-zoom,1))!important;will-change:auto}}</style>` : "";
       const libraryPreviewStyles = libraryPreview ? `<style id="ezkart-library-preview-style">.sq-free-marquee .sq-marquee-track{animation:none!important;transform:translate3d(0,0,0)!important;will-change:auto!important}</style>` : "";
       const motionScripts = hasScrollMotion ? `<script>(()=>{const frames=[...document.querySelectorAll('.ezkart-scroll-frame')].map(frame=>({frame,media:frame.querySelector(':scope>.ezkart-scroll-media'),effect:frame.dataset.ezkartScrollEffect||'parallax',strength:Math.max(0,Math.min(100,Number(frame.dataset.ezkartScrollStrength)||0))/100,damping:frame.dataset.ezkartScrollDamping!=='false',y:null,yVelocity:0,scale:1,scaleVelocity:0,coverScale:1})).filter(item=>item.media);if(!frames.length)return;const reduced=matchMedia('(prefers-reduced-motion: reduce)');let raf=0,lastTime=0,viewportHeight=1;const clamp=value=>Math.max(0,Math.min(1,value));const damp=(value,velocity,target,delta,smoothTime)=>{const omega=2/smoothTime,x=omega*delta,decay=1/(1+x+.48*x*x+.235*x*x*x),change=value-target,temp=(velocity+omega*change)*delta;return[target+(change+temp)*decay,(velocity-omega*temp)*decay]};const render=time=>{raf=0;if(reduced.matches)return;const delta=Math.min(.05,lastTime?Math.max(0,(time-lastTime)/1000):1/60);lastTime=time;let moving=false;frames.forEach(item=>{const rect=item.frame.getBoundingClientRect();if(rect.bottom<-viewportHeight*.25||rect.top>viewportHeight*1.25)return;const progress=clamp((viewportHeight-rect.top)/(viewportHeight+rect.height)),reverse=item.effect==='parallax-reverse',rate=reverse?item.strength*.35:item.strength,zoom=item.effect==='zoom';const yTarget=zoom?0:(progress-.5)*(viewportHeight+rect.height)*rate*(reverse?-1:1),scaleTarget=zoom?1+progress*item.strength*.3:item.coverScale;if(item.y===null){item.y=yTarget;item.scale=scaleTarget}else if(item.damping){[item.y,item.yVelocity]=damp(item.y,item.yVelocity,yTarget,delta,.11);if(zoom)[item.scale,item.scaleVelocity]=damp(item.scale,item.scaleVelocity,scaleTarget,delta,.11);else{item.scale=scaleTarget;item.scaleVelocity=0}}else{item.y=yTarget;item.yVelocity=0;item.scale=scaleTarget;item.scaleVelocity=0}item.media.style.setProperty('--ezkart-scroll-y',item.y.toFixed(3)+'px');item.media.style.setProperty('--ezkart-scroll-scale',item.scale.toFixed(5));if(item.damping&&(Math.abs(yTarget-item.y)>.02||Math.abs(item.yVelocity)>.02||zoom&&(Math.abs(scaleTarget-item.scale)>.0001||Math.abs(item.scaleVelocity)>.0001)))moving=true});if(moving)raf=requestAnimationFrame(render)};const schedule=()=>{if(!raf){lastTime=0;raf=requestAnimationFrame(render)}};const measure=()=>{viewportHeight=Math.max(1,document.documentElement.clientHeight||innerHeight);frames.forEach(item=>{const frameHeight=Math.max(1,item.frame.clientHeight),reverse=item.effect==='parallax-reverse',rate=reverse?item.strength*.35:item.strength,overscan=reverse?(viewportHeight+frameHeight)*rate:Math.max(0,viewportHeight-frameHeight)*rate;item.coverScale=item.effect==='zoom'||reduced.matches||!rate?1:1+(overscan+4)/frameHeight;if(item.scale<item.coverScale){item.scale=item.coverScale;item.scaleVelocity=0}if(reduced.matches){item.y=null;item.yVelocity=0;item.scale=1;item.scaleVelocity=0;item.media.style.removeProperty('--ezkart-scroll-y');item.media.style.removeProperty('--ezkart-scroll-scale')}});schedule()};addEventListener('scroll',schedule,{passive:true});addEventListener('touchmove',schedule,{passive:true});addEventListener('resize',measure,{passive:true});addEventListener('orientationchange',measure,{passive:true});addEventListener('pageshow',measure);window.visualViewport?.addEventListener('resize',measure,{passive:true});reduced.addEventListener?.('change',measure);if(typeof ResizeObserver==='function'){const observer=new ResizeObserver(measure);frames.forEach(item=>observer.observe(item.frame))}document.fonts?.ready.then(measure);measure()})();<\/script>` : "";
-      return `<!doctype html>\n<html lang="${escapeHtml(document.body.dataset.adminLocale||'id')}">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1">\n<title>${escapeHtml(pageName)}</title>\n<meta name="description" content="${escapeHtml(pageDescription)}">\n${motionStyles}\n<style>@font-face{font-family:Poppins;src:url('${fontBase}') format('woff2');font-weight:400}@font-face{font-family:Poppins;src:url('${fontMedium}') format('woff2');font-weight:500}@font-face{font-family:Poppins;src:url('${fontSemibold}') format('woff2');font-weight:600}@font-face{font-family:Poppins;src:url('${fontBold}') format('woff2');font-weight:700}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:#fff;font-family:Poppins,Arial,sans-serif}.svg-sprite{width:0;height:0;position:absolute;overflow:hidden}@media(prefers-reduced-motion:reduce){*{animation:none!important;scroll-behavior:auto!important}}\n${extraFontCss}\n${css}\n${responsiveSpacing}\n</style>\n${commerceStyles}\n${libraryPreviewStyles}\n</head>\n<body>\n${sprite}\n${clone.outerHTML}\n${pinnedNavigationHtml}\n${selectedProducts().length ? commerceMarkup : ""}\n${motionScripts}\n${commerceScript}\n${compositionScript}\n${nativeScript}\n${boundScript}\n${showcaseScript}\n${selectScript}\n</body>\n</html>`;
+      return `<!doctype html>\n<html lang="${escapeHtml(document.body.dataset.adminLocale||'id')}">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1">\n<title>${escapeHtml(pageName)}</title>\n<meta name="description" content="${escapeHtml(pageDescription)}">\n${siteSettings.html()}\n${motionStyles}\n<style>@font-face{font-family:Poppins;src:url('${fontBase}') format('woff2');font-weight:400}@font-face{font-family:Poppins;src:url('${fontMedium}') format('woff2');font-weight:500}@font-face{font-family:Poppins;src:url('${fontSemibold}') format('woff2');font-weight:600}@font-face{font-family:Poppins;src:url('${fontBold}') format('woff2');font-weight:700}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:#fff;font-family:Poppins,Arial,sans-serif}.svg-sprite{width:0;height:0;position:absolute;overflow:hidden}@media(prefers-reduced-motion:reduce){*{animation:none!important;scroll-behavior:auto!important}}\n${extraFontCss}\n${css}\n${responsiveSpacing}\n</style>\n${commerceStyles}\n${libraryPreviewStyles}\n</head>\n<body>\n${sprite}\n${clone.outerHTML}\n${pinnedNavigationHtml}\n${selectedProducts().length ? commerceMarkup : ""}\n${motionScripts}\n${commerceScript}\n${compositionScript}\n${nativeScript}\n${boundScript}\n${showcaseScript}\n${selectScript}\n</body>\n</html>`;
     };
     const requireProductForOutput = async (action = 'publishing') => {
       await settleBuilder();
@@ -8319,6 +8324,7 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
       if (message) message.hidden = true;
     };
     const exportPageHtml = async () => {
+      if (siteSettings.busy()) throw Error('Wait for your favicon upload to finish, then export.');
       await requireProductForOutput('copying or exporting code');
       const html = generateHtml();
       if (cloudEnabled) {
@@ -8352,6 +8358,7 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
       } catch (error) { exportDialog.close(); showToast(error.message); }
     });
     const publishPage = async () => {
+      if (siteSettings.busy()) throw Error("Wait for your favicon upload to finish, then publish.");
       await requireProductForOutput();
       clearTimeout(saveTimer);
       const saved = await persistCurrentState({ status: "published", publishedHtml: generateHtml() });
@@ -8362,8 +8369,14 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
     };
     sqStudio.querySelector("[data-sq-publish]")?.addEventListener("click", async (event) => {
       const button = event.currentTarget; button.disabled = true;
-      try { await publishPage(); } catch(error) { showToast(error.message); }
-      finally { button.disabled = false; }
+      try {
+        await requireProductForOutput();
+        if (await siteSettings.confirmPublish()) {
+          siteSettings.setPublishing(true);
+          await publishPage();
+        }
+      } catch(error) { showToast(error.message); }
+      finally { siteSettings.setPublishing(false); button.disabled = false; }
     });
     const cloneBaseSiteState = () => JSON.parse(JSON.stringify(baseSiteState || captureState()));
     const loadSite = async (site, force = false) => {
@@ -8612,7 +8625,7 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
         if (destination === "replace") {
           remember();
           closeSqInspector();
-          restoreState(prepared.state);
+          restoreState({...prepared.state, favicons: siteSettings.snapshot()});
           refreshNativeBuilder();
           await settleBuilder();
           clearTimeout(saveTimer);
@@ -8801,7 +8814,7 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
       async applyTemplate({templateId,productId,productIds,brandName}={}) {
         if (previewRoot.querySelector('[data-sq-element],.sq-native-section')) throw Error('Create a blank page before applying a template.');
         const prepared = await EzkartTemplates.prepare({templateId,productId,productIds,brandName,products:readCatalogProducts()});
-        remember(); restoreState(prepared.state); refreshNativeBuilder(); await settleBuilder();
+        remember(); restoreState({...prepared.state, favicons: siteSettings.snapshot()}); refreshNativeBuilder(); await settleBuilder();
         return {templateId:prepared.template.id,version:prepared.template.version,sections:prepared.recipe.length,productId:prepared.state.products[0],productIds:prepared.state.products};
       },
       nativeInsert(args){const element=addNativeNode(args);return {id:element.dataset.nativeId,count:1+element.querySelectorAll('.sq-native').length};},

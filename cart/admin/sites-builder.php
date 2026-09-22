@@ -42,7 +42,7 @@ declare(strict_types=1);
       <div class="sq-tool-panels">
         <section class="sq-tool-panel active" data-sq-panel="layers">
           <header><div><small>Site structure</small><h2>Pages &amp; sections</h2></div><button type="button" data-sq-open-panel="add" aria-label="Add section"><?= ez_admin_icon('plus') ?></button></header>
-          <div class="sq-structure-tabs"><button type="button" data-sq-structure-view="pages">Pages</button><button class="active" type="button" data-sq-structure-view="sections">Sections</button></div>
+          <div class="sq-structure-tabs"><button type="button" data-sq-structure-view="pages">Pages</button><button class="active" type="button" data-sq-structure-view="sections">Sections</button><button type="button" data-sq-structure-view="settings">Settings</button></div>
           <div class="sq-site-header-shortcuts"><div><span><?= ez_admin_icon('layout') ?></span><div><b>Header essentials</b><small>Logo, navigation links, and call-to-action.</small></div></div><div><button class="ui-button" type="button" data-sq-edit-logo data-ui-icon="image">Edit logo</button><button class="ui-button" type="button" data-sq-edit-navigation data-ui-icon="link">Edit navigation</button></div></div>
           <p class="sq-panel-intro">Drag sections to reorder them. Click any section or layer to edit it.</p>
           <div class="sq-layer-list" data-sq-layer-list aria-label="Sections and elements"></div>
@@ -113,13 +113,18 @@ declare(strict_types=1);
 
         <section class="sq-tool-panel" data-sq-panel="pages">
           <header><div><small>Website</small><h2>Pages &amp; hosting</h2></div><button type="button" data-open-page-creator aria-label="New landing page"><?= ez_admin_icon('plus') ?></button></header>
-          <div class="sq-structure-tabs"><button class="active" type="button" data-sq-structure-view="pages">Pages</button><button type="button" data-sq-structure-view="sections">Sections</button></div>
+          <div class="sq-structure-tabs"><button class="active" type="button" data-sq-structure-view="pages">Pages</button><button type="button" data-sq-structure-view="sections">Sections</button><button type="button" data-sq-structure-view="settings">Settings</button></div>
           <div class="sq-page-list">
             <template data-sq-site-template><button type="button" data-sq-site><span><?= ez_admin_icon('layout') ?></span><div><b>Landing page</b><small>page.ezkart.site</small></div><em class="draft">Draft</em></button></template>
           </div>
           <div class="sq-navigation-shortcuts"><div><b>Site navigation</b><small>Logo, page links, and call to action</small></div><button type="button" data-sq-edit-logo>Logo</button><button type="button" data-sq-edit-navigation>Links</button></div>
           <div class="sq-host-card"><span><?= ez_admin_icon('shield') ?></span><div><b>Managed hosting</b><small>Global CDN · 99.99% uptime</small></div><em>Active</em></div>
           <button class="ui-button sq-wide-button" type="button" data-toast="Domain manager opened" data-ui-icon="globe">Manage domains &amp; SEO</button>
+        </section>
+        <section class="sq-tool-panel" data-sq-panel="settings">
+          <header><div><h2>Site settings</h2></div></header>
+          <div class="sq-structure-tabs"><button type="button" data-sq-structure-view="pages">Pages</button><button type="button" data-sq-structure-view="sections">Sections</button><button class="active" type="button" data-sq-structure-view="settings">Settings</button></div>
+          <div class="sq-site-favicons"><h3>Browser tab icon</h3><div data-sq-favicons></div></div>
         </section>
       </div>
     </aside>
@@ -397,3 +402,9 @@ declare(strict_types=1);
   </section>
   <footer><button class="ui-button" type="button" data-creator-close data-ui-icon="x">Cancel</button><button class="ui-button primary" value="default" data-create-page data-ui-icon="plus">Create &amp; edit</button></footer>
 </form></dialog>
+
+<dialog class="sq-favicon-dialog" data-sq-favicon-dialog aria-labelledby="sq-favicon-title" aria-describedby="sq-favicon-description">
+  <header><div><h2 id="sq-favicon-title">Add a browser tab icon</h2><p id="sq-favicon-description">Your page has no favicon yet. Add one before publishing, or do it later in Site settings.</p></div><button type="button" data-favicon-close aria-label="Close favicon setup">×</button></header>
+  <div class="sq-favicon-dialog-body" data-sq-favicons></div>
+  <footer><button class="ui-button" type="button" data-favicon-close>Back to editor</button><button class="ui-button primary" type="button" data-favicon-publish>Publish without favicon</button></footer>
+</dialog>

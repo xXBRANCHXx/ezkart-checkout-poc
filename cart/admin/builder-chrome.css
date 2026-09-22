@@ -664,3 +664,37 @@
 .page-site-editor .sq-native-image-replace > img { flex: 0 0 64px; width: 64px; height: 64px; object-fit: contain; background: var(--ui-field); border: 1px solid var(--ui-line); border-radius: 8px; }
 .page-site-editor .sq-native-image-replace > button { flex: 1; }
 .page-site-editor .sq-native-image-source .sq-native-help[data-error] { color: #b32935; }
+
+.page-site-editor .sq-structure-tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.sq-site-favicons > h3 { margin: 24px 0 14px; }
+.sq-favicon-grid { display: grid; gap: 20px; }
+.sq-favicon-card { min-width: 0; }
+.sq-favicon-card h3 { margin: 0 0 10px; color: #343845; font-size: 12px; font-weight: 500; }
+.sq-favicon-preview { display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 12px; margin-bottom: 10px; border: 1px solid #e2e4e9; border-radius: 10px; font-size: 12px; }
+.sq-favicon-preview-light { color: #343845; background: #f7f8fa; }
+.sq-favicon-preview-dark { color: #f2f3f5; background: #24262e; border-color: #343845; }
+.sq-favicon-preview > img { width: 24px; height: 24px; object-fit: contain; }
+.sq-favicon-preview > span:last-child { margin-left: auto; }
+.sq-favicon-card > .ui-button { width: 100%; justify-content: center; }
+.sq-favicon-card > .sq-favicon-remove { margin-top: 8px; padding: 4px 0; color: #666d7c; background: transparent; border: 0; font: inherit; font-size: 11px; text-decoration: underline; cursor: pointer; }
+.sq-favicon-card [data-favicon-status], .sq-favicon-help { color: #737b8c; font-size: 11px; line-height: 1.65; }
+.sq-favicon-card [data-favicon-status]:empty { display: none; }
+.sq-favicon-card [data-favicon-status][data-error] { color: #b32935; }
+.sq-favicon-help { margin: 20px 0; }
+.sq-favicon-dialog { width: min(580px, calc(100% - 24px)); max-height: calc(100dvh - 24px); padding: 0; border: 1px solid #e2e4e9; border-radius: 16px; color: #343845; background: white; overflow: auto; font-family: var(--ui-font, Poppins, sans-serif); }
+.sq-favicon-dialog::backdrop { background: #161c2b80; }
+.sq-favicon-dialog > header { display: flex; gap: 16px; padding: 24px 24px 0; }
+.sq-favicon-dialog h2 { margin: 0; font-size: 20px; line-height: 1.4; }
+.sq-favicon-dialog header p { margin: 10px 0 0; color: #737b8c; font-size: 12px; line-height: 1.7; }
+.sq-favicon-dialog header > button { flex: 0 0 30px; height: 30px; padding: 0; border: 0; border-radius: 8px; background: #f4f5f7; color: #666d7c; font-size: 22px; cursor: pointer; }
+.sq-favicon-dialog-body { padding: 24px; }
+.sq-favicon-dialog .sq-favicon-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.sq-favicon-dialog .sq-favicon-help { margin-bottom: 0; }
+.sq-favicon-dialog > footer { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; padding: 16px 24px; border-top: 1px solid #e2e4e9; }
+@media (max-width: 420px) {
+  .sq-favicon-dialog .sq-favicon-grid { grid-template-columns: minmax(0, 1fr); }
+  .sq-favicon-dialog > header { padding: 18px 18px 0; }
+  .sq-favicon-dialog-body { padding: 20px 18px; }
+  .sq-favicon-dialog > footer { padding: 16px 18px; }
+  .sq-favicon-dialog > footer > button { flex: 1 1 auto; }
+}
