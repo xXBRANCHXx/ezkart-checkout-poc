@@ -6975,7 +6975,8 @@
       const button = document.createElement("button");
       button.type = "button";
       button.dataset.sqTheme = preset.id;
-      button.setAttribute("aria-label", `${preset.name} palette`);
+      button.setAttribute("aria-label", `Apply ${preset.name} preset`);
+      button.title = `Apply ${preset.name} preset`;
       button.setAttribute("aria-pressed", "false");
       button.innerHTML = `<span class="sq-theme-colors" aria-hidden="true">${preset.colors.map((color) => `<i style="background:${color}"></i>`).join("")}</span><span class="sq-theme-name">${preset.name}</span>`;
       return button;
