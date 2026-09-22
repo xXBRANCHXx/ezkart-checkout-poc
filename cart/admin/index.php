@@ -1303,6 +1303,18 @@ $dashboardPeriod = ez_dashboard_period($_GET, $nowJakarta);
 $isDashboard = !isset($_GET['page']) || $_GET['page'] === 'dashboard';
 $orders = ($authenticated && ($legacyDataAccess || $sellerId !== '')) ? array_values(array_filter(ez_admin_orders(), static fn($order) => ez_dashboard_order_visible($order, $sellerId, $legacyDataAccess))) : [];
 $allOrderCount = count($orders);
+$orderQueues = [
+    'needs-processing' => ['label' => 'Needs processing', 'detail' => 'Paid and awaiting acceptance', 'icon' => 'cart'],
+    'processing' => ['label' => 'Being processed', 'detail' => 'Preparing or awaiting courier pickup', 'icon' => 'box'],
+    'shipped' => ['label' => 'Shipped', 'detail' => 'With the courier, on the way to customers', 'icon' => 'truck'],
+    'attention' => ['label' => 'Shipping issues', 'detail' => 'Pickup issues, interrupted deliveries, or returns', 'icon' => 'help'],
+];
+$orderQueueCounts = array_fill_keys(array_keys($orderQueues), 0);
+// Operational work spans all dates, independently of the sales reporting period.
+foreach ($orders as $order) {
+    $queue = ez_dashboard_order_queue($order);
+    if (isset($orderQueueCounts[$queue])) $orderQueueCounts[$queue]++;
+}
 if ($isDashboard) $orders = array_values(array_filter($orders, static fn($order) => ez_dashboard_in_period($order, $dashboardPeriod)));
 foreach ($orders as &$order) {
     $profile = ez_customer_order_profile($order);
@@ -1414,7 +1426,11 @@ $pageTitles = [
     'payments' => 'Payments', 'reviews' => 'Reviews', 'messages' => 'Messages',
     'wallet' => 'Wallet', 'settings' => 'Settings',
 ];
-$allDisplayOrders = array_slice($orders, 0, 200);
+$orderQueueFilter = is_string($_GET['fulfillment'] ?? null) && isset($orderQueues[$_GET['fulfillment']]) ? $_GET['fulfillment'] : '';
+$orderQueueRows = $page === 'orders' && $orderQueueFilter !== ''
+    ? array_values(array_filter($orders, static fn($order) => ez_dashboard_order_queue($order) === $orderQueueFilter))
+    : $orders;
+$allDisplayOrders = array_slice($orderQueueRows, 0, 200);
 $customerProfiles = [];
 $paymentMethods = [];
 $orderMapPoints = [];
@@ -1675,13 +1691,31 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
       <?php if ($page === 'dashboard'): ?>
       <main class="dashboard page-canvas" id="overview">
         <section class="welcome-row page-heading">
-          <div><h1>Dashboard</h1><p>View your sales, orders, and store activity.</p></div>
+          <div><h1>Dashboard</h1><p>Manage orders and track your store's performance.</p></div>
+        </section>
+
+        <?php if ($catalogError !== ''): ?><p class="dashboard-data-error" role="alert"><?= ez_admin_escape($catalogError) ?></p><?php endif; ?>
+        <?php if ($authenticationMethod !== 'supabase' || $sellerId !== ''): ?>
+        <section class="order-overview" aria-labelledby="order-overview-title">
+          <header class="order-overview-header"><div><h2 id="order-overview-title">Orders to manage</h2><p>Current orders across all dates · Updated <?= $nowJakarta->format('H:i') ?> WIB</p></div><a href="?page=orders">View all orders <?= ez_admin_icon('chevron-right') ?></a></header>
+          <div class="order-queue-grid">
+            <?php foreach (['needs-processing', 'processing', 'shipped'] as $queue): $queueInfo = $orderQueues[$queue]; ?>
+            <a class="order-queue-card" data-fulfillment="<?= $queue ?>" href="?page=orders&amp;fulfillment=<?= $queue ?>">
+              <span class="order-queue-icon"><?= ez_admin_icon($queueInfo['icon']) ?></span>
+              <div><h3><?= $queueInfo['label'] ?></h3><strong><?= number_format($orderQueueCounts[$queue]) ?></strong><p><?= $queueInfo['detail'] ?></p></div>
+              <?= ez_admin_icon('chevron-right', 'order-queue-arrow') ?>
+            </a>
+            <?php endforeach; ?>
+          </div>
+          <?php if ($orderQueueCounts['attention'] > 0): ?><a class="order-queue-attention" href="?page=orders&amp;fulfillment=attention"><?= ez_admin_icon('help') ?><span><?= number_format($orderQueueCounts['attention']) ?> <?= $orderQueueCounts['attention'] === 1 ? 'order needs' : 'orders need' ?> a shipping issue or return reviewed</span><?= ez_admin_icon('chevron-right') ?></a><?php endif; ?>
+        </section>
+
+        <section class="sales-performance-heading" aria-labelledby="sales-performance-title">
+          <div><h2 id="sales-performance-title">Sales performance</h2><p>Your store's results for the selected period.</p></div>
           <form class="page-actions dashboard-period" method="get"><input type="hidden" name="page" value="dashboard"><input type="hidden" name="group" value="<?= ez_admin_escape($chartGroup) ?>"><label><?= ez_admin_icon('calendar') ?><select name="range" aria-label="Dashboard date range"><?php foreach (['7' => 'Last 7 days', '30' => 'Last 30 days', '90' => 'Last 90 days', 'all' => 'All time'] as $value => $label): ?><option value="<?= $value ?>" <?= $dashboardPeriod['range'] === (string) $value ? 'selected' : '' ?>><?= $label ?></option><?php endforeach; ?></select></label><button type="submit">Apply</button></form>
         </section>
 
         <p class="dashboard-data-note"><?= $dateRangeStart !== null ? ez_admin_escape($dateRangeStart->format('j M Y') . ' – ' . $nowJakarta->format('j M Y') . ' · ') : 'All time · ' ?><?= $commerceProduction ? 'Production' : 'Sandbox' ?> order records · Updated <?= $nowJakarta->format('H:i') ?> WIB <a href="<?= ez_admin_escape('?' . http_build_query(['page' => 'dashboard', 'range' => $dashboardPeriod['range'], 'group' => $chartGroup])) ?>">Refresh</a></p>
-        <?php if ($catalogError !== ''): ?><p class="dashboard-data-error" role="alert"><?= ez_admin_escape($catalogError) ?></p><?php endif; ?>
-        <?php if ($authenticationMethod !== 'supabase' || $sellerId !== ''): ?>
         <section class="kpi-grid" aria-label="Store overview">
           <article><span class="kpi-icon"><?= ez_admin_icon('money') ?></span><div><small>Total Sales</small><strong><?= ez_admin_short_money($metrics['paid_volume']) ?></strong><em class="positive"><?= $metrics['paid_count'] ?> paid</em><p>Provider-confirmed payments</p></div></article>
           <article><span class="kpi-icon"><?= ez_admin_icon('cart') ?></span><div><small>Orders</small><strong><?= number_format($metrics['orders']) ?></strong><em><?= $metrics['pending_count'] ?> open</em><p>Created in selected period</p></div></article>

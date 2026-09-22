@@ -2700,6 +2700,100 @@ test('shop products reuse server-validated shipping and reject tampered prices a
   assert.equal((await app.request('/cart/api/start.php',{...input,cart})).status,422);
 });
 
+test('order queues follow payment, acceptance and courier milestones without counting skipped shipping', async t => {
+  const app = await setup(); t.after(() => app.close());
+  const cases = [
+    [{ status: 'PENDING' }, ''], [{ status: 'CREATING' }, ''], [{ status: 'FAILED' }, ''],
+    [{ commerce_environment: 'sandbox', shipping_skipped: true }, ''],
+    [{ fulfillment_status: 'AWAITING_ACCEPTANCE' }, 'needs-processing'],
+    [{ accepted_at: '2026-09-20T00:00:00Z' }, 'processing'],
+    [{ fulfillment_status: 'AWAITING_PICKUP_ARRANGEMENT' }, 'processing'],
+    [{ fulfillment_status: 'CREATING' }, 'processing'],
+    [{ biteship_order_id: 'booked-only' }, 'processing'],
+    ...['confirmed', 'scheduled', 'allocated', 'picking_up'].map(biteship_status => [{ biteship_status }, 'processing']),
+    ...['picked', 'picked_up', 'in_transit', 'droppingOff'].map(biteship_status => [{ biteship_status }, 'shipped']),
+    [{ fulfillment_status: 'IN_TRANSIT' }, 'shipped'],
+    [{ biteship_status: 'delivered', accepted_at: '2026-09-20T00:00:00Z' }, ''],
+    [{ fulfillment_status: 'DELIVERED' }, ''],
+    ...['retry_required', 'on_hold', 'rejected', 'courier_not_found', 'canceled', 'return_in_transit', 'returned', 'disposed'].map(fulfillment_status => [{ fulfillment_status }, 'attention']),
+  ];
+  const encoded = Buffer.from(JSON.stringify(cases.map(([order]) => ({ status: 'PAID', ...order })))).toString('base64');
+  const actual = JSON.parse(app.cli(`require ${JSON.stringify(join(root, 'cart/admin/dashboard-data.php'))}; echo ez_json_encode(array_map('ez_dashboard_order_queue',json_decode(base64_decode('${encoded}'),true)));`));
+  assert.deepEqual(actual, cases.map(([, expected]) => expected));
+});
+
+test('dashboard prioritizes all-date order queues and opens matching merchant orders on desktop and mobile', async t => {
+  const { chromium } = await import('../builder-mcp/node_modules/playwright/index.mjs');
+  const app = await setup({ EZKART_CLOUDFLARE_API_URL: 'https://ezkart-api-test.fixture.workers.dev' }); t.after(() => app.close());
+  await writeFile(join(app.directory, 'storefront.json'), JSON.stringify({ store: { sellerId: 'seller_fixture' }, catalog: [] }));
+  const base = { seller_id: 'seller_fixture', commerce_environment: 'sandbox', status: 'PAID', total: 50000, subtotal: 50000, customer: { name: 'Queue Buyer' }, items: [], created_at: new Date(Date.now() - 70 * 86400000).toISOString() };
+  const queues = {
+    'needs-processing': ['QUEUE001'],
+    processing: ['QUEUE002', 'QUEUE003'],
+    shipped: ['QUEUE004', 'QUEUE005'],
+    attention: ['QUEUE006'],
+  };
+  const orders = [
+    { ...base, order_id: 'EZK-S-QUEUE001', fulfillment_status: 'AWAITING_ACCEPTANCE' },
+    { ...base, order_id: 'EZK-S-QUEUE002', accepted_at: base.created_at, fulfillment_status: 'AWAITING_PICKUP_ARRANGEMENT' },
+    { ...base, order_id: 'EZK-S-QUEUE003', biteship_order_id: 'booking', biteship_status: 'confirmed' },
+    { ...base, order_id: 'EZK-S-QUEUE004', biteship_order_id: 'transit', biteship_status: 'in_transit' },
+    { ...base, order_id: 'EZK-S-QUEUE005', biteship_order_id: 'out-for-delivery', biteship_status: 'dropping_off' },
+    { ...base, order_id: 'EZK-S-QUEUE006', fulfillment_status: 'RETRY_REQUIRED' },
+    { ...base, order_id: 'EZK-S-QUEUE007', biteship_order_id: 'completed', biteship_status: 'delivered' },
+    { ...base, order_id: 'EZK-S-QUEUE008', shipping_skipped: true },
+    { ...base, order_id: 'EZK-S-PRIVATE001', seller_id: 'seller_other' },
+    // Current unpaid orders push actionable older orders beyond the unfiltered table's first 200.
+    ...Array.from({ length: 201 }, (_, index) => ({ ...base, order_id: `EZK-S-PENDING${String(index).padStart(3, '0')}`, status: 'PENDING', created_at: new Date(Date.now() - 86400000).toISOString() })),
+  ];
+  app.cli(`foreach(json_decode(base64_decode('${Buffer.from(JSON.stringify(orders)).toString('base64')}'),true) as $order) ez_save_order($order);`);
+  const browser = await chromium.launch(); t.after(() => browser.close());
+  const context = await browser.newContext({ viewport: { width: 1600, height: 1100 } });
+  await context.addCookies([app.adminCookie()]);
+  const page = await context.newPage(); page.setDefaultTimeout(6000);
+  const errors = []; page.on('pageerror', error => errors.push(error.message));
+  await page.route('**/*', route => new URL(route.request().url()).searchParams.get('cloud') === '/v1/admin-profile'
+    ? route.fulfill({ json: { ok: true, profile: { logoId: '', canEdit: true } } }) : route.continue());
+  const dashboardUrl = app.base + '/cart/admin/?page=dashboard&range=7';
+  await page.goto(dashboardUrl);
+  assert.equal(await page.locator('.kpi-grid article').nth(0).locator('strong').innerText(), 'Rp0');
+  assert.equal(await page.locator('.kpi-grid article').nth(1).locator('strong').innerText(), '201');
+  for (const queue of ['needs-processing', 'processing', 'shipped']) {
+    assert.equal(await page.locator(`.order-queue-card[data-fulfillment="${queue}"] strong`).innerText(), String(queues[queue].length));
+  }
+  assert.ok(await page.evaluate(() => document.querySelector('.order-overview').getBoundingClientRect().bottom < document.querySelector('.kpi-grid').getBoundingClientRect().top));
+  await page.screenshot({ path: '/tmp/ezkart-order-queues-desktop.png', fullPage: true });
+  for (const [queue, expected] of Object.entries(queues)) {
+    await page.goto(dashboardUrl);
+    await page.locator(queue === 'attention' ? '.order-queue-attention' : `.order-queue-card[data-fulfillment="${queue}"]`).click();
+    assert.equal(new URL(page.url()).searchParams.get('fulfillment'), queue);
+    assert.equal(await page.locator('.order-queue-filters [aria-current=page]').getAttribute('href'), `?page=orders&fulfillment=${queue}`);
+    assert.deepEqual((await page.locator('#order-list [data-order-card] .order-link').allTextContents()).sort(), expected.map(id => `#S-${id}`).sort());
+    assert.equal(await page.getByText('PRIVATE001', { exact: false }).count(), 0);
+  }
+  await page.locator('#order-search').fill('no-matching-customer');
+  assert.equal(await page.locator('#order-list [data-order-card]:visible').count(), 0);
+  assert.equal(await page.locator('#empty-filter').isVisible(), true);
+  await page.goto(app.base + '/cart/admin/?page=dashboard&range=all');
+  assert.equal(await page.locator('.order-queue-card[data-fulfillment="needs-processing"] strong').innerText(), '1');
+  assert.equal(await page.locator('.kpi-grid article').nth(1).locator('strong').innerText(), '209');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.waitForTimeout(350);
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+  await page.screenshot({ path: '/tmp/ezkart-order-queues-mobile.png', fullPage: true });
+  await page.locator('.order-queue-card[data-fulfillment="shipped"]').click();
+  assert.equal(await page.locator('#order-list [data-order-card]').count(), 2);
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+  await page.screenshot({ path: '/tmp/ezkart-order-filter-mobile.png', fullPage: true });
+  app.cli(`foreach(glob(ez_order_directory().'/*.json') as $path) unlink($path);`);
+  await page.reload();
+  assert.equal(await page.getByText('No orders in this stage', { exact: true }).count(), 1);
+  await page.goto(dashboardUrl);
+  assert.deepEqual(await page.locator('.order-queue-card strong').allTextContents(), ['0', '0', '0']);
+  assert.equal(await page.locator('.order-queue-attention').count(), 0);
+  assert.equal(errors.length, 0, errors.join('\n'));
+});
+
 test('dashboard uses scoped orders, real product photos, actual timestamps, date buckets and honest empty states', async t => {
   const { chromium } = await import('../builder-mcp/node_modules/playwright/index.mjs');
   const app = await setup({ EZKART_CLOUDFLARE_API_URL: 'https://ezkart-api-test.fixture.workers.dev' }); t.after(() => app.close());

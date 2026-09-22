@@ -16,6 +16,22 @@ function ez_dashboard_order_visible(array $order, string $sellerId, bool $legacy
     return ($sellerId !== '' && $owner === $sellerId) || ($legacy && in_array($owner, ['', 'demo'], true));
 }
 
+function ez_dashboard_order_queue(array $order): string
+{
+    if (strtoupper((string) ($order['status'] ?? '')) !== 'PAID' || ez_order_skips_shipping($order)) return '';
+
+    // A booking is still being processed until the courier confirms pickup.
+    // Fall back to the saved fulfillment milestone for older order records.
+    $status = ez_tracking_status((string) ($order['biteship_status'] ?? ''));
+    if ($status === '') $status = ez_tracking_status((string) ($order['fulfillment_status'] ?? ''));
+    if ($status === 'delivered') return '';
+    if (in_array($status, ['picked', 'in_transit', 'dropping_off'], true)) return 'shipped';
+    if (in_array($status, ['retry_required', 'on_hold', 'rejected', 'courier_not_found', 'cancelled', 'return_in_transit', 'returned', 'disposed'], true)) return 'attention';
+    if (!empty($order['accepted_at']) || !empty($order['biteship_order_id'])
+        || in_array($status, ['awaiting_pickup_arrangement', 'creating', 'processing', 'confirmed', 'scheduled', 'allocated', 'picking_up'], true)) return 'processing';
+    return 'needs-processing';
+}
+
 function ez_dashboard_in_period(array $order, array $period): bool
 {
     if ($period['start'] === null) return true;
