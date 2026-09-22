@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__ . '/bootstrap.php';
+require_once __DIR__ . '/customer-profile.php';
 
 const EZ_CUSTOMER_SESSION_LIFETIME = 2592000;
 
@@ -128,9 +129,11 @@ function ez_customer_store_session(array $tokens, array $user, bool $new): void
     $token = (string) ($tokens['access_token'] ?? '');
     $refresh = (string) ($tokens['refresh_token'] ?? '');
     if (strlen($token) < 40 || strlen($token) > 8192 || $refresh === '' || strlen($refresh) > 8192 || ez_customer_needs_mfa($user, $token)) throw new InvalidArgumentException('Complete two-step verification to continue.');
+    $identity = ez_customer_identity($user);
+    ez_customer_save_profile($identity);
     $old = $_SESSION['customer_auth'] ?? [];
     $_SESSION['customer_auth'] = [
-        'user' => ['id' => $user['id'], 'email' => strtolower(trim($user['email']))],
+        'user' => $identity,
         'access_token' => $token, 'refresh_token' => $refresh,
         'expires_at' => time() + max(0, min(3600, (int) ($tokens['expires_in'] ?? 3600))),
         'signed_in_at' => $new ? time() : (int) ($old['signed_in_at'] ?? time()),

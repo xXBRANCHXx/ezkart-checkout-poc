@@ -19,7 +19,14 @@ function curl_exec(object $handle): string {
             return json_encode(['ok' => true, 'store' => $shop['store'], 'products' => ($query['mode'] ?? '') === 'checkout' ? [] : $products]);
         }
         if ($path === '/v1/storefront/products') return json_encode(['ok' => true, 'products' => array_values(array_filter($shop['selections'], static fn($product) => in_array($product['id'], explode(',', $query['ids']), true)))]);
-        if ($path === '/v1/catalog') return json_encode(['ok' => true, 'products' => $shop['catalog'], 'drafts' => []]);
+        if ($path === '/v1/me') {
+            if (!empty($shop['identityUnavailable'])) { $handle->status = 503; return '{"ok":false}'; }
+            return json_encode(['ok' => true, 'user' => ['active_seller' => ['id' => $shop['store']['sellerId'] ?? 'seller_fixture']]]);
+        }
+        if ($path === '/v1/catalog') {
+            if (!empty($shop['catalogUnavailable'])) { $handle->status = 503; return '{"ok":false}'; }
+            return json_encode(['ok' => true, 'products' => $shop['catalog'], 'drafts' => []]);
+        }
         if ($path === '/v1/storefront') {
             if (($handle->options[CURLOPT_CUSTOMREQUEST] ?? '') === 'PUT') {
                 $shop['store'] = array_replace($shop['store'], $payload);

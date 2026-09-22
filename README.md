@@ -107,11 +107,21 @@ must reach `aal2` before the dashboard opens; the verified device can then keep
 its Ezkart session for up to 30 days. State-changing cloud requests also fail
 closed if an enrolled session has not reached `aal2`.
 
-Privileged legacy accounts can read the private JSON order store and display order IDs,
+The dashboard reads the private JSON order store for the authenticated seller
+and displays order IDs,
 customers, line items, product subtotal, shipping charge, final total,
 shipping service, payment provider reference/status, Biteship fulfillment reference,
-and signed-notification result. Other beta accounts receive an empty order view
-and cannot read the shared records. The dashboard's
+and signed-notification result. Orders and fulfillment actions are scoped to
+the active seller verified by the Worker.
+Privileged legacy accounts can also read legacy demo orders without a seller assignment.
+Date filters use the order creation date in Asia/Jakarta. Sales and charts count only
+orders marked `PAID`; catalog counts, product photos, and published ratings come
+from the saved seller catalog. Missing ratings and activity remain empty.
+Verified customer Google sign-in saves the optional name and profile photo in a
+private, environment-specific profile directory alongside the order store.
+Tracking displays that photo, and merchant views match it only to their own
+customer order records. No authentication tokens are stored with these profiles.
+The dashboard's
 “paid volume” is an aggregate of sandbox orders marked `PAID`; it is not a real
 wallet balance or withdrawable settlement amount.
 

@@ -20,9 +20,10 @@ try {
     $token = (string) ($_SESSION['supabase_access_token'] ?? '');
     $user = ez_customer_verified_user($token);
     if ($user['id'] !== ($_SESSION['admin_user']['id'] ?? '') || ez_customer_needs_mfa($user, $token)) ez_api_json(['ok' => true, 'authenticated' => false]);
+    ez_customer_save_profile(ez_customer_identity($user));
     $bridgeIdentity = [
         'source' => 'existing_google',
-        'user' => ['id' => $user['id'], 'email' => strtolower(trim($user['email']))],
+        'user' => ez_customer_identity($user),
         'expires_at' => min(time() + 600, (int) $_SESSION['authenticated_until']),
         'signed_in_at' => (int) $_SESSION['signed_in_at'],
         'version' => bin2hex(random_bytes(16)),

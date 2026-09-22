@@ -433,6 +433,7 @@ function ez_checkout_request(array $input): array
     $items = [];
     $shippingItems = [];
     $subtotal = 0;
+    $productSnapshots = [];
     $weight = 0;
     $itemCount = 0;
     $sellerIds = [];
@@ -452,6 +453,12 @@ function ez_checkout_request(array $input): array
             throw new InvalidArgumentException('A selected quantity is no longer available.');
         }
         $sellerIds[] = (string) ($product['seller_id'] ?? '');
+        $productSnapshots[$product['sku']] = [
+            'product_id' => $product['product_id'] ?? $id,
+            'variant_id' => $product['variant_id'] ?? '',
+            'product_name' => $product['product_name'] ?? $product['name'],
+            'image_url' => $product['image_url'] ?? '',
+        ];
         $lineTotal = $product['price'] * $quantity;
         $items[] = [
             'id' => $product['sku'],
@@ -526,6 +533,7 @@ function ez_checkout_request(array $input): array
     if (count($sellerIds) !== 1 || $sellerIds[0] === '') throw new InvalidArgumentException('The cart must belong to one verified store.');
     return [
         'seller_id' => $sellerIds[0],
+        'product_snapshots' => $productSnapshots,
         'items' => $items,
         'subtotal' => $subtotal,
         'shipping_price' => $shippingPrice,

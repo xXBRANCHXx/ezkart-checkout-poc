@@ -1,5 +1,11 @@
 (() => {
   "use strict";
+  const profilePhoto = document.querySelector('.customer-profile-photo');
+  if (profilePhoto) {
+    const hidePhoto = () => { profilePhoto.hidden = true; };
+    profilePhoto.addEventListener('error', hidePhoto);
+    if (profilePhoto.complete && !profilePhoto.naturalWidth) hidePhoto();
+  }
   const byId = (id) => document.getElementById(id);
   const shell = document.querySelector(".return-shell");
   const order = shell.dataset.order;

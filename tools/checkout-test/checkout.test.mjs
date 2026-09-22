@@ -2692,9 +2692,140 @@ test('shop products reuse server-validated shipping and reject tampered prices a
   assert.equal(rates.status,200); assert.equal(rates.data.quotes[0].price,18000);
   const started = await app.request('/cart/api/start.php',{...input,cart,shop:fixture.store.cartScope,total:1});
   assert.equal(started.status,201); assert.equal(started.data.payment_total,266000);
+  const savedOrder = JSON.parse(app.cli(`echo ez_json_encode(ez_load_order('${started.data.order_id}'));`));
+  assert.equal(Object.keys(savedOrder.product_snapshots).length, 2);
+  assert.ok(Object.values(savedOrder.product_snapshots).some(item => item.variant_id === 'large'));
+  assert.ok(Object.values(savedOrder.product_snapshots).every(item => item.product_id && item.image_url));
+  assert.ok(savedOrder.items.every(item => !Object.hasOwn(item, 'image_url')), 'Product snapshots stay out of provider line items');
   const shipping = (await app.calls()).find(call=>call.url.includes('/rates/couriers'));
   assert.equal(JSON.parse(shipping.body).items.reduce((sum,item)=>sum+item.quantity,0),3);
   fixture.selections.find(item=>item.id==='shop-granola').sellerId='seller_other';
   await writeFile(join(app.directory,'storefront.json'),JSON.stringify(fixture));
   assert.equal((await app.request('/cart/api/start.php',{...input,cart})).status,422);
+});
+
+test('dashboard uses scoped orders, real product photos, actual timestamps, date buckets and honest empty states', async t => {
+  const { chromium } = await import('../builder-mcp/node_modules/playwright/index.mjs');
+  const app = await setup({ EZKART_CLOUDFLARE_API_URL: 'https://ezkart-api-test.fixture.workers.dev' }); t.after(() => app.close());
+  const shop = { store: { sellerId: 'seller_fixture' }, catalog: [
+    { id: 'product_syrup', sku: 'SYRUP', name: 'Actual syrup', status: 'active', price: 50000, stock: 5, media: [{ id: 'media_product' }], variants: [{ id: 'variant_bottle', sku: 'SYRUP-BOTTLE', imageUploadId: 'media_bottle' }], reviewCount: 2, rating: 4.5 },
+    { id: 'product_archive', name: 'Archived product', status: 'archived', reviewCount: 1, rating: 3 },
+  ] };
+  await writeFile(join(app.directory, 'storefront.json'), JSON.stringify(shop));
+  const date = days => new Date(Date.now() - days * 86400000).toISOString();
+  const baseOrder = { seller_id: 'seller_fixture', commerce_environment: 'sandbox', shipping_skipped: true, customer: { name: 'Actual buyer', email: 'checkout@example.com', location: 'Sleman' }, items: [{ id: 'SYRUP-BOTTLE', name: 'Old syrup name', price: 50000, quantity: 1 }], total: 50000, subtotal: 50000, shipping_price: 0, status: 'PAID' };
+  const orders = [
+    { ...baseOrder, order_id: 'EZK-S-FIXTURE001', created_at: date(1) },
+    { ...baseOrder, order_id: 'EZK-S-FIXTURE002', created_at: date(20), status: 'PENDING' },
+    { ...baseOrder, order_id: 'EZK-S-FIXTURE003', created_at: date(70) },
+    { ...baseOrder, order_id: 'EZK-S-FIXTURE004', created_at: date(1), seller_id: 'seller_other', customer: { name: 'Private buyer', email: 'private@example.com' } },
+  ];
+  const encoded = Buffer.from(JSON.stringify(orders)).toString('base64');
+  app.cli(`foreach (json_decode(base64_decode('${encoded}'),true) as $order) ez_save_order($order); require ${JSON.stringify(join(root, 'cart/api/customer-profile.php'))}; ez_customer_save_profile(['id'=>'fixture-google-customer','email'=>'checkout@example.com','name'=>'Actual buyer','avatar_url'=>'https://lh3.googleusercontent.com/a/dashboard-fixture']);`);
+  const browser = await chromium.launch(); t.after(() => browser.close());
+  const context = await browser.newContext({ viewport: { width: 1600, height: 1100 } });
+  await context.addCookies([app.adminCookie()]);
+  const page = await context.newPage();
+  page.setDefaultTimeout(6000);
+  const errors = []; page.on('pageerror', error => errors.push(error.message));
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=', 'base64');
+  await page.route('**/*', route => {
+    const url = new URL(route.request().url()), cloud = url.searchParams.get('cloud');
+    if (url.hostname === 'lh3.googleusercontent.com') return route.fulfill({ contentType: 'image/png', body: png });
+    if (cloud?.startsWith('/v1/media/')) return route.fulfill({ contentType: 'image/png', body: png });
+    if (cloud === '/v1/admin-profile') return route.fulfill({ json: { ok: true, profile: { logoId: '', canEdit: true } } });
+    return route.continue();
+  });
+  await page.goto(app.base + '/cart/admin/?page=dashboard&range=7');
+  assert.equal(await page.locator('.kpi-grid article').nth(0).locator('strong').innerText(), 'Rp50 rb');
+  assert.equal(await page.locator('.kpi-grid article').nth(1).locator('strong').innerText(), '1');
+  assert.equal(await page.locator('.kpi-grid article').nth(2).locator('strong').innerText(), '100.0%');
+  assert.equal(await page.locator('#order-list [data-order-card]').count(), 1);
+  assert.equal(await page.getByText('Private buyer').count(), 0);
+  assert.match(await page.locator('#customer-feed').innerText(), /WIB/);
+  assert.equal(await page.locator('#customer-feed .identity-avatar img').first().getAttribute('src'), 'https://lh3.googleusercontent.com/a/dashboard-fixture');
+  await page.locator('#customer-feed .identity-avatar img').first().waitFor({ state: 'visible' });
+  assert.doesNotMatch(await page.locator('#customer-feed').innerText(), /Just now|min ago|Live/);
+  assert.match(await page.locator('.fulfillment-pulse').innerText(), /0 paid orders need/);
+  assert.equal(await page.locator('#top-products .product-art img').getAttribute('src'), './?cloud=%2Fv1%2Fmedia%2Fmedia_bottle');
+  assert.match(await page.locator('#top-products').innerText(), /Actual syrup/);
+  assert.match(await page.locator('.products-summary').innerText(), /1 products/);
+  assert.match(await page.locator('#customer-reviews').innerText(), /4\.0[\s\S]*3 published reviews/);
+  const dailyPath = await page.locator('.sales-chart path.line').getAttribute('d');
+  await page.getByRole('link', { name: 'Monthly', exact: true }).click();
+  assert.notEqual(await page.locator('.sales-chart path.line').getAttribute('d'), dailyPath);
+  // The shared select widget may wrap the native select; submitting its form remains identical.
+  await page.locator('select[name=range]').selectOption('30', { force: true });
+  await page.locator('.dashboard-period button[type=submit]').click();
+  assert.equal(await page.locator('.kpi-grid article').nth(1).locator('strong').innerText(), '2');
+  await page.goto(app.base + '/cart/admin/?page=dashboard&range=all');
+  assert.equal(await page.locator('.kpi-grid article').nth(1).locator('strong').innerText(), '3');
+  await page.screenshot({ path: '/tmp/ezkart-dashboard-real-desktop.png', fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.waitForTimeout(350); // Finish the sidebar's responsive transition before the visual check.
+  await page.screenshot({ path: '/tmp/ezkart-dashboard-real-mobile.png', fullPage: true });
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'Mobile dashboard must not overflow');
+  // An unscoped order action cannot mutate a different merchant's order.
+  const csrf = await page.locator('body').getAttribute('data-admin-csrf-token');
+  await page.request.post(app.base + '/cart/admin/', { form: { action: 'accept_order', csrf_token: csrf, order_id: 'EZK-S-FIXTURE004' } });
+  const other = JSON.parse(app.cli(`echo ez_json_encode(ez_load_order('EZK-S-FIXTURE004'));`));
+  assert.equal(other.accepted_at, undefined);
+  shop.catalogUnavailable = true;
+  await writeFile(join(app.directory, 'storefront.json'), JSON.stringify(shop));
+  await page.goto(app.base + '/cart/admin/?page=dashboard');
+  assert.match(await page.locator('[role=alert]').innerText(), /could not be loaded/);
+  assert.match(await page.locator('.products-summary').innerText(), /Unavailable/);
+  shop.catalogUnavailable = false; shop.identityUnavailable = true;
+  await writeFile(join(app.directory, 'storefront.json'), JSON.stringify(shop));
+  await page.reload();
+  assert.equal(await page.locator('.kpi-grid').count(), 0, 'Unavailable seller data must not look like zero sales');
+  shop.identityUnavailable = false; shop.catalog = [];
+  await writeFile(join(app.directory, 'storefront.json'), JSON.stringify(shop));
+  app.cli(`foreach (glob(ez_order_directory().'/*.json') as $path) unlink($path);`);
+  await page.reload();
+  assert.equal(await page.locator('.kpi-grid article').nth(0).locator('strong').innerText(), 'Rp0');
+  assert.match(await page.locator('#top-products').innerText(), /No paid product sales/);
+  assert.match(await page.locator('#customer-reviews').innerText(), /No published reviews/);
+  assert.equal(await page.locator('.product-art img').count(), 0);
+  assert.equal(await page.locator('.payout-body .positive').count(), 0);
+  assert.equal(errors.length, 0, errors.join('\n'));
+});
+
+test('verified tracking identity preserves Google photo privately and only matches owned customer records', async t => {
+  const app = await setup(); t.after(() => app.close());
+  const avatar = 'https://lh3.googleusercontent.com/a/fixture-photo';
+  await writeFile(join(app.directory, 'auth-response.json'), JSON.stringify({ user: { user_metadata: { full_name: 'Actual Buyer', picture: avatar } } }));
+  const cookie = app.customerCookie('checkout@example.com', 'fixture-google-customer', -1);
+  // An expired session uses a server-verified refresh and persists the photo.
+  const response = await fetch(app.base + '/cart/tracking-sandbox.php', { headers: { Cookie: `ezkart_customer=${cookie.value}` } });
+  const html = await response.text();
+  assert.equal(response.status, 200);
+  assert.match(html, /class="customer-profile-photo"/);
+  assert.ok(html.includes(avatar));
+  const result = JSON.parse(app.cli(`require ${JSON.stringify(join(root, 'cart/api/customer-profile.php'))}; $order=['customer'=>['email'=>'checkout@example.com']]; echo ez_json_encode([ez_customer_order_profile($order),ez_customer_order_profile($order+['customer_auth_user_id'=>'different-user']),ez_profile_image_url('javascript:alert(1)'),ez_profile_image_url('https://user:password@example.com/image')]);`));
+  assert.equal(result[0].avatar_url, avatar);
+  assert.equal(result[0].name, 'Actual Buyer');
+  assert.deepEqual(result[1], []);
+  assert.equal(result[2], ''); assert.equal(result[3], '');
+  assert.equal(Object.hasOwn(result[0], 'access_token'), false);
+  await writeFile(join(app.directory, 'auth-response.json'), JSON.stringify({ user: { user_metadata: {} } }));
+  const cleared = app.customerCookie('checkout@example.com', 'fixture-google-customer', -1);
+  await fetch(app.base + '/cart/tracking-sandbox.php', { headers: { Cookie: `ezkart_customer=${cleared.value}` } });
+  assert.equal(JSON.parse(app.cli(`require ${JSON.stringify(join(root, 'cart/api/customer-profile.php'))}; echo ez_json_encode(ez_customer_order_profile(['customer'=>['email'=>'checkout@example.com']]));`)).avatar_url, '');
+});
+
+test('dashboard periods honor Jakarta midnight and keep month-end and ISO-week buckets aligned', async t => {
+  const app = await setup(); t.after(() => app.close());
+  const result = JSON.parse(app.cli(`require ${JSON.stringify(join(root, 'cart/admin/dashboard-data.php'))};
+    $now=new DateTimeImmutable('2026-03-31 12:00:00',new DateTimeZone('Asia/Jakarta'));
+    $period=ez_dashboard_period(['range'=>'7'],$now);
+    $edges=array_map(static fn($date)=>ez_dashboard_in_period(['created_at'=>$date],$period),['2026-03-24T16:59:59Z','2026-03-24T17:00:00Z','2026-03-31T16:59:59Z','2026-03-31T17:00:00Z']);
+    $months=ez_dashboard_chart([['created_at'=>'2026-01-31T00:00:00Z','status'=>'PAID','total'=>100],['created_at'=>'2026-03-01T00:00:00Z','status'=>'PENDING','total'=>999]],ez_dashboard_period(['range'=>'all'],$now),'monthly',$now);
+    $weekNow=new DateTimeImmutable('2026-01-03 12:00:00',new DateTimeZone('Asia/Jakarta'));
+    $weeks=ez_dashboard_chart([['created_at'=>'2025-12-31T00:00:00Z','status'=>'PAID','total'=>50],['created_at'=>'2026-01-02T00:00:00Z','status'=>'PAID','total'=>75]],ez_dashboard_period(['range'=>'7'],$weekNow),'weekly',$weekNow);
+    echo ez_json_encode([$edges,$months['buckets'],$weeks['buckets']]);`));
+  assert.deepEqual(result[0], [false, true, true, false]);
+  assert.deepEqual(Object.keys(result[1]), ['2026-01', '2026-02', '2026-03']);
+  assert.deepEqual(Object.values(result[1]).map(bucket => bucket.value), [100, 0, 0]);
+  assert.equal(result[2]['2026-01'].value, 125);
 });

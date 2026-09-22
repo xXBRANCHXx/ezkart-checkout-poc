@@ -132,3 +132,5 @@
 .sandbox-destination button, .sandbox-destination a { font-size: 11px; color: #182b45; }
 .sandbox-destination button { padding: 7px 10px; background: #fff; border: 1px solid #cdd8e5; border-radius: 6px; cursor: pointer; }
 @media (max-width: 780px) { .map-tools { bottom: 66px; } .sandbox-destination select { width: 100%; font-size: 16px; } }
+
+.customer-profile-photo { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; flex: 0 0 auto; }

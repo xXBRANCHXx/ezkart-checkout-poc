@@ -31,10 +31,10 @@ header('X-Content-Type-Options: nosniff');
   <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="payment.css?v=2">
   <link rel="stylesheet" href="vendor/maplibre/maplibre-gl.css?v=5.24.0">
-  <link rel="stylesheet" href="tracking.css?v=9">
+  <link rel="stylesheet" href="tracking.css?v=10">
   <script src="tracking-map.js?v=5" defer></script>
   <?php if ($isTrackingSandbox): ?><script src="tracking-sandbox.js?v=6" defer></script><?php endif; ?>
-  <script src="tracking.js?v=6" defer></script>
+  <script src="tracking.js?v=7" defer></script>
   <title>Track your order · Ezkart</title>
 </head>
 <body>
@@ -43,7 +43,7 @@ header('X-Content-Type-Options: nosniff');
     <span class="secure-label">Order updates</span>
   </div></header>
   <main class="return-shell" data-order="<?= htmlspecialchars($orderId, ENT_QUOTES, 'UTF-8') ?>">
-    <div class="customer-account"><span>Signed in as <b><?= htmlspecialchars($customerAccount['email'], ENT_QUOTES, 'UTF-8') ?></b></span><form method="post" action="/cart/login.php"><input type="hidden" name="action" value="logout"><input type="hidden" name="csrf_token" value="<?= htmlspecialchars($customerCsrf, ENT_QUOTES, 'UTF-8') ?>"><input type="hidden" name="next" value="<?= htmlspecialchars($customerNext, ENT_QUOTES, 'UTF-8') ?>"><button type="submit">Sign out</button></form></div>
+    <div class="customer-account"><?php if (ez_profile_image_url($customerAccount['avatar_url'] ?? '') !== ''): ?><img class="customer-profile-photo" src="<?= htmlspecialchars($customerAccount['avatar_url'], ENT_QUOTES, 'UTF-8') ?>" alt="Your Google profile photo" referrerpolicy="no-referrer"><?php endif; ?><span>Signed in as <b><?= htmlspecialchars($customerAccount['email'], ENT_QUOTES, 'UTF-8') ?></b></span><form method="post" action="/cart/login.php"><input type="hidden" name="action" value="logout"><input type="hidden" name="csrf_token" value="<?= htmlspecialchars($customerCsrf, ENT_QUOTES, 'UTF-8') ?>"><input type="hidden" name="next" value="<?= htmlspecialchars($customerNext, ENT_QUOTES, 'UTF-8') ?>"><button type="submit">Sign out</button></form></div>
     <?php if ($isTrackingSandbox): ?>
     <section class="sandbox-controls" aria-label="Sandbox walkthrough controls">
       <div><strong>Sandbox walkthrough</strong><p>Simulated order data and sample map locations. No payment or courier booking is made.</p></div>

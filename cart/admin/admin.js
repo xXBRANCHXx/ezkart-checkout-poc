@@ -506,6 +506,14 @@
   const updateLandingCountBadges = (count = readLandingSites().length) => {
     document.querySelectorAll("[data-site-count]").forEach((badge) => { badge.textContent = String(count); });
     document.querySelectorAll("[data-landing-page-summary]").forEach((target) => { target.textContent = count ? `${count} landing page${count === 1 ? "" : "s"}` : "No landing pages"; });
+    if (cloudLandingLoadError) {
+      document.querySelectorAll('[data-landing-page-summary], [data-landing-page-state]').forEach(target => { target.textContent = 'Unavailable'; });
+      document.querySelectorAll('[data-landing-page-detail]').forEach(target => { target.textContent = 'Saved pages could not be loaded. Reload to try again.'; });
+      return;
+    }
+    const published = readLandingSites().filter((site) => site.status === "published").length;
+    document.querySelectorAll("[data-landing-page-state]").forEach((target) => { target.textContent = count ? `${published} published` : "Empty"; });
+    document.querySelectorAll("[data-landing-page-detail]").forEach((target) => { target.textContent = count ? `${published} published · ${count - published} drafts` : "Create your first Ezkart site"; });
   };
   const formatCreatorPrice = (amount) => `Rp${new Intl.NumberFormat("id-ID").format(amount)}`;
   const readImageFile = (file) => new Promise((resolve, reject) => {

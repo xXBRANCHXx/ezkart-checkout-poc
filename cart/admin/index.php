@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once dirname(__DIR__) . '/api/bootstrap.php';
+require_once __DIR__ . '/dashboard-data.php';
 
 $previewRepairFrame = ($_GET['preview-repair'] ?? '') === '1'
     && ($_GET['page'] ?? '') === 'sites'
@@ -179,18 +180,12 @@ function ez_admin_short_money(mixed $value): string
     return ez_admin_money($amount);
 }
 
-function ez_admin_product_art(string $name): string
+function ez_admin_product_art(string $name, string $imageUrl = ''): string
 {
-    $normalized = mb_strtolower($name);
-    $type = str_contains($normalized, 'kopi')
-        ? 'coffee'
-        : (str_contains($normalized, 'sambal') ? 'sambal' : 'granola');
-    $src = match ($type) {
-        'coffee' => 'assets/products/kopi-susu.webp',
-        'sambal' => 'assets/products/sambal-roa.webp',
-        default => 'assets/products/granola.webp',
-    };
-    return '<span class="product-art product-' . $type . '"><img src="' . $src . '" alt="" loading="lazy"></span>';
+    $local = preg_match('#^(?:\./\?cloud=%2Fv1%2Fmedia%2F[a-zA-Z0-9_-]+|/cart/admin/assets/products/[a-z0-9-]+\.webp)$#i', $imageUrl) === 1;
+    $src = $local ? $imageUrl : ez_profile_image_url($imageUrl);
+    return '<span class="product-art record-product-art">' . ez_admin_icon('box')
+        . ($src !== '' ? '<img src="' . ez_admin_escape($src) . '" alt="' . ez_admin_escape($name) . '" loading="lazy" data-record-image>' : '') . '</span>';
 }
 
 function ez_admin_location_coordinates(string $location): array
@@ -1204,6 +1199,38 @@ if ($cloudPath !== '') {
         $cloudMethod,
     );
 }
+$catalogData = [];
+$catalogError = '';
+$sellerId = '';
+if ($authenticated && $authenticationMethod === 'supabase') {
+    try {
+        $apiUrl = rtrim(ez_config('cloudflare_api_url'), '/');
+        $headers = ['Accept: application/json', 'Authorization: Bearer ' . $_SESSION['supabase_access_token']];
+        $identity = ez_admin_get_json($apiUrl . '/v1/me', $headers, 'Ezkart account');
+        $sellerId = (string) ($identity['user']['active_seller']['id'] ?? '');
+        $catalogData = ez_admin_get_json($apiUrl . '/v1/catalog', $headers, 'Ezkart catalog');
+        if (($catalogData['ok'] ?? false) !== true || $sellerId === '') throw new RuntimeException('Catalog unavailable');
+    } catch (Throwable $error) {
+        $catalogError = 'Store data could not be loaded. Reload to try again.';
+        $catalogData = [];
+    }
+}
+$dashboardProducts = array_values(array_filter($catalogData['products'] ?? [], 'is_array'));
+$dashboardProductLookup = ez_dashboard_product_lookup($dashboardProducts);
+if ($legacyDataAccess) {
+    foreach (ez_catalog() as $demoProduct) {
+        $dashboardProductLookup[$demoProduct['sku']] ??= ['product_id' => $demoProduct['sku'], 'name' => $demoProduct['name'], 'image_url' => '/cart/' . $demoProduct['image_url']];
+    }
+}
+$activeCatalogCount = ($catalogError !== '' || $authenticationMethod !== 'supabase') ? null : count(array_filter($dashboardProducts, static fn($product) => ($product['status'] ?? '') === 'active'));
+$reviewCount = 0;
+$reviewRatingTotal = 0;
+foreach ($dashboardProducts as $product) {
+    $count = max(0, (int) ($product['reviewCount'] ?? 0));
+    $reviewCount += $count;
+    $reviewRatingTotal += $count * (float) ($product['rating'] ?? 0);
+}
+$reviewAverage = $reviewCount > 0 ? round($reviewRatingTotal / $reviewCount, 1) : null;
 if (
     ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST'
     && in_array((string) ($_POST['action'] ?? ''), ['accept_order', 'arrange_pickup'], true)
@@ -1220,6 +1247,9 @@ if (
     try {
         if (preg_match('/^EZK-[A-Z0-9-]{8,70}$/', $orderId) !== 1) {
             throw new InvalidArgumentException('Invalid order reference.');
+        }
+        if (!ez_dashboard_order_visible(ez_load_order($orderId), $sellerId, $legacyDataAccess)) {
+            throw new InvalidArgumentException('Order not found.');
         }
         if ((string) $_POST['action'] === 'accept_order') {
             ez_accept_paid_order($orderId);
@@ -1257,7 +1287,22 @@ $adminStorageIdentity = $authenticationMethod === 'supabase'
     ? (string) ($adminUser['id'] ?? '')
     : 'legacy-password-owner';
 $adminStorageScope = substr(hash('sha256', $deployment . '|' . $adminStorageIdentity), 0, 24);
-$orders = $legacyDataAccess ? ez_admin_orders() : [];
+$nowJakarta = new DateTimeImmutable('now', new DateTimeZone('Asia/Jakarta'));
+$dashboardPeriod = ez_dashboard_period($_GET, $nowJakarta);
+$isDashboard = !isset($_GET['page']) || $_GET['page'] === 'dashboard';
+$orders = ($authenticated && ($legacyDataAccess || $sellerId !== '')) ? array_values(array_filter(ez_admin_orders(), static fn($order) => ez_dashboard_order_visible($order, $sellerId, $legacyDataAccess))) : [];
+$allOrderCount = count($orders);
+if ($isDashboard) $orders = array_values(array_filter($orders, static fn($order) => ez_dashboard_in_period($order, $dashboardPeriod)));
+foreach ($orders as &$order) {
+    $profile = ez_customer_order_profile($order);
+    $order['customer']['avatar_url'] = $profile['avatar_url'] ?? '';
+    foreach ($order['items'] ?? [] as $itemIndex => $item) {
+        if (!is_array($item) || ($item['id'] ?? '') === 'EZK-SHIPPING') continue;
+        $resolved = ez_dashboard_item($item, $order, $dashboardProductLookup);
+        $order['items'][$itemIndex]['dashboard_product'] = $resolved;
+    }
+}
+unset($order);
 $orderFlash = is_array($_SESSION['order_flash'] ?? null) ? $_SESSION['order_flash'] : null;
 unset($_SESSION['order_flash']);
 $metrics = [
@@ -1287,9 +1332,9 @@ foreach ($orders as $order) {
         $metrics['paid_volume'] += (int) ($order['total'] ?? 0);
         $paidProductRevenue += max(0, (int) ($order['subtotal'] ?? 0));
         $paidShippingRevenue += max(0, (int) ($order['shipping_price'] ?? 0));
-        if (strtoupper((string) ($order['fulfillment_status'] ?? '')) === 'CONFIRMED' && trim((string) ($order['biteship_order_id'] ?? '')) !== '') {
+        if (trim((string) ($order['biteship_order_id'] ?? '')) !== '') {
             $metrics['fulfilled_count']++;
-        } else {
+        } elseif (!ez_order_skips_shipping($order)) {
             $metrics['fulfillment_attention_count']++;
         }
     } elseif (in_array($status, ['CREATING', 'PENDING'], true)) {
@@ -1301,13 +1346,14 @@ foreach ($orders as $order) {
     }
     foreach ((array) ($order['items'] ?? []) as $item) {
         if (!is_array($item) || ($item['id'] ?? '') === 'EZK-SHIPPING') continue;
-        $name = trim((string) ($item['name'] ?? 'Produk')) ?: 'Produk';
+        $resolved = $item['dashboard_product'] ?? ez_dashboard_item($item, $order, $dashboardProductLookup);
+        $name = $resolved['key'];
         $quantity = max(0, (int) ($item['quantity'] ?? 0));
-        if (!isset($productActivity[$name])) $productActivity[$name] = ['quantity' => 0, 'sales' => 0];
+        if (!isset($productActivity[$name])) $productActivity[$name] = ['quantity' => 0, 'sales' => 0, 'name' => $resolved['name'], 'image_url' => $resolved['image_url']];
         $productActivity[$name]['quantity'] += $quantity;
         $productActivity[$name]['sales'] += $quantity * max(0, (int) ($item['price'] ?? 0));
         if ($status === 'PAID') {
-            if (!isset($productSales[$name])) $productSales[$name] = ['quantity' => 0, 'sales' => 0];
+            if (!isset($productSales[$name])) $productSales[$name] = ['quantity' => 0, 'sales' => 0, 'name' => $resolved['name'], 'image_url' => $resolved['image_url']];
             $productSales[$name]['quantity'] += $quantity;
             $productSales[$name]['sales'] += $quantity * max(0, (int) ($item['price'] ?? 0));
         }
@@ -1317,39 +1363,26 @@ uasort($productSales, static fn(array $left, array $right): int => $right['sales
 uasort($productActivity, static fn(array $left, array $right): int => $right['quantity'] <=> $left['quantity']);
 $displayOrders = array_slice($orders, 0, 7);
 $averageOrder = $metrics['paid_count'] > 0 ? (int) round($metrics['paid_volume'] / $metrics['paid_count']) : 0;
-$conversionRate = $metrics['orders'] > 0 ? min(99.9, round(($metrics['paid_count'] / $metrics['orders']) * 100, 1)) : 0;
+$conversionRate = $metrics['orders'] > 0 ? round(($metrics['paid_count'] / $metrics['orders']) * 100, 1) : 0;
 $fulfillmentRate = $metrics['paid_count'] > 0 ? round(($metrics['fulfilled_count'] / $metrics['paid_count']) * 100) : 0;
 $refundRate = $metrics['orders'] > 0 ? round(($metrics['failed_count'] / $metrics['orders']) * 100, 1) : 0;
-$productDefaults = [
-    'Granola Madu Nusantara' => ['quantity' => 0, 'sales' => 0],
-    'Kopi Susu Concentrate' => ['quantity' => 0, 'sales' => 0],
-    'Sambal Roa Signature' => ['quantity' => 0, 'sales' => 0],
-];
-$topProducts = array_slice($productSales !== [] ? $productSales : $productDefaults, 0, 5, true);
-$catalogProducts = array_slice($productActivity !== [] ? $productActivity : $productDefaults, 0, 3, true);
+$topProducts = array_slice($productSales, 0, 5, true);
+$catalogProducts = array_slice($productActivity, 0, 3, true);
 $paidUnits = array_sum(array_column($productSales, 'quantity'));
-$nowJakarta = new DateTimeImmutable('now', new DateTimeZone('Asia/Jakarta'));
-$dateRangeStart = $nowJakarta->modify('-6 days');
-$salesMonths = [];
-for ($offset = 5; $offset >= 0; $offset--) {
-    $month = $nowJakarta->modify('-' . $offset . ' months')->modify('first day of this month');
-    $salesMonths[$month->format('Y-m')] = ['label' => $month->format('M'), 'value' => 0];
-}
-foreach ($orders as $order) {
-    if (strtoupper((string) ($order['status'] ?? '')) !== 'PAID') continue;
-    $timestamp = strtotime((string) ($order['created_at'] ?? ''));
-    if ($timestamp === false) continue;
-    $monthKey = (new DateTimeImmutable('@' . $timestamp))->setTimezone(new DateTimeZone('Asia/Jakarta'))->format('Y-m');
-    if (isset($salesMonths[$monthKey])) $salesMonths[$monthKey]['value'] += max(0, (int) ($order['total'] ?? 0));
-}
-$chartMaximum = max(1, ...array_column($salesMonths, 'value'));
+$dateRangeStart = $dashboardPeriod['start'];
+$chartGroup = in_array($_GET['group'] ?? '', ['daily', 'weekly', 'monthly'], true) ? $_GET['group'] : 'daily';
+$chart = ez_dashboard_chart($orders, $isDashboard ? $dashboardPeriod : ['start' => null, 'end' => $nowJakarta->setTime(0, 0)->modify('+1 day')], $chartGroup, $nowJakarta);
+$chartGroup = $chart['group'];
+$salesMonths = $chart['buckets'];
+$chartMaximum = max([0, ...array_column($salesMonths, 'value')]);
 $chartPoints = [];
 $monthCount = max(1, count($salesMonths) - 1);
 foreach (array_values($salesMonths) as $index => $month) {
     $x = round(($index / $monthCount) * 600, 1);
-    $y = round(160 - (($month['value'] / $chartMaximum) * 145), 1);
+    $y = round(170 - (($month['value'] / max(1, $chartMaximum)) * 160), 1);
     $chartPoints[] = $x . ' ' . $y;
 }
+if (count($chartPoints) === 1) $chartPoints[] = '600 ' . $y;
 $chartLine = 'M' . implode(' L', $chartPoints);
 $chartArea = $chartLine . ' L600 170 L0 170 Z';
 $latestCustomer = is_array($orders[0]['customer'] ?? null) ? $orders[0]['customer'] : [];
@@ -1381,6 +1414,7 @@ foreach ($orders as $order) {
         $customerProfiles[$customerKey] = [
             'name' => (string) ($customer['name'] ?? 'Guest customer'),
             'email' => $email !== '' ? $email : '—',
+            'avatar_url' => (string) ($customer['avatar_url'] ?? ''),
             'phone' => (string) ($customer['phone'] ?? '—'),
             'location' => (string) ($customer['location'] ?? '—'),
             'orders' => 0, 'paid' => 0, 'spend' => 0,
@@ -1402,11 +1436,11 @@ uasort($customerProfiles, static fn(array $left, array $right): int => $right['s
 arsort($paymentMethods);
 $cloudMediaBase = rtrim(ez_config('cloudflare_api_url'), '/');
 if (filter_var($cloudMediaBase, FILTER_VALIDATE_URL) === false) $cloudMediaBase = '';
-$catalogInventory = $legacyDataAccess ? [
-    'Granola Madu Nusantara' => ['sku' => 'EZK-DEMO-GRANOLA', 'price' => 58000, 'stock' => 46, 'category' => 'Breakfast'],
-    'Kopi Susu Concentrate' => ['sku' => 'EZK-DEMO-COFFEE', 'price' => 79000, 'stock' => 28, 'category' => 'Beverage'],
-    'Sambal Roa Signature' => ['sku' => 'EZK-DEMO-SAMBAL', 'price' => 46000, 'stock' => 34, 'category' => 'Condiment'],
-] : [];
+$catalogInventory = [];
+foreach ($dashboardProducts as $product) {
+    if (($product['status'] ?? '') !== 'active') continue;
+    $catalogInventory[$product['name']] = ['sku' => $product['sku'] ?? '', 'price' => $product['price'] ?? 0, 'stock' => $product['stock'] ?? 0, 'category' => $product['category'] ?? ''];
+}
 $adminCssVersion = (string) (@filemtime(__DIR__ . '/admin.css') ?: 1);
 $catalogCssVersion = (string) (@filemtime(__DIR__ . '/catalog.css') ?: 1);
 $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
@@ -1425,6 +1459,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
   <?php if ($authenticated && $page === 'sites'): ?><link rel="stylesheet" href="builder-templates.css?v=<?= (int) filemtime(__DIR__ . '/builder-templates.css') ?>"><?php endif; ?>
   <?php if ($authenticated && $page === 'sites' && $siteEditor): ?><link rel="stylesheet" href="builder-native.css?v=<?= (int) filemtime(__DIR__ . '/builder-native.css') ?>"><link rel="stylesheet" href="builder-components.css?v=<?= (int) filemtime(__DIR__ . '/builder-components.css') ?>"><link rel="stylesheet" href="builder-flow.css?v=<?= (int) filemtime(__DIR__ . '/builder-flow.css') ?>"><link rel="stylesheet" href="builder-showcase.css?v=<?= (int) filemtime(__DIR__ . '/builder-showcase.css') ?>"><link rel="stylesheet" href="builder-chrome.css?v=<?= (int) filemtime(__DIR__ . '/builder-chrome.css') ?>"><?php endif; ?>
   <?php if ($authenticated && $page === 'products'): ?><link rel="stylesheet" href="catalog.css?v=<?= ez_admin_escape($catalogCssVersion) ?>"><?php endif; ?>
+  <link rel="stylesheet" href="dashboard-data.css?v=<?= (int) filemtime(__DIR__ . '/dashboard-data.css') ?>">
   <link rel="stylesheet" href="admin-ui.css?v=<?= (int) filemtime(__DIR__ . '/admin-ui.css') ?>">
   <link rel="stylesheet" href="profile-logo.css?v=<?= (int) filemtime(__DIR__ . '/profile-logo.css') ?>">
   <link rel="stylesheet" href="../select.css?v=<?= (int) filemtime(__DIR__ . '/../select.css') ?>">
@@ -1588,7 +1623,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
       <a class="sidebar-brand" href="../../"><img src="../../assets/ezkart-logo.svg" alt="Ezkart"></a>
       <nav class="primary-nav" aria-label="Main navigation">
         <a class="<?= $page === 'dashboard' ? 'active' : '' ?>" href="?page=dashboard"><?= ez_admin_icon('grid') ?><span>Dashboard</span></a>
-        <a class="<?= $page === 'orders' ? 'active' : '' ?>" href="?page=orders"><?= ez_admin_icon('cart') ?><span>Orders</span><b><?= $metrics['orders'] ?></b></a>
+        <a class="<?= $page === 'orders' ? 'active' : '' ?>" href="?page=orders"><?= ez_admin_icon('cart') ?><span>Orders</span><b><?= $allOrderCount ?></b></a>
         <a class="<?= in_array($page, ['products', 'product-new'], true) ? 'active' : '' ?>" href="?page=products"><?= ez_admin_icon('box') ?><span>Products</span></a>
         <a class="<?= $page === 'shop' ? 'active' : '' ?>" href="?page=shop"><?= ez_admin_icon('cart') ?><span>Shop</span></a>
         <a class="<?= $page === 'sites' ? 'active' : '' ?>" href="?page=sites"><?= ez_admin_icon('layout') ?><span>Landing Pages</span><b data-site-count>0</b></a>
@@ -1597,7 +1632,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
         <a class="<?= $page === 'marketing' ? 'active' : '' ?>" href="?page=marketing"><?= ez_admin_icon('send') ?><span>Marketing</span></a>
         <a class="<?= $page === 'payments' ? 'active' : '' ?>" href="?page=payments"><?= ez_admin_icon('wallet') ?><span>Payments</span></a>
         <a class="<?= $page === 'reviews' ? 'active' : '' ?>" href="?page=reviews"><?= ez_admin_icon('star') ?><span>Reviews</span></a>
-        <a class="<?= $page === 'messages' ? 'active' : '' ?>" href="?page=messages"><?= ez_admin_icon('message') ?><span>Messages</span><b><?= $metrics['pending_count'] ?></b></a>
+        <a class="<?= $page === 'messages' ? 'active' : '' ?>" href="?page=messages"><?= ez_admin_icon('message') ?><span>Messages</span></a>
         <a class="<?= $page === 'integrations' ? 'active' : '' ?>" href="?page=integrations"><?= ez_admin_icon('plug') ?><span>Integrations</span></a>
         <a class="<?= $page === 'settings' ? 'active' : '' ?>" href="?page=settings"><?= ez_admin_icon('settings') ?><span>Settings</span></a>
       </nav>
@@ -1613,8 +1648,8 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
         <button class="mobile-menu" id="mobile-menu" type="button" aria-label="Open navigation"><?= ez_admin_icon('menu') ?></button>
         <label class="global-search"><?= ez_admin_icon('search') ?><input id="global-search" type="search" placeholder="Search anything..." autocomplete="off"><kbd>⌘ K</kbd></label>
         <div class="top-actions">
-          <button class="icon-button" type="button" aria-label="Notifications"><?= ez_admin_icon('bell') ?><i><?= $metrics['pending_count'] ?></i></button>
-          <button class="icon-button" type="button" aria-label="Messages"><?= ez_admin_icon('message') ?></button>
+          <a class="icon-button" href="?page=orders" aria-label="Open orders"><?= ez_admin_icon('bell') ?></a>
+          <a class="icon-button" href="?page=messages" aria-label="Messages"><?= ez_admin_icon('message') ?></a>
           <button class="icon-button" type="button" aria-label="Help"><?= ez_admin_icon('help') ?></button>
           <a class="profile" id="account-menu" href="?page=settings#profile-logo" aria-label="Profile settings"><span class="avatar" data-admin-profile-avatar><span data-admin-profile-fallback><?= ez_admin_escape(mb_substr($adminInitials, 0, 2)) ?></span><img data-admin-profile-image alt="" hidden></span><div><b><?= ez_admin_escape($adminDisplayName) ?></b><small><?= ez_admin_escape($adminDisplayEmail) ?></small></div><?= ez_admin_icon('chevron-down', 'chevron-icon') ?></a>
           <form method="post" class="logout-form">
@@ -1627,13 +1662,16 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
       <main class="dashboard page-canvas" id="overview">
         <section class="welcome-row page-heading">
           <div><h1>Dashboard</h1><p>View your sales, orders, and store activity.</p></div>
-          <div class="page-actions"><button class="date-button" type="button"><?= ez_admin_icon('calendar') ?><span><?= $dateRangeStart->format('M j') ?> – <?= $nowJakarta->format('M j, Y') ?></span><?= ez_admin_icon('chevron-down', 'chevron-icon') ?></button></div>
+          <form class="page-actions dashboard-period" method="get"><input type="hidden" name="page" value="dashboard"><input type="hidden" name="group" value="<?= ez_admin_escape($chartGroup) ?>"><label><?= ez_admin_icon('calendar') ?><select name="range" aria-label="Dashboard date range"><?php foreach (['7' => 'Last 7 days', '30' => 'Last 30 days', '90' => 'Last 90 days', 'all' => 'All time'] as $value => $label): ?><option value="<?= $value ?>" <?= $dashboardPeriod['range'] === (string) $value ? 'selected' : '' ?>><?= $label ?></option><?php endforeach; ?></select></label><button type="submit">Apply</button></form>
         </section>
 
+        <p class="dashboard-data-note"><?= $dateRangeStart !== null ? ez_admin_escape($dateRangeStart->format('j M Y') . ' – ' . $nowJakarta->format('j M Y') . ' · ') : 'All time · ' ?><?= $commerceProduction ? 'Production' : 'Sandbox' ?> order records · Updated <?= $nowJakarta->format('H:i') ?> WIB <a href="<?= ez_admin_escape('?' . http_build_query(['page' => 'dashboard', 'range' => $dashboardPeriod['range'], 'group' => $chartGroup])) ?>">Refresh</a></p>
+        <?php if ($catalogError !== ''): ?><p class="dashboard-data-error" role="alert"><?= ez_admin_escape($catalogError) ?></p><?php endif; ?>
+        <?php if ($authenticationMethod !== 'supabase' || $sellerId !== ''): ?>
         <section class="kpi-grid" aria-label="Store overview">
           <article><span class="kpi-icon"><?= ez_admin_icon('money') ?></span><div><small>Total Sales</small><strong><?= ez_admin_short_money($metrics['paid_volume']) ?></strong><em class="positive"><?= $metrics['paid_count'] ?> paid</em><p>Provider-confirmed payments</p></div></article>
-          <article><span class="kpi-icon"><?= ez_admin_icon('cart') ?></span><div><small>Orders</small><strong><?= number_format($metrics['orders']) ?></strong><em><?= $metrics['pending_count'] ?> open</em><p>All stored orders</p></div></article>
-          <article><span class="kpi-icon"><?= ez_admin_icon('trend') ?></span><div><small>Conversion Rate</small><strong><?= number_format($conversionRate, 1) ?>%</strong><p>Paid orders / all orders</p></div></article>
+          <article><span class="kpi-icon"><?= ez_admin_icon('cart') ?></span><div><small>Orders</small><strong><?= number_format($metrics['orders']) ?></strong><em><?= $metrics['pending_count'] ?> open</em><p>Created in selected period</p></div></article>
+          <article><span class="kpi-icon"><?= ez_admin_icon('trend') ?></span><div><small>Payment Rate</small><strong><?= number_format($conversionRate, 1) ?>%</strong><p>Paid orders / all orders</p></div></article>
           <article><span class="kpi-icon"><?= ez_admin_icon('chart') ?></span><div><small>Average Order Value</small><strong><?= ez_admin_short_money($averageOrder) ?></strong><p>Across paid transactions</p></div></article>
           <article><span class="kpi-icon"><?= ez_admin_icon('refund') ?></span><div><small>Failure Rate</small><strong><?= number_format($refundRate, 1) ?>%</strong><em class="<?= $metrics['failed_count'] > 0 ? 'negative' : 'positive' ?>"><?= $metrics['failed_count'] ?> failed</em><p>Failed or expired orders</p></div></article>
           <article><span class="kpi-icon"><?= ez_admin_icon('wallet') ?></span><div><small>Confirmed Volume</small><strong><?= ez_admin_short_money($metrics['paid_volume']) ?></strong><p>Provider-confirmed payment volume</p></div></article>
@@ -1642,12 +1680,12 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
         <section class="dashboard-grid primary-grid">
           <article class="panel sales-panel" id="sales-overview">
             <header class="panel-header"><h2>Sales Overview</h2></header>
-            <div class="chart-controls"><div><button>Daily</button><button>Weekly</button><button class="active">Monthly</button></div><button class="compare-button">Compare: Previous Period <?= ez_admin_icon('chevron-down') ?></button></div>
+            <div class="chart-controls"><div><?php foreach (['daily' => 'Daily', 'weekly' => 'Weekly', 'monthly' => 'Monthly'] as $group => $label): ?><a class="<?= $chartGroup === $group ? 'active' : '' ?>" href="<?= ez_admin_escape('?' . http_build_query(['page' => 'dashboard', 'range' => $dashboardPeriod['range'], 'group' => $group])) ?>"><?= $label ?></a><?php endforeach; ?></div><small>Paid orders by order date</small></div>
             <div class="sales-chart">
               <div class="chart-y"><span><?= ez_admin_short_money($chartMaximum) ?></span><span><?= ez_admin_short_money($chartMaximum * .75) ?></span><span><?= ez_admin_short_money($chartMaximum * .5) ?></span><span><?= ez_admin_short_money($chartMaximum * .25) ?></span><span>Rp0</span></div>
-              <svg viewBox="0 0 600 170" preserveAspectRatio="none" aria-label="Confirmed sales over the last six months"><defs><linearGradient id="sales-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff4d53" stop-opacity=".27"/><stop offset="1" stop-color="#ff4d53" stop-opacity=".01"/></linearGradient></defs><path class="area" d="<?= ez_admin_escape($chartArea) ?>"/><path class="line" d="<?= ez_admin_escape($chartLine) ?>"/></svg>
-              <div class="chart-x"><?php foreach ($salesMonths as $month): ?><span><?= ez_admin_escape($month['label']) ?></span><?php endforeach; ?></div>
-              <div class="chart-tip"><small>Current month</small><b><?= ez_admin_short_money(array_values($salesMonths)[5]['value']) ?></b></div>
+              <svg viewBox="0 0 600 170" preserveAspectRatio="none" aria-label="Paid order totals in the selected period"><defs><linearGradient id="sales-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff4d53" stop-opacity=".27"/><stop offset="1" stop-color="#ff4d53" stop-opacity=".01"/></linearGradient></defs><path class="area" d="<?= ez_admin_escape($chartArea) ?>"/><path class="line" d="<?= ez_admin_escape($chartLine) ?>"/></svg>
+              <div class="chart-x"><?php $chartLabels = array_values($salesMonths); foreach ($chartLabels as $index => $month): if ($index % max(1, (int) ceil((count($chartLabels) - 1) / 5)) !== 0 && $index !== count($chartLabels) - 1) continue; ?><span><?= ez_admin_escape($month['label']) ?></span><?php endforeach; ?></div>
+              <div class="chart-tip"><small>Selected period</small><b><?= ez_admin_short_money($metrics['paid_volume']) ?></b></div>
             </div>
           </article>
 
@@ -1661,7 +1699,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
                 $items = array_values(array_filter((array) ($order['items'] ?? []), static fn($item): bool => is_array($item) && ($item['id'] ?? '') !== 'EZK-SHIPPING'));
                 $firstItem = is_array($items[0] ?? null) ? $items[0] : [];
                 $searchText = mb_strtolower(implode(' ', [(string) ($order['order_id'] ?? ''), (string) ($customer['name'] ?? ''), (string) ($customer['email'] ?? ''), (string) ($firstItem['name'] ?? '')]));
-              ?><tr data-order-card data-status="<?= ez_admin_escape($status) ?>" data-search="<?= ez_admin_escape($searchText) ?>"><td><button class="order-link" type="button" data-order-toggle aria-expanded="false" title="View <?= ez_admin_escape($order['order_id'] ?? 'order') ?>">#<?= ez_admin_escape(str_replace('EZK-', '', (string) ($order['order_id'] ?? '—'))) ?></button></td><td><?= ez_admin_escape($customer['name'] ?? 'Guest customer') ?></td><td><span class="table-product"><?= ez_admin_product_art((string) ($firstItem['name'] ?? '')) ?><?= ez_admin_escape($firstItem['name'] ?? 'Mixed order') ?></span></td><td><span class="status-badge status-<?= ez_admin_escape(strtolower($status)) ?>"><?= ez_admin_escape(ez_admin_status_label($status)) ?></span></td><td><b><?= ez_admin_money($order['total'] ?? 0) ?></b></td><td><?= ez_admin_escape(ez_admin_time($order['created_at'] ?? '')) ?></td></tr>
+              ?><tr data-order-card data-status="<?= ez_admin_escape($status) ?>" data-search="<?= ez_admin_escape($searchText) ?>"><td><button class="order-link" type="button" data-order-toggle aria-expanded="false" title="View <?= ez_admin_escape($order['order_id'] ?? 'order') ?>">#<?= ez_admin_escape(str_replace('EZK-', '', (string) ($order['order_id'] ?? '—'))) ?></button></td><td><span class="table-customer"><?= ez_admin_customer_avatar($customer) ?><?= ez_admin_escape($customer['name'] ?? 'Guest customer') ?></span></td><td><span class="table-product"><?= ez_admin_product_art((string) ($firstItem['name'] ?? ''), (string) ($firstItem['dashboard_product']['image_url'] ?? '')) ?><?= ez_admin_escape($firstItem['name'] ?? 'Mixed order') ?></span></td><td><span class="status-badge status-<?= ez_admin_escape(strtolower($status)) ?>"><?= ez_admin_escape(ez_admin_status_label($status)) ?></span></td><td><b><?= ez_admin_money($order['total'] ?? 0) ?></b></td><td><?= ez_admin_escape(ez_admin_time($order['created_at'] ?? '')) ?></td></tr>
               <tr class="order-detail-row" hidden><td colspan="6"><div class="order-detail-inline"><section><span>Customer</span><b><?= ez_admin_escape($customer['name'] ?? 'Guest customer') ?></b><p><?= ez_admin_escape($customer['email'] ?? '—') ?><br><?= ez_admin_escape($customer['phone'] ?? '—') ?></p></section><section><span>Delivery</span><b><?= ez_admin_escape(ez_order_skips_shipping($order) ? 'Skipped (sandbox)' : (trim((string) ($shipping['courier'] ?? '') . ' ' . (string) ($shipping['service'] ?? '')) ?: 'Not selected')) ?></b><p><?= ez_admin_escape($customer['location'] ?? '—') ?><br>Biteship: <?= ez_admin_escape($order['biteship_order_id'] ?? ($order['fulfillment_status'] ?? 'awaiting payment')) ?></p></section><section><span>Payment</span><b><?= ez_admin_escape(str_replace('_', ' ', (string) ($order['payment_type'] ?? 'Awaiting method'))) ?></b><p>Status: <?= ez_admin_escape($order['payment_status'] ?? $order['midtrans_status'] ?? 'pending') ?><br><?= ez_admin_escape($order['payment_reference'] ?? $order['midtrans_transaction_id'] ?? 'No transaction ID') ?></p></section><section><span>Price detail</span><b><?= ez_admin_money($order['total'] ?? 0) ?></b><p>Products <?= ez_admin_money($order['subtotal'] ?? 0) ?><br>Shipping <?= ez_admin_money($order['shipping_price'] ?? 0) ?></p></section></div></td></tr><?php endforeach; ?>
               <tr class="table-empty" <?= $displayOrders !== [] ? 'hidden' : '' ?>><td colspan="6"><b>No orders yet</b><span>Complete checkout to see an order here.</span></td></tr>
               <tr class="filter-empty" id="empty-filter" hidden><td colspan="6">No orders match that search.</td></tr>
@@ -1670,36 +1708,37 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
 
           <article class="panel products-panel" id="top-products">
             <header class="panel-header"><h2>Top Selling Products</h2><a href="?page=products">View all</a></header>
-            <ol><?php $rank = 0; foreach ($topProducts as $name => $sales): $rank++; ?><li><span class="rank"><?= $rank ?></span><?= ez_admin_product_art($name) ?><div><b><?= ez_admin_escape($name) ?></b><small><?= number_format($sales['quantity']) ?> sold</small></div><strong><?= ez_admin_short_money($sales['sales']) ?></strong></li><?php endforeach; ?></ol>
-            <footer class="products-summary"><div><small>Active catalog</small><b><?= count($productDefaults) ?> products</b></div><div><small>Paid units</small><b><?= number_format($paidUnits) ?></b></div></footer>
+            <ol><?php $rank = 0; foreach ($topProducts as $name => $sales): $rank++; ?><li><span class="rank"><?= $rank ?></span><?= ez_admin_product_art($sales['name'], $sales['image_url']) ?><div><b><?= ez_admin_escape($sales['name']) ?></b><small><?= number_format($sales['quantity']) ?> sold</small></div><strong><?= ez_admin_short_money($sales['sales']) ?></strong></li><?php endforeach; ?><?php if ($topProducts === []): ?><li class="dashboard-empty">No paid product sales in this period.</li><?php endif; ?></ol>
+            <footer class="products-summary"><div><small>Active catalog</small><b><?= $activeCatalogCount === null ? 'Unavailable' : $activeCatalogCount . ' products' ?></b></div><div><small>Paid units</small><b><?= number_format($paidUnits) ?></b></div></footer>
           </article>
         </section>
 
         <section class="dashboard-grid secondary-grid">
-          <article class="panel feed-panel" id="customer-feed"><header class="panel-header"><h2>Live Customer Feed</h2><span class="live">● Live</span></header><ul>
-            <?php foreach (array_slice($displayOrders, 0, 4) as $index => $order): $customer = (array) ($order['customer'] ?? []); ?><li><span class="mini-avatar c<?= $index % 4 ?>"><?= ez_admin_escape(mb_strtoupper(mb_substr((string) ($customer['name'] ?? 'G'), 0, 1))) ?></span><div><b><?= ez_admin_escape($customer['name'] ?? 'Guest customer') ?></b><small><?= strtoupper((string) ($order['status'] ?? '')) === 'PAID' ? 'Completed checkout' : 'Started an order' ?></small></div><time><?= $index === 0 ? 'Just now' : ($index * 3) . ' min ago' ?></time></li><?php endforeach; ?>
-            <?php if ($displayOrders === []): ?><li><span class="mini-avatar c0">E</span><div><b>Your first customer</b><small>will appear here live</small></div><time>Waiting</time></li><?php endif; ?>
+          <article class="panel feed-panel" id="customer-feed"><header class="panel-header"><h2>Customer Activity</h2><small>Order history</small></header><ul>
+            <?php foreach (array_slice($displayOrders, 0, 4) as $index => $order): $customer = (array) ($order['customer'] ?? []); ?><li><?= ez_admin_customer_avatar($customer, 'mini-avatar c' . ($index % 4)) ?><div><b><?= ez_admin_escape($customer['name'] ?? 'Guest customer') ?></b><small>Order placed · <?= ez_admin_escape(ez_admin_status_label((string) ($order['status'] ?? ''))) ?></small><time datetime="<?= ez_admin_escape($order['created_at'] ?? '') ?>"><?= ez_admin_escape(ez_admin_time($order['created_at'] ?? '')) ?></time></div></li><?php endforeach; ?>
+            <?php if ($displayOrders === []): ?><li class="dashboard-empty">No customer activity in this period.</li><?php endif; ?>
           </ul></article>
 
           <article class="panel revenue-panel"><header class="panel-header"><h2>Revenue Breakdown</h2><a href="?page=payments">View Report</a></header><div class="revenue-rows">
-            <?php $trackedVolume = max(1, $metrics['paid_volume'] + $pendingVolume + $failedVolume); foreach ([['Product Sales', $paidProductRevenue, 'orange'], ['Shipping Fees', $paidShippingRevenue, 'pink'], ['Pending Volume', $pendingVolume, 'purple'], ['Failed Volume', $failedVolume, 'blue']] as $row): $percentage = round(($row[1] / $trackedVolume) * 100, 1); ?><div><span><b><?= $row[0] ?></b><em><?= ez_admin_money($row[1]) ?> <small><?= $percentage ?>%</small></em></span><i><b class="<?= $row[2] ?>" style="width:<?= min(100, max(2, $percentage)) ?>%"></b></i></div><?php endforeach; ?>
+            <?php $trackedVolume = max(1, $metrics['paid_volume'] + $pendingVolume + $failedVolume); foreach ([['Product Sales', $paidProductRevenue, 'orange'], ['Shipping Fees', $paidShippingRevenue, 'pink'], ['Pending Volume', $pendingVolume, 'purple'], ['Failed Volume', $failedVolume, 'blue']] as $row): $percentage = round(($row[1] / $trackedVolume) * 100, 1); ?><div><span><b><?= $row[0] ?></b><em><?= ez_admin_money($row[1]) ?> <small><?= $percentage ?>%</small></em></span><i><b class="<?= $row[2] ?>" style="width:<?= min(100, max(0, $percentage)) ?>%"></b></i></div><?php endforeach; ?>
             <footer><b>Total Revenue</b><strong><?= ez_admin_money($metrics['paid_volume']) ?></strong></footer>
           </div></article>
 
           <article class="panel traffic-panel"><header class="panel-header"><h2>Order Status</h2><a href="?page=orders">View orders</a></header><div class="traffic-content"><div class="donut<?= $metrics['orders'] === 0 ? ' empty' : '' ?>" style="--paid-end:<?= $paidEnd ?>%;--pending-end:<?= $pendingEnd ?>%;--creating-end:<?= $creatingEnd ?>%"><span><small>Total Orders</small><b><?= number_format($metrics['orders']) ?></b></span></div><ul><li><i class="orange"></i>Paid <b><?= $statusCounts['PAID'] ?></b></li><li><i class="pink"></i>Pending <b><?= $statusCounts['PENDING'] ?></b></li><li><i class="purple"></i>Creating <b><?= $statusCounts['CREATING'] ?></b></li><li><i class="blue"></i>Failed <b><?= $statusCounts['FAILED'] ?></b></li></ul></div></article>
 
-          <article class="panel stock-panel"><header class="panel-header"><h2>Catalog Activity</h2><a href="?page=products">Open catalog</a></header><ul><?php foreach ($catalogProducts as $name => $sales): $activity = min(100, max(5, $sales['quantity'] * 12)); ?><li><?= ez_admin_product_art($name) ?><div><b><?= ez_admin_escape($name) ?></b><span><em style="width:<?= $activity ?>%"></em></span></div><small><?= number_format($sales['quantity']) ?> ordered</small></li><?php endforeach; ?></ul></article>
+          <article class="panel stock-panel"><header class="panel-header"><h2>Catalog Activity</h2><a href="?page=products">Open catalog</a></header><ul><?php foreach ($catalogProducts as $name => $sales): $activity = round($sales['quantity'] / max(1, array_sum(array_column($productActivity, 'quantity'))) * 100, 1); ?><li><?= ez_admin_product_art($sales['name'], $sales['image_url']) ?><div><b><?= ez_admin_escape($sales['name']) ?></b><span><em style="width:<?= $activity ?>%"></em></span></div><small><?= number_format($sales['quantity']) ?> ordered</small></li><?php endforeach; ?><?php if ($catalogProducts === []): ?><li class="dashboard-empty">No product orders in this period.</li><?php endif; ?></ul></article>
 
-          <article class="panel fulfillment-panel fulfillment-pulse"><header class="panel-header"><h2>Fulfillment Pulse</h2><a href="?page=orders">Open operations</a></header><div class="fulfillment-summary"><span class="fulfillment-icon"><?= ez_admin_icon('truck') ?></span><div><small>Latest destination</small><b><?= ez_admin_escape($mapLabel) ?></b><p><?= $metrics['fulfillment_attention_count'] ?> paid orders need a Biteship handoff</p></div><strong><?= $metrics['fulfilled_count'] ?><small>Biteship orders</small></strong></div><div class="fulfillment-stages"><span><i style="--stage-progress:100%"></i><b>Confirmed</b><small><?= $metrics['orders'] ?></small></span><span><i style="--stage-progress:<?= $metrics['orders'] > 0 ? round(($metrics['paid_count'] / $metrics['orders']) * 100) : 0 ?>%"></i><b>Paid</b><small><?= $metrics['paid_count'] ?></small></span><span><i style="--stage-progress:<?= $metrics['orders'] > 0 ? round(($metrics['fulfilled_count'] / $metrics['orders']) * 100) : 0 ?>%"></i><b>Biteship</b><small><?= $metrics['fulfilled_count'] ?></small></span></div></article>
+          <article class="panel fulfillment-panel fulfillment-pulse"><header class="panel-header"><h2>Fulfillment Pulse</h2><a href="?page=orders">Open operations</a></header><div class="fulfillment-summary"><span class="fulfillment-icon"><?= ez_admin_icon('truck') ?></span><div><small>Latest destination</small><b><?= ez_admin_escape(trim((string) ($latestCustomer['location'] ?? '')) ?: 'No destination recorded') ?></b><p><?= $metrics['fulfillment_attention_count'] ?> paid orders need a Biteship handoff</p></div><strong><?= $metrics['fulfilled_count'] ?><small>Biteship orders</small></strong></div><div class="fulfillment-stages"><span><i style="--stage-progress:<?= $metrics['orders'] > 0 ? 100 : 0 ?>%"></i><b>Orders</b><small><?= $metrics['orders'] ?></small></span><span><i style="--stage-progress:<?= $metrics['orders'] > 0 ? round(($metrics['paid_count'] / $metrics['orders']) * 100) : 0 ?>%"></i><b>Paid</b><small><?= $metrics['paid_count'] ?></small></span><span><i style="--stage-progress:<?= $metrics['orders'] > 0 ? round(($metrics['fulfilled_count'] / $metrics['orders']) * 100) : 0 ?>%"></i><b>Biteship</b><small><?= $metrics['fulfilled_count'] ?></small></span></div></article>
         </section>
 
         <section class="dashboard-grid footer-grid">
-          <article class="panel reviews-panel" id="customer-reviews"><header class="panel-header"><h2>Customer Reviews</h2><a href="?page=reviews">Open reviews</a></header><div class="review-body"><div><strong>4.8</strong><p class="review-stars"><?= str_repeat(ez_admin_icon('star'), 5) ?></p><small>Sandbox review preview</small></div><ul><?php foreach ([5 => 82, 4 => 12, 3 => 4, 2 => 1, 1 => 1] as $stars => $width): ?><li><span><?= $stars ?> <?= ez_admin_icon('star') ?></span><i><b style="width:<?= $metrics['paid_count'] > 0 ? $width : 0 ?>%"></b></i><small><?= $metrics['paid_count'] > 0 ? max(0, (int) round($metrics['paid_count'] * $width / 100)) : 0 ?></small></li><?php endforeach; ?></ul></div></article>
+          <article class="panel reviews-panel" id="customer-reviews"><header class="panel-header"><h2>Customer Reviews</h2><a href="?page=reviews">Open reviews</a></header><div class="review-body"><div><strong><?= $reviewAverage === null ? '—' : number_format($reviewAverage, 1) ?></strong><p><?= $catalogError !== '' ? 'Reviews unavailable' : ($reviewCount > 0 ? number_format($reviewCount) . ' published reviews' : 'No published reviews yet') ?></p><small>All-time catalog ratings</small></div></div></article>
 
-          <article class="panel storefront-panel"><header class="panel-header"><h2>Landing Page &amp; Domain</h2><a href="?page=sites">Create page</a></header><div class="storefront-summary"><span class="storefront-preview"><?= ez_admin_icon('layout') ?><i>Empty</i></span><div><small>Hosted storefront</small><b data-landing-page-summary>No landing pages</b><p><?= ez_admin_icon('globe') ?> Create your first Ezkart site</p><em><?= ez_admin_icon('shield') ?> Securely saved with Ezkart</em></div></div><div class="storefront-pipeline"><span><?= ez_admin_icon('box') ?><small>Product</small></span><i></i><span><?= ez_admin_icon('layout') ?><small>Page</small></span><i></i><span><?= ez_admin_icon('credit-card') ?><small>Payment</small></span><i></i><span><?= ez_admin_icon('truck') ?><small>Shipping</small></span></div></article>
+          <article class="panel storefront-panel"><header class="panel-header"><h2>Landing Page &amp; Domain</h2><a href="?page=sites">Create page</a></header><div class="storefront-summary"><span class="storefront-preview"><?= ez_admin_icon('layout') ?><i data-landing-page-state>Loading</i></span><div><small>Hosted storefront</small><b data-landing-page-summary>Loading landing pages</b><p data-landing-page-detail>Checking saved pages…</p><em><?= ez_admin_icon('shield') ?> Securely saved with Ezkart</em></div></div><div class="storefront-pipeline"><span><?= ez_admin_icon('box') ?><small>Product</small></span><i></i><span><?= ez_admin_icon('layout') ?><small>Page</small></span><i></i><span><?= ez_admin_icon('credit-card') ?><small>Payment</small></span><i></i><span><?= ez_admin_icon('truck') ?><small>Shipping</small></span></div></article>
 
-          <article class="panel payout-panel" id="payout-summary"><header class="panel-header"><h2>Payment Summary</h2><a href="?page=payments">View all payments</a></header><div class="payout-body"><small>Provider-confirmed Volume</small><div><strong><?= ez_admin_money($metrics['paid_volume']) ?></strong><em class="positive"><?= ez_admin_icon('check-circle') ?> Verified</em><span>verified payment notifications</span></div></div><footer><div><small>Environment</small><b><?= $commerceProduction ? 'DOKU production' : 'DOKU sandbox' ?></b></div><div><small>Paid Orders</small><b><?= number_format($metrics['paid_count']) ?></b></div><a href="../">Open Checkout</a></footer></article>
+          <article class="panel payout-panel" id="payout-summary"><header class="panel-header"><h2>Payment Summary</h2><a href="?page=payments">View all payments</a></header><div class="payout-body"><small>Provider-confirmed Volume</small><div><strong><?= ez_admin_money($metrics['paid_volume']) ?></strong><?php if ($metrics['paid_count'] > 0): ?><em class="positive"><?= ez_admin_icon('check-circle') ?> Confirmed</em><?php endif; ?><span><?= $metrics['paid_count'] > 0 ? 'provider-confirmed payments' : 'No confirmed payments in this period' ?></span></div></div><footer><div><small>Environment</small><b><?= $commerceProduction ? 'DOKU production' : 'DOKU sandbox' ?></b></div><div><small>Paid Orders</small><b><?= number_format($metrics['paid_count']) ?></b></div><a href="../">Open Checkout</a></footer></article>
         </section>
+        <?php endif; ?>
       </main>
       <?php else: require __DIR__ . '/pages.php'; endif; ?>
     </div>
@@ -1708,6 +1747,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
   <script src="assets/vendor/leaflet.js"></script>
   <?php if ($page === 'settings' && $mfaSetup !== null): ?><script src="assets/vendor/qrcode-generator.min.js"></script><?php endif; ?>
   <?php if ($page === 'sites'): ?><script src="builder-native-icons.js?v=<?= (int) filemtime(__DIR__ . '/builder-native-icons.js') ?>"></script><script src="builder-commerce.js?v=<?= (int) filemtime(__DIR__ . '/builder-commerce.js') ?>"></script><script src="builder-native.js?v=<?= (int) filemtime(__DIR__ . '/builder-native.js') ?>"></script><script src="builder-publish.js?v=<?= (int) filemtime(__DIR__ . '/builder-publish.js') ?>"></script><script src="builder-templates.js?v=<?= (int) filemtime(__DIR__ . '/builder-templates.js') ?>"></script><?php endif; ?><?php if ($page === 'sites' && $siteEditor): ?><script src="builder-backgrounds.js?v=<?= (int) filemtime(__DIR__ . '/builder-backgrounds.js') ?>"></script><script src="builder-components.js?v=<?= (int) filemtime(__DIR__ . '/builder-components.js') ?>"></script><script src="builder-showcase-data.js?v=<?= (int) filemtime(__DIR__ . '/builder-showcase-data.js') ?>"></script><script src="builder-showcase.js?v=<?= (int) filemtime(__DIR__ . '/builder-showcase.js') ?>"></script><?php endif; ?>
+  <script src="dashboard-data.js?v=<?= (int) filemtime(__DIR__ . '/dashboard-data.js') ?>"></script>
   <script src="admin.js?v=<?= ez_admin_escape($adminJsVersion) ?>"></script>
   <script src="profile-logo.js?v=<?= (int) filemtime(__DIR__ . '/profile-logo.js') ?>"></script>
   <script src="../select.js?v=<?= (int) filemtime(__DIR__ . '/../select.js') ?>"></script>

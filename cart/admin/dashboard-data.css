@@ -1,0 +1,29 @@
+.dashboard-period { display: flex; align-items: center; gap: 8px; }
+.dashboard-period label { display: flex; align-items: center; gap: 8px; }
+.dashboard-period select, .dashboard-period button { min-height: 36px; padding: 8px 12px; border: 1px solid #dfe3ec; border-radius: 8px; background: white; color: #303544; font: inherit; font-size: 12px; }
+.dashboard-period button { cursor: pointer; }
+.dashboard-data-note { margin: -8px 0 20px; font-size: 11px; color: #727d92; }
+.dashboard-data-note a { margin-left: 10px; color: #de3d43; }
+.dashboard-data-error { padding: 14px; border: 1px solid #efc19d; border-radius: 8px; background: #fff5e9; }
+.dashboard-page .chart-controls a { display: inline-flex; align-items: center; padding: 0 15px; color: #727d92; text-decoration: none; border: 1px solid transparent; border-radius: 7px; font-size: 10px; }
+.dashboard-page .chart-controls a.active { background: white; border-color: #dfe3ec; color: #252b36; }
+.chart-controls > small { font-size: 10px; color: #727d92; }
+.record-product-art { position: relative; overflow: hidden; background: #f1f3f7; color: #8791a2; }
+.record-product-art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.identity-avatar { position: relative; overflow: hidden; flex-shrink: 0; }
+.identity-avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.table-customer { display: flex; align-items: center; gap: 7px; }
+.table-customer .mini-avatar { width: 25px; height: 25px; flex: 0 0 25px; font-size: 10px; }
+.feed-panel li div time { display: block; margin-top: 5px; font-size: 9px; color: #727d92; }
+.dashboard-empty { padding: 20px; color: #727d92; font-size: 12px; }
+.products-panel .dashboard-empty, .stock-panel .dashboard-empty { display: block; }
+@media (max-width: 600px) {
+  .dashboard-period { flex-wrap: wrap; }
+  .dashboard-page .chart-controls a { padding: 0 9px; }
+  .chart-controls > small { max-width: 100px; text-align: right; }
+}
+
+.reviews-panel .review-body { display: block; }
+.reviews-panel .review-body p { color: #566176; font-size: 13px; letter-spacing: normal; }
+.reviews-panel .review-body small { display: block; }
+.record-product-art img[hidden], .identity-avatar img[hidden] { display: none; }
