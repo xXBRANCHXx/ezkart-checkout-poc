@@ -1036,6 +1036,72 @@ test("merchant dashboard displays DOKU orders and accepts and arranges pickup th
 
 
 const bridgeSecret = "fixture-executive-bridge-secret-43-characters-minimum";
+test('sidebar tips persist behind signed owner access and reject stale, overlapping, unsafe, or production writes', async t => {
+  const app = await setup({EZKART_EXECUTIVE_BRIDGE_SECRET: bridgeSecret}); t.after(() => app.close());
+  const path = '/cart/api/executive.php';
+  const call = data => { const input = {action: 'save-tips', environment: 'sandbox', ...data}; return app.request(path, input, bridgeHeaders(input)); };
+  assert.equal((await app.request(path, {action: 'tips', environment: 'sandbox'})).status, 401);
+  const initial = await call({action: 'tips'}); assert.equal(initial.status, 200);
+  assert.equal(initial.data.schedule.cadence_days, 1);
+  const card = {...initial.data.schedule.fallback, title: 'Test tip <strong>plain text</strong>'};
+  const today = new Date().toISOString().slice(0, 10);
+  const create = {operation: 'save', revision: 0, start_date: today, card};
+  const saved = await call(create); assert.equal(saved.status, 200);
+  const id = saved.data.schedule.tips[0].id;
+  assert.equal((await call({...create, card: {...card, title: 'Stale tab'}})).status, 409);
+  assert.equal((await call({...create, revision: 1})).status, 400, 'Overlapping tips rejected');
+  assert.equal((await call({...create, revision: 1, id, card: {...card, href: 'javascript:alert(1)'}})).status, 400);
+  assert.equal((await call({...create, revision: 1, environment: 'production'})).status, 400);
+  assert.equal((await call({operation: 'cadence', revision: 1, cadence_days: 7})).status, 200);
+  const edited = await call({...create, revision: 2, id}); assert.equal(edited.status, 200);
+  assert.equal(edited.data.schedule.tips[0].end_date, saved.data.schedule.tips[0].end_date, 'Editing preserves previously scheduled duration');
+  const fallback = {...card, title: 'Evergreen fallback'};
+  assert.equal((await call({operation: 'fallback', revision: 3, card: fallback})).status, 200);
+  const publicTip = await app.request('/cart/api/sidebar-tip.php?timezone=UTC');
+  assert.equal(publicTip.data.card.title, card.title); assert.equal(publicTip.data.fallback.title, fallback.title);
+  assert.ok(!('schedule' in publicTip.data)); assert.ok(!('tips' in publicTip.data));
+  assert.equal((await app.request('/cart/api/sidebar-tip.php', {})).status, 405);
+  const afterRemove = await call({operation: 'remove', revision: 4, id}); assert.equal(afterRemove.status, 200);
+  assert.equal((await app.request('/cart/api/sidebar-tip.php?timezone=UTC')).data.card.title, fallback.title);
+  const reopened = await call({action: 'tips'}); assert.equal(reopened.data.schedule.revision, 5);
+  assert.equal(reopened.data.schedule.tips.length, 0);
+  await writeFile(join(app.directory, 'executive', 'sidebar-tips.json'), '{broken');
+  assert.equal((await app.request('/cart/api/sidebar-tip.php')).data.card.title, 'Launch on your own domain', 'Corrupt storage safely uses built-in fallback');
+  assert.equal((await call({operation: 'cadence', revision: 5, cadence_days: 1})).status, 503, 'Corrupt storage is never overwritten');
+  const production = await setup({EZKART_EXECUTIVE_BRIDGE_SECRET: bridgeSecret, EZKART_DEPLOYMENT_ENVIRONMENT: 'production'}); t.after(() => production.close());
+  const input = {action: 'tips', environment: 'sandbox'};
+  assert.equal((await production.request(path, input, bridgeHeaders(input))).status, 403);
+});
+
+test('merchant sidebar changes at local midnight and falls back during an offline rollover', async t => {
+  const {chromium} = await import('../builder-mcp/node_modules/playwright/index.mjs');
+  const app = await setup(); t.after(() => app.close());
+  const browser = await chromium.launch(); t.after(() => browser.close());
+  for (const timezoneId of ['Asia/Jakarta', 'America/Los_Angeles']) {
+    const context = await browser.newContext({timezoneId});
+    const page = await context.newPage();
+    await context.addCookies([app.adminCookie()]);
+    const midnight = timezoneId === 'Asia/Jakarta' ? '2026-09-22T17:00:00Z' : '2026-09-23T07:00:00Z';
+    await page.clock.install({time: new Date(Date.parse(midnight) - 1000)});
+    let calls = 0, offline = false;
+    const fallback = {icon: 'globe', title: 'Evergreen help', description: 'Useful every day.', label: 'Open products', href: '?page=products'};
+    await page.route('**/api/sidebar-tip.php?**', async route => {
+      calls++; assert.equal(new URL(route.request().url()).searchParams.get('timezone'), timezoneId);
+      if (offline) return route.abort();
+      const date = calls === 1 ? '2026-09-22' : '2026-09-23';
+      await route.fulfill({json: {ok: true, date, fallback, card: {...fallback, title: calls === 1 ? 'Tuesday tip' : 'Wednesday tip'}}});
+    });
+    await page.goto(app.base + '/cart/admin/');
+    await page.getByText('Tuesday tip', {exact: true}).waitFor();
+    await page.clock.runFor(1500);
+    await page.getByText('Wednesday tip', {exact: true}).waitFor();
+    offline = true;
+    await page.clock.fastForward(86400000);
+    await page.getByText('Evergreen help', {exact: true}).waitFor();
+    assert.ok((await context.cookies()).some(cookie => cookie.name === 'ezkart_tip_timezone'));
+    await context.close();
+  }
+});
 function bridgeHeaders(input, overrides = {}) {
   const body = JSON.stringify(input), timestamp = String(Math.floor(Date.now() / 1000)), nonce = randomBytes(24).toString("hex");
   return {

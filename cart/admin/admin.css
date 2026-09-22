@@ -123,6 +123,8 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .upgrade-card > span { font-size: 26px; transform: rotate(-18deg); }
 .upgrade-card b { font-size: 10px; line-height: 1.5; }
 .upgrade-card p { margin: 5px 0 0; font-size: 8px; line-height: 1.5; }
+.upgrade-card > div { min-width: 0; overflow-wrap: anywhere; }
+.upgrade-card a { overflow-wrap: anywhere; text-align: center; padding: 3px; }
 .upgrade-card a { height: 28px; grid-column: 1 / -1; display: grid; place-items: center; color: #f50768; background: #fff; border-radius: 5px; font-size: 9px; font-weight: 700; text-decoration: none; }
 .store-switcher { min-height: 61px; margin-top: 34px; padding: 0 12px; display: grid; grid-template-columns: 25px 1fr auto; align-items: center; gap: 8px; background: #fff; border: 1px solid var(--line); border-radius: 9px; box-shadow: var(--shadow); }
 .store-switcher > span:first-child { width: 25px; height: 25px; display: grid; place-items: center; background: #f4f5f8; border-radius: 50%; }

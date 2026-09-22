@@ -127,6 +127,36 @@ wallet balance or withdrawable settlement amount.
 
 ## Hosting
 
+### Scheduled merchant sidebar tips
+
+The private Executive Dashboard's **Tips** page manages the sidebar card through
+the signed workbench bridge. The orange-to-pink card supports a title,
+description, icon, button label, and merchant-page or HTTPS destination. Tips are
+scheduled by calendar date for 1, 3, or 7 days and begin at **00:00 in each
+merchant's browser timezone**. Existing dates are preserved when cadence changes.
+
+The schedule and editable fallback live outside the public web root in the
+Executive bridge directory's `sidebar-tips.json`. The merchant page selects the
+current tip on load; JavaScript resolves the browser timezone and refreshes at
+local midnight, on tab focus, and every five minutes. It remembers the timezone
+in a non-sensitive cookie for subsequent server renders. Missing dates use the
+evergreen fallback. Missing or unreadable storage uses the built-in landing-page
+card, and an offline midnight rollover uses the last loaded fallback. No cron is
+required. The public read endpoint exports only the current card and fallback;
+queued tips and edits require the signed Executive bridge.
+
+All editing remains scoped to the test deployment. This does not release the
+feature to `ezkart.id` or change the production release hold.
+
+Verification:
+
+```sh
+php -n tools/checkout-test/sidebar-tips.test.php
+PHP_BINARY=/path/to/php node --test --test-name-pattern='sidebar' tools/checkout-test/checkout.test.mjs
+```
+
+### Deployment
+
 The site is dependency-free and can be served directly from the repository root. Point Hostinger's deployment at the `main` branch; no build command is required.
 
 Experimental seller and landing-builder work is deployed separately from

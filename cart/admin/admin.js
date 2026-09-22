@@ -1,3 +1,48 @@
+// Refresh the announcement at the merchant's local midnight, including tabs
+// left open overnight. A sleeping tab catches up as soon as it becomes visible.
+(() => {
+  const element = document.querySelector('.upgrade-card');
+  if (!element) return;
+  let timer, generation = 0, lastDate = '', fallback = {
+    icon: 'globe', title: 'Launch on your own domain',
+    description: 'Hosted pages, checkout, payments & shipping.',
+    label: 'Manage Landing Pages', href: '?page=sites',
+  };
+  const localDate = () => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  };
+  function paint(card) {
+    element.querySelector('b').textContent = card.title;
+    element.querySelector('p').textContent = card.description;
+    const link = element.querySelector('a');
+    link.textContent = card.label; link.setAttribute('href', card.href);
+    element.querySelector('use')?.setAttribute('href', '#icon-' + card.icon);
+  }
+  async function refresh() {
+    clearTimeout(timer);
+    const version = ++generation, date = localDate();
+    if (lastDate && lastDate !== date) paint(fallback);
+    let zone = 'UTC';
+    try { zone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; } catch (_) {}
+    document.cookie = `ezkart_tip_timezone=${encodeURIComponent(zone)}; Path=/cart; Max-Age=31536000; SameSite=Lax${location.protocol === 'https:' ? '; Secure' : ''}`;
+    try {
+      const response = await fetch('../api/sidebar-tip.php?timezone=' + encodeURIComponent(zone), { cache: 'no-store', signal: AbortSignal.timeout(10000) });
+      const payload = await response.json();
+      if (version !== generation) return;
+      if (response.ok && payload.ok && payload.date === localDate()) {
+        fallback = payload.fallback; lastDate = payload.date; paint(payload.card);
+      }
+    } catch (_) { /* Keep the evergreen card available when the network fails. */ }
+    if (version !== generation) return;
+    const now = new Date(), midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    timer = setTimeout(refresh, Math.min(300000, Math.max(250, midnight - now + 50)));
+  }
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
+  window.addEventListener('focus', refresh);
+  refresh();
+})();
+
 (async () => {
   "use strict";
 

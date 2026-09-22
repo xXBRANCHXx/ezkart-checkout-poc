@@ -14,6 +14,12 @@ try {
     if (!in_array($environment, ['sandbox', 'production'], true)) throw new InvalidArgumentException('Invalid environment.');
     $meta = ['ok' => true, 'deployment' => 'test', 'environment' => $environment];
     $action = (string) ($input['action'] ?? '');
+    if ($action === 'tips' || $action === 'save-tips') {
+        require_once __DIR__ . '/sidebar-tips.php';
+        if ($environment !== 'sandbox') throw new InvalidArgumentException('Tips are managed on the test workbench.');
+        $state = $action === 'save-tips' ? ez_tips_change($input) : ez_tips_read();
+        ez_api_json($meta + ['schedule' => $state, 'icons' => ez_tips_icons()]);
+    }
     if ($action === 'orders') ez_api_json($meta + ez_executive_orders($environment));
     if (!in_array($action, ['status', 'set-mode'], true)) throw new InvalidArgumentException('Unknown executive action.');
     if ($action === 'set-mode') {
@@ -34,5 +40,6 @@ try {
         } finally { flock($lock, LOCK_UN); fclose($lock); }
     }
     ez_api_json($meta + ['mode' => $action === 'set-mode' ? $target : ez_commerce_environment(), 'readiness' => ['sandbox' => ez_executive_readiness('sandbox'), 'production' => ez_executive_readiness('production')]]);
-} catch (InvalidArgumentException $error) { ez_api_json(['ok' => false, 'error' => $error->getMessage()], 400); }
+} catch (DomainException $error) { ez_api_json(['ok' => false, 'error' => $error->getMessage()], 409); }
+catch (InvalidArgumentException $error) { ez_api_json(['ok' => false, 'error' => $error->getMessage()], 400); }
 catch (Throwable $error) { error_log('Ezkart executive bridge: ' . $error->getMessage()); ez_api_json(['ok' => false, 'error' => 'The workbench connector is unavailable. Check its private configuration.'], 503); }
