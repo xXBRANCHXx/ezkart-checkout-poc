@@ -36,7 +36,8 @@ test("one seller shop shares authoritative products and appearance, protects wri
     await db.prepare("INSERT INTO products(id,seller_id,type,status,title,price_amount,stock_quantity,weight_grams,created_at,updated_at) VALUES (?,?,'physical','active',?,12000,8,100,'now','now')").bind(id,`seller_${seller}`,id).run();
   }
   for (const [id, hidden, stock] of [["green", false, 8], ["secret", true, 4], ["empty", false, 0]]) {
-    await db.prepare("INSERT INTO product_variants(id,seller_id,product_id,name,options_json,sku,price_amount,stock_quantity,weight_grams,sort_order,created_at,updated_at) VALUES (?,'seller_alice','tea',?,?,?,15000,?,100,?,'now','now')").bind(id,id,JSON.stringify({ hidden }),id,stock,{green:1,secret:2,empty:3}[id]).run();
+    const values = [{ option: "Flavor", value: id, privateNote: "never expose" }];
+    await db.prepare("INSERT INTO product_variants(id,seller_id,product_id,name,options_json,sku,price_amount,stock_quantity,weight_grams,sort_order,created_at,updated_at) VALUES (?,'seller_alice','tea',?,?,?,15000,?,100,?,'now','now')").bind(id,id,JSON.stringify(id === "empty" ? values : { hidden, values, privateNote: "never expose" }),id,stock,{green:1,secret:2,empty:3}[id]).run();
   }
   for (const [id,seller] of [["logo_alice","alice"],["logo_bob","bob"]]) {
     await db.prepare("INSERT INTO media_uploads(id,seller_id,r2_key,mime_type,size_bytes,created_by_auth_user_id,created_at) VALUES (?,?,?,'image/png',1,?,'2000-01-01')").bind(id,`seller_${seller}`,id,seller).run();
@@ -59,6 +60,8 @@ test("one seller shop shares authoritative products and appearance, protects wri
   const tea = result.products.find(p=>p.id==="tea");
   assert.deepEqual(tea.choices.map(c=>c.id),["tea~green","tea~empty"]);
   assert.equal(tea.choices[1].available,false);
+  assert.deepEqual(tea.choices[0].options, [{ option: "Flavor", value: "green" }]);
+  assert.deepEqual(tea.choices[1].options, [{ option: "Flavor", value: "empty" }], "Legacy option arrays remain available to the picker");
   assert.equal(JSON.stringify(result).includes("never expose"),false);
   assert.equal(JSON.parse((await db.prepare("SELECT settings_json FROM sellers WHERE id='seller_alice'").first()).settings_json).privateSetting,"never expose");
   assert.equal((await mf.dispatchFetch("https://api.fixture.test/v1/public/media/logo_alice")).status,200);

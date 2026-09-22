@@ -53,9 +53,13 @@ function publicProduct(row, media, variants) {
     const price = Number(option.price_amount ?? row.price_amount ?? 0);
     const weight = Number(option.weight_grams ?? row.weight_grams ?? 0);
     const variant = option !== row;
+    const stored = variant ? parse(option.options_json) : [];
+    const values = Array.isArray(stored) ? stored : Array.isArray(stored.values) ? stored.values : [];
     return {
       id: row.id + (variant ? `~${option.id}` : ""),
       name: variant ? option.name : "Standard",
+      options: values.filter(item => typeof item?.option === "string" && typeof item?.value === "string")
+        .slice(0, 3).map(item => ({ option: item.option.slice(0, 20), value: item.value.slice(0, 60) })),
       price, stock,
       available: row.type === "physical" && stock > 0 && price > 0 && weight > 0,
       imagePath: imagePath(option.image_upload_id || media?.id),

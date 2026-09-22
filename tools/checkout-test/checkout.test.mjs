@@ -2537,14 +2537,16 @@ test('shop appearance saves through merchant UI, public catalog shares a multi-p
   assert.match(await page.locator('#cart-subtotal').textContent(), /306\.000/, 'Reload must preserve quantity edits after the cart handoff');
   await page.locator('#back-to-store').click(); await page.locator('#shop-content:not([hidden])').waitFor();
   assert.equal(await page.locator('#shop-count').textContent(), '4');
-  await page.goto(app.base + '/cart/?product=shop-coffee'); await page.locator('[data-product-choice]').waitFor();
+  await page.goto(app.base + '/cart/?product=shop-coffee'); await page.locator('[data-product-options]').waitFor();
   assert.equal(await page.locator('#merchant-name').textContent(), 'Morning & Co.');
-  await page.locator('[data-product-choice]').selectOption('shop-coffee~small');
+  await page.locator('[data-product-options]').click();
+  await page.getByRole('radio', { name: /250 g/ }).check();
+  await page.getByRole('button', { name: 'Update item', exact: true }).click();
   await page.locator('[data-cart-id="shop-coffee~small"]').waitFor();
   assert.match(await page.locator('#cart-subtotal').textContent(), /274\.000/);
-  await page.reload(); await page.locator('[data-product-choice]').waitFor();
+  await page.reload(); await page.locator('[data-product-options]').waitFor();
   assert.equal(await page.locator('.cart-item').count(), 2, 'Opening the product link must not add a duplicate line');
-  assert.equal(await page.locator('[data-product-choice]').inputValue(), 'shop-coffee~small');
+  assert.equal(await page.locator('[data-cart-id="shop-coffee~small"] [data-product-options]').count(), 1);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   assert.equal(await page.locator('.checkout-content').evaluate(n => getComputedStyle(n).animationName), 'none');
   if (process.env.EZKART_TEST_SCREENSHOTS) await page.screenshot({ animations: 'disabled', path: join(process.env.EZKART_TEST_SCREENSHOTS, 'product-checkout-desktop.png'), fullPage: true });
@@ -2559,6 +2561,126 @@ test('shop appearance saves through merchant UI, public catalog shares a multi-p
   const order = app.cli(`echo json_encode(ez_load_order('${new URL(page.url()).searchParams.get('order')}'));`);
   assert.equal(JSON.parse(order).seller_id,'seller_fixture');
   assert.deepEqual(errors, []);
+});
+
+test('checkout options separate variant groups, preview totals, preserve the cart on cancel or failure, and revalidate before applying', async t => {
+  const app = await setup({ EZKART_CLOUDFLARE_API_URL: 'https://ezkart-api-test.fixture.workers.dev', EZKART_DOKU_SANDBOX_PAYMENT_FLOW: 'direct_bca' });
+  const fixture = shopFixture(), product = fixture.products[0];
+  product.name = 'ZERO Syrup 50–550 ml — Sugar-Free Syrup';
+  product.choices = [
+    ['plain-small', 'Plain', '250ml', 42500, 10], ['plain-large', 'Plain', '550ml', 77000, 4],
+    ['vanilla-large', 'Vanilla', '550ml', 90000, 6], ['hazelnut-small', 'Hazelnut', '250ml', 45000, 0],
+    ['hazelnut-large', 'Hazelnut', '550ml', 85000, 1],
+    ...['Maple', 'Cinnamon', 'Caramel', 'Mint', 'Lychee', 'Peach', 'Lemon', 'Almond', 'Taro'].map((flavor, i) => [`extra-${i}`, flavor, '250ml', 50000 + i * 1000, 8]),
+  ].map(([id, flavor, size, price, stock]) => ({ id: `shop-coffee~${id}`, name: `${flavor} · ${size}`, price, stock, available: stock > 0,
+    options: [{ option: 'Flavor', value: flavor }, { option: 'Size', value: size }], imagePath: '/v1/public/media/coffee_image' }));
+  fixture.selections = product.choices.map(choice => ({ ...choice, productId: product.id, variantId: choice.id.split('~')[1], sellerId: fixture.store.id,
+    type: 'physical', name: product.name + ' ' + choice.name, productName: product.name, variantName: choice.name, weightGrams: 300, sku: choice.id }));
+  const saveFixture = () => writeFile(join(app.directory, 'storefront.json'), JSON.stringify(fixture));
+  await saveFixture();
+  const { chromium } = await import('../builder-mcp/node_modules/playwright/index.mjs');
+  const browser = await chromium.launch(), page = await browser.newPage({ viewport: { width: 1200, height: 960 }, reducedMotion: 'reduce' });
+  t.after(async () => { await browser.close(); await app.close(); });
+  const errors = []; page.on('pageerror', error => errors.push(error.message));
+  await shopImages(page);
+  await page.goto(app.base + '/cart/?product=shop-coffee');
+  await page.locator('[data-product-options]').waitFor();
+  await page.locator('[data-quantity=plus]').click();
+  await page.locator('[data-product-options]').click();
+  const panel = page.getByRole('dialog'), confirm = panel.getByRole('button', { name: 'Update item', exact: true });
+  assert.equal(await panel.getByRole('group', { name: 'Flavor', exact: true }).count(), 1);
+  assert.equal(await panel.getByRole('radio', { name: /Hazelnut/ }).isDisabled(), true, 'Insufficient stock never silently reduces quantity');
+  await panel.getByRole('searchbox', { name: 'Search Flavor' }).fill('Vanilla');
+  assert.equal(await panel.getByRole('group', { name: 'Flavor', exact: true }).getByRole('radio').count(), 1);
+  await panel.getByRole('radio', { name: 'Vanilla', exact: true }).check();
+  await panel.getByRole('searchbox', { name: 'Search Flavor' }).fill('');
+  assert.match(await panel.locator('[role=status]').textContent(), /Size updated to 550ml/);
+  assert.equal(await panel.getByRole('radio', { name: /250ml/ }).isDisabled(), true, 'Missing combinations stay unavailable');
+  assert.match(await panel.locator('[data-option-total]').textContent(), /180\.000/);
+  assert.match(await page.locator('#grand-total').textContent(), /85\.000/, 'Browsing choices does not change the cart');
+  await panel.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await panel.waitFor({ state: 'hidden' });
+  assert.equal(await page.locator('[data-product-options]').evaluate(n => n === document.activeElement), true);
+  await page.locator('[data-product-options]').click();
+  assert.equal(await panel.getByRole('radio', { name: 'Plain', exact: true }).isChecked(), true);
+  await panel.getByRole('radio', { name: /550ml/ }).check();
+  await page.route('**/api/catalog.php?*', route => route.fulfill({ status: 503, json: { ok: false } }));
+  await confirm.click();
+  await panel.getByText(/Your cart hasn't changed/).waitFor();
+  assert.match(await page.locator('#grand-total').textContent(), /85\.000/);
+  await page.unroute('**/api/catalog.php?*');
+  fixture.selections.find(choice => choice.id === 'shop-coffee~plain-large').price = 80000;
+  product.choices.find(choice => choice.id === 'shop-coffee~plain-large').price = 80000;
+  await saveFixture();
+  await confirm.click();
+  await panel.getByText('The price has changed. Review the updated total before confirming.').waitFor();
+  assert.match(await panel.locator('[data-option-total]').textContent(), /160\.000/);
+  assert.match(await page.locator('#grand-total').textContent(), /85\.000/);
+  await confirm.click();
+  await panel.waitFor({ state: 'hidden' });
+  assert.match(await page.locator('#grand-total').textContent(), /160\.000/);
+  assert.equal(await page.locator('[data-cart-id="shop-coffee~plain-large"] output').textContent(), '2');
+  assert.equal(await page.locator('[data-product-options]').evaluate(n => n === document.activeElement), true);
+  await page.reload(); await page.locator('[data-product-options]').waitFor();
+  assert.equal(await page.locator('.cart-item').count(), 1);
+  assert.match(await page.locator('#grand-total').textContent(), /160\.000/);
+  for (const viewport of [{ width: 1200, height: 960 }, { width: 390, height: 844 }, { width: 320, height: 640 }, { width: 740, height: 360 }]) {
+    await page.setViewportSize(viewport); await page.locator('[data-product-options]').click();
+    const bounds = await panel.evaluate(dialog => {
+      const box = dialog.getBoundingClientRect(), button = dialog.querySelector('[data-options-apply]').getBoundingClientRect();
+      return { top: box.top, bottom: box.bottom, left: box.left, right: box.right, buttonBottom: button.bottom, buttonHeight: button.height };
+    });
+    assert.ok(bounds.top >= 0 && bounds.left >= 0 && bounds.right <= viewport.width && bounds.bottom <= viewport.height + 1, JSON.stringify(bounds));
+    assert.ok(bounds.buttonBottom <= viewport.height && bounds.buttonHeight >= 48, 'The confirmation stays visible and usable');
+    if (process.env.EZKART_TEST_SCREENSHOTS) await page.screenshot({ path: join(process.env.EZKART_TEST_SCREENSHOTS, `checkout-options-${viewport.width}.png`) });
+    const plain = panel.getByRole('radio', { name: 'Plain', exact: true });
+    await plain.focus(); await page.keyboard.press('ArrowRight');
+    assert.equal(await panel.getByRole('radio', { name: 'Vanilla', exact: true }).isChecked(), true);
+    await page.keyboard.press('Escape'); await panel.waitFor({ state: 'hidden' });
+    assert.match(await page.locator('#grand-total').textContent(), /160\.000/);
+  }
+  await page.setViewportSize({ width: 1200, height: 960 });
+  await page.locator('[data-product-options]').click();
+  await panel.getByRole('radio', { name: /250ml/ }).check();
+  fixture.selections.find(choice => choice.id === 'shop-coffee~plain-small').stock = 1;
+  await saveFixture(); await confirm.click();
+  await panel.getByText(/That quantity is no longer available/).waitFor();
+  assert.equal(await page.locator('[data-cart-id="shop-coffee~plain-large"] output').textContent(), '2');
+  await panel.getByRole('button', { name: 'Cancel', exact: true }).click();
+  fixture.selections.find(choice => choice.id === 'shop-coffee~plain-small').stock = 10;
+  await saveFixture();
+  await page.evaluate(() => localStorage.setItem('ezkart.checkout.cart.v1:shop-fixture', JSON.stringify({ 'shop-coffee~plain-small': 1, 'shop-coffee~plain-large': 2 })));
+  await page.reload(); await page.locator('[data-cart-id="shop-coffee~plain-small"] [data-product-options]').click();
+  await panel.getByRole('radio', { name: /550ml/ }).check(); await confirm.click();
+  await panel.waitFor({ state: 'hidden' });
+  assert.equal(await page.locator('.cart-item').count(), 1);
+  assert.equal(await page.locator('[data-cart-id="shop-coffee~plain-large"] output').textContent(), '3', 'Merging two variants preserves every item');
+  assert.match(await page.locator('#grand-total').textContent(), /240\.000/);
+  assert.deepEqual(errors, []);
+  assert.equal((await app.calls()).some(call => /virtual-account|\/rates\/couriers/.test(call.url)), false, 'Choosing options never creates a payment or delivery quote');
+});
+
+test('checkout retains a searchable and keyboard-accessible picker for variants without named groups', async t => {
+  const app = await setup({ EZKART_CLOUDFLARE_API_URL: 'https://ezkart-api-test.fixture.workers.dev', EZKART_DOKU_SANDBOX_PAYMENT_FLOW: 'direct_bca' });
+  const fixture = shopFixture(), product = fixture.products[0];
+  product.choices = Array.from({ length: 12 }, (_, i) => ({ id: `shop-coffee~batch-${i + 1}`, name: `Batch ${i + 1}`, price: 50000 + i * 1000, stock: i === 1 ? 0 : 5, available: i !== 1 }));
+  fixture.selections = product.choices.map(choice => ({ ...choice, productId: product.id, variantId: choice.id.split('~')[1], sellerId: fixture.store.id,
+    type: 'physical', name: product.name + ' ' + choice.name, productName: product.name, variantName: choice.name, weightGrams: 300, sku: choice.id }));
+  await writeFile(join(app.directory, 'storefront.json'), JSON.stringify(fixture));
+  const { chromium } = await import('../builder-mcp/node_modules/playwright/index.mjs');
+  const browser = await chromium.launch(), page = await browser.newPage({ viewport: { width: 390, height: 700 } });
+  t.after(async () => { await browser.close(); await app.close(); });
+  await shopImages(page); await page.goto(app.base + '/cart/?product=shop-coffee');
+  await page.locator('[data-product-options]').click();
+  const panel = page.getByRole('dialog');
+  assert.equal(await panel.getByRole('radio', { name: /Batch 2 / }).isDisabled(), true);
+  await panel.getByRole('searchbox', { name: 'Find an option' }).fill('Batch 12');
+  assert.equal(await panel.getByRole('radio').count(), 1);
+  await panel.getByRole('radio').check();
+  await panel.getByRole('button', { name: 'Update item', exact: true }).click();
+  await panel.waitFor({ state: 'hidden' });
+  assert.equal(await page.locator('[data-cart-id="shop-coffee~batch-12"]').count(), 1);
+  assert.match(await page.locator('#grand-total').textContent(), /61\.000/);
 });
 
 test('shop products reuse server-validated shipping and reject tampered prices and mixed sellers', async t => {

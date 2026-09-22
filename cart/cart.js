@@ -363,7 +363,7 @@
         <div class="cart-item-copy">
           <h2>${escapeHtml(productTitle(product))}</h2>
           ${product.variant_name ? `<p class="cart-item-variant">${escapeHtml(product.variant_name)}</p>` : ""}
-          ${hostedProduct && (product.product_id || id.split("~")[0]) === hostedProduct.id && hostedProduct.choices.length > 1 ? `<label class="product-choice-label">Option<select data-product-choice aria-label="Choose an option for ${escapeHtml(productTitle(product))}">${hostedProduct.choices.map(choice => `<option value="${escapeHtml(choice.id)}" ${choice.id === id ? "selected" : ""} ${!choice.available ? "disabled" : ""}>${escapeHtml(choice.name)} · ${money(choice.price)}${!choice.available ? " — unavailable" : ""}</option>`).join("")}</select></label>` : ""}
+          ${hostedProduct && (product.product_id || id.split("~")[0]) === hostedProduct.id && hostedProduct.choices.length > 1 ? '<button type="button" class="product-options-edit" data-product-options aria-haspopup="dialog">Change options <span aria-hidden="true">›</span></button>' : ""}
           <p>${escapeHtml(details)}</p>
           <div class="item-controls">
             <div class="quantity-control" aria-label="Quantity for ${escapeHtml(productTitle(product))}">
@@ -571,6 +571,39 @@
   byId("cart-items").addEventListener("click", (event) => {
     const row = event.target.closest("[data-cart-id]");
     if (!row) return;
+    if (event.target.closest("[data-product-options]")) {
+      const oldId = row.dataset.cartId;
+      window.EzkartProductOptions.open({
+        product: hostedProduct, selectedId: oldId, quantity: state.cart[oldId], cart: state.cart,
+        onApply: async choice => {
+          const nextCart = { ...state.cart };
+          if (choice.id !== oldId) {
+            nextCart[choice.id] = (nextCart[choice.id] || 0) + nextCart[oldId];
+            delete nextCart[oldId];
+          }
+          // Recheck stock and prices before changing the customer's saved cart.
+          const response = await fetch(`api/catalog.php?products=${encodeURIComponent(Object.keys(nextCart).join(","))}`, {
+            headers: { Accept: "application/json" }, cache: "no-store", signal: AbortSignal.timeout(15000),
+          });
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok || !Array.isArray(payload.products)) throw new Error(payload.error || "We couldn't check this option. Your cart hasn't changed. Please try again.");
+          const products = Object.fromEntries(payload.products.map(product => [product.id, product]));
+          if (Object.entries(nextCart).some(([id, count]) => !products[id] || products[id].seller_id !== hostedStore.id || Number(products[id].stock) < count)) {
+            throw new Error("That quantity is no longer available. Your cart hasn't changed. Choose another option or reduce the quantity in your cart.");
+          }
+          if (Number(products[choice.id].price) !== Number(choice.price)) {
+            choice.price = Number(products[choice.id].price);
+            return { error: "The price has changed. Review the updated total before confirming." };
+          }
+          state.products = products;
+          state.cart = nextCart;
+          saveCart(); resetDelivery(); renderCart();
+          return {};
+        },
+        onApplied: choice => byId("cart-items").querySelector(`[data-cart-id="${CSS.escape(choice.id)}"] [data-product-options]`)?.focus(),
+      });
+      return;
+    }
     if (event.target.closest("[data-remove]")) {
       changeQuantity(row.dataset.cartId, -(state.cart[row.dataset.cartId] || 0));
       return;
@@ -579,15 +612,6 @@
     if (quantity) {
       changeQuantity(row.dataset.cartId, quantity.dataset.quantity === "plus" ? 1 : -1);
     }
-  });
-  byId("cart-items").addEventListener("change", (event) => {
-    const select = event.target.closest("[data-product-choice]");
-    if (!select) return;
-    const oldId = select.closest("[data-cart-id]").dataset.cartId;
-    const choice = hostedProduct?.choices.find(item => item.id === select.value && item.available);
-    if (!choice || choice.id === oldId) return;
-    state.cart[choice.id] = Math.min(choice.stock, (state.cart[choice.id] || 0) + state.cart[oldId]);
-    delete state.cart[oldId]; saveCart(); resetDelivery(); void loadCatalog();
   });
   byId("to-checkout").addEventListener("click", () => {
     if (itemCount()) setStep("checkout");

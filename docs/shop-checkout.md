@@ -13,6 +13,14 @@ server flow. A cart handoff is consumed once so reloading preserves later edits.
 Product checkout opens an available option and lets the customer switch variants;
 opening it again does not duplicate an existing line.
 
+Product checkout opens an options panel instead of a native variant dropdown.
+Catalog option names form separate choice groups; older unnamed variants use a
+searchable list. Customers preview the unit price and item total, then explicitly
+update the item. Cancel leaves the cart unchanged. Updating rechecks current
+catalog stock and prices; a changed price requires confirmation again. Quantity
+is preserved, including when two variant lines merge, and stock shortages do not
+silently reduce it.
+
 The authenticated `/v1/storefront` endpoint saves a bounded appearance object
 under `sellers.settings_json.storefront`. This preserves other seller settings and
 needs no migration. Public `/v1/storefront/view` returns only the selected seller's
