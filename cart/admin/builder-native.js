@@ -2791,7 +2791,7 @@
       <details open data-native-fill-section><summary>Background &amp; text color</summary>
         <label>What to change<select data-native-fill-type><option value="solid">Background color</option><option value="gradient">Background gradient</option><option value="text">Gradient on all text</option></select></label>
         <div class="sq-native-preview-frame"><div data-native-fill-preview role="img"></div></div>
-        <div data-native-solid-controls><label>Background color<div class="sq-native-color-field"><input type="color" value="#ffffff" data-native-solid-picker aria-label="Choose background color"><input type="text" value="transparent" spellcheck="false" data-native-solid-color aria-label="Background color value"></div></label></div>
+        <div data-native-solid-controls><label>Background color<div class="sq-native-color-field"><input type="color" value="#ffffff" data-native-solid-picker aria-label="Choose background color"><input type="text" value="transparent" spellcheck="false" data-native-solid-color aria-label="Background color value" aria-describedby="native-background-color-help"></div></label><p class="sq-native-help" id="native-background-color-help">For no background, type “transparent” and click Apply background color.</p></div>
         <div data-native-gradient-controls hidden>
           <div data-native-gradient-area hidden>
             <label class="sq-native-check"><input type="checkbox" data-native-gradient-centered checked>Center gradient</label>
