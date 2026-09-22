@@ -32,7 +32,7 @@ declare(strict_types=1);
     <aside class="sq-builder-sidebar">
       <nav class="sq-tool-rail" aria-label="Builder tools">
         <button class="active" type="button" data-sq-tab="layers" aria-label="Pages and sections"><?= ez_admin_icon('layout') ?><span>Site</span></button>
-        <button type="button" data-sq-tab="add" aria-label="Assets: elements, presets, and uploads"><?= ez_admin_icon('grid') ?><span>Assets</span></button>
+        <button type="button" data-sq-tab="add" aria-label="Assets: elements, presets, and uploads"><?= ez_admin_icon('layers') ?><span>Assets</span></button>
         <button type="button" data-sq-templates aria-label="Templates" title="Templates" aria-haspopup="dialog"><?= ez_admin_icon('grid') ?><span>Templates</span></button>
         <button type="button" data-sq-tab="products" aria-label="Products"><?= ez_admin_icon('box') ?><span>Products</span><i data-sq-product-count>0</i></button>
         <button type="button" data-sq-tab="brand" aria-label="Branding: colors, fonts, and buttons" title="Branding: colors, fonts, and buttons"><?= ez_admin_icon('swatch-book') ?><span>Branding</span></button>
