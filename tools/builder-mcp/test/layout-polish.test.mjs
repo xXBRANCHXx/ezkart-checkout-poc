@@ -246,6 +246,47 @@ test("existing product blocks fit after resizing, reflow narrow columns, and pre
     [syrup],
   ));
 
+test("collection cards contain their photos and purchase controls when desktop columns stack on mobile", () =>
+  fixture(async ({ page, invoke, ws }) => {
+    await invoke("addSection", { component: "product-collection", id: "collection" });
+    await invoke("removeSection", { id: "blank" });
+    const grid = page.locator("[data-section-id=collection] [data-sq-product-grid]");
+    const id = await grid.getAttribute("data-sq-element-id");
+    await invoke("updateElement", { id, layout: { x: 1, y: 1, width: 6, height: 3 }, autoHeight: false });
+    for (const device of ["mobile", "tablet"]) {
+      await invoke("updateElement", { id, device, layout: { x: 1, y: 1, width: 12, height: 3 }, autoHeight: false });
+    }
+    const html = await invoke("previewHtml");
+    await page.route("**/collection-cards", route => route.fulfill({ body: html, contentType: "text/html" }));
+    await page.goto(ws.url + "/collection-cards");
+    for (const width of [1440, 390, 320, 768]) {
+      await page.setViewportSize({ width, height: 1100 });
+      await page.evaluate(async () => {
+        await document.fonts.ready;
+        await Promise.all([...document.images].map(image => image.decode().catch(() => {})));
+        for (let i = 0; i < 3; i++) await new Promise(requestAnimationFrame);
+      });
+      const cards = await page.locator(".sq-product-grid > article").evaluateAll(nodes => nodes.map(card => {
+        const box = card.getBoundingClientRect(), photo = card.querySelector(".product-art").getBoundingClientRect();
+        return {
+          top: box.top, bottom: box.bottom, right: box.right, height: box.height,
+          photoBottom: photo.bottom, contentTop: card.querySelector(":scope > div").getBoundingClientRect().top,
+          footerBottom: card.querySelector("footer").getBoundingClientRect().bottom,
+          buttonHeight: card.querySelector("footer button").offsetHeight,
+        };
+      }));
+      assert.equal(cards.length, 2);
+      assert.ok(Math.abs(cards[0].height - cards[1].height) <= 1, "Cards keep equal heights after reflow");
+      for (const card of cards) {
+        assert.ok(card.footerBottom <= card.bottom, "The purchase button stays inside its card");
+        assert.ok(card.photoBottom <= card.contentTop + 1, "The photo cannot overlap the product details");
+        assert.ok(card.right <= width, "Cards fit narrow viewports");
+        assert.ok(card.buttonHeight >= 48, "Purchase buttons retain their touch target in Preview");
+      }
+      if (width < 600) assert.ok(cards[1].top >= cards[0].bottom, "Stacked cards never overlap");
+    }
+  }, [syrup, { ...syrup, id: "drops", name: "Zero Drops 30ml, 5ml — Sugar-Free Sweetener, Zero Calories" }]));
+
 for (const kind of ["native", "native-fixed", "authored", "reference"])
   test(`${kind} navigation stays above content and its mobile menu works in editor and export`, async () =>
     fixture(async ({ page, invoke, ws }) => {

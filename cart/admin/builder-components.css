@@ -37,16 +37,7 @@
 .sq-composition-footer-links>a{color:inherit;text-decoration:none}
 .sq-composition-footer-links>a:hover{text-decoration:underline;text-underline-offset:5px}
 .sq-composition-announcement>.sq-composition-copy{font-size:13px;line-height:1.5;text-align:center}
-.sq-composition-product-collection .sq-product-grid{gap:28px}
-.sq-composition-product-collection .sq-product-grid>article{min-width:0;background:transparent;border:0;border-radius:0;box-shadow:none}
-.sq-composition-product-collection .sq-product-grid .product-art{height:360px;border-radius:0;background:color-mix(in srgb,var(--site-ink) 4%,var(--site-page))}
-.sq-composition-product-collection .sq-product-grid .product-art img{object-fit:contain}
-.sq-composition-product-collection .sq-product-grid article>div{padding:24px 0}
-.sq-composition-product-collection .sq-product-grid h3{font-size:22px;line-height:1.35;letter-spacing:-.02em}
-.sq-composition-product-collection .sq-product-grid :is(p,small){font-size:14px;line-height:1.6}
-.sq-composition-product-collection .sq-product-grid footer{gap:18px;flex-wrap:wrap}
-.sq-composition-product-collection .sq-product-grid footer>b{font-size:20px}
-.sq-composition-product-collection .sq-product-grid footer>button{min-height:44px;padding:12px 20px;font-size:14px}
+.sq-composition-product-collection .sq-product-grid{gap:24px}
 /* Navigation uses the same editable logo/link groups in every composition. */
 .sq-store-nav.sq-authored-navigation { height:auto!important; min-height:0!important; grid-template-rows:repeat(var(--sq-fluid-rows,2),var(--sq-fluid-row-height,40px))!important; grid-auto-rows:var(--sq-fluid-row-height,40px)!important; row-gap:0!important; column-gap:var(--sq-builder-column-gap,10px)!important; color:var(--site-ink,#24262b); border-radius:0; border-bottom:1px solid color-mix(in srgb,var(--site-ink,#24262b) 12%,transparent); box-shadow:none; }
 .sq-store-nav.sq-authored-navigation>.sq-site-logo { height:auto!important; min-width:0; min-height:0!important; padding:0!important; align-self:stretch; justify-content:flex-start; overflow:hidden; }
@@ -162,23 +153,11 @@
 }
 .sq-store-nav.sq-navigation-shop>[data-sq-nav-slot=action],.sq-store-nav.sq-navigation-shop>[data-ezkart-nav-slot=action]{border:0;justify-content:flex-end}
 .sq-store-nav.sq-navigation-shop>[data-sq-nav-slot=categories],.sq-store-nav.sq-navigation-shop>[data-ezkart-nav-slot=categories]{justify-content:flex-start}
-.sq-composition-product-collection [data-product-type=physical]>div>small{display:none}
-.sq-composition-product-collection [data-product-type=physical]>div>p:empty{display:none}
-.sq-composition-product-collection .sq-product-grid h3{margin:0 0 16px}
-.sq-composition .sq-product-option-field>span{font-size:12px}
-.sq-composition .sq-product-option-trigger{min-height:42px!important;font-size:14px!important;padding:10px 12px!important}
-.sq-composition .sq-product-option-menu button{min-height:40px;font-size:13px}
 .sq-composition-call-to-action.section-bg-custom-dark .sq-composition-action{--button-primary-bg:var(--site-ink,#fff);--button-primary-fg:var(--sq-section-background-color,#242822)}
 @media(max-width:600px){.sq-store-nav.sq-navigation-shop>[data-ezkart-nav-slot=categories]{display:none!important}}
 .sq-device-frame.device-mobile .sq-store-nav.sq-navigation-shop>[data-sq-nav-slot=categories]{display:none!important}
 
 .sq-page-preview .sq-composition.section-bg-custom{background:var(--sq-section-background-color)!important}
-
-.sq-composition-product-collection .sq-product-grid>article{display:flex;flex-direction:column}
-.sq-composition-product-collection .sq-product-grid>article>.product-art{flex-shrink:0}
-.sq-composition-product-collection .sq-product-grid>article>div{display:flex;flex:1;flex-direction:column}
-.sq-composition-product-collection .sq-product-grid .sq-product-options{margin-top:auto;padding-top:12px;gap:12px}
-.sq-composition .sq-product-option>span:first-child{font-size:12px;line-height:1.5;margin-bottom:8px}
 
 body:has(>.sq-authored-navigation)>.sq-page-preview.sq-has-pinned-navigation{padding-top:var(--sq-pinned-nav-height,72px)!important}
 .sq-device-frame.device-mobile .sq-store-nav.sq-authored-navigation{grid-template-rows:repeat(2,32px)!important;grid-auto-rows:32px!important}
@@ -240,19 +219,36 @@ body:has(>.sq-authored-navigation)>.sq-page-preview.sq-has-pinned-navigation{pad
 .sq-creator-optional > summary { cursor: pointer; color: #616a78; }
 
 /* Each product card sizes its content from its own width. */
-.sq-page-preview .sq-product-grid > article { container: ezkart-product-card / inline-size; grid-template-columns: minmax(0,1fr); width: 100%; min-width: 0; }
+/* Intrinsic row heights keep stacked cards clear of each other's purchase controls. */
+.sq-page-preview .sq-product-grid { align-items: stretch; grid-auto-rows: minmax(max-content, 1fr); }
+.sq-page-preview .sq-product-grid > article { container: ezkart-product-card / inline-size; display: flex; flex-direction: column; width: 100%; min-width: 0; background: var(--site-surface, #fff); border: 1px solid color-mix(in srgb, var(--site-ink, #24262b) 10%, transparent); border-radius: max(14px, var(--page-radius, 14px)); box-shadow: 0 4px 16px rgb(24 27 34 / 4%); }
 .sq-page-preview .sq-product-grid > article > .product-art { display: block; width: 100%; max-width: none; flex: none; padding: 0; border: 0; }
 .sq-page-preview .sq-product-grid > article > .product-art img { display: block; width: 100%; height: 100%; padding: 0; object-fit: contain; }
-.sq-page-preview .sq-product-grid > article h3 { display: block; overflow: visible; -webkit-line-clamp: unset; font-size: 18px; line-height: 1.4; text-wrap: wrap; overflow-wrap: anywhere; }
-.sq-page-preview .sq-product-grid > article footer b { min-width: 0; font-size: 18px; overflow-wrap: anywhere; }
-.sq-page-preview .sq-product-grid .sq-product-option-trigger { min-height: 42px; height: auto; font-size: 12px; padding: 9px 10px; }
+.sq-page-preview .sq-product-grid > article > div { flex: 1 0 auto; min-height: auto; padding: clamp(16px, 6cqw, 24px); }
+.sq-page-preview .sq-product-grid > [data-product-type=physical] > div > small,
+.sq-page-preview .sq-product-grid > article > div > p:empty { display: none; }
+.sq-page-preview .sq-product-grid > article h3 { margin: 0 0 12px; display: block; overflow: visible; -webkit-line-clamp: unset; font-size: 18px; font-weight: 600; line-height: 1.45; letter-spacing: -.02em; text-wrap: wrap; overflow-wrap: anywhere; }
+.sq-page-preview .sq-product-grid > article > div > small + h3 { margin-top: 12px; }
+.sq-page-preview .sq-product-grid > [data-product-type=physical] > div > small + h3 { margin-top: 0; }
+.sq-page-preview .sq-product-grid > article > div > p { font-size: 13px; line-height: 1.6; }
+.sq-page-preview .sq-product-grid .sq-product-options { margin-top: auto; padding-top: 8px; gap: 12px; }
+.sq-page-preview .sq-product-grid > article footer { padding-top: 20px; gap: 16px; }
+.sq-page-preview .sq-product-grid > article footer b { min-width: 0; font-size: 22px; font-weight: 600; line-height: 1.3; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.sq-page-preview .sq-product-grid > article footer button { min-height: max(48px, var(--button-primary-height, 42px)) !important; height: auto; padding: 12px 20px; font-size: 14px; line-height: 1.4; white-space: normal; }
+.sq-page-preview .sq-product-grid .sq-product-option-trigger { min-height: 44px; height: auto; font-family: var(--site-body-font, Poppins, sans-serif); font-size: 14px; line-height: 1.5; padding: 10px 12px; }
 .sq-page-preview .sq-product-grid .sq-product-option-value { white-space: normal; overflow: visible; text-overflow: clip; text-align: left; overflow-wrap: anywhere; }
-.sq-page-preview .sq-product-grid .sq-product-option > span:first-child { font-size: 11px; }
-.sq-page-preview .sq-native[data-native-type=product] > article { background: transparent; }
+.sq-page-preview .sq-product-grid .sq-product-option > span:first-child { margin-bottom: 6px; font-size: 12px; font-weight: 500; line-height: 1.5; }
+.sq-page-preview .sq-product-grid .sq-product-option-menu button { min-height: 44px; padding: 10px 12px; font-family: var(--site-body-font, Poppins, sans-serif); font-size: 14px; line-height: 1.5; }
+.sq-page-preview .sq-product-grid .sq-media-count { position: absolute; padding: 6px 10px; font-size: 11px; font-weight: 500; font-style: normal; box-shadow: none; }
+.sq-page-preview .sq-native[data-native-type=product] > article { background: transparent; border-radius: inherit; }
+.sq-page-preview .sq-native[data-native-type=product] > article > .product-art { border-top-left-radius: inherit; border-top-right-radius: inherit; }
 .sq-page-preview .sq-native[data-native-type=product] { height: auto; }
 @container ezkart-product-card (max-width: 380px) {
-  .sq-page-preview .sq-product-grid > article footer { grid-template-columns: minmax(0,1fr); gap: 12px; }
-  .sq-page-preview .sq-product-grid > article footer button { width: 100%; min-width: 0; font-size: 12px; }
+  .sq-page-preview .sq-product-grid > article footer { grid-template-columns: minmax(0,1fr); }
+  .sq-page-preview .sq-product-grid > article footer button { width: 100%; min-width: 0; }
+}
+@container ezkart-product-card (max-width: 300px) {
+  .sq-page-preview .sq-product-grid > article h3 { font-size: 16px; }
   .sq-page-preview .sq-product-grid .sq-product-options { grid-template-columns: minmax(0,1fr); }
 }
 @media (max-width: 720px) {
@@ -278,7 +274,7 @@ body:has(>.sq-authored-navigation)>.sq-page-preview.sq-has-pinned-navigation{pad
 .sq-page-preview .sq-native[data-native-type="product"] { height: auto !important; max-height: none !important; }
 .sq-page-preview .sq-native[data-native-type="product"] > article { min-height: var(--sq-product-default-height, 100%); }
 .sq-page-preview .sq-native[data-native-type="product"] > article > div > footer { margin-top: auto; }
-.sq-page-preview .sq-native[data-native-type="product"] > article > div > :has(+ footer) { margin-bottom: 15px; }
+.sq-page-preview .sq-native[data-native-type="product"] > article > div > :has(+ footer) { margin-bottom: 20px; }
 /* A page header has its own layer above every content section. */
 .sq-page-preview > .sq-page-block:is(header,nav,.ezm-site-header,.sq-navigation-template-section) { z-index: 1000 !important; isolation: isolate; overflow: visible; }
 /* Editing tools stay readable when the canvas is zoomed out. */
