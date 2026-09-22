@@ -17,8 +17,9 @@
   --ui-focus: #697586;
   --ui-radius: 8px;
   --ui-action: #ff4c16;
-  --ui-action-hover: #f23e0b;
-  --ui-action-active: #df3508;
+  --ui-action-gradient: linear-gradient(110deg, #ff5a19, #f70a68);
+  --ui-action-hover: linear-gradient(110deg, #f44c0d, #e90960);
+  --ui-action-active: linear-gradient(110deg, #e94306, #db0758);
   --ink: var(--ui-ink);
   --muted: var(--ui-muted);
   --line: var(--ui-line);
@@ -112,7 +113,7 @@ button, input, select, textarea { font-family: inherit; }
   background-color: var(--ui-field);
   border-color: transparent;
 }
-/* Shared action buttons: flat Ezkart orange-red with recognizable icons. */
+/* Shared action buttons: the Ezkart gradient, without bevels or shadows. */
 .dashboard-page :is(.action-button, .ui-button, .sq-command-actions > button, .page-creator-dialog footer > button, .sq-component-dialog footer > button, .sq-export-dialog footer > button):not(:where(.sq-page-preview *, .shop-preview *, [hidden])) {
   min-height: 40px;
   padding: 10px 14px;
@@ -134,7 +135,7 @@ button, input, select, textarea { font-family: inherit; }
 }
 .dashboard-page :is(.action-button, .ui-button, .sq-command-actions > button, .page-creator-dialog footer > button, .sq-component-dialog footer > button, .sq-export-dialog footer > button):not(:where(.sq-page-preview *, .shop-preview *, [hidden])).primary {
   color: #fff;
-  background: var(--ui-action);
+  background: var(--ui-action-gradient);
   border-color: transparent;
   box-shadow: none;
 }

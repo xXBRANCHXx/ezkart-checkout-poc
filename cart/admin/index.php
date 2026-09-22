@@ -1496,6 +1496,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
   <?php if ($authenticated && $page === 'wallet'): ?><link rel="stylesheet" href="wallet.css?v=<?= (int) filemtime(__DIR__ . '/wallet.css') ?>"><?php endif; ?>
   <link rel="stylesheet" href="dashboard-data.css?v=<?= (int) filemtime(__DIR__ . '/dashboard-data.css') ?>">
   <link rel="stylesheet" href="admin-ui.css?v=<?= (int) filemtime(__DIR__ . '/admin-ui.css') ?>">
+  <?php if ($authenticated && $page === 'payments'): ?><link rel="stylesheet" href="payments.css?v=<?= (int) filemtime(__DIR__ . '/payments.css') ?>"><?php endif; ?>
   <link rel="stylesheet" href="profile-logo.css?v=<?= (int) filemtime(__DIR__ . '/profile-logo.css') ?>">
   <link rel="stylesheet" href="../select.css?v=<?= (int) filemtime(__DIR__ . '/../select.css') ?>">
   <title><?= $authenticated ? ez_admin_escape($pageTitles[$page]) : ($pendingMfa !== null ? 'Two-step verification' : 'Admin Login') ?> · Ezkart</title>
@@ -1706,7 +1707,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
           <header class="order-overview-header"><div><h2 id="order-overview-title">Orders to manage</h2><p>Current orders across all dates · Updated <?= $nowJakarta->format('H:i') ?> WIB</p></div><a href="?page=orders">View all orders <?= ez_admin_icon('chevron-right') ?></a></header>
           <div class="order-queue-grid">
             <?php foreach (['needs-processing', 'processing', 'shipped'] as $queue): $queueInfo = $orderQueues[$queue]; ?>
-            <a class="order-queue-card" data-fulfillment="<?= $queue ?>" href="?page=orders&amp;fulfillment=<?= $queue ?>">
+            <a class="order-queue-card<?= $queue === 'needs-processing' && $orderQueueCounts[$queue] > 0 ? ' has-pending-orders' : '' ?>" data-fulfillment="<?= $queue ?>" href="?page=orders&amp;fulfillment=<?= $queue ?>">
               <span class="order-queue-icon"><?= ez_admin_icon($queueInfo['icon']) ?></span>
               <div><h3><?= $queueInfo['label'] ?></h3><strong><?= number_format($orderQueueCounts[$queue]) ?></strong><p><?= $queueInfo['detail'] ?></p></div>
               <?= ez_admin_icon('chevron-right', 'order-queue-arrow') ?>
