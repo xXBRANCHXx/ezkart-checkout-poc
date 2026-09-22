@@ -1,5 +1,6 @@
 import { customerAddressBook, changeCustomerAddressBook } from "./customer-addresses.js";
 import { validatePublication } from "./landing-publication.js";
+import { merchantStorefront, publicStorefront } from "./storefront.js";
 const json = (payload, status = 200, headers = {}) => new Response(JSON.stringify(payload), {
   status,
   headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...headers },
@@ -396,6 +397,8 @@ async function storefrontProducts(url, env) {
     const row = products.get(selection.productId);
     if (!row) return null;
     const availableVariants = variants.get(row.id) || [];
+    const variantIndex = productIds.indexOf(row.id);
+    if (variantResults[variantIndex]?.results?.length && !availableVariants.length) return null;
     const variant = selection.variantId
       ? availableVariants.find((item) => item.id === selection.variantId)
       : availableVariants[0] || null;
@@ -812,6 +815,11 @@ async function servePublicMedia(request, env, context, mediaId) {
         JOIN products p ON p.seller_id = pv.seller_id AND p.id = pv.product_id
         WHERE pv.image_upload_id = mu.id AND p.status = 'active'
       )
+      OR EXISTS (
+        SELECT 1 FROM sellers s WHERE s.id = mu.seller_id AND s.status = 'active'
+        AND (json_extract(s.settings_json, '$.storefront.logoId') = mu.id
+          OR json_extract(s.settings_json, '$.storefront.backgroundId') = mu.id)
+      )
     )
     LIMIT 1
   `).bind(mediaId).first();
@@ -890,6 +898,9 @@ async function cleanupUnusedMedia(env, sellerId, ids) {
           AND NOT EXISTS (SELECT 1 FROM product_media WHERE seller_id = ? AND id = ?)
           AND NOT EXISTS (SELECT 1 FROM product_variants WHERE seller_id = ? AND image_upload_id = ?)
           AND NOT EXISTS (SELECT 1 FROM product_drafts WHERE seller_id = ? AND instr(snapshot_json, ?) > 0)
+          AND NOT EXISTS (SELECT 1 FROM sellers WHERE id = media_uploads.seller_id
+            AND (json_extract(settings_json, '$.storefront.logoId') = media_uploads.id
+              OR json_extract(settings_json, '$.storefront.backgroundId') = media_uploads.id))
       `).bind(sellerId, mediaId, sellerId, mediaId, sellerId, mediaId, sellerId, mediaId).run();
       if (Number(result.meta?.changes || 0) < 1) continue;
       try {
@@ -1259,6 +1270,11 @@ export default {
       }
       if (request.method === "GET" && url.pathname === "/v1/me") return json({ ok: true, user: await currentUser(request, env) }, 200, cors);
       if (request.method === "GET" && url.pathname === "/v1/storefront/products") return json({ ok: true, products: await storefrontProducts(url, env) }, 200, cors);
+      if (request.method === "GET" && url.pathname === "/v1/storefront/view") return json({ ok: true, ...(await publicStorefront(env, url)) }, 200, cors);
+      if (["GET", "PUT"].includes(request.method) && url.pathname === "/v1/storefront") {
+        const { seller } = await sellerContext(request, env);
+        return json({ ok: true, store: await merchantStorefront(env, seller, request.method === "PUT" ? await requestJson(request, 5000) : null) }, 200, cors);
+      }
       if (request.method === "GET" && url.pathname === "/v1/catalog") return json({ ok: true, ...(await catalog(request, env)) }, 200, cors);
       if (request.method === "GET" && url.pathname === "/v1/landing-pages") return json({ ok: true, pages: await landingPages(request, env) }, 200, cors);
       const landingExportMatch = /^\/v1\/landing-pages\/([a-z0-9-]+)\/export$/.exec(url.pathname);

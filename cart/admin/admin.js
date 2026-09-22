@@ -1879,10 +1879,10 @@
     const checkoutLink = (productId = "") => {
       const url = new URL("../", window.location.href);
       url.search = "";
+      if (productId) { url.searchParams.set("product", productId); return url.href; }
       url.searchParams.set("shop", storageScope);
       const brand = String(document.body.dataset.adminCheckoutBrand || "").trim().slice(0, 80);
       if (brand) url.searchParams.set("brand", brand);
-      if (productId) url.searchParams.set("add", productId);
       return url.href;
     };
     const copyCheckoutLink = async (url, message) => {

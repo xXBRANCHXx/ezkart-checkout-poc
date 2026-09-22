@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow"><title>Shop · Ezkart</title>
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/cart/cart.css?v=checkout-rebuild-6">
+  <link rel="stylesheet" href="/cart/storefront.css?v=1"><link rel="stylesheet" href="shop.css?v=1">
+</head>
+<body>
+  <a class="skip-link" href="#shop-main">Skip to products</a>
+  <header class="checkout-header"><div class="header-inner shop-header"><a class="merchant-brand" id="shop-home" href="#"><span class="merchant-avatar" id="shop-avatar">S</span><img id="shop-logo" alt="" hidden><span class="merchant-copy"><small>Welcome to</small><strong id="shop-name">Shop</strong></span></a><a class="shop-bag" href="#shop-order">Your bag <span id="shop-count">0</span></a></div></header>
+  <main class="shop-main" id="shop-main">
+    <header class="shop-heading"><span>THE COLLECTION</span><h1>Shop all products</h1><p>Choose your items and check out together.</p></header>
+    <div id="shop-loading" class="surface-state" role="status">Loading products…</div>
+    <div id="shop-error" class="surface-state" hidden><p id="shop-error-message"></p><button class="outline-button" id="shop-retry" type="button">Try again</button></div>
+    <p id="shop-empty" class="surface-state" hidden>There are no products available yet. Please check back soon.</p>
+    <div class="shop-layout" id="shop-content" hidden>
+      <section class="shop-products" id="shop-products" aria-label="Products"></section>
+      <aside class="shop-order summary-card" id="shop-order" aria-labelledby="bag-heading"><header><h2 id="bag-heading">Your bag</h2><span id="bag-count">0 items</span></header><div id="shop-cart"></div><dl class="checkout-totals"><div class="total-row"><dt>Subtotal</dt><dd id="shop-subtotal">Rp0</dd></div></dl><p class="shop-delivery-note">Delivery and payment at checkout.</p><button class="primary-button" id="shop-checkout" type="button" disabled>Continue to checkout</button><p class="summary-note">Secure checkout by <strong>Ezkart</strong></p></aside>
+    </div>
+  </main>
+  <footer class="checkout-footer"><img src="/assets/ezkart-logo.svg" alt="Ezkart" width="1020" height="420"><p>Simple, secure checkout.</p></footer>
+  <div class="toast" id="shop-toast" role="status" aria-live="polite"></div>
+  <script src="/cart/storefront.js?v=1"></script><script src="shop.js?v=1"></script>
+</body>
+</html>

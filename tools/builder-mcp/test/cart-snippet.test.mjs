@@ -166,6 +166,12 @@ test("Product purchase code selects a specific variant, preserves custom content
   );
   // No Ezkart JavaScript is required on an external HTML page: the link merges into hosted cart.
   const cart = await readFile(join(repoRoot, "cart/index.html"), "utf8");
+  // Serve the checkout's current dependencies; this workspace only serves builder assets.
+  for (const asset of ["storefront.js", "storefront.css", "address-picker.js", "customer-addresses.js", "customer-addresses.css"]) {
+    await p.route(`**/cart/${asset}*`, async route => route.fulfill({ contentType: asset.endsWith(".css") ? "text/css" : "text/javascript", body: await readFile(join(repoRoot, "cart", asset), "utf8") }));
+  }
+  await p.route("**/cart/api/checkout-config.php", route => route.fulfill({ json: { ok: true, environment: "sandbox", shipping_required: false } }));
+  await p.route("**/cart/api/customer-session.php*", route => route.fulfill({ json: { ok: true, authenticated: false } }));
   await p.route(
     (u) => u.pathname === "/cart/",
     (r) => r.fulfill({ contentType: "text/html", body: cart }),

@@ -2448,3 +2448,129 @@ test("switching Google accounts waits for the new identity and existing-login re
   await another.getByRole("button", { name: "Sign in to track" }).waitFor();
   assert.equal((await another.request.get(app.base + "/cart/api/status.php?order=bad&tracking=1")).status(), 401, "An existing AAL1 session cannot bypass a provider-verified second factor.");
 });
+
+function shopFixture() {
+  const store = { id: 'seller_fixture', cartScope: 'shop-fixture', enabled: true, name: 'Morning Goods', accent: '#665240', button: '#233d31', background: '#f4f0e8', logoId: '', backgroundId: '', logoPath: '', backgroundPath: '', animation: 'rise' };
+  const products = [
+    { id: 'shop-coffee', name: 'Roasted coffee', description: 'A smooth, everyday roast for slower mornings.', type: 'physical', imagePath: '/v1/public/media/coffee_image', choices: [
+      { id: 'shop-coffee~small', name: '250 g', price: 79000, stock: 8, available: true, imagePath: '/v1/public/media/coffee_image' },
+      { id: 'shop-coffee~large', name: '500 g', price: 95000, stock: 4, available: true, imagePath: '/v1/public/media/coffee_image' },
+      { id: 'shop-coffee~sold', name: '1 kg', price: 170000, stock: 0, available: false, imagePath: '/v1/public/media/coffee_image' },
+    ] },
+    { id: 'shop-granola', name: 'Honey granola', description: 'Golden oats, roasted nuts, and a little honey.', type: 'physical', imagePath: '/v1/public/media/granola_image', choices: [{ id: 'shop-granola', name: 'Standard', price: 58000, stock: 10, available: true, imagePath: '/v1/public/media/granola_image' }] },
+  ];
+  const selections = products.flatMap(product => product.choices.map(choice => ({ ...choice, productId: product.id, variantId: choice.id.split('~')[1] || '', sellerId: store.id, type: 'physical', name: product.name + ' ' + choice.name, productName: product.name, variantName: choice.name, weightGrams: 300, sku: choice.id })));
+  const catalog = products.map(product => ({ ...product, status: 'active', price: product.choices[0].price, stock: product.choices[0].stock, weightGrams: 300, media: [{ id: product.id === 'shop-coffee' ? 'coffee_image' : 'granola_image' }], variants: product.choices.length > 1 ? product.choices.map(choice => ({ id: choice.id.split('~')[1], name: choice.name, price: choice.price, stock: choice.stock })) : [] }));
+  return { store, products, selections, catalog };
+}
+
+async function shopImages(page) {
+  const coffee = await readFile(join(root, 'cart/admin/assets/products/kopi-susu.webp'));
+  const granola = await readFile(join(root, 'cart/admin/assets/products/granola.webp'));
+  await page.route('https://ezkart-api-test.fixture.workers.dev/v1/public/media/*', route => route.fulfill({ contentType: 'image/webp', body: route.request().url().includes('coffee') ? coffee : granola }));
+}
+
+test('shop appearance saves through merchant UI, public catalog shares a multi-product checkout and direct variant links', async t => {
+  const app = await setup({ EZKART_CLOUDFLARE_API_URL: 'https://ezkart-api-test.fixture.workers.dev', EZKART_DOKU_SANDBOX_PAYMENT_FLOW: 'direct_bca' });
+  const fixture = shopFixture();
+  await writeFile(join(app.directory, 'storefront.json'), JSON.stringify(fixture));
+  const { chromium } = await import('../builder-mcp/node_modules/playwright/index.mjs');
+  const browser = await chromium.launch();
+  t.after(async () => { await browser.close(); await app.close(); });
+  const errors = [], page = await browser.newPage({ viewport: { width: 1400, height: 1000 } });
+  page.on('pageerror', e => errors.push(e.message));
+  await shopImages(page);
+  await page.context().addCookies([app.adminCookie()]);
+  await page.goto(app.base + '/cart/admin/?page=shop');
+  await page.locator('#shop-settings:not([disabled])').waitFor();
+  assert.equal(await page.locator('#shop-product-links .shop-product-link').count(), 2);
+  assert.equal((await page.request.put(app.base + '/cart/admin/?cloud=%2Fv1%2Fstorefront', { data: fixture.store })).status(), 403, 'A forged appearance save must fail CSRF validation');
+  await page.locator('[name=name]').fill('Morning & Co.');
+  await page.locator('[name=button]').fill('#264a38');
+  await page.locator('[name=background]').fill('#ede8dc');
+  await page.locator('[name=animation]').selectOption('fade');
+  await page.locator('[data-shop-upload=logoId]').setInputFiles({ name: 'logo.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jVZkAAAAASUVORK5CYII=', 'base64') });
+  await page.waitForFunction(() => document.querySelector('#shop-admin-status').textContent.includes('Image ready'));
+  await page.locator('[data-preview-mode=checkout]').click();
+  assert.match(await page.locator('#shop-preview').textContent(), /Review your cart/);
+  await page.locator('#shop-save').click();
+  await page.waitForFunction(() => document.querySelector('#shop-admin-status').textContent.startsWith('Saved.'));
+  await page.reload();
+  await page.locator('#shop-settings:not([disabled])').waitFor();
+  assert.equal(await page.locator('[name=name]').inputValue(), 'Morning & Co.');
+  assert.equal(await page.locator('[name=button]').inputValue(), '#264a38');
+  assert.equal(await page.locator('#shop-logo-preview').isVisible(), true);
+  await page.evaluate(() => document.fonts.ready);
+  await page.evaluate(() => scrollTo({ top: 0, behavior: 'instant' }));
+  if (process.env.EZKART_TEST_SCREENSHOTS) await page.screenshot({ animations: 'disabled', path: join(process.env.EZKART_TEST_SCREENSHOTS, 'shop-admin-desktop.png'), fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true);
+  if (process.env.EZKART_TEST_SCREENSHOTS) await page.screenshot({ animations: 'disabled', path: join(process.env.EZKART_TEST_SCREENSHOTS, 'shop-admin-mobile.png'), fullPage: true });
+  await page.goto(app.base + '/shop/?store=seller_fixture');
+  await page.locator('#shop-content:not([hidden])').waitFor();
+  assert.equal(await page.locator('.shop-product').count(), 2);
+  assert.equal(await page.locator('#shop-name').textContent(), 'Morning & Co.');
+  assert.equal(await page.locator('body').evaluate(n => n.style.getPropertyValue('--store-button')), '#264a38');
+  const coffee = page.locator('[data-product=shop-coffee]');
+  await coffee.locator('select').selectOption('shop-coffee~sold');
+  assert.equal(await coffee.locator('[data-add]').isDisabled(), true);
+  await coffee.locator('select').selectOption('shop-coffee~large');
+  await coffee.locator('input').fill('5'); await coffee.locator('[data-add]').click();
+  assert.equal(await page.locator('#shop-count').textContent(), '0');
+  await coffee.locator('input').fill('2'); await coffee.locator('[data-add]').click();
+  await page.locator('[data-product=shop-granola] [data-add]').click();
+  assert.equal(await page.locator('#shop-count').textContent(), '3');
+  assert.match(await page.locator('#shop-subtotal').textContent(), /248\.000/);
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true);
+  await page.evaluate(() => { document.activeElement?.blur(); scrollTo({ top: 0, behavior: 'instant' }); });
+  if (process.env.EZKART_TEST_SCREENSHOTS) await page.screenshot({ animations: 'disabled', path: join(process.env.EZKART_TEST_SCREENSHOTS, 'shop-mobile.png'), fullPage: true });
+  await page.setViewportSize({ width: 1400, height: 1000 });
+  if (process.env.EZKART_TEST_SCREENSHOTS) await page.screenshot({ animations: 'disabled', path: join(process.env.EZKART_TEST_SCREENSHOTS, 'shop-desktop.png'), fullPage: true });
+  await page.locator('#shop-checkout').click();
+  await page.locator('#cart-items:not([hidden])').waitFor();
+  assert.equal(await page.locator('.cart-item').count(), 2);
+  assert.match(await page.locator('#cart-subtotal').textContent(), /248\.000/);
+  await page.locator('[data-cart-id="shop-granola"] [data-quantity=plus]').click();
+  await page.reload(); await page.locator('#cart-items:not([hidden])').waitFor();
+  assert.match(await page.locator('#cart-subtotal').textContent(), /306\.000/, 'Reload must preserve quantity edits after the cart handoff');
+  await page.locator('#back-to-store').click(); await page.locator('#shop-content:not([hidden])').waitFor();
+  assert.equal(await page.locator('#shop-count').textContent(), '4');
+  await page.goto(app.base + '/cart/?product=shop-coffee'); await page.locator('[data-product-choice]').waitFor();
+  assert.equal(await page.locator('#merchant-name').textContent(), 'Morning & Co.');
+  await page.locator('[data-product-choice]').selectOption('shop-coffee~small');
+  await page.locator('[data-cart-id="shop-coffee~small"]').waitFor();
+  assert.match(await page.locator('#cart-subtotal').textContent(), /274\.000/);
+  await page.reload(); await page.locator('[data-product-choice]').waitFor();
+  assert.equal(await page.locator('.cart-item').count(), 2, 'Opening the product link must not add a duplicate line');
+  assert.equal(await page.locator('[data-product-choice]').inputValue(), 'shop-coffee~small');
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  assert.equal(await page.locator('.checkout-content').evaluate(n => getComputedStyle(n).animationName), 'none');
+  if (process.env.EZKART_TEST_SCREENSHOTS) await page.screenshot({ animations: 'disabled', path: join(process.env.EZKART_TEST_SCREENSHOTS, 'product-checkout-desktop.png'), fullPage: true });
+  await page.locator('#to-checkout').click();
+  for (const [name,value] of Object.entries(input.customer)) if(value) await page.locator(`#customer-form [name="${name}"]`).fill(value);
+  await page.locator('#pay-button').click();
+  await page.waitForURL(/\/cart\/payment\.php\?order=EZK-S-/);
+  await page.locator('#transfer-details').waitFor();
+  assert.match(await page.locator('#payment-amount').textContent(), /274\.000/);
+  const payment = (await app.calls()).find(call => call.url.includes('/bca-virtual-account/'));
+  assert.equal(JSON.parse(payment.body).order.amount,274000);
+  const order = app.cli(`echo json_encode(ez_load_order('${new URL(page.url()).searchParams.get('order')}'));`);
+  assert.equal(JSON.parse(order).seller_id,'seller_fixture');
+  assert.deepEqual(errors, []);
+});
+
+test('shop products reuse server-validated shipping and reject tampered prices and mixed sellers', async t => {
+  const app = await setup({ EZKART_CLOUDFLARE_API_URL: 'https://ezkart-api-test.fixture.workers.dev' });
+  t.after(() => app.close());
+  const fixture = shopFixture(); await writeFile(join(app.directory,'storefront.json'),JSON.stringify(fixture));
+  const cart = { 'shop-coffee~large': 2, 'shop-granola': 1 };
+  const rates = await app.request('/cart/api/rates.php',{cart,postal_code:'12345'});
+  assert.equal(rates.status,200); assert.equal(rates.data.quotes[0].price,18000);
+  const started = await app.request('/cart/api/start.php',{...input,cart,shop:fixture.store.cartScope,total:1});
+  assert.equal(started.status,201); assert.equal(started.data.payment_total,266000);
+  const shipping = (await app.calls()).find(call=>call.url.includes('/rates/couriers'));
+  assert.equal(JSON.parse(shipping.body).items.reduce((sum,item)=>sum+item.quantity,0),3);
+  fixture.selections.find(item=>item.id==='shop-granola').sellerId='seller_other';
+  await writeFile(join(app.directory,'storefront.json'),JSON.stringify(fixture));
+  assert.equal((await app.request('/cart/api/start.php',{...input,cart})).status,422);
+});

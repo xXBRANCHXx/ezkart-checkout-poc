@@ -15,6 +15,8 @@
   };
 
   const params = new URLSearchParams(window.location.search);
+  const hostedEntry = params.has("product") || params.has("store");
+  let hostedStore = null, hostedProduct = null, productOpened = false;
 
   const byId = (id) => document.getElementById(id);
   const money = (value) => new Intl.NumberFormat("id-ID", {
@@ -115,11 +117,11 @@
         return {};
       }
     })();
-    const requestedName = String(params.get("brand") || "").trim();
-    state.shop = safeShopScope(params.get("shop")) || brandScope(requestedName || legacyStored.name);
+    const requestedName = String(hostedStore?.name || params.get("brand") || "").trim();
+    state.shop = hostedStore?.cartScope || safeShopScope(params.get("shop")) || brandScope(requestedName || legacyStored.name);
     const stored = readStoredShop();
     const name = String(requestedName || stored.name || legacyStored.name || "Store").trim().slice(0, 80) || "Store";
-    const requestedLogo = String(params.get("logo") || stored.logo || legacyStored.logo || "").trim();
+    const requestedLogo = String(hostedStore ? hostedStore.logoUrl : params.get("logo") || stored.logo || legacyStored.logo || "").trim();
     let logo = "";
 
     try {
@@ -130,7 +132,8 @@
     const explicitReturn = safeReturnUrl(params.get("return"));
     const referringPage = safeReturnUrl(document.referrer);
     const storedReturn = safeReturnUrl(stored.returnUrl);
-    state.returnUrl = explicitReturn || referringPage || storedReturn;
+    const shopReturn = hostedStore?.enabled ? new URL(window.EzkartStorefront.shopUrl(hostedStore), location.origin).href : "";
+    state.returnUrl = hostedEntry && shopReturn ? shopReturn : explicitReturn || referringPage || storedReturn || shopReturn;
     const shop = { name, logo, returnUrl: state.returnUrl };
     saveShop(shop);
     try { sessionStorage.setItem("ezkart.checkout.brand", JSON.stringify({ ...shop, scope: state.shop })); } catch (_) {}
@@ -138,6 +141,8 @@
     byId("merchant-name").textContent = name;
     byId("merchant-avatar").textContent = name.charAt(0).toUpperCase();
     const image = byId("merchant-logo");
+    image.hidden = true;
+    byId("merchant-avatar").hidden = false;
     if (logo) {
       image.src = logo;
       image.alt = `${name} logo`;
@@ -185,6 +190,20 @@
   }
 
   async function loadCatalog() {
+    if (hostedEntry && !hostedStore) {
+      try {
+        const data = await window.EzkartStorefront.load(params.has("product") ? { product: params.get("product"), ...(params.has("store") ? { store: params.get("store") } : {}) } : { store: params.get("store"), mode: "checkout" });
+        hostedStore = data.store;
+        hostedProduct = data.products?.[0] || null;
+        window.EzkartStorefront.appearance(hostedStore);
+        applyMerchantBrand();
+      } catch (error) {
+        byId("catalog-loading").hidden = true;
+        byId("catalog-error").hidden = false;
+        byId("catalog-error-message").textContent = error.message;
+        return;
+      }
+    }
     const request = requestedCart();
     const saved = readStoredCart();
     const requested = request.mode === "merge"
@@ -193,6 +212,17 @@
         (saved[id] || 0) + (request.items[id] || 0),
       ]))
       : request.mode === "replace" ? request.items : saved;
+    if (hostedProduct && !productOpened) {
+      const choice = hostedProduct.choices.find(item => item.available);
+      if (!choice) {
+        byId("catalog-loading").hidden = true;
+        byId("catalog-error").hidden = false;
+        byId("catalog-error-message").textContent = hostedProduct.type === "physical" ? "This product is currently unavailable." : "Online checkout is not available for this product yet.";
+        hostedStore = null;
+        return;
+      }
+      if (!Object.keys(requested).some(id => id === hostedProduct.id || id.startsWith(`${hostedProduct.id}~`))) requested[choice.id] = 1;
+    }
     const ids = Object.keys(requested);
     state.loaded = false;
     byId("catalog-loading").hidden = false;
@@ -243,6 +273,16 @@
       if (ids.some((id) => !state.products[id])) {
         throw new Error("A selected product is no longer available.");
       }
+      if (!hostedStore && !hostedEntry && products[0]?.seller_id && products[0].seller_id !== "demo") {
+        try {
+          const data = await window.EzkartStorefront.load({ store: products[0].seller_id, mode: "checkout" });
+          // Keep existing website cart scopes and return destinations working.
+          hostedStore = { ...data.store, cartScope: state.shop };
+          window.EzkartStorefront.appearance(hostedStore);
+          applyMerchantBrand();
+        } catch (_) { /* Existing checkout links remain usable during an appearance-service outage. */ }
+      }
+      if (hostedStore && products.some(product => product.seller_id !== hostedStore.id)) throw new Error("Products from different stores need separate carts.");
 
       state.cart = Object.fromEntries(ids.map((id) => {
         const stock = Math.max(0, Number(state.products[id].stock ?? Number.MAX_SAFE_INTEGER));
@@ -250,7 +290,14 @@
         return [id, quantity];
       }).filter(([, quantity]) => quantity > 0));
       saveCart();
+      productOpened = true;
       cleanAddParameter();
+      // A handoff is consumed once; reloads must keep subsequent quantity edits.
+      if (hostedStore) {
+        const url = new URL(location.href);
+        for (const key of ["cart", "products", "add"]) { params.delete(key); url.searchParams.delete(key); }
+        history.replaceState({}, "", url);
+      }
       state.loaded = true;
       byId("catalog-loading").hidden = true;
       resetDelivery();
@@ -316,6 +363,7 @@
         <div class="cart-item-copy">
           <h2>${escapeHtml(productTitle(product))}</h2>
           ${product.variant_name ? `<p class="cart-item-variant">${escapeHtml(product.variant_name)}</p>` : ""}
+          ${hostedProduct && (product.product_id || id.split("~")[0]) === hostedProduct.id && hostedProduct.choices.length > 1 ? `<label class="product-choice-label">Option<select data-product-choice aria-label="Choose an option for ${escapeHtml(productTitle(product))}">${hostedProduct.choices.map(choice => `<option value="${escapeHtml(choice.id)}" ${choice.id === id ? "selected" : ""} ${!choice.available ? "disabled" : ""}>${escapeHtml(choice.name)} · ${money(choice.price)}${!choice.available ? " — unavailable" : ""}</option>`).join("")}</select></label>` : ""}
           <p>${escapeHtml(details)}</p>
           <div class="item-controls">
             <div class="quantity-control" aria-label="Quantity for ${escapeHtml(productTitle(product))}">
@@ -531,6 +579,15 @@
     if (quantity) {
       changeQuantity(row.dataset.cartId, quantity.dataset.quantity === "plus" ? 1 : -1);
     }
+  });
+  byId("cart-items").addEventListener("change", (event) => {
+    const select = event.target.closest("[data-product-choice]");
+    if (!select) return;
+    const oldId = select.closest("[data-cart-id]").dataset.cartId;
+    const choice = hostedProduct?.choices.find(item => item.id === select.value && item.available);
+    if (!choice || choice.id === oldId) return;
+    state.cart[choice.id] = Math.min(choice.stock, (state.cart[choice.id] || 0) + state.cart[oldId]);
+    delete state.cart[oldId]; saveCart(); resetDelivery(); void loadCatalog();
   });
   byId("to-checkout").addEventListener("click", () => {
     if (itemCount()) setStep("checkout");

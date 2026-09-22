@@ -1,0 +1,16 @@
+.branded-surface { background-color: var(--store-background); background-image: var(--store-image); background-size: cover; background-position: center; background-attachment: fixed; }
+.branded-surface .primary-button, .branded-surface .shop-add { background: var(--store-button); color: var(--store-on-button); box-shadow: none; }
+.branded-surface .merchant-avatar { background: var(--store-accent); color: var(--store-on-accent); border-color: transparent; }
+.branded-surface .checkout-progress li.active > span { background: var(--store-accent); color: var(--store-on-accent); }
+.branded-surface .checkout-content > .checkout-panel > .page-heading { padding: 20px; border-radius: 16px; background: rgba(255,255,255,.96); }
+.branded-surface .continue-shopping, .branded-surface .back-to-cart, .branded-surface .support-note { background: #fff; padding: 8px 12px; border-radius: 8px; }
+.branded-surface .checkout-footer { padding: 24px; border-radius: 14px; background: rgba(255,255,255,.96); }
+.branded-surface .checkout-footer img { height: auto; }
+.branded-surface :is(button,a,select,input):focus-visible { outline: 3px solid var(--store-accent); outline-offset: 3px; }
+.product-choice-label { display: grid; gap: 6px; margin: 10px 0; font-size: 12px; }
+.product-choice-label select { max-width: 100%; width: 100%; padding: 9px; border: 1px solid var(--line); border-radius: 8px; background: #fff; font: inherit; }
+[data-store-animation="fade"] :is(.shop-product,.shop-heading,.checkout-content,.order-summary) { animation: shop-fade .35s ease both; }
+[data-store-animation="rise"] :is(.shop-product,.shop-heading,.checkout-content,.order-summary) { animation: shop-rise .4s ease both; }
+@keyframes shop-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes shop-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { [data-store-animation] :is(.shop-product,.shop-heading,.checkout-content,.order-summary) { animation: none; } }

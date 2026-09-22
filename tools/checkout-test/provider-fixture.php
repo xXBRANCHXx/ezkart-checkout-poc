@@ -2,12 +2,35 @@
 declare(strict_types=1);
 // Test-only transport loaded by PHP -n. No provider network calls are possible.
 if (extension_loaded('curl') || !getenv('EZKART_TEST_CAPTURE')) throw new RuntimeException('Unsafe test transport setup.');
-foreach (['CURLOPT_POST', 'CURLOPT_POSTFIELDS', 'CURLOPT_HTTPHEADER', 'CURLOPT_RETURNTRANSFER', 'CURLOPT_CONNECTTIMEOUT', 'CURLOPT_TIMEOUT', 'CURLOPT_SSL_VERIFYPEER', 'CURLINFO_HTTP_CODE', 'CURLINFO_RESPONSE_CODE'] as $index => $constant) define($constant, $index + 1);
+foreach (['CURLOPT_POST', 'CURLOPT_POSTFIELDS', 'CURLOPT_HTTPHEADER', 'CURLOPT_RETURNTRANSFER', 'CURLOPT_CONNECTTIMEOUT', 'CURLOPT_TIMEOUT', 'CURLOPT_SSL_VERIFYPEER', 'CURLINFO_HTTP_CODE', 'CURLINFO_RESPONSE_CODE', 'CURLOPT_FOLLOWLOCATION', 'CURLOPT_CUSTOMREQUEST', 'CURLOPT_HEADERFUNCTION', 'CURLINFO_CONTENT_TYPE'] as $index => $constant) define($constant, $index + 1);
 function curl_init(string $url): object { return (object) ['url' => $url, 'options' => [], 'status' => 200]; }
 function curl_setopt_array(object $handle, array $options): bool { $handle->options = $options; return true; }
 function curl_exec(object $handle): string {
     $payload = json_decode($handle->options[CURLOPT_POSTFIELDS] ?? '{}', true);
     file_put_contents(getenv('EZKART_TEST_CAPTURE'), json_encode(['url' => $handle->url, 'method' => !empty($handle->options[CURLOPT_POST]) ? 'POST' : 'GET', 'body' => $handle->options[CURLOPT_POSTFIELDS] ?? '', 'headers' => $handle->options[CURLOPT_HTTPHEADER] ?? []]) . "\n", FILE_APPEND | LOCK_EX);
+    $shopFile = dirname(getenv('EZKART_TEST_CAPTURE')) . '/storefront.json';
+    if (str_starts_with($handle->url, 'https://ezkart-api-test.fixture.workers.dev/v1/') && is_file($shopFile)) {
+        $shop = json_decode((string) file_get_contents($shopFile), true);
+        $path = parse_url($handle->url, PHP_URL_PATH);
+        parse_str((string) parse_url($handle->url, PHP_URL_QUERY), $query);
+        if ($path === '/v1/storefront/view') {
+            if (empty($query['product']) && empty($shop['store']['enabled']) && ($query['mode'] ?? '') !== 'checkout') { $handle->status = 404; return '{"ok":false}'; }
+            $products = array_values(array_filter($shop['products'], static fn($product) => empty($query['product']) || $product['id'] === $query['product']));
+            return json_encode(['ok' => true, 'store' => $shop['store'], 'products' => ($query['mode'] ?? '') === 'checkout' ? [] : $products]);
+        }
+        if ($path === '/v1/storefront/products') return json_encode(['ok' => true, 'products' => array_values(array_filter($shop['selections'], static fn($product) => in_array($product['id'], explode(',', $query['ids']), true)))]);
+        if ($path === '/v1/catalog') return json_encode(['ok' => true, 'products' => $shop['catalog'], 'drafts' => []]);
+        if ($path === '/v1/storefront') {
+            if (($handle->options[CURLOPT_CUSTOMREQUEST] ?? '') === 'PUT') {
+                $shop['store'] = array_replace($shop['store'], $payload);
+                foreach (['logo', 'background'] as $kind) $shop['store'][$kind . 'Path'] = !empty($payload[$kind . 'Id']) ? '/v1/public/media/' . $payload[$kind . 'Id'] : '';
+                file_put_contents($shopFile, json_encode($shop));
+            }
+            return json_encode(['ok' => true, 'store' => $shop['store']]);
+        }
+        if ($path === '/v1/media') return '{"ok":true,"media":{"id":"media_fixture","path":"/v1/media/media_fixture"}}';
+        if ($path === '/v1/landing-pages' || $path === '/v1/components') return '{"ok":true,"pages":[],"components":[]}';
+    }
     if ($handle->url === 'https://ezkart-api-test.fixture.workers.dev/v1/customer/addresses') {
         $file = dirname(getenv('EZKART_TEST_CAPTURE')) . '/address-book.json';
         $book = is_file($file) ? json_decode((string) file_get_contents($file), true) : ['addresses' => [], 'default_id' => '', 'revision' => 0, 'limit' => 3];
@@ -106,5 +129,5 @@ function curl_exec(object $handle): string {
     if ($handle->url === 'https://api.biteship.com/v1/orders') return json_encode(['success' => true, 'id' => 'test-shipment-' . $payload['reference_id'], 'status' => 'confirmed', 'courier' => ['tracking_id' => 'test-tracking', 'waybill_id' => 'TEST-AWB']]);
     throw new RuntimeException('Unexpected external request: ' . $handle->url);
 }
-function curl_getinfo(object $handle, int $option): int { return $handle->status; }
+function curl_getinfo(object $handle, int $option): int|string { return $option === CURLINFO_CONTENT_TYPE ? 'application/json' : $handle->status; }
 function curl_error(object $handle): string { return ''; }

@@ -10,6 +10,23 @@ Arrange pickup.
 
 ## Checkout links for existing websites
 
+In the merchant dashboard, **Shop** manages one catalog page per seller and a
+shared checkout appearance: store name, logo, accent/button/background colors,
+background image, and optional fade/rise animations. Enabling the shop publishes
+`/shop/?store=<seller-id>`. Customers choose products and variants, add quantities
+to one bag, and continue through the existing shipping and payment flow.
+
+Every active product has one canonical checkout URL, `/cart/?product=<product-id>`,
+available from Products → Copy checkout link and from Shop. It works independently
+of the shop's enabled state. Product details come from the current catalog; there
+are no separate checkout page records to create or duplicate. Landing pages remain
+the full builder for promoting an offer. Shop pages and checkout links use fixed
+layouts and do not count toward the landing-page limit.
+
+These pages preserve the existing checkout's physical-product support and
+sandbox/production shipping rules. Digital and subscription products display an
+unavailable notice until the shared checkout supports their fulfillment.
+
 The Products admin can copy a merchant cart URL or a product-specific checkout
 URL for use on an existing website. Cart state is stored on the Ezkart checkout
 origin and isolated by the opaque `shop` value, so customers can return to the
