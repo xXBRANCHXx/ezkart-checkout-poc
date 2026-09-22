@@ -6,7 +6,7 @@ declare(strict_types=1);
     <div class="sq-page-identity">
       <a href="?page=sites" aria-label="Return to landing pages"><?= ez_admin_icon('chevron-left') ?></a>
       <button type="button" data-sq-open-panel="pages"><span><small>Landing page</small><b data-current-site-name>Landing page</b></span><?= ez_admin_icon('chevron-down') ?></button>
-      <button class="sq-new-page-shortcut" type="button" data-open-page-creator>+ New page</button>
+      <button class="sq-new-page-shortcut" type="button" data-open-page-creator data-ui-icon="plus">New page</button>
       <span class="sq-live-state"><i></i> Draft</span>
     </div>
     <div class="sq-history-tools" aria-label="Editing history">
@@ -24,7 +24,7 @@ declare(strict_types=1);
     <div class="sq-command-actions">
       <button type="button" data-sq-preview aria-label="Preview page" title="Preview page"><?= ez_admin_icon('eye') ?><span>Preview</span></button>
       <button type="button" data-sq-export aria-label="Export HTML" title="Export HTML"><?= ez_admin_icon('code') ?><span>Export HTML</span></button>
-      <button class="primary" type="button" data-sq-publish>Publish</button>
+      <button class="ui-button primary" type="button" data-sq-publish data-ui-icon="globe">Publish</button>
     </div>
   </header>
 
@@ -42,7 +42,7 @@ declare(strict_types=1);
         <section class="sq-tool-panel active" data-sq-panel="layers">
           <header><div><small>Site structure</small><h2>Pages &amp; sections</h2></div><button type="button" data-sq-open-panel="add" aria-label="Add section"><?= ez_admin_icon('plus') ?></button></header>
           <div class="sq-structure-tabs"><button type="button" data-sq-structure-view="pages">Pages</button><button class="active" type="button" data-sq-structure-view="sections">Sections</button></div>
-          <div class="sq-site-header-shortcuts"><div><span><?= ez_admin_icon('layout') ?></span><div><b>Header essentials</b><small>Logo, navigation links, and call-to-action.</small></div></div><div><button type="button" data-sq-edit-logo>Edit logo</button><button type="button" data-sq-edit-navigation>Edit navigation</button></div></div>
+          <div class="sq-site-header-shortcuts"><div><span><?= ez_admin_icon('layout') ?></span><div><b>Header essentials</b><small>Logo, navigation links, and call-to-action.</small></div></div><div><button class="ui-button" type="button" data-sq-edit-logo data-ui-icon="image">Edit logo</button><button class="ui-button" type="button" data-sq-edit-navigation data-ui-icon="link">Edit navigation</button></div></div>
           <p class="sq-panel-intro">Drag sections to reorder them. Click any section or layer to edit it.</p>
           <div class="sq-layer-list" data-sq-layer-list aria-label="Sections and elements"></div>
           <footer><span><?= ez_admin_icon('shield') ?> Autosaved and versioned</span></footer>
@@ -109,7 +109,7 @@ declare(strict_types=1);
           </div>
           <div class="sq-navigation-shortcuts"><div><b>Site navigation</b><small>Logo, page links, and call to action</small></div><button type="button" data-sq-edit-logo>Logo</button><button type="button" data-sq-edit-navigation>Links</button></div>
           <div class="sq-host-card"><span><?= ez_admin_icon('shield') ?></span><div><b>Managed hosting</b><small>Global CDN · 99.99% uptime</small></div><em>Active</em></div>
-          <button class="sq-wide-button" type="button" data-toast="Domain manager opened">Manage domains &amp; SEO</button>
+          <button class="ui-button sq-wide-button" type="button" data-toast="Domain manager opened" data-ui-icon="globe">Manage domains &amp; SEO</button>
         </section>
       </div>
     </aside>
@@ -120,7 +120,7 @@ declare(strict_types=1);
         <div class="sq-site-loader" role="status" aria-live="polite" aria-atomic="true">
           <span class="sq-site-loader-worm" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
           <span class="sq-site-loader-copy"><b data-sq-site-loader-title>Loading your page</b><small data-sq-site-loader-message>Preparing your Ezkart canvas</small></span>
-          <button type="button" data-sq-site-retry hidden>Try again</button>
+          <button class="ui-button" type="button" data-sq-site-retry hidden data-ui-icon="refresh">Try again</button>
         </div>
         <div class="sq-device-frame" data-sq-device-frame>
           <article class="sq-page-preview theme-coral radius-soft layout-rich" data-sq-preview-root>
@@ -337,21 +337,21 @@ declare(strict_types=1);
 </dialog>
 
 <dialog class="sq-export-dialog" id="html-export-dialog">
-  <form method="dialog"><header><span><?= ez_admin_icon('code') ?></span><div><small>Production output</small><h2>Generated landing-page HTML</h2><p>Responsive structure, selected products, spacing, animations, SEO metadata, and checkout hooks are included.</p></div><button value="close" aria-label="Close HTML export"><?= ez_admin_icon('x') ?></button></header><div class="sq-export-summary"><span><?= ez_admin_icon('check-circle') ?> Semantic HTML</span><span><?= ez_admin_icon('check-circle') ?> Responsive CSS</span><span><?= ez_admin_icon('check-circle') ?> Animation CSS</span><span><?= ez_admin_icon('check-circle') ?> Commerce hooks</span></div><textarea readonly spellcheck="false" data-sq-html-output></textarea><footer><small data-sq-html-size>Ready to generate</small><button type="button" data-sq-copy-html>Copy HTML</button><button class="primary" type="button" data-sq-download-html><?= ez_admin_icon('download') ?> Download .html</button></footer></form>
+  <form method="dialog"><header><span><?= ez_admin_icon('code') ?></span><div><small>Production output</small><h2>Generated landing-page HTML</h2><p>Responsive structure, selected products, spacing, animations, SEO metadata, and checkout hooks are included.</p></div><button value="close" aria-label="Close HTML export"><?= ez_admin_icon('x') ?></button></header><div class="sq-export-summary"><span><?= ez_admin_icon('check-circle') ?> Semantic HTML</span><span><?= ez_admin_icon('check-circle') ?> Responsive CSS</span><span><?= ez_admin_icon('check-circle') ?> Animation CSS</span><span><?= ez_admin_icon('check-circle') ?> Commerce hooks</span></div><textarea readonly spellcheck="false" data-sq-html-output></textarea><footer><small data-sq-html-size>Ready to generate</small><button class="ui-button" type="button" data-sq-copy-html data-ui-icon="copy">Copy HTML</button><button class="primary" type="button" data-sq-download-html><?= ez_admin_icon('download') ?> Download .html</button></footer></form>
 </dialog>
 
 <dialog class="sq-component-dialog" data-sq-component-dialog>
   <form method="dialog" data-sq-component-form>
     <header><span><?= ez_admin_icon('code') ?></span><div><small data-sq-component-dialog-context>Create component</small><h2 data-sq-component-dialog-title>New main component</h2><p>Write HTML, CSS, and JavaScript in one sandboxed component.</p></div><button type="button" data-sq-component-close aria-label="Close component editor"><?= ez_admin_icon('x') ?></button></header>
     <section><div class="sq-component-meta"><label><span>Name</span><input name="component_name" maxlength="80" required placeholder="Announcement card"></label><label><span>Description</span><input name="component_description" maxlength="180" placeholder="Optional usage note"></label></div><label class="sq-component-code-field"><span>Component code</span><textarea name="component_code" rows="18" required spellcheck="false"></textarea></label><div class="sq-component-budget"><span><b data-sq-component-size>0 KB</b> of 200 KB</span><span><b data-sq-component-total>0</b> of 20 components</span></div><p class="sq-component-error" data-sq-component-error hidden></p></section>
-    <footer><button type="button" data-sq-component-delete hidden><?= ez_admin_icon('trash') ?> Delete main component</button><span></span><button type="button" data-sq-component-close>Cancel</button><button class="primary" type="submit" data-sq-component-save>Save component</button></footer>
+    <footer><button type="button" data-sq-component-delete hidden><?= ez_admin_icon('trash') ?> Delete main component</button><span></span><button class="ui-button" type="button" data-sq-component-close data-ui-icon="x">Cancel</button><button class="ui-button primary" type="submit" data-sq-component-save data-ui-icon="save">Save component</button></footer>
   </form>
 </dialog>
 
 <dialog class="page-creator-dialog" id="builder-templates-dialog" aria-labelledby="builder-templates-title"><form data-builder-templates-form>
   <header><div><h2 id="builder-templates-title">Templates</h2><p>Choose a design for your current project or a new landing page draft.</p></div><button type="button" data-creator-close aria-label="Close"><?= ez_admin_icon('x') ?></button></header>
   <section><div data-template-picker></div></section>
-  <footer><button type="button" data-creator-close>Cancel</button><button class="primary" type="submit" data-template-choose disabled>Use template</button></footer>
+  <footer><button class="ui-button" type="button" data-creator-close data-ui-icon="x">Cancel</button><button class="ui-button primary" type="submit" data-template-choose disabled data-ui-icon="grid">Use template</button></footer>
 </form></dialog>
 
 <dialog class="page-creator-dialog sq-template-apply-dialog" id="template-apply-dialog" aria-labelledby="template-apply-title"><form data-template-apply-form>
@@ -363,14 +363,14 @@ declare(strict_types=1);
       <label><input type="radio" name="destination" value="new" required disabled aria-describedby="template-page-capacity"><span><b>New landing page draft</b><small>Save your current project and open the template as a separate draft.</small></span></label>
     </fieldset>
     <p id="template-page-capacity" data-template-capacity role="status"></p>
-    <button type="button" data-template-check-limit hidden>Check again</button>
+    <button class="ui-button" type="button" data-template-check-limit hidden data-ui-icon="refresh">Check again</button>
     <div class="sq-creator-details" data-template-draft-details hidden>
       <label><span>Page name</span><input name="page_name" required maxlength="60" autocomplete="off" disabled></label>
       <label><span>Free Ezkart URL</span><div class="slug-field"><input name="slug" required maxlength="48" pattern="[a-z0-9]+(?:-[a-z0-9]+)*" autocomplete="off" disabled><em>.ezkart.site</em></div></label>
     </div>
     <p data-template-apply-error role="alert" hidden></p>
   </section>
-  <footer><button type="button" data-template-apply-close>Back</button><button class="primary" type="submit" data-template-apply-submit disabled>Use template</button></footer>
+  <footer><button class="ui-button" type="button" data-template-apply-close data-ui-icon="undo">Back</button><button class="ui-button primary" type="submit" data-template-apply-submit disabled data-ui-icon="grid">Use template</button></footer>
 </form></dialog>
 
 <dialog class="page-creator-dialog" id="page-creator-dialog" aria-labelledby="page-creator-title"><form method="dialog" data-page-creator-form>
@@ -384,5 +384,5 @@ declare(strict_types=1);
     </div>
     <details class="sq-creator-optional"><summary>Connect products now (optional)</summary><fieldset data-creator-products><legend>Starting products · optional</legend><p class="creator-products-empty" data-creator-products-empty>You can build your page now and add products later.</p></fieldset></details>
   </section>
-  <footer><button type="button" data-creator-close>Cancel</button><button class="primary" value="default" data-create-page>Create &amp; edit</button></footer>
+  <footer><button class="ui-button" type="button" data-creator-close data-ui-icon="x">Cancel</button><button class="ui-button primary" value="default" data-create-page data-ui-icon="plus">Create &amp; edit</button></footer>
 </form></dialog>

@@ -41,7 +41,7 @@
     byId("shop-publish-status").textContent = store.enabled ? "Your shop is enabled. Share this link anywhere." : "Your shop is disabled. Product checkout links still work.";
     byId("shop-product-links").innerHTML = products.length ? products.map(product => {
       const url = new URL(`/cart/?product=${encodeURIComponent(product.id)}`, location.origin).href;
-      return `<article class="shop-product-link"><div><b>${esc(product.name)}</b><small>${product.type === "physical" ? "Uses your shared checkout appearance" : "Online checkout currently supports physical products"}</small></div><div><a class="action-button" href="${esc(url)}" target="_blank" rel="noopener">Open ↗</a><button type="button" class="action-button" data-copy-product="${esc(url)}">Copy checkout link</button></div></article>`;
+      return `<article class="shop-product-link"><div><b>${esc(product.name)}</b><small>${product.type === "physical" ? "Uses your shared checkout appearance" : "Online checkout currently supports physical products"}</small></div><div><a data-ui-icon="external-link" class="action-button" href="${esc(url)}" target="_blank" rel="noopener">Open</a><button data-ui-icon="copy" type="button" class="action-button" data-copy-product="${esc(url)}">Copy checkout link</button></div></article>`;
     }).join("") : '<p class="shop-field-note">Your active products will appear here. <a href="?page=product-new&new=1">Create a product</a> to get started.</p>';
   }
   async function copy(value) {

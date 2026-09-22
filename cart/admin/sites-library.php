@@ -27,5 +27,5 @@
     </div>
     <details class="sq-creator-optional"><summary>Connect products now (optional)</summary><fieldset data-creator-products><legend>Starting products · optional</legend><p class="creator-products-empty" data-creator-products-empty>You can build your page now and add products later.</p></fieldset></details>
   </section>
-  <footer><button type="button" data-creator-close>Cancel</button><button class="primary" value="default">Create &amp; edit</button></footer>
+  <footer><button class="ui-button" type="button" data-creator-close data-ui-icon="x">Cancel</button><button class="ui-button primary" value="default" data-ui-icon="plus">Create &amp; edit</button></footer>
 </form></dialog>

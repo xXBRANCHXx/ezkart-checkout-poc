@@ -10,8 +10,8 @@ $walletOrders = array_values(array_filter($orders, static fn($order) => strtoupp
 $walletProductPayments = array_sum(array_map(static fn($order) => max(0, (int) ($order['subtotal'] ?? 0)), $walletOrders));
 $walletDataAvailable = $authenticationMethod === 'password' || $sellerId !== '';
 ez_page_header('Wallet', 'Your balance, withdrawal availability, and the payments behind your earnings.', [
-    ['label' => 'View payments', 'href' => '?page=payments', 'style' => 'primary'],
-    ['label' => 'Refresh', 'href' => '?page=wallet'],
+    ['label' => 'View payments', 'icon' => 'credit-card', 'href' => '?page=payments', 'style' => 'primary'],
+    ['label' => 'Refresh', 'icon' => 'refresh', 'href' => '?page=wallet'],
 ]);
 ?>
 <section class="wallet-overview" aria-label="Wallet overview">
@@ -35,7 +35,7 @@ ez_page_header('Wallet', 'Your balance, withdrawal availability, and the payment
       <li><span><?= ez_admin_icon('check-circle') ?></span><div><b>Provider settlement confirmed</b><p>Payment funds and final fees have been confirmed.</p></div></li>
       <li><span><?= ez_admin_icon('wallet') ?></span><div><b>At least Rp250.000 available</b><p>Minimum seller withdrawal. Ezkart covers the transfer fee.</p></div></li>
     </ol>
-    <div class="wallet-withdraw-action"><button type="button" disabled aria-describedby="wallet-withdraw-reason">Withdraw funds</button><p id="wallet-withdraw-reason">Withdrawals will open after wallet setup is complete and eligible funds are available. A release date is not available yet.</p></div>
+    <div class="wallet-withdraw-action"><button class="ui-button" type="button" disabled aria-describedby="wallet-withdraw-reason" data-ui-icon="wallet">Withdraw funds</button><p id="wallet-withdraw-reason">Withdrawals will open after wallet setup is complete and eligible funds are available. A release date is not available yet.</p></div>
   </article>
 </section>
 <section class="surface wallet-payments" aria-label="Payments awaiting wallet settlement">
@@ -53,6 +53,6 @@ ez_page_header('Wallet', 'Your balance, withdrawal availability, and the payment
         $reference = (string) ($order['order_id'] ?? '');
     ?><tr><td><a href="<?= ez_admin_escape('?' . http_build_query(['page' => 'payments', 'order' => $reference])) ?>"><?= ez_admin_escape($reference) ?></a><small><?= ez_admin_escape(ez_admin_time($order['paid_at'] ?? $order['created_at'] ?? '')) ?></small></td><td><?= ez_admin_money($order['subtotal'] ?? 0) ?></td><td><span class="wallet-delivery <?= $delivered ? 'confirmed' : '' ?>"><?= ez_admin_escape($delivery) ?></span></td><td><span>No settlement record</span></td></tr><?php endforeach; ?>
     </tbody></table></div>
-    <?php if (count($walletOrders) > 20): ?><p class="wallet-table-note">Showing the 20 most recent paid orders. <a href="?page=payments">View all payments</a></p><?php endif; ?>
+    <?php if (count($walletOrders) > 20): ?><p class="wallet-table-note">Showing the 20 most recent paid orders. <a href="?page=payments" data-ui-icon="credit-card">View all payments</a></p><?php endif; ?>
   <?php endif; ?>
 </section>

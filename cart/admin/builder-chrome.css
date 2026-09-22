@@ -18,8 +18,8 @@
   --sq-control-accent-end: #5b45f6;
 }
 .page-site-editor .sq-command-actions button.primary {
-  background: #c74130;
-  box-shadow: 0 1px 2px #18212d12;
+  background: linear-gradient(165deg, var(--ui-action-top), var(--ui-action-bottom));
+  box-shadow: 0 2px 4px #c7292629, inset 0 1px 0 #ffffff30;
 }
 .page-site-editor .sq-commandbar button:focus-visible,
 .page-site-editor .sq-inspector button:focus-visible {
