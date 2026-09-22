@@ -1419,9 +1419,10 @@ $statusTotal = max(1, $metrics['orders']);
 $paidEnd = round(($statusCounts['PAID'] / $statusTotal) * 100, 1);
 $pendingEnd = round((($statusCounts['PAID'] + $statusCounts['PENDING']) / $statusTotal) * 100, 1);
 $creatingEnd = round((($statusCounts['PAID'] + $statusCounts['PENDING'] + $statusCounts['CREATING']) / $statusTotal) * 100, 1);
-$allowedPages = ['dashboard', 'orders', 'products', 'product-new', 'shop', 'sites', 'customers', 'analytics', 'marketing', 'payments', 'reviews', 'messages', 'wallet', 'settings'];
+$allowedPages = ['dashboard', 'orders', 'products', 'product-new', 'shop', 'sites', 'customers', 'analytics', 'marketing', 'payments', 'messages', 'wallet', 'settings'];
 $requestedPage = strtolower(trim((string) ($_GET['page'] ?? 'dashboard')));
 if ($requestedPage === 'integrations') { header('Location: ?page=wallet', true, 302); exit; }
+if ($requestedPage === 'reviews') { header('Location: ?page=customers&tab=reviews', true, 302); exit; }
 $page = in_array($requestedPage, $allowedPages, true) ? $requestedPage : 'dashboard';
 $walletAccess = $page === 'wallet' && $authenticated ? ez_wallet_access($authenticationMethod, $sellerId, $csrfToken, $isHttps) : ['unlocked' => false];
 $requestedSite = trim((string) ($_GET['edit'] ?? ''));
@@ -1429,7 +1430,7 @@ $siteEditor = $page === 'sites' && $requestedSite !== '' && strlen($requestedSit
 $pageTitles = [
     'dashboard' => 'Dashboard', 'orders' => 'Orders', 'products' => 'Products', 'product-new' => 'Create product', 'shop' => 'Shop', 'sites' => 'Landing Pages',
     'customers' => 'Customers', 'analytics' => 'Analytics', 'marketing' => 'Marketing',
-    'payments' => 'Payments', 'reviews' => 'Reviews', 'messages' => 'Messages',
+    'payments' => 'Payments', 'messages' => 'Messages',
     'wallet' => 'Wallet', 'settings' => 'Settings',
 ];
 $orderQueueFilter = is_string($_GET['fulfillment'] ?? null) && isset($orderQueues[$_GET['fulfillment']]) ? $_GET['fulfillment'] : '';
@@ -1666,7 +1667,6 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
         <a class="<?= $page === 'analytics' ? 'active' : '' ?>" href="?page=analytics"><?= ez_admin_icon('chart') ?><span>Analytics</span></a>
         <a class="<?= $page === 'marketing' ? 'active' : '' ?>" href="?page=marketing"><?= ez_admin_icon('send') ?><span>Marketing</span></a>
         <a class="<?= $page === 'payments' ? 'active' : '' ?>" href="?page=payments"><?= ez_admin_icon('credit-card') ?><span>Payments</span></a>
-        <a class="<?= $page === 'reviews' ? 'active' : '' ?>" href="?page=reviews"><?= ez_admin_icon('star') ?><span>Reviews</span></a>
         <a class="<?= $page === 'messages' ? 'active' : '' ?>" href="?page=messages"><?= ez_admin_icon('message') ?><span>Messages</span></a>
         <a class="<?= $page === 'wallet' ? 'active' : '' ?>" href="?page=wallet"><?= ez_admin_icon('wallet') ?><span>Wallet</span></a>
         <a class="<?= $page === 'settings' ? 'active' : '' ?>" href="?page=settings"><?= ez_admin_icon('settings') ?><span>Settings</span></a>
@@ -1786,7 +1786,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
         </section>
 
         <section class="dashboard-grid footer-grid">
-          <article class="panel reviews-panel" id="customer-reviews"><header class="panel-header"><h2>Customer Reviews</h2><a href="?page=reviews" data-ui-icon="star">Open reviews</a></header><div class="review-body"><div><strong><?= $reviewAverage === null ? '—' : number_format($reviewAverage, 1) ?></strong><p><?= $catalogError !== '' ? 'Reviews unavailable' : ($reviewCount > 0 ? number_format($reviewCount) . ' published reviews' : 'No published reviews yet') ?></p><small>All-time catalog ratings</small></div></div></article>
+          <article class="panel reviews-panel" id="customer-reviews"><header class="panel-header"><h2>Customer Reviews</h2><a href="?page=customers&amp;tab=reviews" data-ui-icon="star">Open reviews</a></header><div class="review-body"><div><strong><?= $reviewAverage === null ? '—' : number_format($reviewAverage, 1) ?></strong><p><?= $catalogError !== '' ? 'Reviews unavailable' : ($reviewCount > 0 ? number_format($reviewCount) . ' published reviews' : 'No published reviews yet') ?></p><small>All-time catalog ratings</small></div></div></article>
 
           <article class="panel storefront-panel"><header class="panel-header"><h2>Landing Page &amp; Domain</h2><a href="?page=sites" data-ui-icon="plus">Create page</a></header><div class="storefront-summary"><span class="storefront-preview"><?= ez_admin_icon('layout') ?><i data-landing-page-state>Loading</i></span><div><small>Hosted storefront</small><b data-landing-page-summary>Loading landing pages</b><p data-landing-page-detail>Checking saved pages…</p><em><?= ez_admin_icon('shield') ?> Securely saved with Ezkart</em></div></div><div class="storefront-pipeline"><span><?= ez_admin_icon('box') ?><small>Product</small></span><i></i><span><?= ez_admin_icon('layout') ?><small>Page</small></span><i></i><span><?= ez_admin_icon('credit-card') ?><small>Payment</small></span><i></i><span><?= ez_admin_icon('truck') ?><small>Shipping</small></span></div></article>
 

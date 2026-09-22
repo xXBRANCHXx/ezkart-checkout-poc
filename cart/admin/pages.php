@@ -239,7 +239,15 @@ function ez_orders_table(array $rows, string $tableId, string $csrfToken, string
 <?php break; case 'shop': require __DIR__ . '/shop.php'; ?>
 <?php break; case 'sites': require __DIR__ . ($siteEditor ? '/sites-builder.php' : '/sites-library.php'); break; case 'customers': ?>
   <?php $customerCount = count($customerProfiles); $customerSpend = array_sum(array_column($customerProfiles, 'spend')); ?>
-  <?php ez_page_header('Customers', 'View your customers and their purchase history.', [['label'=>'Export customers', 'icon' => 'download','toast'=>'Customer export prepared'],['label'=>'Create segment', 'icon' => 'users','toast'=>'Segment builder opened','style'=>'primary']]); ?>
+  <?php $customerTab = ($_GET['tab'] ?? '') === 'reviews' ? 'reviews' : 'directory'; ?>
+  <?php ez_page_header('Customers', 'Manage your customers, purchase history, and reviews.', $customerTab === 'reviews' ? [] : [['label'=>'Export customers', 'icon' => 'download','toast'=>'Customer export prepared'],['label'=>'Create segment', 'icon' => 'users','toast'=>'Segment builder opened','style'=>'primary']]); ?>
+  <nav class="customer-page-tabs" aria-label="Customer sections">
+    <a href="?page=customers"<?= $customerTab === 'directory' ? ' aria-current="page"' : '' ?>><?= ez_admin_icon('users') ?>Customer directory</a>
+    <a href="?page=customers&amp;tab=reviews"<?= $customerTab === 'reviews' ? ' aria-current="page"' : '' ?>><?= ez_admin_icon('star') ?>Reviews</a>
+  </nav>
+  <?php if ($customerTab === 'reviews'): ?>
+  <section class="surface customer-reviews-summary"><header class="surface-header"><div><h2>Customer ratings</h2><p>All-time published reviews</p></div></header><div class="review-body"><div><strong><?= $reviewAverage === null ? '—' : number_format($reviewAverage, 1) ?></strong><p><?= $catalogError !== '' ? 'Reviews could not be loaded. Reload to try again.' : ($reviewCount > 0 ? number_format($reviewCount) . ' published reviews' : 'No published reviews yet.') ?></p></div></div></section>
+  <?php else: ?>
   <?php ez_stat_strip([
       ['icon'=>'users','label'=>'Customers','value'=>(string) $customerCount,'detail'=>'Unique checkout identities'],
       ['icon'=>'wallet','label'=>'Customer value','value'=>ez_admin_short_money($customerSpend),'detail'=>'Provider-confirmed spend'],
@@ -248,6 +256,8 @@ function ez_orders_table(array $rows, string $tableId, string $csrfToken, string
   ]); ?>
   <section class="page-grid customer-main-grid"><article class="surface"><header class="surface-header"><div><h2>Customer directory</h2><p>Profiles assembled from sandbox checkout history.</p></div><label class="surface-search"><?= ez_admin_icon('search') ?><input data-table-search="customer-table" type="search" placeholder="Search customers"></label></header><div class="customer-table" id="customer-table"><?php $index=0; foreach ($customerProfiles as $profile): ?><article data-search-row="<?= ez_admin_escape(mb_strtolower(implode(' ', [$profile['name'],$profile['email'],$profile['location']]))) ?>"><?= ez_admin_customer_avatar($profile, 'customer-avatar c' . ($index++ % 4)) ?><div><b><?= ez_admin_escape($profile['name']) ?></b><small><?= ez_admin_escape($profile['email']) ?></small></div><span><?= ez_admin_escape($profile['location']) ?></span><span><b><?= $profile['orders'] ?> orders</b><small><?= $profile['paid'] ?> paid</small></span><strong><?= ez_admin_money($profile['spend']) ?></strong><button class="ui-button" type="button" data-toast="Customer profile opened" data-ui-icon="eye">View</button></article><?php endforeach; ?><?php if ($customerProfiles === []): ?><div class="blank-state">Customer profiles will appear after the first checkout.</div><?php endif; ?></div></article><aside class="surface segments-panel"><header class="surface-header"><div><h2>Smart segments</h2><p>Automatically maintained groups.</p></div></header><div class="segment-list"><article><span class="segment-dot vip"></span><div><b>High value</b><p>Paid spend above Rp150.000</p></div><strong><?= count(array_filter($customerProfiles, static fn($profile): bool => $profile['spend'] >= 150000)) ?></strong></article><article><span class="segment-dot new"></span><div><b>New customers</b><p>One checkout in history</p></div><strong><?= count(array_filter($customerProfiles, static fn($profile): bool => $profile['orders'] === 1)) ?></strong></article><article><span class="segment-dot at-risk"></span><div><b>Needs follow-up</b><p>No provider-confirmed order</p></div><strong><?= count(array_filter($customerProfiles, static fn($profile): bool => $profile['paid'] === 0)) ?></strong></article></div><footer><button class="ui-button" type="button" data-toast="Segment builder opened" data-ui-icon="users">Build a segment</button></footer></aside></section>
   <section class="surface lifecycle-panel"><header class="surface-header"><div><h2>Lifecycle overview</h2><p>Customer movement through the sandbox funnel.</p></div></header><div class="lifecycle-flow"><article><span>01</span><b>Discovered</b><strong><?= max($customerCount, $metrics['orders']) ?></strong><p>Known sessions</p></article><i></i><article><span>02</span><b>Started checkout</b><strong><?= $metrics['orders'] ?></strong><p>Order records</p></article><i></i><article><span>03</span><b>Paid</b><strong><?= $metrics['paid_count'] ?></strong><p>Verified payments</p></article><i></i><article><span>04</span><b>Retained</b><strong><?= count(array_filter($customerProfiles, static fn($profile): bool => $profile['orders'] > 1)) ?></strong><p>Repeat buyers</p></article></div></section>
+
+  <?php endif; ?>
 
 <?php break; case 'analytics': ?>
   <?php ez_page_header('Analytics', 'Track sales, conversion, and product performance in your sandbox.', [['label'=>'Last 6 months', 'icon' => 'calendar','toast'=>'Date range selector opened'],['label'=>'Export report', 'icon' => 'download','toast'=>'Analytics report prepared','style'=>'primary']]); ?>
@@ -314,10 +324,6 @@ function ez_orders_table(array $rows, string $tableId, string $csrfToken, string
       <footer><span>Environment</span><b><?= $commerceProduction ? 'Production' : 'Sandbox' ?></b></footer>
     </aside>
   </section>
-
-<?php break; case 'reviews': ?>
-  <?php ez_page_header('Reviews', 'Published customer ratings from your saved product catalog.'); ?>
-  <section class="surface"><header class="surface-header"><div><h2>Customer ratings</h2><p>All-time published reviews</p></div></header><div class="review-body"><div><strong><?= $reviewAverage === null ? '—' : number_format($reviewAverage, 1) ?></strong><p><?= $catalogError !== '' ? 'Reviews could not be loaded. Reload to try again.' : ($reviewCount > 0 ? number_format($reviewCount) . ' published reviews' : 'No published reviews yet.') ?></p></div></div></section>
 
 <?php break; case 'messages': ?>
   <?php ez_page_header('Messages', 'Manage customer conversations and order questions.', [['label'=>'Saved replies', 'icon' => 'message','toast'=>'Saved replies opened'],['label'=>'New message', 'icon' => 'pencil','toast'=>'Message composer opened','style'=>'primary']]); ?>
