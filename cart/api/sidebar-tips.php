@@ -35,7 +35,7 @@ function ez_tips_card(array $input): array
     if (!in_array($card['icon'], ez_tips_icons(), true)) throw new InvalidArgumentException('Choose one of the available icons.');
     // Only merchant navigation or HTTPS links. No script, protocol-relative, or logout URLs.
     $href = $card['href'];
-    $internal = preg_match('/^\?page=(dashboard|orders|products|customers|payments|wallet|settings|sites|shop|reviews)$/D', $href);
+    $internal = preg_match('/^\?page=(dashboard|orders|products|customers|payments|wallet|settings|sites|shop|reviews|advanced)$/D', $href);
     $url = parse_url($href);
     $external = filter_var($href, FILTER_VALIDATE_URL) && is_array($url) && ($url['scheme'] ?? '') === 'https' && !isset($url['user']) && !isset($url['pass']) && !str_contains($href, '\\');
     if (!$internal && !$external) throw new InvalidArgumentException('Use a merchant page such as ?page=products, or a full https:// link.');
