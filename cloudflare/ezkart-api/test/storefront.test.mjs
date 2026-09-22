@@ -63,6 +63,9 @@ test("one seller shop shares authoritative products and appearance, protects wri
   assert.equal(JSON.parse((await db.prepare("SELECT settings_json FROM sellers WHERE id='seller_alice'").first()).settings_json).privateSetting,"never expose");
   assert.equal((await mf.dispatchFetch("https://api.fixture.test/v1/public/media/logo_alice")).status,200);
   assert.equal((await mf.dispatchFetch("https://api.fixture.test/v1/public/media/logo_bob")).status,404);
+  await (await mf.getWorker()).scheduled({ cron: "17 * * * *" });
+  assert.ok(await db.prepare("SELECT id FROM media_uploads WHERE id='logo_alice'").first(), "A saved appearance image survives scheduled abandoned-upload cleanup");
+  assert.equal(await db.prepare("SELECT id FROM media_uploads WHERE id='logo_bob'").first(), null, "An unreferenced old upload is still collected");
   await call("/v1/storefront",alice,{...appearance,name:"New name"});
   assert.equal((await db.prepare("SELECT COUNT(*) AS count FROM sellers WHERE id='seller_alice'").first()).count,1);
   await db.prepare("UPDATE product_variants SET price_amount=22000,stock_quantity=2 WHERE id='green'").run();
