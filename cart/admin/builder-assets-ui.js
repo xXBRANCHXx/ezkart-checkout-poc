@@ -8,20 +8,109 @@
     artwork.style.transform = `translate(-50%, -50%) scale(${scale})`;
   };
   const observer = new ResizeObserver(entries => entries.forEach(({target}) => fitPreview(target)));
+  const keywords = {code:'snippet syntax terminal',bulletins:'bullets announcement notice checklist',accordions:'faq questions answers expandable',invitations:'call to action cta closing',reviews:'testimonials customer quotes',facts:'stats statistics specifications',people:'about us founder team'};
+  function assetCard(item,asSection=false) {
+    const button = document.createElement('button');
+    button.type='button'; button.draggable=true; button.className='sq-asset-card';
+    button.dataset[asSection?'sqAddBlock':'sqAsset']=item.id;
+    button.dataset.sqAssetPurpose=item.category;
+    button.dataset.search=`${item.name} ${item.category} ${item.description} ${keywords[item.category] || ''}`;
+    button.setAttribute('aria-label',`Add ${item.name}${asSection?' section':''}`);
+    button.title=item.description;
+    button.innerHTML=`<span class="sq-asset-preview" aria-hidden="true"></span><span class="sq-asset-caption"><b>${escape(item.name)}</b><span class="sq-asset-add" aria-hidden="true">+</span></span>`;
+    const frame=button.querySelector('.sq-asset-preview');
+    frame.append(EzkartAssets.preview(item.assetId || item.id)); observer.observe(frame);
+    return button;
+  }
   function renderCatalog(root) {
-    EzkartAssets.definitions.forEach(item => {
-      const list = root.querySelector(`[data-sq-asset-catalog="${item.category}"]`);
-      if (!list) return;
-      const button = document.createElement('button');
-      button.type = 'button'; button.draggable = true;
-      button.className = 'sq-asset-card'; button.dataset.sqAsset = item.id;
-      button.dataset.search = `${item.name} ${item.category} ${item.description} ${item.category === 'code' ? 'snippet syntax terminal' : ''} ${item.category === 'bulletins' ? 'bullets announcement notice checklist' : ''} ${item.category === 'accordions' ? 'faq questions answers expandable' : ''}`;
-      button.setAttribute('aria-label', `Add ${item.name}`);
-      button.innerHTML = `<span class="sq-asset-preview" aria-hidden="true"></span><span class="sq-asset-caption"><b>${escape(item.name)}</b><small>${escape(item.description)}</small><span class="sq-asset-add" aria-hidden="true">+</span></span>`;
-      const frame = button.querySelector('.sq-asset-preview');
-      frame.append(EzkartAssets.preview(item.id));
-      list.append(button); observer.observe(frame);
+    const anchor=root.querySelector('[data-sq-library-group="sections"]');
+    EzkartAssets.categories.forEach(category=>{
+      const group=document.createElement('div');
+      group.className='sq-block-group sq-asset-group';
+      group.dataset.sqLibraryGroup='elements'; group.dataset.sqAssetPurpose=category.id;
+      group.innerHTML=`<h3>${escape(category.name)}<span>3 designs</span></h3><div class="sq-asset-grid" data-sq-asset-catalog="${category.id}"></div>`;
+      EzkartAssets.definitions.filter(item=>item.category===category.id).forEach(item=>group.lastElementChild.append(assetCard(item)));
+      root.insertBefore(group,anchor);
     });
+  }
+  function browse({root,componentCount,syncControls}) {
+    const search=root.querySelector('[data-sq-block-search]'),purpose=root.querySelector('[data-sq-asset-filter]');
+    const purposeRow=root.querySelector('[data-sq-asset-filter-row]');
+    const sectionList=root.querySelector('[data-sq-native-component-list]');
+    const legacyPurpose={Hero:'hero',Commerce:'commerce',Story:'story',Media:'media',Details:'facts',Footer:'footers',Navigation:'navigation'};
+    const specificPurpose={'quote':'reviews','faq-list':'accordions','process':'diagrams','call-to-action':'invitations','announcement':'bulletins','feature-showcase':'features','journey-timeline':'diagrams','support-questions':'accordions','contact-invitation':'contact'};
+    const sectionCategories=[{id:'hero',name:'Hero & introductions'},{id:'commerce',name:'Products & collections'},{id:'story',name:'About & story'},{id:'media',name:'Media & galleries'},{id:'navigation',name:'Navigation'},...EzkartAssets.categories];
+    EzkartComponents.definitions.forEach(item=>{
+      const card=sectionList.querySelector(`[data-sq-add-block="${item.id}"]`);
+      if(!card)return;
+      card.dataset.sqAssetPurpose=specificPurpose[item.id] || legacyPurpose[item.category] || 'story';
+      card.title=item.description; card.setAttribute('aria-label',`Add ${item.name} section`);
+      card.querySelector('small')?.remove();
+    });
+    EzkartAssets.sectionDefinitions.forEach(item=>sectionList.append(assetCard(item,true)));
+    // Keep the older presets in the same purpose-based families as new sections.
+    sectionCategories.forEach(category=>{
+      const cards=[...sectionList.children].filter(card=>card.dataset.sqAssetPurpose===category.id);
+      if(!cards.length)return;
+      const family=document.createElement('div'); family.className='sq-section-family';
+      family.innerHTML=`<h3>${escape(category.name)}<span>${cards.length} designs</span></h3><div class="sq-asset-grid"></div>`;
+      cards.forEach(card=>family.lastElementChild.append(card));sectionList.append(family);
+    });
+    let library='elements';
+    const rememberedPurpose={elements:'all',sections:'all'};
+    const options=()=>{
+      const categories=library==='sections'?sectionCategories:[{id:'basics',name:'Essentials'},...EzkartAssets.categories];
+      const used=new Set([...root.querySelectorAll(`[data-sq-library-group="${library}"] [data-sq-asset-purpose], [data-sq-library-group="${library}"][data-sq-asset-purpose]`)].map(node=>node.dataset.sqAssetPurpose));
+      purpose.innerHTML=`<option value="all">All ${library}</option>`+categories.filter(item=>used.has(item.id)).map(item=>`<option value="${item.id}">${escape(item.name)}</option>`).join('');
+      purpose.value=rememberedPurpose[library] || 'all'; syncControls();
+    };
+    const selector='[data-sq-asset], [data-sq-upload-asset], [data-sq-add-block], [data-sq-add-element], [data-sq-open-products], [data-sq-open-library], [data-sq-component], [data-sq-create-component]';
+    const normalize=value=>String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+    const filter=()=>{
+      const query=normalize(search.value.trim()),terms=query.split(/\s+/).filter(Boolean);
+      let matches=0;
+      root.querySelectorAll(':scope > .sq-block-group').forEach(group=>{
+        let groupMatches=0;
+        group.querySelectorAll(selector).forEach(card=>{
+          const searchable=normalize(`${card.dataset.search || ''} ${card.textContent}`);
+          const category=card.dataset.sqAssetPurpose || group.dataset.sqAssetPurpose;
+          const show=query?terms.every(term=>searchable.includes(term)):(group.dataset.sqLibraryGroup===library && (purpose.value==='all' || !['elements','sections'].includes(library) || category===purpose.value));
+          card.hidden=!show; if(show)groupMatches++;
+        });
+        group.hidden=query?groupMatches===0:(group.dataset.sqLibraryGroup!==library || (['elements','sections'].includes(library) && groupMatches===0));
+        group.querySelectorAll('.sq-library-more').forEach(detail=>{if(query)detail.open=true;});
+        group.querySelectorAll('.sq-section-family').forEach(family=>family.hidden=![...family.querySelectorAll(selector)].some(card=>!card.hidden));
+        if(!group.hidden)matches+=groupMatches;
+      });
+      purposeRow.hidden=Boolean(query) || !['elements','sections'].includes(library);
+      const status=root.querySelector('[data-sq-library-search-status]');
+      status.hidden=!query;status.textContent=`${matches} ${matches===1?'result':'results'} for “${search.value.trim()}”`;
+      root.querySelector('[data-sq-library-search-empty]').hidden=!query || matches>0;
+      root.querySelector('[data-sq-asset-count]').textContent=`${matches} pieces`;
+      root.querySelector('[data-sq-component-empty]').hidden=Boolean(query) || componentCount()>0;
+      root.querySelector('.sq-assets-hint').hidden=library==='saved' || library==='uploads';
+    };
+    root.querySelectorAll('[data-sq-library-category]').forEach(button=>button.addEventListener('click',()=>{
+      library=button.dataset.sqLibraryCategory;search.value='';
+      root.querySelectorAll('[data-sq-library-category]').forEach(item=>item.setAttribute('aria-pressed',String(item===button)));
+      options();filter();
+    }));
+    purpose.addEventListener('change',()=>{rememberedPurpose[library]=purpose.value;filter();});
+    search.addEventListener('input',filter);
+    root.querySelector('[data-sq-clear-block-search]').addEventListener('click',()=>{search.value='';filter();search.focus();});
+    const sidebar=root.closest('.sq-builder-sidebar'),expand=root.querySelector('[data-sq-assets-expand]');
+    let expanded=false;
+    try{expanded=localStorage.getItem('ezkart-assets-expanded')==='true';}catch{}
+    const size=()=>{
+      sidebar.classList.toggle('sq-assets-expanded',expanded);
+      expand.setAttribute('aria-expanded',String(expanded));
+      expand.setAttribute('aria-label',`${expanded?'Collapse':'Expand'} asset library`);
+      expand.title=`${expanded?'Collapse':'Expand'} asset library`;
+      expand.querySelector('path').setAttribute('d',expanded?'M4 4l5 5m0-5v5H4m16-5-5 5m0-5v5h5M4 20l5-5m-5 0h5v5m11 0-5-5m0 5v-5h5':'M8 4H4v4m12-4h4v4M4 16v4h4m12-4v4h-4M4 4l5 5m11-5-5 5M4 20l5-5m11 5-5-5');
+    };
+    expand.addEventListener('click',()=>{expanded=!expanded;size();try{localStorage.setItem('ezkart-assets-expanded',String(expanded));}catch{}});
+    size();options();filter();
+    return {filter};
   }
   function init({root,insert,beginDrag,endDrag,listUploads,upload,readUpload,filter,toast}) {
     const uploads = new Map();
@@ -103,5 +192,5 @@
     uploadGroup.addEventListener('drop',event => {if (![...event.dataTransfer.types].includes('Files')) return; event.preventDefault(); event.stopPropagation(); uploadGroup.classList.remove('sq-assets-file-drop'); void acceptFiles([...event.dataTransfer.files]);});
     return {add,refresh};
   }
-  Object.assign(EzkartAssets,{renderCatalog,init});
+  Object.assign(EzkartAssets,{renderCatalog,browse,init});
 })();

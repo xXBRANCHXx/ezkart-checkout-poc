@@ -2719,6 +2719,7 @@
       sqStudio.classList.add("inspector-closed");
     };
     const openSqPanel = (name, { pin = false } = {}) => {
+      builderSidebar?.classList.remove("sq-panel-dismissed");
       if (pin && window.matchMedia("(max-width: 1120px)").matches) closeSqInspector();
       sqStudio.querySelectorAll("[data-sq-tab]").forEach((button) => button.classList.toggle("active", button.dataset.sqTab === name || name === "pages" && button.dataset.sqTab === "layers"));
       sqStudio.querySelectorAll("[data-sq-panel]").forEach((panel) => panel.classList.toggle("active", panel.dataset.sqPanel === name));
@@ -2728,9 +2729,10 @@
     };
     sqStudio.querySelectorAll("[data-sq-tab]").forEach((button) => button.addEventListener("click", () => {
       if (button.classList.contains('active') && (window.matchMedia('(max-width: 720px)').matches ? sqStudio.classList.contains('mobile-panel-open') : builderSidebar?.classList.contains('sq-panel-pinned'))) {
-        builderSidebar.classList.remove('sq-panel-pinned');sqStudio.classList.remove('mobile-panel-open');button.blur();
+        builderSidebar.classList.remove('sq-panel-pinned');builderSidebar.classList.add('sq-panel-dismissed');sqStudio.classList.remove('mobile-panel-open');button.blur();
       } else openSqPanel(button.dataset.sqTab, {pin:true});
     }));
+    builderSidebar?.addEventListener("pointerleave", () => builderSidebar.classList.remove("sq-panel-dismissed"));
     sqStudio.querySelectorAll("[data-sq-open-panel]").forEach((button) => button.addEventListener("click", () => openSqPanel(button.dataset.sqOpenPanel, { pin: true })));
     sqStudio.querySelectorAll("[data-sq-structure-view]").forEach((button) => button.addEventListener("click", () => openSqPanel(button.dataset.sqStructureView === "pages" ? "pages" : "layers", { pin: true })));
     document.addEventListener("pointerdown", (event) => {
@@ -7163,6 +7165,7 @@
       }));return wrapper.innerHTML;
     };
     const newBlockMarkup = (type, sectionId) => {
+      if (globalThis.EzkartAssets?.sectionDefinitions.some(item => item.id === type)) return EzkartAssets.createSection(type,sectionId);
       if(type==='container')return `<section class="sq-page-block sq-native sq-native-section" data-sq-block data-section-id="${sectionId}" data-native-id="${sectionId}" data-native-type="container" data-sq-native='${escapeHtml(JSON.stringify({id:sectionId,type:'container',props:{display:'flex',flexDirection:'column',gap:'24px',paddingTop:'64px',paddingRight:'48px',paddingBottom:'64px',paddingLeft:'48px'}}))}'></section>`;
       const aliases = { "full-image": "image-wide", gallery: "image-pair", text: "story-split", testimonials: "quote", faq: "faq-list", products: "product-collection", checkout: "call-to-action" };
       const componentId = aliases[type] || type;
@@ -7555,49 +7558,8 @@
     if (navigationCatalog && globalThis.EzkartComponents) {
       navigationCatalog.innerHTML = globalThis.EzkartComponents.navDefinitions.map((item) => `<button type="button" class="sq-navigation-choice" data-sq-add-navigation-template="${item.id}" aria-pressed="false">${globalThis.EzkartComponents.thumbnail(`nav-${item.id}`)}<span><b>${escapeHtml(item.name)}</b><small>${escapeHtml(item.description)}</small></span></button>`).join("");
     }
-    const blockSearch = addPanel?.querySelector("[data-sq-block-search]");
-    let libraryCategory = "elements";
-    const filterBlockLibrary = () => {
-      if (!addPanel) return;
-      const query = normalize(blockSearch?.value);
-      const terms = query.split(/\s+/).filter(Boolean);
-      const selector = "[data-sq-asset], [data-sq-upload-asset], [data-sq-add-block], [data-sq-add-element], [data-sq-open-products], [data-sq-open-library], [data-sq-component], [data-sq-create-component]";
-      let matches = 0;
-      addPanel.querySelectorAll(":scope > .sq-block-group").forEach((group) => {
-        let groupMatches = 0;
-        group.querySelectorAll(selector).forEach((card) => {
-          const searchable = normalize(`${card.dataset.search || ""} ${card.textContent}`);
-          card.hidden = !terms.every((term) => searchable.includes(term));
-          if (!card.hidden) groupMatches += 1;
-        });
-        group.hidden = query ? groupMatches === 0 : group.dataset.sqLibraryGroup !== libraryCategory;
-        group.querySelectorAll(".sq-library-more").forEach(detail => { if (query) detail.open = true; });
-        matches += groupMatches;
-      });
-      const status = addPanel.querySelector("[data-sq-library-search-status]");
-      if (status) {
-        status.hidden = !query;
-        status.textContent = query ? `${matches} ${matches === 1 ? "result" : "results"} for “${blockSearch.value.trim()}”` : "";
-      }
-      const empty = addPanel.querySelector("[data-sq-library-search-empty]");
-      if (empty) empty.hidden = !query || matches > 0;
-      const componentEmpty = addPanel.querySelector("[data-sq-component-empty]");
-      if (componentEmpty) componentEmpty.hidden = Boolean(query) || readComponents().length > 0;
-      addPanel.querySelectorAll(".sq-library-note").forEach((note) => { note.hidden = Boolean(query); });
-    };
-    addPanel?.querySelectorAll("[data-sq-library-category]").forEach(button => button.addEventListener("click", () => {
-      libraryCategory = button.dataset.sqLibraryCategory;
-      if (blockSearch) blockSearch.value = "";
-      addPanel.querySelectorAll("[data-sq-library-category]").forEach(item => item.setAttribute("aria-pressed", String(item === button)));
-      filterBlockLibrary();
-    }));
-    filterBlockLibrary();
-    blockSearch?.addEventListener("input", filterBlockLibrary);
-    addPanel?.querySelector("[data-sq-clear-block-search]")?.addEventListener("click", () => {
-      blockSearch.value = "";
-      filterBlockLibrary();
-      blockSearch.focus();
-    });
+    const assetBrowser = globalThis.EzkartAssets?.browse({root:addPanel,componentCount:()=>readComponents().length,syncControls:syncBuilderSelects});
+    const filterBlockLibrary = () => assetBrowser?.filter();
     const libraryViews = [...sqStudio.querySelectorAll("[data-sq-library-view]")];
     const syncNavigationTemplateOptions = () => {
       const activeTemplate = previewRoot?.querySelector('[data-section-id="navigation"]')?.dataset.sqNavTemplate || "";

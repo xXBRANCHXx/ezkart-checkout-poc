@@ -21,9 +21,14 @@ async function fixture(t) {
   await page.goto(ws.url+'/cart/admin/?page=sites&edit=gallery.ezkart.site');
   await page.waitForFunction(()=>globalThis.EzkartBuilder);
   await call('settle');
-  const category = async name => {
-    if (!await page.locator(`[data-sq-library-category=${name}]`).isVisible()) await page.locator('[data-sq-tab=add]').click();
-    await page.locator(`[data-sq-library-category=${name}]`).click();
+  const category = async (name,library='elements') => {
+    if (!await page.locator('[data-sq-library-category=elements]').isVisible()) await page.locator('[data-sq-tab=add]').click();
+    await page.locator(`[data-sq-library-category=${['elements','sections','uploads','saved'].includes(name)?name:library}]`).click();
+    if (!['elements','sections','uploads','saved'].includes(name)) {
+      const label=await page.locator(`[data-sq-asset-filter] option[value="${name}"]`).textContent();
+      await page.locator('.sq-assets-filter-row .sq-builder-select-trigger').click();
+      await page.getByRole('option',{name:label,exact:true}).click();
+    }
   };
   const shot = async name => {
     if (!process.env.EZKART_ASSET_SCREENSHOTS) return;
@@ -33,10 +38,10 @@ async function fixture(t) {
   return {ws,browser,page,call,category,shot};
 }
 
-test('asset categories contain three editable designs each, searchable alongside section presets',async t => {
+test('all fourteen asset families have three responsive editable designs, searchable with sections',async t => {
   const {page,call,category,shot} = await fixture(t);
   const ids = await page.evaluate(()=>EzkartAssets.definitions);
-  for (const cat of ['text','bulletins','accordions','diagrams','code']) {
+  for (const cat of [...new Set(ids.map(item=>item.category))]) {
     await category(cat);
     assert.equal(await page.locator('[data-sq-asset]:visible').count(),3);
     await shot('gallery-'+cat);
@@ -59,7 +64,7 @@ test('asset categories contain three editable designs each, searchable alongside
     }
   }
   await category('sections');
-  assert.ok(await page.locator('[data-sq-add-block]:visible').count()>=15);
+  assert.ok(await page.locator('[data-sq-add-block]:visible').count()>=51);
   const search = page.locator('[data-sq-block-search]');
   await search.fill('terminal');
   assert.equal(await page.locator('[data-sq-asset]:visible').count(),3);
@@ -160,4 +165,50 @@ test('uploads are reusable across pages and sessions, with images embedded for p
   assert.equal((await call('nativeInspect')).find(n=>n.type==='image').src,photo.src);
   const html = await call('previewHtml');
   assert.ok(html.includes(photo.src));
+});
+
+test('expanded browsing persists, stays within narrow screens, and adds whole editable sections with one undo',async t=>{
+  const {page,call,category,shot}=await fixture(t);
+  await category('elements');
+  const panel=page.locator('[data-sq-panel=add]'),expand=page.locator('[data-sq-assets-expand]');
+  const before=(await panel.boundingBox()).width;
+  await expand.focus();await page.keyboard.press('Enter');
+  assert.equal(await expand.getAttribute('aria-expanded'),'true');
+  assert.ok((await panel.boundingBox()).width>before+250);
+  assert.equal(await page.locator('[data-sq-asset-catalog=text]').evaluate(n=>getComputedStyle(n).gridTemplateColumns.split(' ').length),3);
+  await shot('expanded-library');
+  await page.locator('[data-sq-asset=code-recipe]').scrollIntoViewIfNeeded();
+  const expandRect=await expand.boundingBox(),panelRect=await panel.boundingBox();
+  assert.ok(expandRect.y>=panelRect.y && expandRect.y+expandRect.height<=panelRect.y+panelRect.height,'Expansion stays reachable while browsing deep in the gallery');
+  await expand.click();assert.equal(await expand.getAttribute('aria-expanded'),'false');
+  await expand.click();assert.equal(await expand.getAttribute('aria-expanded'),'true');
+  await page.reload();await page.waitForFunction(()=>globalThis.EzkartBuilder);
+  await category('reviews','sections');
+  assert.equal(await expand.getAttribute('aria-expanded'),'true','Expanded preference survives reopening');
+  assert.equal(await page.locator('[data-sq-add-block]:visible').count(),4,'Existing quote and new designs share one family');
+  await page.locator('[data-sq-add-block=asset-section-review-editorial]').dragTo(page.locator('.sq-page-preview > [data-section-id=blank]'),{targetPosition:{x:700,y:160}});
+  await call('settle');
+  const inserted=page.locator('.sq-page-preview > [data-section-id^="asset-section-review-editorial-"]');
+  assert.equal(await inserted.count(),1);
+  await page.locator('[data-sq-undo]').click();assert.equal(await inserted.count(),0);
+  await page.locator('[data-sq-redo]').click();assert.equal(await inserted.count(),1);
+  // Clicking a section card also creates a whole section, independent of selection.
+  for(const family of ['accordions','contact','invitations','pricing','footers']) {
+    await category(family,'sections');
+    await page.locator('[data-sq-add-block]:visible').last().click();
+    await call('settle');
+  }
+  const sectionCount=await page.locator('.sq-page-preview > [data-sq-block]').count();
+  assert.equal(sectionCount,7);
+  const nodes=await call('nativeInspect');
+  assert.ok(nodes.some(node=>node.name==='Conversation card'));
+  await call('save');await page.reload();await page.waitForFunction(()=>globalThis.EzkartBuilder);await call('settle');
+  assert.equal(await page.locator('.sq-page-preview > [data-sq-block]').count(),sectionCount);
+  assert.deepEqual(await call('nativeInspect'),nodes);
+  for(const width of [941,390]) {
+    await page.setViewportSize({width,height:904});await category('contact','sections');
+    const rect=await panel.boundingBox();assert.ok(rect.x>=0 && rect.x+rect.width<=width,'Expanded panel stays on screen');
+    assert.equal(await panel.evaluate(n=>n.scrollWidth>n.clientWidth+1),false);
+    assert.ok(await expand.isVisible());await shot(`expanded-${width}`);
+  }
 });

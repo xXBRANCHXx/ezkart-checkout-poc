@@ -130,7 +130,7 @@ test("products can be placed and changed independently, including beside an exis
     await page.locator("[data-sq-tab=add]").click();
     const add = page.locator("[data-sq-panel=add]");
     assert.equal(
-      await add.getByRole("button", { name: /^Heading / }).count(),
+      await add.getByRole("button", { name: "Heading", exact: true }).count(),
       1,
     );
     assert.equal(
