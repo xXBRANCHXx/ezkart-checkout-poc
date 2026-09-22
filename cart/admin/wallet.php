@@ -3,17 +3,24 @@ declare(strict_types=1);
 
 if (empty($authenticated)) { http_response_code(404); return; }
 
+ez_page_header('Wallet', 'Your balance, withdrawal availability, and the payments behind your earnings.', [
+    ['label' => 'View payments', 'icon' => 'credit-card', 'href' => '?page=payments', 'style' => 'primary'],
+    ['label' => 'Refresh', 'icon' => 'refresh', 'href' => '?page=wallet'],
+]);
+if (empty($walletAccess['unlocked'])) {
+    require __DIR__ . '/wallet-verification.php';
+    return;
+}
+
 // Payment callbacks confirm collection only. No settlement feed, wallet mapping
 // or payout ledger exists yet, so neither a balance nor a release date is known.
 // Do not derive either from PAID totals or a delivery scan.
 $walletOrders = array_values(array_filter($orders, static fn($order) => strtoupper((string) ($order['status'] ?? '')) === 'PAID'));
 $walletProductPayments = array_sum(array_map(static fn($order) => max(0, (int) ($order['subtotal'] ?? 0)), $walletOrders));
 $walletDataAvailable = $authenticationMethod === 'password' || $sellerId !== '';
-ez_page_header('Wallet', 'Your balance, withdrawal availability, and the payments behind your earnings.', [
-    ['label' => 'View payments', 'icon' => 'credit-card', 'href' => '?page=payments', 'style' => 'primary'],
-    ['label' => 'Refresh', 'icon' => 'refresh', 'href' => '?page=wallet'],
-]);
 ?>
+<div data-wallet-content data-wallet-seconds="<?= max(0, (int) $walletAccess['expires_at'] - time()) ?>">
+<div class="wallet-unlocked-note"><span><?= ez_admin_icon('shield') ?> Wallet unlocked until <?= ez_admin_escape((new DateTimeImmutable('@' . $walletAccess['expires_at']))->setTimezone(new DateTimeZone('Asia/Jakarta'))->format('H:i')) ?> WIB</span><form method="post" action="?page=wallet"><input type="hidden" name="csrf_token" value="<?= ez_admin_escape($csrfToken) ?>"><input type="hidden" name="action" value="wallet_lock"><button type="submit">Lock Wallet</button></form></div>
 <section class="wallet-overview" aria-label="Wallet overview">
   <article class="surface wallet-balance">
     <header><span class="wallet-heading-icon"><?= ez_admin_icon('wallet') ?></span><span class="wallet-environment"><?= $commerceProduction ? 'Production' : 'Sandbox' ?></span></header>
@@ -56,3 +63,4 @@ ez_page_header('Wallet', 'Your balance, withdrawal availability, and the payment
     <?php if (count($walletOrders) > 20): ?><p class="wallet-table-note">Showing the 20 most recent paid orders. <a href="?page=payments" data-ui-icon="credit-card">View all payments</a></p><?php endif; ?>
   <?php endif; ?>
 </section>
+</div>

@@ -78,18 +78,39 @@ function curl_exec(object $handle): string {
         $file = dirname(getenv('EZKART_TEST_CAPTURE')) . '/auth-response.json';
         $config = is_file($file) ? json_decode((string) file_get_contents($file), true) : [];
         $path = substr($handle->url, strlen('https://auth.ezkart.test/auth/v1/'));
-        $tokens = static function (string $aal = 'aal1'): array {
-            $token = 'fixture.' . rtrim(strtr(base64_encode(json_encode(['aal' => $aal, 'exp' => time() + 3600, 'sub' => 'fixture-google-customer'])), '+/', '-_'), '=') . '.fixture-signature';
+        $tokens = static function (string $aal = 'aal1', string $suffix = 'fixture-signature'): array {
+            $token = 'fixture.' . rtrim(strtr(base64_encode(json_encode(['aal' => $aal, 'exp' => time() + 3600, 'sub' => 'fixture-google-customer'])), '+/', '-_'), '=') . '.' . $suffix;
             return ['access_token' => $token, 'refresh_token' => 'fixture-refresh-token', 'expires_in' => 3600];
         };
         if ($path === 'token?grant_type=refresh_token' && isset($config['refresh_error'])) {
             $handle->status = $config['refresh_error']; return '{"error":"fixture_refresh_error"}';
         }
         if (str_starts_with($path, 'token?grant_type=')) return json_encode($tokens());
-        if ($path === 'user') return json_encode(array_replace([
+        if ($path === 'user') {
+            if (!empty($config['user_error'])) { $handle->status = 503; return '{"error":"unavailable"}'; }
+            $verified = str_contains(implode(' ', $handle->options[CURLOPT_HTTPHEADER] ?? []), '.wallet-verified');
+            return json_encode(array_replace([
             'id' => 'fixture-google-customer', 'email' => 'checkout@example.com', 'email_confirmed_at' => '2026-09-01T00:00:00Z',
             'identities' => [['provider' => 'google']], 'factors' => [],
-        ], $config['user'] ?? []));
+            ], $config['user'] ?? [], $verified ? ($config['verified_user'] ?? []) : []));
+        }
+        if ($path === 'otp') {
+            if (!empty($config['otp_send_error'])) { $handle->status = 429; return '{"error":"email_rate_limit_exceeded"}'; }
+            file_put_contents(dirname($file) . '/email-otp.json', json_encode(['email' => $payload['email'], 'code' => '654321', 'used' => false]));
+            return '{}';
+        }
+        if ($path === 'verify') {
+            $otpFile = dirname($file) . '/email-otp.json';
+            $otp = is_file($otpFile) ? json_decode((string) file_get_contents($otpFile), true) : [];
+            if (($payload['type'] ?? '') !== 'email' || ($payload['email'] ?? '') !== ($otp['email'] ?? '') || ($payload['token'] ?? '') !== ($otp['code'] ?? '') || !empty($otp['used'])) { $handle->status = 400; return '{"error":"invalid_otp"}'; }
+            $otp['used'] = true; file_put_contents($otpFile, json_encode($otp));
+            return json_encode($tokens('aal1', 'wallet-verified'));
+        }
+        if (preg_match('#^factors/[a-f0-9-]{36}/challenge$#i', $path)) return '{"id":"22222222-2222-4222-8222-222222222222"}';
+        if (preg_match('#^factors/[a-f0-9-]{36}/verify$#i', $path)) {
+            if (($payload['code'] ?? '') !== '123456' || ($payload['challenge_id'] ?? '') !== '22222222-2222-4222-8222-222222222222') { $handle->status = 400; return '{"error":"bad_code"}'; }
+            return json_encode($tokens(!empty($config['mfa_downgrade']) ? 'aal1' : 'aal2', 'wallet-verified'));
+        }
         if ($path === 'factors/fixture-totp/challenge') return '{"id":"fixture-challenge"}';
         if ($path === 'factors/fixture-totp/verify') {
             if (($payload['code'] ?? '') !== '123456') { $handle->status = 400; return '{"error":"bad_code"}'; }

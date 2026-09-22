@@ -2920,6 +2920,158 @@ test('dashboard periods honor Jakarta midnight and keep month-end and ISO-week b
   assert.equal(result[2]['2026-01'].value, 125);
 });
 
+async function walletVerificationFixture(t, auth = {}) {
+  const { chromium } = await import('../builder-mcp/node_modules/playwright/index.mjs');
+  const app = await setup({ EZKART_CLOUDFLARE_API_URL: 'https://ezkart-api-test.fixture.workers.dev' }); t.after(() => app.close());
+  await writeFile(join(app.directory, 'storefront.json'), JSON.stringify({ store: { sellerId: 'seller_wallet' }, catalog: [] }));
+  const setAuth = data => writeFile(join(app.directory, 'auth-response.json'), JSON.stringify(data));
+  await setAuth(auth);
+  const browser = await chromium.launch(); t.after(() => browser.close());
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  await context.addCookies([app.adminCookie()]);
+  const page = await context.newPage(); page.setDefaultTimeout(6000);
+  await page.route('**/*', route => new URL(route.request().url()).searchParams.get('cloud') === '/v1/admin-profile'
+    ? route.fulfill({ json: { ok: true, profile: { logoId: '', canEdit: true } } }) : route.continue());
+  const url = app.base + '/cart/admin/?page=wallet';
+  await page.goto(url);
+  const post = async (action, fields = {}) => page.request.post(url, { form: { action, csrf_token: await page.locator('body').getAttribute('data-admin-csrf-token'), ...fields } });
+  const session = async code => {
+    const cookie = (await context.cookies()).find(cookie => cookie.name === 'ezkart_admin');
+    return app.cli(`$_COOKIE['ezkart_admin']='${cookie.value}'; define('EZ_CUSTOMER_SESSION_BRIDGE',true); require ${JSON.stringify(join(root, 'cart/admin/index.php'))}; ${code}; session_write_close();`);
+  };
+  const unlockEmail = async () => {
+    await page.getByRole('button', { name: 'Send email code', exact: true }).click();
+    await page.getByLabel('Email code', { exact: true }).fill('654321');
+    await page.getByRole('button', { name: 'Verify and open Wallet' }).click();
+    await page.locator('[data-wallet-content]').waitFor();
+  };
+  return { app, page, context, url, setAuth, post, session, unlockEmail };
+}
+
+test('Wallet email verification protects server-rendered data and enforces fresh codes, CSRF, resend limits and expiry', async t => {
+  const { app, page, context, post, session, url } = await walletVerificationFixture(t);
+  assert.equal(await page.locator('[data-wallet-content]').count(), 0);
+  assert.equal((await app.calls()).filter(call => call.url.endsWith('/otp')).length, 0, 'Opening Wallet must not send email automatically');
+  let response = await post('wallet_email_send', { csrf_token: 'invalid', email: 'attacker@example.com' });
+  assert.equal(response.status(), 403);
+  assert.equal((await app.calls()).filter(call => call.url.endsWith('/otp')).length, 0);
+  response = await post('wallet_verify', { code: '654321' });
+  assert.match(await response.text(), /Request a new email code/);
+  assert.equal((await app.calls()).filter(call => call.url.endsWith('/verify')).length, 0);
+  await page.getByRole('button', { name: 'Send email code', exact: true }).click();
+  const sends = (await app.calls()).filter(call => call.url.endsWith('/otp'));
+  assert.deepEqual(JSON.parse(sends[0].body), { email: 'checkout@example.com', create_user: false });
+  assert.equal(await page.getByLabel('Email code', { exact: true }).count(), 1);
+  await page.getByRole('button', { name: 'Resend email code' }).click();
+  assert.match(await page.locator('[role=alert]').innerText(), /Wait one minute/);
+  assert.equal((await app.calls()).filter(call => call.url.endsWith('/otp')).length, 1);
+  await page.getByLabel('Email code', { exact: true }).fill('000000');
+  await page.getByRole('button', { name: 'Verify and open Wallet' }).click();
+  assert.match(await page.locator('[role=alert]').innerText(), /not accepted/);
+  assert.equal(await page.locator('[data-wallet-content]').count(), 0);
+  await page.screenshot({ path: '/tmp/ezkart-wallet-email-desktop.png', fullPage: true });
+  const originalCookie = (await context.cookies()).find(cookie => cookie.name === 'ezkart_admin');
+  await page.getByLabel('Email code', { exact: true }).fill('654321');
+  await page.getByRole('button', { name: 'Verify and open Wallet' }).click();
+  assert.equal(await page.locator('[data-wallet-content]').count(), 1);
+  assert.notEqual((await context.cookies()).find(cookie => cookie.name === 'ezkart_admin').value, originalCookie.value);
+  assert.equal(await session("echo isset($_SESSION['wallet_email_challenge']) ? 'pending' : 'consumed'"), 'consumed');
+  await page.getByRole('button', { name: 'Lock Wallet', exact: true }).click();
+  assert.equal(await page.locator('[data-wallet-content]').count(), 0);
+  response = await post('wallet_verify', { code: '654321' });
+  assert.match(await response.text(), /Request a new email code/);
+  // Expired challenges cannot be used even while the provider would still accept the code.
+  await session("$_SESSION['wallet_email_challenge']=['identity_key'=>ez_wallet_identity_key(ez_admin_verify_supabase_user($_SESSION['supabase_access_token']),'seller_wallet'),'expires_at'=>time()-1]");
+  response = await post('wallet_verify', { code: '654321' });
+  assert.match(await response.text(), /Request a new email code/);
+  await page.goto(url);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.waitForTimeout(350);
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+  await page.screenshot({ path: '/tmp/ezkart-wallet-email-mobile.png', fullPage: true });
+});
+
+test('Wallet requires a fresh authenticator verification and never falls back to email for enabled two-step', async t => {
+  const factor = { id: '11111111-1111-4111-8111-111111111111', factor_type: 'totp', status: 'verified' };
+  const auth = { user: { factors: [factor] } };
+  const { app, page, post, setAuth, session } = await walletVerificationFixture(t, auth);
+  assert.equal(await page.getByLabel('Authenticator code', { exact: true }).count(), 1, 'Fresh provider factors override the session\'s cached disabled flag');
+  assert.equal(await page.getByRole('button', { name: 'Send email code' }).count(), 0);
+  let response = await post('wallet_email_send');
+  assert.match(await response.text(), /Use your authenticator code/);
+  assert.equal((await app.calls()).filter(call => call.url.endsWith('/otp')).length, 0);
+  await page.getByLabel('Authenticator code', { exact: true }).fill('000000');
+  await page.getByRole('button', { name: 'Verify and open Wallet' }).click();
+  assert.equal(await page.locator('[data-wallet-content]').count(), 0);
+  await setAuth({ ...auth, mfa_downgrade: true });
+  await page.getByLabel('Authenticator code', { exact: true }).fill('123456');
+  await page.getByRole('button', { name: 'Verify and open Wallet' }).click();
+  assert.equal(await page.locator('[data-wallet-content]').count(), 0, 'AAL1 must never unlock a two-step account');
+  await setAuth(auth);
+  await page.screenshot({ path: '/tmp/ezkart-wallet-totp-desktop.png', fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.waitForTimeout(350);
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+  await page.screenshot({ path: '/tmp/ezkart-wallet-totp-mobile.png', fullPage: true });
+  await page.getByLabel('Authenticator code', { exact: true }).fill('123456');
+  await page.getByRole('button', { name: 'Verify and open Wallet' }).click();
+  assert.equal(await page.locator('[data-wallet-content]').count(), 1);
+  await session("$_SESSION['wallet_access']['expires_at']=time()-1");
+  response = await page.request.get(page.url());
+  assert.doesNotMatch(await response.text(), /data-wallet-content/, 'Expired proof cannot fetch Wallet data');
+  await page.evaluate(() => {
+    Date.now = () => new Date().getTime() + 601000;
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await page.getByLabel('Authenticator code', { exact: true }).waitFor();
+  assert.equal(await page.locator('[data-wallet-content]').count(), 0, 'Expiry is enforced on the server, even with AAL2');
+  assert.equal(await page.getByLabel('Authenticator code', { exact: true }).count(), 1);
+});
+
+test('Wallet access is bound to the account, store and current factors and fails closed on provider outages', async t => {
+  const { app, page, context, session, setAuth, unlockEmail, url } = await walletVerificationFixture(t);
+  await unlockEmail();
+  const proof = JSON.parse(await session("echo json_encode($_SESSION['wallet_access'])"));
+  assert.ok(proof.expires_at > Date.now() / 1000);
+  const anotherContext = await context.browser().newContext(); t.after(() => anotherContext.close());
+  await anotherContext.addCookies([app.adminCookie()]);
+  const anotherPage = await anotherContext.newPage();
+  await anotherPage.goto(url);
+  assert.equal(await anotherPage.locator('[data-wallet-content]').count(), 0, 'New browser sessions must verify independently');
+  await writeFile(join(app.directory, 'storefront.json'), JSON.stringify({ store: { sellerId: 'seller_other' }, catalog: [] }));
+  await page.reload();
+  assert.equal(await page.locator('[data-wallet-content]').count(), 0, 'Switching stores invalidates proof');
+  await writeFile(join(app.directory, 'storefront.json'), JSON.stringify({ store: { sellerId: 'seller_wallet' }, catalog: [] }));
+  const restoreProof = () => session(`$_SESSION['wallet_access']=json_decode(base64_decode('${Buffer.from(JSON.stringify(proof)).toString('base64')}'),true)`);
+  await restoreProof();
+  await setAuth({ user: { factors: [{ id: '11111111-1111-4111-8111-111111111111', factor_type: 'totp', status: 'verified' }] } });
+  await page.reload();
+  assert.equal(await page.locator('[data-wallet-content]').count(), 0, 'Enabling two-step invalidates email proof');
+  await restoreProof();
+  await setAuth({ user_error: true });
+  await page.reload();
+  assert.equal(await page.locator('[data-wallet-content]').count(), 0);
+  assert.match(await page.locator('[role=alert]').innerText(), /temporarily unavailable/);
+  assert.equal(await page.getByRole('button', { name: 'Send email code' }).count(), 0);
+});
+
+test('Wallet rejects mismatched verified identities and limits attempts across browser sessions', async t => {
+  const { app, page, context, post, setAuth, url } = await walletVerificationFixture(t, { verified_user: { id: 'different-user' } });
+  await page.getByRole('button', { name: 'Send email code', exact: true }).click();
+  await page.getByLabel('Email code', { exact: true }).fill('654321');
+  await page.getByRole('button', { name: 'Verify and open Wallet' }).click();
+  assert.equal(await page.locator('[data-wallet-content]').count(), 0);
+  assert.match(await page.locator('[role=alert]').innerText(), /not accepted/);
+  await setAuth({});
+  for (let i = 0; i < 4; i++) await post('wallet_verify', { code: '000000' });
+  await context.addCookies([app.adminCookie()]);
+  await page.goto(url);
+  const response = await post('wallet_verify', { code: '654321' });
+  assert.match(await response.text(), /Too many verification attempts/);
+  assert.doesNotMatch(await response.text(), /data-wallet-content/);
+  assert.equal((await app.calls()).filter(call => call.url.endsWith('/verify')).length, 5, 'Blocked attempts never reach the provider');
+});
+
 test('Wallet replaces Integrations, explains release conditions, links actual payments and retains the announcement gradient', async t => {
   const { chromium } = await import('../builder-mcp/node_modules/playwright/index.mjs');
   const app = await setup({ EZKART_CLOUDFLARE_API_URL: 'https://ezkart-api-test.fixture.workers.dev' }); t.after(() => app.close());
@@ -2948,6 +3100,11 @@ test('Wallet replaces Integrations, explains release conditions, links actual pa
   assert.equal(await page.locator('.primary-nav a.active').count(), 1);
   assert.equal(await page.locator('.primary-nav a.active').innerText(), 'Wallet');
   assert.equal(await page.locator('.primary-nav').getByText('Integrations', { exact: true }).count(), 0);
+  assert.equal(await page.getByRole('heading', { name: 'Verify to open Wallet' }).count(), 1);
+  assert.equal(await page.locator('.wallet-amount').count(), 0);
+  await page.getByRole('button', { name: 'Send email code', exact: true }).click();
+  await page.getByLabel('Email code', { exact: true }).fill('654321');
+  await page.getByRole('button', { name: 'Verify and open Wallet', exact: true }).click();
   assert.equal(await page.locator('.wallet-amount').innerText(), '—', 'Gross payments are not a wallet balance');
   assert.equal(await page.getByRole('button', { name: 'Withdraw funds' }).isDisabled(), true);
   assert.match(await page.locator('.wallet-withdrawal').innerText(), /both delivery and provider settlement/);

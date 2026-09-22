@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require_once dirname(__DIR__) . '/api/bootstrap.php';
 require_once __DIR__ . '/dashboard-data.php';
+require_once __DIR__ . '/wallet-access.php';
 
 $previewRepairFrame = ($_GET['preview-repair'] ?? '') === '1'
     && ($_GET['page'] ?? '') === 'sites'
@@ -524,6 +525,7 @@ function ez_admin_store_supabase_session(array $tokens, array $user, bool $newSi
     ], ez_admin_totp_factors($user));
     $_SESSION['legacy_data_access'] = ez_admin_email_has_legacy_access($email);
     if ($newSignIn || (int) ($_SESSION['signed_in_at'] ?? 0) <= 0) {
+        unset($_SESSION['wallet_access'], $_SESSION['wallet_email_challenge'], $_SESSION['wallet_flash']);
         $_SESSION['signed_in_at'] = time();
     }
     $_SESSION['admin_user'] = [
@@ -661,6 +663,9 @@ function ez_admin_clear_authentication(): void
         $_SESSION['legacy_data_access'],
         $_SESSION['signed_in_at'],
         $_SESSION['last_activity_at'],
+        $_SESSION['wallet_access'],
+        $_SESSION['wallet_email_challenge'],
+        $_SESSION['wallet_flash'],
     );
 }
 
@@ -1418,6 +1423,7 @@ $allowedPages = ['dashboard', 'orders', 'products', 'product-new', 'shop', 'site
 $requestedPage = strtolower(trim((string) ($_GET['page'] ?? 'dashboard')));
 if ($requestedPage === 'integrations') { header('Location: ?page=wallet', true, 302); exit; }
 $page = in_array($requestedPage, $allowedPages, true) ? $requestedPage : 'dashboard';
+$walletAccess = $page === 'wallet' && $authenticated ? ez_wallet_access($authenticationMethod, $sellerId, $csrfToken, $isHttps) : ['unlocked' => false];
 $requestedSite = trim((string) ($_GET['edit'] ?? ''));
 $siteEditor = $page === 'sites' && $requestedSite !== '' && strlen($requestedSite) <= 180;
 $pageTitles = [
@@ -1796,6 +1802,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
   <?php if ($page === 'settings' && $mfaSetup !== null): ?><script src="assets/vendor/qrcode-generator.min.js"></script><?php endif; ?>
   <?php if ($page === 'sites'): ?><script src="builder-native-icons.js?v=<?= (int) filemtime(__DIR__ . '/builder-native-icons.js') ?>"></script><script src="builder-commerce.js?v=<?= (int) filemtime(__DIR__ . '/builder-commerce.js') ?>"></script><script src="builder-native.js?v=<?= (int) filemtime(__DIR__ . '/builder-native.js') ?>"></script><script src="builder-publish.js?v=<?= (int) filemtime(__DIR__ . '/builder-publish.js') ?>"></script><script src="builder-templates.js?v=<?= (int) filemtime(__DIR__ . '/builder-templates.js') ?>"></script><?php endif; ?><?php if ($page === 'sites' && $siteEditor): ?><script src="builder-backgrounds.js?v=<?= (int) filemtime(__DIR__ . '/builder-backgrounds.js') ?>"></script><script src="builder-components.js?v=<?= (int) filemtime(__DIR__ . '/builder-components.js') ?>"></script><script src="builder-showcase-data.js?v=<?= (int) filemtime(__DIR__ . '/builder-showcase-data.js') ?>"></script><script src="builder-showcase.js?v=<?= (int) filemtime(__DIR__ . '/builder-showcase.js') ?>"></script><?php endif; ?>
   <script src="dashboard-data.js?v=<?= (int) filemtime(__DIR__ . '/dashboard-data.js') ?>"></script>
+  <?php if ($page === 'wallet'): ?><script src="wallet-access.js?v=<?= (int) filemtime(__DIR__ . '/wallet-access.js') ?>"></script><?php endif; ?>
   <script src="admin.js?v=<?= ez_admin_escape($adminJsVersion) ?>"></script>
   <script src="profile-logo.js?v=<?= (int) filemtime(__DIR__ . '/profile-logo.js') ?>"></script>
   <script src="../select.js?v=<?= (int) filemtime(__DIR__ . '/../select.js') ?>"></script>

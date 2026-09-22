@@ -139,3 +139,26 @@ Until seller wallet mapping, provider settlement synchronization, and the wallet
 ledger are connected, balances and release dates remain unavailable. The page
 must not label payment volume, estimated earnings, or skipped sandbox deliveries
 as withdrawable funds. It does not initiate withdrawals.
+
+## Wallet access verification — confirmed 22 September 2026
+
+Opening Wallet requires a fresh code. Accounts with a verified two-step factor
+use the current code from their existing authenticator app. There is no QR
+enrollment or email fallback for those accounts. Accounts without two-step use
+an email code sent to their server-verified account address.
+
+The PHP gate checks current provider identity and verified factors before showing
+Wallet content. A successful check unlocks Wallet for ten minutes in that browser;
+the user can also lock it immediately. The proof is tied to the account, store,
+factor set, and sign-in. Email challenges expire after ten minutes, and send and
+verification limits are shared across an account's browser sessions. Provider
+failures leave Wallet locked. Password-only emergency sessions must sign in with
+a verified Google account to access Wallet.
+
+The test Supabase Magic Link email template must include `{{ .Token }}` alongside
+the existing sign-in link. The prepared source and hosted-template instructions
+are in [supabase/templates](../supabase/templates/README.md). Publishing PHP does
+not publish that template. Local browser tests cover both verification paths,
+expiry, invalid codes, identity/store isolation, and rate limits; delivery of a
+real code through hosted Supabase still needs to be checked after the template
+is installed.

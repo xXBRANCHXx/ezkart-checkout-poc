@@ -34,8 +34,31 @@
 .wallet-delivery { padding: 5px 8px; border-radius: 5px; background: #f3f4f6; color: #697382; font-size: 11px; }
 .wallet-delivery.confirmed { color: #237d51; background: #e6f5eb; }
 .wallet-empty, .wallet-table-note { margin: 0; padding: 28px 24px; color: #697382; font-size: 12px; }
+.wallet-verification { width: min(100%, 460px); margin: 40px auto; padding: 32px; text-align: center; }
+.wallet-verification-icon { display: grid; place-items: center; width: 56px; height: 56px; margin: 0 auto 20px; border-radius: 16px; color: #d54d35; background: #fff0e9; }
+.wallet-verification-icon .icon { width: 28px; height: 28px; }
+.wallet-verification h2 { margin: 0 0 12px; font-size: 22px; }
+.wallet-verification p { color: #697382; font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
+.wallet-verification p b { color: #3f4958; font-weight: 500; }
+.wallet-code-form { display: grid; gap: 10px; margin-top: 24px; text-align: left; }
+.wallet-code-form label { font-size: 12px; font-weight: 500; }
+.wallet-code-form input { width: 100%; min-height: 52px; border: 1px solid #dce1e9; border-radius: 8px; background: #fff; color: #292e3a; font: inherit; font-size: 24px; text-align: center; letter-spacing: .18em; }
+.wallet-verify-button { width: 100%; min-height: 44px; margin-top: 6px; border: 0; border-radius: 8px; background: #c74130; color: white; font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; }
+.wallet-verify-button:hover { background: #ac3829; }
+.wallet-send-form { margin-top: 16px; }
+.wallet-resend-button, .wallet-unlocked-note button { border: 0; background: transparent; color: #bd3f31; font: inherit; font-size: 12px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.wallet-verification .wallet-verification-error, .wallet-verification .wallet-verification-notice { margin: 18px 0; padding: 12px; border-radius: 8px; text-align: left; font-size: 12px; }
+.wallet-verification .wallet-verification-error { color: #a23626; background: #fff0e9; }
+.wallet-verification .wallet-verification-notice { color: #237d51; background: #e6f5eb; }
+.wallet-verification .wallet-verification-footnote { margin-top: 22px; font-size: 11px; }
+.wallet-verification > a { font-size: 12px; }
+.wallet-unlocked-note { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 18px; color: #697382; font-size: 12px; }
+.wallet-unlocked-note > span { display: inline-flex; align-items: center; gap: 7px; }
+.wallet-unlocked-note .icon { width: 16px; height: 16px; color: #237d51; }
+[data-wallet-content][hidden] { display: none; }
 @media (max-width: 1050px) { .wallet-overview { grid-template-columns: 1fr; } }
 @media (max-width: 600px) {
+  .wallet-verification { margin-top: 20px; padding: 28px 20px; }
   .wallet-balance, .wallet-withdrawal { padding: 22px 18px; }
   .wallet-withdrawal > header { flex-wrap: wrap; }
   .wallet-payment-summary { gap: 22px; padding: 20px 18px; }
