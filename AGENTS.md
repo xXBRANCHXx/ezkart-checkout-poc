@@ -22,3 +22,10 @@ Use `blank-editor-workflow.test.mjs`, `section-actions.test.mjs`, and `grid-snap
 - PR #3 (legacy sandbox lockout) must remain draft and unmerged during this hold. The owner explicitly declined deploying it now.
 - Continue authorized work on `agent/ezkart-workbench` / `test.ezkart.id` and the separate Executive Dashboard. Dashboard environment selection does not authorize a live storefront deployment or provider activation.
 - See `docs/production-release-gates.md` for the recorded release conditions and current validation limits.
+
+## Sidebar announcements
+
+The sidebar promo card's orange-to-pink gradient is intentional. Preserve it
+when changing shared controls or navigation styles. Its title, description, icon,
+button label, and destination live in `cart/admin/sidebar-promo.php` so it can
+promote Advanced or future announcements without redesigning the sidebar.

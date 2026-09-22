@@ -1028,14 +1028,10 @@ test("merchant dashboard displays DOKU orders and accepts and arranges pickup th
       .fulfillment_status,
     "CONFIRMED",
   );
-  await page.goto(app.base + "/cart/admin/?page=integrations");
+  await page.goto(app.base + "/cart/admin/?page=payments");
   assert.match(await page.locator("body").innerText(), /DOKU/);
-  assert.equal(
-    await page
-      .getByRole("link", { name: "View configuration status" })
-      .getAttribute("href"),
-    "../api/health.php",
-  );
+  assert.equal(await page.getByRole("link", { name: "View wallet", exact: true }).getAttribute("href"), "?page=wallet");
+  assert.match(await page.locator("#payments-table").innerText(), new RegExp(id));
 });
 
 
@@ -2828,4 +2824,63 @@ test('dashboard periods honor Jakarta midnight and keep month-end and ISO-week b
   assert.deepEqual(Object.keys(result[1]), ['2026-01', '2026-02', '2026-03']);
   assert.deepEqual(Object.values(result[1]).map(bucket => bucket.value), [100, 0, 0]);
   assert.equal(result[2]['2026-01'].value, 125);
+});
+
+test('Wallet replaces Integrations, explains release conditions, links actual payments and retains the announcement gradient', async t => {
+  const { chromium } = await import('../builder-mcp/node_modules/playwright/index.mjs');
+  const app = await setup({ EZKART_CLOUDFLARE_API_URL: 'https://ezkart-api-test.fixture.workers.dev' }); t.after(() => app.close());
+  await writeFile(join(app.directory, 'storefront.json'), JSON.stringify({ store: { sellerId: 'seller_wallet' }, catalog: [] }));
+  const baseOrder = { seller_id: 'seller_wallet', commerce_environment: 'sandbox', status: 'PAID', created_at: '2026-09-22T03:00:00Z', paid_at: '2026-09-22T03:02:00Z', subtotal: 300000, shipping_price: 10000, total: 310000, customer: { name: 'Wallet Buyer', email: 'buyer@example.com' }, items: [], payment_status: 'SUCCESS' };
+  const orders = [
+    { ...baseOrder, order_id: 'EZK-S-WALLET0001', biteship_order_id: 'delivery_1', biteship_status: 'delivered' },
+    { ...baseOrder, order_id: 'EZK-S-WALLET0002', subtotal: 100000, total: 100000, shipping_price: 0, shipping_skipped: true },
+    { ...baseOrder, order_id: 'EZK-S-WALLET0003', status: 'PENDING' },
+    { ...baseOrder, order_id: 'EZK-S-PRIVATE001', seller_id: 'seller_other' },
+  ];
+  app.cli(`foreach(json_decode(base64_decode('${Buffer.from(JSON.stringify(orders)).toString('base64')}'),true) as $order) ez_save_order($order);`);
+  const browser = await chromium.launch(); t.after(() => browser.close());
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1100 } });
+  await context.addCookies([app.adminCookie()]);
+  const page = await context.newPage(); page.setDefaultTimeout(6000);
+  const errors = []; page.on('pageerror', error => errors.push(error.message));
+  await page.route('**/*', route => {
+    const cloud = new URL(route.request().url()).searchParams.get('cloud');
+    if (cloud === '/v1/admin-profile') return route.fulfill({ json: { ok: true, profile: { logoId: '', canEdit: true } } });
+    return route.continue();
+  });
+  await page.goto(app.base + '/cart/admin/?page=integrations');
+  assert.equal(new URL(page.url()).searchParams.get('page'), 'wallet');
+  assert.equal(await page.getByRole('heading', { name: 'Wallet', exact: true }).count(), 1);
+  assert.equal(await page.locator('.primary-nav a.active').count(), 1);
+  assert.equal(await page.locator('.primary-nav a.active').innerText(), 'Wallet');
+  assert.equal(await page.locator('.primary-nav').getByText('Integrations', { exact: true }).count(), 0);
+  assert.equal(await page.locator('.wallet-amount').innerText(), '—', 'Gross payments are not a wallet balance');
+  assert.equal(await page.getByRole('button', { name: 'Withdraw funds' }).isDisabled(), true);
+  assert.match(await page.locator('.wallet-withdrawal').innerText(), /both delivery and provider settlement/);
+  assert.match(await page.locator('.wallet-withdrawal').innerText(), /Rp250\.000/);
+  assert.match(await page.locator('.wallet-payment-summary').innerText(), /Rp400\.000/);
+  assert.equal(await page.locator('.wallet-table-wrap tbody tr').count(), 2);
+  assert.equal(await page.getByText('EZK-S-PRIVATE001').count(), 0);
+  assert.equal(await page.getByText('No settlement record', { exact: true }).count(), 2, 'Payment SUCCESS and delivered do not manufacture settlement');
+  assert.equal(await page.getByText('Skipped in sandbox', { exact: true }).count(), 1);
+  const gradient = await page.locator('.upgrade-card').evaluate(node => ({ background: getComputedStyle(node).backgroundImage, color: getComputedStyle(node).color }));
+  assert.match(gradient.background, /linear-gradient/);
+  assert.equal(gradient.color, 'rgb(255, 255, 255)');
+  await page.screenshot({ path: '/tmp/ezkart-wallet-desktop.png', fullPage: true });
+  await page.getByRole('link', { name: 'EZK-S-WALLET0001', exact: true }).click();
+  assert.equal(new URL(page.url()).searchParams.get('page'), 'payments');
+  assert.equal(await page.locator('[data-table-search=payments-table]').inputValue(), 'EZK-S-WALLET0001');
+  await page.waitForFunction(() => document.querySelectorAll('#payments-table article:not([hidden])').length === 1);
+  assert.equal(await page.locator('#payments-table article:visible').count(), 1);
+  assert.match(await page.locator('#payments-table article:visible').innerText(), /Rp310\.000/);
+  await page.getByRole('link', { name: 'View wallet', exact: true }).click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.waitForTimeout(350);
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'Wallet must fit mobile width');
+  await page.screenshot({ path: '/tmp/ezkart-wallet-mobile.png', fullPage: true });
+  await page.getByRole('button', { name: 'Open navigation', exact: true }).click();
+  await page.locator('.sidebar.open').waitFor();
+  await page.locator('.upgrade-card').scrollIntoViewIfNeeded();
+  await page.screenshot({ path: '/tmp/ezkart-wallet-sidebar.png' });
+  assert.equal(errors.length, 0, errors.join('\n'));
 });

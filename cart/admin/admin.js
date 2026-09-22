@@ -58,7 +58,10 @@
 
   document.querySelectorAll("[data-table-search]").forEach((input) => {
     const target = document.getElementById(input.dataset.tableSearch || "");
-    if (target) input.addEventListener("input", () => filterRows(input, target));
+    if (target) {
+      input.addEventListener("input", () => filterRows(input, target));
+      if (input.value) filterRows(input, target);
+    }
   });
 
   globalSearch?.addEventListener("input", () => {

@@ -126,15 +126,16 @@ provider transfer cost as an Ezkart expense; do not deduct it from seller funds.
 These rules are recorded in the specification only. There is no operational
 withdrawal endpoint enforcing them yet.
 
-## Decisions still pending
+## Earnings release rule — confirmed 22 September 2026
 
-The Rp250,000 minimum is confirmed. The event that releases seller earnings for
-withdrawal remains unconfirmed: provider settlement, confirmed delivery plus
-settlement, or manual approval. The minimum amount does not by itself define
-that release event. Provider settlement and Ezkart's withdrawal policy are
-separate conditions. The recipient-facing withdrawal-fee threshold is confirmed.
+The owner confirmed that earnings become withdrawable only after **both confirmed
+delivery and provider settlement**. Payment confirmation alone does not release
+funds. Final earnings must account for actual provider fees, applicable seller
+fees, refunds, and any reserved or already withdrawn amount. The available
+balance must also meet the Rp250,000 minimum.
 
-The processing-fee policy and seller withdrawal-fee payer are confirmed. Before
-implementation can treat funds as withdrawable, the seller earnings release
-event above still needs to be specified. An estimated seller share is not a
-confirmed withdrawable balance.
+The merchant Wallet page displays this rule and links paid orders to Payments.
+Until seller wallet mapping, provider settlement synchronization, and the wallet
+ledger are connected, balances and release dates remain unavailable. The page
+must not label payment volume, estimated earnings, or skipped sandbox deliveries
+as withdrawable funds. It does not initiate withdrawals.

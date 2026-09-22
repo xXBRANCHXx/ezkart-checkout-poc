@@ -63,12 +63,8 @@ button, input, select, textarea { font-family: inherit; }
   transform: none;
 }
 .dashboard-page .action-button.primary:hover { color: #fff; background: #ac3324; }
-.dashboard-page .upgrade-card {
-  color: var(--ui-ink);
-  background: var(--ui-field);
-}
-.dashboard-page .upgrade-card::after { display: none; }
-.dashboard-page .upgrade-card a { color: var(--ui-ink); }
+/* The announcement card intentionally keeps the orange-to-pink gradient in
+   admin.css. It promotes Advanced and future launches, not a quiet control. */
 /* Shared page headers: a clear title, useful description, and room for actions. */
 .dashboard-page .page-heading {
   min-height: 0;

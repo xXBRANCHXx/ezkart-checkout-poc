@@ -339,8 +339,8 @@ Rp250,000 minimum seller withdrawal. The Rp2,500 BI-FAST recipient charge applie
 only to withdrawals below Rp250,000; withdrawals at or above that amount carry
 no recipient withdrawal fee. Ezkart covers the provider's transfer fee on seller
 withdrawals. Future affiliates have no Ezkart minimum and pay the fee only when
-withdrawing below the threshold. The event that releases seller earnings for
-withdrawal remains unconfirmed.
+withdrawing below the threshold. The owner confirmed on 22 September 2026 that earnings are released only after
+both confirmed delivery and provider settlement.
 No split rule or payout was created. DOKU's Collect and Route guide
 describes percentage or flat split rules applied at settlement, after provider
 payment fees. Attaching a seller profile and split rule to checkout, persisting

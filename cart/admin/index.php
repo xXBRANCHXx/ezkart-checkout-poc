@@ -1402,8 +1402,9 @@ $statusTotal = max(1, $metrics['orders']);
 $paidEnd = round(($statusCounts['PAID'] / $statusTotal) * 100, 1);
 $pendingEnd = round((($statusCounts['PAID'] + $statusCounts['PENDING']) / $statusTotal) * 100, 1);
 $creatingEnd = round((($statusCounts['PAID'] + $statusCounts['PENDING'] + $statusCounts['CREATING']) / $statusTotal) * 100, 1);
-$allowedPages = ['dashboard', 'orders', 'products', 'product-new', 'shop', 'sites', 'customers', 'analytics', 'marketing', 'payments', 'reviews', 'messages', 'integrations', 'settings'];
+$allowedPages = ['dashboard', 'orders', 'products', 'product-new', 'shop', 'sites', 'customers', 'analytics', 'marketing', 'payments', 'reviews', 'messages', 'wallet', 'settings'];
 $requestedPage = strtolower(trim((string) ($_GET['page'] ?? 'dashboard')));
+if ($requestedPage === 'integrations') { header('Location: ?page=wallet', true, 302); exit; }
 $page = in_array($requestedPage, $allowedPages, true) ? $requestedPage : 'dashboard';
 $requestedSite = trim((string) ($_GET['edit'] ?? ''));
 $siteEditor = $page === 'sites' && $requestedSite !== '' && strlen($requestedSite) <= 180;
@@ -1411,7 +1412,7 @@ $pageTitles = [
     'dashboard' => 'Dashboard', 'orders' => 'Orders', 'products' => 'Products', 'product-new' => 'Create product', 'shop' => 'Shop', 'sites' => 'Landing Pages',
     'customers' => 'Customers', 'analytics' => 'Analytics', 'marketing' => 'Marketing',
     'payments' => 'Payments', 'reviews' => 'Reviews', 'messages' => 'Messages',
-    'integrations' => 'Integrations', 'settings' => 'Settings',
+    'wallet' => 'Wallet', 'settings' => 'Settings',
 ];
 $allDisplayOrders = array_slice($orders, 0, 200);
 $customerProfiles = [];
@@ -1470,6 +1471,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
   <?php if ($authenticated && $page === 'sites'): ?><link rel="stylesheet" href="builder-templates.css?v=<?= (int) filemtime(__DIR__ . '/builder-templates.css') ?>"><?php endif; ?>
   <?php if ($authenticated && $page === 'sites' && $siteEditor): ?><link rel="stylesheet" href="builder-native.css?v=<?= (int) filemtime(__DIR__ . '/builder-native.css') ?>"><link rel="stylesheet" href="builder-components.css?v=<?= (int) filemtime(__DIR__ . '/builder-components.css') ?>"><link rel="stylesheet" href="builder-flow.css?v=<?= (int) filemtime(__DIR__ . '/builder-flow.css') ?>"><link rel="stylesheet" href="builder-showcase.css?v=<?= (int) filemtime(__DIR__ . '/builder-showcase.css') ?>"><link rel="stylesheet" href="builder-chrome.css?v=<?= (int) filemtime(__DIR__ . '/builder-chrome.css') ?>"><?php endif; ?>
   <?php if ($authenticated && $page === 'products'): ?><link rel="stylesheet" href="catalog.css?v=<?= ez_admin_escape($catalogCssVersion) ?>"><?php endif; ?>
+  <?php if ($authenticated && $page === 'wallet'): ?><link rel="stylesheet" href="wallet.css?v=<?= (int) filemtime(__DIR__ . '/wallet.css') ?>"><?php endif; ?>
   <link rel="stylesheet" href="dashboard-data.css?v=<?= (int) filemtime(__DIR__ . '/dashboard-data.css') ?>">
   <link rel="stylesheet" href="admin-ui.css?v=<?= (int) filemtime(__DIR__ . '/admin-ui.css') ?>">
   <link rel="stylesheet" href="profile-logo.css?v=<?= (int) filemtime(__DIR__ . '/profile-logo.css') ?>">
@@ -1641,15 +1643,16 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
         <a class="<?= $page === 'customers' ? 'active' : '' ?>" href="?page=customers"><?= ez_admin_icon('users') ?><span>Customers</span></a>
         <a class="<?= $page === 'analytics' ? 'active' : '' ?>" href="?page=analytics"><?= ez_admin_icon('chart') ?><span>Analytics</span></a>
         <a class="<?= $page === 'marketing' ? 'active' : '' ?>" href="?page=marketing"><?= ez_admin_icon('send') ?><span>Marketing</span></a>
-        <a class="<?= $page === 'payments' ? 'active' : '' ?>" href="?page=payments"><?= ez_admin_icon('wallet') ?><span>Payments</span></a>
+        <a class="<?= $page === 'payments' ? 'active' : '' ?>" href="?page=payments"><?= ez_admin_icon('credit-card') ?><span>Payments</span></a>
         <a class="<?= $page === 'reviews' ? 'active' : '' ?>" href="?page=reviews"><?= ez_admin_icon('star') ?><span>Reviews</span></a>
         <a class="<?= $page === 'messages' ? 'active' : '' ?>" href="?page=messages"><?= ez_admin_icon('message') ?><span>Messages</span></a>
-        <a class="<?= $page === 'integrations' ? 'active' : '' ?>" href="?page=integrations"><?= ez_admin_icon('plug') ?><span>Integrations</span></a>
+        <a class="<?= $page === 'wallet' ? 'active' : '' ?>" href="?page=wallet"><?= ez_admin_icon('wallet') ?><span>Wallet</span></a>
         <a class="<?= $page === 'settings' ? 'active' : '' ?>" href="?page=settings"><?= ez_admin_icon('settings') ?><span>Settings</span></a>
       </nav>
-      <section class="upgrade-card">
-        <span class="upgrade-icon"><?= ez_admin_icon('globe') ?></span><div><b>Launch on your<br>own domain</b><p>Hosted pages, checkout,<br>payments &amp; shipping.</p></div>
-        <a href="?page=sites">Manage Landing Pages</a>
+      <?php $sidebarPromo = require __DIR__ . '/sidebar-promo.php'; ?>
+      <section class="upgrade-card" aria-label="What's new at Ezkart">
+        <span class="upgrade-icon"><?= ez_admin_icon($sidebarPromo['icon']) ?></span><div><b><?= ez_admin_escape($sidebarPromo['title']) ?></b><p><?= ez_admin_escape($sidebarPromo['description']) ?></p></div>
+        <a href="<?= ez_admin_escape($sidebarPromo['href']) ?>"><?= ez_admin_escape($sidebarPromo['label']) ?></a>
       </section>
       <div class="store-switcher"><span class="store-icon"><?= ez_admin_icon('store') ?></span><div><b>Ezkart <?= $commerceProduction ? 'Production' : 'Sandbox' ?></b><small><?= $commerceProduction ? 'DOKU checkout' : 'DOKU sandbox checkout' ?></small></div><?= ez_admin_icon('chevron-down', 'chevron-icon') ?></div>
     </aside>
