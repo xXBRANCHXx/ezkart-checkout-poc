@@ -6958,6 +6958,40 @@
     syncPageSpacingControls();
 
     const brandVariable = { accent: "--site-accent", page: "--site-page", ink: "--site-ink", surface: "--site-surface" };
+    // Palette order is accent, page, text, surface. Previews and applied colors
+    // share this source so the picker always represents the resulting theme.
+    const brandPresets = [
+      { id: "studio", name: "Studio", colors: ["#272b30", "#f5f5f3", "#22252a", "#ffffff"] },
+      { id: "clay", name: "Clay", colors: ["#b34f36", "#faf4ee", "#352b27", "#fffcf8"] },
+      { id: "olive", name: "Olive", colors: ["#576342", "#f4f5ee", "#293025", "#fefff9"] },
+      { id: "ocean", name: "Ocean", colors: ["#176b67", "#eef6f5", "#193b3a", "#fafffe"] },
+      { id: "cobalt", name: "Cobalt", colors: ["#3358c5", "#f2f4fb", "#232b43", "#ffffff"] },
+      { id: "plum", name: "Plum", colors: ["#77506f", "#f7f2f6", "#382a35", "#fffbfe"] },
+      { id: "rose", name: "Rose", colors: ["#ae4664", "#fcf2f4", "#422a33", "#fffcfd"] },
+      { id: "midnight", name: "Midnight", colors: ["#a9c7ff", "#151b27", "#ecf1fa", "#222b3b"], buttonText: "#151b27" },
+    ];
+    const presetGrid = sqStudio.querySelector("[data-sq-theme-presets]");
+    presetGrid?.replaceChildren(...brandPresets.map((preset) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.dataset.sqTheme = preset.id;
+      button.setAttribute("aria-label", `${preset.name} palette`);
+      button.setAttribute("aria-pressed", "false");
+      button.innerHTML = `<span class="sq-theme-colors" aria-hidden="true">${preset.colors.map((color) => `<i style="background:${color}"></i>`).join("")}</span><span class="sq-theme-name">${preset.name}</span>`;
+      return button;
+    }));
+    const syncBrandPresetSelection = () => {
+      if (!previewRoot) return;
+      const computed = getComputedStyle(previewRoot);
+      const colors = Object.values(brandVariable).map((property) => colorToHex(computed.getPropertyValue(property), ""));
+      sqStudio.querySelectorAll("[data-sq-theme]").forEach((button) => {
+        const preset = brandPresets.find((item) => item.id === button.dataset.sqTheme);
+        const active = !!preset && preset.colors.every((color, index) => color === colors[index].toLowerCase());
+        button.classList.toggle("active", active);
+        button.setAttribute("aria-pressed", String(active));
+      });
+    };
+
     const syncPageAppearanceControls = () => {
       if (!previewRoot) return;
       const computed = getComputedStyle(previewRoot);
@@ -6967,6 +7001,7 @@
         const output = sqStudio.querySelector(`[data-sq-page-brand-output="${key}"]`);
         if (output) output.textContent = input.value.toUpperCase();
       });
+      syncBrandPresetSelection();
     };
     let globalStyleSnapshot;
     const startGlobalStyleEdit = () => { if (!globalStyleSnapshot) globalStyleSnapshot = captureState(); };
@@ -6979,7 +7014,6 @@
       const output = sqStudio.querySelector(`[data-sq-brand-color-output="${key}"]`);
       if (output) output.textContent = input.value.toUpperCase();
       syncPageAppearanceControls();
-      sqStudio.querySelectorAll("[data-sq-theme]").forEach((button) => button.classList.remove("active"));
       if (selectedAction?.isConnected) syncElementControls();
       markSqChanged();
     }));
@@ -6991,7 +7025,6 @@
       if (brandInput) brandInput.value = input.value;
       if (brandOutput) brandOutput.textContent = input.value.toUpperCase();
       syncPageAppearanceControls();
-      sqStudio.querySelectorAll("[data-sq-theme]").forEach((button) => button.classList.remove("active"));
       markSqChanged();
     }));
     sqStudio.querySelectorAll("[data-sq-brand-font]").forEach((input) => input.addEventListener("change", () => {
@@ -7103,16 +7136,19 @@
       requestAnimationFrame(() => palette?.classList.add("brand-focus"));
     });
     sqStudio.querySelectorAll("[data-sq-theme]").forEach((button) => button.addEventListener("click", () => {
+      const preset = brandPresets.find((item) => item.id === button.dataset.sqTheme);
+      if (!preset || !previewRoot) return;
       remember();
-      sqStudio.querySelectorAll("[data-sq-theme]").forEach((item) => item.classList.toggle("active", item === button));
-      previewRoot?.classList.remove("theme-coral", "theme-forest", "theme-indigo", "theme-charcoal");
-      previewRoot?.classList.add(button.dataset.sqTheme);
-      const colors = { "theme-coral": ["#f44b34", "#fffbf7", "#24262b", "#ffffff"], "theme-forest": ["#1c6b55", "#f1f5ef", "#17382e", "#ffffff"], "theme-indigo": ["#3f58a8", "#f1f3fb", "#1d2644", "#ffffff"], "theme-charcoal": ["#24262b", "#f4f4f2", "#24262b", "#ffffff"] }[button.dataset.sqTheme];
-      ["accent", "page", "ink", "surface"].forEach((key, index) => { previewRoot?.style.setProperty(brandVariable[key], colors[index]); const input = sqStudio.querySelector(`[data-sq-brand-color="${key}"]`); if (input) input.value = colors[index]; const output = sqStudio.querySelector(`[data-sq-brand-color-output="${key}"]`); if (output) output.textContent = colors[index].toUpperCase(); });
-      previewRoot?.style.setProperty("--button-primary-bg", colors[0]);
-      previewRoot?.style.setProperty("--button-primary-border", colors[0]);
-      syncPageAppearanceControls();
-      syncButtonSystemControls();
+      previewRoot.classList.remove("theme-coral", "theme-forest", "theme-indigo", "theme-charcoal");
+      const [accent, page, ink, surface] = preset.colors;
+      Object.values(brandVariable).forEach((property, index) => previewRoot.style.setProperty(property, preset.colors[index]));
+      const buttonColors = {
+        primary: { bg: accent, fg: preset.buttonText || "#ffffff", border: accent },
+        secondary: { bg: surface, fg: ink, border: ink },
+        tertiary: { bg: page, fg: accent, border: page },
+      };
+      Object.entries(buttonColors).forEach(([role, colors]) => Object.entries(colors).forEach(([key, color]) => previewRoot.style.setProperty(`--button-${role}-${key}`, color)));
+      syncBrandControls();
       if (selectedAction?.isConnected) syncElementControls();
       markSqChanged();
     }));
