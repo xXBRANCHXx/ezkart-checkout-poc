@@ -193,7 +193,7 @@ function ez_orders_table(array $rows, string $tableId, string $csrfToken): void
 
 <?php break; case 'products': ?>
   <?php $productPageInventory = []; // Legacy demonstrations stay out of the signed-in seller catalog. ?>
-  <?php ez_page_header('Catalog management', 'Products', 'Manage photography, pricing, inventory, and merchandising for the complete Ezkart catalog.', [
+  <?php ez_page_header('', 'Products', 'Manage your products, prices, and stock.', [
       ['label'=>'Shop & checkout appearance','href'=>'?page=shop'], ['label'=>'Copy cart link','copy_cart_link'=>true], ['label'=>'Create product','href'=>'?page=product-new&new=1','new_tab'=>true,'style'=>'primary'],
   ]); ?>
   <?php ez_stat_strip([
