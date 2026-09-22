@@ -278,6 +278,7 @@ body:has(>.sq-authored-navigation)>.sq-page-preview.sq-has-pinned-navigation:not
 /* A page header has its own layer above every content section. */
 .sq-page-preview > .sq-page-block:is(header,nav,.ezm-site-header,.sq-navigation-template-section) { z-index: 1000 !important; isolation: isolate; overflow: visible; }
 /* Editing tools stay readable when the canvas is zoomed out. */
+.page-site-editor .sq-page-preview > :is(.sq-element-overlay, .sq-section-toolbar) { z-index: 2147483100 !important; }
 .page-site-editor .sq-element-toolbar { top: auto; bottom: calc(100% + 6px); transform: scale(var(--sq-editor-ui-scale,1)); transform-origin: left bottom; }
 .page-site-editor .sq-element-toolbar > span { font-size: 11px; }
 .page-site-editor .sq-element-toolbar button { width: 32px; }

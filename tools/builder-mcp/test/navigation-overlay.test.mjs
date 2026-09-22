@@ -177,3 +177,41 @@ test('Overlay keeps surface effects, opacity, sticky shadows and scroll visibili
   await overlay.locator('..').click();await invoke('settle');
   assert.match((await effects(page)).blur,/blur\(24px\)/,'Re-enabling overlay retains its effects');
 }));
+
+test('Editing toolbars stay above a blurred overlay navbar and support dragging across it',()=>fixture(async({page,invoke})=>{
+  await page.locator('[data-sq-navigation-overlay]').locator('..').click();
+  await page.locator('.sq-navigation-advanced>summary').click();
+  await page.locator('[data-sq-navigation-surface=blur]').click();
+  await invoke('nativeUpdate',{id:'blank',props:{minHeight:'2400px'}});
+  await invoke('nativeUpdate',{id:'hero-title',props:{marginTop:'20px'}});
+  const hit=selector=>page.evaluate(selector=>{
+    const n=document.querySelector(selector),r=n.getBoundingClientRect();
+    return {clickable:n.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)),x:r.x+r.width/2,y:r.y+r.height/2};
+  },selector);
+  const heading=page.locator('[data-native-id=hero-title]');
+  if(await page.locator('.sq-builder-sidebar').evaluate(n=>n.classList.contains('sq-panel-pinned'))) await page.locator('[data-sq-tab].active').click();
+  await page.mouse.move(800,500);
+  for(const width of [1440,941]) {
+    await page.setViewportSize({width,height:1000});await invoke('settle');
+    const box=await heading.boundingBox();
+    await heading.click({position:{x:10,y:box.height-3}});await invoke('settle');
+    const move=await hit('[data-sq-element-move]');
+    assert.equal(move.clickable,true,'The move handle receives clicks above the navbar');
+    assert.equal((await hit('[data-sq-overlay-duplicate]')).clickable,true,'The full toolbar stays above the navbar');
+    const before=await heading.boundingBox();
+    await page.mouse.move(move.x,move.y);await page.mouse.down();await page.mouse.move(move.x+45,move.y+50,{steps:6});await page.mouse.up();await invoke('settle');
+    const after=await heading.boundingBox();
+    assert.ok(Math.hypot(after.x-before.x,after.y-before.y)>20,'Dragging works from the visible move handle');
+    await invoke('undo');await invoke('settle');
+    const restored=await heading.boundingBox();
+    await heading.click({position:{x:10,y:restored.height-3}});await invoke('settle');
+    await page.locator('.sq-canvas-scroll').evaluate(n=>n.scrollTop=20);await invoke('settle');
+    assert.equal((await hit('[data-sq-overlay-duplicate]')).clickable,true,'Controls remain accessible while scrolling');
+    await page.screenshot({path:`/tmp/ezkart-overlay-editor-tools-${width}.png`,animations:'disabled'});
+    await page.locator('.sq-canvas-scroll').evaluate(n=>n.scrollTop=0);await invoke('settle');
+    await page.locator('.sq-page-preview>[data-section-id=blank]').click({position:{x:5,y:200}});await invoke('settle');
+    assert.equal((await hit('[data-sq-toolbar-duplicate]')).clickable,true,'Section actions also appear above the navbar');
+  }
+  const html=await invoke('previewHtml');
+  assert.ok(!html.includes('data-sq-overlay-duplicate'),'Editing tools do not appear in exported pages');
+}));

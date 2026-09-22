@@ -3848,6 +3848,8 @@
         navigation.classList.toggle("sq-nav-is-stuck", navigation.getBoundingClientRect().top <= stickyTop + 1);
         navigation.classList.remove("sq-nav-hidden");
       });
+      if (selectedElement?.isConnected) refreshElementOverlay();
+      else refreshSectionToolbar();
     };
     const scheduleEditorNavigation = () => {
       if (editorNavigationFrame) return;
@@ -4317,13 +4319,15 @@
       if (!section) return;
       const overlay = document.createElement("div");
       overlay.className = "sq-element-overlay";
+      overlay.onclick = (event) => event.stopPropagation();
       overlay.innerHTML = `<div class="sq-element-toolbar"><button type="button" data-sq-element-move aria-label="Move element">${iconMarkup("grip")}</button><span>${escapeHtml(elementTypeName(selectedElement))}</span><button type="button" data-sq-overlay-duplicate aria-label="Duplicate element">${iconMarkup("layers")}</button><button type="button" data-sq-overlay-delete aria-label="Delete element">${iconMarkup("trash")}</button></div><button class="sq-element-resize" type="button" data-sq-element-resize aria-label="Resize element"></button>`;
-      section.append(overlay);
-      const sectionRect = section.getBoundingClientRect();
+      // Editor controls must escape section stacking contexts and backdrop blur.
+      previewRoot.append(overlay);
+      const rootRect = previewRoot.getBoundingClientRect();
       const elementRect = selectedElement.getBoundingClientRect();
-      const renderedScale = section.offsetWidth ? sectionRect.width / section.offsetWidth : 1;
-      overlay.style.left = `${(elementRect.left - sectionRect.left) / renderedScale}px`;
-      overlay.style.top = `${(elementRect.top - sectionRect.top) / renderedScale}px`;
+      const renderedScale = previewRoot.offsetWidth ? rootRect.width / previewRoot.offsetWidth : 1;
+      overlay.style.left = `${(elementRect.left - rootRect.left) / renderedScale}px`;
+      overlay.style.top = `${(elementRect.top - rootRect.top) / renderedScale}px`;
       overlay.style.width = `${elementRect.width / renderedScale}px`;
       overlay.style.height = `${elementRect.height / renderedScale}px`;
       const toolbar = overlay.querySelector(".sq-element-toolbar");
@@ -4871,14 +4875,18 @@
       removeSectionToolbar();
       if (selectedElement?.isConnected) return;
       const block = previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`);
-      if (!block) return;
+      if (!block?.classList.contains("selected")) return;
       const toolbar = document.createElement("div");
       toolbar.className = "sq-section-toolbar";
       toolbar.innerHTML = `<span>${iconMarkup("layers")} ${escapeHtml(sectionNames[selectedSection] || "Section")}</span><button type="button" data-sq-toolbar-duplicate>${iconMarkup("layers")} Duplicate</button><button type="button" data-sq-toolbar-delete>${iconMarkup("trash")} Delete</button>`;
       toolbar.onclick = (event) => event.stopPropagation();
       toolbar.querySelector("[data-sq-toolbar-duplicate]").onclick = () => sqStudio.querySelector("[data-sq-duplicate]")?.click();
       toolbar.querySelector("[data-sq-toolbar-delete]").onclick = () => sqStudio.querySelector("[data-sq-delete]")?.click();
-      block.append(toolbar);
+      previewRoot.append(toolbar);
+      const rootRect = previewRoot.getBoundingClientRect(), blockRect = block.getBoundingClientRect();
+      const scale = previewRoot.offsetWidth ? rootRect.width / previewRoot.offsetWidth : 1;
+      toolbar.style.left = `${(blockRect.left - rootRect.left) / scale + 10}px`;
+      toolbar.style.top = `${(blockRect.top - rootRect.top) / scale + 10}px`;
     };
     const selectSqSection = (sectionId, focusSection = false) => {
       const targetSection = [...(previewRoot?.querySelectorAll(":scope > [data-sq-block]") || [])].find(node => node.dataset.sectionId === sectionId);
