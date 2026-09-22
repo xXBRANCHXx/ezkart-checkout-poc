@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require_once dirname(__DIR__) . '/api/bootstrap.php';
 require_once __DIR__ . '/dashboard-data.php';
+require_once __DIR__ . '/analytics-data.php';
 require_once __DIR__ . '/wallet-access.php';
 
 $previewRepairFrame = ($_GET['preview-repair'] ?? '') === '1'
@@ -1424,6 +1425,13 @@ $requestedPage = strtolower(trim((string) ($_GET['page'] ?? 'dashboard')));
 if ($requestedPage === 'integrations') { header('Location: ?page=wallet', true, 302); exit; }
 if ($requestedPage === 'reviews') { header('Location: ?page=customers&tab=reviews', true, 302); exit; }
 $page = in_array($requestedPage, $allowedPages, true) ? $requestedPage : 'dashboard';
+$analyticsAvailable = $authenticated && ($authenticationMethod !== 'supabase' || $sellerId !== '');
+$analytics = $page === 'analytics' && $authenticated ? ez_analytics_build($orders, $_GET, $nowJakarta) : null;
+if ($page === 'analytics' && ($_GET['export'] ?? '') === 'csv') {
+    if (!$authenticated) { http_response_code(401); exit('Sign in to export analytics.'); }
+    if (!$analyticsAvailable) { http_response_code(503); exit('Analytics could not be loaded. Reload to try again.'); }
+    ez_analytics_export($analytics);
+}
 $walletAccess = $page === 'wallet' && $authenticated ? ez_wallet_access($authenticationMethod, $sellerId, $csrfToken, $isHttps) : ['unlocked' => false];
 $requestedSite = trim((string) ($_GET['edit'] ?? ''));
 $siteEditor = $page === 'sites' && $requestedSite !== '' && strlen($requestedSite) <= 180;
@@ -1434,9 +1442,12 @@ $pageTitles = [
     'wallet' => 'Wallet', 'settings' => 'Settings',
 ];
 $orderQueueFilter = is_string($_GET['fulfillment'] ?? null) && isset($orderQueues[$_GET['fulfillment']]) ? $_GET['fulfillment'] : '';
+if ($analytics !== null) $pageTitles['analytics'] = ez_analytics_reports()[$analytics['report']]['title'];
 $orderQueueRows = $page === 'orders' && $orderQueueFilter !== ''
     ? array_values(array_filter($orders, static fn($order) => ez_dashboard_order_queue($order) === $orderQueueFilter))
     : $orders;
+$orderReference = is_string($_GET['order'] ?? null) && preg_match('/^EZK-[A-Z0-9-]{8,70}$/D', $_GET['order']) === 1 ? $_GET['order'] : '';
+if ($page === 'orders' && $orderReference !== '') $orderQueueRows = array_values(array_filter($orderQueueRows, static fn($order) => ($order['order_id'] ?? '') === $orderReference));
 $allDisplayOrders = array_slice($orderQueueRows, 0, 200);
 $customerProfiles = [];
 $paymentMethods = [];
@@ -1497,6 +1508,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
   <?php if ($authenticated && $page === 'wallet'): ?><link rel="stylesheet" href="wallet.css?v=<?= (int) filemtime(__DIR__ . '/wallet.css') ?>"><?php endif; ?>
   <link rel="stylesheet" href="dashboard-data.css?v=<?= (int) filemtime(__DIR__ . '/dashboard-data.css') ?>">
   <link rel="stylesheet" href="admin-ui.css?v=<?= (int) filemtime(__DIR__ . '/admin-ui.css') ?>">
+  <?php if ($authenticated && $page === 'analytics'): ?><link rel="stylesheet" href="analytics.css?v=<?= (int) filemtime(__DIR__ . '/analytics.css') ?>"><?php endif; ?>
   <?php if ($authenticated && $page === 'payments'): ?><link rel="stylesheet" href="payments.css?v=<?= (int) filemtime(__DIR__ . '/payments.css') ?>"><?php endif; ?>
   <link rel="stylesheet" href="profile-logo.css?v=<?= (int) filemtime(__DIR__ . '/profile-logo.css') ?>">
   <link rel="stylesheet" href="../select.css?v=<?= (int) filemtime(__DIR__ . '/../select.css') ?>">
@@ -1802,6 +1814,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
   <?php if ($page === 'settings' && $mfaSetup !== null): ?><script src="assets/vendor/qrcode-generator.min.js"></script><?php endif; ?>
   <?php if ($page === 'sites'): ?><script src="builder-native-icons.js?v=<?= (int) filemtime(__DIR__ . '/builder-native-icons.js') ?>"></script><script src="builder-commerce.js?v=<?= (int) filemtime(__DIR__ . '/builder-commerce.js') ?>"></script><script src="builder-native.js?v=<?= (int) filemtime(__DIR__ . '/builder-native.js') ?>"></script><script src="builder-publish.js?v=<?= (int) filemtime(__DIR__ . '/builder-publish.js') ?>"></script><script src="builder-templates.js?v=<?= (int) filemtime(__DIR__ . '/builder-templates.js') ?>"></script><?php endif; ?><?php if ($page === 'sites' && $siteEditor): ?><script src="builder-backgrounds.js?v=<?= (int) filemtime(__DIR__ . '/builder-backgrounds.js') ?>"></script><script src="builder-components.js?v=<?= (int) filemtime(__DIR__ . '/builder-components.js') ?>"></script><script src="builder-showcase-data.js?v=<?= (int) filemtime(__DIR__ . '/builder-showcase-data.js') ?>"></script><script src="builder-showcase.js?v=<?= (int) filemtime(__DIR__ . '/builder-showcase.js') ?>"></script><?php endif; ?>
   <script src="dashboard-data.js?v=<?= (int) filemtime(__DIR__ . '/dashboard-data.js') ?>"></script>
+  <?php if ($page === 'analytics'): ?><script src="analytics.js?v=<?= (int) filemtime(__DIR__ . '/analytics.js') ?>"></script><?php endif; ?>
   <?php if ($page === 'wallet'): ?><script src="wallet-access.js?v=<?= (int) filemtime(__DIR__ . '/wallet-access.js') ?>"></script><?php endif; ?>
   <script src="admin.js?v=<?= ez_admin_escape($adminJsVersion) ?>"></script>
   <script src="profile-logo.js?v=<?= (int) filemtime(__DIR__ . '/profile-logo.js') ?>"></script>

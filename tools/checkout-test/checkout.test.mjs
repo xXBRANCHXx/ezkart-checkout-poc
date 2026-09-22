@@ -2766,6 +2766,171 @@ test('shop products reuse server-validated shipping and reject tampered prices a
   assert.equal((await app.request('/cart/api/start.php',{...input,cart})).status,422);
 });
 
+test('analytics reconciles dates, payment states, variants, comparison buckets and undefined rates', async t => {
+  const app = await setup(); t.after(() => app.close());
+  const product = { key: 'product-a', name: 'Product A', image_url: '' };
+  const item = (id, quantity, price) => ({ id, quantity, price, dashboard_product: product });
+  const orders = [
+    { order_id: 'A', created_at: '2026-09-15T17:00:00Z', paid_at: '2026-09-15T17:10:00Z', status: 'PAID', total: 170000, subtotal: 150000, shipping_price: 20000, items: [item('variant-a', 2, 50000), item('variant-b', 1, 50000)], biteship_order_id: 'booked', biteship_status: 'confirmed' },
+    { order_id: 'B', created_at: '2026-09-18T00:00:00Z', status: 'PENDING', total: 50000, items: [item('variant-a', 1, 50000)] },
+    { order_id: 'C', created_at: '2026-09-19T00:00:00Z', status: 'FAILED', total: 70000, items: [{ id: 'other', name: 'Other product', quantity: 2, price: 35000 }] },
+    { order_id: 'D', created_at: '2026-09-15T16:59:59Z', status: 'PAID', total: 85000, subtotal: 80000, shipping_price: 5000, items: [item('variant-a', 2, 40000)] },
+    { order_id: 'E', created_at: '2026-09-22T00:00:00Z', status: 'PAID', total: 40000, subtotal: 40000, commerce_environment: 'sandbox', shipping_skipped: true, items: [{ id: 'other', name: 'Other product', quantity: 1, price: 40000 }] },
+    { order_id: 'FUTURE', created_at: '2026-09-23T00:00:00Z', status: 'PAID', total: 999999 },
+    { order_id: 'UNDATED', created_at: 'invalid', status: 'PAID', total: 999999 },
+  ];
+  const encoded = Buffer.from(JSON.stringify(orders)).toString('base64');
+  const result = JSON.parse(app.cli(`require ${JSON.stringify(join(root, 'cart/admin/dashboard-data.php'))}; require ${JSON.stringify(join(root, 'cart/admin/analytics-data.php'))};
+    $orders=json_decode(base64_decode('${encoded}'),true); $now=new DateTimeImmutable('2026-09-22T12:00:00+07:00');
+    $a=ez_analytics_build($orders,['range'=>'7'],$now); $invalid=ez_analytics_build($orders,['range'=>'custom','from'=>'2026-02-30','to'=>'2026-02-01'],$now);
+    $empty=ez_analytics_build([],['range'=>'7'],$now); $all=ez_analytics_build($orders,['range'=>'all'],$now);
+    $monthly=ez_analytics_build($orders,['range'=>'custom','from'=>'2026-06-30','to'=>'2026-07-04','group'=>'monthly'],$now);
+    echo ez_json_encode(['current'=>$a['current'],'previous'=>$a['previous'],'currentBuckets'=>array_column(array_column($a['buckets'],'current'),'revenue'),'previousBuckets'=>array_column(array_column($a['buckets'],'previous'),'revenue'),'undated'=>$a['undated'],'invalid'=>$invalid['period'],'empty'=>$empty['current'],'all'=>$all['previous'],'monthly'=>array_map(static fn($b)=>[$b['start']->format('Y-m-d'),$b['end']->format('Y-m-d')],$monthly['buckets'])]);`));
+  assert.equal(result.current.orders, 4);
+  assert.equal(result.current.revenue, 210000);
+  assert.equal(result.current.product_revenue + result.current.shipping, result.current.revenue);
+  assert.equal(result.current.payment_rate, 50);
+  assert.equal(result.current.aov, 105000);
+  assert.equal(result.current.units, 4);
+  assert.equal(result.current.ordered_units, 7);
+  assert.equal(result.current.products['product-a'].orders, 2, 'Variants must not double-count orders');
+  assert.equal(result.current.products['product-a'].paid_orders, 1);
+  assert.equal(result.current.products['product-a'].revenue, 150000);
+  assert.equal(result.current.payment_seconds, 600);
+  assert.equal(result.current.payment_time_samples, 1, 'Missing paid timestamps cannot imply instant payment');
+  assert.equal(result.current.fulfillment.processing, 1);
+  assert.equal(result.current.fulfillment['not-required'], 1);
+  assert.equal(result.previous.revenue, 85000);
+  assert.equal(result.currentBuckets.reduce((a, b) => a + b, 0), 210000);
+  assert.equal(result.previousBuckets.reduce((a, b) => a + b, 0), 85000);
+  assert.equal(result.undated, 1);
+  assert.equal(result.invalid.range, '30');
+  assert.match(result.invalid.error, /valid start and end dates/);
+  assert.equal(result.empty.payment_rate, null);
+  assert.equal(result.empty.aov, null);
+  assert.equal(result.all, null);
+  assert.deepEqual(result.monthly, [['2026-06-30', '2026-07-01'], ['2026-07-01', '2026-07-05']]);
+});
+
+test('analytics reports navigate, filter, inspect charts and export scoped real records on desktop and mobile', async t => {
+  const { chromium } = await import('../builder-mcp/node_modules/playwright/index.mjs');
+  const app = await setup({ EZKART_CLOUDFLARE_API_URL: 'https://ezkart-api-test.fixture.workers.dev' }); t.after(() => app.close());
+  const shop = { store: { sellerId: 'seller_analytics' }, catalog: [
+    { id: 'product-a', name: 'Actual syrup', status: 'active', media: [{ id: 'media_syrup' }], variants: [{ id: 'variant-a', sku: 'SYRUP-A' }, { id: 'variant-b', sku: 'SYRUP-B' }] },
+    { id: 'product-b', sku: 'OTHER', name: '=HYPERLINK("https://example.com")', status: 'active', media: [] },
+  ] };
+  await writeFile(join(app.directory, 'storefront.json'), JSON.stringify(shop));
+  const date = days => new Date(Date.now() - days * 86400000).toISOString();
+  const base = { seller_id: 'seller_analytics', commerce_environment: 'sandbox', customer: { name: 'Actual Buyer', email: 'checkout@example.com' }, total: 50000, subtotal: 50000, shipping_price: 0, status: 'PENDING', created_at: date(3), items: [{ id: 'SYRUP-A', name: 'Old syrup', price: 50000, quantity: 1 }], payment_type: 'qris' };
+  const orders = [
+    { ...base, order_id: 'EZK-S-ANALYTICS01', status: 'PAID', created_at: date(1), paid_at: new Date(Date.now() - 86400000 + 600000).toISOString(), subtotal: 150000, total: 170000, shipping_price: 20000, items: [{ id: 'SYRUP-A', name: 'Old syrup', price: 50000, quantity: 2 }, { id: 'SYRUP-B', name: 'Other variant', price: 50000, quantity: 1 }], biteship_order_id: 'booked', biteship_status: 'confirmed' },
+    { ...base, order_id: 'EZK-S-ANALYTICS02' },
+    { ...base, order_id: 'EZK-S-ANALYTICS03', status: 'FAILED', total: 70000, items: [{ id: 'OTHER', name: 'Other product', price: 35000, quantity: 2 }] },
+    { ...base, order_id: 'EZK-S-ANALYTICS04', status: 'PAID', created_at: date(10), subtotal: 80000, shipping_price: 5000, total: 85000 },
+    { ...base, order_id: 'EZK-S-ANALYTICS05', status: 'PAID', created_at: date(2), subtotal: 40000, total: 40000, shipping_skipped: true, payment_type: 'bank_transfer', items: [{ id: 'OTHER', name: 'Other product', price: 40000, quantity: 1 }] },
+    { ...base, order_id: 'EZK-S-PRIVATE001', seller_id: 'seller_other', status: 'PAID', total: 99999999 },
+    ...Array.from({ length: 21 }, (_, i) => ({ ...base, order_id: `EZK-S-FILLER${String(i).padStart(3, '0')}`, items: [] })),
+  ];
+  app.cli(`foreach(json_decode(base64_decode('${Buffer.from(JSON.stringify(orders)).toString('base64')}'),true) as $order) ez_save_order($order); require ${JSON.stringify(join(root, 'cart/api/customer-profile.php'))}; ez_customer_save_profile(['id'=>'fixture-google-customer','email'=>'checkout@example.com','name'=>'Actual Buyer','avatar_url'=>'https://lh3.googleusercontent.com/a/analytics-fixture']);`);
+  const browser = await chromium.launch(); t.after(() => browser.close());
+  const context = await browser.newContext({ viewport: { width: 1600, height: 1100 }, acceptDownloads: true });
+  await context.addCookies([app.adminCookie()]);
+  const page = await context.newPage(); page.setDefaultTimeout(6000);
+  const errors = []; page.on('pageerror', error => errors.push(error.message));
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=', 'base64');
+  await page.route('**/*', route => {
+    const url = new URL(route.request().url()), cloud = url.searchParams.get('cloud');
+    if (cloud === '/v1/admin-profile') return route.fulfill({ json: { ok: true, profile: { logoId: '', canEdit: true } } });
+    if (url.hostname === 'lh3.googleusercontent.com' || cloud?.startsWith('/v1/media/')) return route.fulfill({ contentType: 'image/png', body: png });
+    return route.continue();
+  });
+  const url = app.base + '/cart/admin/?page=analytics&range=7';
+  await page.goto(url);
+  assert.equal(await page.locator('[data-metric=revenue] strong').innerText(), 'Rp210 rb');
+  assert.equal(await page.locator('[data-metric=orders] strong').innerText(), '25');
+  assert.equal(await page.locator('[data-metric=payment_rate] strong').innerText(), '8.0%');
+  assert.equal(await page.locator('.an-report-card').count(), 4);
+  assert.match(await page.locator('[data-metric=revenue] .an-comparison').innerText(), /147.1%/);
+  await page.getByRole('slider', { name: 'Inspect chart period' }).fill('0');
+  assert.match(await page.locator('.an-chart-inspector output').innerText(), /Previous/);
+  await page.screenshot({ path: '/tmp/ezkart-analytics-overview-desktop.png', fullPage: true });
+  await page.locator('.an-report-card').filter({ has: page.getByRole('heading', { name: 'Revenue', exact: true }) }).click();
+  assert.equal(new URL(page.url()).searchParams.get('report'), 'revenue');
+  assert.equal(new URL(page.url()).searchParams.get('range'), '7');
+  assert.equal(await page.locator('.an-report-table tbody tr').count(), 2);
+  assert.equal(await page.locator('.an-report-table .identity-avatar img').count(), 2);
+  await page.screenshot({ path: '/tmp/ezkart-analytics-revenue-desktop.png', fullPage: true });
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('link', { name: 'Export CSV', exact: true }).click();
+  const download = await downloadPromise;
+  const csv = await readFile(await download.path(), 'utf8');
+  assert.match(csv, /ANALYTICS01/); assert.match(csv, /ANALYTICS05/);
+  assert.doesNotMatch(csv, /PRIVATE001|ANALYTICS02|ANALYTICS04/);
+  await page.locator('.an-report-table tbody tr').first().getByRole('link').click();
+  assert.equal(new URL(page.url()).searchParams.get('page'), 'payments');
+  await page.waitForFunction(() => document.querySelectorAll('#payments-table [data-search-row]:not([hidden])').length === 1);
+  await page.goto(url + '&report=orders');
+  assert.equal(await page.locator('.an-report-table tbody tr').count(), 20);
+  await page.getByRole('link', { name: 'Next', exact: true }).click();
+  assert.equal(await page.locator('.an-report-table tbody tr').count(), 5);
+  await page.getByRole('searchbox', { name: 'Search report records' }).fill('ANALYTICS01');
+  await page.locator('.an-table-filters').getByRole('button', { name: 'Filter', exact: true }).click();
+  assert.equal(await page.locator('.an-report-table tbody tr').count(), 1);
+  await page.locator('.an-report-table tbody tr').getByRole('link').click();
+  assert.equal(new URL(page.url()).searchParams.get('page'), 'orders');
+  assert.equal(await page.locator('#order-list [data-order-card]').count(), 1);
+  await page.goto(url + '&report=orders&stage=shipped');
+  assert.match(await page.locator('.an-report-table').innerText(), /No records match/);
+  await page.goto(url + '&report=payments');
+  assert.equal(await page.locator('[data-metric=payment_seconds] strong').innerText(), '10.0 min');
+  assert.equal(await page.locator('.an-point.previous').count(), 1, 'Isolated previous payment-rate observations stay visible');
+  await page.screenshot({ path: '/tmp/ezkart-analytics-payments-desktop.png', fullPage: true });
+  await page.locator('.an-report-table').getByRole('link', { name: 'Bank Transfer', exact: true }).click();
+  assert.equal(await page.locator('.an-report-table tbody tr').count(), 1);
+  await page.goto(url + '&report=products');
+  assert.equal(await page.locator('.an-report-table tbody tr').count(), 2);
+  assert.match(await page.locator('.an-report-table tbody tr').first().innerText(), /Actual syrup/);
+  assert.equal(await page.locator('.an-report-table .product-art img').first().getAttribute('src'), './?cloud=%2Fv1%2Fmedia%2Fmedia_syrup');
+  const productDownload = page.waitForEvent('download');
+  await page.getByRole('link', { name: 'Export CSV', exact: true }).click();
+  assert.ok((await readFile(await (await productDownload).path(), 'utf8')).includes("'=HYPERLINK"), 'CSV must escape spreadsheet formulas');
+  await page.getByLabel('From date', { exact: true }).fill(date(20).slice(0, 10));
+  assert.equal(await page.getByLabel('Analytics date range', { exact: true }).inputValue(), 'custom');
+  await page.locator('.an-period').getByRole('button', { name: 'Apply', exact: true }).click();
+  assert.equal(new URL(page.url()).searchParams.get('range'), 'custom');
+  await page.locator('.an-navigation').getByRole('link', { name: 'Overview', exact: true }).click();
+  assert.equal(new URL(page.url()).searchParams.get('range'), 'custom');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.waitForTimeout(350);
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'Analytics overview must fit mobile');
+  await page.screenshot({ path: '/tmp/ezkart-analytics-overview-mobile.png', fullPage: true });
+  for (const report of ['Revenue', 'Orders', 'Payments', 'Products']) {
+    await page.locator('.an-navigation').getByRole('link', { name: report, exact: true }).click();
+    await page.evaluate(() => document.fonts.ready);
+    await page.screenshot({ path: `/tmp/ezkart-analytics-${report.toLowerCase()}-mobile.png`, fullPage: true });
+    const overflow = await page.evaluate(() => ({ width: document.documentElement.scrollWidth, viewport: innerWidth, elements: [...document.querySelectorAll('.page-analytics *')].filter(node => node.getBoundingClientRect().right > innerWidth + 1 && !node.closest('.an-table-scroll')).slice(0, 8).map(node => ({ tag: node.tagName, class: node.className, width: node.getBoundingClientRect().width, x: node.getBoundingClientRect().x })) }));
+    assert.ok(overflow.width <= overflow.viewport, `${report} report must fit mobile: ${JSON.stringify(overflow)}`);
+  }
+  await page.screenshot({ path: '/tmp/ezkart-analytics-products-mobile.png', fullPage: true });
+  shop.identityUnavailable = true;
+  await writeFile(join(app.directory, 'storefront.json'), JSON.stringify(shop));
+  await page.goto(url);
+  assert.equal(await page.locator('.an-metrics').count(), 0);
+  const unavailable = await page.request.get(url + '&export=csv');
+  assert.equal(unavailable.status(), 503);
+  assert.doesNotMatch(await unavailable.text(), /ANALYTICS01/);
+  shop.identityUnavailable = false;
+  await writeFile(join(app.directory, 'storefront.json'), JSON.stringify(shop));
+  app.cli("foreach(glob(ez_order_directory().'/*.json') as $path) unlink($path);");
+  await page.reload();
+  assert.equal(await page.locator('[data-metric=payment_rate] strong').innerText(), '—');
+  assert.equal(await page.locator('[data-metric=revenue] strong').innerText(), 'Rp0');
+  const anonymousExport = await fetch(url + '&export=csv');
+  assert.equal(anonymousExport.status, 401);
+  assert.doesNotMatch(await anonymousExport.text(), /ANALYTICS01|PRIVATE001/);
+  assert.equal(errors.length, 0, errors.join('\n'));
+});
+
 test('order queues follow payment, acceptance and courier milestones without counting skipped shipping', async t => {
   const app = await setup(); t.after(() => app.close());
   const cases = [
