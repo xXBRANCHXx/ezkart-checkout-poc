@@ -1,5 +1,5 @@
 <?php declare(strict_types=1); ?>
-<?php ez_page_header('Ready to sell', 'Shop', 'One home for your products. One familiar checkout for every order.', [['label' => 'Manage products', 'href' => '?page=products']]); ?>
+<?php ez_page_header('', 'Shop', 'Manage your shop, checkout links, and appearance.', [['label' => 'Manage products', 'href' => '?page=products']]); ?>
 <div class="shop-admin" data-shop-admin>
   <p class="shop-admin-status" id="shop-admin-status" role="status" aria-live="polite">Loading your shop…</p>
   <button class="action-button" type="button" id="shop-admin-retry" hidden>Try again</button>

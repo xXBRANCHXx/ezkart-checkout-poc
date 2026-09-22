@@ -5,7 +5,7 @@ function ez_page_header(string $eyebrow, string $title, string $description, arr
 {
     ?>
     <header class="page-heading">
-      <div><p class="page-eyebrow"><?= ez_admin_escape($eyebrow) ?></p><h1><?= ez_admin_escape($title) ?></h1><p><?= ez_admin_escape($description) ?></p></div>
+      <div><?php if ($eyebrow !== ''): ?><p class="page-eyebrow"><?= ez_admin_escape($eyebrow) ?></p><?php endif; ?><h1><?= ez_admin_escape($title) ?></h1><p><?= ez_admin_escape($description) ?></p></div>
       <?php if ($actions !== []): ?><div class="page-actions"><?php foreach ($actions as $action): ?>
         <?php if (($action['href'] ?? '') !== ''): ?><a class="action-button <?= ez_admin_escape($action['style'] ?? '') ?>" href="<?= ez_admin_escape($action['href']) ?>"<?= !empty($action['new_tab']) ? ' target="_blank" rel="noopener"' : '' ?>><?= ez_admin_escape($action['label']) ?></a>
         <?php else: ?><button class="action-button <?= ez_admin_escape($action['style'] ?? '') ?>" type="button"<?= !empty($action['product_creator']) ? ' data-open-product-creator' : (!empty($action['copy_cart_link']) ? ' data-copy-cart-link' : ' data-toast="' . ez_admin_escape($action['toast'] ?? 'Action completed') . '"') ?><?= !empty($action['page_creator']) ? ' data-open-page-creator' : '' ?>><?= ez_admin_escape($action['label']) ?></button><?php endif; ?>
