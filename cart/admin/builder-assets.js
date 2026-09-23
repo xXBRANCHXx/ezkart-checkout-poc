@@ -21,11 +21,11 @@
     {id:'text-editorial',category:'text',name:'Editorial title',description:'Expressive serif with a quiet supporting line.',make:() => group([
       title('Good things,\nwell considered.',{fontFamily:'Georgia, serif',fontSize:'56px',fontWeight:'400',letterSpacing:'-2px',whiteSpace:'pre-line'}),
       text('A little intention goes a long way.',{color:'#69645e',fontSize:'18px'})
-    ],{gap:'20px',...pad('8px')})},
+    ],{gap:'12px',...pad('8px')})},
     {id:'text-statement',category:'text',name:'Bold statement',description:'A compact headline with one word in color.',make:() => group([
       {...title('Make space\nfor better.',{fontSize:'64px',fontWeight:'800',letterSpacing:'-3px',whiteSpace:'pre-line'}),marks:[{start:15,end:21,color:'#bd492a'}]},
       text('Fewer things. More meaning.',{fontSize:'18px',color:'#bd492a',fontWeight:'500'})
-    ],{gap:'16px'})},
+    ],{gap:'12px'})},
     {id:'text-story',category:'text',name:'Story & detail',description:'A clear heading, readable body, and a fine rule.',make:() => group([
       title('The thought behind it.',{fontSize:'27px'}),
       text('Every useful thing starts with a simple question: how could this feel a little better? Tell the story of what you make, and the choices that make it yours.',{fontSize:'17px',color:'#5c6267'}),
@@ -223,12 +223,17 @@
     const node = cloneRecipe(recipe.make());
     node.name = recipe.name;
     node.props = {fontFamily:'Arial, Helvetica, sans-serif',color:'#28272c',width:'520px',maxWidth:'100%',flexShrink:'0',height:'auto',...node.props};
+    // Elements start as compact compositions; the section factory explicitly
+    // expands them. A fluid source recipe must not fill an entire blank page.
+    if (node.props.width === '100%') node.props.width = '520px';
     EzkartNative.validate(node);
     return node;
   }
   let previewBaseSheet;
   function preview(id) {
     const config = create(id);
+    config.props.width = '100%';
+    config.props.maxWidth = '100%';
     // Use the native CSS and container queries inside an isolated preview.
     // A single shared sheet avoids copying the native CSS into every card;
     // shadow boundaries keep previews out of the editor's canvas selectors.
@@ -239,13 +244,13 @@
       previewBaseSheet.replaceSync([...source.cssRules].map(rule => rule.cssText.replace(/url\(["']?([^"')]+)["']?\)/g,(_,url)=>`url("${new URL(url,source.href).href}")`)).join('\n'));
     }
     const frame = document.createElement('div');
-    frame.style.cssText = 'width:520px;max-width:none;';
+    frame.style.cssText = 'width:440px;max-width:none;';
     frame.inert = true;
     const shadow = frame.attachShadow({mode:'closed'});
     shadow.adoptedStyleSheets = [previewBaseSheet];
     const canvas = document.createElement('div');
     canvas.className = 'sq-page-preview';
-    canvas.style.cssText = 'width:100%;font-family:Arial,Helvetica,sans-serif;color:#28272c;--native-vw:5.2px;';
+    canvas.style.cssText = 'width:100%;font-family:Arial,Helvetica,sans-serif;color:#28272c;--native-vw:4.4px;';
     const node = EzkartNative.create(config);
     canvas.append(node);
     const sheet = document.createElement('style');
@@ -270,7 +275,16 @@
   function createSection(id,sectionId) {
     const content = create(id.replace(/^asset-section-/,''));
     content.props.width='100%'; content.props.maxWidth='960px';
-    const config = {id:sectionId,type:'container',tag:'section',name:content.name,props:{display:'flex',flexDirection:'column',alignItems:'center',...pad('56px'),backgroundColor:content.props.backgroundColor || '#fff'},responsive:[{max:700,props:pad('24px')}],children:[content]};
+    const framed = parseFloat(content.props.borderRadius) > 0 || Boolean(content.props.boxShadow && content.props.boxShadow !== 'none') || ['Top','Right','Bottom','Left'].some(side=>parseFloat(content.props[`border${side}Width`]) > 0);
+    // Flat compositions share the section's outer gutter. Keep padding inside
+    // bordered/rounded cards, where it separates the content from a visible edge.
+    if (!framed) {
+      Object.assign(content.props,pad('0px'));
+      for (const rule of content.responsive || []) Object.assign(rule.props,pad('0px'));
+    }
+    const spacing = framed ? {...pad('24px'),paddingTop:'32px',paddingBottom:'32px'} : {...pad('32px'),paddingTop:'48px',paddingBottom:'48px'};
+    const narrow = framed ? {...pad('16px'),paddingTop:'24px',paddingBottom:'24px'} : {...pad('20px'),paddingTop:'28px',paddingBottom:'28px'};
+    const config = {id:sectionId,type:'container',tag:'section',name:content.name,props:{display:'flex',flexDirection:'column',alignItems:'center',...spacing,backgroundColor:content.props.backgroundColor || '#fff'},responsive:[{max:700,props:narrow}],children:[content]};
     const node = EzkartNative.create(config);
     node.classList.add('sq-page-block','sq-native-section');
     node.setAttribute('data-sq-block',''); node.dataset.sectionId=sectionId; node.dataset.sqSectionName=content.name;

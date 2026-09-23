@@ -172,6 +172,20 @@ test('every installed design renders without overflow or clipping at desktop and
 
 test('catalogue thumbnails use native responsive CSS with shared styles and no stored config copies',async t=>{
   const {page,category}=await fixture(t,{inspectPreviews:true});
+  const previewOverflow=await page.evaluate(()=>{
+    const holder=document.createElement('div');holder.style.cssText='position:fixed;left:-2000px;top:0;width:440px';document.body.append(holder);
+    const failures=[];
+    for(const recipe of EzkartAssets.definitions){
+      const host=EzkartAssets.preview(recipe.id);holder.replaceChildren(host);
+      const shadow=packPreviewRoots.get(host),bounds=host.getBoundingClientRect();
+      for(const node of shadow.querySelectorAll('.sq-native')){
+        const rect=node.getBoundingClientRect();if(!rect.width||!rect.height)continue;
+        if(rect.left<bounds.left-2||rect.right>bounds.right+2||node.scrollWidth>node.clientWidth+2)failures.push({id:recipe.id,text:node.textContent.slice(0,60)});
+      }
+    }
+    holder.remove();return failures;
+  });
+  assert.deepEqual(previewOverflow,[],'Every preview, including the original designs, fits its display width');
   for(const id of representatives) {
     const categoryId=await page.evaluate(id=>EzkartAssets.definitions.find(item=>item.id===id).category,id);
     await category(categoryId);
@@ -181,15 +195,29 @@ test('catalogue thumbnails use native responsive CSS with shared styles and no s
       const host=card.querySelector('.sq-asset-preview').firstElementChild,shadow=packPreviewRoots.get(host);
       const root=shadow.querySelector('.sq-native'),config=EzkartAssets.create(card.dataset.sqAsset);
       const firstText=shadow.querySelector('[data-native-text-field]');
-      return {width:host.offsetWidth,height:host.offsetHeight,stored:shadow.querySelectorAll('[data-sq-native],[data-sq-element]').length,inert:host.inert,padding:getComputedStyle(root).paddingLeft,expectedPadding:config.responsive?.filter(r=>r.max>=520).at(-1)?.props.paddingLeft||config.props.paddingLeft,textFont:firstText&&getComputedStyle(firstText).fontFamily,sourceFont:config.props.fontFamily};
+      return {width:host.offsetWidth,height:host.offsetHeight,stored:shadow.querySelectorAll('[data-sq-native],[data-sq-element]').length,inert:host.inert,padding:getComputedStyle(root).paddingLeft,expectedPadding:config.responsive?.filter(r=>r.max>=440).at(-1)?.props.paddingLeft||config.props.paddingLeft,textFont:firstText&&getComputedStyle(firstText).fontFamily,sourceFont:config.props.fontFamily};
     });
-    assert.equal(metrics.width,520);assert.ok(metrics.height>0);assert.equal(metrics.stored,0);assert.equal(metrics.inert,true);
-    if(metrics.expectedPadding)assert.equal(metrics.padding,metrics.expectedPadding,`${id} uses its 520px container query`);
+    assert.equal(metrics.width,440);assert.ok(metrics.height>0);assert.equal(metrics.stored,0);assert.equal(metrics.inert,true);
+    if(metrics.expectedPadding)assert.equal(metrics.padding,metrics.expectedPadding,`${id} uses its 440px container query`);
     await shot(page,`thumbnail-${id}`,card);
   }
   const shared=await page.evaluate(()=>{const roots=[...document.querySelectorAll('.sq-asset-preview > div')].map(n=>packPreviewRoots.get(n)).filter(Boolean);return roots.length>1&&roots.every(root=>root.adoptedStyleSheets[0]===roots[0].adoptedStyleSheets[0]);});
   assert.equal(shared,true,'Preview base CSS is allocated once');
   assert.equal(await page.locator('.sq-page-preview').count(),1,'Preview canvases are isolated from editor selectors');
+});
+
+test('individual elements keep a compact width and full sections use one mobile gutter',async t=>{
+  const {page}=await fixture(t,{editor:false});
+  const metrics=await render(page,'text-chapter-opening',1440);
+  const width=await page.locator('#stage > .sq-native').evaluate(node=>node.offsetWidth);
+  assert.ok(width<=520,'An element must not unexpectedly stretch across the entire desktop canvas');
+  assert.deepEqual(metrics.issues,[]);
+  for(const size of [390,320]){
+    await render(page,'accordions-split-intro',size,true);
+    const content=await page.locator('#stage > .sq-native > .sq-native').evaluate(node=>({width:node.offsetWidth,padding:parseFloat(getComputedStyle(node).paddingLeft)}));
+    assert.ok(content.width>=size*.85,'A full section leaves enough width for readable mobile content');
+    assert.equal(content.padding,0,'Flat compositions do not add another inset inside the section gutter');
+  }
 });
 
 const referenceRecipe={id:'reference-pack',category:'buttons',name:'Reference isolation fixture',description:'Native reference validation fixture.',node:{id:'local-root',type:'container',initialState:'start',stateParam:'view',stateMode:'tabs',props:{display:'flex',flexDirection:'column',gap:'12px'},children:[

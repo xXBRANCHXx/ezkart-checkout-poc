@@ -4,7 +4,7 @@
   const fitPreview = frame => {
     const artwork = frame.firstElementChild;
     if (!artwork || !frame.clientWidth) return;
-    const scale = Math.min((frame.clientWidth - 30) / Math.max(1,artwork.offsetWidth), (frame.clientHeight - 24) / artwork.scrollHeight);
+    const scale = Math.min((frame.clientWidth - 20) / Math.max(1,artwork.offsetWidth), (frame.clientHeight - 16) / artwork.scrollHeight);
     artwork.style.transform = `translate(-50%, -50%) scale(${scale})`;
   };
   const observer = new ResizeObserver(entries => entries.forEach(({target}) => fitPreview(target)));
