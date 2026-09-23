@@ -131,7 +131,7 @@ export class Workspace {
      }catch{/* An absent media base needs no additional source. */}
      // Keep the preview isolated; explicitly allow the configured local media
      // server as well as the HTTPS assets supported by the hosted preview.
-     res.setHeader('Content-Security-Policy',`default-src 'none'; img-src 'self' data: https:${mediaSource}; media-src 'self' data: https:${mediaSource}; style-src 'unsafe-inline' https:; script-src 'unsafe-inline' https:; font-src 'self' data: https:; connect-src 'self' https:; form-action 'self' https:; frame-ancestors 'self'; base-uri 'none'; sandbox allow-scripts allow-forms allow-popups allow-top-navigation-by-user-activation`);
+     res.setHeader('Content-Security-Policy',`default-src 'none'; img-src 'self' data: https:${mediaSource}; media-src 'self' data: https:${mediaSource}; style-src 'unsafe-inline' https:; script-src 'unsafe-inline' https:; font-src 'self' data: https:; connect-src 'self' https:; form-action 'self' https:; frame-ancestors 'self'; base-uri 'none'; sandbox allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation`);
      return send(200,shell.replace(/<\?[\s\S]*?\?>/g,''),'text/html; charset=utf-8');
     }
     if(['/cart/select.css','/cart/select.js'].includes(url.pathname))return send(200,await readFile(join(repoRoot,url.pathname.slice(1))),url.pathname.endsWith('.css')?'text/css':'text/javascript');

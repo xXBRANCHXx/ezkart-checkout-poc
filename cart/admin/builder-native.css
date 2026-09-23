@@ -825,6 +825,14 @@
 .page-site-editor .sq-canvas-scroll .sq-page-preview {
   overflow: visible;
 }
+/* Oversized artwork keeps its dimensions; the storefront stays screen-wide. */
+body:has(> .sq-page-preview:not(.sq-overflow-visible)) {
+  overflow-x: clip;
+}
+body > .sq-page-preview:not(.sq-overflow-visible) {
+  overflow-x: clip !important;
+  overflow-y: visible !important;
+}
 
 .page-site-editor
   .sq-inspector

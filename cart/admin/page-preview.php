@@ -4,7 +4,7 @@ declare(strict_types=1);
 header('Content-Type: text/html; charset=utf-8');
 header('Cache-Control: no-store');
 header('X-Content-Type-Options: nosniff');
-header("Content-Security-Policy: default-src 'none'; img-src 'self' data: https:; media-src data: https:; style-src 'unsafe-inline' https:; script-src 'unsafe-inline' https:; font-src 'self' data: https:; connect-src 'self' https:; form-action 'self' https:; frame-ancestors 'self'; base-uri 'none'; sandbox allow-scripts allow-forms allow-popups allow-top-navigation-by-user-activation");
+header("Content-Security-Policy: default-src 'none'; img-src 'self' data: https:; media-src data: https:; style-src 'unsafe-inline' https:; script-src 'unsafe-inline' https:; font-src 'self' data: https:; connect-src 'self' https:; form-action 'self' https:; frame-ancestors 'self'; base-uri 'none'; sandbox allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation");
 ?>
 <!doctype html>
 <html lang="en">
@@ -18,6 +18,10 @@ header("Content-Security-Policy: default-src 'none'; img-src 'self' data: https:
   <p>Preparing production preview…</p>
   <script>
     const maximumPreviewCharacters = 16_000_000;
+    const updateCrop = event => {
+      if (event.source !== parent || event.data?.type !== 'ezkart-preview-crop' || typeof event.data.crop !== 'boolean') return;
+      document.querySelector('body > .sq-page-preview')?.classList.toggle('sq-overflow-visible', !event.data.crop);
+    };
     addEventListener('message', function (event) {
       if (event.source !== parent || !event.data || event.data.type !== 'ezkart-render-page' || typeof event.data.html !== 'string') return;
       if (event.data.html.length > maximumPreviewCharacters) {
@@ -27,6 +31,7 @@ header("Content-Security-Policy: default-src 'none'; img-src 'self' data: https:
       document.open();
       document.write(event.data.html);
       document.close();
+      addEventListener('message', updateCrop);
     });
     parent.postMessage({ type: 'ezkart-page-preview-ready' }, '*');
   </script>

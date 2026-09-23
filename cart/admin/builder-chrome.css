@@ -698,3 +698,14 @@
   .sq-favicon-dialog > footer { padding: 16px 18px; }
   .sq-favicon-dialog > footer > button { flex: 1 1 auto; }
 }
+.sq-live-preview-shell > header { grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); }
+.sq-live-preview-shell > header > div:first-child { min-width:0; }
+.sq-live-preview-shell > header h2 { overflow:hidden;white-space:nowrap;text-overflow:ellipsis; }
+.sq-preview-crop { display:flex;align-items:center;gap:7px;white-space:nowrap;font-size:11px;cursor:pointer; }
+.sq-preview-crop input { width:16px;height:16px;margin:0;accent-color:#f44b34; }
+@media(max-width:900px) {
+  .sq-live-preview-shell { grid-template-rows:106px minmax(0,1fr); }
+  .sq-live-preview-shell > header { padding:8px 10px;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:42px 42px; }
+  .sq-live-preview-shell > header nav { grid-column:1/-1;grid-row:2;justify-self:center; }
+  .sq-live-preview-shell > main { --sq-preview-available-height:calc(100vh - 138px);padding:16px; }
+}
