@@ -8,6 +8,20 @@
     artwork.style.transform = `translate(-50%, -50%) scale(${scale})`;
   };
   const observer = new ResizeObserver(entries => entries.forEach(({target}) => fitPreview(target)));
+  const pendingPreviews = new WeakMap();
+  const previewObserver = new IntersectionObserver(entries => entries.forEach(({target, isIntersecting}) => {
+    if (!isIntersecting) return;
+    const make = pendingPreviews.get(target);
+    if (make) {
+      target.append(make());
+      pendingPreviews.delete(target);
+      observer.observe(target);
+      fitPreview(target);
+    }
+    previewObserver.unobserve(target);
+  }), {rootMargin:'180px'});
+  const queuePreview = (frame, make) => { pendingPreviews.set(frame, make); previewObserver.observe(frame); };
+  document.fonts?.addEventListener('loadingdone', () => document.querySelectorAll('.sq-asset-preview').forEach(fitPreview));
   const keywords = {code:'snippet syntax terminal',bulletins:'bullets announcement notice checklist',accordions:'faq questions answers expandable',invitations:'call to action cta closing',reviews:'testimonials customer quotes',facts:'stats statistics specifications',people:'about us founder team'};
   function assetCard(item,asSection=false) {
     const button = document.createElement('button');
@@ -19,7 +33,7 @@
     button.title=item.description;
     button.innerHTML=`<span class="sq-asset-preview" aria-hidden="true"></span><span class="sq-asset-caption"><b>${escape(item.name)}</b><span class="sq-asset-add" aria-hidden="true">+</span></span>`;
     const frame=button.querySelector('.sq-asset-preview');
-    frame.append(EzkartAssets.preview(item.assetId || item.id)); observer.observe(frame);
+    queuePreview(frame, () => EzkartAssets.preview(item.assetId || item.id));
     return button;
   }
   function renderCatalog(root) {
@@ -28,8 +42,9 @@
       const group=document.createElement('div');
       group.className='sq-block-group sq-asset-group';
       group.dataset.sqLibraryGroup='elements'; group.dataset.sqAssetPurpose=category.id;
-      group.innerHTML=`<h3>${escape(category.name)}<span>3 designs</span></h3><div class="sq-asset-grid" data-sq-asset-catalog="${category.id}"></div>`;
-      EzkartAssets.definitions.filter(item=>item.category===category.id).forEach(item=>group.lastElementChild.append(assetCard(item)));
+      const designs=EzkartAssets.definitions.filter(item=>item.category===category.id);
+      group.innerHTML=`<h3>${escape(category.name)}<span>${designs.length} designs</span></h3><div class="sq-asset-grid" data-sq-asset-catalog="${category.id}"></div><button type="button" class="sq-asset-view-more" data-sq-view-category="${category.id}" data-sq-view-library="elements" aria-label="View more ${escape(category.name)}">View more <span aria-hidden="true">→</span></button>`;
+      designs.forEach(item=>group.querySelector('.sq-asset-grid').append(assetCard(item)));
       root.insertBefore(group,anchor);
     });
   }
@@ -53,17 +68,24 @@
       const cards=[...sectionList.children].filter(card=>card.dataset.sqAssetPurpose===category.id);
       if(!cards.length)return;
       const family=document.createElement('div'); family.className='sq-section-family';
-      family.innerHTML=`<h3>${escape(category.name)}<span>${cards.length} designs</span></h3><div class="sq-asset-grid"></div>`;
-      cards.forEach(card=>family.lastElementChild.append(card));sectionList.append(family);
+      family.dataset.sqSectionPurpose=category.id;
+      family.innerHTML=`<h3>${escape(category.name)}<span>${cards.length} designs</span></h3><div class="sq-asset-grid"></div><button type="button" class="sq-asset-view-more" data-sq-view-category="${category.id}" data-sq-view-library="sections" aria-label="View more ${escape(category.name)} sections">View more <span aria-hidden="true">→</span></button>`;
+      cards.forEach(card=>family.querySelector('.sq-asset-grid').append(card));sectionList.append(family);
     });
     let library='elements',choiceFamily='';
+    let categoryOpener=null, overviewScroll=0;
+    const categoryHeading=document.createElement('div');
+    categoryHeading.className='sq-asset-category-heading';categoryHeading.hidden=true;
+    categoryHeading.innerHTML='<button type="button" data-sq-category-back aria-label="Back to all elements">←</button><div><h3 data-sq-category-title></h3><p data-sq-category-count role="status"></p></div>';
+    purposeRow.after(categoryHeading);
+    const focusedCategory=()=>!choiceFamily && ['elements','sections'].includes(library) && purpose.value!=='all' ? purpose.value : '';
     const choiceView=document.createElement('div');choiceView.className='sq-asset-choice-view';choiceView.hidden=true;root.append(choiceView);
     const closeChoices=()=>{choiceFamily='';search.value='';root.classList.remove('sq-asset-choosing');choiceView.hidden=true;search.placeholder='Find something for your page…';};
     const choose=family=>{
       const info=EzkartAssets.choiceFamilies[family];if(!info)return false;
       choiceFamily=family;choiceView.dataset.family=family;search.value='';search.placeholder=`Search ${info.name.toLowerCase()}…`;
       root.classList.add('sq-asset-choosing');choiceView.hidden=false;
-      choiceView.querySelectorAll('.sq-asset-preview').forEach(frame=>observer.unobserve(frame));
+      choiceView.querySelectorAll('.sq-asset-preview').forEach(frame=>{observer.unobserve(frame);previewObserver.unobserve(frame);pendingPreviews.delete(frame);});
       choiceView.innerHTML=`<header><button type="button" data-sq-choice-back aria-label="Back to all assets">←</button><h3>${escape(info.name)}</h3></header><p>${escape(info.description)}</p>${family==='image'?'<button type="button" class="sq-choice-uploads" data-sq-choice-uploads>Choose from uploads ↗</button>':''}${family==='commerce'?'<label class="sq-choice-product">Product<select data-sq-choice-product aria-label="Product for this control"></select></label>':''}<div class="sq-asset-grid sq-choice-grid ${family==='icon'?'sq-icon-choices':''}"></div><p data-sq-choice-empty hidden>No matching options.</p>`;
       if(family==='commerce'){
         const catalog=products();const select=choiceView.querySelector('select');
@@ -75,7 +97,7 @@
         const card=document.createElement('button');card.type='button';card.draggable=true;card.className='sq-asset-card';card.dataset.sqAssetChoice=item.id;card.dataset.search=item.name;
         card.setAttribute('aria-label',`Add ${item.name}`);
         card.innerHTML=`<span class="sq-asset-preview" aria-hidden="true"></span><span class="sq-asset-caption"><b>${escape(item.name)}</b><span class="sq-asset-add" aria-hidden="true">+</span></span>`;
-        const frame=card.firstElementChild;frame.append(EzkartAssets.previewChoice(item.id));list.append(card);observer.observe(frame);
+        const frame=card.firstElementChild;queuePreview(frame,()=>EzkartAssets.previewChoice(item.id));list.append(card);
       });
       root.scrollTop=0;filter();return true;
     };
@@ -85,6 +107,7 @@
     });
     root.addEventListener('keydown',event=>{
       if(event.key==='Escape'&&choiceFamily){event.preventDefault();event.stopPropagation();choiceView.querySelector('[data-sq-choice-back]').click();}
+      else if(event.key==='Escape'&&focusedCategory()){event.preventDefault();event.stopPropagation();categoryHeading.querySelector('button').click();}
     });
     const rememberedPurpose={elements:'all',sections:'all'};
     const options=()=>{
@@ -98,37 +121,72 @@
     const filter=()=>{
       const query=normalize(search.value.trim()),terms=query.split(/\s+/).filter(Boolean);
       if(choiceFamily){
+        categoryHeading.hidden=true;
         let count=0;choiceView.querySelectorAll('[data-sq-asset-choice]').forEach(card=>{card.hidden=!terms.every(term=>normalize(card.dataset.search).includes(term));if(!card.hidden)count++;});
         choiceView.querySelector('[data-sq-choice-empty]').hidden=count>0;return;
       }
+      const focused=focusedCategory();
+      const categoryInfo=(library==='sections'?sectionCategories:[{id:'basics',name:'Essentials'},...EzkartAssets.categories]).find(item=>item.id===focused);
+      categoryHeading.hidden=!focused;
+      if(focused){
+        categoryHeading.querySelector('[data-sq-category-title]').textContent=categoryInfo?.name || focused;
+        categoryHeading.querySelector('button').setAttribute('aria-label',`Back to all ${library}`);
+      }
+      search.placeholder=focused?`Search ${(categoryInfo?.name || focused).toLowerCase()}…`:'Find something for your page…';
       let matches=0;
       root.querySelectorAll(':scope > .sq-block-group').forEach(group=>{
         let groupMatches=0;
         group.querySelectorAll(selector).forEach(card=>{
           const searchable=normalize(`${card.dataset.search || ''} ${card.textContent}`);
           const category=card.dataset.sqAssetPurpose || group.dataset.sqAssetPurpose;
-          const show=query?terms.every(term=>searchable.includes(term)):(group.dataset.sqLibraryGroup===library && (purpose.value==='all' || !['elements','sections'].includes(library) || category===purpose.value));
+          const inScope=!focused || (group.dataset.sqLibraryGroup===library && category===focused);
+          const show=query?inScope && terms.every(term=>searchable.includes(term)):(group.dataset.sqLibraryGroup===library && (purpose.value==='all' || !['elements','sections'].includes(library) || category===purpose.value));
           card.hidden=!show; if(show)groupMatches++;
         });
         group.hidden=query?groupMatches===0:(group.dataset.sqLibraryGroup!==library || (['elements','sections'].includes(library) && groupMatches===0));
         group.querySelectorAll('.sq-library-more').forEach(detail=>{if(query)detail.open=true;});
-        group.querySelectorAll('.sq-section-family').forEach(family=>family.hidden=![...family.querySelectorAll(selector)].some(card=>!card.hidden));
+        const collections=group.matches('.sq-asset-group')?[group]:[...group.querySelectorAll('.sq-section-family')];
+        collections.forEach(collection=>{
+          const cards=[...collection.querySelectorAll(selector)].filter(card=>!card.hidden);
+          if(collection!==group)collection.hidden=!cards.length;
+          const overview=!query && !focused;
+          if(overview)cards.slice(3).forEach(card=>card.hidden=true);
+          const more=collection.querySelector('[data-sq-view-category]');
+          if(more)more.hidden=!overview || !cards.length;
+          collection.querySelector(':scope > h3')?.toggleAttribute('hidden',Boolean(focused));
+        });
         if(!group.hidden)matches+=groupMatches;
       });
-      purposeRow.hidden=Boolean(query) || !['elements','sections'].includes(library);
+      purposeRow.hidden=Boolean(query) || Boolean(focused) || !['elements','sections'].includes(library);
+      if(focused)categoryHeading.querySelector('[data-sq-category-count]').textContent=`${matches} ${matches===1?'design':'designs'}${query?' found':''}`;
       const status=root.querySelector('[data-sq-library-search-status]');
-      status.hidden=!query;status.textContent=`${matches} ${matches===1?'result':'results'} for “${search.value.trim()}”`;
+      status.hidden=!query || Boolean(focused);status.textContent=`${matches} ${matches===1?'result':'results'} for “${search.value.trim()}”`;
       root.querySelector('[data-sq-library-search-empty]').hidden=!query || matches>0;
       root.querySelector('[data-sq-asset-count]').textContent=`${matches} pieces`;
       root.querySelector('[data-sq-component-empty]').hidden=Boolean(query) || componentCount()>0;
       root.querySelector('.sq-assets-hint').hidden=library==='saved' || library==='uploads';
     };
+    root.addEventListener('click',event=>{
+      const more=event.target.closest('[data-sq-view-category]');
+      if(!more)return;
+      categoryOpener=more;overviewScroll=root.scrollTop;
+      library=more.dataset.sqViewLibrary;
+      search.value='';purpose.value=more.dataset.sqViewCategory;rememberedPurpose[library]=purpose.value;
+      syncControls();filter();root.scrollTop=0;categoryHeading.querySelector('button').focus({preventScroll:true});
+    });
+    categoryHeading.querySelector('button').addEventListener('click',()=>{
+      purpose.value='all';rememberedPurpose[library]='all';search.value='';syncControls();filter();
+      root.scrollTop=overviewScroll;
+      const target=categoryOpener?.isConnected && !categoryOpener.closest('[hidden]')?categoryOpener:root.querySelector('.sq-assets-filter-row .sq-builder-select-trigger');
+      target?.focus({preventScroll:true});categoryOpener=null;
+    });
     root.querySelectorAll('[data-sq-library-category]').forEach(button=>button.addEventListener('click',()=>{
       closeChoices();library=button.dataset.sqLibraryCategory;search.value='';
+      if(['elements','sections'].includes(library))rememberedPurpose[library]='all';
       root.querySelectorAll('[data-sq-library-category]').forEach(item=>item.setAttribute('aria-pressed',String(item===button)));
       options();filter();
     }));
-    purpose.addEventListener('change',()=>{rememberedPurpose[library]=purpose.value;filter();});
+    purpose.addEventListener('change',()=>{overviewScroll=root.scrollTop;categoryOpener=null;rememberedPurpose[library]=purpose.value;filter();root.scrollTop=0;});
     search.addEventListener('input',filter);
     root.querySelector('[data-sq-clear-block-search]').addEventListener('click',()=>{search.value='';filter();search.focus();});
     const sidebar=root.closest('.sq-builder-sidebar'),studio=root.closest('.sq-studio'),grip=sidebar.querySelector('[data-sq-assets-resize]');

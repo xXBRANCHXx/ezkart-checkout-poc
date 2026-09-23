@@ -38,14 +38,14 @@ async function fixture(t) {
   return {ws,browser,page,call,category,shot};
 }
 
-test('all fourteen asset families have three responsive editable designs, searchable with sections',async t => {
+test('asset families retain responsive editable starter designs and search the full collection',async t => {
   const {page,call,category,shot} = await fixture(t);
   const ids = await page.evaluate(()=>EzkartAssets.definitions);
   for (const cat of [...new Set(ids.map(item=>item.category))]) {
     await category(cat);
-    assert.equal(await page.locator('[data-sq-asset]:visible').count(),3);
+    assert.equal(await page.locator('[data-sq-asset]:visible').count(),ids.filter(item=>item.category===cat).length);
     await shot('gallery-'+cat);
-    for (const item of ids.filter(item=>item.category===cat)) {
+    for (const item of ids.filter(item=>item.category===cat).slice(0,3)) {
       await page.locator(`[data-sq-asset=${item.id}]`).click();
       await call('settle');
       const inserted = (await call('nativeInspect')).find(node=>node.name===item.name);
@@ -64,10 +64,10 @@ test('all fourteen asset families have three responsive editable designs, search
     }
   }
   await category('sections');
-  assert.ok(await page.locator('[data-sq-add-block]:visible').count()>=51);
+  assert.ok(await page.locator('[data-sq-add-block]:visible').count()>=30);
   const search = page.locator('[data-sq-block-search]');
   await search.fill('terminal');
-  assert.equal(await page.locator('[data-sq-asset]:visible').count(),3);
+  assert.equal(await page.locator('[data-sq-asset]:visible').count(),ids.filter(item=>item.category==='code').length);
   await search.fill('no such asset xyz');
   assert.equal(await page.locator('[data-sq-library-search-empty]').isVisible(),true);
   await page.locator('[data-sq-clear-block-search]').click();

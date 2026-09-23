@@ -2392,7 +2392,7 @@
       options[targetIndex]?.focus();
     };
     const enhanceBuilderSelect = (select) => {
-      if (select._sqBuilderSelect || select.multiple) return;
+      if (select._sqBuilderSelect || select.multiple || select.matches("[data-sq-element-font-family], [data-sq-brand-font]")) return;
       const wrapper = document.createElement("div");
       wrapper.className = "sq-builder-select";
       wrapper.dataset.sqBuilderSelect = "";
@@ -2449,7 +2449,7 @@
       syncBuilderSelect(select);
     };
     const builderSelects = () => [...sqStudio.querySelectorAll(".sq-tool-panels select, .sq-inspector select")];
-    const enhanceBuilderSelects = () => builderSelects().forEach(enhanceBuilderSelect);
+    const enhanceBuilderSelects = () => { globalThis.EzkartFonts?.attach(sqStudio); builderSelects().forEach(enhanceBuilderSelect); };
     const syncBuilderSelects = () => { enhanceBuilderSelects(); builderSelects().forEach(syncBuilderSelect); };
     document.addEventListener("pointerdown", (event) => { if (openBuilderSelect && !openBuilderSelect.wrapper.contains(event.target) && !openBuilderSelect.menu.contains(event.target)) closeBuilderSelect(openBuilderSelect); });
     window.addEventListener("resize", () => positionBuilderSelectMenu(openBuilderSelect));
@@ -2656,6 +2656,7 @@
         previewRetryCount = 0;
       }
       previewSavePromise = (async () => {
+        await globalThis.EzkartFonts?.prepareExport(previewRoot);
         const result = await cloudRequest("PUT", `/v1/landing-pages/${encodeURIComponent(landingId)}/preview`, {
           html: generateHtml({ libraryPreview: true }),
           sourceUpdatedAt,
@@ -4052,9 +4053,8 @@
         if (hex) { hex.value = transparent ? "Transparent" : value.toUpperCase(); hex.classList.toggle("is-transparent", transparent); }
         sqStudio.querySelector(`[data-sq-color-card="${property}"]`)?.classList.toggle("is-transparent", transparent);
       });
-      const family = String(computed.fontFamily || "").toLowerCase();
       const fontFamily = sqStudio.querySelector("[data-sq-element-font-family]");
-      if (fontFamily) fontFamily.value = family.includes("monospace") || family.includes("consolas") ? "ui-monospace, SFMono-Regular, Consolas, monospace" : family.includes("georgia") ? "Georgia, 'Times New Roman', serif" : family.includes("times new roman") ? "'Times New Roman', Times, serif" : family.includes("arial") || family.includes("helvetica") ? "Arial, Helvetica, sans-serif" : "Poppins, sans-serif";
+      if (fontFamily) globalThis.EzkartFonts?.setValue(fontFamily, computed.fontFamily || "Poppins, sans-serif");
       const fontWeight = sqStudio.querySelector("[data-sq-element-font-weight]");
       if (fontWeight) fontWeight.value = ["400", "500", "600", "700"].reduce((best, weight) => Math.abs(Number(weight) - Number.parseInt(computed.fontWeight, 10)) < Math.abs(Number(best) - Number.parseInt(computed.fontWeight, 10)) ? weight : best, "400");
       const computedFontSize = Math.round(Number.parseFloat(computed.fontSize) || 16);
@@ -7191,7 +7191,7 @@
       ["accent", "page", "ink", "surface"].forEach((key) => { const input = sqStudio.querySelector(`[data-sq-brand-color="${key}"]`); if (input) input.value = colorToHex(computed.getPropertyValue(brandVariable[key]), input.value); const output = sqStudio.querySelector(`[data-sq-brand-color-output="${key}"]`); if (output && input) output.textContent = input.value.toUpperCase(); });
       sqStudio.querySelectorAll("[data-sq-brand-font]").forEach((input) => {
         const font = computed.getPropertyValue(`--site-${input.dataset.sqBrandFont}-font`).trim() || "Poppins, sans-serif";
-        if ([...input.options].some((option) => option.value === font)) input.value = font;
+        globalThis.EzkartFonts?.setValue(input,font);
       });
       syncPageAppearanceControls();
       syncButtonSystemControls();
@@ -7926,8 +7926,9 @@
       window.open(url, "_blank", "noopener");
       window.setTimeout(() => URL.revokeObjectURL(url), 60000);
     });
-    sqStudio.querySelector("[data-sq-preview]")?.addEventListener("click", () => {
+    sqStudio.querySelector("[data-sq-preview]")?.addEventListener("click", async () => {
       if (!livePreviewDialog || !livePreviewFrame) return;
+      try { await globalThis.EzkartFonts?.prepareExport(previewRoot); } catch (error) { showToast(error.message); return; }
       const title = livePreviewDialog.querySelector("[data-sq-preview-title]");
       if (title) title.textContent = document.querySelector("[data-current-site-name]")?.textContent || "Landing page";
       const html = generateHtml();
@@ -7966,18 +7967,6 @@
     });
 
     const exportDialog = document.getElementById("html-export-dialog");
-    // Embed our licensed fonts so exports keep their typography on any host.
-    const exportFontData = new Map();
-    const bundledFonts = [{key:'manrope',family:'Manrope',file:'manrope',weight:'400 800'},{key:'anton',family:'Anton',file:'anton',weight:'400'},{key:'dm-sans',family:'DM Sans',file:'dm-sans',weight:'100 900'},{key:'plus-jakarta-sans',family:'Plus Jakarta Sans',file:'plus-jakarta-sans',weight:'400 800'}];
-    const exportFontsReady = Promise.all([400,500,600,700,...bundledFonts.map(font=>font.key)].map(async weight => {
-      try {
-        const response = await fetch(new URL(`assets/fonts/${typeof weight === "number" ? "poppins-"+weight : weight}.woff2`, location.href));
-        if (!response.ok) return;
-        const blob = await response.blob();
-        const data = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(blob); });
-        exportFontData.set(weight, data);
-      } catch (_) { /* The public asset URL remains the fallback. */ }
-    }));
     const collectExportCss = () => {
       const tokens = [".sq-page-preview", ".sq-page-block", ".sq-page-background", ".sq-section-background", ".sq-announcement", ".sq-store-nav", ".sq-site-logo", ".sq-navigation-template", ".sq-nav-", ".sq-hero", ".sq-product", ".sq-image-story", ".sq-image-blend", ".sq-image-crop", ".sq-benefit", ".sq-cart", ".sq-shipping", ".sq-generated", ".sq-composition", ".sq-authored-navigation", ".sq-navigation-", ".sq-native", ".sq-step-number", ".sq-image-placeholder", ".sq-free", ".sq-marquee", ".sq-surface", ".sq-color", ".element-animation", ".hover-", ".button-", ".ez-fluid", "@keyframes sq", "@keyframes element", ".product-art", ".icon", ".svg-sprite"];
       const collect = (rules) => [...rules].map((rule) => {
@@ -8290,20 +8279,16 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
       const boundProducts = readCatalogProducts().filter(product=>selectedProducts().includes(product.id)).map(product=>({id:product.id,name:product.name,description:product.description,type:product.type,price:product.price,currency:product.currency||'IDR',stock:product.stock,images:product.images,variants:(product.variants||[]).filter(variant=>!variant.hidden).map(variant=>({id:variant.id,name:variant.name,description:variant.description,price:variant.price,stock:variant.stock,image:variant.image,options:variant.options}))}));
       const selectScript = globalThis.EzkartSelect ? `<script>(${EzkartSelect.install.toString()})();<\/script>` : '';
       const boundScript = clone.querySelector('[data-native-type="commerce"]') ? `<script>(${EzkartCommerce.mount.toString()})(document.querySelector('.sq-page-preview'),${JSON.stringify(boundProducts).replace(/</g,"\\u003c")});<\/script>` : '';
-      const extraFontCss = bundledFonts.filter(font=>clone.outerHTML.includes(font.family)||css.includes(font.family)).map(font=>`@font-face{font-family:'${font.family}';src:url('${exportFontData.get(font.key)||new URL('assets/fonts/'+font.file+'.woff2',exportBase).href}') format('woff2');font-weight:${font.weight};font-display:swap}`).join('');
+      const extraFontCss = globalThis.EzkartFonts?.exportCss(previewRoot) || '';
       const nativeScript = clone.querySelector('.sq-native') ? `<script>(${EzkartNative.mount.toString()})(document.querySelector('.sq-page-preview'));<\/script>` : '';
       clone.removeAttribute('data-native-mounted');
       clone.querySelectorAll('dialog.sq-native').forEach(dialog=>dialog.removeAttribute('open'));
       const showcaseScript = clone.querySelector('.sq-reference') && globalThis.EzkartShowcase ? `<script>(${globalThis.EzkartShowcase.mount.toString()})(document.querySelector('.sq-page-preview'));<\/script>` : '';
-      const fontBase = exportFontData.get(400) || new URL("assets/fonts/poppins-400.woff2", exportBase).href;
-      const fontMedium = exportFontData.get(500) || new URL("assets/fonts/poppins-500.woff2", exportBase).href;
-      const fontSemibold = exportFontData.get(600) || new URL("assets/fonts/poppins-600.woff2", exportBase).href;
-      const fontBold = exportFontData.get(700) || new URL("assets/fonts/poppins-700.woff2", exportBase).href;
       const hasScrollMotion = Boolean(clone.querySelector(".ezkart-scroll-frame"));
       const motionStyles = hasScrollMotion ? `<style>.ezkart-scroll-frame{position:relative!important;overflow:hidden!important;contain:paint}.ezkart-scroll-frame>.ezkart-scroll-media{width:100%!important;max-width:none!important;height:100%;position:absolute!important;left:0!important;top:50%!important;display:block;object-fit:cover;transform:translate3d(0,calc(-50% + var(--ezkart-scroll-y,0px)),0) scale(calc(var(--ezkart-scroll-scale,1) * var(--sq-image-crop-zoom,1)));transform-origin:center;will-change:transform;backface-visibility:hidden}@media(prefers-reduced-motion:reduce){.ezkart-scroll-frame>.ezkart-scroll-media{height:100%!important;transform:translate3d(0,-50%,0) scale(var(--sq-image-crop-zoom,1))!important;will-change:auto}}</style>` : "";
       const libraryPreviewStyles = libraryPreview ? `<style id="ezkart-library-preview-style">.sq-free-marquee .sq-marquee-track{animation:none!important;transform:translate3d(0,0,0)!important;will-change:auto!important}</style>` : "";
       const motionScripts = hasScrollMotion ? `<script>(()=>{const frames=[...document.querySelectorAll('.ezkart-scroll-frame')].map(frame=>({frame,media:frame.querySelector(':scope>.ezkart-scroll-media'),effect:frame.dataset.ezkartScrollEffect||'parallax',strength:Math.max(0,Math.min(100,Number(frame.dataset.ezkartScrollStrength)||0))/100,damping:frame.dataset.ezkartScrollDamping!=='false',y:null,yVelocity:0,scale:1,scaleVelocity:0,coverScale:1})).filter(item=>item.media);if(!frames.length)return;const reduced=matchMedia('(prefers-reduced-motion: reduce)');let raf=0,lastTime=0,viewportHeight=1;const clamp=value=>Math.max(0,Math.min(1,value));const damp=(value,velocity,target,delta,smoothTime)=>{const omega=2/smoothTime,x=omega*delta,decay=1/(1+x+.48*x*x+.235*x*x*x),change=value-target,temp=(velocity+omega*change)*delta;return[target+(change+temp)*decay,(velocity-omega*temp)*decay]};const render=time=>{raf=0;if(reduced.matches)return;const delta=Math.min(.05,lastTime?Math.max(0,(time-lastTime)/1000):1/60);lastTime=time;let moving=false;frames.forEach(item=>{const rect=item.frame.getBoundingClientRect();if(rect.bottom<-viewportHeight*.25||rect.top>viewportHeight*1.25)return;const progress=clamp((viewportHeight-rect.top)/(viewportHeight+rect.height)),reverse=item.effect==='parallax-reverse',rate=reverse?item.strength*.35:item.strength,zoom=item.effect==='zoom';const yTarget=zoom?0:(progress-.5)*(viewportHeight+rect.height)*rate*(reverse?-1:1),scaleTarget=zoom?1+progress*item.strength*.3:item.coverScale;if(item.y===null){item.y=yTarget;item.scale=scaleTarget}else if(item.damping){[item.y,item.yVelocity]=damp(item.y,item.yVelocity,yTarget,delta,.11);if(zoom)[item.scale,item.scaleVelocity]=damp(item.scale,item.scaleVelocity,scaleTarget,delta,.11);else{item.scale=scaleTarget;item.scaleVelocity=0}}else{item.y=yTarget;item.yVelocity=0;item.scale=scaleTarget;item.scaleVelocity=0}item.media.style.setProperty('--ezkart-scroll-y',item.y.toFixed(3)+'px');item.media.style.setProperty('--ezkart-scroll-scale',item.scale.toFixed(5));if(item.damping&&(Math.abs(yTarget-item.y)>.02||Math.abs(item.yVelocity)>.02||zoom&&(Math.abs(scaleTarget-item.scale)>.0001||Math.abs(item.scaleVelocity)>.0001)))moving=true});if(moving)raf=requestAnimationFrame(render)};const schedule=()=>{if(!raf){lastTime=0;raf=requestAnimationFrame(render)}};const measure=()=>{viewportHeight=Math.max(1,document.documentElement.clientHeight||innerHeight);frames.forEach(item=>{const frameHeight=Math.max(1,item.frame.clientHeight),reverse=item.effect==='parallax-reverse',rate=reverse?item.strength*.35:item.strength,overscan=reverse?(viewportHeight+frameHeight)*rate:Math.max(0,viewportHeight-frameHeight)*rate;item.coverScale=item.effect==='zoom'||reduced.matches||!rate?1:1+(overscan+4)/frameHeight;if(item.scale<item.coverScale){item.scale=item.coverScale;item.scaleVelocity=0}if(reduced.matches){item.y=null;item.yVelocity=0;item.scale=1;item.scaleVelocity=0;item.media.style.removeProperty('--ezkart-scroll-y');item.media.style.removeProperty('--ezkart-scroll-scale')}});schedule()};addEventListener('scroll',schedule,{passive:true});addEventListener('touchmove',schedule,{passive:true});addEventListener('resize',measure,{passive:true});addEventListener('orientationchange',measure,{passive:true});addEventListener('pageshow',measure);window.visualViewport?.addEventListener('resize',measure,{passive:true});reduced.addEventListener?.('change',measure);if(typeof ResizeObserver==='function'){const observer=new ResizeObserver(measure);frames.forEach(item=>observer.observe(item.frame))}document.fonts?.ready.then(measure);measure()})();<\/script>` : "";
-      return `<!doctype html>\n<html lang="${escapeHtml(document.body.dataset.adminLocale||'id')}">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1">\n<title>${escapeHtml(pageName)}</title>\n<meta name="description" content="${escapeHtml(pageDescription)}">\n${siteSettings.html()}\n${motionStyles}\n<style>@font-face{font-family:Poppins;src:url('${fontBase}') format('woff2');font-weight:400}@font-face{font-family:Poppins;src:url('${fontMedium}') format('woff2');font-weight:500}@font-face{font-family:Poppins;src:url('${fontSemibold}') format('woff2');font-weight:600}@font-face{font-family:Poppins;src:url('${fontBold}') format('woff2');font-weight:700}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:#fff;font-family:Poppins,Arial,sans-serif}.svg-sprite{width:0;height:0;position:absolute;overflow:hidden}@media(prefers-reduced-motion:reduce){*{animation:none!important;scroll-behavior:auto!important}}\n${extraFontCss}\n${css}\n${responsiveSpacing}\n</style>\n${commerceStyles}\n${libraryPreviewStyles}\n</head>\n<body>\n${sprite}\n${clone.outerHTML}\n${pinnedNavigationHtml}\n${selectedProducts().length ? commerceMarkup : ""}\n${motionScripts}\n${commerceScript}\n${compositionScript}\n${nativeScript}\n${boundScript}\n${showcaseScript}\n${selectScript}\n</body>\n</html>`;
+      return `<!doctype html>\n<html lang="${escapeHtml(document.body.dataset.adminLocale||'id')}">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1">\n<title>${escapeHtml(pageName)}</title>\n<meta name="description" content="${escapeHtml(pageDescription)}">\n${siteSettings.html()}\n${motionStyles}\n<style>*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:#fff;font-family:Poppins,Arial,sans-serif}.svg-sprite{width:0;height:0;position:absolute;overflow:hidden}@media(prefers-reduced-motion:reduce){*{animation:none!important;scroll-behavior:auto!important}}\n${extraFontCss}\n${css}\n${responsiveSpacing}\n</style>\n${commerceStyles}\n${libraryPreviewStyles}\n</head>\n<body>\n${sprite}\n${clone.outerHTML}\n${pinnedNavigationHtml}\n${selectedProducts().length ? commerceMarkup : ""}\n${motionScripts}\n${commerceScript}\n${compositionScript}\n${nativeScript}\n${boundScript}\n${showcaseScript}\n${selectScript}\n</body>\n</html>`;
     };
     const requireProductForOutput = async (action = 'publishing') => {
       await settleBuilder();
@@ -8322,6 +8307,7 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
         throw Error(error);
       }
       if (message) message.hidden = true;
+      await globalThis.EzkartFonts?.prepareExport(previewRoot);
     };
     const exportPageHtml = async () => {
       if (siteSettings.busy()) throw Error('Wait for your favicon upload to finish, then export.');
@@ -8774,7 +8760,7 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
     sqStudio.addEventListener('change', scheduleNativeFit);
     scheduleNativeFit();
     const settleBuilder = async () => {
-      await exportFontsReady;
+      await globalThis.EzkartFonts?.ensureUsed(previewRoot).catch(() => {});
       await document.fonts?.ready;
       const transitions = sqStudio.querySelector('.sq-device-frame')?.getAnimations() || [];
       await Promise.all(transitions.map(animation=>animation.finished.catch(()=>{})));
@@ -8949,7 +8935,7 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
       redo(){redoBuilderChange();return inspectBuilder();},
       async save(){await settleBuilder();clearTimeout(saveTimer);const saved=await persistCurrentState();if(!saved)throw new Error('The page could not be saved.');saveState.textContent='Saved just now';return {saved:true,page:activeSiteDocument.id};},
       exportHtml:exportPageHtml,
-      ...(document.body.dataset.adminLocalWorkspace === "true" ? {async previewHtml(){await settleBuilder();return generateHtml();}} : {}),
+      ...(document.body.dataset.adminLocalWorkspace === "true" ? {async previewHtml(){await settleBuilder();await globalThis.EzkartFonts?.prepareExport(previewRoot);return generateHtml();}} : {}),
       snapshot:()=>captureState(),
       async audit(){
         await settleBuilder();const issues=[];

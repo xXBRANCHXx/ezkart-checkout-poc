@@ -2601,6 +2601,7 @@
         : `Editing ${responsive.selectedOptions[0].text.toLowerCase()}${state ? ` · ${state} version` : ""}.`;
     panel.querySelectorAll("[data-native-prop]").forEach((input) => {
       input.value = props[input.dataset.nativeProp] ?? "";
+      if (input.dataset.nativeProp === "fontFamily") globalThis.EzkartFonts?.sync(input);
       input.closest("label").hidden =
         config.type === "product" &&
         ["height", "maxHeight"].includes(input.dataset.nativeProp);
@@ -2996,8 +2997,6 @@
           );
         else input.type = "text";
         input.dataset.nativeProp = key;
-        if (key === "fontFamily")
-          input.setAttribute("list", "sq-native-font-families");
         input.placeholder =
           type === "length" ? "24px, 100%, auto" : "Automatic";
         wrap.append(input);
@@ -3016,24 +3015,7 @@
       '<details><summary>Click action</summary><label>On click<select data-native-action-type><option value="">None</option><option value="link">Open link</option><option value="toggle">Show / hide element</option><option value="state">Switch state</option><option value="dialog">Open dialog</option><option value="close-dialog">Close dialog</option><option value="video-dialog">Open video dialog</option><option value="video-toggle">Play / pause video</option></select></label><label>Destination or target ID<input data-native-action-target></label><label>Interaction group ID<input data-native-action-scope placeholder="Optional: collection or setup group"></label><label>Show group version before opening link<input data-native-action-reveal placeholder="Optional: e.g. all"></label><label><input type="checkbox" data-native-action-disable-active> Disable when this state is selected</label><button type="button" data-native-action-apply>Apply action</button></details><p class="sq-native-help">Hold Alt and click an element to try its interaction.</p>',
     );
     panel.append(advanced);
-    const fontOptions = document.createElement("datalist");
-    fontOptions.id = "sq-native-font-families";
-    for (const family of [
-      "Poppins",
-      "Anton",
-      "DM Sans",
-      "Plus Jakarta Sans",
-      "Manrope",
-      "Arial",
-      "Georgia",
-    ])
-      fontOptions.append(
-        new Option(
-          family,
-          `"${family}", ${family === "Georgia" ? "serif" : "sans-serif"}`,
-        ),
-      );
-    panel.append(fontOptions);
+    globalThis.EzkartFonts?.attach(panel);
     panel.querySelectorAll("label").forEach((wrap) => {
       if (wrap.querySelector('input[type="checkbox"]'))
         wrap.classList.add("sq-native-check");

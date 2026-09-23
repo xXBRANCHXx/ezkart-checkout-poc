@@ -1,0 +1,4 @@
+interface:
+  display_name: "Ezkart Elements"
+  short_description: "Generate and integrate native builder element collections"
+  default_prompt: "Use $ezkart-elements to expand the editable element library with a generator and builder integrator."

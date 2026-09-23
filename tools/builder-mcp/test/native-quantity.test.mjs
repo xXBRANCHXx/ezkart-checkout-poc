@@ -102,7 +102,7 @@ test("native quantities follow product groups and variants, clamp stock, retain 
     const html = await call("previewHtml");
     assert.match(
       html,
-      /font-family:'Manrope';src:url\('data:font\/woff2;base64,/,
+      /font-family:["']Manrope["'];src:url\('data:font\/woff2;base64,/,
     );
     await p.route("**/quantity-export", (route) =>
       route.fulfill({ body: html, contentType: "text/html" }),

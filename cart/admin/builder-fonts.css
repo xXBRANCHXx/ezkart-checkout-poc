@@ -1,0 +1,41 @@
+@import url("builder-font-faces.css");
+[data-sq-font-input][hidden]{display:none!important}
+.sq-font-field{min-width:0}
+.sq-font-control{display:block;min-width:0}
+.sq-native-fields>.sq-font-field{grid-column:1/-1}
+.sq-font-trigger{width:100%;min-width:0;min-height:38px;padding:9px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px;background:#f3f3f5;color:#303541;border:1px solid transparent;border-radius:9px;text-align:left;font:400 12px/1.5 Poppins,sans-serif;cursor:pointer}
+.sq-font-trigger:hover{border-color:#d5d5dc;background:#eeeef1}
+.sq-font-value{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.sq-font-trigger:focus-visible,.sq-font-dialog button:focus-visible,.sq-font-dialog input:focus-visible,.sq-font-dialog select:focus-visible,.sq-font-dialog summary:focus-visible{outline:2px solid #646b82;outline-offset:2px}
+.sq-font-dialog{box-sizing:border-box;width:410px;max-width:calc(100vw - 24px);height:min(730px,calc(100dvh - 40px));max-height:calc(100dvh - 24px);padding:0;border:1px solid #dddce3;border-radius:16px;background:#fff;color:#303541;box-shadow:0 18px 80px #1c1a3233;font:400 12px/1.5 Poppins,sans-serif;overflow:hidden}
+.sq-font-dialog[open]{display:flex;flex-direction:column}
+.sq-font-dialog::backdrop{background:#20213240}
+.sq-font-dialog *{box-sizing:border-box}
+.sq-font-dialog header{padding:20px 20px 14px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.sq-font-dialog h2{margin:0;font:600 17px/1.4 Poppins,sans-serif;letter-spacing:-.02em}
+.sq-font-dialog header p{margin:5px 0 0;color:#767c8a;font-size:11px}
+.sq-font-dialog button{cursor:pointer}
+.sq-font-dialog [data-font-close]{flex:none;width:32px;height:32px;border:0;border-radius:8px;background:#f3f3f5;color:#737786;font:20px/1 Poppins,sans-serif}
+.sq-font-search{display:grid;grid-template-columns:minmax(0,1fr) 125px;gap:8px;padding:0 20px}
+.sq-font-search label{min-width:0}
+.sq-font-dialog input,.sq-font-dialog select{width:100%;min-height:38px;padding:9px 10px;border:1px solid #e5e4e9;border-radius:8px;background:#fafafb;color:#303541;font:400 12px/1.4 Poppins,sans-serif}
+.sq-font-preview{display:grid;grid-template-columns:1fr;gap:5px;padding:12px 20px 0;color:#767c8a;font-size:10px}
+.sq-font-preview input{background:#fff}
+.sq-font-results{min-height:40px;padding:10px 20px 8px;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:10px;color:#767c8a}
+.sq-font-results button{padding:0;border:0;background:transparent;color:#535a73;font:inherit;text-decoration:underline;text-underline-offset:3px}
+.sq-font-results button[hidden]{display:none}
+.sq-font-list{flex:1;min-height:100px;overflow:auto;overscroll-behavior:contain;padding:2px 12px 12px;border-top:1px solid #eeedf1;scroll-padding:5px}
+.sq-font-option{width:100%;display:flex;flex-direction:column;gap:8px;min-height:88px;margin:3px 0;padding:12px 10px;border:1px solid transparent;border-radius:9px;background:#fff;color:#303541;text-align:left}
+.sq-font-option:hover{background:#f8f7fa}
+.sq-font-option[aria-selected=true]{border-color:#b4b9ca;background:#f3f4f7}
+.sq-font-meta{width:100%;display:flex;align-items:baseline;justify-content:space-between;gap:10px;font:500 11px/1.5 Poppins,sans-serif}
+.sq-font-meta small{color:#8c91a0;font-size:9px;font-weight:400}
+.sq-font-sample{max-width:100%;font-size:25px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sq-font-empty{margin:20px 10px;color:#767c8a}
+.sq-font-custom{flex:none;border-top:1px solid #eeedf1;padding:12px 20px;color:#727888;font-size:10px}
+.sq-font-custom summary{cursor:pointer}
+.sq-font-custom p{margin:10px 0}
+.sq-font-custom div{display:flex;gap:8px}
+.sq-font-custom button{padding:8px 14px;border:0;border-radius:8px;background:#303541;color:#fff;font:500 11px Poppins,sans-serif}
+.sq-font-sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+@media(max-width:480px){.sq-font-dialog{height:calc(100dvh - 24px);border-radius:12px}.sq-font-dialog header{padding:16px 16px 12px}.sq-font-search,.sq-font-preview{padding-left:16px;padding-right:16px}.sq-font-search{grid-template-columns:minmax(0,1fr) 115px}.sq-font-results{padding-left:16px;padding-right:16px}.sq-font-option{min-height:82px}.sq-font-sample{font-size:24px}}
