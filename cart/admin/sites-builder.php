@@ -160,6 +160,7 @@ declare(strict_types=1);
         <button type="button" data-sq-section-height-handle role="slider" aria-orientation="vertical" aria-valuemin="0" aria-valuemax="6000" aria-valuenow="0" aria-label="Resize section" title="Drag to resize this section"><span aria-hidden="true">↕</span></button>
         <button type="button" data-sq-canvas-add-section title="Add a blank section below"><span aria-hidden="true">+</span><span>Add section</span></button>
       </div>
+      <div class="sq-drag-snap-hint" data-sq-drag-snap-hint role="status" hidden></div>
       <footer class="sq-stage-footer">
         <span class="sq-stage-ready"><i></i> Editable canvas</span>
         <div class="sq-stage-scale">
@@ -180,6 +181,7 @@ declare(strict_types=1);
         <header><h3 id="sq-grid-settings-title">Grid settings</h3><button type="button" popovertarget="sq-grid-settings" popovertargetaction="hide" aria-label="Close grid settings">×</button></header>
         <p>Arrange content with a grid behind your design.</p>
         <label class="sq-grid-visibility"><input type="checkbox" data-sq-show-layout-grid checked><span>Show grid</span></label>
+        <label class="sq-grid-visibility"><input type="checkbox" data-sq-snap-to-grid checked><span>Snap to grid</span></label>
         <div class="sq-grid-count"><strong data-sq-grid-count-output></strong><span data-sq-grid-density-device>Desktop</span></div>
         <label class="sq-grid-density-field"><span>Density</span><output data-sq-grid-density-output>Balanced</output><input type="range" min="1" max="5" step="1" value="3" data-sq-grid-density autofocus></label>
         <div class="sq-grid-density-ends"><span>Fewer cells</span><span>More cells</span></div>
@@ -190,7 +192,7 @@ declare(strict_types=1);
         <p class="sq-grid-hint">Size applies to all sections on this screen size. Width adjusts to fit whole columns.</p>
         <label class="sq-grid-gap-field"><span>Space between cells</span><span class="sq-grid-number"><input type="number" min="0" max="80" step="1" value="10" data-sq-page-column-gap><span>px</span></span></label>
         <p class="sq-grid-hint">Spacing applies at every screen size.</p>
-        <div class="sq-grid-settings-footer"><span>Hold Alt while dragging to move freely.</span><button type="button" data-sq-grid-reset>Reset grid</button></div>
+        <div class="sq-grid-settings-footer"><button type="button" data-sq-grid-reset>Reset grid</button></div>
       </div>
     </main>
 

@@ -40,6 +40,9 @@ async function fixture(run) {
     await settle();
   };
   const drag = async (node, cell, resizing = false, alt = false) => {
+    const snapping = await page.locator('[data-sq-snap-to-grid]').isChecked();
+    const hint = page.locator('[data-sq-drag-snap-hint]');
+    assert.equal(await hint.isVisible(), false, 'The drag hint is hidden at rest');
     const handle = page.locator(
       resizing ? "[data-sq-element-resize]" : "[data-sq-element-move]",
     );
@@ -60,6 +63,8 @@ async function fixture(run) {
       { steps: 4 },
     );
     const during = await node.boundingBox();
+    assert.equal(await hint.isVisible(), true);
+    assert.equal(await hint.textContent(), !snapping ? 'Snapping off' : alt ? 'Snapping off (Alt)' : 'Hold Alt to disable snapping');
     const overlay = await page.locator(".sq-element-overlay").boundingBox();
     assert.ok(
       Math.abs(during.x - overlay.x) < 1 &&
@@ -67,6 +72,7 @@ async function fixture(run) {
       "Selection follows the element during dragging",
     );
     await page.mouse.up();
+    assert.equal(await hint.isVisible(), false, 'Releasing the pointer hides the hint');
     if (alt) await page.keyboard.up("Alt");
     await settle();
     const end = await node.boundingBox(),
@@ -81,10 +87,10 @@ async function fixture(run) {
       (resizing ? end.height : 0) -
       actualCell.y -
       (resizing ? actualCell.height : 0);
-    if (alt)
+    if (alt || !snapping)
       assert.ok(
         Math.abs(errorX) > 1,
-        "Alt allows a position between grid lines",
+        "Disabled snapping allows a position between grid lines",
       );
     else {
       assert.ok(
@@ -230,6 +236,88 @@ test("native elements snap to their own section grid, including nested scaling, 
     );
   }));
 
+test("snapping preference persists independently of grid visibility and the hint only appears during a drag", async () =>
+  fixture(async ({ page, invoke, settle, select, drag }) => {
+    await invoke('nativeInsert', {
+      section: 'blank',
+      node: {
+        id: 'snap-preference', type: 'container',
+        props: { position: 'relative', minHeight: '720px', paddingTop: '40px', paddingRight: '40px', paddingBottom: '40px', paddingLeft: '40px' },
+        children: [{
+          id: 'free-box', type: 'button', text: 'Drag me',
+          props: { position: 'absolute', left: '17px', top: '13px', width: '180px', height: '80px', backgroundColor: '#d9ece4' },
+        }],
+      },
+    });
+    const node = page.locator('[data-native-id="free-box"]');
+    const hint = page.locator('[data-sq-drag-snap-hint]');
+    const grid = page.locator('[data-section-id="blank"] > .sq-layout-grid-overlay');
+    const settings = page.getByRole('button', { name: 'Grid settings', exact: true });
+    const snapping = page.getByRole('checkbox', { name: 'Snap to grid', exact: true });
+    const visibility = page.getByRole('checkbox', { name: 'Show grid', exact: true });
+    const close = page.getByRole('button', { name: 'Close grid settings', exact: true });
+    await select(node);
+    assert.equal(await hint.isVisible(), false);
+    await settings.click();
+    assert.equal(await snapping.isChecked(), true);
+    assert.equal(await page.locator('#sq-grid-settings').getByText(/Hold Alt/).count(), 0);
+    await snapping.uncheck();
+    assert.equal(await visibility.isChecked(), true, 'Snapping can be off while the grid is visible');
+    if (process.env.EZKART_GRID_SCREENSHOTS) await page.screenshot({ path: join(process.env.EZKART_GRID_SCREENSHOTS, 'grid-settings.png') });
+    await close.click();
+    await drag(node, grid.locator('i').nth(12 * 3 + 2));
+    const moved = await invoke('nativeInspect', { id: 'free-box' });
+    await invoke('undo');
+    assert.notDeepEqual(await invoke('nativeInspect', { id: 'free-box' }), moved);
+    await invoke('redo');
+    assert.deepEqual(await invoke('nativeInspect', { id: 'free-box' }), moved);
+    await select(node);
+    await drag(node, grid.locator('i').nth(12 * 7 + 4), true);
+    const resized = await invoke('nativeInspect', { id: 'free-box' });
+    await invoke('save');
+    await page.reload();
+    await page.waitForFunction(() => globalThis.EzkartBuilder);
+    await settle();
+    assert.deepEqual(await invoke('nativeInspect', { id: 'free-box' }), resized);
+    await settings.click();
+    assert.equal(await snapping.isChecked(), false, 'Reopening remembers the snapping preference');
+    await visibility.uncheck();
+    assert.equal(await snapping.isChecked(), false);
+    await visibility.check();
+    await snapping.check();
+    await close.click();
+    await select(node);
+    await drag(node, grid.locator('i').nth(12 * 2 + 1));
+
+    for (const width of [1600, 900]) {
+      await page.setViewportSize({ width, height: 1000 });
+      await select(node);
+      const start = await node.boundingBox();
+      await page.mouse.move(start.x + 20, start.y + 20);
+      await page.mouse.down();
+      assert.equal(await hint.isVisible(), false, 'A click does not show a drag hint');
+      await page.mouse.move(start.x + 43, start.y + 39, { steps: 4 });
+      assert.equal(await hint.textContent(), 'Hold Alt to disable snapping');
+      assert.equal(await hint.isVisible(), true, 'Dragging the object directly shows the hint');
+      await page.keyboard.down('Alt');
+      assert.equal(await hint.textContent(), 'Snapping off (Alt)');
+      await page.mouse.move(start.x + 49, start.y + 46);
+      const free = await node.boundingBox();
+      assert.ok(Math.abs(free.x - start.x - 29) < 1 && Math.abs(free.y - start.y - 26) < 1, 'Alt follows the pointer between grid lines');
+      await page.keyboard.up('Alt');
+      assert.equal(await hint.textContent(), 'Hold Alt to disable snapping');
+      const box = await hint.boundingBox();
+      assert.ok(box.x >= 0 && box.x + box.width <= width && box.y >= 0 && box.y + box.height <= 1000, 'The drag hint fits the viewport');
+      if (process.env.EZKART_GRID_SCREENSHOTS) await page.screenshot({ path: join(process.env.EZKART_GRID_SCREENSHOTS, `drag-hint-${width}.png`) });
+      await page.evaluate(() => window.dispatchEvent(new PointerEvent('pointercancel')));
+      assert.equal(await hint.isVisible(), false, 'Cancelling a drag hides the hint');
+      await page.mouse.up();
+      await page.keyboard.press('Alt');
+      assert.equal(await hint.isVisible(), false, 'Alt at rest cannot bring the hint back');
+      await settle();
+    }
+  }));
+
 test("flow elements use the visible grid at each device size and hidden guides stay hidden after reopening", async () =>
   fixture(async ({ page, invoke, settle, select, drag }) => {
     await invoke("addSection", {
@@ -302,6 +390,73 @@ test("flow elements use the visible grid at each device size and hidden guides s
       "Mobile movement leaves the desktop position intact",
     );
     await drag(node, grid.locator("i").nth(12 * 4), false, true);
+    await page.getByRole('button', { name: 'Grid settings', exact: true }).click();
+    await page.getByRole('checkbox', { name: 'Snap to grid', exact: true }).uncheck();
+    await page.getByRole('button', { name: 'Close grid settings', exact: true }).click();
+    await drag(node, grid.locator('i').nth(12 * 3));
+    await drag(node, grid.locator('i').nth(12 * 6 + 5), true);
+  }));
+
+test('older grid elements support free dragging, resizing, responsive persistence and export', async () =>
+  fixture(async ({ page, invoke, settle, select, drag, ws }) => {
+    await invoke('addElement', { section: 'blank', type: 'image', id: 'legacy-image' });
+    await invoke('updateElement', { id: 'legacy-image', layout: { x: 2, y: 2, width: 3, height: 3 } });
+    const node = page.locator('[data-sq-element-id="legacy-image"]');
+    assert.equal(await node.evaluate(n => n.classList.contains('sq-native')), false);
+    await select(node);
+    const grid = page.locator('[data-section-id="blank"] > .sq-layout-grid-overlay');
+    await drag(node, grid.locator('i').nth(12 * 2 + 3));
+    await drag(node, grid.locator('i').nth(12 * 3 + 2), false, true);
+    const position = await node.getAttribute('data-flow-desktop');
+    await invoke('undo');
+    assert.equal(await node.getAttribute('data-flow-desktop'), null);
+    await invoke('redo');
+    assert.equal(await node.getAttribute('data-flow-desktop'), position);
+    await select(node);
+    await page.getByRole('button', { name: 'Grid settings', exact: true }).click();
+    await page.getByRole('checkbox', { name: 'Snap to grid', exact: true }).uncheck();
+    await page.getByRole('button', { name: 'Close grid settings', exact: true }).click();
+    const start = await node.boundingBox();
+    await page.mouse.move(start.x + 20, start.y + 20);
+    await page.mouse.down();
+    await page.mouse.move(start.x + 37, start.y + 43, { steps: 4 });
+    assert.equal(await page.locator('[data-sq-drag-snap-hint]').textContent(), 'Snapping off');
+    const during = await node.boundingBox();
+    assert.ok(Math.abs(during.x - start.x - 17) < 1 && Math.abs(during.y - start.y - 23) < 1, JSON.stringify({start, during}));
+    await page.mouse.up();
+    await settle();
+    await drag(node, grid.locator('i').nth(12 * 3 + 5), true);
+    const resized = await node.getAttribute('data-flow-desktop');
+    await invoke('setDevice', { device: 'mobile' });
+    assert.equal(await node.evaluate(n => n.style.getPropertyValue('--sq-flow-width')), '');
+    await invoke('setDevice', { device: 'desktop' });
+    await invoke('save');
+    await page.reload();
+    await page.waitForFunction(() => globalThis.EzkartBuilder);
+    await settle();
+    assert.equal(await node.getAttribute('data-flow-desktop'), resized);
+    await select(node);
+    await page.getByRole('button', { name: 'Grid settings', exact: true }).click();
+    await page.getByRole('checkbox', { name: 'Snap to grid', exact: true }).check();
+    await page.getByRole('button', { name: 'Close grid settings', exact: true }).click();
+    await drag(node, grid.locator('i').nth(12 * 2 + 1));
+    await drag(node, grid.locator('i').nth(12 * 3 + 4), true);
+    const saved = JSON.parse(await node.getAttribute('data-flow-desktop'));
+    const bounds = await node.boundingBox(), sectionBounds = await page.locator('.sq-page-preview > [data-section-id="blank"]').boundingBox();
+    assert.ok(bounds.y + bounds.height <= sectionBounds.y + sectionBounds.height + 1, 'The section grows to keep freely positioned content visible');
+    if (process.env.EZKART_GRID_SCREENSHOTS) await page.screenshot({ path: join(process.env.EZKART_GRID_SCREENSHOTS, 'legacy-grid.png') });
+    const html = await invoke('previewHtml');
+    assert.doesNotMatch(html, /data-sq-drag-snap-hint/);
+    await page.route('**/legacy-grid-export', route => route.fulfill({ body: html, contentType: 'text/html' }));
+    await page.goto(ws.url + '/legacy-grid-export');
+    const exported = page.locator('[data-ezkart-element="legacy-image"]');
+    const appearance = await exported.evaluate(n => ({ width: n.getBoundingClientRect().width, height: n.getBoundingClientRect().height, translate: getComputedStyle(n).translate }));
+    assert.ok(Math.abs(appearance.width - saved.width) < 1);
+    assert.ok(Math.abs(appearance.height - saved.height) < 1);
+    const [x, y] = appearance.translate.split(' ').map(parseFloat);
+    assert.ok(Math.abs(x - saved.x) < 0.01 && Math.abs((y || 0) - saved.y) < 0.01);
+    await page.setViewportSize({ width: 390, height: 900 });
+    assert.equal(await exported.evaluate(n => getComputedStyle(n).translate), '0px');
   }));
 
 test("grid settings change the rendered snap cells, persist across devices and stay below content", async () =>

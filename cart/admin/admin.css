@@ -1631,6 +1631,8 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .sq-grid-settings label { margin: 0; color: #414b5a; font-size: 12px; }
 .sq-grid-settings .sq-grid-visibility { display: flex; align-items: center; gap: 8px; margin: 0 0 16px; }
 .sq-grid-visibility input { width: 16px; height: 16px; accent-color: #5b45f6; }
+.sq-drag-snap-hint { position: fixed; z-index: 1000; max-width: calc(100vw - 24px); padding: 8px 12px; color: #fff; background: #303744; border: 1px solid #ffffff30; border-radius: 8px; box-shadow: 0 3px 12px #18212d26; pointer-events: none; font: 500 12px/1.5 Poppins, sans-serif; }
+.sq-drag-snap-hint[hidden] { display: none; }
 .sq-grid-settings .sq-grid-count { margin: 0 0 18px; padding: 9px 10px; color: #737b88; background: #f6f7f9; border-color: #e8ebef; font-size: 11px; }
 .sq-grid-settings .sq-grid-count strong { font-size: 11px; }
 .sq-grid-density-field { display: grid; grid-template-columns: 1fr auto; gap: 7px; }
