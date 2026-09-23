@@ -1,4 +1,4 @@
-@import url("builder-font-faces.css");
+@import url("builder-font-faces.css?v=0fd08b8f0fa3");
 [data-sq-font-input][hidden]{display:none!important}
 .sq-font-field{min-width:0}
 .sq-font-control{display:block;min-width:0}
@@ -7,16 +7,16 @@
 .sq-font-trigger:hover{border-color:#d5d5dc;background:#eeeef1}
 .sq-font-value{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .sq-font-trigger:focus-visible,.sq-font-dialog button:focus-visible,.sq-font-dialog input:focus-visible,.sq-font-dialog select:focus-visible,.sq-font-dialog summary:focus-visible{outline:2px solid #646b82;outline-offset:2px}
-.sq-font-dialog{box-sizing:border-box;width:410px;max-width:calc(100vw - 24px);height:min(730px,calc(100dvh - 40px));max-height:calc(100dvh - 24px);padding:0;border:1px solid #dddce3;border-radius:16px;background:#fff;color:#303541;box-shadow:0 18px 80px #1c1a3233;font:400 12px/1.5 Poppins,sans-serif;overflow:hidden}
+.sq-font-dialog{box-sizing:border-box;width:640px;max-width:calc(100vw - 24px);height:min(800px,calc(100dvh - 40px));max-height:calc(100dvh - 24px);padding:0;border:1px solid #dddce3;border-radius:16px;background:#fff;color:#303541;box-shadow:0 18px 80px #1c1a3233;font:400 12px/1.5 Poppins,sans-serif;overflow:auto}
 .sq-font-dialog[open]{display:flex;flex-direction:column}
 .sq-font-dialog::backdrop{background:#20213240}
 .sq-font-dialog *{box-sizing:border-box}
 .sq-font-dialog header{padding:20px 20px 14px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
-.sq-font-dialog h2{margin:0;font:600 17px/1.4 Poppins,sans-serif;letter-spacing:-.02em}
+.sq-font-dialog h2{margin:0;font:600 20px/1.4 Poppins,sans-serif;letter-spacing:-.02em}
 .sq-font-dialog header p{margin:5px 0 0;color:#767c8a;font-size:11px}
 .sq-font-dialog button{cursor:pointer}
 .sq-font-dialog [data-font-close]{flex:none;width:32px;height:32px;border:0;border-radius:8px;background:#f3f3f5;color:#737786;font:20px/1 Poppins,sans-serif}
-.sq-font-search{display:grid;grid-template-columns:minmax(0,1fr) 125px;gap:8px;padding:0 20px}
+.sq-font-search{display:grid;grid-template-columns:minmax(0,1fr) 180px;gap:8px;padding:0 20px}
 .sq-font-search label{min-width:0}
 .sq-font-dialog input,.sq-font-dialog select{width:100%;min-height:38px;padding:9px 10px;border:1px solid #e5e4e9;border-radius:8px;background:#fafafb;color:#303541;font:400 12px/1.4 Poppins,sans-serif}
 .sq-font-preview{display:grid;grid-template-columns:1fr;gap:5px;padding:12px 20px 0;color:#767c8a;font-size:10px}
@@ -39,3 +39,39 @@
 .sq-font-custom button{padding:8px 14px;border:0;border-radius:8px;background:#303541;color:#fff;font:500 11px Poppins,sans-serif}
 .sq-font-sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 @media(max-width:480px){.sq-font-dialog{height:calc(100dvh - 24px);border-radius:12px}.sq-font-dialog header{padding:16px 16px 12px}.sq-font-search,.sq-font-preview{padding-left:16px;padding-right:16px}.sq-font-search{grid-template-columns:minmax(0,1fr) 115px}.sq-font-results{padding-left:16px;padding-right:16px}.sq-font-option{min-height:82px}.sq-font-sample{font-size:24px}}
+
+/* A wider comparison view, with one column when space is limited. */
+.sq-font-search input{min-height:42px}
+.sq-font-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-content:start;gap:6px;padding:10px 12px 14px}
+.sq-font-option{min-width:0;min-height:116px;height:auto;margin:0;padding:14px 12px;gap:10px}
+.sq-font-sample{flex:none;font-size:28px;line-height:1.7;white-space:normal;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.sq-font-empty{grid-column:1/-1}
+/* Style names are themselves samples, including the shared select fallback.
+   Fallback indices follow the category order in builder-fonts.js. */
+.sq-font-dialog .sq-font-search [data-font-category],.sq-font-dialog .sq-font-search .ezkart-select-trigger{font-family:var(--sq-font-category-family,Poppins,sans-serif)!important;font-size:var(--sq-font-category-size,12px)!important;line-height:1.4!important;min-height:42px!important}
+.sq-font-dialog [data-font-category] option,.sq-font-dialog .ezkart-select-menu[aria-label="Font style"] [role=option]{min-height:44px;line-height:1.4;white-space:nowrap;overflow-wrap:normal}
+.sq-font-dialog [data-font-category] option[value=all],.sq-font-dialog .ezkart-select-menu[aria-label="Font style"] [data-index="0"]{font-family:Poppins,sans-serif;font-size:13px}
+.sq-font-dialog [data-font-category] option[value=sans],.sq-font-dialog .ezkart-select-menu[aria-label="Font style"] [data-index="1"]{font-family:"DM Sans",sans-serif;font-size:20px}
+.sq-font-dialog [data-font-category] option[value=serif],.sq-font-dialog .ezkart-select-menu[aria-label="Font style"] [data-index="2"]{font-family:"DM Serif Display",serif;font-size:22px}
+.sq-font-dialog [data-font-category] option[value=display],.sq-font-dialog .ezkart-select-menu[aria-label="Font style"] [data-index="3"]{font-family:"Bebas Neue",sans-serif;font-size:24px}
+.sq-font-dialog [data-font-category] option[value=handwriting],.sq-font-dialog .ezkart-select-menu[aria-label="Font style"] [data-index="4"]{font-family:Caveat,cursive;font-size:26px}
+.sq-font-dialog [data-font-category] option[value=mono],.sq-font-dialog .ezkart-select-menu[aria-label="Font style"] [data-index="5"]{font-family:"Space Mono",monospace;font-size:17px}
+@media(max-width:560px){.sq-font-dialog{height:calc(100dvh - 24px)}.sq-font-list{grid-template-columns:minmax(0,1fr)}.sq-font-search{grid-template-columns:minmax(0,1fr) 142px}.sq-font-option{min-height:100px}.sq-font-sample{font-size:27px}}
+
+.sq-font-dialog [data-font-category]::picker(select){min-inline-size:200px;max-inline-size:calc(100vw - 24px)}
+
+/* Import stays visible while browsing the font library. */
+.sq-font-dialog>header,.sq-font-search,.sq-font-preview,.sq-font-results{flex-shrink:0}
+.sq-font-upload{flex:none;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 16px;padding:14px 20px;border-top:1px solid #eeedf1;background:#fafafb}
+.sq-font-upload strong{font-size:12px;font-weight:500}
+.sq-font-upload p{margin:3px 0 0;color:#767c8a;font-size:10px}
+.sq-font-upload button{flex:none;border:1px solid #d9d7e2;border-radius:8px;background:#fff;padding:10px 16px;color:#303541;font:500 12px/1.4 Poppins,sans-serif}
+.sq-font-upload button:hover{background:#f2f1f6}
+.sq-font-upload button:disabled{cursor:wait;opacity:.65}
+.sq-font-upload [data-font-upload-status]{flex-basis:100%;overflow-wrap:anywhere}
+.sq-font-upload [data-font-upload-status].is-error{color:#ac382c}
+.sq-font-upload [hidden]{display:none!important}
+.sq-font-dialog [data-font-category] option[value=uploaded],.sq-font-dialog .ezkart-select-menu[aria-label="Font style"] [data-index="6"]{font:400 13px/1.4 Poppins,sans-serif}
+.sq-font-meta>span{min-width:0;overflow-wrap:anywhere}
+.sq-font-meta small{flex:none}
+@media(max-width:560px){.sq-font-upload{padding:12px 16px;gap:10px}.sq-font-upload button{padding:10px 12px}.sq-font-upload p{font-size:9px}}

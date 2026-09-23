@@ -1,3 +1,4 @@
+import { listBuilderFonts, saveBuilderFont, serveBuilderFont } from './builder-fonts.js';
 import { listBuilderAssets, saveBuilderAsset, serveBuilderAsset } from "./builder-assets.js";
 import { customerAddressBook, changeCustomerAddressBook } from "./customer-addresses.js";
 import { validatePublication } from "./landing-publication.js";
@@ -1313,6 +1314,16 @@ export default {
       if (request.method === "GET" && componentMatch) return json({ ok: true, component: await component(request, env, componentMatch[1]) }, 200, cors);
       if (["PUT", "POST"].includes(request.method) && componentMatch) return json({ ok: true, component: await saveComponent(request, env, componentMatch[1]) }, 200, cors);
       if (request.method === "DELETE" && componentMatch) { await deleteComponent(request, env, componentMatch[1]); return json({ ok: true }, 200, cors); }
+      if (url.pathname === "/v1/fonts" && ["GET", "POST"].includes(request.method)) {
+        const { seller } = await sellerContext(request, env);
+        if (request.method === "GET") return json({ok:true,fonts:await listBuilderFonts(env,seller)},200,cors);
+        return json({ok:true,font:await saveBuilderFont(env,seller,await requestJson(request,7100000))},201,cors);
+      }
+      const builderFontMatch = /^\/v1\/fonts\/(font_[a-f0-9]{64})$/.exec(url.pathname);
+      if (request.method === "GET" && builderFontMatch) {
+        const { seller } = await sellerContext(request,env);
+        return await serveBuilderFont(env,seller,builderFontMatch[1]);
+      }
       if (url.pathname === "/v1/assets" && ["GET", "POST"].includes(request.method)) {
         const { seller } = await sellerContext(request, env);
         if (request.method === "GET") return json({ok:true,assets:await listBuilderAssets(env,seller)},200,cors);

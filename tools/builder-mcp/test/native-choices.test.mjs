@@ -238,7 +238,9 @@ test("scoped filters and keyboard tabs preserve independent state; editable dial
       for (let p = n.parentElement; p; p = p.parentElement)
         if (p.tagName === "DETAILS") p.open = true;
     });
-    await panel.locator("[data-native-action-scope]").fill("filter");
+    const groupMenu = await panel.locator("[data-native-action-scope-choice]").evaluate(select => select._sqBuilderSelect.menu.id);
+    await page.locator(`[aria-controls="${groupMenu}"]`).click();
+    await page.locator(`#${groupMenu} [role=option][data-value=filter]`).click();
     await panel.locator("[data-native-action-reveal]").fill("all");
     await panel.locator("[data-native-action-apply]").click();
     assert.equal(

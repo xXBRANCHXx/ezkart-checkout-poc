@@ -3,12 +3,13 @@ import {readFile,writeFile,rename,mkdir,readdir} from 'node:fs/promises';
 import {dirname,resolve,join,extname} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {randomBytes,createHash} from 'node:crypto';
+import {decodeFontDataUrl} from '../../cloudflare/ezkart-api/src/builder-fonts.js';
 export const repoRoot=resolve(dirname(fileURLToPath(import.meta.url)),'../..');
 const htmlEscape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const slug=value=>{if(!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value)||value.length>48)throw new Error('Use a project ID of up to 48 lowercase letters, numbers, and hyphens.');return value;};
 export class Workspace {
  constructor(directory){this.directory=resolve(directory);this.csrf=randomBytes(24).toString('hex');}
- async init(){await mkdir(join(this.directory,'projects'),{recursive:true});await mkdir(join(this.directory,'exports'),{recursive:true});await mkdir(join(this.directory,'previews'),{recursive:true});await mkdir(join(this.directory,'uploads'),{recursive:true});return this;}
+ async init(){await mkdir(join(this.directory,'projects'),{recursive:true});await mkdir(join(this.directory,'exports'),{recursive:true});await mkdir(join(this.directory,'previews'),{recursive:true});await mkdir(join(this.directory,'uploads'),{recursive:true});await mkdir(join(this.directory,'fonts'),{recursive:true});return this;}
  async catalog(){try{return JSON.parse(await readFile(join(this.directory,'catalog.json'),'utf8'));}catch(error){if(error.code==='ENOENT')return {products:[],storageScope:'ezkart-local',mediaBase:''};throw error;}}
  async read(id){
   const page=JSON.parse(await readFile(join(this.directory,'projects',`${slug(id)}.json`),'utf8'));
@@ -44,6 +45,16 @@ export class Workspace {
      if(req.method==='GET'){
       if(path==='/v1/catalog')return send(200,{ok:true,...await this.catalog(),drafts:[]});
       if(path==='/v1/components')return send(200,{ok:true,components:[]});
+      if(path==='/v1/fonts'){
+       const files=(await readdir(join(this.directory,'fonts'))).filter(file=>file.endsWith('.json'));
+       const fonts=await Promise.all(files.map(async file=>{const {dataUrl,...font}=JSON.parse(await readFile(join(this.directory,'fonts',file),'utf8'));return font;}));
+       return send(200,{ok:true,fonts});
+      }
+      const fontMatch=/^\/v1\/fonts\/(font_[a-f0-9]{64})$/.exec(path);
+      if(fontMatch){
+       const font=JSON.parse(await readFile(join(this.directory,'fonts',fontMatch[1]+'.json'),'utf8'));
+       return send(200,Buffer.from(font.dataUrl.split(',')[1],'base64'),font.mimeType);
+      }
       if(path==='/v1/assets'){
        const files=(await readdir(join(this.directory,'uploads'))).filter(file=>file.endsWith('.json'));
        const assets=await Promise.all(files.map(async file=>{const {dataUrl,...item}=JSON.parse(await readFile(join(this.directory,'uploads',file),'utf8'));return item;}));
@@ -60,6 +71,15 @@ export class Workspace {
       if(previewMatch){res.setHeader('Content-Security-Policy',"default-src 'none'; img-src data: http: https:; style-src 'unsafe-inline'; font-src data:; sandbox");return send(200,await readFile(join(this.directory,'previews',`${slug(previewMatch[1])}.html`)),'text/html; charset=utf-8');}
       const match=/^\/v1\/landing-pages\/([a-z0-9-]+)$/.exec(path);
       if(match)return send(200,{ok:true,page:await this.read(match[1])});
+     }
+     if(req.method==='POST' && path==='/v1/fonts'){
+      if(req.headers['x-ezkart-csrf']!==this.csrf)return send(403,{ok:false,error:'Invalid editor request.'});
+      let body='';for await(const chunk of req){body+=chunk;if(Buffer.byteLength(body)>7100000)return send(413,{ok:false,error:'Choose a font up to 5 MB.'});}
+      const payload=JSON.parse(body),decoded=decodeFontDataUrl(payload.dataUrl);
+      const id='font_'+createHash('sha256').update(decoded.bytes).digest('hex'),path=join(this.directory,'fonts',id+'.json');
+      try{const {dataUrl,...font}=JSON.parse(await readFile(path,'utf8'));return send(201,{ok:true,font});}catch(error){if(error.code!=='ENOENT')throw error;}
+      const font={id,name:String(payload.name||'My font').replace(/[\u0000-\u001f\u007f]/g,'').trim().slice(0,120)||'My font',format:decoded.format,variable:decoded.variable,mimeType:decoded.mimeType,sizeBytes:decoded.bytes.length,createdAt:new Date().toISOString()};
+      await writeFile(path,JSON.stringify({...font,dataUrl:payload.dataUrl}),{mode:0o600});return send(201,{ok:true,font});
      }
      if(req.method==='POST' && path==='/v1/assets'){
       if(req.headers['x-ezkart-csrf']!==this.csrf)return send(403,{ok:false,error:'Invalid editor request.'});
@@ -123,7 +143,7 @@ export class Workspace {
      return send(200,await readFile(file),types[extname(file)]);
     }
     return send(404,{ok:false,error:'File not found.'});
-   }catch(error){send(error.code==='ENOENT'?404:400,{ok:false,error:error.message});}
+   }catch(error){if(error instanceof Response){send(error.status,{ok:false,error:await error.text()});return;}send(error.code==='ENOENT'?404:400,{ok:false,error:error.message});}
   });
   await new Promise((resolve,reject)=>{this.server.once('error',reject);this.server.listen(port,'127.0.0.1',resolve);});
   this.url=`http://127.0.0.1:${this.server.address().port}`;return this.url;

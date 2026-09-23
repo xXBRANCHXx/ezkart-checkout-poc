@@ -695,7 +695,7 @@ function ez_admin_sync_cloudflare_user(string $accessToken): array
 
 function ez_admin_proxy_cloud_request(string $accessToken, string $path, string $method): never
 {
-    $allowedPath = preg_match('#^/v1/(?:catalog|storefront|admin-profile|advanced-mode|media(?:/[a-zA-Z0-9_-]+)?|assets(?:/[a-zA-Z0-9_-]+)?|products/[a-zA-Z0-9_-]+(?:/duplicate)?|drafts/[a-zA-Z0-9_-]+|landing-pages(?:/[a-z0-9-]+(?:/(?:preview|export))?)?|components(?:/[a-z0-9-]+)?)$#', $path) === 1;
+    $allowedPath = preg_match('#^/v1/(?:catalog|storefront|admin-profile|advanced-mode|media(?:/[a-zA-Z0-9_-]+)?|assets(?:/[a-zA-Z0-9_-]+)?|fonts(?:/font_[a-f0-9]{64})?|products/[a-zA-Z0-9_-]+(?:/duplicate)?|drafts/[a-zA-Z0-9_-]+|landing-pages(?:/[a-z0-9-]+(?:/(?:preview|export))?)?|components(?:/[a-z0-9-]+)?)$#', $path) === 1;
     if (!$allowedPath || str_contains($path, '?') || str_contains($path, '#')) {
         ez_admin_json(['ok' => false, 'error' => 'That saved-data path is not allowed.'], 400);
     }
@@ -711,9 +711,10 @@ function ez_admin_proxy_cloud_request(string $accessToken, string $path, string 
     $isLandingPagePreviewWrite = in_array($method, ['POST', 'PUT'], true)
         && preg_match('#^/v1/landing-pages/[a-z0-9-]+/preview$#', $path) === 1;
     $isLargeLandingPageRequest = $isLandingPageRequest || $isLandingPagePreviewWrite;
-    $maximumBodyBytes = $isLandingPagePreviewWrite ? 20_000_000 : ($isLandingPageRequest ? 16_001_000 : 3_200_000);
+    $isFontUpload = $path === '/v1/fonts' && $method === 'POST';
+    $maximumBodyBytes = $isFontUpload ? 7_100_000 : ($isLandingPagePreviewWrite ? 20_000_000 : ($isLandingPageRequest ? 16_001_000 : 3_200_000));
     if ($contentLength > $maximumBodyBytes) {
-        ez_admin_json(['ok' => false, 'error' => $isLargeLandingPageRequest ? 'Landing page project is too large.' : 'Upload is larger than the 2 MB image limit.'], 413);
+        ez_admin_json(['ok' => false, 'error' => $isFontUpload ? 'Choose a font up to 5 MB.' : ($isLargeLandingPageRequest ? 'Landing page project is too large.' : 'Upload is larger than the 2 MB image limit.')], 413);
     }
     $body = in_array($method, ['POST', 'PUT'], true) ? file_get_contents('php://input') : '';
     if (!is_string($body) || strlen($body) > $maximumBodyBytes) {
@@ -721,7 +722,7 @@ function ez_admin_proxy_cloud_request(string $accessToken, string $path, string 
     }
 
     $isMediaRequest = $method === 'GET'
-        && preg_match('#^/v1/(?:media|assets)/[a-zA-Z0-9_-]+$#', $path) === 1;
+        && preg_match('#^/v1/(?:media|assets|fonts)/[a-zA-Z0-9_-]+$#', $path) === 1;
     $isPreviewRequest = $method === 'GET'
         && preg_match('#^/v1/landing-pages/[a-z0-9-]+/preview$#', $path) === 1;
     $isImageRequest = $isMediaRequest;

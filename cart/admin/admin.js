@@ -222,6 +222,11 @@
     }
     return result;
   };
+  if (document.querySelector('[data-sq-preview-root]')) globalThis.EzkartFonts?.configure({
+    list:async () => (await cloudRequest('GET','/v1/fonts')).fonts,
+    upload:async payload => (await cloudRequest('POST','/v1/fonts',payload)).font,
+    url:font => new URL(cloudUrl(`/v1/fonts/${encodeURIComponent(font.id)}`),location.href).href,
+  });
   const normalizeCloudProduct = (product) => {
     const media = Array.isArray(product?.media) ? product.media : [];
     const productMediaUrl = product?.status === "archived" ? cloudPrivateMediaUrl : cloudMediaUrl;
