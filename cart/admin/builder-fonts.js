@@ -27,8 +27,10 @@
   function sync(input) {
     const control = controls.get(input);
     if (!control) return;
-    const font = findFont(input.value);
-    control.value.textContent = font?.name || input.value.split(',')[0].replace(/["']/g,'').trim() || 'Inherit font';
+    const resolved = input.value || input.dataset.effectiveFont || getComputedStyle(document.querySelector('.sq-page-preview') || document.body).fontFamily;
+    const font = findFont(resolved);
+    const name = font?.name || resolved.split(',')[0].replace(/["']/g,'').trim();
+    control.value.textContent = name + (input.value ? '' : ' (default)');
     control.trigger.setAttribute('aria-label',`${control.label}: ${control.value.textContent}. Choose font`);
     control.trigger.disabled = input.disabled;
   }

@@ -431,6 +431,134 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
+/* Property controls use the same compact, readable layout at every panel width. */
+.page-site-editor .sq-inspector .sq-native-inspector label[data-style-field] {
+  align-content: start;
+}
+.sq-native-fields > [data-style-field],
+.sq-native-fields > .sq-setting-with-help:has([data-style-field]),
+.sq-style-spacing {
+  grid-column: 1 / -1;
+}
+.page-site-editor .sq-inspector .sq-native-inspector .sq-style-measure {
+  display: grid;
+  grid-template-columns: minmax(64px, 1fr) minmax(72px, 1fr) 30px;
+  align-items: center;
+  gap: 6px;
+}
+.page-site-editor .sq-inspector .sq-native-inspector .sq-style-measure input {
+  min-height: 38px;
+  padding: 7px 9px;
+  font-variant-numeric: tabular-nums;
+}
+.page-site-editor .sq-inspector .sq-native-inspector .sq-style-measure select {
+  min-height: 38px;
+  padding-left: 8px;
+}
+.page-site-editor .sq-inspector .sq-native-inspector .sq-style-reset {
+  width: 30px;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: 18px;
+}
+.page-site-editor .sq-inspector .sq-native-inspector [data-style-note] {
+  color: #747b86;
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+.page-site-editor .sq-inspector .sq-native-inspector [data-style-slider] {
+  width: 100%;
+  height: 20px;
+  margin: 0;
+  accent-color: #414b59;
+}
+.page-site-editor .sq-inspector .sq-native-inspector .sq-style-fluid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid #e6e8ec;
+  border-radius: 8px;
+}
+.page-site-editor .sq-inspector .sq-native-inspector .sq-style-fluid > span {
+  display: grid;
+  gap: 5px;
+  align-content: start;
+  font-size: 10px;
+  line-height: 1.5;
+}
+.page-site-editor .sq-inspector .sq-native-inspector .sq-style-measure:has(> input[hidden]) > :is(select, .sq-builder-select) {
+  grid-column: 1 / 3;
+}
+.page-site-editor .sq-inspector .sq-native-inspector .sq-style-fluid input {
+  padding: 7px;
+}
+.sq-style-spacing + .sq-style-spacing {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e6e8ec;
+}
+.sq-style-spacing-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+}
+.page-site-editor .sq-inspector .sq-native-inspector .sq-style-spacing-heading label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  font-size: 10px;
+}
+.page-site-editor .sq-inspector .sq-native-inspector .sq-style-spacing-heading input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+}
+.sq-style-spacing .sq-native-fields {
+  margin-top: 10px;
+}
+.sq-style-spacing .sq-native-fields > [data-style-field] {
+  grid-column: auto;
+  position: relative;
+}
+.sq-style-spacing .sq-native-fields > .sq-style-wide-value {
+  grid-column: 1 / -1;
+}
+.page-site-editor .sq-inspector .sq-native-inspector .sq-style-spacing .sq-style-measure {
+  grid-template-columns: minmax(38px, 1fr) minmax(40px, 1fr);
+  gap: 4px;
+}
+.page-site-editor .sq-inspector .sq-native-inspector .sq-style-spacing .sq-style-reset {
+  position: absolute;
+  top: -4px;
+  right: 0;
+  width: 24px;
+  min-height: 24px;
+  font-size: 15px;
+}
+.sq-style-spacing .sq-style-reset:disabled {
+  visibility: hidden;
+}
+.page-site-editor .sq-inspector .sq-native-inspector .sq-style-spacing .sq-style-measure select {
+  padding-left: 4px;
+}
+.sq-style-spacing [data-style-note] {
+  margin: 0;
+  pointer-events: none;
+}
+.page-site-editor .sq-inspector .sq-native-inspector .sq-style-spacing .sq-builder-select-trigger {
+  padding-inline: 6px;
+  gap: 3px;
+}
+.page-site-editor .sq-inspector .sq-native-inspector .sq-style-spacing .sq-style-wide-value .sq-style-measure {
+  grid-template-columns: minmax(50px, 1fr) minmax(110px, 1.5fr);
+}
 .page-site-editor
   .sq-inspector
   .sq-native-inspector

@@ -2346,10 +2346,12 @@
       const control = select?._sqBuilderSelect;
       if (!control) return;
       const options = [...select.options];
-      const signature = options.map((option) => `${option.value}\u0000${option.textContent}\u0000${option.disabled}`).join("\u0001");
+      control.wrapper.hidden = select.hidden;
+      if (select.hidden && openBuilderSelect === control) closeBuilderSelect(control);
+      const signature = options.map((option) => `${option.value}\u0000${option.textContent}\u0000${option.disabled}\u0000${option.hidden}`).join("\u0001");
       if (control.signature !== signature) {
         control.signature = signature;
-        control.menu.replaceChildren(...options.map((option) => {
+        control.menu.replaceChildren(...options.filter(option => !option.hidden).map((option) => {
           const item = document.createElement("button");
           item.type = "button";
           item.className = "sq-builder-select-option";
@@ -2445,7 +2447,7 @@
       });
       select.addEventListener("input", () => syncBuilderSelect(select));
       select.addEventListener("change", () => syncBuilderSelect(select));
-      new MutationObserver(() => syncBuilderSelect(select)).observe(select, { childList: true, subtree: true, attributes: true, attributeFilter: ["disabled", "label"] });
+      new MutationObserver(() => syncBuilderSelect(select)).observe(select, { childList: true, subtree: true, attributes: true, attributeFilter: ["disabled", "label", "hidden"] });
       syncBuilderSelect(select);
     };
     const builderSelects = () => [...sqStudio.querySelectorAll(".sq-tool-panels select, .sq-inspector select")];
@@ -4042,7 +4044,14 @@
         : isNavigation ? selectedAction : actionForElement();
       const isFlow=Boolean(selectedElement.closest('.sq-flow') || selectedElement.classList.contains('sq-free-positioned'));
       sqStudio.querySelector('[data-sq-flow-controls]')?.toggleAttribute('hidden',!isFlow);
-      if(isFlow){const position=readFlowPosition(selectedElement);sqStudio.querySelectorAll('[data-sq-flow-position]').forEach(input=>input.value=position[input.dataset.sqFlowPosition]??'');}
+      if(isFlow){
+        const position=readFlowPosition(selectedElement), computed=getComputedStyle(selectedElement);
+        sqStudio.querySelectorAll('[data-sq-flow-position]').forEach(input=>{
+          const key=input.dataset.sqFlowPosition;
+          input.value=position[key]??'';
+          input.placeholder=['width','height'].includes(key) ? `${Math.round(parseFloat(computed[key])||0)} px (default)` : '0';
+        });
+      }
       const image = isLogo || isProductGrid ? null : imageForElement();
       const contentName = selectedContent?.closest("h1,h2,h3,h4,h5,h6") ? "Heading" : selectedContent ? "Text" : "";
       const contextualName = isBackgroundImage ? "Section background" : isLogo ? "Logo" : selectedAction && action ? "Button" : selectedImage && image ? "Image" : contentName || elementTypeName(selectedElement);
@@ -4239,7 +4248,7 @@
         if (modeInput) modeInput.value = mode;
         if (speedInput) speedInput.value = String(speed);
         if (speedOutput) speedOutput.textContent = mode === "scroll" ? `${Math.round(speed / 60 * 100)}% scroll` : `${speed} px/s`;
-        if (modeNote) modeNote.textContent = mode === "scroll" ? "The strip moves with the visitor’s page scroll and reverses when they scroll up." : "Automatic movement loops continuously with no empty gap.";
+        if (modeNote) modeNote.textContent = mode === "scroll" ? "The strip moves with the visitor’s page scroll and reverses when they scroll up." : "Continuous movement repeats with no empty gap.";
       }
       const reviewControls = sqStudio.querySelector("[data-sq-review-controls]");
       const isReview = elementType === "review";

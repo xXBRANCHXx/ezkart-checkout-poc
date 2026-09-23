@@ -35,14 +35,14 @@
     ["Select the container whose children should stack together.", "Choose Isolate. Adjust the children’s Z index inside that group.", "Set the container’s own Position and Z index to place the entire group above or below a sibling."],
     [["Group isolation", "Isolate"], ["Child Z index", "99"], ["Sibling Z index", "2"]], "Even a child with Z index 99 stays inside its group. The sibling can still appear over the entire group.");
   prop("cursor", "Cursor", "Choose the mouse cursor visitors see when hovering over this element on a computer.",
-    ["Select a clickable element and choose Pointer for a hand cursor.", "Add its behavior under Click action if it should open a link or perform an action.", "Use Auto for the browser’s usual cursor. This setting has no visible cursor effect on touchscreens."],
+    ["Select a clickable element and choose Pointer for a hand cursor.", "Add its behavior under Click action if it should open a link or perform an action.", "Use Match element behavior for the usual cursor. This setting has no visible cursor effect on touchscreens."],
     [["Cursor", "Pointer"], ["Click action", "Open link"]], "A hand cursor signals that an element can be clicked. Changing the cursor alone does not add an action.");
   prop("listStyleType", "List style type", "Choose bullets, numbers, or no marker for list items.",
     ["Use a list container with HTML element ul or ol, and child items with HTML element li.", "Select the list and choose Disc for bullets or Decimal for numbers.", "Leave enough left padding for the markers. Choosing a marker does not turn ordinary text into a list."],
     [["List HTML element", "ol"], ["Item HTML element", "li"], ["List style type", "Decimal"]], "Decimal creates a numbered list; Disc creates bullets; None removes the markers.");
   prop("pointerEvents", "Pointer events", "Choose whether this element receives mouse clicks and taps, or lets them pass through to something behind it.",
-    ["Select a decorative overlay that sits over a real button.", "Choose None so clicks can reach the button beneath it.", "Use Auto for normal interaction. None does not reliably disable keyboard access; do not use it as a disabled-button setting."],
-    [["Overlay pointer events", "None"], ["Button pointer events", "Auto"]], "The decorative overlay lets the click reach the Shop now button underneath.");
+    ["Select a decorative overlay that sits over a real button.", "Choose None so clicks can reach the button beneath it.", "Use Yes for normal interaction. None does not reliably disable keyboard access; do not use it as a disabled-button setting."],
+    [["Overlay pointer events", "None"], ["Button pointer events", "Yes"]], "The decorative overlay lets the click reach the Shop now button underneath.");
 
   state("initialState", "Starting version", "Choose the named appearance selected when this group first opens, such as all, delivery, or collection.",
     ["Select the container that owns the tabs or filters and enter a starting name, such as delivery.", "Give each button a Click action of Switch state. Use the matching name as its target and the container’s ID as its Interaction group ID.", "Create matching alternate versions for the content under Responsive layout & alternate versions. Connect them using Appearance follows group ID."],

@@ -177,6 +177,353 @@
     },
   };
   const schema = Object.assign({}, ...Object.values(groups));
+  // The saved model uses CSS; the inspector describes appearance and behavior.
+  const styleNames = {
+    display: "Arrange content", flexDirection: "Direction", flexWrap: "When items run out of room",
+    alignItems: "Align items", justifyContent: "Distribute items", alignSelf: "This item's alignment",
+    gap: "Space between items", rowGap: "Space between rows", columnGap: "Space between columns",
+    gridTemplateColumns: "Columns", gridTemplateRows: "Rows", gridColumn: "Column placement", gridRow: "Row placement",
+    flexGrow: "Share of extra space", flexShrink: "Allow shrinking", flexBasis: "Starting size", order: "Display order",
+    objectFit: "Image fit", objectPosition: "Image focus", aspectRatio: "Shape",
+    overflow: "Content outside the edges", overflowX: "Content past left / right", overflowY: "Content past top / bottom",
+    fontSize: "Font size", fontWeight: "Weight", lineHeight: "Line spacing", letterSpacing: "Letter spacing",
+    textAlign: "Text alignment", textTransform: "Capitalization", whiteSpace: "Spaces & line breaks",
+    textDecoration: "Text decoration", textWrap: "Line wrapping", overflowWrap: "Long words", color: "Text color",
+    borderRadius: "Corners", opacity: "Opacity", boxShadow: "Shadow", filter: "Image effect", backdropFilter: "Background effect",
+    scrollMarginTop: "Space above a scroll destination", zIndex: "Layer order", position: "Placement",
+    transform: "Rotation & scale", transformOrigin: "Rotation point", perspective: "3D depth",
+    isolation: "Layer grouping", cursor: "Mouse cursor", listStyleType: "List markers", pointerEvents: "Receive clicks",
+    containerType: "Resize contents with", tableLayout: "Column sizing", fontOpticalSizing: "Adjust letter shapes to size",
+  };
+  const styleChoices = {
+    fontWeight: { 100: "Thin", 200: "Extra light", 300: "Light", 400: "Regular", 500: "Medium", 600: "Semibold", 700: "Bold", 800: "Extra bold", 900: "Black" },
+    textAlign: { start: "Left", left: "Left", center: "Center", right: "Right", end: "Right", justify: "Justified" },
+    display: { block: "Stack vertically", flex: "Row or column", "inline-flex": "Row sized to content", grid: "Grid", inline: "Flow with text", "inline-block": "Block sized to content", contents: "Use parent layout", none: "Hidden" },
+    flexDirection: { row: "Left to right", column: "Top to bottom", "row-reverse": "Right to left", "column-reverse": "Bottom to top" },
+    flexWrap: { nowrap: "Keep on one line", wrap: "Wrap to next line", "wrap-reverse": "Wrap in reverse order" },
+    alignSelf: { auto: "Follow parent alignment" },
+    alignItems: { normal: "Stretch to fit" },
+    justifyContent: { normal: "Pack at start" },
+    objectFit: { fill: "Stretch to fill", contain: "Show whole image", cover: "Fill & crop", none: "Original size", "scale-down": "Shrink to fit" },
+    aspectRatio: { auto: "Original proportions", "1 / 1": "Square · 1:1", "4 / 3": "Landscape · 4:3", "3 / 2": "Photo · 3:2", "16 / 9": "Wide · 16:9", "3 / 4": "Portrait · 3:4", "9 / 16": "Tall · 9:16" },
+    objectPosition: { "50% 50%": "Center", "50% 0%": "Top", "50% 100%": "Bottom", "0% 50%": "Left", "100% 50%": "Right" },
+    textTransform: { none: "As written", uppercase: "UPPERCASE", lowercase: "lowercase", capitalize: "Capitalize Words" },
+    textDecoration: { none: "None", underline: "Underline", "line-through": "Strikethrough", overline: "Overline" },
+    whiteSpace: { normal: "Wrap & combine spaces", nowrap: "Single line", pre: "Keep spaces & lines", "pre-line": "Keep line breaks", "pre-wrap": "Keep spaces & wrap" },
+    textWrap: { wrap: "Wrap to fit", nowrap: "Single line", balance: "Balanced lines", pretty: "Avoid short last lines" },
+    overflowWrap: { normal: "Keep words together", "break-word": "Break long words", anywhere: "Break anywhere" },
+    position: { static: "Follow page flow", relative: "Offset in page flow", absolute: "Place inside parent", fixed: "Pin to screen", sticky: "Stick while scrolling" },
+    cursor: { auto: "Match element behavior", default: "Arrow", pointer: "Hand" },
+    pointerEvents: { auto: "Yes", none: "Let clicks pass through" },
+    isolation: { auto: "Share parent layers", isolate: "Separate layer group" },
+    fontOpticalSizing: { auto: "Yes", none: "No" },
+    containerType: { normal: "Screen width", "inline-size": "Container width", size: "Container width & height" },
+    tableLayout: { auto: "Fit contents", fixed: "Equal columns" },
+    gridColumn: { auto: "Next available column", "span 2": "Span 2 columns", "span 3": "Span 3 columns", "1 / -1": "Span every column" },
+    gridRow: { auto: "Next available row", "span 2": "Span 2 rows", "span 3": "Span 3 rows" },
+    listStyleType: { none: "None", disc: "Bullets", decimal: "Numbers" },
+    boxShadow: { none: "None", "0 2px 8px rgb(0 0 0 / .08)": "Soft", "0 8px 24px rgb(0 0 0 / .14)": "Raised", "0 18px 48px rgb(0 0 0 / .22)": "Strong", "inset 0 2px 6px rgb(0 0 0 / .12)": "Inset" },
+    filter: { none: "None", "grayscale(1)": "Black & white", "sepia(.6)": "Warm sepia", "brightness(1.15)": "Brighter", "brightness(.8)": "Darker", "blur(4px)": "Blur" },
+    backdropFilter: { none: "None", "blur(4px)": "Light blur", "blur(12px)": "Medium blur", "blur(24px)": "Strong blur" },
+    transform: { none: "No rotation or scaling", "rotate(-5deg)": "Tilt left", "rotate(5deg)": "Tilt right", "scale(1.1)": "Enlarge 10%", "scale(.9)": "Reduce 10%", "scaleX(-1)": "Flip horizontally", "scaleY(-1)": "Flip vertically" },
+    transformOrigin: { center: "Center", top: "Top", bottom: "Bottom", left: "Left", right: "Right" },
+  };
+  const commonStyleChoices = { "flex-start": "Start", "flex-end": "End", stretch: "Stretch to fit", center: "Center", baseline: "Text baseline", "space-between": "Space between", "space-around": "Space around", "space-evenly": "Evenly spaced", visible: "Show overflow", hidden: "Hide overflow", clip: "Clip at edges", auto: "Scroll when needed", scroll: "Always allow scrolling" };
+  const styleTitle = key => styleNames[key] || label(key);
+  const choiceTitle = (key, value, css) => {
+    if (/^border.*Style$/.test(key) && value === "hidden") return "Hidden border";
+    if (key === "gridTemplateColumns" || key === "gridTemplateRows") {
+      const count = /repeat\((\d+),/.exec(value)?.[1] || (value === "none" ? 1 : value.trim().split(/\s+(?![^()]*\))/).length);
+      return `${count} ${key.endsWith("Rows") ? Number(count) === 1 ? "row" : "rows" : Number(count) === 1 ? "column" : "columns"}`;
+    }
+    if (["boxShadow", "filter", "backdropFilter", "transform"].includes(key) && value && value !== "none" && !styleChoices[key]?.[value])
+      return `Saved ${key === "boxShadow" ? "shadow" : "effect"}`;
+    if (key === "textAlign" && ["start", "end"].includes(value))
+      return (value === "start") === (css?.direction !== "rtl") ? "Left" : "Right";
+    if (key === "alignSelf" && value === "auto" && css && selected?.parentElement)
+      return choiceTitle("alignItems", getComputedStyle(selected.parentElement).alignItems, css);
+    return styleChoices[key]?.[value] || commonStyleChoices[value] || label(value);
+  };
+  const measure = value => /^(-?(?:\d+\.?\d*|\.\d+))(px|%|rem|em|vw|vh|ch|cqw|cqh)?$/.exec(String(value).trim());
+  const fluidSize = value => {
+    const match = /^clamp\(\s*([^,]+),\s*([^,]+),\s*([^,]+)\)$/.exec(String(value));
+    const parts = match?.slice(1).map(measure);
+    return parts?.every(Boolean) ? parts : null;
+  };
+  const rounded = value => String(Math.round(Number(value) * 100) / 100);
+  const styleUnits = key => key === "lineHeight" ? { "": "× font size", px: "px", em: "em", "%": "%" }
+    : { px: "px", "%": "%", rem: "rem", em: "em", vw: "vw", vh: "vh", ch: "ch", cqw: "Container %", cqh: "Container height %" };
+  const sizeBehaviors = key => /^max(Width|Height)$/.test(key) ? { none: "No limit", "fit-content": "Fit content" }
+    : /^(width|height|minWidth|minHeight|flexBasis)$/.test(key) ? { auto: key.toLowerCase().includes("height") ? "Fit contents" : "Follow layout", "fit-content": "Fit contents", "min-content": "Smallest content", "max-content": "Full content" }
+    : /^(margin|top$|right$|bottom$|left$)/.test(key) ? { auto: key.startsWith("margin") ? "Share free space" : "Follow layout" }
+    : key === "letterSpacing" ? { normal: "Font spacing" } : key === "lineHeight" ? { normal: "Font line spacing" }
+    : key === "verticalAlign" ? { baseline: "Text baseline", middle: "Middle", top: "Top", bottom: "Bottom", sub: "Subscript", super: "Superscript" } : {};
+
+  function styleField(key, type) {
+    const wrap = document.createElement("label");
+    wrap.dataset.styleField = key;
+    wrap.append(styleTitle(key));
+    const input = document.createElement("input");
+    input.type = "hidden";
+    input.dataset.nativeProp = key;
+    wrap.append(input);
+    const notify = value => {
+      input.value = value;
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    };
+    const choices = Array.isArray(type) ? Object.fromEntries(type.filter(value => key !== "textAlign" || !["start", "end"].includes(value)).map(value => [value, choiceTitle(key, value)])) : styleChoices[key];
+    if (choices) {
+      const select = document.createElement("select");
+      select.dataset.styleChoice = key;
+      select.setAttribute("aria-label", styleTitle(key));
+      select.append(new Option("Reset to default", ""), ...Object.entries(choices).map(([value, title]) => new Option(title, value)));
+      select.addEventListener("change", () => notify(select.value));
+      wrap.append(select);
+    } else if (["length", "number"].includes(type)) {
+      const row = document.createElement("span");
+      row.className = "sq-style-measure";
+      const number = document.createElement("input");
+      number.type = "number";
+      number.step = "any";
+      if (!/^(margin|top$|right$|bottom$|left$|letterSpacing|order|zIndex)/.test(key)) number.min = "0";
+      if (key === "fontSize") number.min = "1";
+      if (key === "opacity") { number.min = "0"; number.max = "100"; }
+      number.dataset.styleNumber = key;
+      number.setAttribute("aria-label", styleTitle(key));
+      const unit = document.createElement("select");
+      unit.dataset.styleUnit = key;
+      unit.setAttribute("aria-label", `${styleTitle(key)} unit or sizing`);
+      const units = type === "number" ? { "": key === "opacity" ? "%" : "Value" } : styleUnits(key);
+      unit.append(...Object.entries(units).map(([value, title]) => new Option(title, value)), ...Object.entries(sizeBehaviors(key)).map(([value, title]) => new Option(title, value)));
+      if (key === "fontSize") unit.append(new Option("Responsive", "fluid"));
+      unit.append(new Option("Saved sizing", "saved"));
+      unit.addEventListener("change", () => {
+        if (unit.value === "saved") return;
+        if (unit.value === "fluid") {
+          const size = Number(number.value) || 32;
+          notify(`clamp(${Math.max(12, Math.round(size * .6))}px, ${rounded(size / 12)}vw, ${size}px)`);
+        } else if (Object.hasOwn(sizeBehaviors(key), unit.value)) notify(unit.value);
+        else {
+          const n = number.value || "0";
+          notify(`${key === "opacity" ? Number(n) / 100 : n}${unit.value}`);
+        }
+      });
+      number.addEventListener("change", () => {
+        if (!number.value) return notify("");
+        if (!number.checkValidity()) { number.reportValidity(); return; }
+        const suffix = Object.hasOwn(units, unit.value) ? unit.value : "px";
+        notify(`${key === "opacity" ? Number(number.value) / 100 : number.value}${suffix}`);
+      });
+      const reset = document.createElement("button");
+      reset.type = "button";
+      reset.className = "sq-style-reset";
+      reset.dataset.styleReset = key;
+      reset.textContent = "↺";
+      reset.setAttribute("aria-label", `Reset ${styleTitle(key).toLowerCase()} to default`);
+      reset.title = reset.getAttribute("aria-label");
+      reset.addEventListener("click", event => { event.preventDefault(); notify(""); });
+      row.append(number, unit, reset);
+      wrap.append(row);
+      if (key === "fontSize" || key === "opacity") {
+        const slider = document.createElement("input");
+        slider.type = "range";
+        slider.min = key === "opacity" ? "0" : "8";
+        slider.max = key === "opacity" ? "100" : "160";
+        slider.step = "1";
+        slider.dataset.styleSlider = key;
+        slider.setAttribute("aria-label", `${styleTitle(key)} slider`);
+        slider.addEventListener("input", () => { number.value = slider.value; });
+        slider.addEventListener("change", () => notify(key === "opacity" ? String(Number(slider.value) / 100) : `${slider.value}px`));
+        wrap.append(slider);
+      }
+      if (key === "fontSize") {
+        const fluid = document.createElement("span");
+        fluid.className = "sq-style-fluid";
+        fluid.dataset.styleFluid = "";
+        ["Smallest", "Screen width", "Largest"].forEach((title, index) => {
+          const field = document.createElement("span");
+          field.append(title);
+          const n = document.createElement("input");
+          n.type = "number"; n.min = "0.01"; n.step = "any";
+          n.dataset.fluidPart = index;
+          n.setAttribute("aria-label", `Responsive font size: ${title.toLowerCase()}`);
+          const unitLabel = document.createElement("span");
+          unitLabel.dataset.fluidUnit = index;
+          n.addEventListener("change", () => {
+            const parts = [...fluid.querySelectorAll("input")];
+            if (parts.some(part => !part.value || !part.checkValidity())) { n.reportValidity(); return; }
+            if (parts[0].dataset.unit === parts[2].dataset.unit && Number(parts[0].value) > Number(parts[2].value)) {
+              hooks.toast("The smallest size must be no larger than the largest size.");
+              return;
+            }
+            notify(`clamp(${parts.map(part => `${part.value}${part.dataset.unit}`).join(", ")})`);
+          });
+          field.append(n, unitLabel); fluid.append(field);
+        });
+        wrap.append(fluid);
+      }
+      const note = document.createElement("small");
+      note.dataset.styleNote = key;
+      wrap.append(note);
+    } else if (type === "color") {
+      input.type = "text";
+      input.setAttribute("aria-label", styleTitle(key));
+      const row = document.createElement("span");
+      row.className = "sq-native-color-field";
+      const picker = document.createElement("input");
+      picker.type = "color";
+      picker.dataset.styleColor = key;
+      picker.setAttribute("aria-label", `Choose ${styleTitle(key).toLowerCase()}`);
+      picker.addEventListener("input", () => { input.value = picker.value; });
+      picker.addEventListener("change", () => notify(picker.value));
+      row.append(picker, input); wrap.append(row);
+    } else if (type === "columns") {
+      const select = document.createElement("select");
+      select.dataset.styleChoice = key;
+      select.setAttribute("aria-label", styleTitle(key));
+      select.append(new Option("Follow content", ""), ...[1, 2, 3, 4, 5, 6].map(n => new Option(`${n} equal ${key.endsWith("Rows") ? n === 1 ? "row" : "rows" : n === 1 ? "column" : "columns"}`, `repeat(${n}, minmax(0, 1fr))`)));
+      select.addEventListener("change", () => notify(select.value)); wrap.append(select);
+    } else {
+      input.type = "text";
+      input.setAttribute("aria-label", styleTitle(key));
+      input.placeholder = key === "fontFamily" ? "Choose a font" : "Use page setting";
+    }
+    return wrap;
+  }
+
+  function syncStyleFields(panel, config, props) {
+    // Snapshot before writing controls: a live computed-style object would force
+    // a fresh layout for every field as the inspector changes height.
+    const computed = getComputedStyle(selected);
+    const css = Object.fromEntries([...Object.keys(schema), "direction"].map(key => [key, computed[key]]));
+    const own = getContext(config).props || {};
+    panel.querySelectorAll("[data-style-field]").forEach(wrap => {
+      const key = wrap.dataset.styleField, raw = props[key], resolved = css[key] || "", isDefault = own[key] == null;
+      const input = wrap.querySelector("[data-native-prop]");
+      input.value = raw ?? "";
+      const choice = wrap.querySelector("[data-style-choice]");
+      if (choice) {
+        choice.querySelectorAll("[data-saved-choice]").forEach(option => option.remove());
+        // Only call a value a default when it is actually inherited in this context.
+        const defaultTitle = isDefault ? `${choiceTitle(key, raw || resolved, css)} (default)` : "Reset to default";
+        if (choice.options[0].text !== defaultTitle) choice.options[0].text = defaultTitle;
+        const value = isDefault ? "" : String(raw ?? "");
+        if (value && ![...choice.options].some(option => option.value === value)) {
+          const option = new Option(key === "fontWeight" ? `Weight ${value}` : key === "textAlign" ? `${choiceTitle(key, value, css)} · text direction` : "Saved appearance", value);
+          option.dataset.savedChoice = ""; choice.append(option);
+        }
+        choice.value = value;
+        if (key === "textAlign") [...choice.options].filter(o => o.value).forEach(o => o.text = choiceTitle(key, o.value, css));
+      }
+      const number = wrap.querySelector("[data-style-number]");
+      if (number) {
+        const unit = wrap.querySelector("[data-style-unit]"), parsed = measure(raw ?? resolved), fluid = key === "fontSize" && fluidSize(raw);
+        let value = parsed ? parsed[1] : parseFloat(resolved) || 0;
+        if (key === "opacity") value = Number(value) * 100;
+        number.value = parsed && key !== "opacity" ? parsed[1] : rounded(value);
+        const behavior = Object.hasOwn(sizeBehaviors(key), raw ?? resolved) ? raw ?? resolved : null;
+        unit.value = fluid ? "fluid" : behavior || (parsed ? parsed[2] || (schema[key] === "number" || key === "lineHeight" ? "" : "px") : raw ? "saved" : schema[key] === "number" || key === "lineHeight" ? "" : "px");
+        number.disabled = Boolean(fluid || behavior || raw && !parsed);
+        wrap.classList.toggle("sq-style-wide-value", Boolean(behavior || raw && !parsed));
+        number.hidden = Boolean(behavior && !Number.isFinite(parseFloat(resolved)));
+        unit.querySelector('[value="saved"]').hidden = !(raw && !parsed && !fluid && !behavior);
+        wrap.querySelector("[data-style-reset]").disabled = isDefault;
+        const slider = wrap.querySelector("[data-style-slider]");
+        if (slider) { slider.max = key === "opacity" ? "100" : String(Math.max(160, Math.ceil(Number(number.value)))); slider.value = number.value; slider.hidden = key === "fontSize" && unit.value !== "px"; }
+        const fluidPanel = wrap.querySelector("[data-style-fluid]");
+        if (fluidPanel) {
+          fluidPanel.hidden = !fluid;
+          if (fluid) fluid.forEach((part, index) => {
+            const n = fluidPanel.querySelector(`[data-fluid-part="${index}"]`);
+            n.value = part[1]; n.dataset.unit = part[2] || "px";
+            if (index === 1) {
+              const title = { vw: "Screen width", vh: "Screen height", cqw: "Container width", cqh: "Container height" }[part[2]] || "Preferred size";
+              n.parentElement.firstChild.textContent = title;
+              n.setAttribute("aria-label", `Responsive font size: ${title.toLowerCase()}`);
+            }
+            fluidPanel.querySelector(`[data-fluid-unit="${index}"]`).textContent = /^(vw|vh|cqw|cqh)$/.test(part[2]) ? "%" : part[2] || "px";
+          });
+        }
+        const note = wrap.querySelector("[data-style-note]");
+        note.textContent = fluid ? `${rounded(parseFloat(resolved))} px on this screen · scales between these limits`
+          : raw && !parsed && !behavior ? `${rounded(parseFloat(resolved) || 0)} px on this screen · saved responsive sizing`
+          : isDefault ? `${behavior ? sizeBehaviors(key)[behavior] : number.value + (key === "opacity" ? "%" : unit.value === "" ? "" : ` ${unit.value}`)} (default)` : "";
+        note.hidden = !note.textContent;
+      }
+      const picker = wrap.querySelector("[data-style-color]");
+      if (picker) {
+        const probe = document.createElement("canvas").getContext("2d");
+        probe.fillStyle = raw || resolved || "#000000";
+        const value = probe.fillStyle;
+        picker.value = /^#[\da-f]{6}$/i.test(value) ? value : "#000000";
+        picker.style.background = raw || resolved;
+        input.placeholder = resolved;
+        if (!raw) input.value = /^#[\da-f]{6}$/i.test(value) ? `${value}` : resolved;
+      }
+      if (key === "fontFamily") {
+        input.dataset.effectiveFont = css.fontFamily;
+        globalThis.EzkartFonts?.sync(input);
+      }
+      const media = ["image", "video"].includes(config.type);
+      const layout = /flex|grid/.test(css.display), grid = css.display === "grid";
+      wrap.hidden = config.type === "product" && ["height", "maxHeight"].includes(key)
+        || config.type === "icon" && Object.hasOwn(groups.Typography, key) && key !== "color"
+        || ["objectFit", "objectPosition"].includes(key) && !media
+        || ["flexDirection", "flexWrap"].includes(key) && !css.display.includes("flex")
+        || ["alignItems", "justifyContent", "gap", "rowGap", "columnGap"].includes(key) && !layout
+        || ["gridTemplateColumns", "gridTemplateRows"].includes(key) && !grid;
+      if (["objectFit", "objectPosition"].includes(key))
+        wrap.firstChild.textContent = `${config.type === "video" ? "Video" : "Image"} ${key === "objectFit" ? "fit" : "focus"}`;
+      if (wrap.hasAttribute("data-style-all-sides")) {
+        const suffix = key.replace("borderTop", "");
+        const values = ["Top", "Right", "Bottom", "Left"].map(side => css[`border${side}${suffix}`]);
+        const note = wrap.querySelector("[data-style-sides-note]");
+        note.hidden = new Set(values).size < 2;
+      }
+    });
+  }
+  function syncIconPaint(panel, config) {
+    if (config.type !== "icon") return;
+    const css = getComputedStyle(selected);
+    for (const key of ["iconFill", "iconStroke"]) {
+      const value = config[key] ?? (key === "iconFill" ? "none" : "currentColor");
+      const paint = panel.querySelector(`[data-icon-paint="${key}"]`);
+      paint.value = ["none", "currentColor"].includes(value) ? value : "custom";
+      const picker = panel.querySelector(`[data-icon-color="${key}"]`);
+      const color = document.createElement("canvas").getContext("2d");
+      color.fillStyle = paint.value === "custom" ? value : css.color;
+      picker.value = /^#[\da-f]{6}$/i.test(color.fillStyle) ? color.fillStyle : "#24262b";
+      picker.hidden = paint.value !== "custom";
+    }
+  }
+  function syncActionFields(panel) {
+    const type = panel.querySelector("[data-native-action-type]").value;
+    const target = panel.querySelector("[data-native-action-target]");
+    const picker = panel.querySelector("[data-native-action-picker]");
+    const elementTarget = Boolean(type && !["link", "state"].includes(type));
+    target.closest("label").hidden = !type;
+    target.hidden = elementTarget;
+    picker.hidden = !elementTarget;
+    panel.querySelector("[data-native-action-target-label]").textContent = type === "link" ? "Web address or page section" : type === "state" ? "Version to show" : type.includes("video") ? "Video" : type.includes("dialog") ? "Dialog" : "Element to show or hide";
+    target.placeholder = type === "link" ? "https://example.com or #section" : "e.g. delivery";
+    const nodes = type ? [...hooks.root.querySelectorAll(".sq-native")] : [];
+    const targets = elementTarget ? nodes.filter(node => type.includes("video") ? node.tagName === "VIDEO" : type.includes("dialog") ? node.tagName === "DIALOG" : node !== selected) : [];
+    picker.replaceChildren(new Option("Choose an element…", ""), ...targets.map(node => new Option(read(node).name || read(node).text?.slice(0, 45) || typeName(read(node).type), read(node).id)));
+    if (target.value && !targets.some(node => read(node).id === target.value)) picker.append(new Option(`Saved target · ${target.value}`, target.value));
+    picker.value = target.value;
+    const scope = panel.querySelector("[data-native-action-scope]");
+    scope.closest("label").hidden = !["link", "state"].includes(type);
+    const scopeChoice = panel.querySelector("[data-native-action-scope-choice]");
+    scopeChoice.replaceChildren(new Option(type === "state" ? "Containing group (default)" : "No group", ""), ...nodes.filter(node => read(node).type === "container").map(node => new Option(read(node).name || "Layout group", read(node).id)));
+    if (scope.value && ![...scopeChoice.options].some(o => o.value === scope.value)) scopeChoice.append(new Option(`Saved group · ${scope.value}`, scope.value));
+    scopeChoice.value = scope.value;
+    panel.querySelector("[data-native-action-reveal]").closest("label").hidden = type !== "link" || !scope.value;
+    panel.querySelector("[data-native-action-disable-active]").closest("label").hidden = type !== "state";
+    const button = panel.querySelector("[data-native-action-apply]");
+    button.hidden = !type && !read(selected).action;
+    button.textContent = !type ? "Remove click action" : "Apply click action";
+    panel.querySelector("[data-native-action-note]").textContent = !type ? "This element has no click action." : "Hold Alt and click the element to try this action.";
+  }
   const tags = {
     container: [
       "div",
@@ -2352,6 +2699,7 @@
       selection = null;
       layerIndex = 0;
     }
+    if (node !== selected) document.querySelectorAll("[data-style-link]").forEach(input => { input.checked = false; });
     selected = node?.matches(".sq-native") ? node : null;
     const panel = document.querySelector("[data-sq-native-inspector]");
     if (!panel) return;
@@ -2543,6 +2891,7 @@
       "video",
       "break",
     ].includes(config.type);
+    panel.querySelector("[data-native-group=Typography] > summary").textContent = config.type === "icon" ? "Icon color" : "Font & text alignment";
     panel.querySelector("[data-native-open]").closest("label").hidden =
       config.type !== "accordion";
     if (!config.states?.[state]) state = "";
@@ -2599,13 +2948,7 @@
         : context === "base" && !state
         ? "Layout and appearance settings affect all screen sizes."
         : `Editing ${responsive.selectedOptions[0].text.toLowerCase()}${state ? ` · ${state} version` : ""}.`;
-    panel.querySelectorAll("[data-native-prop]").forEach((input) => {
-      input.value = props[input.dataset.nativeProp] ?? "";
-      if (input.dataset.nativeProp === "fontFamily") globalThis.EzkartFonts?.sync(input);
-      input.closest("label").hidden =
-        config.type === "product" &&
-        ["height", "maxHeight"].includes(input.dataset.nativeProp);
-    });
+    syncStyleFields(panel, config, props);
     const text = panel.querySelector("[data-native-text]");
     text.parentElement.hidden = config.text === undefined;
     text.value = config.text || "";
@@ -2683,6 +3026,7 @@
     panel
       .querySelector("[data-native-action-disable-active]")
       .closest("label").hidden = action.type !== "state";
+    syncActionFields(panel);
     const layers = current.fill?.layers || [];
     draftLayers = structuredClone(layers);
     layerIndex = Math.min(layerIndex, Math.max(0, layers.length - 1));
@@ -2789,6 +3133,7 @@
           : key === "iconFill"
             ? "none"
             : "currentColor");
+    syncIconPaint(panel, config);
     for (const key of ["max", "width", "height", "extra"])
       panel.querySelector(`[data-native-fit-${key}]`).value =
         config.fit?.[key] ?? "";
@@ -2887,7 +3232,7 @@
       </details>`;
     panel.insertAdjacentHTML(
       "beforeend",
-      `<details data-native-structure><summary>Structure &amp; accessibility</summary><label>Name<input data-native-name></label><label>Section anchor<input data-native-anchor></label><label>HTML element<select data-native-tag></select></label><label>Table header for<select data-native-table-scope><option value="">Automatic</option><option value="col">Column</option><option value="row">Row</option></select></label><label>Parent container<select data-native-move-parent></select></label><button type="button" data-native-move>Move into container</button><div class="sq-native-pair"><button type="button" data-native-earlier>Move earlier</button><button type="button" data-native-later>Move later</button></div><label><input type="checkbox" data-native-collapsed>Initially hidden (toggle target)</label><label><input type="checkbox" data-native-open>Accordion initially open</label></details><details data-native-media><summary>Video</summary><label>Poster image URL<input data-native-media-poster></label><label>Captions URL<input data-native-media-captions></label><label>Captions (WebVTT)<textarea rows="5" data-native-media-captionsText></textarea></label>${["muted", "controls", "loop", "autoplay"].map((k) => `<label><input type="checkbox" data-native-media-${k}>${label(k)}</label>`).join("")}</details><details data-native-icon-options><summary>Icon appearance</summary>${["iconFill", "iconStroke", "iconWeight"].map((k) => `<label>${label(k)}<input data-native-setting="${k}"></label>`).join("")}</details><details><summary>Show while scrolling</summary><label>Show after element or section<input data-native-visible-after placeholder="e.g. hero"></label><label>Hide while these are visible<input data-native-hide-while placeholder="e.g. purchase, footer"></label><p class="sq-native-help">Enter element IDs separated by commas. Useful for a purchase bar that appears after the hero.</p><button type="button" data-native-visibility-apply>Apply visibility</button><button type="button" data-native-visibility-clear>Always show</button></details><details><summary>Scroll motion</summary><label>Starting tilt (degrees)<input type="number" data-native-motion-tilt></label><label>Vertical travel (px)<input type="number" data-native-motion-travel></label><button type="button" data-native-motion-apply>Apply motion</button><button type="button" data-native-motion-clear>Remove motion</button></details><details><summary>Scale to fit</summary><p>Keep a detailed composition proportional below a screen width. Its parent reserves the scaled height.</p>${["max", "width", "height", "extra"].map((k) => `<label>${{ max: "Below screen width", width: "Design width", height: "Design height", extra: "Extra space below" }[k]}<input type="number" data-native-fit-${k}></label>`).join("")}<button type="button" data-native-fit-apply>Apply frame</button><button type="button" data-native-fit-clear>Remove scaling</button></details>`,
+      `<details data-native-structure><summary>Structure &amp; accessibility</summary><label>Name<input data-native-name></label><label>Section anchor<input data-native-anchor></label><label>HTML element<select data-native-tag></select></label><label>Table header for<select data-native-table-scope><option value="">Based on table position</option><option value="col">Column</option><option value="row">Row</option></select></label><label>Parent container<select data-native-move-parent></select></label><button type="button" data-native-move>Move into container</button><div class="sq-native-pair"><button type="button" data-native-earlier>Move earlier</button><button type="button" data-native-later>Move later</button></div><label><input type="checkbox" data-native-collapsed>Initially hidden (toggle target)</label><label><input type="checkbox" data-native-open>Accordion initially open</label></details><details data-native-media><summary>Video</summary><label>Poster image URL<input data-native-media-poster></label><label>Captions URL<input data-native-media-captions></label><label>Captions (WebVTT)<textarea rows="5" data-native-media-captionsText></textarea></label>${["muted", "controls", "loop", "autoplay"].map((k) => `<label><input type="checkbox" data-native-media-${k}>${label(k)}</label>`).join("")}</details><details data-native-icon-options><summary>Icon appearance</summary>${["iconFill", "iconStroke"].map((k) => `<label>${k === "iconFill" ? "Fill" : "Outline"}<input type="hidden" data-native-setting="${k}"><select data-icon-paint="${k}" aria-label="Icon ${k === "iconFill" ? "fill" : "outline"}"><option value="none">${k === "iconFill" ? "No fill" : "No outline"}</option><option value="currentColor">Use element color</option><option value="custom">Choose a color</option></select><input type="color" data-icon-color="${k}" aria-label="Icon ${k === "iconFill" ? "fill" : "outline"} color"></label>`).join("")}<label>Outline thickness<input type="number" min="0" max="24" step="0.1" data-native-setting="iconWeight"></label></details><details><summary>Show while scrolling</summary><label>Show after element or section<input data-native-visible-after placeholder="e.g. hero"></label><label>Hide while these are visible<input data-native-hide-while placeholder="e.g. purchase, footer"></label><p class="sq-native-help">Enter element IDs separated by commas. Useful for a purchase bar that appears after the hero.</p><button type="button" data-native-visibility-apply>Apply visibility</button><button type="button" data-native-visibility-clear>Always show</button></details><details><summary>Scroll motion</summary><label>Starting tilt (degrees)<input type="number" data-native-motion-tilt></label><label>Vertical travel (px)<input type="number" data-native-motion-travel></label><button type="button" data-native-motion-apply>Apply motion</button><button type="button" data-native-motion-clear>Remove motion</button></details><details><summary>Scale to fit</summary><p>Keep a detailed composition proportional below a screen width. Its parent reserves the scaled height.</p>${["max", "width", "height", "extra"].map((k) => `<label>${{ max: "Below screen width", width: "Design width", height: "Design height", extra: "Extra space below" }[k]}<input type="number" data-native-fit-${k}></label>`).join("")}<button type="button" data-native-fit-apply>Apply frame</button><button type="button" data-native-fit-clear>Remove scaling</button></details>`,
     );
     panel.insertAdjacentHTML(
       "beforeend",
@@ -2914,16 +3259,7 @@
         "gap",
         "gridTemplateColumns",
       ],
-      Size: [
-        "width",
-        "height",
-        "minWidth",
-        "maxWidth",
-        "minHeight",
-        "maxHeight",
-        "objectFit",
-        "aspectRatio",
-      ],
+      Size: ["width", "height", "objectFit", "aspectRatio"],
       Typography: [
         "fontFamily",
         "fontSize",
@@ -2934,35 +3270,12 @@
         "color",
       ],
       Surface: ["backgroundColor", "borderRadius", "opacity", "boxShadow"],
+      Spacing: ["paddingTop", "paddingRight", "paddingBottom", "paddingLeft", "marginTop", "marginRight", "marginBottom", "marginLeft"],
     };
     const names = {
       Surface: "Borders & effects",
       Size: "Size",
       Position: "Position & behavior",
-    };
-    const fieldNames = {
-      display: "Layout type",
-      flexDirection: "Direction",
-      alignItems: "Align items",
-      justifyContent: "Distribute items",
-      gap: "Item spacing",
-      gridTemplateColumns: "Grid columns",
-      objectFit: "Image fit",
-      color: "Text color",
-      backgroundColor: "Background color",
-      borderRadius: "Corner radius",
-    };
-    const optionNames = {
-      flex: "Flexible row / column",
-      grid: "Grid",
-      block: "Stacked blocks",
-      row: "Horizontal",
-      column: "Vertical",
-      "flex-start": "Start",
-      "flex-end": "End",
-      "space-between": "Space between",
-      "space-around": "Space around",
-      nowrap: "No wrap",
     };
     for (const group of [
       "Typography",
@@ -2981,29 +3294,39 @@
       more.innerHTML = `<summary>More ${group.toLowerCase()} options</summary><div class="sq-native-fields"></div>`;
       const grid = document.createElement("div");
       grid.className = "sq-native-fields";
+      if (group === "Surface") {
+        for (const [key, title] of [["borderTopWidth", "Border width"], ["borderTopStyle", "Border style"], ["borderTopColor", "Border color"]]) {
+          const field = styleField(key, fields[key]);
+          field.firstChild.textContent = title;
+          field.dataset.styleAllSides = "";
+          field.querySelector("[data-native-prop]").dataset.styleAllSides = "";
+          const note = document.createElement("small");
+          note.className = "sq-native-help";
+          note.dataset.styleSidesNote = "";
+          note.textContent = "Sides differ. Editing here changes all four sides.";
+          field.append(note);
+          grid.append(field);
+        }
+      }
       for (const [key, type] of Object.entries(fields)) {
         if (key === "backgroundColor") continue;
-        const wrap = document.createElement("label");
-        wrap.append(fieldNames[key] || label(key));
-        const input = Array.isArray(type)
-          ? document.createElement("select")
-          : document.createElement("input");
-        if (Array.isArray(type))
-          input.replaceChildren(
-            new Option("Inherit / automatic", ""),
-            ...type.map(
-              (value) => new Option(optionNames[value] || label(value), value),
-            ),
-          );
-        else input.type = "text";
-        input.dataset.nativeProp = key;
-        input.placeholder =
-          type === "length" ? "24px, 100%, auto" : "Automatic";
-        wrap.append(input);
+        const wrap = styleField(key, type);
         (basicFields[group] && !basicFields[group].includes(key)
           ? more.lastElementChild
           : grid
         ).append(wrap);
+      }
+      if (group === "Spacing") {
+        for (const [prefix, title, description] of [["padding", "Inside spacing", "Space between the edges and the content."], ["margin", "Outside spacing", "Space between this element and its neighbors."]]) {
+          const section = document.createElement("div");
+          section.className = "sq-style-spacing";
+          section.innerHTML = `<div class="sq-style-spacing-heading"><strong>${title}</strong><label><input type="checkbox" data-style-link="${prefix}">Keep sides equal</label></div><p class="sq-native-help">${description}</p><div class="sq-native-fields"></div>`;
+          for (const field of [...grid.children].filter(field => field.dataset.styleField?.startsWith(prefix))) {
+            field.firstChild.textContent = field.dataset.styleField.slice(prefix.length);
+            section.lastElementChild.append(field);
+          }
+          grid.append(section);
+        }
       }
       detail.append(grid);
       if (more.lastElementChild.children.length) detail.append(more);
@@ -3012,7 +3335,7 @@
     }
     panel.insertAdjacentHTML(
       "beforeend",
-      '<details><summary>Click action</summary><label>On click<select data-native-action-type><option value="">None</option><option value="link">Open link</option><option value="toggle">Show / hide element</option><option value="state">Switch state</option><option value="dialog">Open dialog</option><option value="close-dialog">Close dialog</option><option value="video-dialog">Open video dialog</option><option value="video-toggle">Play / pause video</option></select></label><label>Destination or target ID<input data-native-action-target></label><label>Interaction group ID<input data-native-action-scope placeholder="Optional: collection or setup group"></label><label>Show group version before opening link<input data-native-action-reveal placeholder="Optional: e.g. all"></label><label><input type="checkbox" data-native-action-disable-active> Disable when this state is selected</label><button type="button" data-native-action-apply>Apply action</button></details><p class="sq-native-help">Hold Alt and click an element to try its interaction.</p>',
+      '<details><summary>Click action</summary><label>On click<select data-native-action-type><option value="">None</option><option value="link">Open link</option><option value="toggle">Show / hide element</option><option value="state">Switch state</option><option value="dialog">Open dialog</option><option value="close-dialog">Close dialog</option><option value="video-dialog">Open video dialog</option><option value="video-toggle">Play / pause video</option></select></label><label><span data-native-action-target-label>Destination</span><input data-native-action-target><select data-native-action-picker aria-label="Target element"></select></label><label>Interaction group<input type="hidden" data-native-action-scope><select data-native-action-scope-choice aria-label="Interaction group"></select></label><label>Show group version before opening link<input data-native-action-reveal placeholder="Optional: e.g. all"></label><label><input type="checkbox" data-native-action-disable-active> Disable when this state is selected</label><button type="button" data-native-action-apply>Apply action</button><p class="sq-native-help" data-native-action-note></p></details>',
     );
     panel.append(advanced);
     globalThis.EzkartFonts?.attach(panel);
@@ -3033,19 +3356,29 @@
     panel.querySelectorAll("[data-native-prop]").forEach((input) =>
       input.addEventListener("change", () => {
         try {
+          const key = input.dataset.nativeProp;
+          const prefix = /^(padding|margin)/.exec(key)?.[1];
+          const linked = prefix && panel.querySelector(`[data-style-link="${prefix}"]`)?.checked;
+          const allBorders = input.hasAttribute("data-style-all-sides");
+          const keys = allBorders ? ["Top", "Right", "Bottom", "Left"].map(side => key.replace("Top", side))
+            : linked ? ["Top", "Right", "Bottom", "Left"].map(side => prefix + side) : [key];
           if (!input.value) {
-            const config = read(selected),
-              current = getContext(config);
-            delete current.props?.[input.dataset.nativeProp];
+            const config = read(selected), current = getContext(config);
+            keys.forEach(key => delete current.props?.[key]);
             hooks.remember();
             write(selected, config);
             refresh();
             hooks.changed();
-            select(selected);
-          } else
-            change({
-              props: validateProps({ [input.dataset.nativeProp]: input.value }),
-            });
+          } else {
+            const patch = Object.fromEntries(keys.map(key => [key, input.value]));
+            if (allBorders && key === "borderTopWidth" && parseFloat(input.value) > 0) {
+              const css = getComputedStyle(selected);
+              for (const side of ["Top", "Right", "Bottom", "Left"])
+                if (css[`border${side}Style`] === "none") patch[`border${side}Style`] = "solid";
+            }
+            change({ props: validateProps(patch) });
+          }
+          syncStyleFields(panel, read(selected), currentAppearance(read(selected)).props || {});
         } catch (error) {
           callbacks.toast(error.message);
           select(selected);
@@ -3397,7 +3730,16 @@
           }[key],
           value,
         );
+        syncIconPaint(panel, read(selected));
       });
+    for (const key of ["iconFill", "iconStroke"]) {
+      const paint = panel.querySelector(`[data-icon-paint="${key}"]`);
+      const picker = panel.querySelector(`[data-icon-color="${key}"]`);
+      const input = panel.querySelector(`[data-native-setting="${key}"]`);
+      const apply = value => { input.value = value; input.dispatchEvent(new Event("change", { bubbles: true })); };
+      paint.addEventListener("change", () => apply(paint.value === "custom" ? picker.value : paint.value));
+      picker.addEventListener("change", () => apply(picker.value));
+    }
     listen("[data-native-visibility-apply]", "click", () =>
       change({
         scrollVisibility: {
@@ -3613,14 +3955,15 @@
       select(selected);
     });
     listen("[data-native-action-type]", "change", () => {
-      panel
-        .querySelector("[data-native-action-reveal]")
-        .closest("label").hidden =
-        panel.querySelector("[data-native-action-type]").value !== "link";
-      panel
-        .querySelector("[data-native-action-disable-active]")
-        .closest("label").hidden =
-        panel.querySelector("[data-native-action-type]").value !== "state";
+      panel.querySelector("[data-native-action-target]").value = "";
+      syncActionFields(panel);
+    });
+    listen("[data-native-action-picker]", "change", () => {
+      panel.querySelector("[data-native-action-target]").value = panel.querySelector("[data-native-action-picker]").value;
+    });
+    listen("[data-native-action-scope-choice]", "change", () => {
+      panel.querySelector("[data-native-action-scope]").value = panel.querySelector("[data-native-action-scope-choice]").value;
+      syncActionFields(panel);
     });
     listen("[data-native-action-apply]", "click", () => {
       const type = panel.querySelector("[data-native-action-type]").value,
@@ -3645,8 +3988,12 @@
             }
           : null,
       });
-      if (selected.tagName === "A" && type === "link") selected.href = target;
+      if (selected.tagName === "A") {
+        if (type === "link") selected.href = target;
+        else selected.removeAttribute("href");
+      }
       refresh();
+      syncActionFields(panel);
     });
     document.addEventListener("selectionchange", () => {
       // Sidebar focus can leave an old canvas range behind. Only a canvas

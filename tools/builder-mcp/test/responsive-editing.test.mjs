@@ -26,10 +26,17 @@ async function fixture(run) {
     assert.match(await panel.locator("[data-native-context-note]").textContent(), size === "desktop" ? /all screen sizes/ : new RegExp(`${size} only`));
   };
   const prop = async (key, value) => {
-    const input = panel.locator(`[data-native-prop=${key}]`);
-    const group = input.locator("xpath=ancestor::details[1]");
-    if (await group.count() && await group.getAttribute("open") === null) await group.locator(":scope > summary").click();
-    await input.fill(value);
+    const input = panel.locator(`[data-style-number=${key}]`);
+    for (const group of await input.locator("xpath=ancestor::details").all()) {
+      if (await group.getAttribute("open") === null) await group.locator(":scope > summary").click();
+    }
+    const unit = panel.locator(`[data-style-unit=${key}]`);
+    if (value && await unit.inputValue() !== "px") {
+      const id = await unit.evaluate(n => n._sqBuilderSelect.menu.id);
+      await page.locator(`[aria-controls="${id}"]`).click();
+      await page.locator(`#${id}`).getByRole("option", { name: "px", exact: true }).click();
+    }
+    await input.fill(value.replace(/px$/, ""));
     await input.press("Tab");
     await call("settle");
   };

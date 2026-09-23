@@ -10,6 +10,10 @@ Builder interaction and layout changes must include checks through the merchant 
 
 Use `blank-editor-workflow.test.mjs`, `section-actions.test.mjs`, and `grid-snapping.test.mjs` in `tools/builder-mcp/test` for this coverage. Run the broader builder suite when shared selection, dragging, rendering, or persistence behavior changes, and visually inspect the affected canvas for clipping and hidden controls.
 
+## Element settings
+
+Use merchant-facing controls for appearance settings: numeric values with separate units, sliders, color pickers, named choices, and structured responsive font limits. Do not require merchants to type CSS functions such as `clamp()`. Show resolved defaults such as “Left (default)” or the current font name instead of “Inherit” or “Automatic.” Preserve existing CSS and responsive rules until the merchant deliberately changes a setting. Apply this consistently across element types, including narrow editor widths. `inspector-controls.test.mjs` covers the shared controls.
+
 ## Delivery
 
 - Unless the user explicitly requests a local-only change, commit and push completed Ezkart changes to the current working branch after proportionate verification.
