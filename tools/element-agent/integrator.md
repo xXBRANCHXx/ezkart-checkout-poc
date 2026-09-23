@@ -2,6 +2,8 @@
 
 You are the second of two unattended agents. Read the first agent's `RUN_DIRECTORY/handoff.md` and `RUN_DIRECTORY/pack.json`, then install and verify its native element collection. The user authorizes this complete batch without per-design approval. TARGET_COUNT is the minimum total options per existing category. Existing designs remain intact, IDs remain stable, and catalogue growth must remain possible.
 
+If `RUN_DIRECTORY/coordinator-review/review.md` exists, read the independent visual review and resolve its blockers. Editable `#` link destinations are permitted placeholders, matching existing recipes; record that merchants must configure them, especially contact and policy links.
+
 Read `AGENTS.md`, the entire `docs/landing-page-template-plan.md`, `cart/admin/builder-assets.js`, `cart/admin/builder-native.js`, the workspace harness and related asset tests. Own ONLY these checkout paths:
 
 - `cart/admin/builder-asset-packs.js` — native data assigned to `globalThis.EzkartAssetPacks`, preserving earlier packs on future runs.

@@ -49,7 +49,7 @@ test('visual fonts search, keyboard selection, undo, persistence, narrow layout 
     assert.ok(box.x>=0&&box.x+box.width<=390&&box.y>=0&&box.y+box.height<=844,'Font browser fits narrow editor');await dialog.locator('[data-font-search]').fill('Pacifico');await dialog.locator('[data-font-id=pacifico]').click();await call('settle');assert.match((await call('nativeInspect',{id:heading.id})).props.fontFamily,/Pacifico/);
     await page.setViewportSize({width:1600,height:1000});await page.locator('[data-sq-tab=brand]').click();
     const brand=page.locator('[data-sq-brand-font=heading]').locator('..').locator('[data-sq-font-picker]');await brand.click();await dialog.locator('[data-font-search]').fill('Montserrat');await dialog.locator('[data-font-id=montserrat]').click();await call('settle');
-    const brandValue=()=>page.locator('.sq-page-preview').evaluate(el=>el.style.getPropertyValue('--site-heading-font'));
+    const brandValue=()=>page.locator('[data-sq-preview-root]').evaluate(el=>el.style.getPropertyValue('--site-heading-font'));
     assert.match(await brandValue(),/Montserrat/);await call('undo');assert.doesNotMatch(await brandValue(),/Montserrat/);await call('redo');assert.match(await brandValue(),/Montserrat/);
     assert.deepEqual(errors,[]);
   }finally{await browser.close();await ws.stop();await rm(dir,{recursive:true,force:true});}

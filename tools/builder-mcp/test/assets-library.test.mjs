@@ -189,7 +189,8 @@ test('sidebar resizing persists, stays within narrow screens, and adds whole edi
   await page.reload();await page.waitForFunction(()=>globalThis.EzkartBuilder);
   await category('reviews','sections');
   assert.equal(Number(await grip.getAttribute('aria-valuenow')),resized,'The exact width survives reopening');
-  assert.equal(await page.locator('[data-sq-add-block]:visible').count(),4,'Existing quote and new designs share one family');
+  const reviewDesigns=await page.evaluate(()=>EzkartAssets.sectionDefinitions.filter(item=>item.category==='reviews').length);
+  assert.equal(await page.locator('[data-sq-add-block]:visible').count(),reviewDesigns+1,'Existing quote and the complete design collection share one family');
   const target=page.locator('.sq-page-preview > [data-section-id=blank]'),bounds=await target.boundingBox();
   await page.locator('[data-sq-add-block=asset-section-review-editorial]').dragTo(target,{targetPosition:{x:bounds.width*.7,y:bounds.height*.6}});
   await call('settle');
@@ -198,9 +199,9 @@ test('sidebar resizing persists, stays within narrow screens, and adds whole edi
   await page.locator('[data-sq-undo]').click();assert.equal(await inserted.count(),0);
   await page.locator('[data-sq-redo]').click();assert.equal(await inserted.count(),1);
   // Clicking a section card also creates a whole section, independent of selection.
-  for(const family of ['accordions','contact','invitations','pricing','footers']) {
+  for(const [family,design] of [['accordions','accordion-numbered'],['contact','contact-card'],['invitations','invitation-minimal'],['pricing','pricing-menu'],['footers','footer-signature']]) {
     await category(family,'sections');
-    await page.locator('[data-sq-add-block]:visible').last().click();
+    await page.locator(`[data-sq-add-block="asset-section-${design}"]`).click();
     await call('settle');
   }
   const sectionCount=await page.locator('.sq-page-preview > [data-sq-block]').count();

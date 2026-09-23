@@ -159,36 +159,106 @@
       text('Thanks for stopping by.',{fontSize:'13px',color:'#cbbab2'}),title('See you\naround.',{fontFamily:'Georgia, serif',fontWeight:'400',fontSize:'64px',letterSpacing:'-2px',whiteSpace:'pre-line'}),row([text('Your brand',{fontSize:'13px'}),{...button('Keep in touch ↗','link'),props:{...button('x','link').props,color:'#fff6ed',borderBottomColor:'#9b8984'}}],{justifyContent:'space-between',flexWrap:'wrap'})
     ],{...pad('32px'),backgroundColor:'#30282b',color:'#fff6ed',gap:'28px'})}
   ];
+  // Packs are append-only data. Keep their trees private to the factories, so
+  // catalogue cards and section metadata never copy a complete native tree.
+  const recipeIds = new Set(recipes.map(item => item.id));
+  for (const {id,category,name,description,section,node} of globalThis.EzkartAssetPacks || []) {
+    if (recipeIds.has(id)) throw Error(`Duplicate asset recipe: ${id}`);
+    recipeIds.add(id);
+    recipes.push({id,category,name,description,section,make:()=>node});
+  }
   const definitions = recipes.map(({make,...item}) => item);
+  function cloneRecipe(source, kind = 'asset') {
+    const root = structuredClone(source), nodes = [], ids = new Map(), anchors = new Map();
+    const groups = new Map(), params = new Map();
+    const prefix = `${kind}-${crypto.randomUUID().replaceAll('-','')}`;
+    const collect = node => {
+      const id = `${prefix}-${nodes.length + 1}`;
+      if (node.id) {
+        if (ids.has(node.id)) throw Error('Each asset element needs a unique local ID.');
+        ids.set(node.id,id);
+        anchors.set(`native-${node.id}`,`native-${id}`);
+      }
+      if (node.anchor) {
+        if (anchors.has(node.anchor)) throw Error('Each asset anchor needs a unique local name.');
+        anchors.set(node.anchor,`${id}-anchor`);
+      }
+      nodes.push({node,id});
+      (node.children || []).forEach(collect);
+    };
+    collect(root);
+    const localId = value => ids.get(value) || value;
+    const localName = (map,value,label) => {
+      if (!map.has(value)) map.set(value,`${prefix}-${label}-${map.size + 1}`);
+      return map.get(value);
+    };
+    // Resolve after collecting every ID: forward references and references to
+    // ancestors must work too. State names are values, not element IDs.
+    for (const {node,id} of nodes) {
+      node.id = id;
+      if (node.anchor) node.anchor = anchors.get(node.anchor);
+      if (node.group) node.group = localName(groups,node.group,'group');
+      if (node.stateParam) node.stateParam = localName(params,node.stateParam,'state');
+      if (node.stateScope) node.stateScope = localId(node.stateScope);
+      else if (node.states) node.stateScope = root.id;
+      if (node.action) {
+        const action = node.action;
+        if (action.scope) action.scope = localId(action.scope);
+        else if (action.type === 'state') action.scope = root.id;
+        if (action.type === 'link') {
+          const anchor = action.target?.startsWith('#') && anchors.get(action.target.slice(1));
+          if (anchor) action.target = `#${anchor}`;
+        } else if (action.type !== 'state') action.target = localId(action.target);
+      }
+      if (node.scrollVisibility) {
+        if (node.scrollVisibility.after) node.scrollVisibility.after = localId(node.scrollVisibility.after);
+        if (node.scrollVisibility.hideWhile) node.scrollVisibility.hideWhile = node.scrollVisibility.hideWhile.map(localId);
+      }
+    }
+    return root;
+  }
   function create(id) {
     const recipe = recipes.find(item => item.id === id);
     if (!recipe) throw Error('Choose an asset from the library.');
-    let index = 0;
-    const prefix = `asset-${crypto.randomUUID().replaceAll('-','').slice(0,12)}`;
-    const node = recipe.make();
-    const assign = n => { n.id = `${prefix}-${++index}`; (n.children || []).forEach(assign); };
-    assign(node);
+    const node = cloneRecipe(recipe.make());
     node.name = recipe.name;
     node.props = {fontFamily:'Arial, Helvetica, sans-serif',color:'#28272c',width:'520px',maxWidth:'100%',flexShrink:'0',height:'auto',...node.props};
     EzkartNative.validate(node);
     return node;
   }
+  let previewBaseSheet;
   function preview(id) {
     const config = create(id);
+    // Use the native CSS and container queries inside an isolated preview.
+    // A single shared sheet avoids copying the native CSS into every card;
+    // shadow boundaries keep previews out of the editor's canvas selectors.
+    if (!previewBaseSheet) {
+      const source = [...document.styleSheets].find(sheet => sheet.href && new URL(sheet.href).pathname.endsWith('/builder-native.css'));
+      if (!source) throw Error('Load builder-native.css before asset previews.');
+      previewBaseSheet = new CSSStyleSheet();
+      previewBaseSheet.replaceSync([...source.cssRules].map(rule => rule.cssText.replace(/url\(["']?([^"')]+)["']?\)/g,(_,url)=>`url("${new URL(url,source.href).href}")`)).join('\n'));
+    }
+    const frame = document.createElement('div');
+    frame.style.cssText = 'width:520px;max-width:none;';
+    frame.inert = true;
+    const shadow = frame.attachShadow({mode:'closed'});
+    shadow.adoptedStyleSheets = [previewBaseSheet];
+    const canvas = document.createElement('div');
+    canvas.className = 'sq-page-preview';
+    canvas.style.cssText = 'width:100%;font-family:Arial,Helvetica,sans-serif;color:#28272c;--native-vw:5.2px;';
     const node = EzkartNative.create(config);
-    const paint = (element, data) => {
-      element.removeAttribute('id');
-      [...element.attributes].filter(a => a.name.startsWith('data-')).forEach(a => element.removeAttribute(a.name));
-      element.className = '';
-      Object.assign(element.style,{boxSizing:'border-box',margin:'0',fontFamily:'inherit',...data.props});
-      if (data.type === 'accordion') element.open = Boolean(data.open);
-      (data.children || []).forEach((child,i) => paint(element.children[i],child));
-    };
-    paint(node,config);
-    node.style.width = '520px';
-    node.style.maxWidth = 'none';
-    node.inert = true;
-    return node;
+    canvas.append(node);
+    const sheet = document.createElement('style');
+    sheet.textContent = EzkartNative.stylesheet(canvas);
+    for (const element of canvas.querySelectorAll('.sq-native')) {
+      // CSS needs these selectors, but previews need no persisted configs,
+      // editor-selection attributes or copies of the source JSON.
+      for (const attr of [...element.attributes]) {
+        if (attr.name.startsWith('data-') && !['data-native-id','data-native-type','data-native-text-field'].includes(attr.name)) element.removeAttribute(attr.name);
+      }
+    }
+    shadow.append(sheet,canvas);
+    return frame;
   }
   const categories = [
     ['text','Text & typography'],['buttons','Buttons & links'],['bulletins','Banners & bulletins'],
@@ -234,8 +304,7 @@
   function createChoice(id,options={}) {
     const item=choices.find(item=>item.id===id);
     if(!item)throw Error('Choose an option first.');
-    const node=item.make();if(node.type==='commerce')node.productId=options.productId;let index=0;const prefix=`choice-${crypto.randomUUID().replaceAll('-','').slice(0,12)}`;
-    const assign=n=>{n.id=`${prefix}-${++index}`;(n.children || []).forEach(assign);};assign(node);
+    const node=cloneRecipe(item.make(),'choice');if(node.type==='commerce')node.productId=options.productId;
     node.name=item.name;node.props={fontFamily:'Arial, Helvetica, sans-serif',color:ink,flexShrink:'0',...node.props};
     EzkartNative.validate(node);return node;
   }
