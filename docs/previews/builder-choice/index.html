@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Choose your builder · Ezkart preview</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="locale.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <svg class="symbols" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><defs>
+    <symbol id="arrow" viewBox="0 0 24 24"><path d="M4 12h15m-6-6 6 6-6 6"/></symbol>
+    <symbol id="image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1.5"/><path d="m3 17 5-5 4 4 4-6 5 7"/></symbol>
+    <symbol id="layout" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 9h18M9 9v12"/></symbol>
+    <symbol id="cart" viewBox="0 0 24 24"><path d="M2 3h3l3 13h11l3-9H6"/><circle cx="9" cy="21" r="1"/><circle cx="18" cy="21" r="1"/></symbol>
+    <symbol id="phone" viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M10 18h4"/></symbol>
+    <symbol id="desktop" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M12 17v4m-5 0h10"/></symbol>
+    <symbol id="check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+    <symbol id="close" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></symbol>
+    <symbol id="up" viewBox="0 0 24 24"><path d="m6 14 6-6 6 6"/></symbol>
+    <symbol id="down" viewBox="0 0 24 24"><path d="m6 10 6 6 6-6"/></symbol>
+    <symbol id="plus" viewBox="0 0 24 24"><path d="M12 4v16M4 12h16"/></symbol>
+  </defs></svg>
+
+  <header class="app-header">
+    <a class="brand" href="#" aria-label="Ezkart"><img src="../../../assets/ezkart-logo.svg" alt="Ezkart" width="100" height="32"></a>
+    <span class="header-divider"></span><span class="header-title">Landing pages</span>
+    <span class="concept-label">Interactive preview</span>
+  </header>
+
+  <main>
+    <div class="breadcrumb"><span>Landing pages</span><span aria-hidden="true">/</span><span>New page</span></div>
+    <div class="intro"><h1>How would you like to build?</h1><p>Bring a finished design, or make something your own.</p></div>
+
+    <div class="choices">
+      <article class="choice" aria-labelledby="image-title">
+        <button class="choice-art image-art" type="button" data-preview="image" aria-label="Try the image builder preview">
+          <div class="upload-demo" aria-hidden="true">
+            <div class="mini-label">Your images <span>3 files</span></div>
+            <div class="upload-tile"><span class="grip">⠿</span><img src="images/01-intro.png" alt=""><span>01 · Introduction<small>Uploaded</small></span><i>✓</i></div>
+            <div class="upload-tile"><span class="grip">⠿</span><img src="images/02-detail.png" alt=""><span>02 · The details<small>Uploaded</small></span><i>✓</i></div>
+            <div class="upload-tile"><span class="grip">⠿</span><img src="images/03-story.png" alt=""><span>03 · Your story<small>Uploaded</small></span><i>✓</i></div>
+            <div class="mini-upload"><svg><use href="#plus"/></svg> Add images</div>
+          </div>
+          <svg class="art-arrow" aria-hidden="true"><use href="#arrow"/></svg>
+          <div class="mini-phone" aria-hidden="true"><div class="phone-speaker"></div><div class="mini-phone-page"><img src="images/01-intro.png" alt=""><img src="images/02-detail.png" alt=""></div><div class="mini-buy">Beli sekarang <span>↗</span></div></div>
+          <span class="art-caption"><svg><use href="#phone"/></svg> A page made from your images</span>
+        </button>
+        <div class="choice-body">
+          <div class="choice-title"><h2 id="image-title">Image builder</h2><span class="badge">Upload &amp; arrange</span></div>
+          <p class="choice-description">Have your design ready? Turn your images into a simple page for mobile shoppers.</p>
+          <ul class="features">
+            <li><svg><use href="#check"/></svg>Upload and arrange images from your phone</li>
+            <li><svg><use href="#phone"/></svg>One vertical layout, designed for phones</li>
+            <li><svg><use href="#image"/></svg>Replace an image to change its text or design</li>
+          </ul>
+          <div class="choice-actions"><button class="choose" data-choose="image">Use image builder <svg><use href="#arrow"/></svg></button><button class="try-button" data-preview="image">Try a preview</button></div>
+        </div>
+      </article>
+
+      <article class="choice" aria-labelledby="visual-title">
+        <button class="choice-art visual-art" type="button" data-preview="visual" aria-label="Try the visual builder preview">
+          <div class="mini-editor" aria-hidden="true">
+            <div class="mini-toolbar"><span class="window-dots">● ● ●</span><span>Sela · Your page</span><span class="mini-publish">Publish</span></div>
+            <div class="mini-editor-body">
+              <div class="mini-assets"><span>Elements</span><div><b>Aa</b><b>▧</b><b>▤</b><b>▣</b></div><span>Sections</span><i></i><i></i></div>
+              <div class="mini-canvas"><div class="mini-nav">sela.<span>Collection &nbsp; About</span></div><div class="mini-hero"><div><div class="mini-selection"><span>Heading</span><h3>Make room<br>for better.</h3><i></i><i></i><i></i><i></i></div><p>A little more space.<br>A calmer everyday.</p><em>Shop the collection ↗</em></div><img src="../../../cart/admin/templates/sela/preview/assets/hero-720.webp" alt=""></div><div class="mini-story">Good things, well considered.<div></div></div></div>
+              <div class="mini-inspector"><span>Heading</span><small>Font family</small><i>Plus Jakarta Sans⌄</i><small>Font size</small><i>48 &nbsp; &nbsp; px</i><small>Text color</small><i>● &nbsp; #252724</i></div>
+            </div>
+          </div>
+          <span class="art-caption"><svg><use href="#layout"/></svg> A page you can edit element by element</span>
+        </button>
+        <div class="choice-body">
+          <div class="choice-title"><h2 id="visual-title">Visual builder</h2><span class="badge">Design &amp; customize</span></div>
+          <p class="choice-description">Start with a template or a blank page. Make every part of the design your own.</p>
+          <ul class="features">
+            <li><svg><use href="#check"/></svg>Edit text, images, buttons, and sections</li>
+            <li><svg><use href="#desktop"/></svg>Layouts for desktop, tablet, and mobile</li>
+            <li><svg><use href="#layout"/></svg>Move, resize, and style individual elements</li>
+          </ul>
+          <div class="choice-actions"><button class="choose" data-choose="visual">Use visual builder <svg><use href="#arrow"/></svg></button><button class="try-button" data-preview="visual">Try a preview</button></div>
+        </div>
+      </article>
+    </div>
+
+    <div class="shared-checkout"><span class="shared-icon"><svg><use href="#cart"/></svg></span><p><strong>Two ways to build. The same Ezkart checkout.</strong><span>Connect your products. Customers order and pay through Ezkart.</span></p></div>
+    <p class="decision-help">Already designed your page in Canva? Choose <button data-preview="image">Image builder</button>.<br class="mobile-break"> Want to design it here? Choose <button data-preview="visual">Visual builder</button>.</p>
+  </main>
+
+  <dialog id="preview-dialog" aria-labelledby="preview-title">
+    <header class="dialog-header"><div><h2 id="preview-title"></h2><p id="preview-description"></p></div><button class="icon-button close-dialog" aria-label="Close preview"><svg><use href="#close"/></svg></button></header>
+    <div id="demo-content"></div>
+    <footer class="dialog-footer"><span>Example product · Nothing is published</span><button class="choose" id="preview-choose">Use this builder <svg><use href="#arrow"/></svg></button></footer>
+  </dialog>
+  <dialog id="checkout-dialog" aria-labelledby="checkout-title"><header class="dialog-header"><div><h2 id="checkout-title">Ezkart checkout</h2><p>The same purchase flow in both builders.</p></div><button class="icon-button" data-close-checkout aria-label="Close checkout preview"><svg><use href="#close"/></svg></button></header><div class="checkout-content"><div class="checkout-product"><img src="../../../cart/admin/templates/sela/preview/assets/riser-360.webp" alt="Sela wooden desk stand"><div><span>Example product</span><h3>Sela Desk Stand</h3><p>Natural oak · 1 item</p></div></div><div class="checkout-total"><span>Product total</span><strong>Rp349.000</strong></div><p class="checkout-note">Customers continue here to enter their details and complete payment through Ezkart.</p><button class="choose" data-close-checkout>Back to the example <svg><use href="#arrow"/></svg></button><small>This is a preview. No order or payment will be created.</small></div></dialog>
+  <div class="selection-status" role="status" hidden><svg><use href="#check"/></svg><span></span><button aria-label="Dismiss selection message">×</button></div>
+</body>
+</html>
