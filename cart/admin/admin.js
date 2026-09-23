@@ -8032,9 +8032,15 @@
     const collectExportCss = () => {
       const tokens = [".sq-page-preview", ".sq-page-block", ".sq-page-background", ".sq-section-background", ".sq-announcement", ".sq-store-nav", ".sq-site-logo", ".sq-navigation-template", ".sq-nav-", ".sq-hero", ".sq-product", ".sq-image-story", ".sq-image-blend", ".sq-image-crop", ".sq-benefit", ".sq-cart", ".sq-shipping", ".sq-generated", ".sq-composition", ".sq-authored-navigation", ".sq-navigation-", ".sq-native", ".sq-step-number", ".sq-image-placeholder", ".sq-free", ".sq-marquee", ".sq-surface", ".sq-color", ".element-animation", ".hover-", ".button-", ".ez-fluid", "@keyframes sq", "@keyframes element", ".product-art", ".icon", ".svg-sprite"];
       const collect = (rules) => [...rules].map((rule) => {
-        if (rule.type === CSSRule.KEYFRAMES_RULE) return tokens.some((token) => rule.cssText.includes(token)) ? rule.cssText : "";
-        if (rule.cssRules && !rule.selectorText) { const nested = collect(rule.cssRules); return nested ? `${rule.cssText.slice(0, rule.cssText.indexOf("{"))}{${nested}}` : ""; }
-        return tokens.some((token) => rule.cssText.includes(token)) ? rule.cssText : "";
+        if (rule.type !== CSSRule.KEYFRAMES_RULE && rule.cssRules && !rule.selectorText) {
+          const nested = collect(rule.cssRules);
+          if (!nested) return "";
+          const cssText = rule.cssText;
+          return `${cssText.slice(0, cssText.indexOf("{"))}{${nested}}`;
+        }
+        // Reading cssText serializes the rule; reuse it for every token check.
+        const cssText = rule.cssText;
+        return tokens.some((token) => cssText.includes(token)) ? cssText : "";
       }).join("\n");
       return [...document.styleSheets].map((sheet) => { try { return collect(sheet.cssRules); } catch (_) { return ""; } }).join("\n");
     };
