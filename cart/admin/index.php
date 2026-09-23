@@ -1629,7 +1629,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
     <symbol id="icon-refund" viewBox="0 0 24 24"><path d="M4 7v5h5M20 17v-5h-5"/><path d="M6.1 16.8A8 8 0 0 0 20 12M17.9 7.2A8 8 0 0 0 4 12"/></symbol>
     <symbol id="icon-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
     <symbol id="icon-sparkles" viewBox="0 0 24 24"><path d="m12 3 1.2 3.8L17 8l-3.8 1.2L12 13l-1.2-3.8L7 8l3.8-1.2L12 3ZM18.5 14l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2ZM5 13l.7 2.1 2.1.7-2.1.7L5 18.6l-.7-2.1-2.1-.7 2.1-.7L5 13Z"/></symbol>
-    <symbol id="icon-rocket" viewBox="0 0 24 24"><path d="M14 5c2.5-2.5 5.5-2.2 5.5-2.2s.3 3-2.2 5.5l-5.6 5.6-4.3-4.3L14 5Z"/><path d="m9 8-4.3.5-2 2 4.7 1.2M15.2 11.2l-.5 4.3-2 2-1.2-4.7M8.2 15.2c-1.6 1.6-4.8 1.6-4.8 1.6s0-3.2 1.6-4.8"/><circle cx="15.5" cy="6.8" r="1.4"/></symbol>
+    <symbol id="icon-rocket" viewBox="0 0 24 24"><path d="M12 2C9.3 4.2 8 7.1 8 11v5h8v-5c0-3.9-1.3-6.8-4-9Z"/><circle cx="12" cy="9" r="2"/><path d="m8 11-4 5v4l4-2m8-7 4 5v4l-4-2M10 19l2 3 2-3"/></symbol>
     <symbol id="icon-store" viewBox="0 0 24 24"><path d="M4 10v10h16V10M3 4h18l-1 6a3 3 0 0 1-4 1.7A3 3 0 0 1 12 12a3 3 0 0 1-4-.3A3 3 0 0 1 4 10L3 4Z"/><path d="M9 20v-5h6v5"/></symbol>
     <symbol id="icon-granola" viewBox="0 0 24 24"><path d="M4 10h16c0 6-3 10-8 10S4 16 4 10Z"/><path d="M7 10c.6-2 2-3 3.7-3 1.2 0 1.8.6 2.6.6 1 0 1.4-.8 2.6-.8 1.1 0 2 .7 2.4 2M8 5.5l1.2-1M14 5l1-1.5"/></symbol>
     <symbol id="icon-coffee" viewBox="0 0 24 24"><path d="M5 9h12v6a5 5 0 0 1-5 5h-2a5 5 0 0 1-5-5V9Z"/><path d="M17 11h1.5a2.5 2.5 0 0 1 0 5H17M8 6c-1-1 .8-1.7 0-3M12 6c-1-1 .8-1.7 0-3"/></symbol>
