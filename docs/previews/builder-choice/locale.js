@@ -2,6 +2,19 @@
 // ?lang=id is only a review aid for this standalone concept, not a new user setting.
 (() => {
   const strings = {
+    'Upload your finished sales graphics. They become the whole page, stacked from top to bottom.':'Unggah gambar promosi yang sudah jadi. Gambar tersusun dari atas ke bawah menjadi seluruh halaman.',
+    'Just upload images and put them in order':'Cukup unggah gambar dan atur urutannya',
+    'Image-only page, one mobile layout':'Halaman berisi gambar, khusus tampilan ponsel',
+    'Images from top to bottom':'Gambar dari atas sampai bawah',
+    'Add another image':'Tambah gambar lagi',
+    'One long image or several in a row.':'Satu gambar panjang atau beberapa gambar berurutan.',
+    'Upload your images':'Unggah gambarmu',
+    'Your images become the whole page, top to bottom.':'Gambarmu menjadi seluruh halaman, dari atas sampai bawah.',
+    'Use the arrows to change the order.':'Gunakan panah untuk mengubah urutan.',
+    'All the design is in your images. Upload, arrange, and connect your product.':'Seluruh desain sudah ada di gambarmu. Unggah, susun, dan hubungkan produkmu.',
+    'Scroll to see the whole page':'Gulir untuk melihat seluruh halaman',
+    'Scroll the image page':'Gulir halaman gambar',
+    'Example product · Rp89.000':'Contoh produk · Rp89.000',
     'Landing pages':'Landing page', 'New page':'Halaman baru', 'Interactive preview':'Pratinjau interaktif',
     'How would you like to build?':'Mau buat halaman dengan cara apa?',
     'Bring a finished design, or make something your own.':'Unggah desain yang sudah jadi, atau buat desainmu di sini.',
@@ -66,7 +79,7 @@
     const base=reverse[value]||value;
     if(lang==='en')return base;
     if(strings[base])return strings[base];
-    if(/^\d+ (images|files)$/.test(base))return base.replace('images','gambar').replace('files','file');
+    if(/^\d+ (images?|files?)$/.test(base))return base.replace(/images?/,'gambar').replace(/files?/,'file');
     const move=/^Move (.*) (up|down)$/.exec(base);
     if(move)return `Pindahkan ${move[1]} ke ${move[2]==='up'?'atas':'bawah'}`;
     if(/^\d+ images? added\./.test(base))return base.replace(/^(\d+) images? added\./,'$1 gambar ditambahkan.').replace(' Some files could not be added. Use JPG, PNG or WebP up to 15 MB.',' Beberapa file tidak dapat ditambahkan. Gunakan JPG, PNG, atau WebP hingga 15 MB.');
