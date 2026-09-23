@@ -124,3 +124,13 @@
 }
 .page-site-editor [data-sq-panel="add"] [hidden] { display:none !important; }
 @media (prefers-reduced-motion:reduce) { .page-site-editor .sq-asset-card { transition:none; } }
+
+/* File-drop feedback lives outside saved page content and never catches the pointer. */
+.sq-canvas-image-drop{position:fixed;z-index:1000;pointer-events:none;display:flex;align-items:flex-start;justify-content:center;padding:16px;border:2px dashed #e0583e;border-radius:8px;background:#ef6c4514;box-sizing:border-box}
+.sq-canvas-image-drop>span{max-width:100%;padding:9px 14px;border:1px solid #edcfbe;border-radius:8px;background:#fffaf7;color:#633b2d;box-shadow:0 3px 14px #36201c12;font:500 12px/1.4 Poppins,sans-serif;text-align:center}
+.sq-canvas-upload-status{position:fixed;z-index:1100;bottom:58px;left:50%;transform:translateX(-50%);display:flex;align-items:flex-start;gap:16px;max-width:min(560px,calc(100vw - 32px));max-height:30vh;overflow:auto;box-sizing:border-box;padding:13px 16px;border:1px solid #ddd7d5;border-radius:10px;background:#fff;color:#303541;box-shadow:0 8px 30px #32282024;font:400 12px/1.6 Poppins,sans-serif}
+.sq-canvas-upload-status>span{min-width:0;overflow-wrap:anywhere}
+.sq-canvas-upload-status>button{flex:none;border:0;border-radius:5px;background:#f4f2f2;color:#645956;cursor:pointer;width:24px;height:24px;padding:0;font:20px/1 Poppins,sans-serif}
+.sq-canvas-upload-status>button:focus-visible{outline:2px solid #be4b36;outline-offset:2px}
+.sq-canvas-upload-status.is-error{border-color:#e8b7aa;color:#9a3326}
+.sq-canvas-image-drop[hidden],.sq-canvas-upload-status[hidden]{display:none}

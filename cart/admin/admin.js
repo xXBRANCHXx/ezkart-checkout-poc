@@ -2921,8 +2921,8 @@
     const setFlowPosition=(element,changes,device=activeDevice)=>{
       const value={...readFlowPosition(element,device),...changes};
       for(const [key,n] of Object.entries(value))if(!['x','y','width','height'].includes(key)||!Number.isFinite(n))delete value[key];
-      if(value.width!==undefined)value.width=Math.max(24,Math.min(2000,value.width));
-      if(value.height!==undefined)value.height=Math.max(24,Math.min(4000,value.height));
+      if(value.width!==undefined)value.width=Math.max(24,value.width);
+      if(value.height!==undefined)value.height=Math.max(24,value.height);
       element.setAttribute(`data-flow-${device}`,JSON.stringify(value));if(device===activeDevice)applyFlowPosition(element);return value;
     };
     const bindFlowPointer=(event,element,resizing)=>{
@@ -3334,8 +3334,15 @@
       if (!sectionHeightResizeTarget) ensureSectionHeightHandle(section, resize);
       const rect = section.getBoundingClientRect(), stage = sectionToolsStage.getBoundingClientRect();
       const right = Math.min(rect.right, viewport.right - 10), bottom = Math.min(rect.bottom + 18, viewport.bottom - 12);
-      sectionTools.style.left = `${Math.max(viewport.left + 10, right - sectionTools.offsetWidth - 10) - stage.left}px`;
-      sectionTools.style.top = `${Math.max(viewport.top + 8, bottom - sectionTools.offsetHeight) - stage.top}px`;
+      const width = sectionTools.offsetWidth, height = sectionTools.offsetHeight;
+      let left = Math.max(viewport.left + 10, right - width - 10), top = Math.max(viewport.top + 8, bottom - height);
+      const grip = previewRoot.querySelector('[data-sq-element-resize]')?.getBoundingClientRect();
+      if (grip && left < grip.right + 8 && left + width > grip.left - 8 && top < grip.bottom + 8 && top + height > grip.top - 8) {
+        left = Math.max(viewport.left + 10, grip.left - width - 12);
+        if (left + width > grip.left - 8) top = Math.max(viewport.top + 8, grip.top - height - 12);
+      }
+      sectionTools.style.left = `${left - stage.left}px`;
+      sectionTools.style.top = `${top - stage.top}px`;
     };
     scheduleSectionTools = () => { if (!sectionToolsFrame) sectionToolsFrame = requestAnimationFrame(syncSectionTools); };
     previewRoot?.addEventListener('pointermove', event => {
@@ -4415,6 +4422,7 @@
       overlay.querySelector("[data-sq-overlay-delete]").onclick = (event) => { event.stopPropagation(); deleteSelectedElement(); };
       bindElementPointerControl(overlay.querySelector("[data-sq-element-move]"), false);
       bindElementPointerControl(overlay.querySelector("[data-sq-element-resize]"), true);
+      scheduleSectionTools();
     };
     const selectSqElement = (element, action = null, image = null, content = null) => {
       if (!element?.matches("[data-sq-element],.sq-section-background")) return;
@@ -4533,7 +4541,8 @@
           const rawX = screenX / scale, rawY = screenY / scale;
           const {dx, dy} = guides.snap(rawX, rawY, event);
           let changed = dx !== 0 || dy !== 0;
-          if (freePositioning || !snapToGrid || event.altKey) {
+          const beyondGrid = resizing && layout.x - 1 + layout.width + Math.round(rawX / geometry.columnStep) > geometry.columns;
+          if (freePositioning || !snapToGrid || event.altKey || beyondGrid) {
             if (!freePositioning) setElementLayout(element, layout);
             freePositioning = true;
             element.classList.add('sq-free-positioned');
@@ -8224,7 +8233,7 @@
       const flowCssFor=(device)=>[...previewRoot.querySelectorAll('.sq-flow [data-sq-element],.sq-free-positioned')].map(element=>{
         const value=readFlowPosition(element,device),id=element.dataset.sqElementId;
         if(!Object.keys(value).length&&!element.classList.contains('sq-responsive-type'))return '';
-        return `.sq-page-preview [data-ezkart-element="${id}"]${element.classList.contains('sq-free-positioned') ? '.sq-free-positioned' : ''}{--sq-flow-x:${value.x||0}px;--sq-flow-y:${value.y||0}px;${value.width?`width:${value.width}px!important;`:''}${value.height?`height:${value.height}px!important;`:''}${element.classList.contains("sq-responsive-type")?`font-size:${EzkartTypography.fontSize(element,device)}!important;`:""}}`;
+        return `.sq-page-preview [data-ezkart-element="${id}"]${element.classList.contains('sq-free-positioned') ? '.sq-free-positioned' : ''}{--sq-flow-x:${value.x||0}px;--sq-flow-y:${value.y||0}px;${value.width?`width:${value.width}px!important;max-width:none;flex-shrink:0;`:''}${value.height?`height:${value.height}px!important;max-height:none;`:''}${element.classList.contains("sq-responsive-type")?`font-size:${EzkartTypography.fontSize(element,device)}!important;`:""}}`;
       }).join('\n');
       clone.querySelectorAll('.sq-flow .sq-flow-element,.sq-free-positioned').forEach(element=>['x','y','width','height'].forEach(key=>element.style.removeProperty('--sq-flow-'+key)));
       const responsiveSpacing = `@media(min-width:901px){${flowCssFor("desktop")}}\n@media(min-width:601px) and (max-width:900px){${flowCssFor("tablet")}}\n@media(max-width:600px){${flowCssFor("mobile")}}\n${spacingCssFor("desktop")}\n${fluidCssFor("desktop")}\n${elementCssFor("desktop")}\n${productCssFor("desktop")}\n@media(max-width:900px){${spacingCssFor("tablet")}\n${fluidCssFor("tablet")}\n${elementCssFor("tablet")}\n${productCssFor("tablet")}}\n@media(max-width:600px){${spacingCssFor("mobile")}\n${fluidCssFor("mobile")}\n${elementCssFor("mobile")}\n${productCssFor("mobile")}}`;
@@ -9173,6 +9182,91 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
       upload:uploadBuilderAsset,
       readUpload:readBuilderUpload
     });
+    // OS file drags use the canvas, independently of the element-library drag state.
+    const fileCanvas = sqStudio.querySelector('.sq-canvas-scroll');
+    const fileDropMarker = document.createElement('div');
+    fileDropMarker.className = 'sq-canvas-image-drop'; fileDropMarker.hidden = true;
+    fileDropMarker.setAttribute('aria-hidden','true');
+    fileDropMarker.innerHTML = '<span>Drop images here</span>';
+    const fileDropStatus = document.createElement('div');
+    fileDropStatus.className = 'sq-canvas-upload-status'; fileDropStatus.hidden = true;
+    fileDropStatus.innerHTML = '<span role="status" aria-live="polite"></span><button type="button" aria-label="Dismiss image upload message">×</button>';
+    document.body.append(fileDropMarker,fileDropStatus);
+    let fileStatusTimer, fileDragTimer, fileDropQueue = Promise.resolve();
+    const clearFileDrop = () => { clearTimeout(fileDragTimer); fileDropMarker.hidden = true; };
+    const hasFileDrag = event => [...(event.dataTransfer?.types || [])].includes('Files');
+    const reportFileDrop = (message,error=false,finished=false) => {
+      clearTimeout(fileStatusTimer);
+      fileDropStatus.querySelector('span').textContent = message;
+      fileDropStatus.classList.toggle('is-error',error); fileDropStatus.hidden = false;
+      if (finished && !error) fileStatusTimer = setTimeout(()=>{fileDropStatus.hidden=true;},6000);
+    };
+    fileDropStatus.querySelector('button').addEventListener('click',()=>{fileDropStatus.hidden=true;});
+    const fileDropDestination = event => {
+      const sections = [...previewRoot.querySelectorAll(':scope > [data-sq-block]')];
+      const section = event.target.closest?.('[data-sq-block]') || sections.reduce((nearest,node)=>{
+        const distance = candidate => {const box=candidate.getBoundingClientRect();return Math.max(box.top-event.clientY,event.clientY-box.bottom,0);};
+        return !nearest || distance(node)<distance(nearest) ? node : nearest;
+      },null);
+      const box = (section || previewRoot).getBoundingClientRect(), scale = box.width / ((section || previewRoot).offsetWidth || 1);
+      const candidate = event.target.closest?.('.sq-native');
+      const target = section?.matches('.sq-native-section') && candidate && section.contains(candidate)
+        ? (candidate.matches('[data-native-type="container"]') && EzkartNative.read(candidate).text === undefined ? candidate : candidate.parentElement.closest('[data-native-type="container"]')) || section
+        : section || event.target;
+      return {section,box,site:activeSiteKey,request:siteLoadRequest,device:activeDevice,pointer:{target,clientX:event.clientX,clientY:event.clientY,x:(event.clientX-box.left)/scale,y:Math.max(0,(event.clientY-box.top)/scale)}};
+    };
+    const showFileDrop = event => {
+      if (!hasFileDrag(event)) return;
+      event.preventDefault(); event.stopPropagation(); event.dataTransfer.dropEffect = 'copy';
+      const {box} = fileDropDestination(event), viewport = fileCanvas.getBoundingClientRect();
+      const left=Math.max(box.left,viewport.left), top=Math.max(box.top,viewport.top), right=Math.min(box.right,viewport.right), bottom=Math.min(box.bottom,viewport.bottom);
+      Object.assign(fileDropMarker.style,{left:`${left}px`,top:`${top}px`,width:`${Math.max(0,right-left)}px`,height:`${Math.max(0,bottom-top)}px`});
+      fileDropMarker.hidden = false;
+      clearTimeout(fileDragTimer); fileDragTimer = setTimeout(clearFileDrop,1000);
+    };
+    const importDroppedImages = async (files,destination) => {
+      let added=0, uploaded=0; const failures=[];
+      if (!files.length) {reportFileDrop('Drop image files here, or choose files in Uploads.',true);return;}
+      for (const original of files) {
+        reportFileDrop(`Uploading ${original.name}…`);
+        try {
+          const inferred = {png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',webp:'image/webp',gif:'image/gif',avif:'image/avif'}[original.name.split('.').at(-1).toLowerCase()];
+          const file = !original.type && inferred ? new File([original],original.name,{type:inferred}) : original;
+          if (!['image/png','image/jpeg','image/webp','image/gif','image/avif'].includes(file.type)) throw Error('Choose a PNG, JPEG, WebP, GIF, or AVIF image.');
+          if (file.size > 8*1024*1024) throw Error('Choose an image smaller than 8 MB.');
+          const image = new Image(), objectUrl = URL.createObjectURL(file);
+          try {image.src=objectUrl;await image.decode();} catch {throw Error('That image could not be opened. Try another file.');} finally {URL.revokeObjectURL(objectUrl);}
+          const item = await uploadBuilderAsset(file); uploaded++;
+          const src = await readBuilderUpload(item);
+          const {section,pointer,site,request,device} = destination;
+          if (site !== activeSiteKey || request !== siteLoadRequest || device !== activeDevice || section && !previewRoot.contains(section) || !pointer.target.isConnected) throw Error('Saved in Uploads. The destination changed; drag the image onto your page again.');
+          const width = Math.max(1,Math.min(360,image.naturalWidth,320*image.naturalWidth/image.naturalHeight));
+          insertAsset({id:`asset-image-${crypto.randomUUID().replaceAll('-','').slice(0,12)}`,type:'image',name:item.name,alt:item.name,src,props:{display:'block',width:`${width}px`,maxWidth:'100%',height:'auto',aspectRatio:`${image.naturalWidth} / ${image.naturalHeight}`,objectFit:'contain'}},section,section ? {...pointer,x:pointer.x+added*24,y:pointer.y+added*24} : null);
+          added++;
+        } catch (error) {failures.push(`${original.name}: ${error.message || 'The image could not be added. Try again.'}`);}
+      }
+      if (uploaded) void assetLibrary?.refresh();
+      reportFileDrop([added ? `${added} ${added===1?'image':'images'} added. Saved in Uploads.` : '',...failures].filter(Boolean).join(' '),failures.length>0,true);
+    };
+    fileCanvas.addEventListener('dragenter',showFileDrop,true);
+    fileCanvas.addEventListener('dragover',showFileDrop,true);
+    fileCanvas.addEventListener('dragleave',event=>{if(!fileCanvas.contains(event.relatedTarget))clearFileDrop();},true);
+    fileCanvas.addEventListener('drop',event=>{
+      if (!hasFileDrag(event)) return;
+      event.preventDefault(); event.stopPropagation(); clearFileDrop();
+      const files=[...event.dataTransfer.files],destination=fileDropDestination(event);
+      fileDropQueue=fileDropQueue.then(()=>importDroppedImages(files,destination)).catch(error=>reportFileDrop(error.message,true));
+    },true);
+    // Keep an accidental file drop outside a target from navigating away from edits.
+    document.addEventListener('dragover',event=>{if(hasFileDrag(event)){clearFileDrop();if(!event.target.matches?.('input[type=file]'))event.preventDefault();}});
+    document.addEventListener('drop',event=>{
+      if (!hasFileDrag(event)) return;
+      clearFileDrop();
+      if (!event.defaultPrevented && !event.target.matches?.('input[type=file]')) {event.preventDefault();reportFileDrop('Drop images onto your page or into Uploads.',true);}
+    });
+    window.addEventListener('keydown',event=>{if(event.key==='Escape')clearFileDrop();});
+    window.addEventListener('dragend',clearFileDrop);
+    window.addEventListener('blur',clearFileDrop);
     openSqPanel('add',{pin:true});
 
   }

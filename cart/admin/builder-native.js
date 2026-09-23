@@ -1752,6 +1752,8 @@
         left: parseFloat(cs.left) || 0,
         top: parseFloat(cs.top) || 0,
       };
+    const imageHeight = currentAppearance(config).props?.height;
+    const proportionalImage = config.type === "image" && start.width > 0 && start.height > 0 && (!imageHeight || imageHeight === "auto");
     let props,
       remembered = false;
     const guides = hooks.beginPointer?.(node, resizing);
@@ -1768,6 +1770,9 @@
         ? {
             width: `${Math.max(1, Math.round(start.width + dx))}px`,
             height: `${Math.max(1, Math.round(start.height + dy))}px`,
+            maxWidth: "none",
+            maxHeight: "none",
+            flexShrink: "0",
           }
         : {
             position: cs.position === "static" ? "relative" : cs.position,
@@ -1778,6 +1783,12 @@
           };
       if (config.type === "product" && resizing) {
         props.minHeight = props.height;
+        props.height = "auto";
+      }
+      if (proportionalImage && resizing) {
+        const width = Math.abs(dx / start.width) >= Math.abs(dy / start.height)
+          ? start.width + dx : (start.height + dy) * start.width / start.height;
+        props.width = `${Math.max(1, Math.round(width))}px`;
         props.height = "auto";
       }
       Object.assign(node.style, props);
@@ -3374,6 +3385,11 @@
             hooks.changed();
           } else {
             const patch = Object.fromEntries(keys.map(key => [key, input.value]));
+            // A size entered by the merchant takes priority over automatic fitting.
+            if (["width", "height"].includes(key) && !["auto", "fit-content", "min-content", "max-content"].includes(input.value)) {
+              patch[key === "width" ? "maxWidth" : "maxHeight"] = "none";
+              patch.flexShrink = "0";
+            }
             if (allBorders && key === "borderTopWidth" && parseFloat(input.value) > 0) {
               const css = getComputedStyle(selected);
               for (const side of ["Top", "Right", "Bottom", "Left"])

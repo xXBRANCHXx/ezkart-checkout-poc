@@ -8,8 +8,8 @@
 .sq-page-preview .sq-flow .sq-block-handle,.sq-page-preview .sq-flow .sq-section-height-handle{display:none}
 .sq-page-preview .sq-flow.section-bg-custom{background:var(--sq-section-background-color)!important}
 .sq-page-preview .sq-flow .sq-flow-element{translate:var(--sq-flow-x,0px) var(--sq-flow-y,0px)}
-.sq-page-preview .sq-flow .sq-flow-element[style*="--sq-flow-width"]{width:var(--sq-flow-width);max-width:100%}
-.sq-page-preview .sq-flow .sq-flow-element[style*="--sq-flow-height"]{height:var(--sq-flow-height)}
+.sq-page-preview .sq-flow .sq-flow-element[style*="--sq-flow-width"]{width:var(--sq-flow-width);max-width:none;flex-shrink:0}
+.sq-page-preview .sq-flow .sq-flow-element[style*="--sq-flow-height"]{height:var(--sq-flow-height);max-height:none}
 .sq-page-preview .sq-free-positioned{translate:var(--sq-flow-x,0px) var(--sq-flow-y,0px)}
 .sq-page-preview .sq-free-positioned[style*="--sq-flow-width"]{width:var(--sq-flow-width)!important;max-width:none}
 .sq-page-preview .sq-page-block[data-sq-fluid]>.sq-free-positioned[style*="--sq-flow-height"]{height:var(--sq-flow-height)!important}

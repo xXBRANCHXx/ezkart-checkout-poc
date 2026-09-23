@@ -821,6 +821,10 @@
 .sq-page-preview:has(> .sq-native-section) {
   overflow: clip;
 }
+/* Keep oversized elements visible and reachable on the editing canvas. */
+.page-site-editor .sq-canvas-scroll .sq-page-preview {
+  overflow: visible;
+}
 
 .page-site-editor
   .sq-inspector
