@@ -2348,7 +2348,8 @@
       const options = [...select.options];
       control.wrapper.hidden = select.hidden;
       if (select.hidden && openBuilderSelect === control) closeBuilderSelect(control);
-      const signature = options.map((option) => `${option.value}\u0000${option.textContent}\u0000${option.disabled}\u0000${option.hidden}`).join("\u0001");
+      const previewsWeight = select.matches('[data-style-choice="fontWeight"]');
+      const signature = options.map((option) => `${option.value}\u0000${option.textContent}\u0000${option.disabled}\u0000${option.hidden}\u0000${option.style.fontWeight}`).join("\u0001");
       if (control.signature !== signature) {
         control.signature = signature;
         control.menu.replaceChildren(...options.filter(option => !option.hidden).map((option) => {
@@ -2359,6 +2360,11 @@
           item.setAttribute("role", "option");
           item.disabled = option.disabled;
           item.innerHTML = `<span>${escapeHtml(option.textContent)}</span><i aria-hidden="true">✓</i>`;
+          if (previewsWeight) {
+            // The bundled variable font covers every weight from Thin to Black.
+            item.firstElementChild.style.fontFamily = 'Inter, sans-serif';
+            item.firstElementChild.style.fontWeight = option.style.fontWeight;
+          }
           item.addEventListener("click", () => {
             if (item.disabled) return;
             select.value = item.dataset.value;
@@ -2372,6 +2378,10 @@
       }
       const selected = select.selectedOptions[0] || options[0];
       control.value.textContent = selected?.textContent || "Choose an option";
+      if (previewsWeight) {
+        control.value.style.fontFamily = 'Inter, sans-serif';
+        control.value.style.fontWeight = selected?.style.fontWeight || "400";
+      }
       control.trigger.setAttribute("aria-label", `${control.label}: ${selected?.textContent || "Choose an option"}`);
       control.trigger.disabled = select.disabled;
       control.menu.querySelectorAll("[role=option]").forEach((item) => {
@@ -2447,7 +2457,7 @@
       });
       select.addEventListener("input", () => syncBuilderSelect(select));
       select.addEventListener("change", () => syncBuilderSelect(select));
-      new MutationObserver(() => syncBuilderSelect(select)).observe(select, { childList: true, subtree: true, attributes: true, attributeFilter: ["disabled", "label", "hidden"] });
+      new MutationObserver(() => syncBuilderSelect(select)).observe(select, { childList: true, subtree: true, attributes: true, attributeFilter: ["disabled", "label", "hidden", "style"] });
       syncBuilderSelect(select);
     };
     const builderSelects = () => [...sqStudio.querySelectorAll(".sq-tool-panels select, .sq-inspector select")];

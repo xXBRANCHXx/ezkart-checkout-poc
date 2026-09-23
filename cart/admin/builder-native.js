@@ -413,6 +413,9 @@
           option.dataset.savedChoice = ""; choice.append(option);
         }
         choice.value = value;
+        if (key === "fontWeight") [...choice.options].forEach(option => {
+          option.style.fontWeight = option.value || (isDefault ? resolved : "400");
+        });
         if (key === "textAlign") [...choice.options].filter(o => o.value).forEach(o => o.text = choiceTitle(key, o.value, css));
       }
       const number = wrap.querySelector("[data-style-number]");
