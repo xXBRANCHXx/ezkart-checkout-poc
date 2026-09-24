@@ -816,14 +816,14 @@ textarea.invalid {
   background: var(--gradient);
   border: 0;
   border-radius: 8px;
-  box-shadow: 0 7px 17px rgba(245, 7, 104, .17);
+  box-shadow: 0 7px 17px color-mix(in srgb, var(--store-button, var(--pink)) 17%, transparent);
   cursor: pointer;
   font-size: 11px;
   font-weight: 600;
   transition: transform .15s ease, box-shadow .15s ease, opacity .15s ease;
 }
 .primary-button:hover:not(:disabled) {
-  box-shadow: 0 9px 22px rgba(245, 7, 104, .23);
+  box-shadow: 0 9px 22px color-mix(in srgb, var(--store-button, var(--pink)) 23%, transparent);
   transform: translateY(-1px);
 }
 .primary-button:disabled {
@@ -843,6 +843,7 @@ textarea.invalid {
   line-height: 1.5;
 }
 .summary-note img { width: 16px; height: 16px; }
+.summary-note .ezpay-logo { width: 46px; height: auto; flex: 0 0 auto; }
 .summary-note strong { color: #4e5563; font-weight: 600; }
 .support-note {
   padding: 14px 4px 0;
@@ -867,6 +868,9 @@ textarea.invalid {
   font-size: 8px;
 }
 .checkout-footer img { width: 84px; }
+.checkout-footer .checkout-brand { display: grid; gap: 5px; }
+.checkout-footer .checkout-brand img { height: auto; }
+.checkout-brand small { font-size: 8px; }
 .checkout-footer p { margin: 0; }
 .checkout-footer > span { justify-self: end; }
 .toast {

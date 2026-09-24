@@ -1,5 +1,6 @@
 .branded-surface { background-color: var(--store-background); background-image: var(--store-image); background-size: cover; background-position: center; background-attachment: fixed; }
-.branded-surface .primary-button, .branded-surface .shop-add { background: var(--store-button); color: var(--store-on-button); box-shadow: none; }
+.branded-surface .primary-button:not(:disabled), .branded-surface .shop-add { background: var(--store-button); color: var(--store-on-button); }
+.branded-surface .shop-add { box-shadow: none; }
 .branded-surface .merchant-avatar { background: var(--store-accent); color: var(--store-on-accent); border-color: transparent; }
 .branded-surface .checkout-progress li.active > span { background: var(--store-accent); color: var(--store-on-accent); }
 .branded-surface .checkout-content > .checkout-panel > .page-heading { padding: 20px; border-radius: 16px; background: rgba(255,255,255,.96); }

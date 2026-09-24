@@ -153,7 +153,7 @@
         byId("merchant-avatar").hidden = false;
       }, { once: true });
     }
-    document.title = `Checkout for ${name} · Ezkart`;
+    document.title = `Checkout for ${name} · Ezpay`;
   }
 
   function requestedCart() {

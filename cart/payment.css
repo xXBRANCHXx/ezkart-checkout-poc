@@ -75,6 +75,9 @@ input:focus-visible {
   width: 112px;
   height: auto;
 }
+.payment-brand { display: grid; gap: 5px; }
+.payment-brand .brand { display: block; width: 94px; }
+.payment-brand small { color: var(--muted); font-size: 9px; }
 .secure-label {
   display: flex;
   align-items: center;

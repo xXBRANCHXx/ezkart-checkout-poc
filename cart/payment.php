@@ -19,14 +19,14 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-sr
   <meta name="theme-color" content="#ffffff">
   <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
   <link rel="preload" href="admin/assets/fonts/inter.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="payment.css?v=2">
+  <link rel="stylesheet" href="payment.css?v=ezpay-1">
   <script src="payment.js?v=3" defer></script>
-  <title>Complete your payment · Ezkart</title>
+  <title>Complete your payment · Ezpay</title>
 </head>
 <body>
   <header class="payment-header">
     <div class="header-content">
-      <img class="brand" src="../assets/ezkart-logo.svg" width="1020" height="420" alt="Ezkart">
+      <div class="payment-brand"><img class="brand" src="../assets/ezpay-logo.svg" width="1744" height="468" alt="Ezpay"><small>An Ezkart product</small></div>
       <span class="secure-label"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg> Secure checkout</span>
     </div>
   </header>

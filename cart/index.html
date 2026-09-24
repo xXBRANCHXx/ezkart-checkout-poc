@@ -3,18 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Review your order and complete delivery and payment securely with Ezkart." />
+    <meta name="description" content="Review your order and complete delivery and payment securely with Ezpay, an Ezkart product." />
     <meta name="theme-color" content="#ffffff" />
     <meta name="robots" content="noindex,nofollow" />
     <link rel="canonical" href="https://ezkart.id/cart/" />
     <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="cart.css?v=square-products-1" />
-    <link rel="stylesheet" href="storefront.css?v=1" />
+    <link rel="stylesheet" href="cart.css?v=ezpay-1" />
+    <link rel="stylesheet" href="storefront.css?v=ezpay-1" />
     <link rel="stylesheet" href="product-options.css?v=1" />
     <link rel="stylesheet" href="select.css?v=1" />
     <link rel="stylesheet" href="vendor/maplibre/maplibre-gl.css?v=5.24.0" />
     <link rel="stylesheet" href="customer-addresses.css?v=4" />
-    <title>Checkout · Ezkart</title>
+    <title>Checkout · Ezpay</title>
   </head>
   <body>
     <a class="skip-link" href="#checkout-main">Skip to checkout</a>
@@ -127,7 +127,7 @@
             </dl>
             <button class="primary-button" type="button" id="to-checkout" disabled>Continue to checkout</button>
             <button class="primary-button" type="button" id="pay-button" disabled hidden>Choose a delivery method</button>
-            <p class="summary-note"><img src="../assets/shield-check.svg" alt="" width="18" height="18" /><span>Secure checkout by <strong>Ezkart</strong></span></p>
+            <p class="summary-note"><img src="../assets/shield-check.svg" alt="" width="18" height="18" /><span>Secure checkout by</span><img class="ezpay-logo" src="../assets/ezpay-logo.svg" alt="Ezpay" width="1744" height="468" /></p>
           </div>
           <div class="support-note"><span>Need help?</span><a href="../docs/Ezkart-Customer-Checkout-Guide.pdf">View checkout guide</a></div>
         </aside>
@@ -135,7 +135,7 @@
     </main>
 
     <footer class="checkout-footer">
-      <img src="../assets/ezkart-logo.svg" alt="Ezkart" width="1020" height="420" />
+      <div class="checkout-brand"><img src="../assets/ezpay-logo.svg" alt="Ezpay" width="1744" height="468" /><small>An Ezkart product</small></div>
       <p>Simple, secure checkout for Indonesian businesses.</p>
       <span>© <span id="year">2026</span> Ezkart</span>
     </footer>
@@ -145,7 +145,7 @@
     <script src="customer-addresses.js?v=4"></script>
     <script src="storefront.js?v=1"></script>
     <script src="product-options.js?v=1"></script>
-    <script src="cart.js?v=product-options-2"></script>
+    <script src="cart.js?v=ezpay-1"></script>
     <script src="select.js?v=1"></script>
   </body>
 </html>
