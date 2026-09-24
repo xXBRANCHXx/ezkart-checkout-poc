@@ -170,6 +170,28 @@ The editor no longer inherits the admin panel's 18 px top padding and 1 px
 border. Image Stack's cart thumbnails use 80 × 96 px instead of 52 × 60 px on
 mobile, with the complete product image contained in the slot.
 
+## Image arrangement — 24 September 2026
+
+Upload cards now use a six-dot drag handle. A compact artwork preview follows
+the pointer while a shaded, dotted slot marks the drop position. Neighboring
+cards move with a damped spring that preserves velocity when the target changes.
+Dragging near the viewport edge scrolls longer lists. Dropping commits one
+history step; Escape, pointer cancellation and drops outside the list restore
+the original order. Keyboard users pick up with Space or Enter, move with the
+arrow keys (or Home/End), and drop with Space or Enter. Reduced motion skips
+the animation.
+
+The thumbnail opens image replacement directly, with a Replace overlay on
+hover or keyboard focus and a visible caption on touch screens. The trash
+control has no button border. English and Indonesian labels are supported.
+
+Verified 17 merchant UI tests across image sorting, image pages, navigation,
+blank-editor-workflow, section-actions and grid-snapping. Coverage includes
+mouse and touch dragging, cancellation, edge scrolling, keyboard sorting,
+replacement, undo/redo, reduced motion and saved order. Desktop and mobile
+screenshots were visually inspected; narrow layouts were checked at 320,
+390 and 941 px. Review captures are in `/tmp/ezkart-image-sorting-review`.
+
 Verification: 35 unique browser tests passed across navigation, native rendering,
 cart, product controls, universal selects, responsive layouts, blank editing,
 section actions and grid snapping. The six Image Stack/select tests passed again

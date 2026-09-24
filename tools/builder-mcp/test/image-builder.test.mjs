@@ -52,7 +52,8 @@ test('image pages create, upload, reorder, replace, undo, save and use the share
   await page.waitForFunction(()=>document.querySelectorAll('.ib-row').length===2&&!document.querySelector('.ib-controls').disabled);
   const ids=()=>page.locator('.ib-row').evaluateAll(rows=>rows.map(row=>row.dataset.imageRow));
   const original=await ids();
-  await page.locator('.ib-row').nth(1).getByRole('button',{name:/Move up/}).click();
+  await page.locator('.ib-row').nth(1).locator('[data-image-drag]').focus();
+  await page.keyboard.press('Space');await page.keyboard.press('ArrowUp');await page.keyboard.press('Space');
   assert.deepEqual(await ids(),[original[1],original[0]]);
   await page.locator('[data-sq-undo]').click();assert.deepEqual(await ids(),original);
   await page.locator('[data-sq-redo]').click();assert.deepEqual(await ids(),[original[1],original[0]]);

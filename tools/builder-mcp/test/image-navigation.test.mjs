@@ -25,7 +25,7 @@ test('Image Stack navigation settings persist and its menu, product link, surfac
   const target=await page.locator('.ib-nav-link select').nth(1).inputValue();
   await page.locator('[data-sq-undo]').click();assert.equal(await field('ctaLabel').inputValue(),'Shop now');await page.locator('[data-sq-redo]').click();
   // Targets follow the image identity, including after reordering and disabling the bar.
-  await page.locator('.ib-row').nth(1).getByRole('button',{name:/Move up/}).click();assert.equal(await page.locator('.ib-nav-link select').nth(1).inputValue(),target);
+  await page.locator('.ib-row').nth(1).locator('[data-image-drag]').focus();await page.keyboard.press('Space');await page.keyboard.press('ArrowUp');await page.keyboard.press('Space');assert.equal(await page.locator('.ib-nav-link select').nth(1).inputValue(),target);
   await field('enabled').uncheck();await field('enabled').check();assert.equal(await field('title').inputValue(),'Kopi Senja');
   await page.evaluate(()=>EzkartBuilder.save());await page.reload();await field('enabled').waitFor();assert.equal(await field('enabled').isChecked(),true);assert.equal(await field('height').inputValue(),'72');assert.equal(await page.locator('.ib-nav-link').count(),2);
   const frame=page.frameLocator('.ib-phone');await frame.locator('.sq-image-navigation').waitFor();assert.equal(await frame.locator('.ib-nav-title').textContent(),'Kopi Senja');
