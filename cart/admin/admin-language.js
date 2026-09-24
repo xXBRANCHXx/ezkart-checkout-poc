@@ -77,6 +77,17 @@
     'Dismiss selection message':'Tutup pesan pilihan',
   };
   Object.assign(strings, {
+    'Navigation bar':'Bilah navigasi', 'Show navigation bar':'Tampilkan bilah navigasi',
+    'Name in the bar':'Nama di bilah', 'Height':'Tinggi', 'Sticky behavior':'Perilaku saat digulir',
+    'Off':'Mati', 'On':'Aktif', 'Appear on scroll up':'Muncul saat digulir ke atas',
+    'Background color':'Warna latar', 'Background transparency':'Transparansi latar', 'Backdrop blur':'Buramkan latar belakang',
+    'Menu links':'Tautan menu', 'Each link jumps to the start of an image.':'Setiap tautan menuju ke awal gambar.',
+    'Add menu link':'Tambah tautan menu', 'Remove menu link':'Hapus tautan menu', 'Link text':'Teks tautan', 'Jump to image':'Menuju gambar',
+    'Show product button':'Tampilkan tombol produk', 'Button text':'Teks tombol',
+    'The button jumps to your connected product.':'Tombol menuju ke produk yang terhubung.',
+    'Choose a product below to show this button.':'Pilih produk di bawah untuk menampilkan tombol ini.',
+    'Shop now':'Belanja sekarang', 'Page navigation':'Navigasi halaman',
+    'Open navigation menu':'Buka menu navigasi', 'Close navigation menu':'Tutup menu navigasi',
     'Choose another product':'Pilih produk lain', 'Create a landing page':'Buat landing page',
     'Choose a design or start blank. Everything is yours to edit.':'Pilih desain atau mulai dari halaman kosong. Semua bisa kamu edit.',
     'Back':'Kembali', 'Close':'Tutup', 'Cancel':'Batal', 'Preview':'Pratinjau', 'Publish':'Terbitkan',

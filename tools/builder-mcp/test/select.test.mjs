@@ -129,3 +129,33 @@ test('standalone landing pages include the dropdown fallback and update the sele
   assert.equal(await page.locator('[data-ezkart-cart-subtotal]').innerText(), 'Rp65.000');
   assert.deepEqual(errors, []);
 });
+
+test('product cards use the universal fallback in the editor and export without persisting generated controls',async t=>{
+  const dir=await mkdtemp(join(tmpdir(),'ezkart-card-select-')),ws=await new Workspace(dir).init();
+  await writeFile(join(dir,'catalog.json'),JSON.stringify({demoCheckout:true,products:[{id:'syrup',name:'Syrup',type:'physical',status:'active',price:42500,stock:12,options:[{name:'Flavor',values:['Plain','Hazelnut']}],variants:[{id:'plain',name:'Plain',price:42500,stock:8,options:[{option:'Flavor',value:'Plain'}]},{id:'hazelnut',name:'Hazelnut',price:49000,stock:4,options:[{option:'Flavor',value:'Hazelnut'}]}]}]}));
+  await ws.create({id:'card-select',name:'Card select',productIds:['syrup']});await ws.start();
+  const browser=await chromium.launch(),context=await browser.newContext({viewport:{width:1440,height:1000}});
+  await context.addInitScript(()=>{const supports=CSS.supports.bind(CSS);CSS.supports=(...args)=>args[1]==='base-select'?false:supports(...args);});
+  t.after(async()=>{await browser.close();await ws.stop();await rm(dir,{recursive:true,force:true});});
+  const editor=await context.newPage(),errors=[];editor.on('pageerror',e=>errors.push(e.message));
+  await editor.goto(ws.url+'/cart/admin/?page=sites&edit=card-select.ezkart.site');await editor.waitForFunction(()=>globalThis.EzkartBuilder&&globalThis.EzkartSelect);
+  await editor.evaluate(()=>EzkartBuilder.nativeInsert({section:'blank',node:{id:'syrup-card',type:'product',productId:'syrup'}}));
+  const card=editor.locator('.sq-page-preview [data-product-card="syrup"]');
+  await card.locator('.ezkart-select-trigger').waitFor();
+  await card.getByRole('combobox',{name:'Flavor',exact:true}).click();await editor.getByRole('option',{name:'Hazelnut',exact:true}).click();
+  assert.match(await card.locator('footer b').innerText(),/49[.,]000/);
+  await editor.evaluate(()=>EzkartBuilder.save());
+  const saved=await ws.read('card-select');assert.doesNotMatch(saved.state.preview,/ezkart-select-trigger|ezkart-select-source|sq-product-option-menu/);
+  await editor.reload();await editor.waitForFunction(()=>globalThis.EzkartBuilder);
+  await card.locator('.ezkart-select-trigger').waitFor();assert.equal(await card.locator('select').count(),1);
+  const html=await editor.evaluate(()=>EzkartBuilder.exportHtml());
+  const output=await context.newPage();output.on('pageerror',e=>errors.push(e.message));
+  await output.route('https://card-select.example.test/',route=>route.fulfill({body:html,contentType:'text/html'}));await output.goto('https://card-select.example.test/');
+  const purchase=output.locator('[data-product-card="syrup"]');
+  assert.equal(await purchase.locator('.ezkart-select-trigger').count(),1);assert.equal(await purchase.locator('.sq-product-option-trigger,.sq-product-option-menu').count(),0);
+  await purchase.getByRole('combobox',{name:'Flavor',exact:true}).click();await output.getByRole('option',{name:'Plain',exact:true}).click();
+  assert.match(await purchase.locator('footer b').innerText(),/42[.,]500/);
+  await purchase.getByRole('combobox',{name:'Flavor',exact:true}).click();await output.getByRole('option',{name:'Hazelnut',exact:true}).click();
+  await purchase.locator('[data-ezkart-add]').click();assert.match(await output.locator('[data-ezkart-cart-items]').innerText(),/Hazelnut/);assert.match(await output.locator('[data-ezkart-cart-subtotal]').innerText(),/49[.,]000/);
+  assert.deepEqual(errors,[]);
+});

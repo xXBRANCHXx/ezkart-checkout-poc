@@ -6,7 +6,7 @@
     document.documentElement.dataset.ezkartSelects = 'true';
     const controls = new Map();
     let current = null, serial = 0, queued = false;
-    const eligible = select => !select.multiple && select.size <= 1 && !select.matches('.sq-builder-native-select,.product-type-native,[data-native-select],[aria-hidden="true"]') && !select.closest('.sq-tool-panels,.sq-inspector,.sq-studio .sq-page-preview');
+    const eligible = select => !select.multiple && select.size <= 1 && !select.matches('.sq-builder-native-select,.product-type-native,[data-native-select],[aria-hidden="true"]') && (!select.closest('.sq-tool-panels,.sq-inspector,.sq-studio .sq-page-preview') || select.hasAttribute('data-ezkart-option-select'));
     const labelFor = select => {
       if (select.getAttribute('aria-label')) return select.getAttribute('aria-label');
       const label = select.labels?.[0]?.cloneNode(true);
@@ -204,6 +204,17 @@
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true });
     else start();
   }
-  globalThis.EzkartSelect = { install };
+  // Saved pages and exports retain native controls, not generated fallback UI.
+  function clean(root) {
+    root.querySelectorAll('.ezkart-select').forEach(wrapper => {
+      const select = wrapper.querySelector('select.ezkart-select-source');
+      if (!select) return;
+      select.classList.remove('ezkart-select-source');
+      select.removeAttribute('aria-hidden');
+      select.removeAttribute('tabindex');
+      wrapper.replaceWith(select);
+    });
+  }
+  globalThis.EzkartSelect = { install, clean };
   install();
 })();

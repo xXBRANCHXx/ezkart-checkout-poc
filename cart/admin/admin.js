@@ -2779,6 +2779,7 @@
     const previewSnapshotHtml = () => {
       if (!previewRoot) return "";
       const clone = previewRoot.cloneNode(true);
+      globalThis.EzkartSelect?.clean(clone);
       clone.removeAttribute("data-ezm-mounted");
       clone.querySelectorAll("track[data-ezm-captions]").forEach(track=>track.removeAttribute("src"));
       clone.querySelectorAll(".ezm-film-dialog").forEach(dialog=>dialog.removeAttribute("open"));
@@ -5497,114 +5498,53 @@
       })));
       const initialVariant = variants.find((variant) => variant.id === previousVariant) || variants[0];
       groups.forEach((group, index) => {
-        const field = document.createElement("div");
+        const field = document.createElement("label");
         const caption = document.createElement("span");
-        const trigger = document.createElement("button");
-        const valueLabel = document.createElement("span");
-        const menu = document.createElement("div");
+        const select = document.createElement("select");
         field.className = "sq-product-option";
         field.dataset.sqVariantOption = String(index);
         field.dataset.ezkartOption = group.name;
-        trigger.type = "button";
-        trigger.className = "sq-product-option-trigger";
-        trigger.setAttribute("aria-haspopup", "listbox");
-        trigger.setAttribute("aria-expanded", "false");
-        valueLabel.className = "sq-product-option-value";
-        valueLabel.textContent = group.values[0];
-        trigger.append(valueLabel);
-        trigger.insertAdjacentHTML("beforeend", '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="m3 4.5 3 3 3-3"/></svg>');
-        menu.className = "sq-product-option-menu";
-        menu.setAttribute("role", "listbox");
-        menu.setAttribute("aria-label", group.name);
-        menu.hidden = true;
         caption.textContent = group.name;
-        group.values.forEach((value) => {
-          const option = document.createElement("button");
-          option.type = "button";
-          option.setAttribute("role", "option");
-          option.dataset.ezkartOptionValue = value;
-          option.textContent = value;
-          menu.append(option);
-        });
-        const initialValue = initialVariant.options?.find((option) => option.option === group.name)?.value;
-        field.dataset.ezkartValue = initialValue && group.values.includes(initialValue) ? initialValue : group.values[0];
-        valueLabel.textContent = field.dataset.ezkartValue;
-        field.append(caption, trigger, menu);
+        select.className = "sq-product-option-select";
+        select.dataset.ezkartOptionSelect = "";
+        select.setAttribute("aria-label", group.name);
+        group.values.forEach(value => select.add(new Option(value, value)));
+        const initialValue = initialVariant.options?.find(option => option.option === group.name)?.value;
+        select.value = initialValue && group.values.includes(initialValue) ? initialValue : group.values[0];
+        field.dataset.ezkartValue = select.value;
+        field.append(caption, select);
         controls.append(field);
       });
       const footer = card.querySelector("footer");
       if (footer) footer.before(controls);
       else card.querySelector(":scope > div")?.append(controls);
       const optionControls = [...controls.querySelectorAll("[data-sq-variant-option]")];
-      const valueFor = (variant, group) => variant.options?.find((option) => option.option === group.name)?.value;
-      const closeMenus = (except = null) => optionControls.forEach((control) => {
-        if (control === except) return;
-        control.querySelector(".sq-product-option-menu").hidden = true;
-        control.querySelector(".sq-product-option-trigger").setAttribute("aria-expanded", "false");
-      });
-      const setControlValue = (control, value) => {
-        control.dataset.ezkartValue = value;
-        const label = control.querySelector(".sq-product-option-value");
-        if (label) label.textContent = value;
-        control.querySelectorAll("[data-ezkart-option-value]").forEach((option) => {
-          const selected = option.dataset.ezkartOptionValue === value;
-          option.classList.toggle("selected", selected);
-          option.setAttribute("aria-selected", String(selected));
-        });
-      };
+      const valueFor = (variant, group) => variant.options?.find(option => option.option === group.name)?.value;
       const applyVariant = (changedIndex = -1) => {
-        let selected = variants.find((variant) => groups.every((group, index) => valueFor(variant, group) === optionControls[index].dataset.ezkartValue));
-        if (!selected && changedIndex >= 0) selected = variants.find((variant) => valueFor(variant, groups[changedIndex]) === optionControls[changedIndex].dataset.ezkartValue);
+        let selected = variants.find(variant => groups.every((group, index) => valueFor(variant, group) === optionControls[index].dataset.ezkartValue));
+        if (!selected && changedIndex >= 0) selected = variants.find(variant => valueFor(variant, groups[changedIndex]) === optionControls[changedIndex].dataset.ezkartValue);
         selected ||= variants[0];
-        groups.forEach((group, index) => { const value = valueFor(selected, group); if (value) setControlValue(optionControls[index], value); });
         card.dataset.sqSelectedVariant = selected.id || "";
         const priceTarget = card.querySelector("footer b");
         const imageTarget = card.querySelector(".product-art img");
         if (priceTarget) priceTarget.textContent = formatRupiah(Math.max(1000, Number(selected.price) || fallbackPrice));
         if (imageTarget) imageTarget.src = selected.image || fallbackImage;
-        optionControls.forEach((control, index) => control.querySelectorAll("[data-ezkart-option-value]").forEach((option) => {
-          option.disabled = !variants.some((variant) => groups.every((group, groupIndex) => groupIndex === index ? valueFor(variant, group) === option.dataset.ezkartOptionValue : valueFor(variant, group) === optionControls[groupIndex].dataset.ezkartValue));
-        }));
-      };
-      optionControls.forEach((control, index) => {
-        const trigger = control.querySelector(".sq-product-option-trigger");
-        const menu = control.querySelector(".sq-product-option-menu");
-        const options = [...menu.querySelectorAll("[data-ezkart-option-value]")];
-        const openMenu = () => {
-          const opening = menu.hidden;
-          closeMenus(opening ? control : null);
-          menu.hidden = !opening;
-          trigger.setAttribute("aria-expanded", String(opening));
-          controls.closest("[data-sq-product-grid]")?.classList.toggle("sq-option-menu-open", opening);
-          if (opening) (options.find((option) => option.classList.contains("selected")) || options.find((option) => !option.disabled))?.focus();
-        };
-        trigger.addEventListener("click", (event) => { event.preventDefault(); event.stopPropagation(); openMenu(); });
-        trigger.addEventListener("keydown", (event) => { if (["ArrowDown", "ArrowUp"].includes(event.key)) { event.preventDefault(); openMenu(); } });
-        options.forEach((option) => option.addEventListener("click", (event) => {
-          event.preventDefault(); event.stopPropagation();
-          if (option.disabled) return;
-          setControlValue(control, option.dataset.ezkartOptionValue);
-          applyVariant(index);
-          closeMenus();
-          controls.closest("[data-sq-product-grid]")?.classList.remove("sq-option-menu-open");
-          trigger.focus();
-        }));
-        menu.addEventListener("keydown", (event) => {
-          const enabled = options.filter((option) => !option.disabled);
-          const current = enabled.indexOf(document.activeElement);
-          if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
-            event.preventDefault();
-            const next = event.key === "Home" ? 0 : event.key === "End" ? enabled.length - 1 : (current + (event.key === "ArrowDown" ? 1 : -1) + enabled.length) % enabled.length;
-            enabled[next]?.focus();
-          }
-          if (event.key === "Escape") { event.preventDefault(); closeMenus(); controls.closest("[data-sq-product-grid]")?.classList.remove("sq-option-menu-open"); trigger.focus(); }
+        optionControls.forEach((field, index) => {
+          const select = field.querySelector("select"), value = valueFor(selected, groups[index]);
+          if (value) field.dataset.ezkartValue = select.value = value;
         });
-      });
-      controls.addEventListener("focusout", (event) => {
-        if (controls.contains(event.relatedTarget)) return;
-        closeMenus();
-        controls.closest("[data-sq-product-grid]")?.classList.remove("sq-option-menu-open");
-      });
+        optionControls.forEach((field,index) => {
+          const select=field.querySelector("select");
+          [...select.options].forEach(option => {
+            option.disabled = !variants.some(variant => groups.every((group, groupIndex) => groupIndex === index ? valueFor(variant, group) === option.value : valueFor(variant, group) === optionControls[groupIndex].dataset.ezkartValue));
+          });
+          select.dispatchEvent(new Event('input', {bubbles:true}));
+        });
+      };
+      optionControls.forEach((field, index) => field.querySelector("select").addEventListener("change", event => {
+        field.dataset.ezkartValue = event.target.value;
+        applyVariant(index);
+      }));
       applyVariant();
     };
 
@@ -8073,6 +8013,7 @@
     const generateHtml = ({ libraryPreview = false } = {}) => {
       const exportBase = document.body.dataset.adminPublicBase || window.location.href;
       const clone = previewRoot.cloneNode(true);
+      globalThis.EzkartSelect?.clean(clone);
       clone.querySelectorAll('[data-sq-background-type]:not([data-sq-background-type="image"])').forEach((section) => {
         section.querySelector(":scope > .sq-section-background")?.remove();
       });
@@ -8147,7 +8088,7 @@
         menu.hidden = true;
         section.classList.remove("sq-nav-menu-open");
         const toggle = section.querySelector(".sq-nav-menu-toggle");
-        if (toggle) { toggle.setAttribute("aria-expanded", "false"); toggle.setAttribute("aria-label", "Open navigation menu"); }
+        if (toggle) { toggle.setAttribute("aria-expanded", "false"); toggle.setAttribute("aria-label", section.dataset.navOpenLabel || "Open navigation menu"); }
       });
       clone.querySelectorAll('.sq-store-nav [data-sq-element-type="navigation"] > button').forEach((action) => {
         if (action.dataset.sqLinkType) return;
@@ -8286,6 +8227,7 @@ body.ezkart-cart-open .ezkart-cart-trigger{visibility:hidden}
 .ezkart-cart-drawer{top:auto;bottom:0;left:0;right:0;margin-inline:auto;width:min(480px,100%);height:auto;max-height:min(82dvh,720px);border-radius:20px 20px 0 0;background:#fff;color:#252724;font-family:Arial,sans-serif;box-shadow:0 -12px 48px #0a0e1630;overflow:hidden;transform:translateY(100%)}
 .ezkart-cart-head{padding:22px 20px 16px}.ezkart-cart-head h2{font:600 24px/1.2 Arial,sans-serif}.ezkart-cart-head small{color:#727782}
 .ezkart-cart-items{min-height:0;overscroll-behavior:contain;padding-inline:20px}.ezkart-cart-empty{min-height:180px;padding:36px 12px}
+.ezkart-cart-row{grid-template-columns:80px minmax(0,1fr);gap:12px}.ezkart-cart-row img,.ezkart-cart-thumb{width:80px;height:96px;grid-row:span 2;align-self:start}.ezkart-cart-row>strong{grid-column:2;padding-top:0}
 .ezkart-cart-foot{padding:18px 20px calc(20px + env(safe-area-inset-bottom,0px));background:#fff}.ezkart-cart-foot small{line-height:1.5;color:#727782}
 ` : ''}
 </style>`;
@@ -8329,21 +8271,36 @@ const scheduleScrollMarquees=()=>{if(!marqueeFrame)marqueeFrame=requestAnimation
 const syncMarquees=()=>{document.querySelectorAll('.sq-free-marquee').forEach(element=>{const track=element.querySelector('.sq-marquee-track'),source=track?.querySelector('.sq-marquee-copy:not([aria-hidden])');if(!track||!source)return;track.querySelectorAll('.sq-marquee-copy[aria-hidden="true"]').forEach(copy=>copy.remove());const width=Math.max(1,source.offsetWidth),copies=Math.max(2,Math.ceil(Math.max(1,element.clientWidth)/width)+2);for(let index=1;index<copies;index+=1){const copy=source.cloneNode(true);copy.removeAttribute('contenteditable');copy.setAttribute('aria-hidden','true');track.append(copy)}track.style.setProperty('--sq-marquee-distance',width+'px');track.style.setProperty('--sq-marquee-duration',Math.max(2,width/marqueeSpeed(element))+'s');const manual=element.dataset.ezkartMarqueeMode==='scroll';element.classList.toggle('sq-marquee-manual',manual);if(!manual)track.style.removeProperty('transform')});scheduleScrollMarquees()};
 addEventListener('scroll',scheduleScrollMarquees,{passive:true});addEventListener('resize',syncMarquees,{passive:true});document.fonts?.ready.then(syncMarquees);syncMarquees();
 let navigationFrame=0,lastNavigationScroll=scrollY;
-const syncNavigations=()=>{navigationFrame=0;const current=scrollY,direction=current-lastNavigationScroll;document.querySelectorAll('[data-ezkart-nav-position]').forEach(nav=>{const position=nav.dataset.ezkartNavPosition||'static',offset=Math.max(0,Math.min(120,Number(nav.dataset.ezkartNavOffset)||0)),opacity=Math.max(0,Math.min(100,Number(nav.dataset.ezkartNavOpacity??100))),blur=Math.max(0,Math.min(32,Number(nav.dataset.ezkartNavBlur??16))),stuck=position==='fixed'||position==='sticky'&&nav.getBoundingClientRect().top<=offset+1;nav.style.setProperty('--sq-nav-offset',offset+'px');nav.style.setProperty('--sq-nav-surface-opacity',opacity+'%');nav.style.setProperty('--sq-nav-backdrop-blur',blur+'px');nav.classList.toggle('sq-nav-is-stuck',stuck);if(!stuck||nav.dataset.ezkartNavHideScroll!=='true')nav.classList.remove('sq-nav-hidden');else if(direction>2&&current>offset+48)nav.classList.add('sq-nav-hidden');else if(direction<-2)nav.classList.remove('sq-nav-hidden')});lastNavigationScroll=current};
+const syncNavigations=()=>{navigationFrame=0;const current=scrollY,direction=current-lastNavigationScroll;document.querySelectorAll('[data-ezkart-nav-position]').forEach(nav=>{const position=nav.dataset.ezkartNavPosition||'static',offset=Math.max(0,Math.min(120,Number(nav.dataset.ezkartNavOffset)||0)),opacity=Math.max(0,Math.min(100,Number(nav.dataset.ezkartNavOpacity??100))),blur=Math.max(0,Math.min(32,Number(nav.dataset.ezkartNavBlur??16))),stuck=position==='fixed'||position==='sticky'&&nav.getBoundingClientRect().top<=offset+1;nav.style.setProperty('--sq-nav-offset',offset+'px');nav.style.setProperty('--sq-nav-surface-opacity',opacity+'%');nav.style.setProperty('--sq-nav-backdrop-blur',blur+'px');nav.classList.toggle('sq-nav-is-stuck',stuck);if(!stuck||nav.dataset.ezkartNavHideScroll!=='true'||nav.classList.contains('sq-nav-menu-open'))nav.classList.remove('sq-nav-hidden');else if(direction>2&&current>offset+48)nav.classList.add('sq-nav-hidden');else if(direction<-2)nav.classList.remove('sq-nav-hidden')});lastNavigationScroll=current};
 const scheduleNavigations=()=>{if(!navigationFrame)navigationFrame=requestAnimationFrame(syncNavigations)};
 addEventListener('scroll',scheduleNavigations,{passive:true});addEventListener('resize',scheduleNavigations,{passive:true});syncNavigations();
-document.querySelectorAll('.sq-navigation-template-section').forEach(section=>{const toggle=section.querySelector('.sq-nav-menu-toggle'),menu=section.querySelector(':scope>.sq-nav-mobile-menu');if(!toggle||!menu)return;const setOpen=open=>{menu.hidden=!open;section.classList.toggle('sq-nav-menu-open',open);toggle.setAttribute('aria-expanded',String(open));toggle.setAttribute('aria-label',open?'Close navigation menu':'Open navigation menu')};toggle.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();setOpen(menu.hidden)});menu.addEventListener('click',event=>{if(event.target.closest('a'))setOpen(false)});addEventListener('keydown',event=>{if(event.key==='Escape'&&!menu.hidden){setOpen(false);toggle.focus()}});document.addEventListener('click',event=>{if(!section.contains(event.target))setOpen(false)})});
+document.querySelectorAll('.sq-navigation-template-section').forEach(section=>{const toggle=section.querySelector('.sq-nav-menu-toggle'),menu=section.querySelector(':scope>.sq-nav-mobile-menu');if(!toggle||!menu)return;const setOpen=open=>{menu.hidden=!open;section.classList.toggle('sq-nav-menu-open',open);toggle.setAttribute('aria-expanded',String(open));toggle.setAttribute('aria-label',open?(section.dataset.navCloseLabel||'Close navigation menu'):(section.dataset.navOpenLabel||'Open navigation menu'))};toggle.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();setOpen(menu.hidden)});menu.addEventListener('click',event=>{if(event.target.closest('a'))setOpen(false)});addEventListener('keydown',event=>{if(event.key==='Escape'&&!menu.hidden){setOpen(false);toggle.focus()}});document.addEventListener('click',event=>{if(!section.contains(event.target))setOpen(false)})});
 document.querySelectorAll('.sq-nav-commerce-search form').forEach(form=>{const input=form.querySelector('input[type="search"]'),button=form.querySelector('button'),filterProducts=()=>{const query=(input?.value||'').trim().toLocaleLowerCase();document.querySelectorAll('[data-product-card]').forEach(card=>{card.hidden=Boolean(query)&&!card.textContent.toLocaleLowerCase().includes(query)})};form.addEventListener('submit',event=>{event.preventDefault();filterProducts()});button?.addEventListener('click',filterProducts);input?.addEventListener('input',filterProducts)});
 document.querySelectorAll('[data-ezkart-variants]').forEach(controls=>{
   let variants=[];
   try{variants=JSON.parse(controls.dataset.ezkartVariants||'[]')}catch(_){return}
   const card=controls.closest('[data-product-card]'),fields=[...controls.querySelectorAll('[data-ezkart-option]')],valueFor=(variant,name)=>variant.options?.find(option=>option.option===name)?.value;
   if(!card||!fields.length||!variants.length)return;
-  const closeMenus=(except=null)=>fields.forEach(field=>{if(field===except)return;const menu=field.querySelector('.sq-product-option-menu'),trigger=field.querySelector('.sq-product-option-trigger');if(menu)menu.hidden=true;if(trigger)trigger.setAttribute('aria-expanded','false')});
-  const setValue=(field,value)=>{field.dataset.ezkartValue=value;const label=field.querySelector('.sq-product-option-value');if(label)label.textContent=value;field.querySelectorAll('[data-ezkart-option-value]').forEach(option=>{const selected=option.dataset.ezkartOptionValue===value;option.classList.toggle('selected',selected);option.setAttribute('aria-selected',String(selected))})};
-  const sync=(changed=-1)=>{const groups=fields.map(field=>field.dataset.ezkartOption);let selected=variants.find(variant=>groups.every((group,index)=>valueFor(variant,group)===fields[index].dataset.ezkartValue));if(!selected&&changed>=0)selected=variants.find(variant=>valueFor(variant,groups[changed])===fields[changed].dataset.ezkartValue);selected||=variants[0];if(!selected)return;groups.forEach((group,index)=>{const value=valueFor(selected,group);if(value)setValue(fields[index],value)});card.dataset.ezkartVariant=selected.id||'';const price=card.querySelector('footer b'),image=card.querySelector('.product-art img');if(price)price.textContent=money(Math.max(1000,Number(selected.price)||0));if(image&&selected.image)image.src=selected.image;fields.forEach((field,index)=>field.querySelectorAll('[data-ezkart-option-value]').forEach(option=>{option.disabled=!variants.some(variant=>groups.every((group,groupIndex)=>groupIndex===index?valueFor(variant,group)===option.dataset.ezkartOptionValue:valueFor(variant,group)===fields[groupIndex].dataset.ezkartValue))}))};
-  fields.forEach((field,index)=>{const trigger=field.querySelector('.sq-product-option-trigger'),menu=field.querySelector('.sq-product-option-menu'),options=[...field.querySelectorAll('[data-ezkart-option-value]')];if(!trigger||!menu)return;const setOpen=open=>{closeMenus(open?field:null);menu.hidden=!open;trigger.setAttribute('aria-expanded',String(open));controls.closest('.sq-product-grid')?.classList.toggle('sq-option-menu-open',open);if(open)(options.find(option=>option.classList.contains('selected'))||options.find(option=>!option.disabled))?.focus()};trigger.addEventListener('click',event=>{event.preventDefault();setOpen(menu.hidden)});trigger.addEventListener('keydown',event=>{if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();setOpen(true)}});options.forEach(option=>option.addEventListener('click',event=>{event.preventDefault();if(option.disabled)return;setValue(field,option.dataset.ezkartOptionValue);sync(index);setOpen(false);trigger.focus()}));menu.addEventListener('keydown',event=>{const enabled=options.filter(option=>!option.disabled),current=enabled.indexOf(document.activeElement);if(['ArrowDown','ArrowUp','Home','End'].includes(event.key)){event.preventDefault();const next=event.key==='Home'?0:event.key==='End'?enabled.length-1:(current+(event.key==='ArrowDown'?1:-1)+enabled.length)%enabled.length;enabled[next]?.focus()}if(event.key==='Escape'){event.preventDefault();setOpen(false);trigger.focus()}})});
-  controls.addEventListener('focusout',event=>{if(controls.contains(event.relatedTarget))return;closeMenus();controls.closest('.sq-product-grid')?.classList.remove('sq-option-menu-open')});
+  fields.forEach(field=>{
+    let select=field.querySelector('select');
+    // Upgrade saved cards made with the former product-specific menu.
+    if(!select){
+      select=document.createElement('select');select.className='sq-product-option-select';select.dataset.ezkartOptionSelect='';select.setAttribute('aria-label',field.dataset.ezkartOption);
+      field.querySelectorAll('[data-ezkart-option-value]').forEach(option=>select.add(new Option(option.textContent.trim(),option.dataset.ezkartOptionValue)));
+      field.querySelectorAll('.sq-product-option-trigger,.sq-product-option-menu').forEach(node=>node.remove());field.append(select);
+    }
+    select.value=field.dataset.ezkartValue;
+  });
+  const sync=(changed=-1)=>{
+    const groups=fields.map(field=>field.dataset.ezkartOption);let selected=variants.find(variant=>groups.every((group,index)=>valueFor(variant,group)===fields[index].dataset.ezkartValue));
+    if(!selected&&changed>=0)selected=variants.find(variant=>valueFor(variant,groups[changed])===fields[changed].dataset.ezkartValue);
+    selected||=variants[0];if(!selected)return;
+    groups.forEach((group,index)=>{const value=valueFor(selected,group);if(value)fields[index].dataset.ezkartValue=fields[index].querySelector('select').value=value});
+    card.dataset.ezkartVariant=selected.id||'';const price=card.querySelector('footer b'),image=card.querySelector('.product-art img');
+    if(price)price.textContent=money(Math.max(1000,Number(selected.price)||0));if(image&&selected.image)image.src=selected.image;
+    fields.forEach((field,index)=>{const select=field.querySelector('select');[...select.options].forEach(option=>{option.disabled=!variants.some(variant=>groups.every((group,groupIndex)=>groupIndex===index?valueFor(variant,group)===option.value:valueFor(variant,group)===fields[groupIndex].dataset.ezkartValue))});select.dispatchEvent(new Event('input',{bubbles:true}))});
+  };
+  fields.forEach((field,index)=>field.querySelector('select').addEventListener('change',event=>{field.dataset.ezkartValue=event.target.value;sync(index)}));
   sync();
 });
 const addProductToCart=({productId,variantId='',quantity=1}={})=>{quantity=Number(quantity);const product=lineProduct(selectionId(productId,variantId));if(!product||!Number.isSafeInteger(quantity)||quantity<1)return false;const id=selectionId(productId,product.variantId),maximum=product.stock==null?Number.MAX_SAFE_INTEGER:Number(product.stock);if(!Number.isFinite(maximum)||maximum<1||(cart[id]||0)+quantity>maximum)return false;changeCart(id,quantity);openCart();return true};

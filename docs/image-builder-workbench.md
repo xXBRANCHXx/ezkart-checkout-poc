@@ -144,3 +144,36 @@ inspected with catalog photos and missing-photo states. Normal slide-up motion,
 reduced motion, backdrop dismissal and focus return were checked separately.
 This verification used the local merchant UI and exported pages, without placing
 an order or collecting payment.
+
+
+## Navigation and shared controls — 24 September 2026
+
+Image Stack has an optional navigation bar. Merchants can set its name, height
+(48–120 px), background/text colors, background transparency, backdrop blur,
+and scrolling behavior (off, always visible, or appear when scrolling up).
+Up to eight named menu links jump to uploaded images. Links follow persistent
+image IDs through reordering and replacement; removing an image removes its link,
+and Undo restores both. The optional product button jumps to the connected
+catalog card and stays absent when no product is connected. Settings and default
+labels follow the account language and survive saving, undo and reopening.
+
+The bar uses Page Studio's existing navigation menu, blur and scroll runtime.
+Its width remains capped at 480 px, including on desktop. Jump targets account
+for the selected header height. Disabling the bar preserves its settings.
+
+Product card options now use the universal native select and its existing
+fallback, in both editors and standalone pages. Generated fallback wrappers are
+removed from snapshots and exports, then rebuilt by the shared installer.
+The obsolete product-only menu styles and keyboard handlers are removed.
+
+The editor no longer inherits the admin panel's 18 px top padding and 1 px
+border. Image Stack's cart thumbnails use 80 × 96 px instead of 52 × 60 px on
+mobile, with the complete product image contained in the slot.
+
+Verification: 35 unique browser tests passed across navigation, native rendering,
+cart, product controls, universal selects, responsive layouts, blank editing,
+section actions and grid snapping. The six Image Stack/select tests passed again
+in an isolated delivery checkout, including save/reopen, language settings,
+480 px width limits, all scroll modes, image targets after reordering, and zero
+top gap at 390/941/1440 px. Screenshots of the editor, expanded menu, product card
+and cart were reviewed. No real order or payment was created.

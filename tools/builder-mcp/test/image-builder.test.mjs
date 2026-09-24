@@ -115,14 +115,15 @@ test('image pages create, upload, reorder, replace, undo, save and use the share
     assert.equal(await output.locator('[data-ezkart-cart-open]').evaluate(node=>node===document.activeElement),true);
   }
   await output.setViewportSize({width:390,height:660});
-  await card.locator('.sq-product-option-trigger').click();
-  await card.getByRole('option',{name:'Ijo',exact:true}).click();
+  await card.locator('select[data-ezkart-option-select]').selectOption('Ijo');
   assert.match(await card.locator('footer b').textContent(),/91[.,]000/);
   await card.locator('[data-ezkart-add]').click();
   assert.equal(await output.locator('[data-ezkart-cart-layer]').isVisible(),true);
   assert.match(await output.locator('[data-ezkart-cart-layer]').innerText(),/Ijo/);
   await output.locator('[data-ezkart-cart-quantity="1"]').click();
   assert.match(await output.locator('[data-ezkart-cart-subtotal]').innerText(),/182[.,]000/);
+  const thumbnail=await output.locator('.ezkart-cart-row img,.ezkart-cart-thumb').boundingBox();
+  assert.equal(thumbnail.width,80);assert.equal(thumbnail.height,96);
   await output.locator('[data-ezkart-cart-quantity="1"]').click();
   await output.locator('[data-ezkart-cart-quantity="1"]').click();
   assert.equal(await output.locator('[data-ezkart-cart-quantity="1"]').isDisabled(),true);
@@ -162,4 +163,7 @@ test('the chooser and image editor use the account language while leaving upload
   await page.waitForURL('**edit=halaman-gambar.ezkart.site');await page.locator('[data-image-page-add]').waitFor();
   assert.match(await page.locator('[data-image-page-add]').textContent(),/Unggah gambar/);
   assert.match(await page.locator('.ib-stage').textContent(),/khusus tampilan ponsel/);
+  await page.getByRole('checkbox',{name:'Tampilkan bilah navigasi',exact:true}).check();
+  assert.equal(await page.getByRole('combobox',{name:'Perilaku saat digulir',exact:true}).count(),1);
+  assert.equal(await page.locator('[data-image-nav=ctaLabel]').inputValue(),'Belanja sekarang');
 });
