@@ -203,6 +203,8 @@
     : cloudPrivateMediaUrl(id);
   const cloudRequest = async (method, path, payload = null) => {
     if (!cloudEnabled) throw new Error("Sign in with Google to access your saved products.");
+    const started = method === 'GET' && globalThis.EzkartAdminStartup?.take(path);
+    if (started) return started;
     const response = await fetch(cloudUrl(path), {
       method,
       credentials: "same-origin",
@@ -274,7 +276,7 @@
       previewSourceUpdatedAt,
       previewVersion,
       previewUrl: previewIsCurrent
-        ? `${cloudUrl(`/v1/landing-pages/${encodeURIComponent(id)}/preview`)}&v=${encodeURIComponent(previewUpdatedAt)}`
+        ? `${cloudUrl(`/v1/landing-pages/${encodeURIComponent(id)}/preview`)}&v=${encodeURIComponent(previewUpdatedAt)}&render=1`
         : "",
     };
   };
@@ -296,20 +298,39 @@
   let cloudLoadError = "";
   let cloudLandingLoadError = "";
   let cloudComponentLoadError = "";
+  const openingSite = new URLSearchParams(location.search).get('edit') || '';
+  // Fetch the selected page alongside the catalog/list, including local workspaces.
+  let openingPageRequest = cloudEnabled && document.querySelector('[data-sq-preview-root]')
+    && /^[a-z0-9]+(?:-[a-z0-9]+)*\.ezkart\.site$/.test(openingSite)
+    ? cloudRequest('GET', '/v1/landing-pages/' + openingSite.replace(/\.ezkart\.site$/, ''))
+      .then(value => ({value}), error => ({error})) : null;
+  let cloudLandingReady = Promise.resolve();
+  let cloudComponentsReady = Promise.resolve();
+  let cloudComponentsLoaded = !cloudEnabled;
   if (cloudEnabled) {
-    const [catalogLoad, landingPageLoad, componentLoad] = await Promise.allSettled([
-      cloudRequest("GET", "/v1/catalog"),
-      cloudRequest("GET", "/v1/landing-pages"),
-      cloudRequest("GET", "/v1/components"),
-    ]);
-    if (catalogLoad.status === "fulfilled") {
-      cloudCatalogProducts = (Array.isArray(catalogLoad.value.products) ? catalogLoad.value.products : []).map(normalizeCloudProduct);
-      cloudProductDrafts = (Array.isArray(catalogLoad.value.drafts) ? catalogLoad.value.drafts : []).map(normalizeCloudDraft);
-    } else cloudLoadError = catalogLoad.reason instanceof Error ? catalogLoad.reason.message : "Saved products could not be loaded.";
-    if (landingPageLoad.status === "fulfilled") cloudLandingPages = (Array.isArray(landingPageLoad.value.pages) ? landingPageLoad.value.pages : []).map(normalizeCloudLandingPage);
-    else cloudLandingLoadError = landingPageLoad.reason instanceof Error ? landingPageLoad.reason.message : "Saved landing pages could not be loaded.";
-    if (componentLoad.status === "fulfilled") cloudComponents = (Array.isArray(componentLoad.value.components) ? componentLoad.value.components : []).map(normalizeCloudComponent);
-    else cloudComponentLoadError = componentLoad.reason instanceof Error ? componentLoad.reason.message : "Saved components could not be loaded.";
+    cloudLandingReady = cloudRequest('GET', '/v1/landing-pages').then(result => {
+      const pages = (Array.isArray(result.pages) ? result.pages : []).map(normalizeCloudLandingPage);
+      // A late index response must not overwrite the page just loaded or saved.
+      for (const current of cloudLandingPages) {
+        const index = pages.findIndex(page => page.id === current.id);
+        if (index < 0) pages.push(current);
+        else if (String(current.updatedAt) >= String(pages[index].updatedAt)) pages[index] = {...pages[index], ...current};
+      }
+      cloudLandingPages = pages;
+    }).catch(error => { cloudLandingLoadError = error.message || 'Saved landing pages could not be loaded.'; });
+    if (document.querySelector('[data-sq-preview-root]')) {
+      cloudComponentsReady = cloudRequest('GET', '/v1/components').then(result => {
+        cloudComponents = (Array.isArray(result.components) ? result.components : []).map(normalizeCloudComponent);
+      }).catch(error => { cloudComponentLoadError = error.message || 'Saved components could not be loaded.'; })
+        .finally(() => { cloudComponentsLoaded = true; });
+    } else cloudComponentsLoaded = true;
+    try {
+      const catalog = await cloudRequest('GET', '/v1/catalog');
+      cloudCatalogProducts = (Array.isArray(catalog.products) ? catalog.products : []).map(normalizeCloudProduct);
+      cloudProductDrafts = (Array.isArray(catalog.drafts) ? catalog.drafts : []).map(normalizeCloudDraft);
+    } catch (error) { cloudLoadError = error.message || 'Saved products could not be loaded.'; }
+    // The gallery needs its index; opening one editor does not.
+    if (!openingPageRequest) await cloudLandingReady;
   }
 
   const storageScope = document.body.dataset.adminStorageScope || "anonymous";
@@ -505,8 +526,7 @@
   };
   if (cloudLoadError) showToast(`Saved products unavailable: ${cloudLoadError}`);
   else window.setTimeout(() => { void migrateLegacyCloudData(); }, 600);
-  if (cloudLandingLoadError) window.setTimeout(() => showToast(`Landing pages unavailable: ${cloudLandingLoadError}`), cloudLoadError ? 2500 : 0);
-  if (cloudComponentLoadError) window.setTimeout(() => showToast(`Components unavailable: ${cloudComponentLoadError}`), 3500);
+  if (cloudLandingLoadError && !openingSite) window.setTimeout(() => showToast(`Landing pages unavailable: ${cloudLandingLoadError}`), cloudLoadError ? 2500 : 0);
   const hydrateCreatorCatalog = (form) => {
     const fieldset = form?.querySelector("[data-creator-products]");
     if (!fieldset) return;
@@ -546,7 +566,14 @@
   };
   const loadCloudLandingPage = async (url) => {
     if (!cloudEnabled) throw new Error("Sign in with Google to load your saved landing pages.");
-    const result = await cloudRequest("GET", `/v1/landing-pages/${encodeURIComponent(landingPageId(url))}`);
+    let result;
+    if (openingPageRequest && url === openingSite) {
+      const pending = openingPageRequest;
+      openingPageRequest = null;
+      const {value, error} = await pending;
+      if (error) throw error;
+      result = value;
+    } else result = await cloudRequest("GET", `/v1/landing-pages/${encodeURIComponent(landingPageId(url))}`);
     return replaceCloudLandingPage(result.page);
   };
   const deleteCloudLandingPage = async (url) => {
@@ -7725,7 +7752,7 @@
       if (count) count.textContent = `${components.length} / ${componentLimits.count}`;
       if (empty) empty.hidden = components.length > 0;
       if (createButton) {
-        createButton.disabled = components.length >= componentLimits.count;
+        createButton.disabled = !cloudComponentsLoaded || components.length >= componentLimits.count;
         createButton.title = components.length >= componentLimits.count ? "Delete a component before creating another" : "Create component";
       }
       if (!list) return;
@@ -7830,6 +7857,11 @@
       showToast("Instance detached — its code can now be edited independently");
     });
     renderComponentLibrary();
+    cloudComponentsReady.then(() => {
+      renderComponentLibrary();
+      previewRoot.querySelectorAll('[data-sq-element-type="component-instance"]').forEach(syncComponentInstance);
+      if (cloudComponentLoadError) showToast(`Components unavailable: ${cloudComponentLoadError}`);
+    });
     const addCanvasSection = (type = "blank", afterId = selectedSection, showLayers = false) => {
       remember();
       const sectionId = `${type}-${Date.now()}`;
@@ -8516,11 +8548,18 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
       pageList.append(site); bindSiteButton(site); return site;
     };
     readLandingSites().forEach(addSavedSiteButton);
+    cloudLandingReady.then(() => {
+      readLandingSites().forEach(addSavedSiteButton);
+      updateLandingCountBadges();
+      if (cloudLandingLoadError) showToast(cloudLandingLoadError);
+    });
     updateLandingCountBadges();
     sqStudio.querySelectorAll("[data-sq-site]").forEach(bindSiteButton);
 
     const newPageDialog = document.getElementById("page-creator-dialog");
-    sqStudio.querySelectorAll("[data-open-page-creator]").forEach((button) => button.addEventListener("click", () => {
+    sqStudio.querySelectorAll("[data-open-page-creator]").forEach((button) => button.addEventListener("click", async () => {
+      await cloudLandingReady;
+      if (cloudLandingLoadError) { showToast(cloudLandingLoadError); return; }
       if (readLandingSites().length >= 6) { showToast("Delete a project before creating another"); return; }
       EzkartBuilderChoice.open(newPageDialog.querySelector("[data-page-creator-form]"));
     }));

@@ -1,6 +1,7 @@
 import { adminPreferences } from './admin-preferences.js';
 import { listBuilderFonts, saveBuilderFont, serveBuilderFont } from './builder-fonts.js';
 import { listBuilderAssets, saveBuilderAsset, serveBuilderAsset } from "./builder-assets.js";
+import {landingSummaryKey, listLandingObjects, cacheLandingSummary, readLandingSummary, staticLandingPreview} from './landing-page-index.js';
 import { customerAddressBook, changeCustomerAddressBook } from "./customer-addresses.js";
 import { validatePublication } from "./landing-publication.js";
 import { merchantStorefront, publicStorefront } from "./storefront.js";
@@ -497,18 +498,25 @@ async function landingPageWithPreviewMetadata(env, sellerId, id) {
 
 async function landingPages(request, env) {
   const { seller } = await sellerContext(request, env);
-  const objects = [];
-  let cursor;
-  do {
-    const result = await env.PRIVATE_ASSETS.list({ prefix: landingPagePrefix(seller.id), limit: 1000, ...(cursor ? { cursor } : {}) });
-    objects.push(...result.objects.filter((object) => object.key.endsWith(".json")));
-    cursor = result.truncated ? result.cursor : undefined;
-  } while (cursor);
-  const pages = await Promise.all(objects.map(async (object) => {
+  const bucket = env.PRIVATE_ASSETS;
+  const [objects, previews] = await Promise.all([
+    listLandingObjects(bucket, landingPagePrefix(seller.id)),
+    listLandingObjects(bucket, `sellers/${seller.id}/landing-page-previews/`),
+  ]);
+  const previewByKey = new Map(previews.map(object => [object.key, object]));
+  const pages = await Promise.all(objects.filter(object => object.key.endsWith('.json')).map(async (object) => {
     const id = object.key.slice(landingPagePrefix(seller.id).length, -5);
-    return landingPageSummary(await landingPageWithPreviewMetadata(env, seller.id, id));
+    const summary = await readLandingSummary(bucket, seller.id, object, landingPageSummary);
+    if (!summary) return null;
+    const preview = previewByKey.get(landingPagePreviewKey(seller.id, id));
+    return {...summary,
+      previewUpdatedAt: preview?.customMetadata?.updatedAt || null,
+      previewBytes: preview?.size || 0,
+      previewSourceUpdatedAt: preview?.customMetadata?.sourceUpdatedAt || null,
+      previewVersion: preview?.customMetadata?.version || '',
+    };
   }));
-  return pages.sort((left, right) => String(right.updatedAt || "").localeCompare(String(left.updatedAt || "")));
+  return pages.filter(Boolean).sort((left, right) => String(right.updatedAt || "").localeCompare(String(left.updatedAt || "")));
 }
 
 async function landingPage(request, env, rawId) {
@@ -573,18 +581,24 @@ async function saveLandingPage(request, env, rawId) {
   if (new TextEncoder().encode(serialized).byteLength > maximumLandingPageBytes) {
     throw new Response("Landing page project is too large", { status: 413 });
   }
-  await env.PRIVATE_ASSETS.put(landingPageKey(seller.id, id), serialized, {
+  const savedObject = await env.PRIVATE_ASSETS.put(landingPageKey(seller.id, id), serialized, {
     httpMetadata: { contentType: "application/json; charset=utf-8" },
     customMetadata: { sellerId: seller.id, landingPageId: id, status, updatedAt: now },
   });
+  // A failed derived cache write must not turn a successful project save into
+  // an error. The next list read repairs it against the authoritative version.
+  await cacheLandingSummary(env.PRIVATE_ASSETS, seller.id, savedObject, landingPageSummary(page)).catch(() => {});
   return page;
 }
 
 async function landingPagePreview(request, env, rawId) {
   const { seller } = await sellerContext(request, env);
   const id = cleanLandingPageId(rawId);
-  await landingPageObject(env, seller.id, id);
-  const object = await env.PRIVATE_ASSETS.get(landingPagePreviewKey(seller.id, id));
+  const [page, object] = await Promise.all([
+    env.PRIVATE_ASSETS.head(landingPageKey(seller.id, id)),
+    env.PRIVATE_ASSETS.get(landingPagePreviewKey(seller.id, id)),
+  ]);
+  if (!page) throw new Response("Landing page not found", { status: 404 });
   if (!object) throw new Response("Landing page preview not found", { status: 404 });
   const headers = new Headers({
     "content-type": "text/html; charset=utf-8",
@@ -592,8 +606,13 @@ async function landingPagePreview(request, env, rawId) {
     "x-content-type-options": "nosniff",
     "content-security-policy": "default-src 'none'; img-src data: https:; media-src data: https:; style-src 'unsafe-inline' https:; font-src data: https:; script-src 'none'; connect-src 'none'; frame-ancestors 'self'; base-uri 'none'; form-action 'none'; sandbox",
   });
-  if (object.httpEtag) headers.set("etag", object.httpEtag);
-  return new Response(object.body, { status: 200, headers });
+  const etag = `"${object.etag}-static-1"`;
+  headers.set('etag', etag);
+  if ((request.headers.get('if-none-match') || '').split(',').some(value => value.trim().replace(/^W\//, '') === etag || value.trim() === '*')) {
+    await object.body.cancel();
+    return new Response(null, {status: 304, headers});
+  }
+  return staticLandingPreview(new Response(object.body, { status: 200, headers }));
 }
 
 async function saveLandingPagePreview(request, env, rawId) {
@@ -639,7 +658,7 @@ async function deleteLandingPage(request, env, rawId) {
   const id = cleanLandingPageId(rawId);
   const key = landingPageKey(seller.id, id);
   if (!(await env.PRIVATE_ASSETS.head(key))) throw new Response("Landing page not found", { status: 404 });
-  await env.PRIVATE_ASSETS.delete([key, landingPagePreviewKey(seller.id, id), landingPageThumbnailKey(seller.id, id)]);
+  await env.PRIVATE_ASSETS.delete([key, landingPagePreviewKey(seller.id, id), landingPageThumbnailKey(seller.id, id), landingSummaryKey(seller.id, id)]);
 }
 
 const componentPrefix = (sellerId) => `sellers/${sellerId}/components/`;

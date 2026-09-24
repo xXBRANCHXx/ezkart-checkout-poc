@@ -353,4 +353,29 @@ test("Authenticated page saves allow empty drafts and reject publish bypasses ag
   const stored = JSON.parse(await object.text());
   assert.equal(stored.publishedHtml, buy("owned"));
   assert.equal(stored.state.preview, "<h1>My next draft</h1>");
+  const bucket = await mf.getR2Bucket('PRIVATE_ASSETS');
+  const auth = {authorization: 'Bearer ' + token};
+  const list = () => mf.dispatchFetch('http://worker.test/v1/landing-pages', {headers: auth});
+  const listed = (await (await list()).json()).pages;
+  assert.equal(listed[0].name, 'My page');
+  assert.equal(listed[0].state, undefined);
+  // A legacy project gets its derived summary on the first read.
+  await bucket.delete('sellers/mine/landing-page-summaries/my-page.json');
+  assert.equal((await list()).status, 200);
+  assert.ok(await bucket.head('sellers/mine/landing-page-summaries/my-page.json'));
+  const previewUrl = 'http://worker.test/v1/landing-pages/my-page/preview';
+  const savedPreview = await mf.dispatchFetch(previewUrl, {method: 'PUT', headers: {...auth, 'content-type': 'application/json'}, body: JSON.stringify({sourceUpdatedAt: stored.updatedAt, html: '<!doctype html><div class="sq-page-preview">Visible first screen</div><script>largeUnusedCode()</script>'})});
+  assert.equal(savedPreview.status, 200);
+  const preview = await mf.dispatchFetch(previewUrl, {headers: auth});
+  assert.equal(preview.status, 200);
+  assert.doesNotMatch(await preview.text(), /largeUnusedCode|<script/);
+  assert.match(preview.headers.get('cache-control'), /private/);
+  const cachedPreview = await mf.dispatchFetch(previewUrl, {headers: {...auth, 'if-none-match': preview.headers.get('etag')}});
+  assert.equal(cachedPreview.status, 304);
+  assert.equal(await cachedPreview.text(), '');
+  assert.equal((await mf.dispatchFetch(previewUrl)).status, 401);
+  // An otherwise valid preview must disappear when its parent page is gone.
+  await bucket.delete('sellers/mine/landing-pages/my-page.json');
+  assert.equal((await mf.dispatchFetch(previewUrl, {headers: auth})).status, 404);
+  assert.equal((await (await list()).json()).pages.length, 0);
 });

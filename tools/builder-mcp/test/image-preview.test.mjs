@@ -73,3 +73,38 @@ test('startup shows a neutral loader before scripts and page data arrive, then r
   }finally{releaseScript();releaseData();await opening.close();}
  }
 });
+
+test('Image Stack opens while the project list and component library are still pending', async t => {
+ const {ws,browser,page,errors}=await fixture(t);
+ await page.evaluate(()=>EzkartBuilder.save());
+ const opening=await browser.newPage({viewport:{width:941,height:900}});
+ opening.on('pageerror',error=>errors.push(error.message));
+ let release;
+ const gate=new Promise(resolve=>release=resolve),started=new Set();
+ const documentRequests=[];
+ opening.on('request',request=>{
+  if(request.method()==='GET'&&new URL(request.url()).searchParams.get('cloud')==='/v1/landing-pages/fast-preview')documentRequests.push(request.url());
+ });
+ await opening.route(url=>['/v1/landing-pages','/v1/components'].includes(url.searchParams.get('cloud')),async route=>{
+  started.add(new URL(route.request().url()).searchParams.get('cloud'));
+  const response=await route.fetch();await gate;await route.fulfill({response});
+ });
+ try {
+  await opening.goto(ws.url+'/cart/admin/?page=sites&edit=fast-preview.ezkart.site');
+  await opening.locator('.sq-studio:not(.sq-site-loading)').waitFor({timeout:5000});
+  await opening.locator('.ib-editor:not([hidden])').waitFor({timeout:5000});
+  await opening.locator('.sq-site-loader').waitFor({state:'hidden',timeout:5000});
+  assert.equal(await opening.locator('.ib-row').count(),4);
+  assert.equal(documentRequests.length,1,'The early request is consumed instead of downloading the page again');
+  assert.deepEqual([...started].sort(),['/v1/components','/v1/landing-pages']);
+  await opening.locator('[data-image-nav=title]').fill('Ready before the list');
+  await opening.locator('[data-image-nav=title]').blur();
+  await opening.evaluate(()=>EzkartBuilder.save());
+  const saved=(await ws.read('fast-preview')).updatedAt;
+  release();
+  await opening.waitForResponse(response=>new URL(response.url()).searchParams.get('cloud')==='/v1/landing-pages');
+  assert.equal(await opening.locator('[data-image-nav=title]').inputValue(),'Ready before the list');
+  assert.equal((await ws.read('fast-preview')).updatedAt,saved);
+  await opening.screenshot({path:'/tmp/ezkart-fast-startup-941.png'});
+ } finally {release();await opening.close();}
+});
