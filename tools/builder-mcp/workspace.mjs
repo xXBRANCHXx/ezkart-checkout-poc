@@ -4,6 +4,7 @@ import {dirname,resolve,join,extname} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {randomBytes,createHash} from 'node:crypto';
 import {packLandingEditor} from '../../cloudflare/ezkart-api/src/landing-page-transfer.js';
+import {landingPagePolicy, landingPageLinks} from '../../cloudflare/ezkart-api/src/landing-page-hosting.js';
 import {decodeFontDataUrl} from '../../cloudflare/ezkart-api/src/builder-fonts.js';
 export const repoRoot=resolve(dirname(fileURLToPath(import.meta.url)),'../..');
 const htmlEscape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -13,7 +14,7 @@ export class Workspace {
  async init(){await mkdir(join(this.directory,'projects'),{recursive:true});await mkdir(join(this.directory,'exports'),{recursive:true});await mkdir(join(this.directory,'previews'),{recursive:true});await mkdir(join(this.directory,'uploads'),{recursive:true});await mkdir(join(this.directory,'fonts'),{recursive:true});return this;}
  async catalog(){try{return JSON.parse(await readFile(join(this.directory,'catalog.json'),'utf8'));}catch(error){if(error.code==='ENOENT')return {products:[],storageScope:'ezkart-local',mediaBase:''};throw error;}}
  async read(id){
-  const page=JSON.parse(await readFile(join(this.directory,'projects',`${slug(id)}.json`),'utf8'));
+  const page=landingPageLinks(JSON.parse(await readFile(join(this.directory,'projects',`${slug(id)}.json`),'utf8')), {slug:'workspace'});
   try { return {...page,...JSON.parse(await readFile(join(this.directory,'previews',`${slug(id)}.json`),'utf8'))}; }
   catch(error){if(error.code==='ENOENT')return page;throw error;}
  }
@@ -33,6 +34,11 @@ export class Workspace {
   const catalog=await this.catalog();
   const startup=await readFile(join(repoRoot,'cart/admin/admin-startup.js'),'utf8');
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Ezkart builder workspace</title><script id="ezkart-admin-startup" data-admin-cloud-enabled="true">${startup}</script><link rel="stylesheet" href="admin.css"><link rel="stylesheet" href="builder-templates.css"><link rel="stylesheet" href="builder-native.css"><link rel="stylesheet" href="builder-help.css"><link rel="stylesheet" href="builder-fonts.css"><link rel="stylesheet" href="builder-components.css"><link rel="stylesheet" href="builder-flow.css"><link rel="stylesheet" href="builder-showcase.css"><link rel="stylesheet" href="builder-chrome.css"><link rel="stylesheet" href="builder-assets.css"><link rel="stylesheet" href="admin-ui.css"><link rel="stylesheet" href="builder-choice.css"><link rel="stylesheet" href="builder-image.css"><link rel="stylesheet" href="../select.css"></head><body class="dashboard-page page-sites ${library ? 'page-sites-library' : 'page-site-editor'}" data-admin-language="${htmlEscape(catalog.language||'en')}" data-admin-cloud-enabled="true" data-admin-local-workspace="true" data-admin-demo-checkout="${catalog.demoCheckout===true}" data-admin-currency="${htmlEscape(catalog.currency||'IDR')}" data-admin-locale="${htmlEscape(catalog.locale||'id-ID')}" data-admin-storage-scope="${htmlEscape(catalog.storageScope||'ezkart-local')}" data-admin-cloud-media-base="${htmlEscape(catalog.mediaBase||'')}" data-admin-public-base="${htmlEscape(catalog.publicBase||'')}" data-admin-csrf-token="${this.csrf}"><svg style="display:none">${icons}</svg>${view}<script src="builder-native-icons.js"></script><script src="builder-commerce.js"></script><script src="builder-help.js"></script><script src="builder-fonts.js"></script><script src="builder-native.js"></script><script src="builder-publish.js"></script><script src="builder-site-settings.js"></script><script src="builder-templates.js"></script><script src="builder-backgrounds.js"></script><script src="builder-components.js"></script><script src="builder-asset-packs.js"></script><script src="builder-assets.js"></script><script src="builder-assets-ui.js"></script><script src="builder-showcase-data.js"></script><script src="builder-showcase.js"></script><script src="admin-language.js"></script><script src="builder-image.js"></script><script src="builder-choice.js"></script><script src="admin.js"></script><script src="../select.js"></script></body></html>`;
+ }
+ async hostedPolicy(){
+  const {mediaBase=''}=await this.catalog();
+  const media=mediaBase?new URL(mediaBase,this.url).origin:'';
+  return landingPagePolicy.replaceAll('https:',`https: ${this.url} ${media}`);
  }
  async start(port=0){
   await this.init();
@@ -69,6 +75,13 @@ export class Workspace {
       }
 
       if(path==='/v1/landing-pages')return send(200,{ok:true,pages:await this.list()});
+      const viewMatch=/^\/v1\/landing-pages\/([a-z0-9-]+)\/view$/.exec(path);
+      if(viewMatch){
+       await this.read(viewMatch[1]);
+       res.setHeader('Content-Security-Policy',await this.hostedPolicy());
+       const html=await readFile(join(this.directory,'previews',`${slug(viewMatch[1])}.html`),'utf8');
+       return send(200,html.replace(/<style id="ezkart-library-preview-style">[\s\S]*?<\/style>/g,''),'text/html; charset=utf-8');
+      }
       const previewMatch=/^\/v1\/landing-pages\/([a-z0-9-]+)\/preview$/.exec(path);
       if(previewMatch){res.setHeader('Content-Security-Policy',"default-src 'none'; img-src data: http: https:; style-src 'unsafe-inline'; font-src data:; sandbox");return send(200,await readFile(join(this.directory,'previews',`${slug(previewMatch[1])}.html`)),'text/html; charset=utf-8');}
       const editorMatch=/^\/v1\/landing-pages\/([a-z0-9-]+)\/editor$/.exec(path);
@@ -116,10 +129,17 @@ export class Workspace {
         await writeFile(join(this.directory,'previews',`${page.id}.json`),JSON.stringify({previewUpdatedAt:preview.updatedAt,previewSourceUpdatedAt:preview.sourceUpdatedAt,previewVersion:preview.version,previewBytes:preview.bytes}),{mode:0o600});
         return send(200,{ok:true,preview});
        }
-       const saved=await this.write(match[1],{...page,...data,id:page.id,url:page.url,updatedAt:new Date().toISOString()});return send(200,{ok:true,page:saved});
+       const saved=await this.write(match[1],landingPageLinks({...page,...data,id:page.id,url:page.url,updatedAt:new Date().toISOString()}, {slug:'workspace'}));return send(200,{ok:true,page:saved});
       }
      }
      return send(404,{ok:false,error:'This local workspace does not implement that cloud operation.'});
+    }
+    if(url.pathname==='/cart/page.php'){
+     if(url.searchParams.get('store')!=='workspace')return send(404,'Page not found.','text/plain');
+     const page=await this.read(url.searchParams.get('page'));
+     if(page.status!=='published'||!page.publishedHtml)return send(404,'Page not found.','text/plain');
+     res.setHeader('Content-Security-Policy',await this.hostedPolicy());
+     return send(200,page.publishedHtml,'text/html; charset=utf-8');
     }
     if(url.pathname==='/cart/admin/'||url.pathname==='/cart/admin/index.php')return send(200,await this.markup(!url.searchParams.has('edit')),'text/html; charset=utf-8');
     if(url.pathname==='/cart/api/health.php')return send(200,{ok:true,commerce_environment:'test'});

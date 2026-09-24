@@ -1,3 +1,4 @@
+import {hostedLandingResponse, landingPageLinks} from './landing-page-hosting.js';
 import { adminPreferences } from './admin-preferences.js';
 import { listBuilderFonts, saveBuilderFont, serveBuilderFont } from './builder-fonts.js';
 import { listBuilderAssets, saveBuilderAsset, serveBuilderAsset } from "./builder-assets.js";
@@ -510,7 +511,7 @@ async function landingPages(request, env) {
     const summary = await readLandingSummary(bucket, seller.id, object, landingPageSummary);
     if (!summary) return null;
     const preview = previewByKey.get(landingPagePreviewKey(seller.id, id));
-    return {...summary,
+    return {...landingPageLinks(summary, seller),
       previewUpdatedAt: preview?.customMetadata?.updatedAt || null,
       previewBytes: preview?.size || 0,
       previewSourceUpdatedAt: preview?.customMetadata?.sourceUpdatedAt || null,
@@ -522,7 +523,7 @@ async function landingPages(request, env) {
 
 async function landingPage(request, env, rawId) {
   const { seller } = await sellerContext(request, env);
-  return landingPageWithPreviewMetadata(env, seller.id, cleanLandingPageId(rawId));
+  return landingPageLinks(await landingPageWithPreviewMetadata(env, seller.id, cleanLandingPageId(rawId)), seller);
 }
 
 async function saveLandingPage(request, env, rawId) {
@@ -589,7 +590,7 @@ async function saveLandingPage(request, env, rawId) {
   // A failed derived cache write must not turn a successful project save into
   // an error. The next list read repairs it against the authoritative version.
   await cacheLandingSummary(env.PRIVATE_ASSETS, seller.id, savedObject, landingPageSummary(page)).catch(() => {});
-  return page;
+  return landingPageLinks(page, seller);
 }
 
 async function landingPagePreview(request, env, rawId) {
@@ -614,6 +615,29 @@ async function landingPagePreview(request, env, rawId) {
     return new Response(null, {status: 304, headers});
   }
   return staticLandingPreview(new Response(object.body, { status: 200, headers }));
+}
+
+async function landingPageView(request, env, rawId) {
+  const { seller } = await sellerContext(request, env);
+  const id = cleanLandingPageId(rawId);
+  const [page, object] = await Promise.all([
+    env.PRIVATE_ASSETS.head(landingPageKey(seller.id, id)),
+    env.PRIVATE_ASSETS.get(landingPagePreviewKey(seller.id, id)),
+  ]);
+  if (!page || !object) throw new Response("Save a preview in the editor first", {status: 404});
+  // The stored preview contains the full runtime. Only library thumbnails strip
+  // scripts and pause motion; an interactive preview uses the same durable HTML.
+  return new HTMLRewriter().on('#ezkart-library-preview-style', {element(node) { node.remove(); }})
+    .transform(hostedLandingResponse(object.body));
+}
+
+async function publicLandingPage(env, store, rawId) {
+  const seller = await env.DB.prepare("SELECT id, slug FROM sellers WHERE slug = ? AND status = 'active'").bind(store).first();
+  if (!seller) throw new Response("Page not found", {status: 404});
+  const page = await landingPageObject(env, seller.id, cleanLandingPageId(rawId));
+  if (page.status !== 'published' || !page.publishedHtml) throw new Response("Page not found", {status: 404});
+  // Never serve editable state or the draft preview from the public route.
+  return hostedLandingResponse(page.publishedHtml, {noindex: env.APP_ENVIRONMENT !== 'production'});
 }
 
 async function saveLandingPagePreview(request, env, rawId) {
@@ -1290,6 +1314,10 @@ export default {
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
     const url = new URL(request.url);
     try {
+      const publicLandingMatch = /^\/v1\/public\/landing-pages\/([a-z0-9-]+)\/([a-z0-9-]+)$/.exec(url.pathname);
+      if (request.method === "GET" && publicLandingMatch) return await publicLandingPage(env, publicLandingMatch[1], publicLandingMatch[2]);
+      const landingViewMatch = /^\/v1\/landing-pages\/([a-z0-9-]+)\/view$/.exec(url.pathname);
+      if (request.method === "GET" && landingViewMatch) return await landingPageView(request, env, landingViewMatch[1]);
       if (request.method === "GET" && url.pathname === "/health") return json(await health(env), 200, cors);
       if (url.pathname === "/v1/customer/addresses") {
         if (!["GET", "POST"].includes(request.method)) return json({ ok: false, error: "Method not allowed." }, 405, cors);

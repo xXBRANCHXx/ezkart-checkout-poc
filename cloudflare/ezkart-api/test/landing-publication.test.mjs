@@ -301,6 +301,9 @@ test("Authenticated page saves allow empty drafts and reject publish bypasses ag
     state: { preview: "<h1>Draft without products</h1>" },
   });
   assert.equal(initial.status, 200, JSON.stringify(initial.body));
+  const publicUrl = 'http://worker.test/v1/public/landing-pages/mine/my-page';
+  assert.equal(initial.body.page.publicPath, '/cart/page.php?store=mine&page=my-page');
+  assert.equal((await mf.dispatchFetch(publicUrl)).status, 404, 'Drafts are private');
   assert.equal((await exportPage("<h1>Empty</h1>")).status, 422);
   assert.equal((await exportPage(buy("foreign"))).status, 422);
   assert.equal((await exportPage(buy("owned"))).status, 422);
@@ -353,6 +356,22 @@ test("Authenticated page saves allow empty drafts and reject publish bypasses ag
   const stored = JSON.parse(await object.text());
   assert.equal(stored.publishedHtml, buy("owned"));
   assert.equal(stored.state.preview, "<h1>My next draft</h1>");
+  const live = await mf.dispatchFetch(publicUrl);
+  assert.equal(live.status, 200, 'Published pages load without authentication');
+  assert.equal(await live.text(), buy('owned'), 'Only the published snapshot is public');
+  assert.match(live.headers.get('cache-control'), /no-store/);
+  assert.match(live.headers.get('content-security-policy'), /sandbox allow-scripts/);
+  assert.doesNotMatch(live.headers.get('content-security-policy'), /allow-same-origin/);
+  assert.equal((await mf.dispatchFetch(publicUrl.replace('/mine/', '/another-store/'))).status, 404);
+  await db.prepare("UPDATE sellers SET status='suspended' WHERE id='mine'").run();
+  assert.equal((await mf.dispatchFetch(publicUrl)).status, 404);
+  await db.prepare("UPDATE sellers SET status='active' WHERE id='mine'").run();
+  await save({status:'draft'});
+  assert.equal((await mf.dispatchFetch(publicUrl)).status, 404, 'Unpublishing revokes the public link');
+  await db.prepare("UPDATE products SET stock_quantity=2 WHERE id='owned'").run();
+  assert.equal((await save(published('owned'))).status, 200);
+  assert.equal((await mf.dispatchFetch(publicUrl)).status, 200);
+  stored.updatedAt = (await (await mf.dispatchFetch('http://worker.test/v1/landing-pages/my-page', {headers:{authorization:'Bearer '+token}})).json()).page.updatedAt;
   const bucket = await mf.getR2Bucket('PRIVATE_ASSETS');
   const auth = {authorization: 'Bearer ' + token};
   const editorUrl = 'http://worker.test/v1/landing-pages/my-page/editor';
@@ -361,20 +380,21 @@ test("Authenticated page saves allow empty drafts and reject publish bypasses ag
   assert.equal(editorResponse.headers.get('cache-control'), 'no-store');
   const {editor} = await editorResponse.json();
   const editable = JSON.parse(editor.parts.map(part => typeof part === 'string' ? part : editor.images[part]).join(''));
-  assert.deepEqual(editable.state, stored.state);
+  assert.deepEqual(editable.state, {preview: buy("owned")});
   assert.equal(editable.publishedHtml, undefined);
   assert.equal((await mf.dispatchFetch(editorUrl)).status, 401);
   assert.equal((await mf.dispatchFetch(editorUrl.replace('/my-page/', '/someone-elses-page/'), {headers:auth})).status, 404);
   const list = () => mf.dispatchFetch('http://worker.test/v1/landing-pages', {headers: auth});
   const listed = (await (await list()).json()).pages;
   assert.equal(listed[0].name, 'My page');
+  assert.equal(listed[0].publicPath, '/cart/page.php?store=mine&page=my-page');
   assert.equal(listed[0].state, undefined);
   // A legacy project gets its derived summary on the first read.
   await bucket.delete('sellers/mine/landing-page-summaries/my-page.json');
   assert.equal((await list()).status, 200);
   assert.ok(await bucket.head('sellers/mine/landing-page-summaries/my-page.json'));
   const previewUrl = 'http://worker.test/v1/landing-pages/my-page/preview';
-  const savedPreview = await mf.dispatchFetch(previewUrl, {method: 'PUT', headers: {...auth, 'content-type': 'application/json'}, body: JSON.stringify({sourceUpdatedAt: stored.updatedAt, html: '<!doctype html><div class="sq-page-preview">Visible first screen</div><script>largeUnusedCode()</script>'})});
+  const savedPreview = await mf.dispatchFetch(previewUrl, {method: 'PUT', headers: {...auth, 'content-type': 'application/json'}, body: JSON.stringify({sourceUpdatedAt: stored.updatedAt, html: '<!doctype html><div class="sq-page-preview">Visible first screen</div><style id="ezkart-library-preview-style">.paused{animation:none}</style><script>largeUnusedCode()</script>'})});
   assert.equal(savedPreview.status, 200);
   const preview = await mf.dispatchFetch(previewUrl, {headers: auth});
   assert.equal(preview.status, 200);
@@ -384,8 +404,30 @@ test("Authenticated page saves allow empty drafts and reject publish bypasses ag
   assert.equal(cachedPreview.status, 304);
   assert.equal(await cachedPreview.text(), '');
   assert.equal((await mf.dispatchFetch(previewUrl)).status, 401);
+  const viewUrl = 'http://worker.test/v1/landing-pages/my-page/view';
+  assert.equal((await mf.dispatchFetch(viewUrl)).status, 401);
+  const view = await mf.dispatchFetch(viewUrl, {headers:auth});
+  assert.equal(view.status, 200);
+  const viewHtml = await view.text();
+  assert.match(viewHtml, /<script>largeUnusedCode/);
+  assert.doesNotMatch(viewHtml, /ezkart-library-preview-style/);
+  assert.match(view.headers.get('cache-control'), /no-store/);
+  assert.match(view.headers.get('content-security-policy'), /sandbox allow-scripts/);
+  assert.doesNotMatch(view.headers.get('content-security-policy'), /allow-same-origin/);
+  assert.equal((await mf.dispatchFetch(viewUrl.replace('my-page', 'foreign-page'), {headers:auth})).status, 404);
+  await db.batch([
+    db.prepare("INSERT INTO sellers VALUES ('other','other','Other store','free','active')"),
+    db.prepare("INSERT INTO seller_memberships VALUES ('other','other-user','owner','2026-01-01')"),
+  ]);
+  const otherUnsigned = encode({alg:'ES256',kid:'test-key'}) + '.' + encode({iss:'https://auth.example.test/auth/v1',sub:'other-user',aud:'authenticated',exp:Math.floor(Date.now()/1000)+600});
+  const otherSignature = await crypto.subtle.sign({name:'ECDSA',hash:'SHA-256'},keys.privateKey,new TextEncoder().encode(otherUnsigned));
+  const otherToken = otherUnsigned + '.' + Buffer.from(otherSignature).toString('base64url');
+  assert.equal((await mf.dispatchFetch(viewUrl,{headers:{authorization:'Bearer '+otherToken}})).status,404,'Another signed-in seller cannot read this draft');
+  assert.equal((await mf.dispatchFetch(publicUrl.replace('/mine/','/other/'))).status,404,'Page names are scoped to the store');
   // An otherwise valid preview must disappear when its parent page is gone.
   await bucket.delete('sellers/mine/landing-pages/my-page.json');
   assert.equal((await mf.dispatchFetch(previewUrl, {headers: auth})).status, 404);
   assert.equal((await (await list()).json()).pages.length, 0);
+  assert.equal((await mf.dispatchFetch(viewUrl, {headers:auth})).status, 404);
+  assert.equal((await mf.dispatchFetch(publicUrl)).status, 404);
 });

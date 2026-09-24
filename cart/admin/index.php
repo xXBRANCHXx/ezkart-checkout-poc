@@ -10,6 +10,7 @@ $previewRepairFrame = ($_GET['preview-repair'] ?? '') === '1'
     && ($_GET['page'] ?? '') === 'sites'
     && preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*\.ezkart\.site$/', (string) ($_GET['edit'] ?? '')) === 1;
 $previewDocumentFrame = preg_match('#^/v1/landing-pages/[a-z0-9-]+/preview$#', (string) ($_GET['cloud'] ?? '')) === 1;
+$interactivePageView = preg_match('#^/v1/landing-pages/[a-z0-9-]+/view$#', (string) ($_GET['cloud'] ?? '')) === 1;
 $adminStartupScript = (string) file_get_contents(__DIR__ . '/admin-startup.js');
 $adminStartupHash = base64_encode(hash('sha256', $adminStartupScript, true));
 $embeddedPreviewFrame = $previewRepairFrame || $previewDocumentFrame;
@@ -19,7 +20,10 @@ header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: ' . ($embeddedPreviewFrame ? 'SAMEORIGIN' : 'DENY'));
 header('Referrer-Policy: no-referrer');
 header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
-if ($previewDocumentFrame) {
+if ($interactivePageView) {
+    header("Content-Security-Policy: default-src 'none'; img-src 'self' data: https:; media-src 'self' data: blob: https:; style-src 'unsafe-inline' https:; script-src 'unsafe-inline' https:; font-src 'self' data: https:; connect-src 'self' https:; form-action 'self' https:; frame-src https:; frame-ancestors 'self'; base-uri 'none'; sandbox allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation");
+    header('X-Robots-Tag: noindex, nofollow');
+} elseif ($previewDocumentFrame) {
     header("Content-Security-Policy: default-src 'none'; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline' https:; font-src 'self' data: https:; script-src 'none'; connect-src 'none'; frame-src 'none'; form-action 'none'; frame-ancestors 'self'; base-uri 'none'");
 } else {
     header("Content-Security-Policy: default-src 'self'; img-src 'self' data: blob: https:; style-src 'self'; style-src-attr 'unsafe-inline'; script-src 'self' 'sha256-" . $adminStartupHash . "'; connect-src 'self'; frame-src 'self'; form-action 'self'; frame-ancestors " . ($previewRepairFrame ? "'self'" : "'none'") . "; base-uri 'none'");
@@ -698,7 +702,7 @@ function ez_admin_sync_cloudflare_user(string $accessToken): array
 
 function ez_admin_proxy_cloud_request(string $accessToken, string $path, string $method): never
 {
-    $allowedPath = preg_match('#^/v1/(?:catalog|storefront|admin-preferences|admin-profile|advanced-mode|media(?:/[a-zA-Z0-9_-]+)?|assets(?:/[a-zA-Z0-9_-]+)?|fonts(?:/font_[a-f0-9]{64})?|products/[a-zA-Z0-9_-]+(?:/duplicate)?|drafts/[a-zA-Z0-9_-]+|landing-pages(?:/[a-z0-9-]+(?:/(?:preview|export|editor))?)?|components(?:/[a-z0-9-]+)?)$#', $path) === 1;
+    $allowedPath = preg_match('#^/v1/(?:catalog|storefront|admin-preferences|admin-profile|advanced-mode|media(?:/[a-zA-Z0-9_-]+)?|assets(?:/[a-zA-Z0-9_-]+)?|fonts(?:/font_[a-f0-9]{64})?|products/[a-zA-Z0-9_-]+(?:/duplicate)?|drafts/[a-zA-Z0-9_-]+|landing-pages(?:/[a-z0-9-]+(?:/(?:preview|export|editor|view))?)?|components(?:/[a-z0-9-]+)?)$#', $path) === 1;
     if (!$allowedPath || str_contains($path, '?') || str_contains($path, '#')) {
         ez_admin_json(['ok' => false, 'error' => 'That saved-data path is not allowed.'], 400);
     }

@@ -22,7 +22,7 @@
     <div data-template-picker></div>
     <div class="sq-creator-details">
       <label><span>Page name</span><input name="page_name" required maxlength="60" placeholder="Example: Ramadan Collection"></label>
-      <label><span>Free Ezkart URL</span><div class="slug-field"><input name="slug" required pattern="[a-z0-9]+(?:-[a-z0-9]+)*" placeholder="ramadan-collection"><em>.ezkart.site</em></div></label>
+      <label><span>Page name in URL</span><div class="slug-field"><input name="slug" required pattern="[a-z0-9]+(?:-[a-z0-9]+)*" placeholder="ramadan-collection"></div></label>
       <div data-template-settings></div>
     </div>
     <details class="sq-creator-optional"><summary>Connect products now (optional)</summary><fieldset data-creator-products><legend>Starting products · optional</legend><p class="creator-products-empty" data-creator-products-empty>You can build your page now and add products later.</p></fieldset></details>

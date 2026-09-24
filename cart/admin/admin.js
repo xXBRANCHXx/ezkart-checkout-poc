@@ -555,6 +555,12 @@
   const maximumLandingPages = document.body.dataset.adminLandingLimit === "24" ? 24 : 6;
   const readLandingSites = () => [...cloudLandingPages];
   const landingPageId = (url) => String(url || "").toLowerCase().replace(/\.ezkart\.site$/, "");
+  const hostedPageUrl = (page, published = page?.status === 'published') => {
+    if (published && /^\/cart\/page\.php\?store=[a-z0-9-]+&page=[a-z0-9-]+$/.test(page?.publicPath || '')) {
+      return new URL(page.publicPath, window.location.origin).href;
+    }
+    return new URL(cloudUrl(`/v1/landing-pages/${encodeURIComponent(landingPageId(page?.id || page?.url))}/view`), window.location.href).href;
+  };
   const replaceCloudLandingPage = (page) => {
     const index = cloudLandingPages.findIndex((item) => item.id === page?.id);
     const normalized = normalizeCloudLandingPage({ ...(index >= 0 ? cloudLandingPages[index] : {}), ...page });
@@ -1836,12 +1842,14 @@
       card.dataset.siteName = site.name;
       card.dataset.siteUrl = site.url;
       const published = site.status === "published";
-      card.innerHTML = `<a class="landing-project-card-link" href="${href}" aria-label="Open ${escapeHtml(site.name)} in the editor"><span class="landing-project-preview tone-${tone}${site.previewUrl ? " has-preview" : ""}"><span class="project-browser"><i></i><i></i><i></i><small>${escapeHtml(site.url)}</small></span>${pagePreview}</span><span class="landing-project-details"><span><span class="project-status ${published ? "live" : "draft"}"><i></i>${published ? "Published" : "Draft"}</span><h2>${escapeHtml(site.name)}</h2></span></span></a><button class="project-url-copy" type="button" data-project-copy-url aria-label="Copy https://${escapeHtml(site.url)}"><svg class="icon" aria-hidden="true"><use href="#icon-copy"></use></svg></button><button class="project-actions" type="button" data-project-menu aria-label="Project actions" aria-haspopup="menu" aria-expanded="false"><span class="project-action-dots" aria-hidden="true"><i></i><i></i><i></i></span></button>`;
+      const pageUrl = hostedPageUrl(site);
+      const copyLabel = published ? 'Copy published page URL' : 'Copy private preview URL';
+      card.innerHTML = `<a class="landing-project-card-link" href="${href}" aria-label="Open ${escapeHtml(site.name)} in the editor"><span class="landing-project-preview tone-${tone}${site.previewUrl ? " has-preview" : ""}"><span class="project-browser"><i></i><i></i><i></i><small>${escapeHtml(pageUrl.replace(/^https?:\/\//, ""))}</small></span>${pagePreview}</span><span class="landing-project-details"><span><span class="project-status ${published ? "live" : "draft"}"><i></i>${published ? "Published" : "Draft"}</span><h2>${escapeHtml(site.name)}</h2></span></span></a><button class="project-url-copy" type="button" data-project-copy-url aria-label="${copyLabel}" title="${copyLabel}"><svg class="icon" aria-hidden="true"><use href="#icon-copy"></use></svg></button><button class="project-actions" type="button" data-project-menu aria-label="Project actions" aria-haspopup="menu" aria-expanded="false"><span class="project-action-dots" aria-hidden="true"><i></i><i></i><i></i></span></button>`;
       const previewFrame = card.querySelector(".project-page-thumbnail iframe");
       previewFrame?.addEventListener("load", () => card.querySelector(".landing-project-preview")?.classList.add("preview-ready"));
       const copyUrl = card.querySelector("[data-project-copy-url]");
       copyUrl?.addEventListener("click", async () => {
-        const url = `https://${site.url}`;
+        const url = pageUrl;
         try { await navigator.clipboard.writeText(url); }
         catch (_) {
           const input = document.createElement("input");
@@ -1853,7 +1861,7 @@
         copyUrl.querySelector("use")?.setAttribute("href", "#icon-check-circle");
         window.setTimeout(() => {
           copyUrl.classList.remove("copied");
-          copyUrl.setAttribute("aria-label", `Copy https://${site.url}`);
+          copyUrl.setAttribute("aria-label", copyLabel);
           copyUrl.querySelector("use")?.setAttribute("href", "#icon-copy");
         }, 1400);
       });
@@ -2661,6 +2669,19 @@
     const previewRepairMode = new URLSearchParams(window.location.search).get("preview-repair") === "1";
     let activeSiteKey = requestedSiteUrl;
     let activeSiteDocument = null;
+    function syncHostedPageLinks() {
+      if (!activeSiteDocument) return;
+      const published = activeSiteDocument.status === 'published';
+      const url = hostedPageUrl(activeSiteDocument);
+      const link = sqStudio.querySelector('[data-sq-published-link]');
+      if (link) { link.href = url; link.hidden = !published; }
+      document.querySelectorAll('[data-current-site-url]').forEach(target => { target.textContent = url; });
+      const badge = sqStudio.querySelector('.sq-live-state');
+      if (badge) { badge.replaceChildren(document.createElement('i'), document.createTextNode(published ? ' Published' : ' Draft')); }
+      const site = [...sqStudio.querySelectorAll('[data-sq-site]')].find(node => node.dataset.siteUrl === activeSiteDocument.url);
+      if (site?.querySelector('small')) site.querySelector('small').textContent = url;
+      if (site?.querySelector('em')) { site.querySelector('em').textContent = published ? 'Published' : 'Draft'; site.querySelector('em').className = published ? 'published' : 'draft'; }
+    }
     let templateState = null;
     async function connectTemplateProducts(productIds) {
       if (!templateState) throw Error('This page has no template product slots.');
@@ -2877,6 +2898,7 @@
           // Finish an in-flight preview before replacing the version it uses.
           await previewSavePromise;
           activeSiteDocument = await saveCloudLandingPage(site, { state, products: state.products, ...changes });
+          syncHostedPageLinks();
           scheduleLandingPreviewRefresh();
           return true;
         } catch (error) {
@@ -7994,10 +8016,30 @@
     livePreviewDialog?.querySelectorAll("[data-sq-preview-device]").forEach((button) => button.addEventListener("click", () => setLivePreviewDevice(button.dataset.sqPreviewDevice)));
     livePreviewDialog?.querySelector("[data-sq-preview-close]")?.addEventListener("click", () => livePreviewDialog.close());
     livePreviewDialog?.addEventListener("click", (event) => { if (event.target === livePreviewDialog) livePreviewDialog.close(); });
-    livePreviewDialog?.querySelector("[data-sq-preview-new-tab]")?.addEventListener("click", () => {
-      const url = URL.createObjectURL(new Blob([generateHtml()], { type: "text/html" }));
-      window.open(url, "_blank", "noopener");
-      window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+    livePreviewDialog?.querySelector("[data-sq-preview-new-tab]")?.addEventListener("click", async (event) => {
+      const button = event.currentTarget;
+      // Reserve the tab during the user gesture, before saving can trigger a
+      // popup blocker. Sever its opener before authored code can run.
+      const tab = window.open('about:blank', '_blank');
+      if (!tab) { showToast('Allow a new tab to open the preview.'); return; }
+      tab.opener = null;
+      tab.document.title = 'Preparing preview';
+      tab.document.body.textContent = 'Saving your page preview…';
+      button.disabled = true;
+      try {
+        await settleBuilder();
+        if (imageEditor?.busy() || siteSettings.busy()) throw Error('Wait for your uploads to finish, then preview.');
+        await globalThis.EzkartFonts?.prepareExport(previewRoot);
+        clearTimeout(saveTimer);
+        if (!await persistCurrentState()) throw Error('Your page could not be saved. Please try again.');
+        clearTimeout(previewScheduleTimer);
+        await refreshLandingPreviewIfDue();
+        if (activeSiteDocument.previewSourceUpdatedAt !== activeSiteDocument.updatedAt) throw Error('Your preview could not be saved. Please try again.');
+        if (!tab.closed) tab.location.replace(hostedPageUrl(activeSiteDocument, false));
+      } catch (error) {
+        tab.close();
+        showToast(error.message);
+      } finally { button.disabled = false; }
     });
     sqStudio.querySelector("[data-sq-preview]")?.addEventListener("click", async () => {
       if (!livePreviewDialog || !livePreviewFrame) return;
@@ -8464,7 +8506,8 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
       if (saveState) saveState.textContent = saved ? "Published just now" : "Publish failed";
       if (!saved) throw Error('The page could not be published. Check the message and try again.');
       showToast("Landing page published");
-      return {published:true};
+      syncHostedPageLinks();
+      return {published:true,url:hostedPageUrl(activeSiteDocument)};
     };
     sqStudio.querySelector("[data-sq-publish]")?.addEventListener("click", async (event) => {
       const button = event.currentTarget; button.disabled = true;
@@ -8496,11 +8539,12 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
         activeSiteKey = site.dataset.siteUrl || "default";
         sqStudio.querySelectorAll("[data-sq-site]").forEach((item) => item.classList.toggle("active", item === site));
         document.querySelectorAll("[data-current-site-name]").forEach((target) => { target.textContent = site.dataset.siteName; });
-        document.querySelectorAll("[data-current-site-url]").forEach((target) => { target.textContent = site.dataset.siteUrl; });
+        document.querySelectorAll("[data-current-site-url]").forEach((target) => { target.textContent = site.dataset.siteName; });
         window.history.replaceState(null, "", `?page=sites&edit=${encodeURIComponent(site.dataset.siteUrl)}`);
         let state = null;
         try {
           activeSiteDocument = await loadCloudLandingPage(site.dataset.siteUrl);
+          syncHostedPageLinks();
           state = activeSiteDocument.state || null;
           site.dataset.siteName = activeSiteDocument.name;
           const siteTitle = site.querySelector("b");
@@ -8549,13 +8593,14 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
     });
     const bindSiteButton = (site) => { site.onclick = () => { void loadSite(site); }; };
     const pageList = sqStudio.querySelector(".sq-page-list");
-    const addSavedSiteButton = ({ name, url, products = [], customProducts = [] }) => {
+    const addSavedSiteButton = (page) => {
+      const { name, url, products = [], customProducts = [] } = page;
       const sourceSite = pageList?.querySelector("template[data-sq-site-template]")?.content.firstElementChild;
       if (!pageList || !sourceSite || !name || !url || pageList.querySelector(`[data-site-url="${CSS.escape(url)}"]`)) return null;
       const site = sourceSite.cloneNode(true);
       site.classList.remove("active"); site.dataset.siteName = name; site.dataset.siteUrl = url; site.dataset.siteProducts = products.join(","); site.dataset.siteCustomProducts = JSON.stringify(customProducts); site.dataset.customSite = "true";
       const title = site.querySelector("b"); const subtitle = site.querySelector("small"); const status = site.querySelector("em");
-      if (title) title.textContent = name; if (subtitle) subtitle.textContent = url; if (status) { status.textContent = "Draft"; status.className = "draft"; }
+      if (title) title.textContent = name; if (subtitle) subtitle.textContent = hostedPageUrl(page); if (status) { status.textContent = page.status === "published" ? "Published" : "Draft"; status.className = page.status === "published" ? "published" : "draft"; }
       pageList.append(site); bindSiteButton(site); return site;
     };
     readLandingSites().forEach(addSavedSiteButton);

@@ -29,6 +29,7 @@ declare(strict_types=1);
     <div class="sq-command-actions">
       <button type="button" data-sq-preview aria-label="Preview page" title="Preview page"><?= ez_admin_icon('eye') ?><span>Preview</span></button>
       <button type="button" data-sq-export aria-label="Export HTML" title="Export HTML"><?= ez_admin_icon('code') ?><span>Export HTML</span></button>
+      <a class="ui-button" data-sq-published-link href="#" target="_blank" rel="noopener" aria-label="View published page" title="View published page" hidden><?= ez_admin_icon('link') ?></a>
       <button class="ui-button primary" type="button" data-sq-publish data-ui-icon="globe">Publish</button>
     </div>
   </header>
@@ -384,7 +385,7 @@ declare(strict_types=1);
     <button class="ui-button" type="button" data-template-check-limit hidden data-ui-icon="refresh">Check again</button>
     <div class="sq-creator-details" data-template-draft-details hidden>
       <label><span>Page name</span><input name="page_name" required maxlength="60" autocomplete="off" disabled></label>
-      <label><span>Free Ezkart URL</span><div class="slug-field"><input name="slug" required maxlength="48" pattern="[a-z0-9]+(?:-[a-z0-9]+)*" autocomplete="off" disabled><em>.ezkart.site</em></div></label>
+      <label><span>Page name in URL</span><div class="slug-field"><input name="slug" required maxlength="48" pattern="[a-z0-9]+(?:-[a-z0-9]+)*" autocomplete="off" disabled></div></label>
     </div>
     <p data-template-apply-error role="alert" hidden></p>
   </section>
@@ -397,7 +398,7 @@ declare(strict_types=1);
     <div data-template-picker></div>
     <div class="sq-creator-details">
       <label><span>Page name</span><input name="page_name" required maxlength="60" placeholder="Example: Ramadan Collection"></label>
-      <label><span>Free Ezkart URL</span><div class="slug-field"><input name="slug" required pattern="[a-z0-9]+(?:-[a-z0-9]+)*" placeholder="ramadan-collection"><em>.ezkart.site</em></div></label>
+      <label><span>Page name in URL</span><div class="slug-field"><input name="slug" required pattern="[a-z0-9]+(?:-[a-z0-9]+)*" placeholder="ramadan-collection"></div></label>
       <div data-template-settings></div>
     </div>
     <details class="sq-creator-optional"><summary>Connect products now (optional)</summary><fieldset data-creator-products><legend>Starting products · optional</legend><p class="creator-products-empty" data-creator-products-empty>You can build your page now and add products later.</p></fieldset></details>

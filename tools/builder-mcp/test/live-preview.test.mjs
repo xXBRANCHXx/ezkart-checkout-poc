@@ -193,7 +193,21 @@ test("the editor Preview renders current edits, local media and commerce at ever
     await popup.waitForFunction(() =>
       [...document.images].every((img) => img.complete && img.naturalWidth > 0),
     );
+    const hostedUrl = popup.url();
+    assert.equal(new URL(hostedUrl).protocol, 'http:');
+    assert.equal(new URL(hostedUrl).searchParams.get('cloud'), '/v1/landing-pages/preview/view');
+    assert.equal(await popup.evaluate(() => window.opener), null);
     await popup.close();
+    const reopened = await browser.newPage();
+    await reopened.goto(hostedUrl);
+    assert.equal(await reopened.locator('#native-headline').innerText(), 'Take a Thip');
+    await reopened.reload();
+    await reopened.waitForFunction(() => [...document.images].every(img => img.complete && img.naturalWidth > 0));
+    await reopened.locator('#native-options input[value=orange]').check();
+    assert.equal(await reopened.locator('#native-price').innerText(), '$26');
+    await reopened.locator('#native-add button').click();
+    assert.match(await reopened.locator('.ezkart-cart-row').innerText(), /Orange/);
+    await reopened.close();
     await page.locator("[data-sq-preview-close]").click();
     await field.fill("A second edit");
     await field.dispatchEvent("change");
