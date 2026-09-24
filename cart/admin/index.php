@@ -10,6 +10,8 @@ $previewRepairFrame = ($_GET['preview-repair'] ?? '') === '1'
     && ($_GET['page'] ?? '') === 'sites'
     && preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*\.ezkart\.site$/', (string) ($_GET['edit'] ?? '')) === 1;
 $previewDocumentFrame = preg_match('#^/v1/landing-pages/[a-z0-9-]+/preview$#', (string) ($_GET['cloud'] ?? '')) === 1;
+$adminStartupScript = (string) file_get_contents(__DIR__ . '/admin-startup.js');
+$adminStartupHash = base64_encode(hash('sha256', $adminStartupScript, true));
 $embeddedPreviewFrame = $previewRepairFrame || $previewDocumentFrame;
 
 header('Cache-Control: no-store');
@@ -20,7 +22,7 @@ header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
 if ($previewDocumentFrame) {
     header("Content-Security-Policy: default-src 'none'; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline' https:; font-src 'self' data: https:; script-src 'none'; connect-src 'none'; frame-src 'none'; form-action 'none'; frame-ancestors 'self'; base-uri 'none'");
 } else {
-    header("Content-Security-Policy: default-src 'self'; img-src 'self' data: blob: https:; style-src 'self'; style-src-attr 'unsafe-inline'; script-src 'self'; connect-src 'self'; frame-src 'self'; form-action 'self'; frame-ancestors " . ($previewRepairFrame ? "'self'" : "'none'") . "; base-uri 'none'");
+    header("Content-Security-Policy: default-src 'self'; img-src 'self' data: blob: https:; style-src 'self'; style-src-attr 'unsafe-inline'; script-src 'self' 'sha256-" . $adminStartupHash . "'; connect-src 'self'; frame-src 'self'; form-action 'self'; frame-ancestors " . ($previewRepairFrame ? "'self'" : "'none'") . "; base-uri 'none'");
 }
 
 const EZ_ADMIN_SESSION_LIFETIME = 60 * 60 * 24 * 30;
@@ -1506,7 +1508,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
   <meta name="robots" content="noindex,nofollow">
   <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
   <?php if ($authenticated && $authenticationMethod === 'supabase' && $cloudMediaBase !== ''): ?><link rel="preconnect" href="<?= ez_admin_escape($cloudMediaBase) ?>"><?php endif; ?>
-  <?php if ($authenticated): ?><script src="admin-startup.js?v=<?= (int) filemtime(__DIR__ . '/admin-startup.js') ?>" data-admin-cloud-enabled="<?= $authenticationMethod === 'supabase' ? 'true' : 'false' ?>"></script><?php endif; ?>
+  <?php if ($authenticated): ?><script id="ezkart-admin-startup" data-admin-cloud-enabled="<?= $authenticationMethod === 'supabase' ? 'true' : 'false' ?>"><?= $adminStartupScript ?></script><?php endif; ?>
   <?php if ($authenticated): ?><link rel="stylesheet" href="assets/vendor/leaflet.css"><?php endif; ?>
   <link rel="stylesheet" href="admin.css?v=<?= ez_admin_escape($adminCssVersion) ?>">
   <?php if ($authenticated && $page === 'shop'): ?><link rel="stylesheet" href="../storefront.css?v=1"><link rel="stylesheet" href="shop.css?v=<?= (int) filemtime(__DIR__ . '/shop.css') ?>"><?php endif; ?>

@@ -3375,8 +3375,10 @@ test('landing pages start the saved document before editor styles and scripts', 
   const shell=await fetch(app.base+'/cart/admin/?page=sites&edit=example.ezkart.site',{headers:{Cookie:`${cookie.name}=${cookie.value}`}});
   const html=await shell.text();
   assert.equal(shell.status,200);
-  assert.ok(html.indexOf('admin-startup.js')<html.indexOf('rel="stylesheet"'));
+  assert.ok(html.indexOf('id="ezkart-admin-startup"')<html.indexOf('rel="stylesheet"'));
   assert.match(html,/id="ezkart-catalog-bootstrap"/);
+  assert.match(shell.headers.get('content-security-policy'),/script-src 'self' 'sha256-[^']+'/);
+  assert.doesNotMatch(shell.headers.get('content-security-policy'),/script-src[^;]*'unsafe-inline'/);
   assert.match(html,/<script[^>]+src="admin\.js/);
   const proxy=await fetch(app.base+'/cart/admin/?cloud=%2Fv1%2Flanding-pages%2Fexample%2Feditor',{headers:{Cookie:`${cookie.name}=${cookie.value}`}});
   assert.notEqual(proxy.status,400);
@@ -3389,6 +3391,7 @@ test('landing pages start the saved document before editor styles and scripts', 
     await page.route(url=>url.searchParams.get('cloud')==='/v1/fonts',route=>route.fulfill({json:{ok:true,fonts:[]}}));
     await page.route(url=>url.searchParams.get('cloud')==='/v1/landing-pages/example/editor',route=>route.fulfill({json:{ok:true,page:{id:'example',name:'Example',url:'example.ezkart.site',status:'draft',products:[],customProducts:[],state:{version:6,preview:'<section class="sq-page-block sq-generated-blank" data-sq-block data-sq-fluid data-section-id="blank"></section>'}}}}));
     await page.goto(app.base+'/cart/admin/?page=sites&edit=example.ezkart.site');
+    assert.equal(await page.evaluate(()=>typeof globalThis.EzkartAdminStartup), 'object', 'The exact CSP hash permits the inline request starter');
     await page.waitForFunction(()=>globalThis.EzkartBuilder && !document.querySelector('.sq-studio').classList.contains('sq-site-loading'));
     assert.equal(await page.evaluate(()=>EzkartAssets.preview(EzkartAssets.definitions[0].id) instanceof HTMLElement),true);
     assert.deepEqual(errors,[]);

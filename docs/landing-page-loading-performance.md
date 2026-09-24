@@ -61,8 +61,10 @@ The initial change still ran its parser-blocking startup script after the
 stylesheets. Read-only inspection of `image-stack-test-i` in the test bucket
 also found that all four images occurred twice in its 2 MB editable document.
 
-The saved document now starts fetching in the head, before CSS can block script
-execution, with high request priority. The gallery starts its page-list request
+The saved document now starts fetching from a small inline script in the head,
+before CSS can block script execution, with high request priority. CSP allows
+only the exact SHA-256 hash of this repository-owned script; it does not permit
+arbitrary inline JavaScript. This also removes the startup script network wait. The gallery starts its page-list request
 there too. The safely encoded server catalog is consumed later, when the main
 script needs it, without another catalog download.
 
@@ -70,7 +72,7 @@ An authenticated `/v1/landing-pages/:id/editor` endpoint transfers each embedded
 image once and reconstructs the exact editable JSON in the browser. It excludes
 the publication snapshot, which is not needed for editing. Saved projects,
 autosave payloads, exports and publication storage retain their original format.
-For the inspected page, the response fell from 2,024,758 to 1,065,913 bytes;
+For the inspected page, the response fell from 2,024,852 to 1,066,007 bytes;
 gzip fell from 1,466,310 to 738,823 bytes (50%). Deep comparison confirmed lossless
 reconstruction of every editable field. Account data was read for diagnosis and
 was not edited or checked into the repository.
@@ -104,3 +106,12 @@ The test Worker version is `65a586c6-20dc-400e-aa9c-d91ce82284e7`. Actual
 merchant-session timings remain unavailable because Chrome's debugging connection
 does not respond. Hosted-asset measurements use a copied page and controlled API
 responses, not the merchant's authenticated browser.
+
+The final inline bootstrap passed the four Image Stack tests, both PHP/shop
+checks, and an explicit CSP browser check. In three hosted-asset runs with a
+copied page and controlled API transfer delays, the document request started at
+22, 16 and 17 ms after HTML arrival (previously 954, 849 and 663 ms). Overall
+ready times remained variable at 3,046, 3,482 and 2,490 ms, versus 3,207, 3,026
+and 2,911 ms before; these runs establish the earlier request and smaller payload,
+not a measured total startup improvement in the merchant's session. All runs
+had no JavaScript errors. The four-image canvas was visually inspected.
