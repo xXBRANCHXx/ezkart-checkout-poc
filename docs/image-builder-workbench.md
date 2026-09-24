@@ -4,7 +4,7 @@ Implemented 24 September 2026 for `agent/ezkart-workbench` and `test.ezkart.id`.
 
 ## Merchant flow
 
-Landing pages → New page presents the approved image-builder and visual-builder
+Landing pages → New page presents the approved Image builder and Design builder
 comparison. Both choices have example previews. Image pages start with a name,
 image uploads, and a catalog product. The visual choice keeps the existing
 template and blank-page flow. Existing visual pages retain their editor.
@@ -89,3 +89,17 @@ and their buttons fit without scrolling at all six desktop/tablet sizes. The
 four-image example is contiguous, both previews open/close, and page creation
 still follows account language. Twenty-one unique merchant UI regression tests
 passed across the required interaction suites and the image/template workflows.
+
+## Full design preview — 24 September 2026
+
+The visual option is labeled **Design builder** (Indonesian: **Editor desain**).
+Its example previously used the 1440 × 1000 first-screen gallery thumbnail,
+which left no lower page content to scroll. It now uses the approved native Sela
+full-page screenshots: 1440 × 5281 on desktop and 390 × 6134 on phones. These are
+compressed WebP copies of `sela/builder/screenshots/{1440,390}-full.png` in the
+local template archive, stored separately under `assets/builder-choice/`.
+
+Verified actual mouse-wheel scrolling and reaching the footer at desktop and
+phone widths, with the close control still visible and Escape returning focus
+to the example button. The image-editor regression also covers this behavior
+and the new Indonesian chooser label.

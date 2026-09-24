@@ -17,6 +17,27 @@ test('image pages create, upload, reorder, replace, undo, save and use the share
   await page.goto(ws.url+'/cart/admin/?page=sites');
   await page.locator('[data-library-create-card]').click();
   assert.equal(await page.locator('.bc-choices').isVisible(),true);
+  await page.locator('[data-bc-preview=visual]').last().click();
+  const example=page.locator('.bc-example');
+  for(const width of [1440,390]){
+    await page.setViewportSize({width,height:844});
+    await page.waitForFunction(mobile=>{
+      const img=document.querySelector('.bc-example img');
+      return img?.complete&&img.naturalWidth>0&&img.currentSrc.includes(mobile?'sela-mobile-full':'sela-desktop-full');
+    },width===390);
+    await example.locator('img').evaluate(img=>img.decode());
+    assert.ok(await example.evaluate(node=>node.scrollHeight>node.clientHeight+1000));
+    await example.evaluate(node=>node.scrollTop=0);
+    const bounds=await example.boundingBox();
+    await page.mouse.move(bounds.x+bounds.width/2,bounds.y+180);await page.mouse.wheel(0,650);
+    await page.waitForFunction(()=>document.querySelector('.bc-example').scrollTop>100);
+    assert.equal(await example.locator('header button').isVisible(),true);
+    await example.evaluate(node=>node.scrollTop=node.scrollHeight);
+    assert.ok(await example.locator('img').evaluate(img=>img.getBoundingClientRect().bottom<=innerHeight));
+  }
+  await page.keyboard.press('Escape');
+  assert.equal(await page.locator('[data-bc-preview=visual]').last().evaluate(node=>node===document.activeElement),true);
+  await page.setViewportSize({width:1440,height:1000});
   await page.locator('[data-bc-preview=image]').last().click();
   await page.locator('.bc-example img').evaluateAll(images=>Promise.all(images.map(img=>img.decode())));await page.keyboard.press('Escape');
   await page.locator('[data-bc-choose=image]').click();
@@ -91,6 +112,7 @@ test('the chooser and image editor use the account language while leaving upload
   await page.goto(ws.url+'/cart/admin/?page=sites');await page.locator('[data-library-create-card]').click();
   await page.locator('[data-bc-choose=image]').waitFor();assert.match(await page.locator('#library-creator-title').textContent(),/Pilih cara membuat halaman/);
   assert.match(await page.locator('[data-bc-choose=image]').textContent(),/Pilih halaman gambar/);
+  assert.match(await page.locator('[data-bc-choose=visual]').textContent(),/Pilih editor desain/);
   assert.equal(await page.locator('#library-page-creator-dialog').evaluate(node=>node.scrollWidth>node.clientWidth),false);
   await page.locator('[data-bc-choose=image]').click();await page.locator('[name=page_name]').fill('Halaman gambar');await page.locator('[data-library-page-form] button[value=default]').click();
   await page.waitForURL('**edit=halaman-gambar.ezkart.site');await page.locator('[data-image-page-add]').waitFor();

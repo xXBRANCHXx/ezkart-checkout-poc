@@ -20,19 +20,23 @@
   function example(mode, opener) {
     const dialog = document.createElement('dialog');
     dialog.className = 'bc-example';
-    const title = document.createElement('h2');title.textContent=t(mode==='image'?'Image builder':'Visual builder');title.id='bc-example-title';
+    const title = document.createElement('h2');title.textContent=t(mode==='image'?'Image builder':'Design builder');title.id='bc-example-title';
     dialog.setAttribute('aria-labelledby',title.id);
     const close=document.createElement('button');close.type='button';close.textContent='×';close.setAttribute('aria-label',t('Close'));
     const header=document.createElement('header');header.append(title,close);
     const frame=document.createElement('div');frame.className='bc-example-frame '+mode;
-    const sources=mode==='image'
-      ? [1,2,3,4].map(index=>`assets/builder-choice/kopi-senja-0${index}.webp`)
-      : ['templates/sela/preview/desktop.png'];
-    sources.forEach((source,index)=>{
-      const image=new Image();image.alt=t('Example design')+(mode==='image'?` ${index+1} / 4`:'');image.src=new URL(source,base);image.decoding='async';
-      if(mode==='image'){image.width=800;image.height=1200;}
-      frame.append(image);
-    });
+    if(mode==='image'){
+      [1,2,3,4].forEach(index=>{
+        const image=new Image();image.alt=t('Example design')+` ${index} / 4`;image.src=new URL(`assets/builder-choice/kopi-senja-0${index}.webp`,base);image.decoding='async';image.width=800;image.height=1200;
+        frame.append(image);
+      });
+    }else{
+      // Use the complete approved page, not the gallery's first-screen thumbnail.
+      const picture=document.createElement('picture'),mobile=document.createElement('source');
+      mobile.media='(max-width: 600px)';mobile.srcset=new URL('assets/builder-choice/sela-mobile-full.webp',base);mobile.setAttribute('width','390');mobile.setAttribute('height','6134');
+      const image=new Image();image.alt=t('Example design');image.src=new URL('assets/builder-choice/sela-desktop-full.webp',base);image.decoding='async';image.width=1440;image.height=5281;
+      picture.append(mobile,image);frame.append(picture);
+    }
     dialog.append(header,frame);document.body.append(dialog);
     close.onclick=()=>dialog.close();dialog.addEventListener('close',()=>{dialog.remove();opener.focus();},{once:true});
     dialog.showModal();
@@ -75,7 +79,7 @@
     });
     template.then(html=>{if(!html)throw Error('Choices unavailable');choices.innerHTML=html;translate(choices);}).catch(()=>{
       choices.replaceChildren();
-      for(const mode of ['image','visual']){const button=document.createElement('button');button.type='button';button.dataset.bcChoose=mode;button.className='ui-button';button.textContent=t(mode==='image'?'Image builder':'Visual builder');choices.append(button);}
+      for(const mode of ['image','visual']){const button=document.createElement('button');button.type='button';button.dataset.bcChoose=mode;button.className='ui-button';button.textContent=t(mode==='image'?'Image builder':'Design builder');choices.append(button);}
     });
     translate(details);translate(form.querySelector('footer'));
     select('');
