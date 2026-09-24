@@ -25,6 +25,10 @@ try {
         http_response_code(404);
         exit('Page not found.');
     }
+    if (parse_url((string) ($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_PATH) === '/cart/page.php') {
+        header('Location: /' . $store . '/shop/' . $page, true, 302);
+        exit;
+    }
     $api = rtrim(ez_config('cloudflare_api_url'), '/');
     if (!filter_var($api, FILTER_VALIDATE_URL) || !function_exists('curl_init')) throw new RuntimeException('Page hosting is unavailable.');
     $handle = curl_init($api . '/v1/public/landing-pages/' . rawurlencode($store) . '/' . rawurlencode($page));

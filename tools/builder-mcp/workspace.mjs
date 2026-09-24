@@ -54,6 +54,18 @@ export class Workspace {
     if(req.headers.host!==host)return send(403,{ok:false,error:'Invalid host.'});
     if(req.headers.origin && req.headers.origin!==`http://${host}`)return send(403,{ok:false,error:'Invalid origin.'});
     const url=new URL(req.url,`http://${host}`),path=url.searchParams.get('cloud');
+    const hosted=/^\/([a-z0-9-]+)\/shop\/([a-z0-9-]+)(\/preview)?\/?$/.exec(url.pathname);
+    if(hosted){
+     if(hosted[1]!=='workspace')return send(404,'Page not found.','text/plain');
+     if(hosted[3]){
+      const source='/cart/admin/?cloud='+encodeURIComponent(`/v1/landing-pages/${hosted[2]}/view`)+'&preview-store=workspace';
+      return send(200,`<!doctype html><html><head><script src="/cart/page-preview-loader.js" data-preview-source="${htmlEscape(source)}" defer></script></head><body><p data-preview-status>Loading preview…</p><a data-preview-sign-in hidden>Sign in</a></body></html>`,'text/html; charset=utf-8');
+     }
+     const page=await this.read(hosted[2]);
+     if(page.status!=='published'||!page.publishedHtml)return send(404,'Page not found.','text/plain');
+     res.setHeader('Content-Security-Policy',await this.hostedPolicy());
+     return send(200,hostedFrame(page.publishedHtml),'text/html; charset=utf-8');
+    }
     if(path){
      if(req.method==='GET'){
       if(path==='/v1/catalog')return send(200,{ok:true,...await this.catalog(),drafts:[]});
@@ -83,6 +95,9 @@ export class Workspace {
       const viewMatch=/^\/v1\/landing-pages\/([a-z0-9-]+)\/view$/.exec(path);
       if(viewMatch){
        await this.read(viewMatch[1]);
+       const store=url.searchParams.get('preview-store');
+       if(store && store!=='workspace')return send(404,'Page not found.','text/plain');
+       if(!store){res.setHeader('Location',`/workspace/shop/${viewMatch[1]}/preview`);return send(302,'','text/plain');}
        res.setHeader('Content-Security-Policy',await this.hostedPolicy());
        const html=await readFile(join(this.directory,'previews',`${slug(viewMatch[1])}.html`),'utf8');
        return send(200,hostedFrame(html.replace(/<style id="ezkart-library-preview-style">[\s\S]*?<\/style>/g,'')),'text/html; charset=utf-8');
@@ -140,12 +155,11 @@ export class Workspace {
      return send(404,{ok:false,error:'This local workspace does not implement that cloud operation.'});
     }
     if(url.pathname==='/cart/page.php'){
+     const id=slug(url.searchParams.get('page'));
      if(url.searchParams.get('store')!=='workspace')return send(404,'Page not found.','text/plain');
-     const page=await this.read(url.searchParams.get('page'));
-     if(page.status!=='published'||!page.publishedHtml)return send(404,'Page not found.','text/plain');
-     res.setHeader('Content-Security-Policy',await this.hostedPolicy());
-     return send(200,hostedFrame(page.publishedHtml),'text/html; charset=utf-8');
+     res.setHeader('Location',`/workspace/shop/${id}`);return send(302,'','text/plain');
     }
+    if(url.pathname==='/cart/page-preview-loader.js')return send(200,await readFile(join(repoRoot,'cart/page-preview-loader.js')),'text/javascript');
     if(url.pathname==='/cart/admin/'||url.pathname==='/cart/admin/index.php')return send(200,await this.markup(!url.searchParams.has('edit')),'text/html; charset=utf-8');
     if(url.pathname==='/cart/api/health.php')return send(200,{ok:true,commerce_environment:'test'});
     if(url.pathname==='/cart/admin/page-preview.php'){

@@ -738,6 +738,12 @@ function ez_admin_proxy_cloud_request(string $accessToken, string $path, string 
     if ($handle === false) ez_admin_json(['ok' => false, 'error' => 'The save request could not start.'], 503);
     $headers = ['Accept: application/json', 'Authorization: Bearer ' . $accessToken];
     if ($body !== '') $headers[] = 'Content-Type: application/json';
+    $isInteractiveView = $method === 'GET' && preg_match('#^/v1/landing-pages/[a-z0-9-]+/view$#', $path) === 1;
+    $previewStore = (string) ($_GET['preview-store'] ?? '');
+    if ($isInteractiveView && $previewStore !== '') {
+        if (strlen($previewStore) > 96 || preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/D', $previewStore) !== 1) ez_admin_json(['ok' => false, 'error' => 'Page not found.'], 404);
+        $headers[] = 'X-Ezkart-Preview-Store: ' . $previewStore;
+    }
     if ($isImageRequest || $isPreviewRequest) {
         foreach (['HTTP_IF_NONE_MATCH' => 'If-None-Match', 'HTTP_IF_MODIFIED_SINCE' => 'If-Modified-Since'] as $serverKey => $headerName) {
             $conditionalValue = trim((string) ($_SERVER[$serverKey] ?? ''));
@@ -762,7 +768,7 @@ function ez_admin_proxy_cloud_request(string $accessToken, string $path, string 
             $separator = strpos($line, ':');
             if ($separator !== false) {
                 $name = strtolower(trim(substr($line, 0, $separator)));
-                if (in_array($name, ['etag', 'last-modified'], true)) {
+                if (in_array($name, ['etag', 'last-modified', 'x-ezkart-preview-path'], true)) {
                     $upstreamHeaders[$name] = trim(substr($line, $separator + 1));
                 }
             }
@@ -789,7 +795,12 @@ function ez_admin_proxy_cloud_request(string $accessToken, string $path, string 
     }
     header('Content-Type: ' . ($contentType !== '' ? $contentType : 'application/json; charset=utf-8'));
     header('X-Content-Type-Options: nosniff');
-    if ($method === 'GET' && $status === 200 && preg_match('#^/v1/landing-pages/[a-z0-9-]+/view$#', $path) === 1) {
+    if ($isInteractiveView && $status === 200) {
+        $previewPath = (string) ($upstreamHeaders['x-ezkart-preview-path'] ?? '');
+        if ($previewStore === '' && preg_match('#^/[a-z0-9-]+/shop/[a-z0-9-]+/preview$#D', $previewPath) === 1) {
+            header('Location: ' . $previewPath, true, 302);
+            exit;
+        }
         if (!str_starts_with(strtolower($contentType), 'text/html')) {
             ez_admin_json(['ok' => false, 'error' => 'The page preview could not be loaded.'], 502);
         }

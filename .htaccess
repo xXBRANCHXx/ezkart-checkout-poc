@@ -1,0 +1,6 @@
+# Only merchant landing-page paths enter this router. Existing files, the
+# merchant dashboard, checkout and the main website retain their own routes.
+RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^[a-z0-9]+(?:-[a-z0-9]+)*/shop/[a-z0-9]+(?:-[a-z0-9]+)*(?:/preview)?/?$ cart/page-route.php [L]

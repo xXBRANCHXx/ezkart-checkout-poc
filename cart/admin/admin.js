@@ -556,8 +556,9 @@
   const readLandingSites = () => [...cloudLandingPages];
   const landingPageId = (url) => String(url || "").toLowerCase().replace(/\.ezkart\.site$/, "");
   const hostedPageUrl = (page, published = page?.status === 'published') => {
-    if (published && /^\/cart\/page\.php\?store=[a-z0-9-]+&page=[a-z0-9-]+$/.test(page?.publicPath || '')) {
-      return new URL(page.publicPath, window.location.origin).href;
+    const path = published ? page?.publicPath : page?.previewPath;
+    if (/^\/[a-z0-9-]+\/shop\/[a-z0-9-]+(?:\/preview)?$/.test(path || '')) {
+      return new URL(path, window.location.origin).href;
     }
     return new URL(cloudUrl(`/v1/landing-pages/${encodeURIComponent(landingPageId(page?.id || page?.url))}/view`), window.location.href).href;
   };

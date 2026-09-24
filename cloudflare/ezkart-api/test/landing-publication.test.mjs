@@ -302,7 +302,8 @@ test("Authenticated page saves allow empty drafts and reject publish bypasses ag
   });
   assert.equal(initial.status, 200, JSON.stringify(initial.body));
   const publicUrl = 'http://worker.test/v1/public/landing-pages/mine/my-page';
-  assert.equal(initial.body.page.publicPath, '/cart/page.php?store=mine&page=my-page');
+  assert.equal(initial.body.page.publicPath, '/mine/shop/my-page');
+  assert.equal(initial.body.page.previewPath, '/mine/shop/my-page/preview');
   assert.equal((await mf.dispatchFetch(publicUrl)).status, 404, 'Drafts are private');
   assert.equal((await exportPage("<h1>Empty</h1>")).status, 422);
   assert.equal((await exportPage(buy("foreign"))).status, 422);
@@ -387,7 +388,7 @@ test("Authenticated page saves allow empty drafts and reject publish bypasses ag
   const list = () => mf.dispatchFetch('http://worker.test/v1/landing-pages', {headers: auth});
   const listed = (await (await list()).json()).pages;
   assert.equal(listed[0].name, 'My page');
-  assert.equal(listed[0].publicPath, '/cart/page.php?store=mine&page=my-page');
+  assert.equal(listed[0].publicPath, '/mine/shop/my-page');
   assert.equal(listed[0].state, undefined);
   // A legacy project gets its derived summary on the first read.
   await bucket.delete('sellers/mine/landing-page-summaries/my-page.json');
@@ -408,6 +409,9 @@ test("Authenticated page saves allow empty drafts and reject publish bypasses ag
   assert.equal((await mf.dispatchFetch(viewUrl)).status, 401);
   const view = await mf.dispatchFetch(viewUrl, {headers:auth});
   assert.equal(view.status, 200);
+  assert.equal(view.headers.get('x-ezkart-preview-path'), '/mine/shop/my-page/preview');
+  assert.equal((await mf.dispatchFetch(viewUrl,{headers:{...auth,'x-ezkart-preview-store':'other'}})).status,404);
+  assert.equal((await mf.dispatchFetch(viewUrl,{headers:{...auth,'x-ezkart-preview-store':'mine'}})).status,200);
   const viewHtml = await view.text();
   assert.match(viewHtml, /<script>largeUnusedCode/);
   assert.doesNotMatch(viewHtml, /ezkart-library-preview-style/);

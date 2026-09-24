@@ -10,7 +10,9 @@ Implemented on `agent/ezkart-workbench`, 24 September 2026.
   cannot read the draft.
 - Publish keeps the existing ownership, product, stock and artwork checks. The
   saved publication is served publicly at
-  `/cart/page.php?store=<store-slug>&page=<page-id>` on the current site host.
+  `/<business-slug>/shop/<page-name>` on the current site host. Private previews
+  use the same path followed by `/preview`. Spaces in page names become hyphens;
+  the existing unique store slug identifies the business.
 - The link icon beside Publish opens that public page. The library's Copy URL
   control copies the public link for published pages and the private preview
   link for drafts. Page creation no longer advertises an unconfigured
@@ -27,7 +29,8 @@ Implemented on `agent/ezkart-workbench`, 24 September 2026.
 
 `GET /v1/landing-pages/:id/view` authenticates the seller and streams the stored
 full preview. The existing `/preview` route remains a lightweight, script-free
-library thumbnail. The PHP admin proxy allows the new view route. Both hosted PHP routes place
+library thumbnail. The PHP admin proxy allows the view route and checks its requested business
+against the signed-in seller. Both hosted PHP routes place
 authored HTML inside a full-viewport sandboxed iframe. Hostinger replaces CSP
 headers with its own policy, so iframe markup enforces isolation independently
 of response headers. The outer document retains the title, description, language
@@ -36,10 +39,23 @@ for older saved snapshots. The address bar always shows the hosted page URL.
 
 `GET /v1/public/landing-pages/:store/:id` resolves the active seller by its slug
 and returns only `publishedHtml` when the saved status is `published`.
-`cart/page.php` proxies this route using the configured environment API without
+`cart/page.php`, reached through the narrow root `.htaccess` rewrite and
+`cart/page-route.php`, proxies this route using the configured environment API without
 forwarding visitor or merchant credentials. It applies the same sandbox policy,
 returns no-store responses, and suppresses indexing on the test environment.
 The public route never returns editable state or private preview content.
+
+The readable private-preview route loads the authenticated document with a
+same-origin fetch to `/cart/admin`, retaining the existing cookie path. Its
+small loader replaces the loading document with the trusted sandboxed shell,
+so the address bar and checkout return URL stay readable. It shows a sign-in
+link to anonymous visitors. The API rejects a preview requested for a different
+business even when the visitor is signed into another account. No session-cookie
+scope is broadened. Old public query-string links and authenticated admin-view
+links redirect to their readable equivalents; trailing slashes normalize too.
+
+The rewrite matches only `/<business>/shop/<page>` and its `/preview` suffix;
+other site, shop, checkout and admin routes keep their existing behavior.
 
 The workbench uses its test Worker and buckets. A future authorized production
 release must include the Worker routes and PHP/JS changes with the existing
@@ -68,4 +84,15 @@ the return URL. PHP lint and Node syntax
 checks passed. Mobile and desktop screenshots are in
 `/tmp/ezkart-hosting-review`. No real order or payment was created.
 
-Test Worker deployment: `026844ce-d3ef-4e91-ac7f-ab2d312c7472`.
+Test Worker deployment: `81f91827-b2f4-4e37-957c-182804e44ab6`.
+
+## Readable URL verification — 24 September 2026
+
+Browser coverage verifies the clean public and preview paths, empty query
+strings, reloads, publication, copying and cart behavior. The PHP integration
+also verifies both legacy redirects, trailing-slash normalization, the preview
+sign-in state, actual authentication with a cookie scoped to `/cart/admin`,
+checkout returns to the clean URL and wrong-business rejection. The production
+rewrite is verified separately on the test host because PHP's development server
+uses a small test router. Worker route tests check both derived paths and enforce
+the preview's requested business slug.

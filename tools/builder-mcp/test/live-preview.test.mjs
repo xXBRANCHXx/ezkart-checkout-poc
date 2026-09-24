@@ -196,7 +196,8 @@ test("the editor Preview renders current edits, local media and commerce at ever
     );
     const hostedUrl = popup.url();
     assert.equal(new URL(hostedUrl).protocol, 'http:');
-    assert.equal(new URL(hostedUrl).searchParams.get('cloud'), '/v1/landing-pages/preview/view');
+    assert.equal(new URL(hostedUrl).pathname, '/workspace/shop/preview/preview');
+    assert.equal(new URL(hostedUrl).search, '');
     assert.equal(await popup.evaluate(() => window.opener), null);
     await popup.close();
     const reopened = await browser.newPage();

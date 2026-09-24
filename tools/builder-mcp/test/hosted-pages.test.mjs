@@ -24,7 +24,7 @@ test('Image Stack publishes a durable public link and keeps later draft edits pr
   await page.locator('[data-image-page-upload]').setInputFiles(join(repoRoot,'cart/admin/assets/builder-choice/kopi-senja-01.webp'));
   await page.waitForFunction(() => document.querySelectorAll('.ib-row').length===1 && !document.querySelector('.ib-controls').disabled);
   await page.locator('[data-image-page-product]').selectOption('coffee');
-  const publicUrl = ws.url+'/cart/page.php?store=workspace&page=hosted-coffee';
+  const publicUrl = ws.url+'/workspace/shop/hosted-coffee';
   assert.equal((await fetch(publicUrl)).status,404);
   await page.locator('[data-sq-publish]').click();
   await page.locator('[data-favicon-publish]').click();

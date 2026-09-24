@@ -619,6 +619,8 @@ async function landingPagePreview(request, env, rawId) {
 
 async function landingPageView(request, env, rawId) {
   const { seller } = await sellerContext(request, env);
+  const expectedStore = request.headers.get('x-ezkart-preview-store');
+  if (expectedStore && expectedStore !== seller.slug) throw new Response("Page not found", {status: 404});
   const id = cleanLandingPageId(rawId);
   const [page, object] = await Promise.all([
     env.PRIVATE_ASSETS.head(landingPageKey(seller.id, id)),
@@ -627,8 +629,10 @@ async function landingPageView(request, env, rawId) {
   if (!page || !object) throw new Response("Save a preview in the editor first", {status: 404});
   // The stored preview contains the full runtime. Only library thumbnails strip
   // scripts and pause motion; an interactive preview uses the same durable HTML.
-  return new HTMLRewriter().on('#ezkart-library-preview-style', {element(node) { node.remove(); }})
+  const response = new HTMLRewriter().on('#ezkart-library-preview-style', {element(node) { node.remove(); }})
     .transform(hostedLandingResponse(object.body));
+  response.headers.set('x-ezkart-preview-path', landingPageLinks({id}, seller).previewPath);
+  return response;
 }
 
 async function publicLandingPage(env, store, rawId) {

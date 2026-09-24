@@ -15,5 +15,6 @@ export function hostedLandingResponse(html, {noindex = true} = {}) {
 }
 
 export function landingPageLinks(page, seller) {
-  return {...page, publicPath: `/cart/page.php?store=${encodeURIComponent(seller.slug)}&page=${encodeURIComponent(page.id)}`};
+  const publicPath = `/${encodeURIComponent(seller.slug)}/shop/${encodeURIComponent(page.id)}`;
+  return {...page, publicPath, previewPath: `${publicPath}/preview`};
 }
