@@ -173,7 +173,7 @@ mobile, with the complete product image contained in the slot.
 ## Image arrangement — 24 September 2026
 
 Upload cards now use a six-dot drag handle. A compact artwork preview follows
-the pointer while a shaded, dotted slot marks the drop position. Neighboring
+the pointer while a shaded slot with the upload area's dashed border marks the drop position. Neighboring
 cards move with a damped spring that preserves velocity when the target changes.
 Dragging near the viewport edge scrolls longer lists. Dropping commits one
 history step; Escape, pointer cancellation and drops outside the list restore

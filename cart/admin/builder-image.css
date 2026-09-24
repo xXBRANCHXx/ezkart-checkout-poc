@@ -19,8 +19,7 @@
 .ib-remove svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .ib-remove:hover{color:#94251c;background:#fff1ee}
 .ib-row .ib-description{grid-column:2/-1}
-.ib-drop-slot{border-color:transparent;background:#f3f4f5;outline:none}
-.ib-drop-slot::after{content:"";position:absolute;inset:-1px;border-radius:inherit;pointer-events:none;background:radial-gradient(circle,#a5a8ae 1px,transparent 1.25px) 0 0/12px 2px repeat-x,radial-gradient(circle,#a5a8ae 1px,transparent 1.25px) 0 100%/12px 2px repeat-x,radial-gradient(circle,#a5a8ae 1px,transparent 1.25px) 0 0/2px 12px repeat-y,radial-gradient(circle,#a5a8ae 1px,transparent 1.25px) 100% 0/2px 12px repeat-y}
+.ib-drop-slot{border:1px dashed #bfc4ce;background:#f3f4f5;outline:none}
 .ib-drop-slot>*{opacity:0;pointer-events:none}
 .ib-drop-outside{opacity:.45}
 .ib-sorting{overflow-anchor:none;user-select:none}

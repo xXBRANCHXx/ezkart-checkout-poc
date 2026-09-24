@@ -25,7 +25,7 @@ async function fixture(t,{touch=false,count=4}={}){
   return {page,ids,savedIds,settle,start,target};
 }
 
-test('image cards sort with a compact pointer preview, animated dotted slot, one undo step and saved order',async t=>{
+test('image cards sort with a compact pointer preview, animated dashed slot, one undo step and saved order',async t=>{
   const {page,ids,savedIds,settle,start,target}=await fixture(t),original=await ids();
   await page.locator('.ib-controls').screenshot({path:join(artifacts,'desktop-cards.png')});
   assert.equal(await page.locator('[data-image-drag] circle').count(),24);
