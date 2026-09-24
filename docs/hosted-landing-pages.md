@@ -12,17 +12,23 @@ Implemented on `agent/ezkart-workbench`, 24 September 2026.
   saved publication is served publicly at
   `/<business-slug>/shop/<page-name>` on the current site host. Private previews
   use the same path followed by `/preview`. Spaces in page names become hyphens;
-  the existing unique store slug identifies the business.
-- The link icon beside Publish opens that public page. The library's Copy URL
+  a separately reserved business address identifies the store without its internal account ID.
+  Addresses use the configured shop name, falling back to the business name. A short
+  number is added only for a name collision; a reserved address remains stable.
+- Publication shows the shareable URL with **View published page** and **Copy link**.
+  Preview tabs opened from the same editor switch to the public page when publishing
+  succeeds. **View live** beside Publish opens the public page; **Open draft preview**
+  remains available for reviewing unpublished edits. The library's Copy URL
   control copies the public link for published pages and the private preview
   link for drafts. Page creation no longer advertises an unconfigured
   `*.ezkart.site` hostname.
 - Autosave and preview do not replace the public snapshot. Publishing again
   updates the same public URL. Draft/unpublished pages, missing pages and pages
   belonging to inactive stores return 404 from the public route.
-- Existing saved documents and embedded image bytes are preserved. No schema
-  migration, image re-upload, DNS change or public access to private R2 objects
-  is required. Blob URLs remain appropriate for temporary downloads and upload
+- Existing saved documents and embedded image bytes are preserved. No
+  image re-upload, DNS change or public access to private R2 objects is required.
+  Migration `0008_seller_page_addresses.sql` reserves unique public business names
+  in D1 independently of existing account slugs; no project data is rewritten. Blob URLs remain appropriate for temporary downloads and upload
   decoding; they are no longer used as page addresses.
 
 ## Routes and isolation
@@ -53,12 +59,16 @@ link to anonymous visitors. The API rejects a preview requested for a different
 business even when the visitor is signed into another account. No session-cookie
 scope is broadened. Old public query-string links and authenticated admin-view
 links redirect to their readable equivalents; trailing slashes normalize too.
+Legacy business addresses containing account IDs also resolve to the same seller
+and redirect to its reserved public address. Concurrent reservations and duplicate
+business names cannot take ownership of an existing or legacy address.
 
 The rewrite matches only `/<business>/shop/<page>` and its `/preview` suffix;
 other site, shop, checkout and admin routes keep their existing behavior.
 
 The workbench uses its test Worker and buckets. A future authorized production
-release must include the Worker routes and PHP/JS changes with the existing
+release must apply migration `0008_seller_page_addresses.sql` before deploying
+the Worker routes and PHP/JS changes with the existing
 production API configuration and buckets. Links derive their hostname from the
 site where the merchant publishes; this does not migrate test accounts or
 projects into production. No production release or main merge was performed.
@@ -84,7 +94,8 @@ the return URL. PHP lint and Node syntax
 checks passed. Mobile and desktop screenshots are in
 `/tmp/ezkart-hosting-review`. No real order or payment was created.
 
-Test Worker deployment: `81f91827-b2f4-4e37-957c-182804e44ab6`.
+Test Worker deployment: `162918f8-ef3a-400a-ae61-c6f8792a1f65`.
+Test D1 migration `0008_seller_page_addresses.sql` applied successfully.
 
 ## Readable URL verification — 24 September 2026
 
@@ -96,3 +107,14 @@ checkout returns to the clean URL and wrong-business rejection. The production
 rewrite is verified separately on the test host because PHP's development server
 uses a small test router. Worker route tests check both derived paths and enforce
 the preview's requested business slug.
+
+## Published links and business addresses — 24 September 2026
+
+The publication confirmation, public-link copying, automatic preview-tab switch,
+private later edits, republishing, and mobile confirmation layout pass browser
+checks. Favicon and live-preview tests pass, along with the 11 required editor
+interaction checks. All 14 existing Worker tests and the new D1 address test pass;
+the latter verifies concurrent reservations, duplicate names, configured shop names,
+legacy ownership, stable links after renaming and suspended-store denial. The PHP
+integration verifies both old-business redirects with the actual admin cookie
+scope, sandbox isolation and checkout return URLs.

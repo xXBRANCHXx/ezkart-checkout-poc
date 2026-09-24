@@ -9,6 +9,11 @@
         return;
       }
       if (!response.ok || !response.headers.get('content-type')?.startsWith('text/html')) throw Error('Preview unavailable');
+      const canonicalPath = response.headers.get('x-ezkart-preview-path');
+      if (/^\/[a-z0-9-]+\/shop\/[a-z0-9-]+\/preview$/.test(canonicalPath) && canonicalPath !== location.pathname) {
+        location.replace(canonicalPath);
+        return;
+      }
       const html = await response.text();
       // This endpoint returns a trusted shell containing sandboxed authored HTML.
       // Replacing this document keeps its pretty URL, title and checkout return.

@@ -18,9 +18,10 @@ test('PHP page hosting serves only the current environment publication with an i
     requests.push({url:req.url,authorization:req.headers.authorization});
     if(req.url.endsWith('/view')) {
       if(!req.headers.authorization){res.writeHead(401);res.end('Sign in');return;}
-      if(req.headers['x-ezkart-preview-store'] && req.headers['x-ezkart-preview-store']!=='coffee-shop'){res.writeHead(404);res.end('Page not found');return;}
+      if(req.headers['x-ezkart-preview-store'] && !['coffee-shop','coffee-shop-0123456789'].includes(req.headers['x-ezkart-preview-store'])){res.writeHead(404);res.end('Page not found');return;}
       res.setHeader('x-ezkart-preview-path','/coffee-shop/shop/launch/preview');
     }
+    if(req.url.includes('/public/landing-pages/')) res.setHeader('x-ezkart-public-path','/coffee-shop/shop/launch');
     if(req.url.endsWith('/missing')) {res.writeHead(404);res.end('Internal error details');return;}
     if(req.url.endsWith('/bad-response')) {res.writeHead(200,{'Content-Type':'application/json'});res.end('{"private":"data"}');return;}
     res.writeHead(200,{'Content-Type':'text/html; charset=utf-8'});
@@ -58,6 +59,8 @@ test('PHP page hosting serves only the current environment publication with an i
   assert.match(response.headers.get('cache-control'),/no-store/);
   assert.equal(response.headers.get('x-robots-tag'),'noindex, nofollow');
   assert.deepEqual(requests,[{url:'/v1/public/landing-pages/coffee-shop/launch',authorization:undefined}]);
+  const oldBusiness=await fetch(base+'/coffee-shop-0123456789/shop/launch',{redirect:'manual'});
+  assert.equal(oldBusiness.status,302);assert.equal(oldBusiness.headers.get('location'),'/coffee-shop/shop/launch');
   assert.equal((await fetch(base+'/coffee-shop/shop/missing')).status,404);
   const bad=await fetch(base+'/coffee-shop/shop/bad-response');
   assert.equal(bad.status,503);assert.doesNotMatch(await bad.text(),/private|Internal error/);
@@ -107,12 +110,16 @@ test('PHP page hosting serves only the current environment publication with an i
   assert.equal(await previewFrame.locator('h1').innerText(),'Stored publication');
   assert.equal(page.url(),previewUrl);
   assert.equal(await previewFrame.evaluate(()=>document.baseURI),previewUrl);
+  await page.goto(base+'/coffee-shop-0123456789/shop/launch/preview');
+  await page.waitForURL(previewUrl);
+  await page.locator('[data-hosted-page]').waitFor();
+  const canonicalFrame=await page.locator('[data-hosted-page]').elementHandle().then(node=>node.contentFrame());
   const oldPreview=base+'/cart/admin/?cloud='+encodeURIComponent('/v1/landing-pages/launch/view');
   const moved=await context.request.get(oldPreview,{maxRedirects:0});
   assert.equal(moved.status(),302);assert.equal(moved.headers().location,'/coffee-shop/shop/launch/preview');
   assert.ok(requests.some(request=>request.url==='/v1/landing-pages/launch/view' && request.authorization==='Bearer fixture-preview-token'));
   const popup=context.waitForEvent('page');
-  await previewFrame.locator('#checkout').click();
+  await canonicalFrame.locator('#checkout').click();
   const checkout=await popup;await checkout.waitForURL('**/checkout?*');
   assert.equal(new URL(checkout.url()).searchParams.get('return'),previewUrl);
   await checkout.close();

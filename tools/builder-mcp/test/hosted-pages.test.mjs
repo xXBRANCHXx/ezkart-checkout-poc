@@ -26,11 +26,30 @@ test('Image Stack publishes a durable public link and keeps later draft edits pr
   await page.locator('[data-image-page-product]').selectOption('coffee');
   const publicUrl = ws.url+'/workspace/shop/hosted-coffee';
   assert.equal((await fetch(publicUrl)).status,404);
+  await page.locator('[data-sq-preview]').click();
+  const previewTabPromise=page.waitForEvent('popup');
+  await page.locator('[data-sq-preview-new-tab]').click();
+  const previewTab=await previewTabPromise;
+  await previewTab.waitForURL(publicUrl+'/preview');
+  await page.locator('[data-sq-preview-close]').click();
   await page.locator('[data-sq-publish]').click();
   await page.locator('[data-favicon-publish]').click();
   const link=page.locator('[data-sq-published-link]');
   await link.waitFor({state:'visible'});
   assert.equal(await link.getAttribute('href'),publicUrl);
+  await previewTab.waitForURL(publicUrl);
+  const publication=page.locator('[data-sq-published-dialog]');
+  await publication.waitFor({state:'visible'});
+  assert.equal(await publication.locator('[data-published-url]').textContent(),publicUrl);
+  await page.evaluate(()=>{navigator.clipboard.writeText=async text=>{window.copiedPageUrl=text;};});
+  await publication.getByRole('button',{name:'Copy link'}).click();
+  assert.equal(await page.evaluate(()=>window.copiedPageUrl),publicUrl);
+  await page.setViewportSize({width:390,height:844});
+  assert.equal(await publication.evaluate(node=>node.scrollWidth<=node.clientWidth),true);
+  await mkdir('/tmp/ezkart-hosting-review',{recursive:true});
+  await page.screenshot({path:'/tmp/ezkart-hosting-review/publication-390.png'});
+  await page.setViewportSize({width:1440,height:1000});
+  await publication.getByRole('button',{name:'Back to editor'}).click();
   // A separate browser context has no editor cookies or storage.
   const visitor=await browser.newContext({viewport:{width:390,height:844},reducedMotion:'reduce'});
   const live=await visitor.newPage();
@@ -50,6 +69,7 @@ test('Image Stack publishes a durable public link and keeps later draft edits pr
   await page.locator('[data-sq-publish]').click();
   await page.locator('[data-favicon-publish]').click();
   await page.waitForFunction(()=>document.querySelector('[data-sq-save-state]').textContent==='Published just now');
+  await publication.getByRole('button',{name:'Back to editor'}).click();
   await live.reload();
   assert.equal(await live.frameLocator('[data-hosted-page]').locator('[data-image-upload]').getAttribute('alt'),'Unpublished artwork description');
   await page.reload();

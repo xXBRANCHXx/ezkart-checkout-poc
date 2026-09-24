@@ -2674,8 +2674,7 @@
       if (!activeSiteDocument) return;
       const published = activeSiteDocument.status === 'published';
       const url = hostedPageUrl(activeSiteDocument);
-      const link = sqStudio.querySelector('[data-sq-published-link]');
-      if (link) { link.href = url; link.hidden = !published; }
+      document.querySelectorAll('[data-sq-published-link], [data-sq-open-public]').forEach(link => { link.href = url; link.hidden = !published; });
       document.querySelectorAll('[data-current-site-url]').forEach(target => { target.textContent = url; });
       const badge = sqStudio.querySelector('.sq-live-state');
       if (badge) { badge.replaceChildren(document.createElement('i'), document.createTextNode(published ? ' Published' : ' Draft')); }
@@ -8000,6 +7999,7 @@
     setExtraPageHeight(Number.parseFloat(previewRoot?.style.getPropertyValue("--sq-page-extra-height")) || 0);
     sqStudio.querySelector("[data-sq-close-inspector]")?.addEventListener("click", closeSqInspector);
     const livePreviewDialog = document.getElementById("landing-preview-dialog");
+    const previewTabs = new Map();
     const livePreviewFrame = livePreviewDialog?.querySelector("[data-sq-live-preview-frame]");
     const livePreviewStage = livePreviewDialog?.querySelector("[data-sq-live-preview-stage]");
     const previewCropToggle = livePreviewDialog?.querySelector('[data-sq-preview-crop]');
@@ -8036,7 +8036,10 @@
         clearTimeout(previewScheduleTimer);
         await refreshLandingPreviewIfDue();
         if (activeSiteDocument.previewSourceUpdatedAt !== activeSiteDocument.updatedAt) throw Error('Your preview could not be saved. Please try again.');
-        if (!tab.closed) tab.location.replace(hostedPageUrl(activeSiteDocument, false));
+        if (!tab.closed) {
+          tab.location.replace(hostedPageUrl(activeSiteDocument, false));
+          previewTabs.set(tab, {id: activeSiteDocument.id, url: hostedPageUrl(activeSiteDocument, false)});
+        }
       } catch (error) {
         tab.close();
         showToast(error.message);
@@ -8508,15 +8511,31 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
       if (!saved) throw Error('The page could not be published. Check the message and try again.');
       showToast("Landing page published");
       syncHostedPageLinks();
+      for (const [tab, preview] of previewTabs) {
+        if (tab.closed) previewTabs.delete(tab);
+        else if (preview.id === activeSiteDocument.id) {
+          try { if (tab.location.href === preview.url) tab.location.replace(hostedPageUrl(activeSiteDocument)); } catch { /* The visitor navigated away from the preview. */ }
+          previewTabs.delete(tab);
+        }
+      }
       return {published:true,url:hostedPageUrl(activeSiteDocument)};
     };
+    const publishedDialog = document.querySelector('[data-sq-published-dialog]');
+    publishedDialog?.querySelectorAll('[data-published-close]').forEach(button => button.addEventListener('click', () => publishedDialog.close()));
+    publishedDialog?.querySelector('[data-published-copy]')?.addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(publishedDialog.querySelector('[data-published-url]').href); showToast('Published page URL copied'); }
+      catch { showToast('Select the page URL to copy it.'); }
+    });
     sqStudio.querySelector("[data-sq-publish]")?.addEventListener("click", async (event) => {
       const button = event.currentTarget; button.disabled = true;
       try {
         await requireProductForOutput();
         if (await siteSettings.confirmPublish()) {
           siteSettings.setPublishing(true);
-          await publishPage();
+          const result = await publishPage();
+          const publicLink = publishedDialog?.querySelector('[data-published-url]');
+          if (publicLink) { publicLink.href = result.url; publicLink.textContent = result.url; }
+          publishedDialog?.showModal();
         }
       } catch(error) { showToast(error.message); }
       finally { siteSettings.setPublishing(false); button.disabled = false; }

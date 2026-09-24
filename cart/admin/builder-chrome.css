@@ -683,6 +683,8 @@
 .sq-favicon-help { margin: 20px 0; }
 .sq-favicon-dialog { width: min(580px, calc(100% - 24px)); max-height: calc(100dvh - 24px); padding: 0; border: 1px solid #e2e4e9; border-radius: 16px; color: #343845; background: white; overflow: auto; font-family: var(--ui-font, Poppins, sans-serif); }
 .sq-favicon-dialog::backdrop { background: #161c2b80; }
+.sq-published-dialog [data-published-url] { overflow-wrap: anywhere; font-size: 14px; }
+.sq-live-preview-shell [data-sq-open-public] { color: inherit; font: inherit; font-size: 12px; text-decoration: none; }
 .sq-favicon-dialog > header { display: flex; gap: 16px; padding: 24px 24px 0; }
 .sq-favicon-dialog h2 { margin: 0; font-size: 20px; line-height: 1.4; }
 .sq-favicon-dialog header p { margin: 10px 0 0; color: #737b8c; font-size: 12px; line-height: 1.7; }

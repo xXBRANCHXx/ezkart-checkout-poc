@@ -29,7 +29,7 @@ declare(strict_types=1);
     <div class="sq-command-actions">
       <button type="button" data-sq-preview aria-label="Preview page" title="Preview page"><?= ez_admin_icon('eye') ?><span>Preview</span></button>
       <button type="button" data-sq-export aria-label="Export HTML" title="Export HTML"><?= ez_admin_icon('code') ?><span>Export HTML</span></button>
-      <a class="ui-button" data-sq-published-link href="#" target="_blank" rel="noopener" aria-label="View published page" title="View published page" hidden><?= ez_admin_icon('link') ?></a>
+      <a class="ui-button" data-sq-published-link href="#" target="_blank" rel="noopener" aria-label="View published page" title="View published page" hidden><?= ez_admin_icon('link') ?><span>View live</span></a>
       <button class="ui-button primary" type="button" data-sq-publish data-ui-icon="globe">Publish</button>
     </div>
   </header>
@@ -352,7 +352,13 @@ declare(strict_types=1);
 </section>
 
 <dialog class="sq-live-preview-dialog" id="landing-preview-dialog">
-  <div class="sq-live-preview-shell"><header><div><small>Live page preview</small><h2 data-sq-preview-title>Landing page</h2></div><nav aria-label="Preview size"><button class="active" type="button" data-sq-preview-device="desktop"><?= ez_admin_icon('monitor') ?><span>Desktop · 1440</span></button><button type="button" data-sq-preview-device="tablet"><?= ez_admin_icon('layout') ?><span>Tablet · 768</span></button><button type="button" data-sq-preview-device="mobile"><?= ez_admin_icon('smartphone') ?><span>Mobile · 390</span></button></nav><div><label class="sq-preview-crop" title="Crop oversized content at the screen edges in Preview and on your live page"><input type="checkbox" data-sq-preview-crop checked><span>Crop to screen</span></label><button type="button" data-sq-preview-new-tab><?= ez_admin_icon('globe') ?><span>Open tab</span></button><button type="button" data-sq-preview-close aria-label="Close preview"><?= ez_admin_icon('x') ?></button></div></header><main data-sq-live-preview-stage data-preview-device="desktop"><div class="sq-live-preview-frame"><iframe title="Landing page production preview" sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation" data-sq-live-preview-frame></iframe></div></main></div>
+  <div class="sq-live-preview-shell"><header><div><small>Live page preview</small><h2 data-sq-preview-title>Landing page</h2></div><nav aria-label="Preview size"><button class="active" type="button" data-sq-preview-device="desktop"><?= ez_admin_icon('monitor') ?><span>Desktop · 1440</span></button><button type="button" data-sq-preview-device="tablet"><?= ez_admin_icon('layout') ?><span>Tablet · 768</span></button><button type="button" data-sq-preview-device="mobile"><?= ez_admin_icon('smartphone') ?><span>Mobile · 390</span></button></nav><div><label class="sq-preview-crop" title="Crop oversized content at the screen edges in Preview and on your live page"><input type="checkbox" data-sq-preview-crop checked><span>Crop to screen</span></label><button type="button" data-sq-preview-new-tab><?= ez_admin_icon('globe') ?><span>Open draft preview</span></button><a data-sq-open-public href="#" target="_blank" rel="noopener" hidden>View published page</a><button type="button" data-sq-preview-close aria-label="Close preview"><?= ez_admin_icon('x') ?></button></div></header><main data-sq-live-preview-stage data-preview-device="desktop"><div class="sq-live-preview-frame"><iframe title="Landing page production preview" sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation" data-sq-live-preview-frame></iframe></div></main></div>
+</dialog>
+
+<dialog class="sq-favicon-dialog sq-published-dialog" data-sq-published-dialog aria-labelledby="sq-published-title">
+  <header><div><h2 id="sq-published-title">Your page is published</h2><p>Anyone can open this link. Draft edits stay private until you publish again.</p></div><button type="button" data-published-close aria-label="Close publication details">×</button></header>
+  <div class="sq-favicon-dialog-body"><a data-published-url target="_blank" rel="noopener"></a></div>
+  <footer><button class="ui-button" type="button" data-published-close>Back to editor</button><button class="ui-button" type="button" data-published-copy>Copy link</button><a class="ui-button primary" data-sq-open-public target="_blank" rel="noopener">View published page</a></footer>
 </dialog>
 
 <dialog class="sq-export-dialog" id="html-export-dialog">

@@ -16,7 +16,7 @@ test('Advanced persists per store, enforces permissions, and changes page and pr
   }));
   t.after(()=>mf.dispose());
   const db=await mf.getD1Database('DB'), bucket=await mf.getR2Bucket('PUBLIC_ASSETS');
-  for(const migration of ['0001_core.sql','0002_cloud_catalog.sql','0005_product_limit.sql','0007_advanced_product_limit.sql']) {
+  for(const migration of ['0001_core.sql','0002_cloud_catalog.sql','0005_product_limit.sql','0007_advanced_product_limit.sql','0008_seller_page_addresses.sql']) {
     const sql=await readFile(new URL('../migrations/'+migration,import.meta.url),'utf8');
     const clean=sql.replace(/--[^\n]*/g,'');
     const triggers=[...clean.matchAll(/CREATE TRIGGER[\s\S]*?END;/g)].map(m=>m[0]);

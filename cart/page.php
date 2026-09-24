@@ -33,11 +33,16 @@ try {
     if (!filter_var($api, FILTER_VALIDATE_URL) || !function_exists('curl_init')) throw new RuntimeException('Page hosting is unavailable.');
     $handle = curl_init($api . '/v1/public/landing-pages/' . rawurlencode($store) . '/' . rawurlencode($page));
     if ($handle === false) throw new RuntimeException('Page request could not start.');
+    $canonicalPath = '';
     curl_setopt_array($handle, [
         CURLOPT_RETURNTRANSFER => true, CURLOPT_ENCODING => '',
         CURLOPT_CONNECTTIMEOUT => 8, CURLOPT_TIMEOUT => 40,
         CURLOPT_SSL_VERIFYPEER => true, CURLOPT_FOLLOWLOCATION => false,
         CURLOPT_HTTPHEADER => ['Accept: text/html'],
+        CURLOPT_HEADERFUNCTION => static function ($curl, string $line) use (&$canonicalPath): int {
+            if (str_starts_with(strtolower($line), 'x-ezkart-public-path:')) $canonicalPath = trim(substr($line, strlen('x-ezkart-public-path:')));
+            return strlen($line);
+        },
     ]);
     $html = curl_exec($handle);
     $status = (int) curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
@@ -47,6 +52,10 @@ try {
         exit('Page not found.');
     }
     if ($status !== 200 || !is_string($html) || !str_starts_with(strtolower($type), 'text/html')) throw new RuntimeException('Page could not be loaded.');
+    if (preg_match('#^/[a-z0-9-]+/shop/[a-z0-9-]+$#D', $canonicalPath) === 1 && $canonicalPath !== '/' . $store . '/shop/' . $page) {
+        header('Location: ' . $canonicalPath, true, 302);
+        exit;
+    }
     echo ez_landing_page_frame($html);
 } catch (Throwable $error) {
     error_log('Ezkart page hosting: ' . $error->getMessage());

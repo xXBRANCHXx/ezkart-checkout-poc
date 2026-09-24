@@ -1,4 +1,5 @@
 import {hostedLandingResponse, landingPageLinks} from './landing-page-hosting.js';
+import {sellerPageAddress, sellerByPageAddress} from './seller-page-address.js';
 import { adminPreferences } from './admin-preferences.js';
 import { listBuilderFonts, saveBuilderFont, serveBuilderFont } from './builder-fonts.js';
 import { listBuilderAssets, saveBuilderAsset, serveBuilderAsset } from "./builder-assets.js";
@@ -499,7 +500,7 @@ async function landingPageWithPreviewMetadata(env, sellerId, id) {
 }
 
 async function landingPages(request, env) {
-  const { seller } = await sellerContext(request, env);
+  const seller = await sellerPageAddress(env, (await sellerContext(request, env)).seller);
   const bucket = env.PRIVATE_ASSETS;
   const [objects, previews] = await Promise.all([
     listLandingObjects(bucket, landingPagePrefix(seller.id)),
@@ -522,12 +523,12 @@ async function landingPages(request, env) {
 }
 
 async function landingPage(request, env, rawId) {
-  const { seller } = await sellerContext(request, env);
+  const seller = await sellerPageAddress(env, (await sellerContext(request, env)).seller);
   return landingPageLinks(await landingPageWithPreviewMetadata(env, seller.id, cleanLandingPageId(rawId)), seller);
 }
 
 async function saveLandingPage(request, env, rawId) {
-  const { seller } = await sellerContext(request, env);
+  const seller = await sellerPageAddress(env, (await sellerContext(request, env)).seller);
   const id = cleanLandingPageId(rawId);
   const payload = await requestJson(request, maximumLandingPageBytes);
   let existing = null;
@@ -618,9 +619,9 @@ async function landingPagePreview(request, env, rawId) {
 }
 
 async function landingPageView(request, env, rawId) {
-  const { seller } = await sellerContext(request, env);
+  const seller = await sellerPageAddress(env, (await sellerContext(request, env)).seller);
   const expectedStore = request.headers.get('x-ezkart-preview-store');
-  if (expectedStore && expectedStore !== seller.slug) throw new Response("Page not found", {status: 404});
+  if (expectedStore && expectedStore !== seller.pageSlug && expectedStore !== seller.slug) throw new Response("Page not found", {status: 404});
   const id = cleanLandingPageId(rawId);
   const [page, object] = await Promise.all([
     env.PRIVATE_ASSETS.head(landingPageKey(seller.id, id)),
@@ -636,12 +637,14 @@ async function landingPageView(request, env, rawId) {
 }
 
 async function publicLandingPage(env, store, rawId) {
-  const seller = await env.DB.prepare("SELECT id, slug FROM sellers WHERE slug = ? AND status = 'active'").bind(store).first();
+  const seller = await sellerByPageAddress(env, store);
   if (!seller) throw new Response("Page not found", {status: 404});
   const page = await landingPageObject(env, seller.id, cleanLandingPageId(rawId));
   if (page.status !== 'published' || !page.publishedHtml) throw new Response("Page not found", {status: 404});
   // Never serve editable state or the draft preview from the public route.
-  return hostedLandingResponse(page.publishedHtml, {noindex: env.APP_ENVIRONMENT !== 'production'});
+  const response = hostedLandingResponse(page.publishedHtml, {noindex: env.APP_ENVIRONMENT !== 'production'});
+  response.headers.set('x-ezkart-public-path', landingPageLinks(page, seller).publicPath);
+  return response;
 }
 
 async function saveLandingPagePreview(request, env, rawId) {

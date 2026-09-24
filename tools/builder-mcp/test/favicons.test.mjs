@@ -86,6 +86,7 @@ test('site favicons persist, follow the visitor theme, and can be added or skipp
   await published.close();
   await page.locator('[data-sq-publish]').click();
   await page.waitForFunction(() => document.querySelector('[data-sq-save-state]').textContent === 'Published just now');
+  await page.locator('[data-sq-published-dialog]').getByRole('button', {name:'Back to editor'}).click();
   assert.equal(await dialog.isVisible(), false, 'Existing icons skip the setup prompt');
   assert.match((await ws.read('icons')).publishedHtml, /data-ezkart-favicon/);
   await card(settings, 'light').locator('[data-favicon-remove]').click();
@@ -96,6 +97,7 @@ test('site favicons persist, follow the visitor theme, and can be added or skipp
   await upload(dialog, 'dark', svg('#eeeeee'));
   await dialog.getByRole('button', {name: 'Publish page', exact: true}).click();
   await page.waitForFunction(() => document.querySelector('[data-sq-save-state]').textContent === 'Published just now');
+  await page.locator('[data-sq-published-dialog]').getByRole('button', {name:'Back to editor'}).click();
   const darkOnly = (await call('snapshot')).favicons;
   assert.equal((await ws.read('icons')).state.favicons.dark, darkOnly.dark);
   // A new design retains page identity, and switching pages never leaks favicons.
@@ -119,6 +121,7 @@ test('site favicons persist, follow the visitor theme, and can be added or skipp
   }
   await dialog.getByRole('button', {name: 'Publish without favicon'}).click();
   await page.waitForFunction(() => document.querySelector('[data-sq-save-state]').textContent === 'Published just now');
+  await page.locator('[data-sq-published-dialog]').getByRole('button', {name:'Back to editor'}).click();
   assert.equal((await ws.read('empty')).status, 'published');
   await page.locator('[data-sq-tab="layers"]').click();
   await page.locator('[data-sq-panel="layers"] [data-sq-structure-view="settings"]').click();

@@ -804,6 +804,7 @@ function ez_admin_proxy_cloud_request(string $accessToken, string $path, string 
         if (!str_starts_with(strtolower($contentType), 'text/html')) {
             ez_admin_json(['ok' => false, 'error' => 'The page preview could not be loaded.'], 502);
         }
+        if (preg_match('#^/[a-z0-9-]+/shop/[a-z0-9-]+/preview$#D', $previewPath) === 1) header('X-Ezkart-Preview-Path: ' . $previewPath);
         echo ez_landing_page_frame($responseBody);
     } else {
         echo $responseBody;
