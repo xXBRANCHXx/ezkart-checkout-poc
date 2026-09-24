@@ -2535,11 +2535,14 @@
     };
     const closeColorPicker = (commit = true) => {
       if (!colorPickerTarget) return;
-      if (!commit) { colorPickerTarget.value = colorPickerOriginal; colorPickerTarget.dispatchEvent(new Event("input", { bubbles: true })); }
-      else cacheColor(colorPickerTarget.value);
-      colorPickerTarget.dispatchEvent(new Event("change", { bubbles: true }));
+      const target = colorPickerTarget;
       colorPickerTarget = null;
       colorPicker.hidden = true;
+      // Change handlers may update selection and close inspector popovers again.
+      // Retire this picker before dispatching to avoid re-entering the commit.
+      if (!commit) { target.value = colorPickerOriginal; target.dispatchEvent(new Event("input", { bubbles: true })); }
+      else cacheColor(target.value);
+      target.dispatchEvent(new Event("change", { bubbles: true }));
     };
     const openColorPicker = (input) => {
       if (!input || input.disabled) return;
@@ -8442,8 +8445,8 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
       const loaderTitle = sqStudio.querySelector("[data-sq-site-loader-title]");
       const loaderMessage = sqStudio.querySelector("[data-sq-site-loader-message]");
       const retryButton = sqStudio.querySelector("[data-sq-site-retry]");
-      if (loaderTitle) loaderTitle.textContent = "Loading your page";
-      if (loaderMessage) loaderMessage.textContent = "Preparing your Ezkart canvas";
+      if (loaderTitle) loaderTitle.textContent = EzkartLanguage.t("Loading your page");
+      if (loaderMessage) loaderMessage.textContent = EzkartLanguage.t("Getting your page ready");
       if (retryButton) retryButton.hidden = true;
       try {
         if (!force && activeSiteKey) await persistCurrentState();
@@ -9040,6 +9043,7 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
     imageEditor = EzkartImageBuilder.mount({
       studio: sqStudio, root: previewRoot, capture: captureState,
       apply: state => { remember(); restoreState(state); },
+      remember, changed: markSqChanged,
       products: readCatalogProducts,
       upload: (dataUrl, name) => cloudRequest('POST', '/v1/assets', {dataUrl, name}),
       html: () => generateHtml({libraryPreview: true}), siteKey: () => activeSiteKey,

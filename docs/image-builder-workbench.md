@@ -199,3 +199,34 @@ in an isolated delivery checkout, including save/reopen, language settings,
 480 px width limits, all scroll modes, image targets after reordering, and zero
 top gap at 390/941/1440 px. Screenshots of the editor, expanded menu, product card
 and cart were reviewed. No real order or payment was created.
+
+## Color responsiveness and correct startup — 24 September 2026
+
+Navbar appearance changes previously rebuilt the entire native page and re-exported
+it into the preview iframe. Applying the shared color picker could also re-enter
+its close handler through selection updates, repeatedly applying the same change
+until the call stack overflowed. The picker now clears its active target before
+emitting its final change event.
+
+Image Stack previews colors, text, height, transparency and blur in place. A
+frame-coalesced, parent-checked message updates only navbar appearance inside the
+existing opaque-origin sandbox. Apply records one history snapshot, updates the
+editable document and schedules normal autosave. Cancel restores the preview
+without adding a history entry. Images, selected variants, cart contents and
+scroll position remain intact. The message listener is installed only in the
+editor preview, never in the exported or published page. Structural changes still
+use the existing page rebuilding path.
+
+The startup loader now sits outside either editor. Both the tools and canvas stay
+hidden until the saved page has loaded, so Page Studio no longer appears briefly
+before Image Stack. A delayed-script and delayed-page-data browser check covers
+both modes.
+
+A local four-image reproduction under Chromium 4× CPU throttling took 27,321 ms
+from Apply to the updated preview before the fix and recorded stack-overflow
+errors. The first fixed run took 92 ms. Three repeat runs took 141, 77 and 90 ms,
+with zero iframe reloads and no browser errors. These are local reproduction
+measurements, not a four-core hardware benchmark or a guarantee for all devices.
+All 31 relevant browser tests passed, including the required blank-page, section
+and grid workflows, sorting, color controls, live previews, persistence and
+universal dropdowns. The neutral startup screen was visually inspected.

@@ -2,6 +2,11 @@
 declare(strict_types=1);
 ?>
 <section class="sq-studio sq-site-loading" id="visual-builder" aria-label="Landing page builder" aria-busy="true">
+  <div class="sq-site-loader" role="status" aria-live="polite" aria-atomic="true">
+    <span class="sq-site-loader-worm" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+    <span class="sq-site-loader-copy"><b data-sq-site-loader-title>Loading your page</b><small data-sq-site-loader-message>Getting your page ready</small></span>
+    <button class="ui-button" type="button" data-sq-site-retry hidden data-ui-icon="refresh">Try again</button>
+  </div>
   <header class="sq-commandbar">
     <div class="sq-page-identity">
       <a href="?page=sites" aria-label="Return to landing pages"><?= ez_admin_icon('chevron-left') ?></a>
@@ -132,11 +137,6 @@ declare(strict_types=1);
     <main class="sq-canvas-stage">
       <div class="sq-canvas-meta"><span><?= ez_admin_icon('shield') ?><b data-current-site-url>ezkart.site</b></span></div>
       <div class="sq-canvas-scroll">
-        <div class="sq-site-loader" role="status" aria-live="polite" aria-atomic="true">
-          <span class="sq-site-loader-worm" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
-          <span class="sq-site-loader-copy"><b data-sq-site-loader-title>Loading your page</b><small data-sq-site-loader-message>Preparing your Ezkart canvas</small></span>
-          <button class="ui-button" type="button" data-sq-site-retry hidden data-ui-icon="refresh">Try again</button>
-        </div>
         <div class="sq-device-frame" data-sq-device-frame>
           <article class="sq-page-preview theme-coral radius-soft layout-rich" data-sq-preview-root>
             <section class="sq-page-block sq-announcement selected" draggable="true" data-sq-block data-sq-fluid data-sq-rows="2" data-section-id="announcement"><button class="sq-block-handle" type="button" aria-label="Drag announcement section"><?= ez_admin_icon('grip') ?></button><p data-sq-element data-sq-element-type="text" data-layout-desktop="1,1,12,2" data-layout-tablet="1,1,12,2" data-layout-mobile="1,1,12,2">Secure checkout for every product on this page</p></section>

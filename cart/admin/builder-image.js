@@ -15,6 +15,39 @@
     const color=(key,fallback)=>/^#[\da-f]{6}$/i.test(value[key]||'')?value[key]:fallback;
     return {enabled:value.enabled===true,title:String(value.title||'').slice(0,40),height:number('height',64,48,120),color:color('color','#ffffff'),textColor:color('textColor','#252724'),transparency:number('transparency',10,0,100),blur:number('blur',12,0,32),sticky:['off','on','up'].includes(value.sticky)?value.sticky:'on',links:(Array.isArray(value.links)?value.links:[]).slice(0,8).map(link=>({label:String(link.label||'').slice(0,60),target:String(link.target||'')})),cta:value.cta!==false,ctaLabel:String(value.ctaLabel||t('Shop now')).slice(0,32)};
   }
+  function readNavigation(root) {
+    let value={};try{value=JSON.parse(root.querySelector('[data-image-page]')?.dataset.imageNavigation||'{}')||{};}catch(_){}
+    return navigationSettings(value);
+  }
+  // Shared by the editable document and its sandboxed preview. Appearance edits
+  // keep the existing page, images, navigation handlers and cart alive.
+  function paintNavigation(root,settings) {
+    const page=root.matches?.('.sq-page-preview')?root:root.querySelector('.sq-page-preview');
+    page?.style.setProperty('--ib-nav-height',(settings.enabled?settings.height:0)+'px');
+    page?.style.setProperty('--ib-nav-inset',(settings.enabled&&settings.sticky!=='off'?settings.height:0)+'px');
+    const header=root.querySelector('.sq-image-navigation');if(!header)return;
+    header.style.setProperty('--ib-nav-color',settings.color);
+    header.style.setProperty('--ib-nav-ink',settings.textColor);
+    header.style.setProperty('--ib-nav-height',settings.height+'px');
+    header.style.setProperty('--sq-nav-surface-opacity',(100-settings.transparency)+'%');
+    header.style.setProperty('--sq-nav-backdrop-blur',settings.blur+'px');
+    const prefix=header.hasAttribute('data-ezkart-nav-position')?'ezkart':'sq';
+    header.dataset[prefix+'NavSurface']=settings.blur?'blur':'solid';
+    header.dataset[prefix+'NavOpacity']=String(100-settings.transparency);
+    header.dataset[prefix+'NavBlur']=String(settings.blur);
+    const title=header.querySelector('.ib-nav-title'),cta=header.querySelector('.ib-nav-cta');
+    if(title){title.textContent=settings.title;title.hidden=!settings.title;}
+    if(cta)cta.textContent=settings.ctaLabel;
+  }
+  // Installed only in the editor iframe, never in a published page. The iframe
+  // keeps its opaque sandbox origin; no same-origin access or HTML messages.
+  function installPreviewUpdates(channel,paint) {
+    addEventListener('message',event=>{
+      if(event.source!==parent||event.data?.type!=='ezkart:image-navigation'||event.data.channel!==channel)return;
+      paint(document,event.data.settings);
+    });
+    parent.postMessage({type:'ezkart:image-preview-ready',channel},'*');
+  }
   function makeNavigation(settings,images,productId) {
     const header=section('image-navigation',{display:'flex',width:'100%',maxWidth:'480px',marginLeft:'auto',marginRight:'auto',padding:'0px 16px',fontFamily:'Arial, sans-serif'});
     header.classList.add('sq-navigation-template-section','sq-image-navigation');
@@ -60,9 +93,8 @@
   }
   function read(root) {
     const product=root.querySelector('[data-native-id="image-product"],[data-native-id="image-checkout-add"]');
-    let navigation={};try{navigation=JSON.parse(root.querySelector('[data-image-page]')?.dataset.imageNavigation||'{}');}catch(_){}
     return {
-      navigation:navigationSettings(navigation),
+      navigation:readNavigation(root),
       images:[...root.querySelectorAll('[data-image-upload]')].map(node=>{
         const config=EzkartNative.read(node);
         return {id:config.id,src:config.src,alt:config.alt||'',name:node.dataset.imageName||'Image',width:Number(node.getAttribute('width'))||1,height:Number(node.getAttribute('height'))||1};
@@ -237,7 +269,7 @@
     });
     return {cancel:()=>finish(false,false)};
   }
-  function mount({studio,root,capture,apply,products,upload,html,siteKey}) {
+  function mount({studio,root,capture,apply,remember,changed,products,upload,html,siteKey}) {
     const host=document.createElement('main');host.className='ib-editor';host.hidden=true;
     const controls=document.createElement('fieldset');controls.className='ib-controls';
     const heading=document.createElement('h2');heading.textContent=t('Upload your images');
@@ -260,6 +292,19 @@
     const scroll=document.createElement('p');scroll.textContent=t('Scroll through your page');
     stage.append(caption,frame,empty,scroll);host.append(controls,stage);studio.append(host);
     let busy=false,replaceId='',revision=0;
+    let previewChannel='',previewReady=false,paintFrame=0,liveNavigation=null,syncingNavigation=false;
+    const sendNavigation=()=>{
+      paintFrame=0;
+      if(previewReady)frame.contentWindow?.postMessage({type:'ezkart:image-navigation',channel:previewChannel,settings:liveNavigation||readNavigation(root)},'*');
+    };
+    const previewNavigation=settings=>{
+      liveNavigation=settings;
+      if(!paintFrame)paintFrame=requestAnimationFrame(sendNavigation);
+    };
+    window.addEventListener('message',event=>{
+      if(event.source!==frame.contentWindow||event.data?.type!=='ezkart:image-preview-ready'||event.data.channel!==previewChannel)return;
+      previewReady=true;sendNavigation();
+    });
     const active=()=>Boolean(root.querySelector('[data-image-page]'));
     const translateChrome=()=>{
       studio.querySelectorAll('.sq-command-actions,.sq-history-tools,[data-open-page-creator]').forEach(EzkartLanguage.apply);
@@ -279,7 +324,25 @@
     const navHeading=document.createElement('h2');navHeading.textContent=t('Navigation bar');
     const navBody=document.createElement('div');navBody.className='ib-nav-body';
     const navFields=new Map();
-    const updateNavigation=change=>{const current=read(root);commit(current.images,current.productId,{...current.navigation,...change});};
+    const appearanceKeys=new Set(['title','height','color','textColor','transparency','blur','ctaLabel']);
+    const updateNavigation=change=>{
+      const previous=readNavigation(root),next=navigationSettings({...previous,...change});
+      if(Object.keys(change).every(key=>appearanceKeys.has(key))){
+        if(JSON.stringify(previous)!==JSON.stringify(next)){
+          remember();
+          root.querySelector('[data-image-page]').dataset.imageNavigation=JSON.stringify(next);
+          paintNavigation(root,next);
+          changed();
+        }
+        previewNavigation(next);
+        Object.keys(change).forEach(key=>{
+          const field=navFields.get(key);
+          if(field){field.input.value=next[key];field.show();}
+        });
+        return;
+      }
+      const current=read(root);commit(current.images,current.productId,next);
+    };
     function navField(parent,key,text,type,{min,max,unit,options}={}) {
       const label=document.createElement('label');label.className='ib-nav-field'+(type==='checkbox'?' ib-nav-check':'');
       const caption=document.createElement('span');caption.textContent=t(text);
@@ -292,8 +355,12 @@
       const show=()=>{value.textContent=(type==='range'?input.value:'')+(unit?' '+unit:'');};
       const control=document.createElement('div');control.className='ib-nav-input';control.append(input);if(unit)control.append(value);
       if(type==='checkbox')label.append(input,caption);else label.append(caption,control);
-      input.addEventListener('input',show);
-      input.addEventListener('change',()=>updateNavigation({[key]:type==='checkbox'?input.checked:['number','range'].includes(type)?Number(input.value):input.value}));
+      const valueOf=()=>type==='checkbox'?input.checked:['number','range'].includes(type)?Number(input.value):input.value;
+      input.addEventListener('input',()=>{
+        show();
+        if(!syncingNavigation&&appearanceKeys.has(key))previewNavigation(navigationSettings({...readNavigation(root),[key]:valueOf()}));
+      });
+      input.addEventListener('change',()=>updateNavigation({[key]:valueOf()}));
       parent.append(label);navFields.set(key,{input,show});return input;
     }
     navSettings.append(navHeading);navField(navSettings,'enabled','Show navigation bar','checkbox');navSettings.append(navBody);
@@ -316,7 +383,9 @@
     controls.insertBefore(navSettings,productHeading);
     function syncNavigation(images,productId,navigation) {
       navBody.hidden=!navigation.enabled;
+      syncingNavigation=true;
       navFields.forEach(({input,show},key)=>{if(input.type==='checkbox')input.checked=navigation[key];else input.value=navigation[key];input.dispatchEvent(new Event('input',{bubbles:true}));show();});
+      syncingNavigation=false;
       ctaField.closest('label').hidden=!navigation.cta;
       ctaHelp.textContent=t(productId?'The button jumps to your connected product.':'Choose a product below to show this button.');
       navLinks.replaceChildren();
@@ -333,6 +402,8 @@
     }
     function sync() {
       sorter.cancel();
+      liveNavigation=null;previewReady=false;previewChannel='';
+      cancelAnimationFrame(paintFrame);paintFrame=0;
       const enabled=active();host.hidden=!enabled;studio.classList.toggle('sq-image-editor',enabled);document.body.classList.toggle('page-image-editor',enabled);
       const pageMenu=studio.querySelector('.sq-page-identity [data-sq-open-panel="pages"]');
       if(pageMenu)pageMenu.disabled=enabled;
@@ -363,7 +434,11 @@
       if(productId && ![...product.options].some(option=>option.value===productId)){const option=new Option(t('Choose another product'),productId);option.disabled=true;product.add(option);}
       product.value=productId;
       frame.hidden=!images.length;empty.hidden=Boolean(images.length);scroll.hidden=!images.length;
-      if(images.length)frame.srcdoc=html();
+      if(images.length){
+        previewChannel=crypto.randomUUID();
+        const bridge=`<script>(${installPreviewUpdates.toString()})(${JSON.stringify(previewChannel)},${paintNavigation.toString()})<\/script>`;
+        frame.srcdoc=html().replace('</body>',bridge+'</body>');
+      }
       controls.disabled=busy;
     }
     add.onclick=()=>{replaceId='';input.multiple=true;input.click();};

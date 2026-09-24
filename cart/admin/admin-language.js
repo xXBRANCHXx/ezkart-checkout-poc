@@ -77,6 +77,7 @@
     'Dismiss selection message':'Tutup pesan pilihan',
   };
   Object.assign(strings, {
+    'Loading your page':'Memuat halamanmu', 'Getting your page ready':'Menyiapkan halamanmu',
     'Navigation bar':'Bilah navigasi', 'Show navigation bar':'Tampilkan bilah navigasi',
     'Name in the bar':'Nama di bilah', 'Height':'Tinggi', 'Sticky behavior':'Perilaku saat digulir',
     'Off':'Mati', 'On':'Aktif', 'Appear on scroll up':'Muncul saat digulir ke atas',
