@@ -15,7 +15,13 @@ Implemented on `agent/ezkart-workbench`, 24 September 2026.
   a separately reserved business address identifies the store without its internal account ID.
   Addresses use the configured shop name, falling back to the business name. A short
   number is added only for a name collision; a reserved address remains stable.
-- Publication shows the shareable URL with **View published page** and **Copy link**.
+- Publishing shows a modal immediately during preparation and again while the
+  page uploads. It asks the merchant to keep the tab open until the server confirms
+  the save. Closing or reloading during either request triggers the browser’s leave
+  warning; Escape cannot dismiss the progress screen. Failed requests show a
+  persistent error and restore the editor without claiming success.
+- Publication shows **It’s safe to close this tab**, the shareable URL,
+  **View published page** and **Copy link** only after the save succeeds.
   Preview tabs opened from the same editor switch to the public page when publishing
   succeeds. **View live** beside Publish opens the public page; **Open draft preview**
   remains available for reviewing unpublished edits. The library's Copy URL
@@ -118,3 +124,13 @@ the latter verifies concurrent reservations, duplicate names, configured shop na
 legacy ownership, stable links after renaming and suspended-store denial. The PHP
 integration verifies both old-business redirects with the actual admin cookie
 scope, sandbox isolation and checkout return URLs.
+
+## Publication progress verification — 24 September 2026
+
+`publication-progress.test.mjs` holds preparation and publication requests open,
+checks the loading screen and disabled Publish action, rejects Escape, and dismisses
+a real browser before-unload warning. It simulates a failed upload, checks that the
+server error stays visible and success is absent, then retries successfully. It
+closes the editor after acknowledgement and loads the durable public page. Desktop,
+390px and 320px screenshots are in `/tmp/ezkart-publishing-review`.
+The hosted-page, favicon and 11 required editor interaction checks also pass.

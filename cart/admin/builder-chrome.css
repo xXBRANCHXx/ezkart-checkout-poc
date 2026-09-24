@@ -684,6 +684,13 @@
 .sq-favicon-dialog { width: min(580px, calc(100% - 24px)); max-height: calc(100dvh - 24px); padding: 0; border: 1px solid #e2e4e9; border-radius: 16px; color: #343845; background: white; overflow: auto; font-family: var(--ui-font, Poppins, sans-serif); }
 .sq-favicon-dialog::backdrop { background: #161c2b80; }
 .sq-published-dialog [data-published-url] { overflow-wrap: anywhere; font-size: 14px; }
+.sq-publishing-dialog { width: min(440px, calc(100% - 24px)); text-align: center; }
+.sq-publishing-status { padding: 36px 28px; }
+.sq-publishing-status p { margin: 12px 0 0; color: #737b8c; font-size: 13px; line-height: 1.7; }
+.sq-publishing-spinner { display: block; width: 42px; height: 42px; margin: 0 auto 22px; border: 3px solid #fee6de; border-top-color: #f45435; border-radius: 50%; animation: sq-publishing-spin .85s linear infinite; }
+.sq-publishing-status .sq-publishing-error { color: #b32935; overflow-wrap: anywhere; }
+@keyframes sq-publishing-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .sq-publishing-spinner { animation: none; } }
 .sq-live-preview-shell [data-sq-open-public] { color: inherit; font: inherit; font-size: 12px; text-decoration: none; }
 .sq-favicon-dialog > header { display: flex; gap: 16px; padding: 24px 24px 0; }
 .sq-favicon-dialog h2 { margin: 0; font-size: 20px; line-height: 1.4; }

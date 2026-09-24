@@ -2903,6 +2903,8 @@
           return true;
         } catch (error) {
           if (saveState) saveState.textContent = "Save failed";
+          // Publication needs a persistent, accurate error in its progress screen.
+          if (changes.status === 'published') throw error;
           showToast(error instanceof Error ? error.message : "The landing page could not be saved.");
           return false;
         } finally {
@@ -8521,6 +8523,27 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
       return {published:true,url:hostedPageUrl(activeSiteDocument)};
     };
     const publishedDialog = document.querySelector('[data-sq-published-dialog]');
+    const publishingDialog = document.querySelector('[data-sq-publishing-dialog]');
+    let publicationPending = false;
+    const preventLeavingDuringPublication = event => { event.preventDefault(); event.returnValue = ''; };
+    const finishPublicationWait = () => {
+      publicationPending = false;
+      window.removeEventListener('beforeunload', preventLeavingDuringPublication);
+      publishingDialog?.removeAttribute('aria-busy');
+    };
+    const showPublicationWait = title => {
+      publicationPending = true;
+      window.addEventListener('beforeunload', preventLeavingDuringPublication);
+      publishingDialog.querySelector('[data-publishing-title]').textContent = title;
+      publishingDialog.querySelector('[data-publishing-description]').textContent = 'Keep this tab open. We’ll tell you when it’s safe to close.';
+      publishingDialog.querySelector('[data-publishing-spinner]').hidden = false;
+      publishingDialog.querySelector('[data-publishing-error]').hidden = true;
+      publishingDialog.querySelector('[data-publishing-actions]').hidden = true;
+      publishingDialog.setAttribute('aria-busy', 'true');
+      publishingDialog.showModal();
+    };
+    publishingDialog?.addEventListener('cancel', event => { if (publicationPending) event.preventDefault(); });
+    publishingDialog?.querySelector('[data-publishing-close]')?.addEventListener('click', () => publishingDialog.close());
     publishedDialog?.querySelectorAll('[data-published-close]').forEach(button => button.addEventListener('click', () => publishedDialog.close()));
     publishedDialog?.querySelector('[data-published-copy]')?.addEventListener('click', async () => {
       try { await navigator.clipboard.writeText(publishedDialog.querySelector('[data-published-url]').href); showToast('Published page URL copied'); }
@@ -8529,16 +8552,32 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
     sqStudio.querySelector("[data-sq-publish]")?.addEventListener("click", async (event) => {
       const button = event.currentTarget; button.disabled = true;
       try {
+        showPublicationWait('Preparing to publish…');
         await requireProductForOutput();
+        finishPublicationWait();
+        publishingDialog.close();
         if (await siteSettings.confirmPublish()) {
+          showPublicationWait('Publishing your page…');
           siteSettings.setPublishing(true);
           const result = await publishPage();
           const publicLink = publishedDialog?.querySelector('[data-published-url]');
           if (publicLink) { publicLink.href = result.url; publicLink.textContent = result.url; }
+          finishPublicationWait();
+          publishingDialog.close();
           publishedDialog?.showModal();
         }
-      } catch(error) { showToast(error.message); }
-      finally { siteSettings.setPublishing(false); button.disabled = false; }
+      } catch(error) {
+        finishPublicationWait();
+        if (saveState) saveState.textContent = 'Publish failed';
+        publishingDialog.querySelector('[data-publishing-title]').textContent = 'Publishing wasn’t completed';
+        publishingDialog.querySelector('[data-publishing-description]').textContent = 'We couldn’t confirm that your page was published. Return to the editor and try again.';
+        publishingDialog.querySelector('[data-publishing-spinner]').hidden = true;
+        const message = publishingDialog.querySelector('[data-publishing-error]');
+        message.textContent = error.message; message.hidden = false;
+        publishingDialog.querySelector('[data-publishing-actions]').hidden = false;
+        if (!publishingDialog.open) publishingDialog.showModal();
+      }
+      finally { finishPublicationWait(); siteSettings.setPublishing(false); button.disabled = false; }
     });
     const cloneBaseSiteState = () => JSON.parse(JSON.stringify(baseSiteState || captureState()));
     const loadSite = async (site, force = false) => {
