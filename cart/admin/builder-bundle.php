@@ -11,7 +11,7 @@ $version = ez_builder_bundle_version($bundle);
 $etag = 'W/"' . $version . '"';
 header('Content-Type: ' . (str_ends_with($bundle, '.js') ? 'text/javascript' : 'text/css') . '; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
-header('Cache-Control: ' . (($_GET['v'] ?? '') === $version ? 'public, max-age=31536000, immutable' : 'public, no-cache'));
+header('Cache-Control: ' . (($_GET['v'] ?? '') === $version ? 'public, max-age=31536000, immutable, no-transform' : 'public, no-cache, no-transform'));
 header('ETag: ' . $etag);
 header('Vary: Accept-Encoding');
 if (($_SERVER['HTTP_IF_NONE_MATCH'] ?? '') === $etag) {
