@@ -117,7 +117,7 @@ test('Publishing tracks uploaded bytes, waits for confirmation, guards closing, 
   await page.waitForFunction(()=>document.querySelector('[data-publishing-bar]').getAttribute('aria-valuenow')==='90');
   assert.equal(await confirmation.isVisible(),false,'An uploaded request still needs the server to save it');
   assert.equal(await closingIsGuarded(),true);
-  assert.match(await progress.locator('[data-publishing-stage]').textContent(),/Almost there/);
+  assert.match(await progress.locator('[data-publishing-stage]').textContent(),/Upload complete/);
   const percentages=await page.evaluate(()=>publicationPercentages);
   assert.ok(percentages.some(value=>value>20&&value<90),'Real throttled upload events move the bar through intermediate percentages');
   assert.ok(percentages.every((value,index)=>value<=90&&(index===0||value>=percentages[index-1])),'Progress advances without claiming completion');

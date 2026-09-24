@@ -738,6 +738,10 @@ function ez_admin_proxy_cloud_request(string $accessToken, string $path, string 
     if ($handle === false) ez_admin_json(['ok' => false, 'error' => 'The save request could not start.'], 503);
     $headers = ['Accept: application/json', 'Authorization: Bearer ' . $accessToken];
     if ($body !== '') $headers[] = 'Content-Type: application/json';
+    if ($isLandingPageRequest && in_array($method, ['POST', 'PUT'], true)
+        && strtolower(trim((string) ($_SERVER['HTTP_PREFER'] ?? ''))) === 'return=minimal') {
+        $headers[] = 'Prefer: return=minimal';
+    }
     $isInteractiveView = $method === 'GET' && preg_match('#^/v1/landing-pages/[a-z0-9-]+/view$#', $path) === 1;
     $previewStore = (string) ($_GET['preview-store'] ?? '');
     if ($isInteractiveView && $previewStore !== '') {

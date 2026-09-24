@@ -17,7 +17,8 @@ Implemented on `agent/ezkart-workbench`, 24 September 2026.
   number is added only for a name collision; a reserved address remains stable.
 - Publishing shows a modal immediately during preparation and again while the
   page uploads. A percentage bar advances through preparation and measured upload
-  bytes, then holds at 90% while the server saves the publication. Only an accepted
+  bytes, then holds at 90% while the server saves the publication. Receiving the
+  confirmation advances through 95–99%. Only an accepted
   save reaches 100%; elapsed time never fabricates upload or save completion.
   Friendly stage captions explain what is happening. It asks the merchant to keep the tab open until the server confirms
   the save. Closing or reloading during either request triggers the browser’s leave
@@ -103,7 +104,7 @@ the return URL. PHP lint and Node syntax
 checks passed. Mobile and desktop screenshots are in
 `/tmp/ezkart-hosting-review`. No real order or payment was created.
 
-Test Worker deployment: `162918f8-ef3a-400a-ae61-c6f8792a1f65`.
+Test Worker deployment: `4fa520fb-d7b3-4755-81be-a4e0ab4d158d`.
 Test D1 migration `0008_seller_page_addresses.sql` applied successfully.
 
 ## Readable URL verification — 24 September 2026
@@ -145,3 +146,26 @@ intermediate, monotonic percentages. It delays the server save after all bytes
 arrive and verifies 90% plus the close guard until acknowledgement, then 100% and
 the safe-to-close confirmation. Screenshots at 1440, 390 and 320 pixels are in
 `/tmp/ezkart-publishing-review/percentage-*.png`.
+
+## Small save confirmations — 24 September 2026
+
+Page writes can opt into `Prefer: return=minimal`. The authenticated PHP proxy
+forwards this preference only for page writes. The Worker still validates and
+stores the complete project and publication before responding, but returns only
+its authoritative identity, products, status, version timestamps and hosted paths.
+The editor combines this receipt with the snapshot it submitted. Embedded artwork
+and published HTML are not downloaded again after every save. Existing API clients
+without the preference retain the full response. A measured Image Stack project
+shrinks from a 3,409,257-byte JSON save response to 405 bytes before compression.
+This removes unnecessary response transfer; it does not claim a measured duration
+for the merchant's earlier request.
+
+The final progress caption distinguishes waiting for publication from receiving
+its confirmation. Tests verify that receipts follow the durable write, leave saved
+artwork intact, preserve older API callers, and retain proxy authentication and
+CSRF checks. All 16 Worker tests and the PHP integration pass. The full builder
+run passed 126 of 128 checks, including publication progress, hosted pages,
+blank-page editing and section actions. The image sorting check passed on rerun;
+the flow-grid check passed when run alone, both with this change and at the
+unchanged baseline. The initial failures concerned pointer geometry, not save
+content. JavaScript syntax, PHP lint and diff checks pass.

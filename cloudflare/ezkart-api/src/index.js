@@ -4,7 +4,7 @@ import { adminPreferences } from './admin-preferences.js';
 import { listBuilderFonts, saveBuilderFont, serveBuilderFont } from './builder-fonts.js';
 import { listBuilderAssets, saveBuilderAsset, serveBuilderAsset } from "./builder-assets.js";
 import {landingSummaryKey, listLandingObjects, cacheLandingSummary, readLandingSummary, staticLandingPreview} from './landing-page-index.js';
-import {packLandingEditor} from './landing-page-transfer.js';
+import {packLandingEditor, landingPageSaveReceipt} from './landing-page-transfer.js';
 import { customerAddressBook, changeCustomerAddressBook } from "./customer-addresses.js";
 import { validatePublication } from "./landing-publication.js";
 import { merchantStorefront, publicStorefront } from "./storefront.js";
@@ -36,7 +36,7 @@ const corsHeaders = (request, env) => {
   return origin ? {
     "access-control-allow-origin": origin,
     "access-control-allow-credentials": "true",
-    "access-control-allow-headers": "authorization,content-type",
+    "access-control-allow-headers": "authorization,content-type,prefer",
     "access-control-allow-methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
     "vary": "Origin",
   } : {};
@@ -1370,7 +1370,13 @@ export default {
       const landingEditorMatch = /^\/v1\/landing-pages\/([a-z0-9-]+)\/editor$/.exec(url.pathname);
       if (request.method === "GET" && landingEditorMatch) return json({ok: true, editor: packLandingEditor(await landingPage(request, env, landingEditorMatch[1]))}, 200, cors);
       if (request.method === "GET" && landingPageMatch) return json({ ok: true, page: await landingPage(request, env, landingPageMatch[1]) }, 200, cors);
-      if (["PUT", "POST"].includes(request.method) && landingPageMatch) return json({ ok: true, page: await saveLandingPage(request, env, landingPageMatch[1]) }, 200, cors);
+      if (["PUT", "POST"].includes(request.method) && landingPageMatch) {
+        const page = await saveLandingPage(request, env, landingPageMatch[1]);
+        const minimal = request.headers.get('prefer')?.trim().toLowerCase() === 'return=minimal';
+        return json({ok: true, page: minimal ? landingPageSaveReceipt(page) : page}, 200, {
+          ...cors, ...(minimal ? {'preference-applied': 'return=minimal'} : {}),
+        });
+      }
       if (request.method === "DELETE" && landingPageMatch) { await deleteLandingPage(request, env, landingPageMatch[1]); return json({ ok: true }, 200, cors); }
       if (request.method === "GET" && url.pathname === "/v1/components") return json({ ok: true, components: await components(request, env), limits: { count: maximumComponentsPerSeller, bytes: maximumComponentBytes } }, 200, cors);
       const componentMatch = /^\/v1\/components\/([a-z0-9-]+)$/.exec(url.pathname);

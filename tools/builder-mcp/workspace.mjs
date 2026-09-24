@@ -3,7 +3,7 @@ import {readFile,writeFile,rename,mkdir,readdir} from 'node:fs/promises';
 import {dirname,resolve,join,extname} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {randomBytes,createHash} from 'node:crypto';
-import {packLandingEditor} from '../../cloudflare/ezkart-api/src/landing-page-transfer.js';
+import {packLandingEditor, landingPageSaveReceipt} from '../../cloudflare/ezkart-api/src/landing-page-transfer.js';
 import {landingPagePolicy, landingPageLinks} from '../../cloudflare/ezkart-api/src/landing-page-hosting.js';
 import {decodeFontDataUrl} from '../../cloudflare/ezkart-api/src/builder-fonts.js';
 export const repoRoot=resolve(dirname(fileURLToPath(import.meta.url)),'../..');
@@ -149,7 +149,7 @@ export class Workspace {
         await writeFile(join(this.directory,'previews',`${page.id}.json`),JSON.stringify({previewUpdatedAt:preview.updatedAt,previewSourceUpdatedAt:preview.sourceUpdatedAt,previewVersion:preview.version,previewBytes:preview.bytes}),{mode:0o600});
         return send(200,{ok:true,preview});
        }
-       const saved=await this.write(match[1],landingPageLinks({...page,...data,id:page.id,url:page.url,updatedAt:new Date().toISOString()}, {slug:'workspace'}));return send(200,{ok:true,page:saved});
+       const saved=await this.write(match[1],landingPageLinks({...page,...data,id:page.id,url:page.url,updatedAt:new Date().toISOString()}, {slug:'workspace'}));return send(200,{ok:true,page:req.headers.prefer==='return=minimal'?landingPageSaveReceipt(saved):saved});
       }
      }
      return send(404,{ok:false,error:'This local workspace does not implement that cloud operation.'});

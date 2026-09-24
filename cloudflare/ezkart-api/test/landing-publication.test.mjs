@@ -262,7 +262,7 @@ test("Authenticated page saves allow empty drafts and reject publish bypasses ag
     ),
   ]);
   await db.prepare(await readFile(new URL('../migrations/0008_seller_page_addresses.sql', import.meta.url), 'utf8')).run();
-  const save = async (data) => {
+  const save = async (data, minimal = false) => {
     const r = await mf.dispatchFetch(
       "http://worker.test/v1/landing-pages/my-page",
       {
@@ -270,11 +270,12 @@ test("Authenticated page saves allow empty drafts and reject publish bypasses ag
         headers: {
           authorization: "Bearer " + token,
           "content-type": "application/json",
+          ...(minimal ? {prefer: 'return=minimal'} : {}),
         },
         body: JSON.stringify({ name: "My page", ...data }),
       },
     );
-    return { status: r.status, body: await r.json() };
+    return { status: r.status, body: await r.json(), preference: r.headers.get('preference-applied') };
   };
   const exportPage = async (html, state = { preview: html }) =>
     mf.dispatchFetch("http://worker.test/v1/landing-pages/my-page/export", {
@@ -304,6 +305,16 @@ test("Authenticated page saves allow empty drafts and reject publish bypasses ag
     state: { preview: "<h1>Draft without products</h1>" },
   });
   assert.equal(initial.status, 200, JSON.stringify(initial.body));
+  assert.equal(initial.body.page.state.preview, '<h1>Draft without products</h1>', 'Existing callers still receive the full page');
+  const artworkState={preview:'<img src="data:image/png;base64,'+'A'.repeat(2500000)+'">'};
+  const receipt=await save({state:artworkState},true);
+  assert.equal(receipt.status,200);
+  assert.equal(receipt.preference,'return=minimal');
+  assert.equal(receipt.body.page.state,undefined);
+  assert.equal(receipt.body.page.publishedHtml,undefined);
+  assert.ok(JSON.stringify(receipt.body).length<1000);
+  const savedDraft=await (await mf.getR2Bucket('PRIVATE_ASSETS')).get('sellers/mine/landing-pages/my-page.json');
+  assert.deepEqual((await savedDraft.json()).state,artworkState,'The receipt follows the durable write');
   const publicUrl = 'http://worker.test/v1/public/landing-pages/store/my-page';
   assert.equal(initial.body.page.publicPath, '/store/shop/my-page');
   assert.equal(initial.body.page.previewPath, '/store/shop/my-page/preview');
@@ -332,7 +343,11 @@ test("Authenticated page saves allow empty drafts and reject publish bypasses ag
       .status,
     422,
   );
-  assert.equal((await save(published("owned"))).status, 200);
+  const publicationReceipt=await save(published('owned'),true);
+  assert.equal(publicationReceipt.status,200);
+  assert.equal(publicationReceipt.body.page.status,'published');
+  assert.ok(publicationReceipt.body.page.publishedAt);
+  assert.equal(publicationReceipt.body.page.publishedHtml,undefined);
   // Replacing published HTML without sending a status must still run the gate.
   assert.equal(
     (

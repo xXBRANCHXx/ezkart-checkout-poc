@@ -1,5 +1,12 @@
 // A lossless wire format: embedded images occur in native attributes, rendered
 // HTML and catalog snapshots. Send each image once without changing saved data.
+export function landingPageSaveReceipt(page) {
+  // The caller already has its submitted state and artwork. Only return the
+  // authoritative identity, publication status and save version after storage.
+  const {id, name, url, status, products, createdAt, updatedAt, publishedAt, publicPath, previewPath} = page;
+  return {id, name, url, status, products, createdAt, updatedAt, publishedAt, publicPath, previewPath};
+}
+
 export function packLandingEditor(page) {
   const {publishedHtml, ...editable} = page;
   const source = JSON.stringify(editable);

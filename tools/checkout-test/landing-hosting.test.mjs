@@ -12,10 +12,17 @@ import {chromium} from '../builder-mcp/node_modules/playwright/index.mjs';
 
 test('PHP page hosting serves only the current environment publication with an isolated runtime', async t => {
   const requests=[];
+  const savePreferences=[];
   const sessions=await mkdtemp(join(tmpdir(),'ezkart-url-sessions-'));
   t.after(()=>rm(sessions,{recursive:true,force:true}));
   const upstream=createServer((req,res)=>{
     requests.push({url:req.url,authorization:req.headers.authorization});
+    if(req.url==='/v1/landing-pages/launch' && req.method==='PUT') {
+      savePreferences.push(req.headers.prefer);
+      res.writeHead(200,{'Content-Type':'application/json'});
+      res.end(JSON.stringify({ok:true,page:{id:'launch',status:'published',updatedAt:'saved',publishedAt:'saved'}}));
+      return;
+    }
     if(req.url.endsWith('/view')) {
       if(!req.headers.authorization){res.writeHead(401);res.end('Sign in');return;}
       if(req.headers['x-ezkart-preview-store'] && !['coffee-shop','coffee-shop-0123456789'].includes(req.headers['x-ezkart-preview-store'])){res.writeHead(404);res.end('Page not found');return;}
@@ -99,10 +106,19 @@ test('PHP page hosting serves only the current environment publication with an i
   await page.locator('[data-preview-sign-in]').waitFor({state:'visible'});
   assert.equal(page.url(),previewUrl);
   assert.equal(await page.locator('[data-hosted-page]').count(),0);
-  const data=Buffer.from(JSON.stringify({authenticated:true,authentication_method:'supabase',authenticated_until:Math.floor(Date.now()/1000)+3600,signed_in_at:Math.floor(Date.now()/1000),supabase_access_token:'fixture-preview-token',mfa_enabled:false,legacy_data_access:false,admin_user:{id:'fixture-user',email:'test@example.test'}})).toString('base64');
+  const csrf='fixture-publication-csrf-token-1234567890';
+  const data=Buffer.from(JSON.stringify({csrf_token:csrf,authenticated:true,authentication_method:'supabase',authenticated_until:Math.floor(Date.now()/1000)+3600,signed_in_at:Math.floor(Date.now()/1000),supabase_access_token:'fixture-preview-token',mfa_enabled:false,legacy_data_access:false,admin_user:{id:'fixture-user',email:'test@example.test'}})).toString('base64');
   const setup=spawnSync(process.env.PHP_BINARY||'php',[...args,'-r',`session_save_path(getenv('EZKART_ADMIN_SESSION_STORAGE'));session_name('ezkart_admin');session_start();$_SESSION=json_decode(base64_decode('${data}'),true);echo session_id();session_write_close();`],{env,encoding:'utf8'});
   assert.equal(setup.status,0,setup.stderr);
   await context.addCookies([{name:'ezkart_admin',value:setup.stdout.trim(),domain:'127.0.0.1',path:'/cart/admin',httpOnly:true,sameSite:'Lax'}]);
+  const saveUrl=base+'/cart/admin/?cloud='+encodeURIComponent('/v1/landing-pages/launch');
+  const receipt=await context.request.put(saveUrl,{headers:{'X-Ezkart-Csrf':csrf,Prefer:'return=minimal'},data:{status:'published'}});
+  assert.equal(receipt.status(),200);
+  assert.equal((await receipt.json()).page.status,'published');
+  assert.deepEqual(savePreferences,['return=minimal'],'The authenticated proxy forwards the compact-response preference');
+  const denied=await context.request.put(saveUrl,{headers:{Prefer:'return=minimal'},data:{status:'published'}});
+  assert.equal(denied.status(),403);
+  assert.equal(savePreferences.length,1,'Compact replies never bypass the CSRF check');
   const navigation=page.waitForRequest(previewUrl);
   await page.reload();
   assert.equal((await (await navigation).allHeaders()).cookie,undefined,'Admin cookies stay outside public URL paths');

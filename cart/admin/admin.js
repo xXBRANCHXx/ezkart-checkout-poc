@@ -201,7 +201,7 @@
   const cloudMediaUrl = (id) => cloudMediaBase
     ? `${cloudMediaBase}/v1/public/media/${encodeURIComponent(id)}`
     : cloudPrivateMediaUrl(id);
-  const cloudRequest = async (method, path, payload = null, {onUploadProgress} = {}) => {
+  const cloudRequest = async (method, path, payload = null, {onUploadProgress, onResponseProgress, preferMinimal = false} = {}) => {
     if (!cloudEnabled) throw new Error("Sign in with Google to access your saved products.");
     const decode = result => {
       if (!result.editor) return result;
@@ -220,6 +220,7 @@
       Accept: "application/json",
       ...(payload ? { "Content-Type": "application/json" } : {}),
       ...(method === "GET" ? {} : { "X-Ezkart-Csrf": cloudCsrfToken }),
+      ...(preferMinimal ? {Prefer: 'return=minimal'} : {}),
     };
     const body = payload ? JSON.stringify(payload) : null;
     // Fetch does not expose upload progress. Opt in only for publication;
@@ -230,6 +231,7 @@
       Object.entries(headers).forEach(([name, value]) => request.setRequestHeader(name, value));
       request.upload.onprogress = event => { if (event.lengthComputable && event.total > 0) onUploadProgress(event.loaded / event.total); };
       request.upload.onload = () => onUploadProgress(1);
+      request.onprogress = event => { if (request.status >= 200 && request.status < 300) onResponseProgress?.(event.lengthComputable && event.total > 0 ? event.loaded / event.total : null); };
       request.onload = () => resolve({ok: request.status >= 200 && request.status < 300, status: request.status, json: async () => JSON.parse(request.responseText)});
       request.onerror = () => reject(Error('Your page could not be uploaded. Check your connection and try again.'));
       request.onabort = () => reject(Error('The upload was interrupted. Please publish again.'));
@@ -586,8 +588,10 @@
       products: Array.isArray(site.products) ? site.products : [],
       customProducts: Array.isArray(site.customProducts) ? site.customProducts : [],
       ...changes,
-    }, requestOptions);
-    const saved = replaceCloudLandingPage(result.page);
+    }, {preferMinimal: true, ...requestOptions});
+    // Merge the durable save receipt with the state we just sent. Re-downloading
+    // the same embedded artwork can be slower than saving the publication.
+    const saved = replaceCloudLandingPage({...site, ...changes, ...result.page});
     document.dispatchEvent(new CustomEvent("ezkart:cloud-landing-pages-changed", { detail: { page: saved } }));
     return saved;
   };
@@ -8520,7 +8524,8 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
       onProgress?.(20, 'Getting your page ready to upload…');
       clearTimeout(saveTimer);
       const saved = await persistCurrentState({ status: "published", publishedHtml: generateHtml() }, onProgress ? {
-        onUploadProgress: fraction => onProgress(20 + Math.round(Math.min(1, fraction) * 70), fraction >= 1 ? 'Almost there. Saving your page…' : 'Uploading your page…'),
+        onUploadProgress: fraction => onProgress(20 + Math.round(Math.min(1, fraction) * 70), fraction >= 1 ? 'Upload complete. Confirming publication…' : 'Uploading your page…'),
+        onResponseProgress: fraction => onProgress(fraction === null ? 95 : 95 + Math.floor(Math.min(1, fraction) * 4), 'Receiving your save confirmation…'),
       } : {});
       if (saveState) saveState.textContent = saved ? "Published just now" : "Publish failed";
       if (!saved) throw Error('The page could not be published. Check the message and try again.');
