@@ -20,7 +20,7 @@
   function example(mode, opener) {
     const dialog = document.createElement('dialog');
     dialog.className = 'bc-example';
-    const title = document.createElement('h2');title.textContent=t(mode==='image'?'Image builder':'Design builder');title.id='bc-example-title';
+    const title = document.createElement('h2');title.textContent=t(mode==='image'?'Image Stack':'Page Studio');title.id='bc-example-title';
     dialog.setAttribute('aria-labelledby',title.id);
     const close=document.createElement('button');close.type='button';close.textContent='×';close.setAttribute('aria-label',t('Close'));
     const header=document.createElement('header');header.append(title,close);
@@ -79,7 +79,7 @@
     });
     template.then(html=>{if(!html)throw Error('Choices unavailable');choices.innerHTML=html;translate(choices);}).catch(()=>{
       choices.replaceChildren();
-      for(const mode of ['image','visual']){const button=document.createElement('button');button.type='button';button.dataset.bcChoose=mode;button.className='ui-button';button.textContent=t(mode==='image'?'Image builder':'Design builder');choices.append(button);}
+      for(const mode of ['image','visual']){const button=document.createElement('button');button.type='button';button.dataset.bcChoose=mode;button.className='ui-button';button.textContent=t(mode==='image'?'Image Stack':'Page Studio');choices.append(button);}
     });
     translate(details);translate(form.querySelector('footer'));
     select('');

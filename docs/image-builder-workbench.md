@@ -4,7 +4,7 @@ Implemented 24 September 2026 for `agent/ezkart-workbench` and `test.ezkart.id`.
 
 ## Merchant flow
 
-Landing pages → New page presents the approved Image builder and Design builder
+Landing pages → New page presents the approved Image Stack and Page Studio
 comparison. Both choices have example previews. Image pages start with a name,
 image uploads, and a catalog product. The visual choice keeps the existing
 template and blank-page flow. Existing visual pages retain their editor.
@@ -103,3 +103,13 @@ Verified actual mouse-wheel scrolling and reaching the footer at desktop and
 phone widths, with the close control still visible and Escape returning focus
 to the example button. The image-editor regression also covers this behavior
 and the new Indonesian chooser label.
+
+## Approved names — 24 September 2026
+
+The choices are now **Image Stack** and **Page Studio**. Image Stack explains
+uploading finished graphics and putting them in order; Page Studio explains
+starting with a template or a blank canvas and controlling the layout and each
+element. The names appear on the cards, action buttons, accessible preview
+labels, example titles, and loading-error fallback. Indonesian accounts see
+**Susun Gambar** and **Studio Halaman**, with translated descriptions and actions.
+Saved page modes and the underlying editor behavior are unchanged.

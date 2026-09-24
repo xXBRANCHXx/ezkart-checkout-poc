@@ -111,8 +111,8 @@ test('the chooser and image editor use the account language while leaving upload
   t.after(async()=>{await browser.close();await ws.stop();await rm(dir,{recursive:true,force:true});});
   await page.goto(ws.url+'/cart/admin/?page=sites');await page.locator('[data-library-create-card]').click();
   await page.locator('[data-bc-choose=image]').waitFor();assert.match(await page.locator('#library-creator-title').textContent(),/Pilih cara membuat halaman/);
-  assert.match(await page.locator('[data-bc-choose=image]').textContent(),/Pilih halaman gambar/);
-  assert.match(await page.locator('[data-bc-choose=visual]').textContent(),/Pilih editor desain/);
+  assert.match(await page.locator('[data-bc-choose=image]').textContent(),/Gunakan Susun Gambar/);
+  assert.match(await page.locator('[data-bc-choose=visual]').textContent(),/Gunakan Studio Halaman/);
   assert.equal(await page.locator('#library-page-creator-dialog').evaluate(node=>node.scrollWidth>node.clientWidth),false);
   await page.locator('[data-bc-choose=image]').click();await page.locator('[name=page_name]').fill('Halaman gambar');await page.locator('[data-library-page-form] button[value=default]').click();
   await page.waitForURL('**edit=halaman-gambar.ezkart.site');await page.locator('[data-image-page-add]').waitFor();

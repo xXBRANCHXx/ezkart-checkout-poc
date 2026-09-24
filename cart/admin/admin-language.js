@@ -1,6 +1,11 @@
 /* Shared account language, resolved by the admin host. Merchant artwork stays unchanged. */
 (() => {
   const strings = {
+    'Image Stack':'Susun Gambar', 'Page Studio':'Studio Halaman',
+    'Use Image Stack':'Gunakan Susun Gambar', 'Use Page Studio':'Gunakan Studio Halaman',
+    'Preview Image Stack':'Pratinjau Susun Gambar', 'Preview Page Studio':'Pratinjau Studio Halaman',
+    'Upload your finished graphics. Put them in order. Your page is ready.':'Unggah gambar yang sudah jadi. Atur urutannya. Halamanmu siap.',
+    'Start with a template or a blank canvas. Create the layout, style every element, and make the page yours.':'Mulai dari template atau kanvas kosong. Susun tata letak, atur tampilan tiap elemen, dan buat halaman sesuai keinginanmu.',
     'Upload your finished sales graphics. They become the whole page, stacked from top to bottom.':'Unggah gambar promosi yang sudah jadi. Gambar tersusun dari atas ke bawah menjadi seluruh halaman.',
     'Just upload images and put them in order':'Cukup unggah gambar dan atur urutannya',
     'Image-only page, one mobile layout':'Halaman berisi gambar, khusus tampilan ponsel',
