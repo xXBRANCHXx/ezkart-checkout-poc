@@ -5,6 +5,7 @@
   const preload = path => {
     const promise = fetch(`./?cloud=${encodeURIComponent(path)}`, {
       credentials: 'same-origin', headers: {Accept: 'application/json'}, cache: 'no-store',
+      priority: 'high',
     }).then(async response => {
       const result = await response.json();
       if (!response.ok || result.ok !== true) {
@@ -21,7 +22,7 @@
   const site = query.get('edit') || '';
   if (query.get('page') === 'sites' && /^[a-z0-9]+(?:-[a-z0-9]+)*\.ezkart\.site$/.test(site)) {
     preload('/v1/landing-pages/' + site.replace(/\.ezkart\.site$/, '') + '/editor');
-  }
+  } else if (query.get('page') === 'sites' && !site) preload('/v1/landing-pages');
   globalThis.EzkartAdminStartup = {
     take(path) {
       const catalog = path === '/v1/catalog' && document.getElementById('ezkart-catalog-bootstrap');

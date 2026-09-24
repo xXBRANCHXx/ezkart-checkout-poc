@@ -57,54 +57,50 @@ measured; hosted asset versions and the test API health are checked separately.
 
 ## Follow-up: the loading screen still stayed too long
 
-The initial change left two costs on the critical path. The parser-blocking
-startup script ran after stylesheets, and the editor still fetched roughly two
-dozen separate JavaScript files. A hosted-assets probe with local page data took
-about 3.4 seconds to finish loading some startup scripts. Read-only inspection of
-`image-stack-test-i` in the test bucket also found that all four images occurred
-twice in the 2 MB editable document.
+The initial change still ran its parser-blocking startup script after the
+stylesheets. Read-only inspection of `image-stack-test-i` in the test bucket
+also found that all four images occurred twice in its 2 MB editable document.
 
-The startup request now runs in the head before CSS. Landing pages use a single
-CSS bundle and a deferred JS bundle, with separate gallery/editor manifests.
-The manifest only contains allowlisted public repository assets. PHP generates
-fingerprinted static bundles atomically; every source modification time and size
-contributes to the fingerprint, so future edits invalidate browser caches without
-a separate build step. Read-only hosting falls back to the public bundle endpoint. Existing source
-order and relative URLs are preserved; native CSS stays isolated in asset cards.
-Map/dashboard JavaScript is no longer loaded on landing-page screens.
+The saved document now starts fetching in the head, before CSS can block script
+execution, with high request priority. The gallery starts its page-list request
+there too. The safely encoded server catalog is consumed later, when the main
+script needs it, without another catalog download.
 
 An authenticated `/v1/landing-pages/:id/editor` endpoint transfers each embedded
-image once, reconstructing the exact editable JSON in the browser. It excludes
-the publication snapshot, which is not needed for editing. Full saved projects,
+image once and reconstructs the exact editable JSON in the browser. It excludes
+the publication snapshot, which is not needed for editing. Saved projects,
 autosave payloads, exports and publication storage retain their original format.
-For the inspected test page, the response fell from 2,024,758 to 1,065,913 bytes;
+For the inspected page, the response fell from 2,024,758 to 1,065,913 bytes;
 gzip fell from 1,466,310 to 738,823 bytes (50%). Deep comparison confirmed lossless
-reconstruction of every editable field. The account data was read for diagnosis
-and was not edited or checked into the repository.
+reconstruction of every editable field. Account data was read for diagnosis and
+was not edited or checked into the repository.
+
+A combined script/style download was also tried and then removed after hosted
+measurements. The host's compression made the combined editor JS about 562 KB,
+and neither dynamic nor generated static bundles gave a useful cold-start gain.
+The final implementation keeps the existing individually cached assets and the
+measured document-transfer/start-order improvements.
 
 Verification:
 
-- 14 Worker tests passed, including lossless transfer, authorization, missing
+- All 14 Worker cases passed, including lossless transfer, authorization, missing
   projects, publication preservation, and existing ownership/stock checks.
-- Authenticated PHP shell/bundle checks and the shop appearance/checkout browser
-  test passed. Checks cover fingerprinted static files, fallback redirects,
-  path rejection, catalog bootstrap, the new proxy route, and a real PHP editor
-  opening and rendering an isolated native asset preview without errors.
-- The broad builder run passed 122/125 cases. One mock still intercepted only
-  the old document route; it was updated for `/editor` and passed. Two tests hit
-  timeouts under full concurrency. All 13 cases in the follow-up run passed at
-  concurrency 2, including those two, blank-editor workflows, grid interaction,
-  Image Stack sorting/navigation/save/reopen, and a new test that holds both
-  bundles indefinitely while confirming the selected document fetch starts.
+- The actual PHP shell starts its request before CSS. The browser check opens
+  that PHP editor and renders an isolated native asset preview without errors.
+  The existing shop appearance/checkout browser test also passed.
+- A broad builder run passed 122/125 cases. One mock still intercepted only the
+  old document URL; after updating it for `/editor`, the case passed. Two cases
+  timed out under full concurrency and passed at concurrency 2. All 13 cases in
+  that follow-up run passed, including blank editing, grid interaction, Image
+  Stack sorting/navigation/save/reopen, and a new case that blocks styles and
+  scripts while confirming the selected document request has already started.
+- After removing the bundle experiment, the required blank-editor, section-action,
+  grid-snapping, and Image Stack preview/startup tests were rerun on the final
+  implementation. Logs and hosted measurement artifacts are under
+  `/home/branch/ezkart-loading-review-2026-09-24/` and `/tmp/ezkart-loading-final-*`.
 - PHP lint, JavaScript syntax checks, Worker dry-run, and diff checks passed.
-- The local Workspace serves the same bundle manifest and transfer format as
-  hosted PHP. Actual merchant-session timing remains unavailable because Chrome's
-  debugging connection does not respond. Hosted-asset tests use a copied page
-  and controlled API responses, not the merchant's authenticated browser.
 
-The first hosted bundle measurement exposed inefficient dynamic CDN compression:
-the editor JS transferred 561,928 bytes. Explicit whole-response gzip and
-`no-transform` were also recompressed by the host. The final implementation
-therefore serves generated static files, using the host's static asset pipeline
-instead of relying on its dynamic response compression. Generated files stay out
-of Git and contain only the existing public scripts/styles.
+The test Worker version is `65a586c6-20dc-400e-aa9c-d91ce82284e7`. Actual
+merchant-session timings remain unavailable because Chrome's debugging connection
+does not respond. Hosted-asset measurements use a copied page and controlled API
+responses, not the merchant's authenticated browser.

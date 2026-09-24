@@ -31,8 +31,7 @@ export class Workspace {
    .replace(/<\?= ez_admin_product_art\('([^']+)'\) \?>/g,'<span class="product-art"></span>').replace(/<\?[\s\S]*?\?>/g,'');
   const index=await readFile(join(repoRoot,'cart/admin/index.php'),'utf8');const icons=(index.match(/<symbol\b[\s\S]*?<\/symbol>/g)||[]).join('');
   const catalog=await this.catalog();
-  const bundle=library?'library':'editor';
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Ezkart builder workspace</title><script src="admin-startup.js" data-admin-cloud-enabled="true"></script><link rel="stylesheet" href="builder-bundle.php?bundle=${bundle}.css"><script defer src="builder-bundle.php?bundle=${bundle}.js"></script></head><body class="dashboard-page page-sites ${library ? 'page-sites-library' : 'page-site-editor'}" data-admin-language="${htmlEscape(catalog.language||'en')}" data-admin-cloud-enabled="true" data-admin-local-workspace="true" data-admin-demo-checkout="${catalog.demoCheckout===true}" data-admin-currency="${htmlEscape(catalog.currency||'IDR')}" data-admin-locale="${htmlEscape(catalog.locale||'id-ID')}" data-admin-storage-scope="${htmlEscape(catalog.storageScope||'ezkart-local')}" data-admin-cloud-media-base="${htmlEscape(catalog.mediaBase||'')}" data-admin-public-base="${htmlEscape(catalog.publicBase||'')}" data-admin-csrf-token="${this.csrf}"><svg style="display:none">${icons}</svg>${view}</body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Ezkart builder workspace</title><script src="admin-startup.js" data-admin-cloud-enabled="true"></script><link rel="stylesheet" href="admin.css"><link rel="stylesheet" href="builder-templates.css"><link rel="stylesheet" href="builder-native.css"><link rel="stylesheet" href="builder-help.css"><link rel="stylesheet" href="builder-fonts.css"><link rel="stylesheet" href="builder-components.css"><link rel="stylesheet" href="builder-flow.css"><link rel="stylesheet" href="builder-showcase.css"><link rel="stylesheet" href="builder-chrome.css"><link rel="stylesheet" href="builder-assets.css"><link rel="stylesheet" href="admin-ui.css"><link rel="stylesheet" href="builder-choice.css"><link rel="stylesheet" href="builder-image.css"><link rel="stylesheet" href="../select.css"></head><body class="dashboard-page page-sites ${library ? 'page-sites-library' : 'page-site-editor'}" data-admin-language="${htmlEscape(catalog.language||'en')}" data-admin-cloud-enabled="true" data-admin-local-workspace="true" data-admin-demo-checkout="${catalog.demoCheckout===true}" data-admin-currency="${htmlEscape(catalog.currency||'IDR')}" data-admin-locale="${htmlEscape(catalog.locale||'id-ID')}" data-admin-storage-scope="${htmlEscape(catalog.storageScope||'ezkart-local')}" data-admin-cloud-media-base="${htmlEscape(catalog.mediaBase||'')}" data-admin-public-base="${htmlEscape(catalog.publicBase||'')}" data-admin-csrf-token="${this.csrf}"><svg style="display:none">${icons}</svg>${view}<script src="builder-native-icons.js"></script><script src="builder-commerce.js"></script><script src="builder-help.js"></script><script src="builder-fonts.js"></script><script src="builder-native.js"></script><script src="builder-publish.js"></script><script src="builder-site-settings.js"></script><script src="builder-templates.js"></script><script src="builder-backgrounds.js"></script><script src="builder-components.js"></script><script src="builder-asset-packs.js"></script><script src="builder-assets.js"></script><script src="builder-assets-ui.js"></script><script src="builder-showcase-data.js"></script><script src="builder-showcase.js"></script><script src="admin-language.js"></script><script src="builder-image.js"></script><script src="builder-choice.js"></script><script src="admin.js"></script><script src="../select.js"></script></body></html>`;
  }
  async start(port=0){
   await this.init();
@@ -120,15 +119,6 @@ export class Workspace {
       }
      }
      return send(404,{ok:false,error:'This local workspace does not implement that cloud operation.'});
-    }
-    if(url.pathname==='/cart/admin/builder-bundle.php'){
-     const name=url.searchParams.get('bundle'),manifest=JSON.parse(await readFile(join(repoRoot,'cart/admin/builder-bundles.json'),'utf8'));
-     if(!Object.hasOwn(manifest,name))return send(404,{ok:false});
-     const sources=await Promise.all(manifest[name].map(async file=>{
-      const source=await readFile(join(repoRoot,'cart/admin',file),'utf8');
-      return file==='builder-fonts.css'?source.replace(/^@import[^;]+;\s*/,''):file==='builder-native.css'?`@media all {\n${source}\n}`:source;
-     }));
-     return send(200,sources.join(name.endsWith('.js')?'\n;\n':'\n'),name.endsWith('.js')?'text/javascript':'text/css');
     }
     if(url.pathname==='/cart/admin/'||url.pathname==='/cart/admin/index.php')return send(200,await this.markup(!url.searchParams.has('edit')),'text/html; charset=utf-8');
     if(url.pathname==='/cart/api/health.php')return send(200,{ok:true,commerce_environment:'test'});

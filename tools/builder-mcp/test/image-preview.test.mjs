@@ -57,7 +57,7 @@ test('startup shows a neutral loader before scripts and page data arrive, then r
  for(const [id,imageMode] of [['fast-preview',true],['visual-page',false]]){
   const opening=await browser.newPage({viewport:{width:941,height:900}});opening.on('pageerror',e=>errors.push(e.message));
   let releaseScript,releaseData;const scriptGate=new Promise(r=>releaseScript=r),dataGate=new Promise(r=>releaseData=r);
-  await opening.route(url=>url.searchParams.get('bundle')==='editor.js',async route=>{await scriptGate;await route.continue();});
+  await opening.route('**/admin.js',async route=>{await scriptGate;await route.continue();});
   await opening.route(url=>url.searchParams.get('cloud')===`/v1/landing-pages/${id}/editor`,async route=>{await dataGate;await route.continue();});
   try{
    await opening.goto(ws.url+`/cart/admin/?page=sites&edit=${id}.ezkart.site`,{waitUntil:'commit'});
@@ -115,7 +115,7 @@ test('the selected document starts downloading while builder styles and scripts 
  const browser=await chromium.launch(),page=await browser.newPage();
  let release;const gate=new Promise(resolve=>release=resolve);
  t.after(async()=>{release();await browser.close();await ws.stop();await rm(dir,{recursive:true,force:true});});
- await page.route(url=>url.pathname.endsWith('/builder-bundle.php'),async route=>{await gate;await route.continue();});
+ await page.route(url=>/\/(?:admin\.js|admin\.css)$/.test(url.pathname),async route=>{await gate;await route.continue();});
  const documentRequest=page.waitForRequest(request=>new URL(request.url()).searchParams.get('cloud')==='/v1/landing-pages/early-page/editor',{timeout:5000});
  await page.goto(ws.url+'/cart/admin/?page=sites&edit=early-page.ezkart.site',{waitUntil:'commit'});
  await documentRequest;
