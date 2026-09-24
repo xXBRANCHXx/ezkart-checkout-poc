@@ -8,3 +8,89 @@
 @media(max-width:720px){.bc-choices{grid-template-columns:1fr}.page-creator-dialog.bc-choosing{width:calc(100vw - 16px)}.bc-choice-view .bc-choice-art{height:265px;gap:14px}.bc-choice-view .bc-choice-body{padding:20px}.bc-choice-view .bc-choice-description{font-size:12px}.bc-choice-view .bc-features li{font-size:11px}.bc-choice-view .bc-choice-actions{gap:20px}.bc-choice-view .bc-choice-title{flex-direction:row;align-items:center}.bc-badge{font-size:8px}.bc-choice-view .bc-shared-checkout{padding:14px}.bc-choice-view .bc-shared-icon{flex-shrink:0}.bc-choice-view .bc-art-caption{font-size:8px}.bc-choice-view .bc-mini-label{font-size:9px}}
 @media(prefers-reduced-motion:reduce){.bc-choice,.bc-choose{transition:none}}
 @media(max-width:720px){.bc-page-details input{font-size:16px}}
+
+/* The comparison is the dialog: keep its controls in one desktop view. */
+.page-creator-dialog.bc-choosing {
+  width: min(1120px, calc(100vw - 32px));
+  height: fit-content;
+  max-height: calc(100dvh - 32px);
+}
+.page-creator-dialog.bc-choosing > form {
+  height: auto;
+  display: flex;
+  flex-direction: column;
+}
+.page-creator-dialog.bc-choosing > form > header {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 6px 16px;
+  border: 0;
+  flex: 0 0 48px;
+}
+.page-creator-dialog.bc-choosing > form > header > div {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.page-creator-dialog.bc-choosing > form > header > button { width: 36px; height: 36px; }
+.page-creator-dialog.bc-choosing > form > footer { display: none; }
+.page-creator-dialog.bc-choosing > form > section { padding: 0 24px 24px; }
+.bc-choice-view .bc-choices { gap: 20px; }
+.bc-choice-view .bc-choice-art { height: 250px; padding: 16px 20px 34px; }
+.bc-choice-view .bc-upload-demo { width: 190px; }
+.bc-choice-view .bc-mini-label { margin-bottom: 6px; }
+.bc-choice-view .bc-upload-tile { height: 35px; margin-bottom: 5px; padding: 3px 6px; }
+.bc-choice-view .bc-upload-tile img { width: 20px; height: 28px; object-fit: contain; }
+.bc-choice-view .bc-upload-tile small { font-size: 6px; margin-top: 1px; }
+.bc-choice-view .bc-mini-upload { padding: 5px; }
+.bc-choice-view .bc-mini-phone { width: 114px; height: 205px; }
+.bc-choice-view .bc-mini-phone-page img { height: auto; }
+.bc-choice-view .bc-mini-buy { background: #174b3e; }
+.bc-choice-view .bc-mini-editor { max-width: 390px; }
+.bc-choice-view .bc-mini-hero p { font-size: 4px; line-height: 1.6; margin: 8px 0; }
+.bc-choice-view .bc-mini-inspector small { font-size: 5px; }
+.bc-choice-view .bc-choice-body { padding: 19px 22px 20px; }
+.bc-choice-view .bc-choice-title { flex-direction: row; align-items: center; }
+.bc-choice-view .bc-choice-title h2 { margin: 0; }
+.bc-choice-view .bc-choice-description { font-size: 12px; line-height: 1.7; min-height: 41px; margin: 9px 0 16px; }
+.bc-choice-view .bc-features { gap: 10px; margin: 0 0 19px; }
+.bc-choice-view .bc-features li { font-size: 11px; line-height: 1.5; }
+.bc-choice-view .bc-features svg { width: 16px; height: 16px; }
+.bc-example-frame.image { display: flex; flex-direction: column; align-items: center; gap: 0; }
+.page-creator-dialog.bc-image-details { width: min(620px, calc(100vw - 32px)); height: fit-content; }
+.page-creator-dialog.bc-image-details > form { height: auto; display: flex; flex-direction: column; }
+.bc-image-details > form > :is(header, footer) { flex-shrink: 0; }
+.bc-image-details .sq-creator-details { margin-top: 0; border-top: 0; padding-top: 0; }
+
+@media (min-width: 721px) and (max-height: 680px) {
+  .bc-choice-view .bc-choice-art { height: 190px; padding-top: 6px; padding-bottom: 28px; }
+  .bc-choice-view .bc-upload-demo { transform: rotate(-2deg) scale(.72); margin: 0 -16px; }
+  .bc-choice-view .bc-mini-phone { transform: rotate(3deg) scale(.78); margin: 0 -10px; }
+  .bc-choice-view .bc-mini-editor { max-width: 300px; }
+  .bc-choice-view .bc-choice-body { padding: 16px 20px; }
+  .bc-choice-view .bc-choice-description { margin-bottom: 12px; }
+  .bc-choice-view .bc-features { gap: 8px; margin-bottom: 15px; }
+}
+@media (min-width: 721px) and (max-width: 1000px) {
+  .bc-choice-view .bc-upload-demo { width: 150px; }
+  .bc-choice-view .bc-choice-art { gap: 7px; padding-inline: 10px; }
+  .bc-choice-view .bc-mini-phone { width: 96px; height: 190px; }
+  .bc-choice-view .bc-choice-body { padding-inline: 16px; }
+  .bc-choice-view .bc-badge { font-size: 8px; padding: 4px 6px; }
+}
+@media (max-width: 720px) {
+  .page-creator-dialog.bc-choosing { width: calc(100vw - 16px); max-height: calc(100dvh - 16px); }
+  .page-creator-dialog.bc-choosing > form > section { padding: 0 14px 14px; }
+  .bc-choice-view .bc-choices { gap: 14px; }
+  .bc-choice-view .bc-choice-art { height: 235px; gap: 10px; padding-inline: 10px; }
+  .bc-choice-view .bc-upload-demo { width: 150px; }
+  .bc-choice-view .bc-mini-phone { width: 98px; height: 190px; }
+  .bc-choice-view .bc-art-arrow { width: 16px; }
+  .bc-choice-view .bc-choice-body { padding: 18px; }
+  .bc-choice-view .bc-choice-description { min-height: 0; }
+}

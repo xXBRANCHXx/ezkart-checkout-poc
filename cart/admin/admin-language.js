@@ -33,7 +33,7 @@
     'Already designed your page in Canva? Choose':'Desain sudah jadi di Canva? Pilih',
     '. Want to design it here? Choose':'. Mau mendesain di sini? Pilih',
     'Want to design it here? Choose':'Mau mendesain di sini? Pilih',
-    'Your images':'Gambarmu', 'Uploaded':'Sudah diunggah', 'Add images':'Tambah gambar',
+    'Your images':'Gambarmu', '4 images':'4 gambar', 'Uploaded':'Sudah diunggah', 'Add images':'Tambah gambar',
     '01 · Introduction':'01 · Pembuka', '02 · The details':'02 · Detail', '03 · Your story':'03 · Ceritamu',
     'A page made from your images':'Halaman dari gambar-gambarmu',
     'A page you can edit element by element':'Halaman yang bisa diedit per elemen',

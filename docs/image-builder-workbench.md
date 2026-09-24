@@ -34,7 +34,8 @@ the rest of the existing admin application.
   limit the image count before 20. Uploads use the account's existing private
   asset store; the native page embeds the optimized artwork as current image
   elements do.
-- The fictional Sambal Nusa artwork appears only in the chooser. No demo product
+- The user's four fictional Kopi Senja images appear only in the chooser and its
+  full example, joined in upload order. No demo product
   or artwork is inserted into a merchant's new page.
 - `GET/PUT /v1/admin-preferences` reads/updates only the signed-in account's
   language. No database migration is needed.
@@ -66,3 +67,25 @@ The test Worker deployment is `f4ee5abe-9de6-49ae-a3e1-303e04fe9e59` on
 `ezkart-api-test`. Merchant UI automation used the local workspace host;
 hosted asset delivery is checked separately after the workbench push. This
 validation does not create a live order or payment.
+
+## Chooser refinement — 24 September 2026
+
+Replaced the single Sambal example with the four downloaded Kopi Senja images.
+The upload illustration shows four separate files; the example stacks all four
+without gaps. The chooser no longer shows the question header, subtitle,
+shared-checkout banner, or redundant Cancel footer. Its close control and
+accessible dialog name remain. The chooser sizes to its contents, with smaller
+illustrations in short desktop windows; narrow screens keep vertical scrolling
+so content and touch targets remain readable. The following image-page naming
+form uses visible standard inputs and a compact dialog.
+
+The original 1024 × 1536 PNGs remain untouched in Downloads. Runtime WebP copies
+are 800 × 1200, with a combined size of 432,974 bytes. Their order follows the
+download names ending in `12_08_22`, `12_08_24`, `12_08_28`, and `12_08_30`.
+
+Verified the revised chooser at 1894 × 846, 1440 × 900, 1366 × 600,
+1024 × 640, 941 × 720, 768 × 900, 390 × 844, and 320 × 700. Both choices
+and their buttons fit without scrolling at all six desktop/tablet sizes. The
+four-image example is contiguous, both previews open/close, and page creation
+still follows account language. Twenty-one unique merchant UI regression tests
+passed across the required interaction suites and the image/template workflows.

@@ -18,7 +18,7 @@ test('image pages create, upload, reorder, replace, undo, save and use the share
   await page.locator('[data-library-create-card]').click();
   assert.equal(await page.locator('.bc-choices').isVisible(),true);
   await page.locator('[data-bc-preview=image]').last().click();
-  await page.locator('.bc-example img').evaluate(img=>img.decode());await page.keyboard.press('Escape');
+  await page.locator('.bc-example img').evaluateAll(images=>Promise.all(images.map(img=>img.decode())));await page.keyboard.press('Escape');
   await page.locator('[data-bc-choose=image]').click();
   const form=page.locator('[data-library-page-form]');
   await form.locator('[name=page_name]').fill('Image sale');await form.locator('button[value=default]').click();
@@ -89,7 +89,7 @@ test('the chooser and image editor use the account language while leaving upload
   const browser=await chromium.launch(),page=await browser.newPage({viewport:{width:390,height:844}});
   t.after(async()=>{await browser.close();await ws.stop();await rm(dir,{recursive:true,force:true});});
   await page.goto(ws.url+'/cart/admin/?page=sites');await page.locator('[data-library-create-card]').click();
-  await page.locator('[data-bc-choose=image]').waitFor();assert.match(await page.locator('#library-creator-title').textContent(),/Mau buat halaman/);
+  await page.locator('[data-bc-choose=image]').waitFor();assert.match(await page.locator('#library-creator-title').textContent(),/Pilih cara membuat halaman/);
   assert.match(await page.locator('[data-bc-choose=image]').textContent(),/Pilih halaman gambar/);
   assert.equal(await page.locator('#library-page-creator-dialog').evaluate(node=>node.scrollWidth>node.clientWidth),false);
   await page.locator('[data-bc-choose=image]').click();await page.locator('[name=page_name]').fill('Halaman gambar');await page.locator('[data-library-page-form] button[value=default]').click();

@@ -1,7 +1,9 @@
 /* A shared entry point for both library creation and the editor's New page action. */
 (() => {
   const base = new URL('.', document.currentScript.src);
-  const template = fetch(new URL('builder-choice.html', base)).then(response => {
+  const templateUrl = new URL('builder-choice.html', base);
+  templateUrl.search = new URL(document.currentScript.src).search;
+  const template = fetch(templateUrl).then(response => {
     if (!response.ok) throw Error('Builder choices could not load.');
     return response.text();
   }).catch(() => null);
@@ -23,15 +25,22 @@
     const close=document.createElement('button');close.type='button';close.textContent='×';close.setAttribute('aria-label',t('Close'));
     const header=document.createElement('header');header.append(title,close);
     const frame=document.createElement('div');frame.className='bc-example-frame '+mode;
-    const image=new Image();image.alt=t('Example design');image.src=new URL(mode==='image'?'assets/builder-choice/sambal.webp':'templates/sela/preview/desktop.png',base);
-    frame.append(image);dialog.append(header,frame);document.body.append(dialog);
+    const sources=mode==='image'
+      ? [1,2,3,4].map(index=>`assets/builder-choice/kopi-senja-0${index}.webp`)
+      : ['templates/sela/preview/desktop.png'];
+    sources.forEach((source,index)=>{
+      const image=new Image();image.alt=t('Example design')+(mode==='image'?` ${index+1} / 4`:'');image.src=new URL(source,base);image.decoding='async';
+      if(mode==='image'){image.width=800;image.height=1200;}
+      frame.append(image);
+    });
+    dialog.append(header,frame);document.body.append(dialog);
     close.onclick=()=>dialog.close();dialog.addEventListener('close',()=>{dialog.remove();opener.focus();},{once:true});
     dialog.showModal();
   }
   function attach(form) {
     if (!form || forms.has(form)) return;
     const dialog=form.closest('dialog'),section=form.querySelector(':scope > section');
-    const details=document.createElement('fieldset');details.className='bc-page-details';
+    const details=document.createElement('div');details.className='bc-page-details';
     details.append(...section.childNodes);
     const choices=document.createElement('div');choices.className='bc-choice-view';
     choices.textContent=t('Choose your builder');
@@ -44,10 +53,11 @@
     forms.set(form,state);
     function select(mode) {
       state.mode=mode;form.dataset.builderMode=mode;
-      choices.hidden=Boolean(mode);back.hidden=!mode;details.hidden=!mode;details.disabled=!mode;submit.hidden=!mode;
+      choices.hidden=Boolean(mode);back.hidden=!mode;details.hidden=!mode;details.inert=!mode;submit.hidden=!mode;
       dialog.classList.toggle('bc-choosing',!mode);
-      title.textContent=t(!mode?'How would you like to build?':mode==='image'?'Create an image page':originalTitle);
-      subtitle.textContent=t(!mode?'Bring a finished design, or make something your own.':mode==='image'?'Give your page a name. Add images and a product next.':originalSubtitle);
+      dialog.classList.toggle('bc-image-details',mode==='image');
+      title.textContent=t(!mode?'Choose your builder':mode==='image'?'Create an image page':originalTitle);
+      subtitle.textContent=mode?t(mode==='image'?'Give your page a name. Add images and a product next.':originalSubtitle):'';
       details.querySelector('[data-template-picker]').hidden=mode==='image';
       const settings=details.querySelector('[data-template-settings]');
       settings.hidden=mode==='image';settings.querySelectorAll('input,select,textarea').forEach(input=>input.disabled=mode==='image');
