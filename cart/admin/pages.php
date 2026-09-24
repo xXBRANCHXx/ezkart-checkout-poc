@@ -367,7 +367,7 @@ function ez_orders_table(array $rows, string $tableId, string $csrfToken, string
           </details>
         <?php endif; ?>
       </section>
-      <section class="surface settings-section" id="preferences"><header class="surface-header"><div><h2>Regional preferences</h2><p>Formatting used throughout the workspace.</p></div></header><div class="settings-form"><label><span>Timezone</span><select><option>Asia/Jakarta (WIB)</option></select></label><label><span>Currency</span><select><option>IDR — Indonesian Rupiah</option></select></label><label><span>Date format</span><select><option>11 Aug 2026</option></select></label><label><span>Language</span><select><option>English</option><option>Bahasa Indonesia</option></select></label></div></section>
+      <section class="surface settings-section" id="preferences"><header class="surface-header"><div><h2>Regional preferences</h2><p>Formatting used throughout the workspace.</p></div></header><div class="settings-form"><label><span>Timezone</span><select><option>Asia/Jakarta (WIB)</option></select></label><label><span>Currency</span><select><option>IDR — Indonesian Rupiah</option></select></label><label><span>Date format</span><select><option>11 Aug 2026</option></select></label><label><span>Language</span><select data-admin-language-setting><option value="en">English</option><option value="id">Bahasa Indonesia</option></select><small data-admin-language-status role="status"></small></label></div></section>
     </div>
   </div>
 

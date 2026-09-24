@@ -1,4 +1,5 @@
 import "../../../cart/admin/builder-publish.js";
+import { decodeHTMLAttribute } from "entities";
 
 // Parse actual elements, so IDs in comments, scripts, or a product list do not count.
 export async function purchaseGroups(html, draft = false) {
@@ -23,7 +24,13 @@ export async function purchaseGroups(html, draft = false) {
   await new HTMLRewriter()
     .on("*", {
       element(element) {
-        const get = (key) => element.getAttribute(key);
+        // HTMLRewriter returns source attribute values; browser getAttribute()
+        // decodes entities. Match the browser once before reading native JSON,
+        // product IDs, and visibility rules from serialized builder HTML.
+        const get = (key) => {
+          const value = element.getAttribute(key);
+          return value === null ? null : decodeHTMLAttribute(value);
+        };
         const blocked =
           stack.some((item) => item.blocked) ||
           ["script", "style", "template", "noscript"].includes(

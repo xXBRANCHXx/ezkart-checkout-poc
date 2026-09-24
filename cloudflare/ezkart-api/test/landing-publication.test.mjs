@@ -46,6 +46,18 @@ test("Worker publication rules parse real purchase elements and require an owned
     /Add one of your products/,
   );
   assert.equal(await check(node()), "");
+  // Native elements saved with outerHTML use double-quoted, entity-encoded
+  // attributes. The Worker must read those just as the browser does.
+  const serialized = (id = "mine", quote = "&quot;") =>
+    `<div data-native-commerce="${JSON.stringify({ type: "commerce", part: "add", productId: id }).replaceAll("&", "&amp;").replaceAll('"', quote)}"><button data-commerce-add>Buy</button></div>`;
+  for (const quote of ["&quot;", "&#34;", "&#x22;"]) {
+    assert.equal(await check(serialized("mine", quote)), "");
+    assert.match(await check(serialized("foreign", quote)), /Add one of your products/);
+    assert.match(await check(serialized("mine", quote), [{ ...item, stock: 0 }]), /Add stock/);
+  }
+  // Decode once: an ampersand in a real ID must not become a second entity.
+  assert.equal(await check(serialized("mine&amp;"), [{ ...item, id: "mine&amp;" }]), "");
+  assert.match(await check(serialized("mine&amp;"), [{ ...item, id: "mine&" }]), /Add one of your products/);
   const variants = [
     {
       ...item,
@@ -135,6 +147,9 @@ test("Worker publication rules parse real purchase elements and require an owned
     `<div hidden>${node()}</div>`,
     `<div style="display: none !important">${node()}</div>`,
     `<div data-sq-native='{"props":{"display":"none"}}'>${node()}</div>`,
+    `<div data-sq-native="{&quot;props&quot;:{&quot;display&quot;:&quot;none&quot;}}">${serialized()}</div>`,
+    `<div style="display&colon;none">${serialized()}</div>`,
+    `<div aria-hidden="tr&#117;e">${serialized()}</div>`,
   ])
     assert.match(await check(html), /Add one of your products/);
   assert.match(

@@ -48,6 +48,21 @@ test('admin profile logos persist privately, enforce ownership and keep storefro
     });
     return {status:response.status,...await response.json()};
   }
+  await t.test('account language saves independently of other accounts and store branding', async () => {
+    const preference = (access, payload, method = payload === undefined ? 'GET' : 'PUT') => mf.dispatchFetch('https://api.fixture.test/v1/admin-preferences', {
+      method, headers: {...(access ? {authorization:'Bearer '+access} : {}), 'content-type':'application/json'},
+      ...(payload === undefined ? {} : {body:JSON.stringify(payload)}),
+    });
+    assert.equal((await preference('')).status,401);
+    assert.equal((await preference(alice, {language:'id'}, 'POST')).status,405);
+    for(const language of ['fr', '', null, {language:'id'}]) assert.equal((await preference(alice,{language})).status,422);
+    assert.equal((await preference(alice, {language:'id'})).status,200);
+    assert.deepEqual((await (await preference(alice)).json()).preferences,{language:'id'});
+    assert.equal((await identity(alice)).locale,'id-ID');
+    assert.deepEqual((await (await preference(bob)).json()).preferences,{language:'en'});
+    assert.equal((await preference(alice, {language:'en'})).status,200);
+    assert.equal((await identity(alice)).locale,'en');
+  });
   assert.equal((await call()).status,401);
   assert.deepEqual((await call(alice)).profile,{logoId:'',canEdit:true});
   assert.equal((await identity(alice)).active_seller.admin_logo_id,'');

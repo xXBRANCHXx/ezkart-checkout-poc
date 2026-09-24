@@ -39,6 +39,7 @@ test("Templates start without products; connecting products preserves edits and 
   await page.goto(ws.url + "/cart/admin/?page=sites&edit=start.ezkart.site");
   await page.waitForFunction(() => globalThis.EzkartBuilder);
   await page.locator("[data-open-page-creator]").first().click();
+  await page.locator("[data-bc-choose=visual]").click();
   const form = page.locator("[data-page-creator-form]");
   await form.locator("[name=page_name]").fill("Draft Takar");
   await form

@@ -1,3 +1,4 @@
+import { adminPreferences } from './admin-preferences.js';
 import { listBuilderFonts, saveBuilderFont, serveBuilderFont } from './builder-fonts.js';
 import { listBuilderAssets, saveBuilderAsset, serveBuilderAsset } from "./builder-assets.js";
 import { customerAddressBook, changeCustomerAddressBook } from "./customer-addresses.js";
@@ -1281,6 +1282,11 @@ export default {
         if (!["GET", "PUT"].includes(request.method)) return json({ ok: false, error: "Method not allowed." }, 405, cors);
         const { seller } = await sellerContext(request, env);
         return json({ ok: true, plan: await advancedMode(env, seller, request.method === "PUT" ? await requestJson(request, 2000) : null) }, 200, cors);
+      }
+      if (url.pathname === "/v1/admin-preferences") {
+        if (!["GET", "PUT"].includes(request.method)) return json({ ok: false, error: "Method not allowed." }, 405, cors);
+        const user = await authenticatedUser(request, env);
+        return json({ ok: true, preferences: await adminPreferences(env, user.id, request.method === "PUT" ? await requestJson(request, 2000) : null) }, 200, cors);
       }
       if (url.pathname === "/v1/admin-profile") {
         if (!["GET", "PUT"].includes(request.method)) return json({ ok: false, error: "Method not allowed." }, 405, cors);

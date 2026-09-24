@@ -1781,6 +1781,7 @@
     let slugEdited = false;
     hydrateCreatorCatalog(form);
     globalThis.EzkartTemplates?.attach(form, readCatalogProducts);
+    globalThis.EzkartBuilderChoice?.attach(form);
 
     const projectTone = (products = []) => products.includes("coffee") ? "coffee" : products.includes("sambal") ? "chili" : "gold";
     const projectCard = (site) => {
@@ -1908,7 +1909,7 @@
     };
     const openCreator = () => {
       if (customSites.length >= maximumLandingPages) { showToast("Delete a project before creating another"); return; }
-      dialog?.showModal();
+      EzkartBuilderChoice.open(form);
     };
     customSites.forEach((site) => grid?.insertBefore(projectCard(site), landingLibrary.querySelector("[data-library-create-card]")));
     bindProjectMenus(); renderSummary(); document.body.classList.add("cloud-landing-ready");
@@ -1927,7 +1928,7 @@
       const site = { name: String(nameInput.value).trim(), url: `${makePageSlug(slugInput.value)}.ezkart.site`, products, customProducts: [] };
       if (customSites.some((item) => item.url === site.url) || landingLibrary.querySelector(`[data-site-url="${CSS.escape(site.url)}"]`)) { showToast("A page with this URL already exists"); return; }
       try {
-        const prepared = await globalThis.EzkartTemplates?.fromForm(form, readCatalogProducts());
+        const prepared = await EzkartBuilderChoice.prepare(form, readCatalogProducts());
         if (prepared) site.products = prepared.state.products;
         await saveCloudLandingPage(site, { status: "draft", ...(prepared ? { state: prepared.state } : {}) });
         window.location.href = `?page=sites&edit=${encodeURIComponent(site.url)}`;
@@ -2794,7 +2795,9 @@
       return clone.innerHTML;
     };
     let siteSettings;
+    let imageEditor = null;
     const captureState = () => ({
+      builderMode: previewRoot?.querySelector("[data-image-page]") ? "image" : "visual",
       favicons: siteSettings?.snapshot() || {light: "", dark: ""},
       template: templateState ? structuredClone(templateState) : null,
       preview: previewSnapshotHtml(),
@@ -5426,6 +5429,7 @@
       syncBrandControls();
       syncPageSpacingControls();
       syncPageGridControls();
+      imageEditor?.sync();
       markSqChanged();
     };
     const undoBuilderChange = () => {
@@ -8219,7 +8223,9 @@
       const pageName = document.querySelector("[data-current-site-name]")?.textContent || "Ezkart Landing Page";
       const pageDescription = (previewRoot.querySelector(".ezm-hero-description,.sq-composition-copy p,h1+p")?.textContent || pageName).trim().replace(/\s+/g," ").slice(0,180);
       const sprite = document.querySelector(".svg-sprite")?.outerHTML || "";
-      const css = `${collectExportCss()}\nhtml{scrollbar-width:none}html::-webkit-scrollbar{width:0;height:0}.sq-page-block,.sq-page-block:hover{outline-color:transparent!important}`;
+      const isImagePage = Boolean(clone.querySelector('[data-image-page]'));
+      const outputCss = collectExportCss();
+      const css = `${isImagePage ? outputCss.replace(/@font-face\s*\{[^}]*\}/gi, '') : outputCss}\nhtml{scrollbar-width:none}html::-webkit-scrollbar{width:0;height:0}.sq-page-block,.sq-page-block:hover{outline-color:transparent!important}`;
       const singleLineDesktopHeadings = new Set([...previewRoot.querySelectorAll('[data-sq-element-type="heading"]')].filter((element) => {
         const text = element.matches("h1,h2,h3") ? element : element.querySelector("h1,h2,h3") || element;
         if (!text.textContent.trim()) return false;
@@ -8364,7 +8370,7 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
       const boundProducts = readCatalogProducts().filter(product=>selectedProducts().includes(product.id)).map(product=>({id:product.id,name:product.name,description:product.description,type:product.type,price:product.price,currency:product.currency||'IDR',stock:product.stock,images:product.images,variants:(product.variants||[]).filter(variant=>!variant.hidden).map(variant=>({id:variant.id,name:variant.name,description:variant.description,price:variant.price,stock:variant.stock,image:variant.image,options:variant.options}))}));
       const selectScript = globalThis.EzkartSelect ? `<script>(${EzkartSelect.install.toString()})();<\/script>` : '';
       const boundScript = clone.querySelector('[data-native-type="commerce"]') ? `<script>(${EzkartCommerce.mount.toString()})(document.querySelector('.sq-page-preview'),${JSON.stringify(boundProducts).replace(/</g,"\\u003c")});<\/script>` : '';
-      const extraFontCss = globalThis.EzkartFonts?.exportCss(previewRoot) || '';
+      const extraFontCss = isImagePage ? '' : globalThis.EzkartFonts?.exportCss(previewRoot) || '';
       const nativeScript = clone.querySelector('.sq-native') ? `<script>(${EzkartNative.mount.toString()})(document.querySelector('.sq-page-preview'));<\/script>` : '';
       clone.removeAttribute('data-native-mounted');
       clone.querySelectorAll('dialog.sq-native').forEach(dialog=>dialog.removeAttribute('open'));
@@ -8377,6 +8383,10 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
     };
     const requireProductForOutput = async (action = 'publishing') => {
       await settleBuilder();
+      if (imageEditor?.active()) {
+        if (imageEditor.busy()) throw Error(EzkartLanguage.t('Wait for your images to finish uploading.'));
+        if (!previewRoot.querySelector('[data-image-upload]')) throw Error(EzkartLanguage.t('Upload at least one image before publishing.'));
+      }
       if (cloudEnabled) {
         const fresh = await cloudRequest('GET', '/v1/catalog');
         cloudCatalogProducts = (fresh.products || []).map(normalizeCloudProduct);
@@ -8388,7 +8398,8 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
       if (issue) {
         const error = issue.replaceAll('before publishing', 'before ' + action);
         if (message) { message.textContent = error; message.hidden = false; }
-        openSqPanel('products', {pin:true}); syncTemplateProducts();
+        if (imageEditor?.active()) sqStudio.querySelector('[data-image-page-product]')?.focus();
+        else { openSqPanel('products', {pin:true}); syncTemplateProducts(); }
         throw Error(error);
       }
       if (message) message.hidden = true;
@@ -8537,13 +8548,14 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
     const newPageDialog = document.getElementById("page-creator-dialog");
     sqStudio.querySelectorAll("[data-open-page-creator]").forEach((button) => button.addEventListener("click", () => {
       if (readLandingSites().length >= 6) { showToast("Delete a project before creating another"); return; }
-      newPageDialog?.showModal();
+      EzkartBuilderChoice.open(newPageDialog.querySelector("[data-page-creator-form]"));
     }));
     const newPageForm = newPageDialog?.querySelector("[data-page-creator-form]");
     const newPageName = newPageForm?.elements.namedItem("page_name");
     const newPageSlug = newPageForm?.elements.namedItem("slug");
     hydrateCreatorCatalog(newPageForm);
     globalThis.EzkartTemplates?.attach(newPageForm, readCatalogProducts);
+    EzkartBuilderChoice.attach(newPageForm);
     let newPageSlugEdited = false;
     const makePageSlug = (value) => normalize(value).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 48);
     newPageSlug?.addEventListener("input", () => { newPageSlugEdited = true; newPageSlug.value = makePageSlug(newPageSlug.value); });
@@ -8563,7 +8575,7 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
       const submit = newPageForm.querySelector('[data-create-page]');
       if (submit) submit.disabled = true;
       try {
-        prepared = await globalThis.EzkartTemplates?.fromForm(newPageForm, readCatalogProducts());
+        prepared = await EzkartBuilderChoice.prepare(newPageForm, readCatalogProducts());
         savedPage = await saveCloudLandingPage({ name, url: siteUrl, products: prepared?.state.products || starterIds, customProducts }, { status: "draft", ...(prepared ? { state: prepared.state } : {}) });
       }
       catch (error) { showToast(error instanceof Error ? error.message : "The landing page could not be created."); return; }
@@ -9054,6 +9066,13 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
       if(!response.ok) throw Error('That upload could not be opened. Refresh the library and try again.');
       return readImageFile(await response.blob());
     };
+    imageEditor = EzkartImageBuilder.mount({
+      studio: sqStudio, root: previewRoot, capture: captureState,
+      apply: state => { remember(); restoreState(state); },
+      products: readCatalogProducts,
+      upload: (dataUrl, name) => cloudRequest('POST', '/v1/assets', {dataUrl, name}),
+      html: () => generateHtml({libraryPreview: true}), siteKey: () => activeSiteKey,
+    });
     const embeddedAssetSources = new Map();
     const collectPageAssets = async (markup, pageName, hashes) => {
       const doc = new DOMParser().parseFromString(markup || '', 'text/html');

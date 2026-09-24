@@ -20,6 +20,7 @@ test("blank-page editing supports direct dragging, inline text, resize, history 
   try {
     await page.goto(ws.url + "/cart/admin/?page=sites");
     await page.locator("[data-library-create-card]").click();
+    await page.locator("[data-bc-choose=visual]").click();
     const form = page.locator("[data-library-page-form]");
     await form.locator("[name=page_name]").fill("Blank workflow");
     await form.locator("button[value=default]").click();

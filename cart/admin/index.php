@@ -695,7 +695,7 @@ function ez_admin_sync_cloudflare_user(string $accessToken): array
 
 function ez_admin_proxy_cloud_request(string $accessToken, string $path, string $method): never
 {
-    $allowedPath = preg_match('#^/v1/(?:catalog|storefront|admin-profile|advanced-mode|media(?:/[a-zA-Z0-9_-]+)?|assets(?:/[a-zA-Z0-9_-]+)?|fonts(?:/font_[a-f0-9]{64})?|products/[a-zA-Z0-9_-]+(?:/duplicate)?|drafts/[a-zA-Z0-9_-]+|landing-pages(?:/[a-z0-9-]+(?:/(?:preview|export))?)?|components(?:/[a-z0-9-]+)?)$#', $path) === 1;
+    $allowedPath = preg_match('#^/v1/(?:catalog|storefront|admin-preferences|admin-profile|advanced-mode|media(?:/[a-zA-Z0-9_-]+)?|assets(?:/[a-zA-Z0-9_-]+)?|fonts(?:/font_[a-f0-9]{64})?|products/[a-zA-Z0-9_-]+(?:/duplicate)?|drafts/[a-zA-Z0-9_-]+|landing-pages(?:/[a-z0-9-]+(?:/(?:preview|export))?)?|components(?:/[a-z0-9-]+)?)$#', $path) === 1;
     if (!$allowedPath || str_contains($path, '?') || str_contains($path, '#')) {
         ez_admin_json(['ok' => false, 'error' => 'That saved-data path is not allowed.'], 400);
     }
@@ -1210,12 +1210,14 @@ $catalogData = [];
 $catalogError = '';
 $sellerId = '';
 $advancedPlan = null;
+$adminLanguage = 'en';
 $adminProfile = $authenticationMethod === 'supabase' ? null : ['logoId' => '', 'canEdit' => false];
 if ($authenticated && $authenticationMethod === 'supabase') {
     try {
         $apiUrl = rtrim(ez_config('cloudflare_api_url'), '/');
         $headers = ['Accept: application/json', 'Authorization: Bearer ' . $_SESSION['supabase_access_token']];
         $identity = ez_admin_get_json($apiUrl . '/v1/me', $headers, 'Ezkart account');
+        $adminLanguage = preg_match('/^id(?:-|$)/i', (string) ($identity['user']['locale'] ?? 'en')) ? 'id' : 'en';
         $sellerId = (string) ($identity['user']['active_seller']['id'] ?? '');
         $activeSeller = $identity['user']['active_seller'] ?? [];
         $advancedPlan = ['enabled' => ($activeSeller['plan'] ?? 'standard') === 'advanced'];
@@ -1514,11 +1516,12 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
   <?php if ($authenticated && $page === 'analytics'): ?><link rel="stylesheet" href="analytics.css?v=<?= (int) filemtime(__DIR__ . '/analytics.css') ?>"><?php endif; ?>
   <?php if ($authenticated && $page === 'payments'): ?><link rel="stylesheet" href="payments.css?v=<?= (int) filemtime(__DIR__ . '/payments.css') ?>"><?php endif; ?>
   <link rel="stylesheet" href="advanced.css?v=<?= (int) filemtime(__DIR__ . '/advanced.css') ?>">
+  <?php if ($page === 'sites'): ?><link rel="stylesheet" href="builder-choice.css?v=<?= (int) filemtime(__DIR__ . '/builder-choice.css') ?>"><link rel="stylesheet" href="builder-image.css?v=<?= (int) filemtime(__DIR__ . '/builder-image.css') ?>"><?php endif; ?>
   <link rel="stylesheet" href="profile-logo.css?v=<?= (int) filemtime(__DIR__ . '/profile-logo.css') ?>">
   <link rel="stylesheet" href="../select.css?v=<?= (int) filemtime(__DIR__ . '/../select.css') ?>">
   <title><?= $authenticated ? ez_admin_escape($pageTitles[$page]) : ($pendingMfa !== null ? 'Two-step verification' : 'Admin Login') ?> · Ezkart</title>
 </head>
-<body class="<?= $authenticated ? 'dashboard-page page-' . ez_admin_escape($page) . ($page === 'sites' ? ($siteEditor ? ' page-site-editor' : ' page-sites-library') : '') : 'login-page' ?>" data-admin-advanced-mode="<?= !empty($advancedPlan['enabled']) ? 'true' : 'false' ?>" data-admin-landing-limit="<?= !empty($advancedPlan['enabled']) ? 24 : 6 ?>" data-admin-profile="<?= ez_admin_escape(json_encode($adminProfile)) ?>" data-admin-storage-scope="<?= ez_admin_escape($adminStorageScope) ?>" data-admin-checkout-brand="<?= ez_admin_escape($adminDisplayName) ?>" data-admin-migrate-legacy-storage="<?= $legacyDataAccess ? 'true' : 'false' ?>" data-admin-cloud-enabled="<?= $authenticated && $authenticationMethod === 'supabase' ? 'true' : 'false' ?>" data-admin-cloud-media-base="<?= $authenticated && $authenticationMethod === 'supabase' ? ez_admin_escape($cloudMediaBase) : '' ?>" data-admin-csrf-token="<?= ez_admin_escape($csrfToken) ?>">
+<body class="<?= $authenticated ? 'dashboard-page page-' . ez_admin_escape($page) . ($page === 'sites' ? ($siteEditor ? ' page-site-editor' : ' page-sites-library') : '') : 'login-page' ?>" data-admin-language="<?= ez_admin_escape($adminLanguage) ?>" data-admin-advanced-mode="<?= !empty($advancedPlan['enabled']) ? 'true' : 'false' ?>" data-admin-landing-limit="<?= !empty($advancedPlan['enabled']) ? 24 : 6 ?>" data-admin-profile="<?= ez_admin_escape(json_encode($adminProfile)) ?>" data-admin-storage-scope="<?= ez_admin_escape($adminStorageScope) ?>" data-admin-checkout-brand="<?= ez_admin_escape($adminDisplayName) ?>" data-admin-migrate-legacy-storage="<?= $legacyDataAccess ? 'true' : 'false' ?>" data-admin-cloud-enabled="<?= $authenticated && $authenticationMethod === 'supabase' ? 'true' : 'false' ?>" data-admin-cloud-media-base="<?= $authenticated && $authenticationMethod === 'supabase' ? ez_admin_escape($cloudMediaBase) : '' ?>" data-admin-csrf-token="<?= ez_admin_escape($csrfToken) ?>">
 <?php if (!$authenticated): ?>
   <main class="login-shell">
     <?php if ($pendingMfa !== null): ?>
@@ -1822,6 +1825,8 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
   <script src="dashboard-data.js?v=<?= (int) filemtime(__DIR__ . '/dashboard-data.js') ?>"></script>
   <?php if ($page === 'analytics'): ?><script src="analytics.js?v=<?= (int) filemtime(__DIR__ . '/analytics.js') ?>"></script><?php endif; ?>
   <?php if ($page === 'wallet'): ?><script src="wallet-access.js?v=<?= (int) filemtime(__DIR__ . '/wallet-access.js') ?>"></script><?php endif; ?>
+  <script src="admin-language.js?v=<?= (int) filemtime(__DIR__ . '/admin-language.js') ?>"></script>
+  <?php if ($page === 'sites'): ?><script src="builder-image.js?v=<?= (int) filemtime(__DIR__ . '/builder-image.js') ?>"></script><script src="builder-choice.js?v=<?= (int) filemtime(__DIR__ . '/builder-choice.js') ?>"></script><?php endif; ?>
   <script src="admin.js?v=<?= ez_admin_escape($adminJsVersion) ?>"></script>
   <?php if ($page === 'advanced'): ?><script src="advanced.js?v=<?= (int) filemtime(__DIR__ . '/advanced.js') ?>"></script><?php endif; ?>
   <script src="profile-logo.js?v=<?= (int) filemtime(__DIR__ . '/profile-logo.js') ?>"></script>
