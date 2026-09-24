@@ -23,6 +23,11 @@ test('PHP page hosting serves only the current environment publication with an i
       res.end(JSON.stringify({ok:true,page:{id:'launch',status:'published',updatedAt:'saved',publishedAt:'saved'}}));
       return;
     }
+    if(req.url==='/v1/landing-pages/launch/confirmation') {
+      res.writeHead(200,{'Content-Type':'application/json'});
+      res.end(JSON.stringify({ok:true,saveId:'confirmed-save',page:{id:'launch',status:'published'}}));
+      return;
+    }
     if(req.url.endsWith('/view')) {
       if(!req.headers.authorization){res.writeHead(401);res.end('Sign in');return;}
       if(req.headers['x-ezkart-preview-store'] && !['coffee-shop','coffee-shop-0123456789'].includes(req.headers['x-ezkart-preview-store'])){res.writeHead(404);res.end('Page not found');return;}
@@ -119,6 +124,9 @@ test('PHP page hosting serves only the current environment publication with an i
   const denied=await context.request.put(saveUrl,{headers:{Prefer:'return=minimal'},data:{status:'published'}});
   assert.equal(denied.status(),403);
   assert.equal(savePreferences.length,1,'Compact replies never bypass the CSRF check');
+  const savedConfirmation=await context.request.get(base+'/cart/admin/?cloud='+encodeURIComponent('/v1/landing-pages/launch/confirmation'));
+  assert.equal(savedConfirmation.status(),200);
+  assert.equal((await savedConfirmation.json()).saveId,'confirmed-save');
   const navigation=page.waitForRequest(previewUrl);
   await page.reload();
   assert.equal((await (await navigation).allHeaders()).cookie,undefined,'Admin cookies stay outside public URL paths');

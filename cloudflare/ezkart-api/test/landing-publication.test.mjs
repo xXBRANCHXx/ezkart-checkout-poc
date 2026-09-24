@@ -216,7 +216,13 @@ test("Authenticated page saves allow empty drafts and reject publish bypasses ag
   );
   const token = unsigned + "." + Buffer.from(signature).toString("base64url");
   const bundle = await build({
-    entryPoints: [new URL("../src/index.js", import.meta.url).pathname],
+    stdin: {contents: `import worker from './src/index.js'; export default {fetch(request,env,context) {
+      if(request.headers.has('x-test-metadata-only')) env={...env,PRIVATE_ASSETS:new Proxy(env.PRIVATE_ASSETS,{get(bucket,key){
+        if(key==='get') return ()=>{throw Error('This operation must not download project artwork');};
+        const value=Reflect.get(bucket,key);return typeof value==='function'?value.bind(bucket):value;
+      }})};
+      return worker.fetch(request,env,context);
+    }};`, resolveDir: new URL('..', import.meta.url).pathname},
     bundle: true,
     write: false,
     format: "esm",
@@ -262,7 +268,7 @@ test("Authenticated page saves allow empty drafts and reject publish bypasses ag
     ),
   ]);
   await db.prepare(await readFile(new URL('../migrations/0008_seller_page_addresses.sql', import.meta.url), 'utf8')).run();
-  const save = async (data, minimal = false) => {
+  const save = async (data, minimal = false, metadataOnly = false) => {
     const r = await mf.dispatchFetch(
       "http://worker.test/v1/landing-pages/my-page",
       {
@@ -271,6 +277,7 @@ test("Authenticated page saves allow empty drafts and reject publish bypasses ag
           authorization: "Bearer " + token,
           "content-type": "application/json",
           ...(minimal ? {prefer: 'return=minimal'} : {}),
+          ...(metadataOnly ? {'x-test-metadata-only': '1'} : {}),
         },
         body: JSON.stringify({ name: "My page", ...data }),
       },
@@ -343,11 +350,32 @@ test("Authenticated page saves allow empty drafts and reject publish bypasses ag
       .status,
     422,
   );
-  const publicationReceipt=await save(published('owned'),true);
+  const saveId='11111111-1111-4111-8111-111111111111';
+  const publicationReceipt=await save({...published('owned'),saveId},true,true);
   assert.equal(publicationReceipt.status,200);
+  assert.equal(publicationReceipt.body.page.createdAt,initial.body.page.createdAt,'Publishing preserves the creation date without reading previous artwork');
   assert.equal(publicationReceipt.body.page.status,'published');
   assert.ok(publicationReceipt.body.page.publishedAt);
   assert.equal(publicationReceipt.body.page.publishedHtml,undefined);
+  const confirmationUrl='http://worker.test/v1/landing-pages/my-page/confirmation';
+  const confirmed=await mf.dispatchFetch(confirmationUrl,{headers:{authorization:'Bearer '+token,'x-test-metadata-only':'1'}});
+  assert.equal(confirmed.status,200);
+  const confirmation=await confirmed.json();
+  assert.equal(confirmation.saveId,saveId);
+  assert.equal(confirmation.page.publishedAt,publicationReceipt.body.page.publishedAt);
+  assert.equal(confirmation.page.state,undefined);
+  assert.equal(confirmation.page.publicPath,'/store/shop/my-page');
+  assert.equal((await mf.dispatchFetch(confirmationUrl)).status,401);
+  assert.equal((await save({saveId:'not-valid'})).status,400);
+  assert.equal((await save(published('foreign'),true,true)).status,422,'Metadata-only publication still enforces product ownership');
+  // Old objects without creation metadata still preserve their original date.
+  const legacyBucket=await mf.getR2Bucket('PRIVATE_ASSETS');
+  const legacyKey='sellers/mine/landing-pages/my-page.json';
+  const legacy=await legacyBucket.get(legacyKey);
+  await legacyBucket.put(legacyKey,await legacy.text(),{customMetadata:{status:'published'}});
+  const legacyReceipt=await save(published('owned'),true);
+  assert.equal(legacyReceipt.status,200);
+  assert.equal(legacyReceipt.body.page.createdAt,initial.body.page.createdAt);
   // Replacing published HTML without sending a status must still run the gate.
   assert.equal(
     (
@@ -416,7 +444,7 @@ test("Authenticated page saves allow empty drafts and reject publish bypasses ag
   assert.equal((await list()).status, 200);
   assert.ok(await bucket.head('sellers/mine/landing-page-summaries/my-page.json'));
   const previewUrl = 'http://worker.test/v1/landing-pages/my-page/preview';
-  const savedPreview = await mf.dispatchFetch(previewUrl, {method: 'PUT', headers: {...auth, 'content-type': 'application/json'}, body: JSON.stringify({sourceUpdatedAt: stored.updatedAt, html: '<!doctype html><div class="sq-page-preview">Visible first screen</div><style id="ezkart-library-preview-style">.paused{animation:none}</style><script>largeUnusedCode()</script>'})});
+  const savedPreview = await mf.dispatchFetch(previewUrl, {method: 'PUT', headers: {...auth, 'content-type': 'application/json', 'x-test-metadata-only':'1'}, body: JSON.stringify({sourceUpdatedAt: stored.updatedAt, html: '<!doctype html><div class="sq-page-preview">Visible first screen</div><style id="ezkart-library-preview-style">.paused{animation:none}</style><script>largeUnusedCode()</script>'})});
   assert.equal(savedPreview.status, 200);
   const preview = await mf.dispatchFetch(previewUrl, {headers: auth});
   assert.equal(preview.status, 200);
@@ -452,6 +480,7 @@ test("Authenticated page saves allow empty drafts and reject publish bypasses ag
   const otherSignature = await crypto.subtle.sign({name:'ECDSA',hash:'SHA-256'},keys.privateKey,new TextEncoder().encode(otherUnsigned));
   const otherToken = otherUnsigned + '.' + Buffer.from(otherSignature).toString('base64url');
   assert.equal((await mf.dispatchFetch(viewUrl,{headers:{authorization:'Bearer '+otherToken}})).status,404,'Another signed-in seller cannot read this draft');
+  assert.equal((await mf.dispatchFetch(confirmationUrl,{headers:{authorization:'Bearer '+otherToken}})).status,404,'Save confirmations belong to the signed-in seller');
   assert.equal((await mf.dispatchFetch(publicUrl.replace('/store/','/other/'))).status,404,'Page names are scoped to the store');
   // An otherwise valid preview must disappear when its parent page is gone.
   await bucket.delete('sellers/mine/landing-pages/my-page.json');

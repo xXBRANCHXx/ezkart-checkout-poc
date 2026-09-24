@@ -201,7 +201,7 @@
   const cloudMediaUrl = (id) => cloudMediaBase
     ? `${cloudMediaBase}/v1/public/media/${encodeURIComponent(id)}`
     : cloudPrivateMediaUrl(id);
-  const cloudRequest = async (method, path, payload = null, {onUploadProgress, onResponseProgress, preferMinimal = false} = {}) => {
+  const cloudRequest = async (method, path, payload = null, {onUploadProgress, onResponseProgress, preferMinimal = false, timeoutMs = 0, responseTimeoutMs = 0} = {}) => {
     if (!cloudEnabled) throw new Error("Sign in with Google to access your saved products.");
     const decode = result => {
       if (!result.editor) return result;
@@ -227,17 +227,24 @@
     // keep the same proxy, session cookies, CSRF token and response checks.
     const response = onUploadProgress && body !== null ? await new Promise((resolve, reject) => {
       const request = new XMLHttpRequest();
+      let responseTimer, responseTimedOut = false;
+      const timeoutError = () => Error('The save service took too long to confirm your page. Your edits are still open in this tab.');
       request.open(method, cloudUrl(path));
+      request.timeout = timeoutMs;
       Object.entries(headers).forEach(([name, value]) => request.setRequestHeader(name, value));
       request.upload.onprogress = event => { if (event.lengthComputable && event.total > 0) onUploadProgress(event.loaded / event.total); };
-      request.upload.onload = () => onUploadProgress(1);
+      request.upload.onload = () => {
+        onUploadProgress(1);
+        if (responseTimeoutMs) responseTimer = setTimeout(() => { responseTimedOut = true; request.abort(); }, responseTimeoutMs);
+      };
       request.onprogress = event => { if (request.status >= 200 && request.status < 300) onResponseProgress?.(event.lengthComputable && event.total > 0 ? event.loaded / event.total : null); };
-      request.onload = () => resolve({ok: request.status >= 200 && request.status < 300, status: request.status, json: async () => JSON.parse(request.responseText)});
-      request.onerror = () => reject(Error('Your page could not be uploaded. Check your connection and try again.'));
-      request.onabort = () => reject(Error('The upload was interrupted. Please publish again.'));
+      request.onload = () => { clearTimeout(responseTimer); resolve({ok: request.status >= 200 && request.status < 300, status: request.status, json: async () => JSON.parse(request.responseText)}); };
+      request.onerror = () => { clearTimeout(responseTimer); reject(Error('Your page could not be uploaded. Check your connection and try again.')); };
+      request.ontimeout = () => { clearTimeout(responseTimer); reject(timeoutError()); };
+      request.onabort = () => { clearTimeout(responseTimer); reject(responseTimedOut ? timeoutError() : Error('The upload was interrupted. Please publish again.')); };
       onUploadProgress(0);
       request.send(body);
-    }) : await fetch(cloudUrl(path), {method, credentials: "same-origin", headers, body, cache: "no-store"});
+    }) : await fetch(cloudUrl(path), {method, credentials: "same-origin", headers, body, cache: "no-store", ...(timeoutMs ? {signal: AbortSignal.timeout(timeoutMs)} : {})});
     const result = await response.json().catch(() => ({}));
     if (!response.ok || result.ok !== true) {
       const error = new Error(String(result.error || `Ezkart returned ${response.status}.`));
@@ -583,12 +590,32 @@
   const saveCloudLandingPage = async (site, changes = {}, requestOptions = {}) => {
     if (!cloudEnabled) throw new Error("Sign in with Google to save landing pages to your Ezkart account.");
     const id = landingPageId(site?.url || site?.id);
-    const result = await cloudRequest("PUT", `/v1/landing-pages/${encodeURIComponent(id)}`, {
+    const saveId = crypto.randomUUID();
+    const path = `/v1/landing-pages/${encodeURIComponent(id)}`;
+    let result;
+    try { result = await cloudRequest("PUT", path, {
       name: site.name,
       products: Array.isArray(site.products) ? site.products : [],
       customProducts: Array.isArray(site.customProducts) ? site.customProducts : [],
       ...changes,
-    }, {preferMinimal: true, ...requestOptions});
+      saveId,
+    }, {preferMinimal: true, ...(requestOptions.onUploadProgress ? {responseTimeoutMs: 20000} : {}), ...requestOptions});
+    } catch (error) {
+      if (error.status && ![502, 503, 504].includes(error.status)) throw error;
+      requestOptions.onConfirmationCheck?.();
+      // A timeout does not prove the write failed. Check the exact save ID in
+      // durable object metadata; never mistake an older publication for success.
+      for (let attempt = 0; attempt < 3; attempt++) {
+        if (attempt) await new Promise(resolve => setTimeout(resolve, attempt * 500));
+        try {
+          const confirmation = await cloudRequest('GET', `${path}/confirmation`, null, {timeoutMs: 4000});
+          if (confirmation.saveId === saveId) { result = confirmation; break; }
+        } catch (confirmationError) {
+          if ([401, 403, 404].includes(confirmationError.status)) break;
+        }
+      }
+      if (!result) throw error;
+    }
     // Merge the durable save receipt with the state we just sent. Re-downloading
     // the same embedded artwork can be slower than saving the publication.
     const saved = replaceCloudLandingPage({...site, ...changes, ...result.page});
@@ -8526,6 +8553,7 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
       const saved = await persistCurrentState({ status: "published", publishedHtml: generateHtml() }, onProgress ? {
         onUploadProgress: fraction => onProgress(20 + Math.round(Math.min(1, fraction) * 70), fraction >= 1 ? 'Upload complete. Confirming publication…' : 'Uploading your page…'),
         onResponseProgress: fraction => onProgress(fraction === null ? 95 : 95 + Math.floor(Math.min(1, fraction) * 4), 'Receiving your save confirmation…'),
+        onConfirmationCheck: () => onProgress(95, 'Checking whether your page was saved…'),
       } : {});
       if (saveState) saveState.textContent = saved ? "Published just now" : "Publish failed";
       if (!saved) throw Error('The page could not be published. Check the message and try again.');

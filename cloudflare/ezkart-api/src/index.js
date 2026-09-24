@@ -5,6 +5,7 @@ import { listBuilderFonts, saveBuilderFont, serveBuilderFont } from './builder-f
 import { listBuilderAssets, saveBuilderAsset, serveBuilderAsset } from "./builder-assets.js";
 import {landingSummaryKey, listLandingObjects, cacheLandingSummary, readLandingSummary, staticLandingPreview} from './landing-page-index.js';
 import {packLandingEditor, landingPageSaveReceipt} from './landing-page-transfer.js';
+import {readLandingPageJson} from './landing-page-storage.js';
 import { customerAddressBook, changeCustomerAddressBook } from "./customer-addresses.js";
 import { validatePublication } from "./landing-publication.js";
 import { merchantStorefront, publicStorefront } from "./storefront.js";
@@ -474,15 +475,27 @@ const landingPageSummary = (page) => ({
 });
 
 async function landingPageObject(env, sellerId, id) {
-  const object = await env.PRIVATE_ASSETS.get(landingPageKey(sellerId, id));
-  if (!object) throw new Response("Landing page not found", { status: 404 });
   try {
-    const page = JSON.parse(await object.text());
+    const page = await readLandingPageJson(env.PRIVATE_ASSETS, landingPageKey(sellerId, id), {
+      onTiming: timing => { if (timing.failed || timing.openMs + timing.bodyMs > 1000) console.info('landing-page-read', timing); },
+    });
+    if (page === null) throw new Response("Landing page not found", {status: 404});
     if (!page || typeof page !== "object" || Array.isArray(page)) throw new Error("invalid landing page object");
     return page;
-  } catch (_) {
-    throw new Response("Landing page data is invalid", { status: 500 });
+  } catch (error) {
+    if (error instanceof Response) throw error;
+    if (error instanceof SyntaxError || error.message === 'invalid landing page object') throw new Response("Landing page data is invalid", {status: 500});
+    throw new Response("Page storage is taking too long to respond. Please try again.", {status: 503});
   }
+}
+
+async function landingPageConfirmation(request, env, rawId) {
+  const seller = await sellerPageAddress(env, (await sellerContext(request, env)).seller);
+  const id = cleanLandingPageId(rawId);
+  const object = await env.PRIVATE_ASSETS.head(landingPageKey(seller.id, id));
+  if (!object) throw new Response('Landing page not found', {status: 404});
+  const meta = object.customMetadata || {};
+  return {saveId: meta.saveId || '', page: landingPageLinks({id, url: `${id}.ezkart.site`, name: meta.name, status: meta.status, createdAt: meta.createdAt, updatedAt: meta.updatedAt, publishedAt: meta.publishedAt || null}, seller)};
 }
 
 async function landingPageWithPreviewMetadata(env, sellerId, id) {
@@ -527,12 +540,28 @@ async function landingPage(request, env, rawId) {
   return landingPageLinks(await landingPageWithPreviewMetadata(env, seller.id, cleanLandingPageId(rawId)), seller);
 }
 
-async function saveLandingPage(request, env, rawId) {
+async function saveLandingPage(request, env, rawId, context) {
   const seller = await sellerPageAddress(env, (await sellerContext(request, env)).seller);
   const id = cleanLandingPageId(rawId);
   const payload = await requestJson(request, maximumLandingPageBytes);
+  const saveId = String(payload.saveId || '');
+  if (saveId && !/^[a-f0-9-]{36}$/.test(saveId)) throw new Response('Save identifier is invalid', {status: 400});
   let existing = null;
-  try { existing = await landingPageObject(env, seller.id, id); } catch (error) {
+  // A publication supplies every editable field and replaces the old HTML.
+  // Only its original creation date is needed from storage. Downloading the
+  // previous image-heavy project here adds a needless failure point to publish.
+  const completePublication = payload.status === 'published'
+    && typeof payload.name === 'string' && Array.isArray(payload.products)
+    && Array.isArray(payload.customProducts) && Object.hasOwn(payload, 'state')
+    && Object.hasOwn(payload, 'publishedHtml');
+  try {
+    if (completePublication) {
+      const object = await env.PRIVATE_ASSETS.head(landingPageKey(seller.id, id));
+      if (object) existing = object.customMetadata?.createdAt
+        ? {createdAt: object.customMetadata.createdAt}
+        : await landingPageObject(env, seller.id, id);
+    } else existing = await landingPageObject(env, seller.id, id);
+  } catch (error) {
     if (!(error instanceof Response) || error.status !== 404) throw error;
   }
   if (!existing) {
@@ -586,11 +615,11 @@ async function saveLandingPage(request, env, rawId) {
   }
   const savedObject = await env.PRIVATE_ASSETS.put(landingPageKey(seller.id, id), serialized, {
     httpMetadata: { contentType: "application/json; charset=utf-8" },
-    customMetadata: { sellerId: seller.id, landingPageId: id, status, updatedAt: now },
+    customMetadata: { sellerId: seller.id, landingPageId: id, status, updatedAt: now, saveId, name, createdAt: page.createdAt, publishedAt: page.publishedAt || '' },
   });
   // A failed derived cache write must not turn a successful project save into
   // an error. The next list read repairs it against the authoritative version.
-  await cacheLandingSummary(env.PRIVATE_ASSETS, seller.id, savedObject, landingPageSummary(page)).catch(() => {});
+  context.waitUntil(cacheLandingSummary(env.PRIVATE_ASSETS, seller.id, savedObject, landingPageSummary(page)).catch(() => {}));
   return landingPageLinks(page, seller);
 }
 
@@ -650,10 +679,12 @@ async function publicLandingPage(env, store, rawId) {
 async function saveLandingPagePreview(request, env, rawId) {
   const { seller } = await sellerContext(request, env);
   const id = cleanLandingPageId(rawId);
-  const page = await landingPageObject(env, seller.id, id);
+  const page = await env.PRIVATE_ASSETS.head(landingPageKey(seller.id, id));
+  if (!page) throw new Response('Landing page not found', {status: 404});
   const payload = await requestJson(request, maximumLandingPagePreviewRequestBytes);
   const sourceUpdatedAt = String(payload.sourceUpdatedAt || "");
-  if (!sourceUpdatedAt || sourceUpdatedAt !== page.updatedAt) {
+  const savedVersion = page.customMetadata?.updatedAt || (await landingPageObject(env, seller.id, id)).updatedAt;
+  if (!sourceUpdatedAt || sourceUpdatedAt !== savedVersion) {
     throw new Response("Landing page changed while its preview was saving", { status: 409 });
   }
   const html = String(payload.html || "");
@@ -1368,10 +1399,12 @@ export default {
       if (["PUT", "POST"].includes(request.method) && landingPagePreviewMatch) return json({ ok: true, preview: await saveLandingPagePreview(request, env, landingPagePreviewMatch[1]) }, 200, cors);
       const landingPageMatch = /^\/v1\/landing-pages\/([a-z0-9-]+)$/.exec(url.pathname);
       const landingEditorMatch = /^\/v1\/landing-pages\/([a-z0-9-]+)\/editor$/.exec(url.pathname);
+      const landingConfirmationMatch = /^\/v1\/landing-pages\/([a-z0-9-]+)\/confirmation$/.exec(url.pathname);
+      if (request.method === 'GET' && landingConfirmationMatch) return json({ok: true, ...await landingPageConfirmation(request, env, landingConfirmationMatch[1])}, 200, cors);
       if (request.method === "GET" && landingEditorMatch) return json({ok: true, editor: packLandingEditor(await landingPage(request, env, landingEditorMatch[1]))}, 200, cors);
       if (request.method === "GET" && landingPageMatch) return json({ ok: true, page: await landingPage(request, env, landingPageMatch[1]) }, 200, cors);
       if (["PUT", "POST"].includes(request.method) && landingPageMatch) {
-        const page = await saveLandingPage(request, env, landingPageMatch[1]);
+        const page = await saveLandingPage(request, env, landingPageMatch[1], context);
         const minimal = request.headers.get('prefer')?.trim().toLowerCase() === 'return=minimal';
         return json({ok: true, page: minimal ? landingPageSaveReceipt(page) : page}, 200, {
           ...cors, ...(minimal ? {'preference-applied': 'return=minimal'} : {}),

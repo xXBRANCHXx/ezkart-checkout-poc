@@ -106,6 +106,8 @@ export class Workspace {
       if(previewMatch){res.setHeader('Content-Security-Policy',"default-src 'none'; img-src data: http: https:; style-src 'unsafe-inline'; font-src data:; sandbox");return send(200,await readFile(join(this.directory,'previews',`${slug(previewMatch[1])}.html`)),'text/html; charset=utf-8');}
       const editorMatch=/^\/v1\/landing-pages\/([a-z0-9-]+)\/editor$/.exec(path);
       if(editorMatch)return send(200,{ok:true,editor:packLandingEditor(await this.read(editorMatch[1]))});
+      const confirmation=/^\/v1\/landing-pages\/([a-z0-9-]+)\/confirmation$/.exec(path);
+      if(confirmation){const page=await this.read(confirmation[1]);return send(200,{ok:true,saveId:page.saveId||'',page:landingPageSaveReceipt(page)});}
       const match=/^\/v1\/landing-pages\/([a-z0-9-]+)$/.exec(path);
       if(match)return send(200,{ok:true,page:await this.read(match[1])});
      }

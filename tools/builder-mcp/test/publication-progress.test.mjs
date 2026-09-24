@@ -140,3 +140,46 @@ test('Publishing tracks uploaded bytes, waits for confirmation, guards closing, 
   assert.equal(uploads,2);
   assert.deepEqual(errors,[]);
 });
+
+test('a lost publish response is recovered from its durable save ID without accepting an older publication', {timeout:60000}, async t => {
+  const dir=await mkdtemp(join(tmpdir(),'ezkart-confirmation-'));
+  const ws=await new Workspace(dir).init();
+  await writeFile(join(dir,'catalog.json'),JSON.stringify({products:[{id:'coffee',name:'Coffee',type:'physical',status:'active',price:79000,stock:5,variants:[]}]}));
+  await ws.create({id:'coffee',name:'Coffee launch'});await ws.start();
+  const browser=await chromium.launch(),page=await browser.newPage({viewport:{width:941,height:900},reducedMotion:'reduce'});
+  page.setDefaultTimeout(10000);
+  t.after(async()=>{await browser.close();await ws.stop();await rm(dir,{recursive:true,force:true});});
+  await page.goto(ws.url+'/cart/admin/?page=sites&edit=coffee.ezkart.site');
+  await page.waitForFunction(()=>window.EzkartBuilder);
+  await page.evaluate(async()=>{
+    await EzkartBuilder.nativeInsert({section:'blank',node:{id:'buy',type:'commerce',part:'add',productId:'coffee'}});
+    await EzkartBuilder.save();
+  });
+  let saveBeforeDisconnect=true, writes=0, checks=0;
+  await page.route('**/cart/admin/**',async route=>{
+    const request=route.request(),path=new URL(request.url()).searchParams.get('cloud');
+    if(path==='/v1/landing-pages/coffee/confirmation') checks++;
+    if(path==='/v1/landing-pages/coffee'&&request.method()==='PUT'&&request.postDataJSON().status==='published'){
+      writes++;
+      if(saveBeforeDisconnect) assert.equal((await route.fetch()).status(),200);
+      return route.fulfill({status:503,json:{ok:false,error:'The save service did not respond.'}});
+    }
+    await route.continue();
+  });
+  const publish=async()=>{await page.locator('[data-sq-publish]').click();await page.locator('[data-favicon-publish]').click();};
+  await publish();
+  const complete=page.locator('[data-sq-published-dialog]');
+  await complete.waitFor({state:'visible'});
+  assert.equal(await complete.getByRole('progressbar').getAttribute('aria-valuenow'),'100');
+  assert.equal(writes,1,'Recovering confirmation never repeats the write');
+  assert.equal(checks,1);
+  const saved=await ws.read('coffee');assert.equal(saved.status,'published');assert.ok(saved.saveId);
+  await complete.getByRole('button',{name:'Back to editor',exact:true}).click();
+  saveBeforeDisconnect=false;
+  await publish();
+  const progress=page.locator('[data-sq-publishing-dialog]');
+  await progress.getByRole('heading',{name:'Publishing wasn’t completed'}).waitFor();
+  assert.equal(await complete.isVisible(),false,'An older published version must not confirm the new attempt');
+  assert.equal((await ws.read('coffee')).saveId,saved.saveId);
+  assert.equal(writes,2);assert.ok(checks>1);
+});

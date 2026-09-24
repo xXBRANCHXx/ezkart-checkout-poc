@@ -703,7 +703,7 @@ function ez_admin_sync_cloudflare_user(string $accessToken): array
 
 function ez_admin_proxy_cloud_request(string $accessToken, string $path, string $method): never
 {
-    $allowedPath = preg_match('#^/v1/(?:catalog|storefront|admin-preferences|admin-profile|advanced-mode|media(?:/[a-zA-Z0-9_-]+)?|assets(?:/[a-zA-Z0-9_-]+)?|fonts(?:/font_[a-f0-9]{64})?|products/[a-zA-Z0-9_-]+(?:/duplicate)?|drafts/[a-zA-Z0-9_-]+|landing-pages(?:/[a-z0-9-]+(?:/(?:preview|export|editor|view))?)?|components(?:/[a-z0-9-]+)?)$#', $path) === 1;
+    $allowedPath = preg_match('#^/v1/(?:catalog|storefront|admin-preferences|admin-profile|advanced-mode|media(?:/[a-zA-Z0-9_-]+)?|assets(?:/[a-zA-Z0-9_-]+)?|fonts(?:/font_[a-f0-9]{64})?|products/[a-zA-Z0-9_-]+(?:/duplicate)?|drafts/[a-zA-Z0-9_-]+|landing-pages(?:/[a-z0-9-]+(?:/(?:preview|export|editor|view|confirmation))?)?|components(?:/[a-z0-9-]+)?)$#', $path) === 1;
     if (!$allowedPath || str_contains($path, '?') || str_contains($path, '#')) {
         ez_admin_json(['ok' => false, 'error' => 'That saved-data path is not allowed.'], 400);
     }
@@ -784,8 +784,13 @@ function ez_admin_proxy_cloud_request(string $accessToken, string $path, string 
     $contentType = trim((string) curl_getinfo($handle, CURLINFO_CONTENT_TYPE));
     $error = curl_error($handle);
     if (!is_string($responseBody)) {
-        ez_admin_log_auth_error('Cloud data proxy failed', new RuntimeException($error !== '' ? $error : 'Empty Worker response.'));
-        ez_admin_json(['ok' => false, 'error' => 'Your saved Ezkart data could not be reached.'], 503);
+        ez_admin_log_auth_error('Cloud data proxy failed', new RuntimeException(json_encode([
+            'method' => $method, 'path' => $path, 'error' => $error,
+            'seconds' => curl_getinfo($handle, CURLINFO_TOTAL_TIME),
+            'connect_seconds' => curl_getinfo($handle, CURLINFO_CONNECT_TIME),
+            'first_byte_seconds' => curl_getinfo($handle, CURLINFO_STARTTRANSFER_TIME),
+        ], JSON_UNESCAPED_SLASHES)));
+        ez_admin_json(['ok' => false, 'error' => 'The save service did not respond. Please try again.', 'code' => 'cloud_transport_unavailable'], 503);
     }
     http_response_code($status > 0 ? $status : 502);
     if (($isImageRequest || $isPreviewRequest) && in_array($status, [200, 304], true)) {

@@ -26,6 +26,7 @@ export async function readLandingSummary(bucket, sellerId, listed, summarize) {
   if (cached?.customMetadata?.sourceVersion === listed.version) {
     try { return await cached.json(); } catch (_) { /* Rebuild a damaged derived cache. */ }
   }
+  if (cached?.body && !cached.body.locked) await cached.body.cancel().catch(() => {});
   const source = await bucket.get(listed.key);
   if (!source) return null; // It may have been deleted after listing.
   const summary = summarize(await source.json());
