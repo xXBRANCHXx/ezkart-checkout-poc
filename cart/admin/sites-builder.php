@@ -357,14 +357,18 @@ declare(strict_types=1);
 
 <dialog class="sq-favicon-dialog sq-published-dialog" data-sq-published-dialog aria-labelledby="sq-published-title">
   <header><div><h2 id="sq-published-title">Your page is published</h2><p><strong>It’s safe to close this tab.</strong> Anyone can open this link. Draft edits stay private until you publish again.</p></div><button type="button" data-published-close aria-label="Close publication details">×</button></header>
-  <div class="sq-favicon-dialog-body"><a data-published-url target="_blank" rel="noopener"></a></div>
+  <div class="sq-favicon-dialog-body"><div class="sq-publishing-complete"><span>Ready to share</span><strong>100%</strong></div><div class="sq-publishing-bar is-complete" role="progressbar" aria-label="Publishing complete" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span></span></div><a data-published-url target="_blank" rel="noopener"></a></div>
   <footer><button class="ui-button" type="button" data-published-close>Back to editor</button><button class="ui-button" type="button" data-published-copy>Copy link</button><a class="ui-button primary" data-sq-open-public target="_blank" rel="noopener">View published page</a></footer>
 </dialog>
 
 <dialog class="sq-favicon-dialog sq-publishing-dialog" data-sq-publishing-dialog aria-labelledby="sq-publishing-title" aria-describedby="sq-publishing-description">
-  <div class="sq-publishing-status" role="status" aria-live="polite" aria-atomic="true">
-    <span class="sq-publishing-spinner" data-publishing-spinner aria-hidden="true"></span>
+  <div class="sq-publishing-status">
     <h2 id="sq-publishing-title" data-publishing-title>Publishing your page…</h2>
+    <div data-publishing-progress>
+      <strong class="sq-publishing-percent" data-publishing-percent aria-hidden="true">0%</strong>
+      <div class="sq-publishing-bar" data-publishing-bar role="progressbar" aria-label="Publishing progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span></span></div>
+      <p data-publishing-stage role="status" aria-live="polite">Getting everything ready…</p>
+    </div>
     <p id="sq-publishing-description" data-publishing-description>Keep this tab open. We’ll tell you when it’s safe to close.</p>
     <p class="sq-publishing-error" data-publishing-error hidden></p>
   </div>

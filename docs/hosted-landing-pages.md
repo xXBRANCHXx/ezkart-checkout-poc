@@ -16,7 +16,10 @@ Implemented on `agent/ezkart-workbench`, 24 September 2026.
   Addresses use the configured shop name, falling back to the business name. A short
   number is added only for a name collision; a reserved address remains stable.
 - Publishing shows a modal immediately during preparation and again while the
-  page uploads. It asks the merchant to keep the tab open until the server confirms
+  page uploads. A percentage bar advances through preparation and measured upload
+  bytes, then holds at 90% while the server saves the publication. Only an accepted
+  save reaches 100%; elapsed time never fabricates upload or save completion.
+  Friendly stage captions explain what is happening. It asks the merchant to keep the tab open until the server confirms
   the save. Closing or reloading during either request triggers the browser’s leave
   warning; Escape cannot dismiss the progress screen. Failed requests show a
   persistent error and restore the editor without claiming success.
@@ -134,3 +137,11 @@ server error stays visible and success is absent, then retries successfully. It
 closes the editor after acknowledgement and loads the durable public page. Desktop,
 390px and 320px screenshots are in `/tmp/ezkart-publishing-review`.
 The hosted-page, favicon and 11 required editor interaction checks also pass.
+
+Percentage progress uses an opt-in XHR transport for the publish request, preserving
+the same admin proxy, session cookies, CSRF token and response validation. Other
+requests retain fetch. The progress test throttles a real browser upload and checks
+intermediate, monotonic percentages. It delays the server save after all bytes
+arrive and verifies 90% plus the close guard until acknowledgement, then 100% and
+the safe-to-close confirmation. Screenshots at 1440, 390 and 320 pixels are in
+`/tmp/ezkart-publishing-review/percentage-*.png`.

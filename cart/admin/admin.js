@@ -201,7 +201,7 @@
   const cloudMediaUrl = (id) => cloudMediaBase
     ? `${cloudMediaBase}/v1/public/media/${encodeURIComponent(id)}`
     : cloudPrivateMediaUrl(id);
-  const cloudRequest = async (method, path, payload = null) => {
+  const cloudRequest = async (method, path, payload = null, {onUploadProgress} = {}) => {
     if (!cloudEnabled) throw new Error("Sign in with Google to access your saved products.");
     const decode = result => {
       if (!result.editor) return result;
@@ -216,17 +216,26 @@
     };
     const started = method === 'GET' && globalThis.EzkartAdminStartup?.take(path);
     if (started) return decode(await started);
-    const response = await fetch(cloudUrl(path), {
-      method,
-      credentials: "same-origin",
-      headers: {
-        Accept: "application/json",
-        ...(payload ? { "Content-Type": "application/json" } : {}),
-        ...(method === "GET" ? {} : { "X-Ezkart-Csrf": cloudCsrfToken }),
-      },
-      body: payload ? JSON.stringify(payload) : null,
-      cache: "no-store",
-    });
+    const headers = {
+      Accept: "application/json",
+      ...(payload ? { "Content-Type": "application/json" } : {}),
+      ...(method === "GET" ? {} : { "X-Ezkart-Csrf": cloudCsrfToken }),
+    };
+    const body = payload ? JSON.stringify(payload) : null;
+    // Fetch does not expose upload progress. Opt in only for publication;
+    // keep the same proxy, session cookies, CSRF token and response checks.
+    const response = onUploadProgress && body !== null ? await new Promise((resolve, reject) => {
+      const request = new XMLHttpRequest();
+      request.open(method, cloudUrl(path));
+      Object.entries(headers).forEach(([name, value]) => request.setRequestHeader(name, value));
+      request.upload.onprogress = event => { if (event.lengthComputable && event.total > 0) onUploadProgress(event.loaded / event.total); };
+      request.upload.onload = () => onUploadProgress(1);
+      request.onload = () => resolve({ok: request.status >= 200 && request.status < 300, status: request.status, json: async () => JSON.parse(request.responseText)});
+      request.onerror = () => reject(Error('Your page could not be uploaded. Check your connection and try again.'));
+      request.onabort = () => reject(Error('The upload was interrupted. Please publish again.'));
+      onUploadProgress(0);
+      request.send(body);
+    }) : await fetch(cloudUrl(path), {method, credentials: "same-origin", headers, body, cache: "no-store"});
     const result = await response.json().catch(() => ({}));
     if (!response.ok || result.ok !== true) {
       const error = new Error(String(result.error || `Ezkart returned ${response.status}.`));
@@ -569,7 +578,7 @@
     else cloudLandingPages.unshift(normalized);
     return normalized;
   };
-  const saveCloudLandingPage = async (site, changes = {}) => {
+  const saveCloudLandingPage = async (site, changes = {}, requestOptions = {}) => {
     if (!cloudEnabled) throw new Error("Sign in with Google to save landing pages to your Ezkart account.");
     const id = landingPageId(site?.url || site?.id);
     const result = await cloudRequest("PUT", `/v1/landing-pages/${encodeURIComponent(id)}`, {
@@ -577,7 +586,7 @@
       products: Array.isArray(site.products) ? site.products : [],
       customProducts: Array.isArray(site.customProducts) ? site.customProducts : [],
       ...changes,
-    });
+    }, requestOptions);
     const saved = replaceCloudLandingPage(result.page);
     document.dispatchEvent(new CustomEvent("ezkart:cloud-landing-pages-changed", { detail: { page: saved } }));
     return saved;
@@ -2887,7 +2896,7 @@
       redoStack.length = 0;
       updateHistoryButtons();
     };
-    const persistCurrentState = (changes = {}) => {
+    const persistCurrentState = (changes = {}, requestOptions = {}) => {
       const site = readLandingSites().find((page) => page.url === activeSiteKey);
       if (!site || !activeSiteDocument || landingPageId(activeSiteDocument.id) !== landingPageId(activeSiteKey)) return Promise.resolve(false);
       const state = captureState();
@@ -2897,7 +2906,7 @@
         try {
           // Finish an in-flight preview before replacing the version it uses.
           await previewSavePromise;
-          activeSiteDocument = await saveCloudLandingPage(site, { state, products: state.products, ...changes });
+          activeSiteDocument = await saveCloudLandingPage(site, { state, products: state.products, ...changes }, requestOptions);
           syncHostedPageLinks();
           scheduleLandingPreviewRefresh();
           return true;
@@ -8504,13 +8513,18 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
         window.setTimeout(() => URL.revokeObjectURL(url), 1000); showToast("HTML file downloaded");
       } catch (error) { exportDialog.close(); showToast(error.message); }
     });
-    const publishPage = async () => {
+    const publishPage = async ({onProgress} = {}) => {
       if (siteSettings.busy()) throw Error("Wait for your favicon upload to finish, then publish.");
+      onProgress?.(10, 'Checking the final details…');
       await requireProductForOutput();
+      onProgress?.(20, 'Getting your page ready to upload…');
       clearTimeout(saveTimer);
-      const saved = await persistCurrentState({ status: "published", publishedHtml: generateHtml() });
+      const saved = await persistCurrentState({ status: "published", publishedHtml: generateHtml() }, onProgress ? {
+        onUploadProgress: fraction => onProgress(20 + Math.round(Math.min(1, fraction) * 70), fraction >= 1 ? 'Almost there. Saving your page…' : 'Uploading your page…'),
+      } : {});
       if (saveState) saveState.textContent = saved ? "Published just now" : "Publish failed";
       if (!saved) throw Error('The page could not be published. Check the message and try again.');
+      onProgress?.(100, 'Your page is ready to share!');
       showToast("Landing page published");
       syncHostedPageLinks();
       for (const [tab, preview] of previewTabs) {
@@ -8525,18 +8539,32 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
     const publishedDialog = document.querySelector('[data-sq-published-dialog]');
     const publishingDialog = document.querySelector('[data-sq-publishing-dialog]');
     let publicationPending = false;
+    let publicationPercent = 0;
+    const setPublicationProgress = (percent, stage) => {
+      if (!publicationPending) return;
+      publicationPercent = Math.max(publicationPercent, Math.min(100, Math.round(percent)));
+      publishingDialog.querySelector('[data-publishing-percent]').textContent = `${publicationPercent}%`;
+      const bar = publishingDialog.querySelector('[data-publishing-bar]');
+      bar.setAttribute('aria-valuenow', String(publicationPercent));
+      bar.setAttribute('aria-valuetext', `${publicationPercent}%: ${stage}`);
+      bar.firstElementChild.style.transform = `scaleX(${publicationPercent / 100})`;
+      const caption = publishingDialog.querySelector('[data-publishing-stage]');
+      if (caption.textContent !== stage) caption.textContent = stage;
+    };
     const preventLeavingDuringPublication = event => { event.preventDefault(); event.returnValue = ''; };
     const finishPublicationWait = () => {
       publicationPending = false;
       window.removeEventListener('beforeunload', preventLeavingDuringPublication);
       publishingDialog?.removeAttribute('aria-busy');
     };
-    const showPublicationWait = title => {
+    const showPublicationWait = (title, percent = 0) => {
       publicationPending = true;
+      publicationPercent = percent;
       window.addEventListener('beforeunload', preventLeavingDuringPublication);
       publishingDialog.querySelector('[data-publishing-title]').textContent = title;
       publishingDialog.querySelector('[data-publishing-description]').textContent = 'Keep this tab open. We’ll tell you when it’s safe to close.';
-      publishingDialog.querySelector('[data-publishing-spinner]').hidden = false;
+      publishingDialog.querySelector('[data-publishing-progress]').hidden = false;
+      setPublicationProgress(percent, 'Getting everything ready…');
       publishingDialog.querySelector('[data-publishing-error]').hidden = true;
       publishingDialog.querySelector('[data-publishing-actions]').hidden = true;
       publishingDialog.setAttribute('aria-busy', 'true');
@@ -8557,9 +8585,9 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
         finishPublicationWait();
         publishingDialog.close();
         if (await siteSettings.confirmPublish()) {
-          showPublicationWait('Publishing your page…');
+          showPublicationWait('Publishing your page…', 10);
           siteSettings.setPublishing(true);
-          const result = await publishPage();
+          const result = await publishPage({onProgress: setPublicationProgress});
           const publicLink = publishedDialog?.querySelector('[data-published-url]');
           if (publicLink) { publicLink.href = result.url; publicLink.textContent = result.url; }
           finishPublicationWait();
@@ -8571,7 +8599,7 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
         if (saveState) saveState.textContent = 'Publish failed';
         publishingDialog.querySelector('[data-publishing-title]').textContent = 'Publishing wasn’t completed';
         publishingDialog.querySelector('[data-publishing-description]').textContent = 'We couldn’t confirm that your page was published. Return to the editor and try again.';
-        publishingDialog.querySelector('[data-publishing-spinner]').hidden = true;
+        publishingDialog.querySelector('[data-publishing-progress]').hidden = true;
         const message = publishingDialog.querySelector('[data-publishing-error]');
         message.textContent = error.message; message.hidden = false;
         publishingDialog.querySelector('[data-publishing-actions]').hidden = false;
