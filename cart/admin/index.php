@@ -5,6 +5,7 @@ require_once dirname(__DIR__) . '/api/bootstrap.php';
 require_once __DIR__ . '/dashboard-data.php';
 require_once __DIR__ . '/analytics-data.php';
 require_once __DIR__ . '/wallet-access.php';
+require_once dirname(__DIR__) . '/page-frame.php';
 
 $previewRepairFrame = ($_GET['preview-repair'] ?? '') === '1'
     && ($_GET['page'] ?? '') === 'sites'
@@ -21,7 +22,7 @@ header('X-Frame-Options: ' . ($embeddedPreviewFrame ? 'SAMEORIGIN' : 'DENY'));
 header('Referrer-Policy: no-referrer');
 header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
 if ($interactivePageView) {
-    header("Content-Security-Policy: default-src 'none'; img-src 'self' data: https:; media-src 'self' data: blob: https:; style-src 'unsafe-inline' https:; script-src 'unsafe-inline' https:; font-src 'self' data: https:; connect-src 'self' https:; form-action 'self' https:; frame-src https:; frame-ancestors 'self'; base-uri 'none'; sandbox allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation");
+    header("Content-Security-Policy: default-src 'none'; img-src 'self' data: https:; media-src 'self' data: blob: https:; style-src 'unsafe-inline' https:; script-src 'unsafe-inline' https:; font-src 'self' data: https:; connect-src 'self' https:; form-action 'self' https:; frame-src 'self' about: https:; frame-ancestors 'self'; base-uri 'none'; sandbox allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation");
     header('X-Robots-Tag: noindex, nofollow');
 } elseif ($previewDocumentFrame) {
     header("Content-Security-Policy: default-src 'none'; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline' https:; font-src 'self' data: https:; script-src 'none'; connect-src 'none'; frame-src 'none'; form-action 'none'; frame-ancestors 'self'; base-uri 'none'");
@@ -788,7 +789,14 @@ function ez_admin_proxy_cloud_request(string $accessToken, string $path, string 
     }
     header('Content-Type: ' . ($contentType !== '' ? $contentType : 'application/json; charset=utf-8'));
     header('X-Content-Type-Options: nosniff');
-    echo $responseBody;
+    if ($method === 'GET' && $status === 200 && preg_match('#^/v1/landing-pages/[a-z0-9-]+/view$#', $path) === 1) {
+        if (!str_starts_with(strtolower($contentType), 'text/html')) {
+            ez_admin_json(['ok' => false, 'error' => 'The page preview could not be loaded.'], 502);
+        }
+        echo ez_landing_page_frame($responseBody);
+    } else {
+        echo $responseBody;
+    }
     exit;
 }
 

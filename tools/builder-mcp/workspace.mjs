@@ -8,6 +8,11 @@ import {landingPagePolicy, landingPageLinks} from '../../cloudflare/ezkart-api/s
 import {decodeFontDataUrl} from '../../cloudflare/ezkart-api/src/builder-fonts.js';
 export const repoRoot=resolve(dirname(fileURLToPath(import.meta.url)),'../..');
 const htmlEscape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const hostedFrame=html=>{
+ const title=html.match(/<title\b[^>]*>(.*?)<\/title>/is)?.[1]||'Landing page';
+ html=html.replaceAll('return:location.href}',"return:(location.href==='about:srcdoc'?document.baseURI:location.href)}");
+ return `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>${htmlEscape(title)}</title><style>html,body{margin:0;width:100%;height:100%;overflow:hidden}iframe{display:block;width:100%;height:100%;border:0}</style></head><body><iframe data-hosted-page title="${htmlEscape(title)}" sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation" srcdoc="${htmlEscape(html)}"></iframe></body></html>`;
+};
 const slug=value=>{if(!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value)||value.length>48)throw new Error('Use a project ID of up to 48 lowercase letters, numbers, and hyphens.');return value;};
 export class Workspace {
  constructor(directory){this.directory=resolve(directory);this.csrf=randomBytes(24).toString('hex');}
@@ -80,7 +85,7 @@ export class Workspace {
        await this.read(viewMatch[1]);
        res.setHeader('Content-Security-Policy',await this.hostedPolicy());
        const html=await readFile(join(this.directory,'previews',`${slug(viewMatch[1])}.html`),'utf8');
-       return send(200,html.replace(/<style id="ezkart-library-preview-style">[\s\S]*?<\/style>/g,''),'text/html; charset=utf-8');
+       return send(200,hostedFrame(html.replace(/<style id="ezkart-library-preview-style">[\s\S]*?<\/style>/g,'')),'text/html; charset=utf-8');
       }
       const previewMatch=/^\/v1\/landing-pages\/([a-z0-9-]+)\/preview$/.exec(path);
       if(previewMatch){res.setHeader('Content-Security-Policy',"default-src 'none'; img-src data: http: https:; style-src 'unsafe-inline'; font-src data:; sandbox");return send(200,await readFile(join(this.directory,'previews',`${slug(previewMatch[1])}.html`)),'text/html; charset=utf-8');}
@@ -139,7 +144,7 @@ export class Workspace {
      const page=await this.read(url.searchParams.get('page'));
      if(page.status!=='published'||!page.publishedHtml)return send(404,'Page not found.','text/plain');
      res.setHeader('Content-Security-Policy',await this.hostedPolicy());
-     return send(200,page.publishedHtml,'text/html; charset=utf-8');
+     return send(200,hostedFrame(page.publishedHtml),'text/html; charset=utf-8');
     }
     if(url.pathname==='/cart/admin/'||url.pathname==='/cart/admin/index.php')return send(200,await this.markup(!url.searchParams.has('edit')),'text/html; charset=utf-8');
     if(url.pathname==='/cart/api/health.php')return send(200,{ok:true,commerce_environment:'test'});

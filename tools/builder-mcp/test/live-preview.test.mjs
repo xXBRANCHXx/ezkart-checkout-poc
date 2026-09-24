@@ -185,12 +185,13 @@ test("the editor Preview renders current edits, local media and commerce at ever
     const popupPromise = page.context().waitForEvent("page");
     await page.locator("[data-sq-preview-new-tab]").click();
     const popup = await popupPromise;
-    await popup.locator("#native-headline").waitFor();
+    const popupFrame = await popup.locator('[data-hosted-page]').elementHandle().then(node=>node.contentFrame());
+    await popupFrame.locator("#native-headline").waitFor();
     assert.equal(
-      await popup.locator("#native-headline").innerText(),
+      await popupFrame.locator("#native-headline").innerText(),
       "Take a Thip",
     );
-    await popup.waitForFunction(() =>
+    await popupFrame.waitForFunction(() =>
       [...document.images].every((img) => img.complete && img.naturalWidth > 0),
     );
     const hostedUrl = popup.url();
@@ -200,13 +201,14 @@ test("the editor Preview renders current edits, local media and commerce at ever
     await popup.close();
     const reopened = await browser.newPage();
     await reopened.goto(hostedUrl);
-    assert.equal(await reopened.locator('#native-headline').innerText(), 'Take a Thip');
+    assert.equal(await reopened.frameLocator('[data-hosted-page]').locator('#native-headline').innerText(), 'Take a Thip');
     await reopened.reload();
-    await reopened.waitForFunction(() => [...document.images].every(img => img.complete && img.naturalWidth > 0));
-    await reopened.locator('#native-options input[value=orange]').check();
-    assert.equal(await reopened.locator('#native-price').innerText(), '$26');
-    await reopened.locator('#native-add button').click();
-    assert.match(await reopened.locator('.ezkart-cart-row').innerText(), /Orange/);
+    const reopenedFrame=await reopened.locator('[data-hosted-page]').elementHandle().then(node=>node.contentFrame());
+    await reopenedFrame.waitForFunction(() => [...document.images].every(img => img.complete && img.naturalWidth > 0));
+    await reopenedFrame.locator('#native-options input[value=orange]').check();
+    assert.equal(await reopenedFrame.locator('#native-price').innerText(), '$26');
+    await reopenedFrame.locator('#native-add button').click();
+    assert.match(await reopenedFrame.locator('.ezkart-cart-row').innerText(), /Orange/);
     await reopened.close();
     await page.locator("[data-sq-preview-close]").click();
     await field.fill("A second edit");

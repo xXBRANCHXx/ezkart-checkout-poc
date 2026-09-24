@@ -36,22 +36,22 @@ test('Image Stack publishes a durable public link and keeps later draft edits pr
   const live=await visitor.newPage();
   const errors=[];live.on('pageerror',e=>errors.push(e.message));
   assert.equal((await live.goto(publicUrl)).status(),200);
-  await live.locator('[data-image-upload]').evaluate(img=>img.decode());
-  await live.locator('[data-ezkart-add]').click();
-  assert.match(await live.locator('.ezkart-cart-row').innerText(),/Catalog coffee/);
-  await live.locator('[data-ezkart-cart-go]').click();
-  assert.match(await live.locator('[data-ezkart-cart-items]').innerText(),/No order was placed/);
+  await live.frameLocator('[data-hosted-page]').locator('[data-image-upload]').evaluate(img=>img.decode());
+  await live.frameLocator('[data-hosted-page]').locator('[data-ezkart-add]').click();
+  assert.match(await live.frameLocator('[data-hosted-page]').locator('.ezkart-cart-row').innerText(),/Catalog coffee/);
+  await live.frameLocator('[data-hosted-page]').locator('[data-ezkart-cart-go]').click();
+  assert.match(await live.frameLocator('[data-hosted-page]').locator('[data-ezkart-cart-items]').innerText(),/No order was placed/);
   await page.locator('.ib-row summary').click();
   await page.locator('.ib-row textarea').fill('Unpublished artwork description');
   await page.locator('.ib-row textarea').blur();
   await page.evaluate(()=>EzkartBuilder.save());
   await live.reload();
-  assert.notEqual(await live.locator('[data-image-upload]').getAttribute('alt'),'Unpublished artwork description');
+  assert.notEqual(await live.frameLocator('[data-hosted-page]').locator('[data-image-upload]').getAttribute('alt'),'Unpublished artwork description');
   await page.locator('[data-sq-publish]').click();
   await page.locator('[data-favicon-publish]').click();
   await page.waitForFunction(()=>document.querySelector('[data-sq-save-state]').textContent==='Published just now');
   await live.reload();
-  assert.equal(await live.locator('[data-image-upload]').getAttribute('alt'),'Unpublished artwork description');
+  assert.equal(await live.frameLocator('[data-hosted-page]').locator('[data-image-upload]').getAttribute('alt'),'Unpublished artwork description');
   await page.reload();
   await link.waitFor({state:'visible'});
   assert.equal(await link.getAttribute('href'),publicUrl);
@@ -63,7 +63,7 @@ test('Image Stack publishes a durable public link and keeps later draft edits pr
     assert.ok(bounds.x>=0 && bounds.x+bounds.width<=width);
     await page.screenshot({path:`/tmp/ezkart-hosting-review/editor-${width}.png`});
   }
-  await live.locator('[data-image-upload]').evaluate(img=>img.decode());
+  await live.frameLocator('[data-hosted-page]').locator('[data-image-upload]').evaluate(img=>img.decode());
   await live.screenshot({path:'/tmp/ezkart-hosting-review/public-390.png'});
   await page.goto(ws.url+'/cart/admin/?page=sites');
   const copy=page.getByRole('button',{name:'Copy published page URL'});
@@ -73,7 +73,7 @@ test('Image Stack publishes a durable public link and keeps later draft edits pr
   assert.equal(await page.evaluate(()=>window.copiedPageUrl),publicUrl);
   await page.close();
   await live.reload();
-  assert.equal(await live.locator('[data-image-upload]').count(),1);
+  assert.equal(await live.frameLocator('[data-hosted-page]').locator('[data-image-upload]').count(),1);
   assert.deepEqual(errors,[]);
   assert.deepEqual(editorErrors,[]);
 });

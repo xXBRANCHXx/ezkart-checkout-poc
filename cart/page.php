@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__ . '/api/bootstrap.php';
+require_once __DIR__ . '/page-frame.php';
 
 header('Content-Type: text/html; charset=utf-8');
 header('Cache-Control: private, no-store');
@@ -8,7 +9,7 @@ header('X-Content-Type-Options: nosniff');
 header('Referrer-Policy: no-referrer');
 if (strtolower(ez_config('deployment_environment')) !== 'production') header('X-Robots-Tag: noindex, nofollow');
 // Merchant-authored HTML must never gain the hosting origin's privileges.
-header("Content-Security-Policy: default-src 'none'; img-src 'self' data: https:; media-src 'self' data: blob: https:; style-src 'unsafe-inline' https:; script-src 'unsafe-inline' https:; font-src 'self' data: https:; connect-src 'self' https:; form-action 'self' https:; frame-src https:; frame-ancestors 'self'; base-uri 'none'; sandbox allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation");
+header("Content-Security-Policy: default-src 'none'; img-src 'self' data: https:; media-src 'self' data: blob: https:; style-src 'unsafe-inline' https:; script-src 'unsafe-inline' https:; font-src 'self' data: https:; connect-src 'self' https:; form-action 'self' https:; frame-src 'self' about: https:; frame-ancestors 'self'; base-uri 'none'; sandbox allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation");
 
 try {
     if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET') {
@@ -42,7 +43,7 @@ try {
         exit('Page not found.');
     }
     if ($status !== 200 || !is_string($html) || !str_starts_with(strtolower($type), 'text/html')) throw new RuntimeException('Page could not be loaded.');
-    echo $html;
+    echo ez_landing_page_frame($html);
 } catch (Throwable $error) {
     error_log('Ezkart page hosting: ' . $error->getMessage());
     http_response_code(503);
