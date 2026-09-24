@@ -1,0 +1,16 @@
+// A lossless wire format: embedded images occur in native attributes, rendered
+// HTML and catalog snapshots. Send each image once without changing saved data.
+export function packLandingEditor(page) {
+  const {publishedHtml, ...editable} = page;
+  const source = JSON.stringify(editable);
+  const images = [], indexes = new Map(), parts = [];
+  let offset = 0;
+  for (const match of source.matchAll(/data:image\/(?:png|jpeg|webp|gif|avif);base64,[a-zA-Z0-9+/=]{1024,}/g)) {
+    parts.push(source.slice(offset, match.index));
+    if (!indexes.has(match[0])) { indexes.set(match[0], images.length); images.push(match[0]); }
+    parts.push(indexes.get(match[0]));
+    offset = match.index + match[0].length;
+  }
+  parts.push(source.slice(offset));
+  return {format: 'images-v1', parts, images};
+}

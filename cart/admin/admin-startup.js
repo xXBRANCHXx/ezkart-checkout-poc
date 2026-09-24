@@ -1,6 +1,6 @@
 // Start the requested document while the builder scripts are downloading.
 (() => {
-  if (document.body.dataset.adminCloudEnabled !== 'true') return;
+  if ((document.currentScript?.dataset.adminCloudEnabled || document.body?.dataset.adminCloudEnabled) !== 'true') return;
   const requests = new Map();
   const preload = path => {
     const promise = fetch(`./?cloud=${encodeURIComponent(path)}`, {
@@ -17,19 +17,19 @@
     // Store a settled result so slow script downloads cannot cause an unhandled rejection.
     requests.set(path, promise.then(value => ({value}), error => ({error})));
   };
-  const catalog = document.getElementById('ezkart-catalog-bootstrap');
-  if (catalog) {
-    try { requests.set('/v1/catalog', Promise.resolve({value: JSON.parse(catalog.textContent)})); }
-    catch (_) { /* Fall back to the authenticated catalog endpoint. */ }
-    catalog.remove();
-  }
   const query = new URLSearchParams(location.search);
   const site = query.get('edit') || '';
   if (query.get('page') === 'sites' && /^[a-z0-9]+(?:-[a-z0-9]+)*\.ezkart\.site$/.test(site)) {
-    preload('/v1/landing-pages/' + site.replace(/\.ezkart\.site$/, ''));
+    preload('/v1/landing-pages/' + site.replace(/\.ezkart\.site$/, '') + '/editor');
   }
   globalThis.EzkartAdminStartup = {
     take(path) {
+      const catalog = path === '/v1/catalog' && document.getElementById('ezkart-catalog-bootstrap');
+      if (catalog) {
+        try { requests.set(path, Promise.resolve({value: JSON.parse(catalog.textContent)})); }
+        catch (_) { /* Fall back to the authenticated catalog endpoint. */ }
+        catalog.remove();
+      }
       const promise = requests.get(path);
       requests.delete(path);
       return promise?.then(({value, error}) => { if (error) throw error; return value; });

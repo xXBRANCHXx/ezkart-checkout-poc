@@ -203,8 +203,19 @@
     : cloudPrivateMediaUrl(id);
   const cloudRequest = async (method, path, payload = null) => {
     if (!cloudEnabled) throw new Error("Sign in with Google to access your saved products.");
+    const decode = result => {
+      if (!result.editor) return result;
+      const {format, parts, images} = result.editor;
+      if (format !== 'images-v1' || !Array.isArray(parts) || !Array.isArray(images)) throw Error('The saved page could not be read.');
+      const page = JSON.parse(parts.map(part => {
+        if (typeof part === 'string') return part;
+        if (Number.isInteger(part) && typeof images[part] === 'string') return images[part];
+        throw Error('The saved page could not be read.');
+      }).join(''));
+      return {ok: true, page};
+    };
     const started = method === 'GET' && globalThis.EzkartAdminStartup?.take(path);
-    if (started) return started;
+    if (started) return decode(await started);
     const response = await fetch(cloudUrl(path), {
       method,
       credentials: "same-origin",
@@ -222,7 +233,7 @@
       error.status = response.status;
       throw error;
     }
-    return result;
+    return decode(result);
   };
   if (document.querySelector('[data-sq-preview-root]')) globalThis.EzkartFonts?.configure({
     list:async () => (await cloudRequest('GET','/v1/fonts')).fonts,
@@ -302,7 +313,7 @@
   // Fetch the selected page alongside the catalog/list, including local workspaces.
   let openingPageRequest = cloudEnabled && document.querySelector('[data-sq-preview-root]')
     && /^[a-z0-9]+(?:-[a-z0-9]+)*\.ezkart\.site$/.test(openingSite)
-    ? cloudRequest('GET', '/v1/landing-pages/' + openingSite.replace(/\.ezkart\.site$/, ''))
+    ? cloudRequest('GET', '/v1/landing-pages/' + openingSite.replace(/\.ezkart\.site$/, '') + '/editor')
       .then(value => ({value}), error => ({error})) : null;
   let cloudLandingReady = Promise.resolve();
   let cloudComponentsReady = Promise.resolve();
@@ -573,7 +584,7 @@
       const {value, error} = await pending;
       if (error) throw error;
       result = value;
-    } else result = await cloudRequest("GET", `/v1/landing-pages/${encodeURIComponent(landingPageId(url))}`);
+    } else result = await cloudRequest("GET", `/v1/landing-pages/${encodeURIComponent(landingPageId(url))}/editor`);
     return replaceCloudLandingPage(result.page);
   };
   const deleteCloudLandingPage = async (url) => {

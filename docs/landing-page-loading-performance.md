@@ -54,3 +54,48 @@ Delivery is restricted to `agent/ezkart-workbench`, `test.ezkart.id`, and the
 test Worker. No production release is authorized. The existing Chrome debugging
 connection timed out, so the user's authenticated session was not reloaded or
 measured; hosted asset versions and the test API health are checked separately.
+
+## Follow-up: the loading screen still stayed too long
+
+The initial change left two costs on the critical path. The parser-blocking
+startup script ran after stylesheets, and the editor still fetched roughly two
+dozen separate JavaScript files. A hosted-assets probe with local page data took
+about 3.4 seconds to finish loading some startup scripts. Read-only inspection of
+`image-stack-test-i` in the test bucket also found that all four images occurred
+twice in the 2 MB editable document.
+
+The startup request now runs in the head before CSS. Landing pages use a single
+CSS bundle and a deferred JS bundle, with separate gallery/editor manifests.
+The public bundle endpoint only serves allowlisted repository assets, compresses
+responses, and fingerprints every source's modification time and size so future
+edits invalidate browser caches without a separate build step. Existing source
+order and relative URLs are preserved; native CSS stays isolated in asset cards.
+Map/dashboard JavaScript is no longer loaded on landing-page screens.
+
+An authenticated `/v1/landing-pages/:id/editor` endpoint transfers each embedded
+image once, reconstructing the exact editable JSON in the browser. It excludes
+the publication snapshot, which is not needed for editing. Full saved projects,
+autosave payloads, exports and publication storage retain their original format.
+For the inspected test page, the response fell from 2,024,758 to 1,065,913 bytes;
+gzip fell from 1,466,310 to 738,823 bytes (50%). Deep comparison confirmed lossless
+reconstruction of every editable field. The account data was read for diagnosis
+and was not edited or checked into the repository.
+
+Verification:
+
+- 14 Worker tests passed, including lossless transfer, authorization, missing
+  projects, publication preservation, and existing ownership/stock checks.
+- Authenticated PHP shell/bundle checks and the shop appearance/checkout browser
+  test passed. Checks cover gzip, immutable versioned caching, 304 responses,
+  path rejection, catalog bootstrap, and the new proxy route.
+- The broad builder run passed 122/125 cases. One mock still intercepted only
+  the old document route; it was updated for `/editor` and passed. Two tests hit
+  timeouts under full concurrency. All 13 cases in the follow-up run passed at
+  concurrency 2, including those two, blank-editor workflows, grid interaction,
+  Image Stack sorting/navigation/save/reopen, and a new test that holds both
+  bundles indefinitely while confirming the selected document fetch starts.
+- PHP lint, JavaScript syntax checks, Worker dry-run, and diff checks passed.
+- The local Workspace serves the same bundle manifest and transfer format as
+  hosted PHP. Actual merchant-session timing remains unavailable because Chrome's
+  debugging connection does not respond. Hosted-asset tests use a copied page
+  and controlled API responses, not the merchant's authenticated browser.

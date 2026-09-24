@@ -696,7 +696,7 @@ function ez_admin_sync_cloudflare_user(string $accessToken): array
 
 function ez_admin_proxy_cloud_request(string $accessToken, string $path, string $method): never
 {
-    $allowedPath = preg_match('#^/v1/(?:catalog|storefront|admin-preferences|admin-profile|advanced-mode|media(?:/[a-zA-Z0-9_-]+)?|assets(?:/[a-zA-Z0-9_-]+)?|fonts(?:/font_[a-f0-9]{64})?|products/[a-zA-Z0-9_-]+(?:/duplicate)?|drafts/[a-zA-Z0-9_-]+|landing-pages(?:/[a-z0-9-]+(?:/(?:preview|export))?)?|components(?:/[a-z0-9-]+)?)$#', $path) === 1;
+    $allowedPath = preg_match('#^/v1/(?:catalog|storefront|admin-preferences|admin-profile|advanced-mode|media(?:/[a-zA-Z0-9_-]+)?|assets(?:/[a-zA-Z0-9_-]+)?|fonts(?:/font_[a-f0-9]{64})?|products/[a-zA-Z0-9_-]+(?:/duplicate)?|drafts/[a-zA-Z0-9_-]+|landing-pages(?:/[a-z0-9-]+(?:/(?:preview|export|editor))?)?|components(?:/[a-z0-9-]+)?)$#', $path) === 1;
     if (!$allowedPath || str_contains($path, '?') || str_contains($path, '#')) {
         ez_admin_json(['ok' => false, 'error' => 'That saved-data path is not allowed.'], 400);
     }
@@ -1494,6 +1494,8 @@ foreach ($dashboardProducts as $product) {
     if (($product['status'] ?? '') !== 'active') continue;
     $catalogInventory[$product['name']] = ['sku' => $product['sku'] ?? '', 'price' => $product['price'] ?? 0, 'stock' => $product['stock'] ?? 0, 'category' => $product['category'] ?? ''];
 }
+require_once __DIR__ . '/builder-bundles.php';
+$builderBundle = $siteEditor ? 'editor' : 'library';
 $adminCssVersion = (string) (@filemtime(__DIR__ . '/admin.css') ?: 1);
 $catalogCssVersion = (string) (@filemtime(__DIR__ . '/catalog.css') ?: 1);
 $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
@@ -1506,11 +1508,14 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
   <meta name="robots" content="noindex,nofollow">
   <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
   <?php if ($authenticated && $authenticationMethod === 'supabase' && $cloudMediaBase !== ''): ?><link rel="preconnect" href="<?= ez_admin_escape($cloudMediaBase) ?>"><?php endif; ?>
+  <?php if ($authenticated): ?><script src="admin-startup.js?v=<?= (int) filemtime(__DIR__ . '/admin-startup.js') ?>" data-admin-cloud-enabled="<?= $authenticationMethod === 'supabase' ? 'true' : 'false' ?>"></script><?php endif; ?>
+  <?php if ($authenticated && $page === 'sites'): ?>
+  <link rel="stylesheet" href="<?= ez_admin_escape(ez_builder_bundle_url($builderBundle . '.css')) ?>">
+  <script defer src="<?= ez_admin_escape(ez_builder_bundle_url($builderBundle . '.js')) ?>"></script>
+  <?php else: ?>
   <?php if ($authenticated): ?><link rel="stylesheet" href="assets/vendor/leaflet.css"><?php endif; ?>
   <link rel="stylesheet" href="admin.css?v=<?= ez_admin_escape($adminCssVersion) ?>">
   <?php if ($authenticated && $page === 'shop'): ?><link rel="stylesheet" href="../storefront.css?v=1"><link rel="stylesheet" href="shop.css?v=<?= (int) filemtime(__DIR__ . '/shop.css') ?>"><?php endif; ?>
-  <?php if ($authenticated && $page === 'sites'): ?><link rel="stylesheet" href="builder-templates.css?v=<?= (int) filemtime(__DIR__ . '/builder-templates.css') ?>"><?php endif; ?>
-  <?php if ($authenticated && $page === 'sites' && $siteEditor): ?><link rel="stylesheet" href="builder-native.css?v=<?= (int) filemtime(__DIR__ . '/builder-native.css') ?>"><link rel="stylesheet" href="builder-fonts.css?v=<?= (int) filemtime(__DIR__ . '/builder-fonts.css') ?>"><link rel="stylesheet" href="builder-help.css?v=<?= (int) filemtime(__DIR__ . '/builder-help.css') ?>"><link rel="stylesheet" href="builder-components.css?v=<?= (int) filemtime(__DIR__ . '/builder-components.css') ?>"><link rel="stylesheet" href="builder-flow.css?v=<?= (int) filemtime(__DIR__ . '/builder-flow.css') ?>"><link rel="stylesheet" href="builder-showcase.css?v=<?= (int) filemtime(__DIR__ . '/builder-showcase.css') ?>"><link rel="stylesheet" href="builder-chrome.css?v=<?= (int) filemtime(__DIR__ . '/builder-chrome.css') ?>"><link rel="stylesheet" href="builder-assets.css?v=<?= (int) filemtime(__DIR__ . '/builder-assets.css') ?>"><?php endif; ?>
   <?php if ($authenticated && $page === 'products'): ?><link rel="stylesheet" href="catalog.css?v=<?= ez_admin_escape($catalogCssVersion) ?>"><?php endif; ?>
   <?php if ($authenticated && $page === 'wallet'): ?><link rel="stylesheet" href="wallet.css?v=<?= (int) filemtime(__DIR__ . '/wallet.css') ?>"><?php endif; ?>
   <link rel="stylesheet" href="dashboard-data.css?v=<?= (int) filemtime(__DIR__ . '/dashboard-data.css') ?>">
@@ -1518,9 +1523,9 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
   <?php if ($authenticated && $page === 'analytics'): ?><link rel="stylesheet" href="analytics.css?v=<?= (int) filemtime(__DIR__ . '/analytics.css') ?>"><?php endif; ?>
   <?php if ($authenticated && $page === 'payments'): ?><link rel="stylesheet" href="payments.css?v=<?= (int) filemtime(__DIR__ . '/payments.css') ?>"><?php endif; ?>
   <link rel="stylesheet" href="advanced.css?v=<?= (int) filemtime(__DIR__ . '/advanced.css') ?>">
-  <?php if ($page === 'sites'): ?><link rel="stylesheet" href="builder-choice.css?v=<?= (int) filemtime(__DIR__ . '/builder-choice.css') ?>"><link rel="stylesheet" href="builder-image.css?v=<?= (int) filemtime(__DIR__ . '/builder-image.css') ?>"><?php endif; ?>
   <link rel="stylesheet" href="profile-logo.css?v=<?= (int) filemtime(__DIR__ . '/profile-logo.css') ?>">
   <link rel="stylesheet" href="../select.css?v=<?= (int) filemtime(__DIR__ . '/../select.css') ?>">
+  <?php endif; ?>
   <title><?= $authenticated ? ez_admin_escape($pageTitles[$page]) : ($pendingMfa !== null ? 'Two-step verification' : 'Admin Login') ?> · Ezkart</title>
 </head>
 <body class="<?= $authenticated ? 'dashboard-page page-' . ez_admin_escape($page) . ($page === 'sites' ? ($siteEditor ? ' page-site-editor' : ' page-sites-library') : '') : 'login-page' ?>" data-admin-language="<?= ez_admin_escape($adminLanguage) ?>" data-admin-advanced-mode="<?= !empty($advancedPlan['enabled']) ? 'true' : 'false' ?>" data-admin-landing-limit="<?= !empty($advancedPlan['enabled']) ? 24 : 6 ?>" data-admin-profile="<?= ez_admin_escape(json_encode($adminProfile)) ?>" data-admin-storage-scope="<?= ez_admin_escape($adminStorageScope) ?>" data-admin-checkout-brand="<?= ez_admin_escape($adminDisplayName) ?>" data-admin-migrate-legacy-storage="<?= $legacyDataAccess ? 'true' : 'false' ?>" data-admin-cloud-enabled="<?= $authenticated && $authenticationMethod === 'supabase' ? 'true' : 'false' ?>" data-admin-cloud-media-base="<?= $authenticated && $authenticationMethod === 'supabase' ? ez_admin_escape($cloudMediaBase) : '' ?>" data-admin-csrf-token="<?= ez_admin_escape($csrfToken) ?>">
@@ -1822,20 +1827,19 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
   </div>
   <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
   <?php if (($catalogData['ok'] ?? false) === true): ?><script type="application/json" id="ezkart-catalog-bootstrap"><?= json_encode($catalogData, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_INVALID_UTF8_SUBSTITUTE) ?></script><?php endif; ?>
-  <script src="admin-startup.js?v=<?= (int) filemtime(__DIR__ . '/admin-startup.js') ?>"></script>
+  <?php if ($page !== 'sites'): ?>
   <script src="assets/vendor/leaflet.js"></script>
   <?php if ($page === 'settings' && $mfaSetup !== null): ?><script src="assets/vendor/qrcode-generator.min.js"></script><?php endif; ?>
-  <?php if ($page === 'sites'): ?><script src="builder-native-icons.js?v=<?= (int) filemtime(__DIR__ . '/builder-native-icons.js') ?>"></script><script src="builder-commerce.js?v=<?= (int) filemtime(__DIR__ . '/builder-commerce.js') ?>"></script><script src="builder-help.js?v=<?= (int) filemtime(__DIR__ . '/builder-help.js') ?>"></script><script src="builder-fonts.js?v=<?= (int) filemtime(__DIR__ . '/builder-fonts.js') ?>"></script><script src="builder-native.js?v=<?= (int) filemtime(__DIR__ . '/builder-native.js') ?>"></script><script src="builder-publish.js?v=<?= (int) filemtime(__DIR__ . '/builder-publish.js') ?>"></script><script src="builder-site-settings.js?v=<?= (int) filemtime(__DIR__ . '/builder-site-settings.js') ?>"></script><script src="builder-templates.js?v=<?= (int) filemtime(__DIR__ . '/builder-templates.js') ?>"></script><?php endif; ?><?php if ($page === 'sites' && $siteEditor): ?><script src="builder-backgrounds.js?v=<?= (int) filemtime(__DIR__ . '/builder-backgrounds.js') ?>"></script><script src="builder-components.js?v=<?= (int) filemtime(__DIR__ . '/builder-components.js') ?>"></script><script src="builder-asset-packs.js?v=<?= (int) filemtime(__DIR__ . '/builder-asset-packs.js') ?>"></script><script src="builder-assets.js?v=<?= (int) filemtime(__DIR__ . '/builder-assets.js') ?>"></script><script src="builder-assets-ui.js?v=<?= (int) filemtime(__DIR__ . '/builder-assets-ui.js') ?>"></script><script src="builder-showcase-data.js?v=<?= (int) filemtime(__DIR__ . '/builder-showcase-data.js') ?>"></script><script src="builder-showcase.js?v=<?= (int) filemtime(__DIR__ . '/builder-showcase.js') ?>"></script><?php endif; ?>
   <script src="dashboard-data.js?v=<?= (int) filemtime(__DIR__ . '/dashboard-data.js') ?>"></script>
   <?php if ($page === 'analytics'): ?><script src="analytics.js?v=<?= (int) filemtime(__DIR__ . '/analytics.js') ?>"></script><?php endif; ?>
   <?php if ($page === 'wallet'): ?><script src="wallet-access.js?v=<?= (int) filemtime(__DIR__ . '/wallet-access.js') ?>"></script><?php endif; ?>
   <script src="admin-language.js?v=<?= (int) filemtime(__DIR__ . '/admin-language.js') ?>"></script>
-  <?php if ($page === 'sites'): ?><script src="builder-image.js?v=<?= (int) filemtime(__DIR__ . '/builder-image.js') ?>"></script><script src="builder-choice.js?v=<?= (int) filemtime(__DIR__ . '/builder-choice.js') ?>"></script><?php endif; ?>
   <script src="admin.js?v=<?= ez_admin_escape($adminJsVersion) ?>"></script>
   <?php if ($page === 'advanced'): ?><script src="advanced.js?v=<?= (int) filemtime(__DIR__ . '/advanced.js') ?>"></script><?php endif; ?>
   <script src="profile-logo.js?v=<?= (int) filemtime(__DIR__ . '/profile-logo.js') ?>"></script>
   <script src="../select.js?v=<?= (int) filemtime(__DIR__ . '/../select.js') ?>"></script>
   <?php if ($page === 'shop'): ?><script src="../storefront.js?v=1"></script><script src="shop.js?v=<?= (int) filemtime(__DIR__ . '/shop.js') ?>"></script><?php endif; ?>
+  <?php endif; ?>
 <?php endif; ?>
 </body>
 </html>

@@ -157,7 +157,7 @@ test('the ordinary new-page dialog accepts no products and opens a blank canvas'
  try{
   await page.route('**/cart/admin/?cloud=*',async route=>{
    const request=route.request(),path=new URL(request.url()).searchParams.get('cloud');
-   if(path!=='/v1/landing-pages/from-ui')return route.continue();
+   if(!['/v1/landing-pages/from-ui','/v1/landing-pages/from-ui/editor'].includes(path))return route.continue();
    if(request.method()==='PUT')created={...request.postDataJSON(),id:'from-ui',url:'from-ui.ezkart.site',status:'draft'};
    await route.fulfill({json:{ok:true,page:created}});
   });

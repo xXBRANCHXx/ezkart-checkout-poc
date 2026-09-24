@@ -2,6 +2,7 @@ import { adminPreferences } from './admin-preferences.js';
 import { listBuilderFonts, saveBuilderFont, serveBuilderFont } from './builder-fonts.js';
 import { listBuilderAssets, saveBuilderAsset, serveBuilderAsset } from "./builder-assets.js";
 import {landingSummaryKey, listLandingObjects, cacheLandingSummary, readLandingSummary, staticLandingPreview} from './landing-page-index.js';
+import {packLandingEditor} from './landing-page-transfer.js';
 import { customerAddressBook, changeCustomerAddressBook } from "./customer-addresses.js";
 import { validatePublication } from "./landing-publication.js";
 import { merchantStorefront, publicStorefront } from "./storefront.js";
@@ -1331,6 +1332,8 @@ export default {
       }
       if (["PUT", "POST"].includes(request.method) && landingPagePreviewMatch) return json({ ok: true, preview: await saveLandingPagePreview(request, env, landingPagePreviewMatch[1]) }, 200, cors);
       const landingPageMatch = /^\/v1\/landing-pages\/([a-z0-9-]+)$/.exec(url.pathname);
+      const landingEditorMatch = /^\/v1\/landing-pages\/([a-z0-9-]+)\/editor$/.exec(url.pathname);
+      if (request.method === "GET" && landingEditorMatch) return json({ok: true, editor: packLandingEditor(await landingPage(request, env, landingEditorMatch[1]))}, 200, cors);
       if (request.method === "GET" && landingPageMatch) return json({ ok: true, page: await landingPage(request, env, landingPageMatch[1]) }, 200, cors);
       if (["PUT", "POST"].includes(request.method) && landingPageMatch) return json({ ok: true, page: await saveLandingPage(request, env, landingPageMatch[1]) }, 200, cors);
       if (request.method === "DELETE" && landingPageMatch) { await deleteLandingPage(request, env, landingPageMatch[1]); return json({ ok: true }, 200, cors); }

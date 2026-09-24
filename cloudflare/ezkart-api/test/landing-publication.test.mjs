@@ -355,6 +355,16 @@ test("Authenticated page saves allow empty drafts and reject publish bypasses ag
   assert.equal(stored.state.preview, "<h1>My next draft</h1>");
   const bucket = await mf.getR2Bucket('PRIVATE_ASSETS');
   const auth = {authorization: 'Bearer ' + token};
+  const editorUrl = 'http://worker.test/v1/landing-pages/my-page/editor';
+  const editorResponse = await mf.dispatchFetch(editorUrl, {headers: auth});
+  assert.equal(editorResponse.status, 200);
+  assert.equal(editorResponse.headers.get('cache-control'), 'no-store');
+  const {editor} = await editorResponse.json();
+  const editable = JSON.parse(editor.parts.map(part => typeof part === 'string' ? part : editor.images[part]).join(''));
+  assert.deepEqual(editable.state, stored.state);
+  assert.equal(editable.publishedHtml, undefined);
+  assert.equal((await mf.dispatchFetch(editorUrl)).status, 401);
+  assert.equal((await mf.dispatchFetch(editorUrl.replace('/my-page/', '/someone-elses-page/'), {headers:auth})).status, 404);
   const list = () => mf.dispatchFetch('http://worker.test/v1/landing-pages', {headers: auth});
   const listed = (await (await list()).json()).pages;
   assert.equal(listed[0].name, 'My page');
