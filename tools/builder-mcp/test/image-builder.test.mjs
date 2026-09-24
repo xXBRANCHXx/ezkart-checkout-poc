@@ -74,19 +74,63 @@ test('image pages create, upload, reorder, replace, undo, save and use the share
   assert.equal(await page.locator('[data-image-page-product]').inputValue(),'real-sambal');
   assert.equal(await page.locator('.ib-row textarea').first().inputValue(),'The uploaded campaign artwork');
   assert.equal((await ws.read('image-sale')).state.builderMode,'image');
+  // Opening an existing image page upgrades its fixed purchase strip without
+  // losing its artwork, descriptions or connected catalog product.
+  const saved=await ws.read('image-sale');
+  saved.state=await page.evaluate(()=>{
+    const state=EzkartBuilder.snapshot(),root=document.createElement('div');root.innerHTML=state.preview;
+    const checkout=root.querySelector('[data-native-id="image-checkout"]');
+    const config=EzkartNative.read(checkout);config.props.position='fixed';config.props.bottom='0px';EzkartNative.write(checkout,config);
+    checkout.replaceChildren(EzkartNative.create({id:'image-checkout-add',type:'commerce',part:'add',productId:'real-sambal',group:'image-checkout'}));
+    state.preview=root.innerHTML;state.previewStyle='';return state;
+  });
+  await ws.write('image-sale',saved);await page.reload();
+  await page.frameLocator('.ib-phone').locator('[data-product-card="real-sambal"]').waitFor();
+  assert.equal(await page.locator('[data-image-page-product]').inputValue(),'real-sambal');
+  assert.equal(await page.locator('.ib-row').count(),2);
+  assert.equal(await page.locator('.ib-row textarea').first().inputValue(),'The uploaded campaign artwork');
+  await call('save');
+  assert.match((await ws.read('image-sale')).state.preview,/data-native-id="image-product"/);
   const html=await call('exportHtml');
-  const output=await browser.newPage();await output.setContent(html);
+  const output=await browser.newPage({reducedMotion:'reduce'});await output.setContent(html);
+  const card=output.locator('[data-product-card="real-sambal"]');
+  assert.equal(await card.count(),1);
+  assert.ok(await output.locator('[data-native-id=image-checkout]').evaluate(node=>['static','relative'].includes(getComputedStyle(node).position)));
+  assert.ok(await card.evaluate(node=>node.getBoundingClientRect().top>=document.querySelector('[data-image-page]').getBoundingClientRect().bottom));
   assert.equal(await output.locator('[data-image-page]').evaluate(node=>[...node.children].every(child=>child.tagName==='IMG')),true);
   for(const width of [320,390,768,1440]){
     await output.setViewportSize({width,height:1000});
     const bounds=await output.locator('[data-image-page]').boundingBox();assert.ok(Math.abs(bounds.width-Math.min(480,width))<2);
     assert.equal(await output.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+    await output.locator('[data-ezkart-cart-open]').click();
+    const drawer=output.locator('.ezkart-cart-drawer');
+    assert.equal(await drawer.evaluate(node=>getComputedStyle(node).backgroundColor),'rgb(255, 255, 255)');
+    await output.waitForFunction(()=>document.querySelector('.ezkart-cart-layer').classList.contains('is-open'));
+    const sheet=await drawer.boundingBox();
+    assert.ok(sheet.y>0&&Math.abs(sheet.y+sheet.height-1000)<2,'Cart is a bottom sheet');
+    assert.ok(sheet.width<=480&&sheet.x>=0&&sheet.x+sheet.width<=width);
+    assert.equal(await output.locator('[data-ezkart-cart-go]').isDisabled(),true);
+    assert.equal(await output.locator('.sq-page-preview').evaluate(node=>node.inert),true);
+    await output.keyboard.press('Escape');await output.locator('[data-ezkart-cart-layer]').waitFor({state:'hidden'});
+    assert.equal(await output.locator('[data-ezkart-cart-open]').evaluate(node=>node===document.activeElement),true);
   }
-  await output.locator('[data-commerce-option]').selectOption('ijo');
-  assert.match(await output.locator('[data-native-id=image-checkout-price]').textContent(),/91[.,]000/);
-  await output.locator('[data-commerce-add]').click();
+  await output.setViewportSize({width:390,height:660});
+  await card.locator('.sq-product-option-trigger').click();
+  await card.getByRole('option',{name:'Ijo',exact:true}).click();
+  assert.match(await card.locator('footer b').textContent(),/91[.,]000/);
+  await card.locator('[data-ezkart-add]').click();
   assert.equal(await output.locator('[data-ezkart-cart-layer]').isVisible(),true);
   assert.match(await output.locator('[data-ezkart-cart-layer]').innerText(),/Ijo/);
+  await output.locator('[data-ezkart-cart-quantity="1"]').click();
+  assert.match(await output.locator('[data-ezkart-cart-subtotal]').innerText(),/182[.,]000/);
+  await output.locator('[data-ezkart-cart-quantity="1"]').click();
+  await output.locator('[data-ezkart-cart-quantity="1"]').click();
+  assert.equal(await output.locator('[data-ezkart-cart-quantity="1"]').isDisabled(),true);
+  await output.locator('.ezkart-cart-close').click();await output.locator('[data-ezkart-cart-layer]').waitFor({state:'hidden'});
+  await output.locator('[data-ezkart-cart-open]').click();
+  assert.match(await output.locator('[data-ezkart-cart-subtotal]').innerText(),/364[.,]000/);
+  await output.locator('[data-ezkart-cart-go]').click();
+  assert.match(await output.locator('[data-ezkart-cart-items]').textContent(),/No order was placed/);
   await output.close();
   products[0].variants.forEach(variant=>variant.stock=0);await catalog();
   await assert.rejects(()=>call('exportHtml'),/Add stock/);

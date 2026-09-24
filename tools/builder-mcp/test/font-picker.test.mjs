@@ -16,6 +16,7 @@ test('visual fonts search, keyboard selection, undo, persistence, narrow layout 
   const call=(method,args={})=>page.evaluate(({method,args})=>EzkartBuilder[method](args),{method,args});
   try{
     await page.goto(ws.url+'/cart/admin/?page=sites');await page.locator('[data-library-create-card]').click();
+    await page.locator('[data-bc-choose=visual]').click();
     const form=page.locator('[data-library-page-form]');await form.locator('[name=page_name]').fill('Font choices');await form.locator('button[value=default]').click();
     await page.waitForURL('**edit=font-choices.ezkart.site');await page.waitForFunction(()=>globalThis.EzkartBuilder);await call('settle');
     assert.ok(!requests.some(url=>url.includes('pacifico.woff2')),'Unseen fonts do not load when editor opens');

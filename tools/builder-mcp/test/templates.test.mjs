@@ -97,6 +97,7 @@ test("New page applies PITH with merchant content, preserves the original page, 
   await invoke("save");
   const original = await ws.read("source");
   await page.locator("[data-open-page-creator]").first().click();
+  await page.locator("[data-bc-choose=visual]").click();
   const form = page.locator("[data-page-creator-form]");
   await form.locator("[name=page_name]").fill("Merchant launch");
   await form.locator('.sq-template-choice:has(input[value="pith"])').click();
@@ -291,6 +292,7 @@ test("Library creates a template page with the same native mechanism", async (t)
   const { ws, page } = await setup(t);
   await page.goto(ws.url + "/cart/admin/?page=sites");
   await page.locator("[data-library-create-card]").first().click();
+  await page.locator("[data-bc-choose=visual]").click();
   const form = page.locator("[data-library-page-form]");
   await form.locator("[name=page_name]").fill("Library launch");
   await form.locator('.sq-template-choice:has(input[value="pith"])').click();

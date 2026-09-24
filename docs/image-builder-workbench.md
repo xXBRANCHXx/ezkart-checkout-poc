@@ -12,8 +12,10 @@ template and blank-page flow. Existing visual pages retain their editor.
 The image editor supports multiple uploads, replacement, ordering, removal,
 optional image descriptions, undo/redo, autosave, reopening, and preview. Uploaded
 artwork forms the entire page content. It uses one vertical layout, capped at
-480 px and centered on wider screens. The fixed purchase controls use the same
-Ezkart product, variant, price, stock, cart, and checkout behavior as visual pages.
+480 px and centered on wider screens. A native product card follows the artwork,
+using Page Studio's catalog photo, name, options, price and add-to-cart controls.
+Its floating cart opens an opaque bottom sheet and uses the same Ezkart stock
+and checkout behavior as visual pages.
 Drafts may be empty; publication requires artwork and an available owned product.
 
 The chooser and new editor use the account's existing Settings → Regional
@@ -113,3 +115,32 @@ element. The names appear on the cards, action buttons, accessible preview
 labels, example titles, and loading-error fallback. Indonesian accounts see
 **Susun Gambar** and **Studio Halaman**, with translated descriptions and actions.
 Saved page modes and the underlying editor behavior are unchanged.
+
+## Product card and cart refinement — 24 September 2026
+
+Image Stack now ends with Page Studio's native product card instead of the fixed
+purchase strip. Opening an older saved image page upgrades the strip while
+preserving its uploaded images, descriptions and selected product. The upgraded
+draft saves normally; existing published snapshots change when republished.
+
+The shared cart opens from the bottom on Image Stack, capped at the 480 px page
+width on larger screens. It has an opaque white surface, a dimmed backdrop,
+scrollable items and a visible checkout footer. The floating button stays hidden
+while the sheet is open. Escape, backdrop/close buttons, focus restoration,
+quantity limits and the existing checkout remain shared with Page Studio.
+Empty theme values are no longer exported over the cart's default colors/fonts.
+
+Upload rows use arrow, replace and trash icons with translated tooltips and
+accessible names. Touch controls retain 44 px targets. Native product cards now
+also support catalog variants that have names but no separate option groups.
+
+Verification covered 117 unique tests across the complete builder suite. Three
+older page-creation tests initially skipped the builder chooser; they passed
+after their workflows were updated to choose Page Studio. The image workflow
+also verifies reopening and saving an older fixed-strip draft, product-card
+variants, opaque bottom-sheet geometry at 320/390/768/1440 px, cart quantities,
+stock limits and simulated checkout. Desktop and narrow editor screenshots were
+inspected with catalog photos and missing-photo states. Normal slide-up motion,
+reduced motion, backdrop dismissal and focus return were checked separately.
+This verification used the local merchant UI and exported pages, without placing
+an order or collecting payment.

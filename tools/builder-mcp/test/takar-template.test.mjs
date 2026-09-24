@@ -94,6 +94,7 @@ test("Takar applies real product collections with independent choices, editable 
   await p.goto(ws.url + "/cart/admin/?page=sites&edit=start.ezkart.site");
   await p.waitForFunction(() => globalThis.EzkartBuilder);
   await p.locator("[data-open-page-creator]").first().click();
+  await p.locator("[data-bc-choose=visual]").click();
   const form = p.locator("[data-page-creator-form]");
   await form.locator("[name=page_name]").fill("Takar merchant");
   await form

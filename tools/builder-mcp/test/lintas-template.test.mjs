@@ -98,6 +98,7 @@ test("Lintas supports product-free drafts, preserved edits, real independent var
   };
   await edit("start");
   await p.locator("[data-open-page-creator]").first().click();
+  await p.locator("[data-bc-choose=visual]").click();
   const form = p.locator("[data-page-creator-form]");
   await form.locator("[name=page_name]").fill("Lintas merchant");
   await form

@@ -12,7 +12,7 @@
   };
   function makeState(images=[], productId='', previous={}) {
     const holder=document.createElement('div');
-    const page=section('image-page',{display:'block',width:'100%',maxWidth:'480px',marginLeft:'auto',marginRight:'auto',paddingTop:'0px',paddingRight:'0px',paddingBottom:'0px',paddingLeft:'0px',marginBottom:productId?'190px':'0px',minHeight:'0px',backgroundColor:'#ffffff'});
+    const page=section('image-page',{display:'block',width:'100%',maxWidth:'480px',marginLeft:'auto',marginRight:'auto',paddingTop:'0px',paddingRight:'0px',paddingBottom:'0px',paddingLeft:'0px',marginBottom:'0px',minHeight:'0px',backgroundColor:'#ffffff'});
     page.dataset.imagePage='';
     images.forEach((image,index)=>{
       const node=native({id:image.id,type:'image',src:image.src,alt:image.alt||'',loading:index===0?'eager':'lazy',props:{display:'block',width:'100%',height:'auto',maxWidth:'100%',marginTop:'0px',marginBottom:'0px',aspectRatio:`${image.width} / ${image.height}`}});
@@ -23,30 +23,32 @@
     });
     holder.append(page);
     if(productId){
-      const checkout=section('image-checkout',{position:'fixed',bottom:'0px',left:'0px',right:'0px',width:'100%',maxWidth:'480px',marginLeft:'auto',marginRight:'auto',paddingTop:'12px',paddingBottom:'12px',paddingLeft:'16px',paddingRight:'16px',backgroundColor:'#ffffff',color:'#252724',zIndex:'20',borderTopWidth:'1px',borderTopStyle:'solid',borderTopColor:'#e6e7ec',display:'grid',gridTemplateColumns:'minmax(0,1fr) auto',gap:'8px',alignItems:'center',fontFamily:'Arial, sans-serif',fontSize:'14px'});
-      const commerce=(part,props={},extra={})=>native({id:'image-checkout-'+part,type:'commerce',part,productId,group:'image-checkout',props,...extra});
-      checkout.append(
-        commerce('product-name',{gridColumn:'1 / -1',fontSize:'13px',fontWeight:600}),
-        commerce('options',{gridColumn:'1 / -1',fontSize:'13px'},{optionLayout:'select',label:t('Choose an option')}),
-        commerce('price',{fontSize:'18px',fontWeight:700}),
-        commerce('add',{backgroundColor:'#ed4639',color:'#ffffff',borderRadius:'8px',minHeight:'44px',paddingTop:'3px',paddingBottom:'3px',paddingLeft:'10px',paddingRight:'10px'},{label:t('Buy now')})
-      );
+      const checkout=section('image-checkout',{display:'block',width:'100%',maxWidth:'480px',marginLeft:'auto',marginRight:'auto',paddingTop:'24px',paddingBottom:'96px',paddingLeft:'16px',paddingRight:'16px',backgroundColor:'#ffffff',color:'#252724',fontFamily:'Arial, sans-serif',fontSize:'14px'});
+      checkout.append(native({id:'image-product',type:'product',productId,props:{...EzkartNative.defaults.product,width:'100%',fontFamily:'Arial, sans-serif'}}));
       holder.append(checkout);
     }
-    const state={...previous,version:6,builderMode:'image',template:null,previewClass:'sq-page-preview sq-image-page-preview',previewStyle:'',preview:holder.innerHTML,products:productId?[productId]:[],selectedSection:'image-page',spacing:'[]',pageSpacing:{gutters:{desktop:0,tablet:0,mobile:0},columnGap:0}};
+    const state={...previous,version:6,builderMode:'image',template:null,previewClass:'sq-page-preview sq-image-page-preview',previewStyle:'--site-page:#ffffff;--site-surface:#ffffff;--site-ink:#252724;--site-body-font:Arial,sans-serif;--site-heading-font:Arial,sans-serif;--button-primary-bg:#ed4639;--button-primary-fg:#ffffff;--button-primary-radius:8px',preview:holder.innerHTML,products:productId?[productId]:[],selectedSection:'image-page',spacing:'[]',pageSpacing:{gutters:{desktop:0,tablet:0,mobile:0},columnGap:0}};
     // A publication stores both the editable state and the exported HTML in
     // the same 16 MB project. Leave room for that second copy and commerce.
     if(new Blob([JSON.stringify(state)]).size>6*MB)throw Error(t('This page is full. Use smaller images or remove an image first.'));
     return state;
   }
   function read(root) {
+    const product=root.querySelector('[data-native-id="image-product"],[data-native-id="image-checkout-add"]');
     return {
       images:[...root.querySelectorAll('[data-image-upload]')].map(node=>{
         const config=EzkartNative.read(node);
         return {id:config.id,src:config.src,alt:config.alt||'',name:node.dataset.imageName||'Image',width:Number(node.getAttribute('width'))||1,height:Number(node.getAttribute('height'))||1};
       }),
-      productId:root.querySelector('[data-native-id="image-checkout-add"]')?EzkartNative.read(root.querySelector('[data-native-id="image-checkout-add"]')).productId:'',
+      productId:product?EzkartNative.read(product).productId:'',
     };
+  }
+  function upgrade(state) {
+    if(!state?.preview?.includes('data-image-page'))return state;
+    const root=document.createElement('div');root.innerHTML=state.preview;
+    if(!root.querySelector('[data-native-id="image-checkout-add"]'))return state;
+    const {images,productId}=read(root);
+    return makeState(images,productId,state);
   }
   async function prepareImage(file) {
     if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>15*MB)throw Error(t('Choose a JPG, PNG, or WebP image up to 15 MB.'));
@@ -95,7 +97,13 @@
     const saveStatus=studio.querySelector('[data-sq-save-state]');
     if(saveStatus)new MutationObserver(()=>{if(active())EzkartLanguage.apply(saveStatus);}).observe(saveStatus,{childList:true,characterData:true,subtree:true});
     function commit(images,productId){apply(makeState(images,productId,capture()));}
-    function button(text,action,disabled=false){const node=document.createElement('button');node.type='button';node.textContent=t(text);node.disabled=disabled;node.addEventListener('click',action);return node;}
+    const actionIcons={
+      'Move up':'<path d="M12 19V5m-6 6 6-6 6 6"/>',
+      'Move down':'<path d="M12 5v14m-6-6 6 6 6-6"/>',
+      'Replace':'<path d="M4 7h16m-4-4 4 4-4 4M20 17H4m4-4-4 4 4 4"/>',
+      'Remove':'<path d="M3 6h18M9 6V4h6v2M5 6l1 14h12l1-14M10 10v6m4-6v6"/>',
+    };
+    function button(text,action,disabled=false){const node=document.createElement('button');node.type='button';node.title=t(text);node.setAttribute('aria-label',t(text));node.innerHTML=`<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">${actionIcons[text]}</svg>`;node.disabled=disabled;node.addEventListener('click',action);return node;}
     function sync() {
       const enabled=active();host.hidden=!enabled;studio.classList.toggle('sq-image-editor',enabled);document.body.classList.toggle('page-image-editor',enabled);
       const pageMenu=studio.querySelector('.sq-page-identity [data-sq-open-panel="pages"]');
@@ -119,8 +127,8 @@
           },index+direction<0||index+direction>=images.length);
           move.setAttribute('aria-label',t(direction<0?'Move up':'Move down')+': '+image.name);actions.append(move);
         }
-        const replace=button('Replace',()=>{replaceId=image.id;input.multiple=false;input.click();});replace.dataset.imageReplace='';
-        const remove=button('Remove',()=>{const current=read(root);commit(current.images.filter(item=>item.id!==image.id),current.productId);status.textContent=t('Image removed. Use Undo to restore it.');add.focus();});remove.dataset.imageRemove='';
+        const replace=button('Replace',()=>{replaceId=image.id;input.multiple=false;input.click();});replace.dataset.imageReplace='';replace.setAttribute('aria-label',t('Replace')+': '+image.name);
+        const remove=button('Remove',()=>{const current=read(root);commit(current.images.filter(item=>item.id!==image.id),current.productId);status.textContent=t('Image removed. Use Undo to restore it.');add.focus();});remove.dataset.imageRemove='';remove.setAttribute('aria-label',t('Remove')+': '+image.name);
         actions.append(replace,remove);meta.append(name,actions);
         const description=document.createElement('details');description.className='ib-description';
         const summary=document.createElement('summary');summary.textContent=t('Image description (optional)');description.append(summary);
@@ -157,5 +165,5 @@
     sync();
     return {sync,busy:()=>busy,active};
   }
-  globalThis.EzkartImageBuilder={blank:()=>makeState(),mount,read};
+  globalThis.EzkartImageBuilder={blank:()=>makeState(),mount,read,upgrade};
 })();

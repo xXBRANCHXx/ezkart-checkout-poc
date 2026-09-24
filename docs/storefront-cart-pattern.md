@@ -12,6 +12,9 @@ across different storefront palettes. Keep the empty state accessible too.
 - Adding a product opens the shared drawer with that variant, quantity and price.
 - The floating control stays clear of fixed purchase bars, ordinary catalog purchase buttons, variant selectors, native action buttons, disclosure controls, and device safe areas.
 - Desktop uses a right-side drawer; mobile uses the full available width.
+- Image Stack uses a bottom sheet at every width, aligned with its centered
+  mobile page and capped at 480 px. Its white surface, scrollable items and
+  checkout footer stay separate from the uploaded artwork.
 - Closing the drawer preserves the cart and returns focus to the opener.
   Escape, Tab and Shift+Tab work throughout the drawer. Background page controls
   are inert while it is open; their previous inert state is restored when closed.
