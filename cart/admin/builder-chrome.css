@@ -686,6 +686,7 @@
 .sq-published-dialog [data-published-url] { overflow-wrap: anywhere; font-size: 14px; }
 .sq-publishing-dialog { width: min(440px, calc(100% - 24px)); text-align: center; }
 .sq-publishing-status { padding: 36px 28px; }
+.sq-publishing-status > .sq-site-loader-worm { margin-bottom: 20px; }
 .sq-publishing-status p { margin: 12px 0 0; color: #737b8c; font-size: 13px; line-height: 1.7; }
 .sq-publishing-percent { display: block; margin: 20px 0 14px; color: #ea4b2e; font-size: 44px; font-weight: 600; line-height: 1.15; font-variant-numeric: tabular-nums; }
 .sq-publishing-bar { height: 10px; overflow: hidden; border-radius: 999px; background: #fce8e1; }

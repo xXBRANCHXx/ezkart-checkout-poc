@@ -8590,14 +8590,16 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
       window.removeEventListener('beforeunload', preventLeavingDuringPublication);
       publishingDialog?.removeAttribute('aria-busy');
     };
-    const showPublicationWait = (title, percent = 0) => {
+    const showPublicationWait = (title, percent = null) => {
+      const preparing = percent === null;
       publicationPending = true;
-      publicationPercent = percent;
+      publicationPercent = percent ?? 0;
       window.addEventListener('beforeunload', preventLeavingDuringPublication);
       publishingDialog.querySelector('[data-publishing-title]').textContent = title;
-      publishingDialog.querySelector('[data-publishing-description]').textContent = 'Keep this tab open. We’ll tell you when it’s safe to close.';
-      publishingDialog.querySelector('[data-publishing-progress]').hidden = false;
-      setPublicationProgress(percent, 'Getting everything ready…');
+      publishingDialog.querySelector('[data-publishing-description]').textContent = preparing ? 'Checking your page details…' : 'Keep this tab open. We’ll tell you when it’s safe to close.';
+      publishingDialog.querySelector('[data-publishing-loading]').hidden = !preparing;
+      publishingDialog.querySelector('[data-publishing-progress]').hidden = preparing;
+      setPublicationProgress(publicationPercent, 'Getting everything ready…');
       publishingDialog.querySelector('[data-publishing-error]').hidden = true;
       publishingDialog.querySelector('[data-publishing-actions]').hidden = true;
       publishingDialog.setAttribute('aria-busy', 'true');
@@ -8632,6 +8634,7 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
         if (saveState) saveState.textContent = 'Publish failed';
         publishingDialog.querySelector('[data-publishing-title]').textContent = 'Publishing wasn’t completed';
         publishingDialog.querySelector('[data-publishing-description]').textContent = 'We couldn’t confirm that your page was published. Return to the editor and try again.';
+        publishingDialog.querySelector('[data-publishing-loading]').hidden = true;
         publishingDialog.querySelector('[data-publishing-progress]').hidden = true;
         const message = publishingDialog.querySelector('[data-publishing-error]');
         message.textContent = error.message; message.hidden = false;

@@ -39,6 +39,7 @@ test('site favicons persist, follow the visitor theme, and can be added or skipp
   await page.locator('[data-sq-publish]').click();
   await page.locator('[data-sq-publish-message]').waitFor();
   assert.equal(await dialog.isVisible(), false, 'Product requirement still applies');
+  assert.equal(await page.locator('[data-publishing-loading]').isVisible(), false, 'A failed page check stops the loader');
   await page.locator('[data-publishing-close]').click();
   await call('nativeInsert', {section: 'blank', node: {id: 'buy', type: 'commerce', part: 'add', productId: 'one'}});
   await page.locator('[data-sq-publish]').click();

@@ -27,6 +27,7 @@ test('Publishing tracks uploaded bytes, waits for confirmation, guards closing, 
   const confirmation=page.locator('[data-sq-published-dialog]');
   const publish=page.locator('[data-sq-publish]');
   const bar=progress.locator('[data-publishing-bar]');
+  const loading=progress.locator('[data-publishing-loading]');
   const closingIsGuarded=()=>page.evaluate(()=>!window.dispatchEvent(new Event('beforeunload',{cancelable:true})));
   let releaseCatalog;
   const catalogGate=new Promise(resolve=>{releaseCatalog=resolve;});
@@ -45,7 +46,18 @@ test('Publishing tracks uploaded bytes, waits for confirmation, guards closing, 
   });
   await publish.click();
   await progress.getByRole('heading',{name:'Preparing to publish…'}).waitFor();
-  assert.equal(await bar.getAttribute('aria-valuenow'),'0');
+  assert.equal(await loading.isVisible(),true,'Pre-publication checks use the shared worm dots');
+  assert.equal(await bar.isVisible(),false,'There is no publication progress before the favicon decision');
+  assert.equal(await progress.locator('[data-publishing-percent]').isVisible(),false);
+  assert.equal(await progress.getByRole('progressbar').count(),0,'Hidden progress is also absent from the accessibility tree');
+  assert.equal(await loading.locator('i').first().evaluate(node=>getComputedStyle(node).animationName),'none','The shared dots respect reduced motion');
+  await mkdir('/tmp/ezkart-publishing-review',{recursive:true});
+  for(const width of [1440,390,320]){
+    await page.setViewportSize({width,height:900});
+    assert.equal(await progress.evaluate(node=>node.scrollWidth<=node.clientWidth),true);
+    await page.screenshot({path:`/tmp/ezkart-publishing-review/preparing-${width}.png`});
+  }
+  await page.setViewportSize({width:1440,height:1000});
   assert.equal(await closingIsGuarded(),true);
   await page.keyboard.press('Escape');
   assert.equal(await progress.isVisible(),true);
@@ -56,6 +68,8 @@ test('Publishing tracks uploaded bytes, waits for confirmation, guards closing, 
   await page.locator('[data-favicon-publish]').click();
   await firstUploadStarted;
   await progress.getByRole('heading',{name:'Publishing your page…'}).waitFor();
+  assert.equal(await loading.isVisible(),false);
+  assert.equal(await bar.isVisible(),true,'Progress begins after the merchant confirms publication');
   assert.equal(await publish.isDisabled(),true);
   assert.equal(await confirmation.isVisible(),false);
   assert.ok(Number(await bar.getAttribute('aria-valuenow')) < 100);
@@ -81,6 +95,7 @@ test('Publishing tracks uploaded bytes, waits for confirmation, guards closing, 
   await progress.getByRole('heading',{name:'Publishing wasn’t completed'}).waitFor();
   assert.match(await progress.locator('[data-publishing-error]').innerText(),/server could not save/);
   assert.equal(await progress.locator('[data-publishing-progress]').isVisible(),false);
+  assert.equal(await loading.isVisible(),false);
   assert.equal(await closingIsGuarded(),false);
   assert.equal(await confirmation.isVisible(),false);
   assert.equal((await ws.read('coffee')).status,'draft');

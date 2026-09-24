@@ -363,6 +363,7 @@ declare(strict_types=1);
 
 <dialog class="sq-favicon-dialog sq-publishing-dialog" data-sq-publishing-dialog aria-labelledby="sq-publishing-title" aria-describedby="sq-publishing-description">
   <div class="sq-publishing-status">
+    <span class="sq-site-loader-worm" data-publishing-loading aria-hidden="true" hidden><i></i><i></i><i></i><i></i><i></i></span>
     <h2 id="sq-publishing-title" data-publishing-title>Publishing your page…</h2>
     <div data-publishing-progress>
       <strong class="sq-publishing-percent" data-publishing-percent aria-hidden="true">0%</strong>
