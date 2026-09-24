@@ -17,7 +17,23 @@ function ez_builder_bundle_version(string $bundle): string
 
 function ez_builder_bundle_url(string $bundle): string
 {
-    return 'builder-bundle.php?bundle=' . rawurlencode($bundle) . '&v=' . ez_builder_bundle_version($bundle);
+    $version = ez_builder_bundle_version($bundle);
+    [$name, $extension] = explode('.', $bundle, 2);
+    $file = 'builder-cache-' . $name . '-' . $version . '.' . $extension;
+    $path = __DIR__ . '/' . $file;
+    // Serve a fingerprinted static asset so the host can cache and precompress
+    // it normally. Generate atomically; a read-only checkout uses the endpoint.
+    if (!is_file($path) && is_writable(__DIR__)) {
+        $temporary = tempnam(__DIR__, '.builder-cache-');
+        if ($temporary !== false) {
+            $contents = ez_builder_bundle_contents($bundle);
+            if (file_put_contents($temporary, $contents, LOCK_EX) === strlen($contents)) {
+                chmod($temporary, 0644);
+                if (!@rename($temporary, $path)) @unlink($temporary);
+            } else @unlink($temporary);
+        }
+    }
+    return is_file($path) ? $file : 'builder-bundle.php?bundle=' . rawurlencode($bundle) . '&v=' . $version;
 }
 
 function ez_builder_bundle_contents(string $bundle): string

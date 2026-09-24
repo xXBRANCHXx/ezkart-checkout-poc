@@ -7,6 +7,12 @@ if (ez_builder_bundle_files($bundle) === []) {
     http_response_code(404);
     exit;
 }
+$asset = ez_builder_bundle_url($bundle);
+if (!str_starts_with($asset, 'builder-bundle.php')) {
+    header('Cache-Control: public, no-cache');
+    header('Location: ' . $asset, true, 302);
+    exit;
+}
 $version = ez_builder_bundle_version($bundle);
 $etag = 'W/"' . $version . '"';
 header('Content-Type: ' . (str_ends_with($bundle, '.js') ? 'text/javascript' : 'text/css') . '; charset=utf-8');

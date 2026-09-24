@@ -238,9 +238,10 @@
     // A single shared sheet avoids copying the native CSS into every card;
     // shadow boundaries keep previews out of the editor's canvas selectors.
     if (!previewBaseSheet) {
-      const source = [...document.styleSheets].find(sheet => sheet.href && (new URL(sheet.href).pathname.endsWith('/builder-native.css') || new URL(sheet.href).searchParams.get('bundle') === 'editor.css'));
+      const bundled = sheet => sheet.href && (new URL(sheet.href).searchParams.get('bundle') === 'editor.css' || /\/builder-cache-editor-[a-f0-9]{20}\.css$/.test(new URL(sheet.href).pathname));
+      const source = [...document.styleSheets].find(sheet => sheet.href && (new URL(sheet.href).pathname.endsWith('/builder-native.css') || bundled(sheet)));
       if (!source) throw Error('Load builder-native.css before asset previews.');
-      const rules = new URL(source.href).searchParams.get('bundle') === 'editor.css'
+      const rules = bundled(source)
         ? [...source.cssRules].find(rule => rule.type === CSSRule.MEDIA_RULE && rule.conditionText === 'all').cssRules
         : source.cssRules;
       previewBaseSheet = new CSSStyleSheet();

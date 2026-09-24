@@ -66,9 +66,10 @@ twice in the 2 MB editable document.
 
 The startup request now runs in the head before CSS. Landing pages use a single
 CSS bundle and a deferred JS bundle, with separate gallery/editor manifests.
-The public bundle endpoint only serves allowlisted repository assets, compresses
-responses, and fingerprints every source's modification time and size so future
-edits invalidate browser caches without a separate build step. Existing source
+The manifest only contains allowlisted public repository assets. PHP generates
+fingerprinted static bundles atomically; every source modification time and size
+contributes to the fingerprint, so future edits invalidate browser caches without
+a separate build step. Read-only hosting falls back to the public bundle endpoint. Existing source
 order and relative URLs are preserved; native CSS stays isolated in asset cards.
 Map/dashboard JavaScript is no longer loaded on landing-page screens.
 
@@ -86,8 +87,9 @@ Verification:
 - 14 Worker tests passed, including lossless transfer, authorization, missing
   projects, publication preservation, and existing ownership/stock checks.
 - Authenticated PHP shell/bundle checks and the shop appearance/checkout browser
-  test passed. Checks cover gzip, immutable versioned caching, 304 responses,
-  path rejection, catalog bootstrap, and the new proxy route.
+  test passed. Checks cover fingerprinted static files, fallback redirects,
+  path rejection, catalog bootstrap, the new proxy route, and a real PHP editor
+  opening and rendering an isolated native asset preview without errors.
 - The broad builder run passed 122/125 cases. One mock still intercepted only
   the old document route; it was updated for `/editor` and passed. Two tests hit
   timeouts under full concurrency. All 13 cases in the follow-up run passed at
@@ -99,3 +101,10 @@ Verification:
   hosted PHP. Actual merchant-session timing remains unavailable because Chrome's
   debugging connection does not respond. Hosted-asset tests use a copied page
   and controlled API responses, not the merchant's authenticated browser.
+
+The first hosted bundle measurement exposed inefficient dynamic CDN compression:
+the editor JS transferred 561,928 bytes. Explicit whole-response gzip and
+`no-transform` were also recompressed by the host. The final implementation
+therefore serves generated static files, using the host's static asset pipeline
+instead of relying on its dynamic response compression. Generated files stay out
+of Git and contain only the existing public scripts/styles.

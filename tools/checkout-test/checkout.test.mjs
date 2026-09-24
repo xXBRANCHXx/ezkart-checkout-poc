@@ -3367,7 +3367,7 @@ test('Wallet replaces Integrations, explains release conditions, links actual pa
   assert.equal(errors.length, 0, errors.join('\n'));
 });
 
-test('landing pages serve versioned, compressed bundles and start the document before CSS', async t => {
+test('landing pages serve fingerprinted static bundles and start the document before CSS', async t => {
   const app = await setup({EZKART_CLOUDFLARE_API_URL:'https://ezkart-api-test.fixture.workers.dev'});
   t.after(()=>app.close());
   await writeFile(join(app.directory,'storefront.json'),JSON.stringify(shopFixture()));
@@ -3380,19 +3380,32 @@ test('landing pages serve versioned, compressed bundles and start the document b
   assert.doesNotMatch(html,/<script[^>]+src="(?:admin\.js|builder-native\.js|assets\/vendor\/leaflet\.js)/);
   assert.equal((html.match(/rel="stylesheet"/g)||[]).length,1);
   for(const type of ['js','css']){
-    const path=html.match(new RegExp(`(?:src|href)="(builder-bundle\\.php\\?bundle=editor\\.${type}[^\"]+)"`))[1].replaceAll('&amp;','&');
+    const path=html.match(new RegExp(`(?:src|href)="(builder-cache-editor-[a-f0-9]{20}\\.${type})"`))[1];
     const response=await fetch(app.base+'/cart/admin/'+path,{headers:{'Accept-Encoding':'gzip'}});
     assert.equal(response.status,200);
-    assert.match(response.headers.get('cache-control'),/public.*immutable/);
-    assert.equal(response.headers.get('content-encoding'),'gzip');
+    assert.match(path,/builder-cache-editor-[a-f0-9]{20}/);
+    assert.equal((await fetch(app.base+'/cart/admin/builder-bundle.php?bundle=editor.'+type,{redirect:'manual'})).headers.get('location'),path);
     const body=await response.text();
     assert.ok(body.length>500000);
     if(type==='css'){assert.doesNotMatch(body,/@import/);assert.match(body,/@media all \{/);}
     else assert.match(body,/EzkartImageBuilder/);
-    assert.equal((await fetch(app.base+'/cart/admin/'+path,{headers:{'If-None-Match':response.headers.get('etag')}})).status,304);
+    assert.equal((await fetch(app.base+'/cart/admin/'+path)).status,200);
   }
   assert.equal((await fetch(app.base+'/cart/admin/builder-bundle.php?bundle=../../config.runtime.php')).status,404);
   const proxy=await fetch(app.base+'/cart/admin/?cloud=%2Fv1%2Flanding-pages%2Fexample%2Feditor',{headers:{Cookie:`${cookie.name}=${cookie.value}`}});
   assert.notEqual(proxy.status,400);
   assert.ok((await app.calls()).some(call=>call.url.endsWith('/v1/landing-pages/example/editor')));
+  const {chromium}=await import('../builder-mcp/node_modules/playwright/index.mjs');
+  const browser=await chromium.launch();
+  try {
+    const page=await browser.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+    await page.context().addCookies([cookie]);
+    await page.route(url=>url.searchParams.get('cloud')==='/v1/fonts',route=>route.fulfill({json:{ok:true,fonts:[]}}));
+    await page.route(url=>url.searchParams.get('cloud')==='/v1/landing-pages/example/editor',route=>route.fulfill({json:{ok:true,page:{id:'example',name:'Example',url:'example.ezkart.site',status:'draft',products:[],customProducts:[],state:{version:6,preview:'<section class="sq-page-block sq-generated-blank" data-sq-block data-sq-fluid data-section-id="blank"></section>'}}}}));
+    await page.goto(app.base+'/cart/admin/?page=sites&edit=example.ezkart.site');
+    await page.waitForFunction(()=>globalThis.EzkartBuilder && !document.querySelector('.sq-studio').classList.contains('sq-site-loading'));
+    assert.equal(await page.evaluate(()=>EzkartAssets.preview(EzkartAssets.definitions[0].id) instanceof HTMLElement),true);
+    assert.deepEqual(errors,[]);
+  } finally {await browser.close();}
+
 });
