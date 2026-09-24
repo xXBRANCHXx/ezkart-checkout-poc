@@ -18,5 +18,13 @@ if (($_SERVER['HTTP_IF_NONE_MATCH'] ?? '') === $etag) {
     http_response_code(304);
     exit;
 }
-if (function_exists('ob_gzhandler') && !ini_get('zlib.output_compression')) ob_start('ob_gzhandler');
-echo ez_builder_bundle_contents($bundle);
+$contents = ez_builder_bundle_contents($bundle);
+// Compress the complete bundle together. Host streaming compression uses small
+// windows and loses most of the repeated native-asset definitions' savings.
+if (function_exists('gzencode') && preg_match('/\bgzip\b/i', (string) ($_SERVER['HTTP_ACCEPT_ENCODING'] ?? ''))) {
+    ini_set('zlib.output_compression', '0');
+    header('Content-Encoding: gzip');
+    echo gzencode($contents, 9);
+} else {
+    echo $contents;
+}
