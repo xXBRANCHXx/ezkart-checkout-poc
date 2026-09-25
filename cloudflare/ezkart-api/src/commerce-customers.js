@@ -34,9 +34,15 @@ export const customerCte=`WITH scoped_orders AS (
     COALESCE(json_extract(r.customer_snapshot_json,'$.name'),'') AS name,COALESCE(json_extract(r.customer_snapshot_json,'$.email'),'') AS email,
     COALESCE(json_extract(r.customer_snapshot_json,'$.phone'),'') AS phone,COALESCE(json_extract(r.shipping_address_json,'$.location'),'') AS location,
     r.shipping_address_json AS address_json,COALESCE(json_extract(p.data_json,'$.tags'),'[]') AS tags_json,
-    COALESCE(json_extract(p.data_json,'$.note'),'') AS note,COALESCE(p.revision,0) AS revision,p.updated_at AS profile_updated_at
+    COALESCE(json_extract(p.data_json,'$.note'),'') AS note,COALESCE(p.revision,0) AS revision,p.updated_at AS profile_updated_at,
+    CASE WHEN consent.revision IS NULL THEN 'not_recorded' WHEN consent.allowed=1 THEN 'granted' ELSE 'withdrawn' END AS marketing_consent,
+    consent.updated_at AS consent_updated_at
   FROM totals t JOIN ranked r ON r.customer_id=t.customer_id AND r.position=1 JOIN customers c ON c.id=r.customer_id AND c.seller_id=r.seller_id
   LEFT JOIN commerce_customer_profiles p ON p.seller_id=r.seller_id AND p.customer_id=r.customer_id AND p.commerce_environment=r.commerce_environment
+  LEFT JOIN commerce_order_owners owner ON owner.order_id=r.id
+  LEFT JOIN commerce_customer_consents consent ON consent.seller_id=r.seller_id AND consent.commerce_environment=r.commerce_environment
+    AND consent.auth_user_id=COALESCE(owner.auth_user_id,NULLIF(json_extract(r.customer_snapshot_json,'$.authUserId'),''))
+    AND consent.email=lower(trim(json_extract(r.customer_snapshot_json,'$.email')))
 )`;
 export const customerColumns='p.*,CAST(p.gross AS TEXT) AS exact_gross,CAST(p.additional AS TEXT) AS exact_additional';
 export function customerFilterSql(filters){
@@ -67,7 +73,7 @@ export async function customerContext(env,seller,cohort){
 const profileView=(row,detail=false)=>({id:row.id,name:row.name,email:row.email,phone:row.phone,location:row.location,
   orders:row.orders,paidOrders:row.paid_orders,gross:row.exact_gross,additional:row.exact_additional,firstAt:row.first_at,lastAt:row.last_at,lastOrder:row.last_order,
   tags:JSON.parse(row.tags_json),...(detail?{profile:{revision:row.revision,note:row.note,tags:JSON.parse(row.tags_json),updatedAt:row.profile_updated_at},
-    address:(()=>{const a=JSON.parse(row.address_json||'{}');return {address:a.address||'',location:a.location||'',postalCode:a.postalCode||''};})(),marketingConsent:'not_recorded'}:{})});
+    address:(()=>{const a=JSON.parse(row.address_json||'{}');return {address:a.address||'',location:a.location||'',postalCode:a.postalCode||''};})(),marketingConsent:row.marketing_consent,marketingConsentAt:row.consent_updated_at}:{})});
 
 export async function merchantCustomers(env,seller,url){
   const limit=readParameters(url,[...customerFilterKeys,'limit','cursor']),filters=customerFilters(Object.fromEntries(customerFilterKeys.filter(k=>url.searchParams.has(k)).map(k=>[k,url.searchParams.get(k)]))),

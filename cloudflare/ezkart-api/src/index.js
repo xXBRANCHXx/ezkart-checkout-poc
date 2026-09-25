@@ -25,6 +25,7 @@ import {merchantPaymentList,merchantPaymentDetail,merchantPaymentHistory} from '
 import {merchantCustomers,merchantCustomer,customerOrderHistory} from './commerce-customers.js';
 import {customerSegments,customerSegment,saveCustomerWorkspace,customerProfileHistory} from './commerce-customer-workspace.js';
 import {createCustomerExport,readCustomerExport,cleanupCustomerExports} from './commerce-customer-exports.js';
+import {customerConsents} from './commerce-customer-consents.js';
 import {merchantAnalytics} from './commerce-analytics.js';
 import {createAnalyticsExport,readAnalyticsExport,cleanupAnalyticsExports} from './commerce-analytics-exports.js';
 const json = (payload, status = 200, headers = {}) => new Response(JSON.stringify(payload), {
@@ -1432,6 +1433,12 @@ export default {
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
     const url = new URL(request.url);
     try {
+      if(url.pathname==='/internal/commerce/customer-consents'){
+        const payload=await authenticateCommerceService(request,env);
+        if(request.method!=='POST')return json({ok:false,error:'Method not allowed'},405);
+        if(url.search)return json({ok:false,error:'Preference parameters belong in the request body'},422);
+        return json({ok:true,...await customerConsents(env,payload)});
+      }
       const claimOrderMatch = /^\/internal\/commerce\/orders\/(EZK-[SP]-[A-F0-9]{24})\/claim$/.exec(url.pathname);
       if (claimOrderMatch && request.method === 'POST') {
         return json({ok:true,...await claimCommerceOrder(env,claimOrderMatch[1],await authenticateCommerceService(request,env))});

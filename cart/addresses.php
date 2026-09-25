@@ -22,6 +22,7 @@ header('X-Content-Type-Options: nosniff');
 <body>
   <header class="payment-header"><div class="header-content"><img class="brand" src="../assets/ezkart-logo.svg" width="1020" height="420" alt="Ezkart"><span class="secure-label">Delivery details</span></div></header>
   <main class="addresses-shell">
+    <p><a href="preferences.php">Email preferences</a></p>
     <h1>Delivery addresses</h1>
     <p>Save an address and pin the entrance for your next delivery.</p>
     <div id="customer-address-book"></div>

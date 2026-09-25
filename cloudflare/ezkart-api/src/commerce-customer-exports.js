@@ -22,7 +22,8 @@ export async function createCustomerExport(env,seller,input){
       SELECT ?,r.ordinal,r.cells_json FROM (${customerCte} SELECT ROW_NUMBER() OVER(ORDER BY p.last_at DESC,p.id DESC) AS ordinal,
         json_array(p.id,p.name,p.email,p.phone,p.location,p.orders,p.paid_orders,CAST(p.gross AS TEXT),CAST(p.additional AS TEXT),
           strftime('%Y-%m-%d %H:%M:%S',p.first_at,'+7 hours'),strftime('%Y-%m-%d %H:%M:%S',p.last_at,'+7 hours'),
-          (SELECT group_concat(value,', ') FROM json_each(p.tags_json)),'Not recorded') AS cells_json FROM profiles p WHERE ${filter.where}) r
+          (SELECT group_concat(value,', ') FROM json_each(p.tags_json)),
+          CASE p.marketing_consent WHEN 'granted' THEN 'Email allowed' WHEN 'withdrawn' THEN 'Email withdrawn' ELSE 'Not recorded' END) AS cells_json FROM profiles p WHERE ${filter.where}) r
       WHERE EXISTS(SELECT 1 FROM commerce_customer_exports WHERE id=? AND request_hash=? AND state='building')`).bind(id,...ctx.bindings,...filter.values,id,hash),
     env.DB.prepare("UPDATE commerce_customer_exports SET state='ready',row_count=(SELECT COUNT(*) FROM commerce_customer_export_rows WHERE export_id=?) WHERE id=? AND request_hash=? AND state='building'").bind(id,id,hash),
   ]);}catch(error){if(String(error).includes('customer_export_rate'))fail('You can create 10 customer export snapshots per hour. Retry an existing download or try later.',429);throw error;}

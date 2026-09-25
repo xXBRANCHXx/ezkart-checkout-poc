@@ -126,7 +126,10 @@ Its signed-in TEST preview does not activate central checkout. The customer
 directory also has central profiles, complete purchase histories, persisted
 notes/tags/segments and private complete CSV snapshots; migration 0020 adds its
 metadata, audit and export tables. See [central-customers.md](central-customers.md).
-Buyer consent, review workflows and operational legacy handover remain open; see
+Migration 0021 adds buyer-controlled email permission and immutable withdrawal
+history. Merchant readouts require the matching order owner and email address;
+see [customer-consents.md](customer-consents.md). Remaining consent channels,
+review workflows and operational legacy handover remain open; see
 [central-order-manager.md](central-order-manager.md).
 
 Migration `0009_commerce_orders.sql` extends the existing `orders` and

@@ -5,8 +5,8 @@ TEST merchants can inspect it at `?page=customers&customer-preview=1` without
 switching checkout. Profile, note/tag, segment and export controls are real
 operations. Central failures remain explicit and never load legacy order files.
 The existing published review summary remains accessible through the Reviews
-tab; review submission/moderation and buyer consent collection are still open
-work under the full completion plan.
+tab; full review submission/moderation remains open under the completion plan.
+Buyer email choices now use the [email preferences workflow](customer-consents.md).
 
 ## Identity and customer calculations
 
@@ -33,10 +33,12 @@ frontier. Subsequent purchase pages preserve that frontier, excluding later
 backdated inserts. Existing payment states remain current.
 
 No consent is inferred from a checkout, a customer master JSON field, or an
-authenticated buyer account. Profiles and exports currently say marketing
-consent is not recorded. Merchant edits cannot change buyer contact details or
-mark a customer as opted in. A buyer-authorized consent workflow, withdrawal
-history and enforcement in campaign delivery remain required before marketing.
+authenticated buyer account. Profiles and exports now read explicit buyer email
+choices only when the latest scoped order's owner and contact address match.
+Otherwise permission remains unrecorded. Merchant edits cannot change buyer
+contact details or mark a customer as opted in. Migration 0021 adds the separate
+buyer workflow and immutable withdrawal history; see [customer-consents.md](customer-consents.md).
+Phone permission and enforcement in actual campaign delivery remain open.
 
 ## Directory, profiles and saved groups
 
@@ -135,7 +137,7 @@ inspected. These are correctness checks, not production-volume benchmarks.
 
 Signed-in hosted acceptance remains pending shared Chrome initialization. The
 central flags and production release hold remain unchanged. This stage does not
-close the full customer acceptance item: buyer consent, review workflows,
+close the full customer acceptance item: remaining consent channels, review workflows,
 messaging/marketing use, operational legacy promotion and hosted acceptance still
 need completion. Full workbench requirements remain in
 [commerce-completion-plan.md](commerce-completion-plan.md).

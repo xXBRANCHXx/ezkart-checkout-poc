@@ -64,6 +64,23 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 25 September: buyer email preferences and permanent order claims
+
+Implemented buyer-controlled store email opt-in and withdrawal, including verified
+Google identity, exact permission wording, current and previous email addresses,
+immutable history, transactional revisions and replay-safe changes. The real
+buyer page supports complete store/history pagination and retains uncertain
+requests for retry. Changed logins cannot expose results or authorize a new
+account from an old page. Merchant profiles and CSV read the matching buyer's
+recorded choice; checkout contact fields never create permission. A claimed guest
+order now retains its permanent account ownership after a verified email change.
+
+Migration 0021 adds the consent projection/audit tables and guards. See
+[customer-consents.md](customer-consents.md) for contracts, validation and release
+evidence. Phone/WhatsApp consent, campaign unsubscribe and send-time enforcement,
+full review workflows, hosted acceptance and all wider completion gates remain
+open. This delivery does not send messages or activate central checkout.
+
 ### 25 September: customer profiles, segments and private exports
 
 Implemented the scoped central customer directory, full purchase history and
@@ -79,10 +96,11 @@ Migration 0020 adds customer metadata/audit/export tables and guards. Eight D1
 and seven PHP/browser cases cover authorization, concurrency, exact money,
 complete pagination, replay, rollback, retention, filters, exports and mobile use;
 12 adjacent order/payment API and 14 adjacent central browser cases also pass.
-See [central-customers.md](central-customers.md). Marketing consent is explicitly
-unrecorded; checkout contact details are not opt-in evidence. Published review
-summaries remain available. Buyer consent and full review workflows, hosted
-acceptance, legacy promotion and the wider completion gates remain open.
+See [central-customers.md](central-customers.md). This initial stage left marketing
+consent unrecorded; the following delivery above adds explicit buyer email choices.
+Checkout contact details remain insufficient opt-in evidence. Published review
+summaries remain available. Full review workflows, remaining consent channels,
+hosted acceptance, legacy promotion and the wider completion gates remain open.
 Implementation `51c1ac3` is pushed; migration 0020 and TEST Worker
 `eba823ae-56e8-4ada-a524-076ce3cb3e95` are deployed. Served assets match,
 health/authentication checks pass, all new customer tables remain empty and

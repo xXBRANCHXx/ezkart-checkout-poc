@@ -53,7 +53,7 @@
       if (url.protocol !== "https:") throw new Error("Google sign-in is unavailable. Please try again.");
       popup.location.replace(url.href);
       deadline = Date.now() + 10 * 60 * 1000;
-      showMessage("Finish signing in with Google to load your order.");
+      showMessage(gate.dataset.successMessage || "Finish signing in with Google to load your order.");
       readSession();
     } catch (error) {
       try { popup.close(); } catch (_) {}
