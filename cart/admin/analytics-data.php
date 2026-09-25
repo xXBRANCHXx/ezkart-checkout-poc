@@ -47,11 +47,13 @@ function ez_analytics_period(array $query, DateTimeImmutable $now, array $orders
 function ez_analytics_status(array $order): string
 {
     $status = strtoupper((string) ($order['status'] ?? ''));
+    if (!empty($order['_central']) && in_array($status, ['PAID','PENDING','CREATING','FAILED','EXPIRED','CANCELLED','PARTIALLY_REFUNDED','REFUNDED'], true)) return $status;
     return in_array($status, ['PAID', 'PENDING', 'CREATING', 'FAILED'], true) ? $status : 'OTHER';
 }
 
 function ez_analytics_fulfillment(array $order): string
 {
+    if (!empty($order['_central'])) return $order['stage'];
     if (ez_analytics_status($order) !== 'PAID') return 'unpaid';
     if (ez_order_skips_shipping($order)) return 'not-required';
     return ez_dashboard_order_queue($order) ?: 'delivered';
@@ -180,6 +182,8 @@ function ez_analytics_url(array $data, array $changes = []): string
 {
     $period = $data['period'];
     $query = ['page' => 'analytics', 'report' => $data['report'], 'range' => $period['range'], 'group' => $period['group']];
+    if (!empty($data['central']) && !empty($data['cohort'])) $query['cohort'] = $data['cohort'];
+    if (!empty($data['preview'])) $query['analytics-preview'] = '1';
     if ($period['range'] === 'custom') $query += ['from' => $period['start']->format('Y-m-d'), 'to' => $period['end']->modify('-1 day')->format('Y-m-d')];
     return '?' . http_build_query(array_replace($query, $changes));
 }

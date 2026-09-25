@@ -64,6 +64,30 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 25 September: central analytics and complete CSV snapshots
+
+Implemented D1-backed overview/revenue/order/payment/product reports, preserving
+Jakarta periods, equal-length comparisons, chart inspection, server filters and
+pages. Verified capture totals remain separate from additional captures and
+wallet/settlement claims. Saved product/option values, payment-session methods,
+verification-time medians and exact integer money are covered. Central errors
+remain explicit and never read legacy files.
+
+Migration 0019 adds atomically materialized export snapshots, immutable receipts,
+bounded download pages, replay-safe request keys, 24-hour expiry and bounded
+cleanup. The UI recovers lost responses, checks complete row sequences and only
+downloads a complete CSV, with formula-like text escaped. The TEST preview does
+not activate central checkout or create provider/stock/financial operations.
+
+Seven D1 and four PHP/browser cases pass, together with 11 adjacent report API
+cases and three legacy analytics/date regressions. Desktop/mobile layouts and
+large exact-money rendering are inspected. See
+[central-analytics.md](central-analytics.md). Deployment evidence follows after
+TEST migration and publication. Signed-in hosted review is pending shared Chrome;
+the owner-ready reconnect attempt also timed out without a retry loop. Storage
+cutover, remaining read workspaces, operational migration, capacity testing and
+the wider completion gates remain open.
+
 ### 25 September: central dashboard reporting
 
 Implemented authenticated D1 dashboard reporting and a merchant workspace for

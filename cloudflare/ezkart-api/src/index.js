@@ -21,6 +21,8 @@ import { returnList, returnOrder, returnDetail, customerReturns, createReturn, r
 import {fulfillmentList,fulfillmentDetail,fulfillmentAction,serviceShipment,customerShipment,bindShipmentAccount,bindShipment,shippingInbox,refreshShipment,drainPendingShipping} from './commerce-fulfillment.js';
 import {merchantOrderList,merchantOrderDetail,merchantOrderHistory} from './commerce-order-reads.js';
 import {merchantDashboard} from './commerce-dashboard.js';
+import {merchantAnalytics} from './commerce-analytics.js';
+import {createAnalyticsExport,readAnalyticsExport,cleanupAnalyticsExports} from './commerce-analytics-exports.js';
 const json = (payload, status = 200, headers = {}) => new Response(JSON.stringify(payload), {
   status,
   headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...headers },
@@ -1513,6 +1515,17 @@ export default {
         if(request.method==='GET')return json({ok:true,...await returnList(env,actor,url)},200,cors);
         return json({ok:false,error:'Method not allowed'},405,cors);
       }
+      const analyticsExportMatch=/^\/v1\/commerce\/analytics\/exports\/(aex_[a-f0-9]{40})$/.exec(url.pathname);
+      if(url.pathname==='/v1/commerce/analytics'||url.pathname==='/v1/commerce/analytics/exports'||analyticsExportMatch){
+        const {seller}=await sellerContext(request,env);
+        if(url.pathname==='/v1/commerce/analytics/exports'){
+          if(request.method!=='POST')return json({ok:false,error:'Method not allowed'},405,cors);
+          if(url.search)return json({ok:false,error:'Export filters belong in the report'},422,cors);
+          return json({ok:true,...await createAnalyticsExport(env,seller,await requestJson(request,4000))},200,cors);
+        }
+        if(request.method!=='GET')return json({ok:false,error:'Method not allowed'},405,cors);
+        return json({ok:true,...await (analyticsExportMatch?readAnalyticsExport(env,seller,analyticsExportMatch[1],url):merchantAnalytics(env,seller,url))},200,cors);
+      }
       if(url.pathname==='/v1/commerce/dashboard'){
         const {seller}=await sellerContext(request,env);
         if(request.method!=='GET')return json({ok:false,error:'Method not allowed'},405,cors);
@@ -1651,6 +1664,7 @@ export default {
   },
   async scheduled(_controller, env, context) {
     context.waitUntil(cleanupAbandonedMedia(env));
+    context.waitUntil(cleanupAnalyticsExports(env));
     context.waitUntil(expireCommerceOrders(env));
   },
 };

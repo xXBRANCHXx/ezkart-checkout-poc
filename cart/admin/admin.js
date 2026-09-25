@@ -368,6 +368,7 @@
   globalThis.EzkartFulfillment?.mount({request: cloudRequest});
   globalThis.EzkartCommerceOrders?.mount({request: cloudRequest});
   globalThis.EzkartCommerceDashboard?.mount({request: cloudRequest, products: cloudCatalogProducts});
+  globalThis.EzkartCommerceAnalytics?.mount({request: cloudRequest});
   globalThis.EzkartShippingSettings?.mount({request: cloudRequest});
 
   const storageScope = document.body.dataset.adminStorageScope || "anonymous";

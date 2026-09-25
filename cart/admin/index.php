@@ -720,13 +720,18 @@ function ez_admin_proxy_cloud_request(string $accessToken, string $path, string 
     $isFulfillmentPath = preg_match('#^/v1/fulfillment(?:/EZK-[SP]-[A-F0-9]{24})?$#D', $inventoryPath) === 1;
     $isOrderReadPath = preg_match('#^/v1/commerce/orders(?:/EZK-[SP]-[A-F0-9]{24}(?:/(?:captures|activity))?)?$#D', $inventoryPath) === 1;
     $isDashboardReadPath = $inventoryPath === '/v1/commerce/dashboard';
-    $isCommerceReadPath = $isOrderReadPath || $isDashboardReadPath;
+    $isAnalyticsReadPath = $inventoryPath === '/v1/commerce/analytics';
+    $isAnalyticsExportRead = preg_match('#^/v1/commerce/analytics/exports/aex_[a-f0-9]{40}$#D', $inventoryPath) === 1;
+    $isAnalyticsExportWrite = $inventoryPath === '/v1/commerce/analytics/exports';
+    if ($isAnalyticsExportWrite && $method !== 'POST') ez_admin_json(['ok' => false, 'error' => 'Method not allowed.'], 405);
+    $isCommerceReadPath = $isOrderReadPath || $isDashboardReadPath || $isAnalyticsReadPath || $isAnalyticsExportRead;
     if ($isCommerceReadPath && $method !== 'GET') ez_admin_json(['ok' => false, 'error' => 'Method not allowed.'], 405);
-    if ($isInventoryPath || $isReturnsPath || $isFulfillmentPath || $isCommerceReadPath) {
+    if ($isInventoryPath || $isReturnsPath || $isFulfillmentPath || $isCommerceReadPath || $isAnalyticsExportWrite) {
         parse_str((string) parse_url($path, PHP_URL_QUERY), $inventoryQuery);
         if ($isCommerceReadPath && count($inventoryQuery) !== count(array_filter(explode('&', (string) parse_url($path, PHP_URL_QUERY)), 'strlen'))) ez_admin_json(['ok' => false, 'error' => 'Order filters are invalid.'], 400);
         foreach ($inventoryQuery as $key => $value) {
-            if (!in_array($key, $isDashboardReadPath ? ['range','group'] : ($isOrderReadPath ? ['state','queue','q','from','to','order','cursor','limit'] : ($isFulfillmentPath ? ['state', 'cursor', 'limit', 'before', 'q'] : ($isReturnsPath ? ['state', 'cursor', 'limit', 'before'] : ['q', 'status', 'level', 'cursor', 'limit', 'product', 'variant']))), true) || !is_string($value) || strlen($value) > ($isOrderReadPath && $key === 'cursor' ? 1000 : 200) || preg_match('/[\x00-\x1f]/', $value)) {
+            $allowedReadKeys = $isAnalyticsReadPath ? ['report','range','from','to','group','cohort','q','status','stage','method','sort','table_page'] : ($isAnalyticsExportRead ? ['after','limit'] : ($isDashboardReadPath ? ['range','group'] : ($isOrderReadPath ? ['state','queue','q','from','to','order','cursor','limit'] : ($isFulfillmentPath ? ['state', 'cursor', 'limit', 'before', 'q'] : ($isReturnsPath ? ['state', 'cursor', 'limit', 'before'] : ['q', 'status', 'level', 'cursor', 'limit', 'product', 'variant'])))));
+            if (!in_array($key, $allowedReadKeys, true) || !is_string($value) || strlen($value) > ($isAnalyticsReadPath && $key === 'cohort' ? 1600 : ($isOrderReadPath && $key === 'cursor' ? 1000 : 200)) || preg_match('/[\x00-\x1f]/', $value)) {
                 ez_admin_json(['ok' => false, 'error' => 'Inventory filter is invalid.'], 400);
             }
         }
@@ -734,7 +739,7 @@ function ez_admin_proxy_cloud_request(string $accessToken, string $path, string 
         $path = $inventoryPath . ($inventoryQuery !== [] ? '?' . http_build_query($inventoryQuery, '', '&', PHP_QUERY_RFC3986) : '');
     }
     $allowedPath = preg_match('#^/v1/(?:catalog|storefront|admin-preferences|admin-profile|shipping-settings|advanced-mode|media(?:/[a-zA-Z0-9_-]+)?|assets(?:/[a-zA-Z0-9_-]+)?|fonts(?:/font_[a-f0-9]{64})?|products/[a-zA-Z0-9_-]+(?:/(?:duplicate|status))?|drafts/[a-zA-Z0-9_-]+|landing-pages(?:/[a-z0-9-]+(?:/(?:preview|export|editor|view|confirmation))?)?|components(?:/[a-z0-9-]+)?)$#', $path) === 1;
-    if (!$isInventoryPath && !$isReturnsPath && !$isFulfillmentPath && !$isCommerceReadPath && (!$allowedPath || str_contains($path, '?') || str_contains($path, '#'))) {
+    if (!$isInventoryPath && !$isReturnsPath && !$isFulfillmentPath && !$isCommerceReadPath && !$isAnalyticsExportWrite && (!$allowedPath || str_contains($path, '?') || str_contains($path, '#'))) {
         ez_admin_json(['ok' => false, 'error' => 'That saved-data path is not allowed.'], 400);
     }
     if (!in_array($method, ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'], true) || ($method === 'PATCH' && preg_match('#^/v1/products/[a-zA-Z0-9_-]+/status$#D', $path) !== 1)) {
@@ -1386,7 +1391,9 @@ $centralDashboardWorkspace = $authenticated && $isDashboard && (ez_config('comme
     || ($deployment === 'test' && $authenticationMethod === 'supabase' && ($_GET['dashboard-preview'] ?? '') === '1'));
 $centralOrderWorkspace = $authenticated && $page === 'orders' && (ez_config('commerce_storage') === 'd1'
     || ($deployment === 'test' && $authenticationMethod === 'supabase' && ($_GET['order-preview'] ?? '') === '1'));
-$centralReadWorkspace = $centralOrderWorkspace || $centralDashboardWorkspace;
+$centralAnalyticsWorkspace = $authenticated && $page === 'analytics' && (ez_config('commerce_storage') === 'd1'
+    || ($deployment === 'test' && $authenticationMethod === 'supabase' && ($_GET['analytics-preview'] ?? '') === '1'));
+$centralReadWorkspace = $centralOrderWorkspace || $centralDashboardWorkspace || $centralAnalyticsWorkspace;
 $orders = (!$centralReadWorkspace && $authenticated && ($legacyDataAccess || $sellerId !== '')) ? array_values(array_filter(ez_admin_orders(), static fn($order) => ez_dashboard_order_visible($order, $sellerId, $legacyDataAccess))) : [];
 $allOrderCount = count($orders);
 $orderQueues = [
@@ -1503,10 +1510,22 @@ $creatingEnd = round((($statusCounts['PAID'] + $statusCounts['PENDING'] + $statu
 if ($requestedPage === 'integrations') { header('Location: ?page=wallet', true, 302); exit; }
 if ($requestedPage === 'reviews') { header('Location: ?page=customers&tab=reviews', true, 302); exit; }
 $analyticsAvailable = $authenticated && ($authenticationMethod !== 'supabase' || $sellerId !== '');
+require_once __DIR__ . '/commerce-analytics-data.php';
 $analytics = $page === 'analytics' && $authenticated ? ez_analytics_build($orders, $_GET, $nowJakarta) : null;
+$analyticsError = '';
+if ($centralAnalyticsWorkspace) {
+    try { $analytics = ez_central_analytics($_GET, $dashboardProductLookup); }
+    catch (Throwable) {
+        $analyticsAvailable = false;
+        $analyticsError = 'The central report could not be loaded. Refresh or reset the filters to try again.';
+        $analytics['central'] = true;
+        $analytics['preview'] = ez_config('commerce_storage') !== 'd1';
+    }
+}
 if ($page === 'analytics' && ($_GET['export'] ?? '') === 'csv') {
     if (!$authenticated) { http_response_code(401); exit('Sign in to export analytics.'); }
     if (!$analyticsAvailable) { http_response_code(503); exit('Analytics could not be loaded. Reload to try again.'); }
+    if ($centralAnalyticsWorkspace) { http_response_code(405); exit('Use Export CSV on the analytics page to create a complete report snapshot.'); }
     ez_analytics_export($analytics);
 }
 $walletAccess = $page === 'wallet' && $authenticated ? ez_wallet_access($authenticationMethod, $sellerId, $csrfToken, $isHttps) : ['unlocked' => false];
@@ -1911,6 +1930,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
   <?php if ($centralDashboardWorkspace): ?><script src="commerce-dashboard.js?v=<?= (int) filemtime(__DIR__ . '/commerce-dashboard.js') ?>"></script><?php endif; ?>
   <?php if ($page === 'shipping-settings'): ?><script src="../address-picker.js?v=<?= (int) filemtime(__DIR__ . '/../address-picker.js') ?>"></script><script src="shipping-settings.js?v=<?= (int) filemtime(__DIR__ . '/shipping-settings.js') ?>"></script><?php endif; ?>
   <?php if ($page === 'analytics'): ?><script src="analytics.js?v=<?= (int) filemtime(__DIR__ . '/analytics.js') ?>"></script><?php endif; ?>
+  <?php if ($centralAnalyticsWorkspace): ?><script src="commerce-analytics.js?v=<?= (int) filemtime(__DIR__ . '/commerce-analytics.js') ?>"></script><?php endif; ?>
   <?php if ($page === 'wallet'): ?><script src="wallet-access.js?v=<?= (int) filemtime(__DIR__ . '/wallet-access.js') ?>"></script><?php endif; ?>
   <script src="admin-language.js?v=<?= (int) filemtime(__DIR__ . '/admin-language.js') ?>"></script>
   <?php if ($page === 'sites'): ?><script src="builder-image.js?v=<?= (int) filemtime(__DIR__ . '/builder-image.js') ?>"></script><script src="builder-choice.js?v=<?= (int) filemtime(__DIR__ . '/builder-choice.js') ?>"></script><?php endif; ?>

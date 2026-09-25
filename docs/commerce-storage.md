@@ -94,8 +94,10 @@ The central merchant order manager now has scoped D1 pagination, totals, search
 and saved order details. Migration 0018 adds read indexes. It is prepared behind
 the PHP central flag, with a read-only TEST preview. The dashboard now has the
 same prepared central read routing; see [central-dashboard.md](central-dashboard.md).
-Other merchant reporting and
-customer surfaces and the operational legacy handover remain open; see
+Analytics now has the same prepared routing, complete-cohort reports and durable
+CSV snapshots; migration 0019 adds its export tables. See
+[central-analytics.md](central-analytics.md). Payment/customer surfaces and the
+operational legacy handover remain open; see
 [central-order-manager.md](central-order-manager.md).
 
 Migration `0009_commerce_orders.sql` extends the existing `orders` and
