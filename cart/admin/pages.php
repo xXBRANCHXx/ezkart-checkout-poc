@@ -164,7 +164,7 @@ function ez_orders_table(array $rows, string $tableId, string $csrfToken, string
               <div class="product-live-copy">
                 <div class="product-live-heading">
                   <h2 data-product-live-name>Your product name</h2>
-                  <span class="product-live-rating" data-product-live-rating aria-label="Rating 5.0 out of 5"><?= ez_admin_icon('star') ?><b>5.0</b></span>
+                  <span class="product-live-rating" data-product-live-rating aria-label="No published reviews"><?= ez_admin_icon('star') ?><b>—</b></span>
                 </div>
                 <strong data-product-live-price>Rp75.000</strong>
                 <em data-product-live-availability>Stock: 10</em>

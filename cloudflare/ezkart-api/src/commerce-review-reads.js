@@ -40,11 +40,13 @@ async function list(env,scopeId,url,merchant,canWrite=false){
     env.DB.prepare('SELECT COUNT(*) AS n'+joins+' WHERE '+where.join(' AND ')).bind(...bindings),
     env.DB.prepare(reviewSelect+' WHERE '+where.join(' AND ')+(cursor?` AND (r.created_at${comparison}? OR (r.created_at=? AND r.id${comparison}?))`:'')+` ORDER BY r.created_at ${direction},r.id ${direction} LIMIT ?`)
       .bind(...bindings,...(cursor?[cursor.at,cursor.at,cursor.id]:[]),limit+1),
+    ...(merchant&&f.product?[env.DB.prepare(`SELECT ${summaryColumns} FROM product_reviews r WHERE r.seller_id=? AND r.commerce_environment IN (?, 'legacy')
+      AND r.rowid<=? AND r.product_id=? AND ${publicReviewSql}`).bind(scopeId,mode,cap,f.product)]:[]),
   ]);
   const rows=result[2].results.slice(0,limit),last=rows.at(-1);
   return {summary:summary(result[0].results[0]),matching:result[1].results[0].n,items:rows.map(r=>reviewView(r,{publicView:!merchant})),
     nextCursor:result[2].results.length>limit?reviewCursor({v:1,scope,cap,at:last.created_at,id:last.id}):null,
-    ...(merchant?{canWrite:canWrite&&commerceStorageEnabled(env),enabled:commerceStorageEnabled(env)}:{})};
+    ...(merchant?{canWrite:canWrite&&commerceStorageEnabled(env),enabled:commerceStorageEnabled(env),...(f.product?{productSummary:summary(result[3].results[0])}:{})}:{})};
 }
 export function merchantReviews(env,actor,url){return list(env,actor.sellerId,url,true,actor.role!=='viewer');}
 export async function publicReviews(env,url){

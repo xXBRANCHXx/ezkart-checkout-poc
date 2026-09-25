@@ -2,7 +2,7 @@
   "use strict";
   const sf = window.EzkartStorefront, { escape: esc, money } = sf;
   const byId = id => document.getElementById(id);
-  let store, products = [], selections = new Map(), cart = {};
+  let store, products = [], selections = new Map(), cart = {}, reviewDialog = null;
   function toast(message) { const node = byId("shop-toast"); node.textContent = message; node.classList.add("visible"); clearTimeout(toast.timer); toast.timer = setTimeout(() => node.classList.remove("visible"), 2600); }
   function renderCart() {
     sf.saveCart(store, cart);
@@ -15,6 +15,15 @@
       const { product, choice } = selections.get(id);
       return `<div class="shop-cart-line" data-selection="${esc(id)}"><div><b>${esc(product.name)}</b><small>${esc(choice.name)}</small></div><strong>${money(choice.price * qty)}</strong><div class="quantity-control"><button type="button" data-change="-1" aria-label="Decrease ${esc(product.name)} quantity">−</button><output>${qty}</output><button type="button" data-change="1" aria-label="Increase ${esc(product.name)} quantity" ${qty >= choice.stock ? "disabled" : ""}>+</button></div></div>`;
     }).join("") : '<p class="shop-cart-empty">Your cart is empty. Add something you love.</p>';
+  }
+  function reviewLabel(product) { return product.reviewCount ? `${Number(product.rating).toFixed(1)} / 5 · ${product.reviewCount} reviews` : "No reviews yet"; }
+  function openReviews(product, initial = {}) {
+    reviewDialog?.close();
+    reviewDialog = window.EzkartPublicReviews.show({productId:product.id,productName:product.name,initial,
+      onSummary:summary=>{product.rating=summary.average;product.reviewCount=summary.count;document.querySelectorAll('[data-product]').forEach(card=>{if(card.dataset.product===product.id)card.querySelector('[data-reviews]').textContent=reviewLabel(product);});},
+      onFilters:filters=>{const url=new URL(location.href);url.searchParams.set('review-product',product.id);for(const [key,value] of Object.entries(filters)){if(value)url.searchParams.set('review-'+key,value);else url.searchParams.delete('review-'+key);}history.replaceState({},'',url);},
+      onClose:()=>{reviewDialog=null;const url=new URL(location.href);for(const key of ['product','rating','photos','sort'])url.searchParams.delete('review-'+key);history.replaceState({},'',url);},
+    });
   }
   function updateCard(card) {
     const product = products.find(p => p.id === card.dataset.product);
@@ -40,8 +49,11 @@
       selections = new Map(products.flatMap(product => product.choices.map(choice => [choice.id, { product, choice }])));
       const saved = sf.readCart(store);
       cart = Object.fromEntries(Object.entries(saved).filter(([id, qty]) => selections.get(id)?.choice.available && Number.isSafeInteger(qty) && qty > 0).map(([id, qty]) => [id, Math.min(qty, selections.get(id).choice.stock)]));
-      byId("shop-products").innerHTML = products.map(product => `<article class="shop-product" data-product="${esc(product.id)}"><div class="shop-product-media"></div><div class="shop-product-copy"><h2>${esc(product.name)}</h2><p class="shop-product-description">${esc(product.description?.slice(0, 220))}</p><strong class="shop-product-price" data-price></strong>${product.choices.length && (product.choices.length > 1 || product.choices[0]?.name !== "Standard") ? `<label class="product-choice-label">Option<select aria-label="Option for ${esc(product.name)}">${product.choices.map(choice => `<option value="${esc(choice.id)}" ${choice.id === (product.choices.find(c => c.available) || product.choices[0])?.id ? "selected" : ""}>${esc(choice.name)}${!choice.available ? " — unavailable" : ""}</option>`).join("")}</select></label>` : ""}${product.type !== "physical" ? '<p class="shop-unavailable">Online checkout is not available for this product yet.</p>' : ""}<div class="shop-product-actions"><input type="number" min="1" step="1" value="1" aria-label="Quantity for ${esc(product.name)}"><button class="shop-add" type="button" data-add>Add to cart</button></div></div></article>`).join("");
+      byId("shop-products").innerHTML = products.map(product => `<article class="shop-product" data-product="${esc(product.id)}"><div class="shop-product-media"></div><div class="shop-product-copy"><h2>${esc(product.name)}</h2><button type="button" class="shop-review-link" data-reviews>${esc(reviewLabel(product))}</button><p class="shop-product-description">${esc(product.description?.slice(0, 220))}</p><strong class="shop-product-price" data-price></strong>${product.choices.length && (product.choices.length > 1 || product.choices[0]?.name !== "Standard") ? `<label class="product-choice-label">Option<select aria-label="Option for ${esc(product.name)}">${product.choices.map(choice => `<option value="${esc(choice.id)}" ${choice.id === (product.choices.find(c => c.available) || product.choices[0])?.id ? "selected" : ""}>${esc(choice.name)}${!choice.available ? " — unavailable" : ""}</option>`).join("")}</select></label>` : ""}${product.type !== "physical" ? '<p class="shop-unavailable">Online checkout is not available for this product yet.</p>' : ""}<div class="shop-product-actions"><input type="number" min="1" step="1" value="1" aria-label="Quantity for ${esc(product.name)}"><button class="shop-add" type="button" data-add>Add to cart</button></div></div></article>`).join("");
       document.querySelectorAll(".shop-product").forEach(updateCard);
+      const params=new URLSearchParams(location.search),reviewProduct=products.find(p=>p.id===params.get('review-product'));
+      if(reviewProduct)openReviews(reviewProduct,Object.fromEntries(['rating','photos','sort'].map(key=>[key,params.get('review-'+key)||''])));
+
       renderCart();
       byId("shop-content").hidden = !products.length; byId("shop-empty").hidden = !!products.length;
       if (JSON.stringify(saved) !== JSON.stringify(cart)) toast("Your cart was updated to match current availability.");
@@ -50,6 +62,8 @@
   }
   byId("shop-products").addEventListener("change", event => { if (event.target.matches("select")) updateCard(event.target.closest(".shop-product")); });
   byId("shop-products").addEventListener("click", event => {
+    if(event.target.closest('[data-reviews]')){const product=products.find(p=>p.id===event.target.closest('[data-product]').dataset.product);if(product)openReviews(product);return;}
+
     if (!event.target.closest("[data-add]")) return;
     const card = event.target.closest(".shop-product"), product = products.find(p => p.id === card.dataset.product);
     const choice = product.choices.find(c => c.id === card.querySelector("select")?.value) || product.choices[0];

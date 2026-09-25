@@ -1,10 +1,11 @@
-# Purchase reviews: buyer workflow and API
+# Purchase reviews: buyer, merchant and public workflows
 
-This delivery implements the buyer workflow on order tracking and the review API.
-The merchant moderation workspace, public review browser and product-editor
-preview still need integration and acceptance. The customer-operations completion
-gate remains open. The existing central-commerce flag controls all review writes
-and the buyer controls; this delivery does not enable checkout or providers.
+The buyer workflow on order tracking, merchant review workspace, public shop
+review browser and product-editor ratings are implemented. Controlled PHP/browser
+acceptance passes; signed-in hosted acceptance remains outstanding. The wider
+customer-operations completion gate remains open. The existing central-commerce
+flag controls review writes and buyer controls; these deliveries do not enable
+checkout or providers.
 
 ## Purchase and identity
 
@@ -149,10 +150,6 @@ coverage proves these controlled workflows, not a provider delivery in hosting.
 
 ## Remaining acceptance and integration
 
-- Merchant review search, reply, moderation, evidence/history and conflict/retry
-  controls through the real merchant UI, including viewer and mobile acceptance.
-- Public product review browsing/filtering, photos and replies, plus accurate
-  product-editor preview (including removal of its hardcoded 5.0 claim).
 - Hosted signed-in buyer/merchant/public acceptance after central cutover. The
   shared Chrome connection remains unavailable after its approved reconnect
   timed out; no repeated connection attempt is made by this delivery.
@@ -160,6 +157,58 @@ coverage proves these controlled workflows, not a provider delivery in hosting.
   financial validation month, DOKU approval and owner production release.
 
 Production and `main` remain untouched.
+
+## Merchant workspace and public browsing — 25 September 2026
+
+The Customers → Reviews tab now has store-wide rating totals, search, product,
+visibility, star, reply and photo filters, date ordering and complete pagination.
+Details show the original order, current review, scoped photo evidence and complete
+immutable history. Merchants can reply, remove replies, explain moderation,
+restore visibility and approve historical reviews. Drafts survive switching
+reviews; saving a reply preserves a separate moderation draft. Conflicts require
+comparing the latest saved review, and uncertain writes retain the identical
+request/key with editing locked until confirmation. Discard and close controls
+are explicit, with keyboard focus returned to the originating review.
+
+Merchant review JSON and images pass through the existing PHP proxy. Reads and
+writes bind to the page's account and CSRF token, with another session check after
+the upstream response. A changed login clears private review content and images.
+Viewer roles and the held PHP rollout flag disable editing; the proxy also rejects
+writes before forwarding them when PHP commerce storage is held. Both proxies
+reject duplicate, nested, unknown and invalid query parameters. The merchant proxy
+also bounds review request bodies.
+
+Public shop cards show actual ratings/counts and open a review browser with star
+distribution, filters, replies, verified/historical labels and photo enlargement.
+Product/filter links survive reloads. Failed pages retain their previous results
+and cursor; failed filter retries retain the requested filters. Closing a viewer
+discards late replies and releases image object URLs. Enlarging a photo fetches
+it again, so a previously loaded thumbnail cannot bypass a newer hide/withdrawal.
+The public PHP proxy forwards no buyer authentication or private merchant fields.
+
+Product previews no longer claim a fixed 5.0. New products show no reviews;
+unavailable reads show an explicit error and retry. Existing and archived products
+use the merchant API's product-specific published summary, distinct from overall
+store totals and current filters. Archived review evidence remains accessible to
+the merchant. Login changes close that private viewer and clear its ratings.
+
+Thirty-five unique cases pass for this delivery: 12 Worker cases (11 review cases
+and storefront), 11 new merchant/public/product browser cases, seven existing
+customer cases, four buyer-review cases and the existing dashboard regression.
+Coverage includes complete paging/history, failed reads, lost write replies,
+conflicts, retained drafts, late responses, viewer/rollout restrictions, changed
+logins, safe text, public image visibility and cart persistence. Desktop and 390px
+layouts, native and fallback universal dropdowns, and mobile product previews are
+checked. Screenshots are inspected; PHP/JavaScript syntax and TEST dry build pass.
+No migration is needed for this stage.
+
+Logs: `/tmp/ezkart-review-workspace-api-01a0d643.log` (12),
+`/tmp/ezkart-review-workspace-final-01a0d643.log` (22),
+`/tmp/ezkart-review-workspace-dashboard-01a0d643.log` (one), and
+`/tmp/ezkart-product-reviews-final-01a0d643.log` (one overlapping expanded product
+preview check). Screenshots: `/tmp/ezkart-review-workspace-01a0d643/`.
+These fixtures establish application behavior, not hosted login or live provider
+delivery, and do not close the broader customer or release gates.
 
 ## TEST deployment — 25 September 2026
 

@@ -220,6 +220,7 @@
       Accept: "application/json",
       ...(payload ? { "Content-Type": "application/json" } : {}),
       ...(method === "GET" ? {} : { "X-Ezkart-Csrf": cloudCsrfToken }),
+      ...(path.startsWith('/v1/commerce/reviews') ? {'X-Ezkart-Csrf':cloudCsrfToken,'X-Ezkart-Review-Account':document.body.dataset.adminReviewAccount||''} : {}),
       ...(preferMinimal ? {Prefer: 'return=minimal'} : {}),
     };
     const body = payload ? JSON.stringify(payload) : null;
@@ -369,6 +370,7 @@
   globalThis.EzkartCommerceOrders?.mount({request: cloudRequest});
   globalThis.EzkartCommercePayments?.mount({request: cloudRequest});
   globalThis.EzkartCommerceCustomers?.mount({request: cloudRequest});
+  globalThis.EzkartCommerceReviews?.mount({request: cloudRequest});
   globalThis.EzkartCommerceDashboard?.mount({request: cloudRequest, products: cloudCatalogProducts});
   globalThis.EzkartCommerceAnalytics?.mount({request: cloudRequest});
   globalThis.EzkartShippingSettings?.mount({request: cloudRequest});
@@ -793,6 +795,7 @@
     const draftQuery = new URLSearchParams(window.location.search);
     const requestedProductId = /^custom-[a-z0-9]+$/i.test(draftQuery.get("product") || "") ? draftQuery.get("product") : "";
     const editingProduct = requestedProductId ? readCatalogProducts({ includeArchived: true }).find((product) => product.id === requestedProductId) || null : null;
+    globalThis.EzkartProductReviews?.mount({product:editingProduct,request:cloudRequest});
     let baseRevision = editingProduct?.revision ?? null;
     let draftId = draftQuery.get("draft") || (editingProduct ? `edit-${editingProduct.id}` : sessionStorage.getItem(activeProductDraftKey)) || `draft-${globalThis.crypto?.randomUUID?.() || Date.now()}`;
     if (draftQuery.get("new") === "1") draftId = `draft-${globalThis.crypto?.randomUUID?.() || Date.now()}`;

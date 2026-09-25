@@ -127,7 +127,13 @@ test('review filters page the complete cohort and preserve legacy status without
   const filtered=await f.publicList('product=tea&rating=1');assert.equal(filtered.matching,14);assert.equal(filtered.summary.count,63,'Summary is overall and does not re-average filtered reviews');
   const merchant=await f.merchant('/v1/commerce/reviews?state=pending');assert.equal(merchant.items.length,1);assert.equal(merchant.items[0].id,'pending_legacy');
   const approved=await f.merchantChange('pending_legacy','approve',0);assert.equal(approved.status,200,approved.error);assert.equal(approved.review.verifiedPurchase,false);assert.equal(approved.review.state,'published');
-  assert.equal((await f.merchant('/v1/commerce/reviews?product=mug')).items.length,1);
+  const mug=await f.merchant('/v1/commerce/reviews?product=mug&rating=1');
+  assert.equal(mug.items.length,0);assert.equal(mug.matching,0);
+  assert.equal(mug.productSummary.count,1);assert.equal(mug.productSummary.ratingSum,5);assert.equal(mug.productSummary.average,5);
+  assert.equal(mug.summary.count,65,'Store totals stay distinct from the product and current filters');
+  await f.db.prepare("UPDATE products SET status='archived' WHERE id='mug'").run();
+  assert.equal((await f.merchant('/v1/commerce/reviews?product=mug')).productSummary.count,1,'Archived products retain their real ratings');
+  assert.equal((await f.publicList('product=mug')).status,404);
   assert.equal((await f.merchant('/v1/commerce/reviews',undefined,{seller:'bob'})).items.length,0);
   for(const query of ['product=tea&rating=1&rating=2','product=tea&limit=51','product=tea&environment=production','product=tea&sort=evil'])assert.equal((await f.publicList(query)).status,422);
 });

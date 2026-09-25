@@ -11,7 +11,7 @@ ez_page_header('Customers', 'Customer profiles, purchase history, and saved grou
   <a href="?page=customers&amp;tab=reviews<?= $customerPreviewQuery ?>"<?= $customerTab === 'reviews' ? ' aria-current="page"' : '' ?>><?= ez_admin_icon('star') ?>Reviews</a>
 </nav>
 <?php if ($customerTab === 'reviews'): ?>
-<section class="surface customer-reviews-summary"><header class="surface-header"><div><h2>Customer ratings</h2><p>All-time published reviews</p></div></header><div class="review-body"><div><strong><?= $reviewAverage === null ? '—' : number_format($reviewAverage, 1) ?></strong><p><?= $catalogError !== '' ? 'Reviews could not be loaded. Reload to try again.' : ($reviewCount > 0 ? number_format($reviewCount) . ' published reviews' : 'No published reviews yet.') ?></p></div></div></section>
+<?php require __DIR__ . '/commerce-reviews.php'; ?>
 <?php return; endif; ?>
 <section class="commerce-orders commerce-customers" data-commerce-customers data-preview="<?= $customerPreview ? '1' : '0' ?>">
   <p class="commerce-orders-notice" data-customers-availability role="status" hidden></p>

@@ -64,6 +64,25 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 25 September: merchant review workspace and public review browsing
+
+Implemented the real Reviews tab: full search/filter/paging, replies, moderation
+with buyer-visible reasons, restore/approval, private photos, original orders and
+paginated history. Drafts survive navigation and unrelated saves; conflicts and
+uncertain writes preserve the intended change for explicit comparison or retry.
+Viewer roles, the held rollout flag and changed logins are enforced in the PHP
+proxy as well as the UI. Public shop cards now open reviews with ratings, replies,
+filters, photos, shareable links and honest historical/verified labels. Product
+previews use actual per-product ratings, including archived history; the hardcoded
+5.0 is removed.
+
+All 35 unique API/PHP/browser cases pass, including adjacent buyer/customer/cart
+and dashboard coverage. Desktop/mobile screenshots, both universal dropdown modes,
+syntax and TEST dry build are verified. See [purchase-reviews.md](purchase-reviews.md)
+for behavior, logs and acceptance limits. No migration or central-storage/provider
+activation is part of this stage. Signed-in hosted acceptance, remaining consent
+channels, messaging/marketing and all wider completion gates remain open.
+
 ### 25 September: buyer purchase reviews and review API
 
 Implemented the buyer review workflow on order tracking: verified physical

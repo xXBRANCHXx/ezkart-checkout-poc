@@ -715,6 +715,19 @@ function ez_admin_proxy_cloud_request(string $accessToken, string $path, string 
         catch (Throwable) { ez_admin_json(['ok' => false, 'error' => 'Address search is unavailable. You can still choose a location on the map.'], 503); }
     }
     $inventoryPath = (string) parse_url($path, PHP_URL_PATH);
+    $isReviewPath = preg_match('#^/v1/commerce/reviews(?:/([A-Za-z0-9][A-Za-z0-9_-]{2,95})(?:/(history)|/media/(rphoto_[a-f0-9]{32}))?)?$#D', $inventoryPath, $reviewMatch) === 1;
+    if ($isReviewPath) {
+        require_once __DIR__ . '/../api/review-query.php';
+        $reviewSessionId = session_id(); $reviewAccount = (string) ($_SESSION['admin_user']['id'] ?? ''); $reviewCsrf = (string) ($_SESSION['csrf_token'] ?? '');
+        if ($reviewAccount === '' || !hash_equals($reviewAccount, (string) ($_SERVER['HTTP_X_EZKART_REVIEW_ACCOUNT'] ?? ''))
+            || $reviewCsrf === '' || !hash_equals($reviewCsrf, (string) ($_SERVER['HTTP_X_EZKART_CSRF'] ?? ''))) ez_admin_json(['ok' => false, 'error' => 'Your sign-in changed. Reload this page.', 'code' => 'review_session_changed'], 401);
+        if (!in_array($method, ['GET', 'POST'], true) || ($method === 'POST' && (empty($reviewMatch[1]) || !empty($reviewMatch[2]) || !empty($reviewMatch[3])))) ez_admin_json(['ok' => false, 'error' => 'Method not allowed.'], 405);
+        if ($method === 'POST' && ez_config('commerce_storage') !== 'd1') ez_admin_json(['ok' => false, 'error' => 'Review changes are not enabled yet.'], 503);
+        try { $reviewQuery = ez_review_query((string) parse_url($path, PHP_URL_QUERY), $method !== 'GET' || !empty($reviewMatch[3]) ? [] : (empty($reviewMatch[1]) ? ['q','state','reply','product','rating','photos','sort','cursor','limit'] : (!empty($reviewMatch[2]) ? ['cursor','limit'] : []))); }
+        catch (InvalidArgumentException $error) { ez_admin_json(['ok' => false, 'error' => $error->getMessage()], 400); }
+        if (str_contains($path, '#')) ez_admin_json(['ok' => false, 'error' => 'Review reference is invalid.'], 400);
+        $path = $inventoryPath . ($reviewQuery !== [] ? '?' . http_build_query($reviewQuery, '', '&', PHP_QUERY_RFC3986) : '');
+    }
     $isInventoryPath = preg_match('#^/v1/inventory(?:/(?:history|adjustments|draft|reviews(?:/EZK-[SP]-[A-F0-9]{24})?))?$#D', $inventoryPath) === 1;
     $isReturnsPath = preg_match('#^/v1/returns(?:/(?:orders/EZK-[SP]-[A-F0-9]{24}|ret_[a-f0-9]{32}))?$#D', $inventoryPath) === 1;
     $isFulfillmentPath = preg_match('#^/v1/fulfillment(?:/EZK-[SP]-[A-F0-9]{24})?$#D', $inventoryPath) === 1;
@@ -744,7 +757,7 @@ function ez_admin_proxy_cloud_request(string $accessToken, string $path, string 
         $path = $inventoryPath . ($inventoryQuery !== [] ? '?' . http_build_query($inventoryQuery, '', '&', PHP_QUERY_RFC3986) : '');
     }
     $allowedPath = preg_match('#^/v1/(?:catalog|storefront|admin-preferences|admin-profile|shipping-settings|advanced-mode|media(?:/[a-zA-Z0-9_-]+)?|assets(?:/[a-zA-Z0-9_-]+)?|fonts(?:/font_[a-f0-9]{64})?|products/[a-zA-Z0-9_-]+(?:/(?:duplicate|status))?|drafts/[a-zA-Z0-9_-]+|landing-pages(?:/[a-z0-9-]+(?:/(?:preview|export|editor|view|confirmation))?)?|components(?:/[a-z0-9-]+)?)$#', $path) === 1;
-    if (!$isInventoryPath && !$isReturnsPath && !$isFulfillmentPath && !$isCommerceReadPath && !$isAnalyticsExportWrite && !$isCustomerPath && (!$allowedPath || str_contains($path, '?') || str_contains($path, '#'))) {
+    if (!$isReviewPath && !$isInventoryPath && !$isReturnsPath && !$isFulfillmentPath && !$isCommerceReadPath && !$isAnalyticsExportWrite && !$isCustomerPath && (!$allowedPath || str_contains($path, '?') || str_contains($path, '#'))) {
         ez_admin_json(['ok' => false, 'error' => 'That saved-data path is not allowed.'], 400);
     }
     if (!in_array($method, ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'], true) || ($method === 'PATCH' && preg_match('#^/v1/products/[a-zA-Z0-9_-]+/status$#D', $path) !== 1)) {
@@ -761,10 +774,11 @@ function ez_admin_proxy_cloud_request(string $accessToken, string $path, string 
     $isLargeLandingPageRequest = $isLandingPageRequest || $isLandingPagePreviewWrite;
     $isFontUpload = $path === '/v1/fonts' && $method === 'POST';
     $maximumBodyBytes = $isFontUpload ? 7_100_000 : ($isLandingPagePreviewWrite ? 20_000_000 : ($isLandingPageRequest ? 16_001_000 : 3_200_000));
+    if ($isReviewPath) $maximumBodyBytes = 24000;
     if ($contentLength > $maximumBodyBytes) {
-        ez_admin_json(['ok' => false, 'error' => $isFontUpload ? 'Choose a font up to 5 MB.' : ($isLargeLandingPageRequest ? 'Landing page project is too large.' : 'Upload is larger than the 2 MB image limit.')], 413);
+        ez_admin_json(['ok' => false, 'error' => $isReviewPath ? 'The review request is too large.' : ($isFontUpload ? 'Choose a font up to 5 MB.' : ($isLargeLandingPageRequest ? 'Landing page project is too large.' : 'Upload is larger than the 2 MB image limit.'))], 413);
     }
-    $body = (in_array($method, ['POST', 'PUT', 'PATCH'], true) || ($method === 'DELETE' && $inventoryPath === '/v1/inventory/draft')) ? file_get_contents('php://input') : '';
+    $body = (in_array($method, ['POST', 'PUT', 'PATCH'], true) || ($method === 'DELETE' && $inventoryPath === '/v1/inventory/draft')) ? ($isReviewPath ? file_get_contents('php://input', false, null, 0, $maximumBodyBytes + 1) : file_get_contents('php://input')) : '';
     if (!is_string($body) || strlen($body) > $maximumBodyBytes) {
         ez_admin_json(['ok' => false, 'error' => $isLargeLandingPageRequest ? 'Landing page project is too large.' : 'The request is too large.'], 413);
     }
@@ -823,6 +837,13 @@ function ez_admin_proxy_cloud_request(string $accessToken, string $path, string 
     $status = (int) curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
     $contentType = trim((string) curl_getinfo($handle, CURLINFO_CONTENT_TYPE));
     $error = curl_error($handle);
+    if ($isReviewPath) {
+        session_id($reviewSessionId); $_SESSION = []; session_start();
+        $reviewSessionSame = ($_SESSION['authenticated'] ?? false) === true && ($_SESSION['authentication_method'] ?? '') === 'supabase'
+            && ($_SESSION['admin_user']['id'] ?? '') === $reviewAccount && ($_SESSION['csrf_token'] ?? '') === $reviewCsrf;
+        session_write_close();
+        if (!$reviewSessionSame) { header_remove('Set-Cookie'); ez_admin_json(['ok' => false, 'error' => 'Your sign-in changed. Reload to check the saved review.', 'code' => 'review_session_changed'], 401); }
+    }
     if (!is_string($responseBody)) {
         ez_admin_log_auth_error('Cloud data proxy failed', new RuntimeException(json_encode([
             'method' => $method, 'path' => $path, 'error' => $error,
@@ -1401,6 +1422,7 @@ $centralAnalyticsWorkspace = $authenticated && $page === 'analytics' && (ez_conf
 $centralPaymentWorkspace = $authenticated && $page === 'payments' && (ez_config('commerce_storage') === 'd1'
     || ($deployment === 'test' && $authenticationMethod === 'supabase' && ($_GET['payment-preview'] ?? '') === '1'));
 $centralCustomerWorkspace = $authenticated && $page === 'customers' && (ez_config('commerce_storage') === 'd1'
+    || ($authenticationMethod === 'supabase' && ($_GET['tab'] ?? '') === 'reviews')
     || ($deployment === 'test' && $authenticationMethod === 'supabase' && ($_GET['customer-preview'] ?? '') === '1'));
 $centralReadWorkspace = $centralOrderWorkspace || $centralDashboardWorkspace || $centralAnalyticsWorkspace || $centralPaymentWorkspace || $centralCustomerWorkspace;
 $orders = (!$centralReadWorkspace && $authenticated && ($legacyDataAccess || $sellerId !== '')) ? array_values(array_filter(ez_admin_orders(), static fn($order) => ez_dashboard_order_visible($order, $sellerId, $legacyDataAccess))) : [];
@@ -1624,13 +1646,15 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
   <?php if ($authenticated && $page === 'payments'): ?><link rel="stylesheet" href="payments.css?v=<?= (int) filemtime(__DIR__ . '/payments.css') ?>"><?php endif; ?>
   <?php if ($centralPaymentWorkspace): ?><link rel="stylesheet" href="commerce-payments.css?v=<?= (int) filemtime(__DIR__ . '/commerce-payments.css') ?>"><?php endif; ?>
   <?php if ($centralCustomerWorkspace): ?><link rel="stylesheet" href="commerce-customers.css?v=<?= (int) filemtime(__DIR__ . '/commerce-customers.css') ?>"><?php endif; ?>
+  <?php if ($centralCustomerWorkspace || $page === 'product-new'): ?><link rel="stylesheet" href="../review-display.css?v=<?= (int) filemtime(__DIR__ . '/../review-display.css') ?>"><?php endif; ?>
+  <?php if ($centralCustomerWorkspace): ?><link rel="stylesheet" href="commerce-reviews.css?v=<?= (int) filemtime(__DIR__ . '/commerce-reviews.css') ?>"><?php endif; ?>
   <link rel="stylesheet" href="advanced.css?v=<?= (int) filemtime(__DIR__ . '/advanced.css') ?>">
   <?php if ($page === 'sites'): ?><link rel="stylesheet" href="builder-choice.css?v=<?= (int) filemtime(__DIR__ . '/builder-choice.css') ?>"><link rel="stylesheet" href="builder-image.css?v=<?= (int) filemtime(__DIR__ . '/builder-image.css') ?>"><?php endif; ?>
   <link rel="stylesheet" href="profile-logo.css?v=<?= (int) filemtime(__DIR__ . '/profile-logo.css') ?>">
   <link rel="stylesheet" href="../select.css?v=<?= (int) filemtime(__DIR__ . '/../select.css') ?>">
   <title><?= $authenticated ? ez_admin_escape($pageTitles[$page]) : ($pendingMfa !== null ? 'Two-step verification' : 'Admin Login') ?> · Ezkart</title>
 </head>
-<body class="<?= $authenticated ? 'dashboard-page page-' . ez_admin_escape($page) . ($page === 'sites' ? ($siteEditor ? ' page-site-editor' : ' page-sites-library') : '') : 'login-page' ?>" data-admin-language="<?= ez_admin_escape($adminLanguage) ?>" data-admin-advanced-mode="<?= !empty($advancedPlan['enabled']) ? 'true' : 'false' ?>" data-admin-landing-limit="<?= !empty($advancedPlan['enabled']) ? 24 : 6 ?>" data-admin-profile="<?= ez_admin_escape(json_encode($adminProfile)) ?>" data-admin-storage-scope="<?= ez_admin_escape($adminStorageScope) ?>" data-admin-checkout-brand="<?= ez_admin_escape($adminDisplayName) ?>" data-admin-migrate-legacy-storage="<?= $legacyDataAccess ? 'true' : 'false' ?>" data-admin-cloud-enabled="<?= $authenticated && $authenticationMethod === 'supabase' ? 'true' : 'false' ?>" data-admin-cloud-media-base="<?= $authenticated && $authenticationMethod === 'supabase' ? ez_admin_escape($cloudMediaBase) : '' ?>" data-admin-csrf-token="<?= ez_admin_escape($csrfToken) ?>">
+<body class="<?= $authenticated ? 'dashboard-page page-' . ez_admin_escape($page) . ($page === 'sites' ? ($siteEditor ? ' page-site-editor' : ' page-sites-library') : '') : 'login-page' ?>" data-admin-review-account="<?= ez_admin_escape((string) ($adminUser['id'] ?? '')) ?>" data-admin-language="<?= ez_admin_escape($adminLanguage) ?>" data-admin-advanced-mode="<?= !empty($advancedPlan['enabled']) ? 'true' : 'false' ?>" data-admin-landing-limit="<?= !empty($advancedPlan['enabled']) ? 24 : 6 ?>" data-admin-profile="<?= ez_admin_escape(json_encode($adminProfile)) ?>" data-admin-storage-scope="<?= ez_admin_escape($adminStorageScope) ?>" data-admin-checkout-brand="<?= ez_admin_escape($adminDisplayName) ?>" data-admin-migrate-legacy-storage="<?= $legacyDataAccess ? 'true' : 'false' ?>" data-admin-cloud-enabled="<?= $authenticated && $authenticationMethod === 'supabase' ? 'true' : 'false' ?>" data-admin-cloud-media-base="<?= $authenticated && $authenticationMethod === 'supabase' ? ez_admin_escape($cloudMediaBase) : '' ?>" data-admin-csrf-token="<?= ez_admin_escape($csrfToken) ?>">
 <?php if (!$authenticated): ?>
   <main class="login-shell">
     <?php if ($pendingMfa !== null): ?>
@@ -1940,6 +1964,9 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
   <?php if ($centralOrderWorkspace): ?><script src="commerce-orders.js?v=<?= (int) filemtime(__DIR__ . '/commerce-orders.js') ?>"></script><?php endif; ?>
   <?php if ($centralPaymentWorkspace): ?><script src="commerce-payments.js?v=<?= (int) filemtime(__DIR__ . '/commerce-payments.js') ?>"></script><?php endif; ?>
   <?php if ($centralCustomerWorkspace): ?><script src="commerce-customers.js?v=<?= (int) filemtime(__DIR__ . '/commerce-customers.js') ?>"></script><?php endif; ?>
+  <?php if ($centralCustomerWorkspace || $page === 'product-new'): ?><script src="../review-display.js?v=<?= (int) filemtime(__DIR__ . '/../review-display.js') ?>"></script><?php endif; ?>
+  <?php if ($centralCustomerWorkspace): ?><script src="commerce-reviews.js?v=<?= (int) filemtime(__DIR__ . '/commerce-reviews.js') ?>"></script><?php endif; ?>
+  <?php if ($page === 'product-new'): ?><script src="../public-reviews.js?v=<?= (int) filemtime(__DIR__ . '/../public-reviews.js') ?>"></script><script src="product-reviews.js?v=<?= (int) filemtime(__DIR__ . '/product-reviews.js') ?>"></script><?php endif; ?>
   <?php if ($centralDashboardWorkspace): ?><script src="commerce-dashboard.js?v=<?= (int) filemtime(__DIR__ . '/commerce-dashboard.js') ?>"></script><?php endif; ?>
   <?php if ($page === 'shipping-settings'): ?><script src="../address-picker.js?v=<?= (int) filemtime(__DIR__ . '/../address-picker.js') ?>"></script><script src="shipping-settings.js?v=<?= (int) filemtime(__DIR__ . '/shipping-settings.js') ?>"></script><?php endif; ?>
   <?php if ($page === 'analytics'): ?><script src="analytics.js?v=<?= (int) filemtime(__DIR__ . '/analytics.js') ?>"></script><?php endif; ?>

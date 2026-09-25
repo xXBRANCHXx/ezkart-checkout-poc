@@ -52,7 +52,7 @@ test('customer directory and profiles page through real records, save notes and 
     await page.locator('[data-customers-segment-state]').selectOption('archived');await updated.waitFor();await updated.getByRole('button',{name:'Restore',exact:true}).click();await updated.waitFor({state:'detached'});
     await page.locator('[data-customers-segment-state]').selectOption('active');await updated.waitFor();
     await page.locator('[data-customers-clear]').click();await loaded(page);await page.locator('[data-customers-group=no_paid]').click();await loaded(page);assert.match(await page.locator('[data-customers-count]').innerText(),/26 matching/);
-    await page.getByRole('link',{name:'Reviews',exact:true}).click();assert.match(await page.locator('.customer-reviews-summary').innerText(),/published reviews/);
+    await page.getByRole('link',{name:'Reviews',exact:true}).click();await page.locator('[data-reviews-summary]').getByText('No published reviews yet',{exact:true}).waitFor();
     assert.deepEqual(errors,[]);await page.context().close();
   }
   assert.equal((await f.app.calls()).filter(c=>c.url.includes('doku.com')||c.url.includes('biteship.com')).length,0);
