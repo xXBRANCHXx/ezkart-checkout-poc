@@ -120,6 +120,21 @@ than confirming an unrendered suggestion. The two shipping browser workflows,
 a new unavailable-map test and three customer-address regressions pass; the
 browser coverage now checks CSP violations as well as JavaScript errors.
 
+Hostinger reports follow-up `06debd7b` Completed / Current. The hosted shared
+picker hash matches the correction. Verified real OpenFreeMap streets/buildings
+and entrance confirmation in an isolated visible browser, with no browser errors,
+and in the hosted 390px merchant dialog. The shared Chrome tab remains in the
+background, so its QA render used a temporary timer-backed animation callback;
+it was then reloaded to restore normal browser behavior. No new address was saved
+during this map check. The book remains empty at revision 2, with two change
+records and no pending operation.
+
+Separate release finding: the hosted response exposes only
+`Content-Security-Policy: upgrade-insecure-requests`, whereas the PHP origin
+fixture delivers the application's detailed per-page policy. Hosting/edge header
+handling needs investigation and deployed-policy verification before release.
+This deployment does not certify the intended production security headers.
+
 ### 25 September: central commerce foundation
 
 Implemented the D1 order/reservation migration, signed internal service, immutable
