@@ -213,7 +213,15 @@ function curl_exec(object $handle): string {
         if ($response === 'unavailable') { $handle->status = 503; return '{"success":false}'; }
         return $response;
     }
-    if ($handle->url === 'https://api.biteship.com/v1/rates/couriers') return json_encode(['success' => true, 'pricing' => [['courier_code' => 'jne', 'courier_service_code' => 'reg', 'courier_name' => 'JNE', 'courier_service_name' => 'Regular', 'price' => 18000, 'duration' => '2-3', 'shipment_duration_unit' => 'days']]]);
+    if ($handle->url === 'https://api.biteship.com/v1/rates/couriers') {
+        $controlFile = dirname(getenv('EZKART_TEST_CAPTURE')) . '/rates-control.json';
+        if (is_file($controlFile)) {
+            $rates = json_decode(file_get_contents($controlFile), true);
+            $request = json_decode($handle->options[CURLOPT_POSTFIELDS] ?? '{}', true);
+            return json_encode(['success' => true, 'pricing' => $rates[$request['couriers'] ?? ''] ?? $rates['default'] ?? []]);
+        }
+        return json_encode(['success' => true, 'pricing' => [['courier_code' => 'jne', 'courier_service_code' => 'reg', 'courier_name' => 'JNE', 'courier_service_name' => 'Regular', 'price' => 18000, 'duration' => '2-3', 'shipment_duration_unit' => 'days']]]);
+    }
     if ($handle->url === 'https://api-sandbox.doku.com/bca-virtual-account/v2/payment-code') {
         if (getenv('EZKART_TEST_DOKU_FAILURE')) { $handle->status = 503; return '{"error_messages":["Fixture unavailable"]}'; }
         // DOKU's direct response echoes the invoice; it does not normally echo an amount.

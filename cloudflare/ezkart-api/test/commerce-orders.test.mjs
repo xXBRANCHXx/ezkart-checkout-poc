@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {randomBytes} from 'node:crypto';
 import {expireCommerceOrders} from '../src/commerce-orders.js';
-import {setupCommerceFixture as setup, customer, digest} from './commerce-fixture.mjs';
+import {setupCommerceFixture as setup, customer, digest,fixtureShipping} from './commerce-fixture.mjs';
 
 
 async function editorFixture(f, id = 'tea') {
@@ -200,8 +200,7 @@ test('return history is bounded and paginated for store and customer even across
 });
 
 test('stock reviews recover a late paid order once, keep released holds immutable and protect other checkouts',async t=>{
-  const f=await setup(t),order=await latePaidOrder(f,[{productId:'tea',quantity:3,expectedPrice:20000},{productId:'mug',quantity:2,expectedPrice:20000}],
-    {amount:10000,skipped:false,courierCode:'jne',serviceCode:'reg',origin:{address:'Origin fixture'},destination:{address:'Destination fixture'}});
+  const f=await setup(t),order=await latePaidOrder(f,[{productId:'tea',quantity:3,expectedPrice:20000,expectedWeightGrams:100},{productId:'mug',quantity:2,expectedPrice:20000,expectedWeightGrams:100}],fixtureShipping);
   const pending=(await f.create(f.input({items:[{productId:'tea',quantity:6,expectedPrice:20000}]}))).order;
   const request=await stockReviewInput(f,order),path='/v1/inventory/reviews/'+order.id;
   const preview=await f.merchant(path);assert.equal(preview.canResolve,true);assert.equal(preview.items.find(item=>item.productId==='tea').current.available,4);

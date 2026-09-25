@@ -16,7 +16,9 @@ try {
     }
     $cart = is_array($input['cart'] ?? null) ? $input['cart'] : [];
     $postalCode = trim((string) ($input['postal_code'] ?? ''));
-    $quotes = ez_biteship_quotes($cart, $postalCode);
+    $coordinate = ez_delivery_coordinate($input['coordinate'] ?? null);
+    if (isset($input['coordinate']) && $coordinate === null) throw new InvalidArgumentException('Choose a valid delivery pin.');
+    $quotes = ez_biteship_quotes($cart, $postalCode, $coordinate);
     ez_api_json([
         'ok' => true,
         'provider' => ez_commerce_is_production() ? 'Biteship' : 'Biteship Test',

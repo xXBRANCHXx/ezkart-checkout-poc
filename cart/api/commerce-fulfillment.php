@@ -9,10 +9,7 @@ final class EzCourierAccountException extends RuntimeException {}
 function ez_central_courier_key(string $environment): string
 {
     ez_central_commerce_environment($environment);
-    $key = ez_provider_config('biteship', 'api_key', $environment);
-    $prefix = $environment === 'production' ? 'biteship_live.' : 'biteship_test.';
-    if (!str_starts_with($key, $prefix) || str_contains(strtoupper($key), 'REPLACE')) throw new RuntimeException('Courier credentials are unavailable.');
-    return $key;
+    return ez_biteship_api_key($environment);
 }
 
 function ez_central_courier_id(mixed $value): string
@@ -83,7 +80,7 @@ function ez_central_courier_payload(array $order, array $shipment): array
     foreach (['origin' => $origin, 'destination' => $destination] as $name => $address) {
         if (($coordinate = ez_delivery_coordinate($address['coordinate'] ?? null)) !== null) $payload[$name . '_coordinate'] = $coordinate;
     }
-    if (in_array($shipping['serviceCode'], ['instant', 'same_day'], true) && (!isset($payload['origin_coordinate']) || !isset($payload['destination_coordinate']))) {
+    if ((in_array($shipping['courierCode'], ['gojek', 'grab'], true) || in_array($shipping['serviceCode'], ['instant', 'instant_car', 'instant_bike', 'same_day'], true)) && (!isset($payload['origin_coordinate']) || !isset($payload['destination_coordinate']))) {
         throw new RuntimeException('This service requires saved pickup and delivery pins.');
     }
     return $payload;

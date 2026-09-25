@@ -64,6 +64,26 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 25 September: seller shipping addresses and quote binding
+
+Implemented the seller address book, separate pickup/return defaults, confirmed
+map pins, courier preferences, versioned saves and immutable save history. The
+merchant UI reviews changes, rejects stale edits and recovers the exact original
+save after an unreadable response. Central rates use the seller's saved origin;
+public quote results contain no pickup contacts. New order snapshots freeze both
+addresses. Transactional guards reject a concurrent settings or package-weight
+change before inventory or payment work is committed. See
+[seller-shipping-settings.md](seller-shipping-settings.md) for contracts and limits.
+
+Local D1 coverage includes concurrent saves/replays, authorization, malformed
+addresses and courier choices, address deletion after checkout, stale quotes and
+deterministic settings/weight races at reservation time. PHP and browser coverage
+includes missing global settings, private-contact redaction, provider-rate
+filtering, instant courier pins, rejected quotes during a seller move, stale edits,
+lost-save recovery, session-storage failure and desktop/mobile controls. Hosted
+acceptance is recorded below after deployment. Legacy-order migration, monitored
+dispatch, order-read cutover and broader workbench acceptance remain outstanding.
+
 ### 25 September: central commerce foundation
 
 Implemented the D1 order/reservation migration, signed internal service, immutable

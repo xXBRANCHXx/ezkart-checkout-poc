@@ -6,6 +6,11 @@ import {Miniflare, convertV4MiniflareOptions} from 'miniflare';
 export const secret = 'commerce-service-fixture-secret-only-not-a-real-key';
 export const customer = {name: 'Order Tester', email: 'orders@example.test', phone: '081234567890'};
 export const digest = value => createHash('sha256').update(value).digest('hex');
+export const shippingAddress={id:'addr_'+'a'.repeat(32),label:'Main warehouse',name:'Original Warehouse',phone:'081234567891',email:'',organization:'',address:'Jalan Saved Warehouse 18',location:'Jakarta',postalCode:'54321',note:''};
+export const shippingConfiguration={addresses:[shippingAddress],pickupAddressId:shippingAddress.id,returnAddressId:shippingAddress.id,couriers:['jne','sicepat','jnt']};
+export const fixtureShipping={amount:18000,skipped:false,courierCode:'jne',serviceCode:'reg',settingsRevision:1,pickupAddressId:shippingAddress.id,returnAddressId:shippingAddress.id,returnAddress:shippingAddress,
+  origin:{origin_contact_name:shippingAddress.name,origin_contact_phone:shippingAddress.phone,origin_contact_email:'',origin_address:shippingAddress.address+', '+shippingAddress.location,origin_postal_code:shippingAddress.postalCode,origin_note:'',shipper_organization:''},
+  destination:{location:'Jakarta',address:'Jalan Saved Destination 12',postalCode:'12345',coordinate:{latitude:-6.2,longitude:106.8}},quote:{courier:'JNE',service:'Regular',courier_company:'jne',courier_type:'reg',price:18000}};
 
 export async function setupCommerceFixture(t) {
   const key = await crypto.subtle.generateKey({name: 'ECDSA', namedCurve: 'P-256'}, true, ['sign', 'verify']);
@@ -17,7 +22,7 @@ export async function setupCommerceFixture(t) {
     outboundService: async () => Response.json({keys: [publicKey]})}));
   t.after(() => mf.dispose());
   const db = await mf.getD1Database('DB');
-  for (const name of ['0001_core.sql', '0002_cloud_catalog.sql', '0003_subscription_plan_billing.sql', '0004_yearly_subscription_plans.sql', '0008_seller_page_addresses.sql', '0009_commerce_orders.sql', '0010_catalog_revisions.sql','0011_inventory_adjustments.sql','0012_stock_review_recovery.sql','0013_returns_and_inspection.sql','0014_checkout_payment_sessions.sql','0015_central_fulfillment.sql']) {
+  for (const name of ['0001_core.sql', '0002_cloud_catalog.sql', '0003_subscription_plan_billing.sql', '0004_yearly_subscription_plans.sql', '0008_seller_page_addresses.sql', '0009_commerce_orders.sql', '0010_catalog_revisions.sql','0011_inventory_adjustments.sql','0012_stock_review_recovery.sql','0013_returns_and_inspection.sql','0014_checkout_payment_sessions.sql','0015_central_fulfillment.sql','0016_seller_shipping_settings.sql']) {
     const source = (await readFile(new URL('../migrations/' + name, import.meta.url), 'utf8')).replace(/--[^\n]*/g, '');
     const triggers = [...source.matchAll(/CREATE TRIGGER[\s\S]*?END;/g)].map(match => match[0]);
     for (const statement of [...source.replace(/CREATE TRIGGER[\s\S]*?END;/g, '').split(';').filter(value => value.trim()), ...triggers]) await db.prepare(statement).run();
@@ -58,7 +63,7 @@ export async function setupCommerceFixture(t) {
   }
   function input(overrides = {}) {
     return {environment: 'sandbox', sellerId: 'seller_alice', checkoutKey: randomBytes(16).toString('hex'),
-      customer, items: [{productId: 'tea', quantity: 2, expectedPrice: 20000}],
+      customer, items: [{productId: 'tea', quantity: 2, expectedPrice: 20000,expectedWeightGrams:100}],
       checkout:{intentHash:digest('fixture intent'),paymentFlow:'direct_bca',shop:'alice-shop'},
       shipping: {amount: 0, skipped: true}, expiresAt: new Date(Date.now() + 3600000).toISOString(), ...overrides};
   }
@@ -67,5 +72,7 @@ export async function setupCommerceFixture(t) {
   const paid = (order, data = {}, key) => event(order, 'payment.succeeded', {provider: 'doku', verified: true, amount: order.total, currency: 'IDR', reference: 'payment-' + order.id, originalRequestId:order.paymentRequestId, channel:'VIRTUAL_ACCOUNT_BCA',accountNumber:'770011223344',...data}, key);
   const session=(order,data={})=>({provider:'doku',providerRequestId:order.paymentRequestId,amount:order.total,currency:'IDR',expiresAt:order.expiresAt,method:'VIRTUAL_ACCOUNT_BCA',accountNumber:'770011223344',...data});
   const stock = async (id = 'tea') => (await db.prepare('SELECT stock_quantity FROM products WHERE id = ?').bind(id).first()).stock_quantity;
+  const shippingSetup=await merchant('/v1/shipping-settings',{revision:0,requestKey:randomBytes(16).toString('hex'),configuration:shippingConfiguration});
+  if(shippingSetup.status!==200)throw Error('Fixture shipping setup failed: '+JSON.stringify(shippingSetup));
   return {mf, db, headers, call, product, input, create, event, paid, session, stock, merchant,merchantToken};
 }

@@ -198,6 +198,8 @@ function ez_orders_table(array $rows, string $tableId, string $csrfToken, string
   </section>
 
 <?php break; case 'returns': require __DIR__ . '/returns.php'; ?>
+<?php break; case 'shipping-settings': require __DIR__ . '/shipping-settings.php'; ?>
+
 <?php break; case 'fulfillment': require __DIR__ . '/fulfillment.php'; ?>
 <?php break; case 'inventory': require __DIR__ . '/inventory.php'; ?>
 
@@ -336,7 +338,7 @@ function ez_orders_table(array $rows, string $tableId, string $csrfToken, string
 <?php break; case 'settings': ?>
   <?php ez_page_header('Settings', 'Manage your store, notifications, and security.', [['label'=>'Discard changes', 'icon' => 'undo','href'=>'?page=settings'],['label'=>'Save changes', 'icon' => 'save','toast'=>'Settings saved in preview','style'=>'primary']]); ?>
   <div class="settings-layout">
-    <nav class="settings-nav"><a class="active" href="#store-profile">Store profile</a><a href="#notifications">Notifications</a><a href="#security">Security</a><a href="#preferences">Preferences</a><a href="?page=advanced">Advanced Mode</a></nav>
+    <nav class="settings-nav"><a class="active" href="#store-profile">Store profile</a><a href="?page=shipping-settings">Shipping</a><a href="#notifications">Notifications</a><a href="#security">Security</a><a href="#preferences">Preferences</a><a href="?page=advanced">Advanced Mode</a></nav>
     <div class="settings-content">
       <section class="surface settings-section" id="store-profile"><header class="surface-header"><div><h2>Store profile</h2><p>Identity shown across the admin workspace.</p></div></header><?php require __DIR__ . '/profile-logo.php'; ?><div class="settings-form"><label class="wide"><span>Store name</span><input value="Ezkart Sandbox"></label><label><span>Business type</span><select><option>Online merchant</option></select></label><label><span>Plan</span><input value="<?= $advancedPlan === null ? 'Unavailable' : (!empty($advancedPlan['enabled']) ? 'Advanced' : 'Basic') ?>" readonly></label><label><span>Support email</span><input type="email" value="support@ezkart.id"></label><label><span>Support phone</span><input value="+62 812 3456 7890"></label><label class="wide"><span>Store description</span><textarea>Commerce sandbox for testing checkout, shipping, and payment operations.</textarea></label></div></section>
       <section class="surface settings-section" id="notifications"><header class="surface-header"><div><h2>Notifications</h2><p>Choose which operational events need attention.</p></div></header><div class="setting-rows"><label><div><b>Payment confirmed</b><p>Notify when a signed callback marks an order paid.</p></div><input type="checkbox" checked></label><label><div><b>Payment pending</b><p>Surface unresolved checkouts after 30 minutes.</p></div><input type="checkbox" checked></label><label><div><b>Payment failed</b><p>Notify when a payment provider rejects or expires a transaction.</p></div><input type="checkbox" checked></label><label><div><b>Low catalog activity</b><p>Weekly summary for products without paid orders.</p></div><input type="checkbox"></label></div></section>

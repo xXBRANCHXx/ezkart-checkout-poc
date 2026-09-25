@@ -12,6 +12,7 @@ import { merchantStorefront, publicStorefront } from "./storefront.js";
 import { adminProfile } from "./admin-profile.js";
 import { advancedMode, AdvancedModeLimitError, sellerPlan } from "./advanced-mode.js";
 import { authenticateCommerceService, commerceServiceRoute, expireCommerceOrders, reservedStockSql } from "./commerce-orders.js";
+import {merchantShippingSettings,saveShippingSettings,checkoutShippingSettings} from './shipping-settings.js';
 import { claimCommerceJobs, finishCommerceJob } from "./commerce-jobs.js";
 import { inventoryOverview, inventoryHistory, inventoryDraft, adjustInventory, catalogStockMovements } from "./inventory.js";
 import { stockReviewList, stockReviewDetails, resolveStockReview } from "./stock-reviews.js";
@@ -1448,6 +1449,11 @@ export default {
       if(['/internal/commerce/shipping-events','/internal/commerce/shipping-events/drain'].includes(url.pathname)&&request.method==='POST'){
         const payload=await authenticateCommerceService(request,env);return json({ok:true,...await (url.pathname.endsWith('/drain')?drainPendingShipping(env,payload):shippingInbox(env,payload))});
       }
+      const shippingSettingsService=/^\/internal\/commerce\/shipping-settings\/([A-Za-z0-9][A-Za-z0-9_-]{2,95})$/.exec(url.pathname);
+      if(shippingSettingsService&&request.method==='GET'){
+        await authenticateCommerceService(request,env);
+        return json({ok:true,shipping:await checkoutShippingSettings(env,shippingSettingsService[1],url.searchParams.get('environment'))});
+      }
       if (url.pathname.startsWith('/internal/commerce/')) return json({ok: true, ...await commerceServiceRoute(request, env)});
       const publicLandingMatch = /^\/v1\/public\/landing-pages\/([a-z0-9-]+)\/([a-z0-9-]+)$/.exec(url.pathname);
       if (request.method === "GET" && publicLandingMatch) return await publicLandingPage(env, publicLandingMatch[1], publicLandingMatch[2]);
@@ -1477,6 +1483,12 @@ export default {
         if (!["GET", "PUT"].includes(request.method)) return json({ ok: false, error: "Method not allowed." }, 405, cors);
         const user = await authenticatedUser(request, env);
         return json({ ok: true, preferences: await adminPreferences(env, user.id, request.method === "PUT" ? await requestJson(request, 2000) : null) }, 200, cors);
+      }
+      if (url.pathname === '/v1/shipping-settings') {
+        if(!['GET','PUT'].includes(request.method))return json({ok:false,error:'Method not allowed'},405,cors);
+        const {seller,authUserId}=await sellerContext(request,env),actor={sellerId:seller.id,id:authUserId,role:seller.role};
+        return json(request.method==='GET'?{ok:true,...await merchantShippingSettings(env,actor)}:
+          {ok:true,receipt:await saveShippingSettings(env,actor,await requestJson(request,64000))},200,cors);
       }
       if (url.pathname === "/v1/admin-profile") {
         if (!["GET", "PUT"].includes(request.method)) return json({ ok: false, error: "Method not allowed." }, 405, cors);

@@ -1,4 +1,5 @@
 import {checkoutContext,paymentSession,paymentSessionStatements,paymentAccountStatement} from './commerce-payments.js';
+import {validateShippingSettings} from './shipping-settings.js';
 
 const encoder = new TextEncoder();
 const idPattern = /^[A-Za-z0-9][A-Za-z0-9_-]{2,95}$/;
@@ -104,6 +105,7 @@ function checkoutInput(env, input) {
     variantId: item.variantId ? identifier(item.variantId, 'Option') : '',
     quantity: integer(item.quantity, 10000, 'Quantity', 1),
     expectedPrice: integer(item.expectedPrice, 1000000000, 'Expected price', 1),
+    ...(item.expectedWeightGrams!==undefined?{expectedWeightGrams:integer(item.expectedWeightGrams,1000000,'Shipping weight',1)}:{}),
   })).sort((a, b) => `${a.productId}~${a.variantId}`.localeCompare(`${b.productId}~${b.variantId}`));
   if (new Set(items.map(item => `${item.productId}~${item.variantId}`)).size !== items.length) fail('Combine duplicate product options');
   const customer = customerInput(input.customer);
@@ -113,6 +115,7 @@ function checkoutInput(env, input) {
   if (typeof shipping.skipped !== 'boolean') fail('Shipping selection is invalid');
   if (shipping.skipped && (environment !== 'sandbox' || amount !== 0)) fail('Only sandbox orders may skip shipping');
   if (!shipping.skipped && (!shipping.courierCode || !shipping.serviceCode || !shipping.origin || !shipping.destination)) fail('A delivery quote and its addresses are required');
+  if (!shipping.skipped && items.some(item=>item.expectedWeightGrams===undefined)) fail('Quoted product weights are required');
   if (JSON.stringify(shipping).length > 8000) fail('Shipping details are too large');
   const expiresAt = new Date(input.expiresAt);
   if (!Number.isFinite(expiresAt.getTime())) fail('Checkout expiry is invalid');
@@ -156,6 +159,7 @@ function databaseFailure(error) {
   if (/commerce_insufficient_stock|commerce_reserved_stock/.test(message)) fail('There is not enough available stock for this checkout', 409);
   if (/commerce_product_changed/.test(message)) fail('A product changed. Refresh its price and availability', 409);
   if (/commerce_revision_conflict/.test(message)) fail('The order changed. Reload and retry this operation', 409);
+  if (/shipping_revision_conflict/.test(message)) fail('Shipping settings changed. Refresh delivery options before paying.',409);
   if (/commerce_payment_mismatch/.test(message)) fail('The payment does not match this order', 409);
   if (/commerce_payment_binding_mismatch/.test(message)) fail('Provider payment instructions do not match this order',409);
   throw error;
@@ -174,6 +178,7 @@ export async function createCommerceOrder(env, payload) {
   };
   const existing = await findExisting();
   if (existing) return replay(existing);
+  await validateShippingSettings(env,input.sellerId,input.environment,input.shipping);
   if (Date.parse(input.expiresAt) <= Date.now() || Date.parse(input.expiresAt) > Date.now() + 86400000) fail('Checkout expiry is invalid');
   const seller = await env.DB.prepare("SELECT id, plan FROM sellers WHERE id = ? AND status = 'active'").bind(input.sellerId).first();
   if (!seller) fail('Store is unavailable', 404);
@@ -192,6 +197,7 @@ export async function createCommerceOrder(env, payload) {
       || (item.variantId && parse(option.options_json).hidden)) fail('A selected product option is unavailable', 409);
     if (option.price_amount !== item.expectedPrice) fail('A product price changed. Review the new total', 409);
     if (!Number.isSafeInteger(option.weight_grams) || option.weight_grams < 1) fail('Product shipping weight is unavailable', 409);
+    if (item.expectedWeightGrams!==undefined&&item.expectedWeightGrams!==option.weight_grams) fail('A product shipping weight changed. Refresh delivery options',409);
     return {...item, id: `item_${crypto.randomUUID()}`, type: product.type, title: product.title,
       sku: option.sku || product.sku || product.id, price: option.price_amount,
       fulfillment: {variantId: item.variantId, variantName: item.variantId ? option.name : '', weightGrams: option.weight_grams}};

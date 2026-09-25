@@ -366,6 +366,7 @@
   globalThis.EzkartInventory?.mount({request: cloudRequest});
   globalThis.EzkartReturns?.mount({request: cloudRequest});
   globalThis.EzkartFulfillment?.mount({request: cloudRequest});
+  globalThis.EzkartShippingSettings?.mount({request: cloudRequest});
 
   const storageScope = document.body.dataset.adminStorageScope || "anonymous";
   const mayMigrateLegacyStorage = document.body.dataset.adminMigrateLegacyStorage === "true";

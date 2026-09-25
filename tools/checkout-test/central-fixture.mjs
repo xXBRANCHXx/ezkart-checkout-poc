@@ -14,6 +14,7 @@ export async function setupCentralFixture(t, overrides = {}) {
       const response = await f.mf.dispatchFetch('https://api.fixture.test' + req.url, {method: req.method, headers: req.headers,
         ...(body ? {body} : {})});
       let text = await response.text();
+      if (control.afterResponse) await control.afterResponse(req.url);
       // Simulate an elapsed minute for the PHP status-check guard without rewriting immutable database snapshots.
       if (control.ageOrders && req.method === 'GET' && req.url.startsWith('/internal/commerce/orders/')) {
         const data = JSON.parse(text); if (data.order) data.order.createdAt = new Date(Date.now() - 120000).toISOString(); text = JSON.stringify(data);
@@ -33,4 +34,3 @@ export async function setupCentralFixture(t, overrides = {}) {
   const providerCalls = async () => (await app.calls()).filter(call => call.url.includes('/payment-code') || call.url.includes('/checkout/v1/payment'));
   return {...f, app, control, record, count, providerCalls};
 }
-

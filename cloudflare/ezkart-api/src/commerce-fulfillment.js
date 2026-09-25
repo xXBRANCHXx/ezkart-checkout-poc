@@ -41,7 +41,7 @@ function pickupIssue(order){
   if(!/^\d{5}$/.test(origin.origin_postal_code||'')||!/^\d{5}$/.test(destination.postalCode||'')
     ||!origin.origin_contact_name||!order.customer.name||!/^\+?\d{8,15}$/.test(origin.origin_contact_phone||'')||!/^\+?\d{8,15}$/.test(order.customer.phone||'')
     ||typeof origin.origin_address!=='string'||origin.origin_address.length<5||typeof destination.address!=='string'||destination.address.length<5)return 'The saved pickup or delivery address is incomplete. Contact support before arranging pickup.';
-  if(['instant','same_day'].includes(shipping.serviceCode)&&(!origin.coordinate||!destination.coordinate))return 'This delivery service needs saved pickup and delivery pins. Contact support before arranging pickup.';
+  if((['gojek','grab'].includes(shipping.courierCode)||['instant','instant_car','instant_bike','same_day'].includes(shipping.serviceCode))&&(!origin.coordinate||!destination.coordinate))return 'This delivery service needs saved pickup and delivery pins. Contact support before arranging pickup.';
   return '';
 }
 const eventStatement=(env,order,key,type,data,hash,now)=>env.DB.prepare(`INSERT INTO commerce_order_events

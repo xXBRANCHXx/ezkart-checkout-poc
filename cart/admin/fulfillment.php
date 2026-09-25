@@ -1,5 +1,5 @@
 <section class="fulfillment-workspace" data-fulfillment>
-  <header class="page-heading"><div><a href="?page=orders">← Orders</a><h1>Fulfillment</h1><p>Accept paid orders, arrange pickup, and follow every shipment.</p></div><a class="ui-button" href="?page=returns"><?= ez_admin_icon('refund') ?>Manage returns</a></header>
+  <header class="page-heading"><div><a href="?page=orders">← Orders</a><h1>Fulfillment</h1><p>Accept paid orders, arrange pickup, and follow every shipment.</p></div><a class="ui-button" href="?page=shipping-settings">Shipping settings</a><a class="ui-button" href="?page=returns"><?= ez_admin_icon('refund') ?>Manage returns</a></header>
   <p class="fulfillment-status" data-fulfillment-status role="status">Loading your orders…</p>
   <div class="fulfillment-recovery" data-fulfillment-recovery hidden></div>
   <div class="fulfillment-layout">

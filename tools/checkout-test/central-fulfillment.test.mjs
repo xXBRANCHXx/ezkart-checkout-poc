@@ -6,10 +6,8 @@ import {readFile,writeFile,readdir} from 'node:fs/promises';
 import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {setupCentralFixture} from './central-fixture.mjs';
+import {fixtureShipping as shipping} from '../../cloudflare/ezkart-api/test/commerce-fixture.mjs';
 
-const shipping={amount:18000,skipped:false,courierCode:'jne',serviceCode:'reg',
-  origin:{origin_contact_name:'Original Warehouse',origin_contact_phone:'081234567891',origin_address:'Jalan Saved Warehouse 18',origin_postal_code:'54321'},
-  destination:{location:'Jakarta',address:'Jalan Saved Destination 12',postalCode:'12345',coordinate:{latitude:-6.2,longitude:106.8}},quote:{courier:'JNE',service:'Regular',courier_company:'jne',courier_type:'reg',price:18000}};
 const key=()=>randomBytes(16).toString('hex');
 async function fixture(t,arrange=true){
   const f=await setupCentralFixture(t,{EZKART_TEST_CENTRAL_COURIER:'1'});

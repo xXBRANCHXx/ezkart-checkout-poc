@@ -124,12 +124,10 @@ function ez_central_checkout(array $input, ?array $account): array
         $shipping = ['amount' => $checkout['shipping_price'], 'skipped' => $checkout['shipping_skipped'],
             'destination' => array_intersect_key($customer, array_flip(['location', 'address', 'postalCode', 'note', 'coordinate']))];
         if (!$shipping['skipped']) {
-            $origin = ez_biteship_fulfillment_credentials($environment);
             $shipping += ['courierCode' => $checkout['shipping']['courier_company'], 'serviceCode' => $checkout['shipping']['courier_type'],
-                'quote' => $checkout['shipping'], 'origin' => array_intersect_key($origin, array_flip([
-                    'origin_contact_name', 'origin_contact_phone', 'origin_contact_email', 'origin_address',
-                    'origin_postal_code', 'origin_note', 'shipper_organization',
-                ]))];
+                'quote' => $checkout['shipping']] + array_intersect_key($checkout['shipping_context'], array_flip([
+                    'settingsRevision', 'pickupAddressId', 'returnAddressId', 'origin', 'returnAddress',
+                ]));
         }
         try {
             $order = ez_commerce_request('POST', '/internal/commerce/orders', [

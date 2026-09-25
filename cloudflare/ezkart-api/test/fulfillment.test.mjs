@@ -1,11 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomBytes} from 'node:crypto';
-import {setupCommerceFixture} from './commerce-fixture.mjs';
+import {setupCommerceFixture,fixtureShipping as shipping} from './commerce-fixture.mjs';
 
-export const shipping={amount:18000,skipped:false,courierCode:'jne',serviceCode:'reg',
-  origin:{origin_contact_name:'Warehouse',origin_contact_phone:'081234567890',origin_address:'Jalan Origin 1',origin_postal_code:'12345'},
-  destination:{location:'Jakarta',address:'Jalan Destination 2',postalCode:'12345'},quote:{courier:'JNE',service:'Regular',courier_company:'jne',courier_type:'reg',price:18000}};
 const key=()=>randomBytes(16).toString('hex');
 async function fixture(t){
   const f=await setupCommerceFixture(t);
@@ -125,12 +122,12 @@ test('large early callback backlogs drain in order and prevent a tracking read f
   view=await f.detail(order);assert.equal(view.shipments[0].state,'delivered');assert.equal(view.shipments[0].tracking.latestLocation.updatedAt,date);assert.equal(view.shipments[0].tracking.latestLocation.status,'picked');
 });
 
-test('different action keys cannot accept twice and a paid order with incomplete pickup details cannot dispatch',async t=>{
+test('different action keys cannot accept twice and incomplete pickup details cannot enter checkout',async t=>{
   const f=await fixture(t),order=await f.paid();const view=await f.detail(order);
   const results=await Promise.all([1,2].map(()=>f.merchant('/v1/fulfillment/'+order.id,{kind:'accept',requestKey:key(),revision:view.order.revision},{method:'POST'})));
   assert.deepEqual(results.map(r=>r.status).sort(),[200,409]);
-  const bad=await f.paid({shipping:{...shipping,origin:{origin_address:'No contact'}}});await f.act(bad,'accept');
-  const detail=await f.detail(bad);assert.equal(detail.canPickup,false);assert.match(detail.pickupIssue,/incomplete/);assert.equal((await f.act(bad,'pickup')).status,409);
+  const bad=await f.call('/internal/commerce/orders',f.input({shipping:{...shipping,origin:{origin_address:'No contact'}}}));
+  assert.equal(bad.status,409);assert.match(bad.error,/Shipping settings/);
 });
 
 test('an interleaved callback between shipment and order reads cannot let an older shipment overwrite delivery',async t=>{

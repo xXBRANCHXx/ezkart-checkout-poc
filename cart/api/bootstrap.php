@@ -123,7 +123,7 @@ function ez_provider_config(string $provider, string $key, string $environment):
 function ez_biteship_credentials(?string $environment = null): array
 {
     $environment ??= ez_commerce_environment();
-    $apiKey = ez_provider_config('biteship', 'api_key', $environment);
+    $apiKey = ez_biteship_api_key($environment);
     $originPostalCode = ez_config('biteship_origin_postal_code');
     if (
         $apiKey === '' || str_contains(strtoupper($apiKey), 'REPLACE')
@@ -141,6 +141,14 @@ function ez_biteship_credentials(?string $environment = null): array
         'origin_postal_code' => $originPostalCode,
         'couriers' => $couriers !== '' ? $couriers : 'jne,sicepat,jnt',
     ];
+}
+
+function ez_biteship_api_key(string $environment): string
+{
+    $key = ez_provider_config('biteship', 'api_key', $environment);
+    $prefix = $environment === 'production' ? 'biteship_live.' : 'biteship_test.';
+    if (!str_starts_with($key, $prefix) || str_contains(strtoupper($key), 'REPLACE')) throw new RuntimeException('Courier credentials are unavailable.');
+    return $key;
 }
 
 function ez_biteship_fulfillment_credentials(?string $environment = null): array
@@ -345,10 +353,10 @@ function ez_normalize_biteship_quotes(array $pricing): array
 {
     $quotes = [];
     foreach ($pricing as $rate) {
-        if (!is_array($rate) || (int) ($rate['price'] ?? 0) < 1) continue;
+        if (!is_array($rate) || !is_numeric($rate['price'] ?? null) || (float) $rate['price'] !== (float) (int) $rate['price'] || (int) $rate['price'] < 1 || (int) $rate['price'] > 100000000) continue;
         $companyCode = trim((string) ($rate['company'] ?? $rate['courier_company'] ?? $rate['courier_code'] ?? ''));
         $serviceCode = trim((string) ($rate['type'] ?? $rate['courier_type'] ?? $rate['courier_service_code'] ?? ''));
-        if ($companyCode === '' || $serviceCode === '') continue;
+        if (preg_match('/^[a-zA-Z0-9_]{2,60}$/D', $companyCode) !== 1 || preg_match('/^[a-zA-Z0-9_]{2,60}$/D', $serviceCode) !== 1) continue;
         $company = trim((string) ($rate['courier_name'] ?? $companyCode));
         $service = trim((string) ($rate['courier_service_name'] ?? $rate['description'] ?? $serviceCode));
         $id = strtolower(trim((string) preg_replace('/[^a-z0-9]+/i', '-', $companyCode . '-' . $serviceCode), '-'));
@@ -372,7 +380,13 @@ function ez_normalize_biteship_quotes(array $pricing): array
     return array_values($quotes);
 }
 
-function ez_biteship_quotes(array $cart, string $destinationPostalCode): array
+function ez_biteship_quotes(array $cart, string $destinationPostalCode, ?array $coordinate = null): array
+{
+    return ez_biteship_rate_context($cart, $destinationPostalCode, $coordinate)['quotes'];
+}
+
+/** Private context stays on the server; the same read supplies both rates and the order origin. */
+function ez_biteship_rate_context(array $cart, string $destinationPostalCode, ?array $coordinate = null, ?array $catalog = null): array
 {
     if (preg_match('/^\d{5}$/', $destinationPostalCode) !== 1) {
         throw new InvalidArgumentException('A valid five-digit destination postcode is required.');
@@ -380,7 +394,7 @@ function ez_biteship_quotes(array $cart, string $destinationPostalCode): array
     $items = [];
     $itemCount = 0;
     $sellerIds = [];
-    $catalog = ez_catalog(array_keys($cart));
+    $catalog ??= ez_catalog(array_keys($cart));
     foreach ($catalog as $id => $product) {
         if (!is_array($product)) throw new InvalidArgumentException('A selected product is unavailable.');
         $raw = $cart[$id] ?? 0;
@@ -392,6 +406,8 @@ function ez_biteship_quotes(array $cart, string $destinationPostalCode): array
             throw new InvalidArgumentException('Cart quantities cannot be negative.');
         }
         if ($quantity === 0) continue;
+        if ($quantity > 10000) throw new InvalidArgumentException('A cart quantity is too large.');
+        $sellerIds[] = (string) ($product['seller_id'] ?? '');
         if (isset($product['stock']) && $quantity > (int) $product['stock']) {
             throw new InvalidArgumentException('A selected quantity is no longer available.');
         }
@@ -407,23 +423,46 @@ function ez_biteship_quotes(array $cart, string $destinationPostalCode): array
     if ($itemCount < 1) {
         throw new InvalidArgumentException('Add at least one product.');
     }
-    $credentials = ez_biteship_credentials();
-    $response = ez_http_json(EZ_BITESHIP_RATES_URL, [
-        'origin_postal_code' => (int) $credentials['origin_postal_code'],
-        'destination_postal_code' => (int) $destinationPostalCode,
-        'couriers' => $credentials['couriers'],
-        'items' => $items,
-    ], [
-        'Accept: application/json',
-        'Content-Type: application/json',
-        'Authorization: ' . $credentials['api_key'],
-    ], ez_commerce_is_production() ? 'Biteship production' : 'Biteship test-mode');
-    $pricing = is_array($response['pricing'] ?? null) ? $response['pricing'] : [];
-    $quotes = ez_normalize_biteship_quotes($pricing);
+    $sellerIds = array_values(array_unique($sellerIds));
+    if (count($sellerIds) !== 1 || $sellerIds[0] === '') throw new InvalidArgumentException('The cart must belong to one verified store.');
+    require_once __DIR__ . '/commerce-checkout.php';
+    $context = [];
+    if (ez_central_commerce_enabled()) {
+        if ($sellerIds[0] === 'demo') throw new InvalidArgumentException('Choose a store product to get delivery options.');
+        $environment = ez_central_commerce_environment();
+        $apiKey = ez_biteship_api_key($environment);
+        $context = ez_commerce_request('GET', '/internal/commerce/shipping-settings/' . rawurlencode($sellerIds[0]) . '?environment=' . $environment)['shipping'];
+        $couriers = $context['couriers'];
+        $originPostalCode = $context['origin']['origin_postal_code'];
+    } else {
+        $credentials = ez_biteship_credentials();
+        $apiKey = $credentials['api_key']; $originPostalCode = $credentials['origin_postal_code'];
+        $couriers = explode(',', $credentials['couriers']);
+    }
+    $pickupPin = $context['origin']['coordinate'] ?? null;
+    $hasPins = $pickupPin !== null && $coordinate !== null;
+    $instant = ez_central_commerce_enabled() ? array_values(array_intersect($couriers, ['gojek', 'grab'])) : [];
+    $standard = array_values(array_diff($couriers, $instant));
+    $requests = [];
+    if ($standard !== []) $requests[] = ['origin_postal_code' => (int) $originPostalCode, 'destination_postal_code' => (int) $destinationPostalCode, 'couriers' => implode(',', $standard)];
+    if ($instant !== [] && $hasPins) $requests[] = ['origin_latitude' => $pickupPin['latitude'], 'origin_longitude' => $pickupPin['longitude'], 'destination_latitude' => $coordinate['latitude'], 'destination_longitude' => $coordinate['longitude'], 'couriers' => implode(',', $instant)];
+    if ($requests === []) throw new InvalidArgumentException('Choose a delivery pin to see instant courier rates.');
+    $quotes = [];
+    foreach ($requests as $request) {
+        $response = ez_http_json(EZ_BITESHIP_RATES_URL, $request + ['items' => $items], [
+            'Accept: application/json', 'Content-Type: application/json', 'Authorization: ' . $apiKey,
+        ], ez_commerce_is_production() ? 'Biteship production' : 'Biteship test-mode');
+        $allowed = explode(',', $request['couriers']);
+        foreach (ez_normalize_biteship_quotes(is_array($response['pricing'] ?? null) ? $response['pricing'] : []) as $quote) {
+            if (!in_array($quote['courier_company'], $allowed, true)) continue;
+            if (ez_central_commerce_enabled() && !$hasPins && in_array($quote['courier_type'], ['instant', 'instant_car', 'instant_bike', 'same_day'], true)) continue;
+            $quotes[$quote['id']] = $quote;
+        }
+    }
     if ($quotes === []) {
         throw new RuntimeException('Biteship returned no courier rates for this route.');
     }
-    return $quotes;
+    return ['quotes' => array_values($quotes), 'shipping' => $context];
 }
 
 function ez_checkout_request(array $input): array
@@ -463,6 +502,7 @@ function ez_checkout_request(array $input): array
             'variantId' => $product['variant_id'] ?? '',
             'quantity' => $quantity,
             'expectedPrice' => (int) $product['price'],
+            'expectedWeightGrams' => (int) $product['weight'],
         ];
         $productSnapshots[$product['sku']] = [
             'product_id' => $product['product_id'] ?? $id,
@@ -521,11 +561,15 @@ function ez_checkout_request(array $input): array
     $shippingId = trim((string) ($input['shipping_id'] ?? ''));
     $shippingSkipped = !ez_commerce_is_production() && $shippingId === '';
     $shipping = null;
+    $shippingContext = [];
     $shippingPrice = 0;
+    $sellerIds = array_values(array_unique($sellerIds));
+    if (count($sellerIds) !== 1 || $sellerIds[0] === '') throw new InvalidArgumentException('The cart must belong to one verified store.');
     if (!$shippingSkipped) {
         if ($shippingId === '') throw new InvalidArgumentException('Select a valid shipping service.');
-        $quotes = ez_biteship_quotes($cart, $postalCode);
-        foreach ($quotes as $quote) {
+        $rateContext = ez_biteship_rate_context($cart, $postalCode, $coordinate, $catalog);
+        $shippingContext = $rateContext['shipping'];
+        foreach ($rateContext['quotes'] as $quote) {
             if (hash_equals((string) $quote['id'], $shippingId)) {
                 $shipping = $quote;
                 break;
@@ -554,6 +598,7 @@ function ez_checkout_request(array $input): array
         'shipping_items' => $shippingItems,
         'customer' => compact('name', 'email', 'phone', 'location', 'address', 'postalCode', 'note') + ($coordinate !== null ? ['coordinate' => $coordinate] : []),
         'shipping' => $shipping,
+        'shipping_context' => $shippingContext,
         'shipping_skipped' => $shippingSkipped,
     ];
 }

@@ -93,7 +93,7 @@
       searching = true;
       $("[data-find]").disabled = true; status.textContent = "Locating your address…";
       try {
-        const response = await fetch("/cart/api/address-search.php", { method: "POST", cache: "no-store", headers: { "Content-Type": "application/json", "X-Ezkart-CSRF": options.csrf() }, body: JSON.stringify({ address: text }), signal: requestController.signal });
+        const response = await fetch(options.endpoint || "/cart/api/address-search.php", { method: "POST", cache: "no-store", headers: { "Content-Type": "application/json", "X-Ezkart-CSRF": options.csrf() }, body: JSON.stringify({ address: text }), signal: requestController.signal });
         const data = await response.json();
         if (request !== sequence || !active) return;
         if (!response.ok || !data.ok || !Array.isArray(data.results)) throw new Error(response.status === 401 ? "Please sign in again to search for an address." : data.error || "Address search is unavailable. You can still save your address.");
@@ -138,6 +138,15 @@
         schedule("fields");
       },
       close() { active = false; generation++; cancelSearch(); map?.stop(); },
+      confirm() {
+        if (!active || !closeEnough() || !valid(coordinate)) return false;
+        if (map.isMoving()) map.stop();
+        confirmed = true; options.onPin?.(); status.textContent = "Entrance confirmed. This pin will be saved with your address."; return true;
+      },
+      clear() {
+        cancelSearch(); coordinate = null; confirmed = false;
+        status.textContent = "No pin selected. Find the address or move the map to add one."; updateHint();
+      },
       read() {
         if (map?.isMoving()) map.stop();
         const pending = searching; cancelSearch();

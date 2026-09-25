@@ -468,7 +468,7 @@
       const response = await fetch("api/rates.php", {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ cart: state.cart, postal_code: state.customer.postalCode }),
+        body: JSON.stringify({ cart: state.cart, postal_code: state.customer.postalCode, ...(state.deliveryCoordinate ? {coordinate:state.deliveryCoordinate} : {}) }),
       });
       const payload = await response.json().catch(() => ({}));
       if (version !== state.quoteVersion) return;

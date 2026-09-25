@@ -70,7 +70,7 @@ test('lost order and instruction responses recover without new provider requests
   const retry = await f.app.request('/cart/api/start.php', request);
   assert.equal(retry.data.order_id, existing); assert.equal(retry.data.status, 'PENDING');
   const record = await f.record(existing); assert.equal(record.paymentJobState, 'uncertain');
-  assert.equal(record.snapshot.shipping.origin.origin_postal_code, '12345');
+  assert.equal(record.snapshot.shipping.origin.origin_postal_code, '54321');
   assert(!JSON.stringify(record.snapshot).includes('api_key'));
   assert.equal((await f.app.calls()).filter(c => c.url.endsWith('/rates/couriers')).length, 1);
   const replay = await f.app.request('/cart/api/start.php', request); assert.equal(replay.data.order_id, existing);
