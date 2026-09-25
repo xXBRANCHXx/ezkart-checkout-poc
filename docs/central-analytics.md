@@ -103,3 +103,30 @@ The central storage flags stay disabled, and no top-level workbench gate closes.
 Hosted signed-in analytics acceptance is pending shared Chrome access. After the
 owner indicated readiness, one further broker reconnect timed out; it was not
 retried in a loop. Local browser acceptance does not replace the hosted check.
+
+## TEST deployment — 25 September 2026
+
+Implementation `1201985` is pushed to `agent/ezkart-workbench`. Only migration
+0019 was pending; it is now applied to TEST. The pre-migration D1 export is
+`/tmp/ezkart-analytics-deploy-01a0d643/test-before-0019.sql`, mode 600, 359,939
+bytes, SHA-256
+`fb7d6c74bdea074622d6beceaa96e692df303c9d11fd0c3051c71991fe72364a`.
+Private deployment logs and aggregate readbacks are in the same directory.
+
+TEST Worker `54e77e60-0047-4ea7-b6d2-b9fac82a6a44` is deployed. Health at
+18:09 Jakarta reports 49 application tables and healthy D1/public/private R2.
+Unauthenticated analytics and export routes return 401. Hosted HTTPS hashes of
+`commerce-analytics.js`, `analytics.css` and `admin.js` match `1201985`.
+This confirms served assets; Hostinger's signed-in deployment view and hosted
+merchant acceptance are not claimed while shared Chrome is disconnected.
+
+Remote aggregate reads confirm all six export guards, zero export receipts/rows
+and zero operational orders, customers, captures, reservations, shipments and
+provider jobs. The 15-entry legacy receipt and manifest
+`ba180208c85cea72b82323b7b917e0e3771b143d930f5220665fddffc62777c0`
+remain unchanged. The central flags remain disabled. The hourly schedule is
+unchanged; it now also performs bounded export cleanup. No production database,
+Worker, storefront or main-branch change is part of this delivery.
+
+All three existing central order-manager browser cases and all three central
+dashboard browser cases also pass through the updated shared PHP proxy.

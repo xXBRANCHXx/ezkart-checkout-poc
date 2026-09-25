@@ -82,8 +82,12 @@ not activate central checkout or create provider/stock/financial operations.
 Seven D1 and four PHP/browser cases pass, together with 11 adjacent report API
 cases and three legacy analytics/date regressions. Desktop/mobile layouts and
 large exact-money rendering are inspected. See
-[central-analytics.md](central-analytics.md). Deployment evidence follows after
-TEST migration and publication. Signed-in hosted review is pending shared Chrome;
+[central-analytics.md](central-analytics.md). Implementation `1201985` is pushed;
+migration 0019 and TEST Worker `54e77e60-0047-4ea7-b6d2-b9fac82a6a44` are
+deployed. Hosted analytics/admin assets match, health reports 49 healthy tables,
+and operational/export rows remain zero with the 15-entry import unchanged.
+The six existing central order/dashboard browser cases also pass. Signed-in
+hosted review is pending shared Chrome;
 the owner-ready reconnect attempt also timed out without a retry loop. Storage
 cutover, remaining read workspaces, operational migration, capacity testing and
 the wider completion gates remain open.

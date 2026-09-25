@@ -88,6 +88,14 @@ signed-in hosted dashboard review is pending a shared Chrome reconnection;
 local populated desktop/mobile acceptance passes. No storage flag is changed.
 See [central-dashboard.md](central-dashboard.md).
 
+Analytics implementation `1201985` and migration 0019 are now on TEST, with
+Worker `54e77e60-0047-4ea7-b6d2-b9fac82a6a44`. Served analytics/admin assets
+match the commit; health reports 49 application tables. Operational and export
+rows remain zero, and the 15-entry legacy receipt is unchanged. The analytics
+workspace retains the existing report features and adds complete CSV snapshots.
+Its signed-in hosted review remains pending shared Chrome access; storage flags
+stay disabled. See [central-analytics.md](central-analytics.md).
+
 ## Data and invariants
 
 The central merchant order manager now has scoped D1 pagination, totals, search
