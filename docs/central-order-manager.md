@@ -90,3 +90,27 @@ retry, central-read outages, legacy-file exclusion, XSS text rendering and stale
 list/detail responses. Screenshots are inspected at 1360 and 390 pixels.
 Additional checkout/fulfillment/import and existing merchant UI regressions are
 recorded in the completion plan.
+
+## TEST acceptance — 25 September 2026
+
+Implementation `3cb8187` and the shared-icon correction `004d748` are pushed to
+`agent/ezkart-workbench`. Hostinger reports `004d748a` Completed/Current at
+16:47 Jakarta time (39-second deployment). Migration 0018 is applied to the TEST
+database only, and the deployed TEST Worker version is
+`913fe317-193a-4c53-98dd-d0d6a3a1cfd4`.
+
+Authenticated hosted checks at 1360 and 390 pixels confirm the read-only preview,
+zero order totals, search/payment filters surviving reload, disabled empty-page
+navigation, no page overflow and the shared return icon. The API reports sandbox
+environment and `enabled:false`. D1 and both R2 checks pass with 47 application
+tables. The ordinary order manager still displays its original 15 legacy rows;
+the PHP storage switch is unchanged. All six read indexes are present. Orders, customers, captures,
+reservations, shipments and jobs remain zero. The immutable legacy receipt still
+has 15 entries and manifest digest
+`ba180208c85cea72b82323b7b917e0e3771b143d930f5220665fddffc62777c0`.
+
+The private pre-migration TEST export is 359,163 bytes, mode 600, with SHA-256
+`6f496a328ba461fdc0f9424415134d8358b56caa345ba0254a83e63fe55f2445`.
+No source file, provider booking, payment capture or wallet entry was created by
+these hosted checks. This empty hosted read acceptance does not replace the
+populated fixture checks or the future operational cutover acceptance.

@@ -84,6 +84,12 @@ workflows through the real PHP proxy and Worker. All 43 adjacent Worker cases
 (checkout, fulfillment and imports) and eight selected existing PHP/merchant UI
 regressions pass. See
 [central-order-manager.md](central-order-manager.md) for contracts and limits.
+Implementation `3cb8187` plus shared-icon correction `004d748` is deployed to
+TEST; Hostinger reports Completed/Current. Migration 0018 is applied and TEST
+Worker `913fe317-193a-4c53-98dd-d0d6a3a1cfd4` is deployed. Authenticated
+desktop/mobile preview, filter/reload, empty state and health checks pass.
+Operational rows remain zero, all six read indexes are present and the 15-entry
+legacy receipt is unchanged. The central storage switch remains disabled.
 Dashboard, analytics, payment/customer read routing, operational legacy promotion
 and monitored execution remain open. This stage does not close the top-level
 central commerce or broader workbench acceptance items.

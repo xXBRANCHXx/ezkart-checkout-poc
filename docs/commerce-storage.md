@@ -52,7 +52,7 @@ disabled; no central orders or shipments were created during hosted QA. See
 [central-fulfillment.md](central-fulfillment.md) for route contracts, recovery,
 known limits and remaining shipping/operator workflows.
 
-Migration 0016 and current test Worker version
+Migration 0016 and test Worker version
 `48b75b28-dd87-407e-83f9-d083b52a5561` add seller shipping configuration and
 transactional quote-origin/weight checks. Frontend implementation `cb0b200` is
 deployed to test. Hosted address save/reload, separate defaults, request replay
@@ -71,6 +71,14 @@ does not promote them to active orders, create captures/stock movements or
 activate central checkout. Operational counts remain zero and the storage flag
 remains disabled. See [legacy-order-migration.md](legacy-order-migration.md) for
 the audit, replay verification and remaining source fencing/promotion work.
+
+Migration 0018 and current test Worker version
+`913fe317-193a-4c53-98dd-d0d6a3a1cfd4` add the scoped central merchant order reads.
+Frontend `004d748` is deployed to TEST. Authenticated desktop/mobile preview,
+filter reload and empty-state checks pass; the API reports `enabled:false`.
+Operational counts remain zero, the 15-entry import receipt is unchanged, and
+D1/public R2/private R2 health passes. This does not enable central checkout or
+complete the other read adapters. See [central-order-manager.md](central-order-manager.md).
 
 ## Data and invariants
 
