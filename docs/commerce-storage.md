@@ -104,7 +104,10 @@ the PHP central flag, with a read-only TEST preview. The dashboard now has the
 same prepared central read routing; see [central-dashboard.md](central-dashboard.md).
 Analytics now has the same prepared routing, complete-cohort reports and durable
 CSV snapshots; migration 0019 adds its export tables. See
-[central-analytics.md](central-analytics.md). Payment/customer surfaces and the
+[central-analytics.md](central-analytics.md). The Payments workspace now also has
+scoped central reads, exact capture totals, provider-reference search, complete
+paging and safe request/event histories; see [central-payments.md](central-payments.md).
+Its signed-in TEST preview does not activate central checkout. Customer surfaces and the
 operational legacy handover remain open; see
 [central-order-manager.md](central-order-manager.md).
 

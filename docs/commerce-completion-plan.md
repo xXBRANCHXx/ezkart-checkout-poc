@@ -64,6 +64,24 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 25 September: central payment investigation workspace
+
+Implemented complete D1-backed payment history, exact primary/additional capture
+totals, provider-reference and method search, review filters, keyset pages,
+saved provider request details and independently paginated capture/request/event
+histories. Requests and raw logs remain private; these reads do not create
+provider, stock, refund or wallet operations. Legacy files are excluded from the
+central workspace, including on errors. TEST preview leaves checkout unchanged.
+
+Six D1 cases and four real PHP/browser cases pass, covering seller isolation,
+241-order pagination, backdated insertion frontiers, duplicate/uncertain payments,
+exact money, failed requests, stale replies, deep links and desktop/mobile use.
+See [central-payments.md](central-payments.md). Signed-in hosted acceptance is
+pending shared Chrome: the approved connection reached WebSocket connected but
+timed out during browser initialization. There is no automatic retry loop.
+Operational refund/dispute/reconciliation, wallet/settlement and customer work,
+central cutover and all top-level acceptance gates remain open.
+
 ### 25 September: central analytics and complete CSV snapshots
 
 Implemented D1-backed overview/revenue/order/payment/product reports, preserving

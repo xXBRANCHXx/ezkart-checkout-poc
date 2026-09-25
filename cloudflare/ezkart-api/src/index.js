@@ -21,6 +21,7 @@ import { returnList, returnOrder, returnDetail, customerReturns, createReturn, r
 import {fulfillmentList,fulfillmentDetail,fulfillmentAction,serviceShipment,customerShipment,bindShipmentAccount,bindShipment,shippingInbox,refreshShipment,drainPendingShipping} from './commerce-fulfillment.js';
 import {merchantOrderList,merchantOrderDetail,merchantOrderHistory} from './commerce-order-reads.js';
 import {merchantDashboard} from './commerce-dashboard.js';
+import {merchantPaymentList,merchantPaymentDetail,merchantPaymentHistory} from './commerce-payment-reads.js';
 import {merchantAnalytics} from './commerce-analytics.js';
 import {createAnalyticsExport,readAnalyticsExport,cleanupAnalyticsExports} from './commerce-analytics-exports.js';
 const json = (payload, status = 200, headers = {}) => new Response(JSON.stringify(payload), {
@@ -1530,6 +1531,14 @@ export default {
         const {seller}=await sellerContext(request,env);
         if(request.method!=='GET')return json({ok:false,error:'Method not allowed'},405,cors);
         return json({ok:true,...await merchantDashboard(env,seller,url)},200,cors);
+      }
+      const paymentReadMatch=/^\/v1\/commerce\/payments(?:\/(EZK-[SP]-[A-F0-9]{24})(?:\/(captures|attempts|events))?)?$/.exec(url.pathname);
+      if(paymentReadMatch){
+        const {seller}=await sellerContext(request,env);
+        if(request.method!=='GET')return json({ok:false,error:'Method not allowed'},405,cors);
+        const [,orderId,kind]=paymentReadMatch;
+        if(orderId&&!kind&&url.search)return json({ok:false,error:'Payment detail does not accept filters'},422,cors);
+        return json({ok:true,...await (kind?merchantPaymentHistory(env,seller,orderId,kind,url):orderId?merchantPaymentDetail(env,seller,orderId):merchantPaymentList(env,seller,url))},200,cors);
       }
       const orderReadMatch=/^\/v1\/commerce\/orders(?:\/(EZK-[SP]-[A-F0-9]{24})(?:\/(captures|activity))?)?$/.exec(url.pathname);
       if(orderReadMatch){

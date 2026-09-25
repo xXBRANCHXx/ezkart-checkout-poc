@@ -719,19 +719,21 @@ function ez_admin_proxy_cloud_request(string $accessToken, string $path, string 
     $isReturnsPath = preg_match('#^/v1/returns(?:/(?:orders/EZK-[SP]-[A-F0-9]{24}|ret_[a-f0-9]{32}))?$#D', $inventoryPath) === 1;
     $isFulfillmentPath = preg_match('#^/v1/fulfillment(?:/EZK-[SP]-[A-F0-9]{24})?$#D', $inventoryPath) === 1;
     $isOrderReadPath = preg_match('#^/v1/commerce/orders(?:/EZK-[SP]-[A-F0-9]{24}(?:/(?:captures|activity))?)?$#D', $inventoryPath) === 1;
+    $isPaymentReadPath = preg_match('#^/v1/commerce/payments(?:/EZK-[SP]-[A-F0-9]{24}(?:/(?:captures|attempts|events))?)?$#D', $inventoryPath) === 1;
     $isDashboardReadPath = $inventoryPath === '/v1/commerce/dashboard';
     $isAnalyticsReadPath = $inventoryPath === '/v1/commerce/analytics';
     $isAnalyticsExportRead = preg_match('#^/v1/commerce/analytics/exports/aex_[a-f0-9]{40}$#D', $inventoryPath) === 1;
     $isAnalyticsExportWrite = $inventoryPath === '/v1/commerce/analytics/exports';
     if ($isAnalyticsExportWrite && $method !== 'POST') ez_admin_json(['ok' => false, 'error' => 'Method not allowed.'], 405);
-    $isCommerceReadPath = $isOrderReadPath || $isDashboardReadPath || $isAnalyticsReadPath || $isAnalyticsExportRead;
+    $isCommerceReadPath = $isOrderReadPath || $isPaymentReadPath || $isDashboardReadPath || $isAnalyticsReadPath || $isAnalyticsExportRead;
     if ($isCommerceReadPath && $method !== 'GET') ez_admin_json(['ok' => false, 'error' => 'Method not allowed.'], 405);
     if ($isInventoryPath || $isReturnsPath || $isFulfillmentPath || $isCommerceReadPath || $isAnalyticsExportWrite) {
         parse_str((string) parse_url($path, PHP_URL_QUERY), $inventoryQuery);
         if ($isCommerceReadPath && count($inventoryQuery) !== count(array_filter(explode('&', (string) parse_url($path, PHP_URL_QUERY)), 'strlen'))) ez_admin_json(['ok' => false, 'error' => 'Order filters are invalid.'], 400);
         foreach ($inventoryQuery as $key => $value) {
             $allowedReadKeys = $isAnalyticsReadPath ? ['report','range','from','to','group','cohort','q','status','stage','method','sort','table_page'] : ($isAnalyticsExportRead ? ['after','limit'] : ($isDashboardReadPath ? ['range','group'] : ($isOrderReadPath ? ['state','queue','q','from','to','order','cursor','limit'] : ($isFulfillmentPath ? ['state', 'cursor', 'limit', 'before', 'q'] : ($isReturnsPath ? ['state', 'cursor', 'limit', 'before'] : ['q', 'status', 'level', 'cursor', 'limit', 'product', 'variant'])))));
-            if (!in_array($key, $allowedReadKeys, true) || !is_string($value) || strlen($value) > ($isAnalyticsReadPath && $key === 'cohort' ? 1600 : ($isOrderReadPath && $key === 'cursor' ? 1000 : 200)) || preg_match('/[\x00-\x1f]/', $value)) {
+            if ($isPaymentReadPath) $allowedReadKeys = ['state','evidence','review','method','q','from','to','cursor','limit'];
+            if (!in_array($key, $allowedReadKeys, true) || !is_string($value) || strlen($value) > ($isAnalyticsReadPath && $key === 'cohort' ? 1600 : (($isOrderReadPath || $isPaymentReadPath) && $key === 'cursor' ? 1000 : 200)) || preg_match('/[\x00-\x1f]/', $value)) {
                 ez_admin_json(['ok' => false, 'error' => 'Inventory filter is invalid.'], 400);
             }
         }
@@ -1393,7 +1395,9 @@ $centralOrderWorkspace = $authenticated && $page === 'orders' && (ez_config('com
     || ($deployment === 'test' && $authenticationMethod === 'supabase' && ($_GET['order-preview'] ?? '') === '1'));
 $centralAnalyticsWorkspace = $authenticated && $page === 'analytics' && (ez_config('commerce_storage') === 'd1'
     || ($deployment === 'test' && $authenticationMethod === 'supabase' && ($_GET['analytics-preview'] ?? '') === '1'));
-$centralReadWorkspace = $centralOrderWorkspace || $centralDashboardWorkspace || $centralAnalyticsWorkspace;
+$centralPaymentWorkspace = $authenticated && $page === 'payments' && (ez_config('commerce_storage') === 'd1'
+    || ($deployment === 'test' && $authenticationMethod === 'supabase' && ($_GET['payment-preview'] ?? '') === '1'));
+$centralReadWorkspace = $centralOrderWorkspace || $centralDashboardWorkspace || $centralAnalyticsWorkspace || $centralPaymentWorkspace;
 $orders = (!$centralReadWorkspace && $authenticated && ($legacyDataAccess || $sellerId !== '')) ? array_values(array_filter(ez_admin_orders(), static fn($order) => ez_dashboard_order_visible($order, $sellerId, $legacyDataAccess))) : [];
 $allOrderCount = count($orders);
 $orderQueues = [
@@ -1601,7 +1605,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
   <?php if (in_array($page, ['inventory','products'], true)): ?><link rel="stylesheet" href="inventory.css?v=<?= (int) filemtime(__DIR__ . '/inventory.css') ?>"><?php endif; ?>
   <?php if ($page === 'returns'): ?><link rel="stylesheet" href="returns.css?v=<?= (int) filemtime(__DIR__ . '/returns.css') ?>"><?php endif; ?>
   <?php if ($page === 'fulfillment'): ?><link rel="stylesheet" href="fulfillment.css?v=<?= (int) filemtime(__DIR__ . '/fulfillment.css') ?>"><?php endif; ?>
-  <?php if ($centralOrderWorkspace): ?><link rel="stylesheet" href="commerce-orders.css?v=<?= (int) filemtime(__DIR__ . '/commerce-orders.css') ?>"><?php endif; ?>
+  <?php if ($centralOrderWorkspace || $centralPaymentWorkspace): ?><link rel="stylesheet" href="commerce-orders.css?v=<?= (int) filemtime(__DIR__ . '/commerce-orders.css') ?>"><?php endif; ?>
   <?php if ($centralDashboardWorkspace): ?><link rel="stylesheet" href="commerce-dashboard.css?v=<?= (int) filemtime(__DIR__ . '/commerce-dashboard.css') ?>"><?php endif; ?>
   <?php if ($page === 'shipping-settings'): ?><link rel="stylesheet" href="../vendor/maplibre/maplibre-gl.css"><link rel="stylesheet" href="../customer-addresses.css?v=<?= (int) filemtime(__DIR__ . '/../customer-addresses.css') ?>"><link rel="stylesheet" href="shipping-settings.css?v=<?= (int) filemtime(__DIR__ . '/shipping-settings.css') ?>"><?php endif; ?>
   <?php if ($authenticated && $page === 'shop'): ?><link rel="stylesheet" href="../storefront.css?v=1"><link rel="stylesheet" href="shop.css?v=<?= (int) filemtime(__DIR__ . '/shop.css') ?>"><?php endif; ?>
@@ -1613,6 +1617,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
   <link rel="stylesheet" href="admin-ui.css?v=<?= (int) filemtime(__DIR__ . '/admin-ui.css') ?>">
   <?php if ($authenticated && $page === 'analytics'): ?><link rel="stylesheet" href="analytics.css?v=<?= (int) filemtime(__DIR__ . '/analytics.css') ?>"><?php endif; ?>
   <?php if ($authenticated && $page === 'payments'): ?><link rel="stylesheet" href="payments.css?v=<?= (int) filemtime(__DIR__ . '/payments.css') ?>"><?php endif; ?>
+  <?php if ($centralPaymentWorkspace): ?><link rel="stylesheet" href="commerce-payments.css?v=<?= (int) filemtime(__DIR__ . '/commerce-payments.css') ?>"><?php endif; ?>
   <link rel="stylesheet" href="advanced.css?v=<?= (int) filemtime(__DIR__ . '/advanced.css') ?>">
   <?php if ($page === 'sites'): ?><link rel="stylesheet" href="builder-choice.css?v=<?= (int) filemtime(__DIR__ . '/builder-choice.css') ?>"><link rel="stylesheet" href="builder-image.css?v=<?= (int) filemtime(__DIR__ . '/builder-image.css') ?>"><?php endif; ?>
   <link rel="stylesheet" href="profile-logo.css?v=<?= (int) filemtime(__DIR__ . '/profile-logo.css') ?>">
@@ -1927,6 +1932,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
   <?php if ($page === 'returns'): ?><script src="returns.js?v=<?= (int) filemtime(__DIR__ . '/returns.js') ?>"></script><?php endif; ?>
   <?php if ($page === 'fulfillment'): ?><script src="fulfillment.js?v=<?= (int) filemtime(__DIR__ . '/fulfillment.js') ?>"></script><?php endif; ?>
   <?php if ($centralOrderWorkspace): ?><script src="commerce-orders.js?v=<?= (int) filemtime(__DIR__ . '/commerce-orders.js') ?>"></script><?php endif; ?>
+  <?php if ($centralPaymentWorkspace): ?><script src="commerce-payments.js?v=<?= (int) filemtime(__DIR__ . '/commerce-payments.js') ?>"></script><?php endif; ?>
   <?php if ($centralDashboardWorkspace): ?><script src="commerce-dashboard.js?v=<?= (int) filemtime(__DIR__ . '/commerce-dashboard.js') ?>"></script><?php endif; ?>
   <?php if ($page === 'shipping-settings'): ?><script src="../address-picker.js?v=<?= (int) filemtime(__DIR__ . '/../address-picker.js') ?>"></script><script src="shipping-settings.js?v=<?= (int) filemtime(__DIR__ . '/shipping-settings.js') ?>"></script><?php endif; ?>
   <?php if ($page === 'analytics'): ?><script src="analytics.js?v=<?= (int) filemtime(__DIR__ . '/analytics.js') ?>"></script><?php endif; ?>

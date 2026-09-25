@@ -1,0 +1,29 @@
+.commerce-payments .page-stat-strip{grid-template-columns:repeat(3,minmax(0,1fr));margin:0}
+.commerce-payments .page-stat-strip article{border-bottom:1px solid var(--ui-line)}
+.commerce-payments .page-stat-strip article:nth-last-child(-n+3){border-bottom:0}
+.commerce-payments .page-stat-strip article[data-wide-money=true]{grid-column:span 2}
+.commerce-payments .page-stat-strip strong{font-size:clamp(20px,2vw,27px);line-height:1.35}
+.commerce-payments .payment-setup{margin:0}
+.commerce-payments-period{margin:0;color:var(--ui-muted);font-size:12px}
+.commerce-payment-filters{grid-template-columns:repeat(4,minmax(0,1fr))}
+.commerce-payment-filters .commerce-order-search{grid-column:span 2}
+.commerce-payments .surface-header{gap:14px;flex-wrap:wrap}
+.commerce-payments .commerce-order-table table{min-width:860px}
+.commerce-payments .commerce-order-table .commerce-payment-attention{color:#9c4f1d}
+.commerce-payments [data-payments-detail-content]{padding:0 22px 22px;display:grid;gap:20px}
+.commerce-payments [data-payments-detail]{scroll-margin-top:96px}
+.commerce-payments [data-payments-reference]{overflow-wrap:anywhere}
+.commerce-payments .commerce-order-totals{max-width:none}
+.commerce-payments .commerce-order-totals div{min-width:0}
+.commerce-payments .commerce-order-totals dd{text-align:right;overflow-wrap:anywhere}
+.commerce-payment-muted{color:var(--ui-muted);font-size:12px;line-height:1.7;margin:0}
+.commerce-payment-history{min-width:0}
+.commerce-payment-history>[role=status]{margin:10px 0}
+.commerce-payment-method-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;padding:0 22px 20px}
+.commerce-payment-method{display:grid;gap:8px;min-width:0;padding:14px;border:1px solid var(--ui-line);border-radius:9px;background:#fff;text-align:left;font:inherit;color:var(--ui-ink);cursor:pointer}
+.commerce-payment-method:hover{background:#fafbff;border-color:#cdd0e8}
+.commerce-payment-method b{font-size:12px;overflow-wrap:anywhere}
+.commerce-payment-method small{font-size:11px;color:var(--ui-muted)}
+.commerce-payment-share{display:block;height:4px;background:#eff0f7;border-radius:4px;overflow:hidden}
+.commerce-payment-share i{display:block;height:100%;background:#6970cc;border-radius:4px}
+@media(max-width:850px){.commerce-payments .page-stat-strip{grid-template-columns:repeat(2,minmax(0,1fr))}.commerce-payments .page-stat-strip article{padding:18px 14px;border-bottom:1px solid var(--ui-line)}.commerce-payments .page-stat-strip article:nth-last-child(-n+3){border-bottom:1px solid var(--ui-line)}.commerce-payments .page-stat-strip article:nth-last-child(-n+2){border-bottom:0}.commerce-payment-filters{grid-template-columns:repeat(2,minmax(0,1fr))}.commerce-payment-filters .commerce-order-search{grid-column:1/-1}.commerce-payments [data-payments-detail-content]{padding-left:14px;padding-right:14px}.commerce-payment-method-list{grid-template-columns:repeat(2,minmax(0,1fr));padding:0 14px 16px}.commerce-payments .commerce-order-totals div{font-size:12px}.commerce-payments .commerce-order-totals dd{max-width:60%}}

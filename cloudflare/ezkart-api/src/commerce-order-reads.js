@@ -28,6 +28,7 @@ const scopeSql='o.seller_id=? AND o.commerce_environment=? AND o.commerce_versio
 // Reporting uses the same authenticated scope, capture policy and operational
 // queues as the order manager, so the two views cannot reinterpret an order.
 export {queueSql,confirmedSql,additionalSql,scopeSql,environment as commerceReadEnvironment};
+export {parameters as readParameters,localDate as readDate,validateCursor as readCursor,cursor as makeReadCursor};
 
 function parameters(url,allowed){
   for(const name of url.searchParams.keys())if(!allowed.includes(name)||url.searchParams.getAll(name).length!==1)fail('Order filters are invalid');
