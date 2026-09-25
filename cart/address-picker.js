@@ -56,8 +56,10 @@
           map.on("zoomstart", () => { if (!positioning && ready && loading.hidden) cancelSearch(); });
           map.on("moveend", chooseCenter);
           mapReady = new Promise((resolve, reject) => {
+            const failed = event => { if (!ready && !event.tile) { clearTimeout(timeout); reject(new Error("Map data is unavailable")); } };
             const timeout = setTimeout(() => reject(new Error("Map loading timed out")), 20000);
-            map.once("load", () => { clearTimeout(timeout); ready = true; resolve(); });
+            map.on("error", failed);
+            map.once("load", () => { clearTimeout(timeout); map.off("error", failed); ready = true; resolve(); });
           });
         }
         await mapReady;

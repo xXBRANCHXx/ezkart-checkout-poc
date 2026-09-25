@@ -27,7 +27,8 @@ if ($interactivePageView) {
 } elseif ($previewDocumentFrame) {
     header("Content-Security-Policy: default-src 'none'; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline' https:; font-src 'self' data: https:; script-src 'none'; connect-src 'none'; frame-src 'none'; form-action 'none'; frame-ancestors 'self'; base-uri 'none'");
 } else {
-    header("Content-Security-Policy: default-src 'self'; img-src 'self' data: blob: https:; style-src 'self'; style-src-attr 'unsafe-inline'; script-src 'self' 'sha256-" . $adminStartupHash . "'; connect-src 'self'; frame-src 'self'; form-action 'self'; frame-ancestors " . ($previewRepairFrame ? "'self'" : "'none'") . "; base-uri 'none'");
+    $shippingMapPolicy = ($_GET['page'] ?? '') === 'shipping-settings' ? " https://tiles.openfreemap.org; worker-src 'self' blob:" : '';
+    header("Content-Security-Policy: default-src 'self'; img-src 'self' data: blob: https:; style-src 'self'; style-src-attr 'unsafe-inline'; script-src 'self' 'sha256-" . $adminStartupHash . "'; connect-src 'self'" . $shippingMapPolicy . "; frame-src 'self'; form-action 'self'; frame-ancestors " . ($previewRepairFrame ? "'self'" : "'none'") . "; base-uri 'none'");
 }
 
 const EZ_ADMIN_SESSION_LIFETIME = 60 * 60 * 24 * 30;

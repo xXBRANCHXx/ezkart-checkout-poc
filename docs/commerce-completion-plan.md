@@ -84,6 +84,42 @@ lost-save recovery, session-storage failure and desktop/mobile controls. Hosted
 acceptance is recorded below after deployment. Legacy-order migration, monitored
 dispatch, order-read cutover and broader workbench acceptance remain outstanding.
 
+Hosted acceptance for shipping implementation `cb0b200`:
+
+- Exported a private mode-600 test D1 backup before applying migration 0016.
+  Deployed test Worker version `48b75b28-dd87-407e-83f9-d083b52a5561`; health
+  reports 44 tables and healthy D1/public R2/private R2 bindings. Production
+  was not migrated or deployed.
+- Hostinger reports `cb0b200e` Completed / Current for `test.ezkart.id` on the
+  workbench branch. The served shipping JavaScript/CSS, admin JavaScript and
+  shared address picker match their checked-in SHA-256 hashes.
+- Created two explicitly labeled QA addresses through the hosted merchant
+  controls, selected different pickup/return defaults, reviewed and saved them,
+  and reloaded the page. Replaying the exact original PUT returned its revision-1
+  receipt, retaining one save. Checked desktop and 390px layouts and the shared
+  dropdown control, with no horizontal overflow.
+- Removed both QA addresses through the same controls. The resulting empty
+  address book is revision 2 with the original three courier preferences and
+  two immutable change records. No pending browser request remains. The original
+  product/variant stock-and-revision hash is unchanged:
+  `2c9451612b88e613d4dc10bbba8f4b1305ee5de6395e24bf3a70f56049bebb64`.
+- Remote aggregates are zero central orders/shipments and zero active shipping
+  addresses. Checkout still reports `durable_checkout:false`; gated commerce
+  writes return 503. No hosted payment, courier booking or stock reservation was
+  created, and the hourly schedule remains unchanged.
+- Verification passes: all 66 Worker tests, 21 central checkout/fulfillment
+  integration tests, five shipping PHP/browser tests, eight relevant legacy
+  checkout/address/browser tests, PHP/JavaScript syntax checks and the test build.
+  Inspected local desktop/mobile address editors, map-pin controls, save reviews
+  and saved settings. Provider activation and the central cutover remain separate.
+
+Hosted map inspection exposed a merchant-page CSP restriction on the SDK worker
+and tile service. The follow-up allows only the shipping page to use the required
+worker and tile origin, and treats initial map-data failure as unavailable rather
+than confirming an unrendered suggestion. The two shipping browser workflows,
+a new unavailable-map test and three customer-address regressions pass; the
+browser coverage now checks CSP violations as well as JavaScript errors.
+
 ### 25 September: central commerce foundation
 
 Implemented the D1 order/reservation migration, signed internal service, immutable

@@ -49,10 +49,10 @@ test('instant rates require both pins, query their saved coordinates, and filter
 
 async function browserFixture(t,overrides={}){
   const f=await setupCentralFixture(t,overrides),{chromium}=await import('../builder-mcp/node_modules/playwright/index.mjs'),browser=await chromium.launch({headless:true});t.after(()=>browser.close());
-  const page=await browser.newPage({viewport:{width:1360,height:980}}),errors=[];page.on('pageerror',error=>errors.push(error.message));
+  const page=await browser.newPage({viewport:{width:1360,height:980}}),errors=[];page.on('pageerror',error=>errors.push(error.message));page.on('console',message=>{if(/violates.*Content Security Policy/.test(message.text()))errors.push(message.text());});
   await page.context().addCookies([f.app.adminCookie({supabase_access_token:await f.merchantToken('alice','alice@example.test'),admin_user:{id:'alice',email:'alice@example.test'}})]);
   await page.route('**/tracking-map-style.json?*',route=>route.fulfill({json:{version:8,sources:{},layers:[{id:'background',type:'background',paint:{'background-color':'#eef1f4'}}]}}));
-  const open=async()=>{await page.goto(f.app.base+'/cart/admin/?page=shipping-settings');await page.locator('[data-shipping-edit]').first().waitFor();};
+  const open=async()=>{const response=await page.goto(f.app.base+'/cart/admin/?page=shipping-settings');assert.match(response.headers()['content-security-policy'],/connect-src 'self' https:\/\/tiles.openfreemap.org; worker-src 'self' blob:/);await page.locator('[data-shipping-edit]').first().waitFor();};
   const shot=async name=>{if(process.env.EZKART_TEST_SCREENSHOTS){await mkdir(process.env.EZKART_TEST_SCREENSHOTS,{recursive:true});await page.screenshot({path:join(process.env.EZKART_TEST_SCREENSHOTS,name+'.png'),fullPage:true,animations:'disabled'});}};
   return {...f,page,errors,open,shot};
 }
@@ -102,4 +102,21 @@ test('shipping editor retains stale edits, rejects unauthorized search and preve
   assert.equal((await read(f)).revision,2);await page.keyboard.press('Escape');
   page.on('dialog',dialog=>dialog.accept());await f.db.prepare("UPDATE seller_memberships SET role='viewer' WHERE auth_user_id='alice'").run();await page.reload();await page.waitForFunction(()=>document.querySelector('[data-shipping-status]').textContent.includes('cannot change'));
   assert.equal(await page.locator('[data-shipping-add]').isDisabled(),true);assert.equal(await page.locator('[data-shipping-edit]').first().isDisabled(),true);assert.deepEqual(f.errors,[]);
+});
+
+test('unavailable map data cannot confirm a suggested pin and still permits a standard-courier address',async t=>{
+  const f=await browserFixture(t),{page}=f;
+  await page.route('**/tracking-map-style.json?*',route=>route.abort());
+  await page.route('**/cart/admin/?cloud=*',async route=>{
+    if(new URL(route.request().url()).searchParams.get('cloud')==='/v1/shipping-address-search')await route.fulfill({json:{ok:true,results:[{name:'Map unavailable',address:'Jakarta',coordinate:{latitude:-6.2,longitude:106.8}}]}});
+    else await route.continue();
+  });
+  await f.open();await page.locator('[data-shipping-add]').click();
+  for(const [name,value] of Object.entries({label:'Standard pickup',name:'Warehouse Contact',phone:'081234567891',address:'Jalan Standard Warehouse 1',location:'Jakarta',postalCode:'12345'}))await page.locator(`[data-shipping-address-form] [name="${name}"]`).fill(value);
+  await page.locator('.address-picker-query').fill('-6.2,106.8');await page.locator('[data-find]').click();
+  await page.waitForFunction(()=>document.querySelector('.address-picker-loading').textContent.includes('unavailable'));
+  await page.locator('[data-shipping-confirm-pin]').click();assert.equal(await page.locator('[data-shipping-address-error]').isVisible(),true);
+  await page.getByRole('button',{name:'Use this address',exact:true}).click();await page.locator('[data-shipping-save]').click();await page.locator('[data-shipping-confirm]').click();await page.waitForFunction(()=>!document.querySelector('[data-shipping-review]').open);
+  const saved=await read(f);assert.equal(saved.configuration.addresses.length,2);assert.equal(saved.configuration.addresses[1].coordinate,undefined);assert.deepEqual(f.errors,[]);
+  const ordinary=await fetch(f.app.base+'/cart/admin/?page=settings');assert.match(ordinary.headers.get('content-security-policy'),/connect-src 'self';/);assert(!ordinary.headers.get('content-security-policy').includes('worker-src'));
 });

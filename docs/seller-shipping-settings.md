@@ -52,6 +52,10 @@ existing session, CSRF and applicable MFA checks.
 The map uses the shared address picker. Merchant address search is a bounded,
 authenticated, CSRF-protected PHP route at `?cloud=/v1/shipping-address-search`.
 It does not borrow the customer's authentication session or expose provider keys.
+Only the shipping page permits the map SDK's blob worker and connections to
+`tiles.openfreemap.org`; other merchant pages retain their original policy.
+Initial map-data failures show the retry state and cannot confirm a suggested
+pin. A standard-courier address can still be saved without a pin.
 
 ## Checkout binding
 

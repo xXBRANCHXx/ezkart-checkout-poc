@@ -42,7 +42,7 @@ disabled and the dispatcher is not installed as a monitored hosted service.
 See [checkout-payment-recovery.md](checkout-payment-recovery.md) for unresolved
 provider-instruction recovery and the remaining migration/fulfillment gates.
 
-Migration 0015 and current test Worker version
+Migration 0015 and test Worker version
 `57afed4c-6f8d-4392-853f-eff7a46634ef` add immutable fulfillment actions, linked
 shipment attempts, credential bindings and a durable courier inbox. Frontend
 implementation `1ad134d` is deployed to test and its gated merchant workspace was
@@ -51,6 +51,14 @@ owned customer tracking are prepared and tested. Central storage is still
 disabled; no central orders or shipments were created during hosted QA. See
 [central-fulfillment.md](central-fulfillment.md) for route contracts, recovery,
 known limits and remaining shipping/operator workflows.
+
+Migration 0016 and current test Worker version
+`48b75b28-dd87-407e-83f9-d083b52a5561` add seller shipping configuration and
+transactional quote-origin/weight checks. Frontend implementation `cb0b200` is
+deployed to test. Hosted address save/reload, separate defaults, request replay
+and cleanup passed; the current address book is empty at revision 2, with its
+two QA audit records retained. Central storage remains disabled. See
+[seller-shipping-settings.md](seller-shipping-settings.md).
 
 The full completion scope and acceptance gates remain in
 [commerce-completion-plan.md](commerce-completion-plan.md).
