@@ -1,0 +1,15 @@
+import {readFile} from 'node:fs/promises';
+
+// Catalog fixtures need the same review/order schema as deployed reads. Plan
+// limits and legacy-import rehearsal have separate fixtures and migrations.
+export const commerceMigrations=['0001_core.sql','0002_cloud_catalog.sql','0003_subscription_plan_billing.sql','0004_yearly_subscription_plans.sql',
+  '0008_seller_page_addresses.sql','0009_commerce_orders.sql','0010_catalog_revisions.sql','0011_inventory_adjustments.sql',
+  '0012_stock_review_recovery.sql','0013_returns_and_inspection.sql','0014_checkout_payment_sessions.sql','0015_central_fulfillment.sql',
+  '0016_seller_shipping_settings.sql','0018_commerce_order_reads.sql','0019_analytics_exports.sql','0020_customer_workspace.sql','0021_customer_consents.sql','0022_purchase_reviews.sql'];
+export async function applyCommerceSchema(db,after=0,through=Infinity){
+  for(const name of commerceMigrations.filter(name=>Number(name.slice(0,4))>after&&Number(name.slice(0,4))<=through)){
+    const source=(await readFile(new URL('../migrations/'+name,import.meta.url),'utf8')).replace(/--[^\n]*/g,'');
+    const triggers=[...source.matchAll(/CREATE TRIGGER[\s\S]*?END;/g)].map(match=>match[0]);
+    for(const statement of [...source.replace(/CREATE TRIGGER[\s\S]*?END;/g,'').split(';').filter(value=>value.trim()),...triggers])await db.prepare(statement).run();
+  }
+}

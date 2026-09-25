@@ -1,3 +1,4 @@
+import {applyCommerceSchema} from './commerce-schema.mjs';
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
@@ -16,6 +17,7 @@ test("one seller shop shares authoritative products and appearance, protects wri
     const sql = await readFile(new URL(`../migrations/${migration}`, import.meta.url), "utf8");
     for (const statement of sql.replace(/--[^\n]*/g, "").split(";").filter(value => value.trim())) await db.prepare(statement).run();
   }
+  await applyCommerceSchema(db,2);
   for (const id of ["alice", "bob"]) {
     await db.prepare("INSERT INTO app_users(id,auth_user_id,created_at,updated_at) VALUES (?,?, 'now','now')").bind(id,id).run();
     await db.prepare("INSERT INTO sellers(id,slug,name,status,settings_json,created_at,updated_at) VALUES (?,?,?,'active',?, 'now','now')").bind(`seller_${id}`,id,`${id}'s store`,JSON.stringify({ privateSetting: "never expose" })).run();

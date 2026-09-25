@@ -1,3 +1,4 @@
+import {applyCommerceSchema} from './commerce-schema.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
@@ -23,6 +24,7 @@ test('Advanced persists per store, enforces permissions, and changes page and pr
     const triggers=[...clean.matchAll(/CREATE TRIGGER[\s\S]*?END;/g)].map(m=>m[0]);
     for(const statement of [...clean.replace(/CREATE TRIGGER[\s\S]*?END;/g,'').split(';').filter(s=>s.trim()),...triggers])await db.prepare(statement).run();
   }
+  await applyCommerceSchema(db,11);
   for (const id of ['alice', 'bob']) {
     await db.prepare("INSERT INTO app_users(id,auth_user_id,created_at,updated_at) VALUES (?,?,'now','now')").bind(id,id).run();
     await db.prepare("INSERT INTO sellers(id,slug,name,status,settings_json,created_at,updated_at) VALUES (?,?,?,'active',?,'now','now')").bind('seller_'+id,id,id,JSON.stringify({keep:true})).run();

@@ -11,6 +11,7 @@ if ($customerAccount === null || ($_GET['signin'] ?? '') === '1') {
     require __DIR__ . '/tracking-gate.php';
     exit;
 }
+$customerVersion = (string) ($_SESSION['customer_auth']['version'] ?? '');
 session_write_close();
 $isTrackingSandbox = isset($trackingSandboxData) && is_array($trackingSandboxData);
 $returnsEnabled = !$isTrackingSandbox && ez_central_commerce_enabled();
@@ -38,6 +39,7 @@ header('X-Content-Type-Options: nosniff');
   <?php if ($isTrackingSandbox): ?><script src="tracking-sandbox.js?v=6" defer></script><?php endif; ?>
   <script src="tracking.js?v=7" defer></script>
   <?php if ($returnsEnabled): ?><link rel="stylesheet" href="customer-returns.css?v=<?= (int) filemtime(__DIR__ . '/customer-returns.css') ?>"><link rel="stylesheet" href="select.css?v=<?= (int) filemtime(__DIR__ . '/select.css') ?>"><script src="customer-returns.js?v=<?= (int) filemtime(__DIR__ . '/customer-returns.js') ?>" defer></script><script src="select.js?v=<?= (int) filemtime(__DIR__ . '/select.js') ?>" defer></script><?php endif; ?>
+  <?php if ($returnsEnabled): ?><link rel="stylesheet" href="customer-reviews.css?v=<?= (int) filemtime(__DIR__ . '/customer-reviews.css') ?>"><script src="customer-reviews.js?v=<?= (int) filemtime(__DIR__ . '/customer-reviews.js') ?>" defer></script><?php endif; ?>
   <title>Track your order · Ezkart</title>
 </head>
 <body>
@@ -126,6 +128,7 @@ header('X-Content-Type-Options: nosniff');
       </div>
     </div>
     <?php if ($returnsEnabled): require __DIR__ . '/customer-returns.php'; endif; ?>
+    <?php if ($returnsEnabled): require __DIR__ . '/customer-reviews.php'; endif; ?>
     <button id="retry-tracking" class="copy-button" type="button" hidden>Try again</button>
     <div class="payment-bottom"><a id="return-checkout-link" href="./">← Back to checkout</a><a id="return-store-link" href="../">Return to store</a></div>
   </main>

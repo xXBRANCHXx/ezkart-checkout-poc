@@ -26,6 +26,9 @@ import {merchantCustomers,merchantCustomer,customerOrderHistory} from './commerc
 import {customerSegments,customerSegment,saveCustomerWorkspace,customerProfileHistory} from './commerce-customer-workspace.js';
 import {createCustomerExport,readCustomerExport,cleanupCustomerExports} from './commerce-customer-exports.js';
 import {customerConsents} from './commerce-customer-consents.js';
+import {buyerReviews,saveBuyerReview,merchantReview,saveMerchantReview,reviewHistory,reviewMode} from './commerce-reviews.js';
+import {merchantReviews,publicReviews,publicReviewSql} from './commerce-review-reads.js';
+import {uploadReviewPhoto,reviewPhoto,cleanupReviewPhotos} from './commerce-review-media.js';
 import {merchantAnalytics} from './commerce-analytics.js';
 import {createAnalyticsExport,readAnalyticsExport,cleanupAnalyticsExports} from './commerce-analytics-exports.js';
 const json = (payload, status = 200, headers = {}) => new Response(JSON.stringify(payload), {
@@ -252,6 +255,20 @@ async function requestJson(request, maximumBytes = 350000) {
   return body;
 }
 
+// Review image uploads may be streamed without Content-Length. Enforce their
+// bound on bytes actually read, including for small review mutation bodies.
+async function reviewRequestJson(request, maximumBytes=24000) {
+  if(!/^application\/json(?:;|$)/i.test(request.headers.get('content-type')||''))throw new Response('Use a JSON request',{status:415});
+  const reader=request.body?.getReader();if(!reader)throw new Response('Request body is required',{status:400});
+  let size=0;const chunks=[];
+  try{while(true){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>maximumBytes){await reader.cancel();throw new Response('Request body is too large',{status:413});}chunks.push(value);}}
+  finally{reader.releaseLock();}
+  const bytes=new Uint8Array(size);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.length;}
+  let body;try{body=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));}catch{throw new Response('Request body must be valid JSON',{status:400});}
+  if(!body||typeof body!=='object'||Array.isArray(body))throw new Response('Request body must be an object',{status:400});
+  return body;
+}
+
 async function sellerContext(request, env) {
   const user = await authenticatedUser(request, env);
   let seller = await env.DB.prepare(`
@@ -331,6 +348,7 @@ function shapeProduct(row, media = [], variants = [], performance = {}) {
     }),
     rating: Number(performance.review_count || 0) > 0 ? Number(performance.rating_average || 0) : null,
     reviewCount: Math.max(0, Number(performance.review_count || 0)),
+    ratingSum: Math.max(0, Number(performance.rating_sum || 0)),
     soldCount: Math.max(0, Number(performance.sold_count || 0)),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -357,11 +375,11 @@ async function catalog(request, env) {
       GROUP BY oi.product_id
     `).bind(seller.id),
     env.DB.prepare(`
-      SELECT product_id, AVG(rating) AS rating_average, COUNT(*) AS review_count
-      FROM product_reviews
-      WHERE seller_id = ? AND status = 'published'
+      SELECT r.product_id, AVG(r.rating) AS rating_average, SUM(r.rating) AS rating_sum, COUNT(*) AS review_count
+      FROM product_reviews r
+      WHERE r.seller_id = ? AND r.commerce_environment IN (?, 'legacy') AND ${publicReviewSql}
       GROUP BY product_id
-    `).bind(seller.id),
+    `).bind(seller.id,reviewMode(env)),
   ]);
   const media = Array.isArray(mediaResult.results) ? mediaResult.results : [];
   const variants = Array.isArray(variantsResult.results) ? variantsResult.results : [];
@@ -1475,6 +1493,34 @@ export default {
       const landingViewMatch = /^\/v1\/landing-pages\/([a-z0-9-]+)\/view$/.exec(url.pathname);
       if (request.method === "GET" && landingViewMatch) return await landingPageView(request, env, landingViewMatch[1]);
       if (request.method === "GET" && url.pathname === "/health") return json(await health(env), 200, cors);
+      const buyerReviewMatch=/^\/v1\/customer\/orders\/(EZK-[SP]-[A-F0-9]{24})\/reviews(?:\/([A-Za-z0-9_-]{3,96})\/history)?$/.exec(url.pathname);
+      const buyerPhotoUpload=/^\/v1\/customer\/orders\/(EZK-[SP]-[A-F0-9]{24})\/review-media$/.exec(url.pathname);
+      const buyerPhoto=/^\/v1\/customer\/review-media\/(rphoto_[a-f0-9]{32})$/.exec(url.pathname);
+      if(buyerReviewMatch||buyerPhotoUpload||buyerPhoto){
+        const user=await authenticatedUser(request,env),actor={kind:'buyer',id:user.id};
+        if(buyerPhoto){if(request.method==='GET'&&!url.search)return await reviewPhoto(env,actor,'',buyerPhoto[1]);}
+        else if(buyerPhotoUpload){if(request.method==='POST'&&!url.search)return json({ok:true,...await uploadReviewPhoto(env,user,buyerPhotoUpload[1],await reviewRequestJson(request,1401000))},200,cors);}
+        else if(request.method==='GET')return json({ok:true,...await (buyerReviewMatch[2]?reviewHistory(env,actor,buyerReviewMatch[2],url,buyerReviewMatch[1]):buyerReviews(env,user,buyerReviewMatch[1],url))},200,cors);
+        else if(request.method==='POST'&&!buyerReviewMatch[2]&&!url.search)return json({ok:true,...await saveBuyerReview(env,user,buyerReviewMatch[1],await reviewRequestJson(request))},200,cors);
+        return json({ok:false,error:'Method or parameters not allowed'},405,cors);
+      }
+      const publicReviewPhoto=/^\/v1\/public\/reviews\/([A-Za-z0-9_-]{3,96})\/media\/(rphoto_[a-f0-9]{32})$/.exec(url.pathname);
+      if(url.pathname==='/v1/public/reviews'||publicReviewPhoto){
+        if(request.method!=='GET')return json({ok:false,error:'Method not allowed'},405,cors);
+        if(publicReviewPhoto){if(url.search)return json({ok:false,error:'Photo parameters are not allowed'},422,cors);return await reviewPhoto(env,{kind:'public'},publicReviewPhoto[1],publicReviewPhoto[2]);}
+        return json({ok:true,...await publicReviews(env,url)},200,cors);
+      }
+      const merchantReviewMatch=/^\/v1\/commerce\/reviews(?:\/([A-Za-z0-9_-]{3,96})(?:\/(history)|\/media\/(rphoto_[a-f0-9]{32}))?)?$/.exec(url.pathname);
+      if(merchantReviewMatch){
+        const {seller,authUserId}=await sellerContext(request,env),actor={kind:'merchant',id:authUserId,sellerId:seller.id,role:seller.role},[,id,history,photo]=merchantReviewMatch;
+        if(request.method==='GET'){
+          if(photo){if(url.search)return json({ok:false,error:'Photo parameters are not allowed'},422,cors);return await reviewPhoto(env,actor,id,photo);}
+          if(id&&!history&&url.search)return json({ok:false,error:'Review parameters are not allowed'},422,cors);
+          return json({ok:true,...await (history?reviewHistory(env,actor,id,url):id?merchantReview(env,actor,id):merchantReviews(env,actor,url))},200,cors);
+        }
+        if(request.method==='POST'&&id&&!history&&!photo&&!url.search)return json({ok:true,...await saveMerchantReview(env,actor,id,await reviewRequestJson(request))},200,cors);
+        return json({ok:false,error:'Method or parameters not allowed'},405,cors);
+      }
       const customerReturnMatch = /^\/v1\/customer\/orders\/(EZK-[SP]-[A-F0-9]{24})\/returns(?:\/(ret_[a-f0-9]{32}))?$/.exec(url.pathname);
       if (customerReturnMatch && ['GET','POST'].includes(request.method)) {
         const user=await authenticatedUser(request,env),actor={kind:'customer',id:user.id},[,orderId,returnId]=customerReturnMatch;
@@ -1699,6 +1745,7 @@ export default {
       if (failure.includes("catalog_ordered_product")) {
         return json({ ok: false, error: "This product has order history. Archive it to stop new sales while keeping the records." }, 409, cors);
       }
+      if (failure.includes('review_history_retained')) return json({ok:false,error:'This product has review history. Archive it to stop new sales while keeping the reviews.'},409,cors);
       if (failure.includes("UNIQUE constraint failed: products") || failure.includes("UNIQUE constraint failed: product_variants")) {
         return json({ ok: false, error: "This product or SKU already exists. Load the latest catalog and use a unique SKU." }, 409, cors);
       }
@@ -1713,6 +1760,7 @@ export default {
     context.waitUntil(cleanupAbandonedMedia(env));
     context.waitUntil(cleanupAnalyticsExports(env));
     context.waitUntil(cleanupCustomerExports(env));
+    context.waitUntil(cleanupReviewPhotos(env));
     context.waitUntil(expireCommerceOrders(env));
   },
 };

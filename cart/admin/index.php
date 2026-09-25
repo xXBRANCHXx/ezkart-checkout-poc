@@ -1324,7 +1324,7 @@ $reviewRatingTotal = 0;
 foreach ($dashboardProducts as $product) {
     $count = max(0, (int) ($product['reviewCount'] ?? 0));
     $reviewCount += $count;
-    $reviewRatingTotal += $count * (float) ($product['rating'] ?? 0);
+    $reviewRatingTotal += isset($product['ratingSum']) ? max(0, (int) $product['ratingSum']) : $count * (float) ($product['rating'] ?? 0);
 }
 $reviewAverage = $reviewCount > 0 ? round($reviewRatingTotal / $reviewCount, 1) : null;
 if (

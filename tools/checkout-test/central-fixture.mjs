@@ -13,14 +13,14 @@ export async function setupCentralFixture(t, overrides = {}) {
       if (control.fail && req.url === control.fail) { res.writeHead(503); res.end('{"ok":false}'); return; }
       const response = await f.mf.dispatchFetch('https://api.fixture.test' + req.url, {method: req.method, headers: req.headers,
         ...(body ? {body} : {})});
-      let text = await response.text();
+      let responseBody = Buffer.from(await response.arrayBuffer());
       if (control.afterResponse) await control.afterResponse(req.url);
       // Simulate an elapsed minute for the PHP status-check guard without rewriting immutable database snapshots.
       if (control.ageOrders && req.method === 'GET' && req.url.startsWith('/internal/commerce/orders/')) {
-        const data = JSON.parse(text); if (data.order) data.order.createdAt = new Date(Date.now() - 120000).toISOString(); text = JSON.stringify(data);
+        const data = JSON.parse(responseBody.toString()); if (data.order) data.order.createdAt = new Date(Date.now() - 120000).toISOString(); responseBody = Buffer.from(JSON.stringify(data));
       }
       if (control.drop && req.url === control.drop) { control.drop = ''; res.writeHead(503); res.end('lost response'); return; }
-      res.writeHead(response.status, {'content-type': 'application/json'}); res.end(text);
+      res.writeHead(response.status, {'content-type': response.headers.get('content-type') || 'application/json', 'cache-control': response.headers.get('cache-control') || 'no-store'}); res.end(responseBody);
     } catch (error) { res.writeHead(500); res.end(JSON.stringify({ok: false, error: error.message})); }
   });
   await new Promise(resolve => relay.listen(0, '127.0.0.1', resolve));

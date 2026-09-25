@@ -64,6 +64,26 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 25 September: buyer purchase reviews and review API
+
+Implemented the buyer review workflow on order tracking: verified physical
+purchase eligibility, rating/text/public-name choices, private photos, editing,
+withdrawal, history, uncertain-response retry and explicit conflict comparison.
+The API also supports scoped merchant replies/moderation and public review
+filtering, history, photo visibility and accurate rating summaries. New reviews
+publish at every star rating; merchants cannot change buyer content or restore a
+buyer withdrawal. Historical reviews remain unverified. Permanent courier
+delivery evidence survives later returns without treating skipped shipping as
+delivery. Migration 0022 adds immutable review receipts and private photo records.
+
+All 84 unique API/PHP/browser cases pass, including desktop/mobile buyer use,
+legacy upgrade, ownership, races, photo privacy, quotas, rollback and adjacent
+checkout/catalog/fulfillment/consent regressions. See
+[purchase-reviews.md](purchase-reviews.md) for the contract and evidence. Merchant
+review controls, public review browsing, truthful product preview and hosted
+acceptance remain open. This is a delivery stage within the full review scope;
+it does not close the customer-operations gate or activate central checkout.
+
 ### 25 September: buyer email preferences and permanent order claims
 
 Implemented buyer-controlled store email opt-in and withdrawal, including verified

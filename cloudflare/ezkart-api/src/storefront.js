@@ -1,4 +1,6 @@
 import {reservedStockSql} from './commerce-orders.js';
+import {reviewMode} from './commerce-reviews.js';
+import {publicReviewSql} from './commerce-review-reads.js';
 const parse = (value) => { try { return JSON.parse(value || "{}"); } catch { return {}; } };
 const imagePath = (id) => id ? `/v1/public/media/${encodeURIComponent(id)}` : "";
 const idPattern = /^[a-zA-Z0-9][a-zA-Z0-9_-]{2,95}$/;
@@ -47,7 +49,7 @@ export async function merchantStorefront(env, seller, payload = null) {
   return storefrontIdentity(env, row);
 }
 
-function publicProduct(row, media, variants) {
+function publicProduct(row, media, variants, reviews = {}) {
   const options = variants.filter(v => !parse(v.options_json).hidden);
   const choices = (variants.length ? options : [row]).map(option => {
     const stock = Math.max(0, Number(option.stock_quantity ?? row.stock_quantity ?? 0) - Number(option.reserved_quantity ?? 0));
@@ -66,7 +68,9 @@ function publicProduct(row, media, variants) {
       imagePath: imagePath(option.image_upload_id || media?.id),
     };
   });
-  return { id: row.id, name: row.title, description: row.description, type: row.type, imagePath: imagePath(media?.id), choices };
+  const reviewCount=Number(reviews.review_count||0),ratingSum=Number(reviews.rating_sum||0);
+  return { id: row.id, name: row.title, description: row.description, type: row.type, imagePath: imagePath(media?.id), choices,
+    reviewCount,ratingSum,rating:reviewCount?ratingSum/reviewCount:null };
 }
 
 export async function publicStorefront(env, url) {
@@ -80,10 +84,12 @@ export async function publicStorefront(env, url) {
   if (!row || (storeId && row.id !== storeId) || (!productId && !appearanceOnly && !settings(row).enabled)) throw new Response("This shop or product is unavailable", { status: 404 });
   const store = await storefrontIdentity(env, row);
   if (appearanceOnly) return { store, products: [] };
-  const [products, media, variants] = await env.DB.batch([
+  const [products, media, variants, reviews] = await env.DB.batch([
     env.DB.prepare(`SELECT p.*, ${reservedStockSql(env)} AS reserved_quantity FROM products p WHERE seller_id = ? AND status = 'active' AND (? = '' OR id = ?) ORDER BY created_at DESC, id`).bind(row.id, productId, productId),
     env.DB.prepare("SELECT id, product_id FROM product_media WHERE seller_id = ? ORDER BY sort_order").bind(row.id),
     env.DB.prepare(`SELECT v.*, ${reservedStockSql(env, true)} AS reserved_quantity FROM product_variants v WHERE seller_id = ? ORDER BY COALESCE(json_extract(options_json, '$.position'), sort_order), id`).bind(row.id),
+    env.DB.prepare(`SELECT r.product_id,COUNT(*) AS review_count,SUM(r.rating) AS rating_sum FROM product_reviews r
+      WHERE r.seller_id=? AND r.commerce_environment IN (?, 'legacy') AND ${publicReviewSql} GROUP BY r.product_id`).bind(row.id,reviewMode(env)),
   ]);
-  return { store, products: products.results.map(product => publicProduct(product, media.results.find(m => m.product_id === product.id), variants.results.filter(v => v.product_id === product.id))) };
+  return { store, products: products.results.map(product => publicProduct(product, media.results.find(m => m.product_id === product.id), variants.results.filter(v => v.product_id === product.id),reviews.results.find(r=>r.product_id===product.id))) };
 }

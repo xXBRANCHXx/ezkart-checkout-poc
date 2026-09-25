@@ -30,6 +30,7 @@ function curl_exec(object $handle): string {
         $response = @file_get_contents($relay . $path, false, $context);
         $responseHeaders = http_get_last_response_headers();
         $handle->status = preg_match('#^HTTP/\S+ (\d+)#', $responseHeaders[0] ?? '', $matches) ? (int) $matches[1] : 503;
+        foreach ($responseHeaders as $header) if (stripos($header, 'Content-Type:') === 0) $handle->contentType = trim(substr($header, 13));
         if ($response === false) return '';
         if (isset($handle->options[CURLOPT_WRITEFUNCTION])) { ($handle->options[CURLOPT_WRITEFUNCTION])($handle, $response); return '1'; }
         return $response;
@@ -257,5 +258,5 @@ function curl_exec(object $handle): string {
     if ($handle->url === 'https://api.biteship.com/v1/orders') return json_encode(['success' => true, 'id' => 'test-shipment-' . $payload['reference_id'], 'status' => 'confirmed', 'courier' => ['tracking_id' => 'test-tracking', 'waybill_id' => 'TEST-AWB']]);
     throw new RuntimeException('Unexpected external request: ' . $handle->url);
 }
-function curl_getinfo(object $handle, int $option): int|string { return $option === CURLINFO_CONTENT_TYPE ? 'application/json' : $handle->status; }
+function curl_getinfo(object $handle, int $option): int|string { return $option === CURLINFO_CONTENT_TYPE ? ($handle->contentType ?? 'application/json') : $handle->status; }
 function curl_error(object $handle): string { return ''; }

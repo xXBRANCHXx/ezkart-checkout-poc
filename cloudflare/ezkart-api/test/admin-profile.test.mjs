@@ -1,3 +1,4 @@
+import {applyCommerceSchema} from './commerce-schema.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
@@ -20,6 +21,7 @@ test('admin profile logos persist privately, enforce ownership and keep storefro
     const sql=await readFile(new URL('../migrations/'+migration,import.meta.url),'utf8');
     for(const statement of sql.replace(/--[^\n]*/g,'').split(';').filter(s=>s.trim()))await db.prepare(statement).run();
   }
+  await applyCommerceSchema(db,2);
   const branding={storefront:{logoId:'shop_logo',name:'Shop branding'},landingPreference:'preserve-me'};
   for(const id of ['alice','bob']) {
     await db.prepare("INSERT INTO app_users(id,auth_user_id,created_at,updated_at) VALUES (?,?,'now','now')").bind(id,id).run();

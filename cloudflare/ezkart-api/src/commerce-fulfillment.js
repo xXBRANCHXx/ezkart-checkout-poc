@@ -32,7 +32,7 @@ function eventData(value,nested=false){
   return data;
 }
 const shipmentView=row=>row?{id:row.id,orderId:row.order_id,sequence:row.sequence,reference:row.reference,providerId:row.provider_id||'',
-  state:row.state,maximumStage:row.maximum_stage,statusAt:row.status_at,statusReceivedAt:row.status_received_at,
+  state:row.state,maximumStage:row.maximum_stage,statusAt:row.status_at,statusReceivedAt:row.status_received_at,deliveredAt:row.delivered_at||null,
   tracking:parse(row.tracking_json),actualPrice:row.actual_price,createdAt:row.created_at,boundAt:row.bound_at}:null;
 function pickupIssue(order){
   const shipping=order.snapshot.shipping,origin=shipping.origin||{},destination=shipping.destination||{};
@@ -205,6 +205,9 @@ function reduceEvent(shipment,data,source,receivedAt){
   if(target&&data.kind==='status'){
     if(!blocked){next.state=target;next.statusAt=data.updatedAt||(target===current?shipment.statusAt:'');next.statusReceivedAt=receivedAt;next.maximumStage=Math.max(shipment.maximumStage,rank);if(data.updatedAt)next.tracking.statusWatermarkAt=data.updatedAt;}
     else if(current==='cancelled'&&!stale&&rank>=40&&data.updatedAt)review=true;
+    // Preserve actual delivery even when a later return becomes the current state.
+    // Dated history comes from a verified read of this bound courier shipment.
+    if(target==='delivered'&&(!blocked||source==='history'))next.deliveredAt ||= data.updatedAt||receivedAt;
   }
   // Undated retries cannot replace a known waybill or link. Authoritative GET
   // refreshes are revision-checked against callbacks before being applied.
@@ -238,8 +241,8 @@ export async function drainShippingInbox(env,environment,provider){
     const current=await env.DB.prepare('SELECT id FROM commerce_shipments WHERE order_id=? ORDER BY sequence DESC LIMIT 1').bind(order.id).first();
     const now=new Date().toISOString(),ids=pending.results.map(r=>r.id),hash=await commerceHash(ids),key='shipping_events:'+hash;
     try{await env.DB.batch([eventStatement(env,order,key,'shipment.updated',{shipmentId:row.id,eventIds:ids},hash,now),
-      env.DB.prepare(`UPDATE commerce_shipments SET state=?,maximum_stage=?,status_at=?,status_received_at=?,tracking_json=?,actual_price=?,updated_at=? WHERE id=?`)
-        .bind(shipment.state,shipment.maximumStage,shipment.statusAt,shipment.statusReceivedAt,JSON.stringify(shipment.tracking),shipment.actualPrice,now,row.id),
+      env.DB.prepare(`UPDATE commerce_shipments SET state=?,maximum_stage=?,status_at=?,status_received_at=?,tracking_json=?,actual_price=?,delivered_at=?,updated_at=? WHERE id=?`)
+        .bind(shipment.state,shipment.maximumStage,shipment.statusAt,shipment.statusReceivedAt,JSON.stringify(shipment.tracking),shipment.actualPrice,shipment.deliveredAt,now,row.id),
       env.DB.prepare('UPDATE commerce_shipping_inbox SET applied_at=?,shipment_id=? WHERE id IN (SELECT value FROM json_each(?)) AND applied_at IS NULL').bind(now,row.id,JSON.stringify(ids)),
       env.DB.prepare('UPDATE orders SET fulfillment_state=?,fulfillment_review=?,revision=revision+1,updated_at=? WHERE id=? AND revision=?')
         .bind(current.id===row.id?shipment.state:order.fulfillmentState,Number(review),now,order.id,order.revision),
