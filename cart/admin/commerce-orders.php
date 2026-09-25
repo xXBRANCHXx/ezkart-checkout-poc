@@ -3,7 +3,7 @@ declare(strict_types=1);
 if (!isset($authenticated) || !$authenticated) { http_response_code(404); exit; }
 ez_page_header('Orders', 'Find every order and review its payment and delivery progress.', [
     ['label'=>'Fulfillment','icon'=>'truck','href'=>'?page=fulfillment'],
-    ['label'=>'Returns','icon'=>'refund','href'=>'?page=returns'],
+    ['label'=>'Returns','icon'=>'undo','href'=>'?page=returns'],
 ]);
 ?>
 <section class="commerce-orders" data-commerce-orders>
