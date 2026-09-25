@@ -3561,3 +3561,58 @@ test('inventory UI restores cloud counts, reviews stale quantities, retries unce
   fixture.inventory.canEdit=false;await page.reload();await page.waitForFunction(()=>document.querySelector('[data-inv-status]').textContent.includes('cannot change stock'));
   assert.equal(await tea.isDisabled(),true);assert.equal(await page.locator('[data-inv-review]').isDisabled(),true);assert.deepEqual(errors,[]);
 });
+
+test('paid stock review UI reloads failed reads, blocks shortages and stale reviews, and confirms an uncertain allocation once',async t=>{
+  const app=await setup({EZKART_CLOUDFLARE_API_URL:'https://ezkart-api-test.fixture.workers.dev'});t.after(()=>app.close());
+  const fixture=shopFixture();fixture.inventory={sellerId:'seller_fixture',canEdit:true,summary:{skuCount:2,onHand:14,reserved:2,available:12,lowStock:2,outOfStock:0},items:[
+    {key:'tea~',productId:'tea',variantId:'',title:'Morning tea',sku:'TEA',status:'active',hidden:false,revision:1,onHand:10,reserved:2,available:8,reorderPoint:15},
+    {key:'mug~green',productId:'mug',variantId:'green',title:'Mug — green',sku:'GREEN',status:'active',hidden:false,revision:1,onHand:4,reserved:0,available:4,reorderPoint:5},
+  ],nextCursor:null};await writeFile(join(app.directory,'storefront.json'),JSON.stringify(fixture));
+  const {chromium}=await import('../builder-mcp/node_modules/playwright/index.mjs'),browser=await chromium.launch();t.after(()=>browser.close());
+  const context=await browser.newContext({viewport:{width:1440,height:1000}});await context.addCookies([app.adminCookie()]);const page=await context.newPage();page.setDefaultTimeout(7000);
+  const orderId='EZK-S-'+'A'.repeat(24),orderPath='/v1/inventory/reviews/'+orderId;
+  await page.goto(app.base+'/cart/admin/?page=inventory');
+  assert.equal((await page.request.get(app.base+'/cart/admin/?cloud='+encodeURIComponent('/v1/inventory/reviews?limit=20'))).status(),200);
+  assert.equal((await page.request.post(app.base+'/cart/admin/?cloud='+encodeURIComponent(orderPath),{data:{}})).status(),403,'Allocation writes require CSRF');
+  let failRead=true,shortage=true,stale=true,receipt=null,posts=[],applied=0;
+  const review=()=>({ok:true,order:{id:orderId,revision:3,customerName:'Buyer Fixture',state:'paid',fulfillmentState:'stock_review'},canResolve:!shortage,
+    reason:shortage?'There is not enough available stock for every item.':'',receipt:null,
+    items:fixture.inventory.items.map((item,index)=>({orderItemId:'item_'+item.productId,productId:item.productId,variantId:item.variantId,title:index?'Original green mug':'Original morning tea',sku:item.sku,quantity:index?2:3,current:{...item,available:shortage&&index===0?1:item.available}}))});
+  await context.route('**/*',async route=>{
+    const cloud=new URL(route.request().url()).searchParams.get('cloud');if(!cloud?.startsWith('/v1/inventory'))return route.continue();
+    const target=new URL(cloud,'https://fixture.test'),method=route.request().method();
+    if(target.pathname==='/v1/inventory/reviews')return route.fulfill({json:{ok:true,items:receipt?[]:[{id:orderId,customerName:'Buyer Fixture',quantity:5}],nextCursor:null}});
+    if(target.pathname===orderPath){
+      if(method==='GET'){if(failRead){failRead=false;return route.fulfill({status:503,json:{ok:false,error:'Temporary inventory read failure'}});}return route.fulfill({json:review()});}
+      const body=route.request().postDataJSON();posts.push(body);
+      if(receipt)return route.fulfill({json:{ok:true,receipt}});
+      if(stale){stale=false;fixture.inventory.items[0].revision+=1;return route.fulfill({status:409,json:{ok:false,error:'Stock changed while reviewing',code:'stock_review_conflict'}});}
+      assert.equal(body.confirmed,true);assert.equal(body.items.length,2);assert.equal(body.items[0].productRevision,fixture.inventory.items[0].revision);
+      applied+=1;fixture.inventory.items.forEach((row,index)=>{row.onHand-=index?2:3;row.available=row.onHand-row.reserved;row.revision+=1;});fixture.inventory.summary.onHand=9;fixture.inventory.summary.available=7;
+      receipt={id:'stock_fixture',orderId};return route.fulfill({status:200,contentType:'application/json',body:'{"ok":'});
+    }
+    if(target.pathname==='/v1/inventory')return route.fulfill({json:{ok:true,...fixture.inventory}});
+    if(target.pathname==='/v1/inventory/history')return route.fulfill({json:{ok:true,items:[],nextCursor:null}});
+    if(target.pathname==='/v1/inventory/draft')return route.fulfill({json:{ok:true,draft:null}});
+    return route.continue();
+  });
+  await page.reload();await page.locator('[data-stock-open]').click();await page.locator('[data-stock-error]:not([hidden])').waitFor();
+  assert.match(await page.locator('[data-stock-error]').innerText(),/Temporary/);await page.locator('[data-stock-reload]').click();await page.locator('[data-stock-warning]:not([hidden])').waitFor();
+  assert.match(await page.locator('[data-stock-warning]').innerText(),/not enough/);assert.equal(await page.locator('[data-stock-apply]').isDisabled(),true);
+  shortage=false;await page.locator('[data-stock-reload]').click();await page.waitForFunction(()=>!document.querySelector('[data-stock-note]').disabled);
+  await page.locator('[data-stock-note]').fill('Warehouse receipt verified; all original items checked.');await page.locator('[data-stock-confirm]').check();
+  if(process.env.EZKART_TEST_SCREENSHOTS)await page.screenshot({path:join(process.env.EZKART_TEST_SCREENSHOTS,'stock-review-desktop.png'),animations:'disabled'});
+  await page.locator('[data-stock-apply]').click();await page.locator('[data-stock-error]:not([hidden])').waitFor();assert.equal(applied,0);assert.equal(await page.locator('[data-stock-apply]').isDisabled(),true);
+  await page.locator('[data-stock-reload]').click();await page.waitForFunction(()=>!document.querySelector('[data-stock-note]').disabled);
+  assert.equal(await page.locator('[data-stock-confirm]').isChecked(),false);assert.match(await page.locator('[data-stock-note]').inputValue(),/Warehouse receipt/);
+  await page.setViewportSize({width:390,height:844});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true);
+  assert.equal(await page.locator('[data-stock-dialog]').evaluate(e=>e.scrollWidth<=e.clientWidth+1),true);
+  await page.locator('[data-stock-confirm]').check();
+  const allocationButton=await page.locator('[data-stock-apply]').boundingBox(),reviewBox=await page.locator('[data-stock-dialog]').boundingBox();
+  assert(allocationButton.y+allocationButton.height<=reviewBox.y+reviewBox.height,'The mobile confirmation button remains in view');
+  if(process.env.EZKART_TEST_SCREENSHOTS)await page.screenshot({path:join(process.env.EZKART_TEST_SCREENSHOTS,'stock-review-mobile.png'),animations:'disabled'});
+  await page.locator('[data-stock-apply]').click();await page.getByRole('button',{name:'Retry confirmation',exact:true}).waitFor();assert.equal(applied,1);
+  assert.equal(await page.locator('[data-stock-note]').isDisabled(),true);assert.equal(await page.getByRole('button',{name:'Close stock review',exact:true}).isDisabled(),true);
+  await page.locator('[data-stock-apply]').click();await page.waitForFunction(()=>!document.querySelector('[data-stock-dialog]').open);assert.equal(applied,1);assert.deepEqual(posts.at(-1),posts.at(-2));
+  await page.waitForFunction(()=>document.querySelector('[data-inv-metric=onHand]').textContent==='9');assert.match(await page.locator('[data-stock-status]').innerText(),/Stock allocated/);assert.equal(await page.locator('[data-stock-open]').count(),0);
+});

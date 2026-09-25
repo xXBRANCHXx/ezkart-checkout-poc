@@ -43,7 +43,7 @@ export function inventoryInput(input, draft = false) {
   return {requestKey, kind, note, items};
 }
 
-const inventorySql = `WITH stock AS (
+export const inventorySql = `WITH stock AS (
   SELECT p.id AS product_id,'' AS variant_id,p.title,COALESCE(p.sku,'') AS sku,p.status,0 AS hidden,p.revision,p.stock_quantity AS on_hand
   FROM products p WHERE p.seller_id=? AND p.type='physical' AND p.status IN ('active','archived')
     AND NOT EXISTS (SELECT 1 FROM product_variants v WHERE v.product_id=p.id)

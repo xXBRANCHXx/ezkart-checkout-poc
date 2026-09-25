@@ -67,6 +67,35 @@ Writes require the merchant session, CSRF token and the existing MFA gate. The
 catalog status PATCH route now passes those same checks; it previously could not
 pass through the proxy at all.
 
+## Paid orders needing stock
+
+Late payment after expiry/cancellation retains its verified payment while
+fulfillment waits in `stock_review`. The inventory page now lists these orders
+and compares every original order item with current physical stock, its catalog
+identity, reservations and availability. A note and explicit confirmation are
+required. A shortage, missing original option, payment concern, stale order or
+changed product version prevents allocation. Renamed, hidden or archived options
+can fulfill an existing paid promise when their original identities still exist.
+Another SKU is never silently substituted.
+
+Migration `0012_stock_review_recovery.sql` adds immutable resolution receipts and
+one-use allocations. An allocation consumes all original quantities together,
+records stock movements, advances product/order versions and queues a recovery
+notification. Original released reservations remain unchanged. Database guards
+protect other checkout holds and roll back the entire allocation on any shortage.
+One resolution per order plus request-key replay protects both concurrent clicks
+and lost responses. Notification dispatch is still a separate unfinished task.
+
+The merchant proxy supports `GET /v1/inventory/reviews?limit=20&cursor=...` and
+`GET|POST /v1/inventory/reviews/:orderId`. POST includes `requestKey`, order
+`revision`, `note`, `confirmed:true`, and every original `orderItemId` with its
+reviewed `productRevision`. Viewer accounts can inspect but cannot allocate.
+The write requires central commerce to be enabled. Failed reads can be reloaded;
+conflicts retain notes and require a new confirmation. Uncertain writes retry
+the identical payload, including successful responses whose JSON was truncated.
+Inventory requests have bounded timeouts. Allocation does not refund a payment,
+book a courier, mark delivery or make wallet funds available.
+
 ## Verification and remaining commerce work
 
 D1 tests cover seller and role isolation, concurrent request replay, entire-batch
@@ -77,7 +106,10 @@ stale-count review, uncertain-response replay, read-only access, protected PHP
 proxy requests and desktop/mobile interaction. Mobile stock/history use readable
 cards and keep review available while scrolling.
 
-Central PHP checkout has not yet been cut over. Returns, order-linked restocking
-and late-payment stock-review resolution are still outstanding. A manual receipt
-must not be treated as proof of return inspection, customer refund or settlement.
-The full workbench goal and production hold remain in force.
+Central PHP checkout has not yet been cut over. Recovery allocation has D1 and
+browser coverage, including competing paid orders, entire-order rollback,
+original option identity, role/seller isolation, stale reviews and lost responses.
+Hosted paid-order recovery awaits that cutover. Returns, order-linked restocking
+and the refund alternative for unfulfillable orders remain outstanding. A manual
+receipt must not be treated as proof of return inspection, customer refund or
+settlement. The full workbench goal and production hold remain in force.

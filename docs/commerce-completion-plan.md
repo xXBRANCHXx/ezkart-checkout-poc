@@ -169,6 +169,30 @@ Hosted acceptance for inventory implementation `ad99e76`:
   also retains cleared-draft versions like the real API. Single-item review
   and confirmation wording was polished after hosted inspection.
 
+### 25 September: late-payment stock recovery
+
+Implemented a merchant review for paid orders whose stock holds were released.
+The review compares original order items with current catalog identities and
+available quantities. An explicit confirmation and note allocate every original
+unit in one transaction, retain released reservations, write immutable stock
+movements/receipts and advance fulfillment only when all stock is available.
+Competing checkouts keep their reserved units. Versions prevent stale product or
+order reviews; one resolution per order and request replay prevent double use.
+
+Four D1 tests cover concurrent recovery, entire-order rollback, preserved holds,
+renamed/hidden/archived options, missing original identities, payment concerns,
+membership boundaries, paging and immutable records. The browser workflow covers
+failed reads, shortages, stale reviews, retained notes, required reconfirmation,
+mobile controls and a successful allocation with an unreadable response followed
+by exact-payload retry. Inventory requests now time out and retain uncertain
+operations for confirmation. The notification outbox supports recovery events;
+actual delivery still requires its dispatcher.
+
+This recovery write remains gated by the central checkout cutover. Local
+fixtures establish transaction/UI behavior, not a hosted provider-paid order.
+Return inspection/restocking, refund alternatives, hosted recovery acceptance
+and the broader completion scope remain open.
+
 ## Atomicity contract
 
 Commerce database changes use D1 transactional batches and database constraints,

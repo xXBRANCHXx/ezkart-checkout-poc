@@ -20,7 +20,7 @@ async function setup(t) {
     outboundService: async () => Response.json({keys: [publicKey]})}));
   t.after(() => mf.dispose());
   const db = await mf.getD1Database('DB');
-  for (const name of ['0001_core.sql', '0002_cloud_catalog.sql', '0003_subscription_plan_billing.sql', '0004_yearly_subscription_plans.sql', '0009_commerce_orders.sql', '0010_catalog_revisions.sql','0011_inventory_adjustments.sql']) {
+  for (const name of ['0001_core.sql', '0002_cloud_catalog.sql', '0003_subscription_plan_billing.sql', '0004_yearly_subscription_plans.sql', '0009_commerce_orders.sql', '0010_catalog_revisions.sql','0011_inventory_adjustments.sql','0012_stock_review_recovery.sql']) {
     const source = (await readFile(new URL('../migrations/' + name, import.meta.url), 'utf8')).replace(/--[^\n]*/g, '');
     const triggers = [...source.matchAll(/CREATE TRIGGER[\s\S]*?END;/g)].map(match => match[0]);
     for (const statement of [...source.replace(/CREATE TRIGGER[\s\S]*?END;/g, '').split(';').filter(value => value.trim()), ...triggers]) await db.prepare(statement).run();
@@ -78,6 +78,104 @@ async function editorFixture(f, id = 'tea') {
   const product = (await f.merchant('/v1/catalog')).products.find(product => product.id === id);
   return {...product, imageUploadIds};
 }
+
+async function latePaidOrder(f, items, shipping = {amount:0,skipped:true}) {
+  const created=await f.create(f.input({items,shipping}));assert.equal(created.status,200,created.error);
+  assert.equal((await f.event(created.order,'payment.expired',{verified:true})).status,200);
+  const paid=await f.paid(created.order);assert.equal(paid.status,200,paid.error);assert.equal(paid.order.fulfillmentState,'stock_review');return paid.order;
+}
+async function stockReviewInput(f, order) {
+  const review=await f.merchant('/v1/inventory/reviews/'+order.id);assert.equal(review.status,200,review.error);
+  return {requestKey:randomBytes(16).toString('hex'),revision:review.order.revision,confirmed:true,note:'Physical stock checked in aisle A',
+    items:review.items.map(item=>({orderItemId:item.orderItemId,productRevision:item.current?.revision||1}))};
+}
+
+test('stock reviews recover a late paid order once, keep released holds immutable and protect other checkouts',async t=>{
+  const f=await setup(t),order=await latePaidOrder(f,[{productId:'tea',quantity:3,expectedPrice:20000},{productId:'mug',quantity:2,expectedPrice:20000}],
+    {amount:10000,skipped:false,courierCode:'jne',serviceCode:'reg',origin:{address:'Origin fixture'},destination:{address:'Destination fixture'}});
+  const pending=(await f.create(f.input({items:[{productId:'tea',quantity:6,expectedPrice:20000}]}))).order;
+  const request=await stockReviewInput(f,order),path='/v1/inventory/reviews/'+order.id;
+  const preview=await f.merchant(path);assert.equal(preview.canResolve,true);assert.equal(preview.items.find(item=>item.productId==='tea').current.available,4);
+  const outcomes=await Promise.all(Array.from({length:4},()=>f.merchant(path,request,{method:'POST'})));
+  assert(outcomes.every(result=>result.status===200),JSON.stringify(outcomes));assert.equal(new Set(outcomes.map(result=>result.receipt.id)).size,1);
+  assert.equal(await f.stock(),7);assert.equal(await f.stock('mug'),8);
+  assert.equal((await f.db.prepare("SELECT COUNT(*) AS n FROM inventory_reservations WHERE order_id=? AND state='released'").bind(order.id).first()).n,2);
+  assert.equal((await f.db.prepare('SELECT COUNT(*) AS n FROM commerce_stock_resolutions').first()).n,1);
+  assert.equal((await f.db.prepare('SELECT COUNT(*) AS n FROM commerce_stock_allocations').first()).n,2);
+  assert.equal((await f.db.prepare("SELECT COUNT(*) AS n FROM inventory_movements WHERE reason='late_payment_allocation'").first()).n,2);
+  assert.equal((await f.db.prepare("SELECT COUNT(*) AS n FROM commerce_jobs WHERE kind='notification.stock_recovered'").first()).n,1);
+  const jobs=await f.call('/internal/commerce/jobs/claim',{environment:'sandbox',workerId:'stock_notifications',kinds:['notification.stock_recovered']});
+  assert.equal(jobs.status,200,jobs.error);assert.equal(jobs.jobs.length,1);assert.equal(jobs.jobs[0].data.resolutionId,outcomes[0].receipt.id);
+  const after=await f.merchant(path);assert.equal(after.canResolve,false);assert.equal(after.order.fulfillmentState,'awaiting_acceptance');assert.equal(after.receipt.id,outcomes[0].receipt.id);
+  assert.equal((await f.merchant('/v1/inventory/reviews')).items.length,0);
+  assert.equal((await f.merchant(path,{...request,note:'Changed replay content'},{method:'POST'})).status,409);
+  assert.equal((await f.merchant(path,{...request,requestKey:randomBytes(16).toString('hex')},{method:'POST'})).status,409);
+  assert.equal((await f.paid(order)).status,200);assert.equal(await f.stock(),7,'A later provider replay cannot allocate again');
+  assert.equal((await f.paid(pending)).status,200);assert.equal(await f.stock(),1,'Another buyer retains every reserved unit');
+  await assert.rejects(f.db.prepare("UPDATE commerce_stock_resolutions SET note='rewrite'").run(),/stock_review_immutable/);
+  await assert.rejects(f.db.prepare('DELETE FROM commerce_stock_allocations').run(),/stock_review_immutable/);
+});
+
+test('stock reviews reject missing lines, stale versions, payment concerns and cross-seller or viewer writes',async t=>{
+  const f=await setup(t),order=await latePaidOrder(f,[{productId:'tea',quantity:3,expectedPrice:20000},{productId:'mug',quantity:2,expectedPrice:20000}]);
+  const path='/v1/inventory/reviews/'+order.id,request=await stockReviewInput(f,order);
+  const post=body=>f.merchant(path,body,{method:'POST'});
+  assert.equal((await post({...request,items:request.items.slice(1)})).status,422);
+  assert.equal((await post({...request,confirmed:false})).status,422);
+  assert.equal((await post({...request,note:''})).status,422);
+  assert.equal((await f.merchant(path,undefined,{seller:'bob'})).status,404);
+  assert.equal((await f.merchant(path,request,{seller:'bob',method:'POST'})).status,404);
+  assert.equal((await f.merchant('/v1/inventory/reviews',undefined,{seller:'bob'})).items.length,0);
+  await f.db.prepare("UPDATE products SET stock_quantity=11 WHERE id='tea'").run();
+  assert.equal((await post(request)).status,409);assert.equal(await f.stock('mug'),10);
+  let current=await stockReviewInput(f,order);
+  await f.db.prepare("UPDATE seller_memberships SET role='viewer' WHERE auth_user_id='alice'").run();
+  assert.equal((await post(current)).status,403);assert.equal((await f.merchant(path)).canResolve,false);
+  await f.db.prepare("UPDATE seller_memberships SET role='owner' WHERE auth_user_id='alice'").run();
+  assert.equal((await f.paid(order,{reference:'second-real-capture'})).status,200);
+  current=await stockReviewInput(f,order);assert.equal((await post(current)).status,409);
+  assert.match((await f.merchant(path)).reason,/payment review/);
+  assert.equal((await f.db.prepare('SELECT COUNT(*) AS n FROM commerce_stock_resolutions').first()).n,0);
+  assert.equal((await f.db.prepare('SELECT COUNT(*) AS n FROM commerce_stock_allocations').first()).n,0);
+});
+
+test('racing stock reviews cannot consume the same last units and insufficient lines roll back the entire order',async t=>{
+  const f=await setup(t),items=[{productId:'tea',quantity:6,expectedPrice:20000},{productId:'mug',quantity:2,expectedPrice:20000}];
+  const orders=[await latePaidOrder(f,items),await latePaidOrder(f,items)];
+  const page1=await f.merchant('/v1/inventory/reviews?limit=1');assert.equal(page1.items.length,1);assert(page1.nextCursor);
+  const page2=await f.merchant('/v1/inventory/reviews?limit=1&cursor='+encodeURIComponent(page1.nextCursor));assert.equal(page2.items.length,1);assert.notEqual(page1.items[0].id,page2.items[0].id);
+  const inputs=await Promise.all(orders.map(order=>stockReviewInput(f,order)));
+  const results=await Promise.all(orders.map((order,index)=>f.merchant('/v1/inventory/reviews/'+order.id,inputs[index],{method:'POST'})));
+  assert.deepEqual(results.map(result=>result.status).sort(),[200,409]);assert.equal(await f.stock(),4);assert.equal(await f.stock('mug'),8);
+  assert.equal((await f.db.prepare('SELECT COUNT(*) AS n FROM commerce_stock_allocations').first()).n,2);
+  assert.equal((await f.merchant('/v1/inventory/reviews')).items.length,1);
+  // Directly exercise the database stock guard after a stale preflight. Even
+  // an earlier sufficient line and its audit movement roll back together.
+  const loser=orders[results.findIndex(result=>result.status===409)],fresh=await f.merchant('/v1/inventory/reviews/'+loser.id);
+  const mug=fresh.items.find(item=>item.productId==='mug'),tea=fresh.items.find(item=>item.productId==='tea');
+  await assert.rejects(f.db.batch([
+    f.db.prepare("INSERT INTO commerce_stock_resolutions(id,seller_id,order_id,request_key,request_hash,order_revision,actor_auth_user_id,note,receipt_json,created_at) VALUES ('invalid-allocation','seller_alice',?,'direct-guard-fixture','hash',?,'alice','Direct race guard fixture','{}','now')").bind(loser.id,fresh.order.revision),
+    ...[mug,tea].map(item=>f.db.prepare("INSERT INTO commerce_stock_allocations VALUES ('invalid-allocation','seller_alice',?,?,?,?)").bind(item.orderItemId,item.productId,item.variantId,item.quantity)),
+  ]),/commerce_insufficient_stock/);
+  assert.equal(await f.stock('mug'),8);assert.equal((await f.db.prepare("SELECT COUNT(*) AS n FROM inventory_movements WHERE reference_id='invalid-allocation'").first()).n,0);
+  assert.equal((await f.db.prepare("SELECT COUNT(*) AS n FROM commerce_stock_resolutions WHERE id='invalid-allocation'").first()).n,0);
+});
+
+test('stock reviews keep original option identity across catalog changes and never silently substitute another SKU',async t=>{
+  const f=await setup(t);
+  await f.db.prepare("INSERT INTO product_variants(id,seller_id,product_id,name,sku,price_amount,stock_quantity,weight_grams,sort_order,created_at,updated_at) VALUES ('green','seller_alice','tea','Green tea','GREEN',20000,5,100,1,'now','now')").run();
+  const order=await latePaidOrder(f,[{productId:'tea',variantId:'green',quantity:3,expectedPrice:20000}]),path='/v1/inventory/reviews/'+order.id;
+  await f.db.prepare("UPDATE products SET status='archived' WHERE id='tea'").run();
+  await f.db.prepare("UPDATE product_variants SET name='Renamed green',sku='NEW-GREEN',price_amount=25000,options_json='{\"hidden\":true}' WHERE id='green'").run();
+  const review=await f.merchant(path);assert.equal(review.canResolve,true);assert.equal(review.items[0].sku,'GREEN');assert.equal(review.items[0].current.sku,'NEW-GREEN');
+  const result=await f.merchant(path,await stockReviewInput(f,order),{method:'POST'});assert.equal(result.status,200,result.error);
+  assert.equal((await f.db.prepare("SELECT stock_quantity FROM product_variants WHERE id='green'").first()).stock_quantity,2);assert.equal(await f.stock(),0,'The hidden option is not added to the visible parent total');
+  const missing=await latePaidOrder(f,[{productId:'mug',quantity:2,expectedPrice:20000}]);
+  await f.db.prepare("INSERT INTO product_variants(id,seller_id,product_id,name,sku,price_amount,stock_quantity,weight_grams,sort_order,created_at,updated_at) VALUES ('new-mug','seller_alice','mug','New option','NEW-MUG',20000,10,100,1,'now','now')").run();
+  const missingPath='/v1/inventory/reviews/'+missing.id,missingReview=await f.merchant(missingPath);assert.equal(missingReview.canResolve,false);assert.equal(missingReview.items[0].current,null);
+  assert.equal((await f.merchant(missingPath,await stockReviewInput(f,missing),{method:'POST'})).status,409);
+  assert.equal((await f.db.prepare("SELECT stock_quantity FROM product_variants WHERE id='new-mug'").first()).stock_quantity,10);
+});
 
 test('merchant saves reject missing and stale revisions and cannot overwrite stock sold during editing', async t => {
   const f = await setup(t), original = await editorFixture(f);

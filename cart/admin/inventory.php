@@ -3,6 +3,21 @@
   <p class="inv-status" data-inv-status role="status" aria-live="polite">Loading inventory…</p>
   <div class="inv-error" data-inv-error role="alert" hidden><span></span><button type="button" class="ui-button" data-inv-reload-draft>Reload saved draft</button></div>
   <section class="inv-metrics" aria-label="Inventory totals"><article><span>Units on hand</span><strong data-inv-metric="onHand">—</strong></article><article><span>Reserved for orders</span><strong data-inv-metric="reserved">—</strong></article><article><span>Available units</span><strong data-inv-metric="available">—</strong></article><article><span>Low / out of stock SKUs</span><strong data-inv-metric="lowStock">—</strong></article></section>
+  <section class="surface inv-order-reviews" data-stock-reviews>
+    <header class="surface-header"><div><h2>Paid orders needing stock</h2><p>Review payments received after their inventory hold was released.</p></div><button type="button" class="ui-button" data-stock-refresh>Refresh orders</button></header>
+    <p class="inv-help" data-stock-status role="status">Loading paid orders…</p><ul class="inv-order-list" data-stock-list></ul>
+    <div class="inv-pagination"><button type="button" class="ui-button" data-stock-more hidden>Load more orders</button></div>
+    <dialog class="inv-review inv-stock-review" data-stock-dialog aria-labelledby="stock-review-title">
+      <header><h2 id="stock-review-title">Review stock for a paid order</h2><button type="button" class="ui-button" data-stock-close aria-label="Close stock review">×</button></header>
+      <p data-stock-order></p><p>Check the original items against the current catalog and available stock. All items must be allocated together before fulfillment can continue.</p>
+      <p class="inv-error" data-stock-warning role="alert" hidden></p>
+      <div class="inv-table-wrap"><table class="inv-table"><thead><tr><th>Original order item</th><th>Current inventory</th><th>Needed</th><th>Available</th></tr></thead><tbody data-stock-lines></tbody></table></div>
+      <label class="inv-stock-note">Review note<textarea rows="3" maxlength="500" data-stock-note placeholder="Where you checked stock or the receipt that made it available"></textarea></label>
+      <label class="inv-stock-confirm"><input type="checkbox" data-stock-confirm><span>I checked every original item and these units are available to fulfill this paid order.</span></label>
+      <p class="inv-error" data-stock-error role="alert" hidden></p>
+      <footer><button type="button" class="ui-button" data-stock-close>Close</button><button type="button" class="ui-button" data-stock-reload>Reload review</button><button type="button" class="ui-button primary" data-stock-apply disabled>Allocate stock and continue</button></footer>
+    </dialog>
+  </section>
   <div class="inv-layout">
     <section class="surface inv-stock">
       <form class="inv-filters" data-inv-filters><label>Find an item<input type="search" name="q" placeholder="Product, option, or SKU" maxlength="120"></label><label>Products<select name="status"><option value="active">Active</option><option value="archived">Archived</option><option value="all">All products</option></select></label><label>Availability<select name="level"><option value="all">All stock</option><option value="low">Low stock</option><option value="zero">Out of stock</option></select></label><button type="submit" class="ui-button">Search</button></form>

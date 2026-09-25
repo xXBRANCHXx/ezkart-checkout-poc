@@ -14,6 +14,7 @@ import { advancedMode, AdvancedModeLimitError, sellerPlan } from "./advanced-mod
 import { authenticateCommerceService, commerceServiceRoute, expireCommerceOrders, reservedStockSql } from "./commerce-orders.js";
 import { claimCommerceJobs, finishCommerceJob } from "./commerce-jobs.js";
 import { inventoryOverview, inventoryHistory, inventoryDraft, adjustInventory, catalogStockMovements } from "./inventory.js";
+import { stockReviewList, stockReviewDetails, resolveStockReview } from "./stock-reviews.js";
 const json = (payload, status = 200, headers = {}) => new Response(JSON.stringify(payload), {
   status,
   headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...headers },
@@ -1461,6 +1462,16 @@ export default {
         return json({ ok: true, store: await merchantStorefront(env, seller, request.method === "PUT" ? await requestJson(request, 5000) : null) }, 200, cors);
       }
       if (request.method === "GET" && url.pathname === "/v1/catalog") return json({ ok: true, ...(await catalog(request, env)) }, 200, cors);
+      if (url.pathname === '/v1/inventory/reviews' && request.method === 'GET') {
+        const {seller} = await sellerContext(request, env);
+        return json({ok:true,...await stockReviewList(env,seller,url)},200,cors);
+      }
+      const stockReviewMatch = /^\/v1\/inventory\/reviews\/(EZK-[SP]-[A-F0-9]{24})$/.exec(url.pathname);
+      if (stockReviewMatch && ['GET','POST'].includes(request.method)) {
+        const {seller,authUserId} = await sellerContext(request, env);
+        return request.method === 'GET' ? json({ok:true,...await stockReviewDetails(env,seller,stockReviewMatch[1])},200,cors)
+          : json({ok:true,receipt:await resolveStockReview(env,seller,authUserId,stockReviewMatch[1],await requestJson(request,64000))},200,cors);
+      }
       if (url.pathname === "/v1/inventory" && request.method === "GET") {
         const {seller} = await sellerContext(request, env);
         return json({ok: true, ...await inventoryOverview(env, seller, url)}, 200, cors);

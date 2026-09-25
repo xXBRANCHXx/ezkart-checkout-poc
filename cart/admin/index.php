@@ -704,7 +704,7 @@ function ez_admin_sync_cloudflare_user(string $accessToken): array
 function ez_admin_proxy_cloud_request(string $accessToken, string $path, string $method): never
 {
     $inventoryPath = (string) parse_url($path, PHP_URL_PATH);
-    $isInventoryPath = preg_match('#^/v1/inventory(?:/(?:history|adjustments|draft))?$#D', $inventoryPath) === 1;
+    $isInventoryPath = preg_match('#^/v1/inventory(?:/(?:history|adjustments|draft|reviews(?:/EZK-[SP]-[A-F0-9]{24})?))?$#D', $inventoryPath) === 1;
     if ($isInventoryPath) {
         parse_str((string) parse_url($path, PHP_URL_QUERY), $inventoryQuery);
         foreach ($inventoryQuery as $key => $value) {
@@ -1876,6 +1876,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
   <?php if ($page === 'sites'): ?><script src="builder-native-icons.js?v=<?= (int) filemtime(__DIR__ . '/builder-native-icons.js') ?>"></script><script src="builder-commerce.js?v=<?= (int) filemtime(__DIR__ . '/builder-commerce.js') ?>"></script><script src="builder-help.js?v=<?= (int) filemtime(__DIR__ . '/builder-help.js') ?>"></script><script src="builder-fonts.js?v=<?= (int) filemtime(__DIR__ . '/builder-fonts.js') ?>"></script><script src="builder-native.js?v=<?= (int) filemtime(__DIR__ . '/builder-native.js') ?>"></script><script src="builder-publish.js?v=<?= (int) filemtime(__DIR__ . '/builder-publish.js') ?>"></script><script src="builder-site-settings.js?v=<?= (int) filemtime(__DIR__ . '/builder-site-settings.js') ?>"></script><script src="builder-templates.js?v=<?= (int) filemtime(__DIR__ . '/builder-templates.js') ?>"></script><?php endif; ?><?php if ($page === 'sites' && $siteEditor): ?><script src="builder-backgrounds.js?v=<?= (int) filemtime(__DIR__ . '/builder-backgrounds.js') ?>"></script><script src="builder-components.js?v=<?= (int) filemtime(__DIR__ . '/builder-components.js') ?>"></script><script src="builder-asset-packs.js?v=<?= (int) filemtime(__DIR__ . '/builder-asset-packs.js') ?>"></script><script src="builder-assets.js?v=<?= (int) filemtime(__DIR__ . '/builder-assets.js') ?>"></script><script src="builder-assets-ui.js?v=<?= (int) filemtime(__DIR__ . '/builder-assets-ui.js') ?>"></script><script src="builder-showcase-data.js?v=<?= (int) filemtime(__DIR__ . '/builder-showcase-data.js') ?>"></script><script src="builder-showcase.js?v=<?= (int) filemtime(__DIR__ . '/builder-showcase.js') ?>"></script><?php endif; ?>
   <script src="dashboard-data.js?v=<?= (int) filemtime(__DIR__ . '/dashboard-data.js') ?>"></script>
   <?php if (in_array($page, ['inventory','products'], true)): ?><script src="inventory.js?v=<?= (int) filemtime(__DIR__ . '/inventory.js') ?>"></script><?php endif; ?>
+  <?php if ($page === 'inventory'): ?><script src="inventory-reviews.js?v=<?= (int) filemtime(__DIR__ . '/inventory-reviews.js') ?>"></script><?php endif; ?>
   <?php if ($page === 'analytics'): ?><script src="analytics.js?v=<?= (int) filemtime(__DIR__ . '/analytics.js') ?>"></script><?php endif; ?>
   <?php if ($page === 'wallet'): ?><script src="wallet-access.js?v=<?= (int) filemtime(__DIR__ . '/wallet-access.js') ?>"></script><?php endif; ?>
   <script src="admin-language.js?v=<?= (int) filemtime(__DIR__ . '/admin-language.js') ?>"></script>

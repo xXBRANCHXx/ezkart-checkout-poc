@@ -1,7 +1,7 @@
 import {commerceEnvironment, commerceHash} from './commerce-orders.js';
 
 const fail = (message, status = 422) => { throw new Response(message, {status}); };
-const kinds = ['payment.create', 'shipment.create', 'shipment.cancel', 'notification.order_state', 'notification.payment_review', 'notification.send', 'payout.create'];
+const kinds = ['payment.create', 'shipment.create', 'shipment.cancel', 'notification.order_state', 'notification.payment_review', 'notification.stock_recovered', 'notification.send', 'payout.create'];
 const validId = value => typeof value === 'string' && /^[A-Za-z0-9_-]{3,100}$/.test(value);
 const view = row => ({id: row.id, sellerId: row.seller_id, orderId: row.order_id, environment: row.commerce_environment,
   kind: row.kind, state: row.state, data: JSON.parse(row.payload_json), attempts: row.attempts,

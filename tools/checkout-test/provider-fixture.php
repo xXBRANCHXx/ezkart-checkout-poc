@@ -29,6 +29,7 @@ function curl_exec(object $handle): string {
         }
         if ($path === '/v1/inventory' && isset($shop['inventory'])) return json_encode(['ok' => true] + $shop['inventory']);
         if ($path === '/v1/inventory/history' && isset($shop['inventory'])) return json_encode(['ok' => true, 'items' => [], 'nextCursor' => null]);
+        if ($path === '/v1/inventory/reviews' && isset($shop['inventory'])) return json_encode(['ok' => true, 'items' => [], 'nextCursor' => null]);
         if ($path === '/v1/inventory/draft' && isset($shop['inventory'])) return json_encode(['ok' => true, 'draft' => null]);
         if ($path === '/v1/storefront') {
             if (($handle->options[CURLOPT_CUSTOMREQUEST] ?? '') === 'PUT') {

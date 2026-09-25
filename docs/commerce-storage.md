@@ -45,8 +45,9 @@ provider records. New central orders have `commerce_version=1`.
   notifications do not consume stock again. Distinct real captures on the same
   order are retained and flagged for review, not treated as additional sales.
 - A paid notification after an expired/cancelled hold creates `stock_review`.
-  The payment is retained without overselling another buyer's stock. Merchant
-  resolution, refund and inventory reallocation workflows are still required.
+  The payment is retained without overselling another buyer's stock. Explicit
+  merchant reallocation is implemented in the inventory workspace. The refund
+  alternative and hosted recovery acceptance remain required.
 - Revision-checked event batches serialize racing updates. Events, captures,
   reservation identities and commercial snapshots cannot be rewritten.
 - Deadline expiry uses a bounded, set-based database batch. It records expiry,
@@ -146,15 +147,17 @@ order history must be archived instead of deleted. Viewer memberships cannot
 write products, drafts or catalog images.
 
 Inventory counts, manual adjustments, alert thresholds, account drafts and
-immutable stock history are now implemented separately; see
-[inventory-control.md](inventory-control.md). Order-linked return restocking and
-stock-review resolution remain required before the commerce cutover.
+immutable stock history and explicit late-payment allocation are now implemented
+separately; see [inventory-control.md](inventory-control.md). Order-linked return
+restocking and the refund alternative for unfulfillable paid orders remain
+required before the commerce cutover.
 
 ## Required before activating the test cutover
 
 1. Finish PHP checkout, provider dispatch, callback, order read/list, customer
    tracking and merchant-action adapters; preserve private legacy references.
-2. Finish order-linked return restocking and stock-review resolution.
+2. Finish order-linked return restocking and the refund alternative for orders
+   that cannot be fulfilled. Include hosted late-payment allocation acceptance.
    Catalog revision protections are deployed to test; keep their regression
    coverage when completing these remaining inventory flows.
 3. Build and rehearse an idempotent legacy import. Compare order counts, paid

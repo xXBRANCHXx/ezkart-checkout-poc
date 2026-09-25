@@ -1,5 +1,5 @@
 (() => {
-  const labels = {opening:'Opening balance',catalog_create:'Product created',catalog_edit:'Product edited',catalog_delete:'Product removed',catalog_duplicate:'Product duplicated',payment:'Payment confirmed',count:'Physical count',received:'Stock received',damaged:'Damaged stock',lost:'Lost stock',correction:'Record corrected',alert:'Alert threshold changed'};
+  const labels = {opening:'Opening balance',catalog_create:'Product created',catalog_edit:'Product edited',catalog_delete:'Product removed',catalog_duplicate:'Product duplicated',payment:'Payment confirmed',late_payment_allocation:'Late payment stock allocated',count:'Physical count',received:'Stock received',damaged:'Damaged stock',lost:'Lost stock',correction:'Record corrected',alert:'Alert threshold changed'};
   const modes = {
     count:['New count','Enter the total physically counted for each item. Leave uncounted items blank.'],
     received:['Units received','Enter saleable units physically received. They will be added to current stock.'],
@@ -105,7 +105,7 @@
     async function apply(){if(busy)return;busy=true;controls();dialog.querySelectorAll('button').forEach(button=>button.disabled=true);const body=uncertain||{...payload(),draftRevision};
       try{const data=await request('POST','/v1/inventory/adjustments',body);uncertain=null;queue.clear();draftRevision=0;requestKey=newKey();dirty=false;note.value='';selection();dialog.close();error('');await Promise.all([loadRows(),loadHistory(),loadDraft().catch(err=>error('Changes saved. '+err.message))]);status(`Saved ${counted(data.receipt.items.length,'inventory change')}. Reference ${data.receipt.id}.`);
       }catch(err){const message=q('[data-inv-review-error]');message.hidden=false;message.textContent=err.message;
-        if(!err.status||err.status>=500){uncertain=body;message.textContent+=' Confirmation is unavailable. Retry this same change to check whether it was saved.';q('[data-inv-apply]').textContent='Retry confirmation';}
+        if(!err.status||err.status<400||err.status>=500){uncertain=body;message.textContent+=' Confirmation is unavailable. Retry this same change to check whether it was saved.';q('[data-inv-apply]').textContent='Retry confirmation';}
         else{uncertain=null;if(err.code==='inventory_draft_conflict'){draftBlocked=true;error(err.message);}if(err.code==='inventory_conflict'){message.textContent+=' Keep editing, then remove and re-enter the affected items using refreshed stock.';await loadRows();}}
       }finally{busy=false;dialog.querySelectorAll('button').forEach(button=>button.disabled=false);dialog.querySelectorAll('[data-inv-review-close]').forEach(button=>button.disabled=Boolean(uncertain));controls();}}
     filters.addEventListener('submit',event=>{event.preventDefault();void loadRows();});q('[data-inv-more]').addEventListener('click',()=>void loadRows(true));
@@ -121,8 +121,9 @@
     const initialQuery=new URLSearchParams(location.search);if(initialQuery.get('q'))filters.elements.q.value=initialQuery.get('q');
     if(['low','zero'].includes(initialQuery.get('level')))filters.elements.level.value=initialQuery.get('level');
     try{await Promise.all([loadRows(),loadHistory(),loadDraft()]);}catch(err){error(err.message);}
+    globalThis.EzkartStockReviews?.mount({request,root:q('[data-stock-reviews]'),onStockChanged:()=>Promise.all([loadRows(),loadHistory()])});
     window.addEventListener('beforeunload',event=>{if(dirty||uncertain){event.preventDefault();event.returnValue='';}});
   }
   let refreshSummary=()=>{};
-  globalThis.EzkartInventory={refreshSummary:()=>refreshSummary(),mount:({request})=>{const summary=document.querySelector('[data-inventory-summary]'),root=document.querySelector('[data-inventory-workspace]');if(summary){refreshSummary=()=>void mini(summary,request);refreshSummary();document.addEventListener('ezkart:cloud-catalog-changed',refreshSummary);}if(root)void workspace(root,request);}};
+  globalThis.EzkartInventory={refreshSummary:()=>refreshSummary(),mount:({request})=>{const api=(method,path,payload)=>request(method,path,payload,{timeoutMs:method==='GET'?15000:30000});const summary=document.querySelector('[data-inventory-summary]'),root=document.querySelector('[data-inventory-workspace]');if(summary){refreshSummary=()=>void mini(summary,api);refreshSummary();document.addEventListener('ezkart:cloud-catalog-changed',refreshSummary);}if(root)void workspace(root,api);}};
 })();
