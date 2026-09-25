@@ -84,3 +84,28 @@ lifecycle. Merchant refund/dispute/reconciliation workflows, actual provider
 fees, ledger/settlement/payout acceptance, customer read routing, operational
 migration, monitored provider dispatch and representative capacity testing remain
 open under the full workbench completion plan and production release hold.
+
+## TEST deployment — 25 September 2026
+
+Implementation `9d99eec` is pushed to `agent/ezkart-workbench`. TEST Worker
+`b11833b1-2dba-4bdb-9ec0-f54f196e318a` is deployed. No migration is required;
+the schema remains through 0019. Health at 18:47 Jakarta reports 49 application
+tables and healthy D1/public/private R2. All five payment read routes return 401
+without authentication. Hosted HTTPS hashes of `commerce-payments.js`,
+`commerce-payments.css` and `admin.js` match the implementation at 18:48 Jakarta.
+Hostinger's signed-in deployment view and merchant acceptance remain unverified
+while shared Chrome is disconnected.
+
+Before/after TEST readbacks confirm zero operational orders, customers, captures,
+reservations, shipments, provider jobs and analytics export receipts/rows. All
+six existing export guards remain present. The 15-entry legacy import receipt
+and manifest
+`ba180208c85cea72b82323b7b917e0e3771b143d930f5220665fddffc62777c0`
+are unchanged. Private logs, aggregate readbacks and served-asset hashes are in
+`/tmp/ezkart-payments-deploy-01a0d643/`. The central flags remain disabled, the
+hourly maintenance schedule is unchanged, and production/main are untouched.
+
+Final acceptance includes six payment API cases, six adjacent order API cases,
+and 14 browser cases across Payments, Orders, Dashboard and Analytics. The
+desktop/mobile Payments workflow also passes after the final detail-scroll and
+report-link corrections; the final screenshots are inspected.

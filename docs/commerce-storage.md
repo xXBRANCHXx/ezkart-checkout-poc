@@ -80,7 +80,7 @@ Operational counts remain zero, the 15-entry import receipt is unchanged, and
 D1/public R2/private R2 health passes. This does not enable central checkout or
 complete the other read adapters. See [central-order-manager.md](central-order-manager.md).
 
-Current TEST Worker `2e92c29a-d052-46db-b385-ba2da456aff8` also includes central
+The dashboard-stage TEST Worker `2e92c29a-d052-46db-b385-ba2da456aff8` includes central
 dashboard reporting from frontend implementation `125af2a`. Its hosted public
 assets match the committed files, unauthenticated dashboard reads return 401,
 and D1/R2 health and unchanged operational/import counts are verified. The
@@ -95,6 +95,13 @@ rows remain zero, and the 15-entry legacy receipt is unchanged. The analytics
 workspace retains the existing report features and adds complete CSV snapshots.
 Its signed-in hosted review remains pending shared Chrome access; storage flags
 stay disabled. See [central-analytics.md](central-analytics.md).
+
+Current TEST Worker `b11833b1-2dba-4bdb-9ec0-f54f196e318a` adds central payment
+reads and investigation histories from implementation `9d99eec`. Hosted payment
+assets match, health/authentication checks pass, and before/after aggregates and
+the legacy import receipt are unchanged. No migration or storage activation is
+included. Signed-in hosted payment acceptance remains pending shared Chrome
+initialization; see [central-payments.md](central-payments.md).
 
 ## Data and invariants
 

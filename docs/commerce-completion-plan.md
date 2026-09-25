@@ -79,6 +79,11 @@ exact money, failed requests, stale replies, deep links and desktop/mobile use.
 See [central-payments.md](central-payments.md). Signed-in hosted acceptance is
 pending shared Chrome: the approved connection reached WebSocket connected but
 timed out during browser initialization. There is no automatic retry loop.
+Implementation `9d99eec` is pushed and TEST Worker
+`b11833b1-2dba-4bdb-9ec0-f54f196e318a` is deployed. Served assets match,
+authentication and health checks pass, operational rows remain zero and the
+15-entry import receipt is unchanged. All 14 central browser cases and six
+adjacent order API cases pass. No migration or storage activation is included.
 Operational refund/dispute/reconciliation, wallet/settlement and customer work,
 central cutover and all top-level acceptance gates remain open.
 
