@@ -85,8 +85,9 @@ preview. Implementation `125af2a` is pushed; TEST Worker
 `2e92c29a-d052-46db-b385-ba2da456aff8` is deployed. Hosted dashboard/order-manager
 assets match the commit, the dashboard requires authentication, D1/R2 health
 passes, operational rows remain zero and the 15-entry import receipt is
-unchanged. Signed-in hosted dashboard acceptance is pending the one shared
-Chrome reconnect approval; it is not inferred from the local browser tests.
+unchanged. Signed-in hosted dashboard acceptance is pending restored shared
+Chrome access after one reconnect attempt timed out; it is not inferred from
+the local browser tests.
 Analytics/payment/customer reads, operational migration and monitored
 execution still need completion before the storage switch can be enabled. No
 top-level workbench acceptance item is closed by this intermediate stage.

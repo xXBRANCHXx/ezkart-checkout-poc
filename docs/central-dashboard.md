@@ -104,7 +104,9 @@ and manifest digest
 `ba180208c85cea72b82323b7b917e0e3771b143d930f5220665fddffc62777c0`.
 
 Authenticated hosted browser acceptance is still pending: Chrome's shared
-connection ended, and one explicit reconnect request is awaiting Chrome's new
-approval. The passing populated desktop/mobile tests use the real PHP proxy and
+connection ended, and the single explicit reconnect attempt timed out after
+300 seconds. Browser review requires restoring that connection with Chrome's
+new approval; no request is currently running. The passing populated
+desktop/mobile tests use the real PHP proxy and
 local Worker fixture; they are not a claim that the hosted signed-in view has
 already been inspected. No second browser connection or reconnect loop is used.
