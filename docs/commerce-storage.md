@@ -42,6 +42,16 @@ disabled and the dispatcher is not installed as a monitored hosted service.
 See [checkout-payment-recovery.md](checkout-payment-recovery.md) for unresolved
 provider-instruction recovery and the remaining migration/fulfillment gates.
 
+Migration 0015 and current test Worker version
+`57afed4c-6f8d-4392-853f-eff7a46634ef` add immutable fulfillment actions, linked
+shipment attempts, credential bindings and a durable courier inbox. Frontend
+implementation `1ad134d` is deployed to test and its gated merchant workspace was
+verified at desktop/mobile widths. PHP courier callbacks, bounded execution and
+owned customer tracking are prepared and tested. Central storage is still
+disabled; no central orders or shipments were created during hosted QA. See
+[central-fulfillment.md](central-fulfillment.md) for route contracts, recovery,
+known limits and remaining shipping/operator workflows.
+
 The full completion scope and acceptance gates remain in
 [commerce-completion-plan.md](commerce-completion-plan.md).
 
@@ -148,9 +158,10 @@ the attempt limit. The dispatcher must establish that claim using provider
 status/reconciliation. Exhausted uncertain work remains visible for operator
 resolution. Attempts preserve worker, mode, timing and result history.
 
-Outbox kinds for shipping, notifications and payouts establish the common queue
-contract. Their actual provider dispatchers are outstanding; a queued job is
-not evidence that a message, shipment or payout was sent.
+The payment and whole-order shipping dispatchers are implemented behind the
+central-storage flag and require monitored hosted installation. Notification and
+payout delivery remain outstanding. A queued job is not evidence that a message,
+shipment or payout was sent.
 
 ## Catalog concurrency
 
@@ -183,12 +194,14 @@ required before the commerce cutover.
 
 ## Required before activating the test cutover
 
-1. Finish PHP checkout, provider dispatch, callback, order read/list, customer
-   tracking and merchant-action adapters; preserve private legacy references.
-2. Finish order-linked return restocking and the refund alternative for orders
-   that cannot be fulfilled. Include hosted late-payment allocation acceptance.
-   Catalog revision protections are deployed to test; keep their regression
-   coverage when completing these remaining inventory flows.
+1. Complete central merchant/dashboard/payment/customer order lists and private
+   legacy-reference projections. Rehearse the prepared checkout, payment,
+   fulfillment, callback and customer-tracking adapters together. Finish
+   per-seller shipping configuration and quotes before activation.
+2. Extend the implemented physical return inspection/restocking flow with return
+   policies/evidence, return shipping and financial refunds, including orders
+   that cannot be fulfilled. Include hosted late-payment allocation acceptance
+   and retain the catalog/inventory concurrency regression coverage.
 3. Build and rehearse an idempotent legacy import. Compare order counts, paid
    totals, owners and provider references. Legacy records must not reserve stock
    again or become new ledger credits.

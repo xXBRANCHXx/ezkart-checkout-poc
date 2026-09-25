@@ -370,6 +370,29 @@ migration and order-read cutover, monitored execution and notifications, shippin
 exceptions/labels and split/scheduled packages, financial refunds and ledger work
 remain. Hosted central order processing stays disabled during these changes.
 
+Hosted test rollout:
+
+- Committed/pushed implementation `1ad134d` on `agent/ezkart-workbench`.
+  Hostinger reports `1ad134db` **Completed / Current** for `test.ezkart.id`.
+- Applied only `0015_central_fulfillment.sql` to the test D1 database and deployed
+  test Worker version `57afed4c-6f8d-4392-853f-eff7a46634ef`. Health reports 42
+  tables and healthy D1, public R2 and private R2 bindings.
+- The authenticated hosted fulfillment list returns 200 with zero rows,
+  `enabled:false` and `canWrite:false`. An authenticated, CSRF-protected action
+  against a nonexistent QA reference returns 503 before writing. The signed
+  commerce entrypoint remains disabled; checkout configuration remains sandbox
+  with `durable_checkout:false`.
+- Five hosted frontend assets match their source SHA-256 contents. The CLI
+  dispatcher returns HTTP 404. The merchant workspace and universal filter were
+  checked at 1440px and 390px with no horizontal overflow and no actionable
+  fulfillment controls while disabled.
+- Remote aggregate checks show zero central orders, shipments, courier events,
+  and fulfillment actions. No hosted test payment or pickup was manufactured.
+  Catalog inventory/revision hash remains unchanged after QA.
+- The hourly Worker schedule is unchanged; fulfillment/payment dispatch and
+  timely expiry are still uninstalled/unmonitored cutover gates. Production and
+  the main branch remain untouched.
+
 ## Atomicity contract
 
 Commerce database changes use D1 transactional batches and database constraints,
