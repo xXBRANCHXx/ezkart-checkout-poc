@@ -8,7 +8,8 @@ at `?page=orders&order-preview=1` while checkout remains on the existing rollout
 The preview cannot change storage mode or activate a provider.
 
 This stage does not switch hosted checkout or promote the private legacy import.
-Dashboard, analytics, payment and customer read adapters still require cutover.
+The dashboard also has a prepared central read workspace; analytics, payment and
+customer read adapters still require cutover.
 The whole application must not enable central commerce until those adapters,
 operational migration, monitored dispatch and the other acceptance gates pass.
 

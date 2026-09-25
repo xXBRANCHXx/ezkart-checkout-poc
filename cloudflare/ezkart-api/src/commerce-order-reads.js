@@ -25,6 +25,10 @@ const confirmedSql=`COALESCE((SELECT SUM(c.amount) FROM commerce_payment_capture
 const additionalSql=`COALESCE((SELECT SUM(c.amount) FROM commerce_payment_captures c WHERE c.seller_id=o.seller_id AND c.order_id=o.id AND c.capture_kind='duplicate_payment'),0)`;
 const scopeSql='o.seller_id=? AND o.commerce_environment=? AND o.commerce_version=1';
 
+// Reporting uses the same authenticated scope, capture policy and operational
+// queues as the order manager, so the two views cannot reinterpret an order.
+export {queueSql,confirmedSql,additionalSql,scopeSql,environment as commerceReadEnvironment};
+
 function parameters(url,allowed){
   for(const name of url.searchParams.keys())if(!allowed.includes(name)||url.searchParams.getAll(name).length!==1)fail('Order filters are invalid');
   const limit=Number(url.searchParams.get('limit')||25);

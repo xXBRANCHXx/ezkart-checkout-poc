@@ -6,7 +6,7 @@ ez_page_header('Orders', 'Find every order and review its payment and delivery p
     ['label'=>'Returns','icon'=>'undo','href'=>'?page=returns'],
 ]);
 ?>
-<section class="commerce-orders" data-commerce-orders>
+<section class="commerce-orders" data-commerce-orders data-preview="<?= ez_config('commerce_storage') === 'd1' ? '0' : '1' ?>">
   <p class="commerce-orders-notice" data-orders-availability role="status" hidden></p>
   <section class="page-stat-strip" aria-label="All order totals">
     <?php foreach (['total'=>['Orders','All saved orders'],'paid'=>['Paid orders','At least one verified order payment'],'confirmedAmount'=>['Confirmed payments','Order payments, before fees or refunds'],'needsReview'=>['Needs review','Payment, stock or delivery issues']] as $key=>$labels): ?>

@@ -55,7 +55,7 @@
         if(!Array.isArray(data.items)||!data.summary||typeof data.pageCursor!=='string')throw Error('The order response was incomplete.');
         for(const node of root.querySelectorAll('[data-orders-total]')){const key=node.dataset.ordersTotal;node.textContent=key==='confirmedAmount'?money(data.summary[key]):Number(data.summary[key]).toLocaleString();}
         document.querySelectorAll('[data-order-total]').forEach(n=>n.textContent=data.summary.total.toLocaleString());
-        message('[data-orders-availability]',data.enabled?'':'Order processing is not enabled for this store yet.');
+        message('[data-orders-availability]',data.enabled&&root.dataset.preview!=='1'?'':'Order processing is not enabled for this store yet.');
         next=data.nextCursor;previous=data.previousCursor;cursor=data.pageCursor;renderRows(data.items);loaded=true;
         message('[data-orders-list-status]',data.items.length?'':data.matching===0?'No orders match these filters.':'No more orders in this view. Refresh to include status changes.');
         q('[data-orders-count]').textContent=`${data.items.length} shown · ${data.matching.toLocaleString()} matching orders`;

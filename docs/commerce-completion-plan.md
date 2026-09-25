@@ -64,6 +64,27 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 25 September: central dashboard reporting
+
+Implemented authenticated D1 dashboard reporting and a merchant workspace for
+operational queues, complete-cohort totals, payment trends, recent orders,
+product/customer activity and fulfillment context. Reporting periods use Jakarta
+order dates; operational queues remain independent of dates. Verified gross
+payments, additional captures and unpaid order values remain separate. Saved
+item prices determine product totals. Money retains exact integer precision.
+
+The five D1 cases and three PHP/browser cases pass, alongside six adjacent order
+read cases, three order-manager browser cases and five existing dashboard and
+analytics regressions. The populated browser workflow is inspected at 1360 and
+390 pixels, including responsive charts and readable card explanations. Failure,
+retry, stale-response, reload, browser-history and order-link behavior are
+covered. See [central-dashboard.md](central-dashboard.md) for the read contract.
+
+The workspace is prepared behind the PHP central flag with a read-only TEST
+preview. Analytics/payment/customer reads, operational migration and monitored
+execution still need completion before the storage switch can be enabled. No
+top-level workbench acceptance item is closed by this intermediate stage.
+
 ### 25 September: central merchant order manager
 
 Implemented the D1 order-read service and merchant workspace: all-store totals,

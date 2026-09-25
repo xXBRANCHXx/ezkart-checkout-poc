@@ -84,7 +84,9 @@ complete the other read adapters. See [central-order-manager.md](central-order-m
 
 The central merchant order manager now has scoped D1 pagination, totals, search
 and saved order details. Migration 0018 adds read indexes. It is prepared behind
-the PHP central flag, with a read-only TEST preview. Other merchant reporting and
+the PHP central flag, with a read-only TEST preview. The dashboard now has the
+same prepared central read routing; see [central-dashboard.md](central-dashboard.md).
+Other merchant reporting and
 customer surfaces and the operational legacy handover remain open; see
 [central-order-manager.md](central-order-manager.md).
 

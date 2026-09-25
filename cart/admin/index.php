@@ -719,12 +719,14 @@ function ez_admin_proxy_cloud_request(string $accessToken, string $path, string 
     $isReturnsPath = preg_match('#^/v1/returns(?:/(?:orders/EZK-[SP]-[A-F0-9]{24}|ret_[a-f0-9]{32}))?$#D', $inventoryPath) === 1;
     $isFulfillmentPath = preg_match('#^/v1/fulfillment(?:/EZK-[SP]-[A-F0-9]{24})?$#D', $inventoryPath) === 1;
     $isOrderReadPath = preg_match('#^/v1/commerce/orders(?:/EZK-[SP]-[A-F0-9]{24}(?:/(?:captures|activity))?)?$#D', $inventoryPath) === 1;
-    if ($isOrderReadPath && $method !== 'GET') ez_admin_json(['ok' => false, 'error' => 'Method not allowed.'], 405);
-    if ($isInventoryPath || $isReturnsPath || $isFulfillmentPath || $isOrderReadPath) {
+    $isDashboardReadPath = $inventoryPath === '/v1/commerce/dashboard';
+    $isCommerceReadPath = $isOrderReadPath || $isDashboardReadPath;
+    if ($isCommerceReadPath && $method !== 'GET') ez_admin_json(['ok' => false, 'error' => 'Method not allowed.'], 405);
+    if ($isInventoryPath || $isReturnsPath || $isFulfillmentPath || $isCommerceReadPath) {
         parse_str((string) parse_url($path, PHP_URL_QUERY), $inventoryQuery);
-        if ($isOrderReadPath && count($inventoryQuery) !== count(array_filter(explode('&', (string) parse_url($path, PHP_URL_QUERY)), 'strlen'))) ez_admin_json(['ok' => false, 'error' => 'Order filters are invalid.'], 400);
+        if ($isCommerceReadPath && count($inventoryQuery) !== count(array_filter(explode('&', (string) parse_url($path, PHP_URL_QUERY)), 'strlen'))) ez_admin_json(['ok' => false, 'error' => 'Order filters are invalid.'], 400);
         foreach ($inventoryQuery as $key => $value) {
-            if (!in_array($key, $isOrderReadPath ? ['state','queue','q','from','to','order','cursor','limit'] : ($isFulfillmentPath ? ['state', 'cursor', 'limit', 'before', 'q'] : ($isReturnsPath ? ['state', 'cursor', 'limit', 'before'] : ['q', 'status', 'level', 'cursor', 'limit', 'product', 'variant'])), true) || !is_string($value) || strlen($value) > ($isOrderReadPath && $key === 'cursor' ? 1000 : 200) || preg_match('/[\x00-\x1f]/', $value)) {
+            if (!in_array($key, $isDashboardReadPath ? ['range','group'] : ($isOrderReadPath ? ['state','queue','q','from','to','order','cursor','limit'] : ($isFulfillmentPath ? ['state', 'cursor', 'limit', 'before', 'q'] : ($isReturnsPath ? ['state', 'cursor', 'limit', 'before'] : ['q', 'status', 'level', 'cursor', 'limit', 'product', 'variant']))), true) || !is_string($value) || strlen($value) > ($isOrderReadPath && $key === 'cursor' ? 1000 : 200) || preg_match('/[\x00-\x1f]/', $value)) {
                 ez_admin_json(['ok' => false, 'error' => 'Inventory filter is invalid.'], 400);
             }
         }
@@ -732,7 +734,7 @@ function ez_admin_proxy_cloud_request(string $accessToken, string $path, string 
         $path = $inventoryPath . ($inventoryQuery !== [] ? '?' . http_build_query($inventoryQuery, '', '&', PHP_QUERY_RFC3986) : '');
     }
     $allowedPath = preg_match('#^/v1/(?:catalog|storefront|admin-preferences|admin-profile|shipping-settings|advanced-mode|media(?:/[a-zA-Z0-9_-]+)?|assets(?:/[a-zA-Z0-9_-]+)?|fonts(?:/font_[a-f0-9]{64})?|products/[a-zA-Z0-9_-]+(?:/(?:duplicate|status))?|drafts/[a-zA-Z0-9_-]+|landing-pages(?:/[a-z0-9-]+(?:/(?:preview|export|editor|view|confirmation))?)?|components(?:/[a-z0-9-]+)?)$#', $path) === 1;
-    if (!$isInventoryPath && !$isReturnsPath && !$isFulfillmentPath && !$isOrderReadPath && (!$allowedPath || str_contains($path, '?') || str_contains($path, '#'))) {
+    if (!$isInventoryPath && !$isReturnsPath && !$isFulfillmentPath && !$isCommerceReadPath && (!$allowedPath || str_contains($path, '?') || str_contains($path, '#'))) {
         ez_admin_json(['ok' => false, 'error' => 'That saved-data path is not allowed.'], 400);
     }
     if (!in_array($method, ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'], true) || ($method === 'PATCH' && preg_match('#^/v1/products/[a-zA-Z0-9_-]+/status$#D', $path) !== 1)) {
@@ -1376,10 +1378,16 @@ $adminStorageIdentity = $authenticationMethod === 'supabase'
 $adminStorageScope = substr(hash('sha256', $deployment . '|' . $adminStorageIdentity), 0, 24);
 $nowJakarta = new DateTimeImmutable('now', new DateTimeZone('Asia/Jakarta'));
 $dashboardPeriod = ez_dashboard_period($_GET, $nowJakarta);
-$isDashboard = !isset($_GET['page']) || $_GET['page'] === 'dashboard';
-$centralOrderWorkspace = $authenticated && ($_GET['page'] ?? '') === 'orders' && (ez_config('commerce_storage') === 'd1'
+$allowedPages = ['dashboard', 'orders', 'returns', 'fulfillment', 'shipping-settings', 'products', 'product-new', 'inventory', 'shop', 'sites', 'customers', 'analytics', 'marketing', 'payments', 'messages', 'wallet', 'settings', 'advanced'];
+$requestedPage = strtolower(trim((string) ($_GET['page'] ?? 'dashboard')));
+$page = in_array($requestedPage, $allowedPages, true) ? $requestedPage : 'dashboard';
+$isDashboard = $page === 'dashboard';
+$centralDashboardWorkspace = $authenticated && $isDashboard && (ez_config('commerce_storage') === 'd1'
+    || ($deployment === 'test' && $authenticationMethod === 'supabase' && ($_GET['dashboard-preview'] ?? '') === '1'));
+$centralOrderWorkspace = $authenticated && $page === 'orders' && (ez_config('commerce_storage') === 'd1'
     || ($deployment === 'test' && $authenticationMethod === 'supabase' && ($_GET['order-preview'] ?? '') === '1'));
-$orders = (!$centralOrderWorkspace && $authenticated && ($legacyDataAccess || $sellerId !== '')) ? array_values(array_filter(ez_admin_orders(), static fn($order) => ez_dashboard_order_visible($order, $sellerId, $legacyDataAccess))) : [];
+$centralReadWorkspace = $centralOrderWorkspace || $centralDashboardWorkspace;
+$orders = (!$centralReadWorkspace && $authenticated && ($legacyDataAccess || $sellerId !== '')) ? array_values(array_filter(ez_admin_orders(), static fn($order) => ez_dashboard_order_visible($order, $sellerId, $legacyDataAccess))) : [];
 $allOrderCount = count($orders);
 $orderQueues = [
     'needs-processing' => ['label' => 'Needs processing', 'detail' => 'Paid and awaiting acceptance', 'icon' => 'cart'],
@@ -1492,11 +1500,8 @@ $statusTotal = max(1, $metrics['orders']);
 $paidEnd = round(($statusCounts['PAID'] / $statusTotal) * 100, 1);
 $pendingEnd = round((($statusCounts['PAID'] + $statusCounts['PENDING']) / $statusTotal) * 100, 1);
 $creatingEnd = round((($statusCounts['PAID'] + $statusCounts['PENDING'] + $statusCounts['CREATING']) / $statusTotal) * 100, 1);
-$allowedPages = ['dashboard', 'orders', 'returns', 'fulfillment', 'shipping-settings', 'products', 'product-new', 'inventory', 'shop', 'sites', 'customers', 'analytics', 'marketing', 'payments', 'messages', 'wallet', 'settings', 'advanced'];
-$requestedPage = strtolower(trim((string) ($_GET['page'] ?? 'dashboard')));
 if ($requestedPage === 'integrations') { header('Location: ?page=wallet', true, 302); exit; }
 if ($requestedPage === 'reviews') { header('Location: ?page=customers&tab=reviews', true, 302); exit; }
-$page = in_array($requestedPage, $allowedPages, true) ? $requestedPage : 'dashboard';
 $analyticsAvailable = $authenticated && ($authenticationMethod !== 'supabase' || $sellerId !== '');
 $analytics = $page === 'analytics' && $authenticated ? ez_analytics_build($orders, $_GET, $nowJakarta) : null;
 if ($page === 'analytics' && ($_GET['export'] ?? '') === 'csv') {
@@ -1578,6 +1583,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
   <?php if ($page === 'returns'): ?><link rel="stylesheet" href="returns.css?v=<?= (int) filemtime(__DIR__ . '/returns.css') ?>"><?php endif; ?>
   <?php if ($page === 'fulfillment'): ?><link rel="stylesheet" href="fulfillment.css?v=<?= (int) filemtime(__DIR__ . '/fulfillment.css') ?>"><?php endif; ?>
   <?php if ($centralOrderWorkspace): ?><link rel="stylesheet" href="commerce-orders.css?v=<?= (int) filemtime(__DIR__ . '/commerce-orders.css') ?>"><?php endif; ?>
+  <?php if ($centralDashboardWorkspace): ?><link rel="stylesheet" href="commerce-dashboard.css?v=<?= (int) filemtime(__DIR__ . '/commerce-dashboard.css') ?>"><?php endif; ?>
   <?php if ($page === 'shipping-settings'): ?><link rel="stylesheet" href="../vendor/maplibre/maplibre-gl.css"><link rel="stylesheet" href="../customer-addresses.css?v=<?= (int) filemtime(__DIR__ . '/../customer-addresses.css') ?>"><link rel="stylesheet" href="shipping-settings.css?v=<?= (int) filemtime(__DIR__ . '/shipping-settings.css') ?>"><?php endif; ?>
   <?php if ($authenticated && $page === 'shop'): ?><link rel="stylesheet" href="../storefront.css?v=1"><link rel="stylesheet" href="shop.css?v=<?= (int) filemtime(__DIR__ . '/shop.css') ?>"><?php endif; ?>
   <?php if ($authenticated && $page === 'sites'): ?><link rel="stylesheet" href="builder-templates.css?v=<?= (int) filemtime(__DIR__ . '/builder-templates.css') ?>"><?php endif; ?>
@@ -1753,7 +1759,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
       <a class="sidebar-brand" href="../../"><img src="../../assets/ezkart-logo.svg" alt="Ezkart"></a>
       <nav class="primary-nav" aria-label="Main navigation">
         <a class="<?= $page === 'dashboard' ? 'active' : '' ?>" href="?page=dashboard"><?= ez_admin_icon('grid') ?><span>Dashboard</span></a>
-        <a class="<?= in_array($page, ['orders','returns','fulfillment'], true) ? 'active' : '' ?>" href="?page=orders"><?= ez_admin_icon('cart') ?><span>Orders</span><b data-order-total><?= $centralOrderWorkspace ? '—' : $allOrderCount ?></b></a>
+        <a class="<?= in_array($page, ['orders','returns','fulfillment'], true) ? 'active' : '' ?>" href="?page=orders"><?= ez_admin_icon('cart') ?><span>Orders</span><b data-order-total><?= $centralReadWorkspace ? '—' : $allOrderCount ?></b></a>
         <a class="<?= in_array($page, ['products', 'product-new', 'inventory', 'shop'], true) ? 'active' : '' ?>" href="?page=products"><?= ez_admin_icon('box') ?><span>Products</span></a>
         <a class="<?= $page === 'sites' ? 'active' : '' ?>" href="?page=sites"><?= ez_admin_icon('layout') ?><span>Landing Pages</span><b data-site-count>0</b></a>
         <a class="<?= $page === 'customers' ? 'active' : '' ?>" href="?page=customers"><?= ez_admin_icon('users') ?><span>Customers</span></a>
@@ -1788,7 +1794,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
           </form>
         </div>
       </header>
-      <?php if ($page === 'dashboard'): ?>
+      <?php if ($centralDashboardWorkspace): require __DIR__ . '/commerce-dashboard.php'; elseif ($page === 'dashboard'): ?>
       <main class="dashboard page-canvas" id="overview">
         <section class="welcome-row page-heading">
           <div><h1>Dashboard</h1><p>Manage orders and track your store's performance.</p></div>
@@ -1902,6 +1908,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
   <?php if ($page === 'returns'): ?><script src="returns.js?v=<?= (int) filemtime(__DIR__ . '/returns.js') ?>"></script><?php endif; ?>
   <?php if ($page === 'fulfillment'): ?><script src="fulfillment.js?v=<?= (int) filemtime(__DIR__ . '/fulfillment.js') ?>"></script><?php endif; ?>
   <?php if ($centralOrderWorkspace): ?><script src="commerce-orders.js?v=<?= (int) filemtime(__DIR__ . '/commerce-orders.js') ?>"></script><?php endif; ?>
+  <?php if ($centralDashboardWorkspace): ?><script src="commerce-dashboard.js?v=<?= (int) filemtime(__DIR__ . '/commerce-dashboard.js') ?>"></script><?php endif; ?>
   <?php if ($page === 'shipping-settings'): ?><script src="../address-picker.js?v=<?= (int) filemtime(__DIR__ . '/../address-picker.js') ?>"></script><script src="shipping-settings.js?v=<?= (int) filemtime(__DIR__ . '/shipping-settings.js') ?>"></script><?php endif; ?>
   <?php if ($page === 'analytics'): ?><script src="analytics.js?v=<?= (int) filemtime(__DIR__ . '/analytics.js') ?>"></script><?php endif; ?>
   <?php if ($page === 'wallet'): ?><script src="wallet-access.js?v=<?= (int) filemtime(__DIR__ . '/wallet-access.js') ?>"></script><?php endif; ?>
