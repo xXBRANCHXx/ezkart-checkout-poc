@@ -11,6 +11,8 @@ import { validatePublication } from "./landing-publication.js";
 import { merchantStorefront, publicStorefront } from "./storefront.js";
 import { adminProfile } from "./admin-profile.js";
 import { advancedMode, sellerPlan } from "./advanced-mode.js";
+import { authenticateCommerceService, commerceServiceRoute, expireCommerceOrders, reservedStockSql } from "./commerce-orders.js";
+import { claimCommerceJobs, finishCommerceJob } from "./commerce-jobs.js";
 const json = (payload, status = 200, headers = {}) => new Response(JSON.stringify(payload), {
   status,
   headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...headers },
@@ -376,16 +378,16 @@ async function storefrontProducts(url, env) {
   const [productResults, variantResults, mediaResults] = await Promise.all([
     env.DB.batch(productIds.map((id) => env.DB.prepare(`
     SELECT p.id, p.seller_id, p.type, p.title, p.description, p.sku, p.currency,
-      p.price_amount, p.stock_quantity, p.weight_grams, p.metadata_json
+      p.price_amount, p.stock_quantity, p.weight_grams, p.metadata_json, ${reservedStockSql(env)} AS reserved_quantity
     FROM products p
     JOIN sellers s ON s.id = p.seller_id
     WHERE p.id = ? AND p.status = 'active' AND s.status = 'active'
     LIMIT 1
   `).bind(id))),
     env.DB.batch(productIds.map((id) => env.DB.prepare(`
-      SELECT id, product_id, name, options_json, sku, price_amount, stock_quantity,
-        weight_grams, image_upload_id, sort_order
-      FROM product_variants
+      SELECT v.id, v.product_id, v.name, v.options_json, v.sku, v.price_amount, v.stock_quantity,
+        v.weight_grams, v.image_upload_id, v.sort_order, ${reservedStockSql(env, true)} AS reserved_quantity
+      FROM product_variants v
       WHERE product_id = ?
       ORDER BY sort_order
     `).bind(id))),
@@ -432,7 +434,7 @@ async function storefrontProducts(url, env) {
       sku: variant?.sku || row.sku || "",
       currency: row.currency,
       price: Number(variant?.price_amount ?? row.price_amount ?? 0),
-      stock: (variant?.stock_quantity ?? row.stock_quantity) === null ? null : Number(variant?.stock_quantity ?? row.stock_quantity),
+      stock: (variant?.stock_quantity ?? row.stock_quantity) === null ? null : Math.max(0, Number(variant?.stock_quantity ?? row.stock_quantity) - Number(variant?.reserved_quantity ?? row.reserved_quantity ?? 0)),
       weightGrams: (variant?.weight_grams ?? row.weight_grams) === null ? null : Number(variant?.weight_grams ?? row.weight_grams),
       category: cleanText(metadata.category, 80),
       imagePath: imageId ? `/v1/public/media/${encodeURIComponent(imageId)}` : "",
@@ -1352,6 +1354,14 @@ export default {
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
     const url = new URL(request.url);
     try {
+      if (url.pathname.startsWith('/internal/commerce/jobs/') && request.method === 'POST') {
+        const payload = await authenticateCommerceService(request, env);
+        if (url.pathname === '/internal/commerce/jobs/claim') return json({ok: true, jobs: await claimCommerceJobs(env, payload)});
+        const jobMatch = /^\/internal\/commerce\/jobs\/(job_[a-f0-9]{32})\/finish$/.exec(url.pathname);
+        if (jobMatch) return json({ok: true, job: await finishCommerceJob(env, jobMatch[1], payload)});
+        return json({ok: false, error: 'Job route not found'}, 404);
+      }
+      if (url.pathname.startsWith('/internal/commerce/')) return json({ok: true, ...await commerceServiceRoute(request, env)});
       const publicLandingMatch = /^\/v1\/public\/landing-pages\/([a-z0-9-]+)\/([a-z0-9-]+)$/.exec(url.pathname);
       if (request.method === "GET" && publicLandingMatch) return await publicLandingPage(env, publicLandingMatch[1], publicLandingMatch[2]);
       const landingViewMatch = /^\/v1\/landing-pages\/([a-z0-9-]+)\/view$/.exec(url.pathname);
@@ -1465,5 +1475,6 @@ export default {
   },
   async scheduled(_controller, env, context) {
     context.waitUntil(cleanupAbandonedMedia(env));
+    context.waitUntil(expireCommerceOrders(env));
   },
 };

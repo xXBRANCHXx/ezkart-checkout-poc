@@ -1,3 +1,4 @@
+import {reservedStockSql} from './commerce-orders.js';
 const parse = (value) => { try { return JSON.parse(value || "{}"); } catch { return {}; } };
 const imagePath = (id) => id ? `/v1/public/media/${encodeURIComponent(id)}` : "";
 const idPattern = /^[a-zA-Z0-9][a-zA-Z0-9_-]{2,95}$/;
@@ -49,7 +50,7 @@ export async function merchantStorefront(env, seller, payload = null) {
 function publicProduct(row, media, variants) {
   const options = variants.filter(v => !parse(v.options_json).hidden);
   const choices = (variants.length ? options : [row]).map(option => {
-    const stock = Number(option.stock_quantity ?? row.stock_quantity ?? 0);
+    const stock = Math.max(0, Number(option.stock_quantity ?? row.stock_quantity ?? 0) - Number(option.reserved_quantity ?? 0));
     const price = Number(option.price_amount ?? row.price_amount ?? 0);
     const weight = Number(option.weight_grams ?? row.weight_grams ?? 0);
     const variant = option !== row;
@@ -80,9 +81,9 @@ export async function publicStorefront(env, url) {
   const store = await storefrontIdentity(env, row);
   if (appearanceOnly) return { store, products: [] };
   const [products, media, variants] = await env.DB.batch([
-    env.DB.prepare("SELECT * FROM products WHERE seller_id = ? AND status = 'active' AND (? = '' OR id = ?) ORDER BY created_at DESC, id").bind(row.id, productId, productId),
+    env.DB.prepare(`SELECT p.*, ${reservedStockSql(env)} AS reserved_quantity FROM products p WHERE seller_id = ? AND status = 'active' AND (? = '' OR id = ?) ORDER BY created_at DESC, id`).bind(row.id, productId, productId),
     env.DB.prepare("SELECT id, product_id FROM product_media WHERE seller_id = ? ORDER BY sort_order").bind(row.id),
-    env.DB.prepare("SELECT * FROM product_variants WHERE seller_id = ? ORDER BY sort_order").bind(row.id),
+    env.DB.prepare(`SELECT v.*, ${reservedStockSql(env, true)} AS reserved_quantity FROM product_variants v WHERE seller_id = ? ORDER BY sort_order`).bind(row.id),
   ]);
   return { store, products: products.results.map(product => publicProduct(product, media.results.find(m => m.product_id === product.id), variants.results.filter(v => v.product_id === product.id))) };
 }

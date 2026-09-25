@@ -9,6 +9,12 @@ return [
     // Cloudflare Worker rather than a PostgreSQL connection string.
     'deployment_environment' => 'test',
     'cloudflare_api_url' => 'https://api-test.ezkart.id',
+    // Central-commerce cutover must follow docs/commerce-storage.md. Keep legacy
+    // until the PHP checkout/admin migration and reconciliation are complete.
+    'commerce_storage' => 'legacy',
+    // Match the Worker COMMERCE_SERVICE_SECRET; keep at least 32 random bytes.
+    // This key is server-only and separate for every deployment environment.
+    'commerce_service_secret' => '',
     // Supabase is used only to verify Google identity. The publishable/anon
     // key is safe to use for client identification; never paste a service-role
     // key here. Keep the Google client secret in Supabase itself.
