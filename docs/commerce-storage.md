@@ -33,6 +33,15 @@ disabled. See [returns-and-inspection.md](returns-and-inspection.md). Refunds,
 return shipping, financial reconciliation, and paid-order hosted acceptance are
 not completed by this deployment.
 
+Migration 0014 and test Worker version
+`6229f248-31c9-4b57-9af9-8eb3b5210f52` add immutable payment instructions and
+cross-store checkout-key protection. Frontend implementation `228f584` is
+deployed to test. PHP checkout/callback/read adapters and the CLI payment
+dispatcher are prepared and locally tested, but `COMMERCE_STORAGE=d1` remains
+disabled and the dispatcher is not installed as a monitored hosted service.
+See [checkout-payment-recovery.md](checkout-payment-recovery.md) for unresolved
+provider-instruction recovery and the remaining migration/fulfillment gates.
+
 The full completion scope and acceptance gates remain in
 [commerce-completion-plan.md](commerce-completion-plan.md).
 

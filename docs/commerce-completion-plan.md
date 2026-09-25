@@ -297,6 +297,29 @@ financial operations remain necessary. See
 [checkout-payment-recovery.md](checkout-payment-recovery.md) for the contract and
 specific limitations.
 
+Hosted rollout of `228f584`:
+
+- Exported the test database to a private local backup before applying 0014
+  (242,357 bytes; mode 0600). The migration applied successfully to test only.
+- Deployed test Worker `6229f248-31c9-4b57-9af9-8eb3b5210f52`; health reports
+  39 tables and healthy D1/public R2/private R2. Central order creation still
+  returns 503 because the rollout flag is disabled. The hourly schedule has not
+  yet been replaced with the required frequent, monitored expiry service.
+- Hostinger reports `228f584d` completed on `agent/ezkart-workbench`. The four
+  checked frontend assets match their local SHA-256 contents. Hosted checkout
+  config reports sandbox and `durable_checkout:false`.
+- Existing checkout renders at 390px and 1440px with no horizontal overflow.
+  The recovery helper loads, the normal checkout remains usable, an invalid
+  payment link shows an explicit error, and the CLI dispatcher returns 404 over
+  HTTP. A saved central request is refused with 503 while central mode is off,
+  before any payment or file order can be created.
+- Original inventory is unchanged: 2 products, 111 options, 147,510 on-hand and
+  available units, zero reserved, 3 low-stock options. Catalog quantities and
+  revisions retain hash
+  `2c9451612b88e613d4dc10bbba8f4b1305ee5de6395e24bf3a70f56049bebb64`.
+- Hosted acceptance here is deployment/guard/UI smoke evidence. No paid order,
+  provider capture or return was fabricated, and production was not deployed.
+
 ## Atomicity contract
 
 Commerce database changes use D1 transactional batches and database constraints,
