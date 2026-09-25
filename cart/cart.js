@@ -260,10 +260,6 @@
       state.shippingRequired = config.shipping_required;
       byId("get-rates").hidden = !state.shippingRequired;
       byId("delivery-method").hidden = !state.shippingRequired;
-      byId("checkout-title").textContent = state.shippingRequired ? "Delivery & payment" : "Details & payment";
-      byId("checkout-description").textContent = state.shippingRequired
-        ? "Tell us where to send your order, then choose the delivery option that works for you."
-        : "Enter your details to test payment. Delivery is skipped in sandbox checkout.";
       document.querySelector('[data-progress-step="checkout"] b').textContent = state.shippingRequired ? "Delivery" : "Details";
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.error || "The selected products are unavailable.");
@@ -411,6 +407,8 @@
     document.querySelectorAll("[data-progress-step]").forEach((item) => {
       item.classList.toggle("active", item.dataset.progressStep === step);
       item.classList.toggle("complete", step === "checkout" && item.dataset.progressStep === "confirm");
+      if (item.dataset.progressStep === step) item.setAttribute("aria-current", "step");
+      else item.removeAttribute("aria-current");
     });
     byId("to-checkout").hidden = step !== "confirm";
     byId("pay-button").hidden = step !== "checkout";
