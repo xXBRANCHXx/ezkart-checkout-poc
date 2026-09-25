@@ -85,6 +85,13 @@ removing an unintended directory creation from read-only central routing and
 updating one older tracking assertion to include the existing scan status field.
 PHP lint (40 files), JavaScript syntax and whitespace checks pass.
 
+Pushed implementation `5ff91a7` to the workbench branch. Hostinger reports
+`5ff91a72` Completed / Current (25 September, 16:05 as displayed; 37 seconds).
+The authenticated dashboard and orders page load with all 15 legacy orders.
+Checkout configuration is HTTP 200, sandbox, `durable_checkout:false`; the new
+checkout script is served and both private controller PHP files return 404 over
+HTTP. Browser health checks report 47 tables and healthy D1/public/private R2.
+
 The hosted source remains open in legacy mode; this stage does not perform a
 live freeze or alter the existing 15-source D1 rehearsal. Final-set reconciliation,
 durable operational promotion, central merchant/customer reads and callback

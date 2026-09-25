@@ -94,6 +94,14 @@ that disables resume, final-set/ownership reconciliation, central read routing
 and provider-event recovery before an actual handover. Do not manually remove
 the gate file, enable central flags or treat a successful rehearsal as promotion.
 
+Gate deployment acceptance: Hostinger reports implementation `5ff91a72` on
+`agent/ezkart-workbench` Completed / Current at 25 September 16:05 (displayed
+time, 37-second deployment). Authenticated dashboard/orders still show 15 legacy
+orders. Checkout remains sandbox with `durable_checkout:false`, and both
+controller scripts return HTTP 404. The eight local fence tests and ten import
+tests pass. Hosted freeze/resume has deliberately not been executed while the
+operational handover is unfinished.
+
 ## Evidence and ownership
 
 The auditor retains each source JSON string unchanged, its SHA-256 digest and
