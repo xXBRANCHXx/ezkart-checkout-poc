@@ -249,6 +249,7 @@
     if (!response.ok || result.ok !== true) {
       const error = new Error(String(result.error || `Ezkart returned ${response.status}.`));
       error.status = response.status;
+      error.code = typeof result.code === "string" ? result.code : "";
       throw error;
     }
     return decode(result);
@@ -778,11 +779,14 @@
     let draggingImageId = null;
     let draftTimer = 0;
     let restoringDraft = true;
+    let publishingProduct = false;
     const draftQuery = new URLSearchParams(window.location.search);
     const requestedProductId = /^custom-[a-z0-9]+$/i.test(draftQuery.get("product") || "") ? draftQuery.get("product") : "";
     const editingProduct = requestedProductId ? readCatalogProducts({ includeArchived: true }).find((product) => product.id === requestedProductId) || null : null;
+    let baseRevision = editingProduct?.revision ?? null;
     let draftId = draftQuery.get("draft") || (editingProduct ? `edit-${editingProduct.id}` : sessionStorage.getItem(activeProductDraftKey)) || `draft-${globalThis.crypto?.randomUUID?.() || Date.now()}`;
     if (draftQuery.get("new") === "1") draftId = `draft-${globalThis.crypto?.randomUUID?.() || Date.now()}`;
+    if (editingProduct && draftQuery.get("fresh") === "1") draftId = `edit-${editingProduct.id}-${globalThis.crypto?.randomUUID?.() || Date.now()}`;
     sessionStorage.setItem(activeProductDraftKey, draftId);
     const editorQuery = new URLSearchParams({ page: "product-new", draft: draftId });
     if (editingProduct) editorQuery.set("product", editingProduct.id);
@@ -806,6 +810,16 @@
     };
     const setText = (selector, value) => { const target = q(selector); if (target) target.textContent = value; };
     const showError = (message) => { if (!errorTarget) return; errorTarget.textContent = message; errorTarget.hidden = false; errorTarget.scrollIntoView({ behavior: "smooth", block: "center" }); };
+    const showProductConflict = () => {
+      showError("This product changed since these edits started. Your edits stay in this tab so you can compare and reapply them to the latest product. ");
+      if (!errorTarget || !editingProduct) return;
+      const latest = document.createElement("a");
+      latest.href = `?${new URLSearchParams({ page: "product-new", product: editingProduct.id, fresh: "1" })}`;
+      latest.target = "_blank"; latest.rel = "noopener";
+      latest.textContent = "Open latest product in a new tab";
+      latest.dataset.productConflictLatest = "";
+      errorTarget.append(latest);
+    };
     const clearError = () => { if (!errorTarget) return; errorTarget.hidden = true; errorTarget.textContent = ""; };
     const rawOptionValues = (input) => String(input?.value || "").split(",").map((value) => value.trim()).filter(Boolean).filter((value, index, values) => values.indexOf(value) === index);
     const optionValues = (input) => rawOptionValues(input).slice(0, 30);
@@ -1098,13 +1112,14 @@
     };
 
     const markDraftChanged = () => {
-      if (restoringDraft) return;
+      if (restoringDraft || publishingProduct) return;
       if (draftStatus) { draftStatus.classList.add("is-saving"); draftStatus.innerHTML = "<i></i> Saving draft…"; }
       window.clearTimeout(draftTimer);
       draftTimer = window.setTimeout(() => saveDraft(false), 550);
     };
     const draftSnapshot = () => ({
       id: draftId,
+      baseRevision,
       productId: editingProduct && cloudCatalogProducts.some((product) => product.id === editingProduct.id) ? editingProduct.id : null,
       name: String(productCreateForm.elements.name?.value || "").trim(),
       updatedAt: new Date().toISOString(),
@@ -1603,6 +1618,7 @@
 
     const productSnapshot = (product) => ({
       id: draftId,
+      baseRevision: product.revision ?? null,
       name: product.name || "",
       fields: {
         type: product.type || "physical", category: product.category || "", description: product.description || "",
@@ -1627,6 +1643,9 @@
       previewDevice: "desktop",
     });
     const restoreSnapshot = (snapshot, label) => {
+      // A legacy draft without a revision must be reviewed against a fresh copy.
+      // Giving it today's revision would allow its old stock count to erase sales.
+      baseRevision = Number.isSafeInteger(snapshot.baseRevision) ? snapshot.baseRevision : null;
       productCreateForm.elements.name.value = snapshot.name || "";
       Object.entries(snapshot.fields || {}).forEach(([name, value]) => { if (productCreateForm.elements[name]) productCreateForm.elements[name].value = value; });
       selectedImages = (snapshot.images || []).filter((item) => item.data).map((item) => ({ id: item.id || `image-${Date.now()}-${Math.random()}`, cloudId: item.cloudId || null, data: item.data, url: item.data }));
@@ -1720,6 +1739,7 @@
     productCreateForm.elements.unit?.addEventListener("change", syncBaseBillingLimit);
     productCreateForm.addEventListener("submit", async (event) => {
       event.preventDefault(); clearError();
+      if (publishingProduct) return;
       if (!productCreateForm.reportValidity()) return;
       if (!String(categoryInput?.value || "").trim()) { showError("Choose the product category that best matches what you are selling."); openCategoryDialog(); return; }
       const type = currentType(); const minimum = type === "physical" ? 3 : 1;
@@ -1733,12 +1753,20 @@
       const firstPlan = type === "subscription" && variantToggle.checked ? sellableVariants[0] : null;
       const selectedBillingUnit = String(firstPlan?.billingUnit || productCreateForm.elements.unit.value || "month");
       const interval = Math.max(1, Math.min(selectedBillingUnit === "year" ? 10 : 120, Math.round(Number(firstPlan?.billingInterval ?? productCreateForm.elements.interval?.value) || 1)));
+      publishingProduct = true;
+      window.clearTimeout(draftTimer);
+      const editorControls = [...productCreateForm.querySelectorAll("input:not(:disabled), select:not(:disabled), textarea:not(:disabled), button:not(:disabled)")].filter(control => ![...submitButtons].includes(control));
+      editorControls.forEach(control => { control.disabled = true; });
+      if (saveDraftButton) saveDraftButton.disabled = true;
       submitButtons.forEach((button) => { button.disabled = true; button.dataset.originalText = button.textContent; button.textContent = editingProduct ? "Publishing changes…" : "Creating product…"; });
       try {
+        // Finish an in-flight autosave before publishing/deleting its draft.
+        await draftSavePromise;
         await ensureEditorMediaCloud();
         const images = await Promise.all(selectedImages.map(imageData));
         const suffix = globalThis.crypto?.randomUUID?.().replace(/-/g, "").slice(0, 10) || String(Date.now());
         const product = {
+          revision: baseRevision,
           id: editingProduct?.id || `custom-${suffix}`, sku: editingProduct?.sku || `EZK-${type.slice(0, 3).toUpperCase()}-${suffix.toUpperCase()}`, name: String(productCreateForm.elements.name.value).trim(), category: String(productCreateForm.elements.category.value).trim(), categoryKey: currentCategoryEntry() ? categoryKey(productCreateForm.elements.category.value) : "", description: String(productCreateForm.elements.description.value).trim(), type,
           price: variantToggle.checked ? Math.min(...sellableVariants.map((variant) => variant.price)) : Math.round(Number(productCreateForm.elements.price.value) || 0), images, mediaIds: selectedImages.map((image) => image.cloudId), image: images[0],
           ...(type === "physical" ? { stock: variantToggle.checked ? sellableVariants.reduce((total, variant) => total + variant.stock, 0) : Math.max(0, Math.round(Number(productCreateForm.elements.stock.value) || 0)), weightGrams: variantToggle.checked ? Math.max(...sellableVariants.map((variant) => variant.weightGrams)) : Math.max(1, Math.round(Number(productCreateForm.elements.weight.value) || 0)) } : {}),
@@ -1759,11 +1787,20 @@
         }
         removeLocalDraft(draftId); sessionStorage.removeItem(activeProductDraftKey);
         window.opener?.postMessage({ type: editingProduct ? "ezkart:catalog-product-updated" : "ezkart:catalog-product-created", productId: product.id }, window.location.origin); window.location.href = `?page=products&${editingProduct ? "updated" : "created"}=1`;
-      } catch (error) { showError(error instanceof Error ? error.message : "The product could not be created."); }
-      finally { submitButtons.forEach((button) => { button.disabled = false; button.textContent = button.dataset.originalText || (editingProduct ? "Publish changes" : "Create product"); }); }
+      } catch (error) {
+        if (error?.code === "catalog_revision_conflict") showProductConflict();
+        else showError(error instanceof Error ? error.message : "The product could not be created.");
+      }
+      finally {
+        publishingProduct = false;
+        editorControls.forEach(control => { control.disabled = false; });
+        if (saveDraftButton) saveDraftButton.disabled = false;
+        submitButtons.forEach((button) => { button.disabled = false; button.textContent = button.dataset.originalText || (editingProduct ? "Publish changes" : "Create product"); });
+      }
     });
 
     restoreDraft(); syncVariantMode(); syncType(); syncProductTypePicker(); syncCategoryField(); syncPreviewDevice(); renderImages(); restoringDraft = false; updatePreview();
+    if (cloudEnabled && editingProduct && (baseRevision === null || baseRevision !== editingProduct.revision)) showProductConflict();
   }
 
   const setupCreatorProducts = (form) => {

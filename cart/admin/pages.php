@@ -148,7 +148,7 @@ function ez_orders_table(array $rows, string $tableId, string $csrfToken, string
           </div>
         </section>
 
-        <p class="product-editor-error" data-product-create-error hidden></p>
+        <p class="product-editor-error" data-product-create-error role="alert" hidden></p>
         <footer class="product-editor-footer"><a href="?page=products" data-ui-icon="x">Cancel</a><button data-ui-icon="<?= $editingProduct ? 'globe' : 'plus' ?>" class="action-button primary" type="submit"><?= $editingProduct ? 'Publish changes' : 'Create product' ?></button></footer>
       </div>
 

@@ -16,7 +16,7 @@ test('Advanced persists per store, enforces permissions, and changes page and pr
   }));
   t.after(()=>mf.dispose());
   const db=await mf.getD1Database('DB'), bucket=await mf.getR2Bucket('PUBLIC_ASSETS');
-  for(const migration of ['0001_core.sql','0002_cloud_catalog.sql','0005_product_limit.sql','0007_advanced_product_limit.sql','0008_seller_page_addresses.sql']) {
+  for(const migration of ['0001_core.sql','0002_cloud_catalog.sql','0003_subscription_plan_billing.sql','0004_yearly_subscription_plans.sql','0005_product_limit.sql','0007_advanced_product_limit.sql','0008_seller_page_addresses.sql','0009_commerce_orders.sql','0010_catalog_revisions.sql']) {
     const sql=await readFile(new URL('../migrations/'+migration,import.meta.url),'utf8');
     const clean=sql.replace(/--[^\n]*/g,'');
     const triggers=[...clean.matchAll(/CREATE TRIGGER[\s\S]*?END;/g)].map(m=>m[0]);
@@ -81,7 +81,8 @@ test('Advanced persists per store, enforces permissions, and changes page and pr
   assert.equal((await call('landing-pages/page-0',{...page,name:'Edited at limit'})).status,200);
   assert.equal((await call('landing-pages/another',page)).status,409);
   assert.equal((await call('products/another',{})).status,409);
-  assert.equal((await call('products/product_10',{...product,name:'Edited at limit'})).status,200,'Existing products stay editable at the limit');
+  const revision = (await call('catalog')).products.find(item => item.id === 'product_10').revision;
+  assert.equal((await call('products/product_10',{...product,revision,name:'Edited at limit'})).status,200,'Existing products stay editable at the limit');
   await db.prepare("INSERT INTO products(id,seller_id,type,title,price_amount,created_at,updated_at) VALUES ('product_0','seller_alice','digital','Updated',100000,'now','now') ON CONFLICT(id) DO UPDATE SET title=excluded.title").run();
   assert.equal((await db.prepare("SELECT COUNT(*) AS count FROM products WHERE seller_id='seller_alice'").first()).count,50);
   assert.equal((await call('landing-pages')).pages.length,24);

@@ -11,19 +11,33 @@ const customer = {name: 'Order Tester', email: 'orders@example.test', phone: '08
 const digest = value => createHash('sha256').update(value).digest('hex');
 
 async function setup(t) {
+  const key = await crypto.subtle.generateKey({name: 'ECDSA', namedCurve: 'P-256'}, true, ['sign', 'verify']);
+  const publicKey = {...await crypto.subtle.exportKey('jwk', key.publicKey), kid: 'catalog-fixture', alg: 'ES256'};
   const bundle = await build({entryPoints: [new URL('../src/index.js', import.meta.url).pathname], bundle: true, write: false, format: 'esm', platform: 'neutral'});
   const mf = new Miniflare(convertV4MiniflareOptions({modules: true, script: bundle.outputFiles[0].text,
     compatibilityDate: '2026-08-11', d1Databases: ['DB'], r2Buckets: ['PUBLIC_ASSETS', 'PRIVATE_ASSETS'],
-    bindings: {APP_ENVIRONMENT: 'test', COMMERCE_STORAGE: 'd1', COMMERCE_SERVICE_SECRET: secret}}));
+    bindings: {APP_ENVIRONMENT: 'test', COMMERCE_STORAGE: 'd1', COMMERCE_SERVICE_SECRET: secret, SUPABASE_URL: 'https://auth.fixture.test'},
+    outboundService: async () => Response.json({keys: [publicKey]})}));
   t.after(() => mf.dispose());
   const db = await mf.getD1Database('DB');
-  for (const name of ['0001_core.sql', '0002_cloud_catalog.sql', '0009_commerce_orders.sql']) {
+  for (const name of ['0001_core.sql', '0002_cloud_catalog.sql', '0003_subscription_plan_billing.sql', '0004_yearly_subscription_plans.sql', '0009_commerce_orders.sql', '0010_catalog_revisions.sql']) {
     const source = (await readFile(new URL('../migrations/' + name, import.meta.url), 'utf8')).replace(/--[^\n]*/g, '');
     const triggers = [...source.matchAll(/CREATE TRIGGER[\s\S]*?END;/g)].map(match => match[0]);
     for (const statement of [...source.replace(/CREATE TRIGGER[\s\S]*?END;/g, '').split(';').filter(value => value.trim()), ...triggers]) await db.prepare(statement).run();
   }
   for (const seller of ['alice', 'bob']) {
     await db.prepare("INSERT INTO sellers(id,slug,name,created_at,updated_at) VALUES (?,?,?,'now','now')").bind('seller_' + seller, seller, seller).run();
+    await db.prepare("INSERT INTO app_users(id,auth_user_id,created_at,updated_at) VALUES (?,?,'now','now')").bind(seller, seller).run();
+    await db.prepare("INSERT INTO seller_memberships(seller_id,auth_user_id,role,created_at) VALUES (?,?,'owner','now')").bind('seller_' + seller, seller).run();
+  }
+  async function merchant(path, input, {seller = 'alice', method = input === undefined ? 'GET' : 'PUT'} = {}) {
+    const head = Buffer.from(JSON.stringify({alg: 'ES256', kid: publicKey.kid})).toString('base64url');
+    const claims = Buffer.from(JSON.stringify({iss: 'https://auth.fixture.test/auth/v1', sub: seller, aud: 'authenticated', exp: Math.floor(Date.now() / 1000) + 3600})).toString('base64url');
+    const sig = await crypto.subtle.sign({name: 'ECDSA', hash: 'SHA-256'}, key.privateKey, new TextEncoder().encode(`${head}.${claims}`));
+    const response = await mf.dispatchFetch('https://api.fixture.test' + path, {method,
+      headers: {authorization: `Bearer ${head}.${claims}.${Buffer.from(sig).toString('base64url')}`, 'content-type': 'application/json'},
+      ...(input !== undefined ? {body: JSON.stringify(input)} : {})});
+    return {status: response.status, ...await response.json()};
   }
   async function product(id, stock = 10, seller = 'seller_alice', price = 20000) {
     await db.prepare("INSERT INTO products(id,seller_id,type,status,title,sku,price_amount,stock_quantity,weight_grams,created_at,updated_at) VALUES (?,?,'physical','active',?,?,?, ?,100,'now','now')")
@@ -51,8 +65,101 @@ async function setup(t) {
   const event = (order, type, data = {}, key = randomBytes(16).toString('hex')) => call(`/internal/commerce/orders/${order.id}/events`, {environment: 'sandbox', sellerId: order.sellerId, eventKey: key, type, data});
   const paid = (order, data = {}, key) => event(order, 'payment.succeeded', {provider: 'doku', verified: true, amount: order.total, currency: 'IDR', reference: 'payment-' + order.id, ...data}, key);
   const stock = async (id = 'tea') => (await db.prepare('SELECT stock_quantity FROM products WHERE id = ?').bind(id).first()).stock_quantity;
-  return {mf, db, headers, call, product, input, create, event, paid, stock};
+  return {mf, db, headers, call, product, input, create, event, paid, stock, merchant};
 }
+
+async function editorFixture(f, id = 'tea') {
+  const imageUploadIds = [];
+  for (let n = 1; n <= 3; n++) {
+    const mediaId = `media_${id}_${n}`;
+    imageUploadIds.push(mediaId);
+    await f.db.prepare("INSERT INTO media_uploads(id,seller_id,r2_key,mime_type,size_bytes,created_by_auth_user_id,created_at) VALUES (?,'seller_alice',?,'image/png',1,'alice','now')").bind(mediaId, mediaId).run();
+  }
+  const product = (await f.merchant('/v1/catalog')).products.find(product => product.id === id);
+  return {...product, imageUploadIds};
+}
+
+test('merchant saves reject missing and stale revisions and cannot overwrite stock sold during editing', async t => {
+  const f = await setup(t), original = await editorFixture(f);
+  assert.equal((await f.merchant('/v1/products/tea', {...original, revision: null})).status, 409);
+  const order = (await f.create(f.input())).order;
+  assert.equal((await f.paid(order)).status, 200);
+  const rejected = await f.merchant('/v1/products/tea', {...original, name: 'Old draft'});
+  assert.equal(rejected.status, 409); assert.equal(rejected.code, 'catalog_revision_conflict');
+  assert.equal(await f.stock(), 8);
+  const latest = (await f.merchant('/v1/catalog')).products.find(product => product.id === 'tea');
+  assert(latest.revision > original.revision);
+  const outcomes = await Promise.all(['Editor one', 'Editor two'].map(name => f.merchant('/v1/products/tea', {...latest, imageUploadIds: original.imageUploadIds, name})));
+  assert.deepEqual(outcomes.map(result => result.status).sort(), [200, 409]);
+  assert.equal((await f.db.prepare("SELECT COUNT(*) AS n FROM seller_events WHERE event_type='product.updated'").first()).n, 1, 'A conflicting save leaves no partial audit or product changes');
+  assert.equal(await f.stock(), 8);
+  await assert.rejects(f.db.batch([
+    f.db.prepare("INSERT INTO seller_events(id,seller_id,event_type,entity_type,entity_id,payload_json,created_at) VALUES ('stale','seller_alice','product.updated','product','tea',?,'now')").bind(JSON.stringify({expectedRevision: original.revision})),
+    f.db.prepare("UPDATE products SET stock_quantity=999 WHERE id='tea'"),
+  ]), /catalog_revision_conflict/, 'The database guards races after the preflight read');
+  assert.equal(await f.stock(), 8);
+  assert.equal((await f.merchant('/v1/products/tea', undefined, {method: 'DELETE'})).status, 409, 'Order history is archived rather than deleted');
+  assert.equal((await f.merchant('/v1/products/tea/status', {status: 'archived'}, {method: 'PATCH'})).status, 200);
+});
+
+test('editing, reordering and swapping variant SKUs preserves holds and rolls back invalid changes', async t => {
+  const f = await setup(t), original = await editorFixture(f);
+  const variants = ['green', 'black'].map(id => ({id, name: id, sku: id.toUpperCase(), price: 20000, stock: 4, weightGrams: 100, options: [{option: 'Tea', value: id}]}));
+  let result = await f.merchant('/v1/products/tea', {...original, variants});
+  assert.equal(result.status, 200, result.error);
+  let editable = {...result.product, imageUploadIds: original.imageUploadIds};
+  const initial = await f.db.prepare("SELECT id,created_at,sort_order FROM product_variants WHERE product_id='tea' ORDER BY id").all();
+  const order = (await f.create(f.input({items: [{productId: 'tea', variantId: 'green', quantity: 3, expectedPrice: 20000}]}))).order;
+  assert(order);
+  const reordered = [{...variants[1], sku: 'GREEN'}, {...variants[0], sku: 'BLACK'}];
+  result = await f.merchant('/v1/products/tea', {...editable, name: 'Freshly renamed tea', variants: reordered});
+  assert.equal(result.status, 200, result.error);
+  assert.deepEqual(result.product.variants.map(variant => variant.id), ['black', 'green']);
+  assert.deepEqual((await f.db.prepare("SELECT id,created_at,sort_order FROM product_variants WHERE product_id='tea' ORDER BY id").all()).results, initial.results);
+  assert.equal((await f.db.prepare("SELECT state FROM inventory_reservations WHERE order_id=?").bind(order.id).first()).state, 'reserved');
+  const publicProduct = await f.mf.dispatchFetch('https://api.fixture.test/v1/storefront/products?ids=tea');
+  assert.equal((await publicProduct.json()).products[0].variantId, 'black', 'Default checkout follows merchant display order');
+  editable = {...result.product, imageUploadIds: original.imageUploadIds};
+  for (const changes of [
+    {variants: [reordered[0]]},
+    {variants: reordered.map(variant => ({...variant, stock: 1}))},
+    {type: 'digital'},
+  ]) {
+    const invalid = await f.merchant('/v1/products/tea', {...editable, name: 'Should roll back', ...changes});
+    assert.equal(invalid.status, 409, invalid.error);
+    const after = (await f.merchant('/v1/catalog')).products.find(product => product.id === 'tea');
+    assert.equal(after.name, editable.name); assert.equal(after.revision, editable.revision);
+    assert.deepEqual(after.variants, editable.variants);
+  }
+  assert.equal((await f.paid(order)).status, 200);
+  assert.equal((await f.db.prepare("SELECT stock_quantity FROM product_variants WHERE id='green'").first()).stock_quantity, 1);
+  assert.equal((await f.merchant('/v1/products/tea', editable)).status, 409, 'Variant sales invalidate parent editor revisions');
+  const current = (await f.merchant('/v1/catalog')).products.find(product => product.id === 'tea');
+  result = await f.merchant('/v1/products/tea', {...current, imageUploadIds: original.imageUploadIds, variants: [current.variants[1], {id: 'white', name: 'white', sku: 'WHITE', price: 20000, stock: 2, weightGrams: 100}]});
+  assert.equal(result.status, 200, result.error);
+  assert.deepEqual(result.product.variants.map(variant => variant.id), ['green', 'white'], 'Removed unreserved slots can be reused without changing retained identities');
+});
+
+test('catalog writes enforce membership, variant ownership and whole quantities', async t => {
+  const f = await setup(t), original = await editorFixture(f);
+  const foreign = {id: 'foreign', name: 'foreign', sku: 'FOREIGN', price: 20000, stock: 2, weightGrams: 100};
+  await f.db.prepare("INSERT INTO product_variants(id,seller_id,product_id,name,sku,price_amount,stock_quantity,weight_grams,sort_order,created_at,updated_at) VALUES ('foreign','seller_bob','private','foreign','FOREIGN',20000,2,100,1,'now','now')").run();
+  assert.equal((await f.merchant('/v1/products/tea', original, {seller: 'bob'})).status, 404);
+  assert.equal((await f.merchant('/v1/products/tea', {...original, variants: [foreign]})).status, 409);
+  for (const changes of [{stock: -1}, {stock: 1.5}, {stock: 'Infinity'}, {price: 2.5}, {weightGrams: 0}, {variants: [{...foreign, id: 'new', stock: 2.5}]}]) {
+    assert.equal((await f.merchant('/v1/products/tea', {...original, ...changes})).status, 400);
+  }
+  assert.equal((await f.merchant('/v1/products/tea', {...original, variants: [{...foreign, id: 'new'}, {...foreign, id: 'new', sku: 'NEW'}]})).status, 400);
+  await f.db.prepare("UPDATE seller_memberships SET role='viewer' WHERE auth_user_id='alice'").run();
+  for (const [path, input, method] of [
+    ['/v1/products/tea', original, 'PUT'], ['/v1/products/tea', undefined, 'DELETE'],
+    ['/v1/products/tea/status', {status: 'archived'}, 'PATCH'], ['/v1/products/tea/duplicate', {}, 'POST'],
+    ['/v1/drafts/draft-one', {snapshot: {}}, 'PUT'], ['/v1/drafts/draft-one', undefined, 'DELETE'],
+    ['/v1/media', {dataUrl: 'data:image/png;base64,eA=='}, 'POST'],
+  ]) assert.equal((await f.merchant(path, input, {method})).status, 403, path);
+  assert.equal((await f.merchant('/v1/catalog')).status, 200);
+  assert.equal(await f.stock(), 10);
+});
 
 test('commerce service authenticates body, target, time and deployment before accessing private orders', async t => {
   const f = await setup(t);

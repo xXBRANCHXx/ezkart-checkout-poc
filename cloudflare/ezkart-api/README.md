@@ -59,7 +59,10 @@ access token, or refresh token in this repository.
   a 24-hour grace period, covering closed tabs and interrupted requests.
 - `GET /v1/media/:id` streams an image only after authenticating its seller.
 - `PUT|DELETE /v1/products/:id` stores or removes a seller-scoped product,
-  gallery, and variant set in D1.
+  gallery, and variant set in D1. Existing-product saves must send the `revision`
+  returned by the catalog. Apply `0010_catalog_revisions.sql` with the matching
+  editor/Worker; stale edits return 409. Variant identities and pending stock
+  reservations survive edits; products with order history must be archived.
 - `PUT|DELETE /v1/drafts/:id` stores or removes a seller-scoped editor draft.
 - `GET /v1/landing-pages` lists the active seller's R2-backed page projects.
   `GET|PUT|DELETE /v1/landing-pages/:id` loads, saves, or removes one private

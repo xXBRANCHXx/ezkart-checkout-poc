@@ -25,7 +25,7 @@ function curl_exec(object $handle): string {
         }
         if ($path === '/v1/catalog') {
             if (!empty($shop['catalogUnavailable'])) { $handle->status = 503; return '{"ok":false}'; }
-            return json_encode(['ok' => true, 'products' => $shop['catalog'], 'drafts' => []]);
+            return json_encode(['ok' => true, 'products' => $shop['catalog'], 'drafts' => $shop['drafts'] ?? []]);
         }
         if ($path === '/v1/storefront') {
             if (($handle->options[CURLOPT_CUSTOMREQUEST] ?? '') === 'PUT') {

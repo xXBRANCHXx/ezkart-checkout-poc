@@ -256,11 +256,23 @@ async function sellerContext(request, env) {
 }
 
 const mediaPath = (id) => `/v1/media/${encodeURIComponent(id)}`;
+const variantPositionSql = "COALESCE(json_extract(options_json, '$.position'), sort_order), id";
+const assertCatalogEditor = (seller) => {
+  if (seller.role === "viewer") throw new Response("You do not have permission to change this catalog", { status: 403 });
+};
+const catalogInteger = (value, label, minimum = 0, maximum = 1000000000) => {
+  const number = Number(value);
+  if (!["number", "string"].includes(typeof value) || String(value).trim() === "" || !Number.isSafeInteger(number) || number < minimum || number > maximum) {
+    throw new Response(`${label} must be a whole number from ${minimum} to ${maximum}`, { status: 400 });
+  }
+  return number;
+};
 
 function shapeProduct(row, media = [], variants = [], performance = {}) {
   const metadata = parseJson(row.metadata_json, {});
   return {
     id: row.id,
+    revision: row.revision ?? null,
     sku: row.sku || "",
     name: row.title,
     category: cleanText(metadata.category, 80),
@@ -320,7 +332,7 @@ async function catalog(request, env) {
       WHERE pm.seller_id = ?
       ORDER BY pm.product_id, pm.sort_order
     `).bind(seller.id),
-    env.DB.prepare("SELECT * FROM product_variants WHERE seller_id = ? ORDER BY product_id, sort_order").bind(seller.id),
+    env.DB.prepare(`SELECT * FROM product_variants WHERE seller_id = ? ORDER BY product_id, ${variantPositionSql}`).bind(seller.id),
     env.DB.prepare("SELECT id, product_id, title, snapshot_json, created_at, updated_at FROM product_drafts WHERE seller_id = ? ORDER BY updated_at DESC").bind(seller.id),
     env.DB.prepare(`
       SELECT oi.product_id, SUM(oi.quantity) AS sold_count
@@ -389,7 +401,7 @@ async function storefrontProducts(url, env) {
         v.weight_grams, v.image_upload_id, v.sort_order, ${reservedStockSql(env, true)} AS reserved_quantity
       FROM product_variants v
       WHERE product_id = ?
-      ORDER BY sort_order
+      ORDER BY ${variantPositionSql}
     `).bind(id))),
     env.DB.batch(productIds.map((id) => env.DB.prepare(`
     SELECT id, product_id, alt_text
@@ -824,6 +836,7 @@ function decodeImageDataUrl(value) {
 
 async function uploadMedia(request, env) {
   const { seller, authUserId } = await sellerContext(request, env);
+  assertCatalogEditor(seller);
   const payload = await requestJson(request, 2900000);
   const image = decodeImageDataUrl(payload.dataUrl);
   const id = `media_${crypto.randomUUID().replaceAll("-", "")}`;
@@ -1042,10 +1055,14 @@ function normalizedOptions(value) {
 
 async function saveProduct(request, env, rawId) {
   const { seller, authUserId } = await sellerContext(request, env);
+  assertCatalogEditor(seller);
   const payload = await requestJson(request, 500000);
   const id = cleanId(rawId || payload.id, "Product ID");
-  const existing = await env.DB.prepare("SELECT seller_id, created_at FROM products WHERE id = ?").bind(id).first();
+  const existing = await env.DB.prepare("SELECT * FROM products WHERE id = ?").bind(id).first();
   if (existing && existing.seller_id !== seller.id) throw new Response("Product not found", { status: 404 });
+  if (existing && (!Number.isSafeInteger(payload.revision) || payload.revision !== existing.revision)) {
+    throw new Response("This product changed since these edits started. Load the latest product and review your changes before publishing.", { status: 409, headers: { "x-ezkart-error-code": "catalog_revision_conflict" } });
+  }
   if (!existing) await assertProductCapacity(env, seller);
   const type = ["physical", "digital", "subscription"].includes(payload.type) ? payload.type : "physical";
   const title = cleanText(payload.name, 160);
@@ -1067,9 +1084,9 @@ async function saveProduct(request, env, rawId) {
     name: cleanText(variant.name, 120) || `${type === "subscription" ? "Plan" : "Variant"} ${index + 1}`,
     options: Array.isArray(variant.options) ? variant.options.slice(0, 3).map((option) => ({ option: cleanText(option?.option, 20), value: cleanText(option?.value, 60) })) : [],
     sku: cleanText(variant.sku, 80),
-    price: Math.max(0, Math.round(Number(variant.price) || 0)),
-    stock: Math.max(0, Math.round(Number(variant.stock) || 0)),
-    weightGrams: Math.max(0, Math.round(Number(variant.weightGrams) || 0)),
+    price: catalogInteger(variant.price, "Variant price", 1000),
+    stock: type === "physical" ? catalogInteger(variant.stock, "Variant stock") : 0,
+    weightGrams: type === "physical" ? catalogInteger(variant.weightGrams, "Variant weight", 1, 1000000) : 0,
     billingUnit: type === "subscription" && ["month", "year"].includes(variant.billingUnit) ? variant.billingUnit : null,
     billingInterval: type === "subscription" ? Math.max(1, Math.min(variant.billingUnit === "year" ? 10 : 120, Math.round(Number(variant.billingInterval) || 1))) : null,
     hidden: Boolean(variant.hidden),
@@ -1095,14 +1112,33 @@ async function saveProduct(request, env, rawId) {
     throw new Response(type === "subscription" ? "Every plan needs a valid price, SKU, and billing period" : "Every variant needs a valid price, SKU, and shipping weight", { status: 400 });
   }
   if (new Set(variants.map((variant) => variant.sku.toLowerCase())).size !== variants.length) throw new Response(type === "subscription" ? "Plan SKUs must be unique" : "Variant SKUs must be unique", { status: 400 });
+  if (new Set(variants.map((variant) => variant.id)).size !== variants.length) throw new Response("Variant IDs must be unique", { status: 400 });
+  const storedVariants = existing ? (await env.DB.prepare("SELECT id, sort_order FROM product_variants WHERE seller_id = ? AND product_id = ?").bind(seller.id, id).all()).results : [];
+  const retainedIds = new Set(variants.map((variant) => variant.id));
+  const retainedSlots = new Map(storedVariants.filter((variant) => retainedIds.has(variant.id)).map((variant) => [variant.id, variant.sort_order]));
+  const usedSlots = new Set(retainedSlots.values());
+  // sort_order is a stable unique slot. Display order is stored separately so
+  // reordering variants never deletes a held identity or violates slot uniqueness.
+  for (const variant of variants) {
+    variant.slot = retainedSlots.get(variant.id);
+    if (variant.slot === undefined) {
+      for (let slot = 1; slot <= 100; slot++) if (!usedSlots.has(slot)) { variant.slot = slot; usedSlots.add(slot); break; }
+    }
+  }
+  if (variants.length) {
+    const owners = await env.DB.batch(variants.map((variant) => env.DB.prepare("SELECT seller_id, product_id FROM product_variants WHERE id = ?").bind(variant.id)));
+    if (owners.some((result) => result.results.some((owner) => owner.seller_id !== seller.id || owner.product_id !== id))) {
+      throw new Response("A variant does not belong to this product", { status: 409 });
+    }
+  }
   const requestedMediaIds = [...imageIds, ...rawVariants.map((variant) => variant?.imageUploadId).filter(Boolean)];
   const uploadMap = await ownedUploads(env, seller.id, [...imageIds, ...variants.map((variant) => variant.imageUploadId)]);
   const replacedMediaIds = existing ? await productMediaIds(env, seller.id, id) : [];
   const sellableVariants = variants.filter((variant) => !variant.hidden);
   if (variants.length && !sellableVariants.length) throw new Response(type === "subscription" ? "At least one plan must be visible" : "At least one variant must be visible", { status: 400 });
-  const basePrice = sellableVariants.length ? Math.min(...sellableVariants.map((variant) => variant.price)) : Math.max(0, Math.round(Number(payload.price) || 0));
-  const stock = type === "physical" ? (variants.length ? sellableVariants.reduce((sum, variant) => sum + variant.stock, 0) : Math.max(0, Math.round(Number(payload.stock) || 0))) : null;
-  const weight = type === "physical" ? (sellableVariants.length ? Math.max(...sellableVariants.map((variant) => variant.weightGrams)) : Math.max(1, Math.round(Number(payload.weightGrams) || 0))) : null;
+  const basePrice = sellableVariants.length ? Math.min(...sellableVariants.map((variant) => variant.price)) : catalogInteger(payload.price, "Price", 1000);
+  const stock = type === "physical" ? (variants.length ? sellableVariants.reduce((sum, variant) => sum + variant.stock, 0) : catalogInteger(payload.stock, "Stock")) : null;
+  const weight = type === "physical" ? (sellableVariants.length ? Math.max(...sellableVariants.map((variant) => variant.weightGrams)) : catalogInteger(payload.weightGrams, "Shipping weight", 1, 1000000)) : null;
   const firstPlan = type === "subscription" && sellableVariants.length ? sellableVariants[0] : null;
   const displayBillingUnit = type === "subscription" ? (firstPlan?.billingUnit || (["month", "year"].includes(payload.subscription?.unit) ? payload.subscription.unit : "month")) : null;
   const displayBillingInterval = type === "subscription" ? (firstPlan?.billingInterval || Math.max(1, Math.min(displayBillingUnit === "year" ? 10 : 120, Math.round(Number(payload.subscription?.interval) || 1)))) : null;
@@ -1113,17 +1149,28 @@ async function saveProduct(request, env, rawId) {
   const createdAt = existing?.created_at || now;
   const statements = [
     env.DB.prepare(`
+      INSERT INTO seller_events (id, seller_id, actor_auth_user_id, event_type, entity_type, entity_id, payload_json, created_at)
+      VALUES (?, ?, ?, ?, 'product', ?, ?, ?)
+    `).bind(`event_${crypto.randomUUID()}`, seller.id, authUserId, existing ? "product.updated" : "product.created", id,
+      JSON.stringify({ title, variants: variants.length, images: imageIds.length, expectedRevision: existing ? payload.revision : null }), now),
+    env.DB.prepare(`
       INSERT INTO products (id, seller_id, type, status, title, description, sku, currency, price_amount, stock_quantity, weight_grams, billing_interval, billing_interval_count, digital_filename, metadata_json, created_at, updated_at)
       VALUES (?, ?, ?, 'active', ?, ?, ?, 'IDR', ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(id) DO UPDATE SET type = excluded.type, status = 'active', title = excluded.title,
+      ${existing ? `ON CONFLICT(id) DO UPDATE SET type = excluded.type, status = 'active', title = excluded.title,
         description = excluded.description, sku = excluded.sku, price_amount = excluded.price_amount,
         stock_quantity = excluded.stock_quantity, weight_grams = excluded.weight_grams,
         billing_interval = excluded.billing_interval, billing_interval_count = excluded.billing_interval_count,
-        digital_filename = excluded.digital_filename, metadata_json = excluded.metadata_json, updated_at = excluded.updated_at
+        digital_filename = excluded.digital_filename, metadata_json = excluded.metadata_json, updated_at = excluded.updated_at` : ""}
     `).bind(id, seller.id, type, title, description, sku, basePrice, stock, weight, billingUnit, billingInterval, digitalFilename, JSON.stringify({ category: cleanText(payload.category, 80), categoryKey: cleanText(payload.categoryKey, 120), options, ...(type === "subscription" ? { subscription: { interval: displayBillingInterval, unit: displayBillingUnit } } : {}) }), createdAt, now),
-    env.DB.prepare("DELETE FROM product_variants WHERE seller_id = ? AND product_id = ?").bind(seller.id, id),
     env.DB.prepare("DELETE FROM product_media WHERE seller_id = ? AND product_id = ?").bind(seller.id, id),
   ];
+  for (const variant of storedVariants) {
+    if (!retainedIds.has(variant.id)) statements.push(env.DB.prepare("DELETE FROM product_variants WHERE seller_id = ? AND product_id = ? AND id = ?").bind(seller.id, id, variant.id));
+  }
+  // Vacate retained SKUs inside the transaction to permit deliberate SKU swaps.
+  // No temporary value can become externally visible, even when a later guard fails.
+  const temporarySkuPrefix = `edit-${crypto.randomUUID()}-`;
+  for (const variantId of retainedSlots.keys()) statements.push(env.DB.prepare("UPDATE product_variants SET sku = ? WHERE seller_id = ? AND product_id = ? AND id = ?").bind(temporarySkuPrefix + retainedSlots.get(variantId), seller.id, id, variantId));
   imageIds.forEach((mediaId, index) => {
     const media = uploadMap.get(mediaId);
     statements.push(env.DB.prepare(`
@@ -1134,11 +1181,12 @@ async function saveProduct(request, env, rawId) {
   variants.forEach((variant, index) => statements.push(env.DB.prepare(`
     INSERT INTO product_variants (id, seller_id, product_id, name, options_json, sku, price_amount, stock_quantity, weight_grams, billing_interval, billing_interval_count, image_source, image_upload_id, sort_order, created_at, updated_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).bind(variant.id, seller.id, id, variant.name, JSON.stringify({ values: variant.options, hidden: variant.hidden }), variant.sku, variant.price, type === "physical" ? variant.stock : null, type === "physical" ? variant.weightGrams : null, variant.billingUnit, variant.billingInterval, variant.imageSource, variant.imageUploadId, index + 1, now, now)));
-  statements.push(env.DB.prepare(`
-    INSERT INTO seller_events (id, seller_id, actor_auth_user_id, event_type, entity_type, entity_id, payload_json, created_at)
-    VALUES (?, ?, ?, ?, 'product', ?, ?, ?)
-  `).bind(`event_${crypto.randomUUID()}`, seller.id, authUserId, existing ? "product.updated" : "product.created", id, JSON.stringify({ title, variants: variants.length, images: imageIds.length }), now));
+    ${retainedSlots.has(variant.id) ? `ON CONFLICT(id) DO UPDATE SET name = excluded.name, options_json = excluded.options_json,
+      sku = excluded.sku, price_amount = excluded.price_amount, stock_quantity = excluded.stock_quantity,
+      weight_grams = excluded.weight_grams, billing_interval = excluded.billing_interval,
+      billing_interval_count = excluded.billing_interval_count, image_source = excluded.image_source,
+      image_upload_id = excluded.image_upload_id, updated_at = excluded.updated_at` : ""}
+  `).bind(variant.id, seller.id, id, variant.name, JSON.stringify({ values: variant.options, hidden: variant.hidden, position: index + 1 }), variant.sku, variant.price, type === "physical" ? variant.stock : null, type === "physical" ? variant.weightGrams : null, variant.billingUnit, variant.billingInterval, variant.imageSource, variant.imageUploadId, variant.slot, now, now)));
   await env.DB.batch(statements);
   await cleanupUnusedMedia(env, seller.id, [...replacedMediaIds, ...requestedMediaIds]);
   const result = await catalog(request, env);
@@ -1147,6 +1195,7 @@ async function saveProduct(request, env, rawId) {
 
 async function deleteProduct(request, env, productId) {
   const { seller, authUserId } = await sellerContext(request, env);
+  assertCatalogEditor(seller);
   const id = cleanId(productId, "Product ID");
   const existing = await env.DB.prepare("SELECT id FROM products WHERE seller_id = ? AND id = ?").bind(seller.id, id).first();
   if (!existing) throw new Response("Product not found", { status: 404 });
@@ -1164,6 +1213,7 @@ async function deleteProduct(request, env, productId) {
 
 async function setProductStatus(request, env, productId) {
   const { seller, authUserId } = await sellerContext(request, env);
+  assertCatalogEditor(seller);
   const id = cleanId(productId, "Product ID");
   const payload = await requestJson(request, 2000);
   const status = ["active", "archived"].includes(payload.status) ? payload.status : null;
@@ -1190,11 +1240,12 @@ const duplicatedValue = (value, suffix, maximum) => {
 
 async function duplicateProduct(request, env, productId) {
   const { seller, authUserId } = await sellerContext(request, env);
+  assertCatalogEditor(seller);
   const sourceId = cleanId(productId, "Product ID");
   const [product, mediaResult, variantsResult] = await Promise.all([
     env.DB.prepare("SELECT * FROM products WHERE seller_id = ? AND id = ?").bind(seller.id, sourceId).first(),
     env.DB.prepare("SELECT * FROM product_media WHERE seller_id = ? AND product_id = ? ORDER BY sort_order").bind(seller.id, sourceId).all(),
-    env.DB.prepare("SELECT * FROM product_variants WHERE seller_id = ? AND product_id = ? ORDER BY sort_order").bind(seller.id, sourceId).all(),
+    env.DB.prepare(`SELECT * FROM product_variants WHERE seller_id = ? AND product_id = ? ORDER BY ${variantPositionSql}`).bind(seller.id, sourceId).all(),
   ]);
   if (!product) throw new Response("Product not found", { status: 404 });
   await assertProductCapacity(env, seller);
@@ -1283,6 +1334,7 @@ async function duplicateProduct(request, env, productId) {
 
 async function saveDraft(request, env, draftId) {
   const { seller, authUserId } = await sellerContext(request, env);
+  assertCatalogEditor(seller);
   const id = cleanId(draftId, "Draft ID");
   const payload = await requestJson(request, 500000);
   const existing = await env.DB.prepare("SELECT seller_id, snapshot_json, created_at FROM product_drafts WHERE id = ?").bind(id).first();
@@ -1323,6 +1375,7 @@ async function saveDraft(request, env, draftId) {
 
 async function deleteDraft(request, env, draftId) {
   const { seller } = await sellerContext(request, env);
+  assertCatalogEditor(seller);
   const id = cleanId(draftId, "Draft ID");
   const existing = await env.DB.prepare("SELECT snapshot_json FROM product_drafts WHERE seller_id = ? AND id = ?").bind(seller.id, id).first();
   const snapshot = parseJson(existing?.snapshot_json, {});
@@ -1464,8 +1517,20 @@ export default {
       if (request.method === "DELETE" && draftMatch) { await deleteDraft(request, env, draftMatch[1]); return json({ ok: true }, 200, cors); }
       return json({ ok: false, error: "Not found" }, 404, cors);
     } catch (error) {
-      if (error instanceof Response) return json({ ok: false, error: await error.text() }, error.status, cors);
+      if (error instanceof Response) return json({ ok: false, error: await error.text(), ...(error.headers.has("x-ezkart-error-code") ? { code: error.headers.get("x-ezkart-error-code") } : {}) }, error.status, cors);
       const failure = `${error?.message || error || ""} ${error?.cause?.message || ""}`;
+      if (failure.includes("catalog_revision_conflict")) {
+        return json({ ok: false, code: "catalog_revision_conflict", error: "This product changed since these edits started. Load the latest product and review your changes before publishing." }, 409, cors);
+      }
+      if (failure.includes("commerce_reserved_stock")) {
+        return json({ ok: false, error: "Pending orders reserve this stock. Keep those variants and enough stock to fulfill them, or wait for the orders to complete or expire." }, 409, cors);
+      }
+      if (failure.includes("catalog_ordered_product")) {
+        return json({ ok: false, error: "This product has order history. Archive it to stop new sales while keeping the records." }, 409, cors);
+      }
+      if (failure.includes("UNIQUE constraint failed: products") || failure.includes("UNIQUE constraint failed: product_variants")) {
+        return json({ ok: false, error: "This product or SKU already exists. Load the latest catalog and use a unique SKU." }, 409, cors);
+      }
       if (failure.includes("seller_product_limit")) {
         return json({ ok: false, error: "Your store has reached its product limit. Review Advanced Mode or remove a product before creating another." }, 409, cors);
       }

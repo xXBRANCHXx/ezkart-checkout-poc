@@ -83,7 +83,7 @@ export async function publicStorefront(env, url) {
   const [products, media, variants] = await env.DB.batch([
     env.DB.prepare(`SELECT p.*, ${reservedStockSql(env)} AS reserved_quantity FROM products p WHERE seller_id = ? AND status = 'active' AND (? = '' OR id = ?) ORDER BY created_at DESC, id`).bind(row.id, productId, productId),
     env.DB.prepare("SELECT id, product_id FROM product_media WHERE seller_id = ? ORDER BY sort_order").bind(row.id),
-    env.DB.prepare(`SELECT v.*, ${reservedStockSql(env, true)} AS reserved_quantity FROM product_variants v WHERE seller_id = ? ORDER BY sort_order`).bind(row.id),
+    env.DB.prepare(`SELECT v.*, ${reservedStockSql(env, true)} AS reserved_quantity FROM product_variants v WHERE seller_id = ? ORDER BY COALESCE(json_extract(options_json, '$.position'), sort_order), id`).bind(row.id),
   ]);
   return { store, products: products.results.map(product => publicProduct(product, media.results.find(m => m.product_id === product.id), variants.results.filter(v => v.product_id === product.id))) };
 }

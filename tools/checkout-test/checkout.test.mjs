@@ -3398,3 +3398,95 @@ test('landing pages start the saved document before editor styles and scripts', 
   } finally {await browser.close();}
 
 });
+
+test('product editor keeps stale and legacy drafts separate from current stock and offers a fresh comparison tab', async t => {
+  const app = await setup({ EZKART_CLOUDFLARE_API_URL: 'https://ezkart-api-test.fixture.workers.dev' });
+  t.after(() => app.close());
+  const { chromium } = await import('../builder-mcp/node_modules/playwright/index.mjs');
+  const browser = await chromium.launch(); t.after(() => browser.close());
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  await context.addCookies([app.adminCookie()]);
+  const image = await readFile(join(root, 'cart/admin/assets/products/granola.webp'));
+  const fixture = shopFixture();
+  fixture.catalog = [{ id: 'custom-tea', revision: 1, name: 'Morning tea', category: 'Tea', type: 'physical', status: 'active', sku: 'TEA', price: 20000, stock: 10, weightGrams: 100, media: [1, 2, 3].map(n => ({id: 'tea_image_' + n})), variants: [] }];
+  fixture.drafts = [];
+  const persist = () => writeFile(join(app.directory, 'storefront.json'), JSON.stringify(fixture));
+  await persist();
+  const saves = [], draftSaves = [], errors = [];
+  let holdNextDraft = false, draftStarted, releaseDraft;
+  await context.route('**/*', async route => {
+    const url = new URL(route.request().url()), cloud = url.searchParams.get('cloud');
+    if (url.pathname.startsWith('/v1/public/media/') || cloud?.startsWith('/v1/media/')) return route.fulfill({ contentType: 'image/webp', body: image });
+    if (cloud === '/v1/admin-profile') return route.fulfill({ json: { ok: true, profile: { logoId: '', canEdit: true } } });
+    if (cloud === '/v1/catalog') return route.fulfill({ json: { ok: true, products: fixture.catalog, drafts: fixture.drafts } });
+    if (cloud?.startsWith('/v1/drafts/')) {
+      const id = cloud.split('/').at(-1);
+      if (route.request().method() === 'DELETE') fixture.drafts = fixture.drafts.filter(draft => draft.id !== id);
+      else {
+        const payload = route.request().postDataJSON(); draftSaves.push(payload);
+        fixture.drafts = [...fixture.drafts.filter(draft => draft.id !== id), {...payload.snapshot, id}];
+        if (holdNextDraft) {
+          holdNextDraft = false;
+          await new Promise(resolve => { releaseDraft = resolve; draftStarted(); });
+        }
+      }
+      await persist(); return route.fulfill({ json: { ok: true, draft: {id} } });
+    }
+    if (cloud === '/v1/products/custom-tea') {
+      const payload = route.request().postDataJSON(); saves.push(payload);
+      if (payload.revision !== fixture.catalog[0].revision) return route.fulfill({ status: 409, json: { ok: false, code: 'catalog_revision_conflict', error: 'This product changed since these edits started.' } });
+      fixture.catalog[0] = {...fixture.catalog[0], ...payload, revision: payload.revision + 1};
+      await persist(); return route.fulfill({ json: { ok: true, product: fixture.catalog[0] } });
+    }
+    return route.continue();
+  });
+  const page = await context.newPage(); page.on('pageerror', error => errors.push(error.message));
+  page.setDefaultTimeout(6000);
+  const originalUrl = app.base + '/cart/admin/?page=product-new&product=custom-tea';
+  await page.goto(originalUrl);
+  const name = page.locator('#product-create-form [name=name]');
+  await page.waitForFunction(() => document.querySelector('#product-create-form [name=name]')?.value === 'Morning tea');
+  await name.fill('My unpublished tea name');
+  await page.locator('[data-save-product-draft]').click();
+  await page.waitForFunction(() => document.querySelector('[data-product-draft-status]').textContent.includes('Saved'));
+  assert.equal(draftSaves.at(-1).snapshot.baseRevision, 1);
+  const oldDraftId = new URL(page.url()).searchParams.get('draft');
+  fixture.catalog[0] = {...fixture.catalog[0], revision: 2, stock: 8}; await persist();
+  await page.getByRole('button', {name: 'Publish changes', exact: true}).first().click();
+  await page.locator('[data-product-conflict-latest]').waitFor();
+  assert.equal(saves.at(-1).revision, 1); assert.equal(saves.at(-1).stock, 10);
+  assert.equal(await name.inputValue(), 'My unpublished tea name');
+  await page.reload(); await page.locator('[data-product-conflict-latest]').waitFor();
+  assert.equal(await name.inputValue(), 'My unpublished tea name');
+  assert.equal(await page.locator('#product-create-form [name=stock]').inputValue(), '10');
+  await page.setViewportSize({width: 390, height: 844});
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true);
+  if (process.env.EZKART_TEST_SCREENSHOTS) await page.screenshot({path: join(process.env.EZKART_TEST_SCREENSHOTS, 'product-conflict-mobile.png'), fullPage: true, animations: 'disabled'});
+  const freshPromise = context.waitForEvent('page');
+  await page.locator('[data-product-conflict-latest]').click();
+  const fresh = await freshPromise; fresh.on('pageerror', error => errors.push(error.message));
+  await fresh.waitForFunction(() => document.querySelector('#product-create-form [name=stock]')?.value === '8');
+  assert.notEqual(new URL(fresh.url()).searchParams.get('draft'), oldDraftId);
+  assert.equal(await fresh.locator('[data-product-conflict-latest]').count(), 0);
+  await fresh.locator('#product-create-form [name=name]').fill('Reviewed tea name');
+  const freshDraftId = new URL(fresh.url()).searchParams.get('draft');
+  const started = new Promise(resolve => { draftStarted = resolve; });
+  holdNextDraft = true;
+  await fresh.locator('[data-save-product-draft]').click(); await started;
+  const savesBeforePublishing = saves.length;
+  await fresh.getByRole('button', {name: 'Publish changes', exact: true}).first().click();
+  assert.equal(await fresh.locator('#product-create-form [name=stock]').isDisabled(), true);
+  assert.equal(saves.length, savesBeforePublishing, 'Publishing waits for the outstanding draft save');
+  releaseDraft();
+  await fresh.waitForURL('**/?page=products&updated=1');
+  assert.equal(saves.at(-1).revision, 2); assert.equal(saves.at(-1).stock, 8);
+  assert.equal(fixture.drafts.find(draft => draft.id === oldDraftId).name, 'My unpublished tea name', 'Reviewing or publishing a fresh copy preserves the old draft');
+  assert.equal(fixture.drafts.some(draft => draft.id === freshDraftId), false, 'An outstanding autosave cannot recreate a published draft');
+  delete fixture.drafts.find(draft => draft.id === oldDraftId).baseRevision; await persist();
+  await page.goto(originalUrl); await page.locator('[data-product-conflict-latest]').waitFor();
+  await page.getByRole('button', {name: 'Publish changes', exact: true}).first().click();
+  await page.locator('[data-product-conflict-latest]').waitFor();
+  assert.equal(saves.at(-1).revision, null, 'A legacy draft is never assigned the latest revision');
+  assert.equal(fixture.catalog[0].stock, 8);
+  assert.deepEqual(errors, []);
+});

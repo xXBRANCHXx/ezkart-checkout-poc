@@ -110,12 +110,38 @@ Outbox kinds for shipping, notifications and payouts establish the common queue
 contract. Their actual provider dispatchers are outstanding; a queued job is
 not evidence that a message, shipment or payout was sent.
 
+## Catalog concurrency
+
+Apply `0010_catalog_revisions.sql` with the matching Worker and product editor.
+Catalog responses include `revision`; edits to existing products must send the
+revision of the product originally loaded. The first statement of the D1 save
+batch asserts that revision. Product or variant changes, including a payment's
+stock deduction, advance it. A conflict returns HTTP 409 with
+`code: "catalog_revision_conflict"` and rolls back the entire save.
+
+Editor drafts retain `baseRevision`; a legacy draft with no version cannot take
+the latest version automatically. The conflict screen opens a fresh editor in a
+separate tab with a separate draft ID so the merchant can compare and reapply
+changes. Publishing waits for any outstanding draft save before deleting the
+published draft. Existing fields are temporarily disabled during publication.
+
+Variant updates retain their IDs and creation timestamps. `sort_order` is now a
+stable unique slot; `options_json.position` records presentation order, with the
+old slot as a fallback for existing rows. SKU swaps and reorderings are atomic.
+Removing a held variant, reducing stock below reservations, or changing a held
+physical product to another type fails without partial updates. Products with
+order history must be archived instead of deleted. Viewer memberships cannot
+write products, drafts or catalog images.
+
+These controls do not yet implement inventory counts/adjustments, returns or
+stock-review resolution. Those remain required before the commerce cutover.
+
 ## Required before activating the test cutover
 
 1. Finish PHP checkout, provider dispatch, callback, order read/list, customer
    tracking and merchant-action adapters; preserve private legacy references.
-2. Finish product-edit revision protection and reservation-preserving variant
-   edits; finish inventory adjustments and stock-review resolution.
+2. Finish inventory adjustments, return restocking and stock-review resolution.
+   Deploy and verify the implemented catalog revision/variant protections above.
 3. Build and rehearse an idempotent legacy import. Compare order counts, paid
    totals, owners and provider references. Legacy records must not reserve stock
    again or become new ledger credits.

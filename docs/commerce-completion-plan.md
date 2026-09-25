@@ -79,6 +79,23 @@ retry limits and cross-language signatures. See [commerce-storage.md](commerce-s
 for the contract and remaining cutover work. No top-level completion item is
 checked off on the basis of this foundation alone.
 
+### 25 September: merchant edits and reserved inventory
+
+Added product revisions checked transactionally, including revisions advanced by
+variant sales. Product saves retain variant identities while supporting reorder,
+SKU swaps, hiding and adding/removing unreserved options. Holds prevent invalid
+stock reductions and variant removal. Products with order history are archived
+instead of deleted; viewer accounts cannot mutate the catalog or drafts.
+
+The editor preserves the original revision in drafts, reports stale edits, and
+opens a separate current-product draft for comparison. Publishing waits for an
+in-flight autosave so it cannot recreate a draft after successful publication.
+Local D1 tests cover concurrent saves, payment-versus-edit conflicts, transaction
+rollback and seller/role boundaries. The browser workflow covers stale and legacy
+drafts, desktop/mobile recovery, separate comparison tabs and the autosave race.
+Inventory counts/adjustments, returns, stock-review resolution and the PHP order
+cutover remain outstanding; no completion checkbox is advanced by this alone.
+
 ## Atomicity contract
 
 Commerce database changes use D1 transactional batches and database constraints,
