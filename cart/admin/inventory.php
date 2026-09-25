@@ -16,7 +16,7 @@
       <p class="inv-help" data-inv-kind-help>Enter the total physically counted for each item. Leave uncounted items blank.</p>
       <label>Reference or note<textarea rows="3" maxlength="500" data-inv-note placeholder="Delivery reference, count location, or explanation"></textarea></label>
       <p class="inv-draft-status" data-inv-draft-status role="status">Your count draft saves to your account.</p>
-      <h3><span data-inv-selected-count>0</span> selected items</h3>
+      <h3><span data-inv-selected-count>0</span> <span data-inv-selected-label>selected items</span></h3>
       <ul class="inv-selection" data-inv-selection></ul>
       <button type="button" class="ui-button primary" data-inv-review disabled>Review changes</button>
       <button type="button" class="ui-button" data-inv-discard disabled>Clear draft</button>

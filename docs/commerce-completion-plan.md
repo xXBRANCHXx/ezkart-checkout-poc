@@ -139,6 +139,36 @@ access. See [inventory-control.md](inventory-control.md) for behavior and API
 contracts. Order-linked returns/restocking and late-payment stock-review
 resolution remain outstanding, along with the broader commerce work above.
 
+Hosted acceptance for inventory implementation `ad99e76`:
+
+- Exported a private test D1 backup, applied migration 0011, and deployed test
+  Worker version `9ab0f5f0-1d09-4213-8ef3-9a886bf633f1`. Health checks report D1
+  and both R2 bindings healthy, with 30 tables. The hosted frontend serves the
+  inventory workspace and its authenticated proxy. Central checkout remains
+  disabled and the existing hourly schedule is unchanged.
+- Created a disposable product through the hosted merchant form with three
+  images and 10 units. A saved count of 8 survived a reload and reviewed as
+  10 → 8 before applying. Replaying the exact submitted request returned the
+  same receipt with one count movement and 8 units remaining.
+- Received 2 units through the workspace, then changed the alert threshold
+  from 15 to 3 on a 390px viewport. Stock remained 10 during the threshold
+  update. Reviewed the mobile confirmation and immutable per-item history;
+  no horizontal page overflow. Local browser screenshots also cover the full
+  mobile stock/history cards and uncertain-response recovery.
+- Archived and restored the fixture through the product card actions, proving
+  the repaired PATCH proxy works on the hosted site. Deleted the fixture and
+  confirmed no QA product draft remained. The submitted inventory draft is
+  empty at revision 6; its version tombstone and five audit movements remain
+  intentionally. A hash of all original product/variant quantities, hidden
+  flags and revisions is identical before and after this acceptance run.
+- Loaded inventory in pages of 50, 50 and 11: 111 options, 17 hidden, with
+  147,510 physical units. Parent display totals are not counted again.
+- Verification: all 34 Worker tests, the final targeted adjustment/draft tests,
+  browser inventory and product-conflict workflows, PHP/JavaScript syntax
+  checks and the test Worker build pass. The inventory browser fixture now
+  also retains cleared-draft versions like the real API. Single-item review
+  and confirmation wording was polished after hosted inspection.
+
 ## Atomicity contract
 
 Commerce database changes use D1 transactional batches and database constraints,

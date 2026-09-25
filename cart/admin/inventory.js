@@ -12,6 +12,7 @@
   const key = row => row.productId+'~'+row.variantId;
   const newKey = () => crypto.randomUUID().replaceAll('-','');
   const fmt = value => Number(value).toLocaleString();
+  const counted = (value, noun) => `${fmt(value)} ${noun}${value === 1 ? '' : 's'}`;
   const time = value => new Intl.DateTimeFormat('en-GB',{dateStyle:'medium',timeStyle:'short',timeZone:'Asia/Jakarta'}).format(new Date(value))+' WIB';
   async function mini(root,request) {
     const version=(root.inventoryReadVersion||0)+1;root.inventoryReadVersion=version;
@@ -20,7 +21,7 @@
       const [zero,low]=await Promise.all([request('GET','/v1/inventory?limit=5&level=zero'),request('GET','/v1/inventory?limit=5&level=low')]);
       if(root.inventoryReadVersion!==version)return;
       const total=zero.summary.skuCount+low.summary.skuCount;
-      status.textContent=total?`${fmt(total)} SKUs are at or below their alert threshold.`:'No items with low stock. Open inventory to review all quantities.';
+      status.textContent=total?`${counted(total,'SKU')} ${total===1?'is':'are'} at or below their alert threshold.`:'No items with low stock. Open inventory to review all quantities.';
       target.replaceChildren(...[...zero.items,...low.items].slice(0,5).map(row=>{const item=el('div',undefined,'inv-mini-row'),copy=el('div'),link=el('a',row.title);link.href='?page=inventory&q='+encodeURIComponent(row.sku||row.title);copy.append(link,el('small',`${row.sku} · alert at ${fmt(row.reorderPoint)}`));item.append(copy,el('strong',`${fmt(row.available)} available`,row.available<=0?'inv-zero':'inv-low'));return item;}));
     } catch(error) {if(root.inventoryReadVersion===version)status.textContent=error.message||'Inventory could not be loaded.';}
   }
@@ -38,9 +39,10 @@
       note.disabled=!canEdit||busy||Boolean(uncertain);
       q('[data-inv-review]').disabled=!canEdit||!queue.size||busy||draftBlocked||Boolean(uncertain);
       q('[data-inv-mobile-review]').disabled=q('[data-inv-review]').disabled;
-      q('[data-inv-mobile-review]').textContent=`Review ${queue.size} changes`;
+      q('[data-inv-mobile-review]').textContent=`Review ${counted(queue.size,'change')}`;
       q('[data-inv-discard]').disabled=!canEdit||(!queue.size&&!draftRevision)||busy||Boolean(uncertain);
       q('[data-inv-selected-count]').textContent=String(queue.size);
+      q('[data-inv-selected-label]').textContent=queue.size===1?'selected item':'selected items';
       q('[data-inv-input-label]').textContent=modes[kind.value][0];
       q('[data-inv-kind-help]').textContent=modes[kind.value][1];
       root.querySelectorAll('[data-inv-value]').forEach(input=>{input.disabled=!canEdit||busy||Boolean(uncertain);input.min=['received','damaged','lost'].includes(kind.value)?'1':'0';});
@@ -76,7 +78,7 @@
         [...tr.children].forEach((td,index)=>{td.dataset.label=['Product / SKU','On hand','Reserved','Available','Alert at',modes[kind.value][0]][index];});fragment.append(tr);
       }
       if(!rows.length){const row=el('tr'),cell=el('td','No physical inventory matches these filters.');cell.colSpan=6;row.append(cell);fragment.append(row);}
-      q('[data-inv-rows]').replaceChildren(fragment);q('[data-inv-results]').textContent=`${rows.length} items shown`;q('[data-inv-more]').hidden=!nextCursor;controls();
+      q('[data-inv-rows]').replaceChildren(fragment);q('[data-inv-results]').textContent=`${counted(rows.length,'item')} shown`;q('[data-inv-more]').hidden=!nextCursor;controls();
     }
     async function loadRows(more=false) {
       const version=++readVersion,params=new URLSearchParams(new FormData(filters));params.set('limit','50');if(more&&nextCursor)params.set('cursor',nextCursor);
@@ -97,11 +99,11 @@
     async function review(){error('');if(!canEdit||!queue.size||busy||draftBlocked)return;if(['damaged','lost','correction'].includes(kind.value)&&note.value.trim().length<3){error('Add a note explaining this change.');note.focus();return;}
       if([...queue.values()].some(item=>after(item)<0||after(item)>1000000000)){error('An entered change would produce an invalid stock quantity.');return;}
       if(!await saveDraft())return;
-      q('[data-inv-review-note]').textContent=`${labels[kind.value]} · ${queue.size} items. ${note.value.trim()}`;
+      q('[data-inv-review-note]').textContent=`${labels[kind.value]} · ${counted(queue.size,'item')}. ${note.value.trim()}`;
       q('[data-inv-review-error]').hidden=true;q('[data-inv-apply]').textContent='Apply changes';
       q('[data-inv-review-rows]').replaceChildren(...[...queue.values()].map(item=>{const row=el('tr');row.append(el('td',item.label||item.productId),el('td',fmt(kind.value==='alert'?item.beforeAlert:item.beforeQuantity)),el('td',fmt(after(item))));return row;}));dialog.showModal();}
     async function apply(){if(busy)return;busy=true;controls();dialog.querySelectorAll('button').forEach(button=>button.disabled=true);const body=uncertain||{...payload(),draftRevision};
-      try{const data=await request('POST','/v1/inventory/adjustments',body);uncertain=null;queue.clear();draftRevision=0;requestKey=newKey();dirty=false;note.value='';selection();dialog.close();error('');await Promise.all([loadRows(),loadHistory(),loadDraft().catch(err=>error('Changes saved. '+err.message))]);status(`Saved ${data.receipt.items.length} inventory changes. Reference ${data.receipt.id}.`);
+      try{const data=await request('POST','/v1/inventory/adjustments',body);uncertain=null;queue.clear();draftRevision=0;requestKey=newKey();dirty=false;note.value='';selection();dialog.close();error('');await Promise.all([loadRows(),loadHistory(),loadDraft().catch(err=>error('Changes saved. '+err.message))]);status(`Saved ${counted(data.receipt.items.length,'inventory change')}. Reference ${data.receipt.id}.`);
       }catch(err){const message=q('[data-inv-review-error]');message.hidden=false;message.textContent=err.message;
         if(!err.status||err.status>=500){uncertain=body;message.textContent+=' Confirmation is unavailable. Retry this same change to check whether it was saved.';q('[data-inv-apply]').textContent='Retry confirmation';}
         else{uncertain=null;if(err.code==='inventory_draft_conflict'){draftBlocked=true;error(err.message);}if(err.code==='inventory_conflict'){message.textContent+=' Keep editing, then remove and re-enter the affected items using refreshed stock.';await loadRows();}}

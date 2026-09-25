@@ -13,6 +13,12 @@ workbench commit `391af42`. Hosted product edit/revision acceptance passed.
 `COMMERCE_STORAGE=d1` is not enabled. See the completion record for the QA
 procedure and cleanup; commerce cutover remains a separate unfinished step.
 
+Inventory migration 0011 and test Worker version
+`9ab0f5f0-1d09-4213-8ef3-9a886bf633f1` are also deployed. Hosted count-draft
+recovery, idempotent count submission, receipts, alert changes, history and
+catalog archive/restore passed. This extends inventory control without enabling
+the central checkout or provider-job dispatchers.
+
 The full completion scope and acceptance gates remain in
 [commerce-completion-plan.md](commerce-completion-plan.md).
 

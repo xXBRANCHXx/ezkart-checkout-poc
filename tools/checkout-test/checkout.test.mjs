@@ -3517,7 +3517,7 @@ test('inventory UI restores cloud counts, reviews stale quantities, retries unce
     if(target.pathname==='/v1/inventory/history')return route.fulfill({json:{ok:true,items:history.filter(item=>!target.searchParams.has('product')||item.productId===target.searchParams.get('product')),nextCursor:null}});
     if(target.pathname==='/v1/inventory/draft'){
       if(method==='PUT'){assert.equal(payload.revision,revision);revision+=1;draft={revision,payload:payload.payload};}
-      if(method==='DELETE'){assert.equal(payload.revision,revision);draft=null;revision=0;}
+      if(method==='DELETE'){assert.equal(payload.revision,revision);revision+=1;draft={revision,payload:null};}
       return route.fulfill({json:{ok:true,draft}});
     }
     if(target.pathname==='/v1/inventory/adjustments'){
@@ -3525,7 +3525,7 @@ test('inventory UI restores cloud counts, reviews stale quantities, retries unce
       if(payload.items.some(item=>fixture.inventory.items.find(row=>row.key===item.productId+'~'+item.variantId).revision!==item.revision))return route.fulfill({status:409,json:{ok:false,code:'inventory_conflict',error:'Stock changed while this count was open.'}});
       assert.equal(payload.draftRevision,revision);const lines=payload.items.map(item=>{const row=fixture.inventory.items.find(row=>row.key===item.productId+'~'+item.variantId),before=row.onHand;row.onHand=payload.kind==='received'?row.onHand+item.quantity:payload.kind==='alert'?row.onHand:item.quantity;if(payload.kind==='alert')row.reorderPoint=item.quantity;row.available=row.onHand-row.reserved;row.revision+=1;
         return {...item,title:row.title,sku:row.sku,before,after:row.onHand,delta:row.onHand-before,reason:payload.kind,actor:'Merchant Tester',note:payload.note,createdAt:new Date().toISOString(),reference:'adj_fixture',id:history.length+1};});
-      const receipt={id:'adj_fixture',items:lines};receipts.set(payload.requestKey,receipt);history.unshift(...lines);draft=null;revision=0;
+      const receipt={id:'adj_fixture',items:lines};receipts.set(payload.requestKey,receipt);history.unshift(...lines);revision+=1;draft={revision,payload:null};
       fixture.inventory.summary.onHand=fixture.inventory.items.reduce((n,row)=>n+row.onHand,0);fixture.inventory.summary.available=fixture.inventory.summary.onHand-fixture.inventory.summary.reserved;
       if(loseResponse){loseResponse=false;return route.abort('failed');}return route.fulfill({json:{ok:true,receipt}});
     }
@@ -3550,7 +3550,7 @@ test('inventory UI restores cloud counts, reviews stale quantities, retries unce
   assert.equal(await page.getByRole('button',{name:'Keep editing',exact:true}).isDisabled(),true);
   await page.getByRole('button',{name:'Retry confirmation',exact:true}).click();await page.waitForFunction(()=>!document.querySelector('[data-inv-review-dialog]').open);
   assert.equal(receipts.size,1);assert.deepEqual(posts.at(-1),posts.at(-2),'An uncertain response retries the exact same key and body');assert.equal(fixture.inventory.items[0].onHand,8);
-  assert.equal(await page.locator('[data-inv-selected-count]').innerText(),'0');assert.equal(draft,null);
+  assert.equal(await page.locator('[data-inv-selected-count]').innerText(),'0');assert.equal(draft.payload,null);
   await page.locator('[data-inv-history-rows]').getByText('Aisle A cycle count',{exact:true}).first().waitFor();
   if(process.env.EZKART_TEST_SCREENSHOTS)await page.screenshot({path:join(process.env.EZKART_TEST_SCREENSHOTS,'inventory-desktop.png'),fullPage:true,animations:'disabled'});
   await page.setViewportSize({width:390,height:844});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true);
