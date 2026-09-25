@@ -83,6 +83,12 @@ checkout/catalog/fulfillment/consent regressions. See
 review controls, public review browsing, truthful product preview and hosted
 acceptance remain open. This is a delivery stage within the full review scope;
 it does not close the customer-operations gate or activate central checkout.
+Implementation `b9bcf42` is pushed; migration 0022 and TEST Worker
+`63c60345-a741-4181-aeb4-c99705c2ace6` are deployed. Hosted buyer assets match,
+health reports 59 tables, the public review read and anonymous authentication
+checks pass, and operational counts plus the 15-entry import receipt are
+unchanged. The private backup and precise acceptance limits are recorded in the
+review document. Shared Chrome remains disconnected without a reconnect loop.
 
 ### 25 September: buyer email preferences and permanent order claims
 

@@ -159,5 +159,43 @@ coverage proves these controlled workflows, not a provider delivery in hosting.
 - Provider-backed delivery acceptance, the wider commerce completion plan,
   financial validation month, DOKU approval and owner production release.
 
-Production and `main` remain untouched. TEST rollout evidence is recorded below
-after the migration and deployment are verified.
+Production and `main` remain untouched.
+
+## TEST deployment — 25 September 2026
+
+Implementation `b9bcf42` is committed and pushed to `agent/ezkart-workbench`.
+Migration 0022 is applied to TEST D1
+`2595f8c1-3e25-422f-9197-91d50a90e131`. TEST Worker
+`63c60345-a741-4181-aeb4-c99705c2ace6` is deployed at
+`https://ezkart-api-test.vincentbranch23.workers.dev`.
+
+The private pre-migration backup is
+`/tmp/ezkart-reviews-deploy-01a0d643/test-before-0022.sql`, mode 0600,
+379,387 bytes, SHA-256
+`697d039f79c66bea15312defdcbca422de0af4d77a6de4dcfb7fe2f33c28b22b`.
+Only migration 0022 was pending. All three new tables are empty and all 14 guards
+are present. Orders, customers, captures, reservations, shipments, jobs, consent
+records and reviews remain zero. The 15 legacy import entries and manifest
+`ba180208c85cea72b82323b7b917e0e3771b143d930f5220665fddffc62777c0`
+are unchanged.
+
+At 14:09:17 UTC / 21:09 Jakarta, health reports 59 application tables with D1,
+public R2 and private R2 healthy. An existing active product's public review read
+returns an honest empty list and zero count. Anonymous merchant review, buyer
+review and private-image reads return 401. At 14:08:37 UTC the hosted buyer
+JavaScript/CSS hashes match `b9bcf42`, and the PHP proxy also rejects anonymous
+access with 401. No central-storage flag or provider setting was activated.
+
+The shared-browser status is still disconnected, with no queued work and the
+same fifth connection attempt's 300-second initialization timeout. No reconnect
+was attempted. These read-only hosted checks do not establish signed-in buyer,
+merchant or public browsing acceptance.
+
+Private rollout metadata is in `/tmp/ezkart-reviews-deploy-01a0d643/`. Validation
+logs are `/tmp/ezkart-reviews-api-regressions-01a0d643.log` (60 cases),
+`/tmp/ezkart-reviews-api-final-01a0d643.log` (11 final review cases),
+`/tmp/ezkart-reviews-migration-final-01a0d643.log` (upgrade recheck),
+`/tmp/ezkart-reviews-php-regressions-01a0d643.log` (22 cases),
+`/tmp/ezkart-reviews-buyer-final-01a0d643.log` (four final buyer cases) and
+`/tmp/ezkart-reviews-dashboard-01a0d643.log` (one existing rating regression).
+Overlapping reruns are counted once in the 84-case total.
