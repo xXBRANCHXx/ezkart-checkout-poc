@@ -96,7 +96,7 @@ also pass. These are correctness tests, not a production capacity benchmark.
 Aggregation/materialization cost grows with history; browser CSV assembly uses
 memory proportional to the download. Representative maximum datasets, timeout
 behavior, storage/cleanup capacity and supported-device memory remain release
-acceptance work. Refund accounting, customer workspace read routing, hosted
+acceptance work. Refund accounting, buyer consent/review workflows, hosted
 payment workspace acceptance,
 operational migration and monitored provider execution remain separate tasks.
 The central storage flags stay disabled, and no top-level workbench gate closes.

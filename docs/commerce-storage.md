@@ -96,12 +96,20 @@ workspace retains the existing report features and adds complete CSV snapshots.
 Its signed-in hosted review remains pending shared Chrome access; storage flags
 stay disabled. See [central-analytics.md](central-analytics.md).
 
-Current TEST Worker `b11833b1-2dba-4bdb-9ec0-f54f196e318a` adds central payment
+The payment-stage TEST Worker `b11833b1-2dba-4bdb-9ec0-f54f196e318a` adds central payment
 reads and investigation histories from implementation `9d99eec`. Hosted payment
 assets match, health/authentication checks pass, and before/after aggregates and
 the legacy import receipt are unchanged. No migration or storage activation is
 included. Signed-in hosted payment acceptance remains pending shared Chrome
 initialization; see [central-payments.md](central-payments.md).
+
+Current TEST Worker `eba823ae-56e8-4ada-a524-076ce3cb3e95` adds the central
+customer workspace from implementation `51c1ac3`. Migration 0020 is applied;
+health reports 54 application tables. Served customer assets match, authentication
+checks pass and all five new customer tables are empty. Operational counts and
+the legacy receipt remain unchanged. A private pre-migration D1 backup is
+recorded in [central-customers.md](central-customers.md). Both storage flags stay
+disabled; signed-in hosted acceptance is pending shared Chrome initialization.
 
 ## Data and invariants
 

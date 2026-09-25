@@ -83,6 +83,12 @@ See [central-customers.md](central-customers.md). Marketing consent is explicitl
 unrecorded; checkout contact details are not opt-in evidence. Published review
 summaries remain available. Buyer consent and full review workflows, hosted
 acceptance, legacy promotion and the wider completion gates remain open.
+Implementation `51c1ac3` is pushed; migration 0020 and TEST Worker
+`eba823ae-56e8-4ada-a524-076ce3cb3e95` are deployed. Served assets match,
+health/authentication checks pass, all new customer tables remain empty and
+operational counts plus the 15-entry import receipt are unchanged. The private
+pre-migration backup is recorded in the customer workspace document. Storage
+activation and signed-in hosted acceptance are not claimed.
 
 ### 25 September: central payment investigation workspace
 

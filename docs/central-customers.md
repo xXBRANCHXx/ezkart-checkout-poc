@@ -139,3 +139,30 @@ close the full customer acceptance item: buyer consent, review workflows,
 messaging/marketing use, operational legacy promotion and hosted acceptance still
 need completion. Full workbench requirements remain in
 [commerce-completion-plan.md](commerce-completion-plan.md).
+
+## TEST deployment — 25 September 2026
+
+Implementation `51c1ac3` is pushed to `agent/ezkart-workbench`. Migration 0020
+is applied to TEST and Worker `eba823ae-56e8-4ada-a524-076ce3cb3e95` is deployed.
+The pre-migration D1 export is
+`/tmp/ezkart-customers-deploy-01a0d643/test-before-0020.sql`, mode 600, 363,319
+bytes, SHA-256
+`9afc00a090fbc3e231112cfcda5e804a9863b8aaa79044ac58b2d79dcbc7f8bd`.
+Private logs, aggregate readbacks and served-asset hashes are in that directory.
+
+Health at 19:29 Jakarta reports 54 application tables and healthy D1/public/private
+R2. All seven tested customer/segment/export read routes return 401 without
+authentication. At 19:30 Jakarta, hosted HTTPS hashes of `commerce-customers.js`,
+`commerce-customers.css` and `admin.js` match the implementation. Hostinger's
+signed-in deployment view and hosted merchant acceptance remain unverified while
+shared Chrome is disconnected; no connection retry or service restart was made.
+
+Before/after TEST readbacks confirm zero operational orders, customers, captures,
+reservations, shipments, provider jobs and analytics export receipts/rows. The
+five new customer tables are empty; 17 customer-related guards are present. The
+15-entry legacy receipt and manifest
+`ba180208c85cea72b82323b7b917e0e3771b143d930f5220665fddffc62777c0`
+are unchanged. Both central flags remain disabled. The hourly schedule is
+unchanged and now includes bounded cleanup for expired customer exports.
+No hosted customer, segment, note, export or provider record was fabricated for
+acceptance. Production and main are untouched.

@@ -81,7 +81,7 @@ service restart is used. Local acceptance does not replace the hosted check.
 
 This stage does not activate the central flags or complete the wider payment
 lifecycle. Merchant refund/dispute/reconciliation workflows, actual provider
-fees, ledger/settlement/payout acceptance, customer read routing, operational
+fees, ledger/settlement/payout acceptance, buyer consent/review workflows, operational
 migration, monitored provider dispatch and representative capacity testing remain
 open under the full workbench completion plan and production release hold.
 
