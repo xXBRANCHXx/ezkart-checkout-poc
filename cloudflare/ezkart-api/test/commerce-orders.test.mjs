@@ -20,7 +20,7 @@ async function setup(t) {
     outboundService: async () => Response.json({keys: [publicKey]})}));
   t.after(() => mf.dispose());
   const db = await mf.getD1Database('DB');
-  for (const name of ['0001_core.sql', '0002_cloud_catalog.sql', '0003_subscription_plan_billing.sql', '0004_yearly_subscription_plans.sql', '0009_commerce_orders.sql', '0010_catalog_revisions.sql','0011_inventory_adjustments.sql','0012_stock_review_recovery.sql']) {
+  for (const name of ['0001_core.sql', '0002_cloud_catalog.sql', '0003_subscription_plan_billing.sql', '0004_yearly_subscription_plans.sql', '0009_commerce_orders.sql', '0010_catalog_revisions.sql','0011_inventory_adjustments.sql','0012_stock_review_recovery.sql','0013_returns_and_inspection.sql']) {
     const source = (await readFile(new URL('../migrations/' + name, import.meta.url), 'utf8')).replace(/--[^\n]*/g, '');
     const triggers = [...source.matchAll(/CREATE TRIGGER[\s\S]*?END;/g)].map(match => match[0]);
     for (const statement of [...source.replace(/CREATE TRIGGER[\s\S]*?END;/g, '').split(';').filter(value => value.trim()), ...triggers]) await db.prepare(statement).run();
@@ -30,9 +30,9 @@ async function setup(t) {
     await db.prepare("INSERT INTO app_users(id,auth_user_id,created_at,updated_at) VALUES (?,?,'now','now')").bind(seller, seller).run();
     await db.prepare("INSERT INTO seller_memberships(seller_id,auth_user_id,role,created_at) VALUES (?,?,'owner','now')").bind('seller_' + seller, seller).run();
   }
-  async function merchant(path, input, {seller = 'alice', method = input === undefined ? 'GET' : 'PUT'} = {}) {
+  async function merchant(path, input, {seller = 'alice', email, method = input === undefined ? 'GET' : 'PUT'} = {}) {
     const head = Buffer.from(JSON.stringify({alg: 'ES256', kid: publicKey.kid})).toString('base64url');
-    const claims = Buffer.from(JSON.stringify({iss: 'https://auth.fixture.test/auth/v1', sub: seller, aud: 'authenticated', exp: Math.floor(Date.now() / 1000) + 3600})).toString('base64url');
+    const claims = Buffer.from(JSON.stringify({iss: 'https://auth.fixture.test/auth/v1', sub: seller, email, aud: 'authenticated', exp: Math.floor(Date.now() / 1000) + 3600})).toString('base64url');
     const sig = await crypto.subtle.sign({name: 'ECDSA', hash: 'SHA-256'}, key.privateKey, new TextEncoder().encode(`${head}.${claims}`));
     const response = await mf.dispatchFetch('https://api.fixture.test' + path, {method,
       headers: {authorization: `Bearer ${head}.${claims}.${Buffer.from(sig).toString('base64url')}`, 'content-type': 'application/json'},
@@ -89,6 +89,178 @@ async function stockReviewInput(f, order) {
   return {requestKey:randomBytes(16).toString('hex'),revision:review.order.revision,confirmed:true,note:'Physical stock checked in aisle A',
     items:review.items.map(item=>({orderItemId:item.orderItemId,productRevision:item.current?.revision||1}))};
 }
+
+// Delivery here is a local state fixture. It is not evidence of a provider delivery.
+async function returnFixture(f,overrides={}) {
+  const created=await f.create(f.input(overrides));assert.equal(created.status,200,created.error);
+  const paid=await f.paid(created.order);assert.equal(paid.status,200,paid.error);
+  await f.db.prepare("UPDATE orders SET fulfillment_state='delivered' WHERE id=?").bind(created.order.id).run();
+  return paid.order;
+}
+async function returnRequest(f,order,quantity=2,extra={}) {
+  const view=await f.merchant('/v1/returns/orders/'+order.id);assert.equal(view.status,200,view.error);
+  return {requestKey:randomBytes(16).toString('hex'),orderRevision:view.order.revision,reason:'damaged',note:'The package arrived with damaged goods.',
+    items:view.items.map(item=>({orderItemId:item.orderItemId,quantity})),...extra};
+}
+async function openReturn(f,order,quantity=2) {
+  const result=await f.merchant('/v1/returns/orders/'+order.id,await returnRequest(f,order,quantity),{method:'POST'});assert.equal(result.status,200,result.error);return result;
+}
+async function actReturn(f,id,kind,extra={}) {
+  const detail=await f.merchant('/v1/returns/'+id);assert.equal(detail.status,200,detail.error);
+  const body={requestKey:randomBytes(16).toString('hex'),revision:detail.revision,orderRevision:detail.order.revision,kind,message:'Return to the store with the order reference.',...extra};
+  return {body,result:await f.merchant('/v1/returns/'+id,body,{method:'POST'})};
+}
+
+test('return ownership binds verified guests once and preserves checkout identity and original snapshots',async t=>{
+  const f=await setup(t),order=await returnFixture(f),path='/v1/customer/orders/'+order.id+'/returns';
+  assert.equal((await f.merchant(path,undefined,{seller:'buyer',email:customer.email})).status,404,'A JWT alone cannot claim a guest by email');
+  const claim=(id,email='orders@example.test',environment='sandbox')=>f.call('/internal/commerce/orders/'+order.id+'/claim',{environment,customer:{id,email}});
+  assert.equal((await claim('buyer','wrong@example.test')).status,404);
+  assert.equal((await claim('buyer','orders@example.test','production')).status,403);
+  const race=await Promise.all([claim('buyer'),claim('other')]);assert.deepEqual(race.map(r=>r.status).sort(),[200,404]);
+  const winner=race[0].status===200?'buyer':'other';assert.equal((await claim(winner)).status,200);
+  const own=await f.merchant(path,undefined,{seller:winner});assert.equal(own.status,200,own.error);assert.equal(own.canCreate,true);
+  await assert.rejects(f.db.prepare('UPDATE commerce_order_owners SET auth_user_id=? WHERE order_id=?').bind('hijack',order.id).run(),/immutable_owner/);
+  await assert.rejects(f.db.prepare("UPDATE orders SET customer_snapshot_json='{}' WHERE id=?").bind(order.id).run(),/immutable_customer_snapshot/);
+  const identified=await returnFixture(f,{customer:{...customer,authUserId:'buyer'}}),identityPath='/v1/customer/orders/'+identified.id+'/returns';
+  assert.equal((await f.merchant(identityPath,undefined,{seller:'buyer'})).status,200);
+  assert.equal((await f.call('/internal/commerce/orders/'+identified.id+'/claim',{environment:'sandbox',customer:{id:'other',email:customer.email}})).status,404);
+  assert.equal((await f.merchant(identityPath,undefined,{seller:'other'})).status,404);
+});
+
+test('returns require paid consumed delivered units, enforce seller and viewer access, and release declined or withdrawn requests',async t=>{
+  const f=await setup(t),created=await f.create(f.input()),order=created.order,request=await returnRequest(f,order);
+  const path='/v1/returns/orders/'+order.id;
+  assert.equal((await f.merchant(path,request,{method:'POST'})).status,409);
+  await f.paid(order);assert.equal((await f.merchant(path)).canCreate,false);
+  await f.db.prepare("UPDATE orders SET fulfillment_state='delivered' WHERE id=?").bind(order.id).run();
+  let opened=await openReturn(f,order);assert.equal(opened.state,'requested');
+  assert.equal((await f.merchant('/v1/returns/'+opened.id,undefined,{seller:'bob'})).status,404);
+  assert.equal((await f.merchant('/v1/returns',undefined,{seller:'bob'})).items.length,0);
+  await f.db.prepare("UPDATE seller_memberships SET role='viewer' WHERE auth_user_id='alice'").run();
+  assert.equal((await f.merchant('/v1/returns/'+opened.id)).canApprove,false);
+  assert.equal((await actReturn(f,opened.id,'approve')).result.status,403);
+  await f.db.prepare("UPDATE seller_memberships SET role='owner' WHERE auth_user_id='alice'").run();
+  assert.equal((await actReturn(f,opened.id,'decline')).result.status,200);
+  assert.equal((await f.merchant(path)).items[0].availableToReturn,2);
+  opened=await openReturn(f,order);assert.equal((await actReturn(f,opened.id,'withdraw')).result.status,200);
+  assert.equal((await f.merchant(path)).items[0].availableToReturn,2);
+  const late=await latePaidOrder(f,[{productId:'mug',quantity:2,expectedPrice:20000}]);
+  await f.db.prepare("UPDATE orders SET fulfillment_state='delivered' WHERE id=?").bind(late.id).run();
+  assert.equal((await f.merchant('/v1/returns/orders/'+late.id)).canCreate,false,'Unrecovered late payments did not consume inventory');
+});
+
+test('return requests are retryable, quantity bounded across concurrent cases, and paginated',async t=>{
+  const f=await setup(t),order=await returnFixture(f),path='/v1/returns/orders/'+order.id,input=await returnRequest(f,order);
+  const post=body=>f.merchant(path,body,{method:'POST'});
+  const results=await Promise.all([post(input),post(input)]);assert.deepEqual(results.map(r=>r.status),[200,200]);assert.equal(results[0].id,results[1].id);
+  assert.equal((await post({...input,note:'Changed request'})).status,409);
+  assert.equal((await post({...input,requestKey:randomBytes(16).toString('hex')})).status,409);
+  assert.equal((await f.db.prepare('SELECT COUNT(*) AS n FROM commerce_returns').first()).n,1);
+  await actReturn(f,results[0].id,'decline');
+  const input2=await returnRequest(f,order,1),input3={...input2,requestKey:randomBytes(16).toString('hex')};
+  const race=await Promise.all([post(input2),post(input3)]);assert.deepEqual(race.map(r=>r.status).sort(),[200,409]);
+  const more=await openReturn(f,order,1);assert.equal(more.status,200);
+  const page1=await f.merchant('/v1/returns?state=all&limit=2'),page2=await f.merchant('/v1/returns?state=all&limit=2&cursor='+encodeURIComponent(page1.nextCursor));
+  assert.equal(page1.items.length,2);assert.equal(page2.items.length,1);assert.equal(new Set([...page1.items,...page2.items].map(r=>r.id)).size,3);
+  assert.equal((await f.merchant('/v1/returns?state=unknown')).status,422);
+});
+
+test('return inspections separate received and sellable units, restore stock once, and keep money and customer-private notes unchanged',async t=>{
+  const f=await setup(t),order=await returnFixture(f,{customer:{...customer,authUserId:'buyer'},items:[{productId:'tea',quantity:3,expectedPrice:20000}]}),opened=await openReturn(f,order,3);
+  const customerPath='/v1/customer/orders/'+order.id+'/returns/'+opened.id;
+  assert.equal((await f.merchant(customerPath,{}, {seller:'buyer',method:'POST'})).status,403);
+  assert.equal((await actReturn(f,opened.id,'approve')).result.status,200);
+  let detail=await f.merchant('/v1/returns/'+opened.id),item=detail.items[0];
+  const first=await actReturn(f,opened.id,'inspect',{confirmed:true,privateNote:'Warehouse A private bin 9',items:[{orderItemId:item.orderItemId,received:2,restocked:1,productRevision:item.current.revision}]});
+  assert.equal(first.result.status,200,first.result.error);assert.equal(first.result.receipt.state,'receiving');assert.equal(await f.stock(),8);
+  const replay=await f.merchant('/v1/returns/'+opened.id,first.body,{method:'POST'});assert.deepEqual(replay.receipt,first.result.receipt);assert.equal(await f.stock(),8);
+  assert.equal((await f.merchant('/v1/returns/'+opened.id,{...first.body,privateNote:'different'},{method:'POST'})).status,409);
+  detail=await f.merchant('/v1/returns/'+opened.id);assert.equal(detail.items[0].remaining,1);assert.equal(detail.items[0].restocked,1);
+  const publicView=await f.merchant(customerPath,undefined,{seller:'buyer'});assert.equal(publicView.status,200);
+  assert(!JSON.stringify(publicView).includes('private bin'));assert.equal(publicView.items[0].current,undefined);assert.equal(publicView.actions.at(-1).receipt,undefined);
+  const second=await actReturn(f,opened.id,'inspect',{confirmed:true,privateNote:'Last unit is damaged and kept out of stock',items:[{orderItemId:item.orderItemId,received:1,restocked:0}]});
+  assert.equal(second.result.status,200,second.result.error);assert.equal(second.result.receipt.state,'inspected');assert.equal(await f.stock(),8);
+  const fresh=(await f.call('/internal/commerce/orders/'+order.id+'?seller=seller_alice&environment=sandbox')).order;assert.equal(fresh.state,'paid');assert.equal(fresh.fulfillmentState,'delivered');
+  const movements=await f.db.prepare("SELECT * FROM inventory_movements WHERE reason='return_restock'").all();assert.equal(movements.results.length,1);assert.equal(movements.results[0].quantity_after-movements.results[0].quantity_before,1);
+  const jobs=await f.call('/internal/commerce/jobs/claim',{environment:'sandbox',workerId:'return_notifications',kinds:['notification.return_updated']});assert.equal(jobs.status,200,jobs.error);assert.equal(jobs.jobs.length,4);
+  await assert.rejects(f.db.prepare("UPDATE commerce_return_inspections SET restocked_quantity=2").run(),/return_immutable/);
+  await assert.rejects(f.db.prepare("DELETE FROM commerce_return_actions").run(),/return_immutable/);
+});
+
+test('closing partial returns releases only unreceived units, and a completed inspection cannot receive extra lines',async t=>{
+  const f=await setup(t),order=await returnFixture(f,{items:[{productId:'tea',quantity:3,expectedPrice:20000},{productId:'mug',quantity:3,expectedPrice:20000}]}),opened=await openReturn(f,order,3);
+  await actReturn(f,opened.id,'approve');let detail=await f.merchant('/v1/returns/'+opened.id),item=detail.items.find(i=>i.productId==='tea'),other=detail.items.find(i=>i.productId==='mug');
+  const first=await actReturn(f,opened.id,'inspect',{confirmed:true,privateNote:'One damaged unit arrived',items:[{orderItemId:item.orderItemId,received:1,restocked:0}]});assert.equal(first.result.status,200,first.result.error);
+  await assert.rejects(f.db.prepare('INSERT INTO commerce_return_inspections VALUES (?,?,?,?,1,1)').bind(first.result.receipt.id,opened.id,'seller_alice',other.orderItemId).run(),/return_quantity_exceeded/);
+  assert.equal((await actReturn(f,opened.id,'close')).result.status,200);
+  const view=await f.merchant('/v1/returns/orders/'+order.id);assert.equal(view.items.find(i=>i.productId==='tea').availableToReturn,2);assert.equal(view.items.find(i=>i.productId==='mug').availableToReturn,3);
+  const next=await openReturn(f,order,2);assert.equal(next.status,200);
+  assert.equal((await f.merchant('/v1/returns/'+opened.id)).canInspect,false);assert.equal(await f.stock(),7);
+});
+
+test('return inspections reject stale stock and roll back all lines if any original option is unavailable',async t=>{
+  const f=await setup(t),order=await returnFixture(f,{items:[{productId:'tea',quantity:2,expectedPrice:20000},{productId:'mug',quantity:2,expectedPrice:20000}]}),opened=await openReturn(f,order);
+  await actReturn(f,opened.id,'approve');const detail=await f.merchant('/v1/returns/'+opened.id);
+  const input={confirmed:true,privateNote:'Both units verified',items:detail.items.map(i=>({orderItemId:i.orderItemId,received:2,restocked:2,productRevision:i.current.revision}))};
+  await f.db.prepare("UPDATE products SET stock_quantity=7 WHERE id='tea'").run();
+  assert.equal((await actReturn(f,opened.id,'inspect',input)).result.status,409);assert.equal(await f.stock('mug'),8);
+  const fresh=await f.merchant('/v1/returns/'+opened.id),tea=fresh.items.find(i=>i.productId==='tea'),mug=fresh.items.find(i=>i.productId==='mug');
+  await f.db.prepare("INSERT INTO product_variants(id,seller_id,product_id,name,sku,price_amount,stock_quantity,weight_grams,sort_order,created_at,updated_at) VALUES ('new-mug','seller_alice','mug','Replacement','NEW',20000,10,100,1,'now','now')").run();
+  // Exercise the database guard directly after a hypothetical stale preflight.
+  await assert.rejects(f.db.batch([
+    f.db.prepare("INSERT INTO commerce_return_actions VALUES ('atomic-fixture','seller_alice',?,'direct-race-key','hash',?,?,'inspect','inspected','merchant','alice','','Private inspection note','{}','now')").bind(opened.id,fresh.revision,fresh.order.revision),
+    f.db.prepare("INSERT INTO commerce_return_inspections VALUES ('atomic-fixture',?,'seller_alice',?,2,2)").bind(opened.id,tea.orderItemId),
+    f.db.prepare("INSERT INTO commerce_return_inspections VALUES ('atomic-fixture',?,'seller_alice',?,2,2)").bind(opened.id,mug.orderItemId),
+  ]),/return_original_option_missing/);
+  assert.equal(await f.stock(),7);assert.equal((await f.db.prepare("SELECT COUNT(*) AS n FROM inventory_movements WHERE reference_id='atomic-fixture'").first()).n,0);
+  const saved=await actReturn(f,opened.id,'inspect',{...input,items:[{orderItemId:tea.orderItemId,received:2,restocked:2,productRevision:tea.current.revision},{orderItemId:mug.orderItemId,received:2,restocked:0}]});
+  assert.equal(saved.result.status,200,saved.result.error);assert.equal(await f.stock(),9);
+  assert.equal((await f.db.prepare("SELECT stock_quantity FROM product_variants WHERE id='new-mug'").first()).stock_quantity,10);
+  const staleCount={requestKey:randomBytes(16).toString('hex'),kind:'count',note:'Old count',items:[{productId:'tea',variantId:'',revision:tea.current.revision,quantity:7}]};
+  assert.equal((await f.merchant('/v1/inventory/adjustments',staleCount,{method:'POST'})).status,409);assert.equal(await f.stock(),9);
+});
+
+test('returns restore hidden archived options by original identity without inflating visible parent stock',async t=>{
+  const f=await setup(t);
+  await f.db.prepare("INSERT INTO product_variants(id,seller_id,product_id,name,sku,price_amount,stock_quantity,weight_grams,sort_order,created_at,updated_at) VALUES ('green','seller_alice','tea','Green','GREEN',20000,5,100,1,'now','now')").run();
+  const order=await returnFixture(f,{items:[{productId:'tea',variantId:'green',quantity:2,expectedPrice:20000}]}),opened=await openReturn(f,order);
+  await actReturn(f,opened.id,'approve');
+  await f.db.prepare("UPDATE products SET status='archived' WHERE id='tea'").run();
+  await f.db.prepare("UPDATE product_variants SET name='Renamed',sku='NEW',options_json='{\"hidden\":true}' WHERE id='green'").run();
+  const detail=await f.merchant('/v1/returns/'+opened.id),item=detail.items[0];assert.equal(item.sku,'GREEN');assert.equal(item.current.sku,'NEW');
+  const saved=await actReturn(f,opened.id,'inspect',{confirmed:true,privateNote:'Saleable after inspection',items:[{orderItemId:item.orderItemId,received:2,restocked:2,productRevision:item.current.revision}]});
+  assert.equal(saved.result.status,200,saved.result.error);assert.equal(await f.stock(),0);assert.equal((await f.db.prepare("SELECT stock_quantity FROM product_variants WHERE id='green'").first()).stock_quantity,5);
+});
+
+test('customer return writes stay bound to the original buyer and case, and withdrawal releases only its request',async t=>{
+  const f=await setup(t),order=await returnFixture(f,{customer:{...customer,authUserId:'buyer'}}),path='/v1/customer/orders/'+order.id+'/returns';
+  const input=await returnRequest(f,order),post=(target,body,seller='buyer')=>f.merchant(target,body,{seller,method:'POST'});
+  assert.equal((await post(path,input,'other')).status,404);
+  const opened=await post(path,input);assert.equal(opened.status,200,opened.error);
+  assert.equal((await post(path,input)).id,opened.id);
+  assert.equal((await post(path,{...input,reason:'delivery_failed',requestKey:randomBytes(16).toString('hex')})).status,422);
+  const result=await post(path+'/'+opened.id,{requestKey:randomBytes(16).toString('hex'),revision:opened.revision,orderRevision:opened.order.revision,kind:'withdraw',message:'I would like to keep the product.'});
+  assert.equal(result.status,200,result.error);assert.equal(result.receipt.state,'withdrawn');assert.equal((await f.merchant(path,undefined,{seller:'buyer'})).items[0].availableToReturn,2);
+  const other=await returnFixture(f,{customer:{...customer,authUserId:'buyer'}});
+  assert.equal((await f.merchant('/v1/customer/orders/'+other.id+'/returns/'+opened.id,undefined,{seller:'buyer'})).status,404);
+  const signedOnly=await f.merchant('/internal/commerce/orders/'+order.id+'/claim',{environment:'sandbox',customer:{id:'buyer',email:customer.email}},{seller:'buyer',method:'POST'});assert.equal(signedOnly.status,401);
+});
+
+test('return history is bounded and paginated for store and customer even across many partial inspections',async t=>{
+  const f=await setup(t);await f.db.prepare("UPDATE products SET stock_quantity=100 WHERE id='tea'").run();
+  const order=await returnFixture(f,{customer:{...customer,authUserId:'buyer'},items:[{productId:'tea',quantity:60,expectedPrice:20000}]}),opened=await openReturn(f,order,60);
+  await actReturn(f,opened.id,'approve');
+  for(let n=0;n<51;n++){const result=await actReturn(f,opened.id,'inspect',{confirmed:true,privateNote:'Private receipt '+n,items:[{orderItemId:opened.items[0].orderItemId,received:1,restocked:0}]});assert.equal(result.result.status,200,result.result.error);}
+  const merchantPath='/v1/returns/'+opened.id,customerPath='/v1/customer/orders/'+order.id+'/returns/'+opened.id;
+  for(const [target,seller] of [[merchantPath,'alice'],[customerPath,'buyer']]){
+    const first=await f.merchant(target,undefined,{seller});assert.equal(first.actions.length,50);assert(first.historyCursor);
+    const second=await f.merchant(target+'?before='+first.historyCursor,undefined,{seller});assert.equal(second.actions.length,2);assert.equal(second.historyCursor,null);
+    assert.equal(new Set([...first.actions,...second.actions].map(action=>action.id)).size,52);assert.equal(first.items[0].received,51);
+    if(seller==='buyer')assert(!JSON.stringify([first,second]).includes('Private receipt'));
+  }
+  assert.equal((await f.merchant(merchantPath+'?before=NaN')).status,422);assert.equal(await f.stock(),40);
+});
 
 test('stock reviews recover a late paid order once, keep released holds immutable and protect other checkouts',async t=>{
   const f=await setup(t),order=await latePaidOrder(f,[{productId:'tea',quantity:3,expectedPrice:20000},{productId:'mug',quantity:2,expectedPrice:20000}],

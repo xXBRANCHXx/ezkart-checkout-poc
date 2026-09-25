@@ -1,5 +1,5 @@
 (() => {
-  const labels = {opening:'Opening balance',catalog_create:'Product created',catalog_edit:'Product edited',catalog_delete:'Product removed',catalog_duplicate:'Product duplicated',payment:'Payment confirmed',late_payment_allocation:'Late payment stock allocated',count:'Physical count',received:'Stock received',damaged:'Damaged stock',lost:'Lost stock',correction:'Record corrected',alert:'Alert threshold changed'};
+  const labels = {opening:'Opening balance',catalog_create:'Product created',catalog_edit:'Product edited',catalog_delete:'Product removed',catalog_duplicate:'Product duplicated',payment:'Payment confirmed',late_payment_allocation:'Late payment stock allocated',return_restock:'Return restocked',count:'Physical count',received:'Stock received',damaged:'Damaged stock',lost:'Lost stock',correction:'Record corrected',alert:'Alert threshold changed'};
   const modes = {
     count:['New count','Enter the total physically counted for each item. Leave uncounted items blank.'],
     received:['Units received','Enter saleable units physically received. They will be added to current stock.'],

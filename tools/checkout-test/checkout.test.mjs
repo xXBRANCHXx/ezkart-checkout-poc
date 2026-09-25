@@ -3616,3 +3616,123 @@ test('paid stock review UI reloads failed reads, blocks shortages and stale revi
   await page.locator('[data-stock-apply]').click();await page.waitForFunction(()=>!document.querySelector('[data-stock-dialog]').open);assert.equal(applied,1);assert.deepEqual(posts.at(-1),posts.at(-2));
   await page.waitForFunction(()=>document.querySelector('[data-inv-metric=onHand]').textContent==='9');assert.match(await page.locator('[data-stock-status]').innerText(),/Stock allocated/);assert.equal(await page.locator('[data-stock-open]').count(),0);
 });
+
+test('returns UI opens and approves requests, preserves inspection entries after conflicts, and recovers an uncertain save across reload',async t=>{
+  const app=await setup({EZKART_CLOUDFLARE_API_URL:'https://ezkart-api-test.fixture.workers.dev'});t.after(()=>app.close());
+  await writeFile(join(app.directory,'storefront.json'),JSON.stringify(shopFixture()));
+  const {chromium}=await import('../builder-mcp/node_modules/playwright/index.mjs'),browser=await chromium.launch();t.after(()=>browser.close());
+  const context=await browser.newContext({viewport:{width:1440,height:1000}});await context.addCookies([app.adminCookie()]);const page=await context.newPage();page.setDefaultTimeout(8000);
+  const errors=[];page.on('pageerror',error=>errors.push(error.message));
+  const orderId='EZK-S-'+'B'.repeat(24),returnId='ret_'+'b'.repeat(32),casePath='/v1/returns/'+returnId,orderPath='/v1/returns/orders/'+orderId;
+  await page.goto(app.base+'/cart/admin/?page=returns');
+  assert.equal((await page.request.get(app.base+'/cart/admin/?cloud='+encodeURIComponent('/v1/returns?state=open&limit=25'))).status(),200);
+  assert.equal((await page.request.get(app.base+'/cart/admin/?cloud='+encodeURIComponent('/v1/returns?state[]=open'))).status(),400);
+  assert.equal((await page.request.get(app.base+'/cart/admin/?cloud='+encodeURIComponent('/v1/returns/../customer/addresses'))).status(),400);
+  assert.equal((await page.request.post(app.base+'/cart/admin/?cloud='+encodeURIComponent(orderPath),{data:{}})).status(),403);
+  let created=false,stale=true,applied=0,failDetail=false,canEdit=true,retryUnauthorized=true;const posts=[],receipts=new Map();
+  const now=new Date().toISOString(),detail={id:returnId,sellerId:'seller_fixture',order:{id:orderId,revision:3,customerName:'Buyer Fixture',state:'paid',fulfillmentState:'delivered'},revision:1,state:'requested',reason:'damaged',customerNote:'The outer box arrived torn.',createdAt:now,updatedAt:now,actions:[],
+    items:[{orderItemId:'item_tea',productId:'tea',variantId:'',title:'Original morning tea',sku:'TEA',quantity:2,received:0,restocked:0,remaining:2,current:{title:'Morning tea',sku:'TEA',revision:1,onHand:8,status:'active',hidden:false}},
+      {orderItemId:'item_mug',productId:'mug',variantId:'green',title:'Original green mug',sku:'GREEN',quantity:2,received:0,restocked:0,remaining:2,current:{title:'Green mug',sku:'GREEN',revision:1,onHand:5,status:'active',hidden:false}}]};
+  const view=()=>({...detail,canApprove:canEdit&&detail.state==='requested',canDecline:canEdit&&detail.state==='requested',canWithdraw:canEdit&&detail.state==='requested',canInspect:canEdit&&['approved','receiving'].includes(detail.state),canClose:canEdit&&['approved','receiving'].includes(detail.state)});
+  await context.route('**/*',async route=>{
+    const cloud=new URL(route.request().url()).searchParams.get('cloud');if(!cloud?.startsWith('/v1/returns'))return route.continue();const target=new URL(cloud,'https://fixture.test'),method=route.request().method();
+    if(target.pathname==='/v1/returns')return route.fulfill({json:{ok:true,sellerId:'seller_fixture',enabled:true,canCreate:canEdit,items:created?[{...detail,orderId,customerName:'Buyer Fixture',quantity:4,received:detail.items.reduce((n,i)=>n+i.received,0)}]:[],nextCursor:null}});
+    if(target.pathname===orderPath&&method==='GET')return route.fulfill({json:{ok:true,order:detail.order,canCreate:canEdit&&!created,reason:'',items:detail.items.map(item=>({...item,ordered:2,availableToReturn:created?0:2}))}});
+    if(target.pathname===orderPath){const body=route.request().postDataJSON();assert.equal(body.items.length,2);assert.equal(body.reason,'damaged');assert.match(body.note,/torn/);created=true;return route.fulfill({json:{ok:true,...view()}});}
+    if(target.pathname===casePath&&method==='GET'){if(failDetail){failDetail=false;return route.fulfill({status:503,json:{ok:false,error:'Temporary return read failure'}});}return route.fulfill({json:{ok:true,...view()}});}
+    if(target.pathname===casePath){const body=route.request().postDataJSON();posts.push(body);if(receipts.has(body.requestKey)){if(retryUnauthorized){retryUnauthorized=false;return route.fulfill({status:401,json:{ok:false,error:'Please sign in again'}});}return route.fulfill({json:{ok:true,receipt:receipts.get(body.requestKey)}});}
+      if(body.kind==='inspect'&&stale){stale=false;detail.items[0].current.revision++;return route.fulfill({status:409,json:{ok:false,error:'Stock changed during inspection'}});}
+      const state={approve:'approved',inspect:'receiving',close:'closed'}[body.kind];assert(state);
+      const receipt={id:'action_'+posts.length,returnId,orderId,kind:body.kind,state,createdAt:now,items:body.items||[]};receipts.set(body.requestKey,receipt);
+      if(body.kind==='inspect'){assert.equal(body.confirmed,true);assert.equal(body.items.length,1);assert.equal(body.items[0].productRevision,detail.items[0].current.revision);applied++;for(const line of body.items){const item=detail.items.find(i=>i.orderItemId===line.orderItemId);item.received+=line.received;item.restocked+=line.restocked;item.remaining-=line.received;item.current.onHand+=line.restocked;item.current.revision++;}}
+      detail.state=state;detail.revision++;detail.order.revision++;detail.actions.push({id:receipt.id,kind:body.kind,state,actor:'Store',message:body.message,privateNote:body.privateNote||'',createdAt:now,receipt});
+      if(body.kind==='inspect')return route.fulfill({status:200,contentType:'application/json',body:'{"ok":'});
+      return route.fulfill({json:{ok:true,receipt}});
+    }
+    return route.fulfill({status:404,json:{ok:false,error:'No fixture'}});
+  });
+  await page.reload();await page.locator('[data-return-new]').click();await page.locator('[data-return-lookup] input').fill(orderId);await page.getByRole('button',{name:'Find order',exact:true}).click();
+  await page.locator('[data-return-quantity]').first().waitFor();assert.equal(await page.locator('[data-return-save]').isDisabled(),true);
+  await page.locator('textarea[name=note]').fill('The outer box arrived torn.');for(const input of await page.locator('[data-return-quantity]').all())await input.fill('2');
+  await page.locator('[data-return-save]').click();await page.waitForFunction(()=>!document.querySelector('[data-return-dialog]').open);
+  await page.locator('[data-return-action=approve]').click();await page.locator('textarea[name=message]').fill('Return the parcel to our store with the order reference.');await page.locator('[data-return-save]').click();
+  await page.waitForFunction(()=>!document.querySelector('[data-return-dialog]').open);await page.locator('[data-return-action=inspect]').click();
+  await page.locator('[data-return-received]').first().fill('2');await page.locator('[data-return-restocked]').first().fill('1');await page.locator('textarea[name=privateNote]').fill('Warehouse A: one saleable unit, one kept out because the seal is broken.');await page.locator('input[name=confirmed]').check();
+  assert.match(await page.locator('[data-return-line=item_tea] output').innerText(),/^1 kept/);
+  if(process.env.EZKART_TEST_SCREENSHOTS)await page.screenshot({path:join(process.env.EZKART_TEST_SCREENSHOTS,'returns-inspection-desktop.png'),animations:'disabled'});
+  await page.locator('[data-return-save]').click();await page.locator('[data-return-form-error]:not([hidden])').waitFor();assert.equal(applied,0);assert.equal(await page.locator('[data-return-save]').isDisabled(),true);
+  await page.locator('[data-return-form-reload]').click();await page.waitForFunction(()=>!document.querySelector('[data-return-form-reload]').disabled);
+  assert.equal(await page.locator('[data-return-received]').first().inputValue(),'2');assert.equal(await page.locator('[data-return-restocked]').first().inputValue(),'1');assert.match(await page.locator('textarea[name=privateNote]').inputValue(),/Warehouse/);assert.equal(await page.locator('input[name=confirmed]').isChecked(),false);
+  await page.setViewportSize({width:390,height:844});await page.locator('input[name=confirmed]').check();
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true);assert.equal(await page.locator('[data-return-dialog]').evaluate(e=>e.scrollWidth<=e.clientWidth+1),true);
+  const button=await page.locator('[data-return-save]').boundingBox();assert(button.y+button.height<=844);
+  if(process.env.EZKART_TEST_SCREENSHOTS)await page.screenshot({path:join(process.env.EZKART_TEST_SCREENSHOTS,'returns-inspection-mobile.png'),animations:'disabled'});
+  await page.locator('[data-return-save]').click();await page.getByRole('button',{name:'Retry confirmation',exact:true}).waitFor();assert.equal(applied,1);assert.equal(await page.getByRole('button',{name:'Close return form',exact:true}).isDisabled(),true);
+  page.once('dialog',dialog=>dialog.accept());await page.reload();await page.getByRole('button',{name:'Retry confirmation',exact:true}).waitFor();
+  assert.match(await page.locator('#return-dialog-title').innerText(),/previous return update/);await page.locator('[data-return-save]').click();await page.waitForFunction(()=>document.querySelector('[data-return-form-error]').textContent.includes('sign in'));
+  assert(await page.evaluate(()=>sessionStorage.getItem('ezkart.return.pending.seller_fixture')));assert.equal(await page.getByRole('button',{name:'Close return form',exact:true}).isDisabled(),true);
+  await page.locator('[data-return-save]').click();await page.waitForFunction(()=>!document.querySelector('[data-return-dialog]').open);
+  assert.equal(applied,1);assert.deepEqual(posts.at(-1),posts.at(-2));assert.equal(await page.evaluate(()=>sessionStorage.getItem('ezkart.return.pending.seller_fixture')),null);
+  assert.match(await page.locator('[data-return-status]').innerText(),/No refund was issued/);
+  if(process.env.EZKART_TEST_SCREENSHOTS)await page.screenshot({path:join(process.env.EZKART_TEST_SCREENSHOTS,'returns-history-mobile.png'),animations:'disabled'});
+  failDetail=true;await page.locator('[data-return-reload]').click();await page.locator('[data-return-error]:not([hidden])').waitFor();assert.match(await page.locator('[data-return-error]').innerText(),/Temporary/);await page.locator('[data-return-reload]').click();await page.locator('[data-return-action=close]').waitFor();
+  await page.locator('[data-return-action=close]').click();await page.locator('textarea[name=message]').fill('The remaining mug return was cancelled by agreement.');await page.locator('[data-return-save]').click();await page.waitForFunction(()=>!document.querySelector('[data-return-dialog]').open);assert.equal(detail.items[0].received,2);
+  canEdit=false;await page.reload();await page.locator('[data-return-open]').click();await page.waitForFunction(()=>document.querySelector('[data-return-title]').textContent==='Intake closed');assert.equal(await page.locator('[data-return-new]').isDisabled(),true);assert.equal(await page.locator('[data-return-action]').count(),0);assert.deepEqual(errors,[]);
+});
+
+test('customer returns proxy signs only the verified session identity and enforces CSRF, ownership, environment and borrowed-login checks',async t=>{
+  const secret='return-proxy-fixture-secret-32-characters-only';
+  const app=await setup({EZKART_CLOUDFLARE_API_URL:'https://ezkart-api-test.fixture.workers.dev',EZKART_COMMERCE_STORAGE:'d1',EZKART_COMMERCE_SERVICE_SECRET:secret});t.after(()=>app.close());
+  const orderId='EZK-S-'+'C'.repeat(24),endpoint='/cart/admin/customer-returns.php?order='+orderId;
+  await writeFile(join(app.directory,'returns.json'),JSON.stringify({orderId,response:{returns:[]}}));
+  assert.equal((await app.request(endpoint)).status,401);
+  const cookie=app.customerCookie(),headers={Cookie:cookie.name+'='+cookie.value};
+  const first=await app.request(endpoint,undefined,headers);assert.equal(first.status,200,first.data.error);assert(first.data.csrf);
+  assert.equal((await app.request(endpoint,{},headers)).status,403);
+  assert.equal((await app.request(endpoint,{}, {...headers,'X-Ezkart-Csrf':first.data.csrf,Origin:'https://wrong.example'})).status,403);
+  assert.equal((await app.request(endpoint+'&return[]=evil',undefined,headers)).status,400);
+  assert.equal((await app.request(endpoint.replace(orderId,'EZK-S-'+'D'.repeat(24)),undefined,headers)).status,404);
+  const body={requestKey:'return-proxy-fixture-key',reason:'damaged',note:'Original items damaged',items:[],customer:{id:'hijack',email:'wrong@example.test'}};
+  const saved=await app.request(endpoint,body,{...headers,'X-Ezkart-Csrf':first.data.csrf});assert.equal(saved.status,200,saved.data.error);assert(!JSON.stringify(saved.data).includes('access_token'));
+  const calls=await app.calls(),claims=calls.filter(call=>call.url.endsWith('/claim'));
+  assert(claims.length>=2);for(const claim of claims){const payload=JSON.parse(claim.body);assert.deepEqual(payload.customer,{id:'fixture-google-customer',email:'checkout@example.com'});
+    const signed=Object.fromEntries(claim.headers.map(header=>{const index=header.indexOf(':');return [header.slice(0,index).toLowerCase(),header.slice(index+1).trim()];}));
+    const target=new URL(claim.url).pathname,canonical=['v1','test','POST',target,signed['x-ezkart-timestamp'],signed['x-ezkart-request-id'],createHash('sha256').update(claim.body).digest('hex')].join('\n');
+    assert.equal(signed['x-ezkart-signature'],createHmac('sha256',secret).update(canonical).digest('hex'));}
+  const writes=calls.filter(call=>call.url.includes('/v1/customer/orders/')&&call.method==='POST');assert.equal(writes.length,1);assert.equal(JSON.parse(writes[0].body).requestKey,body.requestKey);
+  const {chromium}=await import('../builder-mcp/node_modules/playwright/index.mjs'),browser=await chromium.launch();t.after(()=>browser.close());
+  const page=await browser.newPage();await page.context().addCookies([app.adminCookie()]);await page.goto(app.base+'/cart/tracking-sandbox.php?stage=processing');await page.locator('#tracking-content').waitFor();
+  assert.equal((await page.request.get(app.base+endpoint)).status(),200);
+  const bridge=(await page.context().cookies()).find(c=>c.name==='ezkart_customer');assert(bridge);
+  assert.equal(app.cli(`require ${JSON.stringify(join(root,'cart/api/customer-auth.php'))}; session_id('${bridge.value}'); ez_customer_session(); echo isset($_SESSION['customer_auth']['access_token']) ? 'token' : 'no-token'; session_write_close();`),'no-token');
+  await page.context().addCookies([app.adminCookie({admin_user:{id:'different-account',email:'different@example.com'}})]);assert.equal((await page.request.get(app.base+endpoint)).status(),401);
+});
+
+test('customer return UI requests original items, recovers an uncertain request, shows instructions and withdraws without stock controls',async t=>{
+  const app=await setup({EZKART_CLOUDFLARE_API_URL:'https://ezkart-api-test.fixture.workers.dev',EZKART_COMMERCE_STORAGE:'d1',EZKART_COMMERCE_SERVICE_SECRET:'return-ui-fixture-secret-32-characters-only'});t.after(()=>app.close());
+  const orderId='EZK-S-'+'E'.repeat(24),returnId='ret_'+'e'.repeat(32),now=new Date().toISOString();
+  const {chromium}=await import('../builder-mcp/node_modules/playwright/index.mjs'),browser=await chromium.launch();t.after(()=>browser.close());const page=await browser.newPage({viewport:{width:1280,height:950}});page.setDefaultTimeout(8000);await page.context().addCookies([app.customerCookie()]);
+  let created=false,withdrawn=false,approved=false,activeReturnId=returnId,applied=0,failedRead=false,retryUnauthorized=true;const posts=[];
+  const order={id:orderId,revision:2,customerName:'Customer Fixture'},item={orderItemId:'item_tea',productId:'tea',variantId:'',title:'Morning tea',sku:'TEA',ordered:2,availableToReturn:2,quantity:2,received:0};
+  const detail=()=>({ok:true,id:activeReturnId,order,revision:created?2:1,state:withdrawn?'withdrawn':approved?'approved':'requested',reason:'damaged',customerNote:'The packet seal is broken.',createdAt:now,items:[item],canWithdraw:!withdrawn&&!approved,actions:approved?[{kind:'approve',message:'Example instruction: include the order reference on the parcel.',createdAt:now}]:[]});
+  await page.route('**/admin/customer-returns.php?*',async route=>{const url=new URL(route.request().url());if(route.request().method()==='GET'){
+    if(failedRead){failedRead=false;return route.fulfill({status:503,json:{ok:false,error:'Temporary returns read failure'}});}
+    return route.fulfill({json:url.searchParams.has('return')?detail():{ok:true,csrf:'fixture-csrf',order,items:[{...item,availableToReturn:created&&!withdrawn?0:2}],canCreate:!created||withdrawn,reason:'',returns:created?[{id:activeReturnId,state:withdrawn?'withdrawn':approved?'approved':'requested',reason:'damaged',createdAt:now}]:[],nextCursor:null}});}
+    const body=route.request().postDataJSON();posts.push(body);assert.equal(route.request().headers()['x-ezkart-csrf'],'fixture-csrf');
+    if(url.searchParams.has('return')){assert.equal(body.kind,'withdraw');withdrawn=true;return route.fulfill({json:{ok:true,receipt:{returnId}}});}
+    if(created){if(retryUnauthorized){retryUnauthorized=false;return route.fulfill({status:401,json:{ok:false,error:'Please sign in again'}});}return route.fulfill({json:detail()});}assert.deepEqual(body.items,[{orderItemId:'item_tea',quantity:2}]);created=true;applied++;return route.fulfill({status:200,contentType:'application/json',body:'{"ok":'});
+  });
+  await page.goto(app.base+'/cart/return.php?order='+orderId);await page.locator('[data-cr-new]').click();await page.locator('[data-cr-quantity]').fill('2');await page.locator('[data-cr-form] textarea[name=note]').fill('The packet seal is broken.');
+  if(process.env.EZKART_TEST_SCREENSHOTS)await page.locator('[data-customer-returns]').screenshot({path:join(process.env.EZKART_TEST_SCREENSHOTS,'customer-return-request-desktop.png'),animations:'disabled'});
+  await page.locator('[data-cr-submit]').click();await page.locator('[data-cr-retry]:not([hidden])').waitFor();assert.equal(await page.locator('[data-cr-cancel]').isDisabled(),true);assert.equal(applied,1);
+  page.once('dialog',dialog=>dialog.accept());await page.reload();await page.locator('[data-cr-retry]:not([hidden])').waitFor();await page.locator('[data-cr-retry]').click();await page.waitForFunction(()=>document.querySelector('[data-cr-error]').textContent.includes('sign in'));
+  assert.equal(await page.locator('[data-cr-new]').isDisabled(),true);assert(await page.evaluate(()=>Object.keys(sessionStorage).some(k=>k.startsWith('ezkart.customer.return.'))));
+  await page.locator('[data-cr-retry]').click();await page.waitForFunction(()=>document.querySelector('[data-cr-status]').textContent.includes('sent'));
+  assert.equal(applied,1);assert.deepEqual(posts.at(-1),posts.at(-2));assert.equal(await page.locator('[data-return-received],[data-return-restocked],textarea[name=privateNote]').count(),0);
+  await page.setViewportSize({width:390,height:844});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true);
+  await page.locator('[data-cr-withdraw]').click();await page.locator('[data-cr-withdraw-form] textarea').fill('I no longer want to return it.');await page.locator('[data-cr-withdraw-confirm]').click();await page.waitForFunction(()=>document.querySelector('[data-cr-status]').textContent.includes('withdrawn'));assert.equal(withdrawn,true);
+  failedRead=true;await page.locator('[data-cr-refresh]').click();await page.locator('[data-cr-error]:not([hidden])').waitFor();assert.match(await page.locator('[data-cr-error]').innerText(),/Temporary/);await page.locator('[data-cr-refresh]').click();await page.waitForFunction(()=>document.querySelector('[data-cr-error]').hidden);
+  activeReturnId='ret_'+'f'.repeat(32);approved=true;withdrawn=false;await page.locator('[data-cr-refresh]').click();await page.locator('[data-cr-open="'+activeReturnId+'"]').click();await page.waitForFunction(()=>document.querySelector('[data-cr-detail]').textContent.includes('include the order reference'));
+  assert.equal(await page.locator('[data-cr-withdraw]').count(),0);
+  if(process.env.EZKART_TEST_SCREENSHOTS)await page.locator('[data-customer-returns]').screenshot({path:join(process.env.EZKART_TEST_SCREENSHOTS,'customer-return-history-mobile.png'),animations:'disabled'});
+});

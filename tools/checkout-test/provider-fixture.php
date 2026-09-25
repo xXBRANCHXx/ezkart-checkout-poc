@@ -2,12 +2,27 @@
 declare(strict_types=1);
 // Test-only transport loaded by PHP -n. No provider network calls are possible.
 if (extension_loaded('curl') || !getenv('EZKART_TEST_CAPTURE')) throw new RuntimeException('Unsafe test transport setup.');
-foreach (['CURLOPT_ENCODING', 'CURLOPT_POST', 'CURLOPT_POSTFIELDS', 'CURLOPT_HTTPHEADER', 'CURLOPT_RETURNTRANSFER', 'CURLOPT_CONNECTTIMEOUT', 'CURLOPT_TIMEOUT', 'CURLOPT_SSL_VERIFYPEER', 'CURLINFO_HTTP_CODE', 'CURLINFO_RESPONSE_CODE', 'CURLOPT_FOLLOWLOCATION', 'CURLOPT_CUSTOMREQUEST', 'CURLOPT_HEADERFUNCTION', 'CURLINFO_CONTENT_TYPE'] as $index => $constant) define($constant, $index + 1);
+foreach (['CURLOPT_ENCODING', 'CURLOPT_POST', 'CURLOPT_POSTFIELDS', 'CURLOPT_HTTPHEADER', 'CURLOPT_RETURNTRANSFER', 'CURLOPT_CONNECTTIMEOUT', 'CURLOPT_TIMEOUT', 'CURLOPT_SSL_VERIFYPEER', 'CURLINFO_HTTP_CODE', 'CURLINFO_RESPONSE_CODE', 'CURLOPT_FOLLOWLOCATION', 'CURLOPT_CUSTOMREQUEST', 'CURLOPT_HEADERFUNCTION', 'CURLINFO_CONTENT_TYPE', 'CURLOPT_SSL_VERIFYHOST', 'CURLOPT_WRITEFUNCTION'] as $index => $constant) define($constant, $index + 1);
 function curl_init(string $url): object { return (object) ['url' => $url, 'options' => [], 'status' => 200]; }
 function curl_setopt_array(object $handle, array $options): bool { $handle->options = $options; return true; }
+function curl_setopt(object $handle, int $option, mixed $value): bool { $handle->options[$option] = $value; return true; }
 function curl_exec(object $handle): string {
     $payload = json_decode($handle->options[CURLOPT_POSTFIELDS] ?? '{}', true);
-    file_put_contents(getenv('EZKART_TEST_CAPTURE'), json_encode(['url' => $handle->url, 'method' => !empty($handle->options[CURLOPT_POST]) ? 'POST' : 'GET', 'body' => $handle->options[CURLOPT_POSTFIELDS] ?? '', 'headers' => $handle->options[CURLOPT_HTTPHEADER] ?? []]) . "\n", FILE_APPEND | LOCK_EX);
+    file_put_contents(getenv('EZKART_TEST_CAPTURE'), json_encode(['url' => $handle->url, 'method' => $handle->options[CURLOPT_CUSTOMREQUEST] ?? (!empty($handle->options[CURLOPT_POST]) ? 'POST' : 'GET'), 'body' => $handle->options[CURLOPT_POSTFIELDS] ?? '', 'headers' => $handle->options[CURLOPT_HTTPHEADER] ?? []]) . "\n", FILE_APPEND | LOCK_EX);
+    if (preg_match('#^https://ezkart-api-test.fixture.workers.dev/internal/commerce/orders/(EZK-[SP]-[A-F0-9]{24})/claim$#D', $handle->url, $claimMatch)) {
+        $returnFile = dirname(getenv('EZKART_TEST_CAPTURE')) . '/returns.json';
+        $returnFixture = is_file($returnFile) ? json_decode((string) file_get_contents($returnFile), true) : [];
+        $allowed = ($returnFixture['orderId'] ?? '') === $claimMatch[1] && ($payload['customer']['id'] ?? '') === ($returnFixture['owner'] ?? 'fixture-google-customer');
+        $handle->status = $allowed ? 200 : 404;
+        $response = $allowed ? json_encode(['ok' => true, 'orderId' => $claimMatch[1], 'authUserId' => $payload['customer']['id']]) : '{"ok":false,"error":"Order not found"}';
+        if (isset($handle->options[CURLOPT_WRITEFUNCTION])) { ($handle->options[CURLOPT_WRITEFUNCTION])($handle, $response); return '1'; }
+        return $response;
+    }
+    if (preg_match('#^https://ezkart-api-test.fixture.workers.dev/v1/customer/orders/(EZK-[SP]-[A-F0-9]{24})/returns(?:/(ret_[a-f0-9]{32}))?(?:\\?.*)?$#D', $handle->url, $returnMatch)) {
+        $fixture = json_decode((string) file_get_contents(dirname(getenv('EZKART_TEST_CAPTURE')) . '/returns.json'), true);
+        if (($fixture['orderId'] ?? '') !== $returnMatch[1]) { $handle->status = 404; return '{"ok":false,"error":"Order not found"}'; }
+        return json_encode(['ok' => true] + ($fixture['response'] ?? []));
+    }
     $shopFile = dirname(getenv('EZKART_TEST_CAPTURE')) . '/storefront.json';
     if (str_starts_with($handle->url, 'https://ezkart-api-test.fixture.workers.dev/v1/') && is_file($shopFile)) {
         $shop = json_decode((string) file_get_contents($shopFile), true);
@@ -29,6 +44,7 @@ function curl_exec(object $handle): string {
         }
         if ($path === '/v1/inventory' && isset($shop['inventory'])) return json_encode(['ok' => true] + $shop['inventory']);
         if ($path === '/v1/inventory/history' && isset($shop['inventory'])) return json_encode(['ok' => true, 'items' => [], 'nextCursor' => null]);
+        if ($path === '/v1/returns') return json_encode(['ok' => true, 'items' => [], 'nextCursor' => null, 'sellerId' => 'seller_fixture', 'canCreate' => true, 'enabled' => true]);
         if ($path === '/v1/inventory/reviews' && isset($shop['inventory'])) return json_encode(['ok' => true, 'items' => [], 'nextCursor' => null]);
         if ($path === '/v1/inventory/draft' && isset($shop['inventory'])) return json_encode(['ok' => true, 'draft' => null]);
         if ($path === '/v1/storefront') {

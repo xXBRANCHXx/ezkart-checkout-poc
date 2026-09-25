@@ -213,6 +213,36 @@ Test rollout for recovery implementation `b063ecf`:
   job, with no claim that it has been delivered. No hosted paid-order allocation
   or production release is certified by this rollout.
 
+### 25 September: return requests and physical inspection
+
+Implemented order-linked customer and merchant return requests, approval/decline,
+withdrawal, partial/full inspection, and closing unused intake. Received and
+saleable units are recorded separately. Atomic restocking preserves original
+item identity, reserved quantities, immutable history and stock versions. Claims
+bind a guest checkout to a verified Google identity once; customer API responses
+exclude private warehouse notes and inventory balances. Both store and buyer
+screens retain an uncertain request through tab reloads and sign-in failures.
+
+The merchant Returns workspace is linked from Orders. The buyer section mounts
+on tracking when central commerce is enabled. These writes remain gated while
+the hosted PHP checkout is still file-backed. Notification jobs are durable and
+claimable; their delivery is not yet implemented. Inspection never asserts that
+a refund was issued or releases wallet funds. See
+[returns-and-inspection.md](returns-and-inspection.md) for the state machine,
+ownership, transaction and API contracts, tests, and remaining return/refund work.
+
+No top-level completion checkbox advances on this implementation alone. Hosted
+paid-order acceptance, return courier handling, evidence/disputes/policies,
+refund execution/reconciliation and the broader workbench remain open.
+
+Local verification: all 48 Worker tests pass, including nine return/ownership
+tests and a 52-action paginated history. Merchant/customer browser workflows and
+the customer PHP proxy tests pass, including reload and authorization failures
+after an uncertain write. Existing inventory/recovery browser workflows, the
+address-session proxy and tracking preview checks pass. Desktop/mobile screenshots,
+PHP/JavaScript syntax and the test Worker build were checked. A private test D1
+export was taken before migration; hosted rollout evidence is recorded separately.
+
 ## Atomicity contract
 
 Commerce database changes use D1 transactional batches and database constraints,

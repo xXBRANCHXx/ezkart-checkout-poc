@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__ . '/api/customer-auth.php';
+require_once __DIR__ . '/api/commerce-client.php';
 header('Cache-Control: no-store');
 $customerNext = ez_customer_next((string) ($_SERVER['REQUEST_URI'] ?? '/cart/return.php'));
 try { $customerAccount = ez_customer_current(); }
@@ -12,6 +13,7 @@ if ($customerAccount === null || ($_GET['signin'] ?? '') === '1') {
 }
 session_write_close();
 $isTrackingSandbox = isset($trackingSandboxData) && is_array($trackingSandboxData);
+$returnsEnabled = !$isTrackingSandbox && ez_central_commerce_enabled();
 $orderId = $isTrackingSandbox ? 'EZK-S-000000000000000000000001' : trim((string) ($_GET['order'] ?? ''));
 if (preg_match('/^EZK-[A-Z0-9-]{8,70}$/D', $orderId) !== 1) {
     http_response_code(400);
@@ -35,6 +37,7 @@ header('X-Content-Type-Options: nosniff');
   <script src="tracking-map.js?v=5" defer></script>
   <?php if ($isTrackingSandbox): ?><script src="tracking-sandbox.js?v=6" defer></script><?php endif; ?>
   <script src="tracking.js?v=7" defer></script>
+  <?php if ($returnsEnabled): ?><link rel="stylesheet" href="customer-returns.css?v=<?= (int) filemtime(__DIR__ . '/customer-returns.css') ?>"><link rel="stylesheet" href="select.css?v=<?= (int) filemtime(__DIR__ . '/select.css') ?>"><script src="customer-returns.js?v=<?= (int) filemtime(__DIR__ . '/customer-returns.js') ?>" defer></script><script src="select.js?v=<?= (int) filemtime(__DIR__ . '/select.js') ?>" defer></script><?php endif; ?>
   <title>Track your order · Ezkart</title>
 </head>
 <body>
@@ -121,6 +124,7 @@ header('X-Content-Type-Options: nosniff');
         </aside>
       </div>
     </div>
+    <?php if ($returnsEnabled): require __DIR__ . '/customer-returns.php'; endif; ?>
     <button id="retry-tracking" class="copy-button" type="button" hidden>Try again</button>
     <div class="payment-bottom"><a id="return-checkout-link" href="./">← Back to checkout</a><a id="return-store-link" href="../">Return to store</a></div>
   </main>

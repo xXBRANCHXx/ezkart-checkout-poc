@@ -7,6 +7,11 @@ once; its calculated display total is not another stock item. Archived products
 remain countable through the archive filter. Digital/subscription products are
 excluded from physical counts.
 
+Order-linked return inspection is implemented separately in
+[returns-and-inspection.md](returns-and-inspection.md). Only inspected saleable
+units create a `return_restock` movement; received units kept out of stock do not.
+It remains gated by the central checkout rollout.
+
 ## Merchant workflow
 
 Choose physical count, stock received, damaged stock, lost stock, record

@@ -15,6 +15,8 @@ import { authenticateCommerceService, commerceServiceRoute, expireCommerceOrders
 import { claimCommerceJobs, finishCommerceJob } from "./commerce-jobs.js";
 import { inventoryOverview, inventoryHistory, inventoryDraft, adjustInventory, catalogStockMovements } from "./inventory.js";
 import { stockReviewList, stockReviewDetails, resolveStockReview } from "./stock-reviews.js";
+import { claimCommerceOrder } from "./commerce-access.js";
+import { returnList, returnOrder, returnDetail, customerReturns, createReturn, returnAction } from "./commerce-returns.js";
 const json = (payload, status = 200, headers = {}) => new Response(JSON.stringify(payload), {
   status,
   headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...headers },
@@ -1420,6 +1422,10 @@ export default {
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
     const url = new URL(request.url);
     try {
+      const claimOrderMatch = /^\/internal\/commerce\/orders\/(EZK-[SP]-[A-F0-9]{24})\/claim$/.exec(url.pathname);
+      if (claimOrderMatch && request.method === 'POST') {
+        return json({ok:true,...await claimCommerceOrder(env,claimOrderMatch[1],await authenticateCommerceService(request,env))});
+      }
       if (url.pathname.startsWith('/internal/commerce/jobs/') && request.method === 'POST') {
         const payload = await authenticateCommerceService(request, env);
         if (url.pathname === '/internal/commerce/jobs/claim') return json({ok: true, jobs: await claimCommerceJobs(env, payload)});
@@ -1433,6 +1439,13 @@ export default {
       const landingViewMatch = /^\/v1\/landing-pages\/([a-z0-9-]+)\/view$/.exec(url.pathname);
       if (request.method === "GET" && landingViewMatch) return await landingPageView(request, env, landingViewMatch[1]);
       if (request.method === "GET" && url.pathname === "/health") return json(await health(env), 200, cors);
+      const customerReturnMatch = /^\/v1\/customer\/orders\/(EZK-[SP]-[A-F0-9]{24})\/returns(?:\/(ret_[a-f0-9]{32}))?$/.exec(url.pathname);
+      if (customerReturnMatch && ['GET','POST'].includes(request.method)) {
+        const user=await authenticatedUser(request,env),actor={kind:'customer',id:user.id},[,orderId,returnId]=customerReturnMatch;
+        if(request.method==='GET')return json({ok:true,...await (returnId?returnDetail(env,actor,returnId,orderId,url.searchParams.get('before')||''):customerReturns(env,user,orderId,url))},200,cors);
+        const body=await requestJson(request,16000);
+        return json(returnId?{ok:true,receipt:await returnAction(env,actor,returnId,body,orderId)}:{ok:true,...await createReturn(env,actor,orderId,body)},200,cors);
+      }
       if (url.pathname === "/v1/customer/addresses") {
         if (!["GET", "POST"].includes(request.method)) return json({ ok: false, error: "Method not allowed." }, 405, cors);
         const user = await authenticatedUser(request, env);
@@ -1462,6 +1475,15 @@ export default {
         return json({ ok: true, store: await merchantStorefront(env, seller, request.method === "PUT" ? await requestJson(request, 5000) : null) }, 200, cors);
       }
       if (request.method === "GET" && url.pathname === "/v1/catalog") return json({ ok: true, ...(await catalog(request, env)) }, 200, cors);
+      const returnOrderMatch = /^\/v1\/returns\/orders\/(EZK-[SP]-[A-F0-9]{24})$/.exec(url.pathname);
+      const returnCaseMatch = /^\/v1\/returns\/(ret_[a-f0-9]{32})$/.exec(url.pathname);
+      if ((url.pathname==='/v1/returns'||returnOrderMatch||returnCaseMatch) && ['GET','POST'].includes(request.method)) {
+        const {seller,authUserId}=await sellerContext(request,env),actor={kind:'merchant',id:authUserId,sellerId:seller.id,role:seller.role};
+        if(returnOrderMatch)return json({ok:true,...await (request.method==='GET'?returnOrder(env,actor,returnOrderMatch[1]):createReturn(env,actor,returnOrderMatch[1],await requestJson(request,16000)))},200,cors);
+        if(returnCaseMatch)return request.method==='GET'?json({ok:true,...await returnDetail(env,actor,returnCaseMatch[1],'',url.searchParams.get('before')||'')},200,cors):json({ok:true,receipt:await returnAction(env,actor,returnCaseMatch[1],await requestJson(request,16000))},200,cors);
+        if(request.method==='GET')return json({ok:true,...await returnList(env,actor,url)},200,cors);
+        return json({ok:false,error:'Method not allowed'},405,cors);
+      }
       if (url.pathname === '/v1/inventory/reviews' && request.method === 'GET') {
         const {seller} = await sellerContext(request, env);
         return json({ok:true,...await stockReviewList(env,seller,url)},200,cors);
