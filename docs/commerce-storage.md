@@ -72,13 +72,21 @@ activate central checkout. Operational counts remain zero and the storage flag
 remains disabled. See [legacy-order-migration.md](legacy-order-migration.md) for
 the audit, replay verification and remaining source fencing/promotion work.
 
-Migration 0018 and current test Worker version
+Migration 0018 and test Worker version
 `913fe317-193a-4c53-98dd-d0d6a3a1cfd4` add the scoped central merchant order reads.
 Frontend `004d748` is deployed to TEST. Authenticated desktop/mobile preview,
 filter reload and empty-state checks pass; the API reports `enabled:false`.
 Operational counts remain zero, the 15-entry import receipt is unchanged, and
 D1/public R2/private R2 health passes. This does not enable central checkout or
 complete the other read adapters. See [central-order-manager.md](central-order-manager.md).
+
+Current TEST Worker `2e92c29a-d052-46db-b385-ba2da456aff8` also includes central
+dashboard reporting from frontend implementation `125af2a`. Its hosted public
+assets match the committed files, unauthenticated dashboard reads return 401,
+and D1/R2 health and unchanged operational/import counts are verified. The
+signed-in hosted dashboard review is pending a shared Chrome reconnection;
+local populated desktop/mobile acceptance passes. No storage flag is changed.
+See [central-dashboard.md](central-dashboard.md).
 
 ## Data and invariants
 

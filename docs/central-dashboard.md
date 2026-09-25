@@ -87,3 +87,24 @@ regressions also pass.
 This stage does not activate central checkout. Analytics, payment/customer read
 adapters, operational legacy promotion, monitored dispatch, wallet completion
 and the remaining workbench acceptance gates stay open.
+
+## TEST deployment — 25 September 2026
+
+Implementation `125af2a` is committed and pushed to `agent/ezkart-workbench`.
+The TEST Worker is deployed as `2e92c29a-d052-46db-b385-ba2da456aff8`. No
+migration or storage-flag change is part of this deployment. Public HTTPS reads
+confirm that the hosted dashboard JavaScript/CSS and updated order-manager
+JavaScript exactly match the committed files. The dashboard API rejects an
+unauthenticated request with 401. At 17:27 Jakarta time, Worker health reports
+47 application tables and passing D1/public R2/private R2 checks.
+
+Post-deployment D1 reads confirm zero operational orders, customers, captures,
+reservations, shipments and jobs. The existing import receipt retains 15 entries
+and manifest digest
+`ba180208c85cea72b82323b7b917e0e3771b143d930f5220665fddffc62777c0`.
+
+Authenticated hosted browser acceptance is still pending: Chrome's shared
+connection ended, and one explicit reconnect request is awaiting Chrome's new
+approval. The passing populated desktop/mobile tests use the real PHP proxy and
+local Worker fixture; they are not a claim that the hosted signed-in view has
+already been inspected. No second browser connection or reconnect loop is used.
