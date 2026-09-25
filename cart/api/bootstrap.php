@@ -434,6 +434,7 @@ function ez_checkout_request(array $input): array
     $shippingItems = [];
     $subtotal = 0;
     $productSnapshots = [];
+    $commerceItems = [];
     $weight = 0;
     $itemCount = 0;
     $sellerIds = [];
@@ -453,6 +454,16 @@ function ez_checkout_request(array $input): array
             throw new InvalidArgumentException('A selected quantity is no longer available.');
         }
         $sellerIds[] = (string) ($product['seller_id'] ?? '');
+        if (isset($input['expected_prices']) && ($input['expected_prices'][$id] ?? null) !== (int) $product['price']) {
+            throw new InvalidArgumentException('A product price changed. Review the updated total before paying.');
+        }
+        // Option identity must not depend on a merchant's non-unique SKU.
+        $commerceItems[$id] = [
+            'productId' => $product['product_id'] ?? $id,
+            'variantId' => $product['variant_id'] ?? '',
+            'quantity' => $quantity,
+            'expectedPrice' => (int) $product['price'],
+        ];
         $productSnapshots[$product['sku']] = [
             'product_id' => $product['product_id'] ?? $id,
             'variant_id' => $product['variant_id'] ?? '',
@@ -533,6 +544,7 @@ function ez_checkout_request(array $input): array
     if (count($sellerIds) !== 1 || $sellerIds[0] === '') throw new InvalidArgumentException('The cart must belong to one verified store.');
     return [
         'seller_id' => $sellerIds[0],
+        'commerce_items' => $commerceItems,
         'product_snapshots' => $productSnapshots,
         'items' => $items,
         'subtotal' => $subtotal,

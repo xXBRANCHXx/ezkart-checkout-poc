@@ -173,6 +173,12 @@ function ez_apply_doku_notification(string $body, array $headers, string $target
         || !hash_equals(ez_doku_signature($headers['client-id'], $headers['request-id'], $headers['request-timestamp'], $target, $body, $credentials['secret_key']), $headers['signature'])) {
         throw new InvalidArgumentException('Invalid DOKU notification signature.');
     }
+    require_once __DIR__ . '/commerce-doku.php';
+    if (ez_central_commerce_enabled()) {
+        ez_central_commerce_environment($environment);
+        ez_apply_central_doku_result(ez_central_order($orderId, $environment), $notification);
+        return;
+    }
     // Delayed provider retries remain valid; order locking and monotonic status make replays harmless.
     $lock = ez_lock_order_state($orderId);
     try {

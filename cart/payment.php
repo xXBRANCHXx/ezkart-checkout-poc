@@ -19,8 +19,9 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-sr
   <meta name="theme-color" content="#ffffff">
   <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
   <link rel="preload" href="admin/assets/fonts/inter.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="payment.css?v=ezpay-1">
-  <script src="payment.js?v=3" defer></script>
+  <link rel="stylesheet" href="payment.css?v=<?= filemtime(__DIR__ . '/payment.css') ?>">
+  <script src="checkout-attempt.js?v=<?= filemtime(__DIR__ . '/checkout-attempt.js') ?>" defer></script>
+  <script src="payment.js?v=<?= filemtime(__DIR__ . '/payment.js') ?>" defer></script>
   <title>Complete your payment · Ezpay</title>
 </head>
 <body>
@@ -34,15 +35,15 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-sr
     <div class="payment-intro">
       <div class="eyebrow"><span>Checkout <span class="step-divider" aria-hidden="true">/</span> <strong>Payment</strong></span><span id="sandbox-badge" class="test-badge" hidden>Sandbox</span></div>
       <h1 id="payment-title">Complete payment</h1>
-      <p id="payment-description">Transfer to the BCA Virtual Account below to complete your order.</p>
+      <p id="payment-description">Checking the payment details for your order.</p>
     </div>
     <p id="page-notice" class="notice" role="status">Loading your payment details…</p>
     <button id="retry-details" class="copy-button" type="button" hidden>Try again</button>
     <div id="payment-layout" class="payment-layout" hidden>
       <section class="payment-card" aria-label="Payment details">
         <div class="card-heading">
-          <img class="bank-logo" src="../assets/payment/bca.png" width="331" height="138" alt="BCA">
-          <div class="bank-description"><h2>BCA Virtual Account</h2><p>Bank transfer</p></div>
+          <img id="payment-bank-logo" class="bank-logo" src="../assets/payment/bca.png" width="331" height="138" alt="BCA" hidden>
+          <div class="bank-description"><h2 id="payment-method-title">Secure payment</h2><p id="payment-method-description">Order payment</p></div>
           <span id="payment-state" class="state-pill">Awaiting payment</span>
         </div>
         <div id="transfer-details" hidden>
@@ -60,6 +61,7 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-sr
         </div>
         <div id="result-panel" class="result-panel" hidden><div id="result-icon" class="result-icon" aria-hidden="true">✓</div><h2 id="result-title"></h2><p id="result-message"></p></div>
         <div class="payment-actions">
+          <a id="provider-payment-link" class="primary-button" href="#" rel="noreferrer" hidden>Continue to secure payment</a>
           <button id="check-payment" class="primary-button" type="button">Check payment status</button>
           <a id="order-link" class="primary-button" href="return.php" hidden>View order</a>
           <p id="check-message" role="status" aria-live="polite">Your payment will be confirmed automatically after the transfer.</p>

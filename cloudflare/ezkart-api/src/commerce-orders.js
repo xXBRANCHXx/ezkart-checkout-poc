@@ -1,3 +1,5 @@
+import {checkoutContext,paymentSession,paymentSessionStatements,paymentAccountStatement} from './commerce-payments.js';
+
 const encoder = new TextEncoder();
 const idPattern = /^[A-Za-z0-9][A-Za-z0-9_-]{2,95}$/;
 const orderPattern = /^EZK-[SP]-[A-F0-9]{24}$/;
@@ -114,7 +116,7 @@ function checkoutInput(env, input) {
   if (JSON.stringify(shipping).length > 8000) fail('Shipping details are too large');
   const expiresAt = new Date(input.expiresAt);
   if (!Number.isFinite(expiresAt.getTime())) fail('Checkout expiry is invalid');
-  return {environment, sellerId, checkoutKey, items, customer, shipping: {...shipping, amount}, expiresAt: expiresAt.toISOString()};
+  return {environment, sellerId, checkoutKey, checkout:checkoutContext(input.checkout,environment), items, customer, shipping: {...shipping, amount}, expiresAt: expiresAt.toISOString()};
 }
 
 function orderView(row, items = []) {
@@ -138,10 +140,14 @@ export async function commerceOrder(env, sellerId, orderId, environment) {
   const result = await env.DB.batch([
     env.DB.prepare('SELECT * FROM orders WHERE id = ? AND seller_id = ? AND commerce_environment = ? AND commerce_version = 1').bind(orderId, sellerId, environment),
     env.DB.prepare('SELECT * FROM order_items WHERE order_id = ? AND seller_id = ? ORDER BY id').bind(orderId, sellerId),
+    env.DB.prepare('SELECT details_json FROM commerce_payment_sessions WHERE order_id=? AND seller_id=?').bind(orderId,sellerId),
+    env.DB.prepare("SELECT payload_json,state,last_error FROM commerce_jobs WHERE order_id=? AND seller_id=? AND kind='payment.create'").bind(orderId,sellerId),
   ]);
   const row = result[0].results[0];
   if (!row) fail('Order not found', 404);
-  return orderView(row, result[1].results);
+  const paymentJob=result[3].results[0];
+  return {...orderView(row, result[1].results),payment:result[2].results[0]?parse(result[2].results[0].details_json):null,
+    paymentRequestId:paymentJob?parse(paymentJob.payload_json).providerRequestId:'',paymentJobState:paymentJob?.state||'',paymentJobError:paymentJob?.last_error||''};
 }
 
 function databaseFailure(error) {
@@ -150,6 +156,7 @@ function databaseFailure(error) {
   if (/commerce_product_changed/.test(message)) fail('A product changed. Refresh its price and availability', 409);
   if (/commerce_revision_conflict/.test(message)) fail('The order changed. Reload and retry this operation', 409);
   if (/commerce_payment_mismatch/.test(message)) fail('The payment does not match this order', 409);
+  if (/commerce_payment_binding_mismatch/.test(message)) fail('Provider payment instructions do not match this order',409);
   throw error;
 }
 
@@ -158,10 +165,10 @@ export async function createCommerceOrder(env, payload) {
   // Expiry is chosen by the service for a new attempt and does not change the
   // commercial intent of a retry after a lost response.
   const hash = await commerceHash({...input, expiresAt: undefined});
-  const findExisting = () => env.DB.prepare('SELECT id, request_hash FROM orders WHERE seller_id = ? AND commerce_environment = ? AND checkout_key = ?')
-    .bind(input.sellerId, input.environment, input.checkoutKey).first();
+  const findExisting = () => env.DB.prepare('SELECT id,seller_id,request_hash FROM orders WHERE commerce_environment = ? AND checkout_key = ?')
+    .bind(input.environment, input.checkoutKey).first();
   const replay = async row => {
-    if (row.request_hash !== hash) fail('This checkout key was already used for different order details', 409);
+    if (row.seller_id!==input.sellerId||row.request_hash !== hash) fail('This checkout key was already used for different order details', 409);
     return commerceOrder(env, input.sellerId, row.id, input.environment);
   };
   const existing = await findExisting();
@@ -190,7 +197,7 @@ export async function createCommerceOrder(env, payload) {
   });
   const subtotal = integer(items.reduce((total, item) => total + item.price * item.quantity, 0), 100000000000, 'Order subtotal', 1);
   const total = integer(subtotal + input.shipping.amount, 100000000000, 'Order total', 1);
-  const snapshot = {shipping: input.shipping, fees: {version: 1, plan: seller.plan,
+  const snapshot = {checkout:input.checkout,shipping: input.shipping, fees: {version: 1, plan: seller.plan,
     commissionBasisPoints: seller.plan === 'advanced' ? 600 : 500, adminAmount: 1250,
     commissionAmount: Math.round(subtotal * (seller.plan === 'advanced' ? 600 : 500) / 10000),
     processingFeePolicy: 'actual_provider_fee', withdrawalMinimum: 250000, sellerWithdrawalFee: 0}};
@@ -257,9 +264,15 @@ export async function applyCommerceEvent(env, orderId, input) {
       (id, seller_id, order_id, event_key, event_type, payload_hash, previous_revision, data_json, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(`event_${crypto.randomUUID()}`, sellerId, orderId, eventKey, input.type,
         hash, order.revision, JSON.stringify(data), now)];
+    let session=null;
+    if(input.type==='payment.created'){
+      session=paymentSession(order,data);statements.push(...paymentSessionStatements(env,order,session,now));
+    }
+    if(input.type==='payment.create_failed'&&data.noEffectConfirmed!==true)fail('Confirm no provider payment was created before releasing this order',409);
     if (input.type === 'payment.succeeded') {
       if (data.verified !== true || data.provider !== 'doku' || data.currency !== 'IDR' || data.amount !== order.total) fail('The verified payment must match the order amount, currency and provider', 409);
       const reference = text(data.reference, 160, 'Payment reference');
+      const binding=paymentAccountStatement(env,order,data,now);if(binding)statements.push(binding);
       const existingCapture = await env.DB.prepare('SELECT order_id, provider_reference FROM commerce_payment_captures WHERE order_id = ? OR (provider = ? AND commerce_environment = ? AND provider_reference = ?)')
         .bind(orderId, 'doku', environment, reference).all();
       if (existingCapture.results.some(row => row.order_id !== orderId)) fail('Payment reference is already associated with another order', 409);
@@ -285,12 +298,8 @@ export async function applyCommerceEvent(env, orderId, input) {
       }
     } else if (!paid) {
       if (input.type === 'payment.created' && order.state === 'creating') {
-        next = 'pending';
-        if (data.expiresAt !== undefined) {
-          const deadline = Date.parse(data.expiresAt);
-          if (!Number.isFinite(deadline) || deadline <= Date.now() || deadline > Date.now() + 86400000) fail('Provider payment expiry is invalid');
-          expiresAt = new Date(deadline).toISOString();
-        }
+        expiresAt=session.expiresAt;
+        if(Date.parse(expiresAt)<=Date.now()){next='expired';reservation='released';}else next='pending';
       }
       if (input.type === 'payment.create_failed' && order.state === 'creating') { next = 'failed'; reservation = 'released'; }
       if (input.type === 'payment.expired' && ['creating', 'pending'].includes(order.state)) {
@@ -366,9 +375,20 @@ export async function commerceServiceRoute(request, env) {
   if (request.method === 'POST' && url.pathname === '/internal/commerce/orders') {
     return {order: await createCommerceOrder(env, payload)};
   }
+  if(request.method==='POST'&&url.pathname==='/internal/commerce/checkouts/resume'){
+    const environment=commerceEnvironment(env,payload.environment);
+    if(typeof payload.checkoutKey!=='string'||!/^[A-Za-z0-9_-]{16,100}$/.test(payload.checkoutKey)||!/^[a-f0-9]{64}$/.test(payload.intentHash||''))fail('Checkout identity is invalid');
+    const row=await env.DB.prepare('SELECT id,seller_id,snapshot_json FROM orders WHERE commerce_environment=? AND checkout_key=? AND commerce_version=1').bind(environment,payload.checkoutKey).first();
+    if(!row)return {order:null};
+    if(parse(row.snapshot_json).checkout?.intentHash!==payload.intentHash)fail('This checkout request changed. Recover the original payment before starting another one.',409);
+    return {order:await commerceOrder(env,row.seller_id,row.id,environment)};
+  }
   const match = /^\/internal\/commerce\/orders\/(EZK-[SP]-[A-F0-9]{24})(\/events)?$/.exec(url.pathname);
   if (match && !match[2] && request.method === 'GET') {
-    return {order: await commerceOrder(env, url.searchParams.get('seller'), match[1], url.searchParams.get('environment'))};
+    const environment=commerceEnvironment(env,url.searchParams.get('environment'));
+    const sellerId=url.searchParams.get('seller')||(await env.DB.prepare('SELECT seller_id FROM orders WHERE id=? AND commerce_environment=? AND commerce_version=1').bind(match[1],environment).first())?.seller_id;
+    if(!sellerId)fail('Order not found',404);
+    return {order: await commerceOrder(env, sellerId, match[1], environment)};
   }
   if (match && match[2] && request.method === 'POST') return {order: await applyCommerceEvent(env, match[1], payload)};
   fail('Commerce route not found', 404);

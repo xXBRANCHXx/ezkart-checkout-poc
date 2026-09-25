@@ -12,6 +12,10 @@
     loaded: false,
     shop: "store",
     returnUrl: "",
+    durableCheckout: false,
+    pendingCheckout: null,
+    paymentBusy: false,
+    recoveryError: "",
   };
 
   const params = new URLSearchParams(window.location.search);
@@ -190,6 +194,7 @@
   }
 
   async function loadCatalog() {
+    if (state.pendingCheckout || state.recoveryError) { renderRecovery(); return; }
     if (hostedEntry && !hostedStore) {
       try {
         const data = await window.EzkartStorefront.load(params.has("product") ? { product: params.get("product"), ...(params.has("store") ? { store: params.get("store") } : {}) } : { store: params.get("store"), mode: "checkout" });
@@ -258,6 +263,7 @@
         throw new Error("Checkout settings could not load. Please try again.");
       }
       state.shippingRequired = config.shipping_required;
+      state.durableCheckout = config.durable_checkout === true;
       byId("get-rates").hidden = !state.shippingRequired;
       byId("delivery-method").hidden = !state.shippingRequired;
       document.querySelector('[data-progress-step="checkout"] b').textContent = state.shippingRequired ? "Delivery" : "Details";
@@ -325,7 +331,10 @@
       ? money(shippingPrice())
       : state.step === "confirm" ? "Calculated next" : "Not selected";
     byId("grand-total").textContent = money(total());
-    if (state.shipping || !state.shippingRequired) byId("pay-button").textContent = `Pay ${money(total())}`;
+    if (state.pendingCheckout) {
+      byId("pay-button").textContent = state.paymentBusy ? "Recovering your payment…" : "Resume saved payment";
+      byId("pay-button").disabled = state.paymentBusy || !!state.recoveryError;
+    } else if (state.shipping || !state.shippingRequired) byId("pay-button").textContent = `Pay ${money(total())}`;
   }
 
   function renderSummary() {
@@ -508,6 +517,9 @@
   }
 
   async function startPayment() {
+    if (state.paymentBusy) return;
+    if (state.recoveryError) { showToast(state.recoveryError); return; }
+    if (state.pendingCheckout) { await recoverCheckout(); return; }
     if ((state.shippingRequired && !state.shipping) || !state.loaded || !itemCount() || byId("pay-button").disabled) return;
     const form = byId("customer-form");
     const result = validateForm(form);
@@ -522,15 +534,25 @@
     button.textContent = "Opening secure payment…";
 
     try {
+      const body = {
+        cart: state.cart, shop: state.shop,
+        customer: { ...state.customer, ...(state.deliveryCoordinate ? { coordinate: state.deliveryCoordinate } : {}) },
+        shipping_id: state.shipping?.id || "",
+      };
+      if (state.durableCheckout) {
+        body.checkout_key = [...crypto.getRandomValues(new Uint8Array(16))].map(value => value.toString(16).padStart(2, "0")).join("");
+        body.expected_prices = Object.fromEntries(cartEntries().map(([id]) => [id, Number(state.products[id].price)]));
+        body.expected_total = total();
+        const attempt = {body: JSON.stringify(body), uncertain: false};
+        window.EzkartCheckoutAttempt.save(attempt);
+        state.pendingCheckout = attempt;
+        await recoverCheckout();
+        return;
+      }
       const response = await fetch("api/start.php", {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({
-          cart: state.cart,
-          shop: state.shop,
-          customer: { ...state.customer, ...(state.deliveryCoordinate ? { coordinate: state.deliveryCoordinate } : {}) },
-          shipping_id: state.shipping?.id || "",
-        }),
+        body: JSON.stringify(body),
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.error || "Payment could not start.");
@@ -557,6 +579,68 @@
       ));
       button.disabled = false;
       button.textContent = original;
+    }
+  }
+
+  function renderRecovery(message = "") {
+    const active = !!state.pendingCheckout || !!state.recoveryError;
+    byId("checkout-recovery").hidden = !active;
+    document.querySelector(".checkout-layout").classList.toggle("is-recovering", active);
+    document.querySelector(".order-summary").hidden = active;
+    document.querySelectorAll("[data-panel]").forEach(panel => { panel.hidden = active; });
+    const saved = state.pendingCheckout ? JSON.parse(state.pendingCheckout.body) : null;
+    byId("recovery-total").hidden = !saved;
+    byId("recovery-total").textContent = saved ? `Saved checkout total: ${money(saved.expected_total)}` : "";
+    byId("recover-checkout").disabled = state.paymentBusy || !!state.recoveryError;
+    byId("recover-checkout").textContent = state.paymentBusy ? "Checking your payment…" : state.pendingCheckout?.orderId ? "Continue payment" : "Recover payment";
+    byId("recovery-message").textContent = message || state.recoveryError;
+    byId("recovery-message").hidden = !byId("recovery-message").textContent;
+    renderTotals();
+  }
+
+  async function recoverCheckout() {
+    if (state.paymentBusy || !state.pendingCheckout) return;
+    const attempt = state.pendingCheckout;
+    if (/^EZK-[SP]-[A-F0-9]{24}$/.test(attempt.orderId || "")) {
+      window.location.assign("payment.php?order=" + encodeURIComponent(attempt.orderId)); return;
+    }
+    const previouslyUncertain = attempt.uncertain === true;
+    state.paymentBusy = true; renderRecovery();
+    try {
+      // Persist uncertainty BEFORE sending. Reloads and a lost response must reuse exactly these bytes.
+      attempt.uncertain = true;
+      window.EzkartCheckoutAttempt.save(attempt);
+      const response = await fetch("api/start.php", {method: "POST", headers: {"Content-Type": "application/json", Accept: "application/json"},
+        body: attempt.body, signal: AbortSignal.timeout(75000)});
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.ok) {
+        if (!previouslyUncertain && response.status === 422 && data.checkout_rejected === true) {
+          window.EzkartCheckoutAttempt.clear(); state.pendingCheckout = null;
+          throw new Error(data.error || "Review your checkout details before paying.");
+        }
+        throw new Error(data.error || "We couldn’t confirm payment setup. Use Recover payment to check the same attempt.");
+      }
+      if (data.durable_checkout !== true || data.provider !== "doku" || !["sandbox", "production"].includes(data.environment)
+          || !new RegExp("^EZK-" + (data.environment === "sandbox" ? "S" : "P") + "-[A-F0-9]{24}$").test(data.order_id || "")) {
+        throw new Error("We couldn’t confirm the original payment. Recover this attempt before starting another order.");
+      }
+      attempt.orderId = data.order_id;
+      window.EzkartCheckoutAttempt.save(attempt);
+      window.location.assign("payment.php?order=" + encodeURIComponent(data.order_id));
+    } catch (error) {
+      const message = friendlyError(error instanceof Error ? error.message : "", "We couldn’t confirm payment setup. Recover this same attempt.");
+      if (!state.pendingCheckout) showToast(message);
+      renderRecovery(message);
+      if (state.pendingCheckout) byId("recovery-title").focus({preventScroll: true});
+    } finally {
+      state.paymentBusy = false;
+      if (!state.pendingCheckout) {
+        byId("pay-button").disabled = state.shippingRequired && !state.shipping;
+        await loadCatalog();
+      }
+      byId("recover-checkout").disabled = !!state.recoveryError;
+      byId("recover-checkout").textContent = state.pendingCheckout?.orderId ? "Continue payment" : "Recover payment";
+      renderTotals();
     }
   }
 
@@ -639,6 +723,7 @@
     if (error) error.textContent = "";
   });
   byId("pay-button").addEventListener("click", startPayment);
+  byId("recover-checkout").addEventListener("click", recoverCheckout);
   byId("retry-catalog").addEventListener("click", loadCatalog);
   byId("back-to-store").addEventListener("click", returnToStore);
   byId("empty-back-to-store").addEventListener("click", returnToStore);
@@ -671,5 +756,8 @@
 
   byId("year").textContent = new Date().getFullYear();
   applyMerchantBrand();
+  try { state.pendingCheckout = window.EzkartCheckoutAttempt.read(); }
+  catch (error) { state.recoveryError = error.message || "Saved payment details are unavailable. Recover your previous order before starting another payment."; }
+  renderRecovery();
   loadCatalog();
 })();

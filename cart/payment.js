@@ -32,20 +32,28 @@
     if (!payment) return;
     const data = payment;
     const direct = data.payment_details;
-    const expiry = Date.parse(direct?.expires_at || "");
+    const expiry = Date.parse(direct?.expires_at || data.payment_expires_at || "");
     const expired = Number.isFinite(expiry) && expiry <= Date.now();
     const state =
       data.status === "PAID"
         ? "PAID"
-        : data.status === "FAILED"
-          ? "FAILED"
+        : ["FAILED", "CANCELLED", "EXPIRED"].includes(data.status)
+          ? data.status
           : expired
             ? "EXPIRED"
-            : "PENDING";
+            : data.status === "CREATING" ? "CREATING" : "PENDING";
     const available =
       direct?.method === "VIRTUAL_ACCOUNT_BCA" &&
       /^\d{8,30}$/.test(direct.account_number || "") &&
       Number.isFinite(expiry);
+    let hostedUrl = "";
+    if (data.payment_flow === "hosted" && state === "PENDING" && Number.isFinite(expiry) && !expired) {
+      try {
+        const url = new URL(data.payment_url), hosts = data.environment === "production" ? ["jokul.doku.com"] : ["sandbox.doku.com", "staging.doku.com"];
+        if (url.protocol === "https:" && hosts.includes(url.hostname) && !url.username && !url.password && !url.port && !url.hash
+            && /^\/(?:checkout-link(?:-v2)?\/|checkout\/link\/).+/.test(url.pathname)) hostedUrl = url.href;
+      } catch (_) {}
+    }
     shell.dataset.state = state;
     byId("payment-layout").hidden = false;
     byId("sandbox-badge").hidden = byId("sandbox-note").hidden =
@@ -83,6 +91,11 @@
     byId("transfer-details").hidden = byId("payment-instructions").hidden =
       state !== "PENDING" || !available;
     byId("result-panel").hidden = state === "PENDING" && available;
+    byId("provider-payment-link").hidden = !hostedUrl;
+    byId("provider-payment-link").href = hostedUrl || "#";
+    byId("payment-bank-logo").hidden = !available;
+    byId("payment-method-title").textContent = available ? "BCA Virtual Account" : "Secure payment";
+    byId("payment-method-description").textContent = available ? "Bank transfer" : "Order payment";
     byId("check-payment").hidden = state === "PAID" || state === "FAILED";
     byId("order-link").hidden = state !== "PAID";
     byId("payment-state").textContent = {
@@ -90,6 +103,8 @@
       EXPIRED: "Time expired",
       FAILED: "Not completed",
       PENDING: "Awaiting payment",
+      CREATING: "Preparing payment",
+      CANCELLED: "Cancelled",
     }[state];
     if (available) {
       byId("account-number").value = direct.account_number.replace(
@@ -113,6 +128,9 @@
         ? "Payment window has ended."
         : `${Math.max(1, Math.ceil((expiry - Date.now()) / 60000))} minutes remaining`;
     }
+    if (["PAID", "EXPIRED", "FAILED", "CANCELLED"].includes(data.status)) {
+      try { window.EzkartCheckoutAttempt.clear(orderId); } catch (_) {}
+    }
     if (state === "PAID") {
       byId("payment-title").textContent = "Payment confirmed";
       byId("payment-description").textContent =
@@ -129,7 +147,7 @@
           localStorage.removeItem("ezkart.checkout.cart.v1:" + data.shop);
         } catch (_) {}
       }
-    } else if (state === "EXPIRED" || state === "FAILED") {
+    } else if (["EXPIRED", "FAILED", "CANCELLED"].includes(state)) {
       byId("payment-title").textContent =
         state === "EXPIRED"
           ? "Payment window ended."
@@ -146,11 +164,29 @@
       if (!manualCheck) byId("check-message").textContent = state === "EXPIRED"
         ? "If you already paid, we’ll keep checking for confirmation."
         : "Keep your order number if you need help.";
+    } else if (state === "CREATING") {
+      byId("payment-title").textContent = "Preparing your payment";
+      byId("payment-description").textContent = "Your order is saved. We’re checking the payment service for your payment instructions.";
+      byId("result-icon").textContent = "…";
+      byId("result-title").textContent = "Payment setup is still being confirmed";
+      byId("result-message").textContent = "Keep this order number. You can leave this page and return to the same payment; don’t start another order while this is being checked.";
+      if (!manualCheck) byId("check-message").textContent = "We’ll keep checking this order automatically.";
+    } else if (hostedUrl) {
+      byId("payment-title").textContent = "Complete your payment";
+      byId("payment-description").textContent = "Your secure payment session is ready.";
+      byId("result-icon").textContent = "→";
+      byId("result-title").textContent = "Continue to secure payment";
+      byId("result-message").textContent = "Choose your payment method and complete the payment on the secure payment page. Return here to check confirmation.";
+      if (!manualCheck) byId("check-message").textContent = "Your order will update when payment is confirmed.";
     } else if (!available) {
       byId("result-icon").textContent = "…";
       byId("result-title").textContent = "Payment details unavailable";
       byId("result-message").textContent =
         "We could not load a bank account for this order. Check again in a moment. Do not send a transfer without the account details.";
+    } else {
+      byId("payment-title").textContent = "Complete payment";
+      byId("payment-description").textContent = "Transfer to the BCA Virtual Account below to complete your order.";
+      if (!manualCheck) byId("check-message").textContent = "Your payment will be confirmed automatically after the transfer.";
     }
   }
   async function check(manual = false) {

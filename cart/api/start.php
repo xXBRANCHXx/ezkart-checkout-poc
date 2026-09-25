@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/bootstrap.php';
 require_once __DIR__ . '/customer-auth.php';
+require_once __DIR__ . '/commerce-checkout.php';
 
 try {
     if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
@@ -11,12 +12,21 @@ try {
     if (!ez_request_origin_allowed()) {
         ez_api_json(['ok' => false, 'error' => 'Invalid checkout origin.'], 403);
     }
-    $input = json_decode((string) file_get_contents('php://input'), true);
+    $body = file_get_contents('php://input', false, null, 0, 64001);
+    if (!is_string($body) || strlen($body) > 64000) throw new InvalidArgumentException('Checkout request is too large.');
+    $input = json_decode($body, true);
     if (!is_array($input)) {
         throw new InvalidArgumentException('Invalid checkout request.');
     }
     $customerAccount = ez_customer_current();
     if (session_status() === PHP_SESSION_ACTIVE) session_write_close();
+
+    if (ez_central_commerce_enabled()) {
+        $result = ez_central_checkout($input, $customerAccount);
+        ez_api_json($result, $result['status'] === 'CREATING' ? 202 : 201);
+    }
+    // A saved central attempt must never become a new legacy charge after a configuration rollback.
+    if (array_key_exists('checkout_key', $input)) throw new EzCommerceStorageException('This saved payment requires central checkout recovery.', 503);
 
     // Validate credentials before requesting a paid Biteship rate lookup.
     $environment = ez_commerce_environment();
@@ -99,7 +109,11 @@ try {
         'payment_total' => $checkout['total'],
     ], 201);
 } catch (InvalidArgumentException $error) {
-    ez_api_json(['ok' => false, 'error' => $error->getMessage()], 422);
+    ez_api_json(['ok' => false, 'error' => $error->getMessage(), 'checkout_rejected' => true], 422);
+} catch (EzCommerceStorageException $error) {
+    $status = in_array($error->httpStatus, [403, 409, 422], true) ? $error->httpStatus : 503;
+    ez_api_json(['ok' => false, 'error' => $status === 503
+        ? 'We could not confirm payment setup. Retry this same checkout to recover your order.' : $error->getMessage(), 'retry_same_checkout' => true], $status);
 } catch (Throwable $error) {
     error_log('Ezkart DOKU start error: ' . $error->getMessage());
     ez_api_json(['ok' => false, 'error' => 'Secure payment is temporarily unavailable. Please try again.'], 503);

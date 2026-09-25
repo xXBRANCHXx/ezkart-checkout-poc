@@ -184,6 +184,15 @@ function ez_customer_owns_order(array $order, array $customer): bool
 
 function ez_customer_claim_order(string $id, array $customer): array
 {
+    require_once __DIR__ . '/commerce-checkout.php';
+    if (ez_central_commerce_enabled()) {
+        if (preg_match('/^EZK-[SP]-[A-F0-9]{24}$/D', $id) !== 1) throw new InvalidArgumentException('Order not found.');
+        $environment = ez_central_commerce_environment(str_starts_with($id, 'EZK-P-') ? 'production' : 'sandbox');
+        ez_commerce_request('POST', '/internal/commerce/orders/' . $id . '/claim', [
+            'environment' => $environment, 'customer' => ['id' => $customer['id'], 'email' => $customer['email']],
+        ]);
+        return ez_central_order_projection(ez_central_order($id, $environment));
+    }
     // Load first so random references do not create state-lock files.
     $order = ez_load_order($id);
     if (!ez_customer_owns_order($order, $customer)) throw new InvalidArgumentException('Order not found.');

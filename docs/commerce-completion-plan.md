@@ -265,6 +265,38 @@ Test rollout for return implementation `bad4c16`:
   notification delivery and refund acceptance on a real hosted paid order remain
   pending the central checkout/fulfillment rollout. Production remains untouched.
 
+### 25 September: durable checkout and payment recovery adapters
+
+Prepared the PHP central checkout, signed BCA callback, public payment-status and
+verified-customer ownership paths behind the rollout flag. Checkout now recovers
+the original intent before consulting a changed catalog or requesting another
+paid shipping quote. Migration 0014 stores immutable provider instructions and
+binds direct BCA accounts to the original provider request, including callbacks
+that arrive before the creation response. Cross-store reuse of a checkout key
+is rejected.
+
+The central browser flow persists exact request bytes before sending, survives
+reloads and lost responses, and uses a dedicated recovery view when an attempt
+is unresolved. Its payment page distinguishes setup, bank instructions and a
+validated hosted payment link. A configuration rollback cannot silently turn a
+saved central attempt into a new file-backed payment. Unknown provider outcomes
+retain their jobs and stock holds; a CLI dispatcher reconciles provider status
+without treating a 404 as authorization to create again.
+
+Local verification: all 53 Worker tests, all 10 new PHP/Worker integration and
+desktop/mobile browser tests, both cross-language signing tests, and affected
+legacy checkout/callback/payment/tracking tests pass. PHP/JavaScript syntax and
+the test Worker dry run pass. Reviewed recovery, waiting and hosted-payment
+screens at desktop and 390px widths. Provider calls in these tests are fixtures.
+
+This does not check off a completion item. Hosted central checkout is still
+disabled. Merchant order/fulfillment cutover, private legacy import, seller
+shipping settings, dispatcher installation and monitoring, frequent expiry,
+additional payment-channel adapters, missing-instruction recovery, refunds and
+financial operations remain necessary. See
+[checkout-payment-recovery.md](checkout-payment-recovery.md) for the contract and
+specific limitations.
+
 ## Atomicity contract
 
 Commerce database changes use D1 transactional batches and database constraints,

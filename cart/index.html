@@ -8,7 +8,7 @@
     <meta name="robots" content="noindex,nofollow" />
     <link rel="canonical" href="https://ezkart.id/cart/" />
     <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="cart.css?v=checkout-polish-1" />
+    <link rel="stylesheet" href="cart.css?v=checkout-recovery-1" />
     <link rel="stylesheet" href="storefront.css?v=checkout-polish-1" />
     <link rel="stylesheet" href="product-options.css?v=1" />
     <link rel="stylesheet" href="select.css?v=1" />
@@ -40,6 +40,13 @@
     <main class="checkout-main" id="checkout-main" aria-live="polite">
       <div class="checkout-layout">
         <div class="checkout-content">
+          <section id="checkout-recovery" class="checkout-recovery" aria-labelledby="recovery-title" hidden>
+            <h2 id="recovery-title" tabindex="-1">Continue your payment</h2>
+            <p>A payment attempt is saved in this tab. Recover it using your original items, total, and delivery details.</p>
+            <p id="recovery-total"></p>
+            <p id="recovery-message" role="status" hidden></p>
+            <button id="recover-checkout" class="outline-button" type="button">Recover payment</button>
+          </section>
           <section class="checkout-panel active" data-panel="confirm" aria-labelledby="cart-title">
             <header class="page-heading">
               <h1 id="cart-title">Review your cart</h1>
@@ -149,7 +156,8 @@
     <script src="customer-addresses.js?v=4"></script>
     <script src="storefront.js?v=1"></script>
     <script src="product-options.js?v=1"></script>
-    <script src="cart.js?v=checkout-polish-1"></script>
+    <script src="checkout-attempt.js?v=1"></script>
+    <script src="cart.js?v=checkout-recovery-1"></script>
     <script src="select.js?v=1"></script>
   </body>
 </html>

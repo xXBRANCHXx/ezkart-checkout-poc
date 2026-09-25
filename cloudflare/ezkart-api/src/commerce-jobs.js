@@ -14,6 +14,8 @@ export async function claimCommerceJobs(env, input) {
   if (!Array.isArray(input.kinds) || !input.kinds.length || input.kinds.length > kinds.length || input.kinds.some(kind => !kinds.includes(kind))) fail('Job kinds are invalid');
   const mode = input.mode || 'execute';
   if (!['execute', 'reconcile'].includes(mode)) fail('Job mode is invalid');
+  const orderId=input.orderId||'';
+  if(typeof orderId!=='string'||(orderId&&!/^EZK-[SP]-[A-F0-9]{24}$/.test(orderId)))fail('Job order is invalid');
   const limit = input.limit ?? 5, seconds = input.leaseSeconds ?? 90;
   if (!Number.isInteger(limit) || limit < 1 || limit > 10 || !Number.isInteger(seconds) || seconds < 15 || seconds > 120) fail('Job lease is invalid');
   const now = new Date().toISOString(), until = new Date(Date.now() + seconds * 1000).toISOString();
@@ -32,8 +34,10 @@ export async function claimCommerceJobs(env, input) {
         AND kind IN (SELECT value FROM json_each(?)) AND available_at <= ?
         AND ((? = 'execute' AND state IN ('queued', 'retry') AND attempts < maximum_attempts)
           OR (? = 'reconcile' AND state = 'uncertain' AND attempts < maximum_attempts))
+        AND (?='' OR order_id=?)
+        AND (?='reconcile' OR kind!='payment.create' OR EXISTS (SELECT 1 FROM orders o WHERE o.id=commerce_jobs.order_id AND o.checkout_state='creating' AND o.expires_at>?))
         ORDER BY available_at, created_at, id LIMIT ?) RETURNING *`)
-      .bind(token, input.workerId, until, mode, now, environment, JSON.stringify(input.kinds), now, mode, mode, limit),
+      .bind(token, input.workerId, until, mode, now, environment, JSON.stringify(input.kinds), now, mode, mode, orderId, orderId, mode, now, limit),
     env.DB.prepare(`INSERT INTO commerce_job_attempts (id, job_id, attempt, lease_token, worker_id, mode, started_at)
       SELECT id || ':' || attempts, id, attempts, lease_token, lease_owner, lease_mode, ? FROM commerce_jobs
       WHERE lease_token = ? AND lease_owner = ? AND commerce_environment = ? AND state = 'running'`).bind(now, token, input.workerId, environment),
@@ -61,14 +65,15 @@ export async function finishCommerceJob(env, jobId, input) {
   const now = new Date().toISOString();
   if (row.state !== 'running' || row.lease_until <= now) fail('This job lease has expired', 409);
   if (row.kind === 'payment.create' && input.outcome === 'succeeded') {
-    const recorded = await env.DB.prepare("SELECT id FROM commerce_order_events WHERE order_id = ? AND event_type = 'payment.created' LIMIT 1").bind(row.order_id).first();
+    const recorded = await env.DB.prepare(`SELECT order_id FROM commerce_payment_sessions WHERE order_id=?
+      UNION ALL SELECT order_id FROM commerce_payment_captures WHERE order_id=? AND capture_kind='order_payment' LIMIT 1`).bind(row.order_id,row.order_id).first();
     if (!recorded) fail('Record the provider payment details on the order before completing this job', 409);
   }
   // Only a proven no-effect failure can enter ordinary retry. Network timeout,
   // missing response or a crashed worker requires a provider-status check.
   if (input.outcome === 'retry' && result.noEffectConfirmed !== true) fail('Confirm the provider performed no action before retrying', 409);
   const state = input.outcome === 'retry' && row.attempts >= row.maximum_attempts ? 'dead' : input.outcome;
-  const delay = state === 'retry' ? Math.min(3600, 15 * 2 ** Math.min(row.attempts - 1, 8)) : state === 'uncertain' ? 30 : 0;
+  const delay = state === 'retry' ? Math.min(3600, 15 * 2 ** Math.min(row.attempts - 1, 8)) : state === 'uncertain' ? 60 : 0;
   const available = new Date(Date.now() + delay * 1000).toISOString();
   const saved = await env.DB.batch([env.DB.prepare(`UPDATE commerce_jobs SET state = ?, result_json = ?, completion_hash = ?,
     last_error = ?, available_at = ?, updated_at = ? WHERE id = ? AND commerce_environment = ?

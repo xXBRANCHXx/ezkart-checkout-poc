@@ -1,72 +1,9 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {readFile} from 'node:fs/promises';
-import {createHash, createHmac, randomBytes} from 'node:crypto';
-import {build} from 'esbuild';
-import {Miniflare, convertV4MiniflareOptions} from 'miniflare';
+import {randomBytes} from 'node:crypto';
 import {expireCommerceOrders} from '../src/commerce-orders.js';
+import {setupCommerceFixture as setup, customer, digest} from './commerce-fixture.mjs';
 
-const secret = 'commerce-service-fixture-secret-only-not-a-real-key';
-const customer = {name: 'Order Tester', email: 'orders@example.test', phone: '081234567890'};
-const digest = value => createHash('sha256').update(value).digest('hex');
-
-async function setup(t) {
-  const key = await crypto.subtle.generateKey({name: 'ECDSA', namedCurve: 'P-256'}, true, ['sign', 'verify']);
-  const publicKey = {...await crypto.subtle.exportKey('jwk', key.publicKey), kid: 'catalog-fixture', alg: 'ES256'};
-  const bundle = await build({entryPoints: [new URL('../src/index.js', import.meta.url).pathname], bundle: true, write: false, format: 'esm', platform: 'neutral'});
-  const mf = new Miniflare(convertV4MiniflareOptions({modules: true, script: bundle.outputFiles[0].text,
-    compatibilityDate: '2026-08-11', d1Databases: ['DB'], r2Buckets: ['PUBLIC_ASSETS', 'PRIVATE_ASSETS'],
-    bindings: {APP_ENVIRONMENT: 'test', COMMERCE_STORAGE: 'd1', COMMERCE_SERVICE_SECRET: secret, SUPABASE_URL: 'https://auth.fixture.test'},
-    outboundService: async () => Response.json({keys: [publicKey]})}));
-  t.after(() => mf.dispose());
-  const db = await mf.getD1Database('DB');
-  for (const name of ['0001_core.sql', '0002_cloud_catalog.sql', '0003_subscription_plan_billing.sql', '0004_yearly_subscription_plans.sql', '0009_commerce_orders.sql', '0010_catalog_revisions.sql','0011_inventory_adjustments.sql','0012_stock_review_recovery.sql','0013_returns_and_inspection.sql']) {
-    const source = (await readFile(new URL('../migrations/' + name, import.meta.url), 'utf8')).replace(/--[^\n]*/g, '');
-    const triggers = [...source.matchAll(/CREATE TRIGGER[\s\S]*?END;/g)].map(match => match[0]);
-    for (const statement of [...source.replace(/CREATE TRIGGER[\s\S]*?END;/g, '').split(';').filter(value => value.trim()), ...triggers]) await db.prepare(statement).run();
-  }
-  for (const seller of ['alice', 'bob']) {
-    await db.prepare("INSERT INTO sellers(id,slug,name,created_at,updated_at) VALUES (?,?,?,'now','now')").bind('seller_' + seller, seller, seller).run();
-    await db.prepare("INSERT INTO app_users(id,auth_user_id,created_at,updated_at) VALUES (?,?,'now','now')").bind(seller, seller).run();
-    await db.prepare("INSERT INTO seller_memberships(seller_id,auth_user_id,role,created_at) VALUES (?,?,'owner','now')").bind('seller_' + seller, seller).run();
-  }
-  async function merchant(path, input, {seller = 'alice', email, method = input === undefined ? 'GET' : 'PUT'} = {}) {
-    const head = Buffer.from(JSON.stringify({alg: 'ES256', kid: publicKey.kid})).toString('base64url');
-    const claims = Buffer.from(JSON.stringify({iss: 'https://auth.fixture.test/auth/v1', sub: seller, email, aud: 'authenticated', exp: Math.floor(Date.now() / 1000) + 3600})).toString('base64url');
-    const sig = await crypto.subtle.sign({name: 'ECDSA', hash: 'SHA-256'}, key.privateKey, new TextEncoder().encode(`${head}.${claims}`));
-    const response = await mf.dispatchFetch('https://api.fixture.test' + path, {method,
-      headers: {authorization: `Bearer ${head}.${claims}.${Buffer.from(sig).toString('base64url')}`, 'content-type': 'application/json'},
-      ...(input !== undefined ? {body: JSON.stringify(input)} : {})});
-    return {status: response.status, ...await response.json()};
-  }
-  async function product(id, stock = 10, seller = 'seller_alice', price = 20000) {
-    await db.prepare("INSERT INTO products(id,seller_id,type,status,title,sku,price_amount,stock_quantity,weight_grams,created_at,updated_at) VALUES (?,?,'physical','active',?,?,?, ?,100,'now','now')")
-      .bind(id, seller, id, 'SKU-' + id, price, stock).run();
-  }
-  await product('tea'); await product('mug'); await product('private', 10, 'seller_bob');
-  function headers(path, method, body, extra = {}) {
-    const timestamp = String(Math.floor(Date.now() / 1000));
-    const nonce = randomBytes(16).toString('hex');
-    const canonical = ['v1', 'test', method, path, timestamp, nonce, digest(body)].join('\n');
-    return {'content-type': 'application/json', 'x-ezkart-timestamp': timestamp, 'x-ezkart-request-id': nonce,
-      'x-ezkart-environment': 'test', 'x-ezkart-signature': createHmac('sha256', secret).update(canonical).digest('hex'), ...extra};
-  }
-  async function call(path, input, extra) {
-    const method = input === undefined ? 'GET' : 'POST', body = input === undefined ? '' : JSON.stringify(input);
-    const response = await mf.dispatchFetch('https://api.fixture.test' + path, {method, headers: headers(path, method, body, extra), ...(method === 'POST' ? {body} : {})});
-    return {status: response.status, ...await response.json()};
-  }
-  function input(overrides = {}) {
-    return {environment: 'sandbox', sellerId: 'seller_alice', checkoutKey: randomBytes(16).toString('hex'),
-      customer, items: [{productId: 'tea', quantity: 2, expectedPrice: 20000}],
-      shipping: {amount: 0, skipped: true}, expiresAt: new Date(Date.now() + 3600000).toISOString(), ...overrides};
-  }
-  const create = input => call('/internal/commerce/orders', input);
-  const event = (order, type, data = {}, key = randomBytes(16).toString('hex')) => call(`/internal/commerce/orders/${order.id}/events`, {environment: 'sandbox', sellerId: order.sellerId, eventKey: key, type, data});
-  const paid = (order, data = {}, key) => event(order, 'payment.succeeded', {provider: 'doku', verified: true, amount: order.total, currency: 'IDR', reference: 'payment-' + order.id, ...data}, key);
-  const stock = async (id = 'tea') => (await db.prepare('SELECT stock_quantity FROM products WHERE id = ?').bind(id).first()).stock_quantity;
-  return {mf, db, headers, call, product, input, create, event, paid, stock, merchant};
-}
 
 async function editorFixture(f, id = 'tea') {
   const imageUploadIds = [];
@@ -450,6 +387,71 @@ test('commerce service authenticates body, target, time and deployment before ac
   assert.equal((await f.create(f.input({items: [{productId: 'tea', quantity: 1.5, expectedPrice: 20000}]}))).status, 422);
 });
 
+test('checkout recovery keeps the original intent and provider request even after stock, price and customer changes',async t=>{
+  const f=await setup(t),input=f.input(),created=await f.create(input);assert.equal(created.status,200,created.error);const order=created.order;
+  const recover=extra=>f.call('/internal/commerce/checkouts/resume',{environment:'sandbox',checkoutKey:input.checkoutKey,intentHash:input.checkout.intentHash,...extra});
+  assert.equal((await recover()).order.id,order.id);assert(order.paymentRequestId);
+  await f.db.prepare("UPDATE products SET price_amount=30000 WHERE id='tea'").run();
+  const resumed=await recover();assert.equal(resumed.order.total,40000);assert.equal(resumed.order.paymentRequestId,order.paymentRequestId);assert.equal(resumed.order.items[0].price,20000);
+  assert.equal((await recover({intentHash:digest('changed customer')})).status,409);
+  assert.equal((await recover({environment:'production'})).status,403);
+  assert.equal((await recover({checkoutKey:randomBytes(16).toString('hex')})).order,null);
+  assert.equal((await f.create({...input,sellerId:'seller_bob',items:[{productId:'private',quantity:2,expectedPrice:20000}]})).status,409);
+  const scoped=await f.call('/internal/commerce/orders/'+order.id+'?environment=sandbox');assert.equal(scoped.order.id,order.id);
+  assert.equal((await f.call('/internal/commerce/orders/'+order.id+'?environment=sandbox&seller=seller_bob')).status,404);
+  assert.equal((await f.db.prepare("SELECT COUNT(*) AS n FROM commerce_jobs WHERE kind='payment.create'").first()).n,1);
+});
+
+test('payment instructions are durable and immutable and a notification can safely arrive before the create response',async t=>{
+  const f=await setup(t),order=(await f.create(f.input())).order;
+  assert.equal((await f.event(order,'payment.created',{})).status,409);
+  assert.equal((await f.paid(order,{originalRequestId:'wrong-provider-request'})).status,409);assert.equal(await f.stock(),10);
+  const paid=await f.paid(order);assert.equal(paid.status,200,paid.error);assert.equal(await f.stock(),8);
+  assert.equal((await f.event(order,'payment.created',f.session(order,{accountNumber:'770000000000'}))).status,409);
+  let result=await f.event(order,'payment.created',f.session(order));assert.equal(result.status,200,result.error);assert.equal(result.order.state,'paid');assert.equal(result.order.payment.accountNumber,'770011223344');
+  result=await f.event(order,'payment.created',f.session(order));assert.equal(result.status,200,result.error);assert.equal(await f.stock(),8);
+  assert.equal((await f.db.prepare('SELECT COUNT(*) AS n FROM commerce_payment_sessions').first()).n,1);
+  const revision=result.order.revision;
+  assert.equal((await f.event(order,'payment.created',f.session(order,{expiresAt:new Date(Date.parse(order.expiresAt)+60000).toISOString()}))).status,409);
+  assert.equal((await f.call('/internal/commerce/orders/'+order.id+'?environment=sandbox')).order.revision,revision);
+  await assert.rejects(f.db.prepare("UPDATE commerce_payment_accounts SET account_number='770000000000'").run(),/immutable_payment/);
+  await assert.rejects(f.db.prepare('DELETE FROM commerce_payment_sessions').run(),/immutable_payment/);
+});
+
+test('racing mismatched account responses cannot attach another account or partially consume inventory',async t=>{
+  const f=await setup(t),order=(await f.create(f.input())).order;
+  const results=await Promise.all([f.event(order,'payment.created',f.session(order)),f.paid(order,{accountNumber:'880011223344'})]);
+  assert.deepEqual(results.map(r=>r.status).sort(),[200,409]);
+  const winner=(await f.call('/internal/commerce/orders/'+order.id+'?environment=sandbox')).order;
+  const account=await f.db.prepare('SELECT account_number FROM commerce_payment_accounts WHERE order_id=?').bind(order.id).first();
+  if(winner.state==='paid'){assert.equal(account.account_number,'880011223344');assert.equal(winner.payment,null);assert.equal(await f.stock(),8);}
+  else{assert.equal(account.account_number,'770011223344');assert.equal(winner.payment.accountNumber,'770011223344');assert.equal(await f.stock(),10);}
+  assert.equal((await f.db.prepare("SELECT COUNT(*) AS n FROM commerce_order_events WHERE event_type!='checkout.created'").first()).n,1);
+});
+
+test('hosted payment URLs and expired instructions are checked without reopening released inventory',async t=>{
+  const f=await setup(t),request=f.input();request.checkout.paymentFlow='hosted';const order=(await f.create(request)).order;
+  const input=f.session(order,{paymentUrl:'https://sandbox.doku.com/checkout-link-v2/provider-fixture'});
+  for(const url of ['javascript:alert(1)','https://sandbox.doku.com.evil.test/checkout-link-v2/a','https://user@sandbox.doku.com/checkout-link-v2/a','https://jokul.doku.com/checkout-link-v2/a','https://sandbox.doku.com:8443/checkout-link-v2/a'])assert.equal((await f.event(order,'payment.created',{...input,paymentUrl:url})).status,422);
+  assert.equal((await f.event(order,'payment.created',{...input,providerRequestId:'wrong'})).status,409);
+  assert.equal((await f.event(order,'payment.create_failed')).status,409,'An uncertain network failure cannot release stock');
+  assert.equal((await f.event(order,'payment.expired',{verified:true})).order.state,'expired');
+  const created=await f.event(order,'payment.created',input);assert.equal(created.status,200,created.error);assert.equal(created.order.state,'expired');assert.equal(created.order.payment.paymentUrl,input.paymentUrl);
+  const holds=await f.db.prepare('SELECT state FROM inventory_reservations WHERE order_id=?').bind(order.id).all();assert(holds.results.every(h=>h.state==='released'));
+  const paid=await f.paid(order);assert.equal(paid.order.fulfillmentState,'stock_review');assert.equal(await f.stock(),10);
+});
+
+test('checkout dispatch claims one requested order, skips expired creation and acknowledges a verified callback before instructions arrive',async t=>{
+  const f=await setup(t),one=(await f.create(f.input())).order,two=(await f.create(f.input())).order;
+  const claim=(id,mode='execute')=>f.call('/internal/commerce/jobs/claim',{environment:'sandbox',workerId:'checkout_dispatch',kinds:['payment.create'],orderId:id,limit:1,mode});
+  const job=(await claim(two.id)).jobs[0];assert.equal(job.orderId,two.id);assert.equal(job.data.providerRequestId,two.paymentRequestId);
+  assert.equal((await claim(two.id)).jobs.length,0);
+  await f.db.prepare("UPDATE orders SET expires_at='2026-01-01T00:00:00.000Z' WHERE id=?").bind(one.id).run();assert.equal((await claim(one.id)).jobs.length,0);
+  await f.paid(two);
+  const finish=await f.call('/internal/commerce/jobs/'+job.id+'/finish',{environment:'sandbox',workerId:'checkout_dispatch',leaseToken:job.leaseToken,outcome:'succeeded',result:{confirmedBy:'verified_payment'}});
+  assert.equal(finish.status,200,finish.error);assert.equal((await f.call('/internal/commerce/orders/'+two.id+'?environment=sandbox')).order.paymentJobState,'succeeded');
+});
+
 test('atomic reservations prevent overselling and roll back every line and customer on failure', async t => {
   const f = await setup(t);
   await f.db.prepare("UPDATE products SET stock_quantity = 3 WHERE id = 'tea'").run();
@@ -510,7 +512,7 @@ test('expiry releases holds while late success records payment with a stock-revi
   await f.db.prepare("UPDATE products SET stock_quantity=2 WHERE id='tea'").run();
   const order = (await f.create(f.input())).order;
   assert.equal((await f.event(order, 'payment.expired')).status, 409, 'A timer may not expire a still-valid payment');
-  assert.equal((await f.event(order, 'payment.created')).order.state, 'pending');
+  assert.equal((await f.event(order, 'payment.created',f.session(order))).order.state, 'pending');
   assert.equal((await f.event(order, 'payment.failed', {reason: 'bank attempt failed'})).order.state, 'pending');
   const expired = await f.event(order, 'payment.expired', {verified: true});
   assert.equal(expired.order.state, 'expired');
@@ -538,7 +540,7 @@ test('variants reserve independently; cancellation and failed creation release e
   await assert.rejects(f.db.prepare("UPDATE product_variants SET stock_quantity=1 WHERE id='green'").run(), /commerce_reserved_stock/);
   assert.equal((await f.event(green, 'checkout.cancelled')).order.state, 'cancelled');
   assert.equal((await f.event(green, 'checkout.cancelled')).order.state, 'cancelled');
-  assert.equal((await f.event(black, 'payment.create_failed')).order.state, 'failed');
+  assert.equal((await f.event(black, 'payment.create_failed',{noEffectConfirmed:true})).order.state, 'failed');
   const reopened = await f.create(variant('green')); assert.equal(reopened.status, 200);
   await f.paid(reopened.order);
   assert.equal((await f.db.prepare("SELECT stock_quantity FROM product_variants WHERE id='green'").first()).stock_quantity, 0);
@@ -572,7 +574,7 @@ test('transactional jobs have exclusive leases, immutable retry keys and durable
     leaseToken: job.leaseToken, outcome: 'succeeded', result: {reference: 'created-provider-session'}, ...extra});
   assert.equal((await finish({workerId: 'intruder'})).status, 409);
   assert.equal((await finish()).status, 409, 'Provider results must reach the order before acknowledging the job');
-  await f.event(order, 'payment.created', {reference: 'created-provider-session'});
+  await f.event(order, 'payment.created', f.session(order));
   const completions = await Promise.all([finish(), finish(), finish()]);
   assert(completions.every(result => result.status === 200), JSON.stringify(completions));
   assert.equal((await finish({result: {reference: 'different'}})).status, 409);

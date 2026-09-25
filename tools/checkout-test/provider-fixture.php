@@ -9,6 +9,26 @@ function curl_setopt(object $handle, int $option, mixed $value): bool { $handle-
 function curl_exec(object $handle): string {
     $payload = json_decode($handle->options[CURLOPT_POSTFIELDS] ?? '{}', true);
     file_put_contents(getenv('EZKART_TEST_CAPTURE'), json_encode(['url' => $handle->url, 'method' => $handle->options[CURLOPT_CUSTOMREQUEST] ?? (!empty($handle->options[CURLOPT_POST]) ? 'POST' : 'GET'), 'body' => $handle->options[CURLOPT_POSTFIELDS] ?? '', 'headers' => $handle->options[CURLOPT_HTTPHEADER] ?? []]) . "\n", FILE_APPEND | LOCK_EX);
+    $relay = getenv('EZKART_TEST_COMMERCE_RELAY');
+    if ($relay && str_starts_with($handle->url, 'https://ezkart-api-test.fixture.workers.dev/')) {
+        if (preg_match('#^http://127\.0\.0\.1:\d+$#D', $relay) !== 1) throw new RuntimeException('Test relay must be local.');
+        $path = substr($handle->url, strlen('https://ezkart-api-test.fixture.workers.dev'));
+        $context = stream_context_create(['http' => ['method' => $handle->options[CURLOPT_CUSTOMREQUEST] ?? (!empty($handle->options[CURLOPT_POST]) ? 'POST' : 'GET'),
+            'header' => implode("\r\n", $handle->options[CURLOPT_HTTPHEADER] ?? []), 'content' => $handle->options[CURLOPT_POSTFIELDS] ?? '', 'ignore_errors' => true, 'timeout' => 20]]);
+        $response = @file_get_contents($relay . $path, false, $context);
+        $responseHeaders = http_get_last_response_headers();
+        $handle->status = preg_match('#^HTTP/\S+ (\d+)#', $responseHeaders[0] ?? '', $matches) ? (int) $matches[1] : 503;
+        if ($response === false) return '';
+        if (isset($handle->options[CURLOPT_WRITEFUNCTION])) { ($handle->options[CURLOPT_WRITEFUNCTION])($handle, $response); return '1'; }
+        return $response;
+    }
+    if (preg_match('#^https://api-sandbox.doku.com/orders/v1/status/EZK-S-[A-F0-9]{24}$#D', $handle->url)) {
+        $file = dirname(getenv('EZKART_TEST_CAPTURE')) . '/provider-status.json';
+        $response = is_file($file) ? (string) file_get_contents($file) : '{"error":"not_found"}';
+        $handle->status = is_file($file) ? 200 : 404;
+        if (isset($handle->options[CURLOPT_WRITEFUNCTION])) { ($handle->options[CURLOPT_WRITEFUNCTION])($handle, $response); return '1'; }
+        return $response;
+    }
     if (preg_match('#^https://ezkart-api-test.fixture.workers.dev/internal/commerce/orders/(EZK-[SP]-[A-F0-9]{24})/claim$#D', $handle->url, $claimMatch)) {
         $returnFile = dirname(getenv('EZKART_TEST_CAPTURE')) . '/returns.json';
         $returnFixture = is_file($returnFile) ? json_decode((string) file_get_contents($returnFile), true) : [];
@@ -172,7 +192,7 @@ function curl_exec(object $handle): string {
     if (in_array($handle->url, ['https://api-sandbox.doku.com/checkout/v1/payment', 'https://api.doku.com/checkout/v1/payment'], true)) {
         if (getenv('EZKART_TEST_DOKU_FAILURE')) { $handle->status = 503; return '{"error_messages":["Fixture unavailable"]}'; }
         $host = str_contains($handle->url, 'api-sandbox') ? 'staging.doku.com' : 'jokul.doku.com';
-        return json_encode(['response' => ['order' => $payload['order'], 'payment' => ['url' => 'https://' . $host . '/checkout-link-v2/fixture', 'expired_date' => '20301231235959']]]);
+        return json_encode(['response' => ['order' => $payload['order'], 'payment' => ['url' => 'https://' . $host . '/checkout-link-v2/fixture', 'expired_date' => (new DateTimeImmutable('+1 hour', new DateTimeZone('Asia/Jakarta')))->format('YmdHis')]]]);
     }
     if ($handle->url === 'https://api.biteship.com/v1/orders') return json_encode(['success' => true, 'id' => 'test-shipment-' . $payload['reference_id'], 'status' => 'confirmed', 'courier' => ['tracking_id' => 'test-tracking', 'waybill_id' => 'TEST-AWB']]);
     throw new RuntimeException('Unexpected external request: ' . $handle->url);

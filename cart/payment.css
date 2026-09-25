@@ -270,8 +270,13 @@ h2 {
   color: var(--muted);
 }
 .payment-actions {
+  display: grid;
+  gap: 10px;
   margin-top: 24px;
 }
+.payment-actions:has(#provider-payment-link:not([hidden])) #check-payment { color: #1a2d47; background: #fff; border: 1px solid #dbe2eb; }
+.payment-shell[data-state="CREATING"] .result-icon { color: #896019; background: #fff6e2; }
+.card-heading:has(#payment-bank-logo[hidden]) .bank-description { border-left: 0; padding-left: 0; }
 .primary-button {
   display: flex;
   width: 100%;

@@ -45,7 +45,7 @@ provider records. New central orders have `commerce_version=1`.
 - Orders retain immutable item prices, quantities, customer/shipping snapshots,
   plan/commission/admin rules and the checkout request hash. Shipping is excluded
   from commission. Actual provider processing fees remain unknown until settlement.
-- A checkout key is unique within a seller and commerce environment. Repeating
+- A checkout key is unique across sellers within a commerce environment (0014). Repeating
   the same request returns its original order; changing the commercial request
   under that key is a conflict. Expiry is not part of the commercial hash.
 - `stock_quantity` means physical units on hand. Active reservations reduce
@@ -77,6 +77,7 @@ test and production. No merchant/customer access token authorizes these routes.
 | Method | Route | Purpose |
 | --- | --- | --- |
 | POST | `/internal/commerce/orders` | Reserve an authoritative checkout |
+| POST | `/internal/commerce/checkouts/resume` | Recover the original checkout key and intent before re-quoting |
 | GET | `/internal/commerce/orders/:id?environment=sandbox&seller=:seller` | Read one seller's order |
 | POST | `/internal/commerce/orders/:id/events` | Apply an idempotent payment/checkout event |
 | POST | `/internal/commerce/jobs/claim` | Lease due jobs for execution or reconciliation |
@@ -103,12 +104,17 @@ are rejected. Request bodies are capped at 64 KB including streamed requests.
 no redirects, bounded response size and no local-file fallback after cutover.
 Transient retries must reuse checkout/event keys; signing nonces may change.
 
-Create accepts `sellerId`, `environment`, `checkoutKey`, `customer`, `items`,
+Create accepts `sellerId`, `environment`, `checkoutKey`, `checkout`, `customer`, `items`,
 `shipping` and `expiresAt`. Each item supplies `productId`, optional `variantId`,
 integer `quantity`, and `expectedPrice`; D1 supplies the authoritative product
 price, identity and weight. Existing variant products require an explicit option.
 Shipping contains the server-validated quote amount and origin/destination
 snapshots; only sandbox may use `{amount:0, skipped:true}`.
+`checkout` contains the normalized browser `intentHash`, `paymentFlow` and `shop`.
+The payment request ID and immutable session are returned by internal order reads.
+The PHP central checkout, callback, payment read and dispatcher adapters are
+prepared behind the switch; see [checkout-payment-recovery.md](checkout-payment-recovery.md)
+for their contract, tests and remaining hosted cutover gates.
 
 Events accept `sellerId`, `environment`, `eventKey`, `type`, `data`.
 Initial supported events are `payment.created`, `payment.create_failed`,
