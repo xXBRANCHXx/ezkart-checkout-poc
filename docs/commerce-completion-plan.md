@@ -64,6 +64,26 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 25 September: customer profiles, segments and private exports
+
+Implemented the scoped central customer directory, full purchase history and
+exact customer values from verified captures. Latest contacts come from scoped
+order snapshots. Note/tag edits have immutable history, replay-safe receipts and
+transactional membership/revision checks. The merchant UI preserves drafts on
+conflicts and lets merchants review the current saved version before retrying.
+Saved segments support real filtering, edit, archive/restore and bounded paging;
+the active limit is enforced transactionally. Customer CSV snapshots include all
+matching profiles, recover lost responses and download only complete exports.
+
+Migration 0020 adds customer metadata/audit/export tables and guards. Eight D1
+and seven PHP/browser cases cover authorization, concurrency, exact money,
+complete pagination, replay, rollback, retention, filters, exports and mobile use;
+12 adjacent order/payment API and 14 adjacent central browser cases also pass.
+See [central-customers.md](central-customers.md). Marketing consent is explicitly
+unrecorded; checkout contact details are not opt-in evidence. Published review
+summaries remain available. Buyer consent and full review workflows, hosted
+acceptance, legacy promotion and the wider completion gates remain open.
+
 ### 25 September: central payment investigation workspace
 
 Implemented complete D1-backed payment history, exact primary/additional capture

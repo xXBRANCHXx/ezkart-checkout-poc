@@ -247,6 +247,7 @@ function ez_orders_table(array $rows, string $tableId, string $csrfToken, string
 
 <?php break; case 'shop': require __DIR__ . '/shop.php'; ?>
 <?php break; case 'sites': require __DIR__ . ($siteEditor ? '/sites-builder.php' : '/sites-library.php'); break; case 'customers': ?>
+  <?php if ($centralCustomerWorkspace) { require __DIR__ . '/commerce-customers.php'; break; } ?>
   <?php $customerCount = count($customerProfiles); $customerSpend = array_sum(array_column($customerProfiles, 'spend')); ?>
   <?php $customerTab = ($_GET['tab'] ?? '') === 'reviews' ? 'reviews' : 'directory'; ?>
   <?php ez_page_header('Customers', 'Manage your customers, purchase history, and reviews.', $customerTab === 'reviews' ? [] : [['label'=>'Export customers', 'icon' => 'download','toast'=>'Customer export prepared'],['label'=>'Create segment', 'icon' => 'users','toast'=>'Segment builder opened','style'=>'primary']]); ?>

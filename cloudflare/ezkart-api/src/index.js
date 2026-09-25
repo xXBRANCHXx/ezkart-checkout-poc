@@ -22,6 +22,9 @@ import {fulfillmentList,fulfillmentDetail,fulfillmentAction,serviceShipment,cust
 import {merchantOrderList,merchantOrderDetail,merchantOrderHistory} from './commerce-order-reads.js';
 import {merchantDashboard} from './commerce-dashboard.js';
 import {merchantPaymentList,merchantPaymentDetail,merchantPaymentHistory} from './commerce-payment-reads.js';
+import {merchantCustomers,merchantCustomer,customerOrderHistory} from './commerce-customers.js';
+import {customerSegments,customerSegment,saveCustomerWorkspace,customerProfileHistory} from './commerce-customer-workspace.js';
+import {createCustomerExport,readCustomerExport,cleanupCustomerExports} from './commerce-customer-exports.js';
 import {merchantAnalytics} from './commerce-analytics.js';
 import {createAnalyticsExport,readAnalyticsExport,cleanupAnalyticsExports} from './commerce-analytics-exports.js';
 const json = (payload, status = 200, headers = {}) => new Response(JSON.stringify(payload), {
@@ -1532,6 +1535,34 @@ export default {
         if(request.method!=='GET')return json({ok:false,error:'Method not allowed'},405,cors);
         return json({ok:true,...await merchantDashboard(env,seller,url)},200,cors);
       }
+      const customerPath='/v1/commerce/customers';
+      const customerMatch=/^\/v1\/commerce\/customers\/(customer_[A-Za-z0-9_-]{1,85})(?:\/(orders|profile|changes))?$/.exec(url.pathname);
+      const customerSegmentMatch=/^\/v1\/commerce\/customers\/segments(?:\/(cseg_[a-f0-9]{40}))?$/.exec(url.pathname);
+      const customerExportMatch=/^\/v1\/commerce\/customers\/exports(?:\/(cex_[a-f0-9]{40}))?$/.exec(url.pathname);
+      if(url.pathname===customerPath||customerMatch||customerSegmentMatch||customerExportMatch){
+        const {seller,authUserId}=await sellerContext(request,env),method=request.method;
+        if(method!=='GET'&&url.search)return json({ok:false,error:'Customer changes do not accept query parameters'},422,cors);
+        if(customerSegmentMatch){
+          const id=customerSegmentMatch[1];
+          if(method==='GET'){
+            if(id&&url.search)return json({ok:false,error:'Segment detail does not accept filters'},422,cors);
+            return json({ok:true,...await(id?customerSegment(env,seller,id):customerSegments(env,seller,url))},200,cors);
+          }
+          if((!id&&method==='POST')||(id&&method==='PUT'))return json({ok:true,change:await saveCustomerWorkspace(env,seller,authUserId,'segment',id,await requestJson(request,6000))},200,cors);
+        }else if(customerExportMatch){
+          const id=customerExportMatch[1];
+          if(id&&method==='GET')return json({ok:true,...await readCustomerExport(env,seller,id,url)},200,cors);
+          if(!id&&method==='POST')return json({ok:true,...await createCustomerExport(env,seller,await requestJson(request,6000))},200,cors);
+        }else if(customerMatch){
+          const [,id,kind]=customerMatch;
+          if(kind==='profile'&&method==='PUT')return json({ok:true,change:await saveCustomerWorkspace(env,seller,authUserId,'profile',id,await requestJson(request,10000))},200,cors);
+          if(method==='GET'&&kind!=='profile'){
+            if(!kind&&url.search)return json({ok:false,error:'Customer detail does not accept filters'},422,cors);
+            return json({ok:true,...await(kind==='orders'?customerOrderHistory(env,seller,id,url):kind==='changes'?customerProfileHistory(env,seller,authUserId,id,url):merchantCustomer(env,seller,id))},200,cors);
+          }
+        }else if(method==='GET')return json({ok:true,...await merchantCustomers(env,seller,url)},200,cors);
+        return json({ok:false,error:'Method not allowed'},405,cors);
+      }
       const paymentReadMatch=/^\/v1\/commerce\/payments(?:\/(EZK-[SP]-[A-F0-9]{24})(?:\/(captures|attempts|events))?)?$/.exec(url.pathname);
       if(paymentReadMatch){
         const {seller}=await sellerContext(request,env);
@@ -1674,6 +1705,7 @@ export default {
   async scheduled(_controller, env, context) {
     context.waitUntil(cleanupAbandonedMedia(env));
     context.waitUntil(cleanupAnalyticsExports(env));
+    context.waitUntil(cleanupCustomerExports(env));
     context.waitUntil(expireCommerceOrders(env));
   },
 };

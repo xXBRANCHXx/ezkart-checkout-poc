@@ -114,8 +114,11 @@ CSV snapshots; migration 0019 adds its export tables. See
 [central-analytics.md](central-analytics.md). The Payments workspace now also has
 scoped central reads, exact capture totals, provider-reference search, complete
 paging and safe request/event histories; see [central-payments.md](central-payments.md).
-Its signed-in TEST preview does not activate central checkout. Customer surfaces and the
-operational legacy handover remain open; see
+Its signed-in TEST preview does not activate central checkout. The customer
+directory also has central profiles, complete purchase histories, persisted
+notes/tags/segments and private complete CSV snapshots; migration 0020 adds its
+metadata, audit and export tables. See [central-customers.md](central-customers.md).
+Buyer consent, review workflows and operational legacy handover remain open; see
 [central-order-manager.md](central-order-manager.md).
 
 Migration `0009_commerce_orders.sql` extends the existing `orders` and

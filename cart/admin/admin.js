@@ -368,6 +368,7 @@
   globalThis.EzkartFulfillment?.mount({request: cloudRequest});
   globalThis.EzkartCommerceOrders?.mount({request: cloudRequest});
   globalThis.EzkartCommercePayments?.mount({request: cloudRequest});
+  globalThis.EzkartCommerceCustomers?.mount({request: cloudRequest});
   globalThis.EzkartCommerceDashboard?.mount({request: cloudRequest, products: cloudCatalogProducts});
   globalThis.EzkartCommerceAnalytics?.mount({request: cloudRequest});
   globalThis.EzkartShippingSettings?.mount({request: cloudRequest});
