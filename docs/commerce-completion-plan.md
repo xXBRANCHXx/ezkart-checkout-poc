@@ -64,6 +64,30 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 25 September: central merchant order manager
+
+Implemented the D1 order-read service and merchant workspace: all-store totals,
+server filters, bounded keyset pages, saved commercial/customer/address details,
+verified captures, inventory state and paginated activity. Pagination includes
+records beyond the old 200-row cap and preserves its insertion watermark across
+Next/Previous and reload. Failed/stale responses cannot silently substitute other results.
+Central read failures do not fall back to legacy files in this workspace.
+
+Confirmed order payments and additional captures remain separate; monetary
+aggregates retain exact integer precision. Authentication, seller/environment
+scope and original snapshots are enforced on the server. Migration 0018 adds
+read indexes only. The TEST preview is read-only and leaves hosted checkout and
+the existing 15-source migration rehearsal unchanged.
+
+The six D1 cases and three PHP/browser cases pass, including desktop/mobile
+workflows through the real PHP proxy and Worker. All 43 adjacent Worker cases
+(checkout, fulfillment and imports) and eight selected existing PHP/merchant UI
+regressions pass. See
+[central-order-manager.md](central-order-manager.md) for contracts and limits.
+Dashboard, analytics, payment/customer read routing, operational legacy promotion
+and monitored execution remain open. This stage does not close the top-level
+central commerce or broader workbench acceptance items.
+
 ### 25 September: legacy writer drain and consistent source export
 
 Implemented a private TEST freeze/resume controller and a shared PHP writer

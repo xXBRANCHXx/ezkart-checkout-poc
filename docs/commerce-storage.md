@@ -74,6 +74,12 @@ the audit, replay verification and remaining source fencing/promotion work.
 
 ## Data and invariants
 
+The central merchant order manager now has scoped D1 pagination, totals, search
+and saved order details. Migration 0018 adds read indexes. It is prepared behind
+the PHP central flag, with a read-only TEST preview. Other merchant reporting and
+customer surfaces and the operational legacy handover remain open; see
+[central-order-manager.md](central-order-manager.md).
+
 Migration `0009_commerce_orders.sql` extends the existing `orders` and
 `order_items` tables; it does not import private JSON order files or synthesize
 provider records. New central orders have `commerce_version=1`.

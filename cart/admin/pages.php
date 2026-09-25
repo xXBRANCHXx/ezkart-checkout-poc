@@ -44,6 +44,7 @@ function ez_orders_table(array $rows, string $tableId, string $csrfToken, string
 
 <main class="page-canvas admin-page page-<?= ez_admin_escape($page) ?>">
 <?php switch ($page): case 'orders': ?>
+  <?php if ($centralOrderWorkspace) { require __DIR__ . '/commerce-orders.php'; break; } ?>
   <?php ez_page_header('Orders', 'Manage orders, payments, and deliveries.', [
       ['label' => 'Returns', 'icon' => 'refund', 'href' => '?page=returns'],
       ['label' => 'Fulfillment', 'icon' => 'truck', 'href' => '?page=fulfillment'],

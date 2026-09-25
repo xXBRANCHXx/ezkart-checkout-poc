@@ -19,6 +19,7 @@ import { stockReviewList, stockReviewDetails, resolveStockReview } from "./stock
 import { claimCommerceOrder } from "./commerce-access.js";
 import { returnList, returnOrder, returnDetail, customerReturns, createReturn, returnAction } from "./commerce-returns.js";
 import {fulfillmentList,fulfillmentDetail,fulfillmentAction,serviceShipment,customerShipment,bindShipmentAccount,bindShipment,shippingInbox,refreshShipment,drainPendingShipping} from './commerce-fulfillment.js';
+import {merchantOrderList,merchantOrderDetail,merchantOrderHistory} from './commerce-order-reads.js';
 const json = (payload, status = 200, headers = {}) => new Response(JSON.stringify(payload), {
   status,
   headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...headers },
@@ -1510,6 +1511,14 @@ export default {
         if(returnCaseMatch)return request.method==='GET'?json({ok:true,...await returnDetail(env,actor,returnCaseMatch[1],'',url.searchParams.get('before')||'')},200,cors):json({ok:true,receipt:await returnAction(env,actor,returnCaseMatch[1],await requestJson(request,16000))},200,cors);
         if(request.method==='GET')return json({ok:true,...await returnList(env,actor,url)},200,cors);
         return json({ok:false,error:'Method not allowed'},405,cors);
+      }
+      const orderReadMatch=/^\/v1\/commerce\/orders(?:\/(EZK-[SP]-[A-F0-9]{24})(?:\/(captures|activity))?)?$/.exec(url.pathname);
+      if(orderReadMatch){
+        const {seller}=await sellerContext(request,env);
+        if(request.method!=='GET')return json({ok:false,error:'Method not allowed'},405,cors);
+        const [,orderId,kind]=orderReadMatch;
+        if(orderId&&!kind&&url.search)return json({ok:false,error:'Order detail does not accept filters'},422,cors);
+        return json({ok:true,...await (kind?merchantOrderHistory(env,seller,orderId,kind,url):orderId?merchantOrderDetail(env,seller,orderId):merchantOrderList(env,seller,url))},200,cors);
       }
       const fulfillmentMatch=/^\/v1\/fulfillment(?:\/(EZK-[SP]-[A-F0-9]{24}))?$/.exec(url.pathname);
       if(fulfillmentMatch&&['GET','POST'].includes(request.method)){
