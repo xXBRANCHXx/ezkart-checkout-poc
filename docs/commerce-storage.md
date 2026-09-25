@@ -25,6 +25,14 @@ and include the concurrent Advanced-mode cleanup update. The allocation write
 still requires the central commerce switch. Its hosted paid-order acceptance
 is pending; the local D1/browser tests are recorded separately.
 
+Migration 0013 and test Worker version
+`68328c35-7906-42f4-a6f4-ed8edae931c4` add verified customer order ownership,
+return requests, and immutable physical inspections/restocks. The hosted test
+frontend serves implementation `bad4c16`; central order processing is still
+disabled. See [returns-and-inspection.md](returns-and-inspection.md). Refunds,
+return shipping, financial reconciliation, and paid-order hosted acceptance are
+not completed by this deployment.
+
 The full completion scope and acceptance gates remain in
 [commerce-completion-plan.md](commerce-completion-plan.md).
 

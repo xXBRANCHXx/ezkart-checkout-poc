@@ -243,6 +243,28 @@ address-session proxy and tracking preview checks pass. Desktop/mobile screensho
 PHP/JavaScript syntax and the test Worker build were checked. A private test D1
 export was taken before migration; hosted rollout evidence is recorded separately.
 
+Test rollout for return implementation `bad4c16`:
+
+- Exported test D1 to a private local backup before applying migration 0013.
+  Deployed Worker version `68328c35-7906-42f4-a6f4-ed8edae931c4`; health reports
+  D1 and both R2 buckets healthy, with 37 tables. The existing hourly maintenance
+  schedule remains unchanged and still needs replacement before checkout cutover.
+- Hostinger reports `bad4c161` completed on `agent/ezkart-workbench`. Opened Returns
+  through the hosted Orders navigation, checked its empty state and filter at
+  1440px and 390px widths, and verified no horizontal overflow. Merchant and
+  customer JavaScript/CSS hashes match the committed assets. The customer proxy
+  correctly rejects an unauthenticated read.
+- The authenticated queue returns no central return cases and explicitly reports
+  `enabled: false`, `canCreate: false`. The creation control is disabled with a
+  visible explanation. The internal order route still reports central commerce
+  disabled. No fake paid/delivered order was created for hosted acceptance.
+- Both original products retain their stock, variants and revisions. The before
+  and after hash is identical, and inventory remains 111 options / 147,510 units.
+  This rollout creates no hosted return or stock movement to clean up.
+- This is schema/deployment/UI smoke evidence. Customer request, physical intake,
+  notification delivery and refund acceptance on a real hosted paid order remain
+  pending the central checkout/fulfillment rollout. Production remains untouched.
+
 ## Atomicity contract
 
 Commerce database changes use D1 transactional batches and database constraints,
