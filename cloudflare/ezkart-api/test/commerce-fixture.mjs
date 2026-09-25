@@ -17,7 +17,7 @@ export async function setupCommerceFixture(t) {
     outboundService: async () => Response.json({keys: [publicKey]})}));
   t.after(() => mf.dispose());
   const db = await mf.getD1Database('DB');
-  for (const name of ['0001_core.sql', '0002_cloud_catalog.sql', '0003_subscription_plan_billing.sql', '0004_yearly_subscription_plans.sql', '0009_commerce_orders.sql', '0010_catalog_revisions.sql','0011_inventory_adjustments.sql','0012_stock_review_recovery.sql','0013_returns_and_inspection.sql','0014_checkout_payment_sessions.sql']) {
+  for (const name of ['0001_core.sql', '0002_cloud_catalog.sql', '0003_subscription_plan_billing.sql', '0004_yearly_subscription_plans.sql', '0008_seller_page_addresses.sql', '0009_commerce_orders.sql', '0010_catalog_revisions.sql','0011_inventory_adjustments.sql','0012_stock_review_recovery.sql','0013_returns_and_inspection.sql','0014_checkout_payment_sessions.sql','0015_central_fulfillment.sql']) {
     const source = (await readFile(new URL('../migrations/' + name, import.meta.url), 'utf8')).replace(/--[^\n]*/g, '');
     const triggers = [...source.matchAll(/CREATE TRIGGER[\s\S]*?END;/g)].map(match => match[0]);
     for (const statement of [...source.replace(/CREATE TRIGGER[\s\S]*?END;/g, '').split(';').filter(value => value.trim()), ...triggers]) await db.prepare(statement).run();
@@ -27,12 +27,15 @@ export async function setupCommerceFixture(t) {
     await db.prepare("INSERT INTO app_users(id,auth_user_id,created_at,updated_at) VALUES (?,?,'now','now')").bind(seller, seller).run();
     await db.prepare("INSERT INTO seller_memberships(seller_id,auth_user_id,role,created_at) VALUES (?,?,'owner','now')").bind('seller_' + seller, seller).run();
   }
-  async function merchant(path, input, {seller = 'alice', email, method = input === undefined ? 'GET' : 'PUT'} = {}) {
+  async function merchantToken(seller='alice',email) {
     const head = Buffer.from(JSON.stringify({alg: 'ES256', kid: publicKey.kid})).toString('base64url');
     const claims = Buffer.from(JSON.stringify({iss: 'https://auth.fixture.test/auth/v1', sub: seller, email, aud: 'authenticated', exp: Math.floor(Date.now() / 1000) + 3600})).toString('base64url');
     const sig = await crypto.subtle.sign({name: 'ECDSA', hash: 'SHA-256'}, key.privateKey, new TextEncoder().encode(`${head}.${claims}`));
+    return `${head}.${claims}.${Buffer.from(sig).toString('base64url')}`;
+  }
+  async function merchant(path, input, {seller = 'alice', email, method = input === undefined ? 'GET' : 'PUT'} = {}) {
     const response = await mf.dispatchFetch('https://api.fixture.test' + path, {method,
-      headers: {authorization: `Bearer ${head}.${claims}.${Buffer.from(sig).toString('base64url')}`, 'content-type': 'application/json'},
+      headers: {authorization: `Bearer ${await merchantToken(seller,email)}`, 'content-type': 'application/json'},
       ...(input !== undefined ? {body: JSON.stringify(input)} : {})});
     return {status: response.status, ...await response.json()};
   }
@@ -64,5 +67,5 @@ export async function setupCommerceFixture(t) {
   const paid = (order, data = {}, key) => event(order, 'payment.succeeded', {provider: 'doku', verified: true, amount: order.total, currency: 'IDR', reference: 'payment-' + order.id, originalRequestId:order.paymentRequestId, channel:'VIRTUAL_ACCOUNT_BCA',accountNumber:'770011223344',...data}, key);
   const session=(order,data={})=>({provider:'doku',providerRequestId:order.paymentRequestId,amount:order.total,currency:'IDR',expiresAt:order.expiresAt,method:'VIRTUAL_ACCOUNT_BCA',accountNumber:'770011223344',...data});
   const stock = async (id = 'tea') => (await db.prepare('SELECT stock_quantity FROM products WHERE id = ?').bind(id).first()).stock_quantity;
-  return {mf, db, headers, call, product, input, create, event, paid, session, stock, merchant};
+  return {mf, db, headers, call, product, input, create, event, paid, session, stock, merchant,merchantToken};
 }

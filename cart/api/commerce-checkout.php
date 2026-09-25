@@ -97,6 +97,7 @@ function ez_central_order_projection(array $record): array
         'payment_details' => !empty($payment['accountNumber']) ? ['method' => $payment['method'],
             'account_number' => $payment['accountNumber'], 'expires_at' => $payment['expiresAt']] : null,
         'fulfillment_status' => strtoupper($record['fulfillmentState']), 'paid_at' => $record['paidAt'] ?? '',
+        'accepted_at' => $record['acceptedAt'] ?? '',
         'created_at' => $record['createdAt'], 'updated_at' => $record['updatedAt'],
     ];
 }

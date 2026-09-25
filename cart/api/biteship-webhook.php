@@ -24,7 +24,8 @@ try {
     if (!is_array($payload)) {
         throw new InvalidArgumentException('Invalid webhook body.');
     }
-    $matched = ez_apply_biteship_webhook($payload, $environment);
+    require_once __DIR__ . '/commerce-fulfillment.php';
+    $matched = ez_central_commerce_enabled() ? ez_central_courier_webhook($payload, $environment)['matched'] : ez_apply_biteship_webhook($payload, $environment);
     ez_api_json(['ok' => true, 'matched' => $matched]);
 } catch (InvalidArgumentException $error) {
     error_log('Ezkart Biteship webhook rejected: ' . $error->getMessage());

@@ -103,7 +103,7 @@ header('X-Content-Type-Options: nosniff');
           <p id="package-location-empty" class="location-empty" hidden>The courier hasn’t shared a package location yet. Follow the latest updates below.</p>
           <p id="map-notice" class="muted" role="status" hidden>The map is temporarily unavailable. Your order updates are still shown above.</p>
           <div class="map-route-summary" id="map-route-summary" hidden><span class="route-line-key" aria-hidden="true"></span><p id="map-route-note" role="status"></p><span class="route-credit"><a href="https://routing.openstreetmap.de/about.html" target="_blank" rel="noopener noreferrer">Routing: FOSSGIS</a> · <a href="https://www.openstreetmap.org/fixthemap" target="_blank" rel="noopener noreferrer">Fix the map</a></span></div>
-          <div class="package-map-actions"><button id="map-route-toggle" type="button" hidden>View full route</button><a id="google-maps-link" target="_blank" rel="noopener noreferrer" hidden>Open in Google Maps ↗</a><a id="courier-tracking-link" class="courier-link" target="_blank" rel="noopener noreferrer" hidden>View courier tracking ↗</a></div>
+          <div class="package-map-actions"><button id="map-route-toggle" type="button" hidden>View full route</button><a id="google-maps-link" target="_blank" rel="noopener noreferrer" hidden>Open in Google Maps ↗</a><a id="delivery-proof-link" target="_blank" rel="noopener noreferrer" hidden>View delivery proof ↗</a><a id="courier-tracking-link" class="courier-link" target="_blank" rel="noopener noreferrer" hidden>View courier tracking ↗</a></div>
         </section>
         <section class="tracking-card journey-card" aria-labelledby="journey-title">
           <h2 id="journey-title">Order journey</h2>

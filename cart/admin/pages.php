@@ -46,6 +46,7 @@ function ez_orders_table(array $rows, string $tableId, string $csrfToken, string
 <?php switch ($page): case 'orders': ?>
   <?php ez_page_header('Orders', 'Manage orders, payments, and deliveries.', [
       ['label' => 'Returns', 'icon' => 'refund', 'href' => '?page=returns'],
+      ['label' => 'Fulfillment', 'icon' => 'truck', 'href' => '?page=fulfillment'],
       ['label' => 'Refresh data', 'icon' => 'refresh', 'href' => '?page=orders'], ['label' => 'Open checkout', 'icon' => 'external-link', 'href' => '../', 'style' => 'primary'],
   ]); ?>
   <?php if ($orderFlash !== null): ?><div class="order-flash <?= ez_admin_escape($orderFlash['type'] ?? 'info') ?>"><?= ez_admin_escape($orderFlash['message'] ?? '') ?></div><?php endif; ?>
@@ -197,6 +198,7 @@ function ez_orders_table(array $rows, string $tableId, string $csrfToken, string
   </section>
 
 <?php break; case 'returns': require __DIR__ . '/returns.php'; ?>
+<?php break; case 'fulfillment': require __DIR__ . '/fulfillment.php'; ?>
 <?php break; case 'inventory': require __DIR__ . '/inventory.php'; ?>
 
 <?php break; case 'products': ?>

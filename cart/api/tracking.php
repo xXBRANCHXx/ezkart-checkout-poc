@@ -189,7 +189,7 @@ function ez_refresh_order_tracking(array $order): array
 
 function ez_public_order_tracking(array $order): array
 {
-    $paid = ($order['status'] ?? '') === 'PAID';
+    $paid = in_array($order['status'] ?? '', ['PAID', 'PARTIALLY_REFUNDED', 'REFUNDED'], true);
     $skipped = ez_order_skips_shipping($order);
     $shipment = $paid && !$skipped ? ez_tracking_status((string) ($order['biteship_status'] ?? '')) : '';
     $fulfillment = (string) ($order['fulfillment_status'] ?? 'AWAITING_PAYMENT');
@@ -218,14 +218,14 @@ function ez_public_order_tracking(array $order): array
         // Coordinates must be explicitly supplied with a scan. Never geocode or interpolate a route from a note.
         if ($entry['coordinate'] !== null) $latestLocation = $entry['coordinate'] + [
             'label' => $entry['location_name'] ?: 'Last reported package location',
-            'updated_at' => $entry['updated_at'], 'source' => 'courier_scan',
+            'updated_at' => $entry['updated_at'], 'status' => $entry['status'], 'source' => 'courier_scan',
         ];
     }
     if (in_array($shipment, ['picked', 'delivered'], true)) {
         $coordinate = ez_tracking_coordinate($order['biteship_locations'][$shipment === 'picked' ? 'origin' : 'destination'] ?? null);
         $confirmedAt = (string) ($order['biteship_status_at'] ?? '');
         if ($coordinate !== null && $confirmedAt !== '' && ($latestLocation === null || $confirmedAt >= $latestLocation['updated_at'])) {
-            $latestLocation = $coordinate + ['label' => $shipment === 'picked' ? 'Picked up at the seller' : 'Delivered to the destination', 'updated_at' => $confirmedAt, 'source' => 'confirmed_stop'];
+            $latestLocation = $coordinate + ['label' => $shipment === 'picked' ? 'Picked up at the seller' : 'Delivered to the destination', 'updated_at' => $confirmedAt, 'status' => $shipment, 'source' => 'confirmed_stop'];
         }
     }
     return [
@@ -244,7 +244,7 @@ function ez_public_order_tracking(array $order): array
         ] : ['origin' => null, 'destination' => null],
         'history' => $history,
         'latest_location' => $latestLocation,
-        'updated_at' => $order['biteship_status_at'] ?? $order['tracking_checked_at'] ?? $order['updated_at'] ?? '',
+        'updated_at' => ($order['biteship_status_at'] ?? '') ?: (($order['tracking_checked_at'] ?? '') ?: ($order['updated_at'] ?? '')),
         'unavailable' => $paid && !$skipped && !empty($order['tracking_unavailable']),
     ];
 }

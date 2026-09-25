@@ -90,9 +90,9 @@ export async function setup(overrides = {}) {
         .filter(Boolean)
         .map(JSON.parse);
     },
-    customerCookie(email = "checkout@example.com", id = "fixture-google-customer", expiresIn = 3600) {
-      const account = Buffer.from(JSON.stringify({ id, email })).toString("base64");
-      const sid = this.cli(`require ${JSON.stringify(join(root, "cart/api/customer-auth.php"))}; ez_customer_session(); $_SESSION['customer_auth']=['user'=>json_decode(base64_decode('${account}'),true),'access_token'=>str_repeat('x',64),'refresh_token'=>'fixture-refresh','expires_at'=>time()+${expiresIn},'signed_in_at'=>time()]; echo session_id(); session_write_close();`);
+    customerCookie(email = "checkout@example.com", id = "fixture-google-customer", expiresIn = 3600, accessToken = '') {
+      const account = Buffer.from(JSON.stringify({ id, email, accessToken })).toString("base64");
+      const sid = this.cli(`require ${JSON.stringify(join(root, "cart/api/customer-auth.php"))}; ez_customer_session(); $account=json_decode(base64_decode('${account}'),true); $_SESSION['customer_auth']=['user'=>['id'=>$account['id'],'email'=>$account['email']],'access_token'=>$account['accessToken']?:str_repeat('x',64),'refresh_token'=>'fixture-refresh','expires_at'=>time()+${expiresIn},'signed_in_at'=>time()]; echo session_id(); session_write_close();`);
       return { name: "ezkart_customer", value: sid, domain: "127.0.0.1", path: "/cart", httpOnly: true, sameSite: "Lax" };
     },
     adminCookie(changes = {}) {

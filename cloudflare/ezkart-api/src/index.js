@@ -17,6 +17,7 @@ import { inventoryOverview, inventoryHistory, inventoryDraft, adjustInventory, c
 import { stockReviewList, stockReviewDetails, resolveStockReview } from "./stock-reviews.js";
 import { claimCommerceOrder } from "./commerce-access.js";
 import { returnList, returnOrder, returnDetail, customerReturns, createReturn, returnAction } from "./commerce-returns.js";
+import {fulfillmentList,fulfillmentDetail,fulfillmentAction,serviceShipment,customerShipment,bindShipmentAccount,bindShipment,shippingInbox,refreshShipment,drainPendingShipping} from './commerce-fulfillment.js';
 const json = (payload, status = 200, headers = {}) => new Response(JSON.stringify(payload), {
   status,
   headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...headers },
@@ -1426,12 +1427,26 @@ export default {
       if (claimOrderMatch && request.method === 'POST') {
         return json({ok:true,...await claimCommerceOrder(env,claimOrderMatch[1],await authenticateCommerceService(request,env))});
       }
+      const customerShipmentMatch=/^\/internal\/commerce\/orders\/(EZK-[SP]-[A-F0-9]{24})\/tracking$/.exec(url.pathname);
+      if(customerShipmentMatch&&request.method==='POST')return json({ok:true,...await customerShipment(env,customerShipmentMatch[1],await authenticateCommerceService(request,env))});
       if (url.pathname.startsWith('/internal/commerce/jobs/') && request.method === 'POST') {
         const payload = await authenticateCommerceService(request, env);
         if (url.pathname === '/internal/commerce/jobs/claim') return json({ok: true, jobs: await claimCommerceJobs(env, payload)});
         const jobMatch = /^\/internal\/commerce\/jobs\/(job_[a-f0-9]{32})\/finish$/.exec(url.pathname);
         if (jobMatch) return json({ok: true, job: await finishCommerceJob(env, jobMatch[1], payload)});
         return json({ok: false, error: 'Job route not found'}, 404);
+      }
+      const serviceShipmentMatch=/^\/internal\/commerce\/shipments\/(ship_[a-f0-9]{32})(?:\/(account|bind|refresh))?$/.exec(url.pathname);
+      if(serviceShipmentMatch){
+        const payload=await authenticateCommerceService(request,env),[,shipmentId,operation]=serviceShipmentMatch;
+        if(request.method==='GET'&&!operation)return json({ok:true,...await serviceShipment(env,shipmentId,url.searchParams.get('environment'))});
+        if(request.method==='POST'&&operation==='account')return json({ok:true,...await bindShipmentAccount(env,shipmentId,payload)});
+        if(request.method==='POST'&&operation==='bind')return json({ok:true,...await bindShipment(env,shipmentId,payload)});
+        if(request.method==='POST'&&operation==='refresh')return json({ok:true,...await refreshShipment(env,shipmentId,payload)});
+        return json({ok:false,error:'Method not allowed'},405);
+      }
+      if(['/internal/commerce/shipping-events','/internal/commerce/shipping-events/drain'].includes(url.pathname)&&request.method==='POST'){
+        const payload=await authenticateCommerceService(request,env);return json({ok:true,...await (url.pathname.endsWith('/drain')?drainPendingShipping(env,payload):shippingInbox(env,payload))});
       }
       if (url.pathname.startsWith('/internal/commerce/')) return json({ok: true, ...await commerceServiceRoute(request, env)});
       const publicLandingMatch = /^\/v1\/public\/landing-pages\/([a-z0-9-]+)\/([a-z0-9-]+)$/.exec(url.pathname);
@@ -1483,6 +1498,13 @@ export default {
         if(returnCaseMatch)return request.method==='GET'?json({ok:true,...await returnDetail(env,actor,returnCaseMatch[1],'',url.searchParams.get('before')||'')},200,cors):json({ok:true,receipt:await returnAction(env,actor,returnCaseMatch[1],await requestJson(request,16000))},200,cors);
         if(request.method==='GET')return json({ok:true,...await returnList(env,actor,url)},200,cors);
         return json({ok:false,error:'Method not allowed'},405,cors);
+      }
+      const fulfillmentMatch=/^\/v1\/fulfillment(?:\/(EZK-[SP]-[A-F0-9]{24}))?$/.exec(url.pathname);
+      if(fulfillmentMatch&&['GET','POST'].includes(request.method)){
+        const {seller,authUserId}=await sellerContext(request,env),actor={id:authUserId,sellerId:seller.id,role:seller.role};
+        if(request.method==='GET')return json({ok:true,...await (fulfillmentMatch[1]?fulfillmentDetail(env,actor,fulfillmentMatch[1],url.searchParams.get('before')||''):fulfillmentList(env,actor,url))},200,cors);
+        if(fulfillmentMatch[1])return json({ok:true,receipt:await fulfillmentAction(env,actor,fulfillmentMatch[1],await requestJson(request,4000))},200,cors);
+        return json({ok:false,error:'Order reference is required'},422,cors);
       }
       if (url.pathname === '/v1/inventory/reviews' && request.method === 'GET') {
         const {seller} = await sellerContext(request, env);

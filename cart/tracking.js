@@ -73,7 +73,7 @@
     googleLink.hidden = !location;
     if (location) googleLink.href = "https://www.google.com/maps/search/?" + new URLSearchParams({ api: "1", query: location.latitude + "," + location.longitude });
     else googleLink.removeAttribute("href");
-    setText("package-location-time", location ? location.label + " · " + date(location.updated_at) : latest ? date(latest.updated_at) : "Updates appear as the courier shares them.");
+    setText("package-location-time", location ? location.label + " · " + date(location.updated_at) : latest ? (latest.updated_at ? date(latest.updated_at) : 'Received ' + date(latest.received_at)) : "Updates appear as the courier shares them.");
     deliveryMap.update(t);
   }
   let historyKey = "";
@@ -84,7 +84,7 @@
     if (t.pickup_arranged_at) events.push({ title: "Pickup arranged", updated_at: t.pickup_arranged_at });
     for (const item of t.history || []) events.push({ ...item, title: labels[item.status] || "Courier update" });
     events.forEach((event, index) => { event.sequence = index; });
-    events.sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at) || b.sequence - a.sequence);
+    events.sort((a, b) => Date.parse(b.updated_at || b.received_at) - Date.parse(a.updated_at || a.received_at) || b.sequence - a.sequence);
     const key = JSON.stringify(events);
     if (key === historyKey) return;
     historyKey = key;
@@ -95,7 +95,7 @@
       title.textContent = event.title;
       row.append(title);
       if (event.note) { const note = document.createElement("p"); note.textContent = event.note; row.append(note); }
-      const time = document.createElement("time"); time.dateTime = event.updated_at; time.textContent = date(event.updated_at); row.append(time);
+      const time = document.createElement("time"); time.dateTime = event.updated_at || event.received_at; time.textContent = event.updated_at ? date(event.updated_at) : 'Received ' + date(event.received_at) + ' · Courier time unavailable'; row.append(time);
       return row;
     }));
   }
@@ -109,7 +109,7 @@
     setText("return-message", message);
     byId("tracking-sandbox").hidden = data.environment !== "sandbox";
     setText("return-total", money.format(data.total));
-    setText("return-reference", data.payment_reference || "Waiting");
+    setText("return-reference", data.payment_reference || (t.paid_at ? "Payment confirmed" : "Waiting"));
     setText("return-status", data.status + (data.environment === "sandbox" ? " (test)" : ""));
     setText("return-fulfillment", t.stage === "not_required" ? "Delivery skipped (sandbox)" : t.stage === "awaiting_payment" ? "Waiting for payment" : labels[t.shipment_status] || (t.stage === "processing" ? "Seller processing" : title));
     setText("processing-detail", t.seller_accepted ? "Preparing your order" : "Waiting for seller confirmation");
@@ -128,6 +128,8 @@
     const courierLink = byId("courier-tracking-link");
     courierLink.hidden = !link;
     if (link) courierLink.href = link; else courierLink.removeAttribute("href");
+    const proofLink = byId('delivery-proof-link'), proof = safeLink(t.proof_link);
+    if (proofLink) { proofLink.hidden = !proof; if (proof) proofLink.href = proof; else proofLink.removeAttribute('href'); }
     setText("courier-tracking-link", t.live_tracking ? "View courier live tracking ↗" : "View courier tracking ↗");
     setText("tracking-updated", date(t.updated_at) ? "Last update: " + date(t.updated_at) : "Updates appear here automatically.");
     notice(t.unavailable ? "Courier updates are temporarily unavailable. Your last confirmed status is shown; we’ll try again automatically." : "");

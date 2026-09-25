@@ -16,7 +16,10 @@ try {
         if ($customer === null) ez_api_json(['ok' => false, 'error' => 'Sign in with Google to track your order.'], 401);
         session_write_close();
         $order = ez_customer_claim_order($id, $customer);
-        if (!ez_central_commerce_enabled() && ($_GET['refresh'] ?? '') !== '0') $order = ez_refresh_order_tracking($order);
+        if (ez_central_commerce_enabled()) {
+            require_once __DIR__ . '/commerce-fulfillment.php';
+            $order = ez_central_customer_shipment($order, $customer);
+        } elseif (($_GET['refresh'] ?? '') !== '0') $order = ez_refresh_order_tracking($order);
     } else {
         $order = ez_central_commerce_enabled() ? ez_central_order_projection(ez_central_order($id)) : ez_load_order($id);
     }
@@ -55,6 +58,11 @@ try {
         'fulfillment_deadline_at' => $order['fulfillment_deadline_at'] ?? '',
         'tracking' => ez_public_order_tracking($order),
     ];
+    if ($tracking && isset($order['central_shipment_history'])) {
+        $payload['tracking']['history'] = $order['central_shipment_history'];
+        $payload['tracking']['proof_link'] = $order['biteship_proof_link'];
+        $payload['tracking']['latest_location'] = $order['central_latest_location'];
+    }
     ez_api_json($payload);
 } catch (InvalidArgumentException $error) {
     ez_api_json(['ok' => false, 'error' => 'Order not found.'], 404);

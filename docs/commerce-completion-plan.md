@@ -320,6 +320,56 @@ Hosted rollout of `228f584`:
 - Hosted acceptance here is deployment/guard/UI smoke evidence. No paid order,
   provider capture or return was fabricated, and production was not deployed.
 
+### 25 September: central fulfillment and courier recovery
+
+Prepared seller-scoped fulfillment queues, immutable merchant acceptance and
+pickup actions, multiple linked shipment attempts after confirmed cancellation,
+and an early-callback inbox. Shipment progress and fee/waybill timestamps are
+reduced independently. A provider refresh cannot replace newer or pending courier
+events. Conflicting progress on an earlier cancelled shipment places the order
+under review without rewriting its newer attempt.
+
+The PHP adapter uses saved addresses and packages, binds the first courier
+credential fingerprint, verifies provider IDs against the original unique
+reference, and reconciles lost create/cancel/storage responses. The bounded CLI
+dispatcher processes durable jobs and drains pending matched events. Customer
+tracking now reads owned central shipments, retains honest received-only times,
+and exposes delivery proof only through authorized tracking.
+
+The merchant workspace includes search/filter/pagination, items and saved
+addresses, courier operations, reported fees, multiple attempts, full event
+history, review dialogs, per-order request recovery, and desktop/mobile layouts.
+No stock or financial effect is inferred from a carrier return or cancellation.
+See [central-fulfillment.md](central-fulfillment.md) for the contract and remaining
+operator and shipping workflows.
+
+Local verification:
+
+- The complete 61-test Worker suite passed. The final fulfillment checks passed
+  all eight domain cases plus a deterministic ninth case that commits delivery
+  between shipment/order reads, proving an older shipment snapshot cannot
+  overwrite it.
+- All 11 central courier PHP/integration/browser cases passed, including
+  credential changes, early callbacks, lost create/cancel/storage responses,
+  held orders, missing first events and immutable customer ownership. The ten
+  central checkout/payment regressions also passed.
+- Eight affected legacy checkout/merchant/courier cases passed. Three final
+  customer tracking/map/walkthrough regressions and two final central visual
+  cases passed after correcting the last-location map label and deduplicating
+  repeated customer milestones.
+- Desktop 1360px and phone 390px merchant action/detail screens and the customer
+  tracking page were visually inspected. Recovery, keyboard dismissal, universal
+  dropdown use, unavailable browser storage and horizontal overflow were checked.
+- A private remote test database backup was saved before migration:
+  `/tmp/ezkart-test-before-fulfillment-01a0d643.sql`, 246,211 bytes, mode 0600.
+  Existing catalog stock/revisions still match
+  `2c9451612b88e613d4dc10bbba8f4b1305ee5de6395e24bf3a70f56049bebb64`.
+
+This stage does not close a top-level item. Seller pickup settings/quotes, legacy
+migration and order-read cutover, monitored execution and notifications, shipping
+exceptions/labels and split/scheduled packages, financial refunds and ledger work
+remain. Hosted central order processing stays disabled during these changes.
+
 ## Atomicity contract
 
 Commerce database changes use D1 transactional batches and database constraints,

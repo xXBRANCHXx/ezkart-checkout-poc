@@ -1,7 +1,7 @@
 import {commerceEnvironment, commerceHash} from './commerce-orders.js';
 
 const fail = (message, status = 422) => { throw new Response(message, {status}); };
-const kinds = ['payment.create', 'shipment.create', 'shipment.cancel', 'notification.order_state', 'notification.payment_review', 'notification.stock_recovered', 'notification.return_updated', 'notification.send', 'payout.create'];
+const kinds = ['payment.create', 'shipment.create', 'shipment.cancel', 'shipment.refresh', 'notification.order_state', 'notification.payment_review', 'notification.stock_recovered', 'notification.return_updated', 'notification.shipment_updated', 'notification.send', 'payout.create'];
 const validId = value => typeof value === 'string' && /^[A-Za-z0-9_-]{3,100}$/.test(value);
 const view = row => ({id: row.id, sellerId: row.seller_id, orderId: row.order_id, environment: row.commerce_environment,
   kind: row.kind, state: row.state, data: JSON.parse(row.payload_json), attempts: row.attempts,
@@ -36,8 +36,11 @@ export async function claimCommerceJobs(env, input) {
           OR (? = 'reconcile' AND state = 'uncertain' AND attempts < maximum_attempts))
         AND (?='' OR order_id=?)
         AND (?='reconcile' OR kind!='payment.create' OR EXISTS (SELECT 1 FROM orders o WHERE o.id=commerce_jobs.order_id AND o.checkout_state='creating' AND o.expires_at>?))
+        AND (?='reconcile' OR kind!='shipment.create' OR EXISTS (SELECT 1 FROM commerce_shipments s JOIN orders o ON o.id=s.order_id
+          WHERE s.id=json_extract(commerce_jobs.payload_json,'$.shipmentId') AND s.order_id=commerce_jobs.order_id
+            AND (s.provider_id IS NOT NULL OR (o.checkout_state='paid' AND o.payment_review=0 AND o.fulfillment_review=0 AND s.state='queued'))))
         ORDER BY available_at, created_at, id LIMIT ?) RETURNING *`)
-      .bind(token, input.workerId, until, mode, now, environment, JSON.stringify(input.kinds), now, mode, mode, orderId, orderId, mode, now, limit),
+      .bind(token, input.workerId, until, mode, now, environment, JSON.stringify(input.kinds), now, mode, mode, orderId, orderId, mode, now, mode, limit),
     env.DB.prepare(`INSERT INTO commerce_job_attempts (id, job_id, attempt, lease_token, worker_id, mode, started_at)
       SELECT id || ':' || attempts, id, attempts, lease_token, lease_owner, lease_mode, ? FROM commerce_jobs
       WHERE lease_token = ? AND lease_owner = ? AND commerce_environment = ? AND state = 'running'`).bind(now, token, input.workerId, environment),
@@ -68,6 +71,16 @@ export async function finishCommerceJob(env, jobId, input) {
     const recorded = await env.DB.prepare(`SELECT order_id FROM commerce_payment_sessions WHERE order_id=?
       UNION ALL SELECT order_id FROM commerce_payment_captures WHERE order_id=? AND capture_kind='order_payment' LIMIT 1`).bind(row.order_id,row.order_id).first();
     if (!recorded) fail('Record the provider payment details on the order before completing this job', 409);
+  }
+  if(row.kind.startsWith('shipment.')&&input.outcome==='succeeded'){
+    const shipmentId=JSON.parse(row.payload_json).shipmentId;
+    const shipment=await env.DB.prepare('SELECT * FROM commerce_shipments WHERE id=? AND order_id=? AND commerce_environment=?').bind(shipmentId,row.order_id,environment).first();
+    if(!shipment?.provider_id||shipment.state==='queued')fail('Record the verified courier result before completing this job',409);
+    if(row.kind==='shipment.cancel'&&shipment.state!=='cancelled')fail('The courier has not confirmed cancellation',409);
+    if(row.kind==='shipment.refresh'){
+      const recorded=await env.DB.prepare("SELECT id FROM commerce_shipping_inbox WHERE shipment_id=? AND source='refresh' AND applied_at IS NOT NULL AND received_at>=? LIMIT 1").bind(shipmentId,row.updated_at).first();
+      if(!recorded)fail('Record a current tracking response before completing this job',409);
+    }
   }
   // Only a proven no-effect failure can enter ordinary retry. Network timeout,
   // missing response or a crashed worker requires a provider-status check.

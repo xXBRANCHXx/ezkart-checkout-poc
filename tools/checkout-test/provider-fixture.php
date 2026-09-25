@@ -159,6 +159,46 @@ function curl_exec(object $handle): string {
         if ($path === 'logout?scope=local') { $handle->status = 204; return ''; }
         throw new RuntimeException('Unexpected auth fixture request: ' . $path);
     }
+    if (getenv('EZKART_TEST_CENTRAL_COURIER') && str_starts_with($handle->url, 'https://api.biteship.com/v1/orders')) {
+        // Persist a provider-side shipment even when its HTTP response is lost.
+        $directory = dirname(getenv('EZKART_TEST_CAPTURE'));
+        $path = substr($handle->url, strlen('https://api.biteship.com/v1/orders'));
+        $configFile = $directory . '/courier-control.json';
+        $control = is_file($configFile) ? json_decode((string) file_get_contents($configFile), true) : [];
+        $storeFile = $directory . '/courier-orders.json';
+        $orders = is_file($storeFile) ? json_decode((string) file_get_contents($storeFile), true) : [];
+        if ($path === '') {
+            $id = 'courier_' . hash('md5', $payload['reference_id']);
+            if (isset($orders[$id])) {
+                $handle->status = 400; $response = ['success' => false, 'code' => 40002060, 'details' => ['order_id' => $id, 'reference_id' => $payload['reference_id']]];
+            } else {
+                $response = ['success' => true, 'id' => $id, 'reference_id' => $payload['reference_id'], 'status' => 'confirmed', 'courier' => ['tracking_id' => 'tracking_fixture', 'waybill_id' => 'WB-FIXTURE'], 'price' => 18000];
+                $orders[$id] = $response; file_put_contents($storeFile, json_encode($orders));
+                if (!empty($control['earlyEvent'])) ez_central_courier_webhook(['event' => 'order.status', 'order_id' => $id] + $control['earlyEvent'], 'sandbox');
+                if (!empty($control['loseCreate'])) { $handle->status = 503; $response = ['success' => false]; }
+                if (!empty($control['omitReference'])) unset($response['reference_id']);
+            }
+        } else {
+            $id = explode('/', ltrim($path, '/'))[0];
+            $response = $orders[$id] ?? ['success' => false];
+            if (!isset($orders[$id])) $handle->status = 404;
+            if (str_ends_with($path, '/cancel')) {
+                $orders[$id]['status'] = 'cancelled'; file_put_contents($storeFile, json_encode($orders));
+                $response = ['success' => true, 'id' => $id, 'status' => 'cancelled'];
+                if (!empty($control['loseCancel'])) { $handle->status = 503; $response = ['success' => false]; }
+            } else {
+                if (!empty($control['readUnavailable'])) { $handle->status = 503; $response = ['success' => false]; }
+                if (!empty($control['wrongReference'])) $response['reference_id'] = 'ANOTHER-ORDER';
+                if (!empty($control['concurrentEvent'])) {
+                    ez_central_courier_webhook(['event' => 'order.status', 'order_id' => $id] + $control['concurrentEvent'], 'sandbox');
+                    unset($control['concurrentEvent']); file_put_contents($configFile, json_encode($control));
+                }
+            }
+        }
+        $body = json_encode($response);
+        if (isset($handle->options[CURLOPT_WRITEFUNCTION])) { ($handle->options[CURLOPT_WRITEFUNCTION])($handle, $body); return '1'; }
+        return $body;
+    }
     if (str_starts_with($handle->url, 'https://api.biteship.com/v1/orders/')) {
         // Simulate a webhook arriving while a provider read is in flight.
         $eventPath = dirname(getenv('EZKART_TEST_CAPTURE')) . '/tracking-concurrent-event.json';

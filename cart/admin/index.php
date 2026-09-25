@@ -706,10 +706,11 @@ function ez_admin_proxy_cloud_request(string $accessToken, string $path, string 
     $inventoryPath = (string) parse_url($path, PHP_URL_PATH);
     $isInventoryPath = preg_match('#^/v1/inventory(?:/(?:history|adjustments|draft|reviews(?:/EZK-[SP]-[A-F0-9]{24})?))?$#D', $inventoryPath) === 1;
     $isReturnsPath = preg_match('#^/v1/returns(?:/(?:orders/EZK-[SP]-[A-F0-9]{24}|ret_[a-f0-9]{32}))?$#D', $inventoryPath) === 1;
-    if ($isInventoryPath || $isReturnsPath) {
+    $isFulfillmentPath = preg_match('#^/v1/fulfillment(?:/EZK-[SP]-[A-F0-9]{24})?$#D', $inventoryPath) === 1;
+    if ($isInventoryPath || $isReturnsPath || $isFulfillmentPath) {
         parse_str((string) parse_url($path, PHP_URL_QUERY), $inventoryQuery);
         foreach ($inventoryQuery as $key => $value) {
-            if (!in_array($key, $isReturnsPath ? ['state', 'cursor', 'limit', 'before'] : ['q', 'status', 'level', 'cursor', 'limit', 'product', 'variant'], true) || !is_string($value) || strlen($value) > 200 || preg_match('/[\x00-\x1f]/', $value)) {
+            if (!in_array($key, $isFulfillmentPath ? ['state', 'cursor', 'limit', 'before', 'q'] : ($isReturnsPath ? ['state', 'cursor', 'limit', 'before'] : ['q', 'status', 'level', 'cursor', 'limit', 'product', 'variant']), true) || !is_string($value) || strlen($value) > 200 || preg_match('/[\x00-\x1f]/', $value)) {
                 ez_admin_json(['ok' => false, 'error' => 'Inventory filter is invalid.'], 400);
             }
         }
@@ -717,7 +718,7 @@ function ez_admin_proxy_cloud_request(string $accessToken, string $path, string 
         $path = $inventoryPath . ($inventoryQuery !== [] ? '?' . http_build_query($inventoryQuery, '', '&', PHP_QUERY_RFC3986) : '');
     }
     $allowedPath = preg_match('#^/v1/(?:catalog|storefront|admin-preferences|admin-profile|advanced-mode|media(?:/[a-zA-Z0-9_-]+)?|assets(?:/[a-zA-Z0-9_-]+)?|fonts(?:/font_[a-f0-9]{64})?|products/[a-zA-Z0-9_-]+(?:/(?:duplicate|status))?|drafts/[a-zA-Z0-9_-]+|landing-pages(?:/[a-z0-9-]+(?:/(?:preview|export|editor|view|confirmation))?)?|components(?:/[a-z0-9-]+)?)$#', $path) === 1;
-    if (!$isInventoryPath && !$isReturnsPath && (!$allowedPath || str_contains($path, '?') || str_contains($path, '#'))) {
+    if (!$isInventoryPath && !$isReturnsPath && !$isFulfillmentPath && (!$allowedPath || str_contains($path, '?') || str_contains($path, '#'))) {
         ez_admin_json(['ok' => false, 'error' => 'That saved-data path is not allowed.'], 400);
     }
     if (!in_array($method, ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'], true) || ($method === 'PATCH' && preg_match('#^/v1/products/[a-zA-Z0-9_-]+/status$#D', $path) !== 1)) {
@@ -1475,7 +1476,7 @@ $statusTotal = max(1, $metrics['orders']);
 $paidEnd = round(($statusCounts['PAID'] / $statusTotal) * 100, 1);
 $pendingEnd = round((($statusCounts['PAID'] + $statusCounts['PENDING']) / $statusTotal) * 100, 1);
 $creatingEnd = round((($statusCounts['PAID'] + $statusCounts['PENDING'] + $statusCounts['CREATING']) / $statusTotal) * 100, 1);
-$allowedPages = ['dashboard', 'orders', 'returns', 'products', 'product-new', 'inventory', 'shop', 'sites', 'customers', 'analytics', 'marketing', 'payments', 'messages', 'wallet', 'settings', 'advanced'];
+$allowedPages = ['dashboard', 'orders', 'returns', 'fulfillment', 'products', 'product-new', 'inventory', 'shop', 'sites', 'customers', 'analytics', 'marketing', 'payments', 'messages', 'wallet', 'settings', 'advanced'];
 $requestedPage = strtolower(trim((string) ($_GET['page'] ?? 'dashboard')));
 if ($requestedPage === 'integrations') { header('Location: ?page=wallet', true, 302); exit; }
 if ($requestedPage === 'reviews') { header('Location: ?page=customers&tab=reviews', true, 302); exit; }
@@ -1491,7 +1492,7 @@ $walletAccess = $page === 'wallet' && $authenticated ? ez_wallet_access($authent
 $requestedSite = trim((string) ($_GET['edit'] ?? ''));
 $siteEditor = $page === 'sites' && $requestedSite !== '' && strlen($requestedSite) <= 180;
 $pageTitles = [
-    'dashboard' => 'Dashboard', 'orders' => 'Orders', 'returns' => 'Returns', 'products' => 'Products', 'product-new' => 'Create product', 'inventory' => 'Inventory', 'shop' => 'Shop', 'sites' => 'Landing Pages',
+    'dashboard' => 'Dashboard', 'orders' => 'Orders', 'returns' => 'Returns', 'fulfillment' => 'Fulfillment', 'products' => 'Products', 'product-new' => 'Create product', 'inventory' => 'Inventory', 'shop' => 'Shop', 'sites' => 'Landing Pages',
     'customers' => 'Customers', 'analytics' => 'Analytics', 'marketing' => 'Marketing',
     'payments' => 'Payments', 'messages' => 'Messages',
     'wallet' => 'Wallet', 'settings' => 'Settings', 'advanced' => 'Advanced Mode',
@@ -1559,6 +1560,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
   <link rel="stylesheet" href="admin.css?v=<?= ez_admin_escape($adminCssVersion) ?>">
   <?php if (in_array($page, ['inventory','products'], true)): ?><link rel="stylesheet" href="inventory.css?v=<?= (int) filemtime(__DIR__ . '/inventory.css') ?>"><?php endif; ?>
   <?php if ($page === 'returns'): ?><link rel="stylesheet" href="returns.css?v=<?= (int) filemtime(__DIR__ . '/returns.css') ?>"><?php endif; ?>
+  <?php if ($page === 'fulfillment'): ?><link rel="stylesheet" href="fulfillment.css?v=<?= (int) filemtime(__DIR__ . '/fulfillment.css') ?>"><?php endif; ?>
   <?php if ($authenticated && $page === 'shop'): ?><link rel="stylesheet" href="../storefront.css?v=1"><link rel="stylesheet" href="shop.css?v=<?= (int) filemtime(__DIR__ . '/shop.css') ?>"><?php endif; ?>
   <?php if ($authenticated && $page === 'sites'): ?><link rel="stylesheet" href="builder-templates.css?v=<?= (int) filemtime(__DIR__ . '/builder-templates.css') ?>"><?php endif; ?>
   <?php if ($authenticated && $page === 'sites' && $siteEditor): ?><link rel="stylesheet" href="builder-native.css?v=<?= (int) filemtime(__DIR__ . '/builder-native.css') ?>"><link rel="stylesheet" href="builder-fonts.css?v=<?= (int) filemtime(__DIR__ . '/builder-fonts.css') ?>"><link rel="stylesheet" href="builder-help.css?v=<?= (int) filemtime(__DIR__ . '/builder-help.css') ?>"><link rel="stylesheet" href="builder-components.css?v=<?= (int) filemtime(__DIR__ . '/builder-components.css') ?>"><link rel="stylesheet" href="builder-flow.css?v=<?= (int) filemtime(__DIR__ . '/builder-flow.css') ?>"><link rel="stylesheet" href="builder-showcase.css?v=<?= (int) filemtime(__DIR__ . '/builder-showcase.css') ?>"><link rel="stylesheet" href="builder-chrome.css?v=<?= (int) filemtime(__DIR__ . '/builder-chrome.css') ?>"><link rel="stylesheet" href="builder-assets.css?v=<?= (int) filemtime(__DIR__ . '/builder-assets.css') ?>"><?php endif; ?>
@@ -1733,7 +1735,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
       <a class="sidebar-brand" href="../../"><img src="../../assets/ezkart-logo.svg" alt="Ezkart"></a>
       <nav class="primary-nav" aria-label="Main navigation">
         <a class="<?= $page === 'dashboard' ? 'active' : '' ?>" href="?page=dashboard"><?= ez_admin_icon('grid') ?><span>Dashboard</span></a>
-        <a class="<?= in_array($page, ['orders','returns'], true) ? 'active' : '' ?>" href="?page=orders"><?= ez_admin_icon('cart') ?><span>Orders</span><b><?= $allOrderCount ?></b></a>
+        <a class="<?= in_array($page, ['orders','returns','fulfillment'], true) ? 'active' : '' ?>" href="?page=orders"><?= ez_admin_icon('cart') ?><span>Orders</span><b><?= $allOrderCount ?></b></a>
         <a class="<?= in_array($page, ['products', 'product-new', 'inventory', 'shop'], true) ? 'active' : '' ?>" href="?page=products"><?= ez_admin_icon('box') ?><span>Products</span></a>
         <a class="<?= $page === 'sites' ? 'active' : '' ?>" href="?page=sites"><?= ez_admin_icon('layout') ?><span>Landing Pages</span><b data-site-count>0</b></a>
         <a class="<?= $page === 'customers' ? 'active' : '' ?>" href="?page=customers"><?= ez_admin_icon('users') ?><span>Customers</span></a>
@@ -1880,6 +1882,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
   <?php if (in_array($page, ['inventory','products'], true)): ?><script src="inventory.js?v=<?= (int) filemtime(__DIR__ . '/inventory.js') ?>"></script><?php endif; ?>
   <?php if ($page === 'inventory'): ?><script src="inventory-reviews.js?v=<?= (int) filemtime(__DIR__ . '/inventory-reviews.js') ?>"></script><?php endif; ?>
   <?php if ($page === 'returns'): ?><script src="returns.js?v=<?= (int) filemtime(__DIR__ . '/returns.js') ?>"></script><?php endif; ?>
+  <?php if ($page === 'fulfillment'): ?><script src="fulfillment.js?v=<?= (int) filemtime(__DIR__ . '/fulfillment.js') ?>"></script><?php endif; ?>
   <?php if ($page === 'analytics'): ?><script src="analytics.js?v=<?= (int) filemtime(__DIR__ . '/analytics.js') ?>"></script><?php endif; ?>
   <?php if ($page === 'wallet'): ?><script src="wallet-access.js?v=<?= (int) filemtime(__DIR__ . '/wallet-access.js') ?>"></script><?php endif; ?>
   <script src="admin-language.js?v=<?= (int) filemtime(__DIR__ . '/admin-language.js') ?>"></script>

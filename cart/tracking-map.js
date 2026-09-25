@@ -54,10 +54,10 @@
   function paintMarkers() {
     markers.forEach((marker) => marker.remove());
     markers = [];
-    const { location, origin, destination, completed, returning } = state;
+    const { location, origin, destination, completedLocation, terminal, returning } = state;
     if (destination && !samePoint(location, destination)) makeMarker(destination, "destination", returning ? "Seller" : "Delivery", returning ? "Return address" : "Delivery address");
     if ((overview || !location) && origin && !samePoint(origin, location) && !samePoint(origin, destination)) makeMarker(origin, "pickup", "Pickup", "Pickup address");
-    if (location) makeMarker(location, completed ? "destination" : "truck", completed ? (returning ? "Returned" : "Delivered") : "Your package", "Last reported location: " + location.label);
+    if (location) makeMarker(location, completedLocation ? "destination" : "truck", completedLocation ? (returning ? "Returned" : "Delivered") : terminal ? "Last reported" : "Your package", "Last reported location: " + location.label);
   }
   function positionMap() {
     if (!map || !state) return;
@@ -157,7 +157,8 @@
     const destination = returning ? origin : end;
     const terminal = ["delivered", "returned", "cancelled"].includes(t.stage);
     const completed = ["delivered", "returned"].includes(t.stage);
-    const next = { location, origin, destination, returning, terminal, completed };
+    const completedLocation = completed && location?.status === t.shipment_status;
+    const next = { location, origin, destination, returning, terminal, completed, completedLocation };
     const key = JSON.stringify(next);
     if (key === stateKey) return;
     const firstLocation = !state?.location && !!location;
