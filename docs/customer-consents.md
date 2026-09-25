@@ -119,3 +119,41 @@ campaign unsubscribe links and suppression at actual delivery, full review
 workflows, messaging, data-lifecycle operations and the wider commerce completion
 plan remain open. No email campaign, provider transaction or production change is
 performed by this delivery.
+
+## TEST deployment — 25 September 2026
+
+Implementation `e97da9d` is committed and pushed to `agent/ezkart-workbench`.
+Migration 0021 is applied to TEST D1
+`2595f8c1-3e25-422f-9197-91d50a90e131`. Worker
+`f2f23c3b-27e1-4d0a-9e4b-33f80db3d603` is deployed at
+`https://ezkart-api-test.vincentbranch23.workers.dev`.
+
+The pre-migration backup is
+`/tmp/ezkart-consents-deploy-01a0d643/test-before-0021.sql`, mode 600,
+374,215 bytes, SHA-256
+`1480397c7ddea96ee6ff1f6150b446971bef151acbc0886f4d7e1a030b14c612`.
+The containing directory is mode 700 and holds private deployment logs and
+before/after aggregate readbacks. Do not print the backup log's signed export URL.
+
+At 20:03 Jakarta, hosted HTTPS hashes for `customer-consents.js`,
+`customer-consents.css`, `customer-auth.js` and `admin/commerce-customers.js`
+match the implementation. The anonymous preferences page returns the correct
+sign-in gate without private preference data. Worker health at
+`2026-09-25T13:03:52Z` reports 56 application tables and healthy D1/public/private
+R2. Anonymous merchant customer reads and the buyer PHP proxy return 401.
+The internal consent route returns the expected central-storage-disabled 503;
+the Worker flag remains unset. No central activation is included in this change.
+
+Both consent tables are empty and all seven new guards are present. Before/after
+counts remain zero for operational orders, customers, captures, reservations,
+shipments, jobs, analytics exports/rows and customer metadata/export tables.
+The 15 legacy import entries and manifest
+`ba180208c85cea72b82323b7b917e0e3771b143d930f5220665fddffc62777c0`
+are unchanged. No hosted buyer preference or operational record was fabricated.
+
+Shared Chrome still reports the previously approved connection's initialization
+timeout, with five total connection attempts. This delivery only checked status;
+it did not reconnect or restart the service. Signed-in hosted buyer/merchant
+acceptance is still pending. The host also still replaces PHP's detailed CSP with
+`upgrade-insecure-requests`, as tracked by the existing release work. Storage
+cutover, production and main remain held.

@@ -103,13 +103,22 @@ the legacy import receipt are unchanged. No migration or storage activation is
 included. Signed-in hosted payment acceptance remains pending shared Chrome
 initialization; see [central-payments.md](central-payments.md).
 
-Current TEST Worker `eba823ae-56e8-4ada-a524-076ce3cb3e95` adds the central
+TEST Worker `eba823ae-56e8-4ada-a524-076ce3cb3e95` added the central
 customer workspace from implementation `51c1ac3`. Migration 0020 is applied;
 health reports 54 application tables. Served customer assets match, authentication
 checks pass and all five new customer tables are empty. Operational counts and
 the legacy receipt remain unchanged. A private pre-migration D1 backup is
 recorded in [central-customers.md](central-customers.md). Both storage flags stay
 disabled; signed-in hosted acceptance is pending shared Chrome initialization.
+
+Current TEST Worker `f2f23c3b-27e1-4d0a-9e4b-33f80db3d603` adds buyer email
+preferences and corrects permanent guest-order ownership after an email change,
+from implementation `e97da9d`. Migration 0021 adds two empty consent tables and
+seven guards; health reports 56 application tables. Served assets match, public
+authentication checks pass, and the expected disabled-storage response confirms
+the Worker rollout flag remains unset. Operational counts/import receipts are
+unchanged. The private backup, 90 passing correctness checks and remaining
+hosted/operational acceptance are recorded in [customer-consents.md](customer-consents.md).
 
 ## Data and invariants
 

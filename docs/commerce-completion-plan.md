@@ -80,6 +80,13 @@ Migration 0021 adds the consent projection/audit tables and guards. See
 evidence. Phone/WhatsApp consent, campaign unsubscribe and send-time enforcement,
 full review workflows, hosted acceptance and all wider completion gates remain
 open. This delivery does not send messages or activate central checkout.
+Implementation `e97da9d` is pushed and TEST Worker
+`f2f23c3b-27e1-4d0a-9e4b-33f80db3d603` is deployed with migration 0021.
+All 90 unique API/PHP/browser checks pass. Served assets match, the anonymous
+sign-in gate and authentication checks pass, and health reports 56 tables.
+Both new tables are empty, seven new guards are present and all existing
+operational counts/import receipts are unchanged. The private pre-migration
+backup and hosted acceptance limits are recorded in the consent document.
 
 ### 25 September: customer profiles, segments and private exports
 
