@@ -150,9 +150,11 @@ coverage proves these controlled workflows, not a provider delivery in hosting.
 
 ## Remaining acceptance and integration
 
-- Hosted signed-in buyer/merchant/public acceptance after central cutover. The
-  shared Chrome connection remains unavailable after its approved reconnect
-  timed out; no repeated connection attempt is made by this delivery.
+- Hosted signed-in buyer/merchant acceptance after central cutover, and populated
+  public review/photo acceptance against hosted delivery records. Public empty
+  states and filter navigation are verified as recorded below. The shared Chrome
+  connection remains unavailable after its approved reconnect timed out; no
+  repeated connection attempt is made by this delivery.
 - Provider-backed delivery acceptance, the wider commerce completion plan,
   financial validation month, DOKU approval and owner production release.
 
@@ -209,6 +211,40 @@ Logs: `/tmp/ezkart-review-workspace-api-01a0d643.log` (12),
 preview check). Screenshots: `/tmp/ezkart-review-workspace-01a0d643/`.
 These fixtures establish application behavior, not hosted login or live provider
 delivery, and do not close the broader customer or release gates.
+
+### Workspace TEST rollout
+
+Implementation `10513a7` is committed and pushed to `agent/ezkart-workbench`.
+TEST Worker `457a1f1b-fbee-4f4b-ad0f-4c844ebb6f6d` is deployed at the existing
+TEST URL. The existing `17 * * * *` schedule is unchanged. No migration,
+storage-flag change, provider activation or production deployment was performed.
+
+At 15:00:24 UTC / 22:00 Jakarta, all nine served merchant/shared/public/shop assets
+match the implementation commit byte-for-byte. Health reports 59 application
+tables with D1, public R2 and private R2 healthy. Public review API and PHP proxy
+reads return 200 with honest zero counts. Anonymous merchant API/proxy, buyer
+review and private-photo requests return 401. Before/after D1 query results are
+identical: orders, customers, captures, reservations, shipments, jobs, consents,
+consent changes, reviews, review changes and photo records remain zero. The
+15-entry legacy import and manifest
+`ba180208c85cea72b82323b7b917e0e3771b143d930f5220665fddffc62777c0`
+remain unchanged.
+
+At 15:01:29 UTC / 22:01 Jakarta, an isolated anonymous browser verified the already
+enabled hosted shop at 1360px and 390px: actual empty rating labels, opening the
+review viewer, choosing a star filter through the native dropdown, reloading its
+shareable link and closing it. No horizontal overflow or page errors were found;
+both screenshots are inspected. This read-only check created no orders/reviews
+and did not use or reconnect the user's Chrome. It does not establish populated
+review/photo or signed-in merchant/buyer acceptance.
+
+Private rollout evidence is in `/tmp/ezkart-review-workspace-deploy-01a0d643/`:
+before/after D1 results, deployment log/version, asset hashes, public endpoint
+results, hosted browser report and screenshots. Shared-browser status remains
+disconnected with five attempts, no active/queued work and the same recorded
+300-second initialization timeout. No reconnect was attempted. The final held
+rollout copy check also passes in `/tmp/ezkart-review-workspace-held-01a0d643.log`
+(an overlapping case, not added to the 35-case total).
 
 ## TEST deployment — 25 September 2026
 

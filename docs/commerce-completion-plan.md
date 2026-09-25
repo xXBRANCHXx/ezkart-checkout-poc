@@ -82,6 +82,14 @@ syntax and TEST dry build are verified. See [purchase-reviews.md](purchase-revie
 for behavior, logs and acceptance limits. No migration or central-storage/provider
 activation is part of this stage. Signed-in hosted acceptance, remaining consent
 channels, messaging/marketing and all wider completion gates remain open.
+Implementation `10513a7` is pushed and TEST Worker
+`457a1f1b-fbee-4f4b-ad0f-4c844ebb6f6d` is deployed. Nine served assets match;
+health/authentication checks pass and D1 operational/import results are unchanged.
+The already enabled hosted shop passes anonymous desktop/mobile empty-review,
+filter, shared-link reload and close checks. Populated hosted review/photo and
+signed-in merchant/buyer acceptance remain open; shared Chrome is still
+disconnected without a new reconnect attempt. Precise evidence and limits are
+recorded in the review document.
 
 ### 25 September: buyer purchase reviews and review API
 
