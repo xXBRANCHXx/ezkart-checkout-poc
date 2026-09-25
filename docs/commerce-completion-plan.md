@@ -96,6 +96,28 @@ drafts, desktop/mobile recovery, separate comparison tabs and the autosave race.
 Inventory counts/adjustments, returns, stock-review resolution and the PHP order
 cutover remain outstanding; no completion checkbox is advanced by this alone.
 
+Hosted acceptance for commit `391af42`:
+
+- Exported the test D1 database to a private local backup before applying
+  migrations 0009 and 0010. Production was not migrated or deployed.
+- Deployed test Worker version `cc05b087-bcff-4400-af8b-ed40afb8a36d`.
+  `/health` reports D1 and both R2 bindings healthy. Central checkout remains
+  disabled; the hourly maintenance schedule is not the future checkout-expiry
+  service and must be tightened before cutover.
+- Hostinger reports `391af426` completed for `test.ezkart.id` on
+  `agent/ezkart-workbench`. Verified the deployed editor contains the new
+  conflict handling.
+- Created a clearly labeled QA product through the hosted merchant form with
+  three uploaded images. A second save advanced its revision and changed stock
+  from 10 to 8. Publishing the older editor returned HTTP 409 with
+  `catalog_revision_conflict`, retaining its unpublished name and stock inputs.
+  The fresh editor read 8 units and successfully published revision 3. Checked
+  the conflict warning at 390px width with no horizontal overflow.
+- Removed the QA product and its remaining draft; verified no QA records
+  remained and both original products still had revision 1.
+- Local verification: all 30 Worker tests, the product-editor browser workflow
+  (including a held autosave), PHP syntax checks and the test Worker build pass.
+
 ## Atomicity contract
 
 Commerce database changes use D1 transactional batches and database constraints,

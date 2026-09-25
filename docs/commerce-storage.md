@@ -7,6 +7,12 @@ The existing hosted PHP checkout, callback handlers and merchant order screens
 have **not yet been cut over**. Applying the schema or deploying this Worker
 alone does not complete that integration or make wallets operational.
 
+On 25 September, migrations 0009/0010 and Worker version
+`cc05b087-bcff-4400-af8b-ed40afb8a36d` were deployed to test only, alongside
+workbench commit `391af42`. Hosted product edit/revision acceptance passed.
+`COMMERCE_STORAGE=d1` is not enabled. See the completion record for the QA
+procedure and cleanup; commerce cutover remains a separate unfinished step.
+
 The full completion scope and acceptance gates remain in
 [commerce-completion-plan.md](commerce-completion-plan.md).
 
@@ -141,7 +147,8 @@ stock-review resolution. Those remain required before the commerce cutover.
 1. Finish PHP checkout, provider dispatch, callback, order read/list, customer
    tracking and merchant-action adapters; preserve private legacy references.
 2. Finish inventory adjustments, return restocking and stock-review resolution.
-   Deploy and verify the implemented catalog revision/variant protections above.
+   Catalog revision protections are deployed to test; keep their regression
+   coverage when completing these remaining inventory flows.
 3. Build and rehearse an idempotent legacy import. Compare order counts, paid
    totals, owners and provider references. Legacy records must not reserve stock
    again or become new ledger credits.
