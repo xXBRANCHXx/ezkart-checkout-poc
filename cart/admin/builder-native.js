@@ -1209,7 +1209,9 @@
     return rules;
   }
   function stylesheet(root, exported = false) {
-    const query = (selector, rule) => {
+    // Keep the navigation surface tied to the authored color at each breakpoint.
+    const navColor = (rule, navigation) => navigation && rule.props?.backgroundColor ? `;--sq-native-nav-color:${rule.props.backgroundColor}` : '';
+    const query = (selector, rule, navigation) => {
       const conditions = [
         rule.min != null ? (rule.device ? `(width > ${rule.min}px)` : `(min-width:${rule.min}px)`) : "",
         rule.max != null ? `(max-width:${rule.max}px)` : "",
@@ -1217,27 +1219,28 @@
         .filter(Boolean)
         .join(" and ");
       return conditions
-        ? `@container ezkart-page ${conditions}{${selector}{${declarations(rule)}}}`
+        ? `@container ezkart-page ${conditions}{${selector}{${declarations(rule)}${navColor(rule, navigation)}}}`
         : "";
     };
     return [...root.querySelectorAll(".sq-native")]
       .map((node) => {
         const config = read(node),
           selector = `.sq-page-preview .sq-native[data-native-id="${config.id}"]`;
-        let css = `${selector}{${declarations(config)}${config.type === "icon" ? `;fill:${config.iconFill || "none"};stroke:${config.iconStroke || "currentColor"};stroke-width:${config.iconWeight ?? 1.6};stroke-linecap:round;stroke-linejoin:round;` : ""}}`;
+        const navigation = node.matches('.sq-native-section:is(header,nav)');
+        let css = `${selector}{${declarations(config)}${navColor(config, navigation)}${config.type === "icon" ? `;fill:${config.iconFill || "none"};stroke:${config.iconStroke || "currentColor"};stroke-width:${config.iconWeight ?? 1.6};stroke-linecap:round;stroke-linejoin:round;` : ""}}`;
         for (const rule of automaticLayout(node, config))
-          css += query(selector, rule);
+          css += query(selector, rule, navigation);
         for (const rule of responsiveRules(config))
-          css += query(selector, rule);
+          css += query(selector, rule, navigation);
         for (const [state, value] of Object.entries(config.states || {})) {
           const variant = config.stateScope
             ? config.stateScope === config.id
               ? `${selector}[data-native-state="${state}"]`
               : `.sq-page-preview [data-native-id="${config.stateScope}"][data-native-state="${state}"] .sq-native[data-native-id="${config.id}"]`
             : `.sq-page-preview[data-native-state="${state}"] .sq-native[data-native-id="${config.id}"]`;
-          css += `${variant}{${declarations(value)}}`;
+          css += `${variant}{${declarations(value)}${navColor(value, navigation)}}`;
           for (const rule of responsiveRules(value))
-            css += query(variant, rule);
+            css += query(variant, rule, navigation);
         }
         return css;
       })
@@ -2705,9 +2708,10 @@
     const sharedPanel = document.querySelector("[data-sq-native-inspector]");
     if (sharedPanel && hooks) {
       sharedPanel.classList.remove("sq-word-colors-only");
-      hooks.inspector
-        .querySelector(".sq-inspector-scroll")
-        .prepend(sharedPanel);
+      const scroll = hooks.inspector.querySelector('.sq-inspector-scroll');
+      const navigation = scroll.querySelector('[data-sq-navigation-layout-controls]');
+      if (navigation) navigation.after(sharedPanel);
+      else scroll.prepend(sharedPanel);
     }
     if (node !== selected) {
       selection = null;
@@ -3358,7 +3362,10 @@
         wrap.classList.add("sq-native-check");
     });
     globalThis.EzkartBuilderHelp?.attach(panel);
-    callbacks.inspector.querySelector(".sq-inspector-scroll").prepend(panel);
+    const inspectorScroll = callbacks.inspector.querySelector('.sq-inspector-scroll');
+    const navigationControls = inspectorScroll.querySelector('[data-sq-navigation-layout-controls]');
+    if (navigationControls) navigationControls.after(panel);
+    else inspectorScroll.prepend(panel);
     const listen = (selector, event, fn) =>
       panel.querySelector(selector).addEventListener(event, () => {
         try {

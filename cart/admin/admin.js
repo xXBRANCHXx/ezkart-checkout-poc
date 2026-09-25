@@ -2955,7 +2955,7 @@
     };
     const markSqChanged = () => {
       if (!saveState) return;
-      previewRoot?.querySelectorAll('.sq-authored-navigation').forEach(section => globalThis.EzkartComponents?.fitNavigation(section));
+      previewRoot?.querySelectorAll('.sq-authored-navigation,.sq-native-navigation').forEach(section => globalThis.EzkartComponents?.fitNavigation(section));
       saveState.textContent = "Saving…";
       window.clearTimeout(saveTimer);
       saveTimer = window.setTimeout(async () => { if (await persistCurrentState()) saveState.textContent = "Saved just now"; }, 550);
@@ -3933,8 +3933,20 @@
     showElementPanel(activeElementPanel);
     const navigationSectionFor = (element = selectedElement) => {
       const section = element?.closest('[data-sq-block]') || previewRoot?.querySelector(`[data-section-id="${selectedSection}"]`);
-      return section?.matches('.sq-navigation-template-section') ? section : null;
+      return section?.matches('.sq-navigation-template-section, .sq-native-section:is(header,nav)') ? section : null;
     };
+    const navigationPositionFor = (section) => {
+      const position = section.dataset.sqNavPosition || (section.matches('.sq-native-section') ? getComputedStyle(section).position : 'static');
+      return ['sticky', 'fixed'].includes(position) ? position : 'static';
+    };
+    const nativeNavigationSurface = (section) => {
+      if (!section.matches('.sq-native-section')) return null;
+      const style = getComputedStyle(section);
+      if (/blur\(/.test(style.backdropFilter)) return 'blur';
+      return style.backgroundColor === 'rgba(0, 0, 0, 0)' && style.backgroundImage === 'none' ? 'transparent' : 'solid';
+    };
+    const navigationBlurFor = (section) => section.dataset.sqNavBlur
+      ?? (section.matches('.sq-native-section') ? getComputedStyle(section).backdropFilter.match(/blur\(([\d.]+)px\)/)?.[1] : null) ?? 16;
     const ensureNavigationMobileMenu = (section) => {
       if (!section) return;
       const navigations = [...section.querySelectorAll(':scope > [data-sq-element-type="navigation"]')];
@@ -4037,6 +4049,7 @@
       editorNavigationFrame = requestAnimationFrame(syncEditorNavigation);
     };
     navigationScrollRoot?.addEventListener("scroll", scheduleEditorNavigation, { passive: true });
+    previewRoot?.addEventListener('native-refresh', scheduleEditorNavigation);
     window.addEventListener("resize", scheduleEditorNavigation);
     if (deviceFrame && typeof ResizeObserver === 'function') new ResizeObserver(scheduleEditorNavigation).observe(deviceFrame);
     document.fonts?.ready.then(scheduleEditorNavigation);
@@ -4048,7 +4061,7 @@
       if (pageBackground) pageBackground.after(section); else previewRoot.prepend(section);
     };
     const navigationSurfaceFor = (section) => {
-      const surface = section.dataset.sqNavSurface || (section.dataset.sqNavTemplate === 'overlay' ? 'transparent' : 'solid');
+      const surface = section.dataset.sqNavSurface || nativeNavigationSurface(section) || (section.dataset.sqNavTemplate === 'overlay' ? 'transparent' : 'solid');
       if (section.dataset.sqNavOverlay !== 'true') return surface;
       // A new overlay starts clear, while an existing blur remains intentional.
       // Keep its surface choice separate so disabling overlay restores the header.
@@ -4056,16 +4069,21 @@
     };
     const applyNavigationSectionBehavior = (section) => {
       if (!section) return;
-      const position = ["static", "sticky", "fixed"].includes(section.dataset.sqNavPosition) ? section.dataset.sqNavPosition : "static";
+      const native = section.matches('.sq-native-section');
+      const position = navigationPositionFor(section);
+      if (native && section.dataset.sqNavOffset == null) {
+        section.dataset.sqNavOffset = String(Math.max(0, Math.min(120, parseFloat(getComputedStyle(section).top) || 0)));
+        section.dataset.sqNavOffsetCustomized = 'true';
+      }
       const offsetWasCustomized = section.dataset.sqNavOffsetCustomized === "true";
       const offset = offsetWasCustomized ? Math.max(0, Math.min(120, Number(section.dataset.sqNavOffset) || 0)) : 0;
-      const surfaceFallback = section.dataset.sqNavTemplate === "overlay" ? "transparent" : "solid";
+      const surfaceFallback = nativeNavigationSurface(section) || (section.dataset.sqNavTemplate === "overlay" ? "transparent" : "solid");
       const surface = ["solid", "blur", "transparent"].includes(section.dataset.sqNavSurface) ? section.dataset.sqNavSurface : surfaceFallback;
-      const opacity = Math.max(0, Math.min(100, Number(section.dataset.sqNavOpacity ?? (surface === "transparent" ? 0 : surface === "blur" ? 82 : 100))));
-      const blur = Math.max(0, Math.min(32, Number(section.dataset.sqNavBlur ?? 16)));
+      const opacity = Math.max(0, Math.min(100, Number(section.dataset.sqNavOpacity ?? (surface === "transparent" ? 0 : !native && surface === "blur" ? 82 : 100))));
+      const blur = Math.max(0, Math.min(32, Number(navigationBlurFor(section))));
       const overlay = section.dataset.sqNavOverlay === "true";
       section.classList.toggle("sq-nav-over-hero", overlay);
-      if (position !== "static" || overlay) moveNavigationSectionToTop(section);
+      if (!native && (position !== "static" || overlay)) moveNavigationSectionToTop(section);
       section.dataset.sqNavPosition = position;
       section.dataset.sqNavOffset = String(offset);
       section.dataset.sqNavOffsetCustomized = String(offsetWasCustomized);
@@ -4073,8 +4091,8 @@
       section.dataset.sqNavActiveSurface = navigationSurfaceFor(section);
       section.dataset.sqNavOpacity = String(opacity);
       section.dataset.sqNavBlur = String(blur);
-      section.dataset.sqNavShadow ||= "true";
-      section.classList.add("sq-navigation-template-section");
+      if (!native) section.dataset.sqNavShadow ||= "true";
+      section.classList.add(native ? "sq-native-navigation" : "sq-navigation-template-section");
       section.style.setProperty("--sq-nav-offset", `${offset}px`);
       section.style.setProperty("--sq-nav-surface-opacity", `${opacity}%`);
       section.style.setProperty("--sq-nav-backdrop-blur", `${blur}px`);
@@ -4087,8 +4105,9 @@
       if (!isNavigation) return;
       const section = navigationSectionFor();
       if (!section) return;
-      applyNavigationSectionBehavior(section);
-      const position = section.dataset.sqNavPosition || "static";
+      // Selecting a native header must not rewrite its authored layout or effects.
+      if (!section.matches('.sq-native-section') || section.hasAttribute('data-sq-nav-position')) applyNavigationSectionBehavior(section);
+      const position = navigationPositionFor(section);
       const overlay = sqStudio.querySelector('[data-sq-navigation-overlay]');
       if (overlay) overlay.checked = section.dataset.sqNavOverlay === 'true';
       const sticky = sqStudio.querySelector('[data-sq-navigation-sticky]');
@@ -4100,12 +4119,13 @@
       });
       const offset = sqStudio.querySelector("[data-sq-navigation-offset]");
       const offsetOutput = sqStudio.querySelector("[data-sq-navigation-offset-output]");
-      if (offset) offset.value = section.dataset.sqNavOffset || "0";
-      if (offsetOutput) offsetOutput.textContent = `${section.dataset.sqNavOffset || "0"}px`;
+      const currentOffset = section.dataset.sqNavOffset ?? (parseFloat(getComputedStyle(section).top) || 0);
+      if (offset) offset.value = currentOffset;
+      if (offsetOutput) offsetOutput.textContent = `${currentOffset}px`;
       const hideOnScroll = sqStudio.querySelector("[data-sq-navigation-hide-scroll]");
       const shadow = sqStudio.querySelector("[data-sq-navigation-stuck-shadow]");
       if (hideOnScroll) hideOnScroll.checked = section.dataset.sqNavHideScroll === "true";
-      if (shadow) shadow.checked = section.dataset.sqNavShadow !== "false";
+      if (shadow) shadow.checked = section.dataset.sqNavShadow ? section.dataset.sqNavShadow === "true" : !section.matches('.sq-native-section');
       const surface = navigationSurfaceFor(section);
       sqStudio.querySelectorAll("[data-sq-navigation-surface]").forEach((button) => {
         const active = button.dataset.sqNavigationSurface === surface;
@@ -4118,8 +4138,8 @@
       const blurOutput = sqStudio.querySelector("[data-sq-navigation-blur-output]");
       if (opacity) { opacity.value = surface === "transparent" ? "0" : section.dataset.sqNavOpacity || "100"; opacity.disabled = surface === "transparent"; }
       if (opacityOutput) opacityOutput.textContent = `${opacity?.value || "0"}%`;
-      if (blur) { blur.value = section.dataset.sqNavBlur || "16"; blur.disabled = surface !== "blur"; }
-      if (blurOutput) blurOutput.textContent = `${section.dataset.sqNavBlur || "16"}px`;
+      if (blur) { blur.value = navigationBlurFor(section); blur.disabled = surface !== "blur"; }
+      if (blurOutput) blurOutput.textContent = `${navigationBlurFor(section)}px`;
     };
     const syncElementControls = () => {
       syncNavigationLayoutControls(Boolean(navigationSectionFor()));
@@ -6881,7 +6901,7 @@
       if (!section) return;
       remember();
       section.dataset.sqNavPosition = position;
-      if (section.dataset.sqNavPosition !== "static") {
+      if (section.dataset.sqNavPosition !== "static" && !section.matches('.sq-native-section')) {
         moveNavigationSectionToTop(section);
         rebuildLayerList();
         bindSqInteractions();
@@ -8207,7 +8227,7 @@
         node.dataset.ezkartNavOpacity = node.dataset.sqNavOpacity || (node.dataset.ezkartNavSurface === "transparent" ? "0" : "100");
         node.dataset.ezkartNavBlur = node.dataset.sqNavBlur || "16";
         node.dataset.ezkartNavHideScroll = node.dataset.sqNavHideScroll || "false";
-        node.dataset.ezkartNavShadow = node.dataset.sqNavShadow || "true";
+        if (node.dataset.sqNavShadow != null) node.dataset.ezkartNavShadow = node.dataset.sqNavShadow;
       });
       clone.querySelectorAll("[data-sq-nav-slot]").forEach((node) => { node.dataset.ezkartNavSlot = node.dataset.sqNavSlot; });
       clone.querySelectorAll("[data-section-id]").forEach((node) => { node.dataset.ezkartSection = node.dataset.sectionId; if(!node.id)node.id=node.dataset.sectionId; });
@@ -8455,7 +8475,14 @@ let frame=0,device='';
 const layouts=new WeakMap();
 const write=(element,layout)=>{layouts.set(element,layout);element.style.setProperty('grid-column',layout.x+'/span '+layout.width,'important');element.style.setProperty('grid-row',layout.y+'/span '+layout.height,'important')};
 const fit=()=>{frame=0;const next=innerWidth<=600?'mobile':innerWidth<=900?'tablet':'desktop';
- document.querySelectorAll('.sq-navigation-template-section').forEach(fitNavigation);
+ document.querySelectorAll('.sq-navigation-template-section,.sq-native-navigation').forEach(nav=>{
+  fitNavigation(nav);
+  if(nav.matches('.sq-native-navigation[data-ezkart-nav-position="fixed"]')&&!nav.classList.contains('sq-nav-over-hero')){
+   let spacer=nav.previousElementSibling;
+   if(!spacer?.classList.contains('sq-native-navigation-spacer')){spacer=document.createElement('div');spacer.className='sq-native-navigation-spacer';spacer.setAttribute('aria-hidden','true');nav.before(spacer)}
+   spacer.style.height=nav.offsetHeight+'px';
+  }
+ });
  fitProductCards(document.querySelector('.sq-page-preview'));
  const pinned=document.querySelector('body>.sq-authored-navigation'),root=document.querySelector('body>.sq-page-preview');
  if(pinned&&root)root.style.setProperty('--sq-pinned-nav-height',(pinned.offsetHeight+(parseFloat(getComputedStyle(pinned).top)||0))+'px');
