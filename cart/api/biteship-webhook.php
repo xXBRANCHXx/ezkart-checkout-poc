@@ -30,6 +30,9 @@ try {
 } catch (InvalidArgumentException $error) {
     error_log('Ezkart Biteship webhook rejected: ' . $error->getMessage());
     ez_api_json(['ok' => false], 400);
+} catch (EzLegacyOrderStorageException $error) {
+    header('Retry-After: 30');
+    ez_api_json(['ok' => false], 503);
 } catch (Throwable $error) {
     error_log('Ezkart Biteship webhook error: ' . $error->getMessage());
     ez_api_json(['ok' => false], 500);

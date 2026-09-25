@@ -66,6 +66,9 @@ try {
     ez_api_json($payload);
 } catch (InvalidArgumentException $error) {
     ez_api_json(['ok' => false, 'error' => 'Order not found.'], 404);
+} catch (EzLegacyOrderStorageException $error) {
+    header('Retry-After: 30');
+    ez_api_json(['ok' => false, 'error' => 'Order updates are temporarily paused. Please retry shortly.'], 503);
 } catch (EzCommerceStorageException $error) {
     ez_api_json(['ok' => false, 'error' => $error->httpStatus === 404 ? 'Order not found.' : 'Unable to read payment status.'], $error->httpStatus === 404 ? 404 : 503);
 } catch (Throwable $error) {

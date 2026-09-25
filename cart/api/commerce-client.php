@@ -13,7 +13,10 @@ final class EzCommerceStorageException extends RuntimeException
 
 function ez_central_commerce_enabled(): bool
 {
-    return ez_config('commerce_storage') === 'd1';
+    if (ez_config('commerce_storage') !== 'd1') return false;
+    // A flag change cannot bypass an in-progress source handover.
+    ez_legacy_storage_assert_routing(ez_config('deployment_environment') === 'production' ? 'production' : 'sandbox');
+    return true;
 }
 
 /** Signing is shared by ordinary requests and the provider-job dispatcher. */

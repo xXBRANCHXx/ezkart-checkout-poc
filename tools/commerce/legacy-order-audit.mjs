@@ -4,6 +4,8 @@ export const sha256 = value => createHash('sha256').update(value).digest('hex');
 const canonical = value => Array.isArray(value) ? value.map(canonical) : value && typeof value === 'object'
   ? Object.fromEntries(Object.keys(value).sort().map(key => [key, canonical(value[key])])) : value;
 export const stableJson = value => JSON.stringify(canonical(value));
+export const legacySourceDigest = entries => sha256('ezkart-legacy-files-v1\nsandbox\n' + [...entries]
+  .sort((a,b) => a.filename.localeCompare(b.filename)).map(e => e.filename + ':' + sha256(e.source) + '\n').join(''));
 const fail = message => { throw new Error(message); };
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const id = value => typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9_-]{2,95}$/.test(value);
@@ -217,6 +219,12 @@ export function buildLegacyPlan(source, registry) {
     for (const issue of a.issues) summary.issues[issue] = (summary.issues[issue] || 0) + 1;
   }
   const manifest = {schema:1, deployment:'test', environment:'sandbox', sourceDirectory:source.sourceDirectory, records:entries, summary};
+  if (source.fence !== undefined) {
+    const fence = source.fence;
+    if (!object(fence) || fence.version !== 1 || !/^[a-f0-9]{32}$/.test(fence.epoch || '')
+      || !Number.isSafeInteger(fence.revision) || fence.revision < 2 || fence.sourceDigest !== legacySourceDigest(entries)) fail('Source fence does not match the complete exported files');
+    manifest.fence = {version:1,epoch:fence.epoch,revision:fence.revision,sourceDigest:fence.sourceDigest};
+  }
   const json = stableJson(manifest);
   if (Buffer.byteLength(json) > 400_000) fail('Import batch exceeds 400 KB; split the private source export into reviewed batches');
   const hash = sha256(json);
@@ -225,7 +233,8 @@ export function buildLegacyPlan(source, registry) {
 
 export function sourceFromPlan(plan) {
   return {format:'ezkart-private-legacy-source-v1', deployment:plan.manifest.deployment, environment:plan.manifest.environment,
-    sourceDirectory:plan.manifest.sourceDirectory, entries:plan.manifest.records.map(r => ({filename:r.filename,source:r.source}))};
+    sourceDirectory:plan.manifest.sourceDirectory, ...(plan.manifest.fence?{fence:plan.manifest.fence}:{}),
+    entries:plan.manifest.records.map(r => ({filename:r.filename,source:r.source}))};
 }
 
 export function legacyImportStatement(plan, importedAt = new Date().toISOString()) {

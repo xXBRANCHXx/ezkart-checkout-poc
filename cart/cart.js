@@ -260,7 +260,7 @@
       const config = await configResponse.json().catch(() => ({}));
       if (!configResponse.ok || !["sandbox", "production"].includes(config.environment)
           || config.shipping_required !== (config.environment === "production")) {
-        throw new Error("Checkout settings could not load. Please try again.");
+        throw new Error(typeof config.error === "string" ? config.error : "Checkout settings could not load. Please try again.");
       }
       state.shippingRequired = config.shipping_required;
       state.durableCheckout = config.durable_checkout === true;

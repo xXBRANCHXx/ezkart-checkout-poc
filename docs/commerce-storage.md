@@ -219,10 +219,14 @@ required before the commerce cutover.
    policies/evidence, return shipping and financial refunds, including orders
    that cannot be fulfilled. Include hosted late-payment allocation acceptance
    and retain the catalog/inventory concurrency regression coverage.
-3. Complete the rehearsed legacy import with source-write fencing, final-set
+3. Exercise the implemented source-write fence on TEST and complete the legacy
+   import with final-set
    reconciliation, operational promotion and original-reference read/callback
    handling. The private 0017 snapshot rehearsal checks counts, paid totals,
    ownership evidence and provider references; it does not finish that cutover.
+   The private freeze/resume controller drains complete PHP operations and
+   preserves a hashed export. Durable operational promotion must disable resume
+   before activation; that cross-system handover protocol remains unfinished.
    Legacy records must not reserve stock again or become new ledger credits.
 4. Apply migrations to **test only**, deploy the test Worker, provision matching
    private service secrets and enable `COMMERCE_STORAGE=d1` / PHP

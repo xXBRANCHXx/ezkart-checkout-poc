@@ -30,6 +30,7 @@ try {
 
     // Validate credentials before requesting a paid Biteship rate lookup.
     $environment = ez_commerce_environment();
+    $legacyLease = EzLegacyOrderLease::acquire($environment);
     ez_doku_credentials();
     $paymentFlow = ez_doku_payment_flow($environment);
     $checkout = ez_checkout_request($input);
@@ -110,6 +111,9 @@ try {
     ], 201);
 } catch (InvalidArgumentException $error) {
     ez_api_json(['ok' => false, 'error' => $error->getMessage(), 'checkout_rejected' => true], 422);
+} catch (EzLegacyOrderStorageException $error) {
+    header('Retry-After: 30');
+    ez_api_json(['ok' => false, 'error' => 'Order processing is temporarily paused. Please retry shortly.'], 503);
 } catch (EzCommerceStorageException $error) {
     $status = in_array($error->httpStatus, [403, 409, 422], true) ? $error->httpStatus : 503;
     ez_api_json(['ok' => false, 'error' => $status === 503

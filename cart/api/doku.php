@@ -34,6 +34,7 @@ function ez_doku_payment_flow(string $environment): string
 function ez_create_doku_direct_bca_payment(array $order): array
 {
     if (($order['commerce_environment'] ?? '') !== 'sandbox') throw new RuntimeException('Legacy direct BCA is sandbox only.');
+    $legacyLease = ez_legacy_provider_lease('sandbox');
     $credentials = ez_doku_credentials('sandbox');
     $target = '/bca-virtual-account/v2/payment-code';
     $payload = [
@@ -126,6 +127,7 @@ function ez_doku_checkout_payload(array $order, string $publicUrl): array
 
 function ez_create_doku_payment(array $order): array
 {
+    $legacyLease = ez_legacy_provider_lease((string) $order['commerce_environment']);
     if (($order['payment_flow'] ?? ez_doku_payment_flow($order['commerce_environment'])) === 'direct_bca') {
         return ez_create_doku_direct_bca_payment($order);
     }

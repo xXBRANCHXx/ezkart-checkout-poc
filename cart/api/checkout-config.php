@@ -10,6 +10,7 @@ try {
     }
     // Public checkout behavior is available before provider credentials are installed.
     $environment = ez_commerce_environment();
+    ez_legacy_storage_assert_routing($environment);
     if (ez_central_commerce_enabled()) ez_central_commerce_environment();
     ez_api_json([
         'ok' => true,
@@ -18,6 +19,9 @@ try {
         'shipping_required' => $environment === 'production',
         'durable_checkout' => ez_central_commerce_enabled(),
     ]);
+} catch (EzLegacyOrderStorageException $error) {
+    header('Retry-After: 30');
+    ez_api_json(['ok' => false, 'error' => 'Checkout is temporarily paused. Please retry shortly.'], 503);
 } catch (Throwable $error) {
     error_log('Ezkart checkout config error: ' . $error->getMessage());
     ez_api_json(['ok' => false, 'error' => 'Checkout settings are unavailable.'], 503);

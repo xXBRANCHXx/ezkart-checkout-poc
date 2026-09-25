@@ -13,6 +13,87 @@ shipments or wallet credits. A historical `PAID` status and a stored
 `payment_notification_verified` flag remain historical assertions requiring
 financial reconciliation. The original files remain in place.
 
+The legacy PHP writer gate and CLI freeze/resume rehearsal are implemented. The
+hosted TEST source has **not** been frozen. Its current import receipt remains an
+unfenced rehearsal; neither an old receipt nor a storage configuration flag is
+an operational cutover authorization.
+
+## Consistent source capture
+
+`cart/api/legacy-order-storage.php` holds a shared filesystem lease for each
+complete legacy write operation. Checkout and tracking retain it across provider
+calls even when they release an individual order lock. Signed payment/courier
+callbacks, merchant acceptance/pickup, customer ownership claims and every order
+save also use the gate. A drain first stops new operations, then waits for all
+admitted leases before taking an exclusive lock and reading the source set.
+Nested writes from an admitted operation can finish. Kernel locks release after
+a process exits; an interrupted provider request can still have an uncertain
+outcome and requires reconciliation before promotion.
+
+New checkout/writes and authenticated callbacks return HTTP 503 with
+`Retry-After: 30` while paused. Checkout explains the pause and preserves the
+cart. Read-only legacy payment status remains available. Private controls and
+exports live outside the web root, and the PHP controller refuses HTTP requests
+and any environment other than TEST sandbox. Missing gate state means the
+existing legacy mode; damaged state fails closed. Read-only routing checks do
+not create a legacy storage directory for central commerce.
+
+The controller runs **on the source host**, using the same private configuration
+and order directory as PHP. It requires an explicit private `order_storage` or
+`midtrans_order_storage` setting and an existing directory outside the application
+root. Confirm these match the storefront: CLI execution has no web
+`DOCUMENT_ROOT`, so unconfigured CLI defaults cannot be trusted. All source writers must first
+be deployed with the gate and older PHP requests must finish. Two matching
+directory scans detect changes during capture; they cannot fence old code that
+does not participate in the lease protocol. There is no public operator endpoint.
+
+```sh
+php tools/commerce/legacy-fence.php status
+php tools/commerce/legacy-fence.php freeze --key=<new-32-hex-key> --revision=<current-revision> --wait-ms=10000
+```
+
+The state transitions from `legacy` to `draining` to `frozen`, incrementing the
+revision at each transition. A timeout or failed export deliberately leaves it
+`draining`. Retry the **same key and original revision**, optionally with a
+longer wait (maximum 30 seconds). Concurrent controller commands fail promptly.
+Completed replays return the original receipt and the **current** state; they
+never reapply an old freeze or resume. Always check current mode, epoch and
+revision before acting on an old receipt.
+
+The completed receipt identifies `.commerce-freezes/<epoch>/source.json` and its
+SHA-256 digest. Directories are mode 700 and exports mode 600. Every JSON entry
+must be an explicitly sandbox order whose filename hashes its order reference;
+unrecognized files, symlinks and malformed sources stop the export. Limits of
+1,000 files, 1 MB per source and 16 MiB in total fail explicitly without omitting
+orders. The source JSON bytes are preserved. The envelope additionally contains:
+
+```json
+"fence": {"version": 1, "epoch": "<32-hex-key>", "revision": 2, "sourceDigest": "<sha256>"}
+```
+
+The source digest hashes `ezkart-legacy-files-v1\nsandbox\n`, followed by sorted
+`filename:sha256(original-bytes)\n` lines. The auditor checks this complete set,
+and the manifest/import receipt retains its fence. An incomplete subset cannot
+claim the same fence. Existing exports are never overwritten with changed data;
+a crash between export and receipt commits recovers the same export. Replaying
+a receipt also checks that the original export remains unchanged and private.
+
+To reopen legacy writes after a **rehearsal**, read status and explicitly name
+the current epoch and revision:
+
+```sh
+php tools/commerce/legacy-fence.php resume --key=<new-32-hex-key> --revision=<current-revision> --epoch=<active-freeze-key>
+```
+
+Cancelled pending freezes cannot reuse their keys. Historical frozen exports
+remain immutable evidence after reopening; they are no longer the live source
+set. Resume is refused when central commerce is configured. A configuration
+change cannot bypass a draining/frozen gate. No central activation command or
+cross-system commit protocol exists yet: implement a durable promotion intent
+that disables resume, final-set/ownership reconciliation, central read routing
+and provider-event recovery before an actual handover. Do not manually remove
+the gate file, enable central flags or treat a successful rehearsal as promotion.
+
 ## Evidence and ownership
 
 The auditor retains each source JSON string unchanged, its SHA-256 digest and
@@ -100,10 +181,12 @@ to recover an uncertain write. A receipt is checked before a replay needs any
 current catalog evidence.
 
 The audit accepts up to 250 records and a 400 KB manifest; SQL generation also
-checks the escaped statement against D1's 100 KB statement limit. Split larger
-source sets into reviewed batches, retaining any required original ownership
-anchors. For final reconciliation, count distinct order references across
-batches, not the sum of batch sizes. The limit follows
+checks the escaped statement against D1's 100 KB statement limit. Larger
+unfenced rehearsals may use reviewed batches, retaining required original
+ownership anchors. A fenced source must remain complete; bounded multi-batch
+promotion is not implemented and cannot be worked around by trimming its export.
+For reconciliation of existing rehearsals, count distinct order references
+across batches, not the sum of batch sizes. The limit follows
 [Cloudflare's D1 limits](https://developers.cloudflare.com/d1/platform/limits/).
 
 ## TEST source audit, 25 September 2026
@@ -169,8 +252,10 @@ Hosted rehearsal acceptance:
 
 ## Still required for cutover
 
-1. Fence legacy writes and obtain a final consistent source set. The file-manager
-   read is a rehearsal snapshot; callbacks and checkouts can still change files.
+1. After all writers participate in the implemented gate, rehearse it on the
+   source host and obtain a final frozen source set for cutover. The existing
+   file-manager read is an unfenced snapshot; callbacks and checkouts can still
+   change the live files.
 2. Reconcile that final set against its staged receipts, including any changed
    records, new records, unresolved ownership or nonstandard provider metadata.
 3. Implement operational promotion and D1-only legacy reference projections;

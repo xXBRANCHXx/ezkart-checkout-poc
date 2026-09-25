@@ -64,6 +64,34 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 25 September: legacy writer drain and consistent source export
+
+Implemented a private TEST freeze/resume controller and a shared PHP writer
+gate. Checkout and tracking retain their lease across provider requests;
+callbacks, pickup, acceptance and customer ownership claims participate too.
+New writes receive retryable responses while a freeze drains admitted work.
+The controller exports the complete original byte set, records its digest and
+keeps recoverable operation receipts. Old requests cannot reopen a later freeze.
+No public endpoint or central activation command is added. Explicit source
+configuration prevents CLI execution from exporting a guessed temporary folder.
+
+Eight final PHP/concurrency/browser cases pass, including provider barriers,
+crashed writers, controller conflicts, export-before-receipt recovery, damaged
+controls, privacy, callback retry responses and cart preservation at desktop
+and mobile widths. Ten migration/CLI cases pass, now including D1 retention of
+the complete-source fence. The 104-case checkout/fulfillment/shipping regression
+run passed 101 initially; all three failures passed targeted rechecks after
+removing an unintended directory creation from read-only central routing and
+updating one older tracking assertion to include the existing scan status field.
+PHP lint (40 files), JavaScript syntax and whitespace checks pass.
+
+The hosted source remains open in legacy mode; this stage does not perform a
+live freeze or alter the existing 15-source D1 rehearsal. Final-set reconciliation,
+durable operational promotion, central merchant/customer reads and callback
+recovery remain required. The existing central flags and provider schedule stay
+unchanged, and no top-level completion item closes. See the procedure and limits
+in [legacy-order-migration.md](legacy-order-migration.md).
+
 ### 25 September: private legacy-order audit and import rehearsal
 
 Implemented and rehearsed the immutable legacy source import in TEST. The audit
@@ -91,10 +119,11 @@ counts, private artifact locations, hashes and procedures are in
 [legacy-order-migration.md](legacy-order-migration.md).
 
 No top-level completion item closes here. This is the migration rehearsal;
-source-write fencing, final reconciliation, operational promotion and the
-merchant/customer/reference/callback cutover still need implementation and
-hosted verification. Refunds, wallet settlement, monitored dispatch and the
-broader workbench scope above remain required.
+source-write fencing is implemented in the following stage recorded above, while
+the final freeze, reconciliation, operational promotion and merchant/customer/
+reference/callback cutover still need hosted verification and remaining
+implementation. Refunds, wallet settlement, monitored dispatch and the broader
+workbench scope above remain required.
 
 ### 25 September: seller shipping addresses and quote binding
 

@@ -2234,7 +2234,7 @@ test("latest package location uses reported scans and confirmed stops, never rou
   response.courier.history[1].coordinate = { latitude: -6.2441792, longitude: 106.783529 };
   await saveTrackingResponse(app, response); expireTrackingCache(app, id);
   tracking = (await app.tracking(id, { refresh: true })).data.tracking;
-  assert.deepEqual(tracking.latest_location, { latitude: -6.2441792, longitude: 106.783529, label: "Jakarta sorting facility", updated_at: "2026-09-20T05:00:00+00:00", source: "courier_scan" });
+  assert.deepEqual(tracking.latest_location, { latitude: -6.2441792, longitude: 106.783529, label: "Jakarta sorting facility", updated_at: "2026-09-20T05:00:00+00:00", status: "in_transit", source: "courier_scan" });
   delete response.courier.history[1].coordinate;
   await saveTrackingResponse(app, response); expireTrackingCache(app, id);
   assert.equal((await app.tracking(id, { refresh: true })).data.tracking.latest_location.source, "courier_scan", "A duplicate note without coordinates retains the known scan location.");

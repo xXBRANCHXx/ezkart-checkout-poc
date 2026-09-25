@@ -141,6 +141,7 @@ function ez_refresh_order_tracking(array $order): array
 {
     if (($order['status'] ?? '') !== 'PAID' || ez_order_skips_shipping($order) || empty($order['biteship_order_id'])) return $order;
     $id = (string) $order['order_id'];
+    $legacyLease = EzLegacyOrderLease::acquire(str_starts_with($id, 'EZK-P-') ? 'production' : 'sandbox');
     $lock = ez_lock_order_state($id);
     try {
         $order = ez_load_order($id);

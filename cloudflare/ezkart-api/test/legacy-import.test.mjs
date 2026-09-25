@@ -4,7 +4,7 @@ import {readFile,mkdtemp,writeFile,stat,rm,chmod,symlink} from 'node:fs/promises
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {setupCommerceFixture} from './commerce-fixture.mjs';
-import {buildLegacyPlan,legacyImportStatement,legacyImportSql,sha256,strictJson,stableJson,sourceFromPlan} from '../../../tools/commerce/legacy-order-audit.mjs';
+import {buildLegacyPlan,legacyImportStatement,legacyImportSql,sha256,strictJson,stableJson,sourceFromPlan,legacySourceDigest} from '../../../tools/commerce/legacy-order-audit.mjs';
 import {main,registrySql} from '../../../tools/commerce/legacy-import.mjs';
 
 const scope = sha256('test|alice').slice(0,24);
@@ -88,9 +88,12 @@ test('ownerless history needs an original seller anchor, unchanged owner scope a
 
 test('D1 staging is atomic, concurrent replay-safe, byte-preserving and creates no operational or financial effects',async t=>{
   const f=await fixture(t),raw=source([order(1),order(2,{seller_id:undefined}),order(3,{seller_id:undefined,shop:'ezkart-demo',status:'PAID',paid_at:'2026-09-25T02:00:01Z',payment_reference:'paid-only-in-source',items:[{id:'EZK-DEMO-COFFEE',name:'Demo',price:40000,quantity:1}]})]);
+  raw.fence={version:1,epoch:'e'.repeat(32),revision:2,sourceDigest:legacySourceDigest(raw.entries)};
+  assert.throws(()=>buildLegacyPlan({...raw,entries:raw.entries.slice(0,2)},registry()),/Source fence/);
   const plan=buildLegacyPlan(raw,registry()),before=JSON.parse((await f.db.prepare(registrySql).first()).registry);
   const results=await Promise.all([f.stage(plan),f.stage(plan),f.stage(plan)]);
   assert.ok(results.every(r=>r.success));assert.equal(await f.count('commerce_legacy_import_batches'),1);assert.equal(await f.count('commerce_legacy_sources'),3);assert.equal(await f.count('commerce_legacy_import_entries'),3);
+  assert.deepEqual(JSON.parse((await f.db.prepare('SELECT manifest_json FROM commerce_legacy_import_batches').first()).manifest_json).fence,raw.fence);
   const after=JSON.parse((await f.db.prepare(registrySql).first()).registry);assert.deepEqual(after,before);
   for(const table of ['orders','order_items','customers','commerce_payment_captures','inventory_reservations','commerce_jobs','commerce_shipments'])assert.equal(await f.count(table),0,table);
   const sources=await f.db.prepare('SELECT source_json,source_hash FROM commerce_legacy_sources ORDER BY order_id').all();

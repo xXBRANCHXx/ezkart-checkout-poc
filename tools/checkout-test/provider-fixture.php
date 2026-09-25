@@ -9,6 +9,18 @@ function curl_setopt(object $handle, int $option, mixed $value): bool { $handle-
 function curl_exec(object $handle): string {
     $payload = json_decode($handle->options[CURLOPT_POSTFIELDS] ?? '{}', true);
     file_put_contents(getenv('EZKART_TEST_CAPTURE'), json_encode(['url' => $handle->url, 'method' => $handle->options[CURLOPT_CUSTOMREQUEST] ?? (!empty($handle->options[CURLOPT_POST]) ? 'POST' : 'GET'), 'body' => $handle->options[CURLOPT_POSTFIELDS] ?? '', 'headers' => $handle->options[CURLOPT_HTTPHEADER] ?? []]) . "\n", FILE_APPEND | LOCK_EX);
+    $barrierDirectory = dirname(getenv('EZKART_TEST_CAPTURE'));
+    $barrier = is_file($barrierDirectory . '/provider-barrier.json') ? json_decode((string) file_get_contents($barrierDirectory . '/provider-barrier.json'), true) : null;
+    if (is_array($barrier) && is_string($barrier['match'] ?? null) && $barrier['match'] !== '' && str_contains($handle->url, $barrier['match'])) {
+        file_put_contents($barrierDirectory . '/provider-entered', 'ready');
+        $deadline = microtime(true) + 10;
+        do {
+            clearstatcache(true, $barrierDirectory . '/provider-release');
+            if (is_file($barrierDirectory . '/provider-release')) break;
+            if (microtime(true) > $deadline) throw new RuntimeException('Test provider barrier timed out.');
+            usleep(10000);
+        } while (true);
+    }
     $relay = getenv('EZKART_TEST_COMMERCE_RELAY');
     if ($relay && str_starts_with($handle->url, 'https://ezkart-api-test.fixture.workers.dev/')) {
         if (preg_match('#^http://127\.0\.0\.1:\d+$#D', $relay) !== 1) throw new RuntimeException('Test relay must be local.');

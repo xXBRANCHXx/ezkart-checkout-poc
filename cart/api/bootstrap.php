@@ -4,6 +4,8 @@ declare(strict_types=1);
 const EZ_BITESHIP_RATES_URL = 'https://api.biteship.com/v1/rates/couriers';
 const EZ_BITESHIP_ORDERS_URL = 'https://api.biteship.com/v1/orders';
 
+require_once __DIR__ . '/legacy-order-storage.php';
+
 final class EzProviderException extends RuntimeException
 {
     public function __construct(
@@ -625,6 +627,7 @@ function ez_create_biteship_order(array $order): array
     }
     $environment = (string) ($order['commerce_environment'] ?? 'sandbox');
     if (!in_array($environment, ['sandbox', 'production'], true)) throw new RuntimeException('Invalid order environment.');
+    $legacyLease = ez_legacy_provider_lease($environment);
     if (ez_config('deployment_environment') === 'production' && $environment !== 'production') throw new RuntimeException('Sandbox orders cannot be fulfilled on the production storefront.');
     if (ez_order_skips_shipping($order)) throw new RuntimeException('Delivery is skipped for this sandbox order.');
     $credentials = ez_biteship_fulfillment_credentials($environment);
@@ -718,7 +721,7 @@ function ez_create_biteship_order(array $order): array
     ];
 }
 
-function ez_order_directory(?string $environment = null): string
+function ez_order_directory(?string $environment = null, bool $create = true): string
 {
     $environment ??= ez_commerce_environment();
     if (!in_array($environment, ['sandbox', 'production'], true)) throw new RuntimeException('Invalid order environment.');
@@ -734,7 +737,7 @@ function ez_order_directory(?string $environment = null): string
         elseif (is_dir($legacyDefault)) $path = $legacyDefault;
     }
     if ($path === '' || $path[0] !== '/') throw new RuntimeException('Order storage must be an absolute private path.');
-    if (!is_dir($path) && !mkdir($path, 0700, true) && !is_dir($path)) {
+    if ($create && !is_dir($path) && !mkdir($path, 0700, true) && !is_dir($path)) {
         throw new RuntimeException('Unable to create secure order storage.');
     }
     $resolvedPath = realpath($path);
@@ -757,6 +760,7 @@ function ez_order_path(string $orderId): string
 function ez_save_order(array $order): void
 {
     $path = ez_order_path((string) $order['order_id']);
+    $lease = EzLegacyOrderLease::acquire(str_starts_with((string) $order['order_id'], 'EZK-P-') ? 'production' : 'sandbox');
     $json = ez_json_encode($order);
     $temporary = tempnam(dirname($path), '.order-');
     if ($temporary === false) throw new RuntimeException('Unable to save the order.');
@@ -848,12 +852,14 @@ function ez_apply_biteship_webhook(array $payload, ?string $environment = null):
 function ez_lock_order_state(string $orderId)
 {
     $lockPath = ez_order_path($orderId) . '.state.lock';
+    $lease = EzLegacyOrderLease::acquire(str_starts_with($orderId, 'EZK-P-') ? 'production' : 'sandbox');
     $lock = fopen($lockPath, 'c');
     if ($lock === false || !flock($lock, LOCK_EX)) {
         if (is_resource($lock)) fclose($lock);
         throw new RuntimeException('Unable to lock the order state.');
     }
     chmod($lockPath, 0600);
+    EzLegacyOrderLease::attachOrderLock($lock, $lease);
     return $lock;
 }
 
@@ -861,6 +867,7 @@ function ez_lock_order_state(string $orderId)
 function ez_unlock_order_state($lock): void
 {
     flock($lock, LOCK_UN);
+    EzLegacyOrderLease::releaseOrderLock($lock);
     fclose($lock);
 }
 
