@@ -19,8 +19,18 @@ ez_page_header('Advanced Mode', 'More room for your store to grow.', [['label' =
     <div class="advanced-plan-body">
       <dl class="advanced-fees"><div><dt>Basic commission</dt><dd>5%</dd></div><div><dt>With Advanced</dt><dd>6%</dd></div></dl>
       <p class="advanced-example">On Rp100,000 in product sales, that’s <strong>Rp1,000 extra</strong>. Shipping is excluded. Existing admin and payment-processing fees still apply.</p>
-      <div class="advanced-toggle-row"><div><label for="advanced-toggle">Advanced Mode</label><span data-advanced-state><?= !empty($advancedPlan['enabled']) ? 'On for this store' : 'Off for this store' ?></span></div><input id="advanced-toggle" class="advanced-toggle" type="checkbox" role="switch" aria-describedby="advanced-price-title advanced-toggle-help advanced-status" data-advanced-toggle <?= !empty($advancedPlan['enabled']) ? 'checked' : '' ?> disabled></div>
+      <div class="advanced-toggle-row"><div><label for="advanced-toggle">Advanced Mode</label><span data-advanced-state><?= !empty($advancedPlan['enabled']) ? 'On for this store' : 'Off for this store' ?></span></div><input id="advanced-toggle" class="advanced-toggle" type="checkbox" role="switch" aria-describedby="advanced-price-title advanced-toggle-help advanced-status advanced-downgrade" data-advanced-toggle <?= !empty($advancedPlan['enabled']) ? 'checked' : '' ?> disabled></div>
       <p id="advanced-toggle-help">Turning this on selects Advanced and its extra 1% fee. To turn it off, your store must fit within Basic’s 6 pages and 10 products. Nothing is deleted automatically.</p>
+      <section id="advanced-downgrade" class="advanced-downgrade" data-advanced-downgrade aria-labelledby="advanced-downgrade-title" hidden>
+        <h3 id="advanced-downgrade-title" data-advanced-downgrade-title>Before switching to Basic</h3>
+        <p data-advanced-downgrade-summary></p>
+        <ul class="advanced-usage">
+          <li data-advanced-usage="landingPages"><div><strong>Landing pages</strong><span data-advanced-count></span></div><p data-advanced-removal></p><a href="?page=sites">Manage landing pages</a></li>
+          <li data-advanced-usage="products"><div><strong>Products</strong><span data-advanced-count></span></div><p data-advanced-removal></p><a href="?page=products">Manage products</a></li>
+        </ul>
+        <p class="advanced-counting-note">Published and draft landing pages count. Active and archived products count; archiving does not free a slot. Products with order history cannot be deleted.</p>
+        <button class="ui-button" type="button" data-advanced-recheck data-ui-icon="refresh">Check limits again</button>
+      </section>
       <?php if (!$commerceProduction): ?><p class="advanced-sandbox-note">You’re in sandbox mode. No real transaction fees are charged here.</p><?php endif; ?>
       <p id="advanced-status" data-advanced-status role="status" aria-live="polite">Loading your store’s plan…</p>
       <button class="ui-button" type="button" data-advanced-retry data-ui-icon="refresh" hidden>Try again</button>

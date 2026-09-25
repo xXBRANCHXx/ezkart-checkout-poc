@@ -10,7 +10,7 @@ import { customerAddressBook, changeCustomerAddressBook } from "./customer-addre
 import { validatePublication } from "./landing-publication.js";
 import { merchantStorefront, publicStorefront } from "./storefront.js";
 import { adminProfile } from "./admin-profile.js";
-import { advancedMode, sellerPlan } from "./advanced-mode.js";
+import { advancedMode, AdvancedModeLimitError, sellerPlan } from "./advanced-mode.js";
 import { authenticateCommerceService, commerceServiceRoute, expireCommerceOrders, reservedStockSql } from "./commerce-orders.js";
 import { claimCommerceJobs, finishCommerceJob } from "./commerce-jobs.js";
 import { inventoryOverview, inventoryHistory, inventoryDraft, adjustInventory, catalogStockMovements } from "./inventory.js";
@@ -1545,6 +1545,7 @@ export default {
       if (request.method === "DELETE" && draftMatch) { await deleteDraft(request, env, draftMatch[1]); return json({ ok: true }, 200, cors); }
       return json({ ok: false, error: "Not found" }, 404, cors);
     } catch (error) {
+      if (error instanceof AdvancedModeLimitError) return json({ ok: false, code: 'basic_limits_exceeded', error: error.message, plan: error.plan }, 409, cors);
       if (error instanceof Response) return json({ ok: false, error: await error.text(), ...(error.headers.has("x-ezkart-error-code") ? { code: error.headers.get("x-ezkart-error-code") } : {}) }, error.status, cors);
       const failure = `${error?.message || error || ""} ${error?.cause?.message || ""}`;
       if (failure.includes("catalog_revision_conflict")) {

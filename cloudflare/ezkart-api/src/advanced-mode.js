@@ -1,11 +1,45 @@
+import { listLandingObjects } from './landing-page-index.js';
+
+const basicLimits = Object.freeze({ landingPages: 6, products: 10 });
+
 export function sellerPlan(seller) {
   const enabled = seller.plan === 'advanced';
   return {
     enabled,
     canEdit: seller.role === 'owner',
-    limits: { landingPages: enabled ? 24 : 6, products: enabled ? 50 : 10 },
+    limits: enabled ? { landingPages: 24, products: 50 } : { ...basicLimits },
     commissionPercent: enabled ? 6 : 5,
   };
+}
+
+async function currentPlan(env, seller) {
+  const [row, pages] = await Promise.all([
+    env.DB.prepare(`SELECT plan, (SELECT COUNT(*) FROM products WHERE seller_id = ?) AS product_count
+      FROM sellers WHERE id = ? AND status = 'active'`).bind(seller.id, seller.id).first(),
+    listLandingObjects(env.PRIVATE_ASSETS, `sellers/${seller.id}/landing-pages/`),
+  ]);
+  if (!row) throw new Response('Store not found.', { status: 404 });
+  const usage = { landingPages: pages.filter(object => object.key.endsWith('.json')).length, products: Number(row.product_count) };
+  if (!Number.isSafeInteger(usage.products) || usage.products < 0) throw new Error('Store usage is unavailable');
+  const excess = Object.fromEntries(Object.entries(basicLimits).map(([key, limit]) => [key, Math.max(0, usage[key] - limit)]));
+  return {
+    ...sellerPlan({ ...seller, plan: row.plan }),
+    downgrade: { allowed: Object.values(excess).every(count => count === 0), limits: { ...basicLimits }, usage, excess },
+  };
+}
+
+export class AdvancedModeLimitError extends Error {
+  constructor(plan) {
+    const { landingPages, products } = plan.downgrade.excess;
+    const removals = [
+      landingPages && `${landingPages} landing page${landingPages === 1 ? '' : 's'}`,
+      products && `${products} product${products === 1 ? '' : 's'}`,
+    ].filter(Boolean).join(' and ');
+    super(removals
+      ? `Delete ${removals} before switching to Basic (6 landing pages and 10 products). Your plan has not changed. Nothing has been deleted.`
+      : 'Your store changed while switching plans. Check limits and try again. Your plan has not changed. Nothing has been deleted.');
+    this.plan = plan;
+  }
 }
 
 export async function advancedMode(env, seller, payload = null) {
@@ -14,16 +48,16 @@ export async function advancedMode(env, seller, payload = null) {
     if (typeof payload.enabled !== 'boolean') throw new Response('Choose whether Advanced Mode is on or off.', { status: 422 });
     if (payload.enabled && payload.commissionPercent !== 6) throw new Response('Advanced Mode adds 1% per transaction. Review the price before enabling it.', { status: 422 });
     if (!payload.enabled) {
-      const products = await env.DB.prepare('SELECT COUNT(*) AS count FROM products WHERE seller_id = ?').bind(seller.id).first();
-      const pages = await env.PRIVATE_ASSETS.list({ prefix: `sellers/${seller.id}/landing-pages/`, limit: 1000 });
-      if (Number(products?.count || 0) > 10 || pages.objects.filter(object => object.key.endsWith('.json')).length > 6 || pages.truncated) {
-        throw new Response('To turn off Advanced, first reduce your store to 6 landing pages and 10 products. Your content has not been changed.', { status: 409 });
-      }
+      const plan = await currentPlan(env, seller);
+      if (!plan.downgrade.allowed) throw new AdvancedModeLimitError(plan);
     }
-    await env.DB.prepare("UPDATE sellers SET plan = ?, updated_at = ? WHERE id = ? AND status = 'active'")
-      .bind(payload.enabled ? 'advanced' : 'standard', new Date().toISOString(), seller.id).run();
+    // Recheck products in the write itself: a concurrent create must not slip
+    // between the usage read and the plan change. Inserts also enforce the plan.
+    const result = await env.DB.prepare(`UPDATE sellers SET plan = ?, updated_at = ? WHERE id = ? AND status = 'active'
+      AND (? = 1 OR (SELECT COUNT(*) FROM products WHERE seller_id = ?) <= ?)`)
+      .bind(payload.enabled ? 'advanced' : 'standard', new Date().toISOString(), seller.id,
+        payload.enabled ? 1 : 0, seller.id, basicLimits.products).run();
+    if (!result.meta.changes) throw new AdvancedModeLimitError(await currentPlan(env, seller));
   }
-  const row = await env.DB.prepare("SELECT plan FROM sellers WHERE id = ? AND status = 'active'").bind(seller.id).first();
-  if (!row) throw new Response('Store not found.', { status: 404 });
-  return sellerPlan({ ...seller, plan: row.plan });
+  return currentPlan(env, seller);
 }

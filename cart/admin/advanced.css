@@ -8,7 +8,7 @@
 .advanced-promo .icon { width: 15px; height: 15px; }
 .advanced-promo:hover { background: var(--ui-action-hover); }
 .advanced-promo:focus-visible, .advanced-toggle:focus-visible { outline: 2px solid #f6493b; outline-offset: 4px; }
-.advanced-promo[hidden], [data-advanced-retry][hidden] { display: none; }
+.advanced-promo[hidden], [data-advanced-retry][hidden], [data-advanced-downgrade][hidden] { display: none; }
 .advanced-layout { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(310px, 1fr); gap: 24px; align-items: start; max-width: 1180px; }
 .advanced-benefits, .advanced-plan { border-radius: 14px; box-shadow: none; overflow: hidden; }
 .advanced-benefits > header { padding: 28px 28px 10px; }
@@ -49,6 +49,20 @@
 .advanced-plan #advanced-status { font-size: 12px; margin: 18px 0 0; color: #50596a; }
 .advanced-plan #advanced-status[data-error=true] { color: #b43538; }
 .advanced-plan [data-advanced-retry] { margin-top: 12px; }
+.advanced-downgrade { margin-top: 20px; padding: 18px; border: 1px solid #e1e5ec; border-radius: 10px; background: #fafbfc; }
+.advanced-downgrade[data-blocked=true] { border-color: #e9cbbb; background: #fffaf5; }
+.advanced-downgrade h3 { margin: 0; font-size: 14px; line-height: 1.5; }
+.advanced-downgrade > p { margin: 8px 0 0; font-size: 12px; }
+.advanced-usage { list-style: none; margin: 16px 0; padding: 0; display: grid; gap: 14px; }
+.advanced-usage li + li { border-top: 1px solid #e6e1dc; padding-top: 14px; }
+.advanced-usage li > div { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 5px 12px; font-size: 12px; }
+.advanced-usage [data-advanced-count] { color: #50596a; font-variant-numeric: tabular-nums; }
+.advanced-usage p { margin: 5px 0; font-size: 12px; }
+.advanced-usage [data-over-limit=true] p { color: #a23829; font-weight: 600; }
+.advanced-usage a { color: #424b5a; font-size: 12px; text-underline-offset: 3px; }
+.advanced-usage a:focus-visible { outline: 2px solid #f6493b; outline-offset: 3px; }
+.advanced-downgrade .advanced-counting-note { font-size: 11px; }
+.advanced-downgrade button { margin-top: 14px; }
 @media (max-width: 1200px) {
   .dashboard-page .topbar .profile { grid-template-columns: 40px 14px; gap: 6px; padding-left: 10px; }
   .dashboard-page .topbar .profile > div { display: none; }

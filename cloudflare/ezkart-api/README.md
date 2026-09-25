@@ -78,6 +78,17 @@ create requests. Editing existing products remains possible at the limit.
 Turning Advanced off requires the store to fit within Basic's limits first;
 the plan toggle never deletes content.
 
+The plan endpoint includes `downgrade` with Basic's `limits`, current `usage`,
+the `excess` to delete, and whether the store is `allowed` to switch. All saved
+landing-page projects (including drafts) and products (including archived
+products) count. Shop pages, checkout links, previews, and derived summaries do
+not use landing-page slots. Product editor drafts are separate from the catalog.
+An over-limit `PUT` returns 409 with `code: "basic_limits_exceeded"`, the current
+plan and counts, and an exact deletion message. The dashboard keeps Advanced on,
+links to Landing Pages and Products, and rechecks usage after cleanup. Usage
+failures disable plan changes; the server always checks again on a downgrade,
+including an atomic product-count condition on the plan update.
+
 The Hostinger admin proxies these calls with its server-side Supabase session,
 so access and refresh tokens are never placed in page markup or browser storage.
 Page, order, review, payment, and download routes still need to move behind the
