@@ -64,6 +64,38 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 25 September: private legacy-order audit and import rehearsal
+
+Implemented and rehearsed the immutable legacy source import in TEST. The audit
+accounts for all 15 private sandbox order files, preserving their exact bytes,
+references, customer fields and commercial amounts. Four orders contain a
+seller ID; four older orders have matching historical store/owner/item evidence;
+seven remain sandbox demo history. The two recorded paid orders are demos, with
+Rp116,000 recorded paid out of Rp746,000 in total order value. Eight provider
+expiry strings lack a timezone and remain explicitly flagged, without choosing
+an expiry instant or changing their status.
+
+Migration 0017 stores one immutable receipt, 15 source snapshots and 15 ownership
+assessments. A second source read, exact D1 readback and replay passed. Database
+guards reject concurrent ownership/SKU changes, conflicting provider references
+and partial imports. The CLI recovered the first hosted import through its
+original receipt after Wrangler returned a mixed-format response; it now uses
+durable readback for write confirmation. No active orders, customers, captures,
+reservations, shipments, provider jobs or stock changes were created.
+
+The full 75-test Worker suite passed, followed by all ten final migration/CLI
+cases and two final privacy/recovery checks. TEST health reports 47 tables;
+central checkout remains disabled. The existing Worker version and provider
+schedule remain unchanged. Production/main were not touched. Detailed source
+counts, private artifact locations, hashes and procedures are in
+[legacy-order-migration.md](legacy-order-migration.md).
+
+No top-level completion item closes here. This is the migration rehearsal;
+source-write fencing, final reconciliation, operational promotion and the
+merchant/customer/reference/callback cutover still need implementation and
+hosted verification. Refunds, wallet settlement, monitored dispatch and the
+broader workbench scope above remain required.
+
 ### 25 September: seller shipping addresses and quote binding
 
 Implemented the seller address book, separate pickup/return defaults, confirmed

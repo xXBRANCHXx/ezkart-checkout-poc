@@ -63,6 +63,15 @@ two QA audit records retained. Central storage remains disabled. See
 The full completion scope and acceptance gates remain in
 [commerce-completion-plan.md](commerce-completion-plan.md).
 
+Migration 0017 is applied to TEST. Its private legacy-import rehearsal preserves
+15 original source records and their ownership assessments under one immutable
+receipt. Recorded totals reconcile to Rp746,000 overall and Rp116,000 paid;
+eight records are assessed as seller history and seven as sandbox demos. This
+does not promote them to active orders, create captures/stock movements or
+activate central checkout. Operational counts remain zero and the storage flag
+remains disabled. See [legacy-order-migration.md](legacy-order-migration.md) for
+the audit, replay verification and remaining source fencing/promotion work.
+
 ## Data and invariants
 
 Migration `0009_commerce_orders.sql` extends the existing `orders` and
@@ -210,9 +219,11 @@ required before the commerce cutover.
    policies/evidence, return shipping and financial refunds, including orders
    that cannot be fulfilled. Include hosted late-payment allocation acceptance
    and retain the catalog/inventory concurrency regression coverage.
-3. Build and rehearse an idempotent legacy import. Compare order counts, paid
-   totals, owners and provider references. Legacy records must not reserve stock
-   again or become new ledger credits.
+3. Complete the rehearsed legacy import with source-write fencing, final-set
+   reconciliation, operational promotion and original-reference read/callback
+   handling. The private 0017 snapshot rehearsal checks counts, paid totals,
+   ownership evidence and provider references; it does not finish that cutover.
+   Legacy records must not reserve stock again or become new ledger credits.
 4. Apply migrations to **test only**, deploy the test Worker, provision matching
    private service secrets and enable `COMMERCE_STORAGE=d1` / PHP
    `commerce_storage=d1` together after verification. No production initialization
