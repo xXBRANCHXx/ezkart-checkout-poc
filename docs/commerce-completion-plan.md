@@ -118,6 +118,27 @@ Hosted acceptance for commit `391af42`:
 - Local verification: all 30 Worker tests, the product-editor browser workflow
   (including a held autosave), PHP syntax checks and the test Worker build pass.
 
+### 25 September: inventory workspace and audit trail
+
+Replaced the inventory-count toast with a full merchant workspace: paginated SKU
+stock, reservations and availability, configurable alerts, counts, receipts,
+damage/loss/corrections, account-saved count drafts and immutable history.
+Adjustments commit all selected items together and use request keys to recover
+uncertain outcomes without applying stock twice. Original product versions are
+retained through count reloads; draft versions continue after clearing to protect
+against stale tabs. Catalog mutations and payment consumption also record stock
+movements. The former static health labels and 94/100 score now use inventory
+and catalog data. The product archive/restore PATCH proxy is repaired and subject
+to the same CSRF/MFA checks as other writes.
+
+Verification covers a 100-option count, hidden options without duplicate product
+totals, reservations, rollback, concurrent replay, role/seller isolation, draft
+conflicts and immutable history. The browser workflow exercises saved counts,
+stale stock, lost-response recovery, mobile review and history, and read-only
+access. See [inventory-control.md](inventory-control.md) for behavior and API
+contracts. Order-linked returns/restocking and late-payment stock-review
+resolution remain outstanding, along with the broader commerce work above.
+
 ## Atomicity contract
 
 Commerce database changes use D1 transactional batches and database constraints,

@@ -139,14 +139,16 @@ physical product to another type fails without partial updates. Products with
 order history must be archived instead of deleted. Viewer memberships cannot
 write products, drafts or catalog images.
 
-These controls do not yet implement inventory counts/adjustments, returns or
-stock-review resolution. Those remain required before the commerce cutover.
+Inventory counts, manual adjustments, alert thresholds, account drafts and
+immutable stock history are now implemented separately; see
+[inventory-control.md](inventory-control.md). Order-linked return restocking and
+stock-review resolution remain required before the commerce cutover.
 
 ## Required before activating the test cutover
 
 1. Finish PHP checkout, provider dispatch, callback, order read/list, customer
    tracking and merchant-action adapters; preserve private legacy references.
-2. Finish inventory adjustments, return restocking and stock-review resolution.
+2. Finish order-linked return restocking and stock-review resolution.
    Catalog revision protections are deployed to test; keep their regression
    coverage when completing these remaining inventory flows.
 3. Build and rehearse an idempotent legacy import. Compare order counts, paid

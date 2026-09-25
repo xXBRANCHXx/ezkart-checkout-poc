@@ -27,6 +27,9 @@ function curl_exec(object $handle): string {
             if (!empty($shop['catalogUnavailable'])) { $handle->status = 503; return '{"ok":false}'; }
             return json_encode(['ok' => true, 'products' => $shop['catalog'], 'drafts' => $shop['drafts'] ?? []]);
         }
+        if ($path === '/v1/inventory' && isset($shop['inventory'])) return json_encode(['ok' => true] + $shop['inventory']);
+        if ($path === '/v1/inventory/history' && isset($shop['inventory'])) return json_encode(['ok' => true, 'items' => [], 'nextCursor' => null]);
+        if ($path === '/v1/inventory/draft' && isset($shop['inventory'])) return json_encode(['ok' => true, 'draft' => null]);
         if ($path === '/v1/storefront') {
             if (($handle->options[CURLOPT_CUSTOMREQUEST] ?? '') === 'PUT') {
                 $shop['store'] = array_replace($shop['store'], $payload);

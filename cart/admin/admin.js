@@ -363,6 +363,8 @@
     if (!openingPageRequest) await cloudLandingReady;
   }
 
+  globalThis.EzkartInventory?.mount({request: cloudRequest});
+
   const storageScope = document.body.dataset.adminStorageScope || "anonymous";
   const mayMigrateLegacyStorage = document.body.dataset.adminMigrateLegacyStorage === "true";
   const scopedStorageKey = (key) => `${key}:${storageScope}`;
@@ -2123,7 +2125,6 @@
     const typeInput = form?.querySelector("[data-catalog-product-type]");
     const imageRule = form?.querySelector("[data-catalog-image-rule]");
     const errorTarget = form?.querySelector("[data-catalog-product-error]");
-    const inventory = document.querySelector("[data-product-inventory]");
     const draftsPanel = document.querySelector("[data-product-drafts-panel]");
     const draftList = document.querySelector("[data-product-draft-list]");
     const catalogControls = document.querySelector("[data-product-catalog-controls]");
@@ -2208,11 +2209,21 @@
     const updateCatalogStats = (allProducts, visibleProducts) => {
       const stats = document.querySelectorAll(".page-products .page-stat-strip article");
       const activeProducts = allProducts.filter((product) => product.status !== "archived");
-      const physicalStock = activeProducts.filter((product) => product.type === "physical").reduce((sum, product) => sum + Math.max(0, Number(product.stock) || 0), 0);
+      const physicalStock = activeProducts.filter((product) => product.type === "physical").reduce((sum, product) => sum + (product.variants?.length ? product.variants.reduce((total, variant) => total + Math.max(0, Number(variant.stock) || 0), 0) : Math.max(0, Number(product.stock) || 0)), 0);
       if (stats[0]?.querySelector("strong")) stats[0].querySelector("strong").textContent = String(activeProducts.length);
       if (stats[0]?.querySelector("p")) stats[0].querySelector("p").textContent = "Published in this store";
       if (stats[1]?.querySelector("strong")) stats[1].querySelector("strong").textContent = String(physicalStock);
       if (stats[1]?.querySelector("p")) stats[1].querySelector("p").textContent = "Physical inventory only";
+      const qualityChecks = [
+        ["Product images ready", product => (product.images?.length || 0) >= (product.type === "physical" ? 3 : 1)],
+        ["Prices and SKUs complete", product => product.variants?.length ? product.variants.every(variant => variant.price >= 1000 && variant.sku) : product.price >= 1000 && product.sku],
+        ["Descriptions written", product => Boolean(product.description?.trim())],
+      ];
+      const quality = qualityChecks.map(([label, check]) => ({label, count: activeProducts.filter(check).length}));
+      const qualityScore = document.querySelector("[data-catalog-quality-score]");
+      if (qualityScore) qualityScore.textContent = activeProducts.length ? Math.round(quality.reduce((sum, item) => sum + item.count, 0) / (activeProducts.length * quality.length) * 100) + "/100" : "—";
+      const qualityList = document.querySelector("[data-catalog-quality-checklist]");
+      if (qualityList) qualityList.innerHTML = activeProducts.length ? quality.map(item => `<li>${item.count}/${activeProducts.length} ${item.label}</li>`).join("") : "<li>Add a product to see its completeness.</li>";
       if (catalogCount) catalogCount.textContent = String(visibleProducts.length);
       if (catalogCountNoun) catalogCountNoun.textContent = visibleProducts.length === 1 ? "product" : "products";
       if (catalogCountDetail) catalogCountDetail.textContent = catalogFilter === "active" ? "Active products in this store" : "All products, including archived";
@@ -2266,7 +2277,6 @@
       const products = catalogFilter === "active" ? allProducts.filter((product) => product.status !== "archived") : allProducts;
       productCatalogPage.querySelectorAll("[data-custom-product]").forEach((card) => card.remove());
       productCatalogPage.querySelectorAll("[data-catalog-empty]").forEach((message) => message.remove());
-      inventory?.querySelectorAll("[data-custom-product]").forEach((row) => row.remove());
       products.forEach((product, productIndex) => {
         const type = ["physical", "digital", "subscription"].includes(product.type) ? product.type : "physical";
         const archived = product.status === "archived";
@@ -2317,7 +2327,7 @@
               copy = duplicateLocalProduct(product);
               if (!writeCatalogProducts([copy, ...readLocalCatalogProducts()])) throw new Error("The product copy could not be saved.");
             }
-            renderCatalog(); showToast(`${product.name} duplicated`);
+            renderCatalog(); globalThis.EzkartInventory?.refreshSummary(); showToast(`${product.name} duplicated`);
           };
           void duplicate().catch((error) => { duplicateButton.disabled = false; duplicateLabel.textContent = "Duplicate"; showToast(error instanceof Error ? error.message : "The product could not be duplicated."); });
         });
@@ -2326,7 +2336,7 @@
           const archiveButton = card.querySelector(".product-archive");
           archiveButton.disabled = true;
           void setCatalogProductStatus(product, nextStatus)
-            .then(() => { renderCatalog(); showToast(`${product.name} ${archived ? "restored" : "archived"}`); })
+            .then(() => { renderCatalog(); globalThis.EzkartInventory?.refreshSummary(); showToast(`${product.name} ${archived ? "restored" : "archived"}`); })
             .catch((error) => { archiveButton.disabled = false; showToast(error instanceof Error ? error.message : "The product status could not be changed."); });
         });
         card.querySelector(".product-delete").addEventListener("click", () => {
@@ -2335,16 +2345,11 @@
             if (cloudEnabled && cloudCatalogProducts.some((item) => item.id === product.id)) await cloudRequest("DELETE", `/v1/products/${encodeURIComponent(product.id)}`);
             cloudCatalogProducts = cloudCatalogProducts.filter((item) => item.id !== product.id);
             removeLocalProduct(product.id);
-            renderCatalog(); showToast(`${product.name} deleted`);
+            renderCatalog(); globalThis.EzkartInventory?.refreshSummary(); showToast(`${product.name} deleted`);
           };
           void remove().catch((error) => showError(error instanceof Error ? error.message : "The product could not be deleted."));
         });
         productCatalogPage.append(card);
-        if (inventory && !archived) {
-          const row = document.createElement("article"); row.dataset.customProduct = product.id;
-          row.innerHTML = `<span class="product-art"><img src="${image}" alt="" loading="lazy" decoding="async"></span><div><b>${escapeHtml(product.name)}</b><small>${escapeHtml(product.sku)}</small></div><strong>${type === "physical" ? Math.max(0, Number(product.stock) || 0) : "∞"}</strong><span>${type === "physical" ? "15" : "—"}</span><em class="inventory-good">${type === "physical" ? "Healthy" : "Available"}</em>`;
-          inventory.append(row);
-        }
       });
       if (products.length === 0) {
         const empty = document.createElement("div");

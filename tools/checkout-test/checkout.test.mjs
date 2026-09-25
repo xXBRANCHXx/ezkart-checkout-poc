@@ -3490,3 +3490,74 @@ test('product editor keeps stale and legacy drafts separate from current stock a
   assert.equal(fixture.catalog[0].stock, 8);
   assert.deepEqual(errors, []);
 });
+
+test('inventory UI restores cloud counts, reviews stale quantities, retries uncertain saves once, and keeps a usable mobile history', async t => {
+  const app=await setup({EZKART_CLOUDFLARE_API_URL:'https://ezkart-api-test.fixture.workers.dev'});t.after(()=>app.close());
+  const fixture=shopFixture();fixture.inventory={sellerId:'seller_fixture',canEdit:true,summary:{skuCount:2,onHand:14,reserved:3,available:11,lowStock:2,outOfStock:0},items:[
+    {key:'tea~',productId:'tea',variantId:'',title:'Morning tea',sku:'TEA',status:'active',hidden:false,revision:1,onHand:10,reserved:3,available:7,reorderPoint:15},
+    {key:'mug~green',productId:'mug',variantId:'green',title:'Mug — green',sku:'GREEN',status:'active',hidden:false,revision:1,onHand:4,reserved:0,available:4,reorderPoint:5},
+  ],nextCursor:null};
+  await writeFile(join(app.directory,'storefront.json'),JSON.stringify(fixture));
+  const {chromium}=await import('../builder-mcp/node_modules/playwright/index.mjs');const browser=await chromium.launch();t.after(()=>browser.close());
+  const context=await browser.newContext({viewport:{width:1500,height:1000}});await context.addCookies([app.adminCookie()]);
+  const page=await context.newPage();page.setDefaultTimeout(7000);const errors=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.goto(app.base+'/cart/admin/?page=inventory');
+  await page.locator('[data-inv-value]').first().waitFor();
+  assert.equal((await page.request.get(app.base+'/cart/admin/?cloud='+encodeURIComponent('/v1/inventory?limit=1&q=tea'))).status(),200,'The authenticated PHP proxy allows bounded inventory queries');
+  assert.equal((await page.request.get(app.base+'/cart/admin/?cloud='+encodeURIComponent('/v1/inventory?outside=bad'))).status(),400);
+  assert.equal((await page.request.post(app.base+'/cart/admin/?cloud='+encodeURIComponent('/v1/inventory/adjustments'),{data:{}})).status(),403,'Stock writes require CSRF');
+  assert.equal((await page.request.patch(app.base+'/cart/admin/?cloud='+encodeURIComponent('/v1/products/tea/status'),{data:{status:'archived'}})).status(),403,'Catalog status writes also require CSRF');
+  let draft=null,revision=0,history=[],loseResponse=false,posts=[],receipts=new Map();
+  await context.route('**/*',async route=>{
+    const url=new URL(route.request().url()),cloud=url.searchParams.get('cloud');if(!cloud)return route.continue();
+    if(cloud==='/v1/admin-profile')return route.fulfill({json:{ok:true,profile:{logoId:'',canEdit:true}}});
+    if(!cloud.startsWith('/v1/inventory'))return route.continue();
+    const target=new URL(cloud,'https://fixture.test'),method=route.request().method(),payload=method==='GET'?null:route.request().postDataJSON();
+    if(target.pathname==='/v1/inventory')return route.fulfill({json:{ok:true,...fixture.inventory}});
+    if(target.pathname==='/v1/inventory/history')return route.fulfill({json:{ok:true,items:history.filter(item=>!target.searchParams.has('product')||item.productId===target.searchParams.get('product')),nextCursor:null}});
+    if(target.pathname==='/v1/inventory/draft'){
+      if(method==='PUT'){assert.equal(payload.revision,revision);revision+=1;draft={revision,payload:payload.payload};}
+      if(method==='DELETE'){assert.equal(payload.revision,revision);draft=null;revision=0;}
+      return route.fulfill({json:{ok:true,draft}});
+    }
+    if(target.pathname==='/v1/inventory/adjustments'){
+      posts.push(payload);if(receipts.has(payload.requestKey))return route.fulfill({json:{ok:true,receipt:receipts.get(payload.requestKey)}});
+      if(payload.items.some(item=>fixture.inventory.items.find(row=>row.key===item.productId+'~'+item.variantId).revision!==item.revision))return route.fulfill({status:409,json:{ok:false,code:'inventory_conflict',error:'Stock changed while this count was open.'}});
+      assert.equal(payload.draftRevision,revision);const lines=payload.items.map(item=>{const row=fixture.inventory.items.find(row=>row.key===item.productId+'~'+item.variantId),before=row.onHand;row.onHand=payload.kind==='received'?row.onHand+item.quantity:payload.kind==='alert'?row.onHand:item.quantity;if(payload.kind==='alert')row.reorderPoint=item.quantity;row.available=row.onHand-row.reserved;row.revision+=1;
+        return {...item,title:row.title,sku:row.sku,before,after:row.onHand,delta:row.onHand-before,reason:payload.kind,actor:'Merchant Tester',note:payload.note,createdAt:new Date().toISOString(),reference:'adj_fixture',id:history.length+1};});
+      const receipt={id:'adj_fixture',items:lines};receipts.set(payload.requestKey,receipt);history.unshift(...lines);draft=null;revision=0;
+      fixture.inventory.summary.onHand=fixture.inventory.items.reduce((n,row)=>n+row.onHand,0);fixture.inventory.summary.available=fixture.inventory.summary.onHand-fixture.inventory.summary.reserved;
+      if(loseResponse){loseResponse=false;return route.abort('failed');}return route.fulfill({json:{ok:true,receipt}});
+    }
+    return route.continue();
+  });
+  await page.reload();await page.waitForFunction(()=>document.querySelector('[data-inv-value]')?.disabled===false);
+  assert.equal(await page.locator('[data-inv-metric=reserved]').innerText(),'3');
+  const tea=page.locator('[data-inv-value="tea~"]'),green=page.locator('[data-inv-value="mug~green"]');
+  await tea.fill('8');await green.fill('3');await page.locator('[data-inv-note]').fill('Aisle A cycle count');
+  await page.waitForFunction(()=>document.querySelector('[data-inv-draft-status]').textContent.includes('saved to your account'));
+  assert.equal(draft.payload.items.length,2);
+  await page.reload();await page.waitForFunction(()=>document.querySelector('[data-inv-selected-count]').textContent==='2');
+  assert.equal(await tea.inputValue(),'8');assert.equal(await green.inputValue(),'3');
+  fixture.inventory.items[1].revision=2;fixture.inventory.items[1].onHand=3;fixture.inventory.items[1].available=3;
+  await page.locator('[data-inv-review]').click();await page.locator('[data-inv-apply]').click();
+  await page.locator('[data-inv-review-error]:not([hidden])').waitFor();
+  assert.match(await page.locator('[data-inv-review-error]').innerText(),/Stock changed/);assert.equal(fixture.inventory.items[0].onHand,10);
+  await page.getByRole('button',{name:'Keep editing',exact:true}).click();
+  await page.getByRole('button',{name:'Remove Mug — green',exact:true}).click();await green.fill('3');
+  await page.locator('[data-inv-review]').click();loseResponse=true;await page.locator('[data-inv-apply]').click();
+  await page.getByRole('button',{name:'Retry confirmation',exact:true}).waitFor();assert.equal(fixture.inventory.items[0].onHand,8);
+  assert.equal(await page.getByRole('button',{name:'Keep editing',exact:true}).isDisabled(),true);
+  await page.getByRole('button',{name:'Retry confirmation',exact:true}).click();await page.waitForFunction(()=>!document.querySelector('[data-inv-review-dialog]').open);
+  assert.equal(receipts.size,1);assert.deepEqual(posts.at(-1),posts.at(-2),'An uncertain response retries the exact same key and body');assert.equal(fixture.inventory.items[0].onHand,8);
+  assert.equal(await page.locator('[data-inv-selected-count]').innerText(),'0');assert.equal(draft,null);
+  await page.locator('[data-inv-history-rows]').getByText('Aisle A cycle count',{exact:true}).first().waitFor();
+  if(process.env.EZKART_TEST_SCREENSHOTS)await page.screenshot({path:join(process.env.EZKART_TEST_SCREENSHOTS,'inventory-desktop.png'),fullPage:true,animations:'disabled'});
+  await page.setViewportSize({width:390,height:844});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true);
+  if(process.env.EZKART_TEST_SCREENSHOTS)await page.screenshot({path:join(process.env.EZKART_TEST_SCREENSHOTS,'inventory-mobile.png'),fullPage:true,animations:'disabled'});
+  assert.equal(await page.locator('[data-inv-mobile-review]').isVisible(),false);
+  await page.locator('[data-inv-kind]').selectOption('alert');await tea.fill('2');await page.locator('[data-inv-mobile-review]').click();await page.locator('[data-inv-apply]').click();await page.waitForFunction(()=>!document.querySelector('[data-inv-review-dialog]').open);
+  assert.equal(fixture.inventory.items[0].reorderPoint,2);assert.equal(fixture.inventory.items[0].onHand,8);
+  fixture.inventory.canEdit=false;await page.reload();await page.waitForFunction(()=>document.querySelector('[data-inv-status]').textContent.includes('cannot change stock'));
+  assert.equal(await tea.isDisabled(),true);assert.equal(await page.locator('[data-inv-review]').isDisabled(),true);assert.deepEqual(errors,[]);
+});

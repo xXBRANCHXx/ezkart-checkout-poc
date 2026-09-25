@@ -195,6 +195,8 @@ function ez_orders_table(array $rows, string $tableId, string $csrfToken, string
     </form>
   </section>
 
+<?php break; case 'inventory': require __DIR__ . '/inventory.php'; ?>
+
 <?php break; case 'products': ?>
   <?php $productPageInventory = []; // Legacy demonstrations stay out of the signed-in seller catalog. ?>
   <?php ez_page_header('Products', 'Manage your products, prices, and stock.', [
@@ -234,7 +236,7 @@ function ez_orders_table(array $rows, string $tableId, string $csrfToken, string
     </div>
   </section>
   <section class="catalog-grid catalog-view-grid" data-product-catalog data-demo-product-count="0" data-demo-stock="0"></section>
-  <section class="page-grid product-ops-grid"><article class="surface"><header class="surface-header"><div><h2>Inventory control</h2><p>Availability, reorder points, and product health.</p></div><button class="ui-button" type="button" data-toast="Inventory count prepared" data-ui-icon="box">Count inventory</button></header><div class="inventory-table" data-product-inventory><div class="inventory-head"><span>Product</span><span>Available</span><span>Reorder at</span><span>Health</span></div><?php foreach ($productPageInventory as $name => $product): ?><article><?= ez_admin_product_art($sales['name'], $sales['image_url']) ?><div><b><?= ez_admin_escape($sales['name']) ?></b><small><?= ez_admin_escape($product['sku']) ?></small></div><strong><?= $product['stock'] ?></strong><span>15</span><em class="inventory-good">Healthy</em></article><?php endforeach; ?></div></article><aside class="surface merchandising-card"><header class="surface-header"><div><h2>Merchandising</h2><p>Storefront presentation score.</p></div></header><strong>94<small>/100</small></strong><ul><li><?= ez_admin_icon('check-circle') ?> Product photography complete</li><li><?= ez_admin_icon('check-circle') ?> Pricing published</li><li><?= ez_admin_icon('check-circle') ?> Type-aware fulfillment</li><li><?= ez_admin_icon('check-circle') ?> Descriptions optimized</li></ul><button class="ui-button" type="button" data-toast="Merchandising checklist opened" data-ui-icon="eye">Review storefront</button></aside></section>
+  <section class="page-grid product-ops-grid"><article class="surface" data-inventory-summary><header class="surface-header"><div><h2>Inventory control</h2><p>Counts, reserved stock, and low-stock alerts.</p></div><a class="ui-button" href="?page=inventory" data-ui-icon="box">Count inventory</a></header><div class="inv-mini"><p data-inventory-summary-status>Loading stock alerts…</p><div data-inventory-summary-rows></div><a href="?page=inventory&amp;level=zero">Review all stock and history</a></div></article><aside class="surface merchandising-card"><header class="surface-header"><div><h2>Catalog completeness</h2><p>Images, prices, and descriptions for active products.</p></div></header><strong data-catalog-quality-score>—</strong><ul data-catalog-quality-checklist></ul><a class="ui-button" href="?page=shop" data-ui-icon="eye">Review storefront</a></aside></section>
 
 <?php break; case 'shop': require __DIR__ . '/shop.php'; ?>
 <?php break; case 'sites': require __DIR__ . ($siteEditor ? '/sites-builder.php' : '/sites-library.php'); break; case 'customers': ?>

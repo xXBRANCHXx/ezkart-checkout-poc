@@ -20,7 +20,7 @@ async function setup(t) {
     outboundService: async () => Response.json({keys: [publicKey]})}));
   t.after(() => mf.dispose());
   const db = await mf.getD1Database('DB');
-  for (const name of ['0001_core.sql', '0002_cloud_catalog.sql', '0003_subscription_plan_billing.sql', '0004_yearly_subscription_plans.sql', '0009_commerce_orders.sql', '0010_catalog_revisions.sql']) {
+  for (const name of ['0001_core.sql', '0002_cloud_catalog.sql', '0003_subscription_plan_billing.sql', '0004_yearly_subscription_plans.sql', '0009_commerce_orders.sql', '0010_catalog_revisions.sql','0011_inventory_adjustments.sql']) {
     const source = (await readFile(new URL('../migrations/' + name, import.meta.url), 'utf8')).replace(/--[^\n]*/g, '');
     const triggers = [...source.matchAll(/CREATE TRIGGER[\s\S]*?END;/g)].map(match => match[0]);
     for (const statement of [...source.replace(/CREATE TRIGGER[\s\S]*?END;/g, '').split(';').filter(value => value.trim()), ...triggers]) await db.prepare(statement).run();
@@ -340,4 +340,101 @@ test('lost provider responses require reconciliation; failed retries back off an
   assert(Date.parse(row.available_at) > Date.now() + 13000);
   assert.equal((await claim()).jobs.length, 0);
   assert.equal((await f.call(`/internal/commerce/orders/${order.id}?seller=seller_alice&environment=sandbox`)).order.state, 'creating');
+});
+
+test('inventory lists every physical option once, separates reservations, and scopes history and paging to the seller', async t => {
+  const f = await setup(t), original = await editorFixture(f);
+  const variant = (id, stock, hidden = false) => ({id,name:id,sku:id.toUpperCase(),price:20000,stock,weightGrams:100,hidden});
+  assert.equal((await f.merchant('/v1/products/tea', {...original,variants:[variant('green',8),variant('black',2,true)]})).status,200);
+  assert.equal((await f.create(f.input({items:[{productId:'tea',variantId:'green',quantity:3,expectedPrice:20000}]}))).status,200);
+  await f.db.prepare("INSERT INTO products(id,seller_id,type,status,title,price_amount,created_at,updated_at) VALUES ('download','seller_alice','digital','active','Download',20000,'now','now')").run();
+  const first = await f.merchant('/v1/inventory?limit=2');
+  assert.equal(first.status,200,first.error);assert.equal(first.summary.skuCount,3);assert.equal(first.summary.onHand,20);assert.equal(first.summary.reserved,3);assert.equal(first.summary.available,17);
+  assert.equal(first.items.length,2);assert(first.nextCursor);
+  const second=await f.merchant('/v1/inventory?limit=2&cursor='+encodeURIComponent(first.nextCursor));
+  assert.equal(second.items.length,1);assert.equal(second.nextCursor,null);
+  assert.equal(new Set([...first.items,...second.items].map(item=>item.key)).size,3);
+  const green=(await f.merchant('/v1/inventory?q=GREEN')).items[0];assert.equal(green.available,5);assert.equal(green.reserved,3);
+  const black=(await f.merchant('/v1/inventory?q=black')).items[0];assert.equal(black.hidden,true);assert.equal(black.onHand,2);
+  assert.equal((await f.merchant('/v1/inventory?level=zero')).items.length,0);
+  assert.equal((await f.merchant('/v1/inventory?status=wrong')).status,422);
+  assert.equal((await f.merchant('/v1/inventory',undefined,{seller:'bob'})).summary.skuCount,1);
+  assert.equal((await f.merchant('/v1/inventory/history?product=tea',undefined,{seller:'bob'})).items.length,0);
+  const history=await f.merchant('/v1/inventory/history?product=tea&variant=green');
+  assert.equal(history.items.length,1);assert.equal(history.items[0].after,8);assert.equal(history.items[0].reason,'catalog_edit');
+});
+
+test('inventory adjustments are atomic, idempotent under concurrent retries, reservation-safe and auditable', async t => {
+  const f=await setup(t);
+  const input=(items,kind='received',note='Warehouse receipt\nDelivery A')=>({requestKey:randomBytes(16).toString('hex'),kind,note,items});
+  const item=(productId,quantity,revision=1)=>({productId,variantId:'',quantity,revision});
+  const adjust=body=>f.merchant('/v1/inventory/adjustments',body,{method:'POST'});
+  const request=input([item('tea',5)]);
+  const attempts=await Promise.all(Array.from({length:5},()=>adjust(request)));
+  assert(attempts.every(result=>result.status===200),JSON.stringify(attempts));assert.equal(new Set(attempts.map(result=>result.receipt.id)).size,1);assert.equal(await f.stock(),15);
+  assert.equal((await adjust({...request,items:[item('tea',6)]})).status,409);
+  const history=await f.merchant('/v1/inventory/history?product=tea');assert.equal(history.items.length,1);assert.equal(history.items[0].delta,5);
+  const order=(await f.create(f.input({items:[{productId:'tea',quantity:12,expectedPrice:20000}]}))).order;assert(order);
+  let revision=(await f.merchant('/v1/inventory?q=SKU-tea')).items[0].revision;
+  const failed=await adjust(input([item('mug',20),item('tea',11,revision)],'count','Cycle count'));
+  assert.equal(failed.status,409);assert.equal(failed.code,'inventory_reserved');assert.equal(await f.stock('mug'),10);assert.equal(await f.stock(),15);
+  assert.equal((await f.db.prepare('SELECT COUNT(*) AS n FROM inventory_adjustments').first()).n,1);
+  assert.equal((await f.merchant('/v1/inventory/history?product=mug')).items.length,0);
+  assert.equal((await adjust(input([item('tea',1)],'received'))).code,'inventory_conflict');
+  assert.equal((await adjust(input([item('private',3)]))).status,404);
+  assert.equal((await adjust(input([item('tea',1,revision)],'damaged',''))).status,422);
+  assert.equal((await adjust(input([item('tea',1.5,revision)]))).status,422);
+  assert.equal((await adjust(null)).status,400);
+  assert.equal((await adjust(input([null]))).status,422);
+  const alert=await adjust(input([item('tea',3,revision)],'alert','Reorder at three available units'));assert.equal(alert.status,200,alert.error);assert.equal(await f.stock(),15);
+  assert.equal((await f.merchant('/v1/inventory?q=SKU-tea&level=low')).items[0].reorderPoint,3);
+  assert.equal((await f.paid(order)).status,200);assert.equal(await f.stock(),3);
+  assert.equal((await f.paid(order)).status,200);
+  const sales=(await f.merchant('/v1/inventory/history?product=tea')).items.filter(item=>item.reason==='payment');assert.equal(sales.length,1);assert.equal(sales[0].before,15);assert.equal(sales[0].after,3);
+  await assert.rejects(f.db.prepare('DELETE FROM inventory_movements').run(),/inventory_immutable_history/);
+  await assert.rejects(f.db.prepare("UPDATE inventory_adjustments SET note='changed'").run(),/inventory_immutable_history/);
+});
+
+test('inventory count drafts survive reloads, recover lost responses and prevent cross-tab or read-only writes', async t => {
+  const f=await setup(t),payload={requestKey:randomBytes(16).toString('hex'),kind:'count',note:'Count aisle A',items:[{productId:'tea',variantId:'',revision:1,quantity:7,label:'T'.repeat(283),beforeQuantity:10,beforeAlert:15}]};
+  assert.equal((await f.merchant('/v1/inventory/draft')).draft,null);
+  const saved=await f.merchant('/v1/inventory/draft',{revision:0,payload});assert.equal(saved.status,200,saved.error);assert.equal(saved.draft.revision,1);
+  assert.equal((await f.merchant('/v1/inventory/draft',{revision:0,payload})).draft.revision,1,'A lost save response can be retried');
+  assert.deepEqual((await f.merchant('/v1/inventory/draft')).draft.payload,saved.draft.payload);
+  assert.equal((await f.merchant('/v1/inventory/draft',undefined,{seller:'bob'})).draft,null);
+  const edits=await Promise.all([8,9].map(quantity=>f.merchant('/v1/inventory/draft',{revision:1,payload:{...payload,items:[{...payload.items[0],quantity}]}})));
+  assert.deepEqual(edits.map(result=>result.status).sort(),[200,409]);
+  const current=(await f.merchant('/v1/inventory/draft')).draft;
+  assert.equal((await f.merchant('/v1/inventory/adjustments',{...payload,draftRevision:1},{method:'POST'})).code,'inventory_draft_conflict');assert.equal(await f.stock(),10);
+  assert.equal((await f.merchant('/v1/inventory/draft',{revision:1},{method:'DELETE'})).status,409);
+  await f.db.prepare("UPDATE seller_memberships SET role='viewer' WHERE auth_user_id='alice'").run();
+  assert.equal((await f.merchant('/v1/inventory')).canEdit,false);
+  assert.equal((await f.merchant('/v1/inventory/draft',{revision:2,payload})).status,403);
+  assert.equal((await f.merchant('/v1/inventory/draft',{revision:2},{method:'DELETE'})).status,403);
+  assert.equal((await f.merchant('/v1/inventory/adjustments',payload,{method:'POST'})).status,403);
+  await f.db.prepare("UPDATE seller_memberships SET role='owner' WHERE auth_user_id='alice'").run();
+  const result=await f.merchant('/v1/inventory/adjustments',{...current.payload,draftRevision:current.revision},{method:'POST'});assert.equal(result.status,200,result.error);assert.equal(await f.stock(),current.payload.items[0].quantity);
+  const cleared=(await f.merchant('/v1/inventory/draft')).draft;
+  assert.equal(cleared.payload,null);assert.equal(cleared.revision,current.revision+1);
+  assert.deepEqual((await f.merchant('/v1/inventory/adjustments',{...current.payload,draftRevision:current.revision},{method:'POST'})).receipt,result.receipt);
+  const next={...payload,requestKey:randomBytes(16).toString('hex'),items:[]};
+  const nextDraft=await f.merchant('/v1/inventory/draft',{revision:cleared.revision,payload:next});assert.equal(nextDraft.status,200,nextDraft.error);
+  assert.equal((await f.merchant('/v1/inventory/draft',{revision:1,payload})).status,409,'An old tab cannot overwrite a new count after the previous draft was cleared');
+  assert.equal((await f.merchant('/v1/inventory/draft',{revision:1},{method:'DELETE'})).status,409);
+  const discarded=await f.merchant('/v1/inventory/draft',{revision:nextDraft.draft.revision},{method:'DELETE'});
+  assert.equal(discarded.draft.payload,null);assert.equal(discarded.draft.revision,nextDraft.draft.revision+1);
+});
+
+test('a full 100-option count commits together and reconciles hidden stock without double-counting product totals', async t => {
+  const f=await setup(t);
+  const statements=Array.from({length:100},(_,n)=>f.db.prepare("INSERT INTO product_variants(id,seller_id,product_id,name,options_json,sku,price_amount,stock_quantity,weight_grams,sort_order,created_at,updated_at) VALUES (?,'seller_alice','tea',?,?,?,20000,1,100,?,'now','now')")
+    .bind('mass-'+n,'Option '+n,JSON.stringify({hidden:n%10===0}),'MASS-'+String(n).padStart(3,'0'),n+1));
+  await f.db.batch(statements);
+  const first=await f.merchant('/v1/inventory?q=MASS-&limit=100');assert.equal(first.items.length,100);assert.equal(first.summary.onHand,100);
+  const result=await f.merchant('/v1/inventory/adjustments',{requestKey:randomBytes(16).toString('hex'),kind:'count',note:'Full option count',items:first.items.map(item=>({productId:item.productId,variantId:item.variantId,revision:item.revision,quantity:2}))},{method:'POST'});
+  assert.equal(result.status,200,result.error);assert.equal(result.receipt.items.length,100);assert.equal(await f.stock(),180,'Product display total includes the 90 visible options only');
+  const counted=await f.merchant('/v1/inventory?q=MASS-&limit=100');assert.equal(counted.summary.onHand,200,'Warehouse count includes all 100 options without the aggregate product row');
+  const history=await f.merchant('/v1/inventory/history?product=tea&limit=60');assert.equal(history.items.length,60);assert(history.nextCursor);
+  const next=await f.merchant('/v1/inventory/history?product=tea&limit=60&cursor='+history.nextCursor);assert.equal(next.items.length,40);assert.equal(next.nextCursor,null);
+  assert.equal(new Set([...history.items,...next.items].map(item=>item.id)).size,100);
 });

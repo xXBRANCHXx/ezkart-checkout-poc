@@ -13,6 +13,7 @@ import { adminProfile } from "./admin-profile.js";
 import { advancedMode, sellerPlan } from "./advanced-mode.js";
 import { authenticateCommerceService, commerceServiceRoute, expireCommerceOrders, reservedStockSql } from "./commerce-orders.js";
 import { claimCommerceJobs, finishCommerceJob } from "./commerce-jobs.js";
+import { inventoryOverview, inventoryHistory, inventoryDraft, adjustInventory, catalogStockMovements } from "./inventory.js";
 const json = (payload, status = 200, headers = {}) => new Response(JSON.stringify(payload), {
   status,
   headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...headers },
@@ -1113,7 +1114,7 @@ async function saveProduct(request, env, rawId) {
   }
   if (new Set(variants.map((variant) => variant.sku.toLowerCase())).size !== variants.length) throw new Response(type === "subscription" ? "Plan SKUs must be unique" : "Variant SKUs must be unique", { status: 400 });
   if (new Set(variants.map((variant) => variant.id)).size !== variants.length) throw new Response("Variant IDs must be unique", { status: 400 });
-  const storedVariants = existing ? (await env.DB.prepare("SELECT id, sort_order FROM product_variants WHERE seller_id = ? AND product_id = ?").bind(seller.id, id).all()).results : [];
+  const storedVariants = existing ? (await env.DB.prepare("SELECT * FROM product_variants WHERE seller_id = ? AND product_id = ?").bind(seller.id, id).all()).results : [];
   const retainedIds = new Set(variants.map((variant) => variant.id));
   const retainedSlots = new Map(storedVariants.filter((variant) => retainedIds.has(variant.id)).map((variant) => [variant.id, variant.sort_order]));
   const usedSlots = new Set(retainedSlots.values());
@@ -1147,12 +1148,15 @@ async function saveProduct(request, env, rawId) {
   const digitalFilename = type === "digital" ? cleanText(payload.digitalFileName, 180) : null;
   const now = new Date().toISOString();
   const createdAt = existing?.created_at || now;
+  const eventId = `event_${crypto.randomUUID()}`;
   const statements = [
     env.DB.prepare(`
       INSERT INTO seller_events (id, seller_id, actor_auth_user_id, event_type, entity_type, entity_id, payload_json, created_at)
       VALUES (?, ?, ?, ?, 'product', ?, ?, ?)
-    `).bind(`event_${crypto.randomUUID()}`, seller.id, authUserId, existing ? "product.updated" : "product.created", id,
+    `).bind(eventId, seller.id, authUserId, existing ? "product.updated" : "product.created", id,
       JSON.stringify({ title, variants: variants.length, images: imageIds.length, expectedRevision: existing ? payload.revision : null }), now),
+    ...catalogStockMovements(env, {sellerId: seller.id, actor: authUserId, reason: existing ? 'catalog_edit' : 'catalog_create', reference: eventId, now},
+      existing, storedVariants, {id, type, title, sku, stock_quantity: stock}, variants.map(v => ({...v, stock_quantity: v.stock}))),
     env.DB.prepare(`
       INSERT INTO products (id, seller_id, type, status, title, description, sku, currency, price_amount, stock_quantity, weight_grams, billing_interval, billing_interval_count, digital_filename, metadata_json, created_at, updated_at)
       VALUES (?, ?, ?, 'active', ?, ?, ?, 'IDR', ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -1197,16 +1201,19 @@ async function deleteProduct(request, env, productId) {
   const { seller, authUserId } = await sellerContext(request, env);
   assertCatalogEditor(seller);
   const id = cleanId(productId, "Product ID");
-  const existing = await env.DB.prepare("SELECT id FROM products WHERE seller_id = ? AND id = ?").bind(seller.id, id).first();
+  const existing = await env.DB.prepare("SELECT * FROM products WHERE seller_id = ? AND id = ?").bind(seller.id, id).first();
   if (!existing) throw new Response("Product not found", { status: 404 });
+  const variants = (await env.DB.prepare("SELECT * FROM product_variants WHERE seller_id = ? AND product_id = ?").bind(seller.id, id).all()).results;
   const removedMediaIds = await productMediaIds(env, seller.id, id);
   const now = new Date().toISOString();
+  const eventId = `event_${crypto.randomUUID()}`;
   await env.DB.batch([
-    env.DB.prepare("DELETE FROM products WHERE seller_id = ? AND id = ?").bind(seller.id, id),
     env.DB.prepare(`
       INSERT INTO seller_events (id, seller_id, actor_auth_user_id, event_type, entity_type, entity_id, payload_json, created_at)
-      VALUES (?, ?, ?, 'product.deleted', 'product', ?, '{}', ?)
-    `).bind(`event_${crypto.randomUUID()}`, seller.id, authUserId, id, now),
+      VALUES (?, ?, ?, 'product.deleted', 'product', ?, ?, ?)
+    `).bind(eventId, seller.id, authUserId, id, JSON.stringify({expectedRevision: existing.revision}), now),
+    ...catalogStockMovements(env, {sellerId: seller.id, actor: authUserId, reason: 'catalog_delete', reference: eventId, now}, existing, variants, null, []),
+    env.DB.prepare("DELETE FROM products WHERE seller_id = ? AND id = ?").bind(seller.id, id),
   ]);
   await cleanupUnusedMedia(env, seller.id, removedMediaIds);
 }
@@ -1308,18 +1315,23 @@ async function duplicateProduct(request, env, productId) {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(copy.id, seller.id, copyId, copy.r2_key, copy.mime_type, copy.size_bytes, media.sort_order, media.sort_order === 1 ? copyTitle : `${copyTitle} image ${media.sort_order}`, now));
     });
+    const copiedVariants = [];
     sourceVariants.forEach((variant, index) => {
       const variantIdSuffix = crypto.randomUUID().replaceAll("-", "");
+      copiedVariants.push({...variant, id: `variant-${variantIdSuffix}`, sku: duplicatedValue(variant.sku, skuSuffix, 80)});
       const imageUploadId = variant.image_upload_id ? mediaCopies.get(variant.image_upload_id)?.id || null : null;
       statements.push(env.DB.prepare(`
         INSERT INTO product_variants (id, seller_id, product_id, name, options_json, sku, price_amount, stock_quantity, weight_grams, billing_interval, billing_interval_count, image_source, image_upload_id, sort_order, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(`variant-${variantIdSuffix}`, seller.id, copyId, variant.name, variant.options_json, duplicatedValue(variant.sku, skuSuffix, 80), variant.price_amount, variant.stock_quantity, variant.weight_grams, variant.billing_interval, variant.billing_interval_count, variant.image_source, imageUploadId, index + 1, now, now));
     });
+    const duplicateEventId = `event_${crypto.randomUUID()}`;
+    statements.push(...catalogStockMovements(env, {sellerId: seller.id, actor: authUserId, reason: 'catalog_duplicate', reference: duplicateEventId, now},
+      null, [], {...product, id: copyId, title: copyTitle, sku: copySku}, copiedVariants));
     statements.push(env.DB.prepare(`
       INSERT INTO seller_events (id, seller_id, actor_auth_user_id, event_type, entity_type, entity_id, payload_json, created_at)
       VALUES (?, ?, ?, 'product.duplicated', 'product', ?, ?, ?)
-    `).bind(`event_${crypto.randomUUID()}`, seller.id, authUserId, copyId, JSON.stringify({ source_product_id: sourceId, title: copyTitle }), now));
+    `).bind(duplicateEventId, seller.id, authUserId, copyId, JSON.stringify({ source_product_id: sourceId, title: copyTitle }), now));
 
     await env.DB.batch(statements);
     persisted = true;
@@ -1449,6 +1461,22 @@ export default {
         return json({ ok: true, store: await merchantStorefront(env, seller, request.method === "PUT" ? await requestJson(request, 5000) : null) }, 200, cors);
       }
       if (request.method === "GET" && url.pathname === "/v1/catalog") return json({ ok: true, ...(await catalog(request, env)) }, 200, cors);
+      if (url.pathname === "/v1/inventory" && request.method === "GET") {
+        const {seller} = await sellerContext(request, env);
+        return json({ok: true, ...await inventoryOverview(env, seller, url)}, 200, cors);
+      }
+      if (url.pathname === "/v1/inventory/history" && request.method === "GET") {
+        const {seller} = await sellerContext(request, env);
+        return json({ok: true, ...await inventoryHistory(env, seller, url)}, 200, cors);
+      }
+      if (url.pathname === "/v1/inventory/draft" && ["GET", "PUT", "DELETE"].includes(request.method)) {
+        const {seller, authUserId} = await sellerContext(request, env);
+        return json({ok: true, draft: await inventoryDraft(env, seller, authUserId, request.method, request.method === 'GET' ? null : await requestJson(request, 64000))}, 200, cors);
+      }
+      if (url.pathname === "/v1/inventory/adjustments" && request.method === "POST") {
+        const {seller, authUserId} = await sellerContext(request, env);
+        return json({ok: true, receipt: await adjustInventory(env, seller, authUserId, await requestJson(request, 64000))}, 200, cors);
+      }
       if (request.method === "GET" && url.pathname === "/v1/landing-pages") return json({ ok: true, pages: await landingPages(request, env) }, 200, cors);
       const landingExportMatch = /^\/v1\/landing-pages\/([a-z0-9-]+)\/export$/.exec(url.pathname);
       if (request.method === "POST" && landingExportMatch) return json(await authorizeLandingExport(request, env, landingExportMatch[1]), 200, cors);
