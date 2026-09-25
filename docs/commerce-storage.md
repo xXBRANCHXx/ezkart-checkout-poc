@@ -19,6 +19,12 @@ recovery, idempotent count submission, receipts, alert changes, history and
 catalog archive/restore passed. This extends inventory control without enabling
 the central checkout or provider-job dispatchers.
 
+Migration 0012 and test Worker version
+`531a8c5f-e2b4-4f5b-996d-e00f659f9eb2` add explicit late-payment stock allocation
+and include the concurrent Advanced-mode cleanup update. The allocation write
+still requires the central commerce switch. Its hosted paid-order acceptance
+is pending; the local D1/browser tests are recorded separately.
+
 The full completion scope and acceptance gates remain in
 [commerce-completion-plan.md](commerce-completion-plan.md).
 

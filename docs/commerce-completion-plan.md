@@ -193,6 +193,26 @@ fixtures establish transaction/UI behavior, not a hosted provider-paid order.
 Return inspection/restocking, refund alternatives, hosted recovery acceptance
 and the broader completion scope remain open.
 
+Test rollout for recovery implementation `b063ecf`:
+
+- Backed up test D1 privately and applied migration 0012. The combined Worker
+  version is `531a8c5f-e2b4-4f5b-996d-e00f659f9eb2`, including the concurrent
+  Advanced-mode cleanup update `2020e25`. That update was integrated by a clean
+  rebase before the final push; its two Worker tests also pass.
+- All 38 Worker tests passed before that unrelated integration. The final
+  recovery notification-claim check and both inventory browser workflows pass.
+  Desktop/mobile screenshots were inspected; the mobile allocation button stays
+  visible while order items scroll. PHP/JavaScript syntax and the test build pass.
+- Hostinger reports `b063ecfe` completed on the test branch. The hosted recovery
+  JavaScript hash matches the checked-in asset, the authenticated review list
+  returns no pending central orders, and the empty state renders correctly.
+  Inventory still reads 147,510 units. Worker health reports D1/both R2 buckets
+  healthy with 32 tables. This is a deployment smoke check, not a paid-order
+  recovery acceptance run.
+- Central checkout remains disabled. The recovery notification is a durable
+  job, with no claim that it has been delivered. No hosted paid-order allocation
+  or production release is certified by this rollout.
+
 ## Atomicity contract
 
 Commerce database changes use D1 transactional batches and database constraints,
