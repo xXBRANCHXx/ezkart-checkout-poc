@@ -135,6 +135,9 @@ copies are not a long-term backup.
 
 Hosted rehearsal acceptance:
 
+- Pushed implementation `e6c9f68` to `agent/ezkart-workbench`. Hostinger reports
+  `e6c9f688` Completed / Current on `test.ezkart.id` (25 September, 15:31 as
+  displayed by hPanel). Application checkout behavior remains gated as below.
 - Exported a mode-600 TEST D1 backup (259,637 bytes) before applying migration
   0017. The existing Worker remains deployed; this change adds operator tooling
   and schema, with no new application API route or provider activation.
