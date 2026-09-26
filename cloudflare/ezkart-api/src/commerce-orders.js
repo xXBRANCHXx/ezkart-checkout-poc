@@ -1,5 +1,6 @@
 import {checkoutContext,paymentSession,paymentSessionStatements,paymentAccountStatement} from './commerce-payments.js';
 import {validateShippingSettings} from './shipping-settings.js';
+import {parseMessageJSON} from './message-json.js';
 
 const encoder = new TextEncoder();
 const idPattern = /^[A-Za-z0-9][A-Za-z0-9_-]{2,95}$/;
@@ -42,7 +43,7 @@ export function reservedStockSql(env, variant = false) {
 // This API is for the PHP commerce service, never a browser session. The body,
 // target (including query), deployment and short validity period are signed.
 // Individual operations also have durable idempotency keys in D1.
-export async function authenticateCommerceService(request, env) {
+export async function authenticateCommerceService(request, env, {strictJSON=false,maxBytes=64000}={}) {
   if (!commerceStorageEnabled(env)) fail('Central commerce storage is not enabled', 503);
   const secret = env.COMMERCE_SERVICE_SECRET;
   if (typeof secret !== 'string' || secret.length < 32) fail('Commerce service is not configured', 503);
@@ -53,7 +54,7 @@ export async function authenticateCommerceService(request, env) {
   if (!/^\d{10}$/.test(timestamp) || Math.abs(Date.now() / 1000 - Number(timestamp)) > 120
     || !/^[a-f0-9]{32}$/.test(nonce) || !/^[a-f0-9]{64}$/.test(signature)
     || environment !== env.APP_ENVIRONMENT) fail('Invalid commerce authorization', 401);
-  if (Number(request.headers.get('content-length') || 0) > 64000) fail('Commerce request is too large', 413);
+  if (Number(request.headers.get('content-length') || 0) > maxBytes) fail('Commerce request is too large', 413);
   // Count streamed bytes as well: Content-Length is not a trustworthy limit.
   const reader = request.body?.getReader();
   const chunks = [];
@@ -63,14 +64,14 @@ export async function authenticateCommerceService(request, env) {
       const {done, value} = await reader.read();
       if (done) break;
       size += value.byteLength;
-      if (size > 64000) { await reader.cancel(); fail('Commerce request is too large', 413); }
+      if (size > maxBytes) { await reader.cancel(); fail('Commerce request is too large', 413); }
       chunks.push(value);
     }
   }
   const bytes = new Uint8Array(size);
   let offset = 0;
   for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
-  const body = new TextDecoder().decode(bytes);
+  let body;try{body=new TextDecoder('utf-8',{fatal:strictJSON}).decode(bytes);}catch{fail('Invalid commerce JSON');}
   const url = new URL(request.url);
   const canonical = ['v1', environment, request.method, url.pathname + url.search, timestamp, nonce,
     hex(await crypto.subtle.digest('SHA-256', bytes))].join('\n');
@@ -79,7 +80,7 @@ export async function authenticateCommerceService(request, env) {
   if (!valid) fail('Invalid commerce authorization', 401);
   if (!body) return {};
   let payload;
-  try { payload = JSON.parse(body); } catch { fail('Invalid commerce JSON'); }
+  try { payload = strictJSON?parseMessageJSON(body):JSON.parse(body); } catch { fail('Invalid commerce JSON'); }
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) fail('Invalid commerce JSON');
   return payload;
 }

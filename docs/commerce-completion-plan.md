@@ -64,6 +64,22 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 26 September: email investigation and audited recovery
+
+Implemented private operator listing/history, durable provider lookup intents
+and receipts, exact request/provider correlation, callback-race guards and
+audited resolution of proven submissions without another send. A TEST-only PHP
+command preserves its intent across lost acknowledgements. Current delivery
+status, check time and review confirmation reach merchant/buyer history. Lookup
+bounces/complaints feed the existing address suppression guards. See
+[email-investigation.md](email-investigation.md) for evidence and operating limits.
+
+Missing provider records and uncertain responses remain unresolved; active jobs,
+unknown dead failures and identity conflicts cannot be force-cleared. Actual
+provider/domain acceptance, guest receipt identity, external alerts, retention,
+load testing and signed-in hosted acceptance remain open. The provider and
+central-commerce holds remain in place; no top-level gate is closed.
+
 ### 26 September: buyer notification choices and email
 
 Implemented six account-wide buyer categories with independent in-app/email

@@ -68,7 +68,7 @@
       if(typeof item.href==='string'&&/^\/cart\/(?:admin\/\?|messages\.php\?|return\.php\?|$)/.test(item.href)){link.href=item.href;actions.append(link);}
       if(view!=='email'&&!item.readAt){const button=node('button','Mark as read');button.type='button';button.dataset.noticeRead=String(item.id);button.addEventListener('click',()=>void markRead([item.id]));actions.append(button);}
       else if(view!=='email')actions.append(node('span','Read','notice-meta'));
-      li.append(actions); if(item.email?.label&&item.email.status!=='not_requested'){li.append(node('p',item.email.label,'notice-meta'));if(item.email.note)li.append(node('p',item.email.note,'notice-meta'));}list.append(li);
+      li.append(actions); if(item.email?.label&&item.email.status!=='not_requested'){li.append(node('p',item.email.label,'notice-meta'));if(item.email.note)li.append(node('p',item.email.note,'notice-meta'));emailEvidence(li,item.email);}list.append(li);
     }
     if(!items.length)empty(list,view==='email'?'No email updates to show':'You’re all caught up',applied.q||applied.category||applied.state!=='all'?'No updates match these filters.':view==='email'?'Email requests will appear here when an update matches your saved email preferences.':'New updates will appear here when they are delivered.');
     text('[data-notice-result]',count(items.length)+(view==='email'?(items.length===1?' email update shown':' email updates shown'):(items.length===1?' notification shown':' notifications shown')));q('[data-notice-more]').hidden=!cursor;controls();
@@ -103,6 +103,10 @@
       else text('[data-notice-read-error]',error.message+' Retry to confirm the same read update.');}}
     finally{readBusy=false;controls();}
   }
+  function emailEvidence(card,email) {
+    if(email.checkedAt)card.append(node('p','Delivery status checked: '+date(email.checkedAt),'notice-meta'));
+    if(email.resolvedAt)card.append(node('p','Submission confirmed after review: '+date(email.resolvedAt),'notice-meta'));
+  }
   function renderProcessing() {
     const list=q('[data-notice-process-list]');list.replaceChildren();
     const states={queued:'Queued',running:'Processing',retry:'Retry scheduled',uncertain:'Checking saved result',dead:'Needs operator review',succeeded:'Processed'};
@@ -112,7 +116,7 @@
       const heading=node('div','','notice-card-header');heading.append(node('span',sourceLabels[item.kind]||'Store update','notice-category'),node('span',item.email?(emailStates[item.email.status]||'Email status unavailable'):(states[item.state]||item.state),'notice-meta'));li.append(heading);
       li.append(node('h2',item.orderId||sourceLabels[item.kind]||'Store update'),node('p',date(item.createdAt)+' · '+count(item.attempts)+(item.attempts===1?' processing attempt':' processing attempts'),'notice-meta'));
       if(item.suppression)li.append(node('p',suppressed[item.suppression]||'Delivery skipped.','notice-body'));
-      else if(item.email){li.append(node('p',item.email.label||'Email delivery status unavailable','notice-body'));if(item.email.note)li.append(node('p',item.email.note,'notice-meta'));}
+      else if(item.email){li.append(node('p',item.email.label||'Email delivery status unavailable','notice-body'));if(item.email.note)li.append(node('p',item.email.note,'notice-meta'));emailEvidence(li,item.email);}
       else if(item.state==='succeeded'||item.deliveredInApp>0||item.emailRequested>0)li.append(node('p',count(item.deliveredInApp)+(item.deliveredInApp===1?' in-app inbox reached':' in-app inboxes reached')+(item.emailRequested?' · '+count(item.emailRequested)+(item.emailRequested===1?' email requested':' emails requested'):'.'),'notice-body'));
       if(item.message)li.append(node('p',item.message,'notice-body'));
       if(['retry','uncertain'].includes(item.state))li.append(node('p','Next check: '+date(item.nextAttemptAt),'notice-meta'));

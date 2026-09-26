@@ -30,7 +30,7 @@ async function source(env,job){
 }
 async function evidence(env,job){
   return env.DB.prepare(`SELECT x.*,b.provider_id,EXISTS(SELECT 1 FROM commerce_email_starts a WHERE a.request_id=x.id) AS started
-    FROM commerce_email_requests x LEFT JOIN commerce_email_provider_bindings b ON b.request_id=x.id WHERE x.job_id=?`).bind(job.id).first();
+    FROM commerce_email_requests x LEFT JOIN commerce_email_verified_bindings b ON b.request_id=x.id WHERE x.job_id=?`).bind(job.id).first();
 }
 function ineligible(row,configuration,now=Date.now()){
   if(row.store_status!=='active')return 'store_closed';
@@ -83,7 +83,7 @@ export async function deliverEmailJob(env,job,workerId,fetcher=fetch){
   if(request&&request.recipient_email!==recipient.email)return skip(env,job,workerId,row,request,'address_changed');
   if(configuration.environment==='sandbox'&&!configuration.allowlist.includes(recipient.email))return skip(env,job,workerId,row,request,'test_recipient');
   const emailHash=await commerceHash({environment:job.environment,email:recipient.email});
-  if(await env.DB.prepare(`SELECT x.id FROM commerce_email_requests x JOIN commerce_email_events e ON e.request_id=x.id
+  if(await env.DB.prepare(`SELECT x.id FROM commerce_email_requests x JOIN commerce_email_delivery_evidence e ON e.request_id=x.id
     WHERE x.commerce_environment=? AND x.email_hash=? AND e.kind IN ('bounced','complained','suppressed') LIMIT 1`).bind(job.environment,emailHash).first())return skip(env,job,workerId,row,request,'suppressed');
   if(!request){
     const id='email_'+(await commerceHash({recipient:row.recipient_id,environment:job.environment})).slice(0,32),created=at();
@@ -127,7 +127,7 @@ export async function dispatchEmails(env,limit=2,fetcher=fetch){
           if(saved?.provider_id&&error.code!=='email_evidence_conflict'){await finish(env,job,workerId,'succeeded',{deliveryId:saved.id,submitted:true});out.processed++;continue;}
           const noEffect=error.noEffect===true&&!saved?.started,permanent=['email_source_invalid','email_send_rejected','email_request_invalid','email_evidence_conflict'].includes(error.code);
           const outcome=permanent?'dead':noEffect&&error.retry?'retry':'uncertain';
-          await finish(env,job,workerId,outcome,{deliveryId:saved?.id||null,noEffectConfirmed:noEffect,uncertain:!noEffect},
+          await finish(env,job,workerId,outcome,{deliveryId:saved?.id||null,noEffectConfirmed:noEffect,uncertain:!noEffect,errorCode:typeof error.code==='string'?error.code:'email_internal_error'},
             permanent?'This email needs an operator review.':noEffect?'Recipient verification is temporarily unavailable. A retry is scheduled.':'The email submission result needs confirmation. Any retry uses the original request and key.');
         }catch{/* A lost database acknowledgement or expired lease is recovered by a later claimant. */}
         out.failed++;

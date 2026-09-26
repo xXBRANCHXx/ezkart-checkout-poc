@@ -74,16 +74,17 @@ and [Svix's raw verification contract](https://docs.svix.com/receiving/verifying
 
 The dispatcher rechecks stored evidence after interrupted writes and before
 retries. It never uses a merchant browser response as a delivery receipt.
-Operators must investigate dead/uncertain records with the saved provider ID,
-profile, request key and event evidence. There is intentionally no browser
-button that resets uncertain submissions or bypasses address suppression.
+Operators can use the [private investigation workflow](email-investigation.md)
+to fetch provider evidence and resolve confirmed submissions. Original attempts
+remain intact. There is no browser button that resets uncertain submissions or
+bypasses address suppression.
 
 **Needs attention** includes failed attempts, bounce/complaint/provider failures,
 delays, jobs waiting more than fifteen minutes past their scheduled attempt,
 and submissions without a final delivery event for fifteen minutes. These are
 visible checks, not an active external alerting service. Provider-side lookup
-and operator resolution workflows, notification retention, production rate/load
-limits and external alerting still require acceptance.
+and audited resolution are implemented separately; actual provider acceptance,
+notification retention, production rate/load limits and external alerting remain.
 
 ## Configuration and operating limits
 

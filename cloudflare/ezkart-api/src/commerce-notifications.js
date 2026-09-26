@@ -25,7 +25,7 @@ export async function notificationStats(env,actor,url){
   await access(env,actor);query(url,[]);
   const row=await env.DB.prepare(`SELECT COALESCE(SUM(CASE WHEN r.in_app=1 AND d.recipient_id IS NULL THEN 1 ELSE 0 END),0) AS unread,
     COALESCE(SUM(r.in_app),0) AS total,COALESCE(SUM(CASE WHEN r.email_requested=1 AND mb.request_id IS NULL AND ms.job_id IS NULL AND (mj.state IS NULL OR mj.state!='dead') THEN 1 ELSE 0 END),0) AS email_waiting,
-    COALESCE(SUM(CASE WHEN r.email_requested=1 AND (ms.uncertain=1 OR mj.state='dead' OR EXISTS(SELECT 1 FROM commerce_email_events me WHERE me.request_id=mx.id AND me.kind IN ('bounced','complained','failed','suppressed'))) THEN 1 ELSE 0 END),0) AS email_attention
+    COALESCE(SUM(CASE WHEN r.email_requested=1 AND ((ms.uncertain=1 AND NOT EXISTS(SELECT 1 FROM commerce_email_resolutions mr WHERE mr.request_id=mx.id)) OR mj.state='dead' OR EXISTS(SELECT 1 FROM commerce_email_delivery_evidence me WHERE me.request_id=mx.id AND me.kind IN ('bounced','complained','failed','suppressed'))) THEN 1 ELSE 0 END),0) AS email_attention
     FROM ${tables} ${emailStatusJoins} WHERE ${visibleWhere(actor)}`).bind(...bindings(env,actor)).first();
   await access(env,actor);return {...row,enabled:notificationsEnabled(env),emailEnabled:emailConfiguration(env).ready};
 }
@@ -65,16 +65,16 @@ export async function notificationProcessing(env,actor,url){
   if(cursor&&(!Array.isArray(cursor.before)||cursor.before.length!==2||!stamp(cursor.before[0])||!stamp(cursor.cap)||cursor.before[0]>cursor.cap||typeof cursor.before[1]!=='string'||!/^job_[a-f0-9]{32}$/.test(cursor.before[1])))fail('Processing page is invalid');
   const cap=cursor?.cap||new Date().toISOString(),before=cursor?.before||[cap,'~'];
   const stalled=`((j.state IN ('queued','running') AND j.available_at<strftime('%Y-%m-%dT%H:%M:%fZ','now','-15 minutes'))
-    OR (mb.created_at<strftime('%Y-%m-%dT%H:%M:%fZ','now','-15 minutes') AND NOT EXISTS(SELECT 1 FROM commerce_email_events me WHERE me.request_id=mx.id AND me.kind IN ('delivered','bounced','complained','failed','suppressed'))))`;
+    OR (mb.created_at<strftime('%Y-%m-%dT%H:%M:%fZ','now','-15 minutes') AND NOT EXISTS(SELECT 1 FROM commerce_email_delivery_evidence me WHERE me.request_id=mx.id AND me.kind IN ('delivered','bounced','complained','failed','suppressed'))))`;
   const rows=await env.DB.prepare(`SELECT j.id,j.order_id,j.kind,j.state,j.attempts,j.created_at,j.updated_at,j.available_at,e.id AS event_id,e.suppression,
     (SELECT COUNT(*) FROM commerce_notification_recipients r WHERE r.event_id=e.id AND r.in_app=1) AS inboxes,
     (SELECT COUNT(*) FROM commerce_notification_recipients r WHERE r.event_id=e.id AND r.email_requested=1) AS email_requested_count,
     CASE WHEN j.kind='notification.send' THEN 1 ELSE 0 END AS email_requested,${emailStatusFields('j','mx','ms','mb')},${stalled} AS stalled
     FROM commerce_jobs j LEFT JOIN commerce_notification_events e ON e.job_id=j.id
-    LEFT JOIN commerce_email_requests mx ON mx.job_id=j.id LEFT JOIN commerce_email_skips ms ON ms.job_id=j.id LEFT JOIN commerce_email_provider_bindings mb ON mb.request_id=mx.id
+    LEFT JOIN commerce_email_requests mx ON mx.job_id=j.id LEFT JOIN commerce_email_skips ms ON ms.job_id=j.id LEFT JOIN commerce_email_verified_bindings mb ON mb.request_id=mx.id
     WHERE j.seller_id=? AND j.commerce_environment=? AND j.kind IN (SELECT value FROM json_each(?))
       AND j.created_at<=? AND (j.created_at<? OR (j.created_at=? AND j.id<?))
-      AND (?='all' OR (?='attention' AND (j.state IN ('retry','uncertain','dead') OR EXISTS(SELECT 1 FROM commerce_email_events me WHERE me.request_id=mx.id AND me.kind IN ('bounced','complained','failed','suppressed','delayed'))
+      AND (?='all' OR (?='attention' AND (j.state IN ('retry','uncertain','dead') OR EXISTS(SELECT 1 FROM commerce_email_delivery_evidence me WHERE me.request_id=mx.id AND me.kind IN ('bounced','complained','failed','suppressed')) OR (EXISTS(SELECT 1 FROM commerce_email_delivery_evidence me WHERE me.request_id=mx.id AND me.kind='delayed') AND NOT EXISTS(SELECT 1 FROM commerce_email_delivery_evidence me WHERE me.request_id=mx.id AND me.kind IN ('delivered','bounced','complained','failed','suppressed')))
         OR ${stalled})) OR (?='queued' AND j.state IN ('queued','running')) OR (?='succeeded' AND j.state='succeeded'))
     ORDER BY j.created_at DESC,j.id DESC LIMIT 26`).bind(actor.sellerId,mode(env),JSON.stringify([...notificationSourceKinds,'notification.send']),cap,before[0],before[0],before[1],state,state,state,state).all();
   await access(env,actor);const items=rows.results.slice(0,25);

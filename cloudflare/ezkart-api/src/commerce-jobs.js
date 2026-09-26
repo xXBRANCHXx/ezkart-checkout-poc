@@ -81,7 +81,7 @@ export async function finishCommerceJob(env, jobId, input) {
   if(notificationSourceKinds.includes(row.kind)&&input.outcome==='succeeded'&&!await env.DB.prepare('SELECT id FROM commerce_notification_events WHERE job_id=?').bind(row.id).first()){
     fail('Record the notification and its recipients before completing this job',409);
   }
-  if(row.kind==='notification.send'&&input.outcome==='succeeded'&&!await env.DB.prepare(`SELECT x.id FROM commerce_email_requests x JOIN commerce_email_provider_bindings b ON b.request_id=x.id WHERE x.job_id=?
+  if(row.kind==='notification.send'&&input.outcome==='succeeded'&&!await env.DB.prepare(`SELECT x.id FROM commerce_email_requests x JOIN commerce_email_verified_bindings b ON b.request_id=x.id WHERE x.job_id=?
     UNION ALL SELECT job_id FROM commerce_email_skips WHERE job_id=? AND uncertain=0 LIMIT 1`).bind(row.id,row.id).first()){
     fail('Record the email submission or a confirmed no-send decision before completing this job',409);
   }

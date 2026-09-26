@@ -21,22 +21,57 @@ export function emailWebhookProfiles(env){
 }
 
 // This status contains no credentials and is suitable for private merchant UI.
-export function emailConfiguration(env){
+function emailConnection(env){
   const held={ready:false,reason:'not_connected'};
-  if(env.COMMERCE_EMAIL_PROVIDER!=='resend'||env.COMMERCE_EMAIL_SEND!=='enabled')return held;
+  if(env.COMMERCE_EMAIL_PROVIDER!=='resend')return held;
   if(env.COMMERCE_STORAGE!=='d1')return {ready:false,reason:'commerce_hold'};
   if(!['test','production'].includes(env.APP_ENVIRONMENT))return held;
-  const sender=env.COMMERCE_EMAIL_FROM,profile=env.COMMERCE_EMAIL_PROFILE,start=env.COMMERCE_EMAIL_START_AT;
-  if(!emailAddress(sender)||!profileId(profile)||!stamp(start)||!Object.hasOwn(emailWebhookProfiles(env),profile))return held;
+  const sender=env.COMMERCE_EMAIL_FROM,profile=env.COMMERCE_EMAIL_PROFILE;
+  if(!emailAddress(sender)||!profileId(profile))return held;
   if(typeof env.RESEND_API_KEY!=='string'||!/^re_[A-Za-z0-9_-]{12,240}$/.test(env.RESEND_API_KEY))return held;
-  if(typeof env.SUPABASE_SERVICE_ROLE_KEY!=='string'||env.SUPABASE_SERVICE_ROLE_KEY.length<20||env.SUPABASE_SERVICE_ROLE_KEY.length>4096||/[\s\r\n]/.test(env.SUPABASE_SERVICE_ROLE_KEY))return held;
   try{const auth=new URL(env.SUPABASE_URL);if(auth.protocol!=='https:'||auth.username||auth.password||auth.search||auth.hash||auth.port||auth.pathname!=='/')return held;}catch{return held;}
+  return {ready:true,reason:'ready',sender,profile,environment:env.APP_ENVIRONMENT==='test'?'sandbox':'production',origin:env.APP_ENVIRONMENT==='test'?'https://test.ezkart.id':'https://ezkart.id'};
+}
+export function emailConfiguration(env){
+  const held={ready:false,reason:'not_connected'};
+  if(env.COMMERCE_EMAIL_SEND!=='enabled')return held;
+  const connection=emailConnection(env);if(!connection.ready)return connection;
+  const start=env.COMMERCE_EMAIL_START_AT;
+  if(!stamp(start)||!Object.hasOwn(emailWebhookProfiles(env),connection.profile))return held;
+  if(typeof env.SUPABASE_SERVICE_ROLE_KEY!=='string'||env.SUPABASE_SERVICE_ROLE_KEY.length<20||env.SUPABASE_SERVICE_ROLE_KEY.length>4096||/[\s\r\n]/.test(env.SUPABASE_SERVICE_ROLE_KEY))return held;
   let allowlist=[];
   if(env.APP_ENVIRONMENT==='test'){
     try{allowlist=JSON.parse(env.COMMERCE_EMAIL_TEST_RECIPIENTS||'[]');}catch{return held;}
     if(!Array.isArray(allowlist)||allowlist.length<1||allowlist.length>20||new Set(allowlist).size!==allowlist.length||allowlist.some(email=>!emailAddress(email)))return {ready:false,reason:'test_recipients_required'};
   }
-  return {ready:true,reason:'ready',sender,profile,start:new Date(start).toISOString(),allowlist,environment:env.APP_ENVIRONMENT==='test'?'sandbox':'production',origin:env.APP_ENVIRONMENT==='test'?'https://test.ezkart.id':'https://ezkart.id'};
+  return {...connection,start:new Date(start).toISOString(),allowlist};
+}
+
+// Investigation can remain available while sending is disabled. The original
+// send credential identity must still match; a separate same-account reader key
+// avoids giving the sending key broader permissions solely for investigation.
+export function emailLookupConfiguration(env){
+  if(env.COMMERCE_EMAIL_RECONCILE!=='enabled')return {ready:false,reason:'not_connected'};
+  const connection=emailConnection(env),reader=env.RESEND_READ_API_KEY||env.RESEND_API_KEY;
+  if(!connection.ready)return connection;
+  if(typeof reader!=='string'||!/^re_[A-Za-z0-9_-]{12,240}$/.test(reader))return {ready:false,reason:'not_connected'};
+  return connection;
+}
+export async function emailReaderHash(env,configuration=emailLookupConfiguration(env)){
+  if(!configuration.ready)fail('email_lookup_not_connected','Email investigation is not connected.');
+  return commerceHash({provider:'resend',environment:configuration.environment,profile:configuration.profile,key:env.RESEND_READ_API_KEY||env.RESEND_API_KEY});
+}
+
+export async function retrieveResendEmail(env,id,fetcher=fetch){
+  if(!emailLookupConfiguration(env).ready)fail('email_lookup_not_connected','Email investigation is not connected.');
+  if(!emailProviderId(id))fail('email_lookup_invalid','Choose a valid provider email reference.');
+  let response;
+  try{response=await fetcher('https://api.resend.com/emails/'+id,{method:'GET',redirect:'manual',signal:AbortSignal.timeout(15000),
+    headers:{authorization:'Bearer '+(env.RESEND_READ_API_KEY||env.RESEND_API_KEY),accept:'application/json','user-agent':'Ezkart/1.0'}});}
+  catch{return {outcome:'unavailable',status:0,raw:null,data:null};}
+  let raw,data;try{raw=await boundedBody(response,98304);data=parseMessageJSON(raw);}catch{return {outcome:'invalid',status:response.status,raw:null,data:null};}
+  const outcome=response.status===200?'received':response.status===404?'not_found':response.status===429||response.status>=500?'unavailable':response.status>=400?'rejected':'invalid';
+  return {outcome,status:response.status,raw,data};
 }
 
 export async function emailCredentialHash(env,configuration=emailConfiguration(env)){
@@ -90,7 +125,7 @@ export async function sendResendEmail(env,payload,idempotencyKey,fetcher=fetch){
   }
   let response;
   try{response=await fetcher('https://api.resend.com/emails',{method:'POST',redirect:'manual',signal:AbortSignal.timeout(15000),
-    headers:{authorization:'Bearer '+env.RESEND_API_KEY,'content-type':'application/json',accept:'application/json','Idempotency-Key':idempotencyKey},body:payload});}
+    headers:{authorization:'Bearer '+env.RESEND_API_KEY,'content-type':'application/json',accept:'application/json','user-agent':'Ezkart/1.0','Idempotency-Key':idempotencyKey},body:payload});}
   catch{fail('email_send_uncertain','The email submission result was not confirmed.',{uncertain:true});}
   let raw,data;try{raw=await boundedBody(response,12000);data=parseMessageJSON(raw);}catch{fail('email_send_uncertain','The email submission result could not be verified.',{uncertain:true});}
   if(response.ok){if(!emailProviderId(data?.id))fail('email_send_uncertain','The provider email reference was not confirmed.',{uncertain:true});return {id:data.id,raw};}

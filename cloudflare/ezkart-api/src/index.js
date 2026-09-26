@@ -39,6 +39,7 @@ import {merchantSettings,saveMerchantSettings,settingsHistory,publicStoreProfile
 import {notificationInbox,notificationStats,readNotifications,notificationProcessing} from './commerce-notifications.js';
 import {dispatchNotifications,scheduleNotifications} from './commerce-notification-dispatch.js';
 import {dispatchEmails,recordEmailWebhook} from './commerce-email-delivery.js';
+import {emailInvestigations,lookupEmail,resolveEmail} from './email-investigation.js';
 import {buyerNotificationPreferences,saveBuyerNotificationPreferences,buyerNotificationPreferenceHistory} from './buyer-notification-preferences.js';
 import {merchantAnalytics} from './commerce-analytics.js';
 import {createAnalyticsExport,readAnalyticsExport,cleanupAnalyticsExports} from './commerce-analytics-exports.js';
@@ -1472,6 +1473,13 @@ export default {
         const input=await authenticateCommerceService(request,env);
         if(url.search||Object.keys(input).some(k=>!['environment','limit'].includes(k))||input.environment!==(env.APP_ENVIRONMENT==='test'?'sandbox':'production')||input.limit!==undefined&&(!Number.isSafeInteger(input.limit)||input.limit<1||input.limit>2))return json({ok:false,error:'Email processing request is invalid'},422);
         return json({ok:true,...await dispatchEmails(env,input.limit??2)});
+      }
+      const emailInvestigation=/^\/internal\/commerce\/email\/(investigations(?:\/(email_[a-f0-9]{32}))?|lookup|resolve)$/.exec(url.pathname);
+      if(emailInvestigation){
+        const input=await authenticateCommerceService(request,env,{strictJSON:true,maxBytes:3000});
+        if(emailInvestigation[1].startsWith('investigations')&&request.method==='GET'&&!Object.keys(input).length)return json({ok:true,...await emailInvestigations(env,url,emailInvestigation[2]||null)});
+        if(request.method==='POST'&&!url.search&&['lookup','resolve'].includes(emailInvestigation[1]))return json({ok:true,...await (emailInvestigation[1]==='lookup'?lookupEmail(env,input):resolveEmail(env,input))});
+        return json({ok:false,error:'Email investigation method or parameters are invalid'},422);
       }
       if(url.pathname==='/internal/commerce/notifications/drain'&&request.method==='POST'){
         const input=await authenticateCommerceService(request,env);

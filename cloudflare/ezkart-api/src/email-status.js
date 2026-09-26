@@ -2,15 +2,18 @@
 // provider payloads, or another store member's personal notification choices.
 export const emailStatusFields=(job='mj',request='mx',skip='ms',binding='mb')=>`${job}.id AS mail_job_id,${job}.state AS mail_job_state,${job}.available_at AS mail_next_at,
   ${request}.id AS mail_request_id,${skip}.reason AS mail_skip,${skip}.uncertain AS mail_skip_uncertain,${binding}.created_at AS mail_submitted_at,
-  (SELECT group_concat(DISTINCT kind) FROM commerce_email_events me WHERE me.request_id=${request}.id) AS mail_events,
-  (SELECT MIN(occurred_at) FROM commerce_email_events me WHERE me.request_id=${request}.id AND me.kind='delivered') AS mail_delivered_at`;
+  (SELECT group_concat(DISTINCT kind) FROM commerce_email_delivery_evidence me WHERE me.request_id=${request}.id) AS mail_events,
+  (SELECT MIN(occurred_at) FROM commerce_email_delivery_evidence me WHERE me.request_id=${request}.id AND me.kind='delivered') AS mail_delivered_at,
+  (SELECT MAX(observed_at) FROM commerce_email_delivery_evidence me WHERE me.request_id=${request}.id AND me.source='lookup') AS mail_observed_at,
+  (SELECT created_at FROM commerce_email_resolutions mr WHERE mr.request_id=${request}.id) AS mail_reconciled_at`;
 export const emailStatusJoins=`LEFT JOIN commerce_jobs mj ON mj.seller_id=e.seller_id AND mj.commerce_environment=e.commerce_environment AND mj.job_key='email_recipient:'||r.id AND mj.kind='notification.send'
-  LEFT JOIN commerce_email_requests mx ON mx.recipient_id=r.id LEFT JOIN commerce_email_skips ms ON ms.job_id=mj.id LEFT JOIN commerce_email_provider_bindings mb ON mb.request_id=mx.id`;
+  LEFT JOIN commerce_email_requests mx ON mx.recipient_id=r.id LEFT JOIN commerce_email_skips ms ON ms.job_id=mj.id LEFT JOIN commerce_email_verified_bindings mb ON mb.request_id=mx.id`;
 
 export function emailDeliveryStatus(row,connected){
   if(!row.email_requested)return {status:'not_requested'};
-  const events=String(row.mail_events||'').split(','),result={status:'queued',submittedAt:row.mail_submitted_at||null,deliveredAt:row.mail_delivered_at||null};
-  if(row.mail_skip_uncertain||row.mail_job_state==='dead')result.status='needs_review';
+  const events=String(row.mail_events||'').split(','),result={status:'queued',submittedAt:row.mail_submitted_at||null,deliveredAt:row.mail_delivered_at||null,
+    checkedAt:row.mail_observed_at||null,resolvedAt:row.mail_reconciled_at||null};
+  if((row.mail_skip_uncertain||row.mail_job_state==='dead')&&!row.mail_reconciled_at)result.status='needs_review';
   else if(events.includes('complained'))result.status='complained';
   else if(events.includes('bounced'))result.status='bounced';
   else if(events.includes('suppressed'))result.status='suppressed';
