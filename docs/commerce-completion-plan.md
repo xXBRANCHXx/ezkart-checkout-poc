@@ -82,6 +82,13 @@ campaign operator recovery, automation, performance reporting, provider
 acceptance and capacity/recovery validation remain open. Existing sending and
 central-commerce holds remain in place; no top-level gate is closed.
 
+Implementation `b6e58a2` is pushed and hosted. TEST Worker
+`21fc820f-e69d-41f5-b30f-1a26fad1ff35` passes all 31 health/access/hold checks;
+all five inspected hosted assets match and 13 access/header checks pass.
+No migration is pending. Existing counts, schema, settings and import evidence
+remain unchanged; all five campaign mail tables are empty. No hosted campaign
+or email was created. Signed-in hosted acceptance remains open.
+
 ### 27 September: campaign message outbox and guarded dispatch
 
 Implemented atomic message/unsubscribe preparation, immutable retry bytes and

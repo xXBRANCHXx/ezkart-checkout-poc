@@ -89,3 +89,24 @@ migration is required for these controls. Authenticated hosted acceptance,
 campaign operator recovery, provider acceptance, automation, performance reports
 and capacity/recovery validation remain open. No top-level completion gate is
 closed and no provider or central-commerce hold is lifted.
+
+## TEST rollout
+
+Implementation `b6e58a2` is pushed to workbench and auto-deployed by Hostinger.
+TEST Worker `21fc820f-e69d-41f5-b30f-1a26fad1ff35` is installed with no pending
+migrations. At **26 September 19:23 UTC / 27 September 02:23 WIB**, all 31
+Worker health/access/hold checks passed, with 107 healthy application tables,
+D1 and both R2 buckets. At **19:24 UTC**, all five inspected hosted asset hashes
+matched source and all 13 private/public access and header checks passed.
+
+Read-only checks before deployment and after hosted verification preserve the
+existing counts, schema, seller settings and 15-entry legacy import manifest.
+Foreign-key checks are empty, all five campaign mail tables remain empty, and
+the three changed read query plans compile remotely. No campaign, recipient
+job, unsubscribe token or outbound message was created by rollout checks.
+
+Shared Chrome still reports the prior disconnected/approval-timeout state; no
+reconnect was attempted. Signed-in hosted acceptance remains open. These asset
+and anonymous-route checks do not establish real provider delivery. The
+existing site-wide CSP acceptance gap remains open. Sending, investigation and
+central-commerce activation flags remain held; main and production are unchanged.
