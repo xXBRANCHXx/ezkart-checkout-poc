@@ -95,7 +95,10 @@ reloads, corrupt storage, malformed receipts, stale reads and session changes.
 Provider responses and authenticated browser workflows here use isolated
 fixtures; they do not establish actual provider/domain or hosted acceptance.
 
-Campaign-to-order attribution, verified conversion/revenue reporting,
-automation triggers, signed-in hosted/provider acceptance, monitoring and
-sustained capacity/recovery exercises remain open. These delivery and permission
-reports do not complete the full marketing gate or any production release gate.
+Campaign-to-order attribution is documented in
+[campaign-attribution.md](campaign-attribution.md); verified conversion and gross
+payment reporting with separate complete exports is documented in
+[campaign-performance.md](campaign-performance.md). Automation triggers,
+signed-in hosted/provider acceptance, monitoring and sustained capacity/recovery
+exercises remain open. These reports do not complete the full marketing gate or
+any production release gate.

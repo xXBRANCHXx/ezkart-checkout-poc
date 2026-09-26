@@ -10,14 +10,14 @@ function ez_admin_marketing_proxy(string $token, string $path, string $method): 
         || !hash_equals($csrf, (string) ($_SERVER['HTTP_X_EZKART_CSRF'] ?? '')) || preg_match('/^[A-Za-z0-9][A-Za-z0-9_-]{2,95}$/D', $store) !== 1) {
         ez_admin_json(['ok' => false, 'error' => 'Your sign-in or store changed. Reload this page.', 'code' => 'marketing_session_changed'], 401);
     }
-    if (strlen($path) > 4000 || str_contains($path, '#') || preg_match('#^(/v1/commerce/marketing/(workspace|audience|campaigns|reports|report-exports)(?:/((?:cmp_|crex_)[a-f0-9]{32})(?:/(history|publication|publish|publication-action|recipients|publication-history))?)?)(?:\?(.*))?$#D', $path, $match) !== 1
-        || (!empty($match[3]) && ($match[2] === 'report-exports' ? !str_starts_with($match[3], 'crex_') || !empty($match[4]) : $match[2] !== 'campaigns' || !str_starts_with($match[3], 'cmp_')))) ez_admin_json(['ok' => false, 'error' => 'Campaign path is invalid.'], 400);
+    if (strlen($path) > 4000 || str_contains($path, '#') || preg_match('#^(/v1/commerce/marketing/(workspace|audience|campaigns|reports|report-exports|performance|performance-exports)(?:/((?:cmp_|crex_|cpex_)[a-f0-9]{32})(?:/(history|publication|publish|publication-action|recipients|publication-history))?)?)(?:\?(.*))?$#D', $path, $match) !== 1
+        || (!empty($match[3]) && ($match[2] === 'report-exports' ? !str_starts_with($match[3], 'crex_') || !empty($match[4]) : ($match[2] === 'performance-exports' ? !str_starts_with($match[3], 'cpex_') || !empty($match[4]) : $match[2] !== 'campaigns' || !str_starts_with($match[3], 'cmp_'))))) ez_admin_json(['ok' => false, 'error' => 'Campaign path is invalid.'], 400);
     $route = $match[2]; $id = $match[3] ?? ''; $action = $match[4] ?? '';
-    if (!in_array($method, ['GET','POST'], true) || ($method === 'POST' && (($id !== '' && !in_array($action, ['publish','publication-action'], true)) || in_array($route, ['workspace','reports'], true)))
-        || ($method === 'GET' && ($route === 'audience' || ($route === 'report-exports' && $id === '') || in_array($action, ['publish','publication-action'], true)))) ez_admin_json(['ok' => false, 'error' => 'Method not allowed.'], 405);
+    if (!in_array($method, ['GET','POST'], true) || ($method === 'POST' && (($id !== '' && !in_array($action, ['publish','publication-action'], true)) || in_array($route, ['workspace','reports','performance'], true)))
+        || ($method === 'GET' && ($route === 'audience' || (in_array($route, ['report-exports','performance-exports'], true) && $id === '') || in_array($action, ['publish','publication-action'], true)))) ez_admin_json(['ok' => false, 'error' => 'Method not allowed.'], 405);
     $allowed = $method === 'GET' && $route === 'campaigns' ? ($id === '' ? ['state','q','month','cursor'] : (in_array($action, ['history','recipients','publication-history'], true) ? ['cursor'] : [])) : [];
-    if ($method === 'GET' && $route === 'reports') $allowed = ['range','from','to','cohort','cursor'];
-    if ($method === 'GET' && $route === 'report-exports') $allowed = ['after','limit'];
+    if ($method === 'GET' && in_array($route, ['reports','performance'], true)) $allowed = ['range','from','to','cohort','cursor'];
+    if ($method === 'GET' && in_array($route, ['report-exports','performance-exports'], true)) $allowed = ['after','limit'];
     $query = [];
     if (array_key_exists(5, $match)) {
         foreach (explode('&', $match[5]) as $pair) {
@@ -37,7 +37,7 @@ function ez_admin_marketing_proxy(string $token, string $path, string $method): 
     $path = $match[1] . ($query === [] ? '' : '?' . http_build_query($query, '', '&', PHP_QUERY_RFC3986));
     if ($method === 'POST' && !ez_request_origin_allowed()) ez_admin_json(['ok' => false, 'error' => 'Reload this page before saving.'], 403);
     if ($method === 'POST' && preg_match('#^application/json(?:;|$)#i', (string) ($_SERVER['CONTENT_TYPE'] ?? '')) !== 1) ez_admin_json(['ok' => false, 'error' => 'Use a JSON request.'], 415);
-    $limit = in_array($action, ['publish','publication-action'], true) || $route === 'report-exports' ? 3000 : ($route === 'audience' ? 5000 : 32000);
+    $limit = in_array($action, ['publish','publication-action'], true) || in_array($route, ['report-exports','performance-exports'], true) ? 3000 : ($route === 'audience' ? 5000 : 32000);
     $body = $method === 'POST' ? file_get_contents('php://input', false, null, 0, $limit + 1) : '';
     if (!is_string($body) || strlen($body) > $limit) ez_admin_json(['ok' => false, 'error' => 'Campaign request is too large.'], 413);
     $handle = curl_init(rtrim(ez_config('cloudflare_api_url'), '/') . $path);
@@ -56,6 +56,6 @@ function ez_admin_marketing_proxy(string $token, string $path, string $method): 
     if (!$same) { header_remove('Set-Cookie'); ez_admin_json(['ok' => false, 'error' => 'Your sign-in changed. Reload to check the saved campaign.', 'code' => 'marketing_session_changed'], 401); }
     $data = $received === true ? json_decode($raw, true) : null;
     if (!is_array($data)) ez_admin_json(['ok' => false, 'error' => in_array($action, ['publish','publication-action'], true)
-        ? 'The result was not confirmed. Retry the original delivery action.' : ($route === 'report-exports' ? 'The result was not confirmed. Retry the original export.' : 'The result was not confirmed. Retry the original save.')], 503);
+        ? 'The result was not confirmed. Retry the original delivery action.' : (in_array($route, ['report-exports','performance-exports'], true) ? 'The result was not confirmed. Retry the original export.' : 'The result was not confirmed. Retry the original save.')], 503);
     ez_admin_json($data, in_array($status, [200,400,401,403,404,409,410,413,415,422,429], true) ? $status : 503);
 }

@@ -74,9 +74,10 @@ pass. All 19 relevant PHP/browser cases pass, including four new bridge/checkout
 cases and existing checkout/unsubscribe regressions. Desktop and 390px recovery
 and unavailable-link layouts were inspected. Syntax, diff and TEST dry-run pass.
 
-Merchant conversion/performance views and exports must use actual verified
-payment evidence, account for limited measurement, and label gross amounts
-accurately. Existing 23-column delivery CSV snapshots are unchanged. Those
-performance views, automation, signed-in hosted acceptance, provider acceptance,
-monitoring and sustained capacity/recovery validation remain open. This change
-does not certify the marketing gate or the complete workbench.
+Merchant conversion/performance views and complete exports now use actual
+verified payment evidence, account for limited measurement and distinguish
+gross amounts from settled funds; see
+[campaign-performance.md](campaign-performance.md). Existing 23-column delivery
+CSV snapshots are unchanged. Automation, signed-in hosted acceptance, provider
+acceptance, monitoring and sustained capacity/recovery validation remain open.
+These changes do not certify the marketing gate or the complete workbench.

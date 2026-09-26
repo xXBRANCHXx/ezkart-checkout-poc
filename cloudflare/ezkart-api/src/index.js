@@ -44,6 +44,8 @@ import {emailInvestigations,lookupEmail,resolveEmail,campaignEmailInvestigations
 import {campaignLink,cleanupCampaignVisits} from './campaign-attribution.js';
 import {campaignReport} from './campaign-reports.js';
 import {createCampaignReportExport,readCampaignReportExport,cleanupCampaignReportExports} from './campaign-report-exports.js';
+import {campaignPerformance} from './campaign-performance.js';
+import {createCampaignPerformanceExport,readCampaignPerformanceExport,cleanupCampaignPerformanceExports} from './campaign-performance-exports.js';
 import {campaignWorkspace,listCampaigns,readCampaign,saveCampaign,campaignHistory,campaignAudience} from './marketing-campaigns.js';
 import {readPublication,publishCampaign,changePublication,publicationRecipients,publicationHistory} from './campaign-publication.js';
 import {campaignUnsubscribe} from './campaign-unsubscribe.js';
@@ -1608,16 +1610,19 @@ export default {
         if(request.method==='POST'&&action==='read'&&!url.search)return json({ok:true,...await readNotifications(env,actor,await reviewRequestJson(request,3000,parseMessageJSON))},200,cors);
         return json({ok:false,error:'Method or parameters not allowed'},405,cors);
       }
-      const marketing=/^\/v1\/commerce\/marketing(?:\/(campaigns|workspace|audience|reports|report-exports)(?:\/((?:cmp_|crex_)[a-f0-9]{32})(?:\/(history|publication|publish|publication-action|recipients|publication-history))?)?)?$/.exec(url.pathname);
+      const marketing=/^\/v1\/commerce\/marketing(?:\/(campaigns|workspace|audience|reports|report-exports|performance|performance-exports)(?:\/((?:cmp_|crex_|cpex_)[a-f0-9]{32})(?:\/(history|publication|publish|publication-action|recipients|publication-history))?)?)?$/.exec(url.pathname);
       if(marketing){
         const user=await authenticatedUser(request,env),seller=await env.DB.prepare(`SELECT s.id FROM seller_memberships m JOIN sellers s ON s.id=m.seller_id WHERE m.auth_user_id=? AND s.status='active' ORDER BY m.created_at ASC LIMIT 1`).bind(user.id).first();
         if(!seller)return json({ok:false,error:'Your store membership is no longer available'},403,cors);
         if(request.headers.has('x-ezkart-marketing-store')&&request.headers.get('x-ezkart-marketing-store')!==seller.id)return json({ok:false,error:'Your active store changed. Reload this page.',code:'marketing_session_changed'},409,cors);
         const actor={id:user.id,sellerId:seller.id},[,route,id,action]=marketing;
-        if(id&&(route==='report-exports'?!id.startsWith('crex_')||action:route!=='campaigns'||!id.startsWith('cmp_')))return json({ok:false,error:'Campaign path is invalid'},404,cors);
+        if(id&&(route==='report-exports'?!id.startsWith('crex_')||action:route==='performance-exports'?!id.startsWith('cpex_')||action:route!=='campaigns'||!id.startsWith('cmp_')))return json({ok:false,error:'Campaign path is invalid'},404,cors);
         if(route==='reports'&&!id&&request.method==='GET')return json({ok:true,...await campaignReport(env,actor,url)},200,cors);
         if(route==='report-exports'&&request.method==='POST'&&!id&&!url.search)return json({ok:true,...await createCampaignReportExport(env,actor,await reviewRequestJson(request,3000,parseMessageJSON))},200,cors);
         if(route==='report-exports'&&id&&request.method==='GET')return json({ok:true,...await readCampaignReportExport(env,actor,id,url)},200,cors);
+        if(route==='performance'&&request.method==='GET'&&!id)return json({ok:true,...await campaignPerformance(env,actor,url)},200,cors);
+        if(route==='performance-exports'&&request.method==='POST'&&!id&&!url.search)return json({ok:true,...await createCampaignPerformanceExport(env,actor,await reviewRequestJson(request,3000,parseMessageJSON))},200,cors);
+        if(route==='performance-exports'&&id&&request.method==='GET')return json({ok:true,...await readCampaignPerformanceExport(env,actor,id,url)},200,cors);
         if(route==='workspace'&&!id&&request.method==='GET'&&!url.search)return json({ok:true,...await campaignWorkspace(env,actor)},200,cors);
         if(route==='campaigns'&&id&&request.method==='GET'&&['publication','recipients','publication-history'].includes(action)){
           const read={publication:readPublication,recipients:publicationRecipients,'publication-history':publicationHistory}[action];return json({ok:true,...await read(env,actor,id,url)},200,cors);
@@ -1935,6 +1940,7 @@ export default {
     context.waitUntil(cleanupAbandonedMedia(env));
     context.waitUntil(cleanupCampaignVisits(env));
     context.waitUntil(cleanupCampaignReportExports(env));
+    context.waitUntil(cleanupCampaignPerformanceExports(env));
     context.waitUntil(cleanupAnalyticsExports(env));
     context.waitUntil(cleanupCustomerExports(env));
     context.waitUntil(cleanupReviewPhotos(env));

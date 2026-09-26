@@ -64,6 +64,33 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 27 September: campaign performance and complete payment exports
+
+Implemented publication-period visit, checkout, conversion and verified gross
+payment reports in the Marketing workspace. Distinct converted visits prevent
+multiple orders inflating conversion; exact primary captures establish paid
+sales, and additional captures remain separate for review. Older untracked
+links, measurement limits and attribution/refund boundaries are explicit.
+Complete 19-column performance exports recover original immutable snapshots
+after lost responses, interrupted pages, changed filters and tab reloads.
+Existing delivery reports and 23-column receipts remain intact.
+
+See [campaign-performance.md](campaign-performance.md). The final backend run
+passes thirteen new performance and fourteen existing report cases. Focused
+legacy mixed-message migration and indexed payment-query checks also pass.
+All eighteen report PHP/browser cases and twenty-five existing marketing,
+publishing, investigation and proxy cases pass. Desktop/390px layouts, syntax,
+diff and TEST dry-run are checked. The fresh 592,629-byte TEST backup restores
+all 119 existing physical tables and their records unchanged, with valid
+integrity and no foreign-key errors. Migration 0040 adds eleven objects and
+changes no existing object; all 77 compatibility query plans compile. Backup
+SHA-256: `21babb0c2fc583cbd89a6fa99230afb4d9d8cd805ee2d4c636866b163d503ce2`.
+
+Marketing automation, signed-in hosted/provider acceptance, monitoring and
+sustained capacity/recovery validation remain open. All thirteen completion
+gates remain open; existing sending, central-commerce and production holds
+continue. Main and production remain outside this workbench delivery.
+
 ### 27 September: anonymous campaign links and durable order attribution
 
 New campaign messages carry a shared publication link through the store and cart

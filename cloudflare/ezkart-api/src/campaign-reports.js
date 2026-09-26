@@ -14,8 +14,8 @@ const expressions={recipients:'COUNT(c.id)',submitted:'SUM(d.submitted_at IS NOT
   ...Object.fromEntries(Object.entries({queued:'queued',sending:'sending',retry:'retry',cancelled:'cancelled',notSent:'skipped',unconfirmed:'uncertain',delayed:'delayed',failed:'failed',bounced:'bounced',complained:'complained',suppressed:'suppressed'}).map(([k,state])=>[k,`SUM(d.delivery_state='${state}')`])),
   needsReview:'SUM(d.needs_review)',unsubscribed:'SUM(EXISTS(SELECT 1 FROM commerce_campaign_email_requests x JOIN commerce_unsubscribe_changes u ON u.token_hash=x.unsubscribe_hash WHERE x.candidate_id=c.id))'};
 const metrics=Object.keys(campaignMetrics);
-export async function campaignReportContext(env,actor,params,required=false){
-  const seller=await settingsActor(env,actor),mode=commerceReadEnvironment(env),scope=await commerceHash({actor,mode,view:'campaign_report'});
+export async function campaignReportContext(env,actor,params,required=false,view='campaign_report'){
+  const seller=await settingsActor(env,actor),mode=commerceReadEnvironment(env),scope=await commerceHash({actor,mode,view});
   let cohort=params.get('cohort'),c;
   if(params.has('cohort')&&(typeof cohort!=='string'||!/^[A-Za-z0-9_-]{1,1600}$/.test(cohort)))reportFailure();
   if(cohort){
@@ -41,12 +41,13 @@ export async function campaignReportContext(env,actor,params,required=false){
 
 // Publication dates and the insertion frontier are fixed. Outcomes stay live
 // until an export materializes them atomically. No order/revenue attribution is inferred.
-export const campaignReportCte=`WITH cfg AS (SELECT ? AS seller,? AS environment,? AS cap,? AS cutoff,? AS start,? AS end,? AS previous,? AS offset),
+export const campaignPublicationCte=`WITH cfg AS (SELECT ? AS seller,? AS environment,? AS cap,? AS cutoff,? AS start,? AS end,? AS previous,? AS offset),
  publications AS (SELECT p.rowid AS n,p.id,p.campaign_id,p.data_json,p.created_at,s.send_at,s.cancelled,s.candidate_count,
    CASE WHEN p.created_at>=cfg.start THEN 0 ELSE 1 END AS segment,strftime('%Y-%m-%d',p.created_at,cfg.offset) AS local_day
    FROM commerce_campaign_publications p LEFT JOIN commerce_campaign_publication_state s ON s.id=p.id,cfg
    WHERE p.seller_id=cfg.seller AND p.commerce_environment=cfg.environment AND p.rowid<=cfg.cap AND p.created_at<=cfg.cutoff
-     AND p.created_at>=cfg.previous AND p.created_at<cfg.end),
+     AND p.created_at>=cfg.previous AND p.created_at<cfg.end)`;
+export const campaignReportCte=campaignPublicationCte+`,
  reports AS (SELECT p.n,p.id,p.campaign_id,json_extract(p.data_json,'$.name') AS name,json_extract(p.data_json,'$.subject') AS subject,
    p.created_at AS published_at,p.send_at AS scheduled_at,p.cancelled AS campaign_cancelled,p.segment,p.local_day,
    ${metrics.map(k=>`COALESCE(${expressions[k]},0) AS ${k}`).join(',')},

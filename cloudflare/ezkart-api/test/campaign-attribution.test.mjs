@@ -152,4 +152,5 @@ test('populated migration preserves legacy message bytes and only newly prepared
   await f.ready();assert.equal((await f.drain(2)).processed,2);assert.equal(await f.count('commerce_campaign_link_messages'),1);assert.equal(await f.count('commerce_campaign_visit_sources'),1);
   assert(f.control.calls.some(call=>call.body===payload));assert(f.control.calls.some(call=>call.message.text.includes('/cart/campaign.php?c=')));
   assert.equal((await f.db.prepare('SELECT request_json FROM commerce_campaign_email_requests WHERE id=?').bind(id).first()).request_json,payload);assert.equal((await f.db.prepare('PRAGMA foreign_key_check').all()).results.length,0);
+  await applyCommerceSchema(f.db,39,40);const performance=await f.merchant('/v1/commerce/marketing/performance');assert.equal(performance.status,200,JSON.stringify(performance));assert.equal(performance.totals.trackedCampaigns,1);assert.equal(performance.totals.untrackedCampaigns,1);assert.equal(performance.totals.visits,0);
 });
