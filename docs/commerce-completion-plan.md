@@ -96,6 +96,15 @@ integrity and no foreign-key errors. Migration 0038 adds ten objects and changes
 no existing schema objects. All 28 affected SQL statements compile on the
 restored database without mutation.
 
+Implementation `7f2990c` is pushed and hosted on workbench. TEST migration 0038
+and Worker `2db974da-a268-4b59-926f-23da56fa8ed7` are installed, with 113 healthy
+application tables and no pending migrations. All 38 deployed Worker checks,
+six frontend asset hashes and 17 hosted access/header checks pass. The remote
+schema matches the restored backup; existing counts, settings and the legacy
+import manifest are unchanged. Both new export tables remain empty. No hosted
+campaign, message, payment or export was created for these checks. Signed-in
+hosted/provider acceptance remains open. Main and production are untouched.
+
 ### 27 September: campaign investigation and audited recovery
 
 Implemented purpose-bound operator listing/history, durable provider lookups,
