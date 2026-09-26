@@ -110,3 +110,28 @@ and foreign-key checks. All existing table counts and seller settings remain
 unchanged, and all three new tables are empty. TEST rollout is recorded below
 after deployment. Signed-in hosted acceptance and operational notification
 delivery remain separate from fixture results.
+
+Implementation `615f7f8` is pushed to `agent/ezkart-workbench`. TEST migration
+0028 is applied, with 16 new schema objects (three tables, two indexes and eleven
+triggers) and no remaining migrations. The post-migration snapshot confirms
+unchanged existing counts, seller values, financial/provider records, message
+records and import manifest, with no foreign-key errors. The three new Settings
+tables remain empty; validation did not create hosted profile/preference fixtures.
+
+TEST Worker `16b7f3ed-361a-4ad0-a0ea-140947a148bd` is deployed. At 13:19 UTC
+on 26 September, its health endpoint reported 80 tables and healthy D1/public
+R2/private R2 checks. Both private Settings routes return 401 without a token;
+the financial provider-account route still reports the central-storage hold.
+The hourly `17 * * * *` schedule and provider activation settings are unchanged.
+
+Hostinger auto-deployed the workbench push. All eleven checked Settings,
+formatting, order, shop/checkout and shared-review/message assets match local
+bytes. The hosted Settings page shows the sign-in gate, its unauthenticated proxy
+returns 401/no-store, and direct access to the two new private PHP includes
+returns an empty 404. Evidence is in
+`/tmp/ezkart-settings-deploy-01a0d643/`. Python's default HTTP client was rejected
+by Cloudflare's browser-signature filter; the recorded successful Worker and
+hosted checks used an independently launched browser. No filter was changed.
+
+Shared Chrome still reports the previous connection timeout, so signed-in hosted
+Settings acceptance remains unverified. No additional reconnect loop was started.

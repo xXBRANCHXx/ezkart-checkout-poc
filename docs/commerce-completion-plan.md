@@ -82,6 +82,13 @@ The 163-test Worker suite, 58 affected PHP/browser checks and the logo regressio
 pass. A fresh TEST backup restores with migration 0028, intact foreign keys and
 unchanged existing table counts and seller settings.
 
+Implementation `615f7f8` is pushed and auto-deployed by Hostinger. TEST migration
+0028 and Worker `16b7f3ed-361a-4ad0-a0ea-140947a148bd` are deployed; health reports
+80 tables. The new Settings tables remain empty and old records are unchanged.
+Hosted asset hashes, sign-in/private-route guards and the central-storage hold
+pass. Shared Chrome is still disconnected, so signed-in hosted acceptance remains
+open alongside the actual notification-delivery work.
+
 ### 26 September: persistent buyer and seller messaging
 
 Replaced the sample inbox with real buyer/store conversations, public-product and
