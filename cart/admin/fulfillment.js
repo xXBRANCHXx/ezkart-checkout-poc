@@ -6,7 +6,7 @@
   const el=(tag,text,className='')=>{const node=document.createElement(tag);if(text!==undefined)node.textContent=String(text);if(className)node.className=className;return node;};
   const button=(text,click,primary=false)=>{const node=el('button',text,'ui-button'+(primary?' primary':''));node.type='button';node.addEventListener('click',click);return node;};
   const money=value=>new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(value);
-  const date=value=>Number.isFinite(Date.parse(value))?new Intl.DateTimeFormat('en-GB',{dateStyle:'medium',timeStyle:'short',timeZone:'Asia/Jakarta'}).format(new Date(value))+' WIB':'Time unavailable';
+  const date=value=>window.EzkartAdminFormat.date(value);
   const badge=(state,review=false)=>el('span',review?'Needs review':labels[state]||state,'fulfillment-badge'+(review||attention.has(state)?' attention':state==='delivered'?' good':''));
   const path=id=>'/v1/fulfillment'+(id?'/'+encodeURIComponent(id):'');
   const external=(title,url)=>{let parsed;try{parsed=new URL(url);}catch{return null;}if(parsed.protocol!=='https:'||parsed.username||parsed.password||parsed.port)return null;const a=el('a',title,'ui-button');a.href=parsed.href;a.target='_blank';a.rel='noopener noreferrer';return a;};

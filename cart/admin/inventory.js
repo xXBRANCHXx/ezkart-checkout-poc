@@ -13,7 +13,7 @@
   const newKey = () => crypto.randomUUID().replaceAll('-','');
   const fmt = value => Number(value).toLocaleString();
   const counted = (value, noun) => `${fmt(value)} ${noun}${value === 1 ? '' : 's'}`;
-  const time = value => new Intl.DateTimeFormat('en-GB',{dateStyle:'medium',timeStyle:'short',timeZone:'Asia/Jakarta'}).format(new Date(value))+' WIB';
+  const time=value=>window.EzkartAdminFormat.date(value);
   async function mini(root,request) {
     const version=(root.inventoryReadVersion||0)+1;root.inventoryReadVersion=version;
     const target=root.querySelector('[data-inventory-summary-rows]'),status=root.querySelector('[data-inventory-summary-status]');

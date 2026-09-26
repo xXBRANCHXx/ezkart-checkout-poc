@@ -2,7 +2,7 @@
   const base='/v1/commerce/customers',fields=['q','activity','minSpend','minOrders','maxOrders','lastFrom','lastTo','location','tag'];
   const customerId=/^customer_[A-Za-z0-9_-]{1,85}$/;
   const money=value=>value==null?'—':new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(BigInt(value));
-  const date=value=>value&&Number.isFinite(Date.parse(value))?new Intl.DateTimeFormat('en-GB',{dateStyle:'medium',timeStyle:'short',timeZone:'Asia/Jakarta'}).format(new Date(value))+' WIB':'—';
+  const date=value=>window.EzkartAdminFormat.date(value);
   const key=()=>Array.from(crypto.getRandomValues(new Uint8Array(16)),n=>n.toString(16).padStart(2,'0')).join('');
   const el=(tag,text,className='')=>{const node=document.createElement(tag);if(text!==undefined)node.textContent=String(text);if(className)node.className=className;return node;};
   const button=(text,action)=>{const node=el('button',text,'ui-button');node.type='button';node.addEventListener('click',action);return node;};

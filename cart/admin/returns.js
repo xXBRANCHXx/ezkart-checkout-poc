@@ -4,7 +4,7 @@
   const actions={approve:'Approve return',decline:'Decline request',withdraw:'Withdraw request',inspect:'Record inspection',close:'Close remaining intake'};
   const newKey=()=>crypto.randomUUID().replaceAll('-','');
   const el=(tag,text,className='')=>{const node=document.createElement(tag);if(text!==undefined)node.textContent=String(text);if(className)node.className=className;return node;};
-  const date=value=>new Intl.DateTimeFormat('en-GB',{dateStyle:'medium',timeStyle:'short',timeZone:'Asia/Jakarta'}).format(new Date(value))+' WIB';
+  const date=value=>window.EzkartAdminFormat.date(value);
   const path=id=>'/v1/returns'+(id?'/'+encodeURIComponent(id):'');
   const orderPath=id=>'/v1/returns/orders/'+encodeURIComponent(id);
   const quantities=values=>{const dl=el('dl',undefined,'returns-counts');for(const [label,value] of values){const pair=el('div');pair.append(el('dt',label),el('dd',value));dl.append(pair);}return dl;};

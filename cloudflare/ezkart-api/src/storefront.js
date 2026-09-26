@@ -1,6 +1,7 @@
 import {reservedStockSql} from './commerce-orders.js';
 import {reviewMode} from './commerce-reviews.js';
 import {publicReviewSql} from './commerce-review-reads.js';
+import {publicStoreProfile} from './merchant-settings.js';
 const parse = (value) => { try { return JSON.parse(value || "{}"); } catch { return {}; } };
 const imagePath = (id) => id ? `/v1/public/media/${encodeURIComponent(id)}` : "";
 const idPattern = /^[a-zA-Z0-9][a-zA-Z0-9_-]{2,95}$/;
@@ -16,7 +17,8 @@ export async function storefrontIdentity(env, row) {
   // Match existing landing-page checkout storage for the store owner.
   const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${env.APP_ENVIRONMENT}|${owner?.auth_user_id || row.id}`));
   const cartScope = [...new Uint8Array(hash)].map(value => value.toString(16).padStart(2, "0")).join("").slice(0, 24);
-  return { id: row.id, cartScope, ...appearance, name: appearance.name || row.name, logoPath: imagePath(appearance.logoId), backgroundPath: imagePath(appearance.backgroundId) };
+  const {supportEmail,supportPhone,description}=publicStoreProfile(row);
+  return { id: row.id, cartScope, ...appearance, name: appearance.name || row.name, supportEmail,supportPhone,description,logoPath: imagePath(appearance.logoId), backgroundPath: imagePath(appearance.backgroundId) };
 }
 
 export async function merchantStorefront(env, seller, payload = null) {

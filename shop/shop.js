@@ -41,6 +41,7 @@
     try {
       const data = await sf.load({ store: new URLSearchParams(location.search).get("store") || "" });
       store = data.store; products = data.products; sf.appearance(store);
+      sf.support(store,byId('shop-support'));
       document.title = `${store.name} · Shop`;
       byId("shop-name").textContent = store.name; byId("shop-avatar").textContent = store.name.charAt(0).toUpperCase();
       byId("shop-home").href = sf.shopUrl(store);

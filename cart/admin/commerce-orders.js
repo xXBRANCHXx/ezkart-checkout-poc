@@ -4,7 +4,7 @@
   const activityLabels={'checkout.created':'Order created','payment.instructions':'Payment instructions saved','payment.succeeded':'Payment confirmed','payment.failed':'Payment attempt failed',
     'checkout.expired':'Checkout expired','checkout.cancelled':'Checkout cancelled','fulfillment.accept':'Order accepted','fulfillment.pickup':'Pickup requested','fulfillment.cancel_pickup':'Pickup cancellation requested','fulfillment.refresh':'Tracking refresh requested'};
   const money=value=>new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(typeof value==='string'?BigInt(value):value);
-  const date=value=>value&&Number.isFinite(Date.parse(value))?new Intl.DateTimeFormat('en-GB',{dateStyle:'medium',timeStyle:'short',timeZone:'Asia/Jakarta'}).format(new Date(value))+' WIB':'—';
+  const date=value=>window.EzkartAdminFormat.date(value);
   const el=(tag,text,className='')=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=String(text);if(className)n.className=className;return n;};
   const button=(label,action)=>{const n=el('button',label,'ui-button');n.type='button';n.addEventListener('click',action);return n;};
   const badge=state=>el('span',labels[state]||state||'Awaiting payment','commerce-order-badge'+(['paid','delivered'].includes(state)?' good':state==='attention'?' attention':''));

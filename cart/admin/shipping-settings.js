@@ -2,7 +2,7 @@
   const el=(tag,text,cls='')=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;};
   const button=(text,click)=>{const n=el('button',text,'ui-button');n.type='button';n.addEventListener('click',click);return n;};
   const copy=value=>structuredClone(value),key=()=>crypto.randomUUID().replaceAll('-','');
-  const date=value=>new Intl.DateTimeFormat('en-GB',{dateStyle:'medium',timeStyle:'short',timeZone:'Asia/Jakarta'}).format(new Date(value))+' WIB';
+  const date=value=>window.EzkartAdminFormat.date(value);
   function mount({request}){
     const root=document.querySelector('[data-shipping-settings]');if(!root)return;
     const q=selector=>root.querySelector(selector),form=q('[data-shipping-address-form]'),editor=q('[data-shipping-address-dialog]'),review=q('[data-shipping-review]');

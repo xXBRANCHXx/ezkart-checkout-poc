@@ -4,7 +4,7 @@
   const allFields = ['state', 'evidence', 'review'];
   const reference = /^EZK-[SP]-[A-F0-9]{24}$/;
   const money = value => value == null ? '—' : new Intl.NumberFormat('id-ID', {style:'currency', currency:'IDR', maximumFractionDigits:0}).format(BigInt(value));
-  const date = value => value && Number.isFinite(Date.parse(value)) ? new Intl.DateTimeFormat('en-GB', {dateStyle:'medium', timeStyle:'short', timeZone:'Asia/Jakarta'}).format(new Date(value)) + ' WIB' : '—';
+  const date=value=>window.EzkartAdminFormat.date(value);
   const label = value => String(value || '').replaceAll('_', ' ').replace(/^./, s => s.toUpperCase());
   const events = {'payment.instructions':'Payment instructions saved', 'payment.succeeded':'Payment confirmed', 'payment.failed':'Payment failed'};
   const outcomes = {succeeded:'Completed', retry:'Retry scheduled', uncertain:'Confirmation needed', dead:'Needs investigation', cancelled:'Cancelled'};

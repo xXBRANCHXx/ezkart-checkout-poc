@@ -96,8 +96,9 @@ sent in the last 30 days. No observations displays a dash.
 
 Visible pages poll for updates every 20 seconds and offer manual refresh. The
 UI makes no online-presence or instant-delivery claim. This stage provides inbox
-delivery only. Email/WhatsApp delivery, durable transactional notification jobs,
-delivery failures and preferences remain part of the separate notification gate.
+delivery only. Personal notification preferences are now saved in
+[Settings](merchant-settings.md). Email/WhatsApp delivery, durable transactional
+notification dispatch and delivery failures remain part of the notification gate.
 No external message is sent by these tests or this rollout.
 
 ## Validation and rollout

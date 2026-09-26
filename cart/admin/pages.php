@@ -337,12 +337,11 @@ require dirname(__DIR__) . '/messages-workspace.php'; ?>
 <?php break; case 'advanced': require __DIR__ . '/advanced.php'; ?>
 
 <?php break; case 'settings': ?>
-  <?php ez_page_header('Settings', 'Manage your store, notifications, and security.', [['label'=>'Discard changes', 'icon' => 'undo','href'=>'?page=settings'],['label'=>'Save changes', 'icon' => 'save','toast'=>'Settings saved in preview','style'=>'primary']]); ?>
-  <div class="settings-layout">
-    <nav class="settings-nav"><a class="active" href="#store-profile">Store profile</a><a href="?page=shipping-settings">Shipping</a><a href="#notifications">Notifications</a><a href="#security">Security</a><a href="#preferences">Preferences</a><a href="?page=advanced">Advanced Mode</a></nav>
+  <?php ez_page_header('Settings', 'Manage your store, notifications, and security.'); ?>
+  <div class="settings-layout" data-merchant-settings data-store="<?= ez_admin_escape($sellerId) ?>">
+    <nav class="settings-nav"><a class="active" href="#store-profile">Store profile</a><a href="?page=shipping-settings">Shipping</a><a href="#notifications">Notifications</a><a href="#security">Security</a><a href="#preferences">Language</a><a href="?page=advanced">Advanced Mode</a></nav>
     <div class="settings-content">
-      <section class="surface settings-section" id="store-profile"><header class="surface-header"><div><h2>Store profile</h2><p>Identity shown across the admin workspace.</p></div></header><?php require __DIR__ . '/profile-logo.php'; ?><div class="settings-form"><label class="wide"><span>Store name</span><input value="Ezkart Sandbox"></label><label><span>Business type</span><select><option>Online merchant</option></select></label><label><span>Plan</span><input value="<?= $advancedPlan === null ? 'Unavailable' : (!empty($advancedPlan['enabled']) ? 'Advanced' : 'Basic') ?>" readonly></label><label><span>Support email</span><input type="email" value="support@ezkart.id"></label><label><span>Support phone</span><input value="+62 812 3456 7890"></label><label class="wide"><span>Store description</span><textarea>Commerce sandbox for testing checkout, shipping, and payment operations.</textarea></label></div></section>
-      <section class="surface settings-section" id="notifications"><header class="surface-header"><div><h2>Notifications</h2><p>Choose which operational events need attention.</p></div></header><div class="setting-rows"><label><div><b>Payment confirmed</b><p>Notify when a signed callback marks an order paid.</p></div><input type="checkbox" checked></label><label><div><b>Payment pending</b><p>Surface unresolved checkouts after 30 minutes.</p></div><input type="checkbox" checked></label><label><div><b>Payment failed</b><p>Notify when a payment provider rejects or expires a transaction.</p></div><input type="checkbox" checked></label><label><div><b>Low catalog activity</b><p>Weekly summary for products without paid orders.</p></div><input type="checkbox"></label></div></section>
+      <?php require __DIR__ . '/settings-store.php'; ?>
       <section class="surface settings-section" id="security">
         <header class="surface-header"><div><h2>Security</h2><p>Protect sign-in and store data.</p></div><span class="verified-label"><?= ez_admin_icon('check-circle') ?> <?= $mfaEnabled ? 'Two-step on' : 'Protected session' ?></span></header>
         <?php if ($securityFlash !== null): ?><p class="security-flash <?= ez_admin_escape((string) ($securityFlash['type'] ?? 'info')) ?>" role="status"><?= ez_admin_escape((string) ($securityFlash['message'] ?? '')) ?></p><?php endif; ?>
@@ -376,7 +375,7 @@ require dirname(__DIR__) . '/messages-workspace.php'; ?>
           </details>
         <?php endif; ?>
       </section>
-      <section class="surface settings-section" id="preferences"><header class="surface-header"><div><h2>Regional preferences</h2><p>Formatting used throughout the workspace.</p></div></header><div class="settings-form"><label><span>Timezone</span><select><option>Asia/Jakarta (WIB)</option></select></label><label><span>Currency</span><select><option>IDR — Indonesian Rupiah</option></select></label><label><span>Date format</span><select><option>11 Aug 2026</option></select></label><label><span>Language</span><select data-admin-language-setting><option value="en">English</option><option value="id">Bahasa Indonesia</option></select><small data-admin-language-status role="status"></small></label></div></section>
+      <section class="surface settings-section" id="preferences"><header class="surface-header"><div><h2>Account language</h2><p>Applies to your account and saves when you choose a language.</p></div></header><div class="settings-form"><label><span>Language</span><select data-admin-language-setting><option value="en">English</option><option value="id">Bahasa Indonesia</option></select><small data-admin-language-status role="status"></small></label></div></section>
     </div>
   </div>
 

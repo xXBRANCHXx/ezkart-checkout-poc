@@ -207,6 +207,7 @@
         hostedStore = data.store;
         hostedProduct = data.products?.[0] || null;
         window.EzkartStorefront.appearance(hostedStore);
+        window.EzkartStorefront.support(hostedStore,byId('store-support'),{description:false});
         applyMerchantBrand();
       } catch (error) {
         byId("catalog-loading").hidden = true;
@@ -287,6 +288,7 @@
           // Keep existing website cart scopes and return destinations working.
           hostedStore = { ...data.store, cartScope: state.shop };
           window.EzkartStorefront.appearance(hostedStore);
+          window.EzkartStorefront.support(hostedStore,byId('store-support'),{description:false});
           applyMerchantBrand();
         } catch (_) { /* Existing checkout links remain usable during an appearance-service outage. */ }
       }

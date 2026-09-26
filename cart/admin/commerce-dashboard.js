@@ -2,8 +2,8 @@
   const labels={creating:'Creating',pending:'Pending',paid:'Paid',failed:'Failed',expired:'Expired',cancelled:'Cancelled',partially_refunded:'Partially refunded',refunded:'Refunded'};
   const money=value=>new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(BigInt(value));
   const number=value=>Number(value).toLocaleString();
-  const date=value=>new Intl.DateTimeFormat('en-GB',{dateStyle:'medium',timeZone:'Asia/Jakarta'}).format(new Date(value.length===10?value+'T00:00:00+07:00':value));
-  const time=value=>new Intl.DateTimeFormat('en-GB',{dateStyle:'medium',timeStyle:'short',timeZone:'Asia/Jakarta'}).format(new Date(value))+' WIB';
+  const date=value=>window.EzkartAdminFormat.date(value,{time:false,calendar:true});
+  const time=value=>window.EzkartAdminFormat.date(value);
   const el=(tag,text,cls='')=>{const node=document.createElement(tag);if(text!==undefined)node.textContent=String(text);if(cls)node.className=cls;return node;};
   const svg=(tag,attrs={})=>{const node=document.createElementNS('http://www.w3.org/2000/svg',tag);for(const [k,v] of Object.entries(attrs))node.setAttribute(k,String(v));return node;};
 

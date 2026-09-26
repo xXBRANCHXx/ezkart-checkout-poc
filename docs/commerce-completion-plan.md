@@ -64,6 +64,24 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 26 September: persisted merchant settings
+
+Replaced preview-only store fields with real identity, public support contact,
+description and regional settings. Saved data appears in the shop, checkout,
+merchant sidebar and operational date displays. Each member can save separate
+notification preferences. Both forms have immutable save receipts, reload-safe
+draft/retry recovery, field-level comparison of concurrent edits and private,
+bounded history. See [merchant-settings.md](merchant-settings.md).
+
+Notification delivery, its scheduled sources, delivery evidence and authenticated
+hosted acceptance remain open. Both notification delivery capabilities explicitly
+remain inactive; saving a preference does not claim to send an alert. The combined
+Settings/notifications gate stays unchecked.
+
+The 163-test Worker suite, 58 affected PHP/browser checks and the logo regression
+pass. A fresh TEST backup restores with migration 0028, intact foreign keys and
+unchanged existing table counts and seller settings.
+
 ### 26 September: persistent buyer and seller messaging
 
 Replaced the sample inbox with real buyer/store conversations, public-product and

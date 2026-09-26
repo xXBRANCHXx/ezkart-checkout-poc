@@ -704,6 +704,7 @@ function ez_admin_sync_cloudflare_user(string $accessToken): array
 
 function ez_admin_proxy_cloud_request(string $accessToken, string $path, string $method): never
 {
+    if (str_starts_with($path, '/v1/commerce/settings')) { require_once __DIR__ . '/settings-proxy.php'; ez_admin_settings_proxy($accessToken, $path, $method); }
     if (str_starts_with($path, '/v1/commerce/messages')) { require_once __DIR__ . '/message-proxy.php'; ez_admin_message_proxy($accessToken, $path, $method); }
     if ($path === '/v1/shipping-address-search') {
         if ($method !== 'POST') ez_admin_json(['ok' => false, 'error' => 'Method not allowed.'], 405);
@@ -1314,6 +1315,7 @@ $catalogError = '';
 $sellerId = '';
 $advancedPlan = null;
 $adminLanguage = 'en';
+$storeDisplayPreferences = ['timezone' => 'Asia/Jakarta', 'dateFormat' => 'long'];
 $adminProfile = $authenticationMethod === 'supabase' ? null : ['logoId' => '', 'canEdit' => false];
 if ($authenticated && $authenticationMethod === 'supabase') {
     try {
@@ -1323,6 +1325,7 @@ if ($authenticated && $authenticationMethod === 'supabase') {
         $adminLanguage = preg_match('/^id(?:-|$)/i', (string) ($identity['user']['locale'] ?? 'en')) ? 'id' : 'en';
         $sellerId = (string) ($identity['user']['active_seller']['id'] ?? '');
         $activeSeller = $identity['user']['active_seller'] ?? [];
+        foreach ($storeDisplayPreferences as $key => $fallback) $storeDisplayPreferences[$key] = (string) ($activeSeller['businessProfile'][$key] ?? $fallback);
         $advancedPlan = ['enabled' => ($activeSeller['plan'] ?? 'standard') === 'advanced'];
         if ($sellerId !== '' && is_string($activeSeller['admin_logo_id'] ?? null)) {
             $adminProfile = [
@@ -1658,10 +1661,11 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
   <link rel="stylesheet" href="advanced.css?v=<?= (int) filemtime(__DIR__ . '/advanced.css') ?>">
   <?php if ($page === 'sites'): ?><link rel="stylesheet" href="builder-choice.css?v=<?= (int) filemtime(__DIR__ . '/builder-choice.css') ?>"><link rel="stylesheet" href="builder-image.css?v=<?= (int) filemtime(__DIR__ . '/builder-image.css') ?>"><?php endif; ?>
   <link rel="stylesheet" href="profile-logo.css?v=<?= (int) filemtime(__DIR__ . '/profile-logo.css') ?>">
+  <?php if ($page === 'settings'): ?><link rel="stylesheet" href="merchant-settings.css?v=<?= (int) filemtime(__DIR__ . '/merchant-settings.css') ?>"><?php endif; ?>
   <link rel="stylesheet" href="../select.css?v=<?= (int) filemtime(__DIR__ . '/../select.css') ?>">
   <title><?= $authenticated ? ez_admin_escape($pageTitles[$page]) : ($pendingMfa !== null ? 'Two-step verification' : 'Admin Login') ?> · Ezkart</title>
 </head>
-<body class="<?= $authenticated ? 'dashboard-page page-' . ez_admin_escape($page) . ($page === 'sites' ? ($siteEditor ? ' page-site-editor' : ' page-sites-library') : '') : 'login-page' ?>" data-admin-review-account="<?= ez_admin_escape((string) ($adminUser['id'] ?? '')) ?>" data-admin-language="<?= ez_admin_escape($adminLanguage) ?>" data-admin-advanced-mode="<?= !empty($advancedPlan['enabled']) ? 'true' : 'false' ?>" data-admin-landing-limit="<?= !empty($advancedPlan['enabled']) ? 24 : 6 ?>" data-admin-profile="<?= ez_admin_escape(json_encode($adminProfile)) ?>" data-admin-storage-scope="<?= ez_admin_escape($adminStorageScope) ?>" data-admin-checkout-brand="<?= ez_admin_escape($adminDisplayName) ?>" data-admin-migrate-legacy-storage="<?= $legacyDataAccess ? 'true' : 'false' ?>" data-admin-cloud-enabled="<?= $authenticated && $authenticationMethod === 'supabase' ? 'true' : 'false' ?>" data-admin-cloud-media-base="<?= $authenticated && $authenticationMethod === 'supabase' ? ez_admin_escape($cloudMediaBase) : '' ?>" data-admin-csrf-token="<?= ez_admin_escape($csrfToken) ?>">
+<body class="<?= $authenticated ? 'dashboard-page page-' . ez_admin_escape($page) . ($page === 'sites' ? ($siteEditor ? ' page-site-editor' : ' page-sites-library') : '') : 'login-page' ?>" data-admin-review-account="<?= ez_admin_escape((string) ($adminUser['id'] ?? '')) ?>" data-admin-date-preferences="<?= ez_admin_escape(json_encode($storeDisplayPreferences)) ?>" data-admin-language="<?= ez_admin_escape($adminLanguage) ?>" data-admin-advanced-mode="<?= !empty($advancedPlan['enabled']) ? 'true' : 'false' ?>" data-admin-landing-limit="<?= !empty($advancedPlan['enabled']) ? 24 : 6 ?>" data-admin-profile="<?= ez_admin_escape(json_encode($adminProfile)) ?>" data-admin-storage-scope="<?= ez_admin_escape($adminStorageScope) ?>" data-admin-checkout-brand="<?= ez_admin_escape($adminDisplayName) ?>" data-admin-migrate-legacy-storage="<?= $legacyDataAccess ? 'true' : 'false' ?>" data-admin-cloud-enabled="<?= $authenticated && $authenticationMethod === 'supabase' ? 'true' : 'false' ?>" data-admin-cloud-media-base="<?= $authenticated && $authenticationMethod === 'supabase' ? ez_admin_escape($cloudMediaBase) : '' ?>" data-admin-csrf-token="<?= ez_admin_escape($csrfToken) ?>">
 <?php if (!$authenticated): ?>
   <main class="login-shell">
     <?php if ($pendingMfa !== null): ?>
@@ -1836,7 +1840,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
         <span class="upgrade-icon"><?= ez_admin_icon($sidebarPromo['icon']) ?></span><div><b><?= ez_admin_escape($sidebarPromo['title']) ?></b><p><?= ez_admin_escape($sidebarPromo['description']) ?></p></div>
         <a href="<?= ez_admin_escape($sidebarPromo['href']) ?>"><?= ez_admin_escape($sidebarPromo['label']) ?></a>
       </section>
-      <div class="store-switcher"><span class="store-icon"><?= ez_admin_icon('store') ?></span><div><b>Ezkart <?= $commerceProduction ? 'Production' : 'Sandbox' ?></b><small><?= $commerceProduction ? 'DOKU checkout' : 'DOKU sandbox checkout' ?></small></div><?= ez_admin_icon('chevron-down', 'chevron-icon') ?></div>
+      <div class="store-switcher"><span class="store-icon"><?= ez_admin_icon('store') ?></span><div><b data-merchant-store-name title="<?= ez_admin_escape((string) ($activeSeller['name'] ?? 'Ezkart')) ?>"><?= ez_admin_escape((string) ($activeSeller['name'] ?? 'Ezkart')) ?></b><small><?= $commerceProduction ? 'DOKU checkout' : 'DOKU sandbox checkout' ?></small></div></div>
     </aside>
 
     <div class="workspace">
@@ -1964,6 +1968,8 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
   <?php if ($page === 'settings' && $mfaSetup !== null): ?><script src="assets/vendor/qrcode-generator.min.js"></script><?php endif; ?>
   <?php if ($page === 'sites'): ?><script src="builder-native-icons.js?v=<?= (int) filemtime(__DIR__ . '/builder-native-icons.js') ?>"></script><script src="builder-commerce.js?v=<?= (int) filemtime(__DIR__ . '/builder-commerce.js') ?>"></script><script src="builder-help.js?v=<?= (int) filemtime(__DIR__ . '/builder-help.js') ?>"></script><script src="builder-fonts.js?v=<?= (int) filemtime(__DIR__ . '/builder-fonts.js') ?>"></script><script src="builder-native.js?v=<?= (int) filemtime(__DIR__ . '/builder-native.js') ?>"></script><script src="builder-publish.js?v=<?= (int) filemtime(__DIR__ . '/builder-publish.js') ?>"></script><script src="builder-site-settings.js?v=<?= (int) filemtime(__DIR__ . '/builder-site-settings.js') ?>"></script><script src="builder-templates.js?v=<?= (int) filemtime(__DIR__ . '/builder-templates.js') ?>"></script><?php endif; ?><?php if ($page === 'sites' && $siteEditor): ?><script src="builder-backgrounds.js?v=<?= (int) filemtime(__DIR__ . '/builder-backgrounds.js') ?>"></script><script src="builder-components.js?v=<?= (int) filemtime(__DIR__ . '/builder-components.js') ?>"></script><script src="builder-asset-packs.js?v=<?= (int) filemtime(__DIR__ . '/builder-asset-packs.js') ?>"></script><script src="builder-assets.js?v=<?= (int) filemtime(__DIR__ . '/builder-assets.js') ?>"></script><script src="builder-assets-ui.js?v=<?= (int) filemtime(__DIR__ . '/builder-assets-ui.js') ?>"></script><script src="builder-showcase-data.js?v=<?= (int) filemtime(__DIR__ . '/builder-showcase-data.js') ?>"></script><script src="builder-showcase.js?v=<?= (int) filemtime(__DIR__ . '/builder-showcase.js') ?>"></script><?php endif; ?>
   <script src="dashboard-data.js?v=<?= (int) filemtime(__DIR__ . '/dashboard-data.js') ?>"></script>
+  <script src="admin-format.js?v=<?= (int) filemtime(__DIR__ . '/admin-format.js') ?>"></script>
+  <?php if ($page === 'settings'): ?><script src="merchant-settings.js?v=<?= (int) filemtime(__DIR__ . '/merchant-settings.js') ?>"></script><?php endif; ?>
   <?php if (in_array($page, ['inventory','products'], true)): ?><script src="inventory.js?v=<?= (int) filemtime(__DIR__ . '/inventory.js') ?>"></script><?php endif; ?>
   <?php if ($page === 'inventory'): ?><script src="inventory-reviews.js?v=<?= (int) filemtime(__DIR__ . '/inventory-reviews.js') ?>"></script><?php endif; ?>
   <?php if ($page === 'returns'): ?><script src="returns.js?v=<?= (int) filemtime(__DIR__ . '/returns.js') ?>"></script><?php endif; ?>

@@ -35,5 +35,14 @@
     if (cart) url.searchParams.set("cart", Object.entries(cart).map(([id, count]) => `${id}:${count}`).join(","));
     return url.href;
   };
-  window.EzkartStorefront = { escape, money, imageUrl, appearance, load, cartKey, readCart, saveCart, shopUrl, checkoutUrl };
+  function support(store,target,{description=true}={}) {
+    if(!target)return;target.replaceChildren();
+    const email=typeof store.supportEmail==='string'&&/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(store.supportEmail)?store.supportEmail:'',phone=/^\+[1-9][0-9]{7,14}$/.test(store.supportPhone||'')?store.supportPhone:'';
+    const copy=description&&typeof store.description==='string'?store.description:'';
+    target.hidden=!email&&!phone&&!copy;if(target.hidden)return;
+    const heading=document.createElement('h2');heading.textContent='About '+store.name;target.append(heading);
+    if(copy){const p=document.createElement('p');p.textContent=copy;target.append(p);}
+    for(const [value,href] of [[email,'mailto:'+encodeURIComponent(email)],[phone,'tel:'+phone]])if(value){const a=document.createElement('a');a.textContent=value;a.href=href;target.append(a);}
+  }
+  window.EzkartStorefront = { escape, money, imageUrl, appearance, load, cartKey, readCart, saveCart, shopUrl, checkoutUrl, support };
 })();

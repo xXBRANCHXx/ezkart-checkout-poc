@@ -2,7 +2,7 @@
   'use strict';
   const el=(tag,text,className)=>{const node=document.createElement(tag);if(text!==undefined)node.textContent=String(text);if(className)node.className=className;return node;};
   const button=(text,fn)=>{const node=el('button',text,'reviews-button');node.type='button';node.addEventListener('click',fn);return node;};
-  const date=value=>value&&Number.isFinite(Date.parse(value))?new Intl.DateTimeFormat('en-GB',{dateStyle:'medium',timeZone:'Asia/Jakarta'}).format(new Date(value)):'Date unavailable';
+  const date=value=>window.EzkartAdminFormat?window.EzkartAdminFormat.date(value,{time:false}):value&&Number.isFinite(Date.parse(value))?new Intl.DateTimeFormat('en-GB',{dateStyle:'medium',timeZone:'Asia/Jakarta'}).format(new Date(value)):'Date unavailable';
   const actionLabels={publish:'Published a review',withdraw:'Withdrew the review',reply:'Updated the store reply',hide:'Hid the review',restore:'Restored review visibility',approve:'Approved the review'};
   const stateLabels={published:'Published',hidden:'Hidden by store',pending:'Awaiting moderation',withdrawn:'Withdrawn by buyer'};
   function scope(){

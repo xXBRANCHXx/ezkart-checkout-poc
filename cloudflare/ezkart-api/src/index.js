@@ -35,6 +35,7 @@ import {uploadReviewPhoto,reviewPhoto,cleanupReviewPhotos} from './commerce-revi
 import {startConversation,sendMessage,conversationDetail,markConversationRead,messageInbox,messageStats,savedReplies,saveReply} from './commerce-messages.js';
 import {uploadMessagePhoto,messagePhoto,cleanupMessagePhotos} from './commerce-message-media.js';
 import {parseMessageJSON} from './message-json.js';
+import {merchantSettings,saveMerchantSettings,settingsHistory,publicStoreProfile} from './merchant-settings.js';
 import {merchantAnalytics} from './commerce-analytics.js';
 import {createAnalyticsExport,readAnalyticsExport,cleanupAnalyticsExports} from './commerce-analytics-exports.js';
 const json = (payload, status = 200, headers = {}) => new Response(JSON.stringify(payload), {
@@ -197,7 +198,7 @@ async function currentUser(request, env) {
   ).run();
   const profile = await env.DB.prepare("SELECT id, auth_user_id, email, display_name, avatar_url, locale, created_at, updated_at FROM app_users WHERE auth_user_id = ?").bind(user.id).first();
   let memberships = await env.DB.prepare(`
-    SELECT s.id, s.slug, s.name, s.plan, s.status, sm.role,
+    SELECT s.id, s.slug, s.name, s.plan, s.status, sm.role, s.settings_json AS profile_settings_json,
       COALESCE(json_extract(s.settings_json, '$.adminProfile.logoId'), '') AS admin_logo_id
     FROM seller_memberships sm
     JOIN sellers s ON s.id = sm.seller_id
@@ -229,7 +230,7 @@ async function currentUser(request, env) {
       `).bind(sellerId, user.id, now),
     ]);
     memberships = await env.DB.prepare(`
-      SELECT s.id, s.slug, s.name, s.plan, s.status, sm.role,
+      SELECT s.id, s.slug, s.name, s.plan, s.status, sm.role, s.settings_json AS profile_settings_json,
         COALESCE(json_extract(s.settings_json, '$.adminProfile.logoId'), '') AS admin_logo_id
       FROM seller_memberships sm
       JOIN sellers s ON s.id = sm.seller_id
@@ -238,7 +239,7 @@ async function currentUser(request, env) {
     `).bind(user.id).all();
   }
 
-  const sellers = Array.isArray(memberships.results) ? memberships.results : [];
+  const sellers = Array.isArray(memberships.results) ? memberships.results.map(({profile_settings_json,...row})=>({...row,businessProfile:publicStoreProfile({name:row.name,settings_json:profile_settings_json})})) : [];
   return { ...profile, sellers, active_seller: sellers[0] || null };
 }
 
@@ -1529,6 +1530,15 @@ export default {
       const landingViewMatch = /^\/v1\/landing-pages\/([a-z0-9-]+)\/view$/.exec(url.pathname);
       if (request.method === "GET" && landingViewMatch) return await landingPageView(request, env, landingViewMatch[1]);
       if (request.method === "GET" && url.pathname === "/health") return json(await health(env), 200, cors);
+      if(/^\/v1\/commerce\/settings(?:\/history)?$/.test(url.pathname)){
+        const user=await authenticatedUser(request,env),seller=await env.DB.prepare(`SELECT s.id FROM seller_memberships m JOIN sellers s ON s.id=m.seller_id WHERE m.auth_user_id=? AND s.status='active' ORDER BY m.created_at ASC LIMIT 1`).bind(user.id).first();
+        if(!seller)return json({ok:false,error:'Your store membership is no longer available'},403,cors);
+        if(request.headers.has('x-ezkart-settings-store')&&request.headers.get('x-ezkart-settings-store')!==seller.id)return json({ok:false,error:'Your active store changed. Reload this page.',code:'settings_session_changed'},409,cors);
+        const actor={id:user.id,sellerId:seller.id},history=url.pathname.endsWith('/history');
+        if(request.method==='GET'&&(history||!url.search))return json({ok:true,...await(history?settingsHistory(env,actor,url):merchantSettings(env,actor))},200,cors);
+        if(request.method==='POST'&&!history&&!url.search)return json({ok:true,...await saveMerchantSettings(env,actor,await reviewRequestJson(request,12000,parseMessageJSON))},200,cors);
+        return json({ok:false,error:'Method or parameters not allowed'},405,cors);
+      }
       const messageMatch=/^\/v1\/(customer|commerce)\/messages(?:\/(stats|replies|conv_[a-f0-9]{32})(?:\/(read|media)(?:\/(mphoto_[a-f0-9]{32}))?)?)?$/.exec(url.pathname);
       if(messageMatch){
         const [,audience,id,action,photo]=messageMatch;
