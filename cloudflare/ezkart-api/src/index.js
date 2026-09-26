@@ -38,6 +38,7 @@ import {parseMessageJSON} from './message-json.js';
 import {merchantSettings,saveMerchantSettings,settingsHistory,publicStoreProfile} from './merchant-settings.js';
 import {notificationInbox,notificationStats,readNotifications,notificationProcessing} from './commerce-notifications.js';
 import {dispatchNotifications,scheduleNotifications} from './commerce-notification-dispatch.js';
+import {dispatchEmails,recordEmailWebhook} from './commerce-email-delivery.js';
 import {merchantAnalytics} from './commerce-analytics.js';
 import {createAnalyticsExport,readAnalyticsExport,cleanupAnalyticsExports} from './commerce-analytics-exports.js';
 const json = (payload, status = 200, headers = {}) => new Response(JSON.stringify(payload), {
@@ -1461,6 +1462,16 @@ export default {
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
     const url = new URL(request.url);
     try {
+      const emailCallback=/^\/webhooks\/commerce-email\/resend\/([A-Za-z0-9][A-Za-z0-9_-]{2,63})$/.exec(url.pathname);
+      if(emailCallback){
+        if(url.search)return json({ok:false,error:'Email callback parameters are invalid'},422);
+        return json({ok:true,...await recordEmailWebhook(request,env,emailCallback[1])});
+      }
+      if(url.pathname==='/internal/commerce/email/drain'&&request.method==='POST'){
+        const input=await authenticateCommerceService(request,env);
+        if(url.search||Object.keys(input).some(k=>!['environment','limit'].includes(k))||input.environment!==(env.APP_ENVIRONMENT==='test'?'sandbox':'production')||input.limit!==undefined&&(!Number.isSafeInteger(input.limit)||input.limit<1||input.limit>2))return json({ok:false,error:'Email processing request is invalid'},422);
+        return json({ok:true,...await dispatchEmails(env,input.limit??2)});
+      }
       if(url.pathname==='/internal/commerce/notifications/drain'&&request.method==='POST'){
         const input=await authenticateCommerceService(request,env);
         if(url.search||Object.keys(input).some(k=>!['environment','limit','schedule'].includes(k))||input.environment!==(env.APP_ENVIRONMENT==='test'?'sandbox':'production')||input.schedule!==undefined&&typeof input.schedule!=='boolean'||input.limit!==undefined&&(!Number.isSafeInteger(input.limit)||input.limit<1||input.limit>3))return json({ok:false,error:'Notification processing request is invalid'},422);
@@ -1538,7 +1549,7 @@ export default {
       const landingViewMatch = /^\/v1\/landing-pages\/([a-z0-9-]+)\/view$/.exec(url.pathname);
       if (request.method === "GET" && landingViewMatch) return await landingPageView(request, env, landingViewMatch[1]);
       if (request.method === "GET" && url.pathname === "/health") return json(await health(env), 200, cors);
-      const noticeMatch=/^\/v1\/(customer|commerce)\/notifications(?:\/(stats|processing|read))?$/.exec(url.pathname);
+      const noticeMatch=/^\/v1\/(customer|commerce)\/notifications(?:\/(stats|processing|email|read))?$/.exec(url.pathname);
       if(noticeMatch){
         const user=await authenticatedUser(request,env);let actor={kind:'buyer',id:user.id};
         if(noticeMatch[1]==='commerce'){
@@ -1548,7 +1559,7 @@ export default {
           actor={kind:'merchant',id:user.id,sellerId:seller.id};
         }
         const action=noticeMatch[2];
-        if(request.method==='GET'&&action!=='read')return json({ok:true,...await(action==='stats'?notificationStats(env,actor,url):action==='processing'?notificationProcessing(env,actor,url):notificationInbox(env,actor,url))},200,cors);
+        if(request.method==='GET'&&action!=='read')return json({ok:true,...await(action==='stats'?notificationStats(env,actor,url):action==='processing'?notificationProcessing(env,actor,url):notificationInbox(env,actor,url,action==='email'?'email':'inbox'))},200,cors);
         if(request.method==='POST'&&action==='read'&&!url.search)return json({ok:true,...await readNotifications(env,actor,await reviewRequestJson(request,3000,parseMessageJSON))},200,cors);
         return json({ok:false,error:'Method or parameters not allowed'},405,cors);
       }
@@ -1846,6 +1857,9 @@ export default {
     }
   },
   async scheduled(controller, env, context) {
+    if(controller.cron==='*/2 * * * *'){
+      context.waitUntil(dispatchEmails(env));return;
+    }
     if(controller.cron==='* * * * *'){
       context.waitUntil((async()=>{await scheduleNotifications(env);await dispatchNotifications(env);})());return;
     }

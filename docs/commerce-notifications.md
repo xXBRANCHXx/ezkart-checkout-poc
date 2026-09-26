@@ -82,12 +82,12 @@ account changes in flight. The buyer's reused merchant sign-in is also rechecked
 
 ## Remaining acceptance
 
-Email currently records **requested intent only**, labeled “service not
-connected.” There is no claim of submission or delivery, no connected provider,
-and no real email is sent. The owner question about an existing transactional
-email service is still open. Verified addresses, provider adapter and credentials,
-template/content acceptance, signed delivery callbacks, bounce/complaint handling,
-retry/reconciliation, and appropriate consent/unsubscribe behavior remain open.
+The [email delivery follow-up](commerce-email-delivery.md) adds a durable Resend
+adapter, current confirmed account verification, exact-request retries, signed
+callbacks, suppression and private email history. TEST remains unconfigured and
+sends no real email. Buyer email preferences/delivery, provider and sender
+activation, real mailbox acceptance, campaign consent/unsubscribe and operational
+acceptance remain open. Earlier recipient records are not backfilled.
 
 The combined Settings/notifications gate remains unchecked. Hosted authenticated
 acceptance, actual scheduled delivery after central cutover, alerting for stalled

@@ -75,8 +75,9 @@ Default email choices are off. Weekly activity is off in both channels.
 The initial Settings rollout saved preferences and history with both delivery
 channels inactive. The [notification follow-up](commerce-notifications.md) now
 uses those choices for atomic in-app delivery and scheduled sources when central
-commerce and notifications are enabled. Email still records intent only; its
-provider is not connected and no real emails were sent during validation.
+commerce and notifications are enabled. The [email dispatcher](commerce-email-delivery.md) now consumes merchant email
+preferences with verified recipients, retries and signed delivery evidence. Its
+provider remains unconfigured; no real emails were sent during validation.
 
 The combined Settings/notifications acceptance gate stays open for external
 email delivery, authenticated hosted workflows, and operational acceptance.

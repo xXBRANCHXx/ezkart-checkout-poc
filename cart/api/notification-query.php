@@ -4,10 +4,10 @@ function ez_notification_target(string $target, string $method, bool $merchant):
 {
     if (strlen($target) > 2600 || str_contains($target, '#')) throw new InvalidArgumentException('Notification reference is invalid.');
     $parts = explode('?', $target, 2); $route = $parts[0];
-    if (!in_array($route, ['', '/stats', '/read', '/processing'], true) || ($route === '/processing' && !$merchant)
+    if (!in_array($route, ['', '/stats', '/read', '/processing', '/email'], true) || ($route === '/processing' && !$merchant)
         || ($method === 'POST' && ($route !== '/read' || isset($parts[1]))) || ($method === 'GET' && $route === '/read')
         || !in_array($method, ['GET','POST'], true)) throw new InvalidArgumentException('Notification method is invalid.');
-    $allowed = $route === '' ? ['category','state','q','cursor'] : ($route === '/processing' ? ['state','cursor'] : []);
+    $allowed = $route === '' ? ['category','state','q','cursor'] : ($route === '/processing' ? ['state','cursor'] : ($route === '/email' ? ['category','q','cursor'] : []));
     $query = [];
     foreach (explode('&', $parts[1] ?? '') as $pair) {
         if ($pair === '') continue; $values = explode('=', $pair, 2); $key = urldecode($values[0]); $value = urldecode($values[1] ?? '');

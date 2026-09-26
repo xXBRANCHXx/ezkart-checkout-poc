@@ -4,8 +4,9 @@
   if (!root) return;
   const config = JSON.parse(root.dataset.config), q = selector => root.querySelector(selector);
   const labels = {payment_confirmed:'Payment confirmed',payment_pending:'Payment pending',payment_failed:'Payment unsuccessful',payment_review:'Payment review',shipping:'Shipping',returns:'Returns',messages:'Messages',weekly_activity:'Weekly activity'};
-  const sourceLabels = {'notification.order_state':'Payment update','notification.payment_pending':'Pending payment reminder','notification.payment_review':'Payment review','notification.stock_recovered':'Stock review resolved','notification.shipment_updated':'Shipping update','notification.return_updated':'Return update','notification.message_received':'New message','notification.weekly_activity':'Weekly activity'};
+  const sourceLabels = {'notification.order_state':'Payment update','notification.payment_pending':'Pending payment reminder','notification.payment_review':'Payment review','notification.stock_recovered':'Stock review resolved','notification.shipment_updated':'Shipping update','notification.return_updated':'Return update','notification.message_received':'New message','notification.weekly_activity':'Weekly activity','notification.send':'Email delivery'};
   const form = q('[data-notice-filters]'), processForm = q('[data-notice-process-filters]');
+  let listChannel = 'inbox';
   let stopped = false, enabled = false, view = 'inbox', items = [], cursor = null, processing = [], processCursor = null;
   let listVersion = 0, processVersion = 0, statsVersion = 0, listBusy = false, processBusy = false, readBusy = false, pendingRead = null, latestStats = null;
   let applied = {q:'',category:'',state:'all'}, processState = 'attention';
@@ -54,8 +55,8 @@
   function empty(list, title, body) {const li=node('li','','notice-empty'); li.append(node('strong',title),node('p',body)); list.append(li);}
   function render() {
     const list=q('[data-notice-list]'); list.replaceChildren();
-    for(const item of items){const li=node('li','','notice-card'); li.dataset.notificationId=item.id; li.dataset.unread=String(!item.readAt);
-      const heading=node('div','','notice-card-header'); heading.append(node('span',labels[item.category]||'Update','notice-category')); if(!item.readAt)heading.append(node('span','Unread','notice-unread'));
+    for(const item of items){const li=node('li','','notice-card'); li.dataset.notificationId=item.id; li.dataset.unread=String(view!=='email'&&!item.readAt);
+      const heading=node('div','','notice-card-header'); heading.append(node('span',labels[item.category]||'Update','notice-category')); if(view!=='email'&&!item.readAt)heading.append(node('span','Unread','notice-unread'));
       li.append(heading,node('h2',item.title),node('p',item.body,'notice-body'));
       const meta=node('p',(config.merchant?'':item.storeName+' · ')+date(item.createdAt),'notice-meta');li.append(meta);
       if(item.category==='weekly_activity'&&item.data?.products?.length){const detail=node('div','','notice-details');detail.append(node('p','Products without a paid order during this period'));
@@ -65,18 +66,18 @@
       const actions=node('div','','notice-card-footer'), link=node('a',item.category==='messages'?'Open conversation':item.category==='weekly_activity'?'View products':item.category==='returns'&&config.merchant?'View return':'View order');
       // Destinations are private, same-origin routes constructed by the API.
       if(typeof item.href==='string'&&/^\/cart\/(?:admin\/\?|messages\.php\?|return\.php\?|$)/.test(item.href)){link.href=item.href;actions.append(link);}
-      if(!item.readAt){const button=node('button','Mark as read');button.type='button';button.dataset.noticeRead=String(item.id);button.addEventListener('click',()=>void markRead([item.id]));actions.append(button);}
-      else actions.append(node('span','Read','notice-meta'));
-      li.append(actions); if(item.emailStatus==='not_connected')li.append(node('p','Email requested · service not connected','notice-meta'));list.append(li);
+      if(view!=='email'&&!item.readAt){const button=node('button','Mark as read');button.type='button';button.dataset.noticeRead=String(item.id);button.addEventListener('click',()=>void markRead([item.id]));actions.append(button);}
+      else if(view!=='email')actions.append(node('span','Read','notice-meta'));
+      li.append(actions); if(item.email?.label&&item.email.status!=='not_requested'){li.append(node('p',item.email.label,'notice-meta'));if(item.email.note)li.append(node('p',item.email.note,'notice-meta'));}list.append(li);
     }
-    if(!items.length)empty(list,'You’re all caught up',applied.q||applied.category||applied.state!=='all'?'No updates match these filters.':'New updates will appear here when they are delivered.');
-    text('[data-notice-result]',count(items.length)+(items.length===1?' notification shown':' notifications shown'));q('[data-notice-more]').hidden=!cursor;controls();
+    if(!items.length)empty(list,view==='email'?'No email updates to show':'You’re all caught up',applied.q||applied.category||applied.state!=='all'?'No updates match these filters.':view==='email'?'Email requests will appear here when an update matches your saved email preferences.':'New updates will appear here when they are delivered.');
+    text('[data-notice-result]',count(items.length)+(view==='email'?(items.length===1?' email update shown':' email updates shown'):(items.length===1?' notification shown':' notifications shown')));q('[data-notice-more]').hidden=!cursor;controls();
   }
   async function load(more = false) {
     const version=++listVersion, filters=more?applied:{q:form.elements.q.value.trim(),category:form.elements.category.value,state:form.elements.state.value};
     listBusy=true;controls();text('[data-notice-error]','');
-    const query=new URLSearchParams(filters);if(more&&cursor)query.set('cursor',cursor);
-    try{const data=await api('?'+query);if(stopped||version!==listVersion)return;
+    const query=new URLSearchParams(filters);if(view==='email'){query.delete('state');filters.state='all';}if(more&&cursor)query.set('cursor',cursor);
+    try{const data=await api((view==='email'?'/email':'')+'?'+query);if(stopped||version!==listVersion)return;
       const received=data.items.map(item=>confirmedReads.has(item.id)?{...item,readAt:item.readAt||confirmedReads.get(item.id)}:item).filter(item=>filters.state!=='unread'||!item.readAt);
       applied=filters;items=more?[...items,...received.filter(item=>!items.some(old=>old.id===item.id))]:received;cursor=data.nextCursor;
       deliveryState(data.enabled);render();if(!more)text('[data-notice-live]','');
@@ -87,7 +88,7 @@
     const version=++statsVersion;
     try{const data=await api('/stats');if(stopped||version!==statsVersion)return;
       if(quiet&&latestStats&&data.total>latestStats.total)text('[data-notice-live]','New updates are available. Refresh to see them.');
-      latestStats=data;deliveryState(data.enabled);text('[data-notice-count]',count(data.unread)+' unread');text('[data-notice-total]',count(data.total)+' total updates');emitStats(data);
+      latestStats=data;deliveryState(data.enabled);text('[data-notice-count]',count(data.unread)+' unread');text('[data-notice-total]',count(data.total)+' in-app updates');emitStats(data);
     }catch(error){if(!stopped&&version===statsVersion){text('[data-notice-count]',quiet?'Unread count unavailable':'Could not load unread count');if(!quiet)text('[data-notice-error]',error.message);}}
   }
   async function markRead(ids) {
@@ -104,12 +105,14 @@
   function renderProcessing() {
     const list=q('[data-notice-process-list]');list.replaceChildren();
     const states={queued:'Queued',running:'Processing',retry:'Retry scheduled',uncertain:'Checking saved result',dead:'Needs operator review',succeeded:'Processed'};
+    const emailStates={not_connected:'Service not connected',not_scheduled:'Not scheduled',queued:'Queued',sending:'Submitting',checking:'Checking submission',retry:'Retry scheduled',submitted:'Submitted',delivered:'Delivered',delayed:'Delayed',failed:'Failed',bounced:'Bounced',complained:'Complaint received',suppressed:'Blocked by provider',needs_review:'Needs operator review',skipped:'Skipped'};
     const suppressed={not_actionable:'No alert was needed for this update.',obsolete:'The order changed before this reminder was delivered.',store_closed:'Delivery was skipped because the store is closed.'};
     for(const item of processing){const li=node('li','','notice-card');li.dataset.notificationJob=item.id;
-      const heading=node('div','','notice-card-header');heading.append(node('span',sourceLabels[item.kind]||'Store update','notice-category'),node('span',states[item.state]||item.state,'notice-meta'));li.append(heading);
+      const heading=node('div','','notice-card-header');heading.append(node('span',sourceLabels[item.kind]||'Store update','notice-category'),node('span',item.email?(emailStates[item.email.status]||'Email status unavailable'):(states[item.state]||item.state),'notice-meta'));li.append(heading);
       li.append(node('h2',item.orderId||sourceLabels[item.kind]||'Store update'),node('p',date(item.createdAt)+' · '+count(item.attempts)+(item.attempts===1?' processing attempt':' processing attempts'),'notice-meta'));
       if(item.suppression)li.append(node('p',suppressed[item.suppression]||'Delivery skipped.','notice-body'));
-      else if(item.state==='succeeded'||item.deliveredInApp>0||item.emailWaiting>0)li.append(node('p',count(item.deliveredInApp)+(item.deliveredInApp===1?' in-app inbox reached':' in-app inboxes reached')+(item.emailWaiting?' · '+count(item.emailWaiting)+(item.emailWaiting===1?' email request awaiting a connected service':' email requests awaiting a connected service'):'.'),'notice-body'));
+      else if(item.email){li.append(node('p',item.email.label||'Email delivery status unavailable','notice-body'));if(item.email.note)li.append(node('p',item.email.note,'notice-meta'));}
+      else if(item.state==='succeeded'||item.deliveredInApp>0||item.emailRequested>0)li.append(node('p',count(item.deliveredInApp)+(item.deliveredInApp===1?' in-app inbox reached':' in-app inboxes reached')+(item.emailRequested?' · '+count(item.emailRequested)+(item.emailRequested===1?' email requested':' emails requested'):'.'),'notice-body'));
       if(item.message)li.append(node('p',item.message,'notice-body'));
       if(['retry','uncertain'].includes(item.state))li.append(node('p','Next check: '+date(item.nextAttemptAt),'notice-meta'));
       if(item.orderId){const link=node('a','View order');link.href='/cart/admin/?page=orders&order='+encodeURIComponent(item.orderId);li.append(link);}list.append(li);
@@ -127,11 +130,14 @@
   }
   function updateURL() {
     const url=new URL(location.href);for(const key of ['q','category','state']){const value=form.elements[key].value;if(value&&value!=='all')url.searchParams.set(key,value);else url.searchParams.delete(key);}
-    if(view==='processing'){url.searchParams.set('view','processing');url.searchParams.set('delivery',processForm.elements.state.value);}else{url.searchParams.delete('view');url.searchParams.delete('delivery');}
+    if(view==='processing'){url.searchParams.set('view','processing');url.searchParams.set('delivery',processForm.elements.state.value);}else{url.searchParams.delete('delivery');if(view==='email'){url.searchParams.set('view','email');url.searchParams.delete('state');}else url.searchParams.delete('view');}
     if(url.href!==location.href)history.pushState(null,'',url);
   }
   function showView(next, fetchData = true) {
-    view=config.merchant&&next==='processing'?'processing':'inbox';q('[data-notice-inbox]').hidden=view!=='inbox';if(config.merchant)q('[data-notice-processing]').hidden=view!=='processing';
+    view=config.merchant&&['processing','email'].includes(next)?next:'inbox';q('[data-notice-inbox]').hidden=view==='processing';if(config.merchant)q('[data-notice-processing]').hidden=view!=='processing';
+    q('[data-notice-read-filter]').hidden=view==='email';q('[data-notice-mark]').hidden=view==='email';q('[data-notice-email-info]').hidden=view!=='email';
+    form.classList.toggle('notice-email-filter',view==='email');
+    if(view!=='processing'&&listChannel!==view){listChannel=view;items=[];cursor=null;render();}
     for(const button of root.querySelectorAll('[data-notice-view]'))button.setAttribute('aria-pressed',String(button.dataset.noticeView===view));
     if(fetchData)void(view==='processing'?loadProcessing():load());
   }

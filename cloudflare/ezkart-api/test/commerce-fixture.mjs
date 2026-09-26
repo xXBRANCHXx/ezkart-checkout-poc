@@ -12,14 +12,14 @@ export const fixtureShipping={amount:18000,skipped:false,courierCode:'jne',servi
   origin:{origin_contact_name:shippingAddress.name,origin_contact_phone:shippingAddress.phone,origin_contact_email:'',origin_address:shippingAddress.address+', '+shippingAddress.location,origin_postal_code:shippingAddress.postalCode,origin_note:'',shipper_organization:''},
   destination:{location:'Jakarta',address:'Jalan Saved Destination 12',postalCode:'12345',coordinate:{latitude:-6.2,longitude:106.8}},quote:{courier:'JNE',service:'Regular',courier_company:'jne',courier_type:'reg',price:18000}};
 
-export async function setupCommerceFixture(t,{through=Infinity,notifications='off'}={}) {
+export async function setupCommerceFixture(t,{through=Infinity,notifications='off',bindings={},outbound}={}) {
   const key = await crypto.subtle.generateKey({name: 'ECDSA', namedCurve: 'P-256'}, true, ['sign', 'verify']);
   const publicKey = {...await crypto.subtle.exportKey('jwk', key.publicKey), kid: 'catalog-fixture', alg: 'ES256'};
   const bundle = await build({entryPoints: [new URL('../src/index.js', import.meta.url).pathname], bundle: true, write: false, format: 'esm', platform: 'neutral'});
   const mf = new Miniflare(convertV4MiniflareOptions({modules: true, script: bundle.outputFiles[0].text,
     compatibilityDate: '2026-08-11', d1Databases: ['DB'], r2Buckets: ['PUBLIC_ASSETS', 'PRIVATE_ASSETS'],
-    bindings: {APP_ENVIRONMENT: 'test', COMMERCE_STORAGE: 'd1', COMMERCE_NOTIFICATIONS:notifications, COMMERCE_SERVICE_SECRET: secret, SUPABASE_URL: 'https://auth.fixture.test'},
-    outboundService: async () => Response.json({keys: [publicKey]})}));
+    bindings: {APP_ENVIRONMENT: 'test', COMMERCE_STORAGE: 'd1', COMMERCE_NOTIFICATIONS:notifications, COMMERCE_SERVICE_SECRET: secret, SUPABASE_URL: 'https://auth.fixture.test',...bindings},
+    outboundService: async request => new URL(request.url).pathname==='/auth/v1/.well-known/jwks.json'||!outbound?Response.json({keys: [publicKey]}):outbound(request)}));
   t.after(() => mf.dispose());
   const db = await mf.getD1Database('DB');
   await applyCommerceSchema(db,0,through);

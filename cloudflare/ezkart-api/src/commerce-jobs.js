@@ -3,6 +3,7 @@ import {notificationSourceKinds} from './notification-policy.js';
 
 const fail = (message, status = 422) => { throw new Response(message, {status}); };
 const kinds = ['payment.create', 'shipment.create', 'shipment.cancel', 'shipment.refresh', ...notificationSourceKinds, 'notification.send', 'payout.create', 'wallet.register'];
+const boundedNotificationKinds=[...notificationSourceKinds,'notification.send'];
 const validId = value => typeof value === 'string' && /^[A-Za-z0-9_-]{3,100}$/.test(value);
 const view = row => ({id: row.id, sellerId: row.seller_id, orderId: row.order_id, environment: row.commerce_environment,
   kind: row.kind, state: row.state, data: JSON.parse(row.payload_json), attempts: row.attempts,
@@ -31,7 +32,7 @@ export async function claimCommerceJobs(env, input) {
     env.DB.prepare(`UPDATE commerce_jobs SET state = CASE WHEN kind IN (SELECT value FROM json_each(?)) AND attempts>=maximum_attempts THEN 'dead' ELSE 'uncertain' END,
       last_error = 'Worker lease expired; review the saved result before retrying',
       lease_token = NULL, lease_owner = NULL, lease_until = NULL, lease_mode = NULL, updated_at = ?
-      WHERE commerce_environment = ? AND state = 'running' AND lease_until <= ?`).bind(JSON.stringify(notificationSourceKinds), now, environment, now),
+      WHERE commerce_environment = ? AND state = 'running' AND lease_until <= ?`).bind(JSON.stringify(boundedNotificationKinds), now, environment, now),
     env.DB.prepare(`UPDATE commerce_jobs SET state = 'running', attempts = attempts + 1,
       lease_token = ?, lease_owner = ?, lease_until = ?, lease_mode = ?, completion_hash = NULL, updated_at = ?
       WHERE id IN (SELECT id FROM commerce_jobs WHERE commerce_environment = ?
@@ -80,6 +81,10 @@ export async function finishCommerceJob(env, jobId, input) {
   if(notificationSourceKinds.includes(row.kind)&&input.outcome==='succeeded'&&!await env.DB.prepare('SELECT id FROM commerce_notification_events WHERE job_id=?').bind(row.id).first()){
     fail('Record the notification and its recipients before completing this job',409);
   }
+  if(row.kind==='notification.send'&&input.outcome==='succeeded'&&!await env.DB.prepare(`SELECT x.id FROM commerce_email_requests x JOIN commerce_email_provider_bindings b ON b.request_id=x.id WHERE x.job_id=?
+    UNION ALL SELECT job_id FROM commerce_email_skips WHERE job_id=? AND uncertain=0 LIMIT 1`).bind(row.id,row.id).first()){
+    fail('Record the email submission or a confirmed no-send decision before completing this job',409);
+  }
   if(row.kind==='wallet.register'&&input.outcome==='succeeded'){
     const recorded=await env.DB.prepare(`SELECT p.enrollment_id FROM commerce_wallet_provider_profiles p JOIN commerce_wallet_enrollments e ON e.id=p.enrollment_id
       WHERE e.job_id=? AND e.commerce_environment=?`).bind(row.id,environment).first();
@@ -102,7 +107,7 @@ export async function finishCommerceJob(env, jobId, input) {
   // Only a proven no-effect failure can enter ordinary retry. Network timeout,
   // missing response or a crashed worker requires a provider-status check.
   if (input.outcome === 'retry' && result.noEffectConfirmed !== true) fail('Confirm the provider performed no action before retrying', 409);
-  const exhausted = row.attempts >= row.maximum_attempts && (input.outcome === 'retry' || (input.outcome === 'uncertain' && notificationSourceKinds.includes(row.kind)));
+  const exhausted = row.attempts >= row.maximum_attempts && (input.outcome === 'retry' || (input.outcome === 'uncertain' && boundedNotificationKinds.includes(row.kind)));
   const state = exhausted ? 'dead' : input.outcome;
   const delay = state === 'retry' ? Math.min(3600, 15 * 2 ** Math.min(row.attempts - 1, 8)) : state === 'uncertain' ? 60 : 0;
   const available = new Date(Date.now() + delay * 1000).toISOString();

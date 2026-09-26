@@ -64,6 +64,22 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 26 September: durable merchant email delivery
+
+Implemented a Resend adapter with fresh confirmed Supabase identity checks,
+immutable request/send-start/evidence records, exact-byte idempotent retries,
+signed callbacks, early-callback recovery, bounce/complaint suppression and
+conservative retry exhaustion. Personal email history includes email-only
+preferences. Store activity exposes real failures and stalled jobs without
+recipient addresses or raw provider data. Templates and desktop/phone flows
+are checked using isolated provider fixtures.
+
+See [commerce-email-delivery.md](commerce-email-delivery.md) for the contract,
+configuration and recovery limits. This does not activate an email provider or
+send real mail. Buyer email preferences/delivery, actual provider/mailbox
+acceptance, campaigns and operational monitoring remain open. No completion
+gate is closed by this delivery. Rollout evidence follows verification below.
+
 ### 26 September: private transactional notification inboxes
 
 Implemented merchant and buyer inboxes, the real unread bell, contextual links,
@@ -75,7 +91,8 @@ Lost acknowledgements reconcile the original delivery; exhausted retries are
 visible for review. Source dispatch uses bounded scheduled batches.
 
 See [commerce-notifications.md](commerce-notifications.md) for behavior, recovery,
-privacy, schedule and limits. Email still records intent without a provider.
+privacy, schedule and limits. At that delivery, email recorded intent only;
+the follow-up above adds the unconfigured adapter.
 Hosted authenticated acceptance, actual scheduling after central cutover,
 monitoring, email delivery and sustained load tests remain open. The combined
 Settings/notifications gate and all top-level release gates remain unchecked.
