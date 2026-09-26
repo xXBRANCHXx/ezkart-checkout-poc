@@ -1,3 +1,4 @@
+import {campaignMailLink} from './campaign-attribution.js';
 import {commerceHash} from './commerce-orders.js';
 import {claimCommerceJobs,finishCommerceJob} from './commerce-jobs.js';
 import {campaignEmailConfiguration,emailCredentialHash,verifiedEmailRecipient,sendResendCampaignEmail,emailProviderId} from './email-provider.js';
@@ -64,7 +65,8 @@ export async function deliverCampaignEmailJob(env,job,workerId,fetcher=fetch){
   if(!request){
     const id='campmail_'+(await commerceHash({candidate:row.candidate_id,publication:row.publication_id,environment:job.environment})).slice(0,32);
     const link=await prepareCampaignUnsubscribe(env,{sellerId:row.seller_id,authUserId:row.auth_user_id,email:recipient.email,reference:id,consentRevision:row.consent_revision});
-    const payload=campaignEmailPayload(configuration,{sellerId:row.seller_id,storeName:row.store_name,shopEnabled:Boolean(row.shop_enabled),values:JSON.parse(row.data_json)},recipient.email,id,link.url);
+    const storeLink=JSON.parse(row.data_json).buttonLabel?await campaignMailLink(env,row.publication_id):null;
+    const payload=campaignEmailPayload(configuration,{sellerId:row.seller_id,storeName:row.store_name,shopEnabled:Boolean(row.shop_enabled),values:JSON.parse(row.data_json)},recipient.email,id,link.url,storeLink);
     const created=at(),key='ezkart_campaign/'+job.environment+'/'+id;
     try{await env.DB.batch([link.statement,env.DB.prepare(`INSERT INTO commerce_campaign_email_requests(id,job_id,candidate_id,seller_id,commerce_environment,profile_id,credential_hash,source_lease_token,
       sender_email,recipient_email,email_hash,confirmed_at,verified_at,unsubscribe_hash,idempotency_key,request_json,request_hash,template_version,created_at,retry_until)

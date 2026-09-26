@@ -1,3 +1,4 @@
+import {campaignVisitHash} from './campaign-attribution.js';
 import {checkoutContext,paymentSession,paymentSessionStatements,paymentAccountStatement} from './commerce-payments.js';
 import {validateShippingSettings} from './shipping-settings.js';
 import {parseMessageJSON} from './message-json.js';
@@ -205,7 +206,9 @@ export async function createCommerceOrder(env, payload) {
   });
   const subtotal = integer(items.reduce((total, item) => total + item.price * item.quantity, 0), 100000000000, 'Order subtotal', 1);
   const total = integer(subtotal + input.shipping.amount, 100000000000, 'Order total', 1);
-  const snapshot = {checkout:input.checkout,shipping: input.shipping, fees: {version: 1, plan: seller.plan,
+  const {campaignVisit,...checkout}=input.checkout;
+  if(campaignVisit)checkout.campaignVisitHash=await campaignVisitHash(campaignVisit,input.environment);
+  const snapshot = {checkout,shipping: input.shipping, fees: {version: 1, plan: seller.plan,
     commissionBasisPoints: seller.plan === 'advanced' ? 600 : 500, adminAmount: 1250,
     commissionAmount: Math.round(subtotal * (seller.plan === 'advanced' ? 600 : 500) / 10000),
     processingFeePolicy: 'actual_provider_fee', withdrawalMinimum: 250000, sellerWithdrawalFee: 0}};

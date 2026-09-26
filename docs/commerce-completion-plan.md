@@ -64,6 +64,27 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 27 September: anonymous campaign links and durable order attribution
+
+New campaign messages carry a shared publication link through the store and cart
+to an immutable order source. Checkout retries, lost responses, expired links,
+store ownership and transaction rollback are covered. Old saved message bytes
+and existing delivery CSV receipts remain unchanged. Browser verification caught
+and fixed a remembered return URL carrying the source into later sessions.
+
+See [campaign-attribution.md](campaign-attribution.md). All twelve new backend
+cases, 79 existing campaign/order regression cases, and 19 relevant PHP/browser
+cases pass; desktop and 390px layouts, syntax, diff and TEST dry-run are checked.
+The fresh 579,402-byte TEST backup restores all 114 existing physical tables
+unchanged, with valid integrity and no foreign-key errors. Migration 0039 adds
+31 objects, changes no existing schema object, and compiles all 67 compatibility
+query plans. Its SHA-256 is
+`c8843d133a6d429d3f77ebf14dce6fab0aba98d2e964780f263c3822b3f60e87`.
+
+Verified conversion/performance reporting and exports, marketing automation and
+hosted/provider/capacity acceptance remain open. All thirteen completion gates
+remain open. Sending, central-commerce and production release holds continue.
+
 ### 27 September: campaign delivery and permission reports
 
 Implemented store-local publication periods, equal previous-period comparisons,

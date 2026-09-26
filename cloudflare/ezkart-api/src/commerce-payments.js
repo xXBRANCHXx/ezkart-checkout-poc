@@ -5,7 +5,8 @@ export function checkoutContext(input,environment){
   if(!['direct_bca','hosted'].includes(input.paymentFlow)||(environment==='production'&&input.paymentFlow!=='hosted'))fail('Payment flow is unavailable');
   const shop=input.shop||'';
   if(typeof shop!=='string'||(shop&&!/^[a-z0-9][a-z0-9_-]{5,79}$/.test(shop)))fail('Checkout store reference is invalid');
-  return {intentHash:input.intentHash,paymentFlow:input.paymentFlow,shop};
+  if(input.campaignVisit!==undefined&&(typeof input.campaignVisit!=='string'||!/^[a-f0-9]{64}$/.test(input.campaignVisit)))fail('Campaign visit reference is invalid');
+  return {intentHash:input.intentHash,paymentFlow:input.paymentFlow,shop,...(input.campaignVisit===undefined?{}:{campaignVisit:input.campaignVisit})};
 }
 
 export function paymentSession(order,data){

@@ -139,6 +139,9 @@
     const shopReturn = hostedStore?.enabled ? new URL(window.EzkartStorefront.shopUrl(hostedStore), location.origin).href : "";
     state.returnUrl = hostedEntry && shopReturn ? shopReturn : explicitReturn || referringPage || storedReturn || shopReturn;
     const shop = { name, logo, returnUrl: state.returnUrl };
+    // Keep the current visit in navigation, but never remember it in branding
+    // for later shopping sessions. Checkout recovery retains its original body.
+    try { const remembered = new URL(shop.returnUrl); remembered.searchParams.delete('campaign_visit'); shop.returnUrl = remembered.href; } catch (_) {}
     saveShop(shop);
     try { sessionStorage.setItem("ezkart.checkout.brand", JSON.stringify({ ...shop, scope: state.shop })); } catch (_) {}
 
@@ -548,6 +551,8 @@
         shipping_id: state.shipping?.id || "",
       };
       if (state.durableCheckout) {
+        const campaignVisit = window.EzkartStorefront.campaignVisit(hostedStore);
+        if (campaignVisit) body.campaign_visit = campaignVisit;
         body.checkout_key = [...crypto.getRandomValues(new Uint8Array(16))].map(value => value.toString(16).padStart(2, "0")).join("");
         body.expected_prices = Object.fromEntries(cartEntries().map(([id]) => [id, Number(state.products[id].price)]));
         body.expected_total = total();

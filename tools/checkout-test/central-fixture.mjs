@@ -20,7 +20,9 @@ export async function setupCentralFixture(t, overrides = {}, commerce = {}) {
         const data = JSON.parse(responseBody.toString()); if (data.order) data.order.createdAt = new Date(Date.now() - 120000).toISOString(); responseBody = Buffer.from(JSON.stringify(data));
       }
       if (control.drop && req.url === control.drop) { control.drop = ''; res.writeHead(503); res.end('lost response'); return; }
-      res.writeHead(response.status, {'content-type': response.headers.get('content-type') || 'application/json', 'cache-control': response.headers.get('cache-control') || 'no-store'}); res.end(responseBody);
+      const responseHeaders={'content-type':response.headers.get('content-type')||'application/json','cache-control':response.headers.get('cache-control')||'no-store'};
+      for(const name of ['x-ezkart-campaign-store','x-ezkart-campaign-environment'])if(response.headers.has(name))responseHeaders[name]=response.headers.get(name);
+      res.writeHead(response.status,responseHeaders); res.end(responseBody);
     } catch (error) { res.writeHead(500); res.end(JSON.stringify({ok: false, error: error.message})); }
   });
   await new Promise(resolve => relay.listen(0, '127.0.0.1', resolve));

@@ -2,7 +2,7 @@
 declare(strict_types=1);
 // Test-only transport loaded by PHP -n. No provider network calls are possible.
 if (extension_loaded('curl') || !getenv('EZKART_TEST_CAPTURE')) throw new RuntimeException('Unsafe test transport setup.');
-foreach (['CURLOPT_ENCODING', 'CURLOPT_POST', 'CURLOPT_POSTFIELDS', 'CURLOPT_HTTPHEADER', 'CURLOPT_RETURNTRANSFER', 'CURLOPT_CONNECTTIMEOUT', 'CURLOPT_TIMEOUT', 'CURLOPT_SSL_VERIFYPEER', 'CURLINFO_HTTP_CODE', 'CURLINFO_RESPONSE_CODE', 'CURLOPT_FOLLOWLOCATION', 'CURLOPT_CUSTOMREQUEST', 'CURLOPT_HEADERFUNCTION', 'CURLINFO_CONTENT_TYPE', 'CURLOPT_SSL_VERIFYHOST', 'CURLOPT_WRITEFUNCTION', 'CURLOPT_PROTOCOLS', 'CURLPROTO_HTTPS'] as $index => $constant) define($constant, $index + 1);
+foreach (['CURLOPT_ENCODING', 'CURLOPT_POST', 'CURLOPT_POSTFIELDS', 'CURLOPT_HTTPHEADER', 'CURLOPT_RETURNTRANSFER', 'CURLOPT_CONNECTTIMEOUT', 'CURLOPT_TIMEOUT', 'CURLOPT_SSL_VERIFYPEER', 'CURLINFO_HTTP_CODE', 'CURLINFO_RESPONSE_CODE', 'CURLOPT_FOLLOWLOCATION', 'CURLOPT_CUSTOMREQUEST', 'CURLOPT_HEADERFUNCTION', 'CURLINFO_CONTENT_TYPE', 'CURLOPT_SSL_VERIFYHOST', 'CURLOPT_WRITEFUNCTION', 'CURLOPT_PROTOCOLS', 'CURLPROTO_HTTPS', 'CURLOPT_NOBODY'] as $index => $constant) define($constant, $index + 1);
 function curl_init(string $url): object { return (object) ['url' => $url, 'options' => [], 'status' => 200]; }
 function curl_setopt_array(object $handle, array $options): bool { $handle->options = $options; return true; }
 function curl_setopt(object $handle, int $option, mixed $value): bool { $handle->options[$option] = $value; return true; }
@@ -31,7 +31,10 @@ function curl_exec(object $handle): string|bool {
         $response = @file_get_contents($relay . $path, false, $context);
         $responseHeaders = http_get_last_response_headers();
         $handle->status = preg_match('#^HTTP/\S+ (\d+)#', $responseHeaders[0] ?? '', $matches) ? (int) $matches[1] : 503;
-        foreach ($responseHeaders as $header) if (stripos($header, 'Content-Type:') === 0) $handle->contentType = trim(substr($header, 13));
+        foreach ($responseHeaders as $header) {
+            if (stripos($header, 'Content-Type:') === 0) $handle->contentType = trim(substr($header, 13));
+            if (isset($handle->options[CURLOPT_HEADERFUNCTION])) ($handle->options[CURLOPT_HEADERFUNCTION])($handle, $header . "\r\n");
+        }
         if ($response === false) return '';
         if (isset($handle->options[CURLOPT_WRITEFUNCTION])) return ($handle->options[CURLOPT_WRITEFUNCTION])($handle, $response) === strlen($response);
         return $response;

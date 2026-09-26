@@ -27,11 +27,16 @@
   const cartKey = store => `ezkart.checkout.cart.v1:${store.cartScope}`;
   const readCart = store => { try { const value = JSON.parse(localStorage.getItem(cartKey(store)) || "{}"); return value && typeof value === "object" && !Array.isArray(value) ? value : {}; } catch { return {}; } };
   const saveCart = (store, cart) => { try { localStorage.setItem(cartKey(store), JSON.stringify(cart)); } catch {} };
-  const shopUrl = store => `/shop/?store=${encodeURIComponent(store.id)}`;
+  const campaignVisit = store => {
+    const query = new URLSearchParams(location.search), value = query.get('campaign_visit');
+    return store && query.getAll('store').length === 1 && query.get('store') === store.id && query.getAll('campaign_visit').length === 1 && /^[a-f0-9]{64}$/.test(value || '') ? value : '';
+  };
+  const shopUrl = store => `/shop/?store=${encodeURIComponent(store.id)}` + (campaignVisit(store) ? '&campaign_visit=' + campaignVisit(store) : '');
   const checkoutUrl = (store, cart) => {
     const url = new URL("/cart/", location.origin);
     url.searchParams.set("store", store.id);
     url.searchParams.set("shop", store.cartScope);
+    if (campaignVisit(store)) url.searchParams.set('campaign_visit', campaignVisit(store));
     if (cart) url.searchParams.set("cart", Object.entries(cart).map(([id, count]) => `${id}:${count}`).join(","));
     return url.href;
   };
@@ -44,5 +49,5 @@
     if(copy){const p=document.createElement('p');p.textContent=copy;target.append(p);}
     for(const [value,href] of [[email,'mailto:'+encodeURIComponent(email)],[phone,'tel:'+phone]])if(value){const a=document.createElement('a');a.textContent=value;a.href=href;target.append(a);}
   }
-  window.EzkartStorefront = { escape, money, imageUrl, appearance, load, cartKey, readCart, saveCart, shopUrl, checkoutUrl, support };
+  window.EzkartStorefront = { escape, money, imageUrl, appearance, load, cartKey, readCart, saveCart, shopUrl, checkoutUrl, support, campaignVisit };
 })();

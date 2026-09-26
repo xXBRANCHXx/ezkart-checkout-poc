@@ -41,6 +41,7 @@ import {dispatchNotifications,scheduleNotifications} from './commerce-notificati
 import {dispatchEmails,recordEmailWebhook} from './commerce-email-delivery.js';
 import {dispatchCampaignEmails} from './campaign-email-delivery.js';
 import {emailInvestigations,lookupEmail,resolveEmail,campaignEmailInvestigations,lookupCampaignEmail,resolveCampaignEmail} from './email-investigation.js';
+import {campaignLink,cleanupCampaignVisits} from './campaign-attribution.js';
 import {campaignReport} from './campaign-reports.js';
 import {createCampaignReportExport,readCampaignReportExport,cleanupCampaignReportExports} from './campaign-report-exports.js';
 import {campaignWorkspace,listCampaigns,readCampaign,saveCampaign,campaignHistory,campaignAudience} from './marketing-campaigns.js';
@@ -1540,6 +1541,11 @@ export default {
         if(url.search)return json({ok:false,error:'Preference parameters belong in the request body'},422);
         return json({ok:true,...await customerConsents(env,payload)});
       }
+      if(url.pathname==='/v1/public/campaign-link'){
+        const headers={...cors,'referrer-policy':'no-referrer','x-content-type-options':'nosniff','x-robots-tag':'noindex, nofollow'};
+        if(!['GET','HEAD'].includes(request.method))return json({ok:false,error:'Method not allowed.'},405,{...headers,allow:'GET, HEAD'});
+        const view=await campaignLink(env,request),response=json({ok:true,...view},200,{...headers,'x-ezkart-campaign-store':view.storeId,'x-ezkart-campaign-environment':view.environment});return request.method==='HEAD'?new Response(null,{headers:response.headers}):response;
+      }
       if(url.pathname==='/v1/public/campaign-unsubscribe'){
         const headers={...cors,'referrer-policy':'no-referrer','x-content-type-options':'nosniff'};
         if(!['GET','HEAD','POST'].includes(request.method))return json({ok:false,error:'Method not allowed.'},405,{...headers,allow:'GET, HEAD, POST'});
@@ -1927,6 +1933,7 @@ export default {
       context.waitUntil((async()=>{await scheduleNotifications(env);await dispatchNotifications(env);})());return;
     }
     context.waitUntil(cleanupAbandonedMedia(env));
+    context.waitUntil(cleanupCampaignVisits(env));
     context.waitUntil(cleanupCampaignReportExports(env));
     context.waitUntil(cleanupAnalyticsExports(env));
     context.waitUntil(cleanupCustomerExports(env));

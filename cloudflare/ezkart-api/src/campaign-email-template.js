@@ -6,7 +6,7 @@ const invalid=()=>{throw Object.assign(new Error('The saved campaign content is 
 
 // Render exactly once as part of the atomic token/outbox write. A later retry
 // must use that saved string, even after a draft or store name changes.
-export function campaignEmailPayload(configuration,source,email,deliveryId,unsubscribeUrl){
+export function campaignEmailPayload(configuration,source,email,deliveryId,unsubscribeUrl,storeLink=null){
   let values;try{values=campaignValues(source?.values);}catch{invalid();}
   if(configuration?.ready!==true||!emailAddress(configuration.sender)||!/^[A-Za-z0-9][A-Za-z0-9_-]{2,63}$/.test(configuration.profile||'')
     ||!emailAddress(email)||!/^campmail_[a-f0-9]{32}$/.test(deliveryId||'')||!/^[A-Za-z0-9][A-Za-z0-9_-]{2,95}$/.test(source.sellerId||'')
@@ -14,7 +14,8 @@ export function campaignEmailPayload(configuration,source,email,deliveryId,unsub
     ||typeof source.shopEnabled!=='boolean'||values.archived||!values.subject||!values.heading||!values.body
     ||values.buttonLabel&&!source.shopEnabled)invalid();
   const headers=campaignUnsubscribeHeaders(configuration,unsubscribeUrl),sandbox=configuration.environment==='sandbox';
-  const shop=configuration.origin+'/shop/?store='+encodeURIComponent(source.sellerId),environment=sandbox?'Ezkart TEST · Sandbox campaign':'Ezkart';
+  if(storeLink!==null&&(typeof storeLink!=='string'||!storeLink.startsWith(configuration.origin+'/cart/campaign.php?c=')||!/^[a-f0-9]{64}$/.test(storeLink.slice((configuration.origin+'/cart/campaign.php?c=').length))))invalid();
+  const shop=storeLink||configuration.origin+'/shop/?store='+encodeURIComponent(source.sellerId),environment=sandbox?'Ezkart TEST · Sandbox campaign':'Ezkart';
   const footer='You gave '+source.storeName+' permission to send promotional emails to this address.';
   const choice='Unsubscribing does not change your order or delivery notification choices.';
   const text=[environment,source.storeName,values.heading,values.body,values.buttonLabel?values.buttonLabel+': '+shop:'',footer,

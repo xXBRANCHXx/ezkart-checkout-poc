@@ -55,6 +55,10 @@ function ez_checkout_intent(array $input): array
     if (preg_match('/^[a-z0-9][a-z0-9_-]{5,79}$/D', $shop) !== 1) $shop = '';
     $intent = ['cart' => $cart, 'expected_prices' => $prices, 'expected_total' => $total,
         'customer' => $normalized, 'shipping_id' => trim($shippingId), 'shop' => $shop];
+    if (array_key_exists('campaign_visit', $input)) {
+        if (!is_string($input['campaign_visit']) || preg_match('/^[a-f0-9]{64}$/D', $input['campaign_visit']) !== 1) throw new InvalidArgumentException('Campaign visit reference is invalid.');
+        $intent['campaign_visit'] = $input['campaign_visit'];
+    }
     return ['key' => $key, 'hash' => hash('sha256', ez_json_encode($intent)), 'input' => $intent];
 }
 
@@ -132,7 +136,8 @@ function ez_central_checkout(array $input, ?array $account): array
         try {
             $order = ez_commerce_request('POST', '/internal/commerce/orders', [
                 'environment' => $environment, 'checkoutKey' => $intent['key'], 'sellerId' => $checkout['seller_id'],
-                'checkout' => ['intentHash' => $intent['hash'], 'paymentFlow' => $flow, 'shop' => $intent['input']['shop']],
+                'checkout' => ['intentHash' => $intent['hash'], 'paymentFlow' => $flow, 'shop' => $intent['input']['shop']]
+                    + (isset($intent['input']['campaign_visit']) ? ['campaignVisit' => $intent['input']['campaign_visit']] : []),
                 'customer' => ['name' => $customer['name'], 'email' => $customer['email'], 'phone' => $customer['phone'], 'authUserId' => $account['id'] ?? ''],
                 'items' => array_values($checkout['commerce_items']), 'shipping' => $shipping,
                 'expiresAt' => gmdate('Y-m-d\TH:i:s\Z', time() + 3600),
