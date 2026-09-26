@@ -64,6 +64,22 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 26 September: DOKU Sub-Account evidence reader
+
+Implemented pinned-environment SNAP authentication and read-only account, history
+and transaction-status queries. Exact financial JSON retains large amounts and
+rejects duplicate keys. Scope, account identity, currency, date windows and status
+checks reject ambiguous responses. A bounded private CLI collector saves original
+responses durably, stops on unstable paging or failed storage, and exposes partial
+coverage without asserting settlement or withdrawable money.
+
+All thirteen reader/observer/CLI tests and both existing signing tests pass, together
+with PHP syntax checks. See [doku-financial-reader.md](doku-financial-reader.md).
+Local configuration lacks the SNAP signing key; actual provider reads and hosted
+configuration remain unverified. Seller mapping, routing, settlement ingestion,
+release, refunds, payouts and wallet UI remain open. No provider calls, credential
+changes, financial postings or activation are part of this stage.
+
 ### 26 September: immutable captured-payment accounting
 
 Implemented a balanced financial journal for verified captures, atomically posted

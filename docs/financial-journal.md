@@ -81,6 +81,11 @@ when migration or reconciliation ran. Reads do not create postings.
 
 ## Provider contract and remaining financial work
 
+The [Sub-Account financial reader](doku-financial-reader.md) now provides signed,
+exact-money provider reads and a private sandbox evidence collector. Its responses
+are not yet ingested as settlement journals or linked to seller-owned mappings.
+Actual provider-read acceptance and all money-flow work below remain open.
+
 Official DOKU documentation was checked on 25 September 2026. New integrations
 should target its actively developed Sub-Account V2. Payment routing uses the
 registered profile and optional split-rule ID; routing identifiers need explicit
