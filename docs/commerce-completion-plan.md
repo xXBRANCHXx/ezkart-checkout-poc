@@ -81,6 +81,12 @@ applies in original file order with no integrity or foreign-key errors. See
 rollout is recorded separately. Seller/provider mapping, routing, actual fees,
 settlement, release/holds, refunds, payout recovery, reconciliation and the real
 wallet UI remain open. No top-level completion gate advances on this foundation.
+Implementation `29ae6fa` is pushed; migration 0023 and TEST Worker
+`2914f73f-d7d2-4719-86dc-e942126fe965` are deployed. Health reports 62 tables,
+all financial schema objects are present, and journal/entry counts remain zero.
+Operational data and the 15-entry import manifest are unchanged. Financial routes
+retain the central storage hold; provider activation and populated hosted
+financial acceptance are not claimed.
 
 ### 25 September: merchant review workspace and public review browsing
 

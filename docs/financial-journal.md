@@ -129,3 +129,19 @@ Logs: `/tmp/ezkart-financial-journal-api-final-01a0d643.log` and
 `6e082a678bb0466e13737ef022bc179594b990742a5058c2ce0930bad4734c3d`.
 Hosted rollout evidence follows separately. These tests do not establish actual
 provider settlement, available balances, refunds or withdrawals.
+
+### Hosted TEST rollout
+
+Implementation `29ae6fa` is pushed on `agent/ezkart-workbench`. Only migration
+0023 was applied to TEST D1, followed by TEST Worker
+`2914f73f-d7d2-4719-86dc-e942126fe965`. At 10:06 UTC / 17:06 Jakarta on
+26 September, health reports 62 tables and healthy D1/public R2/private R2.
+All three financial tables, the accounting view, six account definitions and
+eleven guards are present; journal and entry counts remain zero.
+
+Operational counts, review/photo counts and the 15-entry legacy import manifest
+are unchanged. Both financial read routes correctly return the existing central
+storage hold. No checkout flag, provider capability or maintenance schedule was
+changed. Provider settlement, populated hosted accounting, refunds and withdrawals
+remain acceptance work. Private deployment and comparison evidence is under
+`/tmp/ezkart-financial-journal-deploy-01a0d643/`.
