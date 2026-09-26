@@ -64,6 +64,27 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 27 September: campaign unsubscribe and combined consent history
+
+Implemented anonymous, token-authorized promotional-email withdrawal, native
+desktop/mobile confirmation, read-only GET/HEAD, direct one-click POST handling,
+interrupted-result recovery and combined account/email-link permission history.
+Withdrawals update the same state used by customer profiles and campaign
+audiences, remain available during sending/commerce holds, and never grant
+permission or change transactional notifications. Existing consent receipts and
+projections also reject replacement writes that could erase old history.
+
+See [campaign-unsubscribe.md](campaign-unsubscribe.md). Atomic token/message
+publication, the actual sender and send-time checks, scheduling, automations,
+provider/DKIM acceptance, delivery reporting and authenticated hosted acceptance
+remain required. No top-level completion gate is closed.
+
+Local validation reports 234 Worker passes, 26 affected PHP/browser/signing
+passes and a clean 16-test consent/unsubscribe rerun after the full runner was
+terminated following its pass summary. Syntax, diff and TEST build checks pass.
+The fresh pre-migration TEST backup restores with every existing row preserved,
+valid integrity and no foreign-key errors after applying migration 0034.
+
 ### 26–27 September: saved campaign drafts and real audience previews
 
 Replaced the Marketing samples and toast-only actions with versioned campaign

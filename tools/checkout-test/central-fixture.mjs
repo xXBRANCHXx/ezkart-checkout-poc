@@ -9,7 +9,7 @@ export async function setupCentralFixture(t, overrides = {}, commerce = {}) {
     try {
       const chunks = []; for await (const chunk of req) chunks.push(chunk);
       const body = Buffer.concat(chunks).toString();
-      control.calls.push({path: req.url, body: body ? JSON.parse(body) : null});
+      control.calls.push({path: req.url, body: body ? (/^application\/json(?:;|$)/i.test(req.headers['content-type']||'') ? JSON.parse(body) : body) : null});
       if (control.fail && req.url === control.fail) { res.writeHead(503); res.end('{"ok":false}'); return; }
       const response = await f.mf.dispatchFetch('https://api.fixture.test' + req.url, {method: req.method, headers: req.headers,
         ...(body ? {body} : {})});

@@ -114,11 +114,12 @@ syntax checks and whitespace validation also pass. Logs are
 These are correctness checks, not production-volume acceptance.
 
 Signed-in hosted acceptance remains pending the shared Chrome connection and
-controlled central-storage cutover. Phone/WhatsApp verification and consent,
-campaign unsubscribe links and suppression at actual delivery, full review
-workflows, messaging, data-lifecycle operations and the wider commerce completion
-plan remain open. No email campaign, provider transaction or production change is
-performed by this delivery.
+controlled central-storage cutover. The later [campaign unsubscribe
+flow](campaign-unsubscribe.md) adds public, token-authorized withdrawal and
+combined immutable history. Phone/WhatsApp verification and consent, campaign
+sender integration and suppression at actual delivery, data-lifecycle operations
+and the wider commerce completion plan remain open. No email campaign, provider
+transaction or production change is performed by this delivery.
 
 ## TEST deployment — 25 September 2026
 

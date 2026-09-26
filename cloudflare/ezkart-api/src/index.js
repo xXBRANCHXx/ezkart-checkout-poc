@@ -41,6 +41,7 @@ import {dispatchNotifications,scheduleNotifications} from './commerce-notificati
 import {dispatchEmails,recordEmailWebhook} from './commerce-email-delivery.js';
 import {emailInvestigations,lookupEmail,resolveEmail} from './email-investigation.js';
 import {campaignWorkspace,listCampaigns,readCampaign,saveCampaign,campaignHistory,campaignAudience} from './marketing-campaigns.js';
+import {campaignUnsubscribe} from './campaign-unsubscribe.js';
 import {buyerNotificationPreferences,saveBuyerNotificationPreferences,buyerNotificationPreferenceHistory} from './buyer-notification-preferences.js';
 import {merchantAnalytics} from './commerce-analytics.js';
 import {createAnalyticsExport,readAnalyticsExport,cleanupAnalyticsExports} from './commerce-analytics-exports.js';
@@ -1522,6 +1523,12 @@ export default {
         if(request.method!=='POST')return json({ok:false,error:'Method not allowed'},405);
         if(url.search)return json({ok:false,error:'Preference parameters belong in the request body'},422);
         return json({ok:true,...await customerConsents(env,payload)});
+      }
+      if(url.pathname==='/v1/public/campaign-unsubscribe'){
+        const headers={...cors,'referrer-policy':'no-referrer','x-content-type-options':'nosniff'};
+        if(!['GET','HEAD','POST'].includes(request.method))return json({ok:false,error:'Method not allowed.'},405,{...headers,allow:'GET, HEAD, POST'});
+        const response=json({ok:true,...await campaignUnsubscribe(env,request)},200,headers);
+        return request.method==='HEAD'?new Response(null,{headers:response.headers}):response;
       }
       const claimOrderMatch = /^\/internal\/commerce\/orders\/(EZK-[SP]-[A-F0-9]{24})\/claim$/.exec(url.pathname);
       if (claimOrderMatch && request.method === 'POST') {

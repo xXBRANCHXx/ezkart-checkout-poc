@@ -61,7 +61,7 @@ export async function customerConsents(env,input){
     const scope=await commerceHash({id,mode,seller:input.sellerId,email:input.email,kind:'consent_history'}),cursor=input.cursor?decode(input.cursor,scope):null;
     if(cursor&&(!Number.isSafeInteger(cursor.before)||!Number.isSafeInteger(cursor.cap)||cursor.before<1||cursor.cap<cursor.before))fail('Preference history reference is invalid');
     const cap=cursor?.cap??current.revision,before=cursor?.before??cap+1;
-    const rows=await env.DB.prepare(`SELECT revision,allowed,policy_version,statement,source,created_at FROM commerce_customer_consent_changes
+    const rows=await env.DB.prepare(`SELECT revision,allowed,policy_version,statement,source,created_at FROM commerce_customer_consent_history
       WHERE seller_id=? AND commerce_environment=? AND auth_user_id=? AND email=? AND revision<=? AND revision<? ORDER BY revision DESC LIMIT 21`)
       .bind(input.sellerId,mode,id,input.email,cap,before).all(),items=rows.results.slice(0,20);
     return {items:items.map(row=>({revision:row.revision,state:row.allowed?'granted':'withdrawn',policyVersion:row.policy_version,statement:row.statement,source:row.source,createdAt:row.created_at})),

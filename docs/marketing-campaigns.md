@@ -4,8 +4,10 @@ The merchant Marketing workspace now uses saved campaign drafts, real customer
 audience previews and a planning calendar. The sample active campaigns,
 automation counts and toast-only controls have been removed. This delivery is
 the draft/audience portion of the larger marketing gate. Scheduling actual
-delivery, automation triggers, unsubscribe handling, provider receipts and
-performance reports remain required work; this document does not narrow that
+delivery, automation triggers, unsubscribe integration, provider receipts and
+performance reports remain required work. A [public unsubscribe flow](campaign-unsubscribe.md)
+now records store/address-specific withdrawals; the sender must still issue and
+include its links atomically. This document does not narrow that
 scope or mark marketing complete.
 
 ## Merchant behavior

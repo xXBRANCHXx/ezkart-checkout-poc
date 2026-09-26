@@ -26,7 +26,7 @@
       if(loading||ended)return;loading=true;next.disabled=true;status.textContent='Loading history…';
       try{const data=await api({action:'history',seller:item.sellerId,email:item.email,...(append?{cursor:nextCursor}:{})});if(!details.isConnected||ended)return;
         if(!Array.isArray(data.items))throw Error('Preference history was incomplete.');if(!append)rows.replaceChildren();
-        for(const change of data.items){const li=el('li'),title=el('strong',change.state==='granted'?'Email permission granted':'Email permission withdrawn');li.append(title,el('time',date(change.createdAt)),el('p',change.statement));rows.append(li);}
+        for(const change of data.items){const li=el('li'),title=el('strong',change.state==='granted'?'Email permission granted':'Email permission withdrawn');li.append(title,el('time',date(change.createdAt)),el('p',change.statement));if(change.source==='email_unsubscribe')li.append(el('small','From an unsubscribe link'));rows.append(li);}
         nextCursor=data.nextCursor;next.hidden=!nextCursor;next.textContent='Load older changes';loaded=true;status.textContent=rows.children.length?'Choices recorded by you.':'No preference changes recorded.';
       }catch(error){if(details.isConnected&&!ended){status.textContent=error.message;next.hidden=false;next.textContent=loaded?'Retry older changes':'Retry history';}}
       finally{loading=false;next.disabled=false;}
