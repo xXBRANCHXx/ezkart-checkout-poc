@@ -88,6 +88,12 @@ Syntax checks pass for all 25 changed JavaScript/PHP files and the diff is clean
 The implementation is prepared locally; remote rollout evidence follows. The
 current deployed baseline remains `14289f4` until that rollout completes.
 
+The first TEST rollout applied and verified migration 0041, but the additional
+cron exceeded the account limit. The final schedule uses one registered trigger
+for separate campaign and automation invocations, retaining the existing
+campaign send cadence and separate query budgets. Three focused cron/processor
+cases and the adjusted TEST dry-run pass. Final deployment verification follows.
+
 Signed-in hosted/provider acceptance, monitoring, capacity, sustained delay and
 repeat behavior and operational recovery remain open. The new processing flag
 stays unset and existing sending/central-commerce holds remain. All thirteen

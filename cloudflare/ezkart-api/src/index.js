@@ -1950,6 +1950,14 @@ export default {
     }
   },
   async scheduled(controller, env, context) {
+    // One registered trigger, separate invocations: retain sends at :00/:03/...
+    // and scan/publish at :01/:04/... without sharing a D1 query budget.
+    if(controller.cron==='0-59/3,1-59/3 * * * *'){
+      const minute=new Date(controller.scheduledTime).getUTCMinutes();
+      if(!Number.isInteger(minute)||minute%3===2)throw new Error('Marketing schedule time is invalid');
+      context.waitUntil(minute%3===0?dispatchCampaignEmails(env):processMarketingAutomations(env));return;
+    }
+    // Keep the previous handlers while updated triggers propagate.
     if(controller.cron==='*/4 * * * *'){
       context.waitUntil(processMarketingAutomations(env));return;
     }

@@ -74,6 +74,41 @@ test('the signed processor rejects wrong scope, runs the real pipeline, and its 
   assert.equal((await f.jobs()).length,1);assert.equal(f.control.calls.length,0);
 });
 
+test('the shared marketing cron publishes and sends in separate bounded invocations without changing the send cadence',async t=>{
+  const f=await fixture(t);await rule(f);const buyer=await f.addBuyer(1);ok(await f.paid(buyer.order));
+  t.mock.method(globalThis,'fetch',(url,options)=>f.fetcher(url,options));
+  let queries=0;
+  const wrap=statement=>new Proxy(statement,{get(target,property){
+    if(property==='bind')return(...args)=>wrap(target.bind(...args));
+    if(['first','all','run','raw'].includes(property))return(...args)=>{queries++;return target[property](...args);};
+    const value=Reflect.get(target,property);return typeof value==='function'?value.bind(target):value;
+  }});
+  const db=new Proxy(f.db,{get(target,property){
+    if(property==='prepare')return sql=>wrap(target.prepare(sql));
+    if(property==='batch')return statements=>{queries+=statements.length;return target.batch(statements);};
+    const value=Reflect.get(target,property);return typeof value==='function'?value.bind(target):value;
+  }});
+  const tick=async minute=>{
+    queries=0;const tasks=[];
+    await worker.scheduled({cron:'0-59/3,1-59/3 * * * *',scheduledTime:Date.UTC(2026,8,27,12,minute)},{...f.env,DB:db},{waitUntil:task=>tasks.push(task)});
+    assert.equal(tasks.length,1);const result=await tasks[0];assert(queries<=50,'D1 queries: '+queries);return result;
+  };
+  assert.equal((await tick(0)).processed,0);assert.equal(await f.count('commerce_automation_enrollments'),0);
+  assert.equal((await tick(1)).published,1);assert.equal(f.control.calls.length,0);assert.equal((await f.jobs()).length,1);
+  assert.equal((await tick(3)).processed,1);assert.equal(f.control.calls.length,1);
+  assert.equal((await tick(4)).published,0);assert.equal(f.control.calls.length,1);assert.equal(await f.count('commerce_automation_runs'),1);
+});
+
+test('both marketing cron phases honor their holds and invalid scheduled times do not fall through to maintenance',async()=>{
+  const env={APP_ENVIRONMENT:'test',DB:new Proxy({},{get(){throw Error('Held or invalid schedule accessed the database');}})};
+  for(const minute of [0,1,57,58]){
+    const tasks=[];await worker.scheduled({cron:'0-59/3,1-59/3 * * * *',scheduledTime:Date.UTC(2026,8,27,12,minute)},env,{waitUntil:task=>tasks.push(task)});
+    assert.equal(tasks.length,1);assert.equal((await tasks[0]).held,true);
+  }
+  for(const scheduledTime of [undefined,NaN,Date.UTC(2026,8,27,12,2)])await assert.rejects(
+    worker.scheduled({cron:'0-59/3,1-59/3 * * * *',scheduledTime},env,{waitUntil(){throw Error('Invalid schedule created work');}}),/Marketing schedule time is invalid/);
+});
+
 test('automation migration preserves mixed campaign evidence and point reads never scan unrelated recipients or orders',async t=>{
   const f=await campaignDeliveryFixture(t,{through:40,bindings:{COMMERCE_EMAIL_RECONCILE:'enabled',RESEND_READ_API_KEY:'re_fixture_campaign_reader'}});
   for(let n=1;n<=6;n++)await f.addBuyer(n);ok(await f.publish());f.control.outcomes.push(...Array(6).fill('lost'));

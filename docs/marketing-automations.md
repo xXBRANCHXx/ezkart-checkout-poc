@@ -139,9 +139,19 @@ rule/run source; save and reschedule attempts return an explicit conflict.
 Direct access to the PHP component is refused.
 
 `POST /internal/commerce/automations/process` uses the signed internal commerce
-boundary and accepts only the current `environment`. The dedicated TEST cron is
-`*/4 * * * *`; it publishes jobs and never sends provider requests. The existing
-campaign cron dispatches those jobs separately.
+boundary and accepts only the current `environment`. Processing publishes jobs
+and never sends provider requests. TEST uses one registered marketing cron,
+`0-59/3,1-59/3 * * * *`, with separate invocations: campaign sends retain their
+existing :00/:03/:06 cadence and automation processing runs at :01/:04/:07.
+Each phase has its own D1 query budget. The phase uses the event's scheduled
+time, so delayed execution cannot switch a publishing event into a send event.
+
+The first rollout hit the account's five-cron limit after the Worker upload;
+the combined expression replaces the campaign trigger and keeps TEST at four
+registered triggers. No account upgrade or other Worker's schedule is needed.
+Previous handlers remain during propagation. Cloudflare documents the supported
+[range/list syntax](https://developers.cloudflare.com/workers/configuration/cron-triggers/#supported-cron-expressions)
+and the event's [scheduled time](https://developers.cloudflare.com/workers/runtime-apis/handlers/scheduled/#properties).
 
 `COMMERCE_MARKETING_AUTOMATIONS=enabled`, central D1 commerce and campaign email
 readiness are required for new activation/scanning/publication. The automation
@@ -162,6 +172,11 @@ start, uncertain sends and later delivery evidence. Two actual fixture sends fit
 the fifty-query invocation budget. Populated migration tests preserve mixed
 legacy evidence and verify indexed point-read plans. Earlier affected
 order/payment/consent and customer suites also pass.
+
+Three final processor/cron cases pass after consolidating the trigger. They
+execute publication and a real fixture send in distinct invocations, check each
+query budget, preserve the send cadence and verify both holds and invalid times.
+The adjusted TEST dry-run and syntax/diff checks pass.
 
 All six new PHP/browser cases pass, including desktop/390px workflows, uncertain
 saves and activation, pause recovery, conflicts, storage failure/tampering,
