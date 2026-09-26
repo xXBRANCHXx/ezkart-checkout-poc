@@ -140,3 +140,22 @@ connection or approval loop was attempted. Real provider registration, sandbox
 routing, actual fees/settlement, delivery release, reserves, refunds, withdrawals,
 reconciliation, operational recovery and sustained financial validation remain
 open. This delivery does not close a top-level commerce or production release gate.
+
+### Hosted TEST rollout — 26 September 2026
+
+Implementation `1052e92` is pushed to `agent/ezkart-workbench`. Only migration
+0024 was pending and applied to TEST D1. TEST Worker version
+`b981177f-ae81-413e-8036-94b2ca6315d3` is deployed; the existing hourly schedule is
+unchanged. At 11:21 UTC / 18:21 Jakarta, health reports 67 tables and healthy
+D1/public R2/private R2. The five wallet tables remain empty, all sixteen guards
+are present, and foreign-key checks report no errors. Operational counts, the
+six financial account definitions, zero journals/entries and the 15-entry legacy
+import manifest are unchanged.
+
+Hostinger's workbench deployment serves the exact checked JavaScript. An
+unauthenticated Wallet read returns 401 with no account data. Direct access to
+the private proxy and CLI dispatcher returns empty 404 responses. The internal
+wallet route returns the existing central-storage hold (503). No real enrollment,
+provider read, balance or money movement was initiated. Private before/after,
+deployment and hosted-check artifacts are under
+`/tmp/ezkart-wallet-deploy-01a0d643/`.

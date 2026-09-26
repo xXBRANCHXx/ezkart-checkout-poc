@@ -85,6 +85,12 @@ Actual hosted/provider acceptance, account routing, unknown-registration recover
 settlement, fees, release, reserves, refunds, withdrawals and reconciliation remain
 open. No top-level completion gate advances on enrollment alone.
 
+Implementation `1052e92` is pushed; TEST migration 0024 and Worker
+`b981177f-ae81-413e-8036-94b2ca6315d3` are deployed. Health reports 67 tables, all
+five wallet tables remain empty, and existing operational/financial counts and
+the legacy import manifest are unchanged. Hosted assets match the commit; access
+guards pass. Storage/provider holds and the maintenance schedule are unchanged.
+
 ### 26 September: DOKU Sub-Account evidence reader
 
 Implemented pinned-environment SNAP authentication and read-only account, history
