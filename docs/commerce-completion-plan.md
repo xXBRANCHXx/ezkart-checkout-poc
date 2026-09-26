@@ -90,8 +90,19 @@ Implementation `dd3e536` is pushed and hosted. TEST migration 0034 and Worker
 tables and no pending migrations. Twenty-five deployed Worker checks, both
 hosted asset hashes and eight public/private guards pass. All old counts,
 settings and import evidence are preserved; new token/withdrawal tables are
-empty. The host overrides PHP's CSP, so a page-specific server-header correction
-is being verified. No token, campaign message or outbound email was issued.
+empty. The host overrode PHP's CSP; the page-specific server-header correction
+`e06b046` now returns the complete restrictive policy for GET, HEAD and POST.
+No token, campaign message or outbound email was issued.
+
+The [campaign renderer and strict transport](campaign-delivery.md) now prepare
+escaped HTML/plain text with visible unsubscribe links, pinned one-click
+headers, environment/purpose validation and exact provider retries. Promotional
+submissions require a separate flag as well as the existing provider/TEST
+boundaries. All 45 affected Worker checks, the final 11 provider/campaign unit
+checks and the desktop/mobile email rendering test pass. The flag remains
+unset and no route/cron invokes this transport yet. Durable publication/outbox,
+dispatch, campaign callbacks/recovery, scheduling, automation, reporting and
+provider/hosted acceptance remain required; no completion gate is closed.
 
 ### 26–27 September: saved campaign drafts and real audience previews
 

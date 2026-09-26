@@ -47,6 +47,21 @@ export function emailConfiguration(env){
   return {...connection,start:new Date(start).toISOString(),allowlist};
 }
 
+// Connecting transactional mail does not authorize promotional submissions.
+export function campaignEmailConfiguration(env){
+  if(env.COMMERCE_CAMPAIGN_SEND!=='enabled')return {ready:false,reason:'campaign_hold'};
+  return emailConfiguration(env);
+}
+
+export function campaignUnsubscribeHeaders(configuration,url){
+  const origin=configuration.environment==='sandbox'?'https://test.ezkart.id':configuration.environment==='production'?'https://ezkart.id':'';
+  const prefix=origin+'/cart/unsubscribe.php?t=';
+  if(!origin||configuration.origin!==origin||typeof url!=='string'||!url.startsWith(prefix)||!/^[a-f0-9]{64}$/.test(url.slice(prefix.length))){
+    fail('email_request_invalid','The campaign unsubscribe link is invalid.',{noEffect:true});
+  }
+  return {'List-Unsubscribe':'<'+url+'>','List-Unsubscribe-Post':'List-Unsubscribe=One-Click'};
+}
+
 // Investigation can remain available while sending is disabled. The original
 // send credential identity must still match; a separate same-account reader key
 // avoids giving the sending key broader permissions solely for investigation.
@@ -109,20 +124,49 @@ export async function verifiedEmailRecipient(env,actorId,fetcher=fetch){
   return {id:actorId,email:user.email,confirmedAt:new Date(user.email_confirmed_at).toISOString(),verifiedAt:new Date().toISOString()};
 }
 
-export async function sendResendEmail(env,payload,idempotencyKey,fetcher=fetch){
-  const configuration=emailConfiguration(env);if(!configuration.ready)fail('email_not_connected','Email delivery is not connected.',{noEffect:true});
-  if(typeof payload!=='string'||encoder.encode(payload).byteLength>48000||typeof idempotencyKey!=='string'||!/^[A-Za-z0-9_/-]{1,256}$/.test(idempotencyKey))fail('email_request_invalid','The saved email request is invalid.',{noEffect:true});
+function validateSavedEmail(configuration,payload,idempotencyKey,campaign=false){
+  if(typeof payload!=='string'||encoder.encode(payload).byteLength>(campaign?65536:48000)||typeof idempotencyKey!=='string'||!/^[A-Za-z0-9_/-]{1,256}$/.test(idempotencyKey))fail('email_request_invalid','The saved email request is invalid.',{noEffect:true});
   let message;try{message=parseMessageJSON(payload);}catch{fail('email_request_invalid','The saved email request is invalid.',{noEffect:true});}
-  if(!message||typeof message!=='object'||Array.isArray(message)||Object.keys(message).some(key=>!['from','to','subject','html','text','tags'].includes(key))
+  const allowed=['from','to','subject','html','text','tags',...(campaign?['headers']:[])];
+  if(!message||typeof message!=='object'||Array.isArray(message)||Object.keys(message).some(key=>!allowed.includes(key))
     ||message.from!=='Ezkart <'+configuration.sender+'>'||!Array.isArray(message.to)||message.to.length!==1||!emailAddress(message.to[0])
     ||configuration.environment==='sandbox'&&!configuration.allowlist.includes(message.to[0])
     ||typeof message.subject!=='string'||message.subject.length<1||message.subject.length>200||/[\r\n]/.test(message.subject)
-    ||typeof message.html!=='string'||typeof message.text!=='string'||!message.html||!message.text||!Array.isArray(message.tags)||message.tags.length!==3
+    ||typeof message.html!=='string'||typeof message.text!=='string'||!message.html||!message.text||!Array.isArray(message.tags)||message.tags.length!==(campaign?4:3)
+    ||message.tags.some(t=>!t||typeof t!=='object'||Array.isArray(t)||Object.keys(t).length!==2||typeof t.name!=='string'||typeof t.value!=='string')
     ||!message.tags.some(t=>t?.name==='ezkart_environment'&&t.value===configuration.environment)
     ||!message.tags.some(t=>t?.name==='ezkart_profile'&&t.value===configuration.profile)
-    ||!message.tags.some(t=>t?.name==='ezkart_delivery'&&/^email_[a-f0-9]{32}$/.test(t.value||''))){
+    ||!message.tags.some(t=>t?.name==='ezkart_delivery'&&(campaign?/^campmail_[a-f0-9]{32}$/:/^email_[a-f0-9]{32}$/).test(t.value||''))
+    ||campaign&&!message.tags.some(t=>t.name==='ezkart_purpose'&&t.value==='campaign')){
     fail('email_request_invalid','The saved email request does not match this delivery environment.',{noEffect:true});
   }
+  if(campaign){
+    const h=message.headers,delivery=message.tags.find(t=>t.name==='ezkart_delivery').value;
+    if(!h||typeof h!=='object'||Array.isArray(h)||Object.keys(h).length!==2||typeof h['List-Unsubscribe']!=='string'
+      ||h['List-Unsubscribe'][0]!=='<'||h['List-Unsubscribe'].at(-1)!=='>'||h['List-Unsubscribe-Post']!=='List-Unsubscribe=One-Click'
+      ||idempotencyKey!=='ezkart_campaign/'+configuration.environment+'/'+delivery){
+      fail('email_request_invalid','The saved campaign headers or retry reference are invalid.',{noEffect:true});
+    }
+    const url=h['List-Unsubscribe'].slice(1,-1);campaignUnsubscribeHeaders(configuration,url);
+    if(!message.text.includes(url)||!message.html.includes('href="'+url+'"'))fail('email_request_invalid','The campaign needs its visible unsubscribe link.',{noEffect:true});
+  }
+}
+
+export async function sendResendEmail(env,payload,idempotencyKey,fetcher=fetch){
+  const configuration=emailConfiguration(env);if(!configuration.ready)fail('email_not_connected','Email delivery is not connected.',{noEffect:true});
+  validateSavedEmail(configuration,payload,idempotencyKey);
+  return submitResendEmail(env,payload,idempotencyKey,fetcher);
+}
+
+// Only the campaign outbox may call this after its current consent, identity,
+// suppression and lease checks. Transport validation is not send authority.
+export async function sendResendCampaignEmail(env,payload,idempotencyKey,fetcher=fetch){
+  const configuration=campaignEmailConfiguration(env);if(!configuration.ready)fail('email_not_connected','Campaign delivery is not connected.',{noEffect:true});
+  validateSavedEmail(configuration,payload,idempotencyKey,true);
+  return submitResendEmail(env,payload,idempotencyKey,fetcher);
+}
+
+async function submitResendEmail(env,payload,idempotencyKey,fetcher){
   let response;
   try{response=await fetcher('https://api.resend.com/emails',{method:'POST',redirect:'manual',signal:AbortSignal.timeout(15000),
     headers:{authorization:'Bearer '+env.RESEND_API_KEY,'content-type':'application/json',accept:'application/json','user-agent':'Ezkart/1.0','Idempotency-Key':idempotencyKey},body:payload});}

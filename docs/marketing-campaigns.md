@@ -10,6 +10,11 @@ now records store/address-specific withdrawals; the sender must still issue and
 include its links atomically. This document does not narrow that
 scope or mark marketing complete.
 
+The [campaign message renderer and transport](campaign-delivery.md) now provide
+escaped email content, visible opt-out links, one-click headers and a separate
+campaign activation boundary. The recipient outbox and dispatch workflow must
+still connect those components; draft saving does not send mail.
+
 ## Merchant behavior
 
 - Create and edit a named draft with subject, inbox preview, heading, paragraph

@@ -18,10 +18,10 @@ a result directly, with no redirect or account-context dependency. A lost
 acknowledgement leaves the same link available for retry.
 
 The protocol follows the request model in [RFC 8058](https://www.rfc-editor.org/info/rfc8058/):
-the eventual message must carry an HTTPS `List-Unsubscribe` URL and
+the campaign message renderer carries an HTTPS `List-Unsubscribe` URL and
 `List-Unsubscribe-Post: List-Unsubscribe=One-Click`. The mail provider must apply
-a valid DKIM signature covering both headers. Those outbound headers and actual
-mailbox/provider interoperability still need to be integrated and accepted with
+a valid DKIM signature covering both headers. The [renderer/transport](campaign-delivery.md),
+durable outbox and actual mailbox/provider interoperability still need to be connected and accepted with
 the campaign sender; this endpoint alone does not establish delivered one-click
 support. A scanner GET cannot withdraw permission.
 
@@ -137,7 +137,9 @@ At 17:35 UTC, both hosted asset hashes matched, the five merchant/private guards
 passed, and public unknown-link GET/HEAD/POST requests returned 404 with
 `no-store`, `no-referrer`, no session and no redirect. The hosting layer replaced
 PHP's CSP with its global `upgrade-insecure-requests` value. A page-specific
-`cart/.htaccess` response policy and `X-Frame-Options: DENY` address that conflict;
-their deployed result still needs verification. Authenticated hosted workflows
+`cart/.htaccess` response policy and `X-Frame-Options: DENY` address that conflict.
+At 17:38 UTC, GET/HEAD/POST returned the full restrictive CSP after correction
+`e06b046` deployed, while all previous asset and access checks still passed.
+Authenticated hosted workflows
 and real recipient/provider acceptance remain open. No campaign token, message
 or provider request was created during the rollout.
