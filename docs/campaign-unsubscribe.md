@@ -4,8 +4,9 @@ The public unsubscribe flow records a promotional-email withdrawal in the same
 permission state and revision history used by buyer preferences and merchant
 audience previews. It works without sign-in and while commerce/sending is held.
 It does not change transactional notification choices, send mail, or activate a
-provider. Campaign publication, scheduling, send-time eligibility checks,
-automation, delivery evidence and reporting remain required work.
+provider. [Campaign publication](campaign-publication.md) and the
+[guarded sender](campaign-delivery.md) now use this flow; merchant publishing
+controls, automation, reporting and provider/hosted acceptance remain necessary.
 
 ## Recipient and mail-system behavior
 
@@ -20,9 +21,9 @@ acknowledgement leaves the same link available for retry.
 The protocol follows the request model in [RFC 8058](https://www.rfc-editor.org/info/rfc8058/):
 the campaign message renderer carries an HTTPS `List-Unsubscribe` URL and
 `List-Unsubscribe-Post: List-Unsubscribe=One-Click`. The mail provider must apply
-a valid DKIM signature covering both headers. The [renderer/transport](campaign-delivery.md),
-durable outbox and actual mailbox/provider interoperability still need to be connected and accepted with
-the campaign sender; this endpoint alone does not establish delivered one-click
+a valid DKIM signature covering both headers. The [renderer/transport and
+durable outbox](campaign-delivery.md) are integrated. Actual mailbox/provider
+interoperability still requires acceptance; this endpoint alone does not establish delivered one-click
 support. A scanner GET cannot withdraw permission.
 
 The Worker accepts URL-encoded or multipart form bodies, with an 8 KiB streaming
@@ -88,8 +89,10 @@ The helper itself is not proof of current email ownership or send authorization.
 The complete sender must independently verify the account address, current
 store/address-specific permission and global suppression immediately before
 submission. It must preserve its original provider payload, request reference
-and receipt through retries. These integration requirements remain open; no real
-links or campaign messages were issued by the fixture or deployment checks.
+and receipt through retries. The [campaign sender](campaign-delivery.md) now
+implements these requirements with atomic preparation and guarded start receipts.
+Real provider/mailbox acceptance remains open; deployment checks issue no hosted
+links or campaign messages.
 
 ## Verification
 

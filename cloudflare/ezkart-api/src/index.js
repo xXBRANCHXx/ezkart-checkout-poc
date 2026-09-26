@@ -39,6 +39,7 @@ import {merchantSettings,saveMerchantSettings,settingsHistory,publicStoreProfile
 import {notificationInbox,notificationStats,readNotifications,notificationProcessing} from './commerce-notifications.js';
 import {dispatchNotifications,scheduleNotifications} from './commerce-notification-dispatch.js';
 import {dispatchEmails,recordEmailWebhook} from './commerce-email-delivery.js';
+import {dispatchCampaignEmails} from './campaign-email-delivery.js';
 import {emailInvestigations,lookupEmail,resolveEmail} from './email-investigation.js';
 import {campaignWorkspace,listCampaigns,readCampaign,saveCampaign,campaignHistory,campaignAudience} from './marketing-campaigns.js';
 import {readPublication,publishCampaign,changePublication,publicationRecipients,publicationHistory} from './campaign-publication.js';
@@ -1472,6 +1473,11 @@ export default {
         if(url.search)return json({ok:false,error:'Email callback parameters are invalid'},422);
         return json({ok:true,...await recordEmailWebhook(request,env,emailCallback[1])});
       }
+      if(url.pathname==='/internal/commerce/campaigns/drain'&&request.method==='POST'){
+        const input=await authenticateCommerceService(request,env,{strictJSON:true,maxBytes:2000});
+        if(url.search||Object.keys(input).some(k=>!['environment','limit'].includes(k))||input.environment!==(env.APP_ENVIRONMENT==='test'?'sandbox':'production')||input.limit!==undefined&&(!Number.isSafeInteger(input.limit)||input.limit<1||input.limit>2))return json({ok:false,error:'Campaign processing request is invalid'},422);
+        return json({ok:true,...await dispatchCampaignEmails(env,input.limit??2)});
+      }
       if(url.pathname==='/internal/commerce/email/drain'&&request.method==='POST'){
         const input=await authenticateCommerceService(request,env);
         if(url.search||Object.keys(input).some(k=>!['environment','limit'].includes(k))||input.environment!==(env.APP_ENVIRONMENT==='test'?'sandbox':'production')||input.limit!==undefined&&(!Number.isSafeInteger(input.limit)||input.limit<1||input.limit>2))return json({ok:false,error:'Email processing request is invalid'},422);
@@ -1898,6 +1904,9 @@ export default {
     }
   },
   async scheduled(controller, env, context) {
+    if(controller.cron==='*/3 * * * *'){
+      context.waitUntil(dispatchCampaignEmails(env));return;
+    }
     if(controller.cron==='*/2 * * * *'){
       context.waitUntil(dispatchEmails(env));return;
     }

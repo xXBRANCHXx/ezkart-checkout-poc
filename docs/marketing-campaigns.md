@@ -3,23 +3,18 @@
 The merchant Marketing workspace now uses saved campaign drafts, real customer
 audience previews and a planning calendar. The sample active campaigns,
 automation counts and toast-only controls have been removed. This delivery is
-the draft/audience portion of the larger marketing gate. Scheduling actual
-delivery, automation triggers, unsubscribe integration, provider receipts and
-performance reports remain required work. A [public unsubscribe flow](campaign-unsubscribe.md)
-now records store/address-specific withdrawals; the sender must still issue and
-include its links atomically. This document does not narrow that
-scope or mark marketing complete.
+the draft/audience portion of the larger marketing gate. Merchant publishing
+controls, automation triggers and useful performance reports remain required.
+Draft saving does not send mail or mark marketing complete.
 
-The [campaign message renderer and transport](campaign-delivery.md) now provide
-escaped email content, visible opt-out links, one-click headers and a separate
-campaign activation boundary. The recipient outbox and dispatch workflow must
-still connect those components; draft saving does not send mail.
-
-[Publication and recipient queues](campaign-publication.md) now persist frozen
-campaign/audience snapshots and revisioned scheduling/cancellation behind the
-private API/proxy. The merchant publishing controls and actual recipient
-message/dispatch integration remain pending; the visible calendar still plans
-drafts, and delivery remains unavailable.
+[Publication and recipient queues](campaign-publication.md) persist frozen
+campaign/audience snapshots and versioned scheduling/cancellation behind the
+private API/proxy. The [campaign sender](campaign-delivery.md) saves each message
+with its [unsubscribe token](campaign-unsubscribe.md), verifies current
+permission and identity, and records provider submission and signed delivery
+evidence. Publishing controls, operator recovery, automation and performance
+reporting remain outstanding; the visible calendar still plans drafts, and the
+workspace shows delivery unavailable while those are integrated.
 
 ## Merchant behavior
 

@@ -64,6 +64,28 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 27 September: campaign message outbox and guarded dispatch
+
+Implemented atomic message/unsubscribe preparation, immutable retry bytes and
+references, current verified identity/consent/access checks, leased dispatch,
+signed callback correlation and evidence-based merchant delivery summaries.
+Bounces, complaints and provider identity conflicts now apply across campaign
+and transactional email. Unknown submissions remain uncertain after withdrawal,
+cancellation or an expired retry window; later delivery evidence stays visible.
+
+See [campaign-delivery.md](campaign-delivery.md). Campaign operator recovery,
+merchant publishing controls, automation, performance reports, provider/hosted
+acceptance and capacity/monitoring remain open. The conservative TEST cron is
+not production throughput acceptance. Sending and central-commerce flags remain
+held, and no top-level readiness gate is closed.
+
+Local validation passes all 292 Worker tests, all three affected PHP proxy
+checks and syntax/diff/TEST build checks. The fresh private TEST backup restores
+with all rows in 103 existing physical tables preserved, valid integrity and no
+foreign-key errors. Migration 0036 adds 29 objects and changes exactly seven
+email/job guards; all five new tables are empty. All 13 current read/write plans
+compile against that restore without mutation.
+
 ### 27 September: durable campaign publication and recipient queues
 
 Implemented immutable campaign/store/audience snapshots, atomic sealing and

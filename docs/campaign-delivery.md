@@ -1,13 +1,12 @@
 # Campaign delivery integration
 
-The public [unsubscribe flow](campaign-unsubscribe.md), message renderer and
-strict Resend transport are implemented. [Durable publication](campaign-publication.md)
-now freezes the audience and creates recipient jobs with versioned scheduling
-and cancellation. Per-recipient immutable messages, current-permission dispatch,
-campaign callbacks/recovery, automation and performance reporting still need
-integration. No campaign route or cron invokes the new transport, and the
-Marketing workspace still reports delivery unavailable. This is preparatory
-code for the full marketing gate, not an activated sender.
+The renderer, durable publication, immutable recipient messages, send-time
+eligibility checks, signed provider callbacks and merchant delivery summaries
+are implemented. The campaign dispatcher has a separate service route and
+bounded cron. Sending remains held on TEST, and the Marketing workspace still
+reports delivery unavailable until publishing controls and recovery are ready.
+Provider activation, operator investigation, automation and performance reporting
+remain part of the full marketing gate.
 
 ## Message and transport contract
 
@@ -52,36 +51,93 @@ headers as required by [RFC 8058](https://www.rfc-editor.org/info/rfc8058/).
 Browser rendering and fixture submissions do not establish mail-client or
 provider interoperability.
 
-## Remaining durable sender work
+## Durable dispatch and delivery evidence
 
-Publication now preserves the authorized merchant request, expected campaign
-revision, content, audience selection, schedule and store/environment scope.
-Original retries recover the same publication; later draft edits cannot rewrite
-it. The recipient jobs still need the full preparation/dispatch integration.
+Migration 0036 adds five campaign email tables: immutable requests, start
+receipts, provider bindings, lifecycle events and no-send decisions. Campaign
+recipients retain their publication authority rather than becoming transactional
+notification recipients. Each message and its unsubscribe token are saved in
+one D1 batch. A failed batch leaves neither; a lost acknowledgement recovers
+the original message and token. The request fixes the credential identity,
+recipient, rendered bytes, idempotency key and a 23-hour retry deadline.
 
-Recipient preparation must use authoritative customer ownership and the
-store/account/address-specific promotional grant. It must atomically save each
-immutable recipient message with its unsubscribe token statement. A failed
-transaction cannot leave an issued link without its message; an existing
-recipient reference must recover its stored link and payload. Preparation must
-be resumable and bounded, with duplicate recipient protection and honest counts.
+Before preparation and every retry, the dispatcher checks the active store,
+publisher role, current order ownership, the exact captured consent revision,
+current verified Auth address and TEST allowlist. A withdraw/regrant cycle does
+not revive an older publication. Campaigns older than one day after their send
+time are skipped, as are schedules before the configured activation cutoff.
+A shop button requires the shop to remain enabled. Draft edits and a renamed
+store never rewrite the published content.
 
-Dispatch must independently verify the current Auth address, permission,
-suppression, store/publisher access, active lease, schedule and cancellation
-state immediately before submission. An address captured at checkout or a
-successful rendering is not authorization. Campaign bounce/complaint evidence
-must participate in the shared suppression state used by all email purposes.
+The last database operation before POST records a network start only with an
+active lease lasting at least 20 more seconds, an identity check no older than
+60 seconds, a due/non-cancelled schedule, current access and consent, no prior
+submission and no address suppression. Cancellation cannot recall a network
+request already in flight. If an earlier start exists, a later eligibility,
+credential or deadline failure preserves uncertainty and stops further sends.
+No-send receipts cannot erase start evidence.
 
-Submission starts, provider bindings and signed callbacks need durable,
-immutable correlation. A lost acknowledgement must retain the original bytes
-and key; expired retry windows, changed credentials or withdrawn permission
-after an earlier start must remain visibly uncertain until evidence resolves
-them. Cancellation cannot claim to recall an already-submitted email. Merchant
-history must distinguish queued, skipped, uncertain, submitted, delivered and
-failed states, and performance must use actual evidence. Provider acceptance,
-authenticated hosted workflows and operational load/recovery remain required.
+The signed Resend entrypoint routes campaign callbacks by their delivery and
+purpose tags after verifying the raw signature. It matches environment, profile,
+provider ID, sender, recipient, subject and time against the immutable request
+and requires a saved network start. Early callbacks can resolve a lost POST
+response. Repeated identical events are harmless; conflicting evidence fails.
+A shared provider-binding view prevents the same ID from identifying unrelated
+campaign and transactional requests. Bounce, complaint and provider-suppression
+evidence from either purpose suppresses that address throughout the environment,
+including evidence obtained by the transactional investigation service.
 
-## Verification
+Private publication reads add `deliverySummary`, with evidence-based submitted,
+delivered, skipped, uncertain, failed, bounced, complained, suppressed, delayed
+and needs-review counts. Submitted and delivered counts can overlap subsequent
+complaints. Recipient pages add a `delivery` object with state, reason,
+submission/delivery evidence times and an independent `needsReview` flag. Late
+delivery remains visible even if a dead queue job still needs operator recovery.
+Sent/delayed callbacks cannot reverse a recorded delivery. These are transport
+outcomes; they do not claim opens, clicks, revenue or conversion attribution.
+
+`POST /internal/commerce/campaigns/drain` accepts a signed service request with
+`environment` and an optional integer `limit` of 1–2. It rejects mismatched
+environments and extra/duplicate/oversized input. The `*/3 * * * *` cron invokes
+only this dispatcher. Each invocation first recovers uncertain jobs, then claims
+queued work, and processes at most two recipients under the existing bounded
+attempt policy. Two normal deliveries fit the 50-query D1 budget. The default
+cron provides at most 40 attempts/hour; it is a conservative TEST cadence, not
+a production throughput target. Capacity/rate-limit planning and monitored
+operator or queue-driven execution remain required before activation.
+
+## Remaining acceptance and product work
+
+Merchant publishing/scheduling controls, campaign-specific provider lookup and
+operator recovery, automation triggers, useful performance reports, operational
+load/alerting and authenticated hosted workflows remain necessary. Provider
+acceptance must verify real mailbox receipt, sender authentication and DKIM
+coverage of both unsubscribe headers. The current fixtures establish database,
+transport and application behavior; no real campaign mail has been sent by this
+rollout and no top-level completion gate is closed.
+
+## Sender validation
+
+All **292 Worker tests** pass on the completed sender change, including **39
+new campaign-delivery checks**. The three affected PHP publication-proxy checks,
+syntax checks, whitespace checks and TEST dry-run build also pass. Coverage
+includes exact retry bytes/tokens, response loss before and after database
+commit, atomic rollback, early/duplicate/conflicting callbacks, fresh identity,
+consent/role changes at preparation and start, cancellation during a batch,
+provider identity conflicts and suppression across purposes, deadline/attempt
+limits, reporting order, scoped publication reads and the per-invocation query
+budget. The complete existing financial, shipping, inventory, notification,
+customer, messaging and email-investigation suites remain green.
+
+A fresh private TEST export (532,962 bytes; SHA-256
+`0f9a762552bff8a875d315dbad42e4530f3f007a627556859a93a34d7d0d6fcc`)
+restores in original order, passes integrity/foreign-key checks and preserves
+every row across all 103 existing physical tables after migration 0036. The
+migration adds 29 objects and changes exactly seven completion/email guards.
+Thirteen current read/write SQL plans compile against the restored database
+without writes. The five new tables remain empty in that rehearsal.
+
+## Earlier renderer validation
 
 Seven campaign unit cases cover activation holds, all existing delivery
 boundaries, escaped rendering, owned links, one-click headers, exact retry
@@ -99,7 +155,7 @@ copy, maximum unbroken Unicode body text and a campaign without a shop button.
 These checks use isolated local browsers and fixture-only provider calls;
 they issue no hosted campaign link or email.
 
-## TEST rollout
+## Earlier renderer TEST rollout
 
 Implementation `ba6e0d2` is pushed to `agent/ezkart-workbench`. TEST Worker
 `86a09912-b1fc-4a18-b08f-0c4cfc0f6560` is deployed. At 26 September 17:47 UTC,

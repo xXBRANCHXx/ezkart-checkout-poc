@@ -4,10 +4,11 @@ Publication now captures the approved draft, store identity, schedule and
 consented customer audience in one D1 transaction. The sealed audience creates
 one durable `campaign.send` job per account/address, with no token issuance or
 provider request. This is the publication/recipient-queue part of the full
-marketing workflow. Per-recipient message preparation, send-time revalidation,
-provider dispatch/callbacks/recovery and the merchant publishing controls still
-need integration. The existing Marketing UI continues to report delivery
-unavailable, and campaign jobs cannot yet be claimed or completed as sent.
+marketing workflow. [Campaign delivery](campaign-delivery.md) now integrates
+per-recipient message preparation, current-permission dispatch and provider
+callbacks. Operator recovery and merchant publishing controls remain necessary.
+The existing Marketing UI continues to report delivery unavailable, and sending
+remains held behind the campaign/email/commerce configuration.
 
 ## Publication and schedule behavior
 
@@ -40,7 +41,7 @@ unavailable, and campaign jobs cannot yet be claimed or completed as sent.
 - Cancellation is terminal and remains available while sending/commerce are
   held. It stops only jobs that are still queued with no attempt. A running or
   previously attempted job retains its actual state and evidence; cancellation
-  does not claim that such an email was never submitted. The eventual sender
+  does not claim that such an email was never submitted. The sender
   must honor the cancellation immediately before a new provider submission.
 - New publications are limited to 10 per hour and 100 per day per store and
   environment. Publication changes are limited to 20 per minute per campaign.
@@ -74,8 +75,9 @@ retaining the last schedule after cancellation. The read query retrieves
 publication state and queue counts in the same database snapshot. A missing
 recipient job fails the read for operator review instead of reporting a
 smaller audience. Campaign jobs reject replacement/deletion, and a temporary
-completion guard refuses `succeeded` until actual delivery receipts are
-integrated. The existing job claimant does not yet accept `campaign.send`.
+completion guard requires a provider binding or a confirmed no-send receipt.
+The job claimant accepts `campaign.send`; the dedicated dispatcher requires the
+campaign activation flag and every existing email/commerce prerequisite.
 
 All paths extend `/v1/commerce/marketing/campaigns/{campaign_id}` and use the
 current authenticated merchant/store:
@@ -105,8 +107,8 @@ populated drafts/consents/orders. The real PHP proxy tests interrupted
 publication/action acknowledgements, the preserved audience/history,
 route/account/CSRF/origin/size guards and a sign-in replacement after commit.
 
-Provider dispatch, per-recipient immutable messages, campaign event correlation,
-signed-in hosted publishing controls, load/recovery acceptance, automation and
+Campaign-specific operator recovery, merchant publishing controls,
+signed-in hosted acceptance, load/recovery acceptance, automation and
 performance reporting remain required. No top-level marketing or release gate
 is closed by this publication foundation.
 

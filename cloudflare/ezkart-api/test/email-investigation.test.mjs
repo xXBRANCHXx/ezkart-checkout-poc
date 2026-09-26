@@ -192,10 +192,12 @@ test('migration preserves existing email requests, events and bindings',async t=
   // Remove them before applying the migration; no new receipt table exists yet.
   await f.db.prepare('CREATE VIEW commerce_email_verified_bindings AS SELECT request_id,commerce_environment,profile_id,provider_id,created_at FROM commerce_email_provider_bindings').run();
   await f.db.prepare('CREATE VIEW commerce_email_delivery_evidence AS SELECT request_id,kind,occurred_at,received_at AS observed_at,source FROM commerce_email_events').run();
+  await f.db.prepare("CREATE VIEW commerce_email_suppressions AS SELECT x.commerce_environment,x.email_hash FROM commerce_email_requests x JOIN commerce_email_events e ON e.request_id=x.id WHERE e.kind IN ('bounced','complained','suppressed')").run();
   const x=await f.make();assert(x);
   const tables=['commerce_email_requests','commerce_email_starts','commerce_email_events','commerce_email_provider_bindings'];
   const before=await Promise.all(tables.map(table=>f.db.prepare('SELECT * FROM '+table+' ORDER BY rowid').all()));
   await f.db.prepare('DROP VIEW commerce_email_verified_bindings').run();await f.db.prepare('DROP VIEW commerce_email_delivery_evidence').run();
+  await f.db.prepare('DROP VIEW commerce_email_suppressions').run();
   await applyCommerceSchema(f.db,31,32);
   assert.equal((await f.db.prepare('PRAGMA foreign_key_check').all()).results.length,0);
   for(let i=0;i<tables.length;i++)assert.deepEqual((await f.db.prepare('SELECT * FROM '+tables[i]+' ORDER BY rowid').all()).results,before[i].results);

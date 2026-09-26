@@ -23,7 +23,7 @@ test('publication freezes one authorized campaign and consent audience atomicall
   const replay=await f.publish(input);assert.equal(replay.status,200,replay.error);assert.equal(replay.receipt.replayed,true);assert.equal(replay.publication.campaignRevision,1);assert.equal(replay.publication.values.subject,f.values.subject);assert.equal(replay.publication.storeName,'alice');assert.equal(replay.publication.candidateCount,2);
   assert.equal((await f.publish({...input,revision:2})).code,'campaign_publication_reference');assert.equal((await f.publish(f.intent())).code,'campaign_already_published');
   assert.equal(await count(f,'commerce_unsubscribe_tokens'),0);assert.equal(await count(f,'commerce_email_requests'),0);
-  const claim=await f.call('/internal/commerce/jobs/claim',{environment:'sandbox',workerId:'fixture_worker',kinds:['campaign.send']});assert.equal(claim.status,422);
+  const claim=await f.call('/internal/commerce/jobs/claim',{environment:'sandbox',workerId:'fixture_worker',kinds:['campaign.send']});assert.equal(claim.status,200);assert.equal(claim.jobs.length,2);
   await assert.rejects(f.db.prepare("UPDATE commerce_jobs SET state='succeeded' WHERE kind='campaign.send'").run(),/campaign_delivery_receipt_required/);
   await assert.rejects(f.db.prepare("DELETE FROM commerce_jobs WHERE kind='campaign.send'").run(),/campaign_job_immutable/);
 });
@@ -106,7 +106,7 @@ test('migration preserves populated drafts, ownership and consent before new pub
   const tables=['commerce_campaigns','commerce_campaign_changes','commerce_customer_consents','commerce_customer_consent_changes','orders'];
   const before=await Promise.all(tables.map(name=>f.db.prepare('SELECT * FROM '+name+' ORDER BY rowid').all()));await applyCommerceSchema(f.db,34,35);
   for(let n=0;n<tables.length;n++)assert.deepEqual((await f.db.prepare('SELECT * FROM '+tables[n]+' ORDER BY rowid').all()).results,before[n].results);
-  assert.equal((await f.publish()).status,200);assert.equal((await f.db.prepare('PRAGMA foreign_key_check').all()).results.length,0);
+  await applyCommerceSchema(f.db,35,36);assert.equal((await f.publish()).status,200);assert.equal((await f.db.prepare('PRAGMA foreign_key_check').all()).results.length,0);
 });
 
 test('membership and consent changes between preflight and the atomic write cannot publish an unauthorized audience',async t=>{

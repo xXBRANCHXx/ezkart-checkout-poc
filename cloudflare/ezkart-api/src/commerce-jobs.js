@@ -2,8 +2,8 @@ import {commerceEnvironment, commerceHash} from './commerce-orders.js';
 import {notificationSourceKinds} from './notification-policy.js';
 
 const fail = (message, status = 422) => { throw new Response(message, {status}); };
-const kinds = ['payment.create', 'shipment.create', 'shipment.cancel', 'shipment.refresh', ...notificationSourceKinds, 'notification.send', 'payout.create', 'wallet.register'];
-const boundedNotificationKinds=[...notificationSourceKinds,'notification.send'];
+const kinds = ['payment.create', 'shipment.create', 'shipment.cancel', 'shipment.refresh', ...notificationSourceKinds, 'notification.send', 'campaign.send', 'payout.create', 'wallet.register'];
+const boundedNotificationKinds=[...notificationSourceKinds,'notification.send','campaign.send'];
 const validId = value => typeof value === 'string' && /^[A-Za-z0-9_-]{3,100}$/.test(value);
 const view = row => ({id: row.id, sellerId: row.seller_id, orderId: row.order_id, environment: row.commerce_environment,
   kind: row.kind, state: row.state, data: JSON.parse(row.payload_json), attempts: row.attempts,
@@ -84,6 +84,10 @@ export async function finishCommerceJob(env, jobId, input) {
   if(row.kind==='notification.send'&&input.outcome==='succeeded'&&!await env.DB.prepare(`SELECT x.id FROM commerce_email_requests x JOIN commerce_email_verified_bindings b ON b.request_id=x.id WHERE x.job_id=?
     UNION ALL SELECT job_id FROM commerce_email_skips WHERE job_id=? AND uncertain=0 LIMIT 1`).bind(row.id,row.id).first()){
     fail('Record the email submission or a confirmed no-send decision before completing this job',409);
+  }
+  if(row.kind==='campaign.send'&&input.outcome==='succeeded'&&!await env.DB.prepare(`SELECT x.id FROM commerce_campaign_email_requests x JOIN commerce_campaign_email_provider_bindings b ON b.request_id=x.id WHERE x.job_id=?
+    UNION ALL SELECT job_id FROM commerce_campaign_email_skips WHERE job_id=? AND uncertain=0 LIMIT 1`).bind(row.id,row.id).first()){
+    fail('Record the campaign submission or a confirmed no-send decision before completing this job',409);
   }
   if(row.kind==='wallet.register'&&input.outcome==='succeeded'){
     const recorded=await env.DB.prepare(`SELECT p.enrollment_id FROM commerce_wallet_provider_profiles p JOIN commerce_wallet_enrollments e ON e.id=p.enrollment_id

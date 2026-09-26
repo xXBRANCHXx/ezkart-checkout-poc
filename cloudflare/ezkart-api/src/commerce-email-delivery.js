@@ -1,10 +1,11 @@
+import {saveEmailEvent} from './email-events.js';
+import {recordCampaignEmailEvent} from './campaign-email-delivery.js';
 import {commerceHash} from './commerce-orders.js';
 import {claimCommerceJobs,finishCommerceJob} from './commerce-jobs.js';
 import {emailConfiguration,emailCredentialHash,verifiedEmailRecipient,sendResendEmail,emailProviderId,verifyResendWebhook} from './email-provider.js';
 import {notificationEmailPayload} from './email-template.js';
 
 const fail=(message,status=422)=>{throw new Response(message,{status});};
-const conflict=message=>{throw Object.assign(new Response(message,{status:409}),{code:'email_evidence_conflict'});};
 const invalid=()=>{throw Object.assign(new Error('The email source needs an operator review.'),{code:'email_source_invalid'});};
 const at=()=>new Date().toISOString();
 const finish=(env,job,workerId,outcome,result,error='')=>finishCommerceJob(env,job.id,{environment:job.environment,workerId,leaseToken:job.leaseToken,outcome,result,error});
@@ -50,21 +51,6 @@ async function skip(env,job,workerId,row,request,reason){
     VALUES(?,?,?,?,?,?,?)`).bind(job.id,row.recipient_id,request?.id||null,reason,Number(uncertain),job.leaseToken,at()).run();
   return finish(env,job,workerId,uncertain?'dead':'succeeded',{deliveryId:request?.id||null,skipped:reason,uncertain},uncertain?'An earlier email submission needs an operator review.':'');
 }
-async function saveEvent(env,event){
-  const same=await env.DB.prepare('SELECT request_id,body_hash,provider_id,kind FROM commerce_email_events WHERE commerce_environment=? AND profile_id=? AND source=? AND source_id=?')
-    .bind(event.environment,event.profile,event.source,event.sourceId).first();
-  if(same){if(same.request_id!==event.requestId||same.body_hash!==event.hash||same.provider_id!==event.providerId||same.kind!==event.kind)conflict('This email callback already has different evidence');return {duplicate:true};}
-  try{await env.DB.prepare(`INSERT INTO commerce_email_events(request_id,commerce_environment,profile_id,provider_id,source,source_id,attempt_id,kind,raw_json,body_hash,occurred_at,received_at)
-    SELECT ?,?,?,?,?,?,?,?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM commerce_email_events WHERE commerce_environment=? AND profile_id=? AND source=? AND source_id=?)`)
-    .bind(event.requestId,event.environment,event.profile,event.providerId,event.source,event.sourceId,event.attemptId||null,event.kind,event.raw,event.hash,event.occurredAt,event.receivedAt,
-      event.environment,event.profile,event.source,event.sourceId).run();}
-  catch(error){if(/email_(event_invalid|provider_conflict|immutable)/.test(String(error)+' '+String(error.cause||'')))conflict('Email delivery evidence does not match the saved request');throw error;}
-  // A concurrent duplicate can win the insert. It must still be identical.
-  const saved=await env.DB.prepare('SELECT request_id,body_hash,provider_id,kind FROM commerce_email_events WHERE commerce_environment=? AND profile_id=? AND source=? AND source_id=?')
-    .bind(event.environment,event.profile,event.source,event.sourceId).first();
-  if(!saved||saved.request_id!==event.requestId||saved.body_hash!==event.hash||saved.provider_id!==event.providerId||saved.kind!==event.kind)conflict('Email delivery evidence changed while being saved');
-  return {duplicate:false};
-}
 
 export async function deliverEmailJob(env,job,workerId,fetcher=fetch){
   const configuration=emailConfiguration(env);
@@ -83,8 +69,7 @@ export async function deliverEmailJob(env,job,workerId,fetcher=fetch){
   if(request&&request.recipient_email!==recipient.email)return skip(env,job,workerId,row,request,'address_changed');
   if(configuration.environment==='sandbox'&&!configuration.allowlist.includes(recipient.email))return skip(env,job,workerId,row,request,'test_recipient');
   const emailHash=await commerceHash({environment:job.environment,email:recipient.email});
-  if(await env.DB.prepare(`SELECT x.id FROM commerce_email_requests x JOIN commerce_email_delivery_evidence e ON e.request_id=x.id
-    WHERE x.commerce_environment=? AND x.email_hash=? AND e.kind IN ('bounced','complained','suppressed') LIMIT 1`).bind(job.environment,emailHash).first())return skip(env,job,workerId,row,request,'suppressed');
+  if(await env.DB.prepare(`SELECT email_hash FROM commerce_email_suppressions WHERE commerce_environment=? AND email_hash=? LIMIT 1`).bind(job.environment,emailHash).first())return skip(env,job,workerId,row,request,'suppressed');
   if(!request){
     const id='email_'+(await commerceHash({recipient:row.recipient_id,environment:job.environment})).slice(0,32),created=at();
     const payload=notificationEmailPayload(configuration,row,recipient.email,id),key='ezkart_email/'+job.environment+'/'+row.recipient_id;
@@ -106,7 +91,7 @@ export async function deliverEmailJob(env,job,workerId,fetcher=fetch){
     if(changed)return skip(env,job,workerId,current,saved,changed);
   }throw error;}
   const submitted=await sendResendEmail(env,request.request_json,request.idempotency_key,fetcher),received=at();
-  await saveEvent(env,{requestId:request.id,environment:job.environment,profile:request.profile_id,providerId:submitted.id,source:'api',sourceId:attemptId,attemptId,
+  await saveEmailEvent(env,{requestId:request.id,environment:job.environment,profile:request.profile_id,providerId:submitted.id,source:'api',sourceId:attemptId,attemptId,
     kind:'accepted',raw:submitted.raw,hash:await commerceHash(submitted.raw),occurredAt:received,receivedAt:received});
   return finish(env,job,workerId,'succeeded',{deliveryId:request.id,submitted:true});
 }
@@ -143,6 +128,7 @@ export async function recordEmailWebhook(request,env,profile){
   const kinds={'email.sent':'sent','email.delivered':'delivered','email.delivery_delayed':'delayed','email.bounced':'bounced','email.complained':'complained','email.failed':'failed','email.suppressed':'suppressed'};
   if(!Object.hasOwn(kinds,payload.type))return {ignored:true};
   const data=payload.data,tags=data?.tags,environment=env.APP_ENVIRONMENT==='test'?'sandbox':'production';
+  if(tags&&/^campmail_[a-f0-9]{32}$/.test(tags.ezkart_delivery||''))return recordCampaignEmailEvent(env,event,profile);
   if(!tags||typeof tags!=='object'||Array.isArray(tags)||!/^email_[a-f0-9]{32}$/.test(tags.ezkart_delivery||''))return {ignored:true};
   if(tags.ezkart_profile!==profile||tags.ezkart_environment!==environment||!emailProviderId(data.email_id))fail('Email callback identity is invalid');
   if(typeof payload.created_at!=='string'||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$/.test(payload.created_at)
@@ -152,6 +138,6 @@ export async function recordEmailWebhook(request,env,profile){
   if(!saved)return {ignored:true};
   const original=JSON.parse(saved.request_json);
   if(!saved.started||Date.parse(payload.created_at)<Date.parse(saved.created_at)-300000||data.from!==original.from||data.subject!==original.subject||!Array.isArray(data.to)||data.to.length!==1||data.to[0]!==saved.recipient_email)fail('Email callback does not match the saved request',409);
-  return {ignored:false,...await saveEvent(env,{requestId:saved.id,environment,profile,providerId:data.email_id,source:'webhook',sourceId:event.id,
+  return {ignored:false,...await saveEmailEvent(env,{requestId:saved.id,environment,profile,providerId:data.email_id,source:'webhook',sourceId:event.id,
     kind:kinds[payload.type],raw:event.raw,hash:event.hash,occurredAt:new Date(payload.created_at).toISOString(),receivedAt:event.receivedAt})};
 }

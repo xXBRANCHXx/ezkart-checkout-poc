@@ -54,6 +54,10 @@ or provider suppression prevents future sends to that address throughout the
 same Ezkart environment, including another store. See
 [Resend lifecycle events](https://resend.com/docs/webhooks/event-types).
 
+Migration 0036 shares address suppression and provider-ID uniqueness with
+[campaign delivery](campaign-delivery.md), including suppression evidence
+obtained through the transactional investigation service.
+
 ## Callbacks and recovery
 
 `POST /webhooks/commerce-email/resend/{profile}` verifies the exact raw body with
