@@ -704,6 +704,7 @@ function ez_admin_sync_cloudflare_user(string $accessToken): array
 
 function ez_admin_proxy_cloud_request(string $accessToken, string $path, string $method): never
 {
+    if (str_starts_with($path, '/v1/commerce/messages')) { require_once __DIR__ . '/message-proxy.php'; ez_admin_message_proxy($accessToken, $path, $method); }
     if ($path === '/v1/shipping-address-search') {
         if ($method !== 'POST') ez_admin_json(['ok' => false, 'error' => 'Method not allowed.'], 405);
         require_once __DIR__ . '/../api/tracking-address-service.php';
@@ -1429,7 +1430,8 @@ $centralCustomerWorkspace = $authenticated && $page === 'customers' && (ez_confi
     || ($authenticationMethod === 'supabase' && ($_GET['tab'] ?? '') === 'reviews')
     || ($deployment === 'test' && $authenticationMethod === 'supabase' && ($_GET['customer-preview'] ?? '') === '1'));
 $centralWalletWorkspace = $authenticated && $page === 'wallet' && ez_config('commerce_storage') === 'd1';
-$centralReadWorkspace = $centralOrderWorkspace || $centralDashboardWorkspace || $centralAnalyticsWorkspace || $centralPaymentWorkspace || $centralCustomerWorkspace || $centralWalletWorkspace;
+$centralMessageWorkspace = $authenticated && $page === 'messages';
+$centralReadWorkspace = $centralMessageWorkspace || $centralOrderWorkspace || $centralDashboardWorkspace || $centralAnalyticsWorkspace || $centralPaymentWorkspace || $centralCustomerWorkspace || $centralWalletWorkspace;
 $orders = (!$centralReadWorkspace && $authenticated && ($legacyDataAccess || $sellerId !== '')) ? array_values(array_filter(ez_admin_orders(), static fn($order) => ez_dashboard_order_visible($order, $sellerId, $legacyDataAccess))) : [];
 $allOrderCount = count($orders);
 $orderQueues = [

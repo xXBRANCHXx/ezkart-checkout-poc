@@ -64,6 +64,22 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 26 September: persistent buyer and seller messaging
+
+Replaced the sample inbox with real buyer/store conversations, public-product and
+owned-order entry, private photos, per-person unread state, saved replies,
+revision-protected conversation state, bounded history and real response metrics.
+Both browser interfaces preserve uncertain requests across reloads. Removed store
+memberships no longer return through account initialization. See
+[commerce-messaging.md](commerce-messaging.md) for the authorization, persistence,
+media, limits and rollout evidence. The 157-test Worker suite and 100 affected
+PHP/browser regression checks, plus 10 messaging/order browser checks, pass. Authenticated hosted acceptance and reliable
+external notification delivery remain open; the top-level gate stays unchecked.
+TEST migrations 0026/0027 and Worker
+`db122a29-7784-4385-b303-889032fa57b9` are deployed with 77 tables. The seven new
+message tables are empty; all existing counts and the import manifest are
+unchanged. Backup restoration, private-route guards and storage-hold checks pass.
+
 ### 26 September: durable provider financial observations
 
 Added private, immutable provider balance/history receipts tied to confirmed

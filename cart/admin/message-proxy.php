@@ -1,0 +1,39 @@
+<?php
+declare(strict_types=1);
+if (!function_exists('ez_admin_json')) { http_response_code(404); exit; }
+
+function ez_admin_message_proxy(string $token, string $path, string $method): never
+{
+    require_once __DIR__ . '/../api/message-query.php';
+    $session = session_id(); $account = (string) ($_SESSION['admin_user']['id'] ?? ''); $csrf = (string) ($_SESSION['csrf_token'] ?? '');
+    $store = (string) ($_SERVER['HTTP_X_EZKART_MESSAGE_STORE'] ?? '');
+    if ($account === '' || !hash_equals($account, (string) ($_SERVER['HTTP_X_EZKART_MESSAGE_ACCOUNT'] ?? '')) || $csrf === ''
+        || !hash_equals($csrf, (string) ($_SERVER['HTTP_X_EZKART_CSRF'] ?? '')) || preg_match('/^[A-Za-z0-9][A-Za-z0-9_-]{2,95}$/D', $store) !== 1) {
+        ez_admin_json(['ok' => false, 'error' => 'Your sign-in or store changed. Reload this page.', 'code' => 'message_session_changed'], 401);
+    }
+    try { $target = ez_message_target(substr($path, strlen('/v1/commerce/messages')), $method, true); }
+    catch (InvalidArgumentException $error) { ez_admin_json(['ok' => false, 'error' => $error->getMessage()], 400); }
+    if ($method === 'POST' && ez_config('commerce_storage') !== 'd1') ez_admin_json(['ok' => false, 'error' => 'Messaging is not enabled yet.'], 503);
+    if ($method === 'POST' && !ez_request_origin_allowed()) ez_admin_json(['ok' => false, 'error' => 'Reload this page before sending.'], 403);
+    $maximum = $target['upload'] ? 1401000 : 24000;
+    $body = $method === 'POST' ? file_get_contents('php://input', false, null, 0, $maximum + 1) : '';
+    if (!is_string($body) || strlen($body) > $maximum) ez_admin_json(['ok' => false, 'error' => 'Message is too large.'], 413);
+    $handle = curl_init(rtrim(ez_config('cloudflare_api_url'), '/') . '/v1/commerce/messages' . $target['path']);
+    if ($handle === false) ez_admin_json(['ok' => false, 'error' => 'Messaging is unavailable.'], 503);
+    curl_setopt_array($handle, [CURLOPT_CUSTOMREQUEST => $method, CURLOPT_HTTPHEADER => ['Accept: application/json', 'Content-Type: application/json',
+        'Authorization: Bearer ' . $token, 'X-Ezkart-Message-Store: ' . $store], CURLOPT_POSTFIELDS => $method === 'POST' ? $body : null,
+        CURLOPT_RETURNTRANSFER => true, CURLOPT_CONNECTTIMEOUT => 4, CURLOPT_TIMEOUT => 25, CURLOPT_SSL_VERIFYPEER => true, CURLOPT_SSL_VERIFYHOST => 2, CURLOPT_FOLLOWLOCATION => false]);
+    $raw = curl_exec($handle); $status = (int) curl_getinfo($handle, CURLINFO_HTTP_CODE); $type = (string) curl_getinfo($handle, CURLINFO_CONTENT_TYPE);
+    session_id($session); $_SESSION = []; session_start();
+    $same = ($_SESSION['authenticated'] ?? false) === true && ($_SESSION['authentication_method'] ?? '') === 'supabase'
+        && ($_SESSION['admin_user']['id'] ?? '') === $account && ($_SESSION['csrf_token'] ?? '') === $csrf
+        && (empty($_SESSION['mfa_enabled']) || ($_SESSION['mfa_aal'] ?? '') === 'aal2');
+    session_write_close();
+    if (!$same) { header_remove('Set-Cookie'); ez_admin_json(['ok' => false, 'error' => 'Your sign-in changed. Reload to check the saved message.', 'code' => 'message_session_changed'], 401); }
+    if (is_string($raw) && $target['photo'] && $status === 200 && in_array($type, ['image/jpeg','image/png','image/webp'], true)) {
+        header('Content-Type: ' . $type); header('Cache-Control: no-store'); header('X-Content-Type-Options: nosniff'); header("Content-Security-Policy: default-src 'none'; sandbox"); echo $raw; exit;
+    }
+    $data = is_string($raw) ? json_decode($raw, true) : null;
+    if (!is_array($data)) ez_admin_json(['ok' => false, 'error' => 'The result was not confirmed. Retry the same request.'], 503);
+    ez_admin_json($data, in_array($status, [200,400,401,403,404,409,410,413,415,422,429], true) ? $status : 503);
+}

@@ -142,6 +142,12 @@
     saveShop(shop);
     try { sessionStorage.setItem("ezkart.checkout.brand", JSON.stringify({ ...shop, scope: state.shop })); } catch (_) {}
 
+    const messageLink = byId("merchant-message");
+    if (messageLink) {
+      const product = params.get('product');
+      const context = product && hostedStore ? 'product=' + encodeURIComponent(product) : hostedStore?.enabled ? 'store=' + encodeURIComponent(hostedStore.id) : '';
+      messageLink.hidden = !context; messageLink.href = '/cart/messages.php' + (context ? '?' + context : '');
+    }
     byId("merchant-name").textContent = name;
     byId("merchant-avatar").textContent = name.charAt(0).toUpperCase();
     const image = byId("merchant-logo");

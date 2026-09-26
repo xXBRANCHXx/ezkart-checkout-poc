@@ -14,3 +14,5 @@
 @keyframes shop-fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes shop-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 @media (prefers-reduced-motion: reduce) { [data-store-animation] :is(.shop-product,.shop-heading,.checkout-content,.order-summary) { animation: none; } }
+
+.merchant-message{margin-left:auto;font-size:12px;font-weight:600;color:var(--store-accent,#5d50d7);white-space:nowrap}

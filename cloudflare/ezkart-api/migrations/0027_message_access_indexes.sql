@@ -1,0 +1,3 @@
+CREATE INDEX commerce_message_buyer_inbox ON commerce_conversations(buyer_auth_user_id,commerce_environment,created_at,id);
+CREATE INDEX commerce_message_upload_rate ON commerce_message_media(actor_kind,actor_id,created_at);
+CREATE INDEX commerce_saved_replies_store ON commerce_saved_replies(seller_id,commerce_environment,state,title,id);

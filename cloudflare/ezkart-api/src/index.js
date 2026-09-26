@@ -32,6 +32,9 @@ import {customerConsents} from './commerce-customer-consents.js';
 import {buyerReviews,saveBuyerReview,merchantReview,saveMerchantReview,reviewHistory,reviewMode} from './commerce-reviews.js';
 import {merchantReviews,publicReviews,publicReviewSql} from './commerce-review-reads.js';
 import {uploadReviewPhoto,reviewPhoto,cleanupReviewPhotos} from './commerce-review-media.js';
+import {startConversation,sendMessage,conversationDetail,markConversationRead,messageInbox,messageStats,savedReplies,saveReply} from './commerce-messages.js';
+import {uploadMessagePhoto,messagePhoto,cleanupMessagePhotos} from './commerce-message-media.js';
+import {parseMessageJSON} from './message-json.js';
 import {merchantAnalytics} from './commerce-analytics.js';
 import {createAnalyticsExport,readAnalyticsExport,cleanupAnalyticsExports} from './commerce-analytics-exports.js';
 const json = (payload, status = 200, headers = {}) => new Response(JSON.stringify(payload), {
@@ -202,7 +205,8 @@ async function currentUser(request, env) {
     ORDER BY sm.created_at ASC
   `).bind(user.id).all();
 
-  if (!Array.isArray(memberships.results) || memberships.results.length === 0) {
+  if ((!Array.isArray(memberships.results) || memberships.results.length === 0)
+    && !await env.DB.prepare('SELECT id FROM sellers WHERE id=?').bind(`seller_${user.id}`).first()) {
     const displayName = String(metadata.full_name || metadata.name || "").trim();
     const emailName = String(user.email || "").split("@")[0].trim();
     const sellerName = (displayName || emailName || "My Ezkart Store").slice(0, 120);
@@ -260,14 +264,14 @@ async function requestJson(request, maximumBytes = 350000) {
 
 // Review image uploads may be streamed without Content-Length. Enforce their
 // bound on bytes actually read, including for small review mutation bodies.
-async function reviewRequestJson(request, maximumBytes=24000) {
+async function reviewRequestJson(request, maximumBytes=24000, parser=JSON.parse) {
   if(!/^application\/json(?:;|$)/i.test(request.headers.get('content-type')||''))throw new Response('Use a JSON request',{status:415});
   const reader=request.body?.getReader();if(!reader)throw new Response('Request body is required',{status:400});
   let size=0;const chunks=[];
   try{while(true){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>maximumBytes){await reader.cancel();throw new Response('Request body is too large',{status:413});}chunks.push(value);}}
   finally{reader.releaseLock();}
   const bytes=new Uint8Array(size);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.length;}
-  let body;try{body=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));}catch{throw new Response('Request body must be valid JSON',{status:400});}
+  let body;try{body=parser(new TextDecoder('utf-8',{fatal:true}).decode(bytes));}catch{throw new Response('Request body must be valid JSON',{status:400});}
   if(!body||typeof body!=='object'||Array.isArray(body))throw new Response('Request body must be an object',{status:400});
   return body;
 }
@@ -1525,6 +1529,27 @@ export default {
       const landingViewMatch = /^\/v1\/landing-pages\/([a-z0-9-]+)\/view$/.exec(url.pathname);
       if (request.method === "GET" && landingViewMatch) return await landingPageView(request, env, landingViewMatch[1]);
       if (request.method === "GET" && url.pathname === "/health") return json(await health(env), 200, cors);
+      const messageMatch=/^\/v1\/(customer|commerce)\/messages(?:\/(stats|replies|conv_[a-f0-9]{32})(?:\/(read|media)(?:\/(mphoto_[a-f0-9]{32}))?)?)?$/.exec(url.pathname);
+      if(messageMatch){
+        const [,audience,id,action,photo]=messageMatch;
+        let actor;
+        if(audience==='customer'){const user=await authenticatedUser(request,env);actor={kind:'buyer',id:user.id,name:String(user.user_metadata?.full_name||'Customer').slice(0,100)};}
+        else{const user=await authenticatedUser(request,env);const seller=await env.DB.prepare(`SELECT s.id,m.role FROM seller_memberships m JOIN sellers s ON s.id=m.seller_id WHERE m.auth_user_id=? AND s.status='active' ORDER BY m.created_at ASC LIMIT 1`).bind(user.id).first();
+          if(!seller)return json({ok:false,error:'Your store membership is no longer available'},403,cors);
+          actor={kind:'merchant',id:user.id,sellerId:seller.id,role:seller.role};
+          if(request.headers.has('x-ezkart-message-store')&&request.headers.get('x-ezkart-message-store')!==seller.id)return json({ok:false,error:'Your active store changed. Reload this page.',code:'message_session_changed'},409,cors);}
+        if(request.method==='GET'){
+          if(photo&&action==='media'&&id?.startsWith('conv_')&&!url.search)return await messagePhoto(env,actor,id,photo);
+          if(!action)return json({ok:true,...await (id==='stats'?messageStats(env,actor,url):id==='replies'?savedReplies(env,actor,url):id?conversationDetail(env,actor,id,url):messageInbox(env,actor,url))},200,cors);
+        }
+        if(request.method==='POST'&&!url.search&&!photo&&id!=='stats'){
+          const body=await reviewRequestJson(request,action==='media'?1401000:24000,parseMessageJSON);
+          if(!action&&id==='replies')return json({ok:true,...await saveReply(env,actor,body)},200,cors);
+          if(!id)return json({ok:true,...await startConversation(env,actor,body)},200,cors);
+          if(id.startsWith('conv_'))return json({ok:true,...await (action==='media'?uploadMessagePhoto(env,actor,id,body):action==='read'?markConversationRead(env,actor,id,body):sendMessage(env,actor,id,body))},200,cors);
+        }
+        return json({ok:false,error:'Method or parameters not allowed'},405,cors);
+      }
       const buyerReviewMatch=/^\/v1\/customer\/orders\/(EZK-[SP]-[A-F0-9]{24})\/reviews(?:\/([A-Za-z0-9_-]{3,96})\/history)?$/.exec(url.pathname);
       const buyerPhotoUpload=/^\/v1\/customer\/orders\/(EZK-[SP]-[A-F0-9]{24})\/review-media$/.exec(url.pathname);
       const buyerPhoto=/^\/v1\/customer\/review-media\/(rphoto_[a-f0-9]{32})$/.exec(url.pathname);
@@ -1793,6 +1818,7 @@ export default {
     context.waitUntil(cleanupAnalyticsExports(env));
     context.waitUntil(cleanupCustomerExports(env));
     context.waitUntil(cleanupReviewPhotos(env));
+    context.waitUntil(cleanupMessagePhotos(env));
     context.waitUntil(expireCommerceOrders(env));
   },
 };

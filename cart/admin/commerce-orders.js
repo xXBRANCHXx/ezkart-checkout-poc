@@ -91,6 +91,7 @@
       if(data.operations.length){const pending=el('div',undefined,'commerce-order-card');pending.append(el('h3','Processing updates'));
         for(const operation of data.operations){const name=operation.kind.startsWith('payment.')?'Payment request':operation.kind.startsWith('shipment.')?'Courier request':'Notification';pending.append(el('p',`${name}: ${operation.state.replaceAll('_',' ')}${operation.count>1?' ('+operation.count+')':''}`));}content.append(pending);}
       const actions=el('div',undefined,'commerce-order-buttons');actions.append(link('Open fulfillment','fulfillment',order.id),link('Open returns','returns',order.id));
+      if(JSON.parse(document.body.dataset.adminProfile||'{}')?.canEdit)actions.append(link('Message buyer','messages',order.id));
       if(order.fulfillmentState==='stock_review'){const a=el('a','Review stock','ui-button');a.href='?page=inventory&review='+encodeURIComponent(order.id);actions.append(a);}
       content.append(actions,historySection('captures',data.captures,order.id,version),historySection('activity',data.activity,order.id,version));
     }
