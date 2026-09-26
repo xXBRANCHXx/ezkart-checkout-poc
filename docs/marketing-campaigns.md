@@ -127,3 +127,30 @@ evidence are in `/tmp/ezkart-marketing-deploy-01a0d643`.
 Provider delivery and authenticated hosted acceptance are still open. The
 workbench remains on `agent/ezkart-workbench`; production, `main`, PR #3 and
 provider activation remain held. No completion gate is closed by this delivery.
+
+## TEST rollout evidence
+
+Implementation `d3a9d23` is pushed to workbench and served by Hostinger. Migration
+0033 and Worker `125cec15-862c-4ccd-87c1-85cb858cc00d` are installed. At
+**26 September 17:02 UTC / 27 September 00:02 WIB**, the deployed Worker passed
+22 health/access/hold checks, reported 96 application tables with healthy D1 and
+both R2 buckets, and had no pending migrations.
+
+Remote comparisons preserve all pre-existing table counts, settings, financial
+and import evidence; the 15-entry legacy rehearsal manifest remains unchanged.
+Both campaign tables are empty. All eleven added schema objects match the
+original-order restoration exactly, foreign-key checks are empty, and the
+actual list/audience queries and receipt insert plan compile remotely without
+writing data. The release script initially stopped because it compared new
+campaign objects against an email-only schema inventory; the unchanged email
+inventory and all eleven campaign objects were then verified independently
+before Worker deployment.
+
+At **17:02:42 UTC**, both hosted JS/CSS assets matched local hashes, the merchant
+sign-in gate and two private proxy guards passed, and both include-only PHP
+files returned empty 404 responses. Shared Chrome still reported the prior
+disconnected connection, with no new reconnect attempt; signed-in hosted
+acceptance remains open. The hosted CSP still exposes only
+`upgrade-insecure-requests`, so the existing hosting/header investigation also
+remains open. Central commerce, notification delivery and email provider holds
+are unchanged. No campaign email or delivery job was created by the rollout.

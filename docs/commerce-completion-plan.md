@@ -64,7 +64,7 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
-### 26 September: saved campaign drafts and real audience previews
+### 26–27 September: saved campaign drafts and real audience previews
 
 Replaced the Marketing samples and toast-only actions with versioned campaign
 creation/editing, saved-segment filter copies, actual customer/permission
@@ -84,6 +84,14 @@ Local validation passes: 225 Worker tests, 32 affected PHP/browser/signing
 checks and all nine final Marketing browser checks. The fresh TEST backup and
 original-order migration rehearsal preserve all existing rows and pass
 integrity/foreign-key checks. Desktop/mobile visuals were inspected.
+
+Implementation `d3a9d23` is pushed and auto-deployed. TEST migration 0033 and
+Worker `125cec15-862c-4ccd-87c1-85cb858cc00d` are installed with 96 healthy
+application tables and no pending migrations. Twenty-two deployed Worker
+health/access/hold checks, both hosted asset hashes and five merchant/private
+guards pass. Existing counts, settings and the 15-entry legacy import evidence
+remain unchanged; both new campaign tables remain empty. Authenticated hosted
+acceptance, actual delivery and the wider marketing gate remain open.
 
 ### 26 September: email investigation and audited recovery
 
