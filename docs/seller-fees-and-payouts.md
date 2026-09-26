@@ -15,6 +15,12 @@ Seller onboarding, checkout routing, split-rule creation and payouts are not yet
 implemented in Ezkart. The following amounts are a specification, not configured
 provider rules or available wallet balances.
 
+Central orders now preserve immutable per-order fee snapshots. The
+[capture financial journal](financial-journal.md) posts verified payments using
+those original fees and keeps additional payments or unknown historical policies
+unallocated. This is the first accounting stage; actual provider fees, settlement,
+earnings release, refunds, reconciliation and payouts remain to be implemented.
+
 ## Fees shown in the mockup
 
 Customers pay the product subtotal plus shipping. Seller fees are deducted from
@@ -44,9 +50,9 @@ the plan. Existing content remains editable at the plan limit.
 
 Richer analytics entitlements and custom-domain setup are not implemented by
 this change and are labeled Coming soon on the page. The toggle does not create
-provider split rules, initiate charges, or rewrite existing orders. Per-order
-fee snapshots and actual billing still require the financial implementation
-and production release approval described below.
+provider split rules, initiate charges, or rewrite existing orders. Central orders
+snapshot the applicable fees, but actual billing and settlement still require the
+remaining financial integration and release conditions described below.
 
 ## Commission calculation
 

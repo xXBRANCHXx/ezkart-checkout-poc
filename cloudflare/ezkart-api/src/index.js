@@ -22,6 +22,7 @@ import {fulfillmentList,fulfillmentDetail,fulfillmentAction,serviceShipment,cust
 import {merchantOrderList,merchantOrderDetail,merchantOrderHistory} from './commerce-order-reads.js';
 import {merchantDashboard} from './commerce-dashboard.js';
 import {merchantPaymentList,merchantPaymentDetail,merchantPaymentHistory} from './commerce-payment-reads.js';
+import {reconcileCaptureJournals,financialJournalSummary,financialJournalList} from './commerce-financial-journal.js';
 import {merchantCustomers,merchantCustomer,customerOrderHistory} from './commerce-customers.js';
 import {customerSegments,customerSegment,saveCustomerWorkspace,customerProfileHistory} from './commerce-customer-workspace.js';
 import {createCustomerExport,readCustomerExport,cleanupCustomerExports} from './commerce-customer-exports.js';
@@ -1451,6 +1452,16 @@ export default {
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
     const url = new URL(request.url);
     try {
+      if(url.pathname.startsWith('/internal/commerce/finance/')){
+        const payload=await authenticateCommerceService(request,env);
+        if(url.pathname==='/internal/commerce/finance/captures/reconcile'&&request.method==='POST'){
+          if(url.search)return json({ok:false,error:'Financial parameters belong in the request body'},422);
+          return json({ok:true,...await reconcileCaptureJournals(env,payload)});
+        }
+        if(request.method==='GET'&&url.pathname==='/internal/commerce/finance/summary')return json({ok:true,...await financialJournalSummary(env,url)});
+        if(request.method==='GET'&&url.pathname==='/internal/commerce/finance/journals')return json({ok:true,...await financialJournalList(env,url)});
+        return json({ok:false,error:'Financial route or method is unavailable'},404);
+      }
       if(url.pathname==='/internal/commerce/customer-consents'){
         const payload=await authenticateCommerceService(request,env);
         if(request.method!=='POST')return json({ok:false,error:'Method not allowed'},405);

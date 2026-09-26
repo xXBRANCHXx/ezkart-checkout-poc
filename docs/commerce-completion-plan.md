@@ -64,6 +64,24 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 26 September: immutable captured-payment accounting
+
+Implemented a balanced financial journal for verified captures, atomically posted
+with payment and inventory changes. Original fee snapshots determine allocations;
+additional payments and incomplete historical policies stay unallocated. Immutable
+accounts, journals and entries reject altered evidence, deletion and replacement
+writes. Bounded catch-up posts existing captures without inventing payments or
+old fee policies. Signed internal reads expose exact totals and stable history;
+withdrawable funds remain unavailable until actual settlement/release work exists.
+
+All 134 Worker tests and 31 affected PHP/integration/browser tests pass. The TEST
+build and a restoration of the actual prior TEST backup pass; the migration also
+applies in original file order with no integrity or foreign-key errors. See
+[financial-journal.md](financial-journal.md) for contracts and evidence. TEST
+rollout is recorded separately. Seller/provider mapping, routing, actual fees,
+settlement, release/holds, refunds, payout recovery, reconciliation and the real
+wallet UI remain open. No top-level completion gate advances on this foundation.
+
 ### 25 September: merchant review workspace and public review browsing
 
 Implemented the real Reviews tab: full search/filter/paging, replies, moderation
