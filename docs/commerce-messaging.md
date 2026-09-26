@@ -127,3 +127,13 @@ requests, and the signed-commerce surface remains disabled with a 503 hold.
 Storage/provider flags remain held. Authenticated hosted acceptance and ongoing
 operation remain unverified while that hold is in force; fixture success does not
 close the messaging completion gate on its own.
+
+
+Implementation `5bb7d8d` is pushed to `agent/ezkart-workbench`. Hostinger's
+normal auto-deployment published the message JS/CSS, order-entry script and shop
+script; all four hosted bytes match the workbench commit. The customer message
+page returns the sign-in gate with no-store, its private proxy returns 401 with
+no-store without a session, and the two include-only PHP files return empty 404
+responses. Hosted evidence is in `hosted-recheck.json` and `hosted-guards.json`
+under the deployment artifact directory above. No manual Hostinger deployment,
+production deployment, real message, provider call or activation was performed.
