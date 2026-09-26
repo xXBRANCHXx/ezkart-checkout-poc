@@ -11,6 +11,7 @@ ez_page_header('Marketing', 'Write emails, choose customer groups, and plan your
     <article><div><small>Archived campaigns</small><strong data-marketing-count="archived">—</strong><p>Kept with their saved history</p></div></article>
   </section>
   <aside class="marketing-readiness"><span class="marketing-readiness-icon"><?= ez_admin_icon('mail') ?></span><div><h2>Email campaigns</h2><p data-marketing-delivery>Checking delivery availability…</p><p data-marketing-audience-availability></p></div></aside>
+  <?php require __DIR__ . '/marketing-automations.php'; ?>
   <aside class="marketing-local-drafts" data-marketing-local hidden><h2>Unfinished drafts in this tab</h2><p class="marketing-muted">Reopen a draft to finish editing or confirm a pending save.</p><div class="marketing-actions" data-marketing-local-items></div></aside>
   <aside class="marketing-local-drafts" data-campaign-delivery-recovery hidden></aside>
   <section class="surface marketing-library" aria-labelledby="marketing-library-heading">
@@ -21,7 +22,7 @@ ez_page_header('Marketing', 'Write emails, choose customer groups, and plan your
     <footer class="marketing-library-footer"><button type="button" class="ui-button" data-marketing-more hidden>Load more campaigns</button><button type="button" class="ui-button" data-marketing-list-retry hidden>Try loading again</button><p class="marketing-muted" data-marketing-calendar-note hidden>Dates use your store’s timezone. Planned drafts are reminders. Published campaigns show their send schedule.</p></footer>
   </section>
   <section class="surface marketing-editor" data-marketing-editor hidden aria-labelledby="marketing-editor-title">
-    <header class="surface-header"><div><h2 id="marketing-editor-title" data-marketing-editor-title tabindex="-1">Campaign draft</h2><p data-marketing-editor-meta></p></div><div class="marketing-actions"><button type="button" class="ui-button" data-marketing-preview>Preview email</button><button type="button" class="ui-button" data-marketing-history>Saved history</button><button type="button" class="ui-button" data-marketing-close>Close editor</button></div></header>
+    <header class="surface-header"><div><h2 id="marketing-editor-title" data-marketing-editor-title tabindex="-1">Campaign draft</h2><p data-marketing-editor-meta></p></div><div class="marketing-actions"><button type="button" class="ui-button" data-marketing-automation-source hidden>Open source automation</button><button type="button" class="ui-button" data-marketing-preview>Preview email</button><button type="button" class="ui-button" data-marketing-history>Saved history</button><button type="button" class="ui-button" data-marketing-close>Close editor</button></div></header>
     <form data-marketing-form>
       <fieldset class="marketing-edit-fields"><legend class="marketing-sr-only">Campaign details</legend>
         <div class="marketing-editor-columns">

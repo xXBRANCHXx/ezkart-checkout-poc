@@ -22,8 +22,10 @@ export function customerFilters(input={}){
   result.tag=result.tag.normalize('NFC').toLowerCase();
   return result;
 }
-export const customerCte=`WITH scoped_orders AS (
-  SELECT o.rowid AS n,o.*,${confirmedSql} AS confirmed,${additionalSql} AS additional FROM orders o WHERE ${scopeSql} AND o.rowid<=?
+// Callers may pin the frontier inside their own transaction. This argument is
+// SQL supplied by application code, never a request/filter value.
+export const customerCteWithFrontier=(frontier='?')=>`WITH scoped_orders AS (
+  SELECT o.rowid AS n,o.*,${confirmedSql} AS confirmed,${additionalSql} AS additional FROM orders o WHERE ${scopeSql} AND o.rowid<=${frontier}
 ), ranked AS (
   SELECT *,ROW_NUMBER() OVER(PARTITION BY customer_id ORDER BY created_at DESC,id DESC) AS position FROM scoped_orders WHERE customer_id IS NOT NULL
 ), totals AS (
@@ -44,6 +46,7 @@ export const customerCte=`WITH scoped_orders AS (
     AND consent.auth_user_id=COALESCE(owner.auth_user_id,NULLIF(json_extract(r.customer_snapshot_json,'$.authUserId'),''))
     AND consent.email=lower(trim(json_extract(r.customer_snapshot_json,'$.email')))
 )`;
+export const customerCte=customerCteWithFrontier();
 export const customerColumns='p.*,CAST(p.gross AS TEXT) AS exact_gross,CAST(p.additional AS TEXT) AS exact_additional';
 export function customerFilterSql(filters){
   const where=[],values=[];

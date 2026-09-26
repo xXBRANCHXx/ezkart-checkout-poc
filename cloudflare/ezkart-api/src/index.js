@@ -40,6 +40,7 @@ import {notificationInbox,notificationStats,readNotifications,notificationProces
 import {dispatchNotifications,scheduleNotifications} from './commerce-notification-dispatch.js';
 import {dispatchEmails,recordEmailWebhook} from './commerce-email-delivery.js';
 import {dispatchCampaignEmails} from './campaign-email-delivery.js';
+import {processMarketingAutomations} from './automation-dispatch.js';
 import {emailInvestigations,lookupEmail,resolveEmail,campaignEmailInvestigations,lookupCampaignEmail,resolveCampaignEmail} from './email-investigation.js';
 import {campaignLink,cleanupCampaignVisits} from './campaign-attribution.js';
 import {campaignReport} from './campaign-reports.js';
@@ -47,6 +48,7 @@ import {createCampaignReportExport,readCampaignReportExport,cleanupCampaignRepor
 import {campaignPerformance} from './campaign-performance.js';
 import {createCampaignPerformanceExport,readCampaignPerformanceExport,cleanupCampaignPerformanceExports} from './campaign-performance-exports.js';
 import {campaignWorkspace,listCampaigns,readCampaign,saveCampaign,campaignHistory,campaignAudience} from './marketing-campaigns.js';
+import {listAutomations,readAutomation,saveAutomation,changeAutomation,automationHistory,automationActivity} from './marketing-automations.js';
 import {readPublication,publishCampaign,changePublication,publicationRecipients,publicationHistory} from './campaign-publication.js';
 import {campaignUnsubscribe} from './campaign-unsubscribe.js';
 import {buyerNotificationPreferences,saveBuyerNotificationPreferences,buyerNotificationPreferenceHistory} from './buyer-notification-preferences.js';
@@ -1478,6 +1480,11 @@ export default {
         if(url.search)return json({ok:false,error:'Email callback parameters are invalid'},422);
         return json({ok:true,...await recordEmailWebhook(request,env,emailCallback[1])});
       }
+      if(url.pathname==='/internal/commerce/automations/process'&&request.method==='POST'){
+        const input=await authenticateCommerceService(request,env,{strictJSON:true,maxBytes:1000});
+        if(url.search||Object.keys(input).some(k=>k!=='environment')||input.environment!==(env.APP_ENVIRONMENT==='test'?'sandbox':'production'))return json({ok:false,error:'Automation processing request is invalid'},422);
+        return json({ok:true,...await processMarketingAutomations(env)});
+      }
       if(url.pathname==='/internal/commerce/campaigns/drain'&&request.method==='POST'){
         const input=await authenticateCommerceService(request,env,{strictJSON:true,maxBytes:2000});
         if(url.search||Object.keys(input).some(k=>!['environment','limit'].includes(k))||input.environment!==(env.APP_ENVIRONMENT==='test'?'sandbox':'production')||input.limit!==undefined&&(!Number.isSafeInteger(input.limit)||input.limit<1||input.limit>2))return json({ok:false,error:'Campaign processing request is invalid'},422);
@@ -1609,6 +1616,21 @@ export default {
         if(request.method==='GET'&&action!=='read')return json({ok:true,...await(action==='stats'?notificationStats(env,actor,url):action==='processing'?notificationProcessing(env,actor,url):notificationInbox(env,actor,url,action==='email'?'email':'inbox'))},200,cors);
         if(request.method==='POST'&&action==='read'&&!url.search)return json({ok:true,...await readNotifications(env,actor,await reviewRequestJson(request,3000,parseMessageJSON))},200,cors);
         return json({ok:false,error:'Method or parameters not allowed'},405,cors);
+      }
+      const automation=/^\/v1\/commerce\/marketing\/automations(?:\/(auto_[a-f0-9]{32})(?:\/(history|action|activity))?)?$/.exec(url.pathname);
+      if(automation){
+        const user=await authenticatedUser(request,env),seller=await env.DB.prepare(`SELECT s.id FROM seller_memberships m JOIN sellers s ON s.id=m.seller_id WHERE m.auth_user_id=? AND s.status='active' ORDER BY m.created_at ASC LIMIT 1`).bind(user.id).first();
+        if(!seller)return json({ok:false,error:'Your store membership is no longer available'},403,cors);
+        if(request.headers.has('x-ezkart-marketing-store')&&request.headers.get('x-ezkart-marketing-store')!==seller.id)return json({ok:false,error:'Your active store changed. Reload this page.',code:'marketing_session_changed'},409,cors);
+        const actor={id:user.id,sellerId:seller.id},[,id,action]=automation;
+        if(request.method==='GET'&&!action)return json({ok:true,...await (id?readAutomation(env,actor,id,url):listAutomations(env,actor,url))},200,cors);
+        if(request.method==='GET'&&action==='history')return json({ok:true,...await automationHistory(env,actor,id,url)},200,cors);
+        if(request.method==='GET'&&action==='activity')return json({ok:true,...await automationActivity(env,actor,id,url)},200,cors);
+        if(request.method==='POST'&&!url.search&&(!id||action==='action')){
+          const input=await reviewRequestJson(request,id?3000:32000,parseMessageJSON);
+          return json({ok:true,...await (id?changeAutomation(env,actor,id,input):saveAutomation(env,actor,input))},200,cors);
+        }
+        return json({ok:false,error:'Automation method or parameters are invalid'},405,cors);
       }
       const marketing=/^\/v1\/commerce\/marketing(?:\/(campaigns|workspace|audience|reports|report-exports|performance|performance-exports)(?:\/((?:cmp_|crex_|cpex_)[a-f0-9]{32})(?:\/(history|publication|publish|publication-action|recipients|publication-history))?)?)?$/.exec(url.pathname);
       if(marketing){
@@ -1928,6 +1950,9 @@ export default {
     }
   },
   async scheduled(controller, env, context) {
+    if(controller.cron==='*/4 * * * *'){
+      context.waitUntil(processMarketingAutomations(env));return;
+    }
     if(controller.cron==='*/3 * * * *'){
       context.waitUntil(dispatchCampaignEmails(env));return;
     }

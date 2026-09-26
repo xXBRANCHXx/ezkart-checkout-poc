@@ -48,14 +48,14 @@ test('lost publication and schedule responses survive reload and recover exact r
   const f=await fixture(t);await f.addBuyer(1);const b=await browser(t),p=await pageFor(b,f,390);await open(p,f);await edit(p,f);await start(p);
   f.control.drop=f.path+'/publish';await confirm(p,'Publish campaign');await panel(p).getByRole('button',{name:'Retry original delivery action',exact:true}).waitFor();
   await panel(p).locator('[data-delivery-error]').filter({hasText:/not confirmed/}).waitFor();assert.equal(await f.count('commerce_campaign_publications'),1);
-  const first=f.control.calls.filter(c=>c.path===f.path+'/publish').at(-1).body;assert.equal(await root(p).locator('input[name="name"]').isDisabled(),true);
+  const first=f.control.calls.filter(c=>c.path===f.path+'/publish').at(-1).body;assert.equal(await root(p).locator('[data-marketing-form] input[name="name"]').isDisabled(),true);
   await p.reload();await panel(p).getByRole('button',{name:'Retry original delivery action',exact:true}).waitFor();await panel(p).getByRole('button',{name:'Retry original delivery action',exact:true}).click();await panel(p).getByText('Campaign publication confirmed.',{exact:true}).waitFor();
   assert.deepEqual(f.control.calls.filter(c=>c.path===f.path+'/publish').at(-1).body,first);assert.equal(await f.count('commerce_campaign_publications'),1);
   await start(p,'Change send time');await review(p).getByLabel('Send date and time',{exact:false}).fill(local(later(48)));f.control.drop=f.path+'/publication-action';await confirm(p,'Confirm new send time');
   await panel(p).locator('[data-delivery-error]').filter({hasText:/not confirmed/}).waitFor();const action=f.control.calls.filter(c=>c.path===f.path+'/publication-action').at(-1).body;
   await f.db.prepare("UPDATE seller_memberships SET role='viewer' WHERE auth_user_id='alice'").run();await p.reload();await panel(p).getByRole('button',{name:'Retry original delivery action',exact:true}).waitFor();
   await panel(p).getByRole('button',{name:'Retry original delivery action',exact:true}).click();await panel(p).getByText('New send time confirmed.',{exact:true}).waitFor();assert.deepEqual(f.control.calls.filter(c=>c.path===f.path+'/publication-action').at(-1).body,action);
-  assert.equal(await f.count('commerce_campaign_publication_actions'),1);assert.equal(await panel(p).getByRole('button',{name:'Change send time',exact:true}).count(),0);assert.equal(await root(p).locator('input[name="name"]').isDisabled(),true);
+  assert.equal(await f.count('commerce_campaign_publication_actions'),1);assert.equal(await panel(p).getByRole('button',{name:'Change send time',exact:true}).count(),0);assert.equal(await root(p).locator('[data-marketing-form] input[name="name"]').isDisabled(),true);
   await p.screenshot({path:screens+'/recovered-viewer-390.png',fullPage:true});
 });
 

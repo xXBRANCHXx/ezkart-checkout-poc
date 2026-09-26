@@ -6,6 +6,7 @@ import {campaignValues} from './marketing-campaigns.js';
 import {campaignEmailConfiguration} from './email-provider.js';
 import {campaignEmailPayload} from './campaign-email-template.js';
 import {reviewCursor,readReviewCursor} from './commerce-reviews.js';
+import {campaignAutomationSource} from './campaign-source.js';
 
 const fail=(message,status=422,code='')=>{throw new Response(message,{status,headers:code?{'x-ezkart-error-code':code}:{}});};
 const fields=(value,keys)=>{if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).some(k=>!keys.includes(k)))fail('Campaign publication fields are invalid');};
@@ -37,6 +38,7 @@ async function view(env,row){
 }
 function databaseFailure(error){
   const detail=String(error)+' '+String(error.cause||'');
+  if(detail.includes('automation_generated_campaign'))fail('An automated message cannot be rescheduled. Pause its rule to stop waiting messages.',409,'automation_generated_campaign');
   if(detail.includes('campaign_publication_forbidden'))fail('Your store access or details changed. Reload this campaign.',403);
   if(/campaign_publication_(revision|boundary)|campaign_candidate_ineligible/.test(detail))fail('The campaign or audience changed. Review it before publishing.',409,'campaign_publication_changed');
   if(detail.includes('campaign_publication_action_revision'))fail('The publication changed. Reload before changing its schedule.',409,'campaign_publication_conflict');
@@ -47,7 +49,9 @@ function databaseFailure(error){
 }
 export async function readPublication(env,actor,id,url){
   await settingsActor(env,actor);query(url,[]);if(!validId(id)||!await campaign(env,actor,id))fail('Campaign not found',404);
-  const row=await saved(env,actor,id),publication=row?await view(env,row):null;await settingsActor(env,actor);return {publication};
+  const row=await saved(env,actor,id),publication=row?await view(env,row):null;
+  if(publication){publication.automation=await campaignAutomationSource(env,id);if(publication.automation)publication.canReschedule=false;}
+  await settingsActor(env,actor);return {publication};
 }
 export async function publishCampaign(env,actor,id,input){
   fields(input,['revision','requestKey','scheduledAt']);

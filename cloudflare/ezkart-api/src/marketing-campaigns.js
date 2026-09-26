@@ -4,6 +4,7 @@ import {settingsActor,publicStoreProfile} from './merchant-settings.js';
 import {customerFilters,customerFilterSql,customerCte,customerContext} from './commerce-customers.js';
 import {reviewCursor,readReviewCursor} from './commerce-reviews.js';
 import {emailConfiguration,campaignEmailConfiguration} from './email-provider.js';
+import {campaignAutomationSource} from './campaign-source.js';
 
 const fail=(message,status=422,code='')=>{throw new Response(message,{status,headers:code?{'x-ezkart-error-code':code}:{}});};
 const fields=(value,allowed)=>{if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).some(k=>!allowed.includes(k)))fail('Campaign fields are invalid');};
@@ -43,19 +44,22 @@ export async function listCampaigns(env,actor,url){
   const scope=await commerceHash({actor,mode,state,term,month,offset}),cursor=url.searchParams.has('cursor')?readReviewCursor(url.searchParams.get('cursor'),scope):null;
   if(cursor&&(!Number.isSafeInteger(cursor.cap)||!Number.isSafeInteger(cursor.before)||cursor.before<1||cursor.cap<cursor.before))fail('Campaign page is invalid');
   const cap=cursor?.cap??(await env.DB.prepare('SELECT COALESCE(MAX(rowid),0) AS id FROM commerce_campaigns WHERE seller_id=? AND commerce_environment=?').bind(seller.id,mode).first()).id;
-  const rows=await env.DB.prepare(`SELECT c.rowid AS campaign_n,c.*,p.id AS publication_id,p.send_at AS publication_time,p.cancelled AS publication_cancelled
+  const rows=await env.DB.prepare(`SELECT c.rowid AS campaign_n,c.*,p.id AS publication_id,p.send_at AS publication_time,p.cancelled AS publication_cancelled,
+    automation.automation_id,automation.rule_revision,automation.id AS run_id
     FROM commerce_campaigns c LEFT JOIN commerce_campaign_publication_state p ON p.campaign_id=c.id
+    LEFT JOIN commerce_automation_runs automation ON automation.campaign_id=c.id
     WHERE c.seller_id=? AND c.commerce_environment=? AND c.rowid<=? AND c.rowid<?
     AND (?='all' OR json_extract(c.data_json,'$.archived')=?) AND (?='' OR instr(lower(json_extract(c.data_json,'$.name')||' '||json_extract(c.data_json,'$.subject')),lower(?))>0)
     AND (?='' OR strftime('%Y-%m',COALESCE(p.send_at,json_extract(c.data_json,'$.plannedAt')),?)=?) ORDER BY c.rowid DESC LIMIT 26`)
     .bind(seller.id,mode,cap,cursor?.before??cap+1,state,Number(state==='archived'),term,term,month,offset,month).all();
   const items=rows.results.slice(0,25);await settingsActor(env,actor);
   // Row IDs bound paging; edits are live. Refresh to reflect moved/archived drafts.
-  return {items:items.map(r=>({...view(r),publication:r.publication_id?{id:r.publication_id,scheduledAt:r.publication_time,cancelled:Boolean(r.publication_cancelled)}:null})),nextCursor:rows.results.length>25?reviewCursor({v:1,scope,cap,before:items.at(-1).campaign_n}):null};
+  return {items:items.map(r=>({...view(r),automation:r.automation_id?{id:r.automation_id,revision:r.rule_revision,runId:r.run_id}:null,
+    publication:r.publication_id?{id:r.publication_id,scheduledAt:r.publication_time,cancelled:Boolean(r.publication_cancelled)}:null})),nextCursor:rows.results.length>25?reviewCursor({v:1,scope,cap,before:items.at(-1).campaign_n}):null};
 }
 export async function readCampaign(env,actor,id,url){
   await settingsActor(env,actor);query(url,[]);if(!campaignId(id))fail('Campaign not found',404);
-  const row=await current(env,actor,id);if(!row)fail('Campaign not found',404);await settingsActor(env,actor);return {campaign:view(row)};
+  const row=await current(env,actor,id);if(!row)fail('Campaign not found',404);const automation=await campaignAutomationSource(env,id);await settingsActor(env,actor);return {campaign:{...view(row),automation}};
 }
 export async function saveCampaign(env,actor,input){
   fields(input,['id','revision','requestKey','values']);
@@ -77,6 +81,7 @@ export async function saveCampaign(env,actor,input){
   try{await env.DB.prepare(`INSERT INTO commerce_campaign_changes(actor_id,request_key,request_hash,campaign_id,seller_id,commerce_environment,expected_revision,revision,data_json,created_at)
     VALUES(?,?,?,?,?,?,?,?,?,?)`).bind(actor.id,input.requestKey,hash,id,seller.id,mode,input.revision,input.revision+1,JSON.stringify(values),new Date().toISOString()).run();}
   catch(error){const raced=await old();if(raced)return result(raced,true);const detail=String(error)+' '+String(error.cause||'');
+    if(detail.includes('automation_generated_campaign'))fail('This message belongs to an automation. Pause and edit its rule to change future messages.',409,'automation_generated_campaign');
     if(detail.includes('campaign_revision_conflict'))fail('This campaign changed in another session. Compare the saved version before saving.',409,'campaign_revision_conflict');
     if(detail.includes('campaign_forbidden'))fail('Your store access changed. Reload this page.',403);
     if(detail.includes('campaign_rate_limited'))fail('Too many campaign changes. Try again later.',429);throw error;

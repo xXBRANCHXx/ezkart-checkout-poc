@@ -64,6 +64,35 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 27 September: event-driven marketing automations
+
+Implemented versioned welcome, payment, expired-checkout and inactivity rules;
+atomic source scanning/enrollment; delayed publication and repeat protection;
+current eligibility guards immediately before a provider start; and merchant
+editing, activation review, pause/recovery, activity and immutable history.
+Generated messages retain their source and use the existing campaign sender,
+unsubscribe, investigation and reporting paths. Indexed point reads avoid
+global recipient/history scans while respecting D1's expression-depth limit.
+
+See [marketing-automations.md](marketing-automations.md). All 141 final backend
+cases, six new PHP/browser cases and nine existing marketing cases pass.
+Thirty-three existing publishing/investigation/report/performance cases pass;
+the remaining recovery case passes after scoping its ambiguous test selector
+to the campaign form. Desktop/390px layouts and the TEST dry-run are checked.
+The fresh 602,079-byte TEST backup restores all rows in 121 existing physical
+tables unchanged, passes integrity/foreign-key checks and compiles all 128
+compatibility queries. Migration 0041 adds 63 objects and changes only the two
+campaign delivery source/status views. Its nine new tables are empty. Backup
+SHA-256: `6c92784ab09c21d5022a1cb2a1ce08d2bc5787fb6b730dd679f88099a72245d8`.
+Syntax checks pass for all 25 changed JavaScript/PHP files and the diff is clean.
+The implementation is prepared locally; remote rollout evidence follows. The
+current deployed baseline remains `14289f4` until that rollout completes.
+
+Signed-in hosted/provider acceptance, monitoring, capacity, sustained delay and
+repeat behavior and operational recovery remain open. The new processing flag
+stays unset and existing sending/central-commerce holds remain. All thirteen
+completion gates remain open; main and production are outside this delivery.
+
 ### 27 September: campaign performance and complete payment exports
 
 Implemented publication-period visit, checkout, conversion and verified gross

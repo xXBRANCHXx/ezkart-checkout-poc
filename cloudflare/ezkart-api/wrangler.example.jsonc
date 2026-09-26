@@ -11,7 +11,7 @@
       "name": "ezkart-api-test",
       "workers_dev": true,
       "preview_urls": false,
-      "triggers": { "crons": ["17 * * * *", "* * * * *", "*/2 * * * *", "*/3 * * * *"] },
+      "triggers": { "crons": ["17 * * * *", "* * * * *", "*/2 * * * *", "*/3 * * * *", "*/4 * * * *"] },
       "vars": {
         "APP_ENVIRONMENT": "test",
         "COMMERCE_NOTIFICATIONS": "enabled",

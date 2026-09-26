@@ -13,11 +13,18 @@ const finish=(env,job,workerId,outcome,result,error='')=>finishCommerceJob(env,j
 async function source(env,job){
   if(job.kind!=='campaign.send'||!Number.isSafeInteger(job.data?.candidateId)||job.data.candidateId<1||!/^cpub_[a-f0-9]{32}$/.test(job.data?.publicationId||''))invalid();
   const row=await env.DB.prepare('SELECT * FROM commerce_campaign_delivery_sources WHERE candidate_id=? AND publication_id=?').bind(job.data.candidateId,job.data.publicationId).first();
-  if(!row||row.seller_id!==job.sellerId||row.commerce_environment!==job.environment)invalid();return row;
+  if(!row||row.seller_id!==job.sellerId||row.commerce_environment!==job.environment)invalid();
+  if(row.automation_id){
+    const automation=await env.DB.prepare('SELECT automation_reason FROM commerce_automation_delivery_sources WHERE candidate_id=? AND publication_id=?').bind(job.data.candidateId,job.data.publicationId).first();
+    row.automation_reason=automation?.automation_reason??'invalid';
+  }
+  return row;
 }
 const evidence=(env,job)=>env.DB.prepare(`SELECT x.*,b.provider_id,EXISTS(SELECT 1 FROM commerce_campaign_email_starts a WHERE a.request_id=x.id) AS started
   FROM commerce_campaign_email_requests x LEFT JOIN commerce_campaign_email_verified_bindings b ON b.request_id=x.id WHERE x.job_id=?`).bind(job.id).first();
 function ineligible(row,configuration,now=Date.now()){
+  if(row.automation_reason==='invalid')invalid();
+  if(row.automation_reason)return ['store_closed','access_removed','preference_off','consent_changed','shop_disabled','stale'].includes(row.automation_reason)?row.automation_reason:'cancelled';
   if(row.cancelled)return 'cancelled';
   if(row.store_status!=='active')return 'store_closed';
   if(!row.publisher_access||!row.customer_access)return 'access_removed';

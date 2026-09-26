@@ -1,0 +1,59 @@
+<?php
+declare(strict_types=1);
+if (!isset($authenticated) || !$authenticated) { http_response_code(404); exit; }
+?>
+<section class="surface marketing-automations" data-automations aria-labelledby="automations-title">
+  <header class="surface-header"><div><h2 id="automations-title">Email automations</h2><p>Send a saved message after a customer’s activity, with permission checked again before delivery.</p></div><div class="marketing-actions"><button type="button" class="ui-button" data-auto-refresh>Refresh automations</button><button type="button" class="ui-button primary" data-auto-new disabled>New automation</button></div></header>
+  <div class="automation-body">
+    <p class="marketing-muted" data-auto-availability></p><p class="marketing-muted" data-auto-totals></p>
+    <form class="marketing-filters" data-auto-filters><label>Find an automation<input type="search" name="q" maxlength="120"></label><label>Show automations<select name="state"><option value="available">Current automations</option><option value="active">Active</option><option value="paused">Paused</option><option value="archived">Archived</option><option value="all">All automations</option></select></label><button type="submit" class="ui-button">Filter automations</button></form>
+    <p class="marketing-muted" role="status" data-auto-list-status>Loading automations…</p><div class="marketing-campaign-list" data-auto-list></div><button type="button" class="ui-button" data-auto-more hidden>Load more automations</button>
+    <aside class="marketing-local-drafts" data-auto-recovery hidden><h3>Unfinished automation requests</h3><p class="marketing-muted">Drafts and original request references are kept in this tab. A retry checks the same request.</p><div class="marketing-actions" data-auto-local></div></aside>
+    <p class="marketing-error" role="alert" data-auto-storage hidden></p><button type="button" class="ui-button" data-auto-storage-retry hidden>Retry automation storage</button>
+    <section class="automation-editor" data-auto-editor hidden aria-labelledby="auto-editor-title">
+      <div class="marketing-dialog-heading"><div><h3 id="auto-editor-title" tabindex="-1">Automation</h3><p class="marketing-muted" data-auto-meta></p></div><div class="marketing-actions"><button type="button" class="ui-button" data-auto-discard>Discard unsaved automation</button><button type="button" class="ui-button" data-auto-close>Close automation</button></div></div>
+      <form data-auto-form>
+        <fieldset class="marketing-edit-fields"><legend class="marketing-sr-only">Automation details</legend>
+          <div class="marketing-editor-columns">
+            <div class="marketing-copy-fields"><h3>When to send</h3><label>Automation name<input name="name" type="text" maxlength="120" required autocomplete="off"></label>
+              <label>Trigger<select name="trigger"><option value="welcome">New email permission</option><option value="paid">After a verified payment</option><option value="expired">After a checkout expires</option><option value="winback">After a period without a purchase</option></select></label>
+              <p class="marketing-muted" data-auto-trigger-note></p>
+              <div class="marketing-filter-grid"><label>Wait before sending<input name="delayAmount" type="number" min="0" max="525600" step="1" required></label><label>Wait unit<select name="delayUnit"><option value="1">Minutes</option><option value="60">Hours</option><option value="1440">Days</option></select></label></div>
+              <label data-auto-repeat-label>Minimum days between messages<input name="cooldownDays" type="number" min="1" max="90" step="1" required></label>
+              <p class="marketing-muted">The interval starts when a message is queued. A queued message that is later stopped still uses that interval. Welcome messages are queued at most once per rule and contact.</p>
+              <h3>Your message</h3>
+              <?php foreach (['subject'=>['Email subject',160],'preheader'=>['Inbox preview text',200],'heading'=>['Email heading',160]] as $field => [$label,$limit]): ?>
+                <label><?= ez_admin_escape($label) ?><input name="<?= ez_admin_escape($field) ?>" type="text" maxlength="<?= $limit ?>"></label>
+              <?php endforeach; ?>
+              <label>Email message<textarea name="body" aria-label="Email message" rows="8" maxlength="6000"></textarea><small>Plain text. Paragraph breaks are kept.</small></label>
+              <label>Store button label<input name="buttonLabel" aria-label="Store button label" type="text" maxlength="60"><small>Leave empty to omit the button.</small></label>
+            </div>
+            <div class="marketing-audience-fields"><h3>Customer filters</h3><label>Copy a saved segment<select name="segment"><option value="">Choose a saved segment</option></select></label>
+              <p class="marketing-muted">Only activity after activation can qualify. The customer must have email permission at that activity and still meet these filters before sending. Guests are excluded.</p>
+              <div class="marketing-filter-grid"><label class="marketing-wide">Customer search<input name="audience.q" type="search" maxlength="120"></label>
+                <label class="marketing-wide">Customer group<select name="audience.activity"><option value="all">All customers</option><option value="high_value">High value · Rp150.000+</option><option value="one_order">One checkout</option><option value="repeat">Repeat paid buyers</option><option value="no_paid">No paid order</option></select></label>
+                <label>Delivery location<input name="audience.location" type="text" maxlength="100"></label><label>Customer tag<input name="audience.tag" type="text" maxlength="32"></label>
+                <label class="marketing-wide">Minimum customer value (Rp)<input name="audience.minSpend" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="19"></label>
+                <label>Minimum orders<input name="audience.minOrders" type="number" min="0" max="1000000000" step="1"></label><label>Maximum orders<input name="audience.maxOrders" type="number" min="0" max="1000000000" step="1"></label>
+                <label>Last order from<input name="audience.lastFrom" type="date"></label><label>Last order through<input name="audience.lastTo" type="date"></label>
+              </div><p class="marketing-muted">Customer date filters use Jakarta time, as in the Customers workspace.</p>
+            </div>
+          </div>
+        </fieldset>
+        <div class="marketing-actions"><button type="submit" class="ui-button primary" data-auto-save>Save paused draft</button><button type="button" class="ui-button" data-auto-review>Review activation</button><button type="button" class="ui-button" data-auto-pause>Pause automation</button><button type="button" class="ui-button" data-auto-archive>Archive automation</button><button type="button" class="ui-button" data-auto-restore>Restore paused draft</button><button type="button" class="ui-button" data-auto-compare>Review saved automation</button><button type="button" class="ui-button" data-auto-audience>Preview matching customers</button></div>
+      </form>
+      <p class="marketing-muted" role="status" data-auto-status></p><p class="marketing-error" role="alert" data-auto-error hidden></p><div class="marketing-actions" data-auto-pending></div>
+      <section class="automation-activity" data-auto-results hidden><div class="marketing-dialog-heading"><h3>Activity and delivery</h3><button type="button" class="ui-button" data-auto-activity-refresh>Refresh activity</button></div>
+        <div class="marketing-report-totals" data-auto-summary></div><p class="marketing-muted" data-auto-checked></p><div data-auto-issues role="status"></div>
+        <p class="marketing-muted">Stopping means sending is prevented and the queue is waiting to record the stop. Submitted means the email service accepted a message. Delivered requires confirmation. A delivery can still need review after an uncertain send.</p>
+        <label>Activity to show<select data-auto-activity-filter><option value="all">All activity</option><option value="waiting">Waiting or stopping</option><option value="published">Published messages</option><option value="skipped">Skipped or cancelled</option><option value="needs_review">Needs review</option></select></label>
+        <p class="marketing-muted" role="status" data-auto-activity-status></p><ol class="automation-event-list" data-auto-activity></ol><button type="button" class="ui-button" data-auto-activity-more hidden>Load older activity</button>
+        <details data-auto-history><summary>Saved rule history</summary><p class="marketing-muted" data-auto-history-status role="status"></p><ol class="automation-event-list" data-auto-history-items></ol><button type="button" class="ui-button" data-auto-history-more hidden>Load older rule changes</button></details>
+      </section>
+    </section>
+  </div>
+  <dialog class="marketing-dialog" data-auto-discard-dialog aria-labelledby="auto-discard-title"><h2 id="auto-discard-title">Discard this unsaved automation?</h2><p>This removes its draft from this browser tab. It has not been saved.</p><div class="marketing-actions"><button type="button" class="ui-button" data-auto-discard-close autofocus>Keep editing</button><button type="button" class="ui-button primary" data-auto-discard-go>Discard automation draft</button></div></dialog>
+  <dialog class="marketing-dialog" data-auto-confirm aria-labelledby="auto-confirm-title"><h2 id="auto-confirm-title">Activate this saved automation?</h2><div data-auto-confirm-copy></div><p>Activation starts with new activity from this point. Earlier activity and activity while paused are excluded. Pause stops waiting messages; an email already submitted may still arrive.</p><div class="marketing-actions"><button type="button" class="ui-button" data-auto-confirm-close autofocus>Keep paused</button><button type="button" class="ui-button primary" data-auto-confirm-go>Activate saved rule</button></div></dialog>
+  <dialog class="marketing-dialog" data-auto-compare-dialog aria-labelledby="auto-compare-title"><h2 id="auto-compare-title">Compare automation versions</h2><p>Your local draft stays available until you choose a version.</p><div data-auto-compare-copy></div><div class="marketing-actions"><button type="button" class="ui-button" data-auto-compare-close autofocus>Keep my draft</button><button type="button" class="ui-button" data-auto-use-saved>Use saved automation</button><button type="button" class="ui-button primary" data-auto-use-merged>Use compared changes</button></div></dialog>
+  <dialog class="marketing-dialog" data-auto-audience-dialog aria-labelledby="auto-audience-title"><h2 id="auto-audience-title">Current matching customers</h2><p>These are current matches, not a promised send count. A new qualifying event and unchanged email permission are still required.</p><p data-auto-audience-status role="status"></p><ul class="marketing-audience-list" data-auto-audience-items></ul><div class="marketing-actions"><button type="button" class="ui-button" data-auto-audience-more hidden>Load more matches</button><button type="button" class="ui-button" data-auto-audience-close>Close matches</button></div></dialog>
+</section>
