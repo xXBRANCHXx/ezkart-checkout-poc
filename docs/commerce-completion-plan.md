@@ -80,6 +80,16 @@ Hosted authenticated acceptance, actual scheduling after central cutover,
 monitoring, email delivery and sustained load tests remain open. The combined
 Settings/notifications gate and all top-level release gates remain unchecked.
 
+Implementation `4e70d3e` is pushed and auto-deployed. TEST migration 0029 and Worker
+`09de287d-0cb5-4a5b-b0ae-c8c5f6743d78` are installed, with 83 healthy application
+tables and the existing commerce/provider holds intact. The complete 172-test
+Worker run, ten final notification tests (173 distinct Worker checks), and 33
+PHP/browser checks pass. The fresh backup restores with unchanged records and
+seller settings. Hosted assets, private guards, and before/after TEST comparison
+pass; no operational notification or financial records were created. Shared
+Chrome and the hosted CSP issue still prevent closing the remaining acceptance
+items.
+
 ### 26 September: persisted merchant settings
 
 Replaced preview-only store fields with real identity, public support contact,

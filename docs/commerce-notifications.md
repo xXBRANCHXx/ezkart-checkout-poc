@@ -120,4 +120,33 @@ keys are intact, and all old table counts and seller settings are unchanged.
 The three new notification tables are empty. The backup and read-only comparison
 artifacts are private under `/tmp/ezkart-notices-deploy-01a0d643/`.
 
-Hosted rollout evidence follows after deployment.
+Implementation `4e70d3e` is pushed to `agent/ezkart-workbench` and automatically
+deployed by Hostinger. All five affected JavaScript/CSS assets match the local
+commit (hosted modification time 26 September 2026, 14:12:55 UTC). Guest merchant
+and buyer pages show their sign-in gates; both PHP proxies return private 401
+responses, and include-only files return empty 404 responses.
+
+TEST migration 0029 and Worker `09de287d-0cb5-4a5b-b0ae-c8c5f6743d78` are deployed.
+The new migration has three tables, two indexes, and twelve triggers. No pending
+migrations remain. Health reports 83 application tables and healthy D1/public R2/
+private R2. The existing hourly trigger and new minute trigger are installed.
+
+The post-migration comparison confirms unchanged existing rows, seller settings,
+financial/provider records, and import manifest. It permits only the expected
+migration entry and new message-notification trigger in existing schema lists.
+All three notification tables remain empty. Notification inbox/stats/processing
+APIs require authentication (401, no-store). Notification drain and financial
+provider access still return 503 because central commerce is held; installing the
+notification flag has not activated hosted delivery or any provider.
+
+Protected evidence is in `comparison.json`, `restore.json`, `worker-checks.json`,
+`hosted-assets.json`, `hosted-guards.json`, `migrate.log`, `deploy.log`, and
+`pending.log` in the deployment directory above. The first site check caught the
+normal auto-deployment delay; the follow-up assets and guard checks passed.
+
+Shared Chrome remains disconnected at the previously recorded five connection
+attempts; this rollout did not attempt a reconnect. Authenticated hosted acceptance
+therefore remains open. The hosted responses still expose only
+`Content-Security-Policy: upgrade-insecure-requests`, including the new buyer page;
+this repeats the existing hosting-header issue in
+[production-release-gates.md](production-release-gates.md).
