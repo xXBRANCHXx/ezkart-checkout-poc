@@ -6,8 +6,9 @@ one durable `campaign.send` job per account/address, with no token issuance or
 provider request. This is the publication/recipient-queue part of the full
 marketing workflow. [Campaign delivery](campaign-delivery.md) now integrates
 per-recipient message preparation, current-permission dispatch and provider
-callbacks. Operator recovery and merchant publishing controls remain necessary.
-The existing Marketing UI continues to report delivery unavailable, and sending
+callbacks. The merchant [publishing controls](campaign-publishing-ui.md) now
+review saved copy and audiences, schedule or cancel remaining sends, and show
+recipient outcomes and history. Operator recovery remains necessary, and sending
 remains held behind the campaign/email/commerce configuration.
 
 ## Publication and schedule behavior
@@ -52,7 +53,7 @@ remains held behind the campaign/email/commerce configuration.
 A candidate's captured grant revision is historical selection evidence, not
 send-time authority. Current verified account email, current permission,
 suppression, store/publisher access, lease, schedule and cancellation must all
-be rechecked by the pending [delivery integration](campaign-delivery.md).
+are rechecked by the [delivery integration](campaign-delivery.md).
 The message and [unsubscribe token](campaign-unsubscribe.md) must be committed
 atomically when the recipient is prepared, and retries must reuse the original
 stored bytes. This change does not replace those requirements or activate mail.
@@ -107,8 +108,8 @@ populated drafts/consents/orders. The real PHP proxy tests interrupted
 publication/action acknowledgements, the preserved audience/history,
 route/account/CSRF/origin/size guards and a sign-in replacement after commit.
 
-Campaign-specific operator recovery, merchant publishing controls,
-signed-in hosted acceptance, load/recovery acceptance, automation and
+Campaign-specific operator recovery, signed-in hosted acceptance,
+load/recovery acceptance, automation and
 performance reporting remain required. No top-level marketing or release gate
 is closed by this publication foundation.
 

@@ -3,8 +3,8 @@
 The merchant Marketing workspace now uses saved campaign drafts, real customer
 audience previews and a planning calendar. The sample active campaigns,
 automation counts and toast-only controls have been removed. This delivery is
-the draft/audience portion of the larger marketing gate. Merchant publishing
-controls, automation triggers and useful performance reports remain required.
+the draft/audience portion of the larger marketing gate. Automation triggers
+and useful performance reports remain required.
 Draft saving does not send mail or mark marketing complete.
 
 [Publication and recipient queues](campaign-publication.md) persist frozen
@@ -12,9 +12,11 @@ campaign/audience snapshots and versioned scheduling/cancellation behind the
 private API/proxy. The [campaign sender](campaign-delivery.md) saves each message
 with its [unsubscribe token](campaign-unsubscribe.md), verifies current
 permission and identity, and records provider submission and signed delivery
-evidence. Publishing controls, operator recovery, automation and performance
-reporting remain outstanding; the visible calendar still plans drafts, and the
-workspace shows delivery unavailable while those are integrated.
+evidence. The [publishing controls](campaign-publishing-ui.md) now review and
+publish saved drafts, reschedule or cancel remaining sends, and expose recipient
+outcomes and delivery history. The calendar uses the publication's actual send
+time when one exists. Operator recovery, automation and performance reporting
+remain outstanding; sending remains held by the existing deployment flags.
 
 ## Merchant behavior
 
@@ -34,9 +36,10 @@ workspace shows delivery unavailable while those are integrated.
   A recorded grant is not a claim that the address is currently verified or
   deliverable; actual sending must recheck both identity and permission.
 - Plan a draft's date/time in the saved store timezone (WIB, WITA or WIT),
-  including dates across a UTC month boundary. The calendar explicitly labels
-  these as planned drafts, not scheduled deliveries. Saving cannot create an
-  email request or an outbound job.
+  including dates across a UTC month boundary. The calendar labels unpublished
+  reminders as planned drafts and published campaigns with their actual send
+  time and cancellation state. Saving a draft cannot create an email request
+  or an outbound job.
 - Search, archive and restore drafts, page through saved campaigns and inspect
   immutable versions. No fake reach, automation, open or revenue totals appear.
   Draft editing remains available while central commerce is held; audience

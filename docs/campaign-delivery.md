@@ -3,8 +3,9 @@
 The renderer, durable publication, immutable recipient messages, send-time
 eligibility checks, signed provider callbacks and merchant delivery summaries
 are implemented. The campaign dispatcher has a separate service route and
-bounded cron. Sending remains held on TEST, and the Marketing workspace still
-reports delivery unavailable until publishing controls and recovery are ready.
+bounded cron. The merchant [publishing controls](campaign-publishing-ui.md)
+expose review, scheduling, cancellation and recipient history. Sending remains
+held on TEST, and the workspace reports the actual configured readiness.
 Provider activation, operator investigation, automation and performance reporting
 remain part of the full marketing gate.
 
@@ -108,8 +109,8 @@ operator or queue-driven execution remain required before activation.
 
 ## Remaining acceptance and product work
 
-Merchant publishing/scheduling controls, campaign-specific provider lookup and
-operator recovery, automation triggers, useful performance reports, operational
+Campaign-specific provider lookup and operator recovery, automation triggers,
+useful performance reports, operational
 load/alerting and authenticated hosted workflows remain necessary. Provider
 acceptance must verify real mailbox receipt, sender authentication and DKIM
 coverage of both unsubscribe headers. The current fixtures establish database,

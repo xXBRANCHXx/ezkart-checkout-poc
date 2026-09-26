@@ -29,7 +29,7 @@
   const states=new Map();let workspace=null,current=null,dead=false,storageGood=true,storageCorrupt=false,storageError='',loaded=false,navVersion=0,loadBusy=false,comparison=null;
   let view='list',listVersion=0,listBusy=false,listItems=[],listCursor=null,listParams=null;
   const preview=q('[data-marketing-preview-dialog]'),compare=q('[data-marketing-comparison]'),audience=q('[data-marketing-audience-dialog]'),history=q('[data-marketing-history-dialog]'),discard=q('[data-marketing-discard-dialog]');
-  let audienceView=null,historyView=null;
+  let audienceView=null,historyView=null,delivery=null;
   const offset=()=>({'Asia/Jakarta':7,'Asia/Makassar':8,'Asia/Jayapura':9}[workspace.timezone])*3600000;
   const localTime=stamp=>stamp?new Date(Date.parse(stamp)+offset()).toISOString().slice(0,16):'';
   const utcTime=value=>value?new Date(Date.parse(value+'Z')-offset()).toISOString():null;
@@ -37,11 +37,11 @@
   const show=(path,value)=>path==='plannedAt'?date(value):typeof value==='boolean'?(value?'Yes':'No'):value||'Not provided';
   const dirty=s=>!same(s.base,s.draft),storageKey=()=>`ezkart.marketing.v1:${account}:${store}:${workspace.environment}`;
   function stop(message){
-    if(dead)return;dead=true;navVersion++;listVersion++;for(const d of [preview,compare,audience,history,discard])d.close();
+    if(dead)return;delivery?.stop();dead=true;navVersion++;listVersion++;for(const d of [preview,compare,audience,history,discard])d.close();
     root.replaceChildren(el('p',message));const a=el('a','Reload sign-in');a.href='?page=marketing';root.append(a);
   }
   async function api(path,body){
-    const response=await fetch('./?cloud='+encodeURIComponent('/v1/commerce/marketing'+path),{method:body===undefined?'GET':'POST',cache:'no-store',
+    const response=await fetch('./?cloud='+encodeURIComponent('/v1/commerce/marketing'+path),{method:body===undefined?'GET':'POST',cache:'no-store',signal:AbortSignal.timeout(20000),
       headers:{Accept:'application/json','Content-Type':'application/json','X-Ezkart-CSRF':csrf,'X-Ezkart-Marketing-Account':account,'X-Ezkart-Marketing-Store':store},...(body===undefined?{}:{body:JSON.stringify(body)})});
     const result=await response.json().catch(()=>({}));
     if([401,403].includes(response.status)||result.code==='marketing_session_changed')stop(result.error||'Your access changed. Reload this page.');
@@ -87,8 +87,9 @@
   }
   function controls(){
     if(dead||!current)return;const s=current,editable=workspace?.canEdit===true;
-    form.querySelector('fieldset').disabled=!editable||s.busy||Boolean(s.pending);
-    q('[data-marketing-save]').disabled=!editable||s.busy||Boolean(s.pending)||!storageGood||!s.draft.name.trim()||!dirty(s);
+    const deliveryPending=delivery?.pendingFor(s.id);
+    form.querySelector('fieldset').disabled=!editable||s.busy||Boolean(s.pending)||deliveryPending;
+    q('[data-marketing-save]').disabled=!editable||s.busy||Boolean(s.pending)||!storageGood||!s.draft.name.trim()||!dirty(s)||deliveryPending;
     q('[data-marketing-save]').textContent=s.latest?'Compare saved changes':'Save draft';
     q('[data-marketing-retry]').hidden=!s.pending;q('[data-marketing-retry]').disabled=s.busy||!storageGood;
     q('[data-marketing-compare-saved]').disabled=!s.id||s.busy||Boolean(s.pending);
@@ -98,10 +99,10 @@
     q('[data-marketing-storage-retry]').textContent=storageCorrupt?'Reload browser drafts':'Check browser storage';
     q('[data-marketing-editor-meta]').textContent=s.id?`Saved version ${s.revision} · ${s.draft.archived?'Archived draft':'Draft'}`:'This draft is kept in this browser tab until you save it.';
     q('[data-marketing-save-status]').textContent=s.busy?'Checking the saved campaign…':s.pending?'A previous save needs confirmation. Retry the original save to check its result.':s.latest?'A newer version is saved. Compare it with your changes before saving.':!editable?'Your role can view campaigns but cannot change them.':s.message||(dirty(s)?'You have unsaved changes.':'Your draft matches the saved version.');
-    const error=q('[data-marketing-save-error]');error.textContent=storageError||s.error;error.hidden=!error.textContent;
+    const error=q('[data-marketing-save-error]');error.textContent=storageError||s.error;error.hidden=!error.textContent;delivery?.update();
   }
   function captureForm(){
-    if(!current||current.pending||current.busy||!workspace.canEdit)return;
+    if(!current||current.pending||current.busy||!workspace.canEdit||delivery?.pendingFor(current.id))return;
     const draft=current.draft;for(const path of Object.keys(flat(draft))){const input=field(path);let value=input.type==='checkbox'?input.checked:input.value;
       if(path==='plannedAt')value=input.value===localTime(draft.plannedAt)?draft.plannedAt:utcTime(input.value);put(draft,path,value);}
     current.message='';current.error='';remember();
@@ -115,7 +116,7 @@
       if(id.startsWith('new_')){if(!s)throw Error('This unsaved campaign is no longer in this tab.');}
       else{const row=(await api('/campaigns/'+id)).campaign;if(version!==navVersion||dead)return;if(!validRow(row)||row.id!==id)throw Error('The saved campaign could not be verified.');
         if(!s){s=state(id,id,row.values,row.revision);states.set(id,s);}else if(!s.pending&&!dirty(s))applyRow(s,row);else if(!s.pending&&s.revision!==row.revision)s.latest=row;}
-      if(version!==navVersion||dead)return;current=s;fill();remember();q('[data-marketing-status]').textContent='Campaign ready.';
+      if(version!==navVersion||dead)return;current=s;fill();remember();delivery?.refresh();q('[data-marketing-status]').textContent='Campaign ready.';
       if(focus){q('[data-marketing-editor-title]').focus();q('[data-marketing-editor]').scrollIntoView({block:'start',behavior:'instant'});}return true;
     }catch(error){if(!dead&&version===navVersion)q('[data-marketing-status]').textContent=error.message;return false;}
   }
@@ -126,7 +127,7 @@
     q('[data-marketing-status]').textContent='New draft ready.';
     q('[data-marketing-editor-title]').focus();q('[data-marketing-editor]').scrollIntoView({block:'start',behavior:'instant'});
   }
-  function closeDialogs(){for(const d of [preview,compare,audience,history,discard])d.close();audienceView=null;historyView=null;comparison=null;}
+  function closeDialogs(){delivery?.close();for(const d of [preview,compare,audience,history,discard])d.close();audienceView=null;historyView=null;comparison=null;}
   q('[data-marketing-close]').addEventListener('click',()=>{navVersion++;closeDialogs();current=null;q('[data-marketing-editor]').hidden=true;remember();q('[data-marketing-new]').focus();});
   root.querySelectorAll('[data-marketing-dialog-close]').forEach(b=>b.addEventListener('click',()=>b.closest('dialog').close()));
   audience.addEventListener('close',()=>{audienceView=null;});history.addEventListener('close',()=>{historyView=null;});compare.addEventListener('close',()=>{comparison=null;});
@@ -154,7 +155,7 @@
   async function reviewSaved(){const s=current;if(!s?.id||s.busy||s.pending)return;s.busy=true;s.error='';controls();try{const row=(await api('/campaigns/'+s.id)).campaign;if(!validRow(row)||row.id!==s.id)throw Error('The saved version could not be verified.');s.latest=row;openCompare(s);}catch(error){s.error=error.message;}finally{s.busy=false;controls();}}
   q('[data-marketing-compare-saved]').addEventListener('click',()=>void reviewSaved());
   async function save(){
-    const s=current;if(!s||s.busy||!storageGood||dead)return;
+    const s=current;if(!s||s.busy||!storageGood||dead||delivery?.pendingFor(s.id))return;
     if(s.latest&&!s.pending){openCompare(s);return;}
     if(!s.pending){if(!workspace.canEdit||!form.reportValidity())return;const values=normalize(s.draft);if(!values.name)return;s.pending={id:s.id,revision:s.revision,requestKey:random(),values};if(!remember())return;}
     const pending=clone(s.pending);s.busy=true;s.error='';controls();
@@ -179,20 +180,20 @@
   function params(){const f=q('[data-marketing-filters]'),p=new URLSearchParams({state:f.elements.state.value});if(f.elements.q.value.trim())p.set('q',f.elements.q.value.trim());if(view==='calendar')p.set('month',f.elements.month.value);return p;}
   function renderLibrary(){
     const list=q('[data-marketing-list]');list.replaceChildren();q('[data-marketing-calendar]').hidden=view!=='calendar';list.hidden=view!=='list';
-    if(view==='list')for(const row of listItems){const article=el('article');article.className='marketing-campaign-card';const pill=el('span',row.values.archived?'Archived':row.values.plannedAt?'Planned draft':'Draft');pill.className='marketing-pill'+(row.values.plannedAt&&!row.values.archived?' planned':'');
-      article.append(pill,el('h3',row.values.name));const subject=el('p',row.values.subject||'No email subject yet');subject.className='marketing-muted';const plan=el('p',row.values.plannedAt?date(row.values.plannedAt):'No date planned');plan.className='marketing-muted';article.append(subject,plan);
+    if(view==='list')for(const row of listItems){const article=el('article');article.className='marketing-campaign-card';const pill=el('span',row.publication?(row.publication.cancelled?'Cancelled':Date.parse(row.publication.scheduledAt)>Date.now()?'Scheduled':'Published')+(row.values.archived?' · Archived':''):row.values.archived?'Archived':row.values.plannedAt?'Planned draft':'Draft');pill.className='marketing-pill'+(row.values.plannedAt&&!row.values.archived?' planned':'');
+      article.append(pill,el('h3',row.values.name));const subject=el('p',row.values.subject||'No email subject yet');subject.className='marketing-muted';const plan=el('p',row.publication?'Send time: '+date(row.publication.scheduledAt):row.values.plannedAt?date(row.values.plannedAt):'No date planned');plan.className='marketing-muted';article.append(subject,plan);
       const actions=el('div');actions.className='marketing-actions';actions.append(button(workspace.canEdit?'Edit draft':'View draft',()=>void openCampaign(row.id)));article.append(actions);list.append(article);}
     else renderCalendar();
-    q('[data-marketing-more]').hidden=!listCursor;q('[data-marketing-list-status]').textContent=listItems.length?`${listItems.length} ${view==='calendar'?(listItems.length===1?'planned draft':'planned drafts'):(listItems.length===1?'campaign':'campaigns')} shown${listCursor?' · More available':''}.`:view==='calendar'?'No planned drafts match this month.':'No campaigns match. Create a draft to get started.';
+    q('[data-marketing-more]').hidden=!listCursor;q('[data-marketing-list-status]').textContent=listItems.length?`${listItems.length} ${view==='calendar'?(listItems.length===1?'calendar entry':'calendar entries'):(listItems.length===1?'campaign':'campaigns')} shown${listCursor?' · More available':''}.`:view==='calendar'?'No campaigns match this month.':'No campaigns match. Create a draft to get started.';
   }
   function renderCalendar(){
     const calendar=q('[data-marketing-calendar]');calendar.replaceChildren();const month=listParams?.get('month');if(!/^20\d{2}-(?:0[1-9]|1[0-2])$/.test(month||''))return;
     for(const day of ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']){const n=el('div',day);n.className='marketing-calendar-label';calendar.append(n);}
     const first=new Date(month+'-01T00:00:00Z'),start=first.getTime()-((first.getUTCDay()+6)%7)*86400000,today=localTime(new Date().toISOString()).slice(0,10),groups=new Map();
-    for(const row of listItems){const d=localTime(row.values.plannedAt).slice(0,10);if(!groups.has(d))groups.set(d,[]);groups.get(d).push(row);}
+    for(const row of listItems){const d=localTime(row.publication?.scheduledAt||row.values.plannedAt).slice(0,10);if(!groups.has(d))groups.set(d,[]);groups.get(d).push(row);}
     for(let i=0;i<42;i++){const d=new Date(start+i*86400000),stamp=d.toISOString().slice(0,10),items=groups.get(stamp)||[],cell=el('div');cell.className='marketing-calendar-day'+(stamp.slice(0,7)!==month?' is-outside':'')+(stamp===today?' is-today':'')+(!items.length?' is-empty':'');
       cell.append(el('span',new Intl.DateTimeFormat('en-GB',{timeZone:'UTC',day:'numeric',month:'short'}).format(d)));
-      for(const row of items.sort((a,b)=>a.values.plannedAt.localeCompare(b.values.plannedAt))){const b=button(localTime(row.values.plannedAt).slice(11)+' · '+row.values.name+(row.values.archived?' (archived)':''),()=>void openCampaign(row.id));b.className='';cell.append(b);}calendar.append(cell);}
+      for(const row of items.sort((a,b)=>(a.publication?.scheduledAt||a.values.plannedAt).localeCompare(b.publication?.scheduledAt||b.values.plannedAt))){const b=button(localTime(row.publication?.scheduledAt||row.values.plannedAt).slice(11)+' · '+row.values.name+(row.publication?(row.publication.cancelled?' (cancelled)':' (published)'):'')+(row.values.archived?' (archived)':''),()=>void openCampaign(row.id));b.className='';cell.append(b);}calendar.append(cell);}
   }
   async function loadList(reset=false){
     if(dead||!workspace)return;
@@ -207,10 +208,10 @@
   function meta(data){
     if(data.storeId!==store||!['sandbox','production'].includes(data.environment)||workspace&&data.environment!==workspace.environment)throw Error('The campaign workspace changed. Reload this page.');workspace=data;
     for(const [k,v] of Object.entries({...data.summary,archived:data.summary.total-data.summary.active})){const n=q(`[data-marketing-count="${k}"]`);if(n)n.textContent=String(v);}
-    q('[data-marketing-new]').disabled=!data.canEdit;q('[data-marketing-delivery]').textContent=data.deliveryAvailable?'Campaign email delivery is connected.':data.emailServiceConnected?'The email service is connected. Campaign delivery is still being prepared. You can save and plan drafts.':'Email delivery is not connected yet. You can save drafts and plan your calendar.';
+    q('[data-marketing-new]').disabled=!data.canEdit;q('[data-marketing-delivery]').textContent=data.deliveryAvailable?'Campaign email delivery is connected.':data.emailServiceConnected?'Campaign email delivery is not connected. You can save and plan drafts.':'Email delivery is not connected yet. You can save drafts and plan your calendar.';
     q('[data-marketing-audience-availability]').textContent=data.audienceAvailable?'Audience previews show current customer records and recorded email permissions.':'Customer audience previews will be available when customer records are connected.';
     q('[data-marketing-timezone]').textContent='Store timezone: '+data.timezone;q('[data-marketing-shop]').href=data.shopUrl;q('[data-marketing-shop-state]').textContent=data.shopEnabled?'':' · Your store is not published yet.';
-    const segment=field('segment'),selected=segment.value;segment.replaceChildren(new Option('Choose a saved segment',''));for(const s of data.segments)segment.append(new Option(s.name,s.id));segment.value=selected;controls();
+    const segment=field('segment'),selected=segment.value;segment.replaceChildren(new Option('Choose a saved segment',''));for(const s of data.segments)segment.append(new Option(s.name,s.id));segment.value=selected;delivery?.configure(data);controls();
   }
   async function refreshLibrary(){if(dead)return;try{meta(await api('/workspace'));if(!dead)await loadList(true);}catch(error){if(!dead)q('[data-marketing-status]').textContent=error.message;}}
   async function load(){
@@ -246,6 +247,9 @@
   }
   q('[data-marketing-history-more]').addEventListener('click',()=>void loadHistory());q('[data-marketing-history-retry]').addEventListener('click',()=>void loadHistory());
   window.addEventListener('pageshow',event=>{if(event.persisted)location.reload();});
-  window.addEventListener('beforeunload',event=>{if(!storageGood&&[...states.values()].some(s=>dirty(s)||s.pending)){event.preventDefault();event.returnValue='';}});
+  window.addEventListener('beforeunload',event=>{if(!storageGood&&[...states.values()].some(s=>dirty(s)||s.pending)||delivery?.unprotected()){event.preventDefault();event.returnValue='';}});
+  delivery=window.EzkartCampaignDelivery(root,{account,store,api,iso,exactKeys,validValues,validRow,labels,date,localTime,utcTime,alive:()=>!dead,
+    context:()=>current?{id:current.id,revision:current.revision,values:clone(current.base),dirty:dirty(current),saving:current.busy,draftPending:Boolean(current.pending)}:null,
+    changed:controls,open:openCampaign,refresh:refreshLibrary,workspace:meta});
   void load();
 })();

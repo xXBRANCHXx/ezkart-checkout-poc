@@ -18,7 +18,7 @@ const query=(url,keys)=>{for(const k of url.searchParams.keys())if(!keys.include
 const saved=(env,actor,id)=>env.DB.prepare(`SELECT p.*,COUNT(j.id) AS summary_recipients,COALESCE(SUM(j.state='queued'),0) AS summary_queued,
   COALESCE(SUM(d.delivery_state='cancelled'),0) AS summary_cancelled,
   COALESCE(SUM(j.state IN ('retry','uncertain','dead') AND COALESCE(json_extract(j.result_json,'$.cancelled'),0)!=1),0) AS summary_attention,
-  COALESCE(SUM(j.state='running'),0) AS summary_processing,
+  COALESCE(SUM(j.state='running'),0) AS summary_processing,COALESCE(SUM(j.attempts>0),0) AS started_recipients,
   COALESCE(SUM(d.submitted_at IS NOT NULL),0) AS submitted,COALESCE(SUM(d.delivered_at IS NOT NULL),0) AS delivered,
   COALESCE(SUM(d.delivery_state='skipped'),0) AS skipped,COALESCE(SUM(d.delivery_state='uncertain'),0) AS uncertain,
   COALESCE(SUM(d.delivery_state='failed'),0) AS failed,COALESCE(SUM(d.delivery_state='bounced'),0) AS bounced,
@@ -32,7 +32,7 @@ async function view(env,row){
   if(row.summary_recipients!==row.candidate_count)fail('This campaign queue needs an operator review.',503);
   const summary={recipients:row.summary_recipients,queued:row.summary_queued,cancelled:row.summary_cancelled,attention:row.summary_attention,processing:row.summary_processing};
   return {id:row.id,campaignId:row.campaign_id,campaignRevision:row.campaign_revision,revision:row.action_revision,values:JSON.parse(row.data_json),storeName:row.store_name,
-    scheduledAt:row.send_at,createdAt:row.created_at,updatedAt:row.updated_at,cancelled:Boolean(row.cancelled),candidateCount:row.candidate_count,summary,
+    scheduledAt:row.send_at,createdAt:row.created_at,updatedAt:row.updated_at,cancelled:Boolean(row.cancelled),candidateCount:row.candidate_count,canReschedule:!row.cancelled&&row.started_recipients===0&&row.summary_queued===row.candidate_count,summary,
     deliverySummary:{submitted:row.submitted,delivered:row.delivered,skipped:row.skipped,uncertain:row.uncertain,failed:row.failed,bounced:row.bounced,complained:row.complained,suppressed:row.suppressed,delayed:row.delayed,needsReview:row.needs_review}};
 }
 function databaseFailure(error){

@@ -3,7 +3,7 @@ import {commerceReadEnvironment} from './commerce-order-reads.js';
 import {settingsActor,publicStoreProfile} from './merchant-settings.js';
 import {customerFilters,customerFilterSql,customerCte,customerContext} from './commerce-customers.js';
 import {reviewCursor,readReviewCursor} from './commerce-reviews.js';
-import {emailConfiguration} from './email-provider.js';
+import {emailConfiguration,campaignEmailConfiguration} from './email-provider.js';
 
 const fail=(message,status=422,code='')=>{throw new Response(message,{status,headers:code?{'x-ezkart-error-code':code}:{}});};
 const fields=(value,allowed)=>{if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).some(k=>!allowed.includes(k)))fail('Campaign fields are invalid');};
@@ -23,9 +23,9 @@ export function campaignValues(input){
 export async function campaignWorkspace(env,actor){
   const seller=await settingsActor(env,actor),mode=commerceReadEnvironment(env),profile=publicStoreProfile(seller);
   const [summary,segments]=await Promise.all([
-    env.DB.prepare(`SELECT COUNT(*) AS total,COALESCE(SUM(json_extract(data_json,'$.archived')=0),0) AS active,
-      COALESCE(SUM(json_extract(data_json,'$.archived')=0 AND json_extract(data_json,'$.plannedAt') IS NOT NULL),0) AS planned
-      FROM commerce_campaigns WHERE seller_id=? AND commerce_environment=?`).bind(seller.id,mode).first(),
+    env.DB.prepare(`SELECT COUNT(*) AS total,COALESCE(SUM(json_extract(c.data_json,'$.archived')=0),0) AS active,
+      COALESCE(SUM(json_extract(c.data_json,'$.archived')=0 AND (p.id IS NOT NULL OR json_extract(c.data_json,'$.plannedAt') IS NOT NULL)),0) AS planned
+      FROM commerce_campaigns c LEFT JOIN commerce_campaign_publication_state p ON p.campaign_id=c.id WHERE c.seller_id=? AND c.commerce_environment=?`).bind(seller.id,mode).first(),
     env.DB.prepare("SELECT id,revision,data_json FROM commerce_customer_segments WHERE seller_id=? AND commerce_environment=? AND json_extract(data_json,'$.archived')=0 ORDER BY updated_at DESC,id LIMIT 50").bind(seller.id,mode).all()
   ]);
   await settingsActor(env,actor);
@@ -33,7 +33,7 @@ export async function campaignWorkspace(env,actor){
   return {storeId:seller.id,environment:mode,storeName:seller.name,timezone:profile.timezone,canEdit:seller.role!=='viewer',summary,
     segments:segments.results.map(r=>({id:r.id,revision:r.revision,name:JSON.parse(r.data_json).name,filters:JSON.parse(r.data_json).filters})),
     shopUrl:(mode==='sandbox'?'https://test.ezkart.id':'https://ezkart.id')+'/shop/?store='+encodeURIComponent(seller.id),shopEnabled:shop.enabled===true,
-    audienceAvailable:commerceStorageEnabled(env),emailServiceConnected:emailConfiguration(env).ready,deliveryAvailable:false};
+    audienceAvailable:commerceStorageEnabled(env),emailServiceConnected:emailConfiguration(env).ready,deliveryAvailable:campaignEmailConfiguration(env).ready};
 }
 export async function listCampaigns(env,actor,url){
   const seller=await settingsActor(env,actor);query(url,['state','q','month','cursor']);
@@ -43,13 +43,15 @@ export async function listCampaigns(env,actor,url){
   const scope=await commerceHash({actor,mode,state,term,month,offset}),cursor=url.searchParams.has('cursor')?readReviewCursor(url.searchParams.get('cursor'),scope):null;
   if(cursor&&(!Number.isSafeInteger(cursor.cap)||!Number.isSafeInteger(cursor.before)||cursor.before<1||cursor.cap<cursor.before))fail('Campaign page is invalid');
   const cap=cursor?.cap??(await env.DB.prepare('SELECT COALESCE(MAX(rowid),0) AS id FROM commerce_campaigns WHERE seller_id=? AND commerce_environment=?').bind(seller.id,mode).first()).id;
-  const rows=await env.DB.prepare(`SELECT rowid AS campaign_n,* FROM commerce_campaigns WHERE seller_id=? AND commerce_environment=? AND rowid<=? AND rowid<?
-    AND (?='all' OR json_extract(data_json,'$.archived')=?) AND (?='' OR instr(lower(json_extract(data_json,'$.name')||' '||json_extract(data_json,'$.subject')),lower(?))>0)
-    AND (?='' OR strftime('%Y-%m',json_extract(data_json,'$.plannedAt'),?)=?) ORDER BY rowid DESC LIMIT 26`)
+  const rows=await env.DB.prepare(`SELECT c.rowid AS campaign_n,c.*,p.id AS publication_id,p.send_at AS publication_time,p.cancelled AS publication_cancelled
+    FROM commerce_campaigns c LEFT JOIN commerce_campaign_publication_state p ON p.campaign_id=c.id
+    WHERE c.seller_id=? AND c.commerce_environment=? AND c.rowid<=? AND c.rowid<?
+    AND (?='all' OR json_extract(c.data_json,'$.archived')=?) AND (?='' OR instr(lower(json_extract(c.data_json,'$.name')||' '||json_extract(c.data_json,'$.subject')),lower(?))>0)
+    AND (?='' OR strftime('%Y-%m',COALESCE(p.send_at,json_extract(c.data_json,'$.plannedAt')),?)=?) ORDER BY c.rowid DESC LIMIT 26`)
     .bind(seller.id,mode,cap,cursor?.before??cap+1,state,Number(state==='archived'),term,term,month,offset,month).all();
   const items=rows.results.slice(0,25);await settingsActor(env,actor);
   // Row IDs bound paging; edits are live. Refresh to reflect moved/archived drafts.
-  return {items:items.map(view),nextCursor:rows.results.length>25?reviewCursor({v:1,scope,cap,before:items.at(-1).campaign_n}):null};
+  return {items:items.map(r=>({...view(r),publication:r.publication_id?{id:r.publication_id,scheduledAt:r.publication_time,cancelled:Boolean(r.publication_cancelled)}:null})),nextCursor:rows.results.length>25?reviewCursor({v:1,scope,cap,before:items.at(-1).campaign_n}):null};
 }
 export async function readCampaign(env,actor,id,url){
   await settingsActor(env,actor);query(url,[]);if(!campaignId(id))fail('Campaign not found',404);

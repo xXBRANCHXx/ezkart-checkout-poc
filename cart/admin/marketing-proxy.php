@@ -49,6 +49,7 @@ function ez_admin_marketing_proxy(string $token, string $path, string $method): 
     session_write_close();
     if (!$same) { header_remove('Set-Cookie'); ez_admin_json(['ok' => false, 'error' => 'Your sign-in changed. Reload to check the saved campaign.', 'code' => 'marketing_session_changed'], 401); }
     $data = $received === true ? json_decode($raw, true) : null;
-    if (!is_array($data)) ez_admin_json(['ok' => false, 'error' => 'The result was not confirmed. Retry the original save.'], 503);
+    if (!is_array($data)) ez_admin_json(['ok' => false, 'error' => in_array($action, ['publish','publication-action'], true)
+        ? 'The result was not confirmed. Retry the original delivery action.' : 'The result was not confirmed. Retry the original save.'], 503);
     ez_admin_json($data, in_array($status, [200,400,401,403,404,409,413,415,422,429], true) ? $status : 503);
 }

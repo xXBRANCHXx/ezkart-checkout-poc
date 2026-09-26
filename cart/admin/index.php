@@ -1974,7 +1974,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
   <script src="notification-badge.js?v=<?= (int) filemtime(__DIR__ . '/notification-badge.js') ?>"></script>
   <script src="admin-format.js?v=<?= (int) filemtime(__DIR__ . '/admin-format.js') ?>"></script>
   <?php if ($page === 'settings'): ?><script src="merchant-settings.js?v=<?= (int) filemtime(__DIR__ . '/merchant-settings.js') ?>"></script><?php endif; ?>
-  <?php if ($page === 'marketing'): ?><script src="marketing.js?v=<?= (int) filemtime(__DIR__ . '/marketing.js') ?>"></script><?php endif; ?>
+  <?php if ($page === 'marketing'): ?><script src="marketing-publication.js?v=<?= (int) filemtime(__DIR__ . '/marketing-publication.js') ?>"></script><script src="marketing.js?v=<?= (int) filemtime(__DIR__ . '/marketing.js') ?>"></script><?php endif; ?>
   <?php if (in_array($page, ['inventory','products'], true)): ?><script src="inventory.js?v=<?= (int) filemtime(__DIR__ . '/inventory.js') ?>"></script><?php endif; ?>
   <?php if ($page === 'inventory'): ?><script src="inventory-reviews.js?v=<?= (int) filemtime(__DIR__ . '/inventory-reviews.js') ?>"></script><?php endif; ?>
   <?php if ($page === 'returns'): ?><script src="returns.js?v=<?= (int) filemtime(__DIR__ . '/returns.js') ?>"></script><?php endif; ?>

@@ -64,6 +64,24 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 27 September: merchant campaign publishing and delivery controls
+
+Implemented saved-copy/audience review, publication, timezone-bound scheduling,
+rescheduling before processing, cancellation, recipient outcomes and immutable
+delivery history in the actual Marketing editor. Exact pending actions survive
+reloads; stale revisions require renewed review. Published calendar entries use
+their actual send time independently of later draft reminders. Account changes,
+corrupt recovery records and uncertain acknowledgements fail closed.
+
+See [campaign-publishing-ui.md](campaign-publishing-ui.md). All 295 Worker tests,
+11 new browser checks and three real PHP publication proxy checks pass. The
+preceding combined run also passes all nine existing Marketing editor checks.
+Desktop/mobile screenshots, keyboard behavior, syntax/diff checks and the TEST
+dry-run pass. No migration is required. Authenticated hosted acceptance,
+campaign operator recovery, automation, performance reporting, provider
+acceptance and capacity/recovery validation remain open. Existing sending and
+central-commerce holds remain in place; no top-level gate is closed.
+
 ### 27 September: campaign message outbox and guarded dispatch
 
 Implemented atomic message/unsubscribe preparation, immutable retry bytes and
