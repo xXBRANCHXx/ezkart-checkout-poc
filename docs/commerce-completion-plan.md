@@ -64,6 +64,38 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 27 September: campaign delivery and permission reports
+
+Implemented store-local publication periods, equal previous-period comparisons,
+publication-date charts, frozen published copy, current delivery/permission
+outcomes and paginated campaign reports in Marketing. Complete CSV snapshots
+materialize every matching campaign atomically and retain exact export requests
+across failed responses, interrupted pages, changed filters and tab reloads.
+Membership/session changes, corrupt browser records, mismatched receipts and
+incomplete snapshots cannot produce a successful partial file. Expired export
+records are removed through the existing bounded hourly maintenance job.
+
+See [campaign-reports.md](campaign-reports.md). Campaign-to-order attribution,
+verified conversion/revenue reporting, automation, signed-in hosted/provider
+acceptance, monitoring and sustained recovery/capacity validation remain open.
+All thirteen completion gates remain open. No provider, sending, central-commerce
+or production release hold changes with this reporting implementation.
+
+Local validation: the full Worker run passes all 316 existing cases. The final
+report run passes all 14 new cases after correcting the damage-injection fixture
+to bypass the immutable job guard only inside that fixture. All 22 existing
+marketing/publishing/recovery PHP/browser cases, three publication proxy cases
+and ten new report cases pass.
+Desktop/390px layouts, universal filters, spreadsheet quoting, recovery and
+session changes were checked. Syntax, diff and the TEST Worker dry-run pass.
+
+The fresh private TEST backup is 571,182 bytes with SHA-256
+`499c3e10612d51437c1fdd7606871d19985a090846c8d3c7603ae85a442b2d5f`.
+It restores with every row in all 112 existing physical tables unchanged, valid
+integrity and no foreign-key errors. Migration 0038 adds ten objects and changes
+no existing schema objects. All 28 affected SQL statements compile on the
+restored database without mutation.
+
 ### 27 September: campaign investigation and audited recovery
 
 Implemented purpose-bound operator listing/history, durable provider lookups,

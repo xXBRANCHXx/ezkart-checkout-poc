@@ -29,7 +29,7 @@
   const states=new Map();let workspace=null,current=null,dead=false,storageGood=true,storageCorrupt=false,storageError='',loaded=false,navVersion=0,loadBusy=false,comparison=null;
   let view='list',listVersion=0,listBusy=false,listItems=[],listCursor=null,listParams=null;
   const preview=q('[data-marketing-preview-dialog]'),compare=q('[data-marketing-comparison]'),audience=q('[data-marketing-audience-dialog]'),history=q('[data-marketing-history-dialog]'),discard=q('[data-marketing-discard-dialog]');
-  let audienceView=null,historyView=null,delivery=null;
+  let audienceView=null,historyView=null,delivery=null,reports=null;
   const offset=()=>({'Asia/Jakarta':7,'Asia/Makassar':8,'Asia/Jayapura':9}[workspace.timezone])*3600000;
   const localTime=stamp=>stamp?new Date(Date.parse(stamp)+offset()).toISOString().slice(0,16):'';
   const utcTime=value=>value?new Date(Date.parse(value+'Z')-offset()).toISOString():null;
@@ -37,7 +37,7 @@
   const show=(path,value)=>path==='plannedAt'?date(value):typeof value==='boolean'?(value?'Yes':'No'):value||'Not provided';
   const dirty=s=>!same(s.base,s.draft),storageKey=()=>`ezkart.marketing.v1:${account}:${store}:${workspace.environment}`;
   function stop(message){
-    if(dead)return;delivery?.stop();dead=true;navVersion++;listVersion++;for(const d of [preview,compare,audience,history,discard])d.close();
+    if(dead)return;delivery?.stop();reports?.stop();dead=true;navVersion++;listVersion++;for(const d of [preview,compare,audience,history,discard])d.close();
     root.replaceChildren(el('p',message));const a=el('a','Reload sign-in');a.href='?page=marketing';root.append(a);
   }
   async function api(path,body){
@@ -211,7 +211,7 @@
     q('[data-marketing-new]').disabled=!data.canEdit;q('[data-marketing-delivery]').textContent=data.deliveryAvailable?'Campaign email delivery is connected.':data.emailServiceConnected?'Campaign email delivery is not connected. You can save and plan drafts.':'Email delivery is not connected yet. You can save drafts and plan your calendar.';
     q('[data-marketing-audience-availability]').textContent=data.audienceAvailable?'Audience previews show current customer records and recorded email permissions.':'Customer audience previews will be available when customer records are connected.';
     q('[data-marketing-timezone]').textContent='Store timezone: '+data.timezone;q('[data-marketing-shop]').href=data.shopUrl;q('[data-marketing-shop-state]').textContent=data.shopEnabled?'':' · Your store is not published yet.';
-    const segment=field('segment'),selected=segment.value;segment.replaceChildren(new Option('Choose a saved segment',''));for(const s of data.segments)segment.append(new Option(s.name,s.id));segment.value=selected;delivery?.configure(data);controls();
+    const segment=field('segment'),selected=segment.value;segment.replaceChildren(new Option('Choose a saved segment',''));for(const s of data.segments)segment.append(new Option(s.name,s.id));segment.value=selected;delivery?.configure(data);reports?.configure(data);controls();
   }
   async function refreshLibrary(){if(dead)return;try{meta(await api('/workspace'));if(!dead)await loadList(true);}catch(error){if(!dead)q('[data-marketing-status]').textContent=error.message;}}
   async function load(){
@@ -247,7 +247,8 @@
   }
   q('[data-marketing-history-more]').addEventListener('click',()=>void loadHistory());q('[data-marketing-history-retry]').addEventListener('click',()=>void loadHistory());
   window.addEventListener('pageshow',event=>{if(event.persisted)location.reload();});
-  window.addEventListener('beforeunload',event=>{if(!storageGood&&[...states.values()].some(s=>dirty(s)||s.pending)||delivery?.unprotected()){event.preventDefault();event.returnValue='';}});
+  window.addEventListener('beforeunload',event=>{if(!storageGood&&[...states.values()].some(s=>dirty(s)||s.pending)||delivery?.unprotected()||reports?.unprotected()){event.preventDefault();event.returnValue='';}});
+  reports=window.EzkartCampaignReports(root,{account,store,api,iso,exactKeys,alive:()=>!dead,open:openCampaign});
   delivery=window.EzkartCampaignDelivery(root,{account,store,api,iso,exactKeys,validValues,validRow,labels,date,localTime,utcTime,alive:()=>!dead,
     context:()=>current?{id:current.id,revision:current.revision,values:clone(current.base),dirty:dirty(current),saving:current.busy,draftPending:Boolean(current.pending)}:null,
     changed:controls,open:openCampaign,refresh:refreshLibrary,workspace:meta});
