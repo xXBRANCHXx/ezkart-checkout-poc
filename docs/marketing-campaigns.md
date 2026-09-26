@@ -4,7 +4,7 @@ The merchant Marketing workspace now uses saved campaign drafts, real customer
 audience previews and a planning calendar. The sample active campaigns,
 automation counts and toast-only controls have been removed. This delivery is
 the draft/audience portion of the larger marketing gate. Automation triggers
-and useful performance reports remain required.
+and the remaining hosted/provider acceptance are still required.
 Draft saving does not send mail or mark marketing complete.
 
 [Publication and recipient queues](campaign-publication.md) persist frozen
@@ -16,8 +16,10 @@ evidence. The [publishing controls](campaign-publishing-ui.md) now review and
 publish saved drafts, reschedule or cancel remaining sends, and expose recipient
 outcomes and delivery history. The calendar uses the publication's actual send
 time when one exists. [Operator recovery](campaign-investigation.md) verifies
-uncertain submissions. Automation, performance reporting and provider/hosted
-acceptance remain outstanding; sending remains held by the deployment flags.
+uncertain submissions. [Delivery reports](campaign-reports.md) and
+[verified performance reports](campaign-performance.md) now provide complete,
+recoverable exports. Automation and provider/hosted acceptance remain
+outstanding; sending remains held by the deployment flags.
 
 ## Merchant behavior
 

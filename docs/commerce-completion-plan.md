@@ -86,6 +86,17 @@ integrity and no foreign-key errors. Migration 0040 adds eleven objects and
 changes no existing object; all 77 compatibility query plans compile. Backup
 SHA-256: `21babb0c2fc583cbd89a6fa99230afb4d9d8cd805ee2d4c636866b163d503ce2`.
 
+Implementation `1eba342` is pushed and hosted on workbench. TEST migration 0040
+and Worker `557297dc-3dd6-4cdb-9511-3a06f7a769ec` are installed. All 44 Worker
+health/access/hold checks pass at 21:45:47 UTC on 26 September. All eight checked
+hosted assets match at 21:47:20 UTC and 23 hosted access/unsubscribe/link guards
+pass at 21:47:21 UTC. The database has 120 application tables, no pending
+migrations and no foreign-key errors. Existing counts, settings and legacy
+import evidence remain unchanged; all eleven new schema objects match the
+restore and both new export tables remain empty. Hosted verification created no
+campaign, message, visit, order, payment or export. Shared Chrome remains
+disconnected with no new reconnect attempt, so signed-in acceptance is pending.
+
 Marketing automation, signed-in hosted/provider acceptance, monitoring and
 sustained capacity/recovery validation remain open. All thirteen completion
 gates remain open; existing sending, central-commerce and production holds

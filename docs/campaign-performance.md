@@ -125,3 +125,26 @@ Marketing automation, signed-in hosted/provider acceptance, monitoring and
 sustained capacity/recovery validation remain open. All thirteen workbench
 completion gates and existing sending, central-commerce and production holds
 remain open. This report does not establish settled money or release readiness.
+
+## TEST rollout, 27 September Jakarta time
+
+Implementation `1eba342` is pushed to `agent/ezkart-workbench`. Migration 0040
+is applied and TEST Worker `557297dc-3dd6-4cdb-9511-3a06f7a769ec` is deployed.
+All 44 Worker health/access/hold checks pass at 21:45:47 UTC on 26 September.
+The current TEST database has 120 application tables and no pending migrations.
+
+Hostinger serves all eight checked assets exactly as committed, with the last
+modified times 21:46:19–20 UTC. After the initial probe observed the preceding
+deployment, the next check confirms all assets at 21:47:20 UTC and all 23 hosted
+access/unsubscribe/link guards at 21:47:21 UTC. These are public and unauthenticated
+checks in an independently launched browser, not signed-in merchant acceptance.
+
+Post-deployment comparison preserves all prior table counts, seller settings
+and the legacy import manifest. All eleven added schema objects match the
+restored backup; foreign-key checks are clean and all 77 query plans compile.
+Both new export tables remain empty. Verification created no hosted campaigns,
+messages, visits, orders, payments or exports, and changed no provider flags.
+
+The shared-browser status still reports the prior timed-out connection, with
+six attempts and no new attempt during this delivery. Signed-in hosted checks
+remain pending. Main, production and draft PR #3 are untouched.
