@@ -64,6 +64,23 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 26 September: durable provider financial observations
+
+Added private, immutable provider balance/history receipts tied to confirmed
+seller wallet accounts and pinned credentials. Raw request/response evidence and
+exact decimal money are preserved, including duplicate rows and later status
+changes. A bounded sandbox collector saves each response before its next read,
+recovers lost acknowledgements and stops on storage or account-scope failures.
+These observations create no money journals or available funds. See
+[provider-financial-evidence.md](provider-financial-evidence.md).
+
+All 148 Worker tests and 31 affected PHP/signing/reader/Wallet checks pass. A fresh
+TEST backup restores with 0025, all three empty evidence tables and ten guards,
+no foreign-key errors and unchanged existing counts. Actual provider
+acceptance, durable completed-window tracking, transaction correlation, actual-fee
+and settlement postings, release, reserves, refunds, withdrawals and operational
+reconciliation remain open. No top-level gate advances on these observations.
+
 ### 26 September: verified seller wallet enrollment
 
 Added an owner-verified merchant setup flow, one immutable intent/job per

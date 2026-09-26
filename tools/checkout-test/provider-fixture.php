@@ -36,7 +36,7 @@ function curl_exec(object $handle): string {
         if (isset($handle->options[CURLOPT_WRITEFUNCTION])) { ($handle->options[CURLOPT_WRITEFUNCTION])($handle, $response); return '1'; }
         return $response;
     }
-    if (getenv('EZKART_TEST_WALLET') && preg_match('#^https://api-sandbox.doku.com/(authorization/v1/access-token/b2b|sub-account/v2.0/(register|balance-inquiries))$#D', $handle->url, $walletMatch)) {
+    if (getenv('EZKART_TEST_WALLET') && preg_match('#^https://api-sandbox.doku.com/(authorization/v1/access-token/b2b|sub-account/v2.0/(register|balance-inquiries|transaction-history-list))$#D', $handle->url, $walletMatch)) {
         $directory = dirname(getenv('EZKART_TEST_CAPTURE'));
         $control = is_file($directory . '/wallet-control.json') ? json_decode((string) file_get_contents($directory . '/wallet-control.json'), true) : [];
         $profilesFile = $directory . '/wallet-profiles.json';
@@ -58,6 +58,12 @@ function curl_exec(object $handle): string {
                 if (!empty($control['loseRegister'])) { $handle->status = 503; $response = ['responseCode' => '5030000']; }
                 if (!empty($control['wrongParent'])) $response['parentProfileId'] = 'BRN-foreign';
             }
+        } elseif ($walletMatch[2] === 'transaction-history-list') {
+            $historyFile = $directory . '/wallet-history.json';
+            $history = is_file($historyFile) ? json_decode((string) file_get_contents($historyFile), true) : [];
+            $rows = $history[$payload['accountNo']] ?? [];
+            $response = ['responseCode' => '2000000', 'detailData' => array_slice($rows, (int) $payload['pageSize'] * (int) $payload['pageNumber'], (int) $payload['pageSize'])];
+            if (!empty($control['historyUnavailable'])) { $handle->status = 503; $response = ['responseCode' => '5030000']; }
         } else {
             $response = null;
             foreach ($profiles as $profile) if ($profile['profileId'] === $payload['profileId']) $response = $profile;

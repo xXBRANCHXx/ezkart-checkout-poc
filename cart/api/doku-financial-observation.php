@@ -7,16 +7,17 @@ require_once __DIR__ . '/doku-sub-accounts.php';
  * offers offset pages, not an atomic snapshot: exhaustion never proves settlement.
  * The callback must durably save private evidence or throw before another read.
  */
-function ez_observe_doku_financial_window(EzDokuSubAccountReader $reader, string $profile, string $from, string $to, int $maxPages, callable $record): array
+function ez_observe_doku_financial_window(EzDokuSubAccountReader $reader, string $profile, string $from, string $to, int $maxPages, callable $record, int $pageSize = 100): array
 {
     if ($maxPages < 1 || $maxPages > 40) throw new EzDokuReadException('page_budget');
+    if ($pageSize < 1 || $pageSize > 100) throw new EzDokuReadException('page_size');
     EzDokuSubAccountReader::window($from, $to);
     $before = $reader->balances($profile); $record('balance_before', $before);
     $coverage = [];
     foreach ($before['data']['accounts'] as $type => $account) {
         $seen = []; $previousDate = null; $count = 0; $exhausted = false;
         for ($page = 0; $page < $maxPages; $page++) {
-            $response = $reader->historyPage($account['accountNo'], $from, $to, $page);
+            $response = $reader->historyPage($account['accountNo'], $from, $to, $page, $pageSize);
             $record('history_page', $response);
             foreach ($response['data']['items'] as $item) {
                 $hash = hash('sha256', json_encode($item, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));

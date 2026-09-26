@@ -33,6 +33,9 @@ request uses a new numeric request ID.
 The transport now lives in `doku-snap.php`, shared with the separately authorized
 [wallet enrollment adapter](wallet-enrollment.md). The reader's public methods
 remain read-only; the evidence collector cannot register or move funds.
+The [central evidence collector](provider-financial-evidence.md) can now preserve
+those responses against confirmed seller accounts in private D1 storage. The
+standalone file collector below retains its existing behavior.
 
 Financial JSON rejects duplicate keys, malformed strings and excessive nesting.
 Numbers retain their exact original decimal spelling until validated; money is

@@ -24,6 +24,7 @@ import {merchantDashboard} from './commerce-dashboard.js';
 import {merchantPaymentList,merchantPaymentDetail,merchantPaymentHistory} from './commerce-payment-reads.js';
 import {reconcileCaptureJournals,financialJournalSummary,financialJournalList} from './commerce-financial-journal.js';
 import {walletEnrollment,walletRegistration,bindWalletRegistration,saveWalletRegistrationReceipt,recordWalletRegistration} from './commerce-wallet-enrollment.js';
+import {providerFinancialAccount,recordProviderFinancialEvidence,providerFinancialEvidenceList} from './commerce-provider-evidence.js';
 import {merchantCustomers,merchantCustomer,customerOrderHistory} from './commerce-customers.js';
 import {customerSegments,customerSegment,saveCustomerWorkspace,customerProfileHistory} from './commerce-customer-workspace.js';
 import {createCustomerExport,readCustomerExport,cleanupCustomerExports} from './commerce-customer-exports.js';
@@ -1455,6 +1456,12 @@ export default {
     try {
       if(url.pathname.startsWith('/internal/commerce/finance/')){
         const payload=await authenticateCommerceService(request,env);
+        if(url.pathname==='/internal/commerce/finance/provider-account'&&request.method==='GET')return json({ok:true,account:await providerFinancialAccount(env,url)});
+        if(url.pathname==='/internal/commerce/finance/provider-evidence'){
+          if(request.method==='GET')return json({ok:true,...await providerFinancialEvidenceList(env,url)});
+          if(request.method==='POST'&&!url.search)return json({ok:true,...await recordProviderFinancialEvidence(env,payload)});
+          return json({ok:false,error:'Provider evidence route or method is unavailable'},404);
+        }
         if(url.pathname==='/internal/commerce/finance/wallet'&&request.method==='POST'){
           if(url.search)return json({ok:false,error:'Wallet parameters belong in the request body'},422);
           return json({ok:true,...await walletEnrollment(env,payload)});
