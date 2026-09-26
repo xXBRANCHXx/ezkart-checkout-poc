@@ -203,6 +203,26 @@ delivery source/status views. All nine new tables are empty. Current remote
 counts match the backup, including fifteen legacy-import entries. Syntax checks
 pass for all 25 changed JavaScript/PHP files, and the diff check passes.
 
-The implementation is prepared locally for TEST-only rollout. Deployment,
-remote schema and hosted asset/guard evidence will be appended after verification.
-Nothing here authorizes main or production deployment.
+## TEST rollout
+
+Implementation `6de734b` and schedule adjustment `105f991` are pushed to
+`agent/ezkart-workbench`. Migration 0041 is applied and TEST Worker
+`838d462b-0a30-40b5-a9de-532bc4c0ff76` is deployed with four registered cron
+triggers. Health reports 129 application tables and healthy D1/public R2/private
+R2. All 51 deployed API access/hold checks pass at 23:48:00 UTC on 26 September.
+
+Hostinger's automatic workbench deployment serves the exact nine checked assets
+at 23:49:49 UTC. All thirty hosted access, private-component, unsubscribe and
+campaign-link checks pass at 23:49:51 UTC. A final remote read after these checks
+confirms existing counts/settings and the legacy manifest are unchanged, all
+63 new schema objects and two replaced views match the restore, all nine new
+tables remain empty, and there are no pending migrations or foreign-key errors.
+All 128 compatibility queries still compile. These checks created no hosted
+automation, campaign, message, visit, order, payment or export.
+
+The shared Chrome connection remains disconnected; no new connection attempt
+was made for this rollout. Signed-in hosted acceptance remains pending. The
+merchant response still exposes the hosting-level `upgrade-insecure-requests`
+policy rather than PHP's full policy; that existing header issue remains a
+release gate. Automation, campaign/email and central-commerce holds are
+unchanged. Main, production and draft PR #3 are untouched.

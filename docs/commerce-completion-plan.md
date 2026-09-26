@@ -85,14 +85,23 @@ compatibility queries. Migration 0041 adds 63 objects and changes only the two
 campaign delivery source/status views. Its nine new tables are empty. Backup
 SHA-256: `6c92784ab09c21d5022a1cb2a1ce08d2bc5787fb6b730dd679f88099a72245d8`.
 Syntax checks pass for all 25 changed JavaScript/PHP files and the diff is clean.
-The implementation is prepared locally; remote rollout evidence follows. The
-current deployed baseline remains `14289f4` until that rollout completes.
+The first rollout hit the account cron limit. The final schedule uses one
+registered trigger for separate campaign and automation invocations, retaining
+the campaign send cadence and separate query budgets. Three focused processor/
+cron cases and the adjusted TEST dry-run pass.
 
-The first TEST rollout applied and verified migration 0041, but the additional
-cron exceeded the account limit. The final schedule uses one registered trigger
-for separate campaign and automation invocations, retaining the existing
-campaign send cadence and separate query budgets. Three focused cron/processor
-cases and the adjusted TEST dry-run pass. Final deployment verification follows.
+Implementation `6de734b` and schedule adjustment `105f991` are pushed and hosted
+on workbench. TEST migration 0041 and Worker
+`838d462b-0a30-40b5-a9de-532bc4c0ff76` are installed with four cron triggers and
+129 healthy application tables. All 51 API access/hold checks pass at 23:48:00
+UTC on 26 September. Nine hosted assets match at 23:49:49 UTC; thirty hosted
+access/unsubscribe/link checks pass at 23:49:51 UTC. Final remote verification
+preserves all existing counts/settings and legacy evidence, matches all schema
+objects to the restore and compiles all 128 queries. There are no pending
+migrations or foreign-key errors. All nine new tables remain empty; hosted
+checks created no automation, message, order, payment or export. Shared Chrome
+remains disconnected with no new reconnect attempt. The existing hosted merchant
+CSP replacement issue remains open.
 
 Signed-in hosted/provider acceptance, monitoring, capacity, sustained delay and
 repeat behavior and operational recovery remain open. The new processing flag
