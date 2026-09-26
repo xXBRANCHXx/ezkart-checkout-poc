@@ -90,6 +90,8 @@ test('history refuses malformed, out-of-window, unordered and foreign-currency e
   for(const extra of cases)assert.equal(readHistory({responseCode:'2000000',...extra}).results[0].ok,false);
   const full=run({actions:[['history',account,from,to,0,1],['history',account,from,to,1,1]],responses:[token(),history(),history([])]});
   assert.equal(full.results[0].result.data.exhausted,false);assert.equal(full.results[1].result.data.exhausted,true);assert.equal(JSON.parse(full.requests[2].body).pageNumber,'1');
+  const fee=row({transactionType:'SETTLEMENT_FEE',mutationType:'DEBIT',amount:4750});delete fee.partnerReferenceNo;
+  const feeRead=readHistory({responseCode:'2000000',detailData:[fee]}).results[0];assert.equal(feeRead.ok,true);assert.equal(feeRead.result.data.items[0].partnerReferenceNo,null);assert.equal(feeRead.result.data.items[0].referenceNo,'doku-fixture');
 });
 
 test('transaction status preserves refund history and rejects ambiguous references or unsupported outcomes',()=>{
@@ -97,9 +99,11 @@ test('transaction status preserves refund history and rejects ambiguous referenc
     const body=status({latestTransactionStatus:code,refundHistory:[{refundNo:'refund-one',refundStatus:'00',refundAmount:{value:'25000.00',currency:'IDR'},transactionDate:'2026-09-25T14:00:00+07:00',reason:'Partial return'}]});
     const result=run({actions:[['status','order-fixture']],responses:[token(),response(body)]});assert.equal(result.results[0].result.data.latestTransactionStatus,code);assert.equal(result.results[0].result.data.refundHistory[0].amount,'25000');
   }
-  for(const extra of [{partnerReferenceNo:'some-other-order'},{latestTransactionStatus:'07'},{latestTransactionStatus:null},{latestTransactionDesc:'void'},{amount:{value:'120000.00',currency:'USD'}},{refundHistory:{}}]){
+  for(const extra of [{partnerReferenceNo:'some-other-order'},{latestTransactionStatus:'07'},{latestTransactionStatus:null},{latestTransactionDesc:'void'},{amount:{value:'120000.00',currency:'USD'}},{refundHistory:{}},{refundHistory:null}]){
     assert.equal(run({actions:[['status','order-fixture']],responses:[token(),response(status(extra))]}).results[0].ok,false);
   }
+  const noHistory=status();delete noHistory.refundHistory;
+  const observed=run({actions:[['status','order-fixture']],responses:[token(),response(noHistory)]});assert.equal(observed.results[0].result.data.refundHistoryPresent,false);
 });
 
 test('strict financial JSON rejects duplicate keys, invalid syntax and nesting without touching quoted amounts',()=>{

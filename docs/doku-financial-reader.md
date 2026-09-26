@@ -43,6 +43,10 @@ unknown transaction types and same-page duplicate rows as evidence. It requires
 valid timestamps, newest-first order and the requested date window. Transaction
 status requires an exact partner reference, known status code, IDR amount and
 unambiguous refund entries. Refund records are observations, not executed refunds.
+History preserves an absent merchant reference on fee/split records; it never
+invents an order link from those records. Status reads distinguish an omitted
+refund-history field from an explicitly returned empty list, and reject null
+or malformed history instead of interpreting it as no refunds.
 
 The observer queries account numbers obtained from the verified profile response,
 records each response before continuing, and checks those identities again at the
@@ -104,3 +108,9 @@ Still required: seller-owned provider enrollment/mapping, payment routing and sp
 verification, durable synchronization, capture-to-provider correlation, settlement
 and actual-fee postings/corrections, delivery release, holds, refunds, payouts and
 merchant wallet workflows. This reader closes none of those acceptance gates.
+
+Implementation `3521f1a` is pushed to workbench. At 10:30 UTC / 17:30 Jakarta on
+26 September, both the observer command and its PHP test fixture return empty
+HTTP 404 responses on `test.ezkart.id`. This is a hosted HTTP-denial check, not
+provider-read acceptance or verification of the private hosted configuration.
+No Worker migration/deployment is needed for this PHP-only addition.

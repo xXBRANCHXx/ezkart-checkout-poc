@@ -206,7 +206,9 @@ final class EzDokuSubAccountReader
             $type = self::text($item->transactionType ?? null, 32);
             if (preg_match('/^[A-Z][A-Z0-9_]*$/D', $type) !== 1) throw new EzDokuReadException('history');
             $items[] = ['accountNo' => $accountNo, 'referenceNo' => self::text($item->referenceNo ?? null, 64),
-                'partnerReferenceNo' => self::text($item->partnerReferenceNo ?? null, 64), 'transactionType' => $type,
+                // Provider fee/split rows can lack a merchant reference. Preserve
+                // that absence; referenceNo still identifies the provider group.
+                'partnerReferenceNo' => isset($item->partnerReferenceNo) ? self::text($item->partnerReferenceNo, 64, true) : null, 'transactionType' => $type,
                 'mutationType' => $item->mutationType, 'amount' => self::money($item->amount ?? null), 'currency' => 'IDR', 'status' => $item->status,
                 'dateTime' => $date->format('Y-m-d\TH:i:s.u\Z'), 'channel' => self::text($item->channel ?? '', 64, true), 'remark' => self::text($item->remark ?? '', 256, true)];
         }
@@ -227,7 +229,8 @@ final class EzDokuSubAccountReader
         [$response, $evidence] = $this->request('transactions-status', ['partnerReferenceNo' => $partnerReference]);
         if (($response->partnerReferenceNo ?? null) !== $partnerReference || !in_array($response->latestTransactionStatus ?? null, ['00', '03', '04', '05', '06'], true)
             || !($response->amount ?? null) instanceof stdClass || ($response->amount->currency ?? null) !== 'IDR') throw new EzDokuReadException('status');
-        $refunds = $response->refundHistory ?? [];
+        $refundHistoryPresent = property_exists($response, 'refundHistory');
+        $refunds = $refundHistoryPresent ? $response->refundHistory : [];
         if (!is_array($refunds) || count($refunds) > 1000) throw new EzDokuReadException('status');
         $history = []; $seen = [];
         foreach ($refunds as $refund) {
@@ -244,6 +247,7 @@ final class EzDokuSubAccountReader
         return ['data' => ['partnerReferenceNo' => $partnerReference, 'transactionType' => self::text($response->transactionType ?? null, 32),
             'latestTransactionStatus' => $response->latestTransactionStatus, 'latestTransactionDesc' => $description,
             'amount' => self::money($response->amount->value ?? null), 'currency' => 'IDR',
-            'transactionDate' => self::date($response->transactionDate ?? null)->format('Y-m-d\TH:i:s.u\Z'), 'refundHistory' => $history], 'evidence' => $evidence];
+            'transactionDate' => self::date($response->transactionDate ?? null)->format('Y-m-d\TH:i:s.u\Z'),
+            'refundHistoryPresent' => $refundHistoryPresent, 'refundHistory' => $history], 'evidence' => $evidence];
     }
 }

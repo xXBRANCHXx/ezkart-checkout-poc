@@ -79,6 +79,8 @@ Local configuration lacks the SNAP signing key; actual provider reads and hosted
 configuration remain unverified. Seller mapping, routing, settlement ingestion,
 release, refunds, payouts and wallet UI remain open. No provider calls, credential
 changes, financial postings or activation are part of this stage.
+Implementation `3521f1a` is pushed to workbench. Both CLI-only PHP entrypoints
+return empty HTTP 404 responses on TEST; actual provider acceptance remains open.
 
 ### 26 September: immutable captured-payment accounting
 
