@@ -98,3 +98,19 @@ horizontal overflow. The passing browser test also covers hostile-looking
 copy, maximum unbroken Unicode body text and a campaign without a shop button.
 These checks use isolated local browsers and fixture-only provider calls;
 they issue no hosted campaign link or email.
+
+## TEST rollout
+
+Implementation `ba6e0d2` is pushed to `agent/ezkart-workbench`. TEST Worker
+`86a09912-b1fc-4a18-b08f-0c4cfc0f6560` is deployed. At 26 September 17:47 UTC,
+all 25 deployed health/access/hold checks passed with 98 healthy application
+tables, D1 and both R2 buckets. No migration was required or pending. The
+deployment-time comparison preserves all table counts, schema, seller settings
+and the 15-entry legacy import evidence, with no foreign-key errors. Both
+unsubscribe tables remain empty and no provider configuration was activated.
+
+The public page's complete CSP and `X-Frame-Options: DENY` were independently
+confirmed on hosted GET/HEAD/POST responses at 17:41 UTC. Shared Chrome still
+reports the same disconnected connection; no reconnect was attempted.
+Authenticated hosted acceptance remains open while independent implementation
+continues. Main, production and PR #3 remain held.

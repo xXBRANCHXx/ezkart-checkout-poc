@@ -140,6 +140,8 @@ PHP's CSP with its global `upgrade-insecure-requests` value. A page-specific
 `cart/.htaccess` response policy and `X-Frame-Options: DENY` address that conflict.
 At 17:38 UTC, GET/HEAD/POST returned the full restrictive CSP after correction
 `e06b046` deployed, while all previous asset and access checks still passed.
+At 17:41 UTC, all three methods also explicitly passed `X-Frame-Options: DENY`
+checks alongside the complete CSP.
 Authenticated hosted workflows
 and real recipient/provider acceptance remain open. No campaign token, message
 or provider request was created during the rollout.

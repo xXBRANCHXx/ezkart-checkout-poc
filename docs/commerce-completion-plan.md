@@ -104,6 +104,12 @@ unset and no route/cron invokes this transport yet. Durable publication/outbox,
 dispatch, campaign callbacks/recovery, scheduling, automation, reporting and
 provider/hosted acceptance remain required; no completion gate is closed.
 
+Renderer/transport implementation `ba6e0d2` is pushed. TEST Worker
+`86a09912-b1fc-4a18-b08f-0c4cfc0f6560` passes the 25 deployed checks with 98
+healthy application tables. No new migration was required; deployment preserves
+existing counts, schema, settings and import evidence. Campaign/transactional
+provider activation and central commerce remain held.
+
 ### 26–27 September: saved campaign drafts and real audience previews
 
 Replaced the Marketing samples and toast-only actions with versioned campaign
