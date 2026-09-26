@@ -39,6 +39,7 @@ import {merchantSettings,saveMerchantSettings,settingsHistory,publicStoreProfile
 import {notificationInbox,notificationStats,readNotifications,notificationProcessing} from './commerce-notifications.js';
 import {dispatchNotifications,scheduleNotifications} from './commerce-notification-dispatch.js';
 import {dispatchEmails,recordEmailWebhook} from './commerce-email-delivery.js';
+import {buyerNotificationPreferences,saveBuyerNotificationPreferences,buyerNotificationPreferenceHistory} from './buyer-notification-preferences.js';
 import {merchantAnalytics} from './commerce-analytics.js';
 import {createAnalyticsExport,readAnalyticsExport,cleanupAnalyticsExports} from './commerce-analytics-exports.js';
 const json = (payload, status = 200, headers = {}) => new Response(JSON.stringify(payload), {
@@ -1549,6 +1550,12 @@ export default {
       const landingViewMatch = /^\/v1\/landing-pages\/([a-z0-9-]+)\/view$/.exec(url.pathname);
       if (request.method === "GET" && landingViewMatch) return await landingPageView(request, env, landingViewMatch[1]);
       if (request.method === "GET" && url.pathname === "/health") return json(await health(env), 200, cors);
+      if(/^\/v1\/customer\/notifications\/preferences(?:\/history)?$/.test(url.pathname)){
+        const user=await authenticatedUser(request,env),actor={kind:'buyer',id:user.id},history=url.pathname.endsWith('/history');
+        if(request.method==='GET'&&(history||!url.search))return json({ok:true,...await(history?buyerNotificationPreferenceHistory(env,actor,url):buyerNotificationPreferences(env,actor))},200,cors);
+        if(request.method==='POST'&&!history&&!url.search)return json({ok:true,...await saveBuyerNotificationPreferences(env,actor,await reviewRequestJson(request,3000,parseMessageJSON))},200,cors);
+        return json({ok:false,error:'Method or parameters not allowed'},405,cors);
+      }
       const noticeMatch=/^\/v1\/(customer|commerce)\/notifications(?:\/(stats|processing|email|read))?$/.exec(url.pathname);
       if(noticeMatch){
         const user=await authenticatedUser(request,env);let actor={kind:'buyer',id:user.id};

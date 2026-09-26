@@ -1,6 +1,7 @@
 # Transactional email on workbench
 
-Merchant notification preferences now feed a durable email dispatcher. Private
+Merchant and [buyer notification preferences](buyer-notification-preferences.md)
+feed a durable email dispatcher. Private
 notification screens show queued, submitted, delayed, delivered, bounced,
 complained, blocked, skipped and review states. **Your emails** includes alerts
 whose in-app channel was disabled. **Store delivery activity** shows processing
@@ -8,8 +9,7 @@ and failures without exposing addresses or provider payloads to other members.
 
 This implementation uses Resend. It is **not connected or activated** in TEST.
 No real email has been sent during implementation or validation. The provider
-choice remains subject to the owner's existing account/preference. Buyer email
-preferences and delivery, campaign consent/unsubscribe, real mailbox acceptance,
+choice remains subject to the owner's existing account/preference. Guest identity/receipt coverage, campaign consent/unsubscribe, real mailbox acceptance,
 operational alerts and sustained load testing remain open work. The release hold
 and all gates in [the completion plan](commerce-completion-plan.md) still apply.
 
@@ -124,8 +124,8 @@ Templates contain escaped text, private authenticated destinations, HTML and
 plain-text alternatives, and a clear TEST label in both content and subject.
 Message alerts do not copy conversation text or attachments into email. No
 access token or private media URL is included. Email notifications default off.
-Buyer recipients remain in-app only pending their preference/delivery workflow;
-transactional settings do not grant permission for promotional campaigns.
+Buyer email is opt-in through the account preference workflow. Transactional
+settings do not grant permission for promotional campaigns.
 
 ## Validation and rollout
 

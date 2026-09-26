@@ -6,7 +6,7 @@
   const labels = {payment_confirmed:'Payment confirmed',payment_pending:'Payment pending',payment_failed:'Payment unsuccessful',payment_review:'Payment review',shipping:'Shipping',returns:'Returns',messages:'Messages',weekly_activity:'Weekly activity'};
   const sourceLabels = {'notification.order_state':'Payment update','notification.payment_pending':'Pending payment reminder','notification.payment_review':'Payment review','notification.stock_recovered':'Stock review resolved','notification.shipment_updated':'Shipping update','notification.return_updated':'Return update','notification.message_received':'New message','notification.weekly_activity':'Weekly activity','notification.send':'Email delivery'};
   const form = q('[data-notice-filters]'), processForm = q('[data-notice-process-filters]');
-  let listChannel = 'inbox';
+  let listChannel = 'inbox', preferenceEditor = null;
   let stopped = false, enabled = false, view = 'inbox', items = [], cursor = null, processing = [], processCursor = null;
   let listVersion = 0, processVersion = 0, statsVersion = 0, listBusy = false, processBusy = false, readBusy = false, pendingRead = null, latestStats = null;
   let applied = {q:'',category:'',state:'all'}, processState = 'attention';
@@ -17,7 +17,7 @@
   const count = value => Number(value || 0).toLocaleString();
   function emitStats(data) {window.dispatchEvent(new CustomEvent('ezkart:notification-stats',{detail:data}));}
   function loseAccess(message) {
-    stopped=true; ++listVersion; ++processVersion; ++statsVersion; items=[]; processing=[]; pendingRead=null;
+    preferenceEditor?.destroy(); stopped=true; ++listVersion; ++processVersion; ++statsVersion; items=[]; processing=[]; pendingRead=null;
     q('[data-notice-private]').replaceChildren(); text('[data-notice-count]','Sign in again'); text('[data-notice-total]',''); text('[data-notice-live]',''); text('[data-notice-held]','');
     text('[data-notice-error]',message); q('[data-notice-signin]').hidden=false; q('[data-notice-refresh]').disabled=true; emitStats({unread:0,enabled:false});
   }
@@ -30,7 +30,7 @@
     const target=config.merchant?'/cart/admin/?cloud='+encodeURIComponent('/v1/commerce/notifications'+path):'/cart/admin/customer-notifications.php?path='+encodeURIComponent(path);
     const response=await fetch(target,{method:body===undefined?'GET':'POST',headers,body:body===undefined?undefined:JSON.stringify(body),cache:'no-store',credentials:'same-origin'});
     let data; try{data=await response.json();}catch{data={error:'Notification confirmation is unavailable. Try again.'};}
-    if(!response.ok||!data.ok){const error=Object.assign(new Error(data.error||'Notifications could not be loaded. Try again.'),{status:response.status});
+    if(!response.ok||!data.ok){const error=Object.assign(new Error(data.error||'Notifications could not be loaded. Try again.'),{status:response.status,code:data.code});
       if([401,403].includes(response.status)||['notification_session_changed','customer_session_changed'].includes(data.code))loseAccess(error.message);
       throw error;
     }
@@ -38,7 +38,7 @@
   }
   function deliveryState(value) {
     enabled=config.enabled&&value;
-    text('[data-notice-held]',enabled?'':'New notification delivery is not enabled yet. Saved updates remain available; marking them read will be available when delivery is enabled.');
+    text('[data-notice-held]',enabled?'':config.merchant?'New notification delivery is not enabled yet. Saved updates remain available; marking them read will be available when delivery is enabled.':'Notifications are not available yet. You can still manage your preferences.');
     controls();
   }
   function controls() {
@@ -85,6 +85,7 @@
     finally{if(version===listVersion){listBusy=false;controls();}}
   }
   async function stats(quiet = false) {
+    if(!config.merchant&&!config.enabled)return;
     const version=++statsVersion;
     try{const data=await api('/stats');if(stopped||version!==statsVersion)return;
       if(quiet&&latestStats&&data.total>latestStats.total)text('[data-notice-live]','New updates are available. Refresh to see them.');
@@ -130,16 +131,19 @@
   }
   function updateURL() {
     const url=new URL(location.href);for(const key of ['q','category','state']){const value=form.elements[key].value;if(value&&value!=='all')url.searchParams.set(key,value);else url.searchParams.delete(key);}
-    if(view==='processing'){url.searchParams.set('view','processing');url.searchParams.set('delivery',processForm.elements.state.value);}else{url.searchParams.delete('delivery');if(view==='email'){url.searchParams.set('view','email');url.searchParams.delete('state');}else url.searchParams.delete('view');}
+    if(view==='processing'){url.searchParams.set('view','processing');url.searchParams.set('delivery',processForm.elements.state.value);}else{url.searchParams.delete('delivery');if(['email','preferences'].includes(view)){url.searchParams.set('view',view);url.searchParams.delete('state');}else url.searchParams.delete('view');}
     if(url.href!==location.href)history.pushState(null,'',url);
   }
   function showView(next, fetchData = true) {
-    view=config.merchant&&['processing','email'].includes(next)?next:'inbox';q('[data-notice-inbox]').hidden=view==='processing';if(config.merchant)q('[data-notice-processing]').hidden=view!=='processing';
+    view=['inbox','email',config.merchant?'processing':'preferences'].includes(next)?next:'inbox';if(!config.merchant&&!config.enabled)view='preferences';
+    if(view!=='preferences')preferenceEditor?.deactivate();
+    q('[data-notice-inbox]').hidden=!['inbox','email'].includes(view);if(config.merchant)q('[data-notice-processing]').hidden=view!=='processing';
+    q('[data-buyer-preferences]')?.toggleAttribute('hidden',view!=='preferences');
     q('[data-notice-read-filter]').hidden=view==='email';q('[data-notice-mark]').hidden=view==='email';q('[data-notice-email-info]').hidden=view!=='email';
     form.classList.toggle('notice-email-filter',view==='email');
-    if(view!=='processing'&&listChannel!==view){listChannel=view;items=[];cursor=null;render();}
+    if(['inbox','email'].includes(view)&&listChannel!==view){listChannel=view;items=[];cursor=null;render();}
     for(const button of root.querySelectorAll('[data-notice-view]'))button.setAttribute('aria-pressed',String(button.dataset.noticeView===view));
-    if(fetchData)void(view==='processing'?loadProcessing():load());
+    if(fetchData){if(view==='preferences'){if(preferenceEditor)void preferenceEditor.activate();else text('[data-notice-error]','Preference controls could not be loaded. Reload this page.');}else void(view==='processing'?loadProcessing():load());}
   }
   function restoreURL() {
     const params=new URL(location.href).searchParams;
@@ -154,11 +158,11 @@
   q('[data-notice-more]').addEventListener('click',()=>void load(true));q('[data-notice-process-more]')?.addEventListener('click',()=>void loadProcessing(true));
   q('[data-notice-mark]').addEventListener('click',()=>void markRead(items.filter(item=>!item.readAt).slice(0,50).map(item=>item.id)));
   q('[data-notice-read-retry]').addEventListener('click',()=>void markRead(pendingRead));
-  q('[data-notice-refresh]').addEventListener('click',()=>{void stats();void(view==='processing'?loadProcessing():load());});
+  q('[data-notice-refresh]').addEventListener('click',()=>{if(view==='preferences')void preferenceEditor?.refresh();else{void stats();void(view==='processing'?loadProcessing():load());}});
   window.addEventListener('popstate',()=>{if(!stopped)restoreURL();});
   document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!stopped)void stats(true);});
   setInterval(()=>{if(!document.hidden&&!stopped)void stats(true);},30000);
   if(!config.account||(config.merchant&&!config.store)){loseAccess('Open your store with Google sign-in to read its notifications.');return;}
-  if(!config.merchant&&!config.enabled){deliveryState(false);text('[data-notice-count]','Notifications are not available yet');text('[data-notice-result]','');q('[data-notice-private]').hidden=true;q('[data-notice-refresh]').disabled=true;stopped=true;return;}
+  if(!config.merchant){preferenceEditor=window.EzkartBuyerNotificationPreferences?.mount(root,config,api);if(!config.enabled){deliveryState(false);text('[data-notice-count]','Notifications are not available yet');text('[data-notice-result]','');for(const button of root.querySelectorAll('[data-notice-view]'))button.disabled=button.dataset.noticeView!=='preferences';}}
   restoreURL();void stats();
 })();

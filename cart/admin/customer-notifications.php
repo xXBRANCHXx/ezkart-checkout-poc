@@ -8,11 +8,11 @@ try {
     if (!in_array($noticeMethod, ['GET','POST'], true)) ez_api_json(['ok' => false], 405);
     $noticeCustomer = ez_customer_current(); $noticeCsrf = ez_customer_csrf(); $noticeVersion = (string) ($_SESSION['customer_auth']['version'] ?? '');
     if ($noticeCustomer === null || $noticeVersion === '' || !hash_equals($noticeVersion, (string) ($_SERVER['HTTP_X_EZKART_CUSTOMER_SESSION'] ?? ''))) ez_api_json(['ok' => false, 'error' => 'Your sign-in changed. Reload this page.', 'code' => 'customer_session_changed'], 401);
-    if (!ez_central_commerce_enabled()) ez_api_json(['ok' => false, 'error' => 'Notifications are not available yet.'], 503);
     if ($noticeMethod === 'POST' && (!ez_request_origin_allowed() || !hash_equals($noticeCsrf, (string) ($_SERVER['HTTP_X_EZKART_CSRF'] ?? '')))) ez_api_json(['ok' => false, 'error' => 'Reload this page before saving.'], 403);
     if (count($_GET) !== 1 || !is_string($_GET['path'] ?? null) || count(explode('&', (string) ($_SERVER['QUERY_STRING'] ?? ''))) !== 1) ez_api_json(['ok' => false, 'error' => 'Notification reference is invalid.'], 400);
     try { $noticeTarget = '/v1/customer/notifications' . ez_notification_target($_GET['path'], $noticeMethod, false); }
     catch (InvalidArgumentException $error) { ez_api_json(['ok' => false, 'error' => $error->getMessage()], 400); }
+    if (!ez_central_commerce_enabled() && !str_starts_with($noticeTarget, '/v1/customer/notifications/preferences')) ez_api_json(['ok' => false, 'error' => 'Notifications are not available yet.'], 503);
     if ($noticeMethod === 'POST' && preg_match('#^application/json(?:;|$)#i', (string) ($_SERVER['CONTENT_TYPE'] ?? '')) !== 1) ez_api_json(['ok' => false, 'error' => 'Use a JSON request.'], 415);
     $noticeBody = $noticeMethod === 'POST' ? file_get_contents('php://input', false, null, 0, 3001) : '';
     if (!is_string($noticeBody) || strlen($noticeBody) > 3000) ez_api_json(['ok' => false, 'error' => 'Notification request is too large.'], 413);

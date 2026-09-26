@@ -64,6 +64,21 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 26 September: buyer notification choices and email
+
+Implemented six account-wide buyer categories with independent in-app/email
+choices, durable preference receipts, guarded revisions and private history.
+Recipients snapshot the chosen channels; the sender rechecks current preferences
+and uses the confirmed account address. Buyer email history, phone/desktop
+preference editing, interrupted-save recovery, comparison after concurrent edits
+and account-scoped drafts are connected to the actual PHP/Worker flow. Preference
+management remains available during the commerce hold without enabling delivery.
+
+See [buyer-notification-preferences.md](buyer-notification-preferences.md).
+Actual provider/mailbox and authenticated hosted acceptance, guest identity/
+receipt coverage, campaigns and operational validation remain open. No release
+gate is closed by the fixture checks or this workbench implementation.
+
 ### 26 September: durable merchant email delivery
 
 Implemented a Resend adapter with fresh confirmed Supabase identity checks,

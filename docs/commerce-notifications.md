@@ -85,7 +85,8 @@ account changes in flight. The buyer's reused merchant sign-in is also rechecked
 The [email delivery follow-up](commerce-email-delivery.md) adds a durable Resend
 adapter, current confirmed account verification, exact-request retries, signed
 callbacks, suppression and private email history. TEST remains unconfigured and
-sends no real email. Buyer email preferences/delivery, provider and sender
+sends no real email. The [buyer preference follow-up](buyer-notification-preferences.md)
+adds account-wide channel choices and verified email delivery. Provider and sender
 activation, real mailbox acceptance, campaign consent/unsubscribe and operational
 acceptance remain open. Earlier recipient records are not backfilled.
 

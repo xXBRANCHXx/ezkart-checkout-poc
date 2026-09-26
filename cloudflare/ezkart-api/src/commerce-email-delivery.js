@@ -18,7 +18,7 @@ async function source(env,job){
         OR EXISTS(SELECT 1 FROM orders o LEFT JOIN commerce_order_owners owner ON owner.order_id=o.id WHERE o.id=e.order_id
           AND COALESCE(owner.auth_user_id,NULLIF(json_extract(o.customer_snapshot_json,'$.authUserId'),''))=r.actor_id) END AS has_access,
     CASE WHEN r.actor_kind='merchant' THEN COALESCE((SELECT json_extract(p.preferences_json,'$.'||e.category||'.email')
-      FROM commerce_notification_preferences p WHERE p.seller_id=e.seller_id AND p.auth_user_id=r.actor_id),0) ELSE 0 END AS email_enabled,
+      FROM commerce_notification_preferences p WHERE p.seller_id=e.seller_id AND p.auth_user_id=r.actor_id),0) ELSE COALESCE((SELECT json_extract(p.preferences_json,'$.'||e.category||'.email') FROM commerce_buyer_notification_preferences p WHERE p.auth_user_id=r.actor_id),0) END AS email_enabled,
     EXISTS(SELECT 1 FROM commerce_message_reads mr WHERE mr.conversation_id=e.conversation_id AND mr.actor_kind=r.actor_kind AND mr.actor_id=r.actor_id
       AND mr.event_id>=json_extract(e.data_json,'$.eventId')) AS message_read,
     CASE WHEN e.category='payment_pending' THEN NOT EXISTS(SELECT 1 FROM orders o WHERE o.id=e.order_id AND o.checkout_state IN ('creating','pending')
