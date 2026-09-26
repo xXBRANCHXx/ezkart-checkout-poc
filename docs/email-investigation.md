@@ -155,5 +155,23 @@ Original-order restoration with migration 0032 passes integrity/foreign keys
 and preserves every row in all 91 existing physical tables. The migration adds
 22 application objects, including four empty tables, and replaces four intended
 email guards. Private rollout evidence is under
-`/tmp/ezkart-email-recovery-deploy-01a0d643/`. Hosted rollout evidence follows
-verification.
+`/tmp/ezkart-email-recovery-deploy-01a0d643/`.
+
+Implementation `3dd870b` is pushed to `agent/ezkart-workbench` and auto-deployed
+by Hostinger. TEST migration 0032 and Worker
+`47fb4139-1234-4911-9f64-9c7b5de31bc7` are installed; no migrations remain pending.
+Health at 26 September 2026, 16:10:32 UTC reports 94 application tables and
+healthy D1/public-R2/private-R2 bindings. Remote schema matches the local restore
+exactly. Existing table counts, seller settings, financial/provider records and
+the 15-entry legacy import manifest are unchanged; the four new tables are empty.
+
+The hosted D1 status query and both send/lookup trigger plans compile successfully
+with zero writes. Hosted Worker authentication and commerce/provider holds pass.
+JavaScript/CSS assets match the pushed source (16:11:21 UTC). Guest sign-in,
+private PHP route guards and the CLI script's empty HTTP 404 pass.
+
+Shared Chrome still reports the original disconnected/approval-timeout state;
+no new connection was attempted. Signed-in hosted acceptance remains open.
+Hosted CSP still contains only `upgrade-insecure-requests`; that existing release
+gate remains open. This deployment changes no provider credentials, sending or
+investigation activation flags, production deployment or main branch.

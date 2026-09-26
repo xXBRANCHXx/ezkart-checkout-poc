@@ -80,6 +80,15 @@ provider/domain acceptance, guest receipt identity, external alerts, retention,
 load testing and signed-in hosted acceptance remain open. The provider and
 central-commerce holds remain in place; no top-level gate is closed.
 
+Implementation `3dd870b` is pushed and auto-deployed. TEST migration 0032 and
+Worker `47fb4139-1234-4911-9f64-9c7b5de31bc7` are deployed with 94 healthy
+application tables and no pending migrations. All 217 Worker tests, twelve
+focused recovery checks, 36 email/notification regressions and nineteen affected
+PHP/browser/signing checks pass. Fresh backup restoration preserves every old
+row; remote counts/settings/import evidence and schema comparisons pass. Hosted
+query compilation, private guards and served assets pass. All four recovery
+tables remain empty; real provider and signed-in hosted acceptance remain open.
+
 ### 26 September: buyer notification choices and email
 
 Implemented six account-wide buyer categories with independent in-app/email
