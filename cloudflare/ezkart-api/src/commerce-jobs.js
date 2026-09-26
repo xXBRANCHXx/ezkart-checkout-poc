@@ -85,7 +85,7 @@ export async function finishCommerceJob(env, jobId, input) {
     UNION ALL SELECT job_id FROM commerce_email_skips WHERE job_id=? AND uncertain=0 LIMIT 1`).bind(row.id,row.id).first()){
     fail('Record the email submission or a confirmed no-send decision before completing this job',409);
   }
-  if(row.kind==='campaign.send'&&input.outcome==='succeeded'&&!await env.DB.prepare(`SELECT x.id FROM commerce_campaign_email_requests x JOIN commerce_campaign_email_provider_bindings b ON b.request_id=x.id WHERE x.job_id=?
+  if(row.kind==='campaign.send'&&input.outcome==='succeeded'&&!await env.DB.prepare(`SELECT x.id FROM commerce_campaign_email_requests x JOIN commerce_campaign_email_verified_bindings b ON b.request_id=x.id WHERE x.job_id=?
     UNION ALL SELECT job_id FROM commerce_campaign_email_skips WHERE job_id=? AND uncertain=0 LIMIT 1`).bind(row.id,row.id).first()){
     fail('Record the campaign submission or a confirmed no-send decision before completing this job',409);
   }

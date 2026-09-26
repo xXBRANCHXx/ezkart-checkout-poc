@@ -167,7 +167,7 @@ test('migration preserves existing transactional receipts, consent and orders, i
   const tables=['commerce_email_requests','commerce_email_starts','commerce_email_events','commerce_email_provider_bindings','commerce_customer_consents','commerce_campaigns','orders'];
   const before=await Promise.all(tables.map(name=>f.db.prepare('SELECT * FROM '+name+' ORDER BY rowid').all()));await applyCommerceSchema(f.db,35,36);
   for(let i=0;i<tables.length;i++)assert.deepEqual((await f.db.prepare('SELECT * FROM '+tables[i]+' ORDER BY rowid').all()).results,before[i].results);
-  assert.equal((await f.db.prepare('PRAGMA foreign_key_check').all()).results.length,0);await published(f);assert.equal((await dispatchCampaignEmails(f.env,2,f.fetcher)).processed,1);assert.equal(f.control.calls.length,1);
+  assert.equal((await f.db.prepare('PRAGMA foreign_key_check').all()).results.length,0);await applyCommerceSchema(f.db,36,37);await published(f);assert.equal((await dispatchCampaignEmails(f.env,2,f.fetcher)).processed,1);assert.equal(f.control.calls.length,1);
   assert.equal((await f.db.prepare('SELECT reason FROM commerce_campaign_email_skips').first()).reason,'suppressed');
 });
 

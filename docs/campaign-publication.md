@@ -8,8 +8,9 @@ marketing workflow. [Campaign delivery](campaign-delivery.md) now integrates
 per-recipient message preparation, current-permission dispatch and provider
 callbacks. The merchant [publishing controls](campaign-publishing-ui.md) now
 review saved copy and audiences, schedule or cancel remaining sends, and show
-recipient outcomes and history. Operator recovery remains necessary, and sending
-remains held behind the campaign/email/commerce configuration.
+recipient outcomes and history. [Operator recovery](campaign-investigation.md)
+now investigates uncertain submissions. Sending remains held behind the
+campaign/email/commerce configuration.
 
 ## Publication and schedule behavior
 
@@ -108,8 +109,7 @@ populated drafts/consents/orders. The real PHP proxy tests interrupted
 publication/action acknowledgements, the preserved audience/history,
 route/account/CSRF/origin/size guards and a sign-in replacement after commit.
 
-Campaign-specific operator recovery, signed-in hosted acceptance,
-load/recovery acceptance, automation and
+Signed-in hosted acceptance, load/recovery acceptance, automation and
 performance reporting remain required. No top-level marketing or release gate
 is closed by this publication foundation.
 

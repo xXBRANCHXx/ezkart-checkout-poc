@@ -64,6 +64,29 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 27 September: campaign investigation and audited recovery
+
+Implemented purpose-bound operator listing/history, durable provider lookups,
+verified recovery evidence and explicit resolution of proven submissions without
+another send. A campaign lookup can stop a concurrent automatic retry. Shared
+provider identity, suppression and investigation limits apply across promotional
+and transactional mail. Withdrawal, cancellation and historical attempts remain
+intact. The TEST command preserves its original purpose and request after lost
+responses; merchant recipient history shows check and review-confirmation times.
+
+See [campaign-investigation.md](campaign-investigation.md). Provider/domain and
+signed-in hosted acceptance, monitoring, retention, capacity/recovery exercises,
+automation and performance reporting remain open. All sending/investigation and
+central-commerce holds remain in place; no top-level gate is closed.
+
+Local validation passes all 316 Worker tests, 18 affected PHP/browser checks
+and the five final command/recovery checks. Desktop/mobile visuals and keyboard
+focus, syntax/diff checks and the TEST dry-run pass. The fresh TEST backup
+restores with every row in 108 existing physical tables preserved, valid
+integrity and no foreign-key errors. Migration 0037 adds 22 objects and changes
+seven intended views/guards; its four new tables are empty. All 18 affected SQL
+plans compile without mutation.
+
 ### 27 September: merchant campaign publishing and delivery controls
 
 Implemented saved-copy/audience review, publication, timezone-bound scheduling,

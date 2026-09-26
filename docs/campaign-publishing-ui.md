@@ -86,9 +86,13 @@ there is no horizontal overflow, and the sidebar gradient remains intact.
 
 JavaScript/PHP syntax, diff checks and the TEST Worker dry-run pass. No database
 migration is required for these controls. Authenticated hosted acceptance,
-campaign operator recovery, provider acceptance, automation, performance reports
+provider acceptance, automation, performance reports
 and capacity/recovery validation remain open. No top-level completion gate is
 closed and no provider or central-commerce hold is lifted.
+
+The subsequent [campaign investigation](campaign-investigation.md) integration
+adds status-check and review-confirmation times to recipient history. A verified
+provider observation can confirm delivery without inventing its timestamp.
 
 ## TEST rollout
 

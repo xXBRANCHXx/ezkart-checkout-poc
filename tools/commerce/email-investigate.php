@@ -8,7 +8,7 @@ function ez_email_investigation_arguments(array $arguments): array
 {
     $input = [];
     foreach ($arguments as $argument) {
-        if (preg_match('/^--(action|request|provider|operator|intent|lookup|updated-at|cursor|state)=(.+)$/sD', $argument, $match) !== 1 || isset($input[$match[1]])) {
+        if (preg_match('/^--(action|purpose|request|provider|operator|intent|lookup|updated-at|cursor|state)=(.+)$/sD', $argument, $match) !== 1 || isset($input[$match[1]])) {
             throw new InvalidArgumentException('Use each named argument once.');
         }
         $input[$match[1]] = $match[2];
@@ -21,9 +21,12 @@ function ez_email_investigation_arguments(array $arguments): array
         'retry' => ['action', 'intent'],
         default => throw new InvalidArgumentException('Choose --action=list, view, lookup, resolve or retry.'),
     };
+    if ($action !== 'retry') $fields[] = 'purpose';
     if (array_diff(array_keys($input), $fields)) throw new InvalidArgumentException('These arguments do not belong to the chosen action.');
-    foreach (array_diff($fields, ['cursor', 'state']) as $field) if (!isset($input[$field])) throw new InvalidArgumentException('Missing --' . $field . '.');
-    foreach (['request' => '/^email_[a-f0-9]{32}$/D', 'provider' => '/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/D',
+    foreach (array_diff($fields, ['cursor', 'state', 'purpose']) as $field) if (!isset($input[$field])) throw new InvalidArgumentException('Missing --' . $field . '.');
+    $purpose = $input['purpose'] ?? 'transactional';
+    if (!in_array($purpose, ['transactional', 'campaign'], true)) throw new InvalidArgumentException('Choose --purpose=transactional or campaign.');
+    foreach (['request' => $purpose === 'campaign' ? '/^campmail_[a-f0-9]{32}$/D' : '/^email_[a-f0-9]{32}$/D', 'provider' => '/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/D',
         'operator' => '/^[A-Za-z0-9][A-Za-z0-9_-]{2,95}$/D', 'lookup' => '/^[a-f0-9]{32}$/D',
         'updated-at' => '/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/D'] as $name => $pattern) {
         if (isset($input[$name]) && preg_match($pattern, $input[$name]) !== 1) throw new InvalidArgumentException('Invalid --' . $name . '.');
@@ -56,7 +59,7 @@ function ez_email_investigation_main(array $arguments, ?Closure $transport = nul
         $connectionHash = hash('sha256', 'test' . "\n" . $connection['url'] . "\n" . ez_config('commerce_service_secret'));
         $action = $input['action']; $payload = null; $method = 'GET';
         if (in_array($action, ['list', 'view'], true)) {
-            $target = '/internal/commerce/email/investigations' . ($action === 'view' ? '/' . $input['request'] : '') . '?environment=sandbox';
+            $target = '/internal/commerce/' . (($input['purpose'] ?? 'transactional') === 'campaign' ? 'campaigns' : 'email') . '/investigations' . ($action === 'view' ? '/' . $input['request'] : '') . '?environment=sandbox';
             foreach (['state', 'cursor'] as $field) if (isset($input[$field])) $target .= '&' . $field . '=' . rawurlencode($input[$field]);
         } else {
             $intentPath = ez_email_investigation_path($input['intent']);
@@ -80,10 +83,17 @@ function ez_email_investigation_main(array $arguments, ?Closure $transport = nul
             $payload = ['environment' => 'sandbox', 'requestId' => $input['request'], 'operator' => $input['operator']];
             if ($action === 'lookup') $payload += ['providerId' => $input['provider'], 'lookupKey' => $requestKey];
             else $payload += ['lookupKey' => $input['lookup'], 'expectedUpdatedAt' => $input['updated-at'], 'resolutionKey' => $requestKey];
-            $method = 'POST'; $target = '/internal/commerce/email/' . $action;
+            $method = 'POST'; $target = '/internal/commerce/' . (($input['purpose'] ?? 'transactional') === 'campaign' ? 'campaigns' : 'email') . '/' . $action;
         }
         $result = $transport === null ? ez_commerce_request($method, $target, $payload) : $transport($method, $target, $payload);
         if (($result['ok'] ?? false) !== true) throw new RuntimeException('The investigation was not confirmed.');
+        if ($method === 'POST') {
+            $receipt = $result[$action === 'lookup' ? 'receipt' : 'resolution'] ?? null;
+            $expected = $action === 'lookup' ? ['lookupKey' => $payload['lookupKey']] : array_intersect_key($payload, array_flip(['resolutionKey', 'requestId', 'lookupKey', 'operator']));
+            if (!is_array($receipt) || !is_bool($result['replayed'] ?? null)) throw new RuntimeException('The investigation receipt could not be verified.');
+            foreach ($expected as $name => $value) if (($receipt[$name] ?? null) !== $value) throw new RuntimeException('The investigation receipt did not match its original intent.');
+            if ($action === 'lookup' && !in_array($receipt['outcome'] ?? null, ['matched', 'not_found', 'unavailable', 'rejected', 'invalid', 'mismatch', 'conflict'], true)) throw new RuntimeException('The lookup outcome could not be verified.');
+        }
         echo json_encode(['intent' => $intentPath, ...$result], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . "\n";
         return isset($result['receipt']['outcome']) && $result['receipt']['outcome'] !== 'matched' ? 2 : 0;
     } catch (Throwable $error) {

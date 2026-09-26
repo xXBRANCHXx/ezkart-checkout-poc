@@ -15,7 +15,7 @@ async function source(env,job){
   if(!row||row.seller_id!==job.sellerId||row.commerce_environment!==job.environment)invalid();return row;
 }
 const evidence=(env,job)=>env.DB.prepare(`SELECT x.*,b.provider_id,EXISTS(SELECT 1 FROM commerce_campaign_email_starts a WHERE a.request_id=x.id) AS started
-  FROM commerce_campaign_email_requests x LEFT JOIN commerce_campaign_email_provider_bindings b ON b.request_id=x.id WHERE x.job_id=?`).bind(job.id).first();
+  FROM commerce_campaign_email_requests x LEFT JOIN commerce_campaign_email_verified_bindings b ON b.request_id=x.id WHERE x.job_id=?`).bind(job.id).first();
 function ineligible(row,configuration,now=Date.now()){
   if(row.cancelled)return 'cancelled';
   if(row.store_status!=='active')return 'store_closed';

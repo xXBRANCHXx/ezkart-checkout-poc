@@ -40,7 +40,7 @@ import {notificationInbox,notificationStats,readNotifications,notificationProces
 import {dispatchNotifications,scheduleNotifications} from './commerce-notification-dispatch.js';
 import {dispatchEmails,recordEmailWebhook} from './commerce-email-delivery.js';
 import {dispatchCampaignEmails} from './campaign-email-delivery.js';
-import {emailInvestigations,lookupEmail,resolveEmail} from './email-investigation.js';
+import {emailInvestigations,lookupEmail,resolveEmail,campaignEmailInvestigations,lookupCampaignEmail,resolveCampaignEmail} from './email-investigation.js';
 import {campaignWorkspace,listCampaigns,readCampaign,saveCampaign,campaignHistory,campaignAudience} from './marketing-campaigns.js';
 import {readPublication,publishCampaign,changePublication,publicationRecipients,publicationHistory} from './campaign-publication.js';
 import {campaignUnsubscribe} from './campaign-unsubscribe.js';
@@ -1482,6 +1482,13 @@ export default {
         const input=await authenticateCommerceService(request,env);
         if(url.search||Object.keys(input).some(k=>!['environment','limit'].includes(k))||input.environment!==(env.APP_ENVIRONMENT==='test'?'sandbox':'production')||input.limit!==undefined&&(!Number.isSafeInteger(input.limit)||input.limit<1||input.limit>2))return json({ok:false,error:'Email processing request is invalid'},422);
         return json({ok:true,...await dispatchEmails(env,input.limit??2)});
+      }
+      const campaignInvestigation=/^\/internal\/commerce\/campaigns\/(investigations(?:\/(campmail_[a-f0-9]{32}))?|lookup|resolve)$/.exec(url.pathname);
+      if(campaignInvestigation){
+        const input=await authenticateCommerceService(request,env,{strictJSON:true,maxBytes:3000});
+        if(campaignInvestigation[1].startsWith('investigations')&&request.method==='GET'&&!Object.keys(input).length)return json({ok:true,...await campaignEmailInvestigations(env,url,campaignInvestigation[2]||null)});
+        if(request.method==='POST'&&!url.search&&['lookup','resolve'].includes(campaignInvestigation[1]))return json({ok:true,...await (campaignInvestigation[1]==='lookup'?lookupCampaignEmail(env,input):resolveCampaignEmail(env,input))});
+        return json({ok:false,error:'Campaign investigation method or parameters are invalid'},422);
       }
       const emailInvestigation=/^\/internal\/commerce\/email\/(investigations(?:\/(email_[a-f0-9]{32}))?|lookup|resolve)$/.exec(url.pathname);
       if(emailInvestigation){

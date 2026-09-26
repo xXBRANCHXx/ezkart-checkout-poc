@@ -19,7 +19,7 @@ const saved=(env,actor,id)=>env.DB.prepare(`SELECT p.*,COUNT(j.id) AS summary_re
   COALESCE(SUM(d.delivery_state='cancelled'),0) AS summary_cancelled,
   COALESCE(SUM(j.state IN ('retry','uncertain','dead') AND COALESCE(json_extract(j.result_json,'$.cancelled'),0)!=1),0) AS summary_attention,
   COALESCE(SUM(j.state='running'),0) AS summary_processing,COALESCE(SUM(j.attempts>0),0) AS started_recipients,
-  COALESCE(SUM(d.submitted_at IS NOT NULL),0) AS submitted,COALESCE(SUM(d.delivered_at IS NOT NULL),0) AS delivered,
+  COALESCE(SUM(d.submitted_at IS NOT NULL),0) AS submitted,COALESCE(SUM(d.delivered_confirmed),0) AS delivered,
   COALESCE(SUM(d.delivery_state='skipped'),0) AS skipped,COALESCE(SUM(d.delivery_state='uncertain'),0) AS uncertain,
   COALESCE(SUM(d.delivery_state='failed'),0) AS failed,COALESCE(SUM(d.delivery_state='bounced'),0) AS bounced,
   COALESCE(SUM(d.delivery_state='complained'),0) AS complained,COALESCE(SUM(d.delivery_state='suppressed'),0) AS suppressed,
@@ -116,11 +116,11 @@ export async function publicationRecipients(env,actor,id,url){
   await settingsActor(env,actor);query(url,['cursor']);const row=validId(id)&&await saved(env,actor,id);if(!row)fail('Publication not found',404);
   const scope=await commerceHash({actor,publication:row.id,view:'campaign_recipients'}),cursor=url.searchParams.has('cursor')?readReviewCursor(url.searchParams.get('cursor'),scope):null;
   if(cursor&&(!Number.isSafeInteger(cursor.after)||cursor.after<1))fail('Recipient page is invalid');
-  const rows=await env.DB.prepare(`SELECT c.id,c.customer_id,c.name,c.email,c.consent_revision,j.state,j.result_json,d.delivery_state,d.skip_reason,d.needs_review,d.submitted_at,d.delivered_at FROM commerce_campaign_candidates c
+  const rows=await env.DB.prepare(`SELECT c.id,c.customer_id,c.name,c.email,c.consent_revision,j.state,j.result_json,d.delivery_state,d.skip_reason,d.needs_review,d.submitted_at,d.delivered_at,d.checked_at,d.resolved_at FROM commerce_campaign_candidates c
     JOIN commerce_jobs j ON j.id='job_campaign_'||c.id JOIN commerce_campaign_delivery_status d ON d.candidate_id=c.id WHERE c.publication_id=? AND c.id>? ORDER BY c.id LIMIT 26`).bind(row.id,cursor?.after||0).all();
   const items=rows.results.slice(0,25).map(r=>({id:r.id,customerId:r.customer_id,name:r.name,email:r.email,consentRevision:r.consent_revision,
     state:r.result_json&&JSON.parse(r.result_json).cancelled===true?'cancelled':r.state,
-    delivery:{state:r.delivery_state,reason:r.skip_reason,needsReview:Boolean(r.needs_review),submittedAt:r.submitted_at,deliveredAt:r.delivered_at}}));await settingsActor(env,actor);
+    delivery:{state:r.delivery_state,reason:r.skip_reason,needsReview:Boolean(r.needs_review),submittedAt:r.submitted_at,deliveredAt:r.delivered_at,checkedAt:r.checked_at,resolvedAt:r.resolved_at}}));await settingsActor(env,actor);
   return {items,total:row.candidate_count,nextCursor:rows.results.length>25?reviewCursor({v:1,scope,after:items.at(-1).id}):null};
 }
 export async function publicationHistory(env,actor,id,url){

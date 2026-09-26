@@ -6,7 +6,9 @@ are implemented. The campaign dispatcher has a separate service route and
 bounded cron. The merchant [publishing controls](campaign-publishing-ui.md)
 expose review, scheduling, cancellation and recipient history. Sending remains
 held on TEST, and the workspace reports the actual configured readiness.
-Provider activation, operator investigation, automation and performance reporting
+The [campaign investigation workflow](campaign-investigation.md) now verifies
+provider records and resolves proven submissions without another send.
+Provider activation, hosted acceptance, automation and performance reporting
 remain part of the full marketing gate.
 
 ## Message and transport contract
@@ -109,8 +111,7 @@ operator or queue-driven execution remain required before activation.
 
 ## Remaining acceptance and product work
 
-Campaign-specific provider lookup and operator recovery, automation triggers,
-useful performance reports, operational
+Automation triggers, useful performance reports, operational
 load/alerting and authenticated hosted workflows remain necessary. Provider
 acceptance must verify real mailbox receipt, sender authentication and DKIM
 coverage of both unsubscribe headers. The current fixtures establish database,

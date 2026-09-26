@@ -15,8 +15,9 @@ permission and identity, and records provider submission and signed delivery
 evidence. The [publishing controls](campaign-publishing-ui.md) now review and
 publish saved drafts, reschedule or cancel remaining sends, and expose recipient
 outcomes and delivery history. The calendar uses the publication's actual send
-time when one exists. Operator recovery, automation and performance reporting
-remain outstanding; sending remains held by the existing deployment flags.
+time when one exists. [Operator recovery](campaign-investigation.md) verifies
+uncertain submissions. Automation, performance reporting and provider/hosted
+acceptance remain outstanding; sending remains held by the deployment flags.
 
 ## Merchant behavior
 

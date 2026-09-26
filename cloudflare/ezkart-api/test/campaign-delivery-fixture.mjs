@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {campaignPublicationFixture,publicationKey} from './campaign-publication-fixture.mjs';
 export async function campaignDeliveryFixture(t,options={}){
-  const control={calls:[],lookups:[],users:{},outcomes:[],providerIds:new Map(),sendHook:null,identityHook:null,forcedId:null};
+  const control={calls:[],lookups:[],reads:[],read:null,readHook:null,users:{},outcomes:[],providerIds:new Map(),sendHook:null,identityHook:null,forcedId:null};
   const outbound=async request=>{
     const url=new URL(request.url);
     if(url.origin==='https://auth.fixture.test'&&url.pathname.startsWith('/auth/v1/admin/users/')){
@@ -10,9 +10,15 @@ export async function campaignDeliveryFixture(t,options={}){
       const user=Object.hasOwn(control.users,id)?control.users[id]:{id,email:(id.startsWith('campaign-buyer-')?'buyer'+id.slice(15):id)+'@example.test',email_confirmed_at:'2026-09-01T00:00:00Z'};
       return user===null?Response.json({message:'not found'},{status:404}):Response.json(user);
     }
+    if(url.origin==='https://api.resend.com'&&request.method==='GET'){
+      assert.match(url.pathname,/^\/emails\/[a-f0-9-]{36}$/);assert.equal(request.headers.get('authorization'),'Bearer '+(f.bindings.RESEND_READ_API_KEY||f.bindings.RESEND_API_KEY));
+      control.reads.push(url.pathname);if(control.readHook)await control.readHook();
+      const saved=control.calls.find(c=>url.pathname==='/emails/'+c.id),data=saved?{object:'email',id:saved.id,...saved.message,created_at:saved.createdAt,last_event:'delivered',cc:[],bcc:[],reply_to:[],scheduled_at:null}:null;
+      return control.read?control.read(data,request):data?Response.json(data):Response.json({message:'not found'},{status:404});
+    }
     assert.equal(url.href,'https://api.resend.com/emails');assert.equal(request.method,'POST');
     const body=await request.text(),message=JSON.parse(body),key=request.headers.get('Idempotency-Key'),id=control.forcedId||control.providerIds.get(key)||randomUUID();
-    control.providerIds.set(key,id);control.calls.push({body,message,key,id});if(control.sendHook)await control.sendHook(message,id);
+    control.providerIds.set(key,id);control.calls.push({body,message,key,id,createdAt:new Date().toISOString()});if(control.sendHook)await control.sendHook(message,id);
     const outcome=control.outcomes.shift();
     if(outcome==='lost')throw new Error('Fixture accepted submission; response was lost');
     if(outcome==='rejected')return Response.json({name:'validation_error'},{status:422});

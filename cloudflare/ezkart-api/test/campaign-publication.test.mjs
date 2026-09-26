@@ -106,7 +106,7 @@ test('migration preserves populated drafts, ownership and consent before new pub
   const tables=['commerce_campaigns','commerce_campaign_changes','commerce_customer_consents','commerce_customer_consent_changes','orders'];
   const before=await Promise.all(tables.map(name=>f.db.prepare('SELECT * FROM '+name+' ORDER BY rowid').all()));await applyCommerceSchema(f.db,34,35);
   for(let n=0;n<tables.length;n++)assert.deepEqual((await f.db.prepare('SELECT * FROM '+tables[n]+' ORDER BY rowid').all()).results,before[n].results);
-  await applyCommerceSchema(f.db,35,36);assert.equal((await f.publish()).status,200);assert.equal((await f.db.prepare('PRAGMA foreign_key_check').all()).results.length,0);
+  await applyCommerceSchema(f.db,35,37);assert.equal((await f.publish()).status,200);assert.equal((await f.db.prepare('PRAGMA foreign_key_check').all()).results.length,0);
 });
 
 test('membership and consent changes between preflight and the atomic write cannot publish an unauthorized audience',async t=>{

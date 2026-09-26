@@ -190,7 +190,7 @@
             if(v.seen.has(item.id))continue;li.dataset.record=String(item.id);li.append(el('b',item.name||'Customer'),el('span',item.email),el('strong',labels[item.delivery.state]));
             if(item.delivery.reason)li.append(el('span',reasons[item.delivery.reason]||'Delivery stopped after an eligibility check.'));
             if(item.delivery.needsReview)li.append(el('span','Needs review: an earlier submission or processing result is unresolved.'));
-            for(const [k,label] of [['submittedAt','Submission confirmed'],['deliveredAt','Delivered']])if(item.delivery[k]){if(!host.iso(item.delivery[k]))throw Error('The delivery time could not be verified.');li.append(el('small',label+': '+host.date(item.delivery[k])));}
+            for(const [k,label] of [['submittedAt','Submission confirmed'],['deliveredAt','Delivered'],['checkedAt','Delivery status checked'],['resolvedAt','Submission confirmed after review']])if(item.delivery[k]){if(!host.iso(item.delivery[k]))throw Error('The delivery time could not be verified.');li.append(el('small',label+': '+host.date(item.delivery[k])));}
           }else{
             if(!integer(item.revision)||!['publish','reschedule','cancel'].includes(item.kind)||!host.iso(item.createdAt)||item.scheduledAt!==null&&!host.iso(item.scheduledAt))throw Error('The delivery history could not be verified.');
             if(v.seen.has(item.revision))continue;li.dataset.record=String(item.revision);li.append(el('b',{publish:'Published',reschedule:'Send time changed',cancel:'Remaining sends cancelled'}[item.kind]),el('span',(item.actor==='you'?'You':'Store member')+' · '+host.date(item.createdAt)));
@@ -198,7 +198,8 @@
           }rows.push(li);
         }
         const list=lq('[data-delivery-list-items]');for(const row of rows){v.seen.add(Number(row.dataset.record));list.append(row);}v.cursor=result.nextCursor;v.started=true;
-        lq('[data-delivery-list-more]').hidden=!v.cursor;lq('[data-delivery-list-status]').textContent=`${list.children.length} ${v.kind==='recipients'?'recipients':'delivery changes'} shown.`;
+        const n=list.children.length,noun=v.kind==='recipients'?(n===1?'recipient':'recipients'):(n===1?'delivery change':'delivery changes');
+        lq('[data-delivery-list-more]').hidden=!v.cursor;lq('[data-delivery-list-status]').textContent=`${n} ${noun} shown.`;
       }catch(error){if(alive()&&listing===v){lq('[data-delivery-list-status]').textContent=error.message;lq('[data-delivery-list-retry]').hidden=false;}}
       finally{v.busy=false;if(alive()&&listing===v)lq('[data-delivery-list-more]').disabled=false;}
     }

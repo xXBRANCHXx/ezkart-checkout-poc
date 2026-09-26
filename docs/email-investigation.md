@@ -6,6 +6,12 @@ Merchants and buyers see the resulting delivery status and when it was checked.
 The original requests, send attempts, callbacks and uncertain skip decisions
 remain intact. This implementation does not activate any provider or send mail.
 
+[Campaign investigation](campaign-investigation.md) now uses the same guarded
+engine with separate campaign records, purpose validation and command routing.
+Both purposes share provider-identity protection, address suppression and the
+sixty-new-lookups-per-minute limit. The original transactional command remains
+the default; `--purpose=campaign` selects campaign requests.
+
 ## Provider evidence
 
 The adapter uses only `GET https://api.resend.com/emails/{id}`. For a known email,
