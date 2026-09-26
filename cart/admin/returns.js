@@ -149,7 +149,7 @@
     root.querySelectorAll('[data-return-close]').forEach(button=>button.addEventListener('click',()=>{if(!busy&&!uncertain){++formVersion;loading=false;dialog.close();}}));
     dialog.addEventListener('cancel',event=>{if(busy||uncertain)event.preventDefault();else{++formVersion;loading=false;}});
     window.addEventListener('beforeunload',event=>{if(busy||uncertain){event.preventDefault();event.returnValue='';}});
-    status('Return requests and inspection records for your store.');void list().then(ok=>{if(ok)recoverPending();});
+    status('Return requests and inspection records for your store.');void list().then(ok=>{if(!ok)return;recoverPending();const linked=new URL(location.href).searchParams.get('return');if(!uncertain&&/^ret_[a-f0-9]{32}$/.test(linked||''))void loadDetail(linked);});
   }
   globalThis.EzkartReturns={mount};
 })();

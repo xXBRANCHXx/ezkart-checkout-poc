@@ -704,6 +704,7 @@ function ez_admin_sync_cloudflare_user(string $accessToken): array
 
 function ez_admin_proxy_cloud_request(string $accessToken, string $path, string $method): never
 {
+    if (str_starts_with($path, '/v1/commerce/notifications')) { require_once __DIR__ . '/notification-proxy.php'; ez_admin_notification_proxy($accessToken, $path, $method); }
     if (str_starts_with($path, '/v1/commerce/settings')) { require_once __DIR__ . '/settings-proxy.php'; ez_admin_settings_proxy($accessToken, $path, $method); }
     if (str_starts_with($path, '/v1/commerce/messages')) { require_once __DIR__ . '/message-proxy.php'; ez_admin_message_proxy($accessToken, $path, $method); }
     if ($path === '/v1/shipping-address-search') {
@@ -1417,7 +1418,7 @@ $adminStorageIdentity = $authenticationMethod === 'supabase'
 $adminStorageScope = substr(hash('sha256', $deployment . '|' . $adminStorageIdentity), 0, 24);
 $nowJakarta = new DateTimeImmutable('now', new DateTimeZone('Asia/Jakarta'));
 $dashboardPeriod = ez_dashboard_period($_GET, $nowJakarta);
-$allowedPages = ['dashboard', 'orders', 'returns', 'fulfillment', 'shipping-settings', 'products', 'product-new', 'inventory', 'shop', 'sites', 'customers', 'analytics', 'marketing', 'payments', 'messages', 'wallet', 'settings', 'advanced'];
+$allowedPages = ['dashboard', 'orders', 'returns', 'fulfillment', 'shipping-settings', 'products', 'product-new', 'inventory', 'shop', 'sites', 'customers', 'analytics', 'marketing', 'payments', 'messages', 'notifications', 'wallet', 'settings', 'advanced'];
 $requestedPage = strtolower(trim((string) ($_GET['page'] ?? 'dashboard')));
 $page = in_array($requestedPage, $allowedPages, true) ? $requestedPage : 'dashboard';
 $isDashboard = $page === 'dashboard';
@@ -1434,7 +1435,7 @@ $centralCustomerWorkspace = $authenticated && $page === 'customers' && (ez_confi
     || ($deployment === 'test' && $authenticationMethod === 'supabase' && ($_GET['customer-preview'] ?? '') === '1'));
 $centralWalletWorkspace = $authenticated && $page === 'wallet' && ez_config('commerce_storage') === 'd1';
 $centralMessageWorkspace = $authenticated && $page === 'messages';
-$centralReadWorkspace = $centralMessageWorkspace || $centralOrderWorkspace || $centralDashboardWorkspace || $centralAnalyticsWorkspace || $centralPaymentWorkspace || $centralCustomerWorkspace || $centralWalletWorkspace;
+$centralReadWorkspace = ($authenticated && $page === 'notifications') || $centralMessageWorkspace || $centralOrderWorkspace || $centralDashboardWorkspace || $centralAnalyticsWorkspace || $centralPaymentWorkspace || $centralCustomerWorkspace || $centralWalletWorkspace;
 $orders = (!$centralReadWorkspace && $authenticated && ($legacyDataAccess || $sellerId !== '')) ? array_values(array_filter(ez_admin_orders(), static fn($order) => ez_dashboard_order_visible($order, $sellerId, $legacyDataAccess))) : [];
 $allOrderCount = count($orders);
 $orderQueues = [
@@ -1575,7 +1576,7 @@ $siteEditor = $page === 'sites' && $requestedSite !== '' && strlen($requestedSit
 $pageTitles = [
     'dashboard' => 'Dashboard', 'orders' => 'Orders', 'returns' => 'Returns', 'fulfillment' => 'Fulfillment', 'shipping-settings' => 'Shipping settings', 'products' => 'Products', 'product-new' => 'Create product', 'inventory' => 'Inventory', 'shop' => 'Shop', 'sites' => 'Landing Pages',
     'customers' => 'Customers', 'analytics' => 'Analytics', 'marketing' => 'Marketing',
-    'payments' => 'Payments', 'messages' => 'Messages',
+    'payments' => 'Payments', 'messages' => 'Messages', 'notifications' => 'Notifications',
     'wallet' => 'Wallet', 'settings' => 'Settings', 'advanced' => 'Advanced Mode',
 ];
 $orderQueueFilter = is_string($_GET['fulfillment'] ?? null) && isset($orderQueues[$_GET['fulfillment']]) ? $_GET['fulfillment'] : '';
@@ -1848,7 +1849,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
         <button class="mobile-menu" id="mobile-menu" type="button" aria-label="Open navigation"><?= ez_admin_icon('menu') ?></button>
         <label class="global-search"><?= ez_admin_icon('search') ?><input id="global-search" type="search" placeholder="Search anything..." autocomplete="off"><kbd>⌘ K</kbd></label>
         <div class="top-actions">
-          <a class="icon-button" href="?page=orders" aria-label="Open orders"><?= ez_admin_icon('bell') ?></a>
+          <a class="icon-button notification-bell" href="?page=notifications" aria-label="Notifications" data-notification-bell="<?= ez_admin_escape(json_encode(['account' => (string) ($adminUser['id'] ?? ''), 'store' => $sellerId, 'csrf' => $csrfToken, 'enabled' => $authenticationMethod === 'supabase'])) ?>"><?= ez_admin_icon('bell') ?><span data-notification-badge hidden></span></a>
           <a class="icon-button" href="?page=messages" aria-label="Messages"><?= ez_admin_icon('message') ?></a>
           <button class="icon-button" type="button" aria-label="Help"><?= ez_admin_icon('help') ?></button>
           <a class="profile" id="account-menu" href="?page=settings#profile-logo" aria-label="Profile settings"><span class="avatar" data-admin-profile-avatar data-logo-state="<?= ez_admin_escape($adminLogoState) ?>"><span data-admin-profile-fallback><?= ez_admin_escape(mb_substr($adminInitials, 0, 2)) ?></span><img data-admin-profile-image alt="" <?= $adminLogoSrc !== '' ? 'src="' . ez_admin_escape($adminLogoSrc) . '"' : '' ?>></span><div><b><?= ez_admin_escape($adminDisplayName) ?></b><small><?= ez_admin_escape($adminDisplayEmail) ?></small></div><?= ez_admin_icon('chevron-down', 'chevron-icon') ?></a>
@@ -1968,6 +1969,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
   <?php if ($page === 'settings' && $mfaSetup !== null): ?><script src="assets/vendor/qrcode-generator.min.js"></script><?php endif; ?>
   <?php if ($page === 'sites'): ?><script src="builder-native-icons.js?v=<?= (int) filemtime(__DIR__ . '/builder-native-icons.js') ?>"></script><script src="builder-commerce.js?v=<?= (int) filemtime(__DIR__ . '/builder-commerce.js') ?>"></script><script src="builder-help.js?v=<?= (int) filemtime(__DIR__ . '/builder-help.js') ?>"></script><script src="builder-fonts.js?v=<?= (int) filemtime(__DIR__ . '/builder-fonts.js') ?>"></script><script src="builder-native.js?v=<?= (int) filemtime(__DIR__ . '/builder-native.js') ?>"></script><script src="builder-publish.js?v=<?= (int) filemtime(__DIR__ . '/builder-publish.js') ?>"></script><script src="builder-site-settings.js?v=<?= (int) filemtime(__DIR__ . '/builder-site-settings.js') ?>"></script><script src="builder-templates.js?v=<?= (int) filemtime(__DIR__ . '/builder-templates.js') ?>"></script><?php endif; ?><?php if ($page === 'sites' && $siteEditor): ?><script src="builder-backgrounds.js?v=<?= (int) filemtime(__DIR__ . '/builder-backgrounds.js') ?>"></script><script src="builder-components.js?v=<?= (int) filemtime(__DIR__ . '/builder-components.js') ?>"></script><script src="builder-asset-packs.js?v=<?= (int) filemtime(__DIR__ . '/builder-asset-packs.js') ?>"></script><script src="builder-assets.js?v=<?= (int) filemtime(__DIR__ . '/builder-assets.js') ?>"></script><script src="builder-assets-ui.js?v=<?= (int) filemtime(__DIR__ . '/builder-assets-ui.js') ?>"></script><script src="builder-showcase-data.js?v=<?= (int) filemtime(__DIR__ . '/builder-showcase-data.js') ?>"></script><script src="builder-showcase.js?v=<?= (int) filemtime(__DIR__ . '/builder-showcase.js') ?>"></script><?php endif; ?>
   <script src="dashboard-data.js?v=<?= (int) filemtime(__DIR__ . '/dashboard-data.js') ?>"></script>
+  <script src="notification-badge.js?v=<?= (int) filemtime(__DIR__ . '/notification-badge.js') ?>"></script>
   <script src="admin-format.js?v=<?= (int) filemtime(__DIR__ . '/admin-format.js') ?>"></script>
   <?php if ($page === 'settings'): ?><script src="merchant-settings.js?v=<?= (int) filemtime(__DIR__ . '/merchant-settings.js') ?>"></script><?php endif; ?>
   <?php if (in_array($page, ['inventory','products'], true)): ?><script src="inventory.js?v=<?= (int) filemtime(__DIR__ . '/inventory.js') ?>"></script><?php endif; ?>

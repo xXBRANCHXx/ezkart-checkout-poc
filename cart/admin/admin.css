@@ -2474,3 +2474,6 @@ body>.sq-page-preview.sq-has-pinned-navigation:not(.sq-has-announcement-navigati
 }
 
 .store-switcher>div{min-width:0}.store-switcher [data-merchant-store-name]{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* The bell count is private to the signed-in merchant. */
+.notification-bell{position:relative}.notification-bell [data-notification-badge]{position:absolute;top:0;right:-5px;min-width:17px;height:17px;padding:1px 4px;border-radius:10px;background:#6654d9;color:white;font-size:10px;font-weight:700;line-height:15px}.notification-bell [hidden]{display:none!important}

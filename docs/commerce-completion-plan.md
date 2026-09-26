@@ -64,6 +64,22 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 26 September: private transactional notification inboxes
+
+Implemented merchant and buyer inboxes, the real unread bell, contextual links,
+search/filter/paging, monotonic read confirmations, and private delivery activity.
+Existing source jobs now dispatch through atomic notification/recipient receipts
+using each member's current preference revision. New durable message jobs,
+30-minute pending reminders, and Monday weekly catalog summaries are included.
+Lost acknowledgements reconcile the original delivery; exhausted retries are
+visible for review. Source dispatch uses bounded scheduled batches.
+
+See [commerce-notifications.md](commerce-notifications.md) for behavior, recovery,
+privacy, schedule and limits. Email still records intent without a provider.
+Hosted authenticated acceptance, actual scheduling after central cutover,
+monitoring, email delivery and sustained load tests remain open. The combined
+Settings/notifications gate and all top-level release gates remain unchecked.
+
 ### 26 September: persisted merchant settings
 
 Replaced preview-only store fields with real identity, public support contact,

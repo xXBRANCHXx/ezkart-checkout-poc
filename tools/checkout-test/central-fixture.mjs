@@ -3,7 +3,7 @@ import {setup} from './fixture.mjs';
 import {setupCommerceFixture, secret} from '../../cloudflare/ezkart-api/test/commerce-fixture.mjs';
 
 export async function setupCentralFixture(t, overrides = {}) {
-  const f = await setupCommerceFixture(t);
+  const f = await setupCommerceFixture(t,{notifications:overrides.EZKART_TEST_NOTIFICATIONS==='1'?'scheduled':'off'});
   const control = {drop: '', fail: '', calls: [], ageOrders: false};
   const relay = createServer(async (req, res) => {
     try {

@@ -1,5 +1,6 @@
 import {commerceHash} from './commerce-orders.js';
 import {reviewCursor,readReviewCursor} from './commerce-reviews.js';
+import {notificationsEnabled} from './notification-policy.js';
 export const notificationGroups=['payment_confirmed','payment_pending','payment_failed','payment_review','shipping','returns','messages','weekly_activity'];
 export const defaultNotificationPreferences=()=>Object.fromEntries(notificationGroups.map(key=>[key,{inApp:key!=='weekly_activity',email:false}]));
 const fail=(message,status=422)=>{throw new Response(message,{status});};
@@ -26,8 +27,8 @@ export async function merchantSettings(env,actor){
   return {storeId:seller.id,profile:{revision:p?.revision||0,values:p?JSON.parse(p.profile_json):publicStoreProfile(seller),updatedAt:p?.updated_at||null},
     notifications:{revision:n?.revision||0,values:n?JSON.parse(n.preferences_json):defaultNotificationPreferences(),updatedAt:n?.updated_at||null},
     canEditProfile:seller.role!=='viewer',canEditNotifications:true,currency:'IDR',country:'ID',plan:seller.plan,
-    // Neither channel is advertised as active until its dispatcher is wired.
-    delivery:{inAppEnabled:false,emailEnabled:false}};
+    // Email delivery requires a separately configured and verified provider.
+    delivery:{inAppEnabled:notificationsEnabled(env),emailEnabled:false}};
 }
 function profileValues(input){
   fields(input,['name','businessType','supportEmail','supportPhone','description','timezone','dateFormat']);

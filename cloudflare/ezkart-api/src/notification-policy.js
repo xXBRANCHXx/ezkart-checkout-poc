@@ -1,0 +1,2 @@
+export const notificationSourceKinds=['notification.order_state','notification.payment_pending','notification.payment_review','notification.stock_recovered','notification.shipment_updated','notification.return_updated','notification.message_received','notification.weekly_activity'];
+export const notificationsEnabled=env=>env.COMMERCE_STORAGE==='d1'&&['enabled','scheduled'].includes(env.COMMERCE_NOTIFICATIONS);

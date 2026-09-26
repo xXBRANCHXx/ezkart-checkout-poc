@@ -11,8 +11,10 @@
       "name": "ezkart-api-test",
       "workers_dev": true,
       "preview_urls": false,
+      "triggers": { "crons": ["17 * * * *", "* * * * *"] },
       "vars": {
         "APP_ENVIRONMENT": "test",
+        "COMMERCE_NOTIFICATIONS": "enabled",
         "ALLOWED_ORIGINS": "https://test.ezkart.id,http://127.0.0.1:4173",
         "SUPABASE_URL": "https://rwxxjqvoidpkuqftgkjd.supabase.co"
       },

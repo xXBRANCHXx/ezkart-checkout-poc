@@ -36,6 +36,8 @@ import {startConversation,sendMessage,conversationDetail,markConversationRead,me
 import {uploadMessagePhoto,messagePhoto,cleanupMessagePhotos} from './commerce-message-media.js';
 import {parseMessageJSON} from './message-json.js';
 import {merchantSettings,saveMerchantSettings,settingsHistory,publicStoreProfile} from './merchant-settings.js';
+import {notificationInbox,notificationStats,readNotifications,notificationProcessing} from './commerce-notifications.js';
+import {dispatchNotifications,scheduleNotifications} from './commerce-notification-dispatch.js';
 import {merchantAnalytics} from './commerce-analytics.js';
 import {createAnalyticsExport,readAnalyticsExport,cleanupAnalyticsExports} from './commerce-analytics-exports.js';
 const json = (payload, status = 200, headers = {}) => new Response(JSON.stringify(payload), {
@@ -1459,6 +1461,12 @@ export default {
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
     const url = new URL(request.url);
     try {
+      if(url.pathname==='/internal/commerce/notifications/drain'&&request.method==='POST'){
+        const input=await authenticateCommerceService(request,env);
+        if(url.search||Object.keys(input).some(k=>!['environment','limit','schedule'].includes(k))||input.environment!==(env.APP_ENVIRONMENT==='test'?'sandbox':'production')||input.schedule!==undefined&&typeof input.schedule!=='boolean'||input.limit!==undefined&&(!Number.isSafeInteger(input.limit)||input.limit<1||input.limit>3))return json({ok:false,error:'Notification processing request is invalid'},422);
+        const scheduled=input.schedule?await scheduleNotifications(env):null;
+        return json({ok:true,scheduled,...await dispatchNotifications(env,input.limit??3)});
+      }
       if(url.pathname.startsWith('/internal/commerce/finance/')){
         const payload=await authenticateCommerceService(request,env);
         if(url.pathname==='/internal/commerce/finance/provider-account'&&request.method==='GET')return json({ok:true,account:await providerFinancialAccount(env,url)});
@@ -1530,6 +1538,20 @@ export default {
       const landingViewMatch = /^\/v1\/landing-pages\/([a-z0-9-]+)\/view$/.exec(url.pathname);
       if (request.method === "GET" && landingViewMatch) return await landingPageView(request, env, landingViewMatch[1]);
       if (request.method === "GET" && url.pathname === "/health") return json(await health(env), 200, cors);
+      const noticeMatch=/^\/v1\/(customer|commerce)\/notifications(?:\/(stats|processing|read))?$/.exec(url.pathname);
+      if(noticeMatch){
+        const user=await authenticatedUser(request,env);let actor={kind:'buyer',id:user.id};
+        if(noticeMatch[1]==='commerce'){
+          const seller=await env.DB.prepare(`SELECT s.id FROM seller_memberships m JOIN sellers s ON s.id=m.seller_id WHERE m.auth_user_id=? AND s.status='active' ORDER BY m.created_at ASC LIMIT 1`).bind(user.id).first();
+          if(!seller)return json({ok:false,error:'Your store membership is no longer available'},403,cors);
+          if(request.headers.has('x-ezkart-notification-store')&&request.headers.get('x-ezkart-notification-store')!==seller.id)return json({ok:false,error:'Your active store changed. Reload this page.',code:'notification_session_changed'},409,cors);
+          actor={kind:'merchant',id:user.id,sellerId:seller.id};
+        }
+        const action=noticeMatch[2];
+        if(request.method==='GET'&&action!=='read')return json({ok:true,...await(action==='stats'?notificationStats(env,actor,url):action==='processing'?notificationProcessing(env,actor,url):notificationInbox(env,actor,url))},200,cors);
+        if(request.method==='POST'&&action==='read'&&!url.search)return json({ok:true,...await readNotifications(env,actor,await reviewRequestJson(request,3000,parseMessageJSON))},200,cors);
+        return json({ok:false,error:'Method or parameters not allowed'},405,cors);
+      }
       if(/^\/v1\/commerce\/settings(?:\/history)?$/.test(url.pathname)){
         const user=await authenticatedUser(request,env),seller=await env.DB.prepare(`SELECT s.id FROM seller_memberships m JOIN sellers s ON s.id=m.seller_id WHERE m.auth_user_id=? AND s.status='active' ORDER BY m.created_at ASC LIMIT 1`).bind(user.id).first();
         if(!seller)return json({ok:false,error:'Your store membership is no longer available'},403,cors);
@@ -1823,7 +1845,10 @@ export default {
       return json({ ok: false, error: "The API could not complete this request." }, 500, cors);
     }
   },
-  async scheduled(_controller, env, context) {
+  async scheduled(controller, env, context) {
+    if(controller.cron==='* * * * *'){
+      context.waitUntil((async()=>{await scheduleNotifications(env);await dispatchNotifications(env);})());return;
+    }
     context.waitUntil(cleanupAbandonedMedia(env));
     context.waitUntil(cleanupAnalyticsExports(env));
     context.waitUntil(cleanupCustomerExports(env));

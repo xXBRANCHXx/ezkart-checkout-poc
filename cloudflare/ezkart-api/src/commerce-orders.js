@@ -323,6 +323,8 @@ export async function applyCommerceEvent(env, orderId, input) {
       WHERE id = ? AND seller_id = ? AND revision = ?`).bind(next, normalized, fulfillment, Number(paymentReview), paidAt, expiresAt, now, orderId, sellerId, order.revision));
     if (next !== order.state) statements.push(commerceJobStatement(env, {sellerId, orderId, environment,
       kind: 'notification.order_state', key: `order_state:${orderId}:${next}`, data: {orderId, state: next}}, now));
+    if(!paid&&next==='paid'&&fulfillment==='stock_review')statements.push(commerceJobStatement(env,{sellerId,orderId,environment,
+      kind:'notification.payment_review',key:'stock_review:'+orderId,data:{orderId,reason:'stock_shortage'}},now));
     if (next !== 'creating') statements.push(env.DB.prepare(`UPDATE commerce_jobs SET state = 'dead',
       last_error = 'Order no longer awaits payment creation', updated_at = ? WHERE order_id = ?
       AND kind = 'payment.create' AND state IN ('queued', 'retry')`).bind(now, orderId));

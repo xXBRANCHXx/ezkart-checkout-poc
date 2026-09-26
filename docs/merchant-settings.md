@@ -72,17 +72,14 @@ review, shipping, returns, buyer messages and weekly catalog activity, with
 separate in-app and email choices. They are personal to each store membership.
 Default email choices are off. Weekly activity is off in both channels.
 
-This delivery saves the preferences and their history. It does not yet dispatch
-notifications, run the 30-minute pending-payment/weekly catalog schedules, or
-connect an email service. Both delivery capabilities report inactive; the UI
-states that delivery is still being set up. It does not claim that a saved choice
-has sent an alert. No external messages or emails were sent during validation.
+The initial Settings rollout saved preferences and history with both delivery
+channels inactive. The [notification follow-up](commerce-notifications.md) now
+uses those choices for atomic in-app delivery and scheduled sources when central
+commerce and notifications are enabled. Email still records intent only; its
+provider is not connected and no real emails were sent during validation.
 
-The next notification work is the actual private inbox, durable event fan-out,
-scheduled sources, delivery attempts, safe retries, failures visible to operators,
-verified recipients and provider delivery evidence. The existing email-service
-question remains open. The combined Settings/notifications acceptance gate is
-not complete until that behavior and the hosted workflows are verified.
+The combined Settings/notifications acceptance gate stays open for external
+email delivery, authenticated hosted workflows, and operational acceptance.
 
 ## Validation and rollout
 

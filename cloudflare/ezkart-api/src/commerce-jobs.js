@@ -1,7 +1,8 @@
 import {commerceEnvironment, commerceHash} from './commerce-orders.js';
+import {notificationSourceKinds} from './notification-policy.js';
 
 const fail = (message, status = 422) => { throw new Response(message, {status}); };
-const kinds = ['payment.create', 'shipment.create', 'shipment.cancel', 'shipment.refresh', 'notification.order_state', 'notification.payment_review', 'notification.stock_recovered', 'notification.return_updated', 'notification.shipment_updated', 'notification.send', 'payout.create', 'wallet.register'];
+const kinds = ['payment.create', 'shipment.create', 'shipment.cancel', 'shipment.refresh', ...notificationSourceKinds, 'notification.send', 'payout.create', 'wallet.register'];
 const validId = value => typeof value === 'string' && /^[A-Za-z0-9_-]{3,100}$/.test(value);
 const view = row => ({id: row.id, sellerId: row.seller_id, orderId: row.order_id, environment: row.commerce_environment,
   kind: row.kind, state: row.state, data: JSON.parse(row.payload_json), attempts: row.attempts,
@@ -27,9 +28,10 @@ export async function claimCommerceJobs(env, input) {
       WHERE finished_at IS NULL AND EXISTS (SELECT 1 FROM commerce_jobs j WHERE j.id = commerce_job_attempts.job_id
         AND j.lease_token = commerce_job_attempts.lease_token AND j.commerce_environment = ?
         AND j.state = 'running' AND j.lease_until <= ?)`).bind(now, environment, now),
-    env.DB.prepare(`UPDATE commerce_jobs SET state = 'uncertain', last_error = 'Worker lease expired; reconcile the provider result before retrying',
+    env.DB.prepare(`UPDATE commerce_jobs SET state = CASE WHEN kind IN (SELECT value FROM json_each(?)) AND attempts>=maximum_attempts THEN 'dead' ELSE 'uncertain' END,
+      last_error = 'Worker lease expired; review the saved result before retrying',
       lease_token = NULL, lease_owner = NULL, lease_until = NULL, lease_mode = NULL, updated_at = ?
-      WHERE commerce_environment = ? AND state = 'running' AND lease_until <= ?`).bind(now, environment, now),
+      WHERE commerce_environment = ? AND state = 'running' AND lease_until <= ?`).bind(JSON.stringify(notificationSourceKinds), now, environment, now),
     env.DB.prepare(`UPDATE commerce_jobs SET state = 'running', attempts = attempts + 1,
       lease_token = ?, lease_owner = ?, lease_until = ?, lease_mode = ?, completion_hash = NULL, updated_at = ?
       WHERE id IN (SELECT id FROM commerce_jobs WHERE commerce_environment = ?
@@ -75,6 +77,9 @@ export async function finishCommerceJob(env, jobId, input) {
       UNION ALL SELECT order_id FROM commerce_payment_captures WHERE order_id=? AND capture_kind='order_payment' LIMIT 1`).bind(row.order_id,row.order_id).first();
     if (!recorded) fail('Record the provider payment details on the order before completing this job', 409);
   }
+  if(notificationSourceKinds.includes(row.kind)&&input.outcome==='succeeded'&&!await env.DB.prepare('SELECT id FROM commerce_notification_events WHERE job_id=?').bind(row.id).first()){
+    fail('Record the notification and its recipients before completing this job',409);
+  }
   if(row.kind==='wallet.register'&&input.outcome==='succeeded'){
     const recorded=await env.DB.prepare(`SELECT p.enrollment_id FROM commerce_wallet_provider_profiles p JOIN commerce_wallet_enrollments e ON e.id=p.enrollment_id
       WHERE e.job_id=? AND e.commerce_environment=?`).bind(row.id,environment).first();
@@ -97,7 +102,8 @@ export async function finishCommerceJob(env, jobId, input) {
   // Only a proven no-effect failure can enter ordinary retry. Network timeout,
   // missing response or a crashed worker requires a provider-status check.
   if (input.outcome === 'retry' && result.noEffectConfirmed !== true) fail('Confirm the provider performed no action before retrying', 409);
-  const state = input.outcome === 'retry' && row.attempts >= row.maximum_attempts ? 'dead' : input.outcome;
+  const exhausted = row.attempts >= row.maximum_attempts && (input.outcome === 'retry' || (input.outcome === 'uncertain' && notificationSourceKinds.includes(row.kind)));
+  const state = exhausted ? 'dead' : input.outcome;
   const delay = state === 'retry' ? Math.min(3600, 15 * 2 ** Math.min(row.attempts - 1, 8)) : state === 'uncertain' ? 60 : 0;
   const available = new Date(Date.now() + delay * 1000).toISOString();
   const saved = await env.DB.batch([env.DB.prepare(`UPDATE commerce_jobs SET state = ?, result_json = ?, completion_hash = ?,

@@ -93,3 +93,11 @@ The Hostinger admin proxies these calls with its server-side Supabase session,
 so access and refresh tokens are never placed in page markup or browser storage.
 Page, order, review, payment, and download routes still need to move behind the
 same token validation and seller-membership checks.
+
+## Transactional notification dispatch
+
+See [the workbench notification contract](../../docs/commerce-notifications.md)
+for migration 0029, private inbox routes, bounded scheduled dispatch, preference
+snapshots, recovery and current email/hosted acceptance limits. TEST adds a minute
+notification cron alongside hourly housekeeping. It remains held unless central
+commerce and notification delivery are both enabled.

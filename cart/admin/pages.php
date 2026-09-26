@@ -327,6 +327,11 @@ function ez_orders_table(array $rows, string $tableId, string $csrfToken, string
     </aside>
   </section>
 
+<?php break; case 'notifications':
+$notificationConfig = ['merchant' => true, 'account' => (string) ($adminUser['id'] ?? ''), 'store' => $sellerId, 'csrf' => $csrfToken,
+    'enabled' => ez_config('commerce_storage') === 'd1', 'environment' => $deployment];
+require dirname(__DIR__) . '/notifications-workspace.php'; ?>
+
 <?php break; case 'messages':
 $messageConfig = ['merchant' => true, 'account' => (string) ($adminUser['id'] ?? ''), 'store' => $sellerId, 'csrf' => $csrfToken,
     'version' => $csrfToken, 'enabled' => ez_config('commerce_storage') === 'd1', 'environment' => $deployment];
