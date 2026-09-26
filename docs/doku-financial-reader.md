@@ -30,6 +30,10 @@ Tokens stay in the reader object, expire conservatively and are removed after an
 HTTP authentication rejection. There is no implicit retry. Every history/status
 request uses a new numeric request ID.
 
+The transport now lives in `doku-snap.php`, shared with the separately authorized
+[wallet enrollment adapter](wallet-enrollment.md). The reader's public methods
+remain read-only; the evidence collector cannot register or move funds.
+
 Financial JSON rejects duplicate keys, malformed strings and excessive nesting.
 Numbers retain their exact original decimal spelling until validated; money is
 returned as whole-rupiah strings, including above JavaScript's safe integer range.

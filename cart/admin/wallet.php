@@ -12,8 +12,7 @@ if (empty($walletAccess['unlocked'])) {
     return;
 }
 
-// Payment callbacks confirm collection only. No settlement feed, wallet mapping
-// or payout ledger exists yet, so neither a balance nor a release date is known.
+// Account enrollment and payment collection do not establish settled funds.
 // Do not derive either from PAID totals or a delivery scan.
 $walletOrders = array_values(array_filter($orders, static fn($order) => strtoupper((string) ($order['status'] ?? '')) === 'PAID'));
 $walletProductPayments = array_sum(array_map(static fn($order) => max(0, (int) ($order['subtotal'] ?? 0)), $walletOrders));
@@ -21,6 +20,17 @@ $walletDataAvailable = $authenticationMethod === 'password' || $sellerId !== '';
 ?>
 <div data-wallet-content data-wallet-seconds="<?= max(0, (int) $walletAccess['expires_at'] - time()) ?>">
 <div class="wallet-unlocked-note"><span><?= ez_admin_icon('shield') ?> Wallet unlocked until <?= ez_admin_escape((new DateTimeImmutable('@' . $walletAccess['expires_at']))->setTimezone(new DateTimeZone('Asia/Jakarta'))->format('H:i')) ?> WIB</span><form method="post" action="?page=wallet"><input type="hidden" name="csrf_token" value="<?= ez_admin_escape($csrfToken) ?>"><input type="hidden" name="action" value="wallet_lock"><button type="submit">Lock Wallet</button></form></div>
+<?php if (($activeSeller['role'] ?? '') === 'owner'): ?>
+<section class="surface wallet-setup" data-wallet-setup data-account="<?= ez_admin_escape((string) ($adminUser['id'] ?? '')) ?>" data-store="<?= ez_admin_escape($sellerId) ?>" data-environment="<?= ez_admin_escape($commerceEnvironment) ?>" aria-labelledby="wallet-setup-title" aria-busy="true">
+  <header><div><h2 id="wallet-setup-title">Connect your seller wallet</h2><p>Your store’s payment account with DOKU.</p></div><span class="wallet-status" data-wallet-setup-badge>Checking</span></header>
+  <p data-wallet-setup-status role="status" aria-live="polite">Checking your wallet setup…</p>
+  <dl class="wallet-setup-details" data-wallet-setup-details hidden><div><dt>Store name</dt><dd data-wallet-setup-name></dd></div><div><dt>Verified owner email</dt><dd data-wallet-setup-email></dd></div><div data-wallet-setup-account-row hidden><dt>DOKU account</dt><dd data-wallet-setup-account></dd></div></dl>
+  <p data-wallet-setup-disclosure hidden>Connecting shares this store name and your verified email with DOKU to create your seller payment account. Check these details before continuing.</p>
+  <div class="wallet-setup-actions"><button class="action-button primary" type="button" data-wallet-connect hidden>Connect seller wallet</button><button class="action-button" type="button" data-wallet-setup-refresh disabled>Check setup status</button></div>
+  <p class="wallet-setup-footnote">Connecting an account does not make funds available to withdraw. Delivery, settlement, refunds, and any holds must be checked first.</p>
+  <noscript><p>Enable JavaScript to connect your wallet and check setup status.</p></noscript>
+</section>
+<?php endif; ?>
 <section class="wallet-overview" aria-label="Wallet overview">
   <article class="surface wallet-balance">
     <header><span class="wallet-heading-icon"><?= ez_admin_icon('wallet') ?></span><span class="wallet-environment"><?= $commerceProduction ? 'Production' : 'Sandbox' ?></span></header>
@@ -47,6 +57,9 @@ $walletDataAvailable = $authenticationMethod === 'password' || $sellerId !== '';
 </section>
 <section class="surface wallet-payments" aria-label="Payments awaiting wallet settlement">
   <header class="surface-header"><div><h2>Payments behind your earnings</h2><p>Delivery and settlement status for your paid orders.</p></div><a class="action-button" href="?page=payments">Check all payments <?= ez_admin_icon('chevron-right') ?></a></header>
+  <?php if ($centralWalletWorkspace): ?>
+  <p class="wallet-empty">Check your confirmed payments in <a href="?page=payments">Payments</a>. Wallet settlement history will appear here once funds and fees are reconciled.</p>
+  <?php else: ?>
   <div class="wallet-payment-summary"><div><small>Product payments received</small><strong><?= $walletDataAvailable ? ez_admin_money($walletProductPayments) : '—' ?></strong><span>Before seller fees · shipping excluded</span></div><div><small>Paid orders</small><strong><?= $walletDataAvailable ? number_format(count($walletOrders)) : '—' ?></strong><span><?= $commerceProduction ? 'Production payment records' : 'Sandbox payment records' ?></span></div></div>
   <?php if (!$walletDataAvailable): ?><p class="wallet-empty" role="alert">Payment records could not be loaded. Reload to try again.</p>
   <?php elseif ($walletOrders === []): ?><p class="wallet-empty">No paid orders yet. Confirmed payments will appear here.</p>
@@ -61,6 +74,7 @@ $walletDataAvailable = $authenticationMethod === 'password' || $sellerId !== '';
     ?><tr><td><a href="<?= ez_admin_escape('?' . http_build_query(['page' => 'payments', 'order' => $reference])) ?>"><?= ez_admin_escape($reference) ?></a><small><?= ez_admin_escape(ez_admin_time($order['paid_at'] ?? $order['created_at'] ?? '')) ?></small></td><td><?= ez_admin_money($order['subtotal'] ?? 0) ?></td><td><span class="wallet-delivery <?= $delivered ? 'confirmed' : '' ?>"><?= ez_admin_escape($delivery) ?></span></td><td><span>No settlement record</span></td></tr><?php endforeach; ?>
     </tbody></table></div>
     <?php if (count($walletOrders) > 20): ?><p class="wallet-table-note">Showing the 20 most recent paid orders. <a href="?page=payments" data-ui-icon="credit-card">View all payments</a></p><?php endif; ?>
+  <?php endif; ?>
   <?php endif; ?>
 </section>
 </div>

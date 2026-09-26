@@ -1,7 +1,7 @@
 import {commerceEnvironment, commerceHash} from './commerce-orders.js';
 
 const fail = (message, status = 422) => { throw new Response(message, {status}); };
-const kinds = ['payment.create', 'shipment.create', 'shipment.cancel', 'shipment.refresh', 'notification.order_state', 'notification.payment_review', 'notification.stock_recovered', 'notification.return_updated', 'notification.shipment_updated', 'notification.send', 'payout.create'];
+const kinds = ['payment.create', 'shipment.create', 'shipment.cancel', 'shipment.refresh', 'notification.order_state', 'notification.payment_review', 'notification.stock_recovered', 'notification.return_updated', 'notification.shipment_updated', 'notification.send', 'payout.create', 'wallet.register'];
 const validId = value => typeof value === 'string' && /^[A-Za-z0-9_-]{3,100}$/.test(value);
 const view = row => ({id: row.id, sellerId: row.seller_id, orderId: row.order_id, environment: row.commerce_environment,
   kind: row.kind, state: row.state, data: JSON.parse(row.payload_json), attempts: row.attempts,
@@ -16,6 +16,8 @@ export async function claimCommerceJobs(env, input) {
   if (!['execute', 'reconcile'].includes(mode)) fail('Job mode is invalid');
   const orderId=input.orderId||'';
   if(typeof orderId!=='string'||(orderId&&!/^EZK-[SP]-[A-F0-9]{24}$/.test(orderId)))fail('Job order is invalid');
+  const jobId=input.jobId||'';
+  if(typeof jobId!=='string'||(jobId&&!validId(jobId)))fail('Job reference is invalid');
   const limit = input.limit ?? 5, seconds = input.leaseSeconds ?? 90;
   if (!Number.isInteger(limit) || limit < 1 || limit > 10 || !Number.isInteger(seconds) || seconds < 15 || seconds > 120) fail('Job lease is invalid');
   const now = new Date().toISOString(), until = new Date(Date.now() + seconds * 1000).toISOString();
@@ -35,12 +37,13 @@ export async function claimCommerceJobs(env, input) {
         AND ((? = 'execute' AND state IN ('queued', 'retry') AND attempts < maximum_attempts)
           OR (? = 'reconcile' AND state = 'uncertain' AND attempts < maximum_attempts))
         AND (?='' OR order_id=?)
+        AND (?='' OR id=?)
         AND (?='reconcile' OR kind!='payment.create' OR EXISTS (SELECT 1 FROM orders o WHERE o.id=commerce_jobs.order_id AND o.checkout_state='creating' AND o.expires_at>?))
         AND (?='reconcile' OR kind!='shipment.create' OR EXISTS (SELECT 1 FROM commerce_shipments s JOIN orders o ON o.id=s.order_id
           WHERE s.id=json_extract(commerce_jobs.payload_json,'$.shipmentId') AND s.order_id=commerce_jobs.order_id
             AND (s.provider_id IS NOT NULL OR (o.checkout_state='paid' AND o.payment_review=0 AND o.fulfillment_review=0 AND s.state='queued'))))
         ORDER BY available_at, created_at, id LIMIT ?) RETURNING *`)
-      .bind(token, input.workerId, until, mode, now, environment, JSON.stringify(input.kinds), now, mode, mode, orderId, orderId, mode, now, mode, limit),
+      .bind(token, input.workerId, until, mode, now, environment, JSON.stringify(input.kinds), now, mode, mode, orderId, orderId, jobId, jobId, mode, now, mode, limit),
     env.DB.prepare(`INSERT INTO commerce_job_attempts (id, job_id, attempt, lease_token, worker_id, mode, started_at)
       SELECT id || ':' || attempts, id, attempts, lease_token, lease_owner, lease_mode, ? FROM commerce_jobs
       WHERE lease_token = ? AND lease_owner = ? AND commerce_environment = ? AND state = 'running'`).bind(now, token, input.workerId, environment),
@@ -71,6 +74,15 @@ export async function finishCommerceJob(env, jobId, input) {
     const recorded = await env.DB.prepare(`SELECT order_id FROM commerce_payment_sessions WHERE order_id=?
       UNION ALL SELECT order_id FROM commerce_payment_captures WHERE order_id=? AND capture_kind='order_payment' LIMIT 1`).bind(row.order_id,row.order_id).first();
     if (!recorded) fail('Record the provider payment details on the order before completing this job', 409);
+  }
+  if(row.kind==='wallet.register'&&input.outcome==='succeeded'){
+    const recorded=await env.DB.prepare(`SELECT p.enrollment_id FROM commerce_wallet_provider_profiles p JOIN commerce_wallet_enrollments e ON e.id=p.enrollment_id
+      WHERE e.job_id=? AND e.commerce_environment=?`).bind(row.id,environment).first();
+    if(!recorded)fail('Record the verified wallet account before completing this job',409);
+  }
+  if(row.kind==='wallet.register'&&input.outcome==='retry'){
+    const bound=await env.DB.prepare(`SELECT b.enrollment_id FROM commerce_wallet_provider_bindings b JOIN commerce_wallet_enrollments e ON e.id=b.enrollment_id WHERE e.job_id=?`).bind(row.id).first();
+    if(bound)fail('A bound wallet registration requires reconciliation before retrying',409);
   }
   if(row.kind.startsWith('shipment.')&&input.outcome==='succeeded'){
     const shipmentId=JSON.parse(row.payload_json).shipmentId;

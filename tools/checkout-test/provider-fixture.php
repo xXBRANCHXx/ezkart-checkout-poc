@@ -2,10 +2,11 @@
 declare(strict_types=1);
 // Test-only transport loaded by PHP -n. No provider network calls are possible.
 if (extension_loaded('curl') || !getenv('EZKART_TEST_CAPTURE')) throw new RuntimeException('Unsafe test transport setup.');
-foreach (['CURLOPT_ENCODING', 'CURLOPT_POST', 'CURLOPT_POSTFIELDS', 'CURLOPT_HTTPHEADER', 'CURLOPT_RETURNTRANSFER', 'CURLOPT_CONNECTTIMEOUT', 'CURLOPT_TIMEOUT', 'CURLOPT_SSL_VERIFYPEER', 'CURLINFO_HTTP_CODE', 'CURLINFO_RESPONSE_CODE', 'CURLOPT_FOLLOWLOCATION', 'CURLOPT_CUSTOMREQUEST', 'CURLOPT_HEADERFUNCTION', 'CURLINFO_CONTENT_TYPE', 'CURLOPT_SSL_VERIFYHOST', 'CURLOPT_WRITEFUNCTION'] as $index => $constant) define($constant, $index + 1);
+foreach (['CURLOPT_ENCODING', 'CURLOPT_POST', 'CURLOPT_POSTFIELDS', 'CURLOPT_HTTPHEADER', 'CURLOPT_RETURNTRANSFER', 'CURLOPT_CONNECTTIMEOUT', 'CURLOPT_TIMEOUT', 'CURLOPT_SSL_VERIFYPEER', 'CURLINFO_HTTP_CODE', 'CURLINFO_RESPONSE_CODE', 'CURLOPT_FOLLOWLOCATION', 'CURLOPT_CUSTOMREQUEST', 'CURLOPT_HEADERFUNCTION', 'CURLINFO_CONTENT_TYPE', 'CURLOPT_SSL_VERIFYHOST', 'CURLOPT_WRITEFUNCTION', 'CURLOPT_PROTOCOLS', 'CURLPROTO_HTTPS'] as $index => $constant) define($constant, $index + 1);
 function curl_init(string $url): object { return (object) ['url' => $url, 'options' => [], 'status' => 200]; }
 function curl_setopt_array(object $handle, array $options): bool { $handle->options = $options; return true; }
 function curl_setopt(object $handle, int $option, mixed $value): bool { $handle->options[$option] = $value; return true; }
+function curl_close(object $handle): void {}
 function curl_exec(object $handle): string {
     $payload = json_decode($handle->options[CURLOPT_POSTFIELDS] ?? '{}', true);
     file_put_contents(getenv('EZKART_TEST_CAPTURE'), json_encode(['url' => $handle->url, 'method' => $handle->options[CURLOPT_CUSTOMREQUEST] ?? (!empty($handle->options[CURLOPT_POST]) ? 'POST' : 'GET'), 'body' => $handle->options[CURLOPT_POSTFIELDS] ?? '', 'headers' => $handle->options[CURLOPT_HTTPHEADER] ?? []]) . "\n", FILE_APPEND | LOCK_EX);
@@ -34,6 +35,47 @@ function curl_exec(object $handle): string {
         if ($response === false) return '';
         if (isset($handle->options[CURLOPT_WRITEFUNCTION])) { ($handle->options[CURLOPT_WRITEFUNCTION])($handle, $response); return '1'; }
         return $response;
+    }
+    if (getenv('EZKART_TEST_WALLET') && preg_match('#^https://api-sandbox.doku.com/(authorization/v1/access-token/b2b|sub-account/v2.0/(register|balance-inquiries))$#D', $handle->url, $walletMatch)) {
+        $directory = dirname(getenv('EZKART_TEST_CAPTURE'));
+        $control = is_file($directory . '/wallet-control.json') ? json_decode((string) file_get_contents($directory . '/wallet-control.json'), true) : [];
+        $profilesFile = $directory . '/wallet-profiles.json';
+        $profiles = is_file($profilesFile) ? json_decode((string) file_get_contents($profilesFile), true) : [];
+        $parent = getenv('EZKART_DOKU_SANDBOX_PARENT_PROFILE_ID');
+        if (str_starts_with($walletMatch[1], 'authorization/')) {
+            $response = ['responseCode' => '2007300', 'responseMessage' => 'Successful', 'accessToken' => 'fixture-snap-wallet-token', 'tokenType' => 'Bearer', 'expiresIn' => 900];
+            if (!empty($control['tokenDenied'])) { $handle->status = 401; $response = ['responseCode' => '4017300']; }
+        } elseif ($walletMatch[2] === 'register') {
+            $reference = $payload['partnerReferenceNo'];
+            if (isset($profiles[$reference]) || !empty($control['duplicate'])) { $handle->status = 409; $response = ['responseCode' => '4090000']; }
+            else {
+                $number = str_pad((string) hexdec(substr(hash('sha256', $reference), 0, 7)), 9, '0', STR_PAD_LEFT);
+                $response = ['responseCode' => '2000000', 'responseMessage' => 'Successful', 'profileId' => 'SAC-' . substr(hash('sha256', $reference), 0, 18), 'parentProfileId' => $parent, 'accounts' => [
+                    ['type' => 'DOKU_MERCHANT_IDR', 'currency' => 'IDR', 'accountNo' => '1' . $number],
+                    ['type' => 'DOKU_MERCHANT_PENDING_IDR', 'currency' => 'IDR', 'accountNo' => '2' . $number],
+                ]];
+                $profiles[$reference] = $response; file_put_contents($profilesFile, json_encode($profiles));
+                if (!empty($control['loseRegister'])) { $handle->status = 503; $response = ['responseCode' => '5030000']; }
+                if (!empty($control['wrongParent'])) $response['parentProfileId'] = 'BRN-foreign';
+            }
+        } else {
+            $response = null;
+            foreach ($profiles as $profile) if ($profile['profileId'] === $payload['profileId']) $response = $profile;
+            if ($payload['profileId'] === $parent) $response = ['responseCode' => '2000000', 'profileId' => $parent, 'accounts' => [
+                ['type' => 'DOKU_MERCHANT_IDR', 'currency' => 'IDR', 'accountNo' => '1000000001'], ['type' => 'DOKU_MERCHANT_PENDING_IDR', 'currency' => 'IDR', 'accountNo' => '2000000001'],
+            ]];
+            if ($response === null) { $handle->status = 404; $response = ['responseCode' => '4040000']; }
+            else {
+                $response['name'] = 'Fixture account';
+                foreach ($response['accounts'] as &$walletAccount) $walletAccount['balance'] = ['available' => '0.00', 'reserved' => '0.00'];
+                unset($walletAccount);
+                if ($payload['profileId'] !== $parent && !empty($control['wrongConfirmation'])) $response['accounts'][0]['accountNo'] = '1999999999';
+                if ($payload['profileId'] !== $parent && !empty($control['confirmationUnavailable'])) { $handle->status = 503; $response = ['responseCode' => '5030000']; }
+            }
+        }
+        $body = json_encode($response);
+        if (isset($handle->options[CURLOPT_WRITEFUNCTION])) { ($handle->options[CURLOPT_WRITEFUNCTION])($handle, $body); return '1'; }
+        return $body;
     }
     if (preg_match('#^https://api-sandbox.doku.com/orders/v1/status/EZK-S-[A-F0-9]{24}$#D', $handle->url)) {
         $file = dirname(getenv('EZKART_TEST_CAPTURE')) . '/provider-status.json';
@@ -131,7 +173,8 @@ function curl_exec(object $handle): string {
         $file = dirname(getenv('EZKART_TEST_CAPTURE')) . '/auth-response.json';
         $config = is_file($file) ? json_decode((string) file_get_contents($file), true) : [];
         $path = substr($handle->url, strlen('https://auth.ezkart.test/auth/v1/'));
-        $tokens = static function (string $aal = 'aal1', string $suffix = 'fixture-signature'): array {
+        $tokens = static function (string $aal = 'aal1', string $suffix = 'fixture-signature') use ($config): array {
+            if (isset($config['wallet_tokens']) && $suffix === 'wallet-verified') return $config['wallet_tokens'];
             $token = 'fixture.' . rtrim(strtr(base64_encode(json_encode(['aal' => $aal, 'exp' => time() + 3600, 'sub' => 'fixture-google-customer'])), '+/', '-_'), '=') . '.' . $suffix;
             return ['access_token' => $token, 'refresh_token' => 'fixture-refresh-token', 'expires_in' => 3600];
         };

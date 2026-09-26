@@ -1,4 +1,18 @@
 .wallet-overview { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; margin-bottom: 20px; }
+.wallet-setup { margin-bottom: 20px; padding: 24px 28px; }
+.wallet-setup > header { display: flex; justify-content: space-between; align-items: start; flex-wrap: wrap; gap: 12px; }
+.wallet-setup h2 { margin: 0; font-size: 17px; }
+.wallet-setup p { color: #697382; font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; }
+.wallet-setup-details { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 20px; padding: 16px 0; border-top: 1px solid #e8ebef; border-bottom: 1px solid #e8ebef; }
+.wallet-setup-details dt { color: #697382; font-size: 11px; }
+.wallet-setup-details dd { margin: 7px 0 0; font-size: 13px; font-weight: 500; overflow-wrap: anywhere; }
+.wallet-setup-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.wallet-setup-actions button { min-height: 44px; cursor: pointer; }
+.wallet-setup-actions button:disabled { cursor: wait; opacity: .65; }
+.wallet-setup .wallet-setup-footnote { margin-bottom: 0; font-size: 11px; }
+.wallet-setup [hidden] { display: none; }
+.wallet-setup[data-state=connected] .wallet-status { color: #237d51; background: #e6f5eb; }
+.wallet-setup[data-state=review] .wallet-status { color: #945b24; background: #fff3df; }
 .wallet-balance, .wallet-withdrawal { padding: 28px; }
 .wallet-balance > header, .wallet-withdrawal > header { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
 .wallet-heading-icon { width: 44px; height: 44px; display: grid; place-items: center; background: #fff0ec; color: #c74130; border-radius: 12px; }
@@ -60,6 +74,7 @@
 @media (max-width: 600px) {
   .wallet-verification { margin-top: 20px; padding: 28px 20px; }
   .wallet-balance, .wallet-withdrawal { padding: 22px 18px; }
+  .wallet-setup { padding: 22px 18px; }
   .wallet-withdrawal > header { flex-wrap: wrap; }
   .wallet-payment-summary { gap: 22px; padding: 20px 18px; }
   .wallet-table-wrap table { min-width: 650px; }

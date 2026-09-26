@@ -23,6 +23,7 @@ import {merchantOrderList,merchantOrderDetail,merchantOrderHistory} from './comm
 import {merchantDashboard} from './commerce-dashboard.js';
 import {merchantPaymentList,merchantPaymentDetail,merchantPaymentHistory} from './commerce-payment-reads.js';
 import {reconcileCaptureJournals,financialJournalSummary,financialJournalList} from './commerce-financial-journal.js';
+import {walletEnrollment,walletRegistration,bindWalletRegistration,saveWalletRegistrationReceipt,recordWalletRegistration} from './commerce-wallet-enrollment.js';
 import {merchantCustomers,merchantCustomer,customerOrderHistory} from './commerce-customers.js';
 import {customerSegments,customerSegment,saveCustomerWorkspace,customerProfileHistory} from './commerce-customer-workspace.js';
 import {createCustomerExport,readCustomerExport,cleanupCustomerExports} from './commerce-customer-exports.js';
@@ -1454,6 +1455,19 @@ export default {
     try {
       if(url.pathname.startsWith('/internal/commerce/finance/')){
         const payload=await authenticateCommerceService(request,env);
+        if(url.pathname==='/internal/commerce/finance/wallet'&&request.method==='POST'){
+          if(url.search)return json({ok:false,error:'Wallet parameters belong in the request body'},422);
+          return json({ok:true,...await walletEnrollment(env,payload)});
+        }
+        const walletRegistrationPath=/^\/internal\/commerce\/finance\/wallet\/registrations\/(wallet_[a-f0-9]{40})(?:\/(bind|receipt|record))?$/.exec(url.pathname);
+        if(walletRegistrationPath){
+          if(request.method==='GET'&&!walletRegistrationPath[2]){
+            if([...url.searchParams.keys()].length!==1||!url.searchParams.has('environment'))return json({ok:false,error:'Wallet parameters are invalid'},422);
+            return json({ok:true,registration:await walletRegistration(env,walletRegistrationPath[1],url.searchParams.get('environment'))});
+          }
+          if(request.method==='POST'&&!url.search&&walletRegistrationPath[2])return json({ok:true,...await ({bind:bindWalletRegistration,receipt:saveWalletRegistrationReceipt,record:recordWalletRegistration}[walletRegistrationPath[2]])(env,walletRegistrationPath[1],payload)});
+          return json({ok:false,error:'Wallet route or method is unavailable'},404);
+        }
         if(url.pathname==='/internal/commerce/finance/captures/reconcile'&&request.method==='POST'){
           if(url.search)return json({ok:false,error:'Financial parameters belong in the request body'},422);
           return json({ok:true,...await reconcileCaptureJournals(env,payload)});

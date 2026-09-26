@@ -1281,6 +1281,10 @@ if ($authenticated) {
 }
 // The customer bridge reuses the session validation above and stops before any merchant data or actions.
 if (defined('EZ_CUSTOMER_SESSION_BRIDGE')) return;
+if (isset($_GET['wallet'])) {
+    require_once __DIR__ . '/commerce-wallet.php';
+    ez_admin_wallet_request(is_string($_GET['wallet']) ? $_GET['wallet'] : '', $authenticated, $authenticationMethod, $csrfToken, $isHttps);
+}
 $cloudPath = trim((string) ($_GET['cloud'] ?? ''));
 if ($cloudPath !== '') {
     if (!$authenticated || $authenticationMethod !== 'supabase') {
@@ -1424,7 +1428,8 @@ $centralPaymentWorkspace = $authenticated && $page === 'payments' && (ez_config(
 $centralCustomerWorkspace = $authenticated && $page === 'customers' && (ez_config('commerce_storage') === 'd1'
     || ($authenticationMethod === 'supabase' && ($_GET['tab'] ?? '') === 'reviews')
     || ($deployment === 'test' && $authenticationMethod === 'supabase' && ($_GET['customer-preview'] ?? '') === '1'));
-$centralReadWorkspace = $centralOrderWorkspace || $centralDashboardWorkspace || $centralAnalyticsWorkspace || $centralPaymentWorkspace || $centralCustomerWorkspace;
+$centralWalletWorkspace = $authenticated && $page === 'wallet' && ez_config('commerce_storage') === 'd1';
+$centralReadWorkspace = $centralOrderWorkspace || $centralDashboardWorkspace || $centralAnalyticsWorkspace || $centralPaymentWorkspace || $centralCustomerWorkspace || $centralWalletWorkspace;
 $orders = (!$centralReadWorkspace && $authenticated && ($legacyDataAccess || $sellerId !== '')) ? array_values(array_filter(ez_admin_orders(), static fn($order) => ez_dashboard_order_visible($order, $sellerId, $legacyDataAccess))) : [];
 $allOrderCount = count($orders);
 $orderQueues = [
@@ -1971,7 +1976,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
   <?php if ($page === 'shipping-settings'): ?><script src="../address-picker.js?v=<?= (int) filemtime(__DIR__ . '/../address-picker.js') ?>"></script><script src="shipping-settings.js?v=<?= (int) filemtime(__DIR__ . '/shipping-settings.js') ?>"></script><?php endif; ?>
   <?php if ($page === 'analytics'): ?><script src="analytics.js?v=<?= (int) filemtime(__DIR__ . '/analytics.js') ?>"></script><?php endif; ?>
   <?php if ($centralAnalyticsWorkspace): ?><script src="commerce-analytics.js?v=<?= (int) filemtime(__DIR__ . '/commerce-analytics.js') ?>"></script><?php endif; ?>
-  <?php if ($page === 'wallet'): ?><script src="wallet-access.js?v=<?= (int) filemtime(__DIR__ . '/wallet-access.js') ?>"></script><?php endif; ?>
+  <?php if ($page === 'wallet'): ?><script src="wallet-access.js?v=<?= (int) filemtime(__DIR__ . '/wallet-access.js') ?>"></script><script src="wallet-enrollment.js?v=<?= (int) filemtime(__DIR__ . '/wallet-enrollment.js') ?>"></script><?php endif; ?>
   <script src="admin-language.js?v=<?= (int) filemtime(__DIR__ . '/admin-language.js') ?>"></script>
   <?php if ($page === 'sites'): ?><script src="builder-image.js?v=<?= (int) filemtime(__DIR__ . '/builder-image.js') ?>"></script><script src="builder-choice.js?v=<?= (int) filemtime(__DIR__ . '/builder-choice.js') ?>"></script><?php endif; ?>
   <script src="admin.js?v=<?= ez_admin_escape($adminJsVersion) ?>"></script>

@@ -5,6 +5,7 @@
   const deadline = Date.now() + remaining;
   const lock = () => {
     content.hidden = true;
+    window.dispatchEvent(new Event('ezkart:wallet-locked'));
     location.replace('?page=wallet');
   };
   setTimeout(lock, remaining);

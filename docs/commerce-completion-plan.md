@@ -64,6 +64,27 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 26 September: verified seller wallet enrollment
+
+Added an owner-verified merchant setup flow, one immutable intent/job per
+store/environment, provider credential/parent binding, durable registration
+receipts and independently confirmed cash/pending account links. Lost responses
+recover the original request; unknown registrations stay under review without
+another provider write. Every protected merchant request checks the fresh Wallet
+grant and current owner, and changed sessions suppress late replies. Central
+Wallet no longer reads legacy local payment files.
+
+All 142 Worker tests and 62 affected PHP/integration/browser checks pass,
+including desktop/mobile reloads, session expiry, changed factors and lost
+acknowledgements. A fresh TEST backup restores with migration 0024, all five new
+tables and sixteen guards, no foreign-key errors and unchanged existing counts.
+See [wallet-enrollment.md](wallet-enrollment.md) for the provider contract,
+configuration, recovery limits and rollout evidence. No provider credentials,
+flags or scheduler activation changed, and no real provider account was created.
+Actual hosted/provider acceptance, account routing, unknown-registration recovery,
+settlement, fees, release, reserves, refunds, withdrawals and reconciliation remain
+open. No top-level completion gate advances on enrollment alone.
+
 ### 26 September: DOKU Sub-Account evidence reader
 
 Implemented pinned-environment SNAP authentication and read-only account, history

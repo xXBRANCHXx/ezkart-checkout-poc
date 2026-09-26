@@ -102,7 +102,11 @@ See [Collect and Route](https://docs.doku.com/wallet-as-a-service/sub-account/co
 [API versions](https://developers.doku.com/wallet-as-a-service/sub-account) and
 [Sub-Account V2](https://developers.doku.com/wallet-as-a-service/sub-account/sub-account-v2).
 
-Still required: verified seller/provider mapping, payment routing, actual-fee and
+The [wallet enrollment flow](wallet-enrollment.md) now implements owner-authorized
+seller/provider mapping and fresh verification on every enrollment action. Actual
+hosted/provider acceptance and unknown-registration recovery remain open.
+
+Still required: provider-accepted seller mapping, payment routing, actual-fee and
 settlement ingestion with corrections, delivery-plus-settlement release, reserves
 and disputes, partial/full refunds, negative-balance handling, owner-bound fresh
 Wallet verification on every protected action, withdrawal reservations and limits,
