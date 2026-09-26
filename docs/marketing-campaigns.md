@@ -15,6 +15,12 @@ escaped email content, visible opt-out links, one-click headers and a separate
 campaign activation boundary. The recipient outbox and dispatch workflow must
 still connect those components; draft saving does not send mail.
 
+[Publication and recipient queues](campaign-publication.md) now persist frozen
+campaign/audience snapshots and revisioned scheduling/cancellation behind the
+private API/proxy. The merchant publishing controls and actual recipient
+message/dispatch integration remain pending; the visible calendar still plans
+drafts, and delivery remains unavailable.
+
 ## Merchant behavior
 
 - Create and edit a named draft with subject, inbox preview, heading, paragraph

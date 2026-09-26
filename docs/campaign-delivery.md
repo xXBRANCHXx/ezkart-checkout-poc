@@ -1,8 +1,9 @@
 # Campaign delivery integration
 
 The public [unsubscribe flow](campaign-unsubscribe.md), message renderer and
-strict Resend transport are implemented. Campaign publication, a durable
-recipient outbox, scheduling/cancellation, current-permission dispatch,
+strict Resend transport are implemented. [Durable publication](campaign-publication.md)
+now freezes the audience and creates recipient jobs with versioned scheduling
+and cancellation. Per-recipient immutable messages, current-permission dispatch,
 campaign callbacks/recovery, automation and performance reporting still need
 integration. No campaign route or cron invokes the new transport, and the
 Marketing workspace still reports delivery unavailable. This is preparatory
@@ -53,11 +54,10 @@ provider interoperability.
 
 ## Remaining durable sender work
 
-Publication must preserve the authorized merchant request, expected campaign
+Publication now preserves the authorized merchant request, expected campaign
 revision, content, audience selection, schedule and store/environment scope.
-Original retries recover the same publication. Concurrent revisions or a
-different request under the same reference cannot create another campaign send.
-Subsequent draft edits must not rewrite a published message.
+Original retries recover the same publication; later draft edits cannot rewrite
+it. The recipient jobs still need the full preparation/dispatch integration.
 
 Recipient preparation must use authoritative customer ownership and the
 store/account/address-specific promotional grant. It must atomically save each

@@ -41,6 +41,7 @@ import {dispatchNotifications,scheduleNotifications} from './commerce-notificati
 import {dispatchEmails,recordEmailWebhook} from './commerce-email-delivery.js';
 import {emailInvestigations,lookupEmail,resolveEmail} from './email-investigation.js';
 import {campaignWorkspace,listCampaigns,readCampaign,saveCampaign,campaignHistory,campaignAudience} from './marketing-campaigns.js';
+import {readPublication,publishCampaign,changePublication,publicationRecipients,publicationHistory} from './campaign-publication.js';
 import {campaignUnsubscribe} from './campaign-unsubscribe.js';
 import {buyerNotificationPreferences,saveBuyerNotificationPreferences,buyerNotificationPreferenceHistory} from './buyer-notification-preferences.js';
 import {merchantAnalytics} from './commerce-analytics.js';
@@ -1586,14 +1587,20 @@ export default {
         if(request.method==='POST'&&action==='read'&&!url.search)return json({ok:true,...await readNotifications(env,actor,await reviewRequestJson(request,3000,parseMessageJSON))},200,cors);
         return json({ok:false,error:'Method or parameters not allowed'},405,cors);
       }
-      const marketing=/^\/v1\/commerce\/marketing(?:\/(campaigns|workspace|audience)(?:\/(cmp_[a-f0-9]{32})(?:\/(history))?)?)?$/.exec(url.pathname);
+      const marketing=/^\/v1\/commerce\/marketing(?:\/(campaigns|workspace|audience)(?:\/(cmp_[a-f0-9]{32})(?:\/(history|publication|publish|publication-action|recipients|publication-history))?)?)?$/.exec(url.pathname);
       if(marketing){
         const user=await authenticatedUser(request,env),seller=await env.DB.prepare(`SELECT s.id FROM seller_memberships m JOIN sellers s ON s.id=m.seller_id WHERE m.auth_user_id=? AND s.status='active' ORDER BY m.created_at ASC LIMIT 1`).bind(user.id).first();
         if(!seller)return json({ok:false,error:'Your store membership is no longer available'},403,cors);
         if(request.headers.has('x-ezkart-marketing-store')&&request.headers.get('x-ezkart-marketing-store')!==seller.id)return json({ok:false,error:'Your active store changed. Reload this page.',code:'marketing_session_changed'},409,cors);
-        const actor={id:user.id,sellerId:seller.id},[,route,id,history]=marketing;
+        const actor={id:user.id,sellerId:seller.id},[,route,id,action]=marketing;
         if(route==='workspace'&&!id&&request.method==='GET'&&!url.search)return json({ok:true,...await campaignWorkspace(env,actor)},200,cors);
-        if(route==='campaigns'&&request.method==='GET')return json({ok:true,...await(id?(history?campaignHistory(env,actor,id,url):readCampaign(env,actor,id,url)):listCampaigns(env,actor,url))},200,cors);
+        if(route==='campaigns'&&id&&request.method==='GET'&&['publication','recipients','publication-history'].includes(action)){
+          const read={publication:readPublication,recipients:publicationRecipients,'publication-history':publicationHistory}[action];return json({ok:true,...await read(env,actor,id,url)},200,cors);
+        }
+        if(route==='campaigns'&&id&&request.method==='POST'&&!url.search&&['publish','publication-action'].includes(action)){
+          const write=action==='publish'?publishCampaign:changePublication;return json({ok:true,...await write(env,actor,id,await reviewRequestJson(request,3000,parseMessageJSON))},200,cors);
+        }
+        if(route==='campaigns'&&request.method==='GET'&&(!action||action==='history'))return json({ok:true,...await(id?(action?campaignHistory(env,actor,id,url):readCampaign(env,actor,id,url)):listCampaigns(env,actor,url))},200,cors);
         if(!id&&!url.search&&request.method==='POST'&&['campaigns','audience'].includes(route))return json({ok:true,...await(route==='campaigns'?saveCampaign(env,actor,await reviewRequestJson(request,32000,parseMessageJSON)):campaignAudience(env,actor,await reviewRequestJson(request,5000,parseMessageJSON)))},200,cors);
         return json({ok:false,error:'Method or parameters not allowed'},405,cors);
       }

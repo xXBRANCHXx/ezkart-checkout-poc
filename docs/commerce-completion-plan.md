@@ -64,6 +64,29 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 27 September: durable campaign publication and recipient queues
+
+Implemented immutable campaign/store/audience snapshots, atomic sealing and
+recipient jobs, exact publication recovery, schedule revisions, cancellation,
+private recipient/history pages and the corresponding protected PHP routes.
+Current role/ownership/consent checks guard the database transaction; failed or
+empty audiences leave no partial publication. Later draft edits cannot rewrite
+the frozen copy or add recipients. Cancellation preserves any already-running
+work, and campaign jobs cannot be claimed or marked sent before the actual
+delivery integration is installed.
+
+See [campaign-publication.md](campaign-publication.md). Per-recipient immutable
+messages and unsubscribe issuance, current-permission dispatch, callbacks and
+recovery, merchant publishing controls, automation, reporting, provider/hosted
+acceptance and the larger readiness scope remain required. Existing delivery
+flags remain held; no completion gate is closed.
+
+Local release validation passes all 253 Worker tests and 17 affected
+PHP/browser checks, along with syntax/diff/TEST build checks. The fresh TEST
+backup restores with all rows in 99 existing physical tables preserved,
+valid integrity and no foreign-key errors after migration 0035. It adds 23
+schema objects and leaves all four new tables empty.
+
 ### 27 September: campaign unsubscribe and combined consent history
 
 Implemented anonymous, token-authorized promotional-email withdrawal, native
