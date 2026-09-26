@@ -87,6 +87,14 @@ integrity and no foreign-key errors. Migration 0037 adds 22 objects and changes
 seven intended views/guards; its four new tables are empty. All 18 affected SQL
 plans compile without mutation.
 
+Implementation `29f9cd6` is pushed and hosted. TEST migration 0037 and Worker
+`35624928-addf-449c-a079-70999bbb560e` are installed, with 111 healthy application
+tables and no pending migrations. All 35 deployed Worker checks, five inspected
+asset hashes and 14 hosted access/header checks pass. Remote schema matches the
+restore; old counts, settings and import evidence are unchanged, and all four
+new recovery tables are empty. No hosted message, lookup or resolution was
+created. Authenticated hosted/provider acceptance remains open.
+
 ### 27 September: merchant campaign publishing and delivery controls
 
 Implemented saved-copy/audience review, publication, timezone-bound scheduling,

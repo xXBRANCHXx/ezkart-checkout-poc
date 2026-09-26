@@ -139,3 +139,26 @@ and changes the seven intended views/guards. All four new recovery tables are
 empty. All 18 current read/write plans compile against that restoration without
 mutation. Private rollout evidence is under
 `/tmp/ezkart-campaign-investigation-deploy-01a0d643/`.
+
+## TEST rollout
+
+Implementation `29f9cd6` is pushed to workbench and auto-deployed by Hostinger.
+TEST migration 0037 and Worker `35624928-addf-449c-a079-70999bbb560e` are installed,
+with no pending migration. At **26 September 19:49 UTC / 27 September 02:49 WIB**,
+all 35 Worker health/access/hold checks passed, reporting 111 healthy application
+tables, D1 and both R2 buckets. At **19:50 UTC**, all five inspected hosted asset
+hashes matched source and all 14 access/header checks passed, including the
+operator command's empty HTTP 404.
+
+The remote schema matches the original-order restoration exactly. Existing
+table counts, seller settings and the 15-entry legacy import manifest remain
+unchanged; foreign-key checks are empty and all four new recovery tables are
+empty. All 18 actual read/write plans compile remotely without mutation. The
+same preservation checks pass after hosted verification. No hosted campaign,
+provider lookup, resolution, unsubscribe token or outbound message was created.
+
+Provider sending, investigation and central-commerce flags remain held. Shared
+Chrome's latest status still showed the prior disconnected connection; no new
+reconnect was attempted. Authenticated hosted/provider acceptance and the
+site-wide CSP gap remain open. Main, production and the production PR are
+unchanged.
