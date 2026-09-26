@@ -128,3 +128,18 @@ The fresh TEST export at
 It restores with migration 0025 applied in original file order: integrity `ok`,
 no foreign-key errors, three empty evidence tables and ten guards, with every
 pre-existing table count unchanged.
+
+### Hosted TEST rollout — 26 September 2026
+
+Implementation `ef9ee24` is pushed on workbench. Only 0025 was pending and applied
+to TEST D1, followed by Worker `2eea36c1-0220-4049-827b-9e371fb1d751`. At 11:41 UTC
+/ 18:41 Jakarta, health reports 70 tables and healthy D1/public R2/private R2.
+The three evidence tables remain empty and all ten guards are present. Existing
+wallet/operational/financial counts and the 15-entry legacy import manifest are
+unchanged, with no foreign-key errors.
+
+Both provider-evidence routes retain the central-storage hold (503). The hosted
+collector returns an empty 404 over HTTP. The hourly maintenance schedule and
+all activation flags are unchanged. Private rollout and comparison artifacts are
+under `/tmp/ezkart-provider-evidence-deploy-01a0d643/`. These checks do not establish
+populated hosted reconciliation or real provider acceptance.

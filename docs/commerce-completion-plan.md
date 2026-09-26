@@ -81,6 +81,12 @@ acceptance, durable completed-window tracking, transaction correlation, actual-f
 and settlement postings, release, reserves, refunds, withdrawals and operational
 reconciliation remain open. No top-level gate advances on these observations.
 
+Implementation `ef9ee24`, TEST migration 0025 and Worker
+`2eea36c1-0220-4049-827b-9e371fb1d751` are deployed. Health reports 70 tables; all
+evidence tables remain empty, and existing wallet/operational/financial counts
+and the import manifest are unchanged. The private HTTP and storage-hold checks
+pass. No provider capability, credential, scheduler or activation flag changed.
+
 ### 26 September: verified seller wallet enrollment
 
 Added an owner-verified merchant setup flow, one immutable intent/job per
