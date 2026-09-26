@@ -170,3 +170,29 @@ confirmed on hosted GET/HEAD/POST responses at 17:41 UTC. Shared Chrome still
 reports the same disconnected connection; no reconnect was attempted.
 Authenticated hosted acceptance remains open while independent implementation
 continues. Main, production and PR #3 remain held.
+
+## Campaign sender TEST rollout
+
+Implementation `dfa5ff9` is pushed on `agent/ezkart-workbench`. TEST migration
+0036 and Worker `e531ff4d-0578-4784-aec9-16474a4d7ec1` are installed. At
+26 September 18:49:28 UTC, all 31 deployed Worker health/auth/hold checks pass
+with 107 healthy application tables, D1 and both R2 bindings. No migrations
+remain pending. Remote schema exactly matches the restore rehearsal, all 13
+read/write plans compile, and existing table counts, seller settings and the
+15-entry import manifest are preserved with no foreign-key errors. All five
+new campaign delivery tables are empty.
+
+The configured TEST crons now include the dedicated campaign invocation.
+Central commerce, transactional email and campaign sending remain held; no
+provider setting, recipient, publication, token or email was activated or
+created by these checks. The worker's new drain route respects that hold.
+
+Both inspected hosted assets match their checked-in bytes, with a hosting
+modification time of 18:49:12 UTC. Thirteen hosted access/header checks pass at
+18:49:27 UTC, including protected publication routes and the unsubscribe
+page's complete CSP, no-store/no-referrer, frame denial and read-only HEAD.
+No frontend asset changed in this sender stage. These anonymous checks do not
+replace signed-in merchant/customer acceptance. Shared Chrome still reports its
+previous disconnected timeout; no reconnect was attempted. Provider/mailbox
+acceptance, recovery UI, sustained operation and all other readiness gates remain
+open. Main, production and PR #3 are unchanged.

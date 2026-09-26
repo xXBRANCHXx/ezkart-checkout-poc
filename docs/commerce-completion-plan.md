@@ -86,6 +86,14 @@ foreign-key errors. Migration 0036 adds 29 objects and changes exactly seven
 email/job guards; all five new tables are empty. All 13 current read/write plans
 compile against that restore without mutation.
 
+Implementation `dfa5ff9` is pushed. TEST migration 0036 and Worker
+`e531ff4d-0578-4784-aec9-16474a4d7ec1` are installed with 107 healthy application
+tables and no pending migrations. All 31 deployed Worker checks, both inspected
+hosted asset hashes and 13 hosted access/header checks pass. Existing counts,
+settings and import evidence remain intact, with five empty new mail tables.
+No hosted campaign message or unsubscribe token was created. Authenticated
+hosted/provider acceptance remains open, and all sending/commerce holds remain.
+
 ### 27 September: durable campaign publication and recipient queues
 
 Implemented immutable campaign/store/audience snapshots, atomic sealing and
