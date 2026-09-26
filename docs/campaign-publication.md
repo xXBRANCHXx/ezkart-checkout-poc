@@ -124,3 +124,26 @@ returns `ok` from the integrity check and no foreign-key errors, and adds
 exactly 23 schema objects without changing an existing object. All four added
 tables remain empty in the rehearsal. Remote rollout must match this schema
 and preserve the existing operational/import evidence.
+
+## TEST rollout
+
+Implementation `ce382b8` is pushed to workbench. TEST migration 0035 and
+Worker `14ecc8b8-0e42-4aac-b078-4b95b6d51c4e` are installed, with no pending
+migrations. Remote checks preserve every prior table count, seller setting and
+the 15-entry legacy import manifest; all four new tables are empty. All 23
+schema objects match the original-order restoration exactly, foreign-key
+checks are empty, and the actual state read and four publication/candidate/
+seal/action write plans compile remotely without performing a write.
+
+At **26 September 18:14 UTC / 27 September 01:14 WIB**, all 30 deployed Worker
+health/access/hold checks passed, with 102 healthy application tables, D1 and
+both R2 buckets. At **18:15 UTC**, both checked hosted asset hashes matched
+the working source and 13 hosted access/header checks passed, including all
+five publication proxy routes returning 401 anonymously. The unsubscribe page
+retains its complete restrictive CSP, `DENY`, no session and no redirect.
+
+Provider and central-commerce flags remain held. No hosted campaign was
+published, queued or sent as part of deployment verification. These anonymous
+route checks do not establish signed-in hosted publication or provider
+acceptance; those remain open with the full delivery/UI integration. Main,
+production and the production PR remain untouched.

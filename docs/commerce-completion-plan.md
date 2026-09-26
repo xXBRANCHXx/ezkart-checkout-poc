@@ -87,6 +87,14 @@ backup restores with all rows in 99 existing physical tables preserved,
 valid integrity and no foreign-key errors after migration 0035. It adds 23
 schema objects and leaves all four new tables empty.
 
+Implementation `ce382b8` is pushed. TEST migration 0035 and Worker
+`14ecc8b8-0e42-4aac-b078-4b95b6d51c4e` are installed with 102 healthy application
+tables and no pending migrations. All 30 deployed Worker checks, both checked
+hosted asset hashes and 13 hosted access/header checks pass. Existing counts,
+schema, settings and the 15-entry import evidence remain intact; all four new
+tables are empty. Anonymous guards do not replace signed-in hosted acceptance.
+No hosted campaign was published, queued or sent during the rollout.
+
 ### 27 September: campaign unsubscribe and combined consent history
 
 Implemented anonymous, token-authorized promotional-email withdrawal, native
