@@ -81,6 +81,19 @@ unchanged, with valid integrity and no foreign-key errors. Migration 0039 adds
 query plans. Its SHA-256 is
 `c8843d133a6d429d3f77ebf14dce6fab0aba98d2e964780f263c3822b3f60e87`.
 
+Implementation `75dde73` is pushed to workbench. TEST migration 0039 is applied
+and Worker `3ce63182-742a-4b01-b73d-6720bdccb03d` is deployed. All 41 Worker
+health/authentication/hold checks pass at 21:12:56 UTC on 26 September. Hostinger
+serves the five exact checked assets from 21:13:31 UTC; twenty hosted access,
+unsubscribe and campaign-link guards pass at 21:14:55 UTC. The current TEST
+schema has 118 application tables, no pending migrations and no foreign-key
+errors. Existing counts, seller settings, the legacy manifest and all 31 new
+schema objects match the restored backup. All five attribution tables remain
+empty: hosted verification created no campaigns, messages, visits or orders.
+Shared Chrome remains disconnected after the previous single timed-out reconnect;
+the current status check made no connection attempt. Signed-in hosted acceptance
+remains pending. Main, production and draft PR #3 are untouched.
+
 Verified conversion/performance reporting and exports, marketing automation and
 hosted/provider/capacity acceptance remain open. All thirteen completion gates
 remain open. Sending, central-commerce and production release holds continue.
