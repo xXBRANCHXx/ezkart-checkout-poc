@@ -79,6 +79,15 @@ Actual provider/mailbox and authenticated hosted acceptance, guest identity/
 receipt coverage, campaigns and operational validation remain open. No release
 gate is closed by the fixture checks or this workbench implementation.
 
+Implementation `552c079` is pushed and auto-deployed. TEST migration 0031 and
+Worker `2b01cfd3-8653-455a-8873-7d5e4dc1526d` are installed with 90 healthy
+application tables and no pending migrations. All 205 Worker tests, 38 focused
+backend checks, 16 affected PHP/browser checks and the final same-browser account
+switch check pass. Fresh backup restoration and remote comparisons preserve all
+old records/settings/import entries. Both new tables are empty. Hosted assets,
+private routes and delivery holds pass; signed-in hosted acceptance, actual
+provider delivery and the existing hosted CSP gate remain open.
+
 ### 26 September: durable merchant email delivery
 
 Implemented a Resend adapter with fresh confirmed Supabase identity checks,
@@ -91,7 +100,7 @@ are checked using isolated provider fixtures.
 
 See [commerce-email-delivery.md](commerce-email-delivery.md) for the contract,
 configuration and recovery limits. This does not activate an email provider or
-send real mail. Buyer email preferences/delivery, actual provider/mailbox
+send real mail. At this delivery, buyer email preferences/delivery, actual provider/mailbox
 acceptance, campaigns and operational monitoring remain open. No completion
 gate is closed by this delivery.
 

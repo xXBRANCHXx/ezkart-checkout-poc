@@ -93,7 +93,21 @@ keys pass, all 89 old table counts and seller settings are unchanged, and the
 two new tables are empty. The migration adds ten application schema objects and
 three automatic indexes and replaces only the three intended recipient/send
 guards. Private rollout artifacts are in
-`/tmp/ezkart-buyer-prefs-deploy-01a0d643/`. Hosted evidence follows rollout.
+`/tmp/ezkart-buyer-prefs-deploy-01a0d643/`.
+
+Implementation `552c079` is pushed to workbench and auto-deployed by Hostinger.
+TEST migration 0031 and Worker `2b01cfd3-8653-455a-8873-7d5e4dc1526d`
+are installed; no migrations remain pending. Health at 26 September 2026,
+15:39:21 UTC reports 90 application tables and healthy D1/public-R2/private-R2.
+Remote schema matches the restore rehearsal exactly. Existing records, seller
+settings, financial holds and the 15-entry legacy import manifest are unchanged;
+both new tables remain empty.
+
+All three hosted JavaScript/CSS assets match the pushed source (15:40:13 UTC).
+Guest sign-in, private preference/email proxy and include-only guards pass.
+Worker private reads require authentication; service drains retain the central
+commerce hold and unconfigured callbacks reject delivery evidence. Hosted CSP
+still contains only `upgrade-insecure-requests`; that acceptance gate stays open.
 
 Authenticated hosted acceptance, real provider/domain/mailbox verification,
 operational monitoring and sustained delivery testing remain open. Work stays
