@@ -64,6 +64,27 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 26 September: saved campaign drafts and real audience previews
+
+Replaced the Marketing samples and toast-only actions with versioned campaign
+creation/editing, saved-segment filter copies, actual customer/permission
+previews, an escaped email preview, archive/restore and saved history. Drafts
+and exact pending saves survive reload in the same browser tab; concurrent
+changes have field-by-field comparison. The planning calendar uses the saved
+store timezone and explicitly distinguishes a planned draft from a scheduled
+send. Account/store/session changes suppress private responses.
+
+See [marketing-campaigns.md](marketing-campaigns.md). This is the draft/audience
+portion of the required marketing workflow. Actual campaign scheduling/sending,
+automation triggers, unsubscribe, delivery tracking and performance reports
+remain required, along with provider and authenticated hosted acceptance. The
+central-commerce and email holds remain in place; no top-level gate is closed.
+
+Local validation passes: 225 Worker tests, 32 affected PHP/browser/signing
+checks and all nine final Marketing browser checks. The fresh TEST backup and
+original-order migration rehearsal preserve all existing rows and pass
+integrity/foreign-key checks. Desktop/mobile visuals were inspected.
+
 ### 26 September: email investigation and audited recovery
 
 Implemented private operator listing/history, durable provider lookup intents

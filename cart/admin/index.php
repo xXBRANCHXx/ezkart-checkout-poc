@@ -706,6 +706,7 @@ function ez_admin_proxy_cloud_request(string $accessToken, string $path, string 
 {
     if (str_starts_with($path, '/v1/commerce/notifications')) { require_once __DIR__ . '/notification-proxy.php'; ez_admin_notification_proxy($accessToken, $path, $method); }
     if (str_starts_with($path, '/v1/commerce/settings')) { require_once __DIR__ . '/settings-proxy.php'; ez_admin_settings_proxy($accessToken, $path, $method); }
+    if (str_starts_with($path, '/v1/commerce/marketing')) { require_once __DIR__ . '/marketing-proxy.php'; ez_admin_marketing_proxy($accessToken, $path, $method); }
     if (str_starts_with($path, '/v1/commerce/messages')) { require_once __DIR__ . '/message-proxy.php'; ez_admin_message_proxy($accessToken, $path, $method); }
     if ($path === '/v1/shipping-address-search') {
         if ($method !== 'POST') ez_admin_json(['ok' => false, 'error' => 'Method not allowed.'], 405);
@@ -1663,6 +1664,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
   <?php if ($page === 'sites'): ?><link rel="stylesheet" href="builder-choice.css?v=<?= (int) filemtime(__DIR__ . '/builder-choice.css') ?>"><link rel="stylesheet" href="builder-image.css?v=<?= (int) filemtime(__DIR__ . '/builder-image.css') ?>"><?php endif; ?>
   <link rel="stylesheet" href="profile-logo.css?v=<?= (int) filemtime(__DIR__ . '/profile-logo.css') ?>">
   <?php if ($page === 'settings'): ?><link rel="stylesheet" href="merchant-settings.css?v=<?= (int) filemtime(__DIR__ . '/merchant-settings.css') ?>"><?php endif; ?>
+  <?php if ($page === 'marketing'): ?><link rel="stylesheet" href="marketing.css?v=<?= (int) filemtime(__DIR__ . '/marketing.css') ?>"><?php endif; ?>
   <link rel="stylesheet" href="../select.css?v=<?= (int) filemtime(__DIR__ . '/../select.css') ?>">
   <title><?= $authenticated ? ez_admin_escape($pageTitles[$page]) : ($pendingMfa !== null ? 'Two-step verification' : 'Admin Login') ?> · Ezkart</title>
 </head>
@@ -1972,6 +1974,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
   <script src="notification-badge.js?v=<?= (int) filemtime(__DIR__ . '/notification-badge.js') ?>"></script>
   <script src="admin-format.js?v=<?= (int) filemtime(__DIR__ . '/admin-format.js') ?>"></script>
   <?php if ($page === 'settings'): ?><script src="merchant-settings.js?v=<?= (int) filemtime(__DIR__ . '/merchant-settings.js') ?>"></script><?php endif; ?>
+  <?php if ($page === 'marketing'): ?><script src="marketing.js?v=<?= (int) filemtime(__DIR__ . '/marketing.js') ?>"></script><?php endif; ?>
   <?php if (in_array($page, ['inventory','products'], true)): ?><script src="inventory.js?v=<?= (int) filemtime(__DIR__ . '/inventory.js') ?>"></script><?php endif; ?>
   <?php if ($page === 'inventory'): ?><script src="inventory-reviews.js?v=<?= (int) filemtime(__DIR__ . '/inventory-reviews.js') ?>"></script><?php endif; ?>
   <?php if ($page === 'returns'): ?><script src="returns.js?v=<?= (int) filemtime(__DIR__ . '/returns.js') ?>"></script><?php endif; ?>

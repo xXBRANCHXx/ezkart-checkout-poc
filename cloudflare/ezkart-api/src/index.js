@@ -40,6 +40,7 @@ import {notificationInbox,notificationStats,readNotifications,notificationProces
 import {dispatchNotifications,scheduleNotifications} from './commerce-notification-dispatch.js';
 import {dispatchEmails,recordEmailWebhook} from './commerce-email-delivery.js';
 import {emailInvestigations,lookupEmail,resolveEmail} from './email-investigation.js';
+import {campaignWorkspace,listCampaigns,readCampaign,saveCampaign,campaignHistory,campaignAudience} from './marketing-campaigns.js';
 import {buyerNotificationPreferences,saveBuyerNotificationPreferences,buyerNotificationPreferenceHistory} from './buyer-notification-preferences.js';
 import {merchantAnalytics} from './commerce-analytics.js';
 import {createAnalyticsExport,readAnalyticsExport,cleanupAnalyticsExports} from './commerce-analytics-exports.js';
@@ -1576,6 +1577,17 @@ export default {
         const action=noticeMatch[2];
         if(request.method==='GET'&&action!=='read')return json({ok:true,...await(action==='stats'?notificationStats(env,actor,url):action==='processing'?notificationProcessing(env,actor,url):notificationInbox(env,actor,url,action==='email'?'email':'inbox'))},200,cors);
         if(request.method==='POST'&&action==='read'&&!url.search)return json({ok:true,...await readNotifications(env,actor,await reviewRequestJson(request,3000,parseMessageJSON))},200,cors);
+        return json({ok:false,error:'Method or parameters not allowed'},405,cors);
+      }
+      const marketing=/^\/v1\/commerce\/marketing(?:\/(campaigns|workspace|audience)(?:\/(cmp_[a-f0-9]{32})(?:\/(history))?)?)?$/.exec(url.pathname);
+      if(marketing){
+        const user=await authenticatedUser(request,env),seller=await env.DB.prepare(`SELECT s.id FROM seller_memberships m JOIN sellers s ON s.id=m.seller_id WHERE m.auth_user_id=? AND s.status='active' ORDER BY m.created_at ASC LIMIT 1`).bind(user.id).first();
+        if(!seller)return json({ok:false,error:'Your store membership is no longer available'},403,cors);
+        if(request.headers.has('x-ezkart-marketing-store')&&request.headers.get('x-ezkart-marketing-store')!==seller.id)return json({ok:false,error:'Your active store changed. Reload this page.',code:'marketing_session_changed'},409,cors);
+        const actor={id:user.id,sellerId:seller.id},[,route,id,history]=marketing;
+        if(route==='workspace'&&!id&&request.method==='GET'&&!url.search)return json({ok:true,...await campaignWorkspace(env,actor)},200,cors);
+        if(route==='campaigns'&&request.method==='GET')return json({ok:true,...await(id?(history?campaignHistory(env,actor,id,url):readCampaign(env,actor,id,url)):listCampaigns(env,actor,url))},200,cors);
+        if(!id&&!url.search&&request.method==='POST'&&['campaigns','audience'].includes(route))return json({ok:true,...await(route==='campaigns'?saveCampaign(env,actor,await reviewRequestJson(request,32000,parseMessageJSON)):campaignAudience(env,actor,await reviewRequestJson(request,5000,parseMessageJSON)))},200,cors);
         return json({ok:false,error:'Method or parameters not allowed'},405,cors);
       }
       if(/^\/v1\/commerce\/settings(?:\/history)?$/.test(url.pathname)){

@@ -7,7 +7,7 @@ function curl_init(string $url): object { return (object) ['url' => $url, 'optio
 function curl_setopt_array(object $handle, array $options): bool { $handle->options = $options; return true; }
 function curl_setopt(object $handle, int $option, mixed $value): bool { $handle->options[$option] = $value; return true; }
 function curl_close(object $handle): void {}
-function curl_exec(object $handle): string {
+function curl_exec(object $handle): string|bool {
     $payload = json_decode($handle->options[CURLOPT_POSTFIELDS] ?? '{}', true);
     file_put_contents(getenv('EZKART_TEST_CAPTURE'), json_encode(['url' => $handle->url, 'method' => $handle->options[CURLOPT_CUSTOMREQUEST] ?? (!empty($handle->options[CURLOPT_POST]) ? 'POST' : 'GET'), 'body' => $handle->options[CURLOPT_POSTFIELDS] ?? '', 'headers' => $handle->options[CURLOPT_HTTPHEADER] ?? []]) . "\n", FILE_APPEND | LOCK_EX);
     $barrierDirectory = dirname(getenv('EZKART_TEST_CAPTURE'));
@@ -33,7 +33,7 @@ function curl_exec(object $handle): string {
         $handle->status = preg_match('#^HTTP/\S+ (\d+)#', $responseHeaders[0] ?? '', $matches) ? (int) $matches[1] : 503;
         foreach ($responseHeaders as $header) if (stripos($header, 'Content-Type:') === 0) $handle->contentType = trim(substr($header, 13));
         if ($response === false) return '';
-        if (isset($handle->options[CURLOPT_WRITEFUNCTION])) { ($handle->options[CURLOPT_WRITEFUNCTION])($handle, $response); return '1'; }
+        if (isset($handle->options[CURLOPT_WRITEFUNCTION])) return ($handle->options[CURLOPT_WRITEFUNCTION])($handle, $response) === strlen($response);
         return $response;
     }
     if (getenv('EZKART_TEST_WALLET') && preg_match('#^https://api-sandbox.doku.com/(authorization/v1/access-token/b2b|sub-account/v2.0/(register|balance-inquiries|transaction-history-list))$#D', $handle->url, $walletMatch)) {
@@ -80,14 +80,14 @@ function curl_exec(object $handle): string {
             }
         }
         $body = json_encode($response);
-        if (isset($handle->options[CURLOPT_WRITEFUNCTION])) { ($handle->options[CURLOPT_WRITEFUNCTION])($handle, $body); return '1'; }
+        if (isset($handle->options[CURLOPT_WRITEFUNCTION])) return ($handle->options[CURLOPT_WRITEFUNCTION])($handle, $body) === strlen($body);
         return $body;
     }
     if (preg_match('#^https://api-sandbox.doku.com/orders/v1/status/EZK-S-[A-F0-9]{24}$#D', $handle->url)) {
         $file = dirname(getenv('EZKART_TEST_CAPTURE')) . '/provider-status.json';
         $response = is_file($file) ? (string) file_get_contents($file) : '{"error":"not_found"}';
         $handle->status = is_file($file) ? 200 : 404;
-        if (isset($handle->options[CURLOPT_WRITEFUNCTION])) { ($handle->options[CURLOPT_WRITEFUNCTION])($handle, $response); return '1'; }
+        if (isset($handle->options[CURLOPT_WRITEFUNCTION])) return ($handle->options[CURLOPT_WRITEFUNCTION])($handle, $response) === strlen($response);
         return $response;
     }
     if (preg_match('#^https://ezkart-api-test.fixture.workers.dev/internal/commerce/orders/(EZK-[SP]-[A-F0-9]{24})/claim$#D', $handle->url, $claimMatch)) {
@@ -96,7 +96,7 @@ function curl_exec(object $handle): string {
         $allowed = ($returnFixture['orderId'] ?? '') === $claimMatch[1] && ($payload['customer']['id'] ?? '') === ($returnFixture['owner'] ?? 'fixture-google-customer');
         $handle->status = $allowed ? 200 : 404;
         $response = $allowed ? json_encode(['ok' => true, 'orderId' => $claimMatch[1], 'authUserId' => $payload['customer']['id']]) : '{"ok":false,"error":"Order not found"}';
-        if (isset($handle->options[CURLOPT_WRITEFUNCTION])) { ($handle->options[CURLOPT_WRITEFUNCTION])($handle, $response); return '1'; }
+        if (isset($handle->options[CURLOPT_WRITEFUNCTION])) return ($handle->options[CURLOPT_WRITEFUNCTION])($handle, $response) === strlen($response);
         return $response;
     }
     if (preg_match('#^https://ezkart-api-test.fixture.workers.dev/v1/customer/orders/(EZK-[SP]-[A-F0-9]{24})/returns(?:/(ret_[a-f0-9]{32}))?(?:\\?.*)?$#D', $handle->url, $returnMatch)) {
@@ -258,7 +258,7 @@ function curl_exec(object $handle): string {
             }
         }
         $body = json_encode($response);
-        if (isset($handle->options[CURLOPT_WRITEFUNCTION])) { ($handle->options[CURLOPT_WRITEFUNCTION])($handle, $body); return '1'; }
+        if (isset($handle->options[CURLOPT_WRITEFUNCTION])) return ($handle->options[CURLOPT_WRITEFUNCTION])($handle, $body) === strlen($body);
         return $body;
     }
     if (str_starts_with($handle->url, 'https://api.biteship.com/v1/orders/')) {
