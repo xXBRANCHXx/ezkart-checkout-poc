@@ -151,6 +151,28 @@ keys pass, all 84 existing table counts and seller settings are unchanged, and
 the five new email tables have zero rows. Private backup/comparison artifacts
 are under `/tmp/ezkart-email-deploy-01a0d643/`.
 
-Migration comparison, Worker version and hosted checks are recorded after
-rollout. Authenticated hosted acceptance and real-provider delivery remain
-separate from these fixture checks.
+Implementation `f42e759` is pushed to `agent/ezkart-workbench` and automatically
+deployed by Hostinger. TEST migration 0030 and Worker
+`c956c398-f296-405f-90a7-32af0a8958c2` are installed with all three documented
+crons. Health at 26 September 2026, 15:08:00 UTC reports 88 application tables
+and healthy D1/public-R2/private-R2 bindings. No migrations remain pending.
+
+Before/after comparisons preserve all existing records, seller settings,
+financial/provider records and the 15-entry legacy import manifest
+`ba180208c85cea72b82323b7b917e0e3771b143d930f5220665fddffc62777c0`.
+The 27 new application schema objects and ten automatic indexes match the local
+restore rehearsal. All five new email tables remain empty. The central commerce
+and provider holds remain in force.
+
+Both hosted notification JavaScript/CSS assets match the pushed source
+(26 September, 15:08:39 UTC). Private Worker reads require authentication;
+service drains retain the central-commerce hold; unconfigured callbacks are
+rejected. Hosted guest sign-in, private proxy and include-only guards pass with
+no private inbox exposed. Hosted responses still provide only
+`upgrade-insecure-requests` for CSP; the existing release gate remains open.
+
+Shared Chrome remains disconnected with the same previous approval timeout;
+no new connection was attempted. Signed-in hosted acceptance, actual approved
+provider delivery, sender authentication, mailbox rendering and sustained
+operational acceptance are still required. These are not established by the
+isolated authenticated fixture tests.

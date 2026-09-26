@@ -78,7 +78,17 @@ See [commerce-email-delivery.md](commerce-email-delivery.md) for the contract,
 configuration and recovery limits. This does not activate an email provider or
 send real mail. Buyer email preferences/delivery, actual provider/mailbox
 acceptance, campaigns and operational monitoring remain open. No completion
-gate is closed by this delivery. Rollout evidence follows verification below.
+gate is closed by this delivery.
+
+Implementation `f42e759` is pushed and auto-deployed. TEST migration 0030 and
+Worker `c956c398-f296-405f-90a7-32af0a8958c2` are installed with 88 healthy
+application tables and no pending migrations. Verification passed: 198 full
+Worker checks plus 26 final email checks (199 distinct Worker cases), 24 affected
+PHP/browser checks, syntax checks, dry run and original-order backup restore.
+Existing TEST records/settings/import manifest are unchanged; all five email
+tables are empty. Hosted assets and private guards pass. Sending remains held
+and unconfigured. The existing shared-Chrome and hosted-CSP acceptance limits
+remain; actual provider delivery and buyer email preferences are next work.
 
 ### 26 September: private transactional notification inboxes
 
