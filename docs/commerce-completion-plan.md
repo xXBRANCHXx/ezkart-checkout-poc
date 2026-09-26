@@ -85,6 +85,14 @@ terminated following its pass summary. Syntax, diff and TEST build checks pass.
 The fresh pre-migration TEST backup restores with every existing row preserved,
 valid integrity and no foreign-key errors after applying migration 0034.
 
+Implementation `dd3e536` is pushed and hosted. TEST migration 0034 and Worker
+`57ac5996-28dc-41b1-9fa1-7eac9db74080` are installed with 98 healthy application
+tables and no pending migrations. Twenty-five deployed Worker checks, both
+hosted asset hashes and eight public/private guards pass. All old counts,
+settings and import evidence are preserved; new token/withdrawal tables are
+empty. The host overrides PHP's CSP, so a page-specific server-header correction
+is being verified. No token, campaign message or outbound email was issued.
+
 ### 26–27 September: saved campaign drafts and real audience previews
 
 Replaced the Marketing samples and toast-only actions with versioned campaign

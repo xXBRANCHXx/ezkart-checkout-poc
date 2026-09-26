@@ -6,6 +6,7 @@ require_once __DIR__ . '/api/database.php';
 header('Cache-Control: no-store');
 header('Referrer-Policy: no-referrer');
 header('X-Content-Type-Options: nosniff');
+header('X-Frame-Options: DENY');
 header('X-Robots-Tag: noindex, nofollow');
 header("Content-Security-Policy: default-src 'none'; style-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'");
 header('Content-Type: text/html; charset=utf-8');

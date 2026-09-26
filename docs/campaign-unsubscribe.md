@@ -122,3 +122,22 @@ no foreign-key errors. The export is 512,352 bytes with SHA-256
 `74da04c177ad40495225d9e0cd4c8e0add7936abd56f49233773aec6a853f46c`.
 The remote rollout must match the rehearsed 11 added schema objects and four
 modified guards and preserve the existing operational/import evidence.
+
+## TEST rollout
+
+Implementation `dd3e536` is pushed to workbench. TEST migration 0034 and Worker
+`57ac5996-28dc-41b1-9fa1-7eac9db74080` are installed, with 98 healthy application
+tables and no pending migrations. At 26 September 17:33 UTC, all 25 deployed
+health/access/hold checks passed. All old table counts, seller settings and the
+15-entry legacy import manifest remain unchanged; both added tables are empty.
+All 15 added/modified schema objects match the restoration exactly, foreign-key
+checks are empty, and the actual history/read/write-plan queries compile.
+
+At 17:35 UTC, both hosted asset hashes matched, the five merchant/private guards
+passed, and public unknown-link GET/HEAD/POST requests returned 404 with
+`no-store`, `no-referrer`, no session and no redirect. The hosting layer replaced
+PHP's CSP with its global `upgrade-insecure-requests` value. A page-specific
+`cart/.htaccess` response policy and `X-Frame-Options: DENY` address that conflict;
+their deployed result still needs verification. Authenticated hosted workflows
+and real recipient/provider acceptance remain open. No campaign token, message
+or provider request was created during the rollout.
