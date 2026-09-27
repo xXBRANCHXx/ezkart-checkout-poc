@@ -108,8 +108,14 @@ integrity and foreign-key checks, adds exactly 22 objects and changes no existin
 object. All 150 captured compatibility statements compile against the restored
 database. The TEST Worker dry-run passes.
 
-Deployment and hosted verification are recorded in the workbench completion
-log. Shared Chrome is still disconnected; no new reconnect was attempted.
+Implementation `4606eef` is pushed and hosted on workbench. TEST migration 0042
+and Worker `d54f902b-bc88-48b2-b539-41215822fdbb` are installed. Fifty-eight Worker
+checks pass at 00:54:34 UTC on 27 September; twelve hosted asset hashes match at
+00:55:07 UTC, and thirty-five hosted access/header checks pass at 00:55:09 UTC.
+Final remote verification preserves existing counts/settings/legacy evidence,
+confirms the restored schema and all 150 query plans, and finds no pending
+migration or foreign-key error. All four new tables remain empty: hosted checks
+created no uploaded file, product, order or payment. Shared Chrome is still disconnected; no new reconnect was attempted.
 Signed-in hosted uploads/downloads, maximum-size real-network transfers, storage
 capacity and cleanup monitoring remain unverified. Central commerce, provider
 send/payment holds and the production release hold remain unchanged. All thirteen

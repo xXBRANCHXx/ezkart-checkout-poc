@@ -86,7 +86,16 @@ The fresh 655,349-byte TEST backup preserves every record in all 130 existing
 physical tables, passes integrity/foreign-key checks and compiles all 150 captured
 compatibility queries. Migration 0042 adds 22 objects and changes none. Backup
 SHA-256: `8aac26501fe6d7c26b293bbd49705a29b2b660673a434533418221ea2bafff1b`.
-Deployment and hosted verification follow this implementation check.
+Implementation `4606eef` is pushed and automatically hosted on workbench. TEST
+migration 0042 and Worker `d54f902b-bc88-48b2-b539-41215822fdbb` are installed.
+All 58 Worker health/access/hold checks pass at 00:54:34 UTC on 27 September with
+133 healthy application tables. Twelve hosted assets match at 00:55:07 UTC;
+thirty-five hosted access/header checks pass at 00:55:09 UTC. Final remote
+verification preserves existing counts/settings and legacy-import evidence,
+matches every new schema object to the restore and compiles all 150 queries.
+There are no pending migrations or foreign-key errors. All four new tables remain
+empty; hosted checks created no file, product, message, order or payment. The
+TEST private bucket's enabled seven-day multipart-abort lifecycle is verified.
 
 Buyer digital checkout, payment-bound entitlements, delivery evidence, refunds,
 subscription lifecycles, maximum-size hosted transfers and storage operations
