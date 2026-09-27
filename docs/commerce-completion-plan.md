@@ -85,6 +85,12 @@ registrations, and accepts exact numeric evidence. Rehearsal on the fresh beta
 export preserves 146 tables and all six original rows, with clean integrity and
 foreign keys. Real child enrollment, routing, settlements and payouts remain open.
 
+Implementation `2bdb73e` and migration 0049 are deployed to beta Worker
+`993f0482-1d8c-423f-a989-c7ddd0458136`. Remote and restored foreign keys pass;
+all original records are preserved. Four hosted health/hold checks pass at
+06:39 UTC. DOKU accepted the BCA activation request at 13:36 Jakarta; it shows
+UPDATING and has no assigned BCA channel configuration yet.
+
 ### 27 September: durable SNAP payment dispatch and callbacks
 
 The explicit BCA SNAP flow now freezes its original request and credentials

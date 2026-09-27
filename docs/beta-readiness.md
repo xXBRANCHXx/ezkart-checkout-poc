@@ -127,10 +127,22 @@ and foreign keys. The verified parent is prepared privately for beta; hosted
 runtime, payment mode and commerce holds remain unchanged. This is read-only
 provider evidence, not acceptance of child registration, routing or payouts.
 
+Implementation `2bdb73e` is pushed to workbench and deployed to beta Worker
+`993f0482-1d8c-423f-a989-c7ddd0458136`. Migration 0049 is installed. The private
+428,088-byte post-export, SHA-256
+`6f28aa3655945bd47bb6bd224f9f609e65be81afbc2983a77dd227cbacc19204`,
+restores cleanly and preserves every original row. Remote foreign keys pass;
+orders, captures and seller wallet profiles remain zero. Four hosted beta health
+and commerce-hold checks pass at 06:39 UTC.
+
 The signed-in production DOKU dashboard was inspected on 27 September. Its
 Service page shows active SNAP VAs for BJB, BNC, BNI, BRI, BSI, BSS, BTN, CIMB,
 DOKU, Danamon, Maybank, Permata and Sinarmas. BCA SNAP is not in the active list;
-it is offered unchecked under Add Service. Balance Management and Fund Connector
+it was offered unchecked under Add Service. Its activation request was submitted
+at 13:36 Jakarta and now shows **UPDATING**, with no assigned BCA configuration
+yet. DOKU's [service activation guidance](https://docs.doku.com/get-started/manage-business/activate-services)
+identifies this status as requiring provider review when it persists.
+Balance Management and Fund Connector
 are unchecked and disabled in that dialog. The Sub Account list is empty. These
 observations do not establish that the separately approved payout/Sub-Account
 capabilities are technically provisioned.
