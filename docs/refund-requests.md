@@ -92,3 +92,15 @@ receipts, fee/ledger reversals, precise digital-access effects, and reconciliati
 Approval never creates a provider job that could execute later without that
 separate authorization and evidence contract. Signed-in hosted acceptance and
 all wider commerce, provider and production-release gates remain open.
+
+## TEST rollout
+
+Implementation `52c4954` is pushed on workbench. Migration 0045 and TEST Worker
+`f85a8f22-8a9a-4632-8203-ab9c12183e76` are installed, with 143 healthy application
+tables. Nineteen Worker checks pass at 03:10:56 UTC and twenty-three hosted checks
+at 03:10:57 UTC on 27 September. Private refund routes require authentication;
+new assets match; existing physical checkout remains usable at 1360px and 390px;
+central checkout stays disabled. Final remote verification matches restoration,
+compiles all 351 plans and preserves existing counts, settings and legacy evidence.
+The three new tables remain empty. No hosted refund, decision or provider request
+was created. Shared Chrome remains disconnected, with signed-in acceptance pending.

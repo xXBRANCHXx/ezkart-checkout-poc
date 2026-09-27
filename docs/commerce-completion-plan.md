@@ -88,6 +88,15 @@ pass integrity/foreign-key checks and compile 351 captured plans. Eighteen objec
 are added; no existing object changes. Provider refund execution and financial
 release remain unimplemented. All thirteen top-level gates and all holds remain.
 
+Implementation `52c4954` is pushed to workbench. TEST migration 0045 and Worker
+`f85a8f22-8a9a-4632-8203-ab9c12183e76` are installed. Nineteen Worker checks pass
+at 03:10:56 UTC and twenty-three hosted checks at 03:10:57 UTC on 27 September.
+Final remote verification preserves existing counts, settings and legacy evidence,
+matches the restored schema and compiles all 351 plans. No migration is pending;
+all three new tables remain empty. Hosted QA created no refund request, decision,
+order or provider call. Shared Chrome remains disconnected; signed-in hosted
+acceptance is still pending and no new reconnect was attempted in this delivery.
+
 ### 27 September: verified digital purchase reviews
 
 The original verified complete download now unlocks reviews and review photos
