@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
 import {generateKeyPairSync,randomBytes} from 'node:crypto';
-import {mkdtemp,mkdir,rm,writeFile,readFile,readdir,stat,chmod,symlink} from 'node:fs/promises';
+import {mkdtemp,mkdir,rm,writeFile,readFile,readdir,stat,chmod,symlink,copyFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join,resolve} from 'node:path';
 import {setupCentralFixture} from './central-fixture.mjs';
@@ -59,8 +59,86 @@ async function fixture(t,{beta=false,queue=false}={}){
   const reads=async()=>(await f.app.calls()).filter(c=>c.url.includes('/sub-account/v2.0/'));
   const funds=()=>f.call('/internal/commerce/finance/earnings/summary?seller=seller_alice&environment='+environment);
   const dispatch=(reads=20,overrides={})=>php(`$argv=['payout-sync-dispatch.php','--once','--max-reads=${reads}']; require ${JSON.stringify(join(root,'tools/commerce/payout-sync-dispatch.php'))};`,overrides);
-  return {...f,...current,php,identity,environment,recovery,directory,run,scope,history,controlProvider:control,sync,reads,grant,funds,dispatch};
+  const scheduled=(reads=20,overrides={})=>php(`$argv=['payout-sync-scheduled.php','--once','--max-reads=${reads}']; require ${JSON.stringify(join(root,'tools/commerce/payout-sync-scheduled.php'))};`,overrides);
+  return {...f,...current,php,identity,environment,recovery,directory,run,scope,history,controlProvider:control,sync,reads,grant,funds,dispatch,scheduled};
 }
+
+test('the scheduled beta runner records a held heartbeat with private storage and no provider reads',async t=>{
+  const f=await fixture(t,{beta:true}),directory=join(f.recovery,'scheduled-private');
+  const result=await f.scheduled(20,{EZKART_COMMERCE_WITHDRAWAL_SYNC:'held',EZKART_COMMERCE_WITHDRAWAL_RECOVERY_DIRECTORY:directory});
+  assert.equal(result.status,0,result.error);const body=JSON.parse(result.output);assert.equal(body.state,'held');assert.equal(body.providerCalls,0);
+  assert.equal((await f.reads()).length,0);assert.equal(await f.count('commerce_payout_sync_jobs'),0);
+  const row=await f.db.prepare('SELECT * FROM commerce_payout_sync_runner').first();assert.equal(row.state,'held');assert.equal(row.runs,1);
+  const saved=JSON.parse(await readFile(join(directory,'payout-sync-last-run.json'),'utf8'));assert.equal(saved.confirmed,true);
+  assert.equal((await stat(directory)).mode&0o777,0o700);
+  assert.equal((await stat(join(directory,'payout-sync-last-run.json'))).mode&0o777,0o600);
+  assert.equal((await stat(join(directory,'payout-sync-scheduler.lock'))).mode&0o777,0o600);
+  const unsafe=join(root,'runner-public-'+randomBytes(8).toString('hex'));
+  assert.equal((await f.scheduled(20,{EZKART_COMMERCE_WITHDRAWAL_RECOVERY_DIRECTORY:unsafe})).status,1);
+  await assert.rejects(stat(unsafe),{code:'ENOENT'});
+  assert(!result.output.includes('fixture_private_receipts'));assert(!result.output.includes(f.w.id));
+  for(const file of ['/cart/api/commerce-payout-sync-runner.php','/tools/commerce/payout-sync-scheduled.php'])assert.equal((await fetch(f.app.base+file)).status,404);
+});
+
+test('scheduled bounded work and lost runner acknowledgements preserve one payout and the original receipts',async t=>{
+  const f=await fixture(t,{beta:true,queue:true}),base='/internal/commerce/finance/payout-sync/runner/';f.control.drop=base+'start';
+  const first=await f.scheduled(2);assert.equal(first.status,2,first.error);assert.equal(JSON.parse(first.output).state,'retry');
+  const initial=JSON.parse(await readFile(join(f.recovery,'payout-sync-last-run.json'),'utf8'));assert.equal(initial.confirmed,true);
+  const starts=f.control.calls.filter(c=>c.path===base+'start');assert.equal(starts.length,2);assert.deepEqual(starts[0].body,starts[1].body);
+  await f.db.prepare("UPDATE commerce_payout_sync_jobs SET available_at='2000-01-01T00:00:00.000Z'").run();f.control.drop=base+'finish';
+  const done=await f.scheduled();assert.equal(done.status,0,done.error);assert.equal(JSON.parse(done.output).state,'completed');assert.equal((await f.reads()).length,9);
+  const finished=f.control.calls.filter(c=>c.path===base+'finish');assert.equal(finished.length,3);assert.deepEqual(finished[1].body,finished[2].body);
+  const row=await f.db.prepare('SELECT * FROM commerce_payout_sync_runner').first();assert.equal(row.runs,2);assert.equal(row.failed_runs,0);
+  assert.equal((await f.db.prepare("SELECT COUNT(*) n FROM commerce_financial_journals WHERE kind='payout'").first()).n,1);
+});
+
+test('a prolonged runner completion outage recovers its exact saved result before another scheduled pass',async t=>{
+  const f=await fixture(t,{beta:true,queue:true}),base='/internal/commerce/finance/payout-sync/runner/';f.control.fail=base+'finish';
+  const failed=await f.scheduled();assert.equal(failed.status,1);assert.equal((await f.reads()).length,9);
+  const file=join(f.recovery,'payout-sync-last-run.json'),original=JSON.parse(await readFile(file,'utf8'));assert.equal(original.confirmed,false);assert.equal(original.finish.result.state,'completed');
+  await f.db.prepare("UPDATE commerce_payout_sync_runner SET lease_until='2000-01-01T00:00:00.000Z'").run();f.control.fail='';
+  const recovered=await f.scheduled(20,{EZKART_COMMERCE_WITHDRAWAL_SYNC:'held',EZKART_DOKU_PRODUCTION_SNAP_PRIVATE_KEY:'unavailable'});
+  assert.equal(recovered.status,0,recovered.error);assert.equal(JSON.parse(recovered.output).state,'held');assert.equal((await f.reads()).length,9);
+  const finishes=f.control.calls.filter(c=>c.path===base+'finish');assert.deepEqual(finishes[2].body,original.finish);
+  const row=await f.db.prepare('SELECT * FROM commerce_payout_sync_runner').first();assert.equal(row.runs,2);assert.equal(row.interrupted_runs,0);
+  assert.equal((await f.db.prepare("SELECT COUNT(*) n FROM commerce_financial_journals WHERE kind='payout'").first()).n,1);
+});
+
+test('scheduled dispatch failures stay visible and foreign or unsafe runner receipts stop before provider access',async t=>{
+  const f=await fixture(t,{beta:true,queue:true});f.control.fail='/internal/commerce/finance/payout-sync/schedule';
+  const failed=await f.scheduled();assert.equal(failed.status,1,failed.error);assert.equal(JSON.parse(failed.output).state,'failed');
+  assert.equal((await f.db.prepare('SELECT failed_runs FROM commerce_payout_sync_runner').first()).failed_runs,1);
+  const file=join(f.recovery,'payout-sync-last-run.json'),saved=JSON.parse(await readFile(file,'utf8'));
+  assert.equal((await f.scheduled(20,{EZKART_COMMERCE_WITHDRAWAL_SYNC_STORAGE:'different_storage'})).status,1);
+  assert.deepEqual(JSON.parse(await readFile(file,'utf8')),saved);assert.equal((await f.reads()).length,0);
+  await chmod(file,0o644);assert.equal((await f.scheduled()).status,1);assert.equal((await f.reads()).length,0);
+});
+
+test('overlapping scheduled processes share one private lock and cannot claim another run',async t=>{
+  const f=await fixture(t,{beta:true});let release,arrived;
+  const gate=new Promise(resolve=>release=resolve),started=new Promise(resolve=>arrived=resolve);
+  f.control.afterResponse=async path=>{if(path.endsWith('/runner/start')){arrived();await gate;}};
+  const first=f.scheduled(20,{EZKART_COMMERCE_WITHDRAWAL_SYNC:'held'});await started;
+  try {
+    const competing=await f.scheduled(20,{EZKART_COMMERCE_WITHDRAWAL_SYNC:'held'});
+    assert.equal(competing.status,0,competing.error);assert.equal(JSON.parse(competing.output).state,'busy');
+    assert.equal((await f.db.prepare('SELECT runs FROM commerce_payout_sync_runner').first()).runs,1);
+  } finally {release();f.control.afterResponse=null;}
+  const done=await first;assert.equal(done.status,0,done.error);assert.equal((await f.reads()).length,0);
+});
+
+test('the scheduled CLI loads the private parent settings when no web-server document root exists',async t=>{
+  const directory=await mkdtemp(join(tmpdir(),'ezkart-scheduled-config-')),web=join(directory,'public_html');t.after(()=>rm(directory,{recursive:true,force:true}));
+  await mkdir(join(web,'tools/commerce'),{recursive:true});await mkdir(join(web,'cart/api'),{recursive:true});
+  const command=join(web,'tools/commerce/payout-sync-scheduled.php');await copyFile(join(root,'tools/commerce/payout-sync-scheduled.php'),command);
+  await writeFile(join(directory,'config.runtime.php'),"<?php return ['runner_config_probe'=>'private-parent-loaded'];\n",{mode:0o600});
+  await writeFile(join(web,'cart/api/commerce-payout-sync-runner.php'),`<?php require ${JSON.stringify(join(root,'cart/api/bootstrap.php'))}; function ez_run_scheduled_payout_sync(int $reads): array {return ['exitCode'=>0,'probe'=>ez_config('runner_config_probe'),'reads'=>$reads];}`);
+  const result=await new Promise((resolve,reject)=>{
+    const child=spawn(process.env.PHP_BINARY||'php',['-n',command,'--once','--max-reads=7'],{env:{PATH:process.env.PATH}});let output='',error='';
+    child.stdout.on('data',x=>output+=x);child.stderr.on('data',x=>error+=x);child.on('error',reject);child.on('close',status=>resolve({status,output,error}));
+  });
+  assert.equal(result.status,0,result.error);assert.equal(JSON.parse(result.output).probe,'private-parent-loaded');assert.equal(JSON.parse(result.output).reads,7);
+});
 
 test('bounded provider reads resume the original common window and do not replay successful requests',async t=>{
   const f=await fixture(t);

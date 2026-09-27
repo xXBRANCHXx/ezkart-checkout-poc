@@ -4,10 +4,11 @@ if (realpath((string) ($_SERVER['SCRIPT_FILENAME'] ?? '')) === __FILE__) { http_
 require_once __DIR__ . '/commerce-payout-sync.php';
 
 /** One bounded pass. No generic payment/wallet job can be claimed here. */
-function ez_dispatch_payout_sync(int $maxReads = 20): array
+function ez_dispatch_payout_sync(int $maxReads = 20, ?Closure $pulse = null): array
 {
     $environment = ez_central_commerce_environment(); ez_withdrawal_workbench($environment);
     if ($maxReads < 1 || $maxReads > 50) throw new InvalidArgumentException('Read budget must be between 1 and 50.');
+    if ($pulse !== null) $pulse();
     if (ez_config('commerce_withdrawal_sync') !== 'enabled') return ['held'=>true,'processed'=>0,'mayPay'=>false];
     $directory = ez_withdrawal_receipt_directory(); $storage = ez_config('commerce_withdrawal_sync_storage');
     if (preg_match('/^[A-Za-z0-9_-]{3,100}$/D', $storage) !== 1) throw new RuntimeException('The private receipt storage identity is required.');
@@ -24,7 +25,8 @@ function ez_dispatch_payout_sync(int $maxReads = 20): array
         || !is_int($job['maxPages'] ?? null) || $job['maxPages'] < 1 || $job['maxPages'] > 40) throw new RuntimeException('Synchronization lease was not confirmed.');
     $lease = ['environment'=>$environment,'id'=>$job['id'],'workerId'=>$worker,'storageId'=>$storage,'leaseToken'=>$claim];
     $renewAt = 0;
-    $heartbeat = static function () use ($base, $lease, &$renewAt): void {
+    $heartbeat = static function () use ($base, $lease, &$renewAt, $pulse): void {
+        if ($pulse !== null) $pulse();
         if (time() < $renewAt) return;
         $saved = ez_payout_sync_request($base . 'heartbeat', $lease);
         if (($saved['id'] ?? null) !== $lease['id'] || ($saved['mayPay'] ?? null) !== false) throw new RuntimeException('Synchronization lease renewal was not confirmed.');

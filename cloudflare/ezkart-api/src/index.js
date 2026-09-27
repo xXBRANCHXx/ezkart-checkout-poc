@@ -41,6 +41,7 @@ import {saveWithdrawalStatus,withdrawalStatusHistory} from './commerce-withdrawa
 import {reconcilePayout,payoutStatus} from './commerce-payouts.js';
 import {payoutSyncScope} from './commerce-payout-sync.js';
 import {requestPayoutSync,schedulePayoutSync,claimPayoutSync,heartbeatPayoutSync,finishPayoutSync,listPayoutSync,payoutSyncHousekeeping} from './commerce-payout-sync-jobs.js';
+import {startPayoutSyncRunner,pulsePayoutSyncRunner,finishPayoutSyncRunner,payoutSyncRunnerStatus} from './commerce-payout-sync-runner.js';
 import {merchantCustomers,merchantCustomer,customerOrderHistory} from './commerce-customers.js';
 import {customerSegments,customerSegment,saveCustomerWorkspace,customerProfileHistory} from './commerce-customer-workspace.js';
 import {createCustomerExport,readCustomerExport,cleanupCustomerExports} from './commerce-customer-exports.js';
@@ -1565,7 +1566,8 @@ export default {
       }
       if(url.pathname.startsWith('/internal/commerce/finance/payout-sync/')){
         const payload=await authenticateCommerceService(request,env,{strictJSON:true,maxBytes:30000});
-        const actions={request:requestPayoutSync,schedule:schedulePayoutSync,claim:claimPayoutSync,heartbeat:heartbeatPayoutSync,finish:finishPayoutSync,list:listPayoutSync};
+        const actions={request:requestPayoutSync,schedule:schedulePayoutSync,claim:claimPayoutSync,heartbeat:heartbeatPayoutSync,finish:finishPayoutSync,list:listPayoutSync,
+          'runner/start':startPayoutSyncRunner,'runner/pulse':pulsePayoutSyncRunner,'runner/finish':finishPayoutSyncRunner,'runner/status':payoutSyncRunnerStatus};
         const name=url.pathname.slice('/internal/commerce/finance/payout-sync/'.length),action=Object.hasOwn(actions,name)?actions[name]:null;
         if(request.method!=='POST'||url.search||!action)return json({ok:false,error:'Synchronization job route is unavailable'},404);
         return json({ok:true,...await action(env,payload)});

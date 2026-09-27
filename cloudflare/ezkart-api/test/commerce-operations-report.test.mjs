@@ -23,7 +23,7 @@ async function job(f,id,state,{environment='sandbox',available='2000-01-01T00:00
 
 test('inspection reports uncertain, exhausted, expired and overdue work without changing attempts or leaking private data',async t=>{
   const f=await setup(t);
-  const empty=await report(f);assert.deepEqual(empty.warnings,[]);assert.equal(empty.exitCode,0);assert.equal(empty.launchReadinessAssessed,false);
+  const empty=await report(f);assert.deepEqual(empty.warnings,['payout_runner_not_observed']);assert.equal(empty.exitCode,2);assert.equal(empty.launchReadinessAssessed,false);
   await job(f,'original-wallet','uncertain');await job(f,'exhausted','dead');
   await job(f,'expired','running',{lease:'2000-01-01T00:01:00.000Z'});await job(f,'overdue','queued');
   await job(f,'retry','retry');await job(f,'future','queued',{available:'2099-01-01T00:00:00.000Z'});
@@ -31,7 +31,7 @@ test('inspection reports uncertain, exhausted, expired and overdue work without 
   const before=(await f.db.prepare('SELECT * FROM commerce_jobs ORDER BY id').all()).results;
   const result=await report(f);
   assert.deepEqual(result.jobs,{total:6,uncertain:1,dead:1,cancelledBeforeSend:0,expiredLeases:1,overdue:2});
-  assert.deepEqual(result.warnings,['jobs_uncertain','jobs_dead','job_leases_expired','jobs_overdue']);assert.equal(result.exitCode,2);
+  assert.deepEqual(result.warnings,['jobs_uncertain','jobs_dead','job_leases_expired','jobs_overdue','payout_runner_not_observed']);assert.equal(result.exitCode,2);
   assert(!JSON.stringify(result).match(/never-print|private-provider|seller_alice|original-wallet|lease_token|request_json/));
   assert.deepEqual((await f.db.prepare('SELECT * FROM commerce_jobs ORDER BY id').all()).results,before);
   const beta=await report(f,'beta');assert.equal(beta.environment,'production');assert.equal(beta.jobs.total,1);assert.equal(beta.jobs.uncertain,1);

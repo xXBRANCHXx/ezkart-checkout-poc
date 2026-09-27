@@ -5,9 +5,9 @@ status read, the original wallets' complete cash/pending histories, payout
 reconciliation, and related settlement/earnings reconciliation. It never
 calls a transfer, refund, registration or inquiry operation.
 
-Migration 0061 adds a durable queue and a bounded PHP dispatcher. The existing
-hourly Worker housekeeping can schedule eligible work when explicitly enabled;
-the PHP runner's recurring installation and operational alerting remain open.
+Migration 0061 adds a durable queue and a bounded PHP dispatcher. Migration 0062
+adds a bounded runner heartbeat and a recoverable scheduled command. The existing
+hourly Worker housekeeping can also schedule eligible work when explicitly enabled.
 Provider callback authentication, actual payment execution, Ezkart-funded
 transfer fees and live owner/provider acceptance also remain separate work.
 The beta's collection flag and payment execution remain held.
@@ -99,7 +99,7 @@ are reconciled; it does not certify all sellers, enable withdrawals or prove a
 live money movement. Output includes no bank/account identifiers or raw evidence.
 
 Long-window/history aggregation, groups exceeding the plan limits, callback
-wake-ups, recurring runner installation and alerting remain necessary for
+wake-ups and accepted operational alert delivery remain necessary for
 continuous operation. Existing balance holds continue to exclude stale evidence
 from available earnings in the meantime.
 
@@ -121,7 +121,8 @@ can be replayed; a different result cannot replace a completed attempt.
 
 The dispatcher additionally requires PHP `commerce_withdrawal_sync=enabled`,
 `commerce_withdrawal_sync_storage` (a stable 3–100 character storage identifier)
-and the private recovery directory. These remain unset/held in beta.
+and the private recovery directory. Provider reads remain held in beta; hosted
+installation evidence and current storage configuration are in beta readiness.
 
 ```sh
 php tools/commerce/payout-sync-dispatch.php --once --max-reads=20
@@ -143,9 +144,44 @@ payload. After lease expiry, resume the original job on its bound receipt storag
 No queue operation can reopen the original grant's payment authority.
 
 The dispatcher exits 0 for held/no-work/completed, 2 for retry/review, and 1 for
-dispatch failure. Installing a recurring process must preserve private storage
-and retain/alert on these outcomes; a one-off invocation is not proof that
-continuous operation is installed or monitored.
+dispatch failure. A one-off invocation is not proof of continuous operation.
+
+## Scheduled runner and liveness
+
+Use the scheduled entry point for cron, once every five minutes:
+
+```sh
+php /ABSOLUTE_WORKBENCH_ROOT/tools/commerce/payout-sync-scheduled.php --once --max-reads=20
+```
+
+It supplies this checkout's document root to the normal configuration loader so
+CLI uses the private parent settings with the same precedence as hosted requests.
+It creates only the explicitly configured receipt directory, with mode 0700 and
+an existing parent outside the public root. An existing unsafe directory is rejected.
+The private process lock prevents overlapping cron invocations from dispatching.
+
+Signed `runner/start`, `runner/pulse`, `runner/finish` and `runner/status` routes
+under the queue namespace record one current runner per commerce environment.
+The original private storage identity is immutable. A ten-minute lease renews
+while the runner works; another live run cannot replace it. An expired unfinished
+run increments the interrupted-run count when replaced. Late completion cannot
+overwrite a newer run. Exact start/finish acknowledgements replay without another
+dispatch or another failure count.
+
+The bounded private `payout-sync-last-run.json` (0600) saves the exact completion
+before D1 delivery. A lost finish response is recovered before starting the next
+pass, including after lease expiry if the same original run is still current.
+A replaced run, foreign storage or unsafe receipt stops for review. Original
+provider receipts and queue attempt history remain retained separately.
+
+Heartbeat state distinguishes running, held, idle, completed, retry, review and
+failed. Held runs create no queue/provider work but establish scheduler liveness.
+Output has fixed status/count fields and no seller, bank, token or private path.
+The [operations report](commerce-operations.md) flags a missing heartbeat, more
+than fifteen minutes without a pulse, an expired live lease, a failed pass and
+held execution. Its historical failure/interruption counters remain visible.
+No email or external alert is sent by the runner. Alert destination, delivery and
+operator ownership still require acceptance before buyers are admitted.
 
 ## Verification
 
@@ -159,6 +195,9 @@ two sellers sharing one platform, lost queue acknowledgements and fresh checks
 after a provider-pending outcome. `test/commerce-payout-sync-jobs.test.mjs`
 checks concurrent claims, storage binding, lease expiry, failure limits,
 completion races, periodic selection, review visibility and held deployments.
+Runner cases additionally cover held liveness, concurrency, stale/expired runs,
+immutable storage, exact late completion, private configuration loading, durable
+completion recovery and fixed-budget scheduled dispatch.
 `test/commerce-payout-sync.test.mjs` checks immutable account scope, stale shared
 work, legacy grants and service/deployment isolation. Provider, collection,
 payment/status and payout regression suites remain part of verification.
