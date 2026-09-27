@@ -14,14 +14,14 @@ deployment now uses the isolated live beta configuration described below, with
 new checkout, provider dispatch schedules and automatic email sending held.
 Existing sandbox evidence is preserved. Main and `ezkart.id` remain held.
 
-## Current hosted state — 27 September, 11:05 UTC
+## Current hosted state — 27 September, 11:42 UTC
 
 Hostinger's private runtime now selects `beta`, production providers and the beta
 Worker. Its live DOKU client, secret, signing key and verified parent profile are
 installed outside the public root with mode 0600. Reloaded file hashes match the
 private prepared configuration; all earlier provider credentials are preserved.
 Health confirms beta, live DOKU credentials and connected D1/public R2/private R2
-with 147 application tables. At 07:45 UTC, central merchant operations were
+with 149 application tables. At 07:45 UTC, central merchant operations were
 enabled with `commerce_storage=d1`; new checkout remains separately paused in both PHP and
 the Worker. The public checkout configuration returns 503 with `Retry-After: 300`.
 An hourly housekeeping schedule is now installed; new checkout, provider
@@ -248,6 +248,19 @@ No delivery receipt or available balance was created. Hosted PHP confirms live
 beta, 147 application tables and the checkout pause. Delivery remains separate
 from settlement and available earnings; this work does not enable a withdrawal
 or close the financial gate. TEST/main resources and execution holds are unchanged.
+
+The [payment routing implementation](doku-payment-routing.md) is now deployed as
+`3e884e0` with migration 0051 and beta Worker
+`9b49f151-e8c5-44aa-9df8-86c128cf4ee3`. Confirmed same-parent seller/platform wallets,
+the order's original flat fee allocation and an accepted split receipt are required
+before a new BCA dispatch. All 143 relevant tests and ten hosted service checks
+pass. At 11:42 UTC, workbench health, source deployment and callback dependencies
+are verified. All 147 original application tables are preserved exactly; both
+new routing tables remain empty. No live fee destination is configured, no
+provider rule/payment was created, and the original uncertain wallet remains
+untouched. Actual provisioning, routed settlement and the remaining financial
+ledger still need completion; all execution and main-release holds remain.
+
 
 ## Financial policy now confirmed
 

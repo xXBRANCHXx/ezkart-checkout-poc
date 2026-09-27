@@ -118,3 +118,30 @@ empty. No remote restoration or provider action is part of this rehearsal.
 Private backups and rehearsal evidence are under
 `/home/branch/.local/share/ezkart/beta-01a0d643/routing-before-0051-20260927/`.
 Test logs begin `/tmp/ezkart-payment-routing-` and end `-01a0d643.log`.
+
+## Hosted beta rollout
+
+Implementation `3e884e0` and migration 0051 are deployed to isolated beta Worker
+`9b49f151-e8c5-44aa-9df8-86c128cf4ee3`. Ten hosted service checks pass at
+11:39:47 UTC, including new route authorization/environment/missing-order checks
+and exact preservation of the original uncertain wallet registration. No routing
+grant, split receipt, delivery receipt or available earnings were created.
+
+The post-migration export restores 150 tables including migration history, with
+clean integrity and foreign keys. Every row of all 147 original application
+tables matches the pre-migration export. Both new routing tables are empty.
+The 650,688-byte export has SHA-256
+`29fdf6b3c9a24b0f124c87446fdd349af1a5013c4b37e76ca2c6dc252c8907a6`.
+
+At 11:42:29 UTC, hosted PHP health confirms live beta and 149 application tables;
+checkout returns its expected 503 pause. The routing document matches the pushed
+implementation byte-for-byte, and the callback loads the new PHP dependencies
+and rejects GET with its expected 405. These are deployment/access checks, not
+real routed-purchase or settlement acceptance. The platform destination is still
+unconfigured; only the existing hourly housekeeping schedule is active. Email,
+provider dispatch schedules and main release holds are unchanged. TEST and main
+resources were not changed by this rollout.
+
+Private evidence is in `payment-routing-hosted-proof.json`,
+`payment-routing-preservation-proof.json`, `payment-routing-workbench-proof.json`
+and `routing-after-0051-20260927/receipt.json` under the beta evidence directory.

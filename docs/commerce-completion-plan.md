@@ -89,6 +89,14 @@ cleanly; migration 0051 preserves all 148 original exported tables in rehearsal,
 with no integrity or foreign-key errors. This implementation does not enable
 checkout, configure a live fee destination or close a top-level financial gate.
 
+Implementation `3e884e0` is pushed, migration 0051 is installed only on beta and
+Worker `9b49f151-e8c5-44aa-9df8-86c128cf4ee3` is deployed. Ten hosted service checks
+pass at 11:39 UTC; hosted PHP/dependency/source checks pass at 11:42 UTC. The
+post-migration export restores cleanly and preserves every row of all 147
+original application tables, including the original uncertain wallet. Both new
+routing tables are empty. No real rule, payment or financial release was created.
+Checkout, email and provider execution holds, TEST and main remain unchanged.
+
 ### 27 September: whole-order delivery evidence for financial release
 
 The [financial delivery receipt](financial-delivery.md) requires every original
