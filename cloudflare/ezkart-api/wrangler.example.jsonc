@@ -40,6 +40,7 @@
       "vars": {
         "APP_ENVIRONMENT": "beta",
         "COMMERCE_STORAGE": "legacy",
+        "COMMERCE_CHECKOUT": "held",
         "ALLOWED_ORIGINS": "https://test.ezkart.id",
         "SUPABASE_URL": "https://rwxxjqvoidpkuqftgkjd.supabase.co"
       },

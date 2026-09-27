@@ -27,6 +27,7 @@ try {
     }
     // A saved central attempt must never become a new legacy charge after a configuration rollback.
     if (array_key_exists('checkout_key', $input)) throw new EzCommerceStorageException('This saved payment requires central checkout recovery.', 503);
+    if (!ez_new_checkout_enabled()) throw new EzCheckoutPausedException();
 
     // Validate credentials before requesting a paid Biteship rate lookup.
     $environment = ez_commerce_environment();
@@ -109,6 +110,9 @@ try {
         'payment_flow' => $paymentFlow,
         'payment_total' => $checkout['total'],
     ], 201);
+} catch (EzCheckoutPausedException $error) {
+    header('Retry-After: 300');
+    ez_api_json(['ok' => false, 'error' => $error->getMessage(), 'retry_same_checkout' => true], 503);
 } catch (InvalidArgumentException $error) {
     ez_api_json(['ok' => false, 'error' => $error->getMessage(), 'checkout_rejected' => true], 422);
 } catch (EzLegacyOrderStorageException $error) {

@@ -126,6 +126,7 @@ function ez_central_checkout(array $input, ?array $account): array
     ])['order'];
     $order = $resume();
     if ($order === null) {
+        if (!ez_new_checkout_enabled()) throw new EzCheckoutPausedException();
         // Check credentials before the billable shipping quote, and reserve only a reviewed price.
         ez_doku_credentials($environment);
         $flow = ez_doku_payment_flow($environment);

@@ -19,7 +19,7 @@ export async function setupCommerceFixture(t,{through=Infinity,notifications='of
   const bundle = await build({entryPoints: [new URL('../src/index.js', import.meta.url).pathname], bundle: true, write: false, format: 'esm', platform: 'neutral'});
   const mf = new Miniflare(convertV4MiniflareOptions({modules: true, script: bundle.outputFiles[0].text,
     compatibilityDate: '2026-08-11', d1Databases: ['DB'], r2Buckets: ['PUBLIC_ASSETS', 'PRIVATE_ASSETS'],
-    bindings: {APP_ENVIRONMENT: 'test', COMMERCE_STORAGE: 'd1', COMMERCE_NOTIFICATIONS:notifications, COMMERCE_SERVICE_SECRET: secret, SUPABASE_URL: 'https://auth.fixture.test',...bindings},
+    bindings: {APP_ENVIRONMENT: 'test', COMMERCE_STORAGE: 'd1', COMMERCE_CHECKOUT:'enabled', COMMERCE_NOTIFICATIONS:notifications, COMMERCE_SERVICE_SECRET: secret, SUPABASE_URL: 'https://auth.fixture.test',...bindings},
     outboundService: async request => new URL(request.url).pathname==='/auth/v1/.well-known/jwks.json'||!outbound?Response.json({keys: [publicKey]}):outbound(request)}));
   t.after(() => mf.dispose());
   const db = await mf.getD1Database('DB');

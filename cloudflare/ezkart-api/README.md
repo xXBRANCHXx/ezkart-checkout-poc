@@ -39,10 +39,17 @@ access token, or refresh token in this repository.
 The owner-approved live workbench beta uses the separate `beta` Wrangler
 environment, `ezkart_beta_database`, `ezkart-beta-public` and
 `ezkart-beta-private`. Its commerce mode is production and customer links stay
-on `test.ezkart.id`. Use `npm run check:beta` for the build check. Commerce and
-schedules stay held until the cutover work in
+on `test.ezkart.id`. Use `npm run check:beta` for the build check. New checkout and
+schedules stay held until the acceptance work in
 [beta readiness](../../docs/beta-readiness.md) is complete. This is not permission
 to deploy the production environment or merge main.
+
+Merchant operations can use `COMMERCE_STORAGE=d1` while new sales remain paused
+with `COMMERCE_CHECKOUT=held`. Match PHP's private `commerce_storage=d1` and
+`commerce_checkout=held`. Beta requires explicit `enabled` in both layers to
+accept new checkouts; missing or invalid beta settings remain paused. Original
+checkout recovery, payment callbacks and existing order processing remain usable
+during this pause. Changing the checkout flag does not enable scheduled jobs.
 
 ## Current endpoints
 

@@ -33,6 +33,8 @@ export function commerceEnvironment(env, value) {
 }
 
 export const commerceStorageEnabled = env => env.COMMERCE_STORAGE === 'd1';
+export const newCheckoutEnabled = env => env.COMMERCE_CHECKOUT === 'enabled'
+  || ((env.COMMERCE_CHECKOUT === undefined || env.COMMERCE_CHECKOUT === '') && env.APP_ENVIRONMENT !== 'beta');
 
 // Aliases are fixed by callers in source, never taken from a request.
 export function reservedStockSql(env, variant = false) {
@@ -188,6 +190,7 @@ export async function createCommerceOrder(env, payload) {
   };
   const existing = await findExisting();
   if (existing) return replay(existing);
+  if (!newCheckoutEnabled(env)) fail('Checkout is temporarily paused. Please try again later.', 503);
   if (Date.parse(input.expiresAt) <= Date.now() || Date.parse(input.expiresAt) > Date.now() + 86400000) fail('Checkout expiry is invalid');
   const seller = await env.DB.prepare("SELECT id, plan FROM sellers WHERE id = ? AND status = 'active'").bind(input.sellerId).first();
   if (!seller) fail('Store is unavailable', 404);

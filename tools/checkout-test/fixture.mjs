@@ -22,6 +22,7 @@ export async function setup(overrides = {}) {
     EZKART_SUPABASE_PUBLISHABLE_KEY: "fixture-publishable-key",
     EZKART_DEPLOYMENT_ENVIRONMENT: "test",
     EZKART_COMMERCE_ENVIRONMENT: "sandbox",
+    EZKART_COMMERCE_CHECKOUT: "enabled",
     EZKART_ORDER_STORAGE: join(directory, "orders"),
     EZKART_EXECUTIVE_STORAGE: join(directory, "executive"),
     EZKART_DOKU_SANDBOX_CLIENT_ID: "MCH-SANDBOX-TEST",

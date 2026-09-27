@@ -11,12 +11,27 @@ final class EzCommerceStorageException extends RuntimeException
     }
 }
 
+final class EzCheckoutPausedException extends RuntimeException
+{
+    public function __construct()
+    {
+        parent::__construct('Checkout is temporarily paused. Please try again later.');
+    }
+}
+
 function ez_central_commerce_enabled(): bool
 {
     if (ez_config('commerce_storage') !== 'd1') return false;
     // A flag change cannot bypass an in-progress source handover.
     ez_legacy_storage_assert_routing(ez_deployment_profile()['commerce_environment']);
     return true;
+}
+
+/** New sales can pause while existing orders and merchant operations stay usable. */
+function ez_new_checkout_enabled(): bool
+{
+    $setting = ez_config('commerce_checkout');
+    return $setting === 'enabled' || ($setting === '' && ez_deployment_profile()['environment'] !== 'beta');
 }
 
 /** Signing is shared by ordinary requests and the provider-job dispatcher. */

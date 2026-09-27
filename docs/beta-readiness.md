@@ -26,10 +26,12 @@ provider jobs and schedules.
 
 A dedicated live Biteship key is now installed in the private hosted runtime and
 prepared local settings. At 07:19 UTC its read-only `GET /v1/couriers` succeeds
-with 81 courier services. Rates and Tracking are active; Order API on this new key
-is not active. The existing older key shows Order API active, but its one-time
-secret is unavailable in the saved runtime. The dashboard's live balance is zero.
-Biteship's required activation evidence and funding remain shipping gates.
+with 81 courier services. At 07:30 UTC, Biteship approved Order API activation
+using the account's original delivered/cancelled sandbox evidence and the store's
+configured JNE, J&T and SiCepat couriers. Rates, Order and Tracking all remain
+active after reload. No new test or real shipment was created for activation.
+The dashboard's live balance is zero; funding and a real shipping journey remain
+acceptance gates.
 The authenticated live webhook is registered and verified after reload at
 07:24 UTC for `order.status`, `order.price` and `order.waybill_id`, targeting the
 workbench production callback. No shipment or real delivery was created.
@@ -55,15 +57,27 @@ redirect to the configured Auth service. The fix permits only that exact HTTPS
 origin and Google for form redirects. Three browser/header cases pass, including
 the actual form/redirect chain, blocked foreign destinations, inline/eval guards
 and preview isolation. The beta login label now says “Beta admin.” Implementation
-`9148660` is pushed and auto-deployed; the hosted Google flow now reaches the
-owner's authenticator challenge. A fresh signed-in merchant check is pending
-that authenticator code, which cannot be obtained through email OTP access.
+`9148660` is pushed and auto-deployed. The owner completed the authenticator
+challenge; fresh hosted sign-in now reaches the beta dashboard with two products
+and zero orders. Further signed-in merchant/customer acceptance remains open.
 
 The email investigation CLI now supports beta/production while preserving TEST
 intent compatibility. Its recovery fingerprint binds the deployment, API and
 service secret. Five existing transactional/campaign cases and the added beta
 case pass, including lost acknowledgements, reuse of the original receipt and
 rejection of another mode/connection before a provider read. Sending remains held.
+
+The new checkout pause is separate from central merchant operations. PHP
+`commerce_checkout=held` and Worker `COMMERCE_CHECKOUT=held` prevent new orders;
+beta requires an explicit `enabled` setting in both layers to reopen sales.
+Original checkout recovery and verified payment callbacks remain available.
+The guard runs before provider requests or new reservations, including through
+the legacy entry point. Merchant settings and marketing reads continue working.
+Four focused cases and the checkout/SNAP/beta regressions pass (30 distinct
+cases across the focused and regression runs). Desktop and 390px checks include
+the pause and recovery of an existing paid order without provider calls.
+The beta Worker build and PHP syntax checks pass. Hosted deployment of this
+separate pause is the next cutover step; it does not close the financial gates.
 
 The sections below retain earlier rollout observations; this current-state
 record supersedes their historical “not installed” and empty-catalog statements.
