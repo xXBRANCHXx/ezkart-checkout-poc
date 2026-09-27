@@ -102,6 +102,13 @@ saved evidence. The [recovery runbook](workbench-recovery.md) separates database
 restoration from external payment/provider reconciliation and records the remaining
 R2/off-device recovery work. No remote database was restored.
 
+The aggregate [operations check](commerce-operations.md) passes six D1-backed
+cases and the actual beta read. It flags unknown/exhausted/overdue work, order
+reviews, missing or inconsistent accounting and email delivery problems without
+claiming jobs or sending messages. Its first live report correctly flags the one
+uncertain wallet registration. Scheduled alert delivery, assigned review and
+sustained operational acceptance remain open.
+
 At 08:55 UTC, the owner-provided pickup/return address and support contacts are
 saved and verified after reload, with the existing courier selection and other
 profile fields preserved. Beta's ordinary housekeeping run completed successfully.

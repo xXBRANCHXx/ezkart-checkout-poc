@@ -200,6 +200,16 @@ Offline re-verification passes. The original uncertain wallet/binding/attempt,
 merchant profile and shipping settings match the saved private evidence. No
 remote restoration or provider retry was performed. Off-device retention and
 R2/application recovery remain separate operational acceptance work.
+Recovery implementation `c254454` is pushed. At 09:59 UTC the hosted runbook is
+present and all four checked commerce operator/source paths return 404.
+
+The [commerce operations report](commerce-operations.md) now reads queue,
+order-review, capture-accounting, wallet and application email counts together.
+Six D1-backed cases pass, including unchanged uncertain jobs, balanced but wrong
+journal entries, delivery callbacks and intentional cancellation. The actual
+10:02 UTC beta check returns the expected warning for its one uncertain wallet
+job, with zero rows written and no additional provider action. Automatic alert
+delivery and operator ownership still need acceptance.
 
 ## Work required for the beta candidate
 
