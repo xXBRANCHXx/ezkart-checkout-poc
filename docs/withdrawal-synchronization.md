@@ -98,7 +98,7 @@ stale evidence from available earnings in the meantime.
 ## Verification
 
 `tools/checkout-test/payout-sync.test.mjs` exercises the actual PHP command,
-SNAP read adapters and D1 Worker together: completed outflows, proportional fee
+SNAP read adapters and D1 Worker together: completed outflows, actual fee
 correction deltas, interrupted responses, lost/prolonged acknowledgement outages,
 recovery without provider credentials, two related payouts, incomplete coverage,
 seller-paid fee rejection, private files and concurrent run exclusion.
