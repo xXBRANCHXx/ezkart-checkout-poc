@@ -47,6 +47,10 @@ if (empty($walletAccess['unlocked']) || empty($walletOwner) || empty($centralWal
         <button class="action-button primary" type="submit" data-withdrawal-confirm>Confirm bank details</button>
       </form>
       <p class="wallet-withdraw-confirmed" data-withdrawal-confirmed hidden></p>
+      <form class="wallet-withdraw-confirm" data-withdrawal-pay-form hidden>
+        <label><input type="checkbox" name="confirmed" required> Send the amount above to this confirmed bank account. This transfer cannot be cancelled after sending.</label>
+        <button class="action-button primary" type="submit" data-withdrawal-pay>Send bank transfer</button>
+      </form>
       <div class="wallet-withdraw-cancel"><button class="action-button" type="button" data-withdrawal-cancel>Cancel request</button>
         <div data-withdrawal-cancel-review hidden><p>Cancel this withdrawal request? Other holds on your earnings will remain.</p><div class="wallet-withdraw-actions"><button class="action-button" type="button" data-withdrawal-keep>Keep request</button><button class="action-button" type="button" data-withdrawal-cancel-confirm>Confirm cancellation</button></div></div>
       </div>

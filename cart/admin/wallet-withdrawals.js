@@ -2,7 +2,7 @@
   const root = document.querySelector('[data-withdrawals]'), wallet = document.querySelector('[data-wallet-setup]');
   if (!root || !wallet) return;
   const q = name => root.querySelector('[data-withdrawal-' + name + ']');
-  const dialog = q('dialog'), form = q('form'), confirmation = q('confirm-form'), start = document.querySelector('[data-wallet-withdraw-start]');
+  const dialog = q('dialog'), form = q('form'), confirmation = q('confirm-form'), payment = q('pay-form'), start = document.querySelector('[data-wallet-withdraw-start]');
   const storageScope = ['ezkart-withdrawal', wallet.dataset.account, wallet.dataset.store, wallet.dataset.environment].join(':');
   const headers = {'Content-Type':'application/json', 'X-Ezkart-Csrf':document.body.dataset.adminCsrfToken,
     'X-Ezkart-Wallet-Account':wallet.dataset.account, 'X-Ezkart-Wallet-Store':wallet.dataset.store};
@@ -41,7 +41,7 @@
   const forgetKey = type => { try { sessionStorage.removeItem(storageName(type)); } catch {} };
   const setError = message => { q('error').textContent = message; q('error').hidden = !message; };
   function clearDialog() {
-    form.reset(); confirmation.reset(); selected = null; q('detail').hidden = true; form.hidden = true;
+    form.reset(); confirmation.reset(); payment.reset(); selected = null; q('detail').hidden = true; form.hidden = true;
     q('message').textContent = ''; setError('');
     for (const name of ['amount','bank','account','beneficiary','channel','status','status-note','created','reference','confirmed','warning']) q(name).textContent = '';
     q('cancel-review').hidden = true;
@@ -78,7 +78,7 @@
     document.getElementById('wallet-withdraw-reason').textContent = !report ? unavailableMessage
       : !caps().requests ? 'Bank withdrawals are not available yet. Your earnings remain recorded here.'
       : !ready ? 'At least Rp250.000 in available earnings is needed for a new request.'
-      : 'Save a request and confirm your bank details. Bank transfers are currently paused.';
+      : caps().transfers ? 'Save a request, verify your bank details and confirm the transfer.' : 'Save a request and confirm your bank details. Bank transfers are currently paused.';
     root.setAttribute('aria-busy',String(busy)); dialog.setAttribute('aria-busy',String(busy));
     q('refresh').disabled = busy || !report; q('recover').disabled = busy || !report; q('more').disabled = busy;
     root.querySelectorAll('[data-withdrawal-id]').forEach(button => { button.disabled = busy; });
@@ -98,6 +98,9 @@
     confirmation.hidden = cancelled || started || !row.bankVerified || !!confirmed || !own;
     confirmation.querySelector('input').disabled = busy || !caps().requests || !funded;
     q('confirm').disabled = busy || !caps().requests || !funded;
+    payment.hidden = cancelled || started || !confirmed || !own || !caps().transfers;
+    payment.querySelector('input').disabled = busy || !funded;
+    q('pay').disabled = busy || !funded;
     q('cancel').hidden = cancelled || started || !q('cancel-review').hidden; q('cancel').disabled = busy;
     if (started) q('cancel-review').hidden = true;
     q('confirmed').hidden = cancelled || started || !confirmed;
@@ -106,7 +109,7 @@
     const row = data.withdrawal;
     if (!row || !/^wd_[a-f0-9]{40}$/.test(row.id) || !['reserved','cancelled','completed','failed','review'].includes(row.state) || typeof row.bank?.accountNumber !== 'string') throw Error('Saved withdrawal details could not be checked.');
     if (!dialog.open || stopped) return;
-    selected = data; form.hidden = true; q('detail').hidden = false; confirmation.reset(); q('cancel-review').hidden = true;
+    selected = data; form.hidden = true; q('detail').hidden = false; confirmation.reset(); payment.reset(); q('cancel-review').hidden = true;
     q('title').textContent = 'Withdrawal request'; q('message').textContent = row.state === 'cancelled'
       ? 'This request was cancelled. No bank transfer was started.'
       : row.state === 'completed' ? 'Your bank transfer and its actual fee have been reconciled. The transferred amount stays deducted from your earnings. Ezkart covers the transfer fee.'
@@ -234,12 +237,14 @@
     if (!selected) return;
     const id = selected.withdrawal.id, payload = {id}, keyType = action + ':' + id;
     if (action === 'confirm') Object.assign(payload,{requestKey:actionKey(keyType),inquiryDigest:selected.withdrawal.inquiry.digest});
+    if (action === 'pay') payload.confirmationId = selected.withdrawal.confirmation.id;
     if (action === 'cancel') payload.requestKey = actionKey(keyType);
-    q('message').textContent = action === 'inquire' ? 'Checking your bank account…' : action === 'status' ? 'Checking the original transfer with DOKU…' : action === 'confirm' ? 'Saving your bank confirmation…' : 'Cancelling this request…';
+    q('message').textContent = action === 'pay' ? 'Sending this bank transfer. Keep this request open while its response is saved…' : action === 'inquire' ? 'Checking your bank account…' : action === 'status' ? 'Checking the original transfer with DOKU…' : action === 'confirm' ? 'Saving your bank confirmation…' : 'Cancelling this request…';
     try {
       const result = await call(action,payload); if (action !== 'inquire' && action !== 'status') forgetKey(keyType);
       renderDetail(await call('read',{id}));
       if (result.statusCheck?.state === 'review') setError('The latest status check needs review. Earlier accounting entries remain recorded.');
+      if (result.paymentDispatch?.state === 'review') setError('This transfer needs review. Check its status; do not start another withdrawal for the same payment.');
     } catch (error) {
       try { renderDetail(await call('read',{id})); } catch { /* Keep the original reference for the next status check. */ }
       throw error;
@@ -248,6 +253,7 @@
   q('check').addEventListener('click', () => run(() => act('inquire')));
   q('status-check').addEventListener('click', () => run(() => act('status')));
   confirmation.addEventListener('submit',event => { event.preventDefault(); if (confirmation.elements.confirmed.checked) void run(() => act('confirm')); });
+  payment.addEventListener('submit',event => { event.preventDefault(); if (payment.elements.confirmed.checked) void run(() => act('pay')); });
   q('detail-refresh').addEventListener('click', () => run(async () => { if (selected) renderDetail(await call('read',{id:selected.withdrawal.id})); }));
   q('cancel').addEventListener('click', () => { if (!busy) { q('cancel-review').hidden = false; controls(); q('keep').focus(); } });
   q('keep').addEventListener('click', () => { q('cancel-review').hidden = true; controls(); q('cancel').focus(); });

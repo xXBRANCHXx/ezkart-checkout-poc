@@ -71,6 +71,17 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 28 September: timed finish — payout caller
+
+The owner capped each remaining area at twenty minutes and the full pass at
+140 minutes. The first area adds the protected merchant payment action and the
+[original-grant caller](withdrawal-payment-grants.md), including private receipt
+storage and recovery with dispatch held. Unknown provider outcomes and lost
+grant acknowledgements cannot trigger another transfer. The live switches stay
+held pending DOKU activation and evidence of Ezkart-funded withdrawal fees.
+This completes the missing caller, not live payout acceptance; no financial
+completion gate is claimed.
+
 ### 28 September: original DOKU refund request preparation
 
 The [provider handoff](refund-provider-handoffs.md) adds buyer-owned private bank

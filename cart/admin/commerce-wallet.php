@@ -10,7 +10,7 @@ function ez_admin_wallet_request(string $action, bool $authenticated, string $au
 {
     if (!$authenticated || $authenticationMethod !== 'supabase') ez_admin_json(['ok' => false, 'error' => 'Sign in again to open Wallet.', 'code' => 'wallet_locked'], 401);
     $allowedQuery = $action === 'history' ? ['wallet', 'before', 'cap'] : ['wallet'];
-    $withdrawalActions = ['withdrawal_read', 'withdrawal_lookup', 'withdrawal_list', 'withdrawal_reserve', 'withdrawal_cancel', 'withdrawal_inquire', 'withdrawal_confirm', 'withdrawal_status'];
+    $withdrawalActions = ['withdrawal_read', 'withdrawal_lookup', 'withdrawal_list', 'withdrawal_reserve', 'withdrawal_cancel', 'withdrawal_inquire', 'withdrawal_confirm', 'withdrawal_pay', 'withdrawal_status'];
     $isWithdrawal = in_array($action, $withdrawalActions, true);
     if (array_diff(array_keys($_GET), $allowedQuery) !== [] || !in_array($action, ['read', 'history', 'enroll', 'refresh', ...$withdrawalActions], true)) ez_admin_json(['ok' => false, 'error' => 'Wallet request is invalid.'], 400);
     $seenQuery = [];
@@ -43,6 +43,7 @@ function ez_admin_wallet_request(string $action, bool $authenticated, string $au
                     'withdrawal_lookup' => ['requestKey'],
                     'withdrawal_reserve' => ['requestKey', 'amount', 'bank'],
                     'withdrawal_confirm' => ['id', 'requestKey', 'inquiryDigest'],
+                    'withdrawal_pay' => ['id', 'confirmationId'],
                     'withdrawal_cancel' => ['id', 'requestKey'],
                     default => ['id'],
                 };
@@ -92,6 +93,12 @@ function ez_admin_wallet_request(string $action, bool $authenticated, string $au
                     // A lost acknowledgement may already have committed the receipt.
                     if (($response['withdrawal']['bankVerified'] ?? null) === true) $result['state'] = 'verified';
                     $response['bankCheck'] = $result;
+                } elseif ($action === 'withdrawal_pay') {
+                    if (!is_string($input['confirmationId'] ?? null) || preg_match('/^wdconf_[a-f0-9]{40}$/D', $input['confirmationId']) !== 1)
+                        throw new EzCommerceStorageException('Payment confirmation is invalid.', 422);
+                    $result = ez_pay_withdrawal($id, $input['confirmationId'], $payload);
+                    $response = ez_commerce_request('POST', $path . '/' . $id . '/read', $payload);
+                    $response['paymentDispatch'] = $result;
                 } elseif ($action === 'withdrawal_status') {
                     $result = ez_check_withdrawal_status($id, $payload);
                     $response = ez_commerce_request('POST', $path . '/' . $id . '/read', $payload);
@@ -121,7 +128,7 @@ function ez_admin_wallet_request(string $action, bool $authenticated, string $au
                 if ($action !== 'history') $response['withdrawalCapabilities'] = [
                     'requests' => $ready && ez_config('commerce_withdrawals') === 'enabled' && ($response['enrollment']['status'] ?? '') === 'connected',
                     'bankVerification' => $ready && ez_config('commerce_withdrawals') === 'enabled' && ez_config('commerce_withdrawal_inquiry') === 'enabled',
-                    'transfers' => false,
+                    'transfers' => $ready && ez_config('commerce_withdrawals') === 'enabled' && ez_config('commerce_withdrawal_payment') === 'enabled',
                     'paymentStatus' => $ready && ez_config('commerce_withdrawal_status') === 'enabled',
                     'banks' => ez_withdrawal_bank_catalog(),
                 ];

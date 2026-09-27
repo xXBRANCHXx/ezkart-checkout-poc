@@ -132,6 +132,64 @@ async function paymentGrantFixture(t,overrides={}){
   return {...f,w,g,paymentPath};
 }
 
+async function paymentCallerFixture(t,overrides={}){
+  const f=await bankInquiryFixture(t,{EZKART_COMMERCE_WITHDRAWAL_PAYMENT:'enabled',...overrides},{COMMERCE_WITHDRAWAL_PAYMENT:'enabled'}),w=await f.reserve();
+  const checked=await f.inquire(w);assert.equal(checked.status,200);
+  const confirmed=await f.request('withdrawal_confirm',{id:w.id,requestKey:key(),inquiryDigest:checked.data.withdrawal.inquiry.digest});assert.equal(confirmed.status,200);
+  const input={id:w.id,confirmationId:confirmed.data.confirmation.id},paymentPath='/internal/commerce/finance/withdrawals/'+w.id+'/payment';
+  return {...f,w,input,paymentPath,pay:()=>f.request('withdrawal_pay',input),paymentCalls:async()=>(await f.app.calls()).filter(c=>c.url.endsWith('/sub-account/v2.0/transfer-payment'))};
+}
+
+test('payment caller sends the confirmed original exactly once and keeps bank success unconfirmed',async t=>{
+  const f=await paymentCallerFixture(t),result=await f.pay();assert.equal(result.status,200,JSON.stringify(result.data));
+  assert.deepEqual(result.data.paymentDispatch,{state:'recorded',providerCalls:1,payoutConfirmed:false});
+  assert.equal(result.data.withdrawal.payment.state,'response_recorded');assert.equal(result.data.withdrawal.state,'reserved');
+  const repeated=await f.pay();assert.equal(repeated.status,200);assert.equal(repeated.data.paymentDispatch.providerCalls,0);
+  assert.equal((await f.paymentCalls()).length,1);assert.equal(await f.count('commerce_withdrawal_payment_grants'),1);assert.equal(await f.count('commerce_withdrawal_payment_receipts'),1);
+  const file=join(f.recovery,f.w.id+'-payment.json');assert.equal((await stat(file)).mode&0o777,0o600);
+  assert.equal(JSON.parse(await readFile(file,'utf8')).confirmationId,f.input.confirmationId);
+  assert.equal((await f.request('withdrawal_cancel',{id:f.w.id,requestKey:key()})).status,409);
+  assert.equal((await f.paymentCalls()).length,1);
+});
+
+test('payment caller recovers the private receipt after storage outage while dispatch is held',async t=>{
+  const f=await paymentCallerFixture(t);f.control.fail=f.paymentPath+'/receipt';
+  const sent=await f.pay();assert.equal(sent.status,200);assert.equal(sent.data.paymentDispatch.state,'review');assert.equal(await f.count('commerce_withdrawal_payment_receipts'),0);
+  f.control.fail='';const scope=Buffer.from(JSON.stringify({environment:'sandbox',seller:'seller_alice',actor:proof()})).toString('base64');
+  const result=await f.run(`require ${JSON.stringify(join(root,'cart/api/commerce-withdrawal-payments.php'))}; echo json_encode(ez_pay_withdrawal('${f.w.id}','${f.input.confirmationId}',json_decode(base64_decode('${scope}'),true)));`,{EZKART_COMMERCE_WITHDRAWAL_PAYMENT:'held',EZKART_DOKU_SANDBOX_SNAP_PRIVATE_KEY:'missing'});
+  assert.equal(result.status,0,result.error+result.output);assert.deepEqual(JSON.parse(result.output),{state:'recorded',providerCalls:0,payoutConfirmed:false});
+  assert.equal(await f.count('commerce_withdrawal_payment_receipts'),1);assert.equal((await f.paymentCalls()).length,1);
+});
+
+test('payment caller cannot resend after a lost grant acknowledgement or unknown provider outcome',async t=>{
+  const f=await paymentCallerFixture(t);f.control.drop=f.paymentPath+'/start';
+  await f.pay();const replay=await f.pay();assert.equal(replay.status,200);assert.equal(replay.data.paymentDispatch.state,'review');
+  assert.equal((await f.paymentCalls()).length,0);assert.equal(await f.count('commerce_withdrawal_payment_grants'),1);
+  const second=await f.reserve(),checked=await f.inquire(second),confirmed=await f.request('withdrawal_confirm',{id:second.id,requestKey:key(),inquiryDigest:checked.data.withdrawal.inquiry.digest});
+  await f.setControl({paymentFailure:true});const input={id:second.id,confirmationId:confirmed.data.confirmation.id};
+  assert.equal((await f.request('withdrawal_pay',input)).data.paymentDispatch.state,'review');
+  await f.setControl({});assert.equal((await f.request('withdrawal_pay',input)).data.paymentDispatch.providerCalls,0);
+  assert.equal((await f.paymentCalls()).length,1);assert.equal(await f.count('commerce_withdrawal_payment_receipts'),0);
+});
+
+test('payment caller is held without consuming a dispatch and rejects injected payment fields',async t=>{
+  const f=await paymentCallerFixture(t,{EZKART_COMMERCE_WITHDRAWAL_PAYMENT:'held'});
+  assert.equal((await f.pay()).status,503);assert.equal(await f.count('commerce_withdrawal_payment_grants'),0);assert.equal((await f.paymentCalls()).length,0);
+  assert.equal((await f.request('withdrawal_pay',{...f.input,amount:'1'})).status,422);
+  assert.equal((await f.request('withdrawal_pay',f.input,{'X-Ezkart-Csrf':'wrong'})).status,401);
+});
+
+test('payment caller merchant confirmation is explicit on mobile and disappears after dispatch',async t=>{
+  const f=await paymentCallerFixture(t);await f.page.reload();await f.page.locator('[data-withdrawals][aria-busy=false]').waitFor();
+  await f.page.setViewportSize({width:390,height:844});await f.page.locator('[data-withdrawal-id="'+f.w.id+'"]').click();
+  const form=f.page.locator('[data-withdrawal-pay-form]');await form.waitFor({state:'visible'});
+  await mkdir(screens,{recursive:true});await f.page.screenshot({path:join(screens,'payment-confirm-mobile.png'),fullPage:true});
+  await form.getByRole('button',{name:'Send bank transfer',exact:true}).click();assert.equal((await f.paymentCalls()).length,0);
+  await form.getByRole('checkbox').check();await form.getByRole('button',{name:'Send bank transfer',exact:true}).click();
+  await f.page.locator('[data-withdrawal-status]').filter({hasText:'Transfer response saved'}).waitFor();assert.equal(await form.isVisible(),false);assert.equal((await f.paymentCalls()).length,1);
+  assert.equal(await f.page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);assert.deepEqual(f.errors,[]);
+});
+
 test('payout reconciliation recovers a lost acknowledgement without provider calls and shows completed and stale outcomes in protected Wallet',async t=>{
   const f=await paymentGrantFixture(t),p=payoutFixture({...f.e,p:f.p},f.w,f.g),cap=await p.payoutStatus(),pair=await p.collectPayout();
   const input=p.payoutInput(pair,cap),encoded=Buffer.from(JSON.stringify(input)).toString('base64');
@@ -181,7 +239,7 @@ test('a reconciled voided transfer releases only its reservation and shows the f
   await f.page.reload();await withdrawalIdle(f);await viewWithdrawal(f);
   assert.equal(await f.page.locator('[data-withdrawal-status]').innerText(),'Transfer failed · funds released');
   assert.match(await f.page.locator('[data-withdrawal-message]').innerText(),/reservation has been released/);
-  for(const selector of ['[data-withdrawal-cancel]','[data-withdrawal-confirm-form]','[data-withdrawal-check]'])assert.equal(await f.page.locator(selector).isHidden(),true);
+  for(const selector of ['[data-withdrawal-cancel]','[data-withdrawal-confirm-form]','[data-withdrawal-pay-form]','[data-withdrawal-check]'])assert.equal(await f.page.locator(selector).isHidden(),true);
   assert.equal((await f.request('withdrawal_pay',{id:f.w.id})).status,400);
   assert.equal((await f.app.calls()).filter(c=>c.url.endsWith('/sub-account/v2.0/transfer-payment')).length,0);assert.deepEqual(f.errors,[]);
 });
@@ -269,7 +327,8 @@ test('a payment-granted withdrawal keeps its reserved money and hides cancellati
   assert.match(await f.page.locator('[data-withdrawal-message]').innerText(),/cannot be cancelled or sent again/);
   for(const selector of ['[data-withdrawal-cancel]','[data-withdrawal-confirm-form]','[data-withdrawal-check]'])assert.equal(await f.page.locator(selector).isHidden(),true);
   assert.equal((await f.request('withdrawal_cancel',{id:f.w.id,requestKey:key()})).status,409);
-  for(const action of ['withdrawal_pay','withdrawal_payment_start'])assert.equal((await f.request(action,{id:f.w.id})).status,400);
+  assert.equal((await f.request('withdrawal_pay',{id:f.w.id})).status,422);
+  assert.equal((await f.request('withdrawal_payment_start',{id:f.w.id})).status,400);
   assert.equal((await f.e.earnings()).reservedWithdrawals,'250000');assert.equal((await f.e.summary()).balanced,true);
   assert.equal((await f.app.calls()).filter(c=>c.url.endsWith('/sub-account/v2.0/transfer-payment')).length,0);
   // Exercise only the presentation of a current read from a changed owner;

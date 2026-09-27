@@ -22,6 +22,9 @@ return [
     // See docs/withdrawal-bank-inquiries.md; this does not enable bank payments.
     'commerce_withdrawals' => 'held',
     'commerce_withdrawal_inquiry' => 'held',
+    // Also requires Worker COMMERCE_WITHDRAWAL_PAYMENT=enabled. Keep both held
+    // until DOKU activation, platform-paid fees and live acceptance are confirmed.
+    'commerce_withdrawal_payment' => 'held',
     // Absolute mode-0700 directory outside the application and public web root.
     'commerce_withdrawal_recovery_directory' => '',
     // Supabase is used only to verify Google identity. The publishable/anon

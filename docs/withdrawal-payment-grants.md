@@ -6,8 +6,9 @@ another send authority. Original payment replies are retained independently of
 the bank inquiry, with private recovery after failed or lost acknowledgements.
 No final payout is inferred from an HTTP success response.
 
-This stage has no merchant payment action, scheduled dispatcher or integrated
-provider-payment caller. `COMMERCE_WITHDRAWAL_PAYMENT` remains absent/held on beta.
+The merchant payment action and integrated provider caller are implemented.
+`COMMERCE_WITHDRAWAL_PAYMENT` remains absent/held on beta, as does the matching
+PHP `commerce_withdrawal_payment` switch.
 Do not enable it until actual Ezkart-funded fees, authenticated outcome
 reconciliation, final accounting and the complete transport workflow are ready.
 The grant is infrastructure for that workflow, not evidence of operational
@@ -115,7 +116,7 @@ php tools/commerce/finalize-withdrawal-payment.php \
   --receipt-file=/absolute/private/withdrawal-bank-payment.json
 ```
 
-The future transport caller must use this storage before D1 delivery. Both the
+The transport caller uses this storage before D1 delivery. Both the
 helper and CLI return 404 over direct HTTP. Neither stores provider credentials
 in a receipt. A partial/unflushed file requires review and is never overwritten.
 
@@ -125,8 +126,25 @@ Protected Wallet history/details distinguish a payment needing review from one
 whose original response is recorded. Neither is labelled completed. Cancellation,
 bank re-verification and another confirmation are hidden once a grant exists;
 the server independently rejects those mutations. Full bank details remain
-behind the existing Wallet verification rule. There is no browser send-payment
-action in this delivery.
+behind the existing Wallet verification rule. After a fresh bank confirmation,
+the merchant explicitly acknowledges the amount/destination and submits “Send
+bank transfer”. That form appears only when the PHP payment switch is enabled;
+the Worker independently requires its own switch and original current authority.
+
+The PHP caller obtains one durable grant, sends the exact original inquiry's
+payment, exclusively saves its private receipt, then finalizes it in D1. A lost
+grant response consumes the authority without retrying DOKU. An unknown provider
+outcome also cannot be resent. Repeating a saved dispatch only recovers its
+original receipt or reports review. Recovery works with payment dispatch held
+and without loading provider credentials. Provider acceptance is displayed as
+“Transfer response saved”; the existing status/history reconciliation alone can
+establish completed payout accounting.
+
+Five focused PHP/Worker/browser cases cover one-send behavior, private receipt
+recovery during a storage outage, lost grant acknowledgements, unknown provider
+outcomes, held configuration, CSRF/input restrictions and explicit mobile
+confirmation. These are local fixture tests. Platform-paid fee funding, DOKU
+service activation, authenticated callbacks and live bank acceptance remain open.
 
 ## Verification and rollout
 
