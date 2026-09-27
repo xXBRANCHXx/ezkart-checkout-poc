@@ -71,6 +71,22 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 27 September: bank payout contract
+
+The [DOKU bank payout adapter](doku-payouts.md) implements inquiry and transfer
+against a fixed credential/account/amount binding. Original inquiry evidence and
+bank-confirmed beneficiary details are required before preparing payment; the
+owner-confirmation digest also binds both dispatch IDs. The seller minimum is
+enforced, exact amounts and bank-account leading zeroes are preserved, and no
+automatic retry or alternate transfer is attempted after a lost reply.
+
+Ten new contract/HTTP cases and 42 existing reader/BCA/Wallet regressions pass.
+No provider call was made outside isolated fixtures. The adapter has no public
+route or central caller, does not reserve or release earnings and does not mark
+a payout complete. Actual fee funding, central ledger/reservations, owner-bound
+dispatch, reconciliation and live payout acceptance remain open. This delivery
+does not close a top-level gate or change any checkout, provider or main hold.
+
 ### 27 September: hosted beta catalog and private runtime cutover
 
 At 09:11 UTC, the two missing product descriptions are saved through the merchant

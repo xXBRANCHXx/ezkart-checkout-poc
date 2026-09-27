@@ -217,7 +217,7 @@ delivery and operator ownership still need acceptance.
 | --- | --- | --- |
 | Purchases and stock | Central immutable orders, atomic reservations, recoverable payment jobs, fulfillment and physical returns; isolated beta merchant cutover | Legacy ownership/count reconciliation, full signed-in physical/digital purchase and failure journeys |
 | Refunds | Purchase allocations, store decisions, buyer/store notifications and original delivery/return evidence | Provider-supported execution, unknown-result recovery, confirmed refund evidence, fee reversals, item access effects and reconciliation |
-| Wallet | Balanced capture journal, seller enrollment and original provider balance/history receipts | Actual settlement/fee ingestion and corrections, delivery-plus-settlement release, reserves, negative balances, withdrawal reservations and verified payouts |
+| Wallet | Balanced capture journal, seller enrollment, original provider balance/history receipts and an isolated bank-transfer adapter | Actual settlement/fee ingestion and corrections, delivery-plus-settlement release, reserves, negative balances, withdrawal reservations and verified payouts |
 | Digital files | Immutable versions, private buyer grants, complete-download proof, reviews and full 500 MiB local transfer/recovery | Hosted signed-in and real-device transfers, storage monitoring/recovery, refund effects and subscription lifecycle |
 | Store/customer operations | Persistent settings, customer workspace, consent, messaging, notifications, campaigns and reporting | Hosted fresh-seller/customer acceptance, actual enabled delivery and failure monitoring, domain/analytics acceptance and accessibility/mobile review |
 | Operations | Private TEST/beta database backups, repeatable local restoration, recovery runbook and guarded deployment checks | Off-device retention, R2/application recovery, monitored execution, alert ownership, sustained financial validation and final acceptance report |
@@ -226,6 +226,14 @@ Continue completing the full scope in
 [commerce-completion-plan.md](commerce-completion-plan.md). Optional features are
 not removed from that scope to make the checklist appear complete. A row here
 is not a closed top-level gate.
+
+The [bank payout adapter](doku-payouts.md) now validates the original amount,
+bank-confirmed beneficiary, credential scope and separate inquiry/payment dispatch
+identities. Ten isolated cases pass. It enforces the seller minimum and makes no
+automatic retry after an uncertain transfer. It has no application caller or
+public payout endpoint; settled balances, owner verification, reservations,
+durable dispatch, actual transfer-fee funding and outcome reconciliation still
+need integration. No real bank inquiry or transfer was submitted.
 
 ## Financial policy now confirmed
 

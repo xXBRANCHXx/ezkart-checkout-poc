@@ -132,6 +132,14 @@ abstract class EzDokuSnapClient
         return $this->signedPost($operation, $path, $payload, $externalId, $operation === 'bca-create' ? 'H2H' : null);
     }
 
+    /** Both transfer steps use separately persisted dispatch IDs. Never retry here. */
+    protected function transferRequest(string $operation, array $payload, string $externalId): array
+    {
+        if (!in_array($operation, ['transfer-inquiry', 'transfer-payment'], true)) throw new EzDokuReadException('operation');
+        if (preg_match('/^[0-9]{32}$/D', $externalId) !== 1) throw new EzDokuReadException('external_id');
+        return $this->signedPost($operation, '/sub-account/v2.0/' . $operation, $payload, $externalId);
+    }
+
     protected function now(): int { return ($this->clock)(); }
 
     private function signedPost(string $operation, string $path, array $payload, ?string $externalId = null, ?string $channel = null): array

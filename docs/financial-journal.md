@@ -107,6 +107,11 @@ The [wallet enrollment flow](wallet-enrollment.md) now implements owner-authoriz
 seller/provider mapping and fresh verification on every enrollment action. Actual
 hosted/provider acceptance and unknown-registration recovery remain open.
 
+The [bank payout contract adapter](doku-payouts.md) now binds inquiry and transfer
+to the original amount, verified beneficiary and separate dispatch identities.
+It has no central withdrawal caller and does not create available funds or
+completed payout journals. Durable reservations and execution remain required.
+
 Still required: provider-accepted seller mapping, payment routing, actual-fee and
 settlement ingestion with corrections, delivery-plus-settlement release, reserves
 and disputes, partial/full refunds, negative-balance handling, owner-bound fresh
