@@ -83,8 +83,13 @@ Wallet reflects the pending reconciliation and hides invalid cancellation action
 
 All 80 relevant Worker/PHP/browser cases pass. The fresh beta backup restores
 cleanly, and migration rehearsal preserves all original rows in 162 tables,
-adding only three empty tables. The workbench rollout is in progress. The
-integrated payment caller, actual Ezkart-funded fees, authenticated outcome
+adding only three empty tables. Implementation `8960126`, migration 0057 and
+beta Worker `581b21e5-81a0-4b49-99a2-0e714b089c3a` are deployed. Thirty-seven
+hosted checks pass at 16:23 UTC, and matching assets/the real Wallet gate pass
+at 16:24. The post-export restores 165 tables; original business/financial data
+is preserved, with only the expected sign-in/housekeeping metadata changes.
+All new tables and money journals remain empty. The integrated payment caller,
+actual Ezkart-funded fees, authenticated outcome
 reconciliation, final payout/refund accounting and live acceptance remain open.
 No top-level gate is closed.
 

@@ -14,21 +14,41 @@ deployment now uses the isolated live beta configuration described below, with
 new checkout, provider dispatch schedules and automatic email sending held.
 Existing sandbox evidence is preserved. Main and `ezkart.id` remain held.
 
-## Current hosted state — 27 September, 15:50 UTC
+## Current hosted state — 27 September, 16:27 UTC
 
 Hostinger's private runtime now selects `beta`, production providers and the beta
 Worker. Its live DOKU client, secret, signing key and verified parent profile are
 installed outside the public root with mode 0600. Reloaded file hashes match the
 private prepared configuration; all earlier provider credentials are preserved.
 Health confirms beta, live DOKU credentials and connected D1/public R2/private R2
-with 161 application tables. At 07:45 UTC, central merchant operations were
+with 164 application tables. At 07:45 UTC, central merchant operations were
 enabled with `commerce_storage=d1`; new checkout remains separately paused in both PHP and
 the Worker. The public checkout configuration returns 503 with `Retry-After: 300`.
 An hourly housekeeping schedule is now installed; new checkout, provider
 dispatch schedules and email sending remain held. See the storage note below.
 
-The [merchant withdrawal workflow](withdrawal-merchant-workflow.md)
-implementation `75bfe13` is pushed and deployed to beta Worker
+The [payment grant and original receipt](withdrawal-payment-grants.md)
+implementation `8960126`, migration 0057 and beta Worker
+`581b21e5-81a0-4b49-99a2-0e714b089c3a` are deployed. Payment grants atomically
+fence cancellation and repeat send authority, recheck current original-owner
+confirmation/funding and preserve original response evidence. Private recovery
+does not contact DOKU. Accepted responses do not release reservations or claim
+completed payouts. No merchant payment action or integrated transport caller is
+enabled; payment execution remains held.
+
+All 80 relevant local cases and 37 hosted API checks pass. At 16:24 UTC, Hostinger
+serves the matching assets and the actual Wallet verification gate exposes no
+withdrawal details or earnings. The post-export restores 165 tables with clean
+integrity/foreign keys. Of 161 original application tables, 159 are exactly
+unchanged; the remaining differences are one routine sign-in timestamp and an
+empty successful 16:17 housekeeping run. The three new tables and all money
+records remain empty. Original wallet records and execution holds are preserved.
+
+The integrated payment caller, actual Ezkart-funded fees, authenticated outcome
+reconciliation, final payout/refund accounting and live acceptance remain open.
+
+The preceding [merchant withdrawal workflow](withdrawal-merchant-workflow.md)
+implementation `75bfe13` was pushed and deployed to beta Worker
 `281c44d7-2b73-4dac-81ac-d6d9990677e7`, retaining migration 0056. It adds request
 creation, bank review/confirmation, cancellation, paged history and recovery of
 the original request after a lost response. The relevant 25 Worker and 31
@@ -41,13 +61,6 @@ execution holds and TEST/main configuration are unchanged. No transfer occurs.
 
 Durable payment dispatch, actual Ezkart-funded transfer fees, final payout/refund
 accounting, outcome reconciliation and live acceptance remain required.
-
-The later [payment grant and original receipt](withdrawal-payment-grants.md)
-implementation is verified locally and its workbench rollout is in progress.
-It adds the atomic cancellation fence, current owner/confirmation/funding checks
-and private original-response recovery. All 80 relevant cases and the populated
-migration rehearsal pass. It does not enable an integrated payment caller or
-close the actual-fee, outcome-accounting or live-acceptance requirements.
 
 The preceding [bank inquiry and owner confirmation](withdrawal-bank-inquiries.md)
 implementation `4810fec` was deployed with migration 0056 and beta Worker
