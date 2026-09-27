@@ -12,9 +12,10 @@ same date. The PDF is unchanged.
 A DOKU sandbox seller sub-account has been created, as recorded in
 [the sandbox setup](commerce-sandbox-setup.md#seller-wallets-fee-rules-and-payouts).
 Verified seller [wallet enrollment](wallet-enrollment.md) is implemented, with
-live acceptance still outstanding. Checkout routing, split-rule creation and
-payouts remain to be completed. The following amounts are a specification, not
-configured provider rules or available wallet balances.
+live acceptance still outstanding. [Checkout routing and split-rule dispatch](doku-payment-routing.md)
+now preserve each order's original fee allocation and confirmed destinations.
+Live configuration, routing/settlement acceptance and payouts remain required.
+The following amounts are not available wallet balances.
 
 Central orders now preserve immutable per-order fee snapshots. The
 [capture financial journal](financial-journal.md) posts verified payments using
@@ -106,11 +107,12 @@ says that provider processing fees are deducted before split rules run at
 settlement. Therefore a provider percentage split on the settled amount would
 not reproduce the mockup's percentage of product subtotal.
 
-The proposed mapping for the confirmed actual-fee policy is to compute
-commission in Ezkart and create a flat allocation of
+The implementation computes commission in Ezkart and creates a flat allocation of
 `shipping + commission + admin` to the platform, leaving the remaining settled
-amount for the seller. The exact API contract and destination-account rules
-still require verification before creating or attaching provider rules.
+amount for the seller. The implementation now binds two confirmed Sub-Accounts
+under the same parent and credentials, records the original flat rule and attaches
+it to the BCA request. Actual destination credits, fees and small-net behavior
+still need provider acceptance; these are not inferred from rule creation.
 
 For the Basic example, if DOKU actually charges Rp4,750:
 

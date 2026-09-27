@@ -102,6 +102,11 @@ export async function finishCommerceJob(env, jobId, input) {
     &&await env.DB.prepare('SELECT order_id FROM commerce_snap_payment_bindings WHERE job_id=?').bind(row.id).first()){
     fail('A dispatched SNAP payment requires reconciliation before retrying',409);
   }
+  if(row.kind==='payment.create'&&input.outcome==='retry'
+    &&await env.DB.prepare(`SELECT b.order_id FROM commerce_payment_route_bindings b WHERE b.job_id=?
+      AND NOT EXISTS(SELECT 1 FROM commerce_payment_route_receipts r WHERE r.order_id=b.order_id)`).bind(row.id).first()){
+    fail('An uncertain split rule requires reconciliation before retrying',409);
+  }
   if(row.kind.startsWith('shipment.')&&input.outcome==='succeeded'){
     const shipmentId=JSON.parse(row.payload_json).shipmentId;
     const shipment=await env.DB.prepare('SELECT * FROM commerce_shipments WHERE id=? AND order_id=? AND commerce_environment=?').bind(shipmentId,row.order_id,environment).first();

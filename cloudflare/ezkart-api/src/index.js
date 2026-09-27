@@ -26,6 +26,7 @@ import {merchantOrderList,merchantOrderDetail,merchantOrderHistory} from './comm
 import {merchantDashboard} from './commerce-dashboard.js';
 import {merchantPaymentList,merchantPaymentDetail,merchantPaymentHistory} from './commerce-payment-reads.js';
 import {snapPayment,bindSnapPayment,recordSnapPaymentReceipt} from './commerce-snap-payments.js';
+import {bindPaymentRoute,recordPaymentRoute} from './commerce-payment-routing.js';
 import {reconcileCaptureJournals,financialJournalSummary,financialJournalList} from './commerce-financial-journal.js';
 import {reconcileFinancialDeliveries,financialDeliveryStatus} from './commerce-financial-delivery.js';
 import {walletEnrollment,walletRegistration,bindWalletRegistration,saveWalletRegistrationReceipt,recordWalletRegistration} from './commerce-wallet-enrollment.js';
@@ -1490,6 +1491,12 @@ export default {
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
     const url = new URL(request.url);
     try {
+      const routePath=/^\/internal\/commerce\/snap-payments\/(EZK-[SP]-[A-F0-9]{24})\/route\/(bind|receipt)$/.exec(url.pathname);
+      if(routePath){
+        const input=await authenticateCommerceService(request,env,{strictJSON:true,maxBytes:routePath[2]==='receipt'?40000:2000});
+        if(request.method!=='POST'||url.search)return json({ok:false,error:'Payment routing request is invalid'},405);
+        return json({ok:true,...await (routePath[2]==='bind'?bindPaymentRoute:recordPaymentRoute)(env,routePath[1],input)});
+      }
       const snapPath=/^\/internal\/commerce\/snap-payments\/(EZK-[SP]-[A-F0-9]{24})(?:\/(bind|receipt))?$/.exec(url.pathname);
       if(snapPath){
         const input=await authenticateCommerceService(request,env,{strictJSON:true,maxBytes:snapPath[2]==='receipt'?600000:2000});

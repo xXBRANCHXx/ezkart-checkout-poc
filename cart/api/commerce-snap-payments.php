@@ -45,7 +45,7 @@ function ez_central_snap_payment_job(array $job, string $worker): array
         $order = $payment['order'];
         if ($job['kind'] !== 'payment.create' || $payment['jobId'] !== $job['id'] || $order['sellerId'] !== $job['sellerId']
             || $order['environment'] !== $job['environment'] || $order['paymentRequestId'] !== $job['data']['providerRequestId']) throw new RuntimeException('SNAP job identity changed.');
-        $mayHaveStarted = $payment['binding'] !== null;
+        $mayHaveStarted = $payment['binding'] !== null || ($payment['route'] !== null && $payment['route']['routing'] === null);
         if ($order['payment'] !== null || in_array($order['state'], ['paid', 'partially_refunded', 'refunded'], true)) {
             $outcome = 'succeeded'; $result = ['recorded' => true];
         } elseif (!$mayHaveStarted && ($order['state'] !== 'creating' || strtotime($order['expiresAt']) <= time())) {
@@ -63,6 +63,8 @@ function ez_central_snap_payment_job(array $job, string $worker): array
                 }
                 throw new RuntimeException('Reconcile the original SNAP request.');
             }
+            if ($payment['route'] !== null && ($payment['route']['binding']['credentialFingerprint'] !== $identity['credentialFingerprint'] || $payment['route']['clientId'] !== $identity['clientId'])) throw new RuntimeException('Original routing credentials changed.');
+            if ($payment['route'] !== null && $payment['route']['routing'] === null) throw new RuntimeException('Reconcile the original split-rule request.');
             if ($job['mode'] !== 'execute') {
                 // No fence means no provider write could have been dispatched.
                 $outcome = 'retry'; $result = ['noEffectConfirmed' => true];
@@ -73,6 +75,24 @@ function ez_central_snap_payment_job(array $job, string $worker): array
                     'name' => $order['customer']['name'], 'email' => $order['customer']['email'], 'expiresAt' => gmdate('Y-m-d\TH:i:s\Z', strtotime($order['expiresAt']))];
                 $client->paymentPayload($binding);
                 $client->verifyAuthentication();
+                $route = $payment['route'];
+                if ($route === null) {
+                    $mayHaveStarted = true;
+                    $route = ez_commerce_request('POST', $path . '/route/bind', ['environment' => $order['environment'], 'workerId' => $worker,
+                        'leaseToken' => $job['leaseToken'], 'credentialFingerprint' => $identity['credentialFingerprint'], 'clientId' => $identity['clientId']]);
+                    if (($route['mayCreateRule'] ?? false) !== true) throw new RuntimeException('Routing dispatch was not confirmed.');
+                    $createdRule = $client->createSplitRule($route['binding']);
+                    $routePayload = ['environment' => $order['environment'], 'evidence' => $createdRule['evidence']];
+                    try { $savedRule = ez_commerce_request('POST', $path . '/route/receipt', $routePayload); }
+                    catch (EzCommerceStorageException $error) {
+                        if ($error->httpStatus < 500) throw $error;
+                        $savedRule = ez_commerce_request('POST', $path . '/route/receipt', $routePayload);
+                    }
+                    if (($savedRule['recorded'] ?? false) !== true || ($savedRule['routing'] ?? null) !== $createdRule['routing']) throw new RuntimeException('Original split rule was not recorded.');
+                    $route['routing'] = $savedRule['routing'];
+                }
+                $binding['routing'] = $route['routing'];
+                $client->paymentPayload($binding);
                 // Even a missing bind acknowledgement requires reconciliation.
                 $mayHaveStarted = true;
                 $bound = ez_commerce_request('POST', $path . '/bind', ['environment' => $order['environment'], 'workerId' => $worker,

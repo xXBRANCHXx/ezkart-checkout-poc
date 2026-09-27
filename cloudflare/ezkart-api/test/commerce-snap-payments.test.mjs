@@ -4,24 +4,28 @@ import {randomBytes} from 'node:crypto';
 import {setupCommerceFixture} from './commerce-fixture.mjs';
 import {applyCommerceSchema} from './commerce-schema.mjs';
 import {recordSnapPaymentReceipt} from '../src/commerce-snap-payments.js';
+import {seedRoutingWallets,prepareFixtureRoute} from './payment-routing-fixture.mjs';
 
 const fingerprint='a'.repeat(64),clientId='MCH-FIXTURE-SNAP',account='1900800000347140',workerId='fixture_snap_worker';
 const iso=()=>new Date().toISOString().replace(/\.\d{3}Z$/,'Z');
 const path=order=>'/internal/commerce/snap-payments/'+order.id;
 async function fixture(t,options={}){
-  const f=await setupCommerceFixture(t,options),environment=options.bindings?.APP_ENVIRONMENT==='beta'?'production':'sandbox';
+  const f=await setupCommerceFixture(t,{...options,bindings:{COMMERCE_PLATFORM_WALLET_SELLER:'seller_bob',...options.bindings}}),environment=options.bindings?.APP_ENVIRONMENT==='beta'?'production':'sandbox';
+  await seedRoutingWallets(f,{environment,fingerprint,clientId});
   const create=async()=>{const r=await f.create(f.input({checkout:{intentHash:'f'.repeat(64),paymentFlow:'snap_bca',shop:'alice-shop'}}));assert.equal(r.status,200,r.error);return r.order;};
   const claim=async(order,mode='execute')=>{const r=await f.call('/internal/commerce/jobs/claim',{environment,workerId,kinds:['payment.create'],orderId:order.id,mode,limit:1,leaseSeconds:120});assert.equal(r.status,200,r.error);assert.equal(r.jobs.length,1);return r.jobs[0];};
   const bind=(order,job,overrides={})=>f.call(path(order)+'/bind',{environment,workerId,leaseToken:job.leaseToken,credentialFingerprint:fingerprint,clientId,partnerServiceId:'   19008',customerPrefix:'0',...overrides});
-  const start=async()=>{const order=await create(),job=await claim(order),r=await bind(order,job);assert.equal(r.status,200,r.error);assert.equal(r.mayCreate,true);return {order,job,binding:r.binding};};
+  const route=(order,job)=>prepareFixtureRoute(f,order,job,{environment,workerId,fingerprint,clientId});
+  const start=async()=>{const order=await create(),job=await claim(order);await route(order,job);const r=await bind(order,job);assert.equal(r.status,200,r.error);assert.equal(r.mayCreate,true);return {order,job,binding:r.binding};};
   const read=async order=>(await f.call(path(order)+'?environment='+environment)).payment;
   const counts=async()=>{const tables=['commerce_snap_payment_receipts','commerce_payment_accounts','commerce_payment_sessions','commerce_payment_captures','commerce_order_events','commerce_financial_journals'];
     const values={};for(const table of tables)values[table]=(await f.db.prepare('SELECT COUNT(*) AS n FROM '+table).first()).n;return values;};
-  return {...f,environment,create,claim,bind,start,read,counts,receipt:(order,input)=>f.call(path(order)+'/receipt',input)};
+  return {...f,environment,create,claim,bind,start,read,counts,route,receipt:(order,input)=>f.call(path(order)+'/receipt',input)};
 }
 function createBody(b){return {partnerServiceId:b.partnerServiceId,customerNo:b.customerPrefix,virtualAccountNo:b.partnerServiceId+b.customerPrefix,
   virtualAccountName:b.name,virtualAccountEmail:b.email,trxId:b.orderId,totalAmount:{value:b.amount+'.00',currency:'IDR'},
-  virtualAccountTrxType:'C',expiredDate:b.expiresAt,additionalInfo:{channel:'VIRTUAL_ACCOUNT_BCA',virtualAccountConfig:{reusableStatus:false}}};}
+  virtualAccountTrxType:'C',expiredDate:b.expiresAt,additionalInfo:{channel:'VIRTUAL_ACCOUNT_BCA',virtualAccountConfig:{reusableStatus:false},
+    ...(b.routing?{account:{id:b.routing.profileId,split_rule_id:b.routing.splitRuleId}}:{})}};}
 function created(b){return {responseCode:'2002700',responseMessage:'Successful',virtualAccountData:{...createBody(b),customerNo:account.slice(5),virtualAccountNo:'   '+account}};}
 function notice(b){const {totalAmount,expiredDate,...data}=created(b).virtualAccountData;return {...data,paidAmount:totalAmount,paymentRequestId:'PJP-one',trxDateTime:iso()};}
 const evidence=(b,operation,body,requestBody=null)=>({environment:b.environment,credentialFingerprint:b.credentialFingerprint,operation,
@@ -32,6 +36,7 @@ async function finish(f,job,outcome='uncertain'){return f.call('/internal/commer
 
 test('SNAP binds the exact leased original order once, freezes provider identity and denies unsafe retries',async t=>{
   const f=await fixture(t),order=await f.create(),job=await f.claim(order);
+  await f.route(order,job);
   assert.match(order.paymentRequestId,/^[0-9]{32}$/);assert.match(order.expiresAt,/\.000Z$/);
   assert.equal((await f.bind(order,job,{leaseToken:'foreign_token'})).status,409);
   const results=await Promise.all([f.bind(order,job),f.bind(order,job)]);assert.equal(results.filter(r=>r.mayCreate===true).length,1);
@@ -84,6 +89,10 @@ test('mismatched or ambiguous original receipts cannot change money, order, acco
   }
   const duplicate=notification(binding);duplicate.body=duplicate.body.replace('"trxId":','"trxId":"other","trxId":');assert.equal((await f.receipt(order,duplicate)).status,422);
   const changedRequest=createReceipt(binding);const req=JSON.parse(changedRequest.requestBody);req.totalAmount.value='1.00';changedRequest.requestBody=JSON.stringify(req);assert.equal((await f.receipt(order,changedRequest)).status,409);
+  for(const routing of [{id:'SAC-other',split_rule_id:binding.routing.splitRuleId},{id:binding.routing.profileId,split_rule_id:'different-rule'}]){
+    const changed=createReceipt(binding),response=JSON.parse(changed.body);response.virtualAccountData.additionalInfo.account=routing;changed.body=JSON.stringify(response);
+    assert.equal((await f.receipt(order,changed)).status,409);assert.deepEqual(await f.counts(),before);
+  }
   assert.equal((await f.receipt(order,{...notification(binding),credentialFingerprint:'f'.repeat(64)})).status,409);
   assert.deepEqual(await f.counts(),before);assert.equal(await f.stock(),10);
 });

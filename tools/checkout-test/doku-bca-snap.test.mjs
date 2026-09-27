@@ -9,7 +9,7 @@ const php=process.env.PHP_BINARY||'php',fixture=fileURLToPath(new URL('./doku-bc
 const keys=generateKeyPairSync('rsa',{modulusLength:2048,publicKeyEncoding:{type:'spki',format:'pem'},privateKeyEncoding:{type:'pkcs8',format:'pem'}});
 const credentials={environment:'sandbox',clientId:'MCH-fixture-only',secretKey:'fixture-secret-not-used-remotely',privateKey:keys.privateKey};
 const target='/cart/api/doku-snap-webhook.php',account='1900800000347140',time=1790484000;
-const binding={environment:'sandbox',externalId:'00000000000000000000000012345678',orderId:'EZK-S-'+'A'.repeat(24),partnerServiceId:'   19008',customerPrefix:'0',amount:58000,name:'Toko café ☕',email:'fixture@example.com',expiresAt:new Date((time+3600)*1000).toISOString().replace('.000Z','Z')};
+const binding={environment:'sandbox',externalId:'00000000000000000000000012345678',orderId:'EZK-S-'+'A'.repeat(24),partnerServiceId:'   19008',customerPrefix:'0',amount:58000,name:'Toko café ☕',email:'fixture@example.com',expiresAt:new Date((time+3600)*1000).toISOString().replace('.000Z','Z'),routing:{profileId:'SAC-fixture',splitRuleId:'split-fixture'}};
 const response=body=>({body:typeof body==='string'?body:JSON.stringify(body)});
 const token=()=>response({responseCode:'2007300',tokenType:'Bearer',accessToken:'fixture-token',expiresIn:900});
 const info=()=>({partnerServiceId:binding.partnerServiceId,customerNo:account.slice(5),virtualAccountNo:'   '+account,virtualAccountName:binding.name,
@@ -59,7 +59,7 @@ test('BCA SNAP creation signs the fixed 1.1 path and original numeric dispatch i
   assert.equal(header(request,'X-SIGNATURE'),createHmac('sha512',credentials.secretKey).update(canonical).digest('base64'));
   const payload=JSON.parse(request.body);assert.deepEqual(payload,result.results[0].result);
   assert.equal(payload.virtualAccountNo,'   190080');assert.equal(payload.virtualAccountTrxType,'C');assert.equal(payload.totalAmount.value,'58000.00');
-  assert.deepEqual(payload.additionalInfo,{channel:'VIRTUAL_ACCOUNT_BCA',virtualAccountConfig:{reusableStatus:false}});
+  assert.deepEqual(payload.additionalInfo,{channel:'VIRTUAL_ACCOUNT_BCA',virtualAccountConfig:{reusableStatus:false},account:{id:'SAC-fixture',split_rule_id:'split-fixture'}});
   const output=result.results[1].result;assert.equal(output.data.accountNumber,account);assert.equal(output.data.expiresAt,binding.expiresAt);assert.equal(output.evidence.responseBody,JSON.stringify(created()));
   for(const secret of [credentials.secretKey,'fixture-token','PRIVATE KEY'])assert(!JSON.stringify(result.results).includes(secret));
   const prodBinding={...binding,environment:'production',orderId:'EZK-P-'+'A'.repeat(24)},prodResponse=created();prodResponse.virtualAccountData.trxId=prodBinding.orderId;
@@ -83,6 +83,8 @@ test('creation rejects changed invoices, amounts, currency, account components, 
     r=>r.virtualAccountData.partnerServiceId='   19009',r=>r.virtualAccountData.customerNo=Number(account.slice(5)),r=>r.virtualAccountData.virtualAccountNo='   19008'+'0'.repeat(20),
     r=>r.virtualAccountData.virtualAccountNo='\t'+account,r=>r.virtualAccountData.virtualAccountNo='0'+account,r=>r.virtualAccountData.virtualAccountNo='   1900800000347141',
     r=>r.virtualAccountData.virtualAccountTrxType='O',r=>r.virtualAccountData.additionalInfo.channel='VIRTUAL_ACCOUNT_BNI',r=>r.virtualAccountData.additionalInfo.virtualAccountConfig={reusableStatus:true},
+    r=>r.virtualAccountData.additionalInfo.account={id:'SAC-other',split_rule_id:binding.routing.splitRuleId},
+    r=>r.virtualAccountData.additionalInfo.account={id:binding.routing.profileId,split_rule_id:'different-rule'},
     r=>r.virtualAccountData.expiredDate='2026-09-27T23:59:59Z',r=>r.virtualAccountData.virtualAccountName='Foreign name',r=>r.virtualAccountData.virtualAccountEmail='foreign@example.com']){
     const body=created();mutate(body);const result=run({actions:[['create']],responses:[token(),response(body)]});assert.equal(result.results[0].ok,false,JSON.stringify(body));assert.equal(result.requests.length,2);
   }

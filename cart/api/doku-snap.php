@@ -142,6 +142,12 @@ abstract class EzDokuSnapClient
 
     protected function now(): int { return ($this->clock)(); }
 
+    protected function splitRuleRequest(array $payload, string $externalId): array
+    {
+        if (preg_match('/^[0-9]{32}$/D', $externalId) !== 1) throw new EzDokuReadException('external_id');
+        return $this->signedPost('split-rules', '/sub-account/v2.0/split-rules', $payload, $externalId);
+    }
+
     private function signedPost(string $operation, string $path, array $payload, ?string $externalId = null, ?string $channel = null): array
     {
         $token = $this->token(); $timestamp = gmdate('Y-m-d\TH:i:s\Z', ($this->clock)());

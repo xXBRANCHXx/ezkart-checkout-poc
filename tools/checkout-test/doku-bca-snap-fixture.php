@@ -18,6 +18,8 @@ try {
     }, static function () use (&$time): int { return $time; });
     $binding = $input['binding'] ?? [];
     if (!array_key_exists('credentialFingerprint', $binding)) $binding['credentialFingerprint'] = $client->credentialFingerprint;
+    $routeBinding = $input['routeBinding'] ?? [];
+    if (!array_key_exists('credentialFingerprint', $routeBinding)) $routeBinding['credentialFingerprint'] = $client->credentialFingerprint;
     foreach ($input['actions'] ?? [] as $action) {
         try {
             if ($action[0] === 'connectionCLI') {
@@ -33,6 +35,8 @@ try {
                 'status' => $client->observeStatus($binding, $action[1], $action[2] ?? null),
                 'debug' => $client->__debugInfo(),
                 'authentication' => $client->verifyAuthentication(),
+                'splitPayload' => $client->splitPayload($routeBinding),
+                'splitCreate' => $client->createSplitRule($routeBinding),
             };
             $results[] = ['ok' => true, 'result' => $result];
         } catch (Throwable $error) { $results[] = ['ok' => false, 'reason' => $error instanceof EzDokuReadException ? $error->reason : get_class($error), 'error' => $error->getMessage()]; }

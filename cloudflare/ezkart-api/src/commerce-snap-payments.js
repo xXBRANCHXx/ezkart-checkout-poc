@@ -1,5 +1,6 @@
 import {commerceEnvironment,commerceHash,commerceOrder,applyCommerceEvent} from './commerce-orders.js';
 import {parseMessageJSON} from './message-json.js';
+import {paymentRoute} from './commerce-payment-routing.js';
 
 const fail=(message,status=422)=>{throw new Response(message,{status});};
 const fields=(value,allowed)=>{if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).some(key=>!allowed.includes(key)))fail('SNAP payment parameters are invalid');};
@@ -35,7 +36,8 @@ async function context(env,orderId,environment){
 
 export async function snapPayment(env,orderId,environment){
   const {row,order,binding}=await context(env,orderId,environment);
-  return {order,jobId:row.job_id,binding,clientId:row.client_id||null,boundAt:row.created_at||null,accountNumber:row.account_number||null};
+  return {order,jobId:row.job_id,binding,clientId:row.client_id||null,boundAt:row.created_at||null,accountNumber:row.account_number||null,
+    route:await paymentRoute(env,orderId,environment)};
 }
 
 export async function bindSnapPayment(env,orderId,input){
@@ -54,14 +56,16 @@ export async function bindSnapPayment(env,orderId,input){
   }
   if(order.state!=='creating'||Date.parse(order.expiresAt)<=Date.now()||Date.parse(order.expiresAt)>Date.now()+86400000
     ||!/^[0-9]{32}$/.test(order.paymentRequestId))fail('This order cannot start another payment',409);
+  const route=await paymentRoute(env,orderId,input.environment);
+  if(!route?.routing||route.binding.credentialFingerprint!==input.credentialFingerprint||route.clientId!==input.clientId)fail('Confirmed original payment routing is required',409);
   const frozen={environment:order.environment,credentialFingerprint:input.credentialFingerprint,externalId:order.paymentRequestId,
     orderId,partnerServiceId:input.partnerServiceId,customerPrefix:input.customerPrefix,amount:order.total,
-    name:order.customer.name,email:order.customer.email,expiresAt:new Date(order.expiresAt).toISOString().replace('.000Z','Z')};
+    name:order.customer.name,email:order.customer.email,expiresAt:new Date(order.expiresAt).toISOString().replace('.000Z','Z'),routing:route.routing};
   try{await env.DB.prepare(`INSERT INTO commerce_snap_payment_bindings(order_id,seller_id,commerce_environment,job_id,attempt_id,
     credential_fingerprint,client_id,external_id,binding_json,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)`)
     .bind(orderId,order.sellerId,order.environment,row.job_id,row.job_id+':'+row.attempts,input.credentialFingerprint,input.clientId,
       order.paymentRequestId,JSON.stringify(frozen),now).run();}
-  catch(error){if(/commerce_snap_dispatch_mismatch|UNIQUE constraint/.test(String(error)))fail('Payment dispatch changed. Reconcile the original request.',409);throw error;}
+  catch(error){if(/commerce_snap_dispatch_mismatch|payment_route_|UNIQUE constraint/.test(String(error)))fail('Payment dispatch changed. Reconcile the original request.',409);throw error;}
   return {mayCreate:true,binding:frozen};
 }
 
@@ -75,7 +79,8 @@ function account(data,binding,expected){
 }
 function createPayload(b){return {partnerServiceId:b.partnerServiceId,customerNo:b.customerPrefix,virtualAccountNo:b.partnerServiceId+b.customerPrefix,
   virtualAccountName:b.name,virtualAccountEmail:b.email,trxId:b.orderId,totalAmount:{value:String(b.amount)+'.00',currency:'IDR'},
-  virtualAccountTrxType:'C',expiredDate:b.expiresAt,additionalInfo:{channel:'VIRTUAL_ACCOUNT_BCA',virtualAccountConfig:{reusableStatus:false}}};}
+  virtualAccountTrxType:'C',expiredDate:b.expiresAt,additionalInfo:{channel:'VIRTUAL_ACCOUNT_BCA',virtualAccountConfig:{reusableStatus:false},
+    ...(b.routing?{account:{id:b.routing.profileId,split_rule_id:b.routing.splitRuleId}}:{})}};}
 
 /** The signed PHP service verifies TLS/provider signatures. Revalidate original
  * identity and money here; raw receipts stay private and no bearer token crosses.
@@ -98,6 +103,8 @@ export async function recordSnapPaymentReceipt(env,orderId,input){
       ||(va.virtualAccountEmail!==undefined&&va.virtualAccountEmail!==binding.email)
       ||(va.additionalInfo?.virtualAccountConfig?.reusableStatus!==undefined&&va.additionalInfo.virtualAccountConfig.reusableStatus!==false)
       ||date(va.expiredDate)!==date(binding.expiresAt))fail('Provider creation receipt does not match the original request',409);
+    if(va.additionalInfo.account!==undefined&&(!binding.routing||va.additionalInfo.account?.id!==binding.routing.profileId
+      ||va.additionalInfo.account?.split_rule_id!==binding.routing.splitRuleId))fail('Provider creation returned different routing',409);
     money(va.totalAmount,order.total);accountNumber=account(va,binding,row.account_number);
     type='payment.created';eventKey='snap_created:'+binding.externalId;
     data={...base,providerRequestId:order.paymentRequestId,expiresAt:binding.expiresAt,method:'VIRTUAL_ACCOUNT_BCA',accountNumber};

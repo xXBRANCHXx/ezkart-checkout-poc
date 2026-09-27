@@ -1,9 +1,9 @@
 <?php
 declare(strict_types=1);
-require_once __DIR__ . '/doku-snap.php';
+require_once __DIR__ . '/doku-payment-routing.php';
 
 /** BCA SNAP 1.1, aggregator/DGPC, closed amount, non-reusable. */
-final class EzDokuBcaSnapClient extends EzDokuSnapClient
+final class EzDokuBcaSnapClient extends EzDokuPaymentRoutingClient
 {
     public const NOTIFICATION_PATH = '/cart/api/doku-snap-webhook.php';
 
@@ -33,6 +33,7 @@ final class EzDokuBcaSnapClient extends EzDokuSnapClient
     public function paymentPayload(array $binding): array
     {
         $allowed = ['environment', 'credentialFingerprint', 'externalId', 'orderId', 'partnerServiceId', 'customerPrefix', 'amount', 'name', 'email', 'expiresAt'];
+        if (array_key_exists('routing', $binding)) $allowed[] = 'routing';
         $prefix = $this->credentials['environment'] === 'sandbox' ? 'S' : 'P';
         if (count($binding) !== count($allowed) || array_diff(array_keys($binding), $allowed)
             || ($binding['environment'] ?? null) !== $this->credentials['environment']
@@ -47,12 +48,20 @@ final class EzDokuBcaSnapClient extends EzDokuSnapClient
             || !is_string($binding['email'] ?? null) || strlen($binding['email']) > 255 || filter_var($binding['email'], FILTER_VALIDATE_EMAIL) === false) throw new EzDokuReadException('payment_binding');
         $name = self::text($binding['name'] ?? null, 255);
         $expiry = self::date($binding['expiresAt'] ?? null);
+        $routing = [];
+        if (array_key_exists('routing', $binding)) {
+            $route = $binding['routing'];
+            if (!is_array($route) || count($route) !== 2 || array_diff(array_keys($route), ['profileId', 'splitRuleId'])
+                || !is_string($route['profileId'] ?? null) || preg_match('/^SAC-[A-Za-z0-9_-]{1,18}$/D', $route['profileId']) !== 1
+                || !is_string($route['splitRuleId'] ?? null) || preg_match('/^[A-Za-z0-9][A-Za-z0-9_-]{0,35}$/D', $route['splitRuleId']) !== 1) throw new EzDokuReadException('routing_binding');
+            $routing = ['account' => ['id' => $route['profileId'], 'split_rule_id' => $route['splitRuleId']]];
+        }
         return ['partnerServiceId' => $binding['partnerServiceId'], 'customerNo' => $binding['customerPrefix'],
             'virtualAccountNo' => $binding['partnerServiceId'] . $binding['customerPrefix'], 'virtualAccountName' => $name,
             'virtualAccountEmail' => $binding['email'], 'trxId' => $binding['orderId'],
             'totalAmount' => ['value' => (string) $binding['amount'] . '.00', 'currency' => 'IDR'],
             'virtualAccountTrxType' => 'C', 'expiredDate' => $expiry->format('Y-m-d\TH:i:s\Z'),
-            'additionalInfo' => ['channel' => 'VIRTUAL_ACCOUNT_BCA', 'virtualAccountConfig' => ['reusableStatus' => false]]];
+            'additionalInfo' => ['channel' => 'VIRTUAL_ACCOUNT_BCA', 'virtualAccountConfig' => ['reusableStatus' => false], ...$routing]];
     }
 
     /** Padding never changes digits. Only the documented 16-digit aggregator DGPC is supported. */
@@ -72,6 +81,7 @@ final class EzDokuBcaSnapClient extends EzDokuSnapClient
     /** Caller must durably fence dispatch before this call. Never retry an unknown result. */
     public function createAccount(array $binding): array
     {
+        if (!isset($binding['routing'])) throw new EzDokuReadException('routing_required');
         $payload = $this->paymentPayload($binding);
         $expiry = self::date($binding['expiresAt'])->getTimestamp();
         if ($expiry <= $this->now() || $expiry > $this->now() + 86400) throw new EzDokuReadException('expiry');
@@ -83,6 +93,9 @@ final class EzDokuBcaSnapClient extends EzDokuSnapClient
             || ($data->virtualAccountTrxType ?? null) !== 'C' || ($data->additionalInfo->channel ?? null) !== 'VIRTUAL_ACCOUNT_BCA'
             || (property_exists($data, 'virtualAccountEmail') && $data->virtualAccountEmail !== $binding['email'])
             || (isset($data->additionalInfo->virtualAccountConfig->reusableStatus) && $data->additionalInfo->virtualAccountConfig->reusableStatus !== false)) throw new EzDokuReadException('payment_response');
+        if (property_exists($data->additionalInfo, 'account') && (!($data->additionalInfo->account instanceof stdClass)
+            || ($data->additionalInfo->account->id ?? null) !== $binding['routing']['profileId']
+            || ($data->additionalInfo->account->split_rule_id ?? null) !== $binding['routing']['splitRuleId'])) throw new EzDokuReadException('routing_response');
         self::money($data->totalAmount ?? null, $binding['amount']);
         $returnedExpiry = self::date($data->expiredDate ?? null);
         if ($returnedExpiry->getTimestamp() !== $expiry || $expiry <= $this->now()) throw new EzDokuReadException('expiry');

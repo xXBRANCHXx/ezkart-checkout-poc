@@ -60,6 +60,12 @@ lost DGPC creation reply still require provider acceptance evidence.
 
 ## Durable dispatch and recovery
 
+New requests also use [durable payment routing](doku-payment-routing.md): a
+confirmed seller wallet, a dedicated confirmed platform fee wallet, one original
+flat split allocation and its accepted provider receipt precede payment-account
+creation. Migration 0051 preserves older unrouted evidence for callbacks and
+reconciliation while preventing new unrouted dispatches.
+
 Migration 0048 adds two immutable private tables for the original dispatch
 binding and provider receipts. Existing orders, snapshots, accounts, captures,
 fees and journals are preserved. Each SNAP order starts with one numeric external
@@ -119,7 +125,8 @@ isolated provider fixtures and create no real DOKU payment or money movement.
 
 Still required: actual provider channel configuration/acceptance and hosted live
 cutover; verified paid/expired/failed status recovery, including a lost DGPC reply;
-settlement and actual fees; provider refunds, Sub-Account routing and payouts.
+settlement and actual fees; provider refunds, live Sub-Account routing acceptance
+and payouts.
 Checkout wiring does not establish any of those financial capabilities.
 
 ## Live account setup

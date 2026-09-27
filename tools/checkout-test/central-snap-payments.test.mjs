@@ -6,18 +6,22 @@ import {readFile,writeFile,access,mkdir} from 'node:fs/promises';
 import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {setupCentralFixture} from './central-fixture.mjs';
+import {seedRoutingWallets} from '../../cloudflare/ezkart-api/test/payment-routing-fixture.mjs';
 
 const php=process.env.PHP_BINARY||'php',keys=generateKeyPairSync('rsa',{modulusLength:2048,publicKeyEncoding:{type:'spki',format:'pem'},privateKeyEncoding:{type:'pkcs8',format:'pem'}});
 const target='/cart/api/doku-snap-webhook.php',account='1900800000347140';
 const iso=()=>new Date().toISOString().replace(/\.\d{3}Z$/,'Z');
-async function fixture(t,{beta=false,...overrides}={}){
+async function fixture(t,{beta=false,routing=true,...overrides}={}){
   const environment=beta?'production':'sandbox';
   const f=await setupCentralFixture(t,{EZKART_TEST_SNAP:'1',EZKART_DOKU_SANDBOX_PAYMENT_FLOW:'snap_bca',EZKART_DOKU_PRODUCTION_PAYMENT_FLOW:'snap_bca',
     EZKART_DOKU_SANDBOX_SNAP_PRIVATE_KEY:keys.privateKey,EZKART_DOKU_PRODUCTION_SNAP_PRIVATE_KEY:keys.privateKey,
     EZKART_DOKU_SANDBOX_SNAP_BCA_PARTNER_SERVICE_ID:'19008',EZKART_DOKU_PRODUCTION_SNAP_BCA_PARTNER_SERVICE_ID:'19008',
     EZKART_DOKU_SANDBOX_SNAP_BCA_CUSTOMER_PREFIX:'0',EZKART_DOKU_PRODUCTION_SNAP_BCA_CUSTOMER_PREFIX:'0',
     ...(beta?{EZKART_DEPLOYMENT_ENVIRONMENT:'beta',EZKART_COMMERCE_ENVIRONMENT:'production',EZKART_CLOUDFLARE_API_URL:'https://ezkart-api-beta.fixture.workers.dev'}:{}),...overrides},
-    beta?{bindings:{APP_ENVIRONMENT:'beta'}}:{});
+    {bindings:{COMMERCE_PLATFORM_WALLET_SELLER:routing?'seller_bob':'',...(beta?{APP_ENVIRONMENT:'beta'}:{})}});
+  const clientId=beta?'MCH-PRODUCTION-TEST':'MCH-SANDBOX-TEST',secret=beta?'fixture-doku-production-secret':'fixture-doku-sandbox-secret';
+  const hash=value=>createHash('sha256').update(value).digest('hex');
+  if(routing)await seedRoutingWallets(f,{environment,clientId,fingerprint:hash(JSON.stringify([environment,clientId,hash(secret),hash(keys.publicKey)]))});
   const create=async()=>{const r=await f.create(f.input({checkout:{intentHash:'f'.repeat(64),paymentFlow:'snap_bca',shop:'alice-shop'}}));assert.equal(r.status,200,r.error);return r.order;};
   return {...f,environment,create,read:async order=>(await f.call('/internal/commerce/snap-payments/'+order.id+'?environment='+environment)).payment,
     providerCreates:async()=>(await f.app.calls()).filter(c=>c.url.includes('/transfer-va/create-va'))};
@@ -49,6 +53,12 @@ test('beta dispatcher signs production SNAP, saves one original request and rend
   const canonical=['POST',new URL(request.url).pathname,'fixture-snap-payment-token',createHash('sha256').update(request.body).digest('hex'),header(request,'X-TIMESTAMP')].join(':');
   assert.equal(header(request,'X-SIGNATURE'),createHmac('sha512','fixture-doku-production-secret').update(canonical).digest('base64'));
   assert.equal(JSON.parse(request.body).trxId,order.id);assert.equal(JSON.parse(request.body).totalAmount.value,order.total+'.00');
+  const split=(await f.app.calls()).filter(c=>c.url.endsWith('/split-rules'));assert.equal(split.length,1);
+  assert.deepEqual(JSON.parse(split[0].body),{transactionType:'PAYMENT',rules:[{type:'FLAT',value:21250,currency:'IDR',accountNumber:2010000002}]});
+  assert.notEqual(header(split[0],'X-EXTERNAL-ID'),order.paymentRequestId);
+  assert.deepEqual(JSON.parse(request.body).additionalInfo.account,{id:'SAC-alice',split_rule_id:payment.binding.routing.splitRuleId});
+  const splitCanonical=['POST','/sub-account/v2.0/split-rules','fixture-snap-payment-token',createHash('sha256').update(split[0].body).digest('hex'),header(split[0],'X-TIMESTAMP')].join(':');
+  assert.equal(header(split[0],'X-SIGNATURE'),createHmac('sha512','fixture-doku-production-secret').update(splitCanonical).digest('base64'));
   const receipt=await f.db.prepare('SELECT body_json,request_json FROM commerce_snap_payment_receipts').first();assert.equal(receipt.request_json,request.body);
   const publicStatus=await f.app.request('/cart/api/status.php?order='+order.id);assert.equal(publicStatus.status,200);assert.equal(publicStatus.data.environment,'production');assert.equal(publicStatus.data.payment_details.account_number,account);
   for(const privateText of ['credentialFingerprint','PRIVATE KEY','fixture-snap-payment-token','fixture-doku-production-secret','body_json','providerRequestId'])assert(!JSON.stringify(publicStatus.data).includes(privateText));
@@ -68,7 +78,7 @@ test('lost receipt acknowledgement retries only internal storage and never creat
   const f=await fixture(t),order=await f.create();f.control.drop='/internal/commerce/snap-payments/'+order.id+'/receipt';
   const done=await dispatch(f);assert.equal(done.code,0,done.stderr+done.stdout);assert.equal((await f.providerCreates()).length,1);
   assert.equal((await f.read(order)).order.state,'pending');assert.equal(await f.count('commerce_snap_payment_receipts'),1);
-  assert.equal(f.control.calls.filter(c=>c.path.endsWith('/receipt')).length,2);
+  assert.equal(f.control.calls.filter(c=>c.path==='/internal/commerce/snap-payments/'+order.id+'/receipt').length,2);
 });
 
 test('lost dispatch acknowledgement and lost provider response remain uncertain without a second create',async t=>{
@@ -131,4 +141,46 @@ test('the beta operator status command waits sixty seconds, stores read evidence
   for(const flag of ['paymentConfirmed','settlementVerified','createRetryAllowed'])assert.equal(result[flag],false);
   assert.equal((await f.providerCreates()).length,1);assert.equal(await f.count('commerce_payment_captures'),0);assert.equal((await f.read(order)).order.state,'pending');
   const receipt=await f.db.prepare("SELECT body_json FROM commerce_snap_payment_receipts WHERE operation='bca-status'").first();assert.deepEqual(JSON.parse(receipt.body_json),{responseCode:'2002600',virtualAccountData:[]});
+});
+
+test('lost split dispatch or provider replies never repeat the rule or proceed to payment',async t=>{
+  for(const kind of ['bind','provider','wrong_rule'])await t.test(kind,async t=>{
+    const f=await fixture(t),order=await f.create();
+    if(kind==='bind')f.control.drop='/internal/commerce/snap-payments/'+order.id+'/route/bind';
+    else await writeFile(join(f.app.directory,'snap-control.json'),JSON.stringify(kind==='provider'?{loseSplit:true}:{wrongSplit:true}));
+    const first=await dispatch(f);assert.equal(first.code,2,first.stderr+first.stdout);
+    assert.equal((await f.read(order)).order.paymentJobState,'uncertain');assert.equal((await f.providerCreates()).length,0);
+    const splits=()=>f.app.calls().then(rows=>rows.filter(c=>c.url.endsWith('/split-rules')));
+    assert.equal((await splits()).length,kind==='bind'?0:1);
+    await f.db.prepare("UPDATE commerce_jobs SET available_at='2000-01-01T00:00:00.000Z' WHERE order_id=? AND kind='payment.create'").bind(order.id).run();
+    const again=await dispatch(f);assert.equal(again.code,2,again.stderr+again.stdout);assert.equal((await splits()).length,kind==='bind'?0:1);
+    assert.equal((await f.providerCreates()).length,0);assert.equal(await f.count('commerce_payment_captures'),0);assert.equal(await f.count('commerce_financial_journals'),0);
+  });
+});
+
+test('a lost split receipt acknowledgement replays only exact storage before one routed payment',async t=>{
+  const f=await fixture(t),order=await f.create(),target='/internal/commerce/snap-payments/'+order.id+'/route/receipt';f.control.drop=target;
+  const result=await dispatch(f);assert.equal(result.code,0,result.stderr+result.stdout);
+  assert.equal(f.control.calls.filter(c=>c.path===target).length,2);
+  assert.equal((await f.app.calls()).filter(c=>c.url.endsWith('/split-rules')).length,1);assert.equal((await f.providerCreates()).length,1);
+  assert.equal((await f.read(order)).order.state,'pending');assert.equal(await f.count('commerce_payment_route_receipts'),1);
+});
+
+test('a store without confirmed routing cannot fall back to an ordinary merchant payment',async t=>{
+  const f=await fixture(t,{routing:false}),order=await f.create(),result=await dispatch(f);
+  assert.equal(result.code,2,result.stderr+result.stdout);assert.equal((await f.providerCreates()).length,0);
+  assert.equal((await f.app.calls()).filter(c=>c.url.endsWith('/split-rules')).length,0);
+  assert.equal(await f.count('commerce_payment_route_bindings'),0);assert.equal(await f.count('commerce_payment_captures'),0);
+});
+
+test('a saved split rule survives payment pre-dispatch storage failure and is reused through reconciliation',async t=>{
+  const f=await fixture(t),order=await f.create();f.control.fail='/internal/commerce/snap-payments/'+order.id+'/bind';
+  const failed=await dispatch(f);assert.equal(failed.code,2,failed.stderr+failed.stdout);
+  const initial=await f.read(order);assert.equal(initial.binding,null);assert(initial.route.routing);assert.equal((await f.providerCreates()).length,0);
+  f.control.fail=null;
+  const ready=()=>f.db.prepare("UPDATE commerce_jobs SET available_at='2000-01-01T00:00:00.000Z' WHERE order_id=? AND kind='payment.create'").bind(order.id).run();
+  await ready();const reconciled=await dispatch(f);assert.equal(reconciled.code,0,reconciled.stderr+reconciled.stdout);assert.equal((await f.read(order)).order.paymentJobState,'retry');
+  await ready();const recovered=await dispatch(f);assert.equal(recovered.code,0,recovered.stderr+recovered.stdout);
+  const current=await f.read(order);assert.equal(current.order.state,'pending');assert.deepEqual(current.binding.routing,initial.route.routing);
+  assert.equal((await f.app.calls()).filter(c=>c.url.endsWith('/split-rules')).length,1);assert.equal((await f.providerCreates()).length,1);
 });

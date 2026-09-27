@@ -71,6 +71,24 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 27 September: bound seller routing and original flat split rules
+
+[Payment routing](doku-payment-routing.md) now joins confirmed seller and platform
+Sub-Accounts under the same parent/credentials, derives the original fee snapshot's
+flat allocation, fences a single split-rule request and requires its accepted
+receipt before BCA dispatch. Account IDs and the rule are attached to the actual
+payment payload. Lost or mismatched split responses cannot start an unrouted
+payment or silently create another rule. Existing payment captures and callbacks
+remain supported after migration 0051. No rule creation proves settlement or
+available earnings; negative seller allocations are preserved without inventing
+actual provider fees. Actual account provisioning and small-net behavior still
+need provider acceptance, alongside the remaining financial ledger and payouts.
+
+All 143 relevant Worker/PHP/browser cases pass. The fresh beta export restores
+cleanly; migration 0051 preserves all 148 original exported tables in rehearsal,
+with no integrity or foreign-key errors. This implementation does not enable
+checkout, configure a live fee destination or close a top-level financial gate.
+
 ### 27 September: whole-order delivery evidence for financial release
 
 The [financial delivery receipt](financial-delivery.md) requires every original

@@ -92,8 +92,15 @@ should target its actively developed Sub-Account V2. Payment routing uses the
 registered profile and optional split-rule ID; routing identifiers need explicit
 validation because invalid values can fail silently. Settlement applies the split
 after processing fees. A percentage of net settlement would not reproduce the
-owner's percentage of product subtotal. The proposed flat platform allocation
-still needs its actual provider integration and acceptance.
+owner's percentage of product subtotal. The flat platform allocation still needs
+live routing and settlement acceptance.
+
+[Payment routing](doku-payment-routing.md) now implements the original flat
+allocation through a fenced split-rule request and accepted receipt before the
+BCA dispatch. The seller and dedicated platform fee wallet must be independently
+confirmed under the same parent and credentials. Actual provisioning, small-net
+behavior and settlement credits remain required; creating the rule never posts
+settlement or available funds.
 
 The transaction-history/status adapter must preserve account scope, correlate
 payment, fee and destination rows, distinguish pending and voided records, and
