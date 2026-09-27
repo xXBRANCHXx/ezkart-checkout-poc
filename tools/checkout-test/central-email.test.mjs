@@ -9,7 +9,8 @@ import {browser,pageFor,choose} from './review-workspace-fixture.mjs';
 import {emailFixtureConfiguration,emailFixtureEvent,emailFixtureCallback} from '../../cloudflare/ezkart-api/test/email-fixture.mjs';
 const key=()=>randomBytes(16).toString('hex'),base='/v1/commerce/notifications',screens='/tmp/ezkart-email-ui-01a0d643';
 const root=p=>p.locator('[data-notification-workspace]');
-async function fixture(t,{lost=false}={}){
+async function fixture(t,{lost=false,beta=false}={}){
+  const environment=beta?'production':'sandbox';
   const mail=[],reads=[];
   const outbound=async request=>{
     const url=new URL(request.url);
@@ -21,13 +22,13 @@ async function fixture(t,{lost=false}={}){
     assert.equal(url.href,'https://api.resend.com/emails');assert.equal(request.method,'POST');
     const payload=await request.json(),id=randomUUID();mail.push({payload,id,createdAt:new Date().toISOString()});if(lost)throw Error('Fixture lost the send acknowledgement');return Response.json({id});
   };
-  const f=await setupCentralFixture(t,{EZKART_TEST_NOTIFICATIONS:'1'},{bindings:{...emailFixtureConfiguration(),COMMERCE_EMAIL_RECONCILE:'enabled'},outbound});
+  const f=await setupCentralFixture(t,{EZKART_TEST_NOTIFICATIONS:'1',...(beta?{EZKART_DEPLOYMENT_ENVIRONMENT:'beta',EZKART_COMMERCE_ENVIRONMENT:'production',EZKART_CLOUDFLARE_API_URL:'https://ezkart-api-beta.fixture.workers.dev'}:{})},{bindings:{...emailFixtureConfiguration(),COMMERCE_EMAIL_RECONCILE:'enabled',...(beta?{APP_ENVIRONMENT:'beta'}:{})},outbound});
   const cookie=f.app.adminCookie({supabase_access_token:await f.merchantToken('alice','alice@example.test'),admin_user:{id:'alice',email:'alice@example.test'}});
   const settings=await f.merchant('/v1/commerce/settings');settings.notifications.values.payment_confirmed={email:true,inApp:false};
   assert.equal((await f.merchant('/v1/commerce/settings',{kind:'notifications',values:settings.notifications.values,revision:0,requestKey:key()},{method:'POST'})).status,200);
-  const create=async()=>{const made=await f.create(f.input());assert.equal(made.status,200,made.error);assert.equal((await f.paid(made.order)).status,200);assert.equal((await f.call('/internal/commerce/notifications/drain',{environment:'sandbox'})).failed,0);return made.order;};
+  const create=async()=>{const made=await f.create(f.input());assert.equal(made.status,200,made.error);assert.equal((await f.paid(made.order)).status,200);assert.equal((await f.call('/internal/commerce/notifications/drain',{environment})).failed,0);return made.order;};
   const callback=async(type,index=0)=>{const message=mail[index],request=emailFixtureCallback(emailFixtureEvent(message.payload,message.id,type));const result=await f.mf.dispatchFetch(request.url,{method:'POST',headers:Object.fromEntries(request.headers),body:await request.text()});assert.equal(result.status,200,await result.text());};
-  const drain=async()=>{const r=await f.call('/internal/commerce/email/drain',{environment:'sandbox'});assert.equal(r.failed,0,JSON.stringify(r));return r;};
+  const drain=async()=>{const r=await f.call('/internal/commerce/email/drain',{environment});assert.equal(r.failed,0,JSON.stringify(r));return r;};
   return {...f,cookie,mail,reads,create,callback,drain};
 }
 
@@ -38,6 +39,25 @@ async function investigationCommand(f,args,extraEnv={}){
     child.stdout.on('data',v=>stdout+=v);child.stderr.on('data',v=>stderr+=v);child.on('error',reject);child.on('close',code=>resolve({code,stdout,stderr,data:stdout?JSON.parse(stdout):null}));
   });
 }
+
+test('beta email recovery preserves live intent across lost acknowledgements and refuses another deployment or provider mode',async t=>{
+  const f=await fixture(t,{lost:true,beta:true});await f.create();assert.equal((await f.call('/internal/commerce/email/drain',{environment:'production'})).failed,1);
+  const request=await f.db.prepare('SELECT * FROM commerce_email_requests').first();assert.equal(request.commerce_environment,'production');
+  const list=await investigationCommand(f,['--action=list']);assert.equal(list.code,0,list.stderr);assert.equal(list.data.items[0].id,request.id);
+  const campaign=await investigationCommand(f,['--action=list','--purpose=campaign']);assert.equal(campaign.code,0,campaign.stderr);assert.deepEqual(campaign.data.items,[]);
+  const intent=f.app.directory+'/beta-lookup.json',args=['--action=lookup','--request='+request.id,'--provider='+f.mail[0].id,'--operator=fixture_operator','--intent='+intent];
+  f.control.drop='/internal/commerce/email/lookup';assert.equal((await investigationCommand(f,args)).code,1);
+  const saved=await readFile(intent,'utf8'),before=f.control.calls.length;
+  for(const extra of [
+    {EZKART_DEPLOYMENT_ENVIRONMENT:'production'},
+    {EZKART_COMMERCE_ENVIRONMENT:'sandbox'},
+    {EZKART_CLOUDFLARE_API_URL:'https://ezkart-api-test.fixture.workers.dev'},
+    {EZKART_DEPLOYMENT_ENVIRONMENT:'test',EZKART_COMMERCE_ENVIRONMENT:'sandbox',EZKART_CLOUDFLARE_API_URL:'https://ezkart-api-test.fixture.workers.dev'},
+  ])assert.equal((await investigationCommand(f,['--action=retry','--intent='+intent],extra)).code,1);
+  assert.equal(f.control.calls.length,before);assert.equal(await readFile(intent,'utf8'),saved);
+  const retry=await investigationCommand(f,['--action=retry','--intent='+intent]);assert.equal(retry.code,0,retry.stderr);assert.equal(retry.data.receipt.outcome,'matched');assert.equal(retry.data.replayed,true);
+  assert.equal(f.mail.length,1);assert.equal(f.reads.length,1);assert.equal(await readFile(intent,'utf8'),saved);
+});
 
 test('operator CLI preserves lost lookup/resolution acknowledgements and merchant recovery history works on desktop and phone',async t=>{
   const f=await fixture(t,{lost:true});await f.create();assert.equal((await f.call('/internal/commerce/email/drain',{environment:'sandbox'})).failed,1);

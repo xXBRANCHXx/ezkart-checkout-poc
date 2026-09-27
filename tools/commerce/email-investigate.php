@@ -54,12 +54,15 @@ function ez_email_investigation_main(array $arguments, ?Closure $transport = nul
     $intentPath = null;
     try {
         $input = ez_email_investigation_arguments($arguments);
-        if (ez_config('deployment_environment') !== 'test') throw new InvalidArgumentException('This workbench command accepts TEST only.');
+        $deployment = ez_config('deployment_environment');
+        if (!in_array($deployment, ['test', 'beta'], true)) throw new InvalidArgumentException('This workbench command accepts TEST or beta only.');
+        $environment = ez_deployment_profile($deployment)['commerce_environment'];
+        if (ez_commerce_environment() !== $environment) throw new InvalidArgumentException('Provider settings do not match this workbench environment.');
         $connection = ez_database_configuration();
-        $connectionHash = hash('sha256', 'test' . "\n" . $connection['url'] . "\n" . ez_config('commerce_service_secret'));
+        $connectionHash = hash('sha256', $deployment . "\n" . $connection['url'] . "\n" . ez_config('commerce_service_secret'));
         $action = $input['action']; $payload = null; $method = 'GET';
         if (in_array($action, ['list', 'view'], true)) {
-            $target = '/internal/commerce/' . (($input['purpose'] ?? 'transactional') === 'campaign' ? 'campaigns' : 'email') . '/investigations' . ($action === 'view' ? '/' . $input['request'] : '') . '?environment=sandbox';
+            $target = '/internal/commerce/' . (($input['purpose'] ?? 'transactional') === 'campaign' ? 'campaigns' : 'email') . '/investigations' . ($action === 'view' ? '/' . $input['request'] : '') . '?environment=' . $environment;
             foreach (['state', 'cursor'] as $field) if (isset($input[$field])) $target .= '&' . $field . '=' . rawurlencode($input[$field]);
         } else {
             $intentPath = ez_email_investigation_path($input['intent']);
@@ -67,7 +70,7 @@ function ez_email_investigation_main(array $arguments, ?Closure $transport = nul
                 if (!is_file($intentPath) || (fileperms($intentPath) & 0077) !== 0 || filesize($intentPath) > 6000) throw new InvalidArgumentException('Use the preserved private intent file.');
                 $saved = json_decode((string) file_get_contents($intentPath), true, 12, JSON_THROW_ON_ERROR);
                 if (!is_array($saved) || array_keys($saved) !== ['version', 'connectionHash', 'arguments', 'key'] || $saved['version'] !== 1 || !hash_equals($connectionHash, (string) $saved['connectionHash'])
-                    || !is_array($saved['arguments']) || preg_match('/^[a-f0-9]{32}$/D', (string) $saved['key']) !== 1) throw new InvalidArgumentException('This intent does not match the configured TEST connection.');
+                    || !is_array($saved['arguments']) || preg_match('/^[a-f0-9]{32}$/D', (string) $saved['key']) !== 1) throw new InvalidArgumentException('This intent does not match the configured workbench connection.');
                 $input = ez_email_investigation_arguments($saved['arguments']);
                 if (!in_array($input['action'], ['lookup', 'resolve'], true) || ez_email_investigation_path($input['intent']) !== $intentPath) throw new InvalidArgumentException('The preserved intent is invalid.');
                 $action = $input['action']; $requestKey = $saved['key'];
@@ -80,7 +83,7 @@ function ez_email_investigation_main(array $arguments, ?Closure $transport = nul
                 try { if (fwrite($file, $encoded) !== strlen($encoded) || !fflush($file) || !fsync($file)) throw new RuntimeException('Intent could not be preserved.'); }
                 finally { fclose($file); }
             }
-            $payload = ['environment' => 'sandbox', 'requestId' => $input['request'], 'operator' => $input['operator']];
+            $payload = ['environment' => $environment, 'requestId' => $input['request'], 'operator' => $input['operator']];
             if ($action === 'lookup') $payload += ['providerId' => $input['provider'], 'lookupKey' => $requestKey];
             else $payload += ['lookupKey' => $input['lookup'], 'expectedUpdatedAt' => $input['updated-at'], 'resolutionKey' => $requestKey];
             $method = 'POST'; $target = '/internal/commerce/' . (($input['purpose'] ?? 'transactional') === 'campaign' ? 'campaigns' : 'email') . '/' . $action;

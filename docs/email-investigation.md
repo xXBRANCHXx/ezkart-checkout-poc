@@ -88,7 +88,8 @@ the submission job successful. It does not change a finished attempt or override
 a bounce, complaint or failed-delivery state. A concurrent edit rejects a stale
 resolution; identical retries recover the same receipt.
 
-The TEST-only command uses the configured PHP commerce client:
+The workbench command uses the configured PHP commerce client. It accepts
+TEST/sandbox or beta/production with the matching API and service credentials:
 
 ```sh
 php tools/commerce/email-investigate.php --action=list
@@ -104,8 +105,9 @@ Replace placeholders with the exact returned references. Before a new lookup or
 resolution, choose an unused intent path in an existing mode-0700 directory
 outside the repository/web root. The command exclusively creates and flushes a
 mode-0600 intent before calling the Worker. Preserve it after interruption;
-`retry` reuses its key and checks the original TEST connection fingerprint.
-Existing files, symlinks, public directories and production configuration are
+`retry` reuses its key and checks the original deployment/API/service connection
+fingerprint. A TEST intent cannot be replayed against beta, or conversely.
+Existing files, symlinks, public directories and main's production deployment are
 rejected. No signing or provider key is accepted on the command line.
 
 After a matched lookup, reload `view` and use its `request.updatedAt`:
@@ -121,6 +123,14 @@ lookup without matching proof, or one for an error/interruption. The result is
 printed as JSON; its authoritative copy and all prior evidence remain in D1.
 The command is unavailable through HTTP. It never enables sending, removes
 suppression, changes an email address or creates another submission.
+
+The 27 September beta extension passes its focused live-mode recovery case,
+plus all five existing transactional/campaign CLI/browser cases. The fixture
+simulates a lost lookup acknowledgement, then verifies one original provider
+read, exact replay and rejection of another deployment/mode/API before network
+access. Logs: `/tmp/ezkart-beta-email-investigation-01a0d643.log` (five existing
+cases passed; initial new-test assertion corrected) and
+`/tmp/ezkart-beta-email-focused-01a0d643.log` (corrected beta case passed).
 
 ## Configuration and acceptance
 

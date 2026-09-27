@@ -64,7 +64,10 @@ recipient addresses, raw provider responses, rendered mail, unsubscribe links
 and credentials. The operator value is an audit reference asserted by the
 trusted signing service, not independent user authentication.
 
-Use the existing TEST-only command with `--purpose=campaign`:
+Use the workbench command with `--purpose=campaign`. It supports TEST/sandbox and
+the isolated beta/production configuration, and rejects main's production
+deployment. Saved recovery intents remain bound to their original deployment,
+API origin and service credential:
 
 ```sh
 php tools/commerce/email-investigate.php --action=list --purpose=campaign

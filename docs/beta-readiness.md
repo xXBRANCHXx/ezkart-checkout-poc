@@ -22,7 +22,17 @@ installed outside the public root with mode 0600. Reloaded file hashes match the
 private prepared configuration; all earlier provider credentials are preserved.
 Health confirms beta, live DOKU credentials and connected D1/public R2/private R2
 with 146 tables. Checkout remains held (`durable_checkout:false`), as do Worker
-provider jobs and schedules. Live Biteship is still unconfigured.
+provider jobs and schedules.
+
+A dedicated live Biteship key is now installed in the private hosted runtime and
+prepared local settings. At 07:19 UTC its read-only `GET /v1/couriers` succeeds
+with 81 courier services. Rates and Tracking are active; Order API on this new key
+is not active. The existing older key shows Order API active, but its one-time
+secret is unavailable in the saved runtime. The dashboard's live balance is zero.
+Biteship's required activation evidence and funding remain shipping gates.
+The authenticated live webhook is registered and verified after reload at
+07:24 UTC for `order.status`, `order.price` and `order.waybill_id`, targeting the
+workbench production callback. No shipment or real delivery was created.
 
 The beta catalog import is complete: five users/stores/memberships, two physical
 products, 111 variants, 54 media records, 16 product images, two unbound drafts
@@ -44,8 +54,16 @@ Fresh hosted sign-in exposed a CSP regression: Chrome blocked the local form's
 redirect to the configured Auth service. The fix permits only that exact HTTPS
 origin and Google for form redirects. Three browser/header cases pass, including
 the actual form/redirect chain, blocked foreign destinations, inline/eval guards
-and preview isolation. The beta login label now says “Beta admin.” Hosted
-verification of this source change follows automatic workbench deployment.
+and preview isolation. The beta login label now says “Beta admin.” Implementation
+`9148660` is pushed and auto-deployed; the hosted Google flow now reaches the
+owner's authenticator challenge. A fresh signed-in merchant check is pending
+that authenticator code, which cannot be obtained through email OTP access.
+
+The email investigation CLI now supports beta/production while preserving TEST
+intent compatibility. Its recovery fingerprint binds the deployment, API and
+service secret. Five existing transactional/campaign cases and the added beta
+case pass, including lost acknowledgements, reuse of the original receipt and
+rejection of another mode/connection before a provider read. Sending remains held.
 
 The sections below retain earlier rollout observations; this current-state
 record supersedes their historical “not installed” and empty-catalog statements.
