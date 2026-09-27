@@ -33,16 +33,19 @@ between selection and claim survives. Once a claim has fenced the file as
 `deleting`, publication is rejected by the existing transaction guard. Cleanup
 does not revoke purchases, rewrite delivery receipts or touch money/stock.
 
-## Read-only TEST inspection
+## Read-only workbench inspection
 
 With the repository's existing Cloudflare TEST access:
 
 ```sh
 node tools/commerce/digital-storage-report.mjs --fail-on-warning
+node tools/commerce/digital-storage-report.mjs --deployment=beta --fail-on-warning
 ```
 
-The command runs one fixed aggregate D1 query against TEST. It accepts no SQL,
-production environment, object key or mutation argument. It exposes counts,
+The command runs one fixed aggregate D1 query against TEST by default or the
+explicitly selected beta database. Beta reports its production provider mode;
+`--deployment=production` and any main target remain rejected. It accepts no SQL,
+object key or mutation argument. It exposes counts,
 decimal-string byte totals, due/deferred/unconfirmed cleanup and the last heartbeat.
 It prints no filename, account identity, buyer, grant, private storage path or
 provider response. There is no new HTTP interface.
@@ -94,3 +97,17 @@ and exit 0. This establishes the ordinary schedule and empty-run heartbeat.
 No synthetic file, cleanup invocation, purchase,
 delivery or money movement was created for hosted verification. Financial and
 provider holds remain unchanged.
+
+On 27 September, beta selection and rejection of main/duplicate/conflicting flags
+pass two focused inspection cases. The live beta inspection at 07:59 UTC reports
+zero uploads, retained files, cleanup backlog and unavailable purchase files,
+with `maintenance_not_observed` because beta had no schedule yet.
+
+The first scheduling attempt reached Cloudflare's five-cron free-account limit.
+The deployed TEST version was checked: it has no commerce-storage activation,
+email-send activation or Resend key, so its `*/2 * * * *` email trigger does no
+work. That inactive trigger was removed and its slot reassigned to beta's hourly
+`:17` housekeeping. Both trigger updates succeeded without uploading application
+code or changing data, provider configuration, TEST's other three schedules or
+main's schedule. Beta's first ordinary run still needs to be observed. This
+schedule does not enable transactional or campaign email delivery.

@@ -24,7 +24,8 @@ Health confirms beta, live DOKU credentials and connected D1/public R2/private R
 with 146 tables. At 07:45 UTC, central merchant operations were enabled with
 `commerce_storage=d1`; new checkout remains separately paused in both PHP and
 the Worker. The public checkout configuration returns 503 with `Retry-After: 300`.
-Worker schedules remain empty and email sending remains disabled.
+An hourly housekeeping schedule is now installed; new checkout, provider
+dispatch schedules and email sending remain held. See the storage note below.
 
 A dedicated live Biteship key is now installed in the private hosted runtime and
 prepared local settings. At 07:19 UTC its read-only `GET /v1/couriers` succeeds
@@ -99,6 +100,21 @@ products also lack descriptions, and imported stock needs a physical count
 before sales. DOKU BCA still shows UPDATING after fresh login at 07:44 UTC.
 The catalog's obsolete CV-approval and delivery-readiness claims are replaced
 with the actual checkout pause and links to inventory/payment/shipping settings.
+
+At 390px, Orders, Customers, Marketing, Messages, Settings and Shipping settings
+load without JS errors, visible alerts or page overflow. The corrected product
+status strip is auto-deployed and matches the pause on desktop and narrow screens;
+its layout is also visually checked in an isolated browser. Shared Chrome's
+screenshot capture timed out, so the hosted narrow checks use DOM/layout evidence.
+
+The storage inspector now accepts explicit `--deployment=beta` while retaining
+TEST as its default and rejecting main or ambiguous arguments. Its two focused
+cases pass. Live beta reports zero uploaded/retained/unavailable files and no
+cleanup backlog. Cloudflare's free-account cron limit initially blocked beta's
+housekeeping. An inactive TEST email trigger was verified against the deployed
+version and reassigned to beta's hourly `:17` housekeeping; the application
+versions and stored TEST evidence are unchanged. The first beta maintenance
+heartbeat remains pending. See [storage operations](digital-storage-operations.md).
 
 The sections below retain earlier rollout observations; this current-state
 record supersedes their historical “not installed” and empty-catalog statements.

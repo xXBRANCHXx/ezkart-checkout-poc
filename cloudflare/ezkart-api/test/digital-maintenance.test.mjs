@@ -64,7 +64,7 @@ test('publication between selection and deletion preserves the file, and an unce
   assert.ok(await env.PRIVATE_ASSETS.head(file.r2_key));
 });
 
-test('storage inspection is read-only, TEST-only, exact about recorded bytes and explicit about missing or failed maintenance',async t=>{
+test('storage inspection is read-only, defaults to TEST, and reports exact recorded bytes and missing or failed maintenance',async t=>{
   const f=await setup(t),env=await mode(f),now=new Date().toISOString(),queries=[];
   const query=async sql=>{queries.push(sql);return(await f.db.prepare(sql).all()).results;};
   const missing=await inspect(['--fail-on-warning'],query,now);assert.equal(missing.exitCode,2);assert.deepEqual(missing.warnings,['maintenance_not_observed']);assert.equal(missing.retainedBytes,'0');
@@ -76,6 +76,21 @@ test('storage inspection is read-only, TEST-only, exact about recorded bytes and
   const late=new Date(Date.parse(now)+3*3600000).toISOString();assert.deepEqual((await inspect([],query,late)).warnings,['maintenance_overdue']);
   assert.equal((await f.db.prepare('SELECT COUNT(*) AS n FROM digital_file_maintenance').first()).n,1);
   for(const sql of queries)assert.match(sql,/^WITH eligible AS/);
+});
+
+test('beta storage inspection selects only its deployment and rejects main, duplicate and conflicting flags before a database read',async t=>{
+  const f=await setup(t,{bindings:{APP_ENVIRONMENT:'beta'}}),now=new Date().toISOString(),selected=[];
+  const query=async(sql,deployment)=>{selected.push(deployment);return(await f.db.prepare(sql).all()).results;};
+  const result=await inspect(['--deployment=beta','--fail-on-warning'],query,now);
+  assert.equal(result.deployment,'beta');assert.equal(result.environment,'production');assert.equal(result.readOnly,true);
+  assert.equal(result.exitCode,2);assert.deepEqual(result.warnings,['maintenance_not_observed']);assert.equal(result.retainedBytes,'0');
+  for(const args of [['--deployment=production'],['--deployment=main'],['--deployment=Beta'],['--deployment=beta','--deployment=test'],
+    ['--deployment=beta','--deployment=beta'],['--deployment=beta','--fail-on-warning','--fail-on-warning']])await assert.rejects(inspect(args,query,now),/Usage/);
+  assert.deepEqual(selected,['beta']);
+  await cleanupDigitalUploads(await mode(f),now);
+  const healthy=await inspect(['--fail-on-warning','--deployment=beta'],query,now);assert.equal(healthy.exitCode,0);assert.deepEqual(healthy.warnings,[]);
+  assert.deepEqual(selected,['beta','beta']);
+  assert.equal((await f.db.prepare('SELECT COUNT(*) AS n FROM orders').first()).n,0);
 });
 
 test('the maintenance migration preserves existing uploads, parts and immutable purchase versions',async t=>{
