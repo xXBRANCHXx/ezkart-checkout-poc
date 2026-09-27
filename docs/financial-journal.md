@@ -2,9 +2,11 @@
 
 The financial implementation starts with a durable journal for verified payment
 captures. It is operational accounting, not a provider balance, a completed wallet,
-recognized platform profit, or permission to withdraw. Settlement synchronization,
-actual processing fees, release/holds, refunds, reconciliation, seller account
-mapping and payouts remain part of the full completion scope.
+recognized platform profit, or permission to withdraw. Original provider
+collections can now produce [settlement and correction entries](provider-settlement-accounting.md)
+with actual processing fees. Live provider acceptance, continuous synchronization,
+release/holds, refunds, seller account mapping and payouts remain part of the full
+completion scope.
 
 ## Capture accounting
 
@@ -43,10 +45,12 @@ The account chart classifies platform fee allocations separately from assets,
 liabilities and expenses. Those allocations are not an Executive revenue feed.
 Account meanings, receipts and postings cannot be changed or deleted, including
 through SQLite replacement writes. Correcting a financial fact will require new
-balancing entries with their own evidence, not rewriting an old capture.
+balancing entries with their own evidence, not rewriting an old capture. Migration
+0053 implements those entries for supported settlement groups and their corrections.
 
-The capture journal is unique per capture. Later financial event kinds can have
-their own journals; the current writer rejects every kind except capture. Source
+The capture journal is unique per capture. Settlement, settlement correction and
+settlement reversal have their own canonical journals; unsupported kinds remain
+rejected. Source
 and entry guards independently bind each line to its immutable capture/order and
 the canonical allocation. All lines must exist and sum to zero. A primary and an
 additional payment arriving concurrently remain distinct, balanced receipts.
@@ -59,7 +63,8 @@ the deployment's commerce environment, narrow parameters and seller scope on
 reads. They remain disabled while central commerce storage is held.
 
 - `GET /internal/commerce/finance/summary?seller=...&environment=...`: capture
-  coverage, unallocated/additional counts, exact account totals and balance checks.
+  coverage, unallocated/additional counts, exact account totals, balance checks
+  and counts of saved settlement interpretations.
 - `GET /internal/commerce/finance/journals?seller=...&environment=...`: journal
   history, up to 50 rows, with an initial sequence `cap` and descending `before`.
   Newly inserted journals do not enter later pages of an existing cohort.
@@ -72,8 +77,10 @@ The migration does not invent old fee policies or payments. Existing captures
 need the bounded catch-up operation; until all are posted, `accountingComplete`
 is false and `unposted` remains visible. Summary and history amounts use decimal
 strings so aggregate rupiah values do not lose precision in JavaScript. Summary
-`availableToWithdraw` is null and `settlementConnected` is false: captured volume
-and pre-processing allocations cannot become a fictional wallet balance.
+`availableToWithdraw` is null. `settlementConnected` becomes true after original
+provider collections have been assessed, including unresolved results. Saved
+interpretation counts are not current verification or a spendable wallet balance;
+the per-order settlement route checks for newer provider evidence and holds.
 
 `occurredAt` preserves the capture's verification timestamp; `postedAt` records
 when it entered the journal. Catch-up does not claim the payment was received
@@ -83,9 +90,10 @@ when migration or reconciliation ran. Reads do not create postings.
 
 The [Sub-Account financial reader](doku-financial-reader.md) now provides signed,
 exact-money provider reads and a private sandbox evidence collector. Its responses
-can now be [preserved against confirmed seller mappings](provider-financial-evidence.md),
-but are not yet ingested as settlement journals.
-Actual provider-read acceptance and all money-flow work below remain open.
+are [preserved against confirmed seller mappings](provider-financial-evidence.md)
+and assembled into durable collection receipts. Supported grouped payment/fee/
+cash facts now produce [settlement journals](provider-settlement-accounting.md).
+Actual provider-read acceptance and the remaining money-flow work below stay open.
 
 Official DOKU documentation was checked on 25 September 2026. New integrations
 should target its actively developed Sub-Account V2. Payment routing uses the
@@ -118,15 +126,16 @@ The [whole-order delivery receipt](financial-delivery.md) now binds every
 physical shipment and complete original digital download to the primary capture.
 It is recorded atomically with the final proof and preserves current refund,
 return and review holds on service reads. Delivery alone never posts available
-earnings; actual settlement and the remaining money ledger are still required.
+earnings; current settlement evidence and the remaining release/reserve/refund
+ledger are still required.
 
 The [bank payout contract adapter](doku-payouts.md) now binds inquiry and transfer
 to the original amount, verified beneficiary and separate dispatch identities.
 It has no central withdrawal caller and does not create available funds or
 completed payout journals. Durable reservations and execution remain required.
 
-Still required: provider-accepted seller mapping, payment routing, actual-fee and
-settlement ingestion with corrections, delivery-plus-settlement release, reserves
+Still required: provider-accepted seller mapping, payment routing and settlement,
+automatic reconciliation operations, delivery-plus-settlement release, reserves
 and disputes, partial/full refunds, negative-balance handling, owner-bound fresh
 Wallet verification on every protected action, withdrawal reservations and limits,
 beneficiary verification, payout idempotency/recovery, reconciliation and the real

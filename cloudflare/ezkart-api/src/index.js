@@ -32,6 +32,7 @@ import {reconcileFinancialDeliveries,financialDeliveryStatus} from './commerce-f
 import {walletEnrollment,walletRegistration,bindWalletRegistration,saveWalletRegistrationReceipt,recordWalletRegistration} from './commerce-wallet-enrollment.js';
 import {providerFinancialAccount,recordProviderFinancialEvidence,providerFinancialEvidenceList} from './commerce-provider-evidence.js';
 import {recordProviderFinancialCollection,providerFinancialCollections} from './commerce-provider-collections.js';
+import {reconcileProviderSettlement,financialSettlementStatus} from './commerce-settlements.js';
 import {merchantCustomers,merchantCustomer,customerOrderHistory} from './commerce-customers.js';
 import {customerSegments,customerSegment,saveCustomerWorkspace,customerProfileHistory} from './commerce-customer-workspace.js';
 import {createCustomerExport,readCustomerExport,cleanupCustomerExports} from './commerce-customer-exports.js';
@@ -1553,6 +1554,12 @@ export default {
         if(url.pathname==='/internal/commerce/finance/delivery'&&request.method==='GET'&&!Object.keys(payload).length)return json({ok:true,...await financialDeliveryStatus(env,url)});
         if(url.pathname==='/internal/commerce/finance/delivery/reconcile'&&request.method==='POST'&&!url.search)return json({ok:true,...await reconcileFinancialDeliveries(env,payload)});
         return json({ok:false,error:'Delivery evidence route or method is unavailable'},404);
+      }
+      if(url.pathname.startsWith('/internal/commerce/finance/settlement')){
+        const payload=await authenticateCommerceService(request,env,{strictJSON:true,maxBytes:3000});
+        if(request.method==='GET'&&url.pathname==='/internal/commerce/finance/settlement'&&!Object.keys(payload).length)return json({ok:true,...await financialSettlementStatus(env,url)});
+        if(request.method==='POST'&&url.pathname==='/internal/commerce/finance/settlement/reconcile'&&!url.search)return json({ok:true,...await reconcileProviderSettlement(env,payload)});
+        return json({ok:false,error:'Settlement route or method is unavailable'},404);
       }
       const providerCollectionPath=/^\/internal\/commerce\/finance\/provider-collections(?:\/(fcol_[a-f0-9]{40}))?$/.exec(url.pathname);
       if(providerCollectionPath){

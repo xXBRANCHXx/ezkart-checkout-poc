@@ -40,14 +40,22 @@ export async function financialJournalSummary(env,url){
     env.DB.prepare(`SELECT COUNT(*) AS invalid FROM commerce_financial_journals j WHERE j.seller_id=? AND j.commerce_environment=?
       AND ((SELECT COUNT(*) FROM commerce_financial_entries e WHERE e.journal_sequence=j.sequence)!=json_array_length(j.lines_json)
         OR (SELECT COALESCE(SUM(e.amount),1) FROM commerce_financial_entries e WHERE e.journal_sequence=j.sequence)!=0)`).bind(...values),
+    env.DB.prepare(`SELECT r.state,COUNT(*) AS count FROM commerce_settlement_assessments a
+      JOIN commerce_settlement_results r ON r.assessment_sequence=a.sequence
+      WHERE a.seller_id=? AND a.commerce_environment=? AND NOT EXISTS(
+        SELECT 1 FROM commerce_settlement_assessments newer WHERE newer.capture_id=a.capture_id AND newer.sequence>a.sequence)
+      GROUP BY r.state`).bind(...values),
   ]);
   const row=result[0].results[0],accounts=Object.fromEntries(result[1].results.map(row=>[row.account,row.amount]));
+  const settlementAccounting={assessed:0,settled:0,voided:0,unresolved:0};
+  for(const state of result[3].results){settlementAccounting[state.state]=state.count;settlementAccounting.assessed+=state.count;}
   return {currency:'IDR',captures:row.captures,posted:row.posted,unposted:row.captures-row.posted,unallocated:row.unallocated,
     additionalPayments:row.additional,capturedGross:row.captured,accounts,
     accountingComplete:row.captures===row.posted&&result[2].results[0].invalid===0,
     balanced:result[2].results[0].invalid===0,
-    // Collection accounting is never exposed as a settled or spendable wallet.
-    availableToWithdraw:null,settlementConnected:false};
+    // These are saved interpretations, not a current spendable balance. Protected
+    // actions must also check each order's latest provider evidence and holds.
+    settlementAccounting,availableToWithdraw:null,settlementConnected:settlementAccounting.assessed>0};
 }
 
 export async function financialJournalList(env,url){

@@ -44,9 +44,11 @@ Merchant/customer tokens do not authorize them. Input rejects duplicate JSON
 keys, extra parameters and unbounded requests.
 
 - `GET /internal/commerce/finance/delivery?seller=…&environment=…&orderId=…`
-  returns the original receipt and current holds for that exact order. It always
-  reports `settlementVerified: false`, `releaseReady: false` and
-  `availableToWithdraw: null` at this implementation stage.
+  returns the original receipt and current holds for that exact order. It now
+  reads [current provider settlement evidence](provider-settlement-accounting.md)
+  for `settlementVerified` and `settlementAssessmentId`, including stale-history
+  and attribution holds. `releaseReady` remains false and `availableToWithdraw`
+  remains null until the release/reserve/refund ledger is implemented.
 - `POST /internal/commerce/finance/delivery/reconcile` accepts `seller`,
   `environment`, optional `orderId`, and `limit` from 1–100 (default 25). It
   catches up existing complete evidence after an upgrade. It accepts no delivery

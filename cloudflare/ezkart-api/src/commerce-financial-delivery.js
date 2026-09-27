@@ -1,4 +1,5 @@
 import {commerceEnvironment} from './commerce-orders.js';
+import {settlementForOrder} from './commerce-settlements.js';
 
 const fail=(message,status=422)=>{throw new Response(message,{status});};
 function scope(env,input){
@@ -53,9 +54,11 @@ export async function financialDeliveryStatus(env,url){
   if(row.unresolved_returns)reasons.push('return_requires_reconciliation');
   if(row.capture_id&&row.allocation_state!=='allocated')reasons.push('capture_accounting_incomplete');
   if(!row.receipt_id)reasons.push('delivery_unconfirmed');
+  const settlement=await settlementForOrder(env,input);
   // This immutable receipt preserves the evidence chosen at completion. Later
   // equivalent courier observations need not become the canonical source again.
   return {orderId:input.orderId,deliveryConfirmed:Boolean(row.receipt_id),
     receipt:row.receipt_id?{id:row.receipt_id,confirmedAt:row.confirmed_at,recordedAt:row.recorded_at,source:JSON.parse(row.source_json)}:null,
-    holds:reasons,settlementVerified:false,releaseReady:false,availableToWithdraw:null};
+    holds:[...new Set([...reasons,...settlement.holds])],settlementVerified:settlement.settlementVerified,
+    settlementAssessmentId:settlement.assessment?.id||null,releaseReady:false,availableToWithdraw:null};
 }

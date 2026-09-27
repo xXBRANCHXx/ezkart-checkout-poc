@@ -76,7 +76,9 @@ test('journal and entry guards reject altered, unbalanced, foreign and deleted a
 
 test('upgrade catch-up posts only existing captures, keeps original policies and converges under repeated concurrent batches',async t=>{
   const f=await setupCommerceFixture(t,{through:22}),o=await order(f);await f.paid(o);await seed(f,1);await seed(f,2,{seller:'seller_bob'});await seed(f,3,{mode:'production'});
-  await applyCommerceSchema(f.db,22,23);let s=await summary(f);assert.equal(s.accountingComplete,false);assert.equal(s.posted,0);assert.equal(s.unposted,2);assert.equal(s.capturedGross,'80000');
+  // Read the historical capture upgrade through the current service/schema,
+  // including settlement reporting; no historical fee policy is invented.
+  await applyCommerceSchema(f.db,22);let s=await summary(f);assert.equal(s.accountingComplete,false);assert.equal(s.posted,0);assert.equal(s.unposted,2);assert.equal(s.capturedGross,'80000');
   assert.equal((await f.call(base+'/captures/reconcile',{environment:'sandbox',limit:1})).remaining,2);
   const results=await Promise.all([f.call(base+'/captures/reconcile',{environment:'sandbox',limit:1}),f.call(base+'/captures/reconcile',{environment:'sandbox',limit:1})]);assert(results.every(r=>r.status===200));
   assert.equal((await f.call(base+'/captures/reconcile',{environment:'sandbox',limit:1})).remaining,0);assert.equal(await count(f,'commerce_financial_journals'),3);s=await summary(f);assert.equal(s.accountingComplete,true);assert.equal(s.unallocated,1);assert.equal(s.accounts.seller_pending,'-36750');assert.equal(s.availableToWithdraw,null);

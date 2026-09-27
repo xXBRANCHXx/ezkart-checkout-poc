@@ -5,7 +5,7 @@ import {seedRoutingWallets} from './payment-routing-fixture.mjs';
 
 export const collectionPath='/internal/commerce/finance/provider-collections';
 export async function setupCollectionFixture(t,options={}){
-  const f=await setupCommerceFixture(t,options),environment=options.bindings?.APP_ENVIRONMENT==='beta'?'production':'sandbox';
+  const f=options.baseFixture||await setupCommerceFixture(t,options),environment=options.bindings?.APP_ENVIRONMENT==='beta'?'production':'sandbox';
   const enrollments=await seedRoutingWallets(f,{environment});
   const epoch=Date.now()-60000,from=new Date(epoch-3600000).toISOString(),to=new Date(epoch-1000).toISOString();let tick=0;
   const ref=()=>Array.from(randomBytes(32),n=>n%10).join('');
@@ -33,5 +33,5 @@ export async function setupCollectionFixture(t,options={}){
   const list=(suffix='')=>f.call(collectionPath+'?seller=seller_alice&environment='+environment+suffix);
   const rawInsert=(ids)=>f.db.prepare(`INSERT INTO commerce_provider_financial_collections(id,enrollment_id,seller_id,commerce_environment,credential_fingerprint,observation_ids_json,proof_hash,recorded_at) VALUES(?,?,?,?,?,?,?,?)`)
     .bind('fcol_'+randomBytes(20).toString('hex'),enrollments.alice,'seller_alice',environment,'a'.repeat(64),JSON.stringify(ids),randomBytes(32).toString('hex'),new Date().toISOString()).run();
-  return {...f,environment,enrollments,from,to,row,record,balance,history,sources,input,seal,list,rawInsert};
+  return {...f,checkoutInput:f.input,environment,enrollments,from,to,row,record,balance,history,sources,input,seal,list,rawInsert};
 }

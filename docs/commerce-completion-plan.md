@@ -71,6 +71,25 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 27 September: actual-fee settlement journals and corrections
+
+[Settlement accounting](provider-settlement-accounting.md) now derives balanced
+entries from the original captured/routed payment and both wallets' complete
+provider collections. It records actual processing fees, separates seller and
+platform cash, applies fee corrections and full void reversals, and preserves
+every earlier capture and journal. Unsupported/duplicate/foreign facts remain
+unresolved. Newer overlapping or related history suspends current verification;
+old collections cannot bypass that hold. The private command recovers a lost
+acknowledgement without another provider call or money entry.
+
+All 77 relevant Worker/PHP cases pass, including 3,196 source rows, concurrent
+retries, transactional rollback, maximum/zero/negative boundaries, original fee
+policy and populated beta migration. The fresh beta backup restores cleanly;
+rehearsal preserves all original rows in 152 exported tables and adds only the
+two intended account codes. Actual provider acceptance, continuous synchronization,
+earnings release, refunds/reserves and withdrawals remain open. Checkout and
+provider/email execution holds remain; no top-level gate is closed by this change.
+
 ### 27 September: durable provider collection coverage and recovery
 
 [Provider collection receipts](provider-financial-evidence.md) now retain the
