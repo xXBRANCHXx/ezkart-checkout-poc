@@ -41,6 +41,16 @@ test('wallet dispatcher signs one registration, confirms both account identities
   await f.processWallet(e);assert.equal((await f.registerCalls()).length,1);
 });
 
+test('numeric provider accounts remain exact through registration, confirmation and immutable storage',async t=>{
+  const f=await fixture(t),e=await f.enroll();await f.setControl({numericAccounts:true});await f.processWallet(e);
+  const saved=await f.registration(e.id);assert.equal(saved.jobState,'succeeded');assert(saved.profile);
+  const raw=JSON.parse(saved.registrationBody);assert(raw.accounts.every(a=>typeof a.accountNo==='number'));
+  assert.equal(saved.profile.cashAccount,String(raw.accounts[0].accountNo));assert.equal(saved.profile.pendingAccount,String(raw.accounts[1].accountNo));
+  const evidence=await f.db.prepare('SELECT registration_json,confirmation_json FROM commerce_wallet_provider_profiles').first();
+  assert.equal(evidence.registration_json,saved.registrationBody);assert(JSON.parse(evidence.confirmation_json).accounts.every(a=>typeof a.accountNo==='number'));
+  await f.processWallet(e);assert.equal((await f.registerCalls()).length,1);assert.equal(await f.count('commerce_financial_journals'),0);
+});
+
 test('lost receipt acknowledgement and failed account reads recover the original registration without another provider write',async t=>{
   const f=await fixture(t),e=await f.enroll();f.control.drop=base+'/registrations/'+e.id+'/receipt';await f.setControl({confirmationUnavailable:true});
   await f.processWallet(e);let saved=await f.registration(e.id);assert.equal(saved.jobState,'uncertain');assert(saved.registrationBody);assert.equal(saved.profile,null);

@@ -116,6 +116,17 @@ syntax checks pass. None of these fixture captures are real provider payments.
 
 ## Current evidence and limits
 
+The live parent balance inquiry passes at 06:31:01 UTC on 27 September with an
+exact match to the merchant's own business profile. DOKU returns numeric cash and
+point account IDs and no parent pending account. The reader, wallet registration
+and original-evidence validators now support exact integer IDs while retaining
+strict two-account seller confirmation. Forty-nine affected PHP/Worker checks
+pass. Migration 0049 changes one evidence trigger; rehearsing it on the fresh
+beta export preserves all 146 tables and six original rows, with clean integrity
+and foreign keys. The verified parent is prepared privately for beta; hosted
+runtime, payment mode and commerce holds remain unchanged. This is read-only
+provider evidence, not acceptance of child registration, routing or payouts.
+
 The signed-in production DOKU dashboard was inspected on 27 September. Its
 Service page shows active SNAP VAs for BJB, BNC, BNI, BRI, BSI, BSS, BTN, CIMB,
 DOKU, Danamon, Maybank, Permata and Sinarmas. BCA SNAP is not in the active list;

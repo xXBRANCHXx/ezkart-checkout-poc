@@ -41,7 +41,7 @@ function balances(row,request,response){
   if(request.profileId!==row.profile_id||response.profileId!==row.profile_id||!Array.isArray(response.accounts)||response.accounts.length>10)fail('Provider balance response does not match the seller wallet');
   const accounts=[],seen=new Set(),types=new Set();
   for(const entry of response.accounts){
-    const number=account(entry?.accountNo);if(seen.has(number))fail('Provider account response is ambiguous');seen.add(number);
+    const number=account(entry?.accountNo instanceof FinancialJsonNumber?entry.accountNo.value:entry?.accountNo);if(seen.has(number))fail('Provider account response is ambiguous');seen.add(number);
     if(['DOKU_MERCHANT_POINT','DOKU_SYSTEM_POINT'].includes(entry.type)&&entry.currency==='POINT')continue;
     const expected=entry.type==='DOKU_MERCHANT_IDR'?row.cash_account:entry.type==='DOKU_MERCHANT_PENDING_IDR'?row.pending_account:null;
     if(!expected||expected!==number||entry.currency!=='IDR'||types.has(entry.type))fail('Provider accounts changed from the confirmed wallet');

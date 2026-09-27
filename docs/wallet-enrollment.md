@@ -80,6 +80,14 @@ profile under the configured parent and exactly one cash and one pending IDR
 account, with an optional merchant point account. The subsequent balance inquiry
 must identify that exact profile and the same accounts.
 
+Live DOKU balance evidence on 27 September uses numeric account IDs. The adapters
+and Worker preserve exact integer tokens as digit strings for comparison while
+retaining original response JSON. Fractions, exponents, negatives and IDs longer
+than ten digits are rejected. Migration 0049 updates the database evidence guard
+without changing existing rows or ownership requirements. Parent preflight now
+accepts the observed merchant cash/points shape without requiring a pending
+account; seller registration and confirmation still require both IDR accounts.
+
 `cart/api/doku-snap.php` now holds the shared signed transport; the read-only
 adapter and registration adapter use its pinned origins, RSA token authentication,
 HMAC request signing, TLS checks, response limits and strict financial JSON parser.
@@ -134,12 +142,19 @@ Restoring it and applying 0024 in original file order yields SQLite integrity
 `ok`, no foreign-key errors, all five empty wallet tables and sixteen guards.
 All existing table counts are unchanged.
 
-Hosted signed-in acceptance is still unavailable: the shared Chrome service
+At the original 26 September delivery, hosted signed-in acceptance was unavailable: the shared Chrome service
 remains disconnected after its earlier approved connection timed out. No new
 connection or approval loop was attempted. Real provider registration, sandbox
 routing, actual fees/settlement, delivery release, reserves, refunds, withdrawals,
 reconciliation, operational recovery and sustained financial validation remain
 open. This delivery does not close a top-level commerce or production release gate.
+
+On 27 September, the owner-approved production session and private signing key
+are available. The merchant parent balance read succeeds with matching identity
+at 06:31:01 UTC. Forty-nine affected PHP/Worker cases pass, including a complete
+numeric-account registration/confirmation fixture and preservation of existing
+registered string accounts through 0049. No real child account was manufactured;
+actual seller registration, payment routing and payouts still need acceptance.
 
 ### Hosted TEST rollout — 26 September 2026
 

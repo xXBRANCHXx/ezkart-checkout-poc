@@ -29,6 +29,7 @@ try {
             }
             $result = match ($action[0]) {
                 'balances' => $client->balances(...array_slice($action, 1)),
+                'parentBalances' => $client->parentBalances(...array_slice($action, 1)),
                 'history' => $client->historyPage(...array_slice($action, 1)),
                 'status' => $client->transactionStatus(...array_slice($action, 1)),
                 'debug' => $client->__debugInfo(),

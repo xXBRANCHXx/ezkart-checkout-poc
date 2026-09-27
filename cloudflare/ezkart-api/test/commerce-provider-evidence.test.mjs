@@ -65,6 +65,17 @@ test('balances preserve signed exact rupiah above 2^53 and reject changed accoun
   const duplicate=f.evidence();duplicate.evidence.responseBody=duplicate.evidence.responseBody.replace('"responseCode":"2000000"','"responseCode":"2000000","responseCode":"2000000"');assert.equal((await f.call(base,duplicate)).status,422);
 });
 
+test('live numeric balance account IDs bind exact original seller accounts while preserving raw provider evidence',async t=>{
+  const f=await fixture(t),payload=f.evidence();payload.evidence.responseBody=payload.evidence.responseBody.replaceAll('"2010000001"','2010000001').replaceAll('"2030000001"','2030000001');
+  const result=await f.call(base,payload);assert.equal(result.status,200,result.error);
+  const saved=await f.db.prepare('SELECT response_json FROM commerce_provider_financial_observations WHERE id=?').bind(result.id).first();assert.equal(saved.response_json,payload.evidence.responseBody);
+  const report=await f.list();assert.deepEqual(report.items[0].data.accounts.map(a=>a.accountNo),['2010000001','2030000001']);
+  for(const token of ['2010000001.0','2.010000001e9','10000000000','-2010000001','true']){
+    const bad=f.evidence();bad.evidence.responseBody=bad.evidence.responseBody.replace('"2010000001"',token);assert.equal((await f.call(base,bad)).status,422,token);
+  }
+  assert.equal((await f.list()).items.length,1);assert.equal((await f.db.prepare('SELECT COUNT(*) AS n FROM commerce_financial_journals').first()).n,0);
+});
+
 test('history preserves repeated rows, missing partner references, exact amounts and changed statuses as separate observations',async t=>{
   const f=await fixture(t),entry=f.transaction({amount:'9007199254740993',dateTime:f.from.replace('Z','.123456Z')});
   const saved=await f.call(base,f.history([entry,entry]));assert.equal(saved.status,200,saved.error);

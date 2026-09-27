@@ -1,4 +1,5 @@
 import {commerceEnvironment,commerceHash} from './commerce-orders.js';
+import {parseFinancialEvidenceJSON,FinancialJsonNumber} from './financial-evidence-json.js';
 
 const fail=(message,status=422)=>{throw new Response(message,{status});};
 const id=value=>typeof value==='string'&&/^[A-Za-z0-9][A-Za-z0-9_-]{2,95}$/.test(value);
@@ -88,28 +89,23 @@ export async function bindWalletRegistration(env,enrollmentId,input){
   return {bound:true,mayRegister:true};
 }
 
-// The service receives original responses from its verified TLS/SNAP adapter.
-// Scan object keys before JSON.parse so DB JSON extraction cannot disagree with
-// JavaScript because of repeated or escaped duplicate properties.
+// Preserve original numeric account tokens as well as rejecting duplicate keys.
+// No floating-point conversion may turn an exponent/fraction into an account ID.
 function evidence(raw){
   if(typeof raw!=='string'||raw.length>16000)fail('Wallet provider evidence is invalid');
-  let position=0;
-  const space=()=>{while(/\s/.test(raw[position]||'')&&position<raw.length)position++;};
-  const string=()=>{const start=position++;let escaped=false;while(position<raw.length){const c=raw[position++];if(escaped){escaped=false;continue;}if(c==='\\'){escaped=true;continue;}if(c==='"')return JSON.parse(raw.slice(start,position));}throw Error();};
-  const value=depth=>{if(depth>20)throw Error();space();const c=raw[position];if(c==='"'){string();return;}if(c==='{'||c==='['){position++;space();const close=c==='{'?'}':']',seen=new Set();if(raw[position]===close){position++;return;}while(true){space();if(c==='{'){if(raw[position]!=='"')throw Error();const key=string();if(seen.has(key))throw Error();seen.add(key);space();if(raw[position++]!==':')throw Error();}value(depth+1);space();const next=raw[position++];if(next===close)return;if(next!==',')throw Error();}}
-    const match=/^(?:true|false|null|-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)/.exec(raw.slice(position));if(!match)throw Error();position+=match[0].length;};
-  try{value(0);space();if(position!==raw.length)throw Error();const parsed=JSON.parse(raw);if(!parsed||typeof parsed!=='object'||Array.isArray(parsed))throw Error();return parsed;}
+  try{const parsed=parseFinancialEvidenceJSON(raw);if(!parsed||typeof parsed!=='object'||Array.isArray(parsed)||parsed instanceof FinancialJsonNumber)throw Error();return parsed;}
   catch{fail('Wallet provider evidence is invalid or ambiguous');}
 }
 function providerAccounts(response){
   if(typeof response.responseCode!=='string'||!/^200[0-9]{4}$/.test(response.responseCode)||!Array.isArray(response.accounts)||response.accounts.length>10)fail('Wallet provider accounts are invalid');
   const ids=new Set(),accounts={};
   for(const item of response.accounts){
-    if(!item||typeof item!=='object'||typeof item.accountNo!=='string'||!/^[0-9]{1,10}$/.test(item.accountNo)||ids.has(item.accountNo))fail('Wallet provider accounts are ambiguous');
-    ids.add(item.accountNo);
+    const number=item?.accountNo instanceof FinancialJsonNumber?item.accountNo.value:item?.accountNo;
+    if(!item||typeof item!=='object'||typeof number!=='string'||!/^[0-9]{1,10}$/.test(number)||ids.has(number))fail('Wallet provider accounts are ambiguous');
+    ids.add(number);
     if(['DOKU_MERCHANT_POINT','DOKU_SYSTEM_POINT'].includes(item.type)&&item.currency==='POINT')continue;
     if(!['DOKU_MERCHANT_IDR','DOKU_MERCHANT_PENDING_IDR'].includes(item.type)||item.currency!=='IDR'||accounts[item.type])fail('Wallet provider accounts are invalid');
-    accounts[item.type]=item.accountNo;
+    accounts[item.type]=number;
   }
   if(Object.keys(accounts).length!==2)fail('Both provider IDR accounts are required');return accounts;
 }

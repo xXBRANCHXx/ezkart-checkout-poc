@@ -39,7 +39,7 @@ function ez_wallet_registration_job(array $job, string $worker, ?EzDokuWalletReg
                 // Verify the configured parent and obtain a usable token before
                 // committing the dispatch binding. A setup/authentication error
                 // here is a known no-effect failure and can safely be retried.
-                $client->balances($parent);
+                $client->parentBalances($parent);
                 // Treat an uncertain bind response as dispatch uncertainty too.
                 // It must never cause a second call to the registration API.
                 $mayHaveStarted = true;

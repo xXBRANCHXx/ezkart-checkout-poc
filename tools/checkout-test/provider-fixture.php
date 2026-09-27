@@ -91,6 +91,10 @@ function curl_exec(object $handle): string|bool {
                     ['type' => 'DOKU_MERCHANT_IDR', 'currency' => 'IDR', 'accountNo' => '1' . $number],
                     ['type' => 'DOKU_MERCHANT_PENDING_IDR', 'currency' => 'IDR', 'accountNo' => '2' . $number],
                 ]];
+                if (!empty($control['numericAccounts'])) {
+                    foreach ($response['accounts'] as &$providerAccount) $providerAccount['accountNo'] = (int) $providerAccount['accountNo'];
+                    unset($providerAccount);
+                }
                 $profiles[$reference] = $response; file_put_contents($profilesFile, json_encode($profiles));
                 if (!empty($control['loseRegister'])) { $handle->status = 503; $response = ['responseCode' => '5030000']; }
                 if (!empty($control['wrongParent'])) $response['parentProfileId'] = 'BRN-foreign';
@@ -105,7 +109,7 @@ function curl_exec(object $handle): string|bool {
             $response = null;
             foreach ($profiles as $profile) if ($profile['profileId'] === $payload['profileId']) $response = $profile;
             if ($payload['profileId'] === $parent) $response = ['responseCode' => '2000000', 'profileId' => $parent, 'accounts' => [
-                ['type' => 'DOKU_MERCHANT_IDR', 'currency' => 'IDR', 'accountNo' => '1000000001'], ['type' => 'DOKU_MERCHANT_PENDING_IDR', 'currency' => 'IDR', 'accountNo' => '2000000001'],
+                ['type' => 'DOKU_MERCHANT_IDR', 'currency' => 'IDR', 'accountNo' => 1000000001], ['type' => 'DOKU_MERCHANT_POINT', 'currency' => 'POINT', 'accountNo' => 1000000002],
             ]];
             if ($response === null) { $handle->status = 404; $response = ['responseCode' => '4040000']; }
             else {

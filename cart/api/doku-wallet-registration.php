@@ -26,13 +26,14 @@ final class EzDokuWalletRegistrationClient extends EzDokuSubAccountReader
             || !is_array($response->accounts ?? null) || count($response->accounts) > 3) throw new EzDokuReadException('registration_response');
         $seen = []; $accounts = [];
         foreach ($response->accounts as $account) {
-            if (!$account instanceof stdClass || !is_string($account->accountNo ?? null) || preg_match('/^[0-9]{1,10}$/D', $account->accountNo) !== 1
-                || isset($seen[$account->accountNo])) throw new EzDokuReadException('registration_response');
-            $seen[$account->accountNo] = true;
+            if (!$account instanceof stdClass) throw new EzDokuReadException('registration_response');
+            $number = self::account($account->accountNo ?? null);
+            if (isset($seen[$number])) throw new EzDokuReadException('registration_response');
+            $seen[$number] = true;
             if (($account->type ?? null) === 'DOKU_MERCHANT_POINT' && ($account->currency ?? null) === 'POINT') continue;
             if (!in_array($account->type ?? null, ['DOKU_MERCHANT_IDR', 'DOKU_MERCHANT_PENDING_IDR'], true)
                 || ($account->currency ?? null) !== 'IDR' || isset($accounts[$account->type])) throw new EzDokuReadException('registration_response');
-            $accounts[$account->type] = $account->accountNo;
+            $accounts[$account->type] = $number;
         }
         if (count($accounts) !== 2) throw new EzDokuReadException('registration_response');
         return ['data' => ['profileId' => $response->profileId, 'parentProfileId' => $parentProfileId,

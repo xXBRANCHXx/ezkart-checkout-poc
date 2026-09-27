@@ -71,6 +71,20 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 27 September: live parent wallet evidence
+
+The production parent balance inquiry passes at 06:31:01 UTC with the requested
+merchant identity. Its numeric account IDs and cash/points-only parent shape
+are now supported without weakening the two-account seller requirement. Original
+provider JSON remains private and unchanged. The verified parent ID is prepared
+in local/private beta settings; hosted settings are unchanged.
+
+Thirty-two PHP/integration cases and seventeen Worker cases pass. Migration
+0049 changes one wallet evidence trigger, preserves populated string-account
+registrations, and accepts exact numeric evidence. Rehearsal on the fresh beta
+export preserves 146 tables and all six original rows, with clean integrity and
+foreign keys. Real child enrollment, routing, settlements and payouts remain open.
+
 ### 27 September: durable SNAP payment dispatch and callbacks
 
 The explicit BCA SNAP flow now freezes its original request and credentials

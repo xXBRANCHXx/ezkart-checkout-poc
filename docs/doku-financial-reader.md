@@ -44,8 +44,12 @@ Fractional rupiah, exponential money notation and values outside signed 64-bit
 storage are rejected. Balances preserve negative values rather than hiding them.
 Non-cash point accounts cannot become IDR amounts.
 
-A balance response must identify the requested profile and exactly one cash and
-one pending IDR account. History retains all four statuses, both mutation directions,
+A seller balance response must identify the requested profile and exactly one
+cash and one pending IDR account. The separate `parentBalances` preflight accepts
+a merchant parent with cash and optional pending; point accounts stay excluded.
+Account IDs may be digit strings or exact integer JSON tokens. Fractional,
+exponential, negative and overlong numeric IDs are rejected without floating-point
+coercion. Original provider JSON is preserved. History retains all four statuses, both mutation directions,
 unknown transaction types and same-page duplicate rows as evidence. It requires
 valid timestamps, newest-first order and the requested date window. Transaction
 status requires an exact partner reference, known status code, IDR amount and
@@ -106,7 +110,8 @@ JSON, account/reference scope, statuses, paging, evidence retention, storage fai
 private output, forbidden arguments and the HTTP denial. All five PHP sources pass syntax checks.
 Log: `/tmp/ezkart-doku-reader-delivery-01a0d643.log`.
 
-Local configuration inspection found existing sandbox client/secret slots but no
+At the original 26 September delivery, local configuration inspection found
+existing sandbox client/secret slots but no
 SNAP private key. Hosted key registration/configuration and actual provider reads
 remain unverified. Shared Chrome still reports disconnected, with the same five
 prior connection attempts; this delivery did not reconnect it or alter credentials.
@@ -121,3 +126,21 @@ Implementation `3521f1a` is pushed to workbench. At 10:30 UTC / 17:30 Jakarta on
 HTTP 404 responses on `test.ezkart.id`. This is a hosted HTTP-denial check, not
 provider-read acceptance or verification of the private hosted configuration.
 No Worker migration/deployment is needed for this PHP-only addition.
+
+### Live parent read — 27 September 2026
+
+Production B2B authentication and a balance inquiry for the merchant's own
+business ID pass at 06:31:01 UTC. The returned profile matches the requested ID
+exactly. The actual response has numeric cash and point account IDs and no pending
+IDR account. The typed parent reader confirms the cash identity and excludes
+points. Both original response and normalized evidence are retained in private
+0600 files outside Git; no access token or authorization header is retained.
+The verified parent ID is prepared in the ignored local runtime and private beta
+settings fragment. Hosted configuration is unchanged.
+
+Thirty-two PHP/integration cases and seventeen Worker cases pass for this change,
+including exact numeric IDs, strict seller account requirements, registration
+recovery, original financial receipts and populated migration preservation.
+Migration 0049 changes only the wallet profile evidence guard to accept integer
+account tokens alongside strings; it does not rewrite financial records. This
+read does not establish child registration, routing, settlement or payout readiness.

@@ -12,8 +12,11 @@ class EzDokuSubAccountReader extends EzDokuSnapClient
         return $value;
     }
 
-    private static function account(mixed $value): string
+    protected static function account(mixed $value): string
     {
+        // Live DOKU balance responses use JSON integers despite the documented
+        // string schema. Preserve their exact token; never cast through float.
+        $value = $value instanceof EzDokuJsonNumber ? $value->value : $value;
         if (!is_string($value) || preg_match('/^[0-9]{1,10}$/D', $value) !== 1) throw new EzDokuReadException('account');
         return $value;
     }
@@ -39,6 +42,19 @@ class EzDokuSubAccountReader extends EzDokuSnapClient
 
     public function balances(string $profileId): array
     {
+        return $this->readBalances($profileId, false);
+    }
+
+    /** The merchant parent can have cash/points without a pending IDR account.
+     * This does not relax the two-account requirement for a seller wallet.
+     */
+    public function parentBalances(string $profileId): array
+    {
+        return $this->readBalances($profileId, true);
+    }
+
+    private function readBalances(string $profileId, bool $parent): array
+    {
         if (preg_match('/^[A-Za-z0-9][A-Za-z0-9_-]{1,21}$/D', $profileId) !== 1) throw new EzDokuReadException('profile');
         [$response, $evidence] = $this->request('balance-inquiries', ['profileId' => $profileId]);
         if (($response->profileId ?? null) !== $profileId || !is_array($response->accounts ?? null) || count($response->accounts) > 10) throw new EzDokuReadException('scope');
@@ -54,7 +70,7 @@ class EzDokuSubAccountReader extends EzDokuSnapClient
             $accounts[$item->type] = ['accountNo' => $number, 'currency' => 'IDR',
                 'available' => self::money($item->balance->available ?? null, true), 'reserved' => self::money($item->balance->reserved ?? null, true)];
         }
-        if (count($accounts) !== 2) throw new EzDokuReadException('account');
+        if (!isset($accounts['DOKU_MERCHANT_IDR']) || (!$parent && count($accounts) !== 2)) throw new EzDokuReadException('account');
         return ['data' => ['profileId' => $profileId, 'name' => self::text($response->name ?? null, 128), 'accounts' => $accounts], 'evidence' => $evidence];
     }
 

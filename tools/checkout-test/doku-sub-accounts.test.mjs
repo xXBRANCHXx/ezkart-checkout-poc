@@ -83,6 +83,27 @@ test('balance responses must match the requested profile and unambiguous IDR acc
   assert(invalid.results.every(r=>!r.ok));assert.equal(invalid.requests.length,0);
 });
 
+test('live numeric account IDs retain their exact digits while fractions, exponents and ambiguous duplicates fail',()=>{
+  const b=balance();b.accounts=b.accounts.map(a=>({...a,accountNo:Number(a.accountNo)}));
+  const result=readBalance(b).results[0];assert.equal(result.ok,true);assert.equal(result.result.data.accounts.DOKU_MERCHANT_IDR.accountNo,account);
+  assert.equal(result.result.data.accounts.DOKU_MERCHANT_PENDING_IDR.accountNo,pending);assert.equal(result.result.evidence.responseBody,JSON.stringify(b));
+  for(const raw of ['2010000001.0','2.010000001e9','-2010000001','10000000000','null','true']){
+    const body=JSON.stringify(balance()).replace('"accountNo":"'+account+'"','"accountNo":'+raw);assert.equal(readBalance(body).results[0].ok,false,raw);
+  }
+  const duplicate=balance();duplicate.accounts[1].accountNo=Number(account);assert.equal(readBalance(duplicate).results[0].ok,false);
+  const leading=balance();leading.accounts[0].accountNo='0012345678';assert.equal(readBalance(leading).results[0].result.data.accounts.DOKU_MERCHANT_IDR.accountNo,'0012345678');
+});
+
+test('parent balance preflight accepts the live cash/points shape without inventing a pending seller account',()=>{
+  const b=balance();b.responseCode='2001100';b.accounts=b.accounts.filter(a=>a.type!=='DOKU_MERCHANT_PENDING_IDR').map(a=>({...a,accountNo:Number(a.accountNo)}));
+  const result=run({actions:[['parentBalances',profile]],responses:[token(),response(b)]}).results[0];assert.equal(result.ok,true);
+  assert.deepEqual(Object.keys(result.result.data.accounts),['DOKU_MERCHANT_IDR']);assert.equal(result.result.data.accounts.DOKU_MERCHANT_IDR.accountNo,account);
+  assert.equal(readBalance(b).results[0].ok,false,'A parent response cannot establish a seller cash/pending wallet');
+  for(const changed of [{...b,profileId:'foreign'}, {...b,accounts:b.accounts.filter(a=>a.currency==='POINT')}, {...b,accounts:[...b.accounts,b.accounts[0]]}]){
+    assert.equal(run({actions:[['parentBalances',profile]],responses:[token(),response(changed)]}).results[0].ok,false);
+  }
+});
+
 test('history refuses malformed, out-of-window, unordered and foreign-currency evidence',()=>{
   const cases=[{detailData:{}},{detailData:[row({currency:'POINT'})]},{detailData:[row({status:'UNKNOWN'})]},{detailData:[row({mutationType:'ADJUST'})]},
     {detailData:[row({dateTime:'2026-09-27T00:00:00Z'})]},{detailData:[row({dateTime:'2026-09-25T24:00:00Z'})]},

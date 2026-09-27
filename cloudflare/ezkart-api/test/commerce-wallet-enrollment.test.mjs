@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomBytes} from 'node:crypto';
 import {setupCommerceFixture} from './commerce-fixture.mjs';
+import {applyCommerceSchema} from './commerce-schema.mjs';
 
 const base='/internal/commerce/finance/wallet',key=()=>randomBytes(16).toString('hex'),fingerprint='a'.repeat(64);
 const actor=(user='alice')=>({id:user,email:user+'@example.test',proofExpiresAt:new Date(Date.now()+550000).toISOString()});
@@ -102,12 +103,39 @@ test('ambiguous provider evidence, parent substitution and changed credentials c
     {registrationBody:JSON.stringify({...JSON.parse(evidence().registrationBody),accounts:[...accounts(),{type:'DOKU_SYSTEM_POINT',currency:'POINT',accountNo:'3000000001'}]})},
     evidence('BRN-fixture'),
     {registrationBody:JSON.stringify({...JSON.parse(evidence().registrationBody),accounts:[...accounts(),accounts()[0]]})},
-    {registrationBody:JSON.stringify({...JSON.parse(evidence().registrationBody),accounts:[{...accounts()[0],accountNo:2010000001},accounts()[1]]})},
+    {registrationBody:evidence().registrationBody.replace('"accountNo":"2010000001"','"accountNo":2010000001.0')},
     {registrationBody:' '.repeat(16001)}];
   for(const change of cases){const r=await record(f,e,{...evidence(),...change});assert([409,422].includes(r.status),JSON.stringify(r));}
   assert.equal((await receipt(f,e)).status,200);
   for(const confirmationBody of [JSON.stringify({...JSON.parse(evidence().confirmationBody),profileId:'SAC-other'}),JSON.stringify({...JSON.parse(evidence().confirmationBody),accounts:accounts('2010000099')})])assert.equal((await confirm(f,e,{...evidence(),confirmationBody})).status,422);
   assert.equal(await count(f,'commerce_wallet_provider_profiles'),0);assert.equal(await count(f,'commerce_wallet_provider_accounts'),0);
+});
+
+test('integer account evidence matches frozen digit strings without accepting exponents, fractions or collapsed leading zeros',async t=>{
+  const f=await setupCommerceFixture(t),e=await enroll(f),job=await claim(f,e);await bind(f,e,job);
+  for(const token of ['2010000001.0','2.010000001e9','-2010000001','10000000000','true','null']){
+    const input=evidence();input.registrationBody=input.registrationBody.replace('"accountNo":"2010000001"','"accountNo":'+token);
+    assert.equal((await receipt(f,e,input)).status,422,token);
+  }
+  const numeric=evidence();numeric.registrationBody=numeric.registrationBody.replaceAll('"2010000001"','2010000001').replaceAll('"2030000001"','2030000001');
+  assert.equal((await receipt(f,e,numeric)).status,200);
+  const wrong={...numeric,confirmationBody:numeric.confirmationBody.replace('"2010000001"','"0201000001"')};assert.equal((await confirm(f,e,wrong)).status,422);
+  assert.equal((await confirm(f,e,numeric)).status,200);
+  const saved=(await registration(f,e.id)).registration;assert.equal(saved.profile.cashAccount,'2010000001');assert.equal(saved.registrationBody,numeric.registrationBody);
+  assert.equal(await count(f,'commerce_wallet_provider_accounts'),2);assert.equal(await count(f,'commerce_financial_journals'),0);
+});
+
+test('migration 0049 preserves registered string accounts and changes only the future evidence guard',async t=>{
+  const f=await setupCommerceFixture(t,{through:48}),e=await enroll(f),job=await claim(f,e);await bind(f,e,job);assert.equal((await record(f,e)).status,200);
+  const tables=(await f.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%' ORDER BY name").all()).results.map(r=>r.name);
+  const before={};for(const table of tables)before[table]=(await f.db.prepare('SELECT * FROM '+table).all()).results;
+  await applyCommerceSchema(f.db,48,49);
+  for(const table of tables)assert.deepEqual((await f.db.prepare('SELECT * FROM '+table).all()).results,before[table],table);
+  assert.deepEqual((await f.db.prepare('PRAGMA foreign_key_check').all()).results,[]);assert.equal((await record(f,e)).replayed,true);
+  const second=await enroll(f,request({seller:'seller_bob',actor:actor('bob')})),nextJob=await claim(f,second);await bind(f,second,nextJob);
+  const numeric=evidence('SAC-second','2010000002','2030000002');numeric.registrationBody=numeric.registrationBody.replaceAll('"2010000002"','2010000002').replaceAll('"2030000002"','2030000002');
+  numeric.confirmationBody=numeric.confirmationBody.replaceAll('"2010000002"','2010000002').replaceAll('"2030000002"','2030000002');
+  assert.equal((await record(f,second,numeric)).status,200);assert.equal(await count(f,'commerce_wallet_provider_accounts'),4);
 });
 
 test('provider profiles and account numbers cannot cross seller boundaries, including cash/pending cross-column collisions',async t=>{
