@@ -14,7 +14,7 @@ deployment now uses the isolated live beta configuration described below, with
 new checkout, provider dispatch schedules and automatic email sending held.
 Existing sandbox evidence is preserved. Main and `ezkart.id` remain held.
 
-## Current hosted state — 27 September, 15:11 UTC
+## Current hosted state — 27 September, 15:50 UTC
 
 Hostinger's private runtime now selects `beta`, production providers and the beta
 Worker. Its live DOKU client, secret, signing key and verified parent profile are
@@ -27,8 +27,23 @@ the Worker. The public checkout configuration returns 503 with `Retry-After: 300
 An hourly housekeeping schedule is now installed; new checkout, provider
 dispatch schedules and email sending remain held. See the storage note below.
 
-The [bank inquiry and owner confirmation](withdrawal-bank-inquiries.md)
-implementation `4810fec` is deployed with migration 0056 and beta Worker
+The [merchant withdrawal workflow](withdrawal-merchant-workflow.md)
+implementation `75bfe13` is pushed and deployed to beta Worker
+`281c44d7-2b73-4dac-81ac-d6d9990677e7`, retaining migration 0056. It adds request
+creation, bank review/confirmation, cancellation, paged history and recovery of
+the original request after a lost response. The relevant 25 Worker and 31
+PHP/browser cases are covered, with focused reruns resolving initial layout and
+test-fixture failures. Thirty hosted API checks pass at 15:47 UTC. At 15:50,
+Hostinger serves the tested source hashes and the actual Wallet verification
+gate exposes no withdrawal details or earnings. The browser loads the matching
+script. Private routes remain protected; the original wallet, zero money records,
+execution holds and TEST/main configuration are unchanged. No transfer occurs.
+
+Durable payment dispatch, actual Ezkart-funded transfer fees, final payout/refund
+accounting, outcome reconciliation and live acceptance remain required.
+
+The preceding [bank inquiry and owner confirmation](withdrawal-bank-inquiries.md)
+implementation `4810fec` was deployed with migration 0056 and beta Worker
 `34752837-315d-4c1a-8fd1-bc167728c8cd`. One committed grant permits one bank
 inquiry; the original receipt is saved privately before D1 delivery. Replays
 cannot grant another inquiry. Confirmation binds the original bank-returned
@@ -47,12 +62,9 @@ remain empty. The original uncertain wallet and execution holds are preserved;
 TEST/main deployment configuration hashes are unchanged. The scoped owner-mailbox
 search still finds no matching reply to the DOKU support request.
 
-The [merchant request/confirmation/history UI](withdrawal-merchant-workflow.md)
-is implemented and verified locally, including original-request recovery,
-verification expiry, mobile layouts and cancellation while held. Its workbench
-rollout is in progress. Durable payment dispatch, actual Ezkart-funded transfer
-fees, final payout/refund accounting, outcome reconciliation and live acceptance
-remain required.
+The merchant UI is implemented in the later stage above. Durable payment
+dispatch, actual Ezkart-funded transfer fees, final payout/refund accounting,
+outcome reconciliation and live acceptance remain required.
 
 The preceding [withdrawal reservation](withdrawal-reservations.md) implementation
 `fd04afa` was deployed with migration 0055 and beta Worker

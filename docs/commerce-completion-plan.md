@@ -80,8 +80,12 @@ the same original request key without persisting bank details in browser storage
 Wallet expiry clears open details and preserves the server's original receipt.
 
 Relevant coverage comprises 25 Worker and 31 PHP/browser cases; focused reruns
-resolve the initial mobile clipping and expiry-test cooldown failures. The
-workbench rollout is in progress. No migration or live money movement is added.
+resolve the initial mobile clipping and expiry-test cooldown failures.
+Implementation `75bfe13` and beta Worker
+`281c44d7-2b73-4dac-81ac-d6d9990677e7` are deployed. Thirty hosted API checks
+pass at 15:47 UTC; matching source hashes and the real Wallet verification gate
+pass at 15:50. Original financial/wallet records and execution holds are
+unchanged. No migration or live money movement is added.
 Payment dispatch, fees, final payout/refund accounting, reconciliation and live
 acceptance remain required. No top-level gate is closed.
 

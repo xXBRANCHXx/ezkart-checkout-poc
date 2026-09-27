@@ -73,6 +73,34 @@ and the beta Worker dry build pass.
 Logs are `/tmp/ezkart-withdrawal-ui-{worker-final,php-final,expiry-final,lock-final,read-failure-final,history-visual}-01a0d643.log`.
 These isolated provider fixtures do not establish a real inquiry or transfer.
 
+## Hosted workbench rollout
+
+Implementation `75bfe13` is pushed to `agent/ezkart-workbench`; beta Worker
+`281c44d7-2b73-4dac-81ac-d6d9990677e7` is deployed. No migration is required;
+the database remains on 0056 with 161 application tables. All 30 hosted API
+checks pass at 15:47 UTC on 27 September, including the new lookup's signed
+service, expired-proof, missing-proof and unknown-field rejection. Earnings,
+captures and money journals remain empty; the original uncertain seller-wallet
+registration is unchanged.
+
+At 15:50 UTC, Hostinger serves matching hashes for the withdrawal script, bank
+catalog, shared Wallet script/styles and implementation document. Private PHP
+partials/helpers and the recovery CLI return 404 over direct HTTP; unsigned
+merchant lookup returns 401. In the actual signed-in shared Chrome session, the
+Wallet verification gate renders no withdrawal markup, dialog or earnings.
+The browser loads the exact tested withdrawal script. No additional owner code
+is requested for these held-feature checks. The populated screens remain
+verified with isolated merchant fixtures, not a live bank transaction.
+
+The first asset checks encountered normal rollout lag and a cached pre-deployment
+404; a unique verification URL and the actual versioned browser script both
+resolve to the tested file. Private evidence is
+`withdrawal-ui-{hosted,workbench,wallet-gate}-proof.json` under
+`/home/branch/.local/share/ezkart/beta-01a0d643/`.
+All environment configuration hashes are unchanged. Checkout, provider inquiry,
+merchant withdrawal and automatic email holds remain in place; only the existing
+hourly housekeeping trigger remains scheduled. TEST/main are not deployed.
+
 ## Remaining work
 
 Payment dispatch still needs its own durable grant and atomic cancellation
