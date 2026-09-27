@@ -3,9 +3,10 @@ import {setupCollectionFixture} from './provider-collection-fixture.mjs';
 import {prepareFixtureRoute} from './payment-routing-fixture.mjs';
 
 export const settlementPath='/internal/commerce/finance/settlement';
-const workerId='settlement_fixture',fingerprint='a'.repeat(64),clientId='MCH-FIXTURE-SNAP';
+const workerId='settlement_fixture';
 export async function setupSettlementFixture(t,options={}){
   const f=await setupCollectionFixture(t,{...options,bindings:{COMMERCE_PLATFORM_WALLET_SELLER:'seller_bob',...options.bindings}}),environment=f.environment;
+  const fingerprint=options.fingerprint||'a'.repeat(64),clientId=options.clientId||'MCH-FIXTURE-SNAP';
   let charge=0;
   async function payment(input={}){
     const made=await f.create(f.checkoutInput({checkout:{intentHash:'f'.repeat(64),paymentFlow:'snap_bca',shop:'alice-shop'},...input}));assert.equal(made.status,200,made.error);

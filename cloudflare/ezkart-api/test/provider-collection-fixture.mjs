@@ -6,13 +6,14 @@ import {seedRoutingWallets} from './payment-routing-fixture.mjs';
 export const collectionPath='/internal/commerce/finance/provider-collections';
 export async function setupCollectionFixture(t,options={}){
   const f=options.baseFixture||await setupCommerceFixture(t,options),environment=options.bindings?.APP_ENVIRONMENT==='beta'?'production':'sandbox';
-  const enrollments=await seedRoutingWallets(f,{environment});
+  const fingerprint=options.fingerprint||'a'.repeat(64),clientId=options.clientId||'MCH-FIXTURE-SNAP';
+  const enrollments=await seedRoutingWallets(f,{environment,fingerprint,clientId});
   const epoch=Date.now()-60000,from=new Date(epoch-3600000).toISOString(),to=new Date(epoch-1000).toISOString();let tick=0;
   const ref=()=>Array.from(randomBytes(32),n=>n%10).join('');
   const time=()=>new Date(epoch+tick++).toISOString();
   const row=(reference='group',changes={})=>({referenceNo:reference,transactionType:'SETTLEMENT_FEE',mutationType:'DEBIT',amount:'9007199254740993',currency:'IDR',status:'SUCCESS',dateTime:from,...changes});
   async function record(operation,request,response,{seller='seller_alice',...extra}={}){
-    const at=time(),input={seller,environment,evidence:{environment,credentialFingerprint:'a'.repeat(64),operation,externalId:ref(),requestedAt:at,observedAt:at,
+    const at=time(),input={seller,environment,evidence:{environment,credentialFingerprint:fingerprint,operation,externalId:ref(),requestedAt:at,observedAt:at,
       requestBody:JSON.stringify(request),responseBody:JSON.stringify(response),...extra}};
     const result=await f.call('/internal/commerce/finance/provider-evidence',input);assert.equal(result.status,200,result.error);return result.id;
   }

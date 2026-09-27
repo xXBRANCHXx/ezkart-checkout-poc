@@ -4,6 +4,8 @@ Migration 0055 adds the central reservation and cancellation part of seller bank
 withdrawals. It does not dispatch a bank inquiry or transfer. The merchant
 withdrawal button remains unavailable until bank confirmation, durable dispatch,
 actual Ezkart-funded transfer fees and outcome reconciliation are integrated.
+Migration 0056 adds [durable bank inquiry and owner confirmation](withdrawal-bank-inquiries.md)
+with independent execution holds; it still has no payment dispatcher.
 
 ## Funds and transaction boundary
 
@@ -34,7 +36,7 @@ amount is disclosed as a reservation shortfall. Cancelling it never makes held
 or stale earnings spendable. These shortfalls are not treated as completed
 payouts or customer refunds.
 
-This stage has no dispatch record or provider caller. When dispatch is connected,
+The reservation stage has no payment dispatch record or caller. When connected,
 its committed payment grant must prevent cancellation in the same transaction.
 A timeout, missing acknowledgement or unsuccessful-looking transport response
 cannot release money that may already have left the server. Completed payouts,
@@ -57,8 +59,10 @@ scheduled dispatcher is enabled.
   unsubmitted request; ownership changes cannot reuse that original request key.
 - `POST /internal/commerce/finance/withdrawals/list` accepts the owner scope and
   optional `cap`, `before`, `limit` (1–50). The first sequence cap fixes the cohort;
-  cancellation status stays current. Responses mask bank accounts and exclude
-  provider credentials, account mappings and private financial sources.
+  cancellation status stays current. List/reservation/cancellation responses mask
+  bank accounts. The protected detail now returns the original full destination
+  for confirmation. All merchant responses exclude provider credentials, cash
+  account mappings and private financial sources.
 
 Protected Wallet reads subtract reservations from available earnings and show
 them separately from order holds. They disclose a funding shortfall and continue
@@ -67,9 +71,10 @@ earnings; it does not claim to be completed bank-transfer history.
 
 ## Remaining withdrawal work
 
-Connect the [bank adapter](doku-payouts.md) to single-use durable inquiry/payment
-grants and original receipts, show and confirm the bank-returned beneficiary,
-bind the owner decision to that receipt, recheck authority/funds before dispatch,
+The [bank inquiry](withdrawal-bank-inquiries.md) now has a single-use grant,
+original private receipt and owner confirmation bound to that receipt.
+Connect payment dispatch to its own durable grant and original receipt,
+show the bank-returned beneficiary in Wallet, recheck authority/funds at dispatch,
 fund the actual transfer fee from Ezkart, and reconcile authenticated status,
 callbacks and account history into final journals. Complete the owner-facing
 request/history/recovery flows and live acceptance before opening withdrawals.

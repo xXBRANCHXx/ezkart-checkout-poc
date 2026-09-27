@@ -17,6 +17,13 @@ return [
     // Match the Worker COMMERCE_SERVICE_SECRET; keep at least 32 random bytes.
     // This key is server-only and separate for every deployment environment.
     'commerce_service_secret' => '',
+    // Keep withdrawals held until the complete payout workflow is accepted.
+    // Bank inquiries also require Worker COMMERCE_WITHDRAWAL_INQUIRY=enabled.
+    // See docs/withdrawal-bank-inquiries.md; this does not enable bank payments.
+    'commerce_withdrawals' => 'held',
+    'commerce_withdrawal_inquiry' => 'held',
+    // Absolute mode-0700 directory outside the application and public web root.
+    'commerce_withdrawal_recovery_directory' => '',
     // Supabase is used only to verify Google identity. The publishable/anon
     // key is safe to use for client identification; never paste a service-role
     // key here. Keep the Google client secret in Supabase itself.

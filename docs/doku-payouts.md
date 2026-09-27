@@ -1,9 +1,10 @@
 # DOKU seller bank payouts
 
 Workbench contract implementation, 27 September 2026. The bank-transfer adapter
-exists; **seller withdrawals are not operational**. There is no public payout
-route, caller, schedule or available-balance writer in this change. Checkout and
-all existing money-execution holds remain in place.
+exists; **seller withdrawals are not operational**. The later
+[bank inquiry integration](withdrawal-bank-inquiries.md) adds protected bank
+verification and owner confirmation with execution held. There is no bank payment
+grant, caller or schedule. Checkout and money-execution holds remain in place.
 
 ## Provider contract
 
@@ -49,8 +50,10 @@ fallbacks. This adapter alone does not fence separate calls or process restarts.
 
 The [central reservation workflow](withdrawal-reservations.md) now freezes an
 owner's intent and bank destination, reserves current eligible earnings atomically
-and supports cancellation before any provider dispatch. It does not call this
-adapter or enable withdrawals. The complete workflow must:
+and supports cancellation before payment dispatch. Durable bank inquiries and
+owner confirmations are implemented separately, with execution held. The complete
+workflow must satisfy all the following; the inquiry stage closes only its
+corresponding requirements:
 
 1. Resolve the confirmed seller/provider mapping and its cash account. Determine
    available funds from settled and delivered earnings, actual fees, refunds,

@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
 import {generateKeyPairSync,createHash,createHmac,verify,randomBytes} from 'node:crypto';
-import {writeFile,mkdir} from 'node:fs/promises';
+import {writeFile,mkdir,mkdtemp,rm,readFile,stat,chmod} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
 import {join,resolve} from 'node:path';
 import {setupCentralFixture} from './central-fixture.mjs';
 import {setupEarningsFixture} from '../../cloudflare/ezkart-api/test/earnings-fixture.mjs';
@@ -101,6 +102,96 @@ async function merchantFixture(t,overrides={},options={}){
   return {...f,page,context,browser,errors,setAuth,session,unlock,request};
 }
 
+async function bankInquiryFixture(t,overrides={}){
+  const recovery=await mkdtemp(join(tmpdir(),'ezkart-bank-inquiry-'));t.after(()=>rm(recovery,{recursive:true,force:true}));
+  const bindings={COMMERCE_PLATFORM_WALLET_SELLER:'seller_bob',COMMERCE_WITHDRAWAL_INQUIRY:'enabled'};
+  const f=await merchantFixture(t,{EZKART_COMMERCE_WITHDRAWALS:'enabled',EZKART_COMMERCE_WITHDRAWAL_INQUIRY:'enabled',
+    EZKART_COMMERCE_WITHDRAWAL_RECOVERY_DIRECTORY:recovery,...overrides},{bindings});
+  const identity=await f.run(`require ${JSON.stringify(join(root,'cart/api/doku-payout.php'))}; echo json_encode(EzDokuPayoutClient::configured('sandbox')->providerIdentity());`);
+  assert.equal(identity.status,0,identity.error);const provider=JSON.parse(identity.output);
+  const e=await setupEarningsFixture(t,{baseFixture:f,bindings,fingerprint:provider.credentialFingerprint,clientId:provider.clientId});
+  await e.product('bank-inquiry-merchant',10,'seller_alice',400000);
+  const p=await e.payment({items:[{productId:'bank-inquiry-merchant',quantity:2,expectedPrice:400000,expectedWeightGrams:100}]});await e.settle(p);await e.deliver(p);
+  await f.unlock();
+  const reserve=async()=>{const r=await f.request('withdrawal_reserve',{requestKey:key(),amount:'250000',bank:{code:'CENAIDJA',accountNumber:'001234567890',channel:'BI_FAST'}});assert.equal(r.status,200,JSON.stringify(r.data));return r.data.withdrawal;};
+  const inquire=w=>f.request('withdrawal_inquire',{id:w.id});
+  const bankCalls=async()=>(await f.app.calls()).filter(c=>c.url.endsWith('/sub-account/v2.0/transfer-inquiry'));
+  return {...f,e,recovery,reserve,inquire,bankCalls};
+}
+
+test('the protected merchant bank inquiry persists its receipt, confirms the returned beneficiary and never sends a payment',async t=>{
+  const f=await bankInquiryFixture(t),w=await f.reserve(),name='Fixture Bank Owner Ω\u2028\u2029';await f.setControl({inquiryName:name,inquiryLiteralUnicode:true});
+  const result=await f.inquire(w);assert.equal(result.status,200,JSON.stringify(result.data));assert.equal(result.data.withdrawal.bankVerified,true);
+  assert.equal(result.data.withdrawal.bank.beneficiaryName,name);assert.equal(result.data.withdrawal.bank.accountNumber,'001234567890');assert.equal(result.data.withdrawal.payoutConfirmed,false);
+  const receipt=join(f.recovery,w.id+'-bank-inquiry.json');assert.equal((await stat(receipt)).mode&0o777,0o600);
+  const saved=JSON.parse(await readFile(receipt,'utf8'));assert.equal(saved.withdrawalId,w.id);assert.equal(saved.binding.beneficiaryAccountNumber,'001234567890');
+  assert(saved.evidence.responseBody.includes(name)); // Exercise PHP/Worker digests over literal Unicode line separators.
+  const confirmation=await f.request('withdrawal_confirm',{id:w.id,requestKey:key(),inquiryDigest:result.data.withdrawal.inquiry.digest});assert.equal(confirmation.status,200,JSON.stringify(confirmation.data));
+  assert.equal(confirmation.data.payoutConfirmed,false);assert.equal((await f.inquire(w)).data.bankCheck.providerCalls,0);assert.equal((await f.bankCalls()).length,1);
+  const history=await f.request('withdrawal_list',{});assert.equal(history.status,200);assert(!JSON.stringify(history.data).includes('001234567890'));
+  assert(!(await f.app.calls()).some(c=>c.url.endsWith('/transfer-payment')));
+  assert(!/credentialFingerprint|requestBody|responseBody|SAC-|2010000001/.test(JSON.stringify(result.data)));
+  for(const extra of [{actor:proof('bob')},{seller:'seller_bob'},{environment:'production'},{credentialFingerprint:'f'.repeat(64)}])
+    assert.equal((await f.request('withdrawal_inquire',{id:w.id,...extra})).status,422);
+  assert.equal((await f.request('withdrawal_read',{id:w.id},{'X-Ezkart-Csrf':'changed'})).status,401);
+  await f.session("$_SESSION['wallet_access']['expires_at']=time()-1");
+  for(const action of ['withdrawal_read','withdrawal_list','withdrawal_inquire','withdrawal_confirm','withdrawal_cancel'])assert.equal((await f.request(action,action==='withdrawal_list'?{}:{id:w.id})).status,401);
+});
+
+test('a lost inquiry-grant acknowledgement cannot cause the merchant proxy to call the provider on replay',async t=>{
+  const f=await bankInquiryFixture(t),w=await f.reserve();f.control.drop='/internal/commerce/finance/withdrawals/'+w.id+'/inquiry/start';
+  const lost=await f.inquire(w);assert(lost.status>=500);assert.equal((await f.bankCalls()).length,0);assert.equal(await f.count('commerce_withdrawal_inquiry_grants'),1);
+  const replay=await f.inquire(w);assert.equal(replay.status,200,JSON.stringify(replay.data));assert.equal(replay.data.withdrawal.inquiry.state,'review');assert.equal((await f.bankCalls()).length,0);
+  assert.equal((await f.request('withdrawal_cancel',{id:w.id,requestKey:key()})).status,200);assert.equal((await f.e.earnings()).reservedWithdrawals,'0');
+});
+
+test('private original receipts recover missing or lost storage acknowledgements without another provider inquiry',async t=>{
+  for(const failure of ['fail','drop']){
+    const f=await bankInquiryFixture(t),w=await f.reserve();f.control[failure]='/internal/commerce/finance/withdrawals/'+w.id+'/inquiry/receipt';
+    const first=await f.inquire(w);assert.equal(first.status,200,JSON.stringify(first.data));assert.equal((await f.bankCalls()).length,1);
+    assert.equal(first.data.bankCheck.state,failure==='drop'?'verified':'review');
+    const file=join(f.recovery,w.id+'-bank-inquiry.json'),original=await readFile(file,'utf8');assert.equal(await f.count('commerce_withdrawal_inquiry_receipts'),failure==='drop'?1:0);
+    f.control[failure]='';const recovered=await f.inquire(w);assert.equal(recovered.status,200,JSON.stringify(recovered.data));assert.equal(recovered.data.withdrawal.bankVerified,true);
+    assert.equal(await f.count('commerce_withdrawal_inquiry_receipts'),1);assert.equal((await f.bankCalls()).length,1);assert.equal(await readFile(file,'utf8'),original);
+    assert.equal((await f.e.earnings()).reservedWithdrawals,'250000');assert.equal((await f.e.summary()).balanced,true);
+  }
+});
+
+test('failed or mismatched provider inquiries retain their original grant and diagnostic instead of retrying or confirming a bank',async t=>{
+  for(const failure of ['inquiryFailure','inquiryWrongAccount']){
+    const f=await bankInquiryFixture(t),w=await f.reserve();await f.setControl({[failure]:true});
+    const first=await f.inquire(w);assert.equal(first.status,200,JSON.stringify(first.data));assert.equal(first.data.withdrawal.bankVerified,false);
+    assert.equal(first.data.withdrawal.inquiry.state,'review');const diagnostic=(await f.call('/internal/commerce/finance/withdrawals/'+w.id+'/inquiry/read',{environment:'sandbox'})).diagnostic;
+    assert.equal(diagnostic.stage,'provider_inquiry');assert.equal(diagnostic.providerStatus,failure==='inquiryFailure'?503:0);
+    await f.setControl({});assert.equal((await f.inquire(w)).data.bankCheck.providerCalls,0);assert.equal((await f.bankCalls()).length,1);
+    assert.equal((await f.request('withdrawal_confirm',{id:w.id,requestKey:key(),inquiryDigest:'a'.repeat(64)})).status,409);
+  }
+});
+
+test('private receipt finalization works with the inquiry switch held and makes no provider call',async t=>{
+  const f=await bankInquiryFixture(t),w=await f.reserve();f.control.fail='/internal/commerce/finance/withdrawals/'+w.id+'/inquiry/receipt';
+  assert.equal((await f.inquire(w)).status,200);f.control.fail='';const file=join(f.recovery,w.id+'-bank-inquiry.json');
+  const run=()=>new Promise((resolve,reject)=>{
+    const child=spawn(process.env.PHP_BINARY||'php',['-n','-d','auto_prepend_file='+join(root,'tools/checkout-test/provider-fixture.php'),
+      join(root,'tools/commerce/finalize-withdrawal-inquiry.php'),'--receipt-file='+file],{env:{...f.app.env,EZKART_COMMERCE_WITHDRAWAL_INQUIRY:'held'}});
+    let output='',error='';child.stdout.on('data',x=>output+=x);child.stderr.on('data',x=>error+=x);child.on('error',reject);child.on('close',status=>resolve({status,output,error}));
+  });
+  const done=await run();assert.equal(done.status,0,done.error);assert.equal(JSON.parse(done.output).providerCalls,0);assert.equal((await f.bankCalls()).length,1);
+  assert.equal((await run()).status,0);assert.equal(await f.count('commerce_withdrawal_inquiry_receipts'),1);
+  await chmod(file,0o644);assert.equal((await run()).status,1);await chmod(file,0o600);
+  for(const path of ['/tools/commerce/finalize-withdrawal-inquiry.php','/cart/api/commerce-withdrawal-inquiries.php']){
+    const blocked=await fetch(f.app.base+path);assert.equal(blocked.status,404);assert.equal(await blocked.text(),'');
+  }
+});
+
+test('held merchant withdrawals and unavailable private recovery storage consume no inquiry grants',async t=>{
+  const held=await bankInquiryFixture(t,{EZKART_COMMERCE_WITHDRAWALS:'held'});
+  assert.equal((await held.request('withdrawal_reserve',{requestKey:key(),amount:'250000',bank:{code:'CENAIDJA',accountNumber:'001234567890',channel:'BI_FAST'}})).status,503);
+  assert.equal(await held.count('commerce_withdrawals'),0);assert.equal((await held.bankCalls()).length,0);
+  const f=await bankInquiryFixture(t,{EZKART_COMMERCE_WITHDRAWAL_RECOVERY_DIRECTORY:'/tmp'}),w=await f.reserve();
+  assert.equal((await f.inquire(w)).status,503);assert.equal(await f.count('commerce_withdrawal_inquiry_grants'),0);assert.equal((await f.bankCalls()).length,0);
+});
+
 test('merchant Wallet verifies owner identity, connects through the real proxy, and survives desktop/mobile reloads without inventing earnings',async t=>{
   const f=await merchantFixture(t);await mkdir(join(f.app.directory,'orders'),{recursive:true});await writeFile(join(f.app.directory,'orders','legacy-wallet.json'),JSON.stringify({order_id:'EZK-S-LEGACYWALLETSENTINEL',seller_id:'seller_alice',status:'PAID',subtotal:999999}));await f.unlock();assert.equal((await f.registerCalls()).length,0);
   assert(!(await f.page.content()).includes('LEGACYWALLETSENTINEL'));assert.equal(await f.page.locator('.wallet-payment-summary').count(),0);
@@ -125,7 +216,7 @@ test('protected Wallet shows actual released earnings, reserves and stable histo
   await f.page.locator('[data-wallet-earnings-more]').click();await f.page.locator('[data-wallet-setup][aria-busy=false]').waitFor();
   assert.equal(await f.page.locator('[data-wallet-earnings-history] tr').count(),23);assert.equal(await f.page.locator('[data-wallet-earnings-more]').isHidden(),true);
   assert.equal(await f.page.getByRole('button',{name:'Withdraw funds'}).isDisabled(),true);
-  const raw=await f.request('read');assert.equal(raw.status,200);assert(!/fcol_|fobs_|credentialFingerprint|providerReference/.test(JSON.stringify(raw.body)));
+  const raw=await f.request('read');assert.equal(raw.status,200);assert(!/fcol_|fobs_|credentialFingerprint|providerReference/.test(JSON.stringify(raw.data)));
   await mkdir(screens,{recursive:true});
   for(const width of [1360,390]){await f.page.setViewportSize({width,height:1000});await f.page.reload();await f.page.locator('[data-wallet-setup][aria-busy=false]').waitFor();await f.page.evaluate(()=>window.scrollTo(0,0));assert.equal(await amount('available'),'34250');assert.equal(await f.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);assert.equal(await f.page.locator('[data-wallet-earnings-history-table]').evaluate(el=>el.scrollWidth<=el.clientWidth),true);await f.page.screenshot({path:join(screens,'wallet-earnings-'+width+'.png'),fullPage:true});}
   await e.refund(p);await f.page.locator('[data-wallet-setup-refresh]').click();await f.page.locator('[data-wallet-setup][aria-busy=false]').waitFor();

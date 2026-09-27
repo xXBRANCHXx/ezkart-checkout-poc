@@ -71,6 +71,28 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 27 September: durable bank inquiries and owner confirmation
+
+[Bank verification](withdrawal-bank-inquiries.md) now permits one inquiry per
+committed withdrawal grant, preserves the original response before D1 delivery,
+and records owner confirmation against its exact digest. Both grant and
+confirmation recheck current ownership, verification and funding. Lost
+acknowledgements cannot grant another inquiry; private recovery uses the original
+receipt without a provider request. Protected merchant actions exclude server
+identities and require fresh Wallet verification.
+
+All 96 relevant cases pass: eleven focused inquiry/database cases, 28 reservation/
+earnings cases, 25 settlement/collection cases and 32 PHP/adapter/merchant cases.
+The populated 0055 upgrade preserves existing reservations and journals. A fresh
+beta export restores cleanly; migration rehearsal preserves every row in all
+158 original tables and adds four empty tables. Hosted rollout is still pending
+at this implementation commit.
+
+Payment grants, transfer fees funded by Ezkart, final payout/refund accounting,
+payment outcome reconciliation, merchant request/confirmation/history UI and live
+acceptance remain required. Execution holds and the original uncertain wallet
+remain unchanged. No top-level gate is closed.
+
 ### 27 September: owner withdrawal reservations and cancellation
 
 [Withdrawal reservations](withdrawal-reservations.md) now check current eligible
