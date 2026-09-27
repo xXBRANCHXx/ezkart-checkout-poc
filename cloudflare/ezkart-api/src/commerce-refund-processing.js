@@ -2,6 +2,7 @@ import {commerceHash,commerceStorageEnabled} from './commerce-orders.js';
 import {currentCommerceEnvironment as mode} from './commerce-access.js';
 import {refundDetail,refundAccess} from './commerce-refunds.js';
 import {supportAccess} from './commerce-support.js';
+import {refundCostPreview} from './commerce-refund-costs.js';
 const fail=(message,status=422)=>{throw new Response(message,{status,headers:status===401?{'x-ezkart-error-code':'support_verification_required'}:{}});};
 const fields=(input,allowed)=>{if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).some(k=>!allowed.includes(k)))fail('Refund processing details are invalid.');};
 const text=(value,label,min,max)=>{if(typeof value!=='string'||value.trim().length<min||value.trim().length>max||/[\u0000-\u001f\u007f]/.test(value))fail(label+' is invalid.');return value.trim();};
@@ -33,7 +34,7 @@ export async function refundProcessingView(env,actor,row,authority,dispute){
     requiresVerification:staff&&authority.role==='reviewer'&&!authority.canWrite,
     reason:request?'':reason,request:request?{id:request.id,preparedAt:request.created_at,...(staff?{settlementId:request.settlement_id}: {})}:null,
     submission:submission?{submittedAt:submission.submitted_at,recordedAt:submission.recorded_at,...(staff?{channel:submission.channel,reference:submission.reference}: {})}:null,
-    paymentConfirmed:false};
+    ...(actor.kind==='buyer'?{}:{costs:await refundCostPreview(env,row)}),paymentConfirmed:false};
 }
 
 export async function saveRefundBank(env,actor,refundId,raw,expectedOrder=''){

@@ -83,6 +83,18 @@
     else if(p.bankProvided)box.append(el('p','The buyer has provided private refund bank details to Ezkart.'));
     if(p.request)box.append(el('p','Original provider request prepared · '+date(p.request.preparedAt)),el('p','The destination is fixed for this request. Contact Ezkart if it needs correction; do not submit a replacement refund.'));
     if(p.submission)box.append(el('p','Submission recorded · '+date(p.submission.submittedAt)),el('p','DOKU processing and the returned funds still need verification.'));
+    if(p.costs){
+      const costs=p.costs,range=value=>value.minimum===value.maximum?money(value.minimum):money(value.minimum)+'–'+money(value.maximum),plan=el('section');plan.dataset.refundCosts='';
+      plan.append(el('h4','Cost after a confirmed refund'),el('p','Planning amounts only. No refund payment or accounting entry is confirmed.'));
+      const rows=[['Amount returned to buyer',money(costs.buyerRefund)],['Product refund',money(costs.productRefund)],['Shipping refund',money(costs.shippingRefund)],
+        ['Commission returned by Ezkart',range(costs.commissionReversal)],['Seller’s product deduction',range(costs.sellerProductDeduction)],
+        ['Original admin fee retained',money(costs.retainedAdminFee)],['Original payment fee retained',costs.originalProcessingFee===null?'Awaiting verified provider fee':money(costs.originalProcessingFee)],
+        ['New refund processing fee','Awaiting actual provider charge']];
+      const list=el('dl');for(const [label,value] of rows)list.append(el('dt',label),el('dd',value));plan.append(list,
+        el('p','The original admin and payment fees are retained once per purchase; they are not charged again for this request. Shipping funding needs reconciliation. The actual refund fee belongs to whoever holds the money when it is charged.'),
+        el('p','Partial-refund commission is rounded across the original purchase. A one-rupiah range is resolved when the confirmed refunds are accounted for.'));
+      box.append(plan);
+    }
     if(p.requiresVerification){const link=el('a','Verify your authenticator to update refund processing');link.href='?page=support-refunds&refund='+encodeURIComponent(r.id)+'#review-verification';box.append(link);}
     if(p.canProvideBank){
       const bank=el('form');bank.dataset.refundBank='';const inputs={};

@@ -22,6 +22,7 @@ test('buyer bank confirmation stays out of browser storage; desktop/mobile provi
   await bank.getByRole('button',{name:'Retry bank confirmation',exact:true}).click();await buyer.getByText('Your refund bank details were saved.',{exact:true}).waitFor();
   assert.equal((await f.db.prepare('SELECT COUNT(*) n FROM commerce_refund_bank_details').first()).n,1);
   const staff=await f.page('support',1360);staff.on('pageerror',e=>errors.push(e.message));f.control.drop=f.support+'/processing';
+  await staff.getByRole('heading',{name:'Cost after a confirmed refund',exact:true}).waitFor();assert.equal(await buyer.locator('[data-refund-costs]').count(),0);
   await staff.getByRole('button',{name:'Prepare DOKU refund request',exact:true}).click();await staff.getByRole('button',{name:'Retry confirmation',exact:true}).waitFor();
   await staff.reload();await staff.getByRole('button',{name:'Retry confirmation',exact:true}).click();await staff.getByText('Your refund request was saved.',{exact:true}).waitFor();
   assert.equal((await f.db.prepare('SELECT COUNT(*) n FROM commerce_refund_provider_requests').first()).n,1);

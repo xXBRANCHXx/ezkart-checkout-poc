@@ -82,6 +82,17 @@ held pending DOKU activation and evidence of Ezkart-funded withdrawal fees.
 This completes the missing caller, not live payout acceptance; no financial
 completion gate is claimed.
 
+### 28 September: timed finish — refund cost review
+
+The refund workspace now shows the original-policy cost breakdown, including
+proportional commission reversal, retained admin/payment fees and separate
+shipping funding. Exact integer arithmetic bounds cumulative rounding without
+promising a premature one-rupiah allocation. The actual new refund fee and its
+funding owner remain unset. This is a read-only planning view, not a refund
+outcome or ledger entry. The actual DOKU refund service integration, authenticated
+returned-funds evidence, final journals and digital entitlement effects remain
+unfinished. See [the refund handoff](refund-provider-handoffs.md#cost-review).
+
 ### 28 September: original DOKU refund request preparation
 
 The [provider handoff](refund-provider-handoffs.md) adds buyer-owned private bank

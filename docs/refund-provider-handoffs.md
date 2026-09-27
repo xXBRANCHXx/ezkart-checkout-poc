@@ -54,3 +54,26 @@ proportional commission reversal, retained admin/original payment fees, actual
 refund-fee custody, entitlement effects, processing notifications and financial
 reconciliation remain necessary. This handoff does not close the refund or
 broader launch gate. Real paid-purchase acceptance remains outstanding.
+
+## Cost review
+
+Merchant and support details show a read-only breakdown from the original
+captured fee policy. Product commission reverses proportionally; shipping does
+not earn a commission reversal. A full product refund returns the exact original
+commission. Partial refunds show the possible one-rupiah rounding range until
+the cumulative confirmed refunds can be posted. Product deductions, shipping
+refunds and the buyer total are separate. Original admin and verified payment
+fees remain retained once per purchase. A changed seller plan cannot change
+these original terms. Buyers do not receive the internal seller cost breakdown.
+
+The actual new refund fee and its payer remain unknown until there is provider
+evidence. The owner's rule is that the current funds holder bears that charge;
+the preview does not guess custody or post a fee. Shipping funding also requires
+reconciliation. Nothing in this view posts a journal, revokes a download, sends
+a provider request or reports payment completion.
+
+DOKU also documents a separately funded non-card
+[disbursement/refund service](https://docs.doku.com/accept-payments/finance-and-settlement/refund-and-chargeback/refund-and-chargeback).
+Its account-specific credentials, funding and verifiable result contract still
+need acceptance. The Sub-Account withdrawal caller is not automatically that
+service. A published tariff is not an actual fee charged to an Ezkart refund.
