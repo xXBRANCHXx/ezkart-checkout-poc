@@ -38,7 +38,7 @@ header('X-Ezkart-Content-Security-Policy: ' . $adminSecurityPolicy);
 const EZ_ADMIN_SESSION_LIFETIME = 60 * 60 * 24 * 30;
 
 $deployment = strtolower(ez_config('deployment_environment'));
-$sessionEnvironment = in_array($deployment, ['test', 'production'], true) ? $deployment : 'local';
+$sessionEnvironment = in_array($deployment, ['test', 'beta', 'production'], true) ? $deployment : 'local';
 $configuredSessionDirectory = ez_config('admin_session_storage');
 $documentRoot = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/');
 $sessionDirectory = $configuredSessionDirectory !== ''
@@ -263,7 +263,7 @@ function ez_admin_auth_mode(): string
 {
     $configured = strtolower(ez_config('admin_auth_mode'));
     if (in_array($configured, ['allowlist', 'open_beta', 'open'], true)) return $configured;
-    return strtolower(ez_config('deployment_environment')) === 'test' ? 'open_beta' : 'allowlist';
+    return in_array(strtolower(ez_config('deployment_environment')), ['test', 'beta'], true) ? 'open_beta' : 'allowlist';
 }
 
 function ez_admin_email_has_legacy_access(string $email): bool

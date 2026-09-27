@@ -7,6 +7,8 @@ return [
     // Each deployed website keeps a different ignored config.runtime.php.
     // Supabase is Auth-only. D1 and R2 are reached through the matching
     // Cloudflare Worker rather than a PostgreSQL connection string.
+    // Live workbench: beta + a dedicated ezkart-api-beta.*.workers.dev endpoint.
+    // See docs/beta-readiness.md before changing the hosted configuration.
     'deployment_environment' => 'test',
     'cloudflare_api_url' => 'https://api-test.ezkart.id',
     // Central-commerce cutover must follow docs/commerce-storage.md. Keep legacy
@@ -20,7 +22,7 @@ return [
     // key here. Keep the Google client secret in Supabase itself.
     'supabase_url' => 'https://rwxxjqvoidpkuqftgkjd.supabase.co',
     'supabase_publishable_key' => 'REPLACE_WITH_SUPABASE_PUBLISHABLE_OR_ANON_KEY',
-    // Test defaults to open_beta; production defaults to allowlist unless this
+    // Test and beta default to open_beta; production defaults to allowlist unless this
     // is explicitly changed to open after the data-isolation review.
     'admin_auth_mode' => 'open_beta',
     // Optional privileged accounts that may read the legacy shared sandbox
@@ -33,7 +35,7 @@ return [
     // Customer Google sign-in uses the same provider, with a separate private session.
     'customer_session_storage' => '',
     // The server-side switch selects BOTH providers. Default is sandbox.
-    // ezkart.id / production deployments reject sandbox settings.
+    // Beta and production deployments require production provider settings.
     // The test deployment may use either mode, after all provider checks pass.
     'commerce_environment' => 'sandbox',
     // Private dashboard bridge key, or ../.ezkart-executive-bridge/secret.php.

@@ -71,6 +71,23 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 27 September: live DOKU authentication and separate beta storage
+
+The owner clarified live DOKU on workbench. A dedicated production public key is
+registered, its private half and the OTP-revealed existing secret are preserved
+outside Git, and live B2B authentication passed at 05:26:29 UTC. No payment,
+Sub-Account, refund or payout was created. The typed BCA SNAP contract adapter
+passes 25 contract/reader cases; durable central dispatch, webhook and checkout
+wiring and channel acceptance remain required.
+
+The beta deployment uses a separate API/service-signature scope and fixed live
+provider mode while retaining the workbench URL. Its new D1 and R2 resources
+contain no financial or seller data. All 47 migrations are installed; the fresh
+private baseline restores cleanly. Dedicated isolation/destination tests and 99
+checkout regressions pass. Main, the hosted provider mode and TEST history remain
+unchanged. See [beta-readiness.md](beta-readiness.md) and
+[DOKU SNAP preparation](doku-snap-payments.md) for exact evidence and remaining work.
+
 ### 27 September: beta preparation, full-size files and cleanup recovery
 
 DOKU approval is owner-confirmed and beta/soft-launch preparation is authorized

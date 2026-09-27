@@ -15,14 +15,14 @@ function ez_central_commerce_enabled(): bool
 {
     if (ez_config('commerce_storage') !== 'd1') return false;
     // A flag change cannot bypass an in-progress source handover.
-    ez_legacy_storage_assert_routing(ez_config('deployment_environment') === 'production' ? 'production' : 'sandbox');
+    ez_legacy_storage_assert_routing(ez_deployment_profile()['commerce_environment']);
     return true;
 }
 
 /** Signing is shared by ordinary requests and the provider-job dispatcher. */
 function ez_commerce_request_headers(string $method, string $target, string $body, string $environment, string $secret, ?int $timestamp = null, ?string $nonce = null): array
 {
-    if (!in_array($method, ['GET', 'POST'], true) || !in_array($environment, ['test', 'production'], true)
+    if (!in_array($method, ['GET', 'POST'], true) || !in_array($environment, ['test', 'beta', 'production'], true)
         || !preg_match('~^/internal/commerce/[A-Za-z0-9_/?=&%.:-]+$~D', $target)
         || strlen($secret) < 32 || strlen($body) > 64000) {
         throw new InvalidArgumentException('Invalid central commerce request.');

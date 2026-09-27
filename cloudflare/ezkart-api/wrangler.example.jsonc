@@ -31,6 +31,31 @@
         { "binding": "PRIVATE_ASSETS", "bucket_name": "ezkart-test-private" }
       ]
     },
+    "beta": {
+      "name": "ezkart-api-beta",
+      "workers_dev": true,
+      "preview_urls": false,
+      // Connect only after isolated data preparation and provider acceptance.
+      "triggers": { "crons": [] },
+      "vars": {
+        "APP_ENVIRONMENT": "beta",
+        "COMMERCE_STORAGE": "legacy",
+        "ALLOWED_ORIGINS": "https://test.ezkart.id",
+        "SUPABASE_URL": "https://rwxxjqvoidpkuqftgkjd.supabase.co"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "ezkart_beta_database",
+          "database_id": "PASTE_BETA_D1_DATABASE_ID",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "r2_buckets": [
+        { "binding": "PUBLIC_ASSETS", "bucket_name": "ezkart-beta-public" },
+        { "binding": "PRIVATE_ASSETS", "bucket_name": "ezkart-beta-private" }
+      ]
+    },
     "production": {
       "name": "ezkart-api-production",
       "routes": [

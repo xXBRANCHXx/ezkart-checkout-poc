@@ -76,7 +76,7 @@ abstract class EzDokuSnapClient
             $sent = curl_exec($handle); $status = (int) curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
             if ($sent === false) throw new EzDokuReadException('transport', $status);
             return [$status, $response];
-        } finally { curl_close($handle); }
+        } finally { unset($handle); }
     }
 
     private function send(string $path, array $headers, string $body): array

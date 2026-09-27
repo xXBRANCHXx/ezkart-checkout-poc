@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__ . '/deployment.php';
 
 /**
  * Validate the branch-specific Cloudflare Worker endpoint. Supabase is used
@@ -10,9 +11,7 @@ function ez_database_configuration(): array
     $environment = strtolower(ez_config('deployment_environment'));
     $url = rtrim(ez_config('cloudflare_api_url'), '/');
 
-    if (!in_array($environment, ['test', 'production'], true)) {
-        throw new RuntimeException('deployment_environment must be test or production.');
-    }
+    ez_deployment_profile($environment);
     if ($url === '') {
         throw new RuntimeException('cloudflare_api_url is required.');
     }
@@ -20,19 +19,21 @@ function ez_database_configuration(): array
     $parts = parse_url($url);
     $host = strtolower((string) ($parts['host'] ?? ''));
     $scheme = strtolower((string) ($parts['scheme'] ?? ''));
-    $validHost = $environment === 'test'
-        ? hash_equals('api-test.ezkart.id', $host)
-            || preg_match('/^ezkart-api-test\.[a-z0-9-]+\.workers\.dev$/', $host) === 1
-        : hash_equals('api.ezkart.id', $host);
-    if ($scheme !== 'https' || !$validHost) {
+    $validHost = match ($environment) {
+        'test' => hash_equals('api-test.ezkart.id', $host) || preg_match('/^ezkart-api-test\.[a-z0-9-]+\.workers\.dev$/D', $host) === 1,
+        'beta' => hash_equals('api-beta.ezkart.id', $host) || preg_match('/^ezkart-api-beta\.[a-z0-9-]+\.workers\.dev$/D', $host) === 1,
+        'production' => hash_equals('api.ezkart.id', $host),
+    };
+    if ($scheme !== 'https' || !$validHost || isset($parts['user']) || isset($parts['pass']) || isset($parts['port'])
+        || isset($parts['query']) || isset($parts['fragment']) || !in_array($parts['path'] ?? '', ['', '/'], true)) {
         throw new RuntimeException('Cloudflare API hostname does not match this deployment environment.');
     }
 
     $requestHost = strtolower(preg_replace('/:\d+$/', '', (string) ($_SERVER['HTTP_HOST'] ?? '')) ?? '');
-    $localTest = $environment === 'test' && in_array($requestHost, ['localhost', '127.0.0.1'], true) && in_array((string) ($_SERVER['REMOTE_ADDR'] ?? ''), ['127.0.0.1', '::1'], true);
+    $localTest = in_array($environment, ['test', 'beta'], true) && in_array($requestHost, ['localhost', '127.0.0.1'], true) && in_array((string) ($_SERVER['REMOTE_ADDR'] ?? ''), ['127.0.0.1', '::1'], true);
     if ($requestHost !== '' && !$localTest) {
-        if ($environment === 'test' && $requestHost !== 'test.ezkart.id') {
-            throw new RuntimeException('Test data configuration is only allowed on test.ezkart.id.');
+        if (in_array($environment, ['test', 'beta'], true) && $requestHost !== 'test.ezkart.id') {
+            throw new RuntimeException('Workbench data configuration is only allowed on test.ezkart.id.');
         }
         if ($environment === 'production' && !in_array($requestHost, ['ezkart.id', 'www.ezkart.id'], true)) {
             throw new RuntimeException('Production data configuration is only allowed on ezkart.id.');
@@ -80,6 +81,7 @@ function ez_database_status(): array
     $checks = is_array($payload['checks'] ?? null) ? $payload['checks'] : [];
     $connected = $status >= 200 && $status < 300
         && ($payload['ok'] ?? false) === true
+        && ($payload['environment'] ?? null) === $database['environment']
         && ($checks['d1'] ?? false) === true
         && ($checks['public_r2'] ?? false) === true
         && ($checks['private_r2'] ?? false) === true

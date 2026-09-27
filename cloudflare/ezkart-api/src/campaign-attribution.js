@@ -1,13 +1,14 @@
 import {commerceHash} from './commerce-orders.js';
 import {commerceReadEnvironment} from './commerce-order-reads.js';
+import {deploymentProfile} from './deployment.js';
 
 const fail=(message='This campaign link is unavailable.',status=404)=>{throw new Response(message,{status});};
 const hex=bytes=>Array.from(bytes,v=>v.toString(16).padStart(2,'0')).join('');
 export const campaignVisitHash=(token,environment)=>commerceHash({purpose:'campaign_visit',token,environment});
-export const campaignLinkUrl=(environment,code)=>'https://'+(environment==='sandbox'?'test.ezkart.id':'ezkart.id')+'/cart/campaign.php?c='+code;
+export const campaignLinkUrl=(env,code)=>{commerceReadEnvironment(env);return deploymentProfile(env).origin+'/cart/campaign.php?c='+code;};
 export async function campaignMailLink(env,publicationId){
   const row=await env.DB.prepare('SELECT code FROM commerce_campaign_links WHERE publication_id=?').bind(publicationId).first();
-  if(!row)fail('The published campaign link is unavailable.',503);return campaignLinkUrl(commerceReadEnvironment(env),row.code);
+  if(!row)fail('The published campaign link is unavailable.',503);return campaignLinkUrl(env,row.code);
 }
 export async function campaignLink(env,request){
   const url=new URL(request.url),mode=commerceReadEnvironment(env);

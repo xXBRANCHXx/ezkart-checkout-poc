@@ -36,11 +36,11 @@ export async function campaignDeliveryFixture(t,options={}){
     const input={...grant.input,revision,allow:false,requestKey:publicationKey(),statement:`I withdraw permission for promotional emails from alice at ${grant.input.email}. Order and delivery updates are unaffected.`};
     const result=await f.call('/internal/commerce/customer-consents',input);assert.equal(result.status,200,result.error);return result;
   };
-  const makeNotification=async()=>{
+  const makeNotification=async(dispatch=()=>f.call('/internal/commerce/notifications/drain',{environment:'sandbox'}))=>{
     const current=await f.merchant('/v1/commerce/settings');current.notifications.values.payment_confirmed.email=true;
     const settings=await f.merchant('/v1/commerce/settings',{kind:'notifications',revision:current.notifications.revision,values:current.notifications.values,requestKey:publicationKey()},{method:'POST'});assert.equal(settings.status,200,settings.error);
     const order=await f.create(f.input());assert.equal(order.status,200,order.error);assert.equal((await f.paid(order.order)).status,200);
-    const result=await f.call('/internal/commerce/notifications/drain',{environment:'sandbox'});assert.equal(result.failed,0,JSON.stringify(result));
+    const result=await dispatch();assert.equal(result.failed,0,JSON.stringify(result));
   };
   return {...f,control,fetcher,drain,count,jobs,ready,postCallback,decline,makeNotification};
 }

@@ -123,7 +123,7 @@ export async function dispatchEmails(env,limit=2,fetcher=fetch){
 }
 
 export async function recordEmailWebhook(request,env,profile){
-  if(!['test','production'].includes(env.APP_ENVIRONMENT))fail('Email callback environment is not configured',503);
+  if(!['test','beta','production'].includes(env.APP_ENVIRONMENT))fail('Email callback environment is not configured',503);
   const event=await verifyResendWebhook(request,env,profile),payload=event.payload;
   const kinds={'email.sent':'sent','email.delivered':'delivered','email.delivery_delayed':'delayed','email.bounced':'bounced','email.complained':'complained','email.failed':'failed','email.suppressed':'suppressed'};
   if(!Object.hasOwn(kinds,payload.type))return {ignored:true};

@@ -78,9 +78,18 @@ A new dedicated 2048-bit RSA key was prepared outside the repository, with priva
 directory mode 0700 and private-key mode 0600. Its public half was registered to
 the expected live business account and matched byte-for-byte after normalizing
 PEM wrapping, including after a full dashboard reload. No existing key was
-replaced. The secret-key reveal requires DOKU's email OTP; credentials are never
-to be pasted into chat or committed. This registration authenticates future
-requests; it does not prove a channel, settlement or payout is operational.
+replaced. The existing secret was captured during an owner-completed email OTP
+reveal and stored privately, with mode 0600. The temporary browser capture was
+removed and the dashboard has masked the secret again. No secret was rotated,
+printed or committed. The ignored local runtime now has the production client,
+secret and signing key; its other values and the hosted runtime are unchanged.
+
+`tools/commerce/doku-check-connection.php --environment=production` successfully
+authenticated against the live B2B-token API at 05:26:29 UTC on 27 September.
+Its output excludes the token and credentials. The production authentication
+proof is saved privately. This check creates no payment or Sub-Account and does
+not establish channel, settlement or payout acceptance. Twenty-five contract and
+reader cases also pass after the PHP cURL cleanup adjustment.
 
 See [beta-readiness.md](beta-readiness.md) for the observed production service and
 callback configuration gaps.

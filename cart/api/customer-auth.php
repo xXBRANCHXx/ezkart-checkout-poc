@@ -12,7 +12,8 @@ function ez_customer_session(bool $create = true): bool
         return true;
     }
     if (!$create && empty($_COOKIE['ezkart_customer'])) return false;
-    $environment = ez_config('deployment_environment') === 'production' ? 'production' : 'test';
+    $environment = strtolower(ez_config('deployment_environment'));
+    if (!in_array($environment, ['beta', 'production'], true)) $environment = 'test';
     $root = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/');
     $directory = ez_config('customer_session_storage') ?: (($root !== '' ? dirname($root) : sys_get_temp_dir()) . '/ezkart-customer-sessions-' . $environment);
     if (!str_starts_with($directory, '/') || str_contains($directory, "\0")

@@ -2,6 +2,7 @@ import {campaignVisitHash} from './campaign-attribution.js';
 import {checkoutContext,paymentSession,paymentSessionStatements,paymentAccountStatement} from './commerce-payments.js';
 import {validateShippingSettings} from './shipping-settings.js';
 import {parseMessageJSON} from './message-json.js';
+import {deploymentProfile} from './deployment.js';
 
 const encoder = new TextEncoder();
 const idPattern = /^[A-Za-z0-9][A-Za-z0-9_-]{2,95}$/;
@@ -26,7 +27,7 @@ const hex = bytes => [...new Uint8Array(bytes)].map(byte => byte.toString(16).pa
 export const commerceHash = async value => hex(await crypto.subtle.digest('SHA-256', encoder.encode(typeof value === 'string' ? value : JSON.stringify(stable(value)))));
 
 export function commerceEnvironment(env, value) {
-  const expected = env.APP_ENVIRONMENT === 'test' ? 'sandbox' : env.APP_ENVIRONMENT === 'production' ? 'production' : '';
+  const expected = deploymentProfile(env)?.commerceEnvironment;
   if (!expected || value !== expected) fail('Commerce environment does not match this deployment', 403);
   return expected;
 }
@@ -54,7 +55,7 @@ export async function authenticateCommerceService(request, env, {strictJSON=fals
   const environment = request.headers.get('x-ezkart-environment') || '';
   if (!/^\d{10}$/.test(timestamp) || Math.abs(Date.now() / 1000 - Number(timestamp)) > 120
     || !/^[a-f0-9]{32}$/.test(nonce) || !/^[a-f0-9]{64}$/.test(signature)
-    || environment !== env.APP_ENVIRONMENT) fail('Invalid commerce authorization', 401);
+    || !deploymentProfile(env) || environment !== env.APP_ENVIRONMENT) fail('Invalid commerce authorization', 401);
   if (Number(request.headers.get('content-length') || 0) > maxBytes) fail('Commerce request is too large', 413);
   // Count streamed bytes as well: Content-Length is not a trustworthy limit.
   const reader = request.body?.getReader();

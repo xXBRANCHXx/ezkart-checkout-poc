@@ -5,6 +5,7 @@ const EZ_BITESHIP_RATES_URL = 'https://api.biteship.com/v1/rates/couriers';
 const EZ_BITESHIP_ORDERS_URL = 'https://api.biteship.com/v1/orders';
 
 require_once __DIR__ . '/legacy-order-storage.php';
+require_once __DIR__ . '/deployment.php';
 
 final class EzProviderException extends RuntimeException
 {
@@ -73,7 +74,7 @@ function ez_commerce_environment(): string
     $host = strtolower(preg_replace('/:\d+$/', '', (string) ($_SERVER['HTTP_HOST'] ?? '')) ?? '');
     $productionHost = in_array($host, ['ezkart.id', 'www.ezkart.id'], true);
     $configured = strtolower(ez_config('commerce_environment'));
-    if ($deployment === 'production' || $productionHost) {
+    if (in_array($deployment, ['beta', 'production'], true) || $productionHost) {
         // A production deployment can never fall back to test providers.
         if ($configured !== '' && $configured !== 'production') throw new RuntimeException('The production storefront requires production commerce settings.');
         return $resolved = 'production';
@@ -97,14 +98,14 @@ function ez_checkout_public_url(): string
 {
     $deployment = strtolower(ez_config('deployment_environment'));
     $requestHost = strtolower(preg_replace('/:\d+$/', '', (string) ($_SERVER['HTTP_HOST'] ?? '')) ?? '');
-    $allowedHosts = $deployment === 'test'
+    $allowedHosts = in_array($deployment, ['test', 'beta'], true)
         ? ['test.ezkart.id']
         : ($deployment === 'production' ? ['ezkart.id', 'www.ezkart.id'] : []);
     $host = in_array($requestHost, $allowedHosts, true)
         ? $requestHost
-        : ($deployment === 'test' ? 'test.ezkart.id' : ($deployment === 'production' ? 'ezkart.id' : ''));
+        : (in_array($deployment, ['test', 'beta'], true) ? 'test.ezkart.id' : ($deployment === 'production' ? 'ezkart.id' : ''));
     if ($host === '') {
-        throw new RuntimeException('deployment_environment must be test or production before checkout can start.');
+        throw new RuntimeException('deployment_environment must be test, beta or production before checkout can start.');
     }
     return 'https://' . $host;
 }
@@ -113,7 +114,7 @@ function ez_provider_config(string $provider, string $key, string $environment):
 {
     if (!in_array($environment, ['sandbox', 'production'], true)) throw new RuntimeException('Invalid provider environment.');
     $host = strtolower(preg_replace('/:\d+$/', '', (string) ($_SERVER['HTTP_HOST'] ?? '')) ?? '');
-    if ($environment === 'sandbox' && (ez_config('deployment_environment') === 'production' || in_array($host, ['ezkart.id', 'www.ezkart.id'], true))) throw new InvalidArgumentException('Sandbox providers are disabled on the production storefront.');
+    if ($environment === 'sandbox' && (in_array(strtolower(ez_config('deployment_environment')), ['beta', 'production'], true) || in_array($host, ['ezkart.id', 'www.ezkart.id'], true))) throw new InvalidArgumentException('Sandbox providers are disabled on a live storefront.');
     $value = ez_config($provider . '_' . $environment . '_' . $key);
     // Old sandbox settings may be reused. Production always requires its own slots.
     if ($value === '' && $provider === 'biteship' && $environment === 'sandbox') {
@@ -653,7 +654,7 @@ function ez_create_biteship_order(array $order): array
     $environment = (string) ($order['commerce_environment'] ?? 'sandbox');
     if (!in_array($environment, ['sandbox', 'production'], true)) throw new RuntimeException('Invalid order environment.');
     $legacyLease = ez_legacy_provider_lease($environment);
-    if (ez_config('deployment_environment') === 'production' && $environment !== 'production') throw new RuntimeException('Sandbox orders cannot be fulfilled on the production storefront.');
+    if (in_array(strtolower(ez_config('deployment_environment')), ['beta', 'production'], true) && $environment !== 'production') throw new RuntimeException('Sandbox orders cannot be fulfilled on a live storefront.');
     if (ez_order_skips_shipping($order)) throw new RuntimeException('Delivery is skipped for this sandbox order.');
     $credentials = ez_biteship_fulfillment_credentials($environment);
     $customer = is_array($order['customer'] ?? null) ? $order['customer'] : [];
@@ -752,7 +753,8 @@ function ez_order_directory(?string $environment = null, bool $create = true): s
     if (!in_array($environment, ['sandbox', 'production'], true)) throw new RuntimeException('Invalid order environment.');
     $configured = ez_config('order_storage');
     $documentRoot = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/');
-    $deployment = ez_config('deployment_environment') === 'production' ? 'production' : 'test';
+    $deployment = strtolower(ez_config('deployment_environment'));
+    if (!in_array($deployment, ['beta', 'production'], true)) $deployment = 'test';
     $base = $configured !== '' ? rtrim($configured, '/') : (($documentRoot !== '' ? dirname($documentRoot) : sys_get_temp_dir()) . '/ezkart-orders');
     $path = $base . '/' . $deployment . '/' . $environment;
     if ($configured === '' && $environment === 'sandbox') {

@@ -1,5 +1,6 @@
 import {commerceHash} from './commerce-orders.js';
 import {parseMessageJSON} from './message-json.js';
+import {deploymentProfile} from './deployment.js';
 
 const encoder=new TextEncoder();
 const fail=(code,message,options={})=>{throw Object.assign(new Error(message),{code,...options});};
@@ -25,12 +26,12 @@ function emailConnection(env){
   const held={ready:false,reason:'not_connected'};
   if(env.COMMERCE_EMAIL_PROVIDER!=='resend')return held;
   if(env.COMMERCE_STORAGE!=='d1')return {ready:false,reason:'commerce_hold'};
-  if(!['test','production'].includes(env.APP_ENVIRONMENT))return held;
+  const deployment=deploymentProfile(env);if(!deployment)return held;
   const sender=env.COMMERCE_EMAIL_FROM,profile=env.COMMERCE_EMAIL_PROFILE;
   if(!emailAddress(sender)||!profileId(profile))return held;
   if(typeof env.RESEND_API_KEY!=='string'||!/^re_[A-Za-z0-9_-]{12,240}$/.test(env.RESEND_API_KEY))return held;
   try{const auth=new URL(env.SUPABASE_URL);if(auth.protocol!=='https:'||auth.username||auth.password||auth.search||auth.hash||auth.port||auth.pathname!=='/')return held;}catch{return held;}
-  return {ready:true,reason:'ready',sender,profile,environment:env.APP_ENVIRONMENT==='test'?'sandbox':'production',origin:env.APP_ENVIRONMENT==='test'?'https://test.ezkart.id':'https://ezkart.id'};
+  return {ready:true,reason:'ready',sender,profile,deployment:deployment.environment,environment:deployment.commerceEnvironment,origin:deployment.origin};
 }
 export function emailConfiguration(env){
   const held={ready:false,reason:'not_connected'};
@@ -54,7 +55,8 @@ export function campaignEmailConfiguration(env){
 }
 
 export function campaignUnsubscribeHeaders(configuration,url){
-  const origin=configuration.environment==='sandbox'?'https://test.ezkart.id':configuration.environment==='production'?'https://ezkart.id':'';
+  const deployment=deploymentProfile({APP_ENVIRONMENT:configuration.deployment??(configuration.environment==='sandbox'?'test':configuration.environment==='production'?'production':'')});
+  const origin=deployment&&deployment.commerceEnvironment===configuration.environment?deployment.origin:'';
   const prefix=origin+'/cart/unsubscribe.php?t=';
   if(!origin||configuration.origin!==origin||typeof url!=='string'||!url.startsWith(prefix)||!/^[a-f0-9]{64}$/.test(url.slice(prefix.length))){
     fail('email_request_invalid','The campaign unsubscribe link is invalid.',{noEffect:true});

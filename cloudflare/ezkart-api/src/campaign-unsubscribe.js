@@ -1,5 +1,6 @@
 import {commerceHash,commerceStorageEnabled} from './commerce-orders.js';
 import {commerceReadEnvironment} from './commerce-order-reads.js';
+import {deploymentProfile} from './deployment.js';
 
 const fail=(message,status=400)=>{throw new Response(message,{status});};
 const unavailable=()=>fail('This unsubscribe link is unavailable.',404);
@@ -23,7 +24,7 @@ export async function prepareCampaignUnsubscribe(env,input){
     ||!/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(input.email)||typeof input.reference!=='string'||!/^[A-Za-z0-9][A-Za-z0-9_.:-]{2,159}$/.test(input.reference)
     ||!Number.isSafeInteger(input.consentRevision)||input.consentRevision<1)fail('Campaign unsubscribe reference is invalid.',422);
   const token=Array.from(crypto.getRandomValues(new Uint8Array(32)),b=>b.toString(16).padStart(2,'0')).join(''),hash=await tokenHash(token),mode=commerceReadEnvironment(env);
-  return {tokenHash:hash,url:(mode==='sandbox'?'https://test.ezkart.id':'https://ezkart.id')+'/cart/unsubscribe.php?t='+token,
+  return {tokenHash:hash,url:deploymentProfile(env).origin+'/cart/unsubscribe.php?t='+token,
     statement:env.DB.prepare(`INSERT INTO commerce_unsubscribe_tokens(token_hash,seller_id,commerce_environment,auth_user_id,email,reference,consent_revision,created_at) VALUES(?,?,?,?,?,?,?,?)`)
       .bind(hash,input.sellerId,mode,input.authUserId,input.email,input.reference,input.consentRevision,new Date().toISOString())};
 }

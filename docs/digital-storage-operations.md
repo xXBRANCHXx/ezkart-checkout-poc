@@ -87,7 +87,10 @@ schema, preserves original record counts/settings/legacy evidence, compiles all
 
 The initial inspection at 04:24:14 UTC reports zero uploaded files and no
 maintenance heartbeat, with `maintenance_not_observed` and warning exit 2.
-Deployment followed the ordinary hourly :17 run; the next scheduled invocation
-must establish the heartbeat. No synthetic file, cleanup invocation, purchase,
+Deployment followed the ordinary hourly :17 run. The next scheduled invocation
+started at 05:17:32 UTC and completed at 05:17:33 UTC on 27 September, selecting
+zero files and reporting zero failures. The read-only report returned no warnings
+and exit 0. This establishes the ordinary schedule and empty-run heartbeat.
+No synthetic file, cleanup invocation, purchase,
 delivery or money movement was created for hosted verification. Financial and
 provider holds remain unchanged.

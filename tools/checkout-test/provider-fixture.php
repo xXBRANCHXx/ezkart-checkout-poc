@@ -23,9 +23,9 @@ function curl_exec(object $handle): string|bool {
         } while (true);
     }
     $relay = getenv('EZKART_TEST_COMMERCE_RELAY');
-    if ($relay && str_starts_with($handle->url, 'https://ezkart-api-test.fixture.workers.dev/')) {
+    if ($relay && preg_match('#^https://ezkart-api-(?:test|beta)\.fixture\.workers\.dev(/.*)$#D', $handle->url, $relayMatch)) {
         if (preg_match('#^http://127\.0\.0\.1:\d+$#D', $relay) !== 1) throw new RuntimeException('Test relay must be local.');
-        $path = substr($handle->url, strlen('https://ezkart-api-test.fixture.workers.dev'));
+        $path = $relayMatch[1];
         $context = stream_context_create(['http' => ['method' => $handle->options[CURLOPT_CUSTOMREQUEST] ?? (!empty($handle->options[CURLOPT_POST]) ? 'POST' : 'GET'),
             'header' => implode("\r\n", $handle->options[CURLOPT_HTTPHEADER] ?? []), 'content' => $handle->options[CURLOPT_POSTFIELDS] ?? '', 'ignore_errors' => true, 'timeout' => $handle->options[CURLOPT_TIMEOUT] ?? 20]]);
         // Match cURL's incremental write callback. Buffering an entire private

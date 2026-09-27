@@ -6,7 +6,7 @@ require_once __DIR__ . '/commerce-client.php';
 function ez_central_commerce_environment(?string $requested = null): string
 {
     $database = ez_database_configuration();
-    $expected = $database['environment'] === 'test' ? 'sandbox' : 'production';
+    $expected = ez_deployment_profile($database['environment'])['commerce_environment'];
     if (($requested ?? ez_commerce_environment()) !== $expected) {
         throw new EzCommerceStorageException('Payment settings do not match this checkout environment.', 503);
     }

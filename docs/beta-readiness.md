@@ -45,6 +45,42 @@ is not a closed top-level gate.
 - Seller withdrawals start at Rp250,000; Ezkart covers the seller transfer fee.
   Original payment fees, refund-processing fees and withdrawal fees are distinct.
 
+## Isolated live beta foundation
+
+The new deployment label `beta` uses production providers while keeping public
+links on `test.ezkart.id`. It has its own API hostname, service-signature scope,
+order-file namespace and default merchant/customer session directories. PHP
+rejects TEST/main API URLs and mismatched Worker health responses. Sandbox
+credentials and the legacy Executive mode switch cannot change beta's provider
+mode. Campaign, email, unsubscribe and shop links retain the workbench origin.
+
+The APAC D1 database `ezkart_beta_database`
+(`27bb47cf-c0f0-463c-94e3-44b9b27edcf4`) and buckets `ezkart-beta-public` and
+`ezkart-beta-private` are created. All 47 migrations are installed with 144
+application tables, zero sellers/orders/captures and no pending migration.
+Both buckets report zero objects; the private bucket keeps the default seven-day
+incomplete-upload abort rule. The private 420,929-byte baseline export, SHA-256
+`3734158dc4fb41d7a4b8acf5f66d6e045b75d8d1e9f4d6fb6b06a70a19be7a4a`,
+restores with clean integrity and foreign-key checks. Remote foreign keys are
+also clean. TEST/main resource bindings are preserved; no sandbox history was
+copied into the real-payment database.
+
+The beta configuration keeps commerce held and has no scheduled provider or
+email work. Creating these resources does not cut over the hosted frontend.
+Still required before that cutover: owned catalog/settings/assets preparation,
+central SNAP dispatch and durable callback wiring, configured/accepted channels,
+hosted private credentials and provider jobs, Executive/operations access and
+signed-in merchant/customer acceptance. Existing operator commands restricted
+to TEST must gain explicit beta support before they are used for live recovery.
+
+Verification includes dedicated PHP/Worker beta isolation and destination tests,
+99 checkout/callback/admin/email regressions and 25 DOKU contract/reader cases.
+The broader Worker checks exposed an old migration fixture using the new refund
+column against schema 0035. Its historical seed now adapts only that absent null
+field while retaining the old schema and database guards; preservation and the
+affected transactional/campaign cases pass. The beta Worker dry run and PHP
+syntax checks pass. None of these fixture captures are real provider payments.
+
 ## Current evidence and limits
 
 The signed-in production DOKU dashboard was inspected on 27 September. Its
@@ -57,9 +93,11 @@ capabilities are technically provisioned.
 
 The production API Keys page initially said the merchant public key had not
 been set. A dedicated production public key is now registered and matched after
-dashboard reload; its private half is stored outside the repository. Retrieval
-of the existing secret is being completed through DOKU's own OTP prompt; no
-secret is being rotated. DOKU's active VA configuration shows
+dashboard reload; its private half is stored outside the repository. The existing
+secret is now preserved privately after the owner completed DOKU's OTP. Live B2B
+authentication passed at 05:26:29 UTC on 27 September. No secret was rotated or
+exposed, and no payment was created. Only the ignored local runtime has these
+credentials so far; hosted configuration is unchanged. DOKU's active VA configuration shows
 SNAP 1.1, aggregator/DGPC, closed amount and an empty payment-notification URL.
 No service or callback setting was changed during that inspection.
 The empty Token URL is not itself a DGPC blocker: DOKU's
@@ -75,8 +113,8 @@ Implementation `56c6fab` is on workbench and TEST Worker
 application tables. Twenty-five Worker checks pass at 04:24:15 UTC and twenty-nine
 hosted asset/access/guest checks pass at 04:24:18 UTC on 27 September. Existing
 records, legacy evidence and holds remain intact; no migration is pending.
-The read-only storage inspection correctly reports that the first ordinary
-hourly maintenance run has not yet been observed. See
+The first ordinary hourly storage-maintenance run completed at 05:17:33 UTC
+with zero selected files, zero failures and no inspection warnings. See
 [digital-storage-operations.md](digital-storage-operations.md) and
 [refund-requests.md](refund-requests.md).
 

@@ -13,6 +13,7 @@ export const fixtureShipping={amount:18000,skipped:false,courierCode:'jne',servi
   destination:{location:'Jakarta',address:'Jalan Saved Destination 12',postalCode:'12345',coordinate:{latitude:-6.2,longitude:106.8}},quote:{courier:'JNE',service:'Regular',courier_company:'jne',courier_type:'reg',price:18000}};
 
 export async function setupCommerceFixture(t,{through=Infinity,notifications='off',bindings={},outbound}={}) {
+  const deployment=bindings.APP_ENVIRONMENT||'test',environment=deployment==='test'?'sandbox':'production';
   const key = await crypto.subtle.generateKey({name: 'ECDSA', namedCurve: 'P-256'}, true, ['sign', 'verify']);
   const publicKey = {...await crypto.subtle.exportKey('jwk', key.publicKey), kid: 'catalog-fixture', alg: 'ES256'};
   const bundle = await build({entryPoints: [new URL('../src/index.js', import.meta.url).pathname], bundle: true, write: false, format: 'esm', platform: 'neutral'});
@@ -48,9 +49,9 @@ export async function setupCommerceFixture(t,{through=Infinity,notifications='of
   function headers(path, method, body, extra = {}) {
     const timestamp = String(Math.floor(Date.now() / 1000));
     const nonce = randomBytes(16).toString('hex');
-    const canonical = ['v1', 'test', method, path, timestamp, nonce, digest(body)].join('\n');
+    const canonical = ['v1', deployment, method, path, timestamp, nonce, digest(body)].join('\n');
     return {'content-type': 'application/json', 'x-ezkart-timestamp': timestamp, 'x-ezkart-request-id': nonce,
-      'x-ezkart-environment': 'test', 'x-ezkart-signature': createHmac('sha256', secret).update(canonical).digest('hex'), ...extra};
+      'x-ezkart-environment': deployment, 'x-ezkart-signature': createHmac('sha256', secret).update(canonical).digest('hex'), ...extra};
   }
   async function call(path, input, extra) {
     const method = input === undefined ? 'GET' : 'POST', body = input === undefined ? '' : JSON.stringify(input);
@@ -58,13 +59,13 @@ export async function setupCommerceFixture(t,{through=Infinity,notifications='of
     return {status: response.status, ...await response.json()};
   }
   function input(overrides = {}) {
-    return {environment: 'sandbox', sellerId: 'seller_alice', checkoutKey: randomBytes(16).toString('hex'),
+    return {environment, sellerId: 'seller_alice', checkoutKey: randomBytes(16).toString('hex'),
       customer, items: [{productId: 'tea', quantity: 2, expectedPrice: 20000,expectedWeightGrams:100}],
-      checkout:{intentHash:digest('fixture intent'),paymentFlow:'direct_bca',shop:'alice-shop'},
-      shipping: {amount: 0, skipped: true}, expiresAt: new Date(Date.now() + 3600000).toISOString(), ...overrides};
+      checkout:{intentHash:digest('fixture intent'),paymentFlow:environment==='sandbox'?'direct_bca':'hosted',shop:'alice-shop'},
+      shipping: environment==='sandbox'?{amount: 0, skipped: true}:fixtureShipping, expiresAt: new Date(Date.now() + 3600000).toISOString(), ...overrides};
   }
   const create = input => call('/internal/commerce/orders', input);
-  const event = (order, type, data = {}, key = randomBytes(16).toString('hex')) => call(`/internal/commerce/orders/${order.id}/events`, {environment: 'sandbox', sellerId: order.sellerId, eventKey: key, type, data});
+  const event = (order, type, data = {}, key = randomBytes(16).toString('hex')) => call(`/internal/commerce/orders/${order.id}/events`, {environment, sellerId: order.sellerId, eventKey: key, type, data});
   const paid = (order, data = {}, key) => event(order, 'payment.succeeded', {provider: 'doku', verified: true, amount: order.total, currency: 'IDR', reference: 'payment-' + order.id, originalRequestId:order.paymentRequestId, channel:'VIRTUAL_ACCOUNT_BCA',accountNumber:'770011223344',...data}, key);
   const session=(order,data={})=>({provider:'doku',providerRequestId:order.paymentRequestId,amount:order.total,currency:'IDR',expiresAt:order.expiresAt,method:'VIRTUAL_ACCOUNT_BCA',accountNumber:'770011223344',...data});
   const stock = async (id = 'tea') => (await db.prepare('SELECT stock_quantity FROM products WHERE id = ?').bind(id).first()).stock_quantity;

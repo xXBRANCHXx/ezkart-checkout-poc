@@ -21,7 +21,7 @@ Cloudflare R2.
 3. Copy `wrangler.example.jsonc` to `wrangler.jsonc` and replace the test D1
    database ID. The production D1 ID already matches the database shown in the
    Cloudflare dashboard. The Worker verifies ES256 Supabase access tokens
-   against Supabase's public JWKS endpoint, so no Supabase API key is stored in
+against Supabase's public JWKS endpoint, so no Supabase API key is stored in
    Cloudflare.
 4. Install the local deploy tool with `npm install`.
 5. Run `npm run db:migrate:test`, then `npm run deploy:test`.
@@ -35,6 +35,14 @@ Cloudflare R2.
 The Google client secret remains only inside the Supabase provider settings.
 Never place an R2 secret, Cloudflare API token, Supabase service-role key,
 access token, or refresh token in this repository.
+
+The owner-approved live workbench beta uses the separate `beta` Wrangler
+environment, `ezkart_beta_database`, `ezkart-beta-public` and
+`ezkart-beta-private`. Its commerce mode is production and customer links stay
+on `test.ezkart.id`. Use `npm run check:beta` for the build check. Commerce and
+schedules stay held until the cutover work in
+[beta readiness](../../docs/beta-readiness.md) is complete. This is not permission
+to deploy the production environment or merge main.
 
 ## Current endpoints
 

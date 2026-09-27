@@ -23,12 +23,30 @@ Supabase access/refresh tokens, or a service-role key into D1.
 | Website | Git branch | Worker | D1 | R2 |
 | --- | --- | --- | --- | --- |
 | `test.ezkart.id` | `agent/ezkart-workbench` | `ezkart-api-test.*.workers.dev` initially; `api-test.ezkart.id` after DNS moves to Cloudflare | `ezkart_test_database` | `ezkart-test-public` + `ezkart-test-private` |
+| `test.ezkart.id` live beta (separate runtime) | `agent/ezkart-workbench` | `ezkart-api-beta.*.workers.dev` | `ezkart_beta_database` | `ezkart-beta-public` + `ezkart-beta-private` |
 | `ezkart.id` | `main` | `api.ezkart.id` | `ezkart_main_user_database` | `ezkart-production-public` + `ezkart-production-private` |
 
-Both environments may use the same Supabase Auth project so the free project
+These environments may use the same Supabase Auth project so the free project
 remains the canonical user directory. Their application data and files remain
 separate. A Git merge copies Worker code and migrations; it never copies D1
 rows, R2 objects, Cloudflare bindings, or credentials.
+
+The beta deployment label is `beta`, its provider/commerce mode is `production`,
+and its public origin remains `https://test.ezkart.id`. PHP verifies the dedicated
+beta API hostname, the request host and the Worker's health environment. Internal
+requests sign the deployment label, so a TEST or main signature cannot authorize
+beta access even if a secret is accidentally reused. Use a separate secret anyway.
+Order files and default merchant/customer session directories have a beta
+namespace. Beta cannot switch into sandbox through the old Executive mode file.
+Email, campaign, unsubscribe and storefront links use the deployment origin.
+
+The beta database and two APAC buckets were created on 27 September. All 47
+migrations are installed, yielding 144 application tables and zero orders,
+captures or sellers. The private exported baseline restores with clean SQLite
+integrity and foreign keys; the remote foreign-key check is also clean. Existing
+TEST and main bindings remain byte-for-byte equivalent. The private bucket has
+the default seven-day incomplete-multipart abort rule, without object expiry.
+See [beta-readiness.md](beta-readiness.md) for activation and data-preparation work.
 
 ## One-time setup
 
@@ -61,8 +79,9 @@ rows, R2 objects, Cloudflare bindings, or credentials.
    Worker hostname.
 8. Connect the test frontend and run seller-isolation, catalog, builder, upload,
    checkout, callback, subscription, digital-access, review, and shipping tests.
-9. After approval, merge the application change into `main`, apply the same D1
-   migration to production, and deploy the production Worker.
+9. Main and the production Worker remain held until explicit final release
+   authorization and the recorded financial validation gates are satisfied.
+   DOKU business approval and live beta preparation do not remove that hold.
 
 ## Data placement
 
@@ -80,8 +99,11 @@ state belong in D1; the generated HTML and images belong in R2.
 
 ## Current boundary
 
-The Worker scaffold, D1 migration, environment bindings, health endpoint, and
-authenticated `/v1/me` profile sync are prepared on the workbranch. The current
-prototype UI still saves custom catalog and landing-page drafts in browser
-storage, while sandbox checkout still writes private JSON order files. Those
-paths must move behind Worker routes before they become production-authoritative.
+The hosted workbench already uses D1/R2 for merchant profiles, catalog, settings,
+and page projects. Central commerce, customer operations, messaging, digital
+delivery and financial foundations are implemented behind authenticated routes,
+but the hosted checkout still uses private legacy sandbox order files while its
+central cutover is held. The separate beta baseline starts empty. Catalog/assets
+preparation, legacy ownership reconciliation, supported live provider execution
+and hosted acceptance remain explicit work in
+[the completion plan](commerce-completion-plan.md).

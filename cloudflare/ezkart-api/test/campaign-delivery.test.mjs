@@ -10,6 +10,7 @@ import {claimCommerceJobs,finishCommerceJob} from '../src/commerce-jobs.js';
 import {emailFixtureEvent as callbackBody,emailFixtureCallback as callback} from './email-fixture.mjs';
 import worker from '../src/index.js';
 import {applyCommerceSchema} from './commerce-schema.mjs';
+import {dispatchNotifications} from '../src/commerce-notification-dispatch.js';
 const published=async f=>{const result=await f.publish();assert.equal(result.status,200,result.error);return result;};
 const record=(f,call,type='email.delivered',extra={})=>recordEmailWebhook(callback(callbackBody(call.message,call.id,type,extra)),f.env,'test_mail');
 test('campaign Worker dispatch binds the frozen copy, verified recipient and unsubscribe token to one immutable request',async t=>{
@@ -160,14 +161,29 @@ test('two campaign messages fit the D1 invocation budget and have a separate hel
 });
 
 test('migration preserves existing transactional receipts, consent and orders, including their suppression evidence',async t=>{
-  const f=await fixture(t,{through:35});await f.addBuyer(1);await f.makeNotification();
+  const f=await fixture(t,{through:35});await f.addBuyer(1);
+  // Seed a pre-refund notification without adding newer columns to the old
+  // schema under migration. Only the absent, null refund reference is adapted;
+  // all original leases, fan-out, send and evidence guards still run in D1.
+  assert(!(await f.db.prepare('PRAGMA table_info(commerce_notification_events)').all()).results.some(r=>r.name==='refund_id'));
+  const legacyDB=new Proxy(f.db,{get(target,property){
+    if(property==='prepare')return sql=>{
+      const insert=sql.startsWith('INSERT INTO commerce_notification_events(');
+      if(insert)sql=sql.replace(',refund_id,title,',',title,').replace('SELECT ?,','SELECT ');
+      const statement=target.prepare(sql.replace('e.refund_id,','NULL AS refund_id,'));
+      if(!insert)return statement;
+      return {bind(...args){assert.equal(args[10],null);args.splice(10,1);return statement.bind(...args);}};
+    };
+    const value=Reflect.get(target,property);return typeof value==='function'?value.bind(target):value;
+  }}),legacyEnv={...f.env,DB:legacyDB};
+  await f.makeNotification(()=>dispatchNotifications(legacyEnv));
   f.control.users.alice={id:'alice',email:'buyer1@example.test',email_confirmed_at:'2026-09-01T00:00:00Z'};
   await f.db.prepare("CREATE VIEW commerce_email_suppressions AS SELECT x.commerce_environment,x.email_hash FROM commerce_email_requests x JOIN commerce_email_delivery_evidence e ON e.request_id=x.id WHERE e.kind IN ('bounced','complained','suppressed')").run();
-  assert.equal((await dispatchEmails(f.env,2,f.fetcher)).processed,1);await record(f,f.control.calls[0],'email.bounced');await f.db.prepare('DROP VIEW commerce_email_suppressions').run();
+  assert.equal((await dispatchEmails(legacyEnv,2,f.fetcher)).processed,1);await record(f,f.control.calls[0],'email.bounced');await f.db.prepare('DROP VIEW commerce_email_suppressions').run();
   const tables=['commerce_email_requests','commerce_email_starts','commerce_email_events','commerce_email_provider_bindings','commerce_customer_consents','commerce_campaigns','orders'];
   const before=await Promise.all(tables.map(name=>f.db.prepare('SELECT * FROM '+name+' ORDER BY rowid').all()));await applyCommerceSchema(f.db,35,36);
   for(let i=0;i<tables.length;i++)assert.deepEqual((await f.db.prepare('SELECT * FROM '+tables[i]+' ORDER BY rowid').all()).results,before[i].results);
-  assert.equal((await f.db.prepare('PRAGMA foreign_key_check').all()).results.length,0);await applyCommerceSchema(f.db,36,37);await published(f);assert.equal((await dispatchCampaignEmails(f.env,2,f.fetcher)).processed,1);assert.equal(f.control.calls.length,1);
+  assert.equal((await f.db.prepare('PRAGMA foreign_key_check').all()).results.length,0);await applyCommerceSchema(f.db,36);await published(f);assert.equal((await dispatchCampaignEmails(f.env,2,f.fetcher)).processed,1);assert.equal(f.control.calls.length,1);
   assert.equal((await f.db.prepare('SELECT reason FROM commerce_campaign_email_skips').first()).reason,'suppressed');
 });
 

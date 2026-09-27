@@ -5,6 +5,7 @@ import {customerFilters,customerFilterSql,customerCte,customerContext} from './c
 import {reviewCursor,readReviewCursor} from './commerce-reviews.js';
 import {emailConfiguration,campaignEmailConfiguration} from './email-provider.js';
 import {campaignAutomationSource} from './campaign-source.js';
+import {deploymentProfile} from './deployment.js';
 
 const fail=(message,status=422,code='')=>{throw new Response(message,{status,headers:code?{'x-ezkart-error-code':code}:{}});};
 const fields=(value,allowed)=>{if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).some(k=>!allowed.includes(k)))fail('Campaign fields are invalid');};
@@ -33,7 +34,7 @@ export async function campaignWorkspace(env,actor){
   let shop={};try{shop=JSON.parse(seller.settings_json||'{}').storefront||{};}catch{}
   return {storeId:seller.id,environment:mode,storeName:seller.name,timezone:profile.timezone,canEdit:seller.role!=='viewer',summary,
     segments:segments.results.map(r=>({id:r.id,revision:r.revision,name:JSON.parse(r.data_json).name,filters:JSON.parse(r.data_json).filters})),
-    shopUrl:(mode==='sandbox'?'https://test.ezkart.id':'https://ezkart.id')+'/shop/?store='+encodeURIComponent(seller.id),shopEnabled:shop.enabled===true,
+    shopUrl:deploymentProfile(env).origin+'/shop/?store='+encodeURIComponent(seller.id),shopEnabled:shop.enabled===true,
     audienceAvailable:commerceStorageEnabled(env),emailServiceConnected:emailConfiguration(env).ready,deliveryAvailable:campaignEmailConfiguration(env).ready};
 }
 export async function listCampaigns(env,actor,url){
