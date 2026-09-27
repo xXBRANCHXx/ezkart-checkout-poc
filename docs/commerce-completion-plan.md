@@ -88,6 +88,14 @@ checkout regressions pass. Main, the hosted provider mode and TEST history remai
 unchanged. See [beta-readiness.md](beta-readiness.md) and
 [DOKU SNAP preparation](doku-snap-payments.md) for exact evidence and remaining work.
 
+Implementation `c48f178` is pushed. Isolated beta Worker
+`2eeb80ab-a240-4c6f-ae2b-065ac1eb6675` is deployed with its own service secret,
+commerce held and no schedules. Seven hosted checks pass; PHP confirms its
+beta storage connection. A private live-DOKU/beta runtime fragment is ready for
+the later hosted cutover. Existing TEST remains healthy and unchanged. Live
+Biteship credentials, actual payment channels, wallet/payout acceptance and
+central payment/callback wiring remain open; no top-level gate is closed.
+
 ### 27 September: beta preparation, full-size files and cleanup recovery
 
 DOKU approval is owner-confirmed and beta/soft-launch preparation is authorized

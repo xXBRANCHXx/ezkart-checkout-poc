@@ -73,6 +73,21 @@ hosted private credentials and provider jobs, Executive/operations access and
 signed-in merchant/customer acceptance. Existing operator commands restricted
 to TEST must gain explicit beta support before they are used for live recovery.
 
+Implementation `c48f178` is pushed to workbench. The isolated beta Worker is
+deployed at `https://ezkart-api-beta.vincentbranch23.workers.dev`, current version
+`2eeb80ab-a240-4c6f-ae2b-065ac1eb6675` after installing its dedicated private
+commerce-service secret. All seven hosted infrastructure/access/hold/CORS checks
+pass at 05:39:57 UTC on 27 September. PHP's real cURL health check confirms the
+beta environment, all storage bindings and 144 tables. A private runtime-settings
+fragment is prepared outside Git with live DOKU credentials and the beta service
+secret; it is not installed on Hostinger. No live Biteship key is present in the
+local runtime, so shipping credentials and Order API acceptance remain required.
+
+The existing TEST Worker and hosted storefront still report their original TEST/
+sandbox configuration, healthy data connectivity and `durable_checkout:false`.
+Neither was switched to the new database by this rollout. Main and `ezkart.id`
+remain held. No beta buyer, payment, capture, refund or payout was manufactured.
+
 Verification includes dedicated PHP/Worker beta isolation and destination tests,
 99 checkout/callback/admin/email regressions and 25 DOKU contract/reader cases.
 The broader Worker checks exposed an old migration fixture using the new refund
