@@ -1,11 +1,11 @@
 (() => {
   'use strict';
   const root=document.querySelector('[data-refunds]');if(!root)return;
-  const q=s=>root.querySelector(s),merchant=root.dataset.audience==='merchant',form=q('[data-refund-form]'),list=q('[data-refund-list]'),detail=q('[data-refund-detail]');
+  const q=s=>root.querySelector(s),merchant=root.dataset.audience==='merchant',support=root.dataset.audience==='support',form=q('[data-refund-form]'),list=q('[data-refund-list]'),detail=q('[data-refund-detail]');
   const el=(tag,text,cls='')=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;};
   const button=(text,fn)=>{const n=el('button',text);n.type='button';n.addEventListener('click',fn);return n;};
   const money=n=>'Rp'+Number(n).toLocaleString('id-ID'),date=s=>new Date(s).toLocaleString('en-GB',{timeZone:'Asia/Jakarta'});
-  const base=merchant?'/v1/commerce/refunds':'/v1/customer/orders/'+root.dataset.order+'/refunds';
+  const base=support?'/v1/support/refunds':merchant?'/v1/commerce/refunds':'/v1/customer/orders/'+root.dataset.order+'/refunds';
   const orderPath=id=>merchant?base+'/orders/'+id:base,casePath=id=>base+'/'+id;
   const scope=JSON.stringify([root.dataset.audience,root.dataset.account,root.dataset.store,root.dataset.order]),storageKey='ezkart.refunds.pending.v1:'+scope;
   let pending=null,busy=false,loading=false,ended=false,damaged=false,rejected=false,enabled=true,cursor=null,generation=0,overview=null,dirty=false;
@@ -28,7 +28,7 @@
   async function readPending(){
     const raw=localStorage.getItem(storageKey);if(raw===null)return null;
     const value=JSON.parse(raw),path=typeof value?.path==='string'?value.path:'';
-    const validPath=merchant?/^\/v1\/commerce\/refunds\/(?:orders\/EZK-[SP]-[A-F0-9]{24}|ref_[a-f0-9]{32})$/.test(path):path===base||new RegExp('^'+base+'/ref_[a-f0-9]{32}$').test(path);
+    const validPath=support?/^\/v1\/support\/refunds\/ref_[a-f0-9]{32}\/dispute$/.test(path):merchant?/^\/v1\/commerce\/refunds\/(?:orders\/EZK-[SP]-[A-F0-9]{24}|ref_[a-f0-9]{32}(?:\/dispute)?)$/.test(path):path===base||new RegExp('^'+base+'/ref_[a-f0-9]{32}(?:/dispute)?$').test(path);
     if(value?.v!==1||value.scope!==scope||!validPath||typeof value.body!=='string'||value.body.length>16000)throw Error('Saved retry data is damaged.');
     const body=JSON.parse(value.body);if(!/^[A-Za-z0-9_-]{16,100}$/.test(body?.requestKey||'')||(!body.kind&&(!Array.isArray(body.items)||body.items.some(i=>!i||!Number.isSafeInteger(i.amount)||i.amount<1))))throw Error('Saved retry data is damaged.');
     if(value.checksum!==await checksum(value)||localStorage.getItem(storageKey)!==raw)throw Error('Saved retry data is damaged or changed.');
@@ -36,26 +36,26 @@
   }
   function recovery(){
     const box=q('[data-refund-recovery]');box.replaceChildren();box.hidden=!pending;if(!pending)return;
-    const body=JSON.parse(pending.body);box.append(el('h3','Confirm your saved request'),el('p',body.kind?'Decision: '+body.kind:money(body.items.reduce((sum,i)=>sum+i.amount,body.shippingAmount||0))+' requested'),el('p','Your original details are saved. Retry confirmation to check the result.'));
+    const body=JSON.parse(pending.body);box.append(el('h3','Confirm your saved request'),el('p',body.kind?'Saved action: '+(reviewLabels[body.kind?.replace(/^review_/,'')]||body.kind):money(body.items.reduce((sum,i)=>sum+i.amount,body.shippingAmount||0))+' requested'),el('p','Your original details are saved. Retry confirmation to check the result.'));
     const retry=button('Retry confirmation',()=>void send());retry.dataset.refundRetry='';box.append(retry);
     if(rejected){const review=button('Review changes',()=>void reviewChanges());review.dataset.refundReviewChanges='';box.append(review);}controls();
   }
   async function api(path,body,binary=false){
     let url,headers={'Content-Type':'application/json','X-Ezkart-CSRF':root.dataset.csrf};
-    if(merchant){url='/cart/admin/?cloud='+encodeURIComponent(path);headers['X-Ezkart-Refund-Account']=root.dataset.account;headers['X-Ezkart-Refund-Store']=root.dataset.store;}
-    else{const parsed=new URL(path,location.origin),[id,action,attachment]=parsed.pathname.slice(base.length).replace(/^\//,'').split('/');url='/cart/admin/customer-refunds.php?'+new URLSearchParams({order:root.dataset.order,...(id?{refund:id}:{}),...(action==='evidence'?{evidence:attachment||'upload'}:{}),...Object.fromEntries(parsed.searchParams)});headers['X-Ezkart-Customer-Session']=root.dataset.version;}
+    if(merchant||support){url='/cart/admin/?cloud='+encodeURIComponent(path);headers['X-Ezkart-Refund-Account']=root.dataset.account;headers['X-Ezkart-Refund-Store']=root.dataset.store;}
+    else{const parsed=new URL(path,location.origin),[id,action,attachment]=parsed.pathname.slice(base.length).replace(/^\//,'').split('/');url='/cart/admin/customer-refunds.php?'+new URLSearchParams({order:root.dataset.order,...(id?{refund:id}:{}),...(action==='evidence'?{evidence:attachment||'upload'}:action==='dispute'?{dispute:'1'}:{}),...Object.fromEntries(parsed.searchParams)});headers['X-Ezkart-Customer-Session']=root.dataset.version;}
     const response=await fetch(url,{method:body===undefined?'GET':'POST',credentials:'same-origin',cache:'no-store',headers,signal:AbortSignal.timeout(35000),...(body===undefined?{}:{body})});
     if(binary&&response.ok)return {bytes:await response.arrayBuffer(),mime:response.headers.get('content-type'),sha256:response.headers.get('x-ezkart-file-sha256')};
     let data;try{data=await response.json();}catch{throw Error('The response was interrupted. Retry confirmation.');}
-    if(!response.ok||data.ok!==true){const e=Error(data.error||'The refund result could not be confirmed.');e.status=response.status;if([401,403].includes(e.status))end(e.message);throw e;}return data;
+    if(!response.ok||data.ok!==true){const e=Error(data.error||'The refund result could not be confirmed.');e.status=response.status;if([401,403].includes(e.status)){end(e.message);if(support&&data.code==='support_verification_required')q('[data-refund-refresh]').textContent='Reload to verify';}throw e;}return data;
   }
   async function load(append=false){
     if(ended)return;const version=++generation;loading=true;controls();
     try{const data=await api(base+'?'+new URLSearchParams({state:q('[data-refund-filter]').value,...(append&&cursor?{cursor}:{})}));if(ended||version!==generation)return;
-      if(!append)list.replaceChildren();for(const r of data.refunds){const card=button('',()=>void show(r.id));card.className='refund-case';card.append(el('b',r.stateLabel),el('small',r.orderId+' · '+date(r.createdAt)),el('strong',money(r.amount)));card.dataset.refundCase=r.id;list.append(card);}
+      if(!append)list.replaceChildren();for(const r of data.refunds){const card=button('',()=>void show(r.id));card.className='refund-case';card.append(el('b',r.stateLabel),el('small',(r.storeName?r.storeName+' · ':'')+r.orderId+' · '+date(r.createdAt)),el('strong',money(r.amount)));card.dataset.refundCase=r.id;list.append(card);}
       cursor=data.nextCursor;enabled=data.enabled;q('[data-refund-more]').hidden=!cursor;
-      notice(data.enabled?(list.children.length?'Your refund requests are up to date.':'No refund requests yet.'):'Refund requests will open when order processing is enabled.');
-      if(!merchant)overview=data;
+      notice(data.enabled?(support?(list.children.length?'The review queue is up to date.':'No reviews in this view.'):(list.children.length?'Your refund requests are up to date.':'No refund requests yet.')):'Refund requests will open when order processing is enabled.');
+      if(!merchant&&!support)overview=data;
     }catch(e){if(!ended)error(e.message);}finally{if(version===generation){loading=false;controls();}}
   }
   function renderForm(data,draft){
@@ -71,7 +71,7 @@
   }
   function total(){const n=[...form.querySelectorAll('[data-refund-amount]')].reduce((sum,input)=>sum+Number(input.value||0),0);q('[data-refund-total]').textContent='Requested total: '+money(n);}
   async function begin(orderId=root.dataset.order,draft){
-    if(ended||pending||busy)return;
+    if(ended||pending||busy||support)return;
     if(!orderId){q('[data-refund-lookup]').hidden=false;q('[data-refund-lookup] input').focus();return;}
     loading=true;controls();error('');try{const data=await api(orderPath(orderId));if(!ended)renderForm(data,draft);}catch(e){if(!ended)error(e.message);}finally{loading=false;controls();}
   }
@@ -103,21 +103,56 @@
     detail.hidden=false;detail.replaceChildren();detail.append(el('h3',r.stateLabel),el('p',r.orderId),el('strong',money(r.amount)),el('p','Reason: '+([...form.elements.reason.options].find(o=>o.value===r.reason)?.textContent||r.reason)),el('p',r.note));
     if(merchant){const orderLink=el('a','View original order');orderLink.href='?page=orders&order='+encodeURIComponent(r.orderId);detail.append(orderLink);}
     const lines=el('ul',undefined,'refund-lines');for(const i of r.items)lines.append(el('li',i.title+(i.variant?' — '+i.variant:'')+': '+money(i.amount)+' requested from '+money(i.quantity*i.price)));if(r.shippingAmount)lines.append(el('li','Shipping: '+money(r.shippingAmount)));detail.append(lines);
-    if(r.state==='approved')detail.append(el('p','Approved by the store. The refund has not been paid. Refund processing is not available yet.'));
+    if(r.state==='approved')detail.append(el('p','This refund request is approved. The refund has not been paid. Refund processing is not available yet.'));
     renderEvidence(r);
     renderAttachments(r);
     const history=el('div',undefined,'refund-history');history.append(el('h4','Request history'),el('p','Requested · '+date(r.createdAt)));
     for(const a of r.history){const row=el('article');row.append(el('b',a.actor+' · '+({approve:'Approved',decline:'Declined',withdraw:'Withdrawn'}[a.kind])),el('time',date(a.createdAt)),el('p',a.message));history.append(row);}detail.append(history);
+    renderDispute(r);
     const available=['approve','decline','withdraw'].filter(kind=>r['can'+kind[0].toUpperCase()+kind.slice(1)]);
     if(available.length){const decision=el('form',undefined,'refund-decision'),label=el('label',merchant?'Message for the buyer':'Why are you withdrawing?'),note=el('textarea');note.name='message';note.required=true;note.minLength=3;note.maxLength=2000;note.rows=3;label.append(note);decision.append(label);
       if(merchant&&r.canApprove)decision.append(el('p','Approval records your decision. Refund processing is not available yet.'));
       const actions=el('div',undefined,'refund-buttons');for(const kind of available){const action=el('button',({approve:'Approve request',decline:'Decline request',withdraw:'Withdraw request'}[kind]));action.type='submit';action.dataset.kind=kind;actions.append(action);}decision.append(actions);
       decision.addEventListener('input',()=>{dirty=true;controls();});decision.addEventListener('submit',e=>{e.preventDefault();const kind=e.submitter?.dataset.kind;if(!kind||!decision.reportValidity())return;
-        const evidenceForm=detail.querySelector('[data-refund-file-form]');if(evidenceForm&&(evidenceForm.elements.file.value||evidenceForm.elements.caption.value)){error('Add or clear the selected evidence before deciding.');return;}
+        if(otherDraft(decision)){error('Save or clear your other draft before deciding.');return;}
         void persistAndSend(casePath(r.id),{requestKey:crypto.randomUUID().replaceAll('-',''),revision:r.revision,orderRevision:r.orderRevision,evidenceVersion:r.evidenceVersion,kind,message:note.value});});detail.append(decision);
     }
     const reload=button('Reload request',()=>void show(r.id)),footer=el('div',undefined,'refund-buttons');reload.dataset.refundDetailReload='';footer.append(reload);
-    if(available.length){const discard=button('Discard decision draft',()=>{dirty=false;renderDetail(r);});discard.dataset.refundDiscard='';footer.append(discard);}detail.append(footer);controls();
+    {const discard=button('Discard draft',()=>{dirty=false;renderDetail(r);});discard.dataset.refundDiscard='';footer.append(discard);}detail.append(footer);controls();
+  }
+  const reviewLabels={open:'Request Ezkart review',reply:'Send information',ask_buyer:'Ask buyer for information',ask_store:'Ask store for information',approve:'Approve refund request',decline:'Decline refund request',withdraw:'Withdraw Ezkart review',reopen:'Reopen Ezkart review'};
+  const reviewEvents={reply:'Added information',ask_buyer:'Requested buyer information',ask_store:'Requested store information',approve:'Approved refund request',decline:'Declined refund request',withdraw:'Withdrew review',reopen:'Reopened review'};
+  const otherDraft=except=>[...detail.querySelectorAll('form')].filter(f=>f!==except).some(f=>[...f.querySelectorAll('textarea,input[type=file]')].some(n=>Boolean(n.value)));
+  function renderDispute(r){
+    const d=r.dispute;if(!d&&!r.canRequestReview)return;
+    const box=el('section',undefined,'refund-evidence refund-review');box.dataset.refundReview='';box.append(el('h4','Ezkart review'));
+    if(d){
+      box.append(el('p',d.stateLabel),el('p',d.openedBy+' requested review · '+date(d.createdAt)),el('p',d.message));
+      if(d.active)box.append(el('p','The affected earnings remain held while this review is open. The original store decision remains in the request history.'));
+      const history=el('div',undefined,'refund-history');history.dataset.reviewHistory='';
+      const row=a=>{const n=el('article');n.append(el('b',a.actor+' · '+reviewEvents[a.kind]),el('time',date(a.createdAt)),el('p',a.message));return n;};
+      for(const a of d.actions)history.append(row(a));box.append(history);
+      let before=d.olderBefore;
+      if(before){const older=button('Load earlier review updates',()=>void(async()=>{
+        if(busy||loading||pending||dirty||ended)return;busy=true;controls();error('');try{const data=await api(casePath(r.id)+'/dispute?before='+before);if(ended)return;
+          history.prepend(...data.disputeHistory.actions.map(row));before=data.disputeHistory.olderBefore;older.hidden=!before;
+        }catch(e){if(!ended)error(e.message);}finally{busy=false;controls();}
+      })());older.dataset.refundDetailReload='';box.append(older);}
+      if(d.requiresVerification){const link=el('a','Verify your authenticator to update this review');link.href='?page=support-refunds&refund='+encodeURIComponent(r.id)+'#review-verification';box.append(link);}
+    }else box.append(el('p','Ask Ezkart to review the original purchase, supporting files and store decision. Explain what needs reviewing.'));
+    const kinds=d?[...(d.canReply?['reply']:[]),...(d.canDecide?['ask_buyer','ask_store','approve','decline']:[]),...(d.canWithdraw?['withdraw']:[]),...(d.canReopen?['reopen']:[])]:['open'];
+    if(kinds.length){const review=el('form'),label=el('label',d?'Information for this review':'Why should Ezkart review this request?'),note=el('textarea');review.dataset.reviewForm='';
+      note.name='message';note.rows=4;note.required=true;note.minLength=3;note.maxLength=2000;label.append(note);review.append(label);
+      review.append(el('p','Your message is retained with the case and visible to the buyer, store and authorized Ezkart reviewers.'));
+      if(d?.canDecide)review.append(el('p','A decision applies to the original requested '+money(r.amount)+'. Approval does not send money. Review the purchase, delivery and all supporting files before deciding.'));
+      const actions=el('div',undefined,'refund-buttons');for(const kind of kinds){const b=el('button',reviewLabels[kind]);b.type='submit';b.dataset.kind=kind;actions.append(b);}review.append(actions);
+      review.addEventListener('input',()=>{dirty=true;controls();});review.addEventListener('submit',event=>{
+        event.preventDefault();const kind=event.submitter?.dataset.kind;if(!kinds.includes(kind)||!review.reportValidity())return;
+        if(otherDraft(review)){error('Save or clear your other draft before updating the review.');return;}
+        void persistAndSend(casePath(r.id)+'/dispute',{requestKey:crypto.randomUUID().replaceAll('-',''),kind:'review_'+kind,revision:d?.revision||0,refundRevision:r.revision,orderRevision:r.orderRevision,evidenceVersion:r.evidenceVersion,message:note.value});
+      });box.append(review);
+    }
+    detail.append(box);
   }
   async function downloadAttachment(r,file){
     if(busy||loading||pending||ended)return;busy=true;controls();error('');
@@ -128,7 +163,7 @@
     }catch(e){if(!ended)error(e.message);}finally{busy=false;controls();}
   }
   function renderAttachments(r){
-    const box=el('section',undefined,'refund-evidence');box.dataset.refundAttachments='';box.append(el('h4','Supporting files'),el('p','Files are private to this purchase’s buyer and store. Originals and descriptions are retained with the request. Evidence added later does not change an earlier decision.'));
+    const box=el('section',undefined,'refund-evidence');box.dataset.refundAttachments='';box.append(el('h4','Supporting files'),el('p','Files are private to this purchase’s buyer, store and authorized Ezkart reviewers. Originals and descriptions are retained with the request. Evidence added later does not change an earlier decision.'));
     const files=r.attachments||[];
     if(!files.length)box.append(el('p','No supporting files yet.'));
     for(const file of files){const row=el('article');row.append(el('b',file.filename),el('p',file.actor+' · '+date(file.createdAt)+' · '+new Intl.NumberFormat().format(file.size)+' bytes'));
@@ -140,12 +175,12 @@
     if(r.canUploadEvidence){
       const upload=el('form');upload.dataset.refundFileForm='';const fileLabel=el('label','Evidence file'),fileInput=el('input'),captionLabel=el('label','File description (optional)'),caption=el('textarea');
       fileInput.type='file';fileInput.name='file';fileInput.accept='.jpg,.jpeg,.png,.webp,.pdf';fileInput.required=true;fileLabel.append(fileInput);caption.name='caption';caption.maxLength=500;caption.rows=2;captionLabel.append(caption);
-      const add=el('button','Add or retry evidence');add.type='submit';const clear=button('Clear selected evidence',()=>{upload.reset();dirty=Boolean(detail.querySelector('.refund-decision textarea')?.value);error('');controls();}),buttons=el('div',undefined,'refund-buttons');buttons.append(add,clear);
+      const add=el('button','Add or retry evidence');add.type='submit';const clear=button('Clear selected evidence',()=>{upload.reset();dirty=otherDraft(upload);error('');controls();}),buttons=el('div',undefined,'refund-buttons');buttons.append(add,clear);
       upload.append(fileLabel,captionLabel,el('p','JPG, PNG, WebP or PDF, up to 5 MiB each. Up to 10 files per side. Include only information relevant to this request. Files are kept exactly as supplied, including embedded metadata.'),buttons);
       upload.addEventListener('input',()=>{dirty=true;controls();});
       upload.addEventListener('submit',event=>{event.preventDefault();void (async()=>{
         if(busy||loading||pending||ended||!upload.reportValidity())return;
-        if(detail.querySelector('.refund-decision textarea')?.value){error('Save or clear your decision draft before adding evidence.');return;}
+        if(otherDraft(upload)){error('Save or clear your other draft before adding evidence.');return;}
         const file=fileInput.files[0],mime=/\.jpe?g$/i.test(file.name)?'image/jpeg':/\.png$/i.test(file.name)?'image/png':/\.webp$/i.test(file.name)?'image/webp':/\.pdf$/i.test(file.name)?'application/pdf':'';
         if(!mime||file.size<1||file.size>5242880){error('Choose a JPG, PNG, WebP or PDF file up to 5 MiB.');return;}
         busy=true;controls();error('');notice('Saving the original evidence file…');
@@ -192,7 +227,7 @@
     try{if(JSON.stringify(await readPending())!==JSON.stringify(original))throw Error('The saved retry changed. Reload this page.');localStorage.removeItem(storageKey);if(localStorage.getItem(storageKey)!==null)throw Error('Browser recovery could not be cleared.');}
     catch(e){error(e.message);return;}
     pending=null;rejected=false;dirty=false;recovery();error('');
-    if(body.kind)await show(original.path.split('/').at(-1));else await begin(merchant?original.path.split('/').at(-1):root.dataset.order,body);
+    if(body.kind)await show(original.path.match(/ref_[a-f0-9]{32}/)?.[0]);else await begin(merchant?original.path.split('/').at(-1):root.dataset.order,body);
   }
   form.addEventListener('input',()=>{dirty=true;total();controls();});
   form.addEventListener('submit',e=>{e.preventDefault();if(!overview?.canCreate||!form.reportValidity())return;

@@ -2,7 +2,9 @@
 
 Workbench implementation, 27 September 2026. Buyers and store editors can open
 refund requests against original paid purchases. The store can approve or decline
-the exact request; the buyer can withdraw it before a decision. This implements
+the exact request; the buyer can withdraw it before a decision. Both parties can
+also request an [Ezkart review](refund-reviews.md), which retains the original
+store decision and holds the affected earnings while an appeal is open. This implements
 request allocation and review, not provider execution, refunded-payment evidence,
 financial reversal or digital entitlement revocation. Central checkout remains held.
 
@@ -18,7 +20,7 @@ and stock adjustments remain in the separate physical return workflow.
 Requested and approved amounts reserve the original purchase allocation. The
 transaction checks every item and shipping amount against all existing active
 requests, so concurrent attempts cannot overclaim. Decline and withdrawal release
-that allocation without deleting history. A catalog price change, file replacement
+that allocation when no Ezkart review remains open, without deleting history. A catalog price change, file replacement
 or archived product cannot change the purchased amount. At most twenty new
 requests per order per hour are accepted; exact retries do not spend another slot.
 
@@ -32,8 +34,9 @@ support review until actual refund evidence and allocations are integrated.
 
 Buyer access uses the permanent verified order owner. Submitted email addresses,
 account fields and identifiers cannot transfer ownership. Store access requires
-current active membership; viewers are read-only. Only the store can approve or
-decline. A buyer can withdraw a requested case; a merchant can withdraw only a
+current active membership; viewers are read-only. The store can approve or
+decline an undisputed request; a separately authorized Ezkart reviewer decides
+an active appeal. A buyer can withdraw a requested case; a merchant can withdraw only a
 request that merchant originally opened. Approved cases retain their allocation
 pending the separate processing lifecycle.
 

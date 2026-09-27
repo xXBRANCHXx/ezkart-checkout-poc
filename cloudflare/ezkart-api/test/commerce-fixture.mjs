@@ -29,15 +29,15 @@ export async function setupCommerceFixture(t,{through=Infinity,notifications='of
     await db.prepare("INSERT INTO app_users(id,auth_user_id,created_at,updated_at) VALUES (?,?,'now','now')").bind(seller, seller).run();
     await db.prepare("INSERT INTO seller_memberships(seller_id,auth_user_id,role,created_at) VALUES (?,?,'owner','now')").bind('seller_' + seller, seller).run();
   }
-  async function merchantToken(seller='alice',email) {
+  async function merchantToken(seller='alice',email,extraClaims={}) {
     const head = Buffer.from(JSON.stringify({alg: 'ES256', kid: publicKey.kid})).toString('base64url');
-    const claims = Buffer.from(JSON.stringify({iss: 'https://auth.fixture.test/auth/v1', sub: seller, email, aud: 'authenticated', exp: Math.floor(Date.now() / 1000) + 3600})).toString('base64url');
+    const claims = Buffer.from(JSON.stringify({iss: 'https://auth.fixture.test/auth/v1', sub: seller, email, aud: 'authenticated', exp: Math.floor(Date.now() / 1000) + 3600,...extraClaims})).toString('base64url');
     const sig = await crypto.subtle.sign({name: 'ECDSA', hash: 'SHA-256'}, key.privateKey, new TextEncoder().encode(`${head}.${claims}`));
     return `${head}.${claims}.${Buffer.from(sig).toString('base64url')}`;
   }
-  async function merchant(path, input, {seller = 'alice', email, method = input === undefined ? 'GET' : 'PUT'} = {}) {
+  async function merchant(path, input, {seller = 'alice', email, claims, method = input === undefined ? 'GET' : 'PUT'} = {}) {
     const response = await mf.dispatchFetch('https://api.fixture.test' + path, {method,
-      headers: {authorization: `Bearer ${await merchantToken(seller,email)}`, 'content-type': 'application/json'},
+      headers: {authorization: `Bearer ${await merchantToken(seller,email,claims)}`, 'content-type': 'application/json'},
       ...(input !== undefined ? {body: JSON.stringify(input)} : {})});
     return {status: response.status, ...await response.json()};
   }

@@ -32,6 +32,7 @@ command has no hosted HTTP interface and requires the current workbench schema.
 | `payouts_need_reconciliation`, `payout_accounts_unassigned`, `payout_history_outside_window`, `settlement_sources_stale` | Existing payout grants or settlement sources need reconciliation, original account review or extended history. These signals describe stored evidence and do not establish current DOKU balances. |
 | `payout_runner_not_observed`, `payout_runner_overdue`, `payout_runner_interrupted`, `payout_runner_failed` | No scheduled runner has been recorded, no pulse arrived for fifteen minutes, its lease expired, or its latest pass failed. Check the host cron output and private runner receipt before continuing the original queue work. |
 | `payout_runner_held` | The scheduler is running with provider collection held. This is an explicit execution hold, not evidence that live money flows are accepted. |
+| `refund_reviews_stale` | An open refund review has had no update for 48 hours. An authorized reviewer should inspect its original evidence and any outstanding information request. This threshold is not a customer response-time promise. |
 
 Email signals include saved callbacks and verified provider lookups. Later
 delivery evidence clears the missing-delivery condition, while a later bounce or
@@ -61,7 +62,8 @@ invitation to enable a held dispatcher or repeat an unknown financial request.
 The command does not install a scheduler or send alerts. The separate
 [payout runner](withdrawal-synchronization.md#scheduled-runner-and-liveness) records
 a bounded heartbeat, and report version 2 includes that state plus current queue
-and financial reconciliation signals. Read-only inspection never renews a lease
+and financial reconciliation signals. Migration 0064 also adds open refund review
+counts, cases awaiting each party and the 48-hour stale-case signal. Read-only inspection never renews a lease
 or clears an alert. Before opening the beta
 to buyers, a named operator, review cadence and alert destination still need
 acceptance. Automatic email delivery and the existing checkout/provider holds

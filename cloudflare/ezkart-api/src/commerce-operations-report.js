@@ -65,6 +65,11 @@ export function commerceOperationsStatement(environment, now) {
     'payoutRunner',json((SELECT json_object('state',state,'startedAt',started_at,'seenAt',seen_at,'leaseUntil',lease_until,'finishedAt',finished_at,
       'runs',runs,'failedRuns',failed_runs,'interruptedRuns',interrupted_runs,'lastFailureAt',last_failure_at)
       FROM commerce_payout_sync_runner WHERE commerce_environment=(SELECT environment FROM scope))),
+    'refundReviews',json_object(
+      'open',(SELECT COUNT(*) FROM commerce_refund_disputes WHERE commerce_environment=(SELECT environment FROM scope) AND state IN ('open','awaiting_buyer','awaiting_store')),
+      'awaitingBuyer',(SELECT COUNT(*) FROM commerce_refund_disputes WHERE commerce_environment=(SELECT environment FROM scope) AND state='awaiting_buyer'),
+      'awaitingStore',(SELECT COUNT(*) FROM commerce_refund_disputes WHERE commerce_environment=(SELECT environment FROM scope) AND state='awaiting_store'),
+      'stale',(SELECT COUNT(*) FROM commerce_refund_disputes WHERE commerce_environment=(SELECT environment FROM scope) AND state IN ('open','awaiting_buyer','awaiting_store') AND updated_at<strftime('%Y-%m-%dT%H:%M:%fZ',(SELECT observed_at FROM scope),'-48 hours'))),
     'email',json_object(
       'transactionalRequests',(SELECT COUNT(*) FROM commerce_email_requests WHERE commerce_environment=(SELECT environment FROM scope)),
       'transactionalAttention',${emailAttention('commerce_email')},
@@ -79,6 +84,7 @@ const fields = {
   accounting:['captures','journals','unpostedCaptures','unallocatedCaptures','inconsistentJournals'],
   wallets:['enrollments','confirmedProfiles'],
   payoutSync:['jobs','active','reviewGroups','expiredLeases','overdue','unreconciledPayouts','unassignedAccounts','outsideWindow','staleSettlements'],
+  refundReviews:['open','awaitingBuyer','awaitingStore','stale'],
   email:['transactionalRequests','transactionalAttention','campaignRequests','campaignAttention'],
 };
 export function commerceOperationsWarnings(report) {
@@ -92,6 +98,7 @@ export function commerceOperationsWarnings(report) {
     ['jobs','expiredLeases','job_leases_expired'],['jobs','overdue','jobs_overdue'],
     ['orders','paymentReview','orders_payment_review'],['orders','stockReview','orders_stock_review'],
     ['orders','shippingReview','orders_shipping_review'],
+    ['refundReviews','stale','refund_reviews_stale'],
     ['accounting','unpostedCaptures','capture_journals_missing'],['accounting','unallocatedCaptures','capture_allocations_need_review'],
     ['accounting','inconsistentJournals','financial_journals_inconsistent'],
     ['email','transactionalAttention','transactional_email_attention'],['email','campaignAttention','campaign_email_attention'],

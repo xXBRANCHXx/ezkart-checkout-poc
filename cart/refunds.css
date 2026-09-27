@@ -3,3 +3,6 @@
 @media(max-width:600px){.refunds-workspace{padding:18px;margin:18px 0}.refunds-workspace header,.refund-list-heading{display:grid;gap:12px}.refund-buttons{width:100%}.refund-buttons button{flex:1}.refunds-workspace form,.refunds-workspace [data-refund-detail]{padding:14px}.refund-amount{display:grid;gap:8px}.refunds-workspace input[type=number]{max-width:none}.refund-case{grid-template-columns:1fr}.refund-case strong{grid-column:1;grid-row:auto}.refund-list-heading label{min-width:0}}
 .refund-evidence{margin:20px 0;padding:16px;background:#fff;border:1px solid #e1dfeb;border-radius:10px}.refund-evidence h4{margin:0 0 12px}.refund-evidence article{margin:12px 0;padding-top:12px;border-top:1px solid #ecebf2}.refund-evidence p:last-child{margin-bottom:0}
 .refunds-workspace [data-refund-file-form]{padding:0;border:0}.refunds-workspace [data-refund-attachments] button{max-width:100%;overflow-wrap:anywhere;text-align:left}.refunds-workspace input[type=file]{font-size:13px;padding:8px}
+
+.refund-review{border-color:#c8c2e0}.refund-review [data-review-form]{padding:0;border:0}.refund-review [data-review-history] article{padding:12px 0}.refund-review a{display:inline-block;margin:8px 0}
+@media(max-width:600px){.refund-review .refund-buttons{display:grid;grid-template-columns:1fr}.refund-review .refund-buttons button{width:100%;overflow-wrap:normal}}

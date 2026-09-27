@@ -1,6 +1,8 @@
 import {commerceHash,commerceStorageEnabled} from './commerce-orders.js';
 import {currentCommerceEnvironment as mode,customerOrderSeller} from './commerce-access.js';
 import {reviewCursor,readReviewCursor} from './commerce-reviews.js';
+import {disputeView,disputeActive} from './commerce-refund-disputes.js';
+import {supportAccess} from './commerce-support.js';
 
 const fail=(message,status=422,code='')=>{throw new Response(message,{status,headers:code?{'x-ezkart-error-code':code}:{}});};
 const conflict=message=>fail(message,409,'refund_conflict');
@@ -11,14 +13,19 @@ const message=value=>{if(typeof value!=='string')fail('Explain the refund in 3 t
 const reasons=['not_received','damaged','wrong_item','not_as_described','file_problem','changed_mind','other'];
 const caseId=value=>{if(typeof value!=='string'||!/^ref_[a-f0-9]{32}$/.test(value))fail('Refund request not found.',404);};
 const labels={requested:'Awaiting store review',approved:'Approved — awaiting refund',declined:'Declined',withdrawn:'Withdrawn'};
+const reservationSql="(r.state IN ('requested','approved') OR EXISTS(SELECT 1 FROM commerce_refund_disputes d WHERE d.refund_id=r.id AND d.state IN ('open','awaiting_buyer','awaiting_store')))";
 const reservedSql=`COALESCE((SELECT SUM(ri.amount) FROM commerce_refund_items ri JOIN commerce_refunds r ON r.id=ri.refund_id
-  WHERE ri.order_item_id=i.id AND r.state IN ('requested','approved')),0)`;
+  WHERE ri.order_item_id=i.id AND ${reservationSql}),0)`;
 const reasonFor=order=>order.payment_review?'This payment needs a support review.':order.checkout_state!=='paid'?
   (['partially_refunded','refunded'].includes(order.checkout_state)?'This order’s refunds need a support review.':'Refund requests open after payment is confirmed.'):
   !order.capture_id?'This payment needs a support review.':'';
 
 async function access(env,actor,orderId){
   if(actor.kind==='buyer')return {sellerId:await customerOrderSeller(env,{id:actor.id},orderId),canWrite:true};
+  if(actor.kind==='support'){
+    const authority=await supportAccess(env,actor),order=await env.DB.prepare('SELECT seller_id FROM orders WHERE id=? AND commerce_environment=?').bind(orderId,mode(env)).first();
+    if(!order)fail('Order not found.',404);return {...authority,sellerId:order.seller_id};
+  }
   if(actor.kind!=='merchant'||!actor.id||!actor.sellerId)fail('Store access is required.',403);
   const member=await env.DB.prepare(`SELECT m.role FROM seller_memberships m JOIN sellers s ON s.id=m.seller_id
     WHERE m.seller_id=? AND m.auth_user_id=? AND s.status='active'`).bind(actor.sellerId,actor.id).first();
@@ -45,7 +52,7 @@ function databaseFailure(error){
   if(/refund_|UNIQUE constraint failed/.test(text))conflict('The order or refund allocation changed. Reload and review the saved request.');
   throw error;
 }
-const caseView=row=>({id:row.id,orderId:row.order_id,revision:row.revision,state:row.state,stateLabel:labels[row.state],
+const caseView=row=>({id:row.id,orderId:row.order_id,revision:row.revision,state:row.state,stateLabel:disputeActive(row.dispute_state)?'Ezkart review in progress':labels[row.state],
   amount:row.amount,currency:'IDR',createdAt:row.created_at,updatedAt:row.updated_at,
   paymentConfirmed:false,processingAvailable:false});
 
@@ -54,7 +61,7 @@ export async function refundOrder(env,actor,orderId){
   const result=await env.DB.batch([
     env.DB.prepare(`SELECT i.id,i.title,i.product_type,i.quantity,i.unit_price_amount,i.fulfillment_snapshot_json,${reservedSql} AS reserved
       FROM order_items i WHERE i.order_id=? AND i.seller_id=? ORDER BY i.id`).bind(orderId,order.seller_id),
-    env.DB.prepare("SELECT COALESCE(SUM(shipping_amount),0) AS reserved FROM commerce_refunds WHERE order_id=? AND state IN ('requested','approved')").bind(orderId),
+    env.DB.prepare(`SELECT COALESCE(SUM(r.shipping_amount),0) AS reserved FROM commerce_refunds r WHERE r.order_id=? AND ${reservationSql}`).bind(orderId),
   ]);
   const items=result[0].results.map(i=>({orderItemId:i.id,title:i.title,variant:JSON.parse(i.fulfillment_snapshot_json).variantName||'',type:i.product_type,
     quantity:i.quantity,price:i.unit_price_amount,paidAmount:i.quantity*i.unit_price_amount,reservedAmount:i.reserved,
@@ -71,6 +78,7 @@ export async function refundDetail(env,actor,id,expectedOrder=''){
   caseId(id);
   const row=await env.DB.prepare('SELECT * FROM commerce_refunds WHERE id=? AND commerce_environment=?').bind(id,mode(env)).first();
   if(!row||(expectedOrder&&row.order_id!==expectedOrder))fail('Refund request not found.',404);
+  if(actor.kind==='support'&&!await env.DB.prepare('SELECT id FROM commerce_refund_disputes WHERE refund_id=?').bind(id).first())fail('Review not found.',404);
   const {order,authority}=await orderFor(env,actor,row.order_id);if(order.seller_id!==row.seller_id)fail('Refund request not found.',404);
   const result=await env.DB.batch([
     env.DB.prepare(`SELECT ri.order_item_id,ri.amount,i.title,i.quantity,i.unit_price_amount,i.product_type,i.fulfillment_snapshot_json,
@@ -97,12 +105,13 @@ export async function refundDetail(env,actor,id,expectedOrder=''){
     env.DB.prepare(`SELECT id,actor_kind,filename,mime_type,size_bytes,content_hash,caption,state,created_at,ready_at
       FROM commerce_refund_attachments WHERE refund_id=? ORDER BY sequence`).bind(id),
   ]);
-  const data=JSON.parse(row.data_json),canWrite=commerceStorageEnabled(env)&&authority.canWrite&&row.state==='requested';
+  const dispute=await disputeView(env,actor,id,authority),data=JSON.parse(row.data_json),canWrite=commerceStorageEnabled(env)&&authority.canWrite&&row.state==='requested'&&!dispute?.active&&actor.kind!=='support';
   const payment=result[2].results[0];
   await access(env,actor,row.order_id);
-  return {...caseView(row),orderRevision:order.revision,reason:data.reason,note:data.note,shippingAmount:row.shipping_amount,
+  return {...caseView({...row,dispute_state:dispute?.state}),orderRevision:order.revision,reason:data.reason,note:data.note,shippingAmount:row.shipping_amount,
+    dispute,canRequestReview:commerceStorageEnabled(env)&&authority.canWrite&&actor.kind!=='support'&&!dispute&&row.state!=='withdrawn',
     evidenceVersion:result[4].results.reduce((sum,file)=>sum+1+(file.state==='ready'?1:0),0),
-    canUploadEvidence:commerceStorageEnabled(env)&&authority.canWrite,
+    canUploadEvidence:commerceStorageEnabled(env)&&authority.canWrite&&actor.kind!=='support',
     attachments:result[4].results.map(file=>({id:file.id,actor:file.actor_kind==='merchant'?'Store':'Buyer',filename:file.filename,
       mime:file.mime_type,size:file.size_bytes,sha256:file.content_hash,caption:file.caption,state:file.state,createdAt:file.created_at,readyAt:file.ready_at})),
     items:result[0].results.map(i=>{const snapshot=JSON.parse(i.fulfillment_snapshot_json),file=snapshot.digitalFile;
@@ -123,8 +132,9 @@ export async function refundList(env,actor,url,orderId=''){
   const scope=await commerceHash({actor,environment:mode(env),orderId,state}),cursor=url.searchParams.has('cursor')?readReviewCursor(url.searchParams.get('cursor'),scope):null;
   if(cursor&&(!Number.isSafeInteger(cursor.cap)||!Number.isSafeInteger(cursor.before)||cursor.before<1||cursor.cap<cursor.before))fail('Refund page is invalid.');
   const cap=cursor?.cap??(await env.DB.prepare('SELECT COALESCE(MAX(sequence),0) AS cap FROM commerce_refunds WHERE seller_id=? AND commerce_environment=?').bind(authority.sellerId,mode(env)).first()).cap;
-  const result=await env.DB.prepare(`SELECT * FROM commerce_refunds WHERE seller_id=? AND commerce_environment=? AND (?='' OR order_id=?)
-    AND sequence<=? AND sequence<? AND (?='all' OR (?='open' AND state IN ('requested','approved')) OR state=?) ORDER BY sequence DESC LIMIT 26`)
+  const result=await env.DB.prepare(`SELECT r.*,(SELECT d.state FROM commerce_refund_disputes d WHERE d.refund_id=r.id) AS dispute_state
+    FROM commerce_refunds r WHERE r.seller_id=? AND r.commerce_environment=? AND (?='' OR r.order_id=?)
+    AND r.sequence<=? AND r.sequence<? AND (?='all' OR (?='open' AND ${reservationSql}) OR r.state=?) ORDER BY r.sequence DESC LIMIT 26`)
     .bind(authority.sellerId,mode(env),orderId,orderId,cap,cursor?.before??cap+1,state,state,state).all();
   const rows=result.results.slice(0,25);await access(env,actor,orderId);
   return {refunds:rows.map(caseView),nextCursor:result.results.length>25?reviewCursor({v:1,scope,cap,before:rows.at(-1).sequence}):null,enabled:commerceStorageEnabled(env)};
@@ -177,3 +187,4 @@ export async function changeRefund(env,actor,id,raw,expectedOrder=''){
   catch(error){const saved=await replay();if(saved)return saved;databaseFailure(error);}
   return refundDetail(env,actor,id,expectedOrder);
 }
+export {access as refundAccess};

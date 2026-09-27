@@ -37,7 +37,8 @@ export async function financialDeliveryStatus(env,url){
   const row=await env.DB.prepare(`SELECT o.checkout_state,o.fulfillment_state,o.payment_review,o.fulfillment_review,
     c.id AS capture_id,j.allocation_state,r.id AS receipt_id,r.confirmed_at,r.recorded_at,r.source_json,
     (SELECT COUNT(*) FROM commerce_payment_captures x WHERE x.order_id=o.id AND x.capture_kind='duplicate_payment') AS additional_captures,
-    (SELECT COUNT(*) FROM commerce_refunds x WHERE x.order_id=o.id AND x.state IN ('requested','approved')) AS pending_refunds,
+    (SELECT COUNT(*) FROM commerce_refunds x WHERE x.order_id=o.id AND (x.state IN ('requested','approved') OR EXISTS(
+      SELECT 1 FROM commerce_refund_disputes d WHERE d.refund_id=x.id AND d.state IN ('open','awaiting_buyer','awaiting_store')))) AS pending_refunds,
     (SELECT COUNT(*) FROM commerce_returns x WHERE x.order_id=o.id AND x.state NOT IN ('declined','withdrawn')) AS unresolved_returns,
     (SELECT COUNT(*) FROM commerce_jobs x WHERE x.order_id=o.id AND (x.kind LIKE 'shipment.%' OR x.kind='payment.create')
       AND (x.state IN ('uncertain','dead') OR (x.kind='shipment.cancel' AND x.state IN ('queued','running','retry')))) AS unresolved_jobs

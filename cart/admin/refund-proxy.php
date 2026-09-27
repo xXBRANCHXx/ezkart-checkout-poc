@@ -2,29 +2,38 @@
 declare(strict_types=1);
 if (!function_exists('ez_admin_json')) { http_response_code(404); exit; }
 
-function ez_admin_refund_proxy(string $token, string $path, string $method): never
+function ez_admin_refund_proxy(string $token, string $path, string $method, bool $support = false): never
 {
     require_once dirname(__DIR__) . '/api/refund-media.php';
     $session = session_id(); $account = (string) ($_SESSION['admin_user']['id'] ?? ''); $csrf = (string) ($_SESSION['csrf_token'] ?? '');
     $store = (string) ($_SERVER['HTTP_X_EZKART_REFUND_STORE'] ?? '');
     if ($account === '' || !hash_equals($account, (string) ($_SERVER['HTTP_X_EZKART_REFUND_ACCOUNT'] ?? '')) || $csrf === ''
-        || !hash_equals($csrf, (string) ($_SERVER['HTTP_X_EZKART_CSRF'] ?? '')) || preg_match('/^[A-Za-z0-9][A-Za-z0-9_-]{2,95}$/D', $store) !== 1) {
+        || !hash_equals($csrf, (string) ($_SERVER['HTTP_X_EZKART_CSRF'] ?? '')) || (!$support && preg_match('/^[A-Za-z0-9][A-Za-z0-9_-]{2,95}$/D', $store) !== 1)) {
         ez_admin_json(['ok' => false, 'error' => 'Your sign-in or store changed. Reload this page.', 'code' => 'refund_session_changed'], 401);
     }
     $parts = parse_url($path);
     $route = is_array($parts) ? ($parts['path'] ?? '') : '';
-    if (strlen($path) > 2400 || str_contains($path, '#') || preg_match('#^/v1/commerce/refunds(?:/(ref_[a-f0-9]{32})(?:/(evidence)(?:/(rattach_[a-f0-9]{32}))?)?|/orders/(EZK-[SP]-[A-F0-9]{24}))?$#D', $route, $match) !== 1) ez_admin_json(['ok' => false, 'error' => 'Refund reference is invalid.'], 400);
-    $evidence = !empty($match[2]); $download = !empty($match[3]);
+    $pattern = $support
+        ? '#^/v1/support/refunds(?:/(ref_[a-f0-9]{32})(?:/(evidence|dispute)(?:/(rattach_[a-f0-9]{32}))?)?)?$#D'
+        : '#^/v1/commerce/refunds(?:/(ref_[a-f0-9]{32})(?:/(evidence|dispute)(?:/(rattach_[a-f0-9]{32}))?)?|/orders/(EZK-[SP]-[A-F0-9]{24}))?$#D';
+    if (strlen($path) > 2400 || str_contains($path, '#') || preg_match($pattern, $route, $match) !== 1) ez_admin_json(['ok' => false, 'error' => 'Refund reference is invalid.'], 400);
+    $evidence = ($match[2] ?? '') === 'evidence'; $dispute = ($match[2] ?? '') === 'dispute'; $download = !empty($match[3]);
+    if ($download && !$evidence) ez_admin_json(['ok' => false], 400);
     if ($evidence && (($method === 'GET' && !$download) || ($method === 'POST' && $download))) ez_admin_json(['ok' => false], 405);
+    if ($support && $method === 'POST' && !$dispute) ez_admin_json(['ok' => false], 405);
     $query = [];
+    $states = $support ? ['all','open','awaiting_buyer','awaiting_store','closed'] : ['all','open','requested','approved','declined','withdrawn'];
     foreach (explode('&', (string) ($parts['query'] ?? '')) as $pair) {
         if ($pair === '') continue;
         [$key, $value] = array_pad(explode('=', $pair, 2), 2, ''); $key = rawurldecode($key); $value = rawurldecode($value);
-        if (isset($query[$key]) || !in_array($key, ['state','cursor'], true) || $method !== 'GET' || !empty($match[1])
-            || ($key === 'state' && !in_array($value, ['all','open','requested','approved','declined','withdrawn'], true))
-            || ($key === 'cursor' && preg_match('/^[A-Za-z0-9_-]{1,1800}$/D', $value) !== 1)) ez_admin_json(['ok' => false, 'error' => 'Refund filters are invalid.'], 400);
+        if (isset($query[$key]) || $method !== 'GET'
+            || ($dispute ? ($key !== 'before' || preg_match('/^[1-9][0-9]{0,14}$/D', $value) !== 1)
+                : (!empty($match[1]) || !in_array($key, ['state','cursor'], true)
+                    || ($key === 'state' && !in_array($value, $states, true))
+                    || ($key === 'cursor' && preg_match('/^[A-Za-z0-9_-]{1,1800}$/D', $value) !== 1)))) ez_admin_json(['ok' => false, 'error' => 'Refund filters are invalid.'], 400);
         $query[$key] = $value;
     }
+    if ($dispute && $method === 'GET' && !isset($query['before'])) ez_admin_json(['ok' => false], 400);
     if ($method === 'POST' && empty($match[1]) && empty($match[4])) ez_admin_json(['ok' => false], 405);
     if ($method === 'POST' && ez_config('commerce_storage') !== 'd1') ez_admin_json(['ok' => false, 'error' => 'Refund requests are not available yet.'], 503);
     $path = $route . ($query !== [] ? '?' . http_build_query($query, '', '&', PHP_QUERY_RFC3986) : '');
@@ -37,7 +46,7 @@ function ez_admin_refund_proxy(string $token, string $path, string $method): nev
     $handle = curl_init(rtrim(ez_config('cloudflare_api_url'), '/') . $path);
     if ($handle === false) ez_admin_json(['ok' => false, 'error' => 'Refund are unavailable.'], 503);
     curl_setopt_array($handle, [CURLOPT_CUSTOMREQUEST => $method, CURLOPT_HTTPHEADER => ['Accept: application/json', 'Content-Type: application/json',
-        'Authorization: Bearer ' . $token, 'X-Ezkart-Refund-Store: ' . $store], CURLOPT_POSTFIELDS => $method === 'POST' ? $body : null,
+        'Authorization: Bearer ' . $token, ...($support ? [] : ['X-Ezkart-Refund-Store: ' . $store])], CURLOPT_POSTFIELDS => $method === 'POST' ? $body : null,
         CURLOPT_RETURNTRANSFER => true, CURLOPT_CONNECTTIMEOUT => 4, CURLOPT_TIMEOUT => 25, CURLOPT_SSL_VERIFYPEER => true, CURLOPT_SSL_VERIFYHOST => 2, CURLOPT_FOLLOWLOCATION => false]);
     $response = ez_refund_fetch($handle); $raw = $response['raw']; $status = $response['status'];
     session_id($session); $_SESSION = []; session_start();

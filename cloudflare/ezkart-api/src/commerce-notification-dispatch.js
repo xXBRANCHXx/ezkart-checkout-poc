@@ -48,6 +48,23 @@ async function content(env,job){
     if(!row||!['requested','approved','declined','withdrawn','receiving','inspected','closed'].includes(data.state))invalid();
     return {...result,returnId:row.id,category:'returns',title:'Return '+labels[data.state],body:`The return for ${order.id} is ${labels[data.state]}. Open the return to review the details.`,data:{state:data.state}};
   }
+  if(job.kind==='notification.dispute_updated'){
+    const titles={open:'Ezkart review requested',reply:'New information for Ezkart review',ask_buyer:'Ezkart needs information from the buyer',ask_store:'Ezkart needs information from the store',approve:'Ezkart approved the refund request',decline:'Ezkart declined the refund request',withdraw:'Ezkart review withdrawn',reopen:'Ezkart review reopened'};
+    if(!Object.hasOwn(titles,data.reviewKind)||typeof data.disputeId!=='string'||typeof data.refundId!=='string')invalid();
+    const row=await env.DB.prepare(`SELECT d.id,d.created_at,j.created_at AS source_at,j.job_key FROM commerce_refund_disputes d JOIN commerce_jobs j ON j.id=?
+      WHERE d.id=? AND d.refund_id=? AND d.seller_id=? AND d.order_id=? AND d.commerce_environment=?`).bind(job.id,data.disputeId,data.refundId,job.sellerId,order.id,job.environment).first();
+    if(!row)invalid();
+    if(data.reviewKind==='open'){
+      if(Object.hasOwn(data,'actionId')||row.created_at!==row.source_at||row.job_key!=='dispute_open:'+row.id)invalid();
+    }else{
+      if(typeof data.actionId!=='string')invalid();
+      const action=await env.DB.prepare('SELECT kind,created_at FROM commerce_refund_dispute_actions WHERE id=? AND dispute_id=?').bind(data.actionId,row.id).first();
+      if(!action||action.kind!==data.reviewKind||action.created_at!==row.source_at||row.job_key!=='dispute_action:'+data.actionId)invalid();
+    }
+    return {...result,refundId:data.refundId,category:'returns',title:titles[data.reviewKind],
+      body:`${order.id}: open the refund request to read the review and its current status.`+(data.reviewKind==='approve'?' Approval does not confirm a refund payment.':''),
+      data:{refundId:data.refundId,disputeId:row.id,reviewKind:data.reviewKind}};
+  }
   if(job.kind==='notification.refund_updated'){
     if(typeof data.refundId!=='string'||!/^ref_[a-f0-9]{32}$/.test(data.refundId)||!['requested','approved','declined','withdrawn'].includes(data.state))invalid();
     const row=await env.DB.prepare(`SELECT r.id,r.amount,r.created_at,j.created_at AS source_at,j.job_key

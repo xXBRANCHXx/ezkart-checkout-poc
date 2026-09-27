@@ -714,6 +714,7 @@ function ez_admin_sync_cloudflare_user(string $accessToken): array
 
 function ez_admin_proxy_cloud_request(string $accessToken, string $path, string $method): never
 {
+    if (str_starts_with($path, '/v1/support/refunds')) { require_once __DIR__ . '/refund-proxy.php'; ez_admin_refund_proxy($accessToken, $path, $method, true); }
     if (str_starts_with($path, '/v1/commerce/refunds')) { require_once __DIR__ . '/refund-proxy.php'; ez_admin_refund_proxy($accessToken, $path, $method); }
     if (str_starts_with($path, '/v1/digital-files')) { require_once __DIR__ . '/digital-file-proxy.php'; ez_admin_digital_file_proxy($accessToken, $path, $method); }
     if (str_starts_with($path, '/v1/commerce/notifications')) { require_once __DIR__ . '/notification-proxy.php'; ez_admin_notification_proxy($accessToken, $path, $method); }
@@ -1432,7 +1433,7 @@ $adminStorageIdentity = $authenticationMethod === 'supabase'
 $adminStorageScope = substr(hash('sha256', $deployment . '|' . $adminStorageIdentity), 0, 24);
 $nowJakarta = new DateTimeImmutable('now', new DateTimeZone('Asia/Jakarta'));
 $dashboardPeriod = ez_dashboard_period($_GET, $nowJakarta);
-$allowedPages = ['dashboard', 'orders', 'returns', 'refunds', 'fulfillment', 'shipping-settings', 'products', 'product-new', 'inventory', 'shop', 'sites', 'customers', 'analytics', 'marketing', 'payments', 'messages', 'notifications', 'wallet', 'settings', 'advanced'];
+$allowedPages = ['dashboard', 'orders', 'returns', 'refunds', 'support-refunds', 'fulfillment', 'shipping-settings', 'products', 'product-new', 'inventory', 'shop', 'sites', 'customers', 'analytics', 'marketing', 'payments', 'messages', 'notifications', 'wallet', 'settings', 'advanced'];
 $requestedPage = strtolower(trim((string) ($_GET['page'] ?? 'dashboard')));
 $page = in_array($requestedPage, $allowedPages, true) ? $requestedPage : 'dashboard';
 $isDashboard = $page === 'dashboard';
@@ -1584,11 +1585,16 @@ if ($page === 'analytics' && ($_GET['export'] ?? '') === 'csv') {
     if ($centralAnalyticsWorkspace) { http_response_code(405); exit('Use Export CSV on the analytics page to create a complete report snapshot.'); }
     ez_analytics_export($analytics);
 }
+$supportAccess = ['authorized' => false];
+if ($authenticated && $authenticationMethod === 'supabase') {
+    require_once __DIR__ . '/support-access.php';
+    $supportAccess = ez_support_access($page === 'support-refunds', $csrfToken, $isHttps);
+}
 $walletAccess = $page === 'wallet' && $authenticated ? ez_wallet_access($authenticationMethod, $sellerId, $csrfToken, $isHttps) : ['unlocked' => false];
 $requestedSite = trim((string) ($_GET['edit'] ?? ''));
 $siteEditor = $page === 'sites' && $requestedSite !== '' && strlen($requestedSite) <= 180;
 $pageTitles = [
-    'dashboard' => 'Dashboard', 'orders' => 'Orders', 'returns' => 'Returns', 'refunds' => 'Refunds', 'fulfillment' => 'Fulfillment', 'shipping-settings' => 'Shipping settings', 'products' => 'Products', 'product-new' => 'Create product', 'inventory' => 'Inventory', 'shop' => 'Shop', 'sites' => 'Landing Pages',
+    'dashboard' => 'Dashboard', 'orders' => 'Orders', 'returns' => 'Returns', 'refunds' => 'Refunds', 'support-refunds' => 'Ezkart reviews', 'fulfillment' => 'Fulfillment', 'shipping-settings' => 'Shipping settings', 'products' => 'Products', 'product-new' => 'Create product', 'inventory' => 'Inventory', 'shop' => 'Shop', 'sites' => 'Landing Pages',
     'customers' => 'Customers', 'analytics' => 'Analytics', 'marketing' => 'Marketing',
     'payments' => 'Payments', 'messages' => 'Messages', 'notifications' => 'Notifications',
     'wallet' => 'Wallet', 'settings' => 'Settings', 'advanced' => 'Advanced Mode',
@@ -1655,7 +1661,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
   <?php if ($authenticated): ?><link rel="stylesheet" href="assets/vendor/leaflet.css"><?php endif; ?>
   <link rel="stylesheet" href="admin.css?v=<?= ez_admin_escape($adminCssVersion) ?>">
   <?php if (in_array($page, ['inventory','products'], true)): ?><link rel="stylesheet" href="inventory.css?v=<?= (int) filemtime(__DIR__ . '/inventory.css') ?>"><?php endif; ?>
-  <?php if ($page === 'refunds'): ?><link rel="stylesheet" href="../refunds.css?v=<?= (int) filemtime(__DIR__ . '/../refunds.css') ?>"><?php endif; ?>
+  <?php if (in_array($page, ['refunds','support-refunds'], true)): ?><link rel="stylesheet" href="../refunds.css?v=<?= (int) filemtime(__DIR__ . '/../refunds.css') ?>"><?php endif; ?>
   <?php if ($page === 'returns'): ?><link rel="stylesheet" href="returns.css?v=<?= (int) filemtime(__DIR__ . '/returns.css') ?>"><?php endif; ?>
   <?php if ($page === 'fulfillment'): ?><link rel="stylesheet" href="fulfillment.css?v=<?= (int) filemtime(__DIR__ . '/fulfillment.css') ?>"><?php endif; ?>
   <?php if ($centralOrderWorkspace || $centralPaymentWorkspace || $centralCustomerWorkspace): ?><link rel="stylesheet" href="commerce-orders.css?v=<?= (int) filemtime(__DIR__ . '/commerce-orders.css') ?>"><?php endif; ?>
@@ -1842,6 +1848,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
       <a class="sidebar-brand" href="../../"><img src="../../assets/ezkart-logo.svg" alt="Ezkart"></a>
       <nav class="primary-nav" aria-label="Main navigation">
         <a class="<?= $page === 'dashboard' ? 'active' : '' ?>" href="?page=dashboard"><?= ez_admin_icon('grid') ?><span>Dashboard</span></a>
+        <?php if (!empty($supportAccess['authorized'])): ?><a class="<?= $page === 'support-refunds' ? 'active' : '' ?>" href="?page=support-refunds"><?= ez_admin_icon('refund') ?><span>Ezkart reviews</span></a><?php endif; ?>
         <a class="<?= in_array($page, ['orders','returns','refunds','fulfillment'], true) ? 'active' : '' ?>" href="?page=orders"><?= ez_admin_icon('cart') ?><span>Orders</span><b data-order-total><?= $centralReadWorkspace ? '—' : $allOrderCount ?></b></a>
         <a class="<?= in_array($page, ['products', 'product-new', 'inventory', 'shop'], true) ? 'active' : '' ?>" href="?page=products"><?= ez_admin_icon('box') ?><span>Products</span></a>
         <a class="<?= $page === 'sites' ? 'active' : '' ?>" href="?page=sites"><?= ez_admin_icon('layout') ?><span>Landing Pages</span><b data-site-count>0</b></a>
@@ -1992,7 +1999,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
   <?php if ($page === 'marketing'): ?><script src="marketing-reports.js?v=<?= (int) filemtime(__DIR__ . '/marketing-reports.js') ?>"></script><script src="marketing-publication.js?v=<?= (int) filemtime(__DIR__ . '/marketing-publication.js') ?>"></script><script src="marketing-automations.js?v=<?= (int) filemtime(__DIR__ . '/marketing-automations.js') ?>"></script><script src="marketing.js?v=<?= (int) filemtime(__DIR__ . '/marketing.js') ?>"></script><?php endif; ?>
   <?php if (in_array($page, ['inventory','products'], true)): ?><script src="inventory.js?v=<?= (int) filemtime(__DIR__ . '/inventory.js') ?>"></script><?php endif; ?>
   <?php if ($page === 'inventory'): ?><script src="inventory-reviews.js?v=<?= (int) filemtime(__DIR__ . '/inventory-reviews.js') ?>"></script><?php endif; ?>
-  <?php if ($page === 'refunds'): ?><script src="../refunds.js?v=<?= (int) filemtime(__DIR__ . '/../refunds.js') ?>"></script><?php endif; ?>
+  <?php if (in_array($page, ['refunds','support-refunds'], true)): ?><script src="../refunds.js?v=<?= (int) filemtime(__DIR__ . '/../refunds.js') ?>"></script><?php endif; ?>
   <?php if ($page === 'returns'): ?><script src="returns.js?v=<?= (int) filemtime(__DIR__ . '/returns.js') ?>"></script><?php endif; ?>
   <?php if ($page === 'fulfillment'): ?><script src="fulfillment.js?v=<?= (int) filemtime(__DIR__ . '/fulfillment.js') ?>"></script><?php endif; ?>
   <?php if ($centralOrderWorkspace): ?><script src="commerce-orders.js?v=<?= (int) filemtime(__DIR__ . '/commerce-orders.js') ?>"></script><?php endif; ?>

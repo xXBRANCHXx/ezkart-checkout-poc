@@ -21,6 +21,8 @@ import { stockReviewList, stockReviewDetails, resolveStockReview } from "./stock
 import { claimCommerceOrder } from "./commerce-access.js";
 import { returnList, returnOrder, returnDetail, customerReturns, createReturn, returnAction } from "./commerce-returns.js";
 import {refundOrder,refundList,refundDetail,createRefund,changeRefund} from './commerce-refunds.js';
+import {changeDispute,disputeHistory,supportRefunds} from './commerce-refund-disputes.js';
+import {supportSession,supportActor,recordSupportPermission} from './commerce-support.js';
 import {uploadRefundAttachment,refundAttachment,refundAttachmentJsonBytes} from './commerce-refund-media.js';
 import {fulfillmentList,fulfillmentDetail,fulfillmentAction,serviceShipment,customerShipment,bindShipmentAccount,bindShipment,shippingInbox,refreshShipment,drainPendingShipping} from './commerce-fulfillment.js';
 import {merchantOrderList,merchantOrderDetail,merchantOrderHistory} from './commerce-order-reads.js';
@@ -113,7 +115,7 @@ const decodeBase64Url = (value) => {
 
 const decodeJwtJson = (value) => JSON.parse(new TextDecoder().decode(decodeBase64Url(value)));
 
-async function authenticatedUser(request, env) {
+async function authenticatedUser(request, env, includeAssurance = false) {
   const authorization = request.headers.get("authorization") || "";
   if (!authorization.startsWith("Bearer ")) throw new Response("Missing access token", { status: 401 });
   const token = authorization.slice(7).trim();
@@ -179,6 +181,7 @@ async function authenticatedUser(request, env) {
 
   return {
     id: claims.sub,
+    ...(includeAssurance ? {assurance:{aal:claims.aal,amr:claims.amr,expiresAt:claims.exp}} : {}),
     email: typeof claims.email === "string" ? claims.email : "",
     user_metadata: claims.user_metadata && typeof claims.user_metadata === "object"
       ? claims.user_metadata
@@ -1559,6 +1562,11 @@ export default {
         const scheduled=input.schedule?await scheduleNotifications(env):null;
         return json({ok:true,scheduled,...await dispatchNotifications(env,input.limit??3)});
       }
+      if(url.pathname==='/internal/commerce/support/access'){
+        const input=await authenticateCommerceService(request,env,{strictJSON:true,maxBytes:3000});
+        if(request.method!=='POST'||url.search)return json({ok:false,error:'Access provisioning method is invalid.'},405);
+        return json({ok:true,permission:await recordSupportPermission(env,input)});
+      }
       if(url.pathname.startsWith('/internal/commerce/finance/delivery')){
         const payload=await authenticateCommerceService(request,env,{strictJSON:true,maxBytes:3000});
         if(url.pathname==='/internal/commerce/finance/delivery'&&request.method==='GET'&&!Object.keys(payload).length)return json({ok:true,...await financialDeliveryStatus(env,url)});
@@ -1797,14 +1805,40 @@ export default {
         if(request.method==='POST'&&receipt)return json({ok:true,...await acknowledgeDigitalPart(env,user,orderId,itemId,grantId,Number(part),await reviewRequestJson(request,2000,parseMessageJSON))},200,cors);
         return json({ok:false,error:'Download method is not allowed.'},405,cors);
       }
-      const buyerRefund=/^\/v1\/customer\/orders\/(EZK-[SP]-[A-F0-9]{24})\/refunds(?:\/(ref_[a-f0-9]{32})(?:\/(evidence)(?:\/(rattach_[a-f0-9]{32}))?)?)?$/.exec(url.pathname);
-      const merchantRefund=/^\/v1\/commerce\/refunds(?:\/(ref_[a-f0-9]{32})(?:\/(evidence)(?:\/(rattach_[a-f0-9]{32}))?)?|\/orders\/(EZK-[SP]-[A-F0-9]{24}))?$/.exec(url.pathname);
+      if(url.pathname==='/v1/support/session'){
+        const user=await authenticatedUser(request,env,true);
+        if(request.method!=='GET'||url.search)return json({ok:false,error:'Review session method is invalid.'},405,cors);
+        return json({ok:true,support:await supportSession(env,user)},200,cors);
+      }
+      const supportRefund=/^\/v1\/support\/refunds(?:\/(ref_[a-f0-9]{32})(?:\/(dispute|evidence)(?:\/(rattach_[a-f0-9]{32}))?)?)?$/.exec(url.pathname);
+      if(url.pathname.startsWith('/v1/support/')&&!supportRefund)return json({ok:false,error:'Review reference is invalid.'},400,cors);
+      if(supportRefund){
+        const actor=await supportActor(env,await authenticatedUser(request,env,true)),[,id,action,file]=supportRefund;
+        if(action==='dispute'&&!file){
+          if(request.method==='POST'&&!url.search)return json({ok:true,refund:await changeDispute(env,actor,id,await reviewRequestJson(request,16000,parseMessageJSON))},200,cors);
+          if(request.method==='GET'&&[...url.searchParams.keys()].length===1&&url.searchParams.has('before'))return json({ok:true,disputeHistory:await disputeHistory(env,actor,id,url.searchParams.get('before'))},200,cors);
+        }
+        if(request.method==='GET'&&action==='evidence'&&file&&!url.search&&!request.headers.has('range'))return await refundAttachment(env,actor,id,file);
+        if(request.method==='GET'&&!action){
+          if(id){if(url.search)return json({ok:false,error:'Review parameters are invalid.'},400,cors);return json({ok:true,refund:await refundDetail(env,actor,id)},200,cors);}
+          return json({ok:true,...await supportRefunds(env,actor,url)},200,cors);
+        }
+        return json({ok:false,error:'Review method or parameters are invalid.'},405,cors);
+      }
+      const buyerRefund=/^\/v1\/customer\/orders\/(EZK-[SP]-[A-F0-9]{24})\/refunds(?:\/(ref_[a-f0-9]{32})(?:\/(evidence|dispute)(?:\/(rattach_[a-f0-9]{32}))?)?)?$/.exec(url.pathname);
+      const merchantRefund=/^\/v1\/commerce\/refunds(?:\/(ref_[a-f0-9]{32})(?:\/(evidence|dispute)(?:\/(rattach_[a-f0-9]{32}))?)?|\/orders\/(EZK-[SP]-[A-F0-9]{24}))?$/.exec(url.pathname);
       if((url.pathname.startsWith('/v1/customer/orders/')&&url.pathname.includes('/refunds')||url.pathname.startsWith('/v1/commerce/refunds'))&&!buyerRefund&&!merchantRefund)return json({ok:false,error:'Refund reference is invalid.'},400,cors);
       if(buyerRefund||merchantRefund){
         let actor,orderId,id,evidence,attachment;
         if(buyerRefund){const user=await authenticatedUser(request,env);actor={kind:'buyer',id:user.id};[,orderId,id,evidence,attachment]=buyerRefund;}
         else{const {seller,authUserId}=await sellerContext(request,env);actor={kind:'merchant',id:authUserId,sellerId:seller.id};[,id,evidence,attachment,orderId]=merchantRefund;
           if(request.headers.has('x-ezkart-refund-store')&&request.headers.get('x-ezkart-refund-store')!==seller.id)return json({ok:false,error:'Your active store changed. Reload this page.'},409,cors);}
+        if(evidence==='dispute'){
+          if(attachment)return json({ok:false,error:'Review reference is invalid.'},400,cors);
+          if(request.method==='POST'&&!url.search)return json({ok:true,refund:await changeDispute(env,actor,id,await reviewRequestJson(request,16000,parseMessageJSON),orderId)},200,cors);
+          if(request.method==='GET'&&[...url.searchParams.keys()].length===1&&url.searchParams.has('before'))return json({ok:true,disputeHistory:await disputeHistory(env,actor,id,url.searchParams.get('before'),orderId)},200,cors);
+          return json({ok:false,error:'Review method or parameters are invalid.'},405,cors);
+        }
         if(evidence){
           if(url.search)return json({ok:false,error:'Evidence parameters are invalid.'},400,cors);
           if(request.method==='GET'&&attachment&&!request.headers.has('range'))return await refundAttachment(env,actor,id,attachment,orderId);
