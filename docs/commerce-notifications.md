@@ -3,7 +3,7 @@
 The merchant bell opens `?page=notifications`; signed-in buyers use
 `/cart/notifications.php`. Both screens show real private notifications with
 category, literal-text search, read/unread filtering, bounded history, read
-confirmation, and links to the relevant order, return, or conversation. The
+confirmation, and links to the relevant order, return, refund request or conversation. The
 merchant bell polls unread counts on visible pages. Notifications do not mark
 themselves read just because the inbox was opened.
 
@@ -23,11 +23,28 @@ in-app/email choices used by the transaction. A later preference change applies
 to future delivery; retries reuse the original receipt.
 
 Sources are verified payment/order-state events, additional-payment or stock
-review, stock recovery, courier/fulfillment updates, return transitions, and
+review, stock recovery, courier/fulfillment updates, return and refund transitions, and
 messages. Message alerts refer to the conversation without copying private text
 or attachments. The message event and its source job commit together. Merchant
 messages alert the buyer, and buyer messages alert store members. Viewer members
 can read and mark their own notifications; they gain no order-edit permissions.
+
+Refund requests and decisions use the existing `returns` preferences, labelled
+**Returns and refunds**. Migration 0046 adds a purchase-bound refund reference
+to the event receipt and creates a source job in the same transaction as each
+request or decision. Dispatch verifies the original source ID, state, timestamp,
+store, environment, order and unique job key. The inbox and email link to that
+exact request; buyer sign-in preserves its validated reference. Alerts omit
+private explanations and decision messages. Approval explicitly says the refund
+has not been paid. Existing email opt-in and current-preference checks still apply.
+
+The migration replaces the event table within one transaction using
+[D1's deferred foreign-key checks](https://developers.cloudflare.com/d1/sql-api/foreign-keys/),
+copies every original event, and restores its existing guards and current
+preference-aware fan-out trigger. Recipients, read receipts, preferences and
+email evidence stay intact. An event can identify exactly one return or refund.
+Existing refunds receive distinct source jobs retaining their original times;
+old recipients are not re-created. See [refund-requests.md](refund-requests.md).
 
 Scheduled sources:
 

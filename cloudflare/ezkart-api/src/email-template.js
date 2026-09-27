@@ -3,6 +3,7 @@ const paragraph=value=>escape(value).replace(/\r?\n/g,'<br>');
 export function notificationEmailDestination(row){
   const merchant=row.actor_kind==='merchant';
   if(row.conversation_id&&/^conv_[a-f0-9]{32}$/.test(row.conversation_id))return merchant?'/cart/admin/?page=messages&conversation='+row.conversation_id:'/cart/messages.php?conversation='+row.conversation_id;
+  if(row.refund_id&&/^ref_[a-f0-9]{32}$/.test(row.refund_id)&&/^EZK-[SP]-[A-F0-9]{24}$/.test(row.order_id))return merchant?'/cart/admin/?page=refunds&refund='+row.refund_id:'/cart/return.php?order='+row.order_id+'&refund='+row.refund_id;
   if(merchant&&row.return_id&&/^ret_[a-f0-9]{32}$/.test(row.return_id))return '/cart/admin/?page=returns&return='+row.return_id;
   if(row.order_id&&/^EZK-[SP]-[A-F0-9]{24}$/.test(row.order_id))return merchant?'/cart/admin/?page=orders&order='+row.order_id:'/cart/return.php?order='+row.order_id;
   return merchant?'/cart/admin/?page=products':'/cart/notifications.php';
@@ -13,7 +14,7 @@ export function notificationEmailDestination(row){
 export function notificationEmailPayload(configuration,row,email,id){
   const sandbox=configuration.environment==='sandbox',store=String(row.store_name||'Your store').slice(0,160),title=String(row.title||'Store update'),body=String(row.body||'Open Ezkart to read this update.');
   const url=configuration.origin+notificationEmailDestination(row),preferences=configuration.origin+(row.actor_kind==='merchant'?'/cart/admin/?page=settings#notifications':'/cart/notifications.php?view=preferences');
-  const label=row.category==='messages'?'Open conversation':row.category==='weekly_activity'?'View products':row.category==='returns'&&row.actor_kind==='merchant'?'View return':'View order';
+  const label=row.category==='messages'?'Open conversation':row.category==='weekly_activity'?'View products':row.category==='returns'&&row.refund_id?'View refund request':row.category==='returns'&&row.actor_kind==='merchant'?'View return':'View order';
   let products=[];try{const data=JSON.parse(row.data_json||'{}');if(row.category==='weekly_activity'&&Array.isArray(data.products))products=data.products.slice(0,10).map(p=>String(p.name||'Product').slice(0,160));}catch{/* The durable event body remains useful without optional product details. */}
   const date=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Jakarta',day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}).format(new Date(row.occurred_at))+' WIB';
   const environment=sandbox?'Ezkart TEST · Sandbox activity':'Ezkart',footer=row.actor_kind==='merchant'?'You chose email notifications for this store. Manage your choices in Settings.':'This update relates to your Ezkart activity. Sign in to view your private order or conversation.';

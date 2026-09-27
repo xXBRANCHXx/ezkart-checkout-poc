@@ -3,7 +3,7 @@
   const root = document.querySelector('[data-notification-workspace]');
   if (!root) return;
   const config = JSON.parse(root.dataset.config), q = selector => root.querySelector(selector);
-  const labels = {payment_confirmed:'Payment confirmed',payment_pending:'Payment pending',payment_failed:'Payment unsuccessful',payment_review:'Payment review',shipping:'Shipping',returns:'Returns',messages:'Messages',weekly_activity:'Weekly activity'};
+  const labels = {payment_confirmed:'Payment confirmed',payment_pending:'Payment pending',payment_failed:'Payment unsuccessful',payment_review:'Payment review',shipping:'Shipping',returns:'Returns and refunds',messages:'Messages',weekly_activity:'Weekly activity'};
   const sourceLabels = {'notification.order_state':'Payment update','notification.payment_pending':'Pending payment reminder','notification.payment_review':'Payment review','notification.stock_recovered':'Stock review resolved','notification.shipment_updated':'Shipping update','notification.return_updated':'Return update','notification.message_received':'New message','notification.weekly_activity':'Weekly activity','notification.send':'Email delivery'};
   const form = q('[data-notice-filters]'), processForm = q('[data-notice-process-filters]');
   let listChannel = 'inbox', preferenceEditor = null;
@@ -63,7 +63,7 @@
         const products=node('ul'); for(const product of item.data.products)products.append(node('li',product.name)); detail.append(products);
         if(item.data.withoutOrders>item.data.products.length)detail.append(node('p','Plus '+count(item.data.withoutOrders-item.data.products.length)+' more.'));li.append(detail);
       }
-      const actions=node('div','','notice-card-footer'), link=node('a',item.category==='messages'?'Open conversation':item.category==='weekly_activity'?'View products':item.category==='returns'&&config.merchant?'View return':'View order');
+      const actions=node('div','','notice-card-footer'), link=node('a',item.category==='messages'?'Open conversation':item.category==='weekly_activity'?'View products':item.category==='returns'&&item.data?.refundId?'View refund request':item.category==='returns'&&config.merchant?'View return':'View order');
       // Destinations are private, same-origin routes constructed by the API.
       if(typeof item.href==='string'&&/^\/cart\/(?:admin\/\?|messages\.php\?|return\.php\?|$)/.test(item.href)){link.href=item.href;actions.append(link);}
       if(view!=='email'&&!item.readAt){const button=node('button','Mark as read');button.type='button';button.dataset.noticeRead=String(item.id);button.addEventListener('click',()=>void markRead([item.id]));actions.append(button);}

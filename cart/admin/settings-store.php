@@ -6,7 +6,7 @@ $notificationRows = [
     'payment_failed' => ['Payment failed or expired', 'A payment fails or its payment window closes.'],
     'payment_review' => ['Payment and stock review', 'A payment or stock exception needs your review.'],
     'shipping' => ['Shipping updates', 'Pickup, delivery and shipping exceptions.'],
-    'returns' => ['Returns', 'Return requests, decisions and inspection updates.'],
+    'returns' => ['Returns and refunds', 'Return and refund requests, decisions and return inspection updates.'],
     'messages' => ['Buyer messages', 'A buyer sends your store a new message.'],
     'weekly_activity' => ['Weekly catalog activity', 'A weekly summary of products without paid orders.'],
 ];

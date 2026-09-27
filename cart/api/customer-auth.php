@@ -73,6 +73,7 @@ function ez_customer_next(string $value): string
     }
     $safe = [];
     if (is_string($query['order'] ?? null) && preg_match('/^EZK-[A-Z0-9-]{8,70}$/D', $query['order']) === 1) $safe['order'] = $query['order'];
+    if (isset($safe['order']) && is_string($query['refund'] ?? null) && preg_match('/^ref_[a-f0-9]{32}$/D', $query['refund']) === 1) $safe['refund'] = $query['refund'];
     if (is_string($query['shop'] ?? null) && preg_match('/^[a-z0-9][a-z0-9_-]{5,79}$/D', $query['shop']) === 1) $safe['shop'] = $query['shop'];
     return '/cart/return.php' . ($safe !== [] ? '?' . http_build_query($safe) : '');
 }

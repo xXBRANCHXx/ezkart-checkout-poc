@@ -3,7 +3,7 @@
   window.EzkartBuyerNotificationPreferences={mount(root,config,api){
     const panel=root.querySelector('[data-buyer-preferences]');if(!panel)return null;
     const q=selector=>panel.querySelector(selector),form=q('[data-buyer-pref-form]'),compare=q('[data-buyer-pref-comparison]'),history=q('[data-buyer-pref-history-dialog]');
-    const labels={payment_confirmed:'Payment confirmed',payment_pending:'Payment reminders',payment_failed:'Payment unsuccessful',shipping:'Shipping updates',returns:'Returns',messages:'Store messages'};
+    const labels={payment_confirmed:'Payment confirmed',payment_pending:'Payment reminders',payment_failed:'Payment unsuccessful',shipping:'Shipping updates',returns:'Returns and refunds',messages:'Store messages'};
     const paths=Object.keys(labels).flatMap(key=>[key+'.inApp',key+'.email']),copy=value=>JSON.parse(JSON.stringify(value));
     const value=(data,path)=>{const [group,channel]=path.split('.');return data[group][channel];},put=(data,path,on)=>{const [group,channel]=path.split('.');data[group][channel]=on;};
     const valid=data=>data&&typeof data==='object'&&!Array.isArray(data)&&Object.keys(data).length===6&&Object.keys(labels).every(key=>data[key]&&Object.keys(data[key]).length===2&&typeof data[key].inApp==='boolean'&&typeof data[key].email==='boolean');

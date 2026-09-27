@@ -90,6 +90,30 @@ test('weekly catalog details use safe text and a return notification opens the a
   await p.goto(f.app.base+'/cart/admin/?page=returns&return=ret_'+'f'.repeat(32));await p.locator('[data-return-title]').getByText('Return could not be loaded',{exact:true}).waitFor();assert.equal(await p.locator('[data-return-detail]').getByText('Inspect this particular return',{exact:true}).count(),0);
 });
 
+test('refund alerts open the exact saved request for buyer and store on desktop and mobile and preserve it through sign-in',async t=>{
+  const f=await fixture(t),b=await browser(t),path='/v1/customer/orders/'+f.order.id+'/refunds',overview=await f.merchant(path,undefined,{seller:buyer});
+  const created=await f.merchant(path,{requestKey:key(),orderRevision:overview.order.revision,reason:'other',note:'The exact refund request from the notification.',items:[{orderItemId:overview.items[0].orderItemId,amount:1000}],shippingAmount:0},{seller:buyer,method:'POST'});assert.equal(created.status,200,created.error);const r=created.refund;
+  assert.equal((await f.merchant('/v1/commerce/refunds/'+r.id,{requestKey:key(),revision:1,orderRevision:overview.order.revision,kind:'approve',message:'The original request has been approved.'},{method:'POST'})).status,200);await f.drain();
+  const directory='/tmp/ezkart-refund-notifications-ui-01a0d643';await mkdir(directory,{recursive:true});
+  for(const width of [1360,390])for(const merchant of [true,false]){
+    const p=await pageFor(b,f,width,merchant?f.cookie:f.buyerCookie),errors=[];p.on('pageerror',e=>errors.push(e.message));
+    await p.goto(f.app.base+(merchant?'/cart/admin/?page=notifications&category=returns':'/cart/notifications.php?category=returns'));
+    await root(p).getByText('2 notifications shown',{exact:true}).waitFor();await root(p).getByText(/The refund has not been paid/).waitFor();
+    assert.equal(await root(p).getByText('The exact refund request from the notification.',{exact:true}).count(),0);
+    assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await p.screenshot({path:directory+'/'+(merchant?'merchant':'buyer')+'-'+width+'.png',fullPage:true});
+    await root(p).getByRole('link',{name:'View refund request',exact:true}).first().click();
+    const detail=p.locator('[data-refund-detail]');await detail.getByText('The exact refund request from the notification.',{exact:true}).waitFor();
+    await detail.getByText('Approved by the store. The refund has not been paid. Refund processing is not available yet.',{exact:true}).waitFor();assert.equal(new URL(p.url()).searchParams.get('refund'),r.id);assert.deepEqual(errors,[]);await p.context().close();
+  }
+  const guest=await pageFor(b,f,390,null),link='/cart/return.php?order='+f.order.id+'&refund='+r.id;
+  await guest.goto(f.app.base+link);assert.equal(await guest.locator('input[name=next]').first().inputValue(),link);
+  await guest.context().addCookies([f.buyerCookie]);await guest.goto(f.app.base+link);await guest.locator('[data-refund-detail]').getByText('The exact refund request from the notification.',{exact:true}).waitFor();
+  await writeFile(f.app.directory+'/auth-response.json',JSON.stringify({user:{id:'other-buyer',email:'other@example.com'}}));
+  const other=await pageFor(b,f,390,f.app.customerCookie('other@example.com','other-buyer',3600,await f.merchantToken('other-buyer','other@example.com')));await other.goto(f.app.base+link);
+  await other.locator('[data-refund-error]').getByText('Order not found',{exact:true}).waitFor();assert.equal(await other.getByText('The exact refund request from the notification.',{exact:true}).count(),0);
+  const invalid=await pageFor(b,f,390,null);await invalid.goto(f.app.base+'/cart/return.php?order='+f.order.id+'&refund=invalid');assert.equal(await invalid.locator('input[name=next]').first().inputValue(),'/cart/return.php?order='+f.order.id);
+});
+
 test('buyer bridge discards an inbox response if the merchant session used for sign-in changes while it is loading',async t=>{
   const f=await fixture(t),b=await browser(t),admin=f.app.adminCookie({supabase_access_token:await f.merchantToken(buyer,'checkout@example.com'),admin_user:{id:buyer,email:'checkout@example.com'}});
   f.app.cli(`require '${process.cwd()}/cart/api/customer-auth.php'; session_id('${f.buyerCookie.value}'); ez_customer_session(); $_SESSION['customer_auth']['source']='existing_google'; session_write_close();`);

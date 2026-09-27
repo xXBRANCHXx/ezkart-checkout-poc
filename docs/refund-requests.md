@@ -85,13 +85,47 @@ It restores every existing record in 141 physical tables with clean integrity an
 foreign-key checks. Migration 0045 adds eighteen objects and changes none of the
 existing objects. All 351 captured compatibility plans compile against the restore.
 
-Still required: notification delivery for these requests, return/dispute evidence
+Still required: return/dispute evidence
 integration, owner-authorized execution with fresh financial verification,
 provider capability and amount checks, unknown-outcome recovery, verified refund
 receipts, fee/ledger reversals, precise digital-access effects, and reconciliation.
 Approval never creates a provider job that could execute later without that
 separate authorization and evidence contract. Signed-in hosted acceptance and
 all wider commerce, provider and production-release gates remain open.
+
+## Request and decision notifications
+
+Migration 0046 adds durable source jobs for request, approval, decline and
+withdrawal. Each job commits with its original request or decision. Delivery
+requires the source's exact identity, original timestamp, state, order, store,
+environment and unique key, plus a live lease. A lost acknowledgement reuses its
+saved event and recipients. Approval alerts explicitly state that money has not
+been returned; they change no financial or payment state.
+
+Buyer and merchant inboxes and emails link to the exact authorized request.
+The buyer's validated request link survives sign-in. Private request notes and
+decision messages are not copied into alerts. Existing `returns` in-app/email
+preferences apply, displayed as **Returns and refunds**. No preference, email
+consent, provider connection or send flag is enabled by this addition.
+
+Six new API cases cover original request/decision sources, replay, lost delivery
+acknowledgements, forged receipts, preference snapshots and current opt-out,
+email destinations, and a populated migration. Three decision notifications fit
+within the existing D1 query allowance. Forty-two refund, email and buyer
+preference API cases pass, as do the ten existing notification API cases.
+Fifteen affected PHP/browser cases pass, including the new desktop/mobile
+request links, sign-in continuation and foreign-account rejection.
+Desktop 1360px and narrow 390px inboxes were visually
+inspected. These tests use isolated local fixtures and mocked email transport.
+
+The fresh private pre-0046 TEST backup is 691,831 bytes, SHA-256
+`9f76d3f81edf268701094e5a0da14400dfcd000848a47577fc8ee2c8c5fc925e`.
+Restoration preserves every original record in 144 physical tables with clean
+integrity/foreign-key checks. The migration changes only the event table and its
+source/completion guards, and adds one index and two source triggers. All 399
+captured compatibility plans compile. A separate populated D1 rehearsal preserves
+an existing event, both recipients, a read receipt, saved preferences and queued
+email while backfilling two refund source jobs. All wider completion gates stay open.
 
 ## TEST rollout
 

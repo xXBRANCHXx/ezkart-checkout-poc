@@ -48,6 +48,25 @@ async function content(env,job){
     if(!row||!['requested','approved','declined','withdrawn','receiving','inspected','closed'].includes(data.state))invalid();
     return {...result,returnId:row.id,category:'returns',title:'Return '+labels[data.state],body:`The return for ${order.id} is ${labels[data.state]}. Open the return to review the details.`,data:{state:data.state}};
   }
+  if(job.kind==='notification.refund_updated'){
+    if(typeof data.refundId!=='string'||!/^ref_[a-f0-9]{32}$/.test(data.refundId)||!['requested','approved','declined','withdrawn'].includes(data.state))invalid();
+    const row=await env.DB.prepare(`SELECT r.id,r.amount,r.created_at,j.created_at AS source_at,j.job_key
+      FROM commerce_refunds r JOIN commerce_jobs j ON j.id=? WHERE r.id=? AND r.seller_id=? AND r.order_id=? AND r.commerce_environment=?`)
+      .bind(job.id,data.refundId,job.sellerId,order.id,job.environment).first();
+    if(!row)invalid();
+    if(data.state==='requested'){
+      if(Object.hasOwn(data,'actionId')||row.created_at!==row.source_at||row.job_key!=='refund_request:'+row.id)invalid();
+    }else{
+      if(typeof data.actionId!=='string')invalid();
+      const action=await env.DB.prepare('SELECT kind,created_at FROM commerce_refund_actions WHERE id=? AND refund_id=?').bind(data.actionId,row.id).first();
+      if(!action||({approve:'approved',decline:'declined',withdraw:'withdrawn'})[action.kind]!==data.state||action.created_at!==row.source_at||row.job_key!=='refund_action:'+data.actionId)invalid();
+    }
+    const amount=new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(row.amount);
+    const title=data.state==='requested'?'Refund requested':'Refund request '+labels[data.state];
+    const body=data.state==='approved'?`The ${amount} refund request for ${order.id} was approved by the store. The refund has not been paid. Open the request for its current status.`:
+      `A ${amount} refund request for ${order.id} was ${labels[data.state]}. Open the request to review the details.`;
+    return {...result,refundId:row.id,category:'returns',title,body,data:{refundId:row.id,state:data.state}};
+  }
   if(job.kind==='notification.shipment_updated'){
     if(data.kind){
       const actions={accept:['Order accepted','The store accepted the order for fulfillment.'],pickup:['Pickup requested','A pickup was requested. This does not confirm that the courier has collected the parcel.'],cancel_pickup:['Pickup cancellation requested','A cancellation was requested. Check tracking for the courier’s confirmation.'],refresh:['Tracking refresh requested','']};
@@ -71,11 +90,11 @@ export async function deliverNotificationJob(env,job,workerId){
     const item=await content(env,job);id='notice_'+(await commerceHash({job:job.id,environment:job.environment})).slice(0,32);
     const source=await env.DB.prepare('SELECT created_at FROM commerce_jobs WHERE id=?').bind(job.id).first();if(!source)invalid();
     const now=new Date().toISOString();
-    await env.DB.prepare(`INSERT INTO commerce_notification_events(id,job_id,source_lease_token,seller_id,commerce_environment,category,audience,order_id,conversation_id,return_id,title,body,data_json,suppression,occurred_at,created_at)
-      SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,CASE WHEN NOT EXISTS(SELECT 1 FROM sellers WHERE id=? AND status='active') THEN 'store_closed'
+    await env.DB.prepare(`INSERT INTO commerce_notification_events(id,job_id,source_lease_token,seller_id,commerce_environment,category,audience,order_id,conversation_id,return_id,refund_id,title,body,data_json,suppression,occurred_at,created_at)
+      SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,CASE WHEN NOT EXISTS(SELECT 1 FROM sellers WHERE id=? AND status='active') THEN 'store_closed'
         WHEN ?='notification.payment_pending' AND NOT EXISTS(SELECT 1 FROM orders WHERE id=? AND checkout_state IN ('creating','pending') AND expires_at>?) THEN 'obsolete' ELSE ? END,?,?
       WHERE NOT EXISTS(SELECT 1 FROM commerce_notification_events WHERE job_id=?)`)
-      .bind(id,job.id,job.leaseToken,job.sellerId,job.environment,item.category,item.audience,item.orderId||null,item.conversationId||null,item.returnId||null,item.title,item.body,JSON.stringify(item.data||{}),job.sellerId,job.kind,job.orderId,now,item.suppression||'',source.created_at,now,job.id).run();
+      .bind(id,job.id,job.leaseToken,job.sellerId,job.environment,item.category,item.audience,item.orderId||null,item.conversationId||null,item.returnId||null,item.refundId||null,item.title,item.body,JSON.stringify(item.data||{}),job.sellerId,job.kind,job.orderId,now,item.suppression||'',source.created_at,now,job.id).run();
   }
   return finishCommerceJob(env,job.id,{environment:job.environment,workerId,leaseToken:job.leaseToken,outcome:'succeeded',result:{notificationId:id}});
 }

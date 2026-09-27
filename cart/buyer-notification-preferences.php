@@ -1,6 +1,6 @@
 <?php
 if (!isset($notificationConfig) || $notificationConfig['merchant']) { http_response_code(404); exit; }
-$buyerNoticeLabels = ['payment_confirmed' => ['Payment confirmed', 'When a provider confirms your payment.'], 'payment_pending' => ['Payment reminders', 'When an order is still waiting for payment.'], 'payment_failed' => ['Payment unsuccessful', 'Failed, cancelled or expired checkout updates.'], 'shipping' => ['Shipping updates', 'Order acceptance, courier and delivery updates.'], 'returns' => ['Returns', 'Changes to your return requests.'], 'messages' => ['Store messages', 'When a store replies in your conversation.']];
+$buyerNoticeLabels = ['payment_confirmed' => ['Payment confirmed', 'When a provider confirms your payment.'], 'payment_pending' => ['Payment reminders', 'When an order is still waiting for payment.'], 'payment_failed' => ['Payment unsuccessful', 'Failed, cancelled or expired checkout updates.'], 'shipping' => ['Shipping updates', 'Order acceptance, courier and delivery updates.'], 'returns' => ['Returns and refunds', 'Changes to your return and refund requests.'], 'messages' => ['Store messages', 'When a store replies in your conversation.']];
 ?>
 <section data-buyer-preferences aria-label="Your notification preferences" hidden>
   <h2>Your notification preferences</h2>

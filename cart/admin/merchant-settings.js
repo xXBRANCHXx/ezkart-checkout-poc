@@ -6,7 +6,7 @@
   const el=(tag,text)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=String(text);return n;};
   const key=()=>Array.from(crypto.getRandomValues(new Uint8Array(16)),x=>x.toString(16).padStart(2,'0')).join('');
   const profileFields=['name','businessType','supportEmail','supportPhone','description','timezone','dateFormat'];
-  const groupLabels={payment_confirmed:'Payment confirmed',payment_pending:'Payment pending',payment_failed:'Payment failed or expired',payment_review:'Payment and stock review',shipping:'Shipping updates',returns:'Returns',messages:'Buyer messages',weekly_activity:'Weekly catalog activity'};
+  const groupLabels={payment_confirmed:'Payment confirmed',payment_pending:'Payment pending',payment_failed:'Payment failed or expired',payment_review:'Payment and stock review',shipping:'Shipping updates',returns:'Returns and refunds',messages:'Buyer messages',weekly_activity:'Weekly catalog activity'};
   const fieldLabels={name:'Store name',businessType:'Business type',supportEmail:'Support email',supportPhone:'Support phone',description:'Store description',timezone:'Display timezone',dateFormat:'Date format'};
   const label=path=>fieldLabels[path]||`${groupLabels[path.split('.')[0]]}: ${path.endsWith('.email')?'email':'in-app'}`;
   const flat=values=>Object.fromEntries(Object.entries(values).flatMap(([k,v])=>v&&typeof v==='object'?Object.entries(v).map(([channel,on])=>[k+'.'+channel,on]):[[k,v]]));

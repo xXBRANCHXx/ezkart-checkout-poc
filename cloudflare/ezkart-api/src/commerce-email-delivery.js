@@ -12,7 +12,7 @@ const finish=(env,job,workerId,outcome,result,error='')=>finishCommerceJob(env,j
 async function source(env,job){
   if(job.kind!=='notification.send'||!Number.isSafeInteger(job.data?.recipientId)||job.data.recipientId<1)invalid();
   const row=await env.DB.prepare(`SELECT r.id AS recipient_id,r.actor_kind,r.actor_id,r.email_requested,r.created_at AS recipient_created_at,
-    e.seller_id,e.commerce_environment,e.category,e.title,e.body,e.data_json,e.occurred_at,e.order_id,e.conversation_id,e.return_id,e.suppression,
+    e.seller_id,e.commerce_environment,e.category,e.title,e.body,e.data_json,e.occurred_at,e.order_id,e.conversation_id,e.return_id,e.refund_id,e.suppression,
     s.name AS store_name,s.status AS store_status,
     CASE WHEN r.actor_kind='merchant' THEN EXISTS(SELECT 1 FROM seller_memberships m WHERE m.seller_id=e.seller_id AND m.auth_user_id=r.actor_id)
       ELSE EXISTS(SELECT 1 FROM commerce_conversations c WHERE c.id=e.conversation_id AND c.buyer_auth_user_id=r.actor_id)

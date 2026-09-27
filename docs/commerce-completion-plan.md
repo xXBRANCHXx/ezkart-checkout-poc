@@ -64,6 +64,29 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 27 September: refund request notifications
+
+Refund requests and decisions now create durable notification sources in the same
+transaction. The dispatcher verifies the exact original request/action before
+fan-out; recovery cannot duplicate recipients or email jobs. Buyer and store inbox
+and email links open the exact authorized request, preserving its reference across
+buyer sign-in. Approval says the refund has not been paid. Private explanations
+stay in the request. Existing return preferences apply under the display label
+"Returns and refunds"; preferences and sending holds are unchanged.
+
+All 67 relevant cases pass: 42 refund/email/buyer-preference API cases, ten existing
+notification API cases, and fifteen PHP/browser cases. Coverage includes populated
+D1 migration, invalid sources, lost acknowledgement, current opt-out, query limits,
+desktop/mobile links, sign-in recovery and foreign-account rejection. Both widths
+were visually checked. See [refund-requests.md](refund-requests.md) for evidence.
+
+The private 691,831-byte TEST backup has SHA-256
+`9f76d3f81edf268701094e5a0da14400dfcd000848a47577fc8ee2c8c5fc925e`.
+Restoration and migration 0046 preserve all existing records across 144 physical
+tables, pass integrity/foreign-key checks and compile 399 captured plans. Actual
+refund execution, verified money movement, ledger reversals, digital-access effects,
+disputes and reconciliation remain. All thirteen top-level gates remain open.
+
 ### 27 September: purchase-linked refund requests and decisions
 
 Implemented buyer and merchant refund requests with original item/shipping amount
@@ -72,7 +95,7 @@ digital items can be reviewed together; concurrent requests cannot overclaim the
 purchase. A later catalog change cannot change the original amount. Approval is
 explicitly separate from payment and changes no accounting, stock or download
 access. See [refund-requests.md](refund-requests.md) for the contract and remaining
-execution, notification, evidence, entitlement and reconciliation work.
+execution, evidence, entitlement and reconciliation work.
 
 All fifty relevant cases pass: eight refund API cases, eleven digital API cases,
 eight financial journal cases, five refund PHP/browser cases, three order-manager

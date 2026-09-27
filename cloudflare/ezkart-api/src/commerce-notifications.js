@@ -16,8 +16,8 @@ const visibleWhere=actor=>`r.actor_kind=? AND r.actor_id=? AND e.commerce_enviro
 const bindings=(env,actor)=>[actor.kind,actor.id,mode(env),...scopeArgs(actor)];
 const tables=`commerce_notification_recipients r JOIN commerce_notification_events e ON e.id=r.event_id JOIN sellers s ON s.id=e.seller_id LEFT JOIN commerce_notification_reads d ON d.recipient_id=r.id`;
 function view(row,actor,connected){
-  const href=row.conversation_id?'/cart/messages.php?conversation='+encodeURIComponent(row.conversation_id):row.order_id?'/cart/return.php?order='+encodeURIComponent(row.order_id):'/cart/';
-  const merchant=row.conversation_id?'?page=messages&conversation='+encodeURIComponent(row.conversation_id):row.return_id?'?page=returns&return='+encodeURIComponent(row.return_id):row.order_id?'?page=orders&order='+encodeURIComponent(row.order_id):'?page=products';
+  const href=row.conversation_id?'/cart/messages.php?conversation='+encodeURIComponent(row.conversation_id):row.order_id?'/cart/return.php?order='+encodeURIComponent(row.order_id)+(row.refund_id?'&refund='+encodeURIComponent(row.refund_id):''):'/cart/';
+  const merchant=row.conversation_id?'?page=messages&conversation='+encodeURIComponent(row.conversation_id):row.refund_id?'?page=refunds&refund='+encodeURIComponent(row.refund_id):row.return_id?'?page=returns&return='+encodeURIComponent(row.return_id):row.order_id?'?page=orders&order='+encodeURIComponent(row.order_id):'?page=products';
   return {id:row.id,category:row.category,title:row.title,body:row.body,storeName:row.store_name,createdAt:row.occurred_at,deliveredAt:row.created_at,readAt:row.read_at||null,
     href:actor.kind==='merchant'?'/cart/admin/'+merchant:href,data:JSON.parse(row.data_json),emailStatus:emailDeliveryStatus(row,connected).status,email:emailDeliveryStatus(row,connected)};
 }
@@ -38,7 +38,7 @@ export async function notificationInbox(env,actor,url,channel='inbox'){
   const requested=channel==='email'?'r.email_requested=1':'r.in_app=1';
   const max=await env.DB.prepare(`SELECT COALESCE(MAX(r.id),0) AS id FROM ${tables} WHERE ${visibleWhere(actor)} AND ${requested}`).bind(...bindings(env,actor)).first();
   const cap=cursor?.cap??max.id,before=cursor?.before??cap+1,like='%'+term.replace(/[|%_]/g,'|$&')+'%';
-  const rows=await env.DB.prepare(`SELECT r.id,r.created_at,r.email_requested,e.category,e.title,e.body,e.data_json,e.occurred_at,e.order_id,e.return_id,e.conversation_id,s.name AS store_name,d.read_at,${emailStatusFields()}
+  const rows=await env.DB.prepare(`SELECT r.id,r.created_at,r.email_requested,e.category,e.title,e.body,e.data_json,e.occurred_at,e.order_id,e.return_id,e.refund_id,e.conversation_id,s.name AS store_name,d.read_at,${emailStatusFields()}
     FROM ${tables} ${emailStatusJoins} WHERE ${visibleWhere(actor)} AND ${requested} AND r.id<=? AND r.id<? AND (?='' OR e.category=?)
       AND (?='all' OR (?='unread' AND d.recipient_id IS NULL) OR (?='read' AND d.recipient_id IS NOT NULL))
       AND (?='' OR e.title LIKE ? ESCAPE '|' OR e.body LIKE ? ESCAPE '|') ORDER BY r.id DESC LIMIT 26`)
