@@ -135,4 +135,35 @@ passes integrity and foreign-key checks. Rehearsing migration 0056
 preserves every row in all 158 original tables and adds only the four empty
 inquiry/confirmation tables. Private evidence is under
 `/home/branch/.local/share/ezkart/beta-01a0d643/inquiries-before-0056-20260927/`.
-Hosted rollout is pending at this implementation commit.
+
+## Workbench rollout
+
+Implementation `4810fec` is pushed to `agent/ezkart-workbench`; migration 0056
+and Worker `34752837-315d-4c1a-8fd1-bc167728c8cd` are deployed only to beta.
+Twenty-six hosted checks pass at 15:08 UTC on 27 September, including the held
+inquiry gate, signed-service protection, environment/query/proof rejection,
+missing-original recovery, unavailable payment routes, zero monetary records
+and preservation of the original uncertain wallet.
+
+At 15:09 UTC, Hostinger serves the matching tested documents and Wallet assets,
+loads the PHP dependencies, rejects unsigned merchant actions and blocks direct
+helper/CLI HTTP access. The actual Wallet verification gate renders no earnings
+or wallet-setup content before fresh verification. Populated merchant actions
+are covered by isolated fixtures; live bank acceptance remains open.
+
+The post-export is 726,964 bytes with SHA-256
+`fe02ad899afa2e5b82d70b8dc07a39e7643ea558f909d4a763f244f9c7dc3721`.
+It restores 162 tables with clean integrity/foreign keys and an unchanged Time
+Travel bookmark across the export. Of 157 original application tables, 156 are
+exactly unchanged. The sole expected change is one user's `updated_at`, from
+14:24:10.699 to 15:09:32.533 UTC, caused by the actual merchant-page visit.
+Migration history advances from 55 to 56. All four new tables, withdrawals,
+captures and money journals remain empty. The original uncertain wallet is
+unchanged. Private proofs are `inquiries-{hosted,workbench,wallet-gate}-proof.json`,
+`inquiries-post-preservation.json` and `inquiries-after-0056-20260927/` under
+the beta evidence directory.
+
+Checkout, merchant withdrawals, provider inquiry execution and automatic email
+sending remain held. Only the existing hourly housekeeping schedule runs.
+TEST/main deployment configuration hashes are unchanged; neither environment
+was deployed or migrated. No live bank inquiry, transfer or refund was submitted.

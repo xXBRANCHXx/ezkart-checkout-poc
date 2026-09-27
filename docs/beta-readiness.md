@@ -14,21 +14,45 @@ deployment now uses the isolated live beta configuration described below, with
 new checkout, provider dispatch schedules and automatic email sending held.
 Existing sandbox evidence is preserved. Main and `ezkart.id` remain held.
 
-## Current hosted state — 27 September, 14:24 UTC
+## Current hosted state — 27 September, 15:11 UTC
 
 Hostinger's private runtime now selects `beta`, production providers and the beta
 Worker. Its live DOKU client, secret, signing key and verified parent profile are
 installed outside the public root with mode 0600. Reloaded file hashes match the
 private prepared configuration; all earlier provider credentials are preserved.
 Health confirms beta, live DOKU credentials and connected D1/public R2/private R2
-with 157 application tables. At 07:45 UTC, central merchant operations were
+with 161 application tables. At 07:45 UTC, central merchant operations were
 enabled with `commerce_storage=d1`; new checkout remains separately paused in both PHP and
 the Worker. The public checkout configuration returns 503 with `Retry-After: 300`.
 An hourly housekeeping schedule is now installed; new checkout, provider
 dispatch schedules and email sending remain held. See the storage note below.
 
-The [withdrawal reservation](withdrawal-reservations.md) implementation `fd04afa`
-is deployed on workbench with migration 0055 and beta Worker
+The [bank inquiry and owner confirmation](withdrawal-bank-inquiries.md)
+implementation `4810fec` is deployed with migration 0056 and beta Worker
+`34752837-315d-4c1a-8fd1-bc167728c8cd`. One committed grant permits one bank
+inquiry; the original receipt is saved privately before D1 delivery. Replays
+cannot grant another inquiry. Confirmation binds the original bank-returned
+details and rechecks current owner verification and funds. Private receipt
+recovery makes no provider request. Merchant withdrawal/inquiry execution remains
+held; no payment grant, caller or schedule exists.
+
+All 96 relevant local cases and 26 hosted checks pass. Hostinger's 15:09 UTC
+source hashes match the tested workbench implementation, the PHP dependencies
+load, and private helper/CLI routes remain inaccessible over HTTP. The actual
+Wallet verification gate exposes no earnings before fresh verification. The
+post-export restores 162 tables with clean integrity/foreign keys. Of 157 original
+application tables, 156 are exactly unchanged; one user has only the routine
+15:09 sign-in timestamp refresh. The four new tables and all money journals
+remain empty. The original uncertain wallet and execution holds are preserved;
+TEST/main deployment configuration hashes are unchanged. The scoped owner-mailbox
+search still finds no matching reply to the DOKU support request.
+
+Merchant request/confirmation/history UI, durable payment dispatch, actual
+Ezkart-funded transfer fees, final payout/refund accounting, outcome
+reconciliation and live acceptance remain required.
+
+The preceding [withdrawal reservation](withdrawal-reservations.md) implementation
+`fd04afa` was deployed with migration 0055 and beta Worker
 `8ad4668d-cdda-40df-b064-6c33afa95f8c`. Current owner verification and eligible
 earnings are rechecked atomically with the request and reservation journal.
 Concurrent requests cannot spend twice; cancellations cannot restore stale or
@@ -37,8 +61,9 @@ All 72 relevant local checks and 17 hosted checks pass. The 14:23 UTC source
 hashes match, and the 14:24 UTC Wallet gate exposes no balances before verification.
 The post-export restores 158 tables; original financial/provider records are
 unchanged, both withdrawal tables are empty, and normal sign-in/maintenance
-metadata changes are accounted for. Actual bank confirmation, dispatch, fee
-funding and outcome reconciliation remain unfinished. No real transfer is made.
+metadata changes are accounted for. Bank verification is implemented in the
+later stage above; payment dispatch, fee funding and outcome reconciliation
+remain unfinished. No real transfer is made.
 
 The preceding [seller earnings and Wallet](seller-earnings.md) implementation
 `9f45d53`, migration 0054 and beta Worker

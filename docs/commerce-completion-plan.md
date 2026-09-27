@@ -85,8 +85,15 @@ All 96 relevant cases pass: eleven focused inquiry/database cases, 28 reservatio
 earnings cases, 25 settlement/collection cases and 32 PHP/adapter/merchant cases.
 The populated 0055 upgrade preserves existing reservations and journals. A fresh
 beta export restores cleanly; migration rehearsal preserves every row in all
-158 original tables and adds four empty tables. Hosted rollout is still pending
-at this implementation commit.
+158 original tables and adds four empty tables.
+
+Implementation `4810fec`, migration 0056 and Worker
+`34752837-315d-4c1a-8fd1-bc167728c8cd` are deployed to beta. Twenty-six hosted
+checks pass at 15:08 UTC; Hostinger source/access and actual Wallet gate checks
+pass at 15:09. The post-export restores 162 tables with clean integrity/foreign
+keys. Of 157 original application tables, 156 are exactly unchanged; one user
+has only its ordinary sign-in timestamp refresh. All four new tables and all
+money journals remain empty.
 
 Payment grants, transfer fees funded by Ezkart, final payout/refund accounting,
 payment outcome reconciliation, merchant request/confirmation/history UI and live
