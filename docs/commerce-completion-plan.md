@@ -71,6 +71,30 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 28 September: queued shared-platform payout synchronization
+
+The [synchronization queue](withdrawal-synchronization.md) adds bounded claims,
+original-storage binding, lease recovery, exact acknowledgement replay, review
+visibility and recurring selection. A shared platform is collected once for its
+covered sellers; all covered payout/settlement/earnings state is reconciled together.
+Provider-pending outcomes permit later fresh observations without another
+transfer. Database completion checks reject evidence arriving after request
+validation. Original operator receipts remain recoverable.
+
+All 85 relevant cases pass. The populated migration rehearsal preserves every
+row in all 169 original tables and adds two empty tables. Implementation `be2c65a`,
+migration 0061 and beta Worker `26403f6e-6eab-4a0e-874b-07b15d36142b` are deployed.
+The 65 hosted API checks pass at 19:27 UTC on 27 September; matching workbench
+sources and fifteen private-route guards pass at 19:28. The post-export restores
+171 tables, preserving original business/financial records; only migration history
+and the ordinary empty 19:17 housekeeping marker change. Queue/money tables remain
+empty, the uncertain wallet is preserved and configuration/execution holds stay
+unchanged. Main is untouched.
+
+The recurring PHP runner and operational alerting still need installation.
+Extended histories, callback authentication, actual fee funding, payment execution,
+refunds and live owner/provider acceptance remain open. No top-level gate closes.
+
 ### 28 September: integrated payout observation and recovery
 
 [Withdrawal synchronization](withdrawal-synchronization.md) now connects an
