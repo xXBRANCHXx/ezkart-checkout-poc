@@ -14,7 +14,7 @@ deployment now uses the isolated live beta configuration described below, with
 new checkout, provider dispatch schedules and automatic email sending held.
 Existing sandbox evidence is preserved. Main and `ezkart.id` remain held.
 
-## Current hosted state — 27 September, 18:07 UTC
+## Current hosted state — 27 September, 18:40 UTC
 
 Hostinger's private runtime now selects `beta`, production providers and the beta
 Worker. Its live DOKU client, secret, signing key and verified parent profile are
@@ -27,7 +27,34 @@ the Worker. The public checkout configuration returns 503 with `Retry-After: 300
 An hourly housekeeping schedule is now installed; new checkout, provider
 dispatch schedules and email sending remain held. See the storage note below.
 
-The [matched payout reconciliation](withdrawal-reconciliation.md) is deployed
+The [integrated payout synchronization](withdrawal-synchronization.md) is deployed
+from `09e1026` to beta Worker `19c2a6a6-edbf-4d3c-b668-f83c193dd3b4`, retaining
+migration 0060 and the existing hourly housekeeping schedule. An original payout
+now has one recoverable operator workflow for status, both original wallets'
+histories, payout accounting and related settlement/earnings reconciliation.
+Original responses are saved privately before D1 delivery; interrupted runs
+resume only their missing reads, and recovery works with provider access held.
+Incomplete, changed or unsupported sources and remaining shared-wallet work are
+reported for review. No transfer API, registration, refund or bank inquiry is
+called by this workflow.
+
+All 73 affected cases pass (40 Worker and 33 PHP/adapter integration cases).
+The 53 hosted API checks pass at 18:38 UTC, including original-wallet preservation;
+Hostinger's matching sources and twelve private-route guards pass at 18:40 after
+the ordinary deployment delay. A read-only beta D1 check confirms zero orders,
+captures, journals, earnings, withdrawals, payment grants, status observations,
+payout assessments and collections, with 60 migrations and no rows written.
+Private runtime and Wrangler configuration hashes are unchanged. Collection,
+checkout, payment execution and automatic sending remain held; no migration or
+main deployment is performed. The 18:39 UTC scoped mailbox search finds no reply
+to the original DOKU support request.
+
+Recurring/cross-seller synchronization, extended-history aggregation, callback
+authentication, actual fee provisioning, integrated payment execution, refunds
+and live owner/provider acceptance remain open. This operator integration does
+not close any full completion gate.
+
+The preceding [matched payout reconciliation](withdrawal-reconciliation.md) was deployed
 from `993a588`, migration 0060 and beta Worker
 `6dfd9d15-52f8-498e-8bce-ca1780b83544`. Original status observations and complete
 seller/platform histories produce immutable payout results and balanced journals.

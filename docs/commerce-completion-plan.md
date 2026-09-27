@@ -88,6 +88,13 @@ synchronization, extended-history aggregation, callback authentication, actual
 fee provisioning, payment execution, refunds and live acceptance remain open.
 No top-level gate is closed. Hosted rollout evidence is recorded in beta readiness.
 
+Implementation `09e1026` and beta Worker
+`19c2a6a6-edbf-4d3c-b668-f83c193dd3b4` are deployed. All 53 hosted API checks pass
+at 18:38 UTC on 27 September; matching workbench sources and twelve private-route
+guards pass at 18:40. A read-only beta check confirms the original empty financial
+tables and migration 0060; runtime/configuration and the uncertain wallet are
+preserved. No execution hold, schedule or main deployment changes.
+
 ### 28 September: matched payout accounting and recovery
 
 [Payout reconciliation](withdrawal-reconciliation.md) connects the original
