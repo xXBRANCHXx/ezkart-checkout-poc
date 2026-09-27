@@ -1,8 +1,8 @@
 # Digital checkout and verified download records
 
 Workbench implementation, 27 September 2026. This implements the central API
-contract and the authenticated buyer download screen. The storefront/PHP purchase
-flow, real-device storage/resume behavior and signed-in hosted acceptance remain.
+contract, public/PHP checkout, order status and authenticated buyer downloads.
+Real-device storage/resume behavior and signed-in hosted acceptance remain.
 Central-commerce and provider holds remain in place. Subscription billing,
 allocated refunds and wallet release are separate unfinished work.
 
@@ -22,6 +22,28 @@ cannot enter a no-shipping order. Mixed orders retain the authoritative quote an
 reserve/consume only physical items. Late-payment stock recovery and courier
 acceptance also operate only on physical items; PHP sends only those items to
 the courier. Every item remains in the payment total and original fee snapshot.
+
+The public catalog exposes only current published file ID, edition and byte size.
+It never exposes private filenames, upload IDs, storage keys or manifests. A
+filename without a real ready upload is unavailable. Both Worker and PHP central
+holds prevent digital checkout; it cannot fall back to legacy file orders.
+Digital choices have no physical stock limit but keep the common 10,000-unit
+per-line request limit. Hidden options and archived products remain unavailable.
+
+The browser freezes `expected_file_versions` alongside reviewed prices and total
+in its existing durable checkout request. PHP hashes that optional map without
+changing older physical checkout intents. Missing/stale versions and replacement
+between catalog read and transaction fail before charging. Once an order exists,
+an exact retry recovers its original file even after a replacement or archival.
+Digital-only checkout disables address fields and sends no courier selection or
+coordinate; mixed carts quote only physical lines. Removing/adding the final
+physical item updates required fields and invalidates previous delivery quotes.
+
+Payment and authenticated order screens distinguish digital availability from
+completed delivery. Digital-only orders have no courier steps or map; mixed
+orders show download progress alongside their physical shipment. The buyer's
+download counts and completion timestamp never appear in public payment polling.
+The checkout explains the existing verified-Google-account access requirement.
 
 ## Payment and buyer access
 
@@ -174,7 +196,22 @@ purchase data. The internal CSP bridge header is removed. Checkout remains
 sandbox with `durable_checkout:false`. No database migration, provider request
 or Worker redeployment was needed for this PHP/browser delivery.
 
-Outstanding: storefront/PHP checkout integration, maximum-size
-and real-mobile transfers, signed-in hosted acceptance, allocated digital refunds,
+The checkout/status integration passes ten new PHP/browser cases and eleven
+digital API cases. Twenty-one fulfillment/courier cases, ten existing checkout/
+address/storefront cases and eleven central checkout/storefront cases also pass
+(63 relevant cases). The full isolated buyer journey at 1360px and 390px includes
+shop options, payment creation/confirmation, original-byte saving and verified
+order status. Additional cases cover mixed quotes/reservations/tracking, file
+replacement races, uncertain checkout recovery, production-shaped validation,
+both central holds, and restoring address requirements. Layouts were visually
+inspected. PHP/JS syntax, diff checks and the TEST Worker dry-run pass.
+
+The fresh TEST export is 680,095 bytes, SHA-256
+`887e027415a84eaf9ac61910386c494fb827f113c7315ea444422f5cfa65cfc8`.
+It restores 141 physical tables with clean integrity/foreign-key checks. All 267
+captured plans compile locally and remotely. No schema migration is needed.
+
+Outstanding: maximum-size and real-mobile transfers, signed-in hosted acceptance,
+digital purchase reviews, allocated digital refunds,
 subscription lifecycles, storage operations and financial release/settlement.
 All thirteen top-level completion gates remain open.

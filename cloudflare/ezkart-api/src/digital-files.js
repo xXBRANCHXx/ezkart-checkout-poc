@@ -1,7 +1,18 @@
-import {commerceHash} from './commerce-orders.js';
+import {commerceHash,commerceStorageEnabled} from './commerce-orders.js';
 
 export const digitalPartBytes=5*1024*1024;
 export const digitalMaximumBytes=100*digitalPartBytes;
+// Public purchase metadata excludes filenames, object keys and upload manifests.
+export async function publicDigitalFiles(env,products){
+  const ids=products.filter(p=>p.type==='digital').map(p=>p.id);
+  if(!commerceStorageEnabled(env)||!ids.length)return new Map();
+  const rows=await env.DB.prepare(`SELECT f.product_id,v.id,v.version,u.size_bytes FROM digital_product_files f
+    JOIN digital_product_versions v ON v.id=f.version_id AND v.seller_id=f.seller_id AND v.product_id=f.product_id
+    JOIN digital_file_uploads u ON u.id=v.upload_id AND u.seller_id=f.seller_id
+    WHERE f.product_id IN (SELECT value FROM json_each(?)) AND u.state='ready' AND u.retained_at IS NOT NULL`)
+    .bind(JSON.stringify(ids)).all();
+  return new Map(rows.results.map(row=>[row.product_id,{id:row.id,version:row.version,size:row.size_bytes}]));
+}
 const iso=()=>new Date().toISOString();
 const fail=(message,status=422,code='digital_file_invalid')=>{throw new Response(message,{status,headers:{'x-ezkart-error-code':code}});};
 const membership=`EXISTS (SELECT 1 FROM seller_memberships m JOIN sellers s ON s.id=m.seller_id

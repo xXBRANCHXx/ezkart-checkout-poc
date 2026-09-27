@@ -64,6 +64,40 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 27 September: digital storefront, checkout and order status
+
+Connected public shop choices and PHP checkout to actual published file versions.
+Checkout durably binds the reviewed file alongside prices and total; missing,
+stale or concurrently replaced files cannot create a charge. An uncertain order
+response recovers the originally purchased edition after catalog changes. Both
+Worker and PHP holds prevent digital availability and legacy-order fallback.
+
+Digital-only purchases need no address, courier quote, physical reservation or
+sandbox shipping bypass. Mixed quotes/reservations include only physical units.
+Checkout updates required address fields when the final physical item changes.
+Digital order status distinguishes ready files from verified complete downloads
+and omits courier steps/maps; mixed orders retain both independent workflows.
+Authenticated completion details stay out of public payment polling. Existing
+physical return/review messages no longer imply courier delivery for digital
+files; digital reviews/refunds remain unfinished.
+
+All 63 relevant cases pass: ten new PHP/browser cases, eleven digital API cases,
+twenty-one fulfillment/courier cases, ten existing checkout/address/shop cases,
+and eleven central checkout/storefront cases. The desktop 1360px and narrow 390px
+buyer journey purchases an actual fixture file, receives payment confirmation,
+saves original bytes and reads verified delivery on the order. Options, mixed
+tracking, racing file replacements, lost checkout responses and both central
+holds are covered. Screens were visually inspected; syntax/diff and TEST Worker
+dry-run checks pass.
+
+The fresh private TEST backup is 680,095 bytes with SHA-256
+`887e027415a84eaf9ac61910386c494fb827f113c7315ea444422f5cfa65cfc8`.
+All 141 physical tables restore with clean integrity/foreign-key checks and all
+267 captured plans compile locally and remotely. No migration is required.
+Signed-in hosted/real-device/maximum-size acceptance, digital reviews/refunds,
+subscriptions and settlement/release remain open. All thirteen top-level gates
+and all provider, central-commerce, financial and production holds remain.
+
 ### 27 September: buyer download, storage and recovery
 
 Implemented the authenticated buyer download page and bounded PHP proxy described

@@ -34,10 +34,10 @@ header('X-Content-Type-Options: nosniff');
   <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="payment.css?v=2">
   <link rel="stylesheet" href="vendor/maplibre/maplibre-gl.css?v=5.24.0">
-  <link rel="stylesheet" href="tracking.css?v=10">
+  <link rel="stylesheet" href="tracking.css?v=11">
   <script src="tracking-map.js?v=5" defer></script>
   <?php if ($isTrackingSandbox): ?><script src="tracking-sandbox.js?v=6" defer></script><?php endif; ?>
-  <script src="tracking.js?v=7" defer></script>
+  <script src="tracking.js?v=8" defer></script>
   <?php if ($returnsEnabled): ?><link rel="stylesheet" href="customer-returns.css?v=<?= (int) filemtime(__DIR__ . '/customer-returns.css') ?>"><link rel="stylesheet" href="select.css?v=<?= (int) filemtime(__DIR__ . '/select.css') ?>"><script src="customer-returns.js?v=<?= (int) filemtime(__DIR__ . '/customer-returns.js') ?>" defer></script><script src="select.js?v=<?= (int) filemtime(__DIR__ . '/select.js') ?>" defer></script><?php endif; ?>
   <?php if ($returnsEnabled): ?><link rel="stylesheet" href="customer-reviews.css?v=<?= (int) filemtime(__DIR__ . '/customer-reviews.css') ?>"><script src="customer-reviews.js?v=<?= (int) filemtime(__DIR__ . '/customer-reviews.js') ?>" defer></script><?php endif; ?>
   <title>Track your order · Ezkart</title>
@@ -81,6 +81,10 @@ header('X-Content-Type-Options: nosniff');
           <li><span class="step-dot" aria-hidden="true">5</span><div><b>Delivered</b><small>Order received</small></div></li>
         </ol>
         <div class="tracking-controls"><span id="tracking-updated">Updates appear here automatically.</span><span>Updates automatically</span></div>
+      </section>
+      <section id="order-downloads" class="tracking-card" aria-labelledby="downloads-title" hidden>
+        <h2 id="downloads-title">Your digital files</h2><p id="order-download-state" role="status"></p>
+        <a class="copy-button courier-link" href="downloads.php?order=<?= htmlspecialchars($orderId, ENT_QUOTES, 'UTF-8') ?>">Open downloads</a>
       </section>
       <div class="tracking-layout">
         <section id="delivery-map-section" class="tracking-card map-card" aria-labelledby="map-title" hidden>

@@ -54,7 +54,7 @@ export async function returnOrder(env,actor,orderId){
     title:row.title+(f.variantName?' — '+f.variantName:''),sku:row.sku,ordered:row.quantity,consumed:row.consumed,allocated:row.allocated,
     availableToReturn:Math.max(0,row.consumed-row.allocated),price:row.unit_price_amount};});
   const fulfillmentOk=(isMerchant(actor)?['delivered','return_in_transit','returned']:['delivered']).includes(order.fulfillmentState);
-  const reason=!['paid','partially_refunded','refunded'].includes(order.state)?'This order has no completed payment.':!fulfillmentOk?
+  const reason=order.items.every(item=>item.productType!=='physical')?'For help with digital files, message the store from this order.':!['paid','partially_refunded','refunded'].includes(order.state)?'This order has no completed payment.':!fulfillmentOk?
     'A return can be opened after confirmed delivery or a courier return.':!items.some(item=>item.availableToReturn>0)?'All eligible units are already included in a return.':
     !commerceStorageEnabled(env)?'Returns are not available yet.':isMerchant(actor)&&actor.role==='viewer'?'Your account can view returns but cannot create them.':'';
   return {order:{id:order.id,sellerId,revision:order.revision,customerName:order.customer.name,state:order.state,fulfillmentState:order.fulfillmentState},items,canCreate:!reason,reason};

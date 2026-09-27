@@ -77,7 +77,7 @@ export async function buyerReviews(env,user,orderId,url){
     return {orderItemId:line.id,productId:line.product_id,title:line.title,option:JSON.parse(line.fulfillment_snapshot_json).variantName||'',
       canPublish,canWithdraw:enabled&&owned&&row?.buyer_state==='published',review:reviewView(row),
       reason:canPublish?'':!enabled?'Reviews will open when central checkout is enabled.':!owned?'This is a historical review and cannot be edited from this account.':
-        line.product_type!=='physical'?'Reviews open after verified product delivery is available.':'Reviews open after verified payment and courier delivery.'};
+        line.product_type!=='physical'?'Reviews are currently unavailable for this item.':'Reviews open after verified payment and courier delivery.'};
   })};
 }
 export function reviewWritable(env){if(!commerceStorageEnabled(env))reviewFail('Review changes are not enabled',503);}

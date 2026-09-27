@@ -252,6 +252,7 @@ function ez_central_customer_shipment(array $order, array $customer): array
         'environment' => $order['commerce_environment'], 'customerId' => $customer['id'],
     ]);
     $shipment = $record['shipment'];
+    $order['digital_downloads'] = $record['digital'] ?? null;
     if ($shipment === null) return $order;
     $order['biteship_order_id'] = $shipment['providerId'];
     $order['biteship_status'] = $shipment['state'] === 'queued' ? '' : $shipment['state'];

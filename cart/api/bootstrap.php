@@ -305,6 +305,7 @@ function ez_catalog(array $requestedIds = []): array
         else $remoteIds[] = $id;
     }
     if ($remoteIds !== []) {
+        require_once __DIR__ . '/commerce-client.php';
         $apiUrl = rtrim(ez_config('cloudflare_api_url'), '/');
         foreach (ez_remote_storefront_products($remoteIds) as $product) {
             if (!is_array($product)) continue;
@@ -312,7 +313,14 @@ function ez_catalog(array $requestedIds = []): array
             $name = trim((string) ($product['name'] ?? ''));
             $price = (int) ($product['price'] ?? 0);
             $weight = (int) ($product['weightGrams'] ?? 0);
-            if (!in_array($id, $remoteIds, true) || $name === '' || $price < 1 || $weight < 1 || ($product['type'] ?? '') !== 'physical') continue;
+            $type = $product['type'] ?? '';
+            $digitalFile = $product['digitalFile'] ?? null;
+            if (!in_array($id, $remoteIds, true) || $name === '' || $price < 1 || !in_array($type, ['physical', 'digital'], true)) continue;
+            if ($type === 'physical' && $weight < 1) continue;
+            if ($type === 'digital' && (!ez_central_commerce_enabled() || !is_array($digitalFile)
+                || !is_string($digitalFile['id'] ?? null) || preg_match('/^dfile_[a-f0-9]{32}$/D', $digitalFile['id']) !== 1
+                || !is_int($digitalFile['version'] ?? null) || $digitalFile['version'] < 1
+                || !is_int($digitalFile['size'] ?? null) || $digitalFile['size'] < 1 || $digitalFile['size'] > 524288000)) continue;
             $imagePath = trim((string) ($product['imagePath'] ?? ''));
             $catalog[$id] = [
                 'id' => $id,
@@ -330,13 +338,14 @@ function ez_catalog(array $requestedIds = []): array
                     return $label !== '' && $value !== '' ? ['label' => $label, 'value' => $value] : null;
                 }, is_array($product['options'] ?? null) ? $product['options'] : []))),
                 'description' => mb_substr(trim((string) ($product['description'] ?? '')), 0, 500),
-                'type' => 'physical',
+                'type' => $type,
                 'price' => $price,
-                'weight' => $weight,
-                'stock' => max(0, (int) ($product['stock'] ?? 0)),
+                'weight' => $type === 'digital' ? 0 : $weight,
+                'stock' => $type === 'digital' ? null : max(0, (int) ($product['stock'] ?? 0)),
                 'image_url' => str_starts_with($imagePath, '/') ? $apiUrl . $imagePath : '',
                 'image_alt' => mb_substr(trim((string) ($product['imageAlt'] ?? '')) ?: $name, 0, 160),
             ];
+            if ($type === 'digital') $catalog[$id]['digital_file'] = array_intersect_key($digitalFile, array_flip(['id', 'version', 'size']));
         }
     }
     $ordered = [];
@@ -413,6 +422,7 @@ function ez_biteship_rate_context(array $cart, string $destinationPostalCode, ?a
         if (isset($product['stock']) && $quantity > (int) $product['stock']) {
             throw new InvalidArgumentException('A selected quantity is no longer available.');
         }
+        if (($product['type'] ?? 'physical') === 'digital') continue;
         $items[] = [
             'name' => $product['name'],
             'description' => $product['sku'],
@@ -423,7 +433,7 @@ function ez_biteship_rate_context(array $cart, string $destinationPostalCode, ?a
         $itemCount += $quantity;
     }
     if ($itemCount < 1) {
-        throw new InvalidArgumentException('Add at least one product.');
+        throw new InvalidArgumentException('Delivery options require a physical product.');
     }
     $sellerIds = array_values(array_unique($sellerIds));
     if (count($sellerIds) !== 1 || $sellerIds[0] === '') throw new InvalidArgumentException('The cart must belong to one verified store.');
@@ -491,6 +501,7 @@ function ez_checkout_request(array $input): array
             throw new InvalidArgumentException('Cart quantities cannot be negative.');
         }
         if ($quantity === 0) continue;
+        if ($quantity > 10000) throw new InvalidArgumentException('A cart quantity is too large.');
         if (isset($product['stock']) && $quantity > (int) $product['stock']) {
             throw new InvalidArgumentException('A selected quantity is no longer available.');
         }
@@ -506,6 +517,16 @@ function ez_checkout_request(array $input): array
             'expectedPrice' => (int) $product['price'],
             'expectedWeightGrams' => (int) $product['weight'],
         ];
+        $digital = ($product['type'] ?? 'physical') === 'digital';
+        if ($digital) {
+            $expectedFile = $input['expected_file_versions'][$id] ?? null;
+            if (!is_string($expectedFile) || $expectedFile !== $product['digital_file']['id']) {
+                throw new InvalidArgumentException('A digital file changed. Review the current file before paying.');
+            }
+            $commerceItems[$id]['expectedFileVersion'] = $expectedFile;
+        } elseif (isset($input['expected_file_versions'][$id])) {
+            throw new InvalidArgumentException('A product type changed. Review the current products before paying.');
+        }
         $productSnapshots[$product['sku']] = [
             'product_id' => $product['product_id'] ?? $id,
             'variant_id' => $product['variant_id'] ?? '',
@@ -519,7 +540,7 @@ function ez_checkout_request(array $input): array
             'price' => $product['price'],
             'quantity' => $quantity,
         ];
-        $shippingItems[] = [
+        if (!$digital) $shippingItems[] = [
             'name' => mb_substr($product['name'], 0, 100),
             'description' => $product['sku'],
             'category' => 'food_and_drink',
@@ -550,24 +571,27 @@ function ez_checkout_request(array $input): array
     ) {
         throw new InvalidArgumentException('Valid customer name, email, and phone are required.');
     }
-    if (
+    $hasPhysical = $shippingItems !== [];
+    if ($hasPhysical && (
         mb_strlen($location) < 3 || mb_strlen($location) > 120
         || mb_strlen($address) < 5 || mb_strlen($address) > 300
         || preg_match('/^\d{5}$/', $postalCode) !== 1
-    ) {
+    )) {
         throw new InvalidArgumentException('A valid delivery location, address, and postcode are required.');
     }
 
-    $coordinate = ez_delivery_coordinate($customer['coordinate'] ?? null);
-    if (isset($customer['coordinate']) && $coordinate === null) throw new InvalidArgumentException('Choose a valid delivery pin.');
+    $coordinate = $hasPhysical ? ez_delivery_coordinate($customer['coordinate'] ?? null) : null;
+    if ($hasPhysical && isset($customer['coordinate']) && $coordinate === null) throw new InvalidArgumentException('Choose a valid delivery pin.');
+    if (!$hasPhysical) $location = $address = $postalCode = $note = '';
     $shippingId = trim((string) ($input['shipping_id'] ?? ''));
-    $shippingSkipped = !ez_commerce_is_production() && $shippingId === '';
+    if (!$hasPhysical && $shippingId !== '') throw new InvalidArgumentException('Digital downloads do not need a shipping service.');
+    $shippingSkipped = $hasPhysical && !ez_commerce_is_production() && $shippingId === '';
     $shipping = null;
     $shippingContext = [];
     $shippingPrice = 0;
     $sellerIds = array_values(array_unique($sellerIds));
     if (count($sellerIds) !== 1 || $sellerIds[0] === '') throw new InvalidArgumentException('The cart must belong to one verified store.');
-    if (!$shippingSkipped) {
+    if ($hasPhysical && !$shippingSkipped) {
         if ($shippingId === '') throw new InvalidArgumentException('Select a valid shipping service.');
         $rateContext = ez_biteship_rate_context($cart, $postalCode, $coordinate, $catalog);
         $shippingContext = $rateContext['shipping'];
@@ -602,6 +626,7 @@ function ez_checkout_request(array $input): array
         'shipping' => $shipping,
         'shipping_context' => $shippingContext,
         'shipping_skipped' => $shippingSkipped,
+        'shipping_kind' => $hasPhysical ? 'carrier' : 'none',
     ];
 }
 

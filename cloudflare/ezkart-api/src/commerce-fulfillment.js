@@ -1,5 +1,6 @@
 import {commerceEnvironment,commerceHash,commerceOrder,commerceJobStatement,commerceStorageEnabled} from './commerce-orders.js';
 import {currentCommerceEnvironment,customerOrderSeller} from './commerce-access.js';
+import {buyerDigitalPurchases} from './commerce-digital.js';
 
 const fail=(message,status=422)=>{throw new Response(message,{status});};
 const shipPattern=/^ship_[a-f0-9]{32}$/;
@@ -153,8 +154,16 @@ export async function customerShipment(env,orderId,input){
   commerceEnvironment(env,input.environment);
   if(typeof input.customerId!=='string'||!/^[A-Za-z0-9][A-Za-z0-9_-]{2,95}$/.test(input.customerId))fail('Order not found',404);
   const sellerId=await customerOrderSeller(env,{id:input.customerId},orderId);
+  let digital=null;
+  if(await env.DB.prepare("SELECT 1 FROM order_items WHERE order_id=? AND seller_id=? AND product_type='digital' LIMIT 1").bind(orderId,sellerId).first()){
+    const purchases=await buyerDigitalPurchases(env,{id:input.customerId},orderId),items=purchases.items;
+    const verified=items.filter(item=>item.deliveryConfirmed);
+    digital={itemCount:items.length,verifiedCount:verified.length,
+      deliveredAt:items.length&&verified.length===items.length?verified.map(item=>item.deliveredAt).sort().at(-1):null,
+      accessState:items.find(item=>!item.canDownload)?.state||'available'};
+  }
   const row=await env.DB.prepare('SELECT * FROM commerce_shipments WHERE order_id=? AND seller_id=? ORDER BY sequence DESC LIMIT 1').bind(orderId,sellerId).first();
-  if(!row)return {shipment:null,history:[]};
+  if(!row)return {shipment:null,history:[],digital};
   const events=await env.DB.prepare('SELECT payload_json,received_at FROM commerce_shipping_inbox WHERE shipment_id=? ORDER BY received_sequence DESC LIMIT 100').bind(row.id).all();
   const history=[],seen=new Map();
   for(const event of events.results){const data=parse(event.payload_json);for(const item of [data,...(data.history||[])]){
@@ -164,7 +173,7 @@ export async function customerShipment(env,orderId,input){
   }}
   history.sort((a,b)=>(a.updatedAt||a.receivedAt).localeCompare(b.updatedAt||b.receivedAt));
   const view=shipmentView(row),{fieldTimes,statusWatermarkAt,...tracking}=view.tracking;
-  return {shipment:{id:view.id,providerId:view.providerId,sequence:view.sequence,state:view.state,statusAt:view.statusAt,statusReceivedAt:view.statusReceivedAt,boundAt:view.boundAt,tracking},history:history.slice(-100)};
+  return {shipment:{id:view.id,providerId:view.providerId,sequence:view.sequence,state:view.state,statusAt:view.statusAt,statusReceivedAt:view.statusReceivedAt,boundAt:view.boundAt,tracking},history:history.slice(-100),digital};
 }
 
 export async function shippingInbox(env,input,source='webhook'){

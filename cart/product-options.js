@@ -11,7 +11,7 @@
     const grouped = names.length > 0 && new Set(names).size === names.length && choices.every(choice =>
       choice.options?.length === names.length && names.every(name => typeof valueFor(choice, name) === "string" && valueFor(choice, name)));
     const groups = grouped ? names.map(name => ({ name, values: [...new Set(choices.map(choice => valueFor(choice, name)))] })) : [];
-    const canChoose = choice => choice.available && Number(choice.stock) >= quantity + (cart[choice.id] || 0) - (choice.id === selectedId ? quantity : 0);
+    const canChoose = choice => choice.available && Math.min(10000, Number(choice.stock ?? 10000)) >= quantity + (cart[choice.id] || 0) - (choice.id === selectedId ? quantity : 0);
     const opener = document.activeElement;
     const searches = new Map();
     let pending = false;
@@ -32,7 +32,7 @@
     const candidates = (groupIndex, value) => choices.filter(choice => groups.slice(0, groupIndex).every(group => valueFor(choice, group.name) === valueFor(draft, group.name)) && valueFor(choice, groups[groupIndex].name) === value);
     const bestChoice = candidates => candidates.filter(canChoose).sort((a, b) =>
       names.filter(name => valueFor(b, name) === valueFor(draft, name)).length - names.filter(name => valueFor(a, name) === valueFor(draft, name)).length)[0];
-    const unavailableLabel = candidates => !candidates.length ? "Not available" : candidates.every(choice => Number(choice.stock) === 0) ? "Sold out" : candidates.some(choice => choice.available) ? "Not enough stock" : "Unavailable";
+    const unavailableLabel = candidates => !candidates.length ? "Not available" : candidates.every(choice => choice.stock !== null && Number(choice.stock) === 0) ? "Sold out" : candidates.some(choice => choice.available) ? "Quantity unavailable" : "Unavailable";
     const radio = ({ name, value, label, detail, checked, disabled, attributes }) => `<label class="product-option-choice${disabled ? " is-unavailable" : ""}"><input type="radio" name="${name}" value="${value}" ${attributes} ${checked ? "checked" : ""} ${disabled ? "disabled" : ""}><span><b>${esc(label)}</b>${detail ? `<small>${esc(detail)}</small>` : ""}</span><i aria-hidden="true"></i></label>`;
 
     function render() {

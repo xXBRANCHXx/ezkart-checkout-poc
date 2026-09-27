@@ -44,9 +44,15 @@
     if (data.status === "FAILED") return ["Payment wasn’t completed", "The payment was declined, expired, or cancelled. Return to checkout to try again."];
     if (t.stage === "awaiting_payment") {
       if (Date.parse(data.payment_details?.expires_at) <= Date.now()) return ["Payment window ended", "Do not transfer to the expired account. If you already paid, we’re still checking for confirmation."];
-      return ["Awaiting payment", "We’re waiting for payment confirmation. Your order will move to the seller once payment is received."];
+      return ["Awaiting payment", t.kind === 'digital' ? 'Your digital files will be available after payment is confirmed.' : "We’re waiting for payment confirmation. Your order will move to the seller once payment is received."];
     }
     return ({
+      digital_ready: ['Your files are ready to download', 'Payment is confirmed. Open downloads to receive and save the original files included with your purchase.'],
+      digital_complete: ['Your digital download is verified', 'All files in this order were received and verified. You can download your purchased files again.'],
+      digital_review: ['Your downloads are under review', 'Downloads are on hold while this payment or refund is reviewed. Contact the store for help.'],
+      digital_refunded: ['Your purchase was refunded', 'Downloads are no longer available for this refunded purchase.'],
+      digital_payment_closed: ['Payment wasn’t completed', 'This payment expired, failed or was cancelled. If you already paid, contact the store for help.'],
+      digital_unavailable: ['Your files are temporarily unavailable', 'We could not confirm file access. Contact the store for help.'],
       not_required: ["Payment confirmed", "Your test payment is confirmed. Delivery was skipped for this sandbox order."],
       processing: t.seller_accepted
         ? ["The seller is preparing your order", "Your payment is confirmed and the seller has accepted your order. Next, they’ll arrange a courier pickup."]
@@ -65,6 +71,7 @@
   }
   const deliveryMap = window.ezkartDeliveryMap;
   function renderMap(t) {
+    if (t.kind === 'digital') { byId('delivery-map-section').hidden = true; deliveryMap.update({...t, stage:'not_required'}); return; }
     byId("delivery-map-section").hidden = ["awaiting_payment", "not_required", "processing", "pickup_issue"].includes(t.stage);
     const latest = (t.history || []).at(-1);
     setText("package-update", latest?.note || labels[t.shipment_status] || "Waiting for the courier’s first update.");
@@ -77,9 +84,10 @@
     deliveryMap.update(t);
   }
   let historyKey = "";
-  function renderHistory(t) {
+  function renderHistory(t, downloads) {
     const events = [];
     if (t.paid_at) events.push({ title: "Payment received", updated_at: t.paid_at });
+    if (downloads?.deliveredAt) events.push({title:'Digital download verified', updated_at:downloads.deliveredAt, note:'All purchased digital files were received and verified.'});
     if (t.accepted_at) events.push({ title: "Seller accepted your order", updated_at: t.accepted_at, note: "The seller is preparing your order for pickup." });
     if (t.pickup_arranged_at) events.push({ title: "Pickup arranged", updated_at: t.pickup_arranged_at });
     for (const item of t.history || []) events.push({ ...item, title: labels[item.status] || "Courier update" });
@@ -101,7 +109,7 @@
   }
   function render(data) {
     const t = data.tracking;
-    const attention = ["attention", "pickup_issue", "cancelled", "returning", "returned"].includes(t.stage);
+    const attention = ["attention", "pickup_issue", "cancelled", "returning", "returned", 'digital_review', 'digital_unavailable'].includes(t.stage);
     shell.dataset.stage = t.stage;
     shell.dataset.attention = String(attention);
     const [title, message] = presentation(data);
@@ -113,7 +121,7 @@
     setText("return-status", data.status + (data.environment === "sandbox" ? " (test)" : ""));
     setText("return-fulfillment", t.stage === "not_required" ? "Delivery skipped (sandbox)" : t.stage === "awaiting_payment" ? "Waiting for payment" : labels[t.shipment_status] || (t.stage === "processing" ? "Seller processing" : title));
     setText("processing-detail", t.seller_accepted ? "Preparing your order" : "Waiting for seller confirmation");
-    byId("tracking-steps").hidden = t.stage === "not_required";
+    byId("tracking-steps").hidden = t.kind === 'digital' || t.stage === "not_required";
     [...byId("tracking-steps").children].forEach((step, index) => {
       step.classList.toggle("complete", index < t.progress || (attention && index <= t.progress));
       if (index === t.progress && !attention) step.setAttribute("aria-current", "step"); else step.removeAttribute("aria-current");
@@ -138,7 +146,17 @@
       try { localStorage.removeItem("ezkart.checkout.cart.v1:" + data.shop); } catch (_) {}
     }
     byId("tracking-content").hidden = false;
-    renderHistory(t);
+    const downloads = data.downloads;
+    byId('order-downloads').hidden = !downloads?.itemCount;
+    if (downloads?.itemCount) {
+      const state = downloads.accessState;
+      setText('order-download-state', state === 'available'
+        ? `${downloads.verifiedCount} of ${downloads.itemCount} files received and verified. ${downloads.deliveredAt ? 'You can download them again.' : 'Open downloads to receive your files.'}`
+        : ['creating','pending'].includes(state) ? 'Your files will be available after payment is confirmed.'
+        : ['payment_review','refund_review'].includes(state) ? 'Downloads are on hold while this purchase is reviewed.'
+        : state === 'refunded' ? 'This purchase was refunded. Downloads are unavailable.' : 'Downloads are currently unavailable. Contact the store for help.');
+    }
+    renderHistory(t, downloads);
     renderMap(t);
   }
   let lastData, requestInFlight = false, manualCheck = false, timer, failures = 0;

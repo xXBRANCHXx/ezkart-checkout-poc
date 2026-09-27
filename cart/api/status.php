@@ -31,6 +31,7 @@ try {
         'subtotal' => $order['subtotal'] ?? $order['total'],
         'shipping_price' => $order['shipping_price'] ?? 0,
         'shipping_skipped' => ez_order_skips_shipping($order),
+        'shipping_kind' => $order['shipping_kind'] ?? 'carrier',
         'shop' => $order['shop'] ?? '',
         'items' => array_values(array_map(static fn(array $item): array => [
             'name' => (string) $item['name'], 'price' => (int) $item['price'], 'quantity' => (int) $item['quantity'],
@@ -51,6 +52,7 @@ try {
     ];
     // The public payment poll never exposes shipment data, history, or map coordinates.
     if ($tracking) $payload += [
+        'downloads' => $order['digital_downloads'] ?? null,
         'fulfillment_status' => $order['fulfillment_status'] ?? 'AWAITING_PAYMENT',
         'biteship_order_id' => $order['biteship_order_id'] ?? '',
         'biteship_waybill_id' => $order['biteship_waybill_id'] ?? '',

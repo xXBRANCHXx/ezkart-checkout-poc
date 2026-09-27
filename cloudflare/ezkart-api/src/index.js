@@ -1,4 +1,4 @@
-import {beginDigitalUpload,digitalUpload,uploadDigitalPart,completeDigitalUpload,cancelDigitalUpload,digitalMerchantFile,digitalFileHistory,readyDigitalUpload,digitalVersionStatements,digitalCatalogSql,digitalCatalogFile,cleanupDigitalUploads} from './digital-files.js';
+import {beginDigitalUpload,digitalUpload,uploadDigitalPart,completeDigitalUpload,cancelDigitalUpload,digitalMerchantFile,digitalFileHistory,readyDigitalUpload,digitalVersionStatements,digitalCatalogSql,digitalCatalogFile,cleanupDigitalUploads,publicDigitalFiles} from './digital-files.js';
 import {buyerDigitalPurchases,createDigitalDownloadGrant,buyerDigitalFile,readDigitalDownloadGrant,buyerDigitalPart,acknowledgeDigitalPart} from './commerce-digital.js';
 import {hostedLandingResponse, landingPageLinks} from './landing-page-hosting.js';
 import {sellerPageAddress, sellerByPageAddress} from './seller-page-address.js';
@@ -474,6 +474,7 @@ async function storefrontProducts(url, env) {
   `).bind(id))),
   ]);
   const products = new Map(productResults.map((result) => result.results?.[0]).filter(Boolean).map((row) => [row.id, row]));
+  const digitalFiles = await publicDigitalFiles(env, [...products.values()]);
   const variants = new Map(productIds.map((id, index) => [id, (variantResults[index]?.results || []).filter((variant) => {
     const storedOptions = parseJson(variant.options_json, []);
     return Array.isArray(storedOptions) || !storedOptions.hidden;
@@ -508,8 +509,9 @@ async function storefrontProducts(url, env) {
       sku: variant?.sku || row.sku || "",
       currency: row.currency,
       price: Number(variant?.price_amount ?? row.price_amount ?? 0),
-      stock: (variant?.stock_quantity ?? row.stock_quantity) === null ? null : Math.max(0, Number(variant?.stock_quantity ?? row.stock_quantity) - Number(variant?.reserved_quantity ?? row.reserved_quantity ?? 0)),
-      weightGrams: (variant?.weight_grams ?? row.weight_grams) === null ? null : Number(variant?.weight_grams ?? row.weight_grams),
+      stock: row.type==='digital'||(variant?.stock_quantity ?? row.stock_quantity) === null ? null : Math.max(0, Number(variant?.stock_quantity ?? row.stock_quantity) - Number(variant?.reserved_quantity ?? row.reserved_quantity ?? 0)),
+      weightGrams: row.type==='digital'?0:(variant?.weight_grams ?? row.weight_grams) === null ? null : Number(variant?.weight_grams ?? row.weight_grams),
+      ...(row.type==='digital'?{digitalFile:digitalFiles.get(row.id)||null}:{}),
       category: cleanText(metadata.category, 80),
       imagePath: imageId ? `/v1/public/media/${encodeURIComponent(imageId)}` : "",
       imageAlt: variant?.name ? `${row.title} — ${variant.name}` : mainMedia?.alt_text || row.title,

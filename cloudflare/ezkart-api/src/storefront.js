@@ -2,6 +2,7 @@ import {reservedStockSql} from './commerce-orders.js';
 import {reviewMode} from './commerce-reviews.js';
 import {publicReviewSql} from './commerce-review-reads.js';
 import {publicStoreProfile} from './merchant-settings.js';
+import {publicDigitalFiles} from './digital-files.js';
 const parse = (value) => { try { return JSON.parse(value || "{}"); } catch { return {}; } };
 const imagePath = (id) => id ? `/v1/public/media/${encodeURIComponent(id)}` : "";
 const idPattern = /^[a-zA-Z0-9][a-zA-Z0-9_-]{2,95}$/;
@@ -51,10 +52,10 @@ export async function merchantStorefront(env, seller, payload = null) {
   return storefrontIdentity(env, row);
 }
 
-function publicProduct(row, media, variants, reviews = {}) {
+function publicProduct(row, media, variants, reviews = {}, digitalFile = null) {
   const options = variants.filter(v => !parse(v.options_json).hidden);
   const choices = (variants.length ? options : [row]).map(option => {
-    const stock = Math.max(0, Number(option.stock_quantity ?? row.stock_quantity ?? 0) - Number(option.reserved_quantity ?? 0));
+    const stock = row.type==='digital'?null:Math.max(0, Number(option.stock_quantity ?? row.stock_quantity ?? 0) - Number(option.reserved_quantity ?? 0));
     const price = Number(option.price_amount ?? row.price_amount ?? 0);
     const weight = Number(option.weight_grams ?? row.weight_grams ?? 0);
     const variant = option !== row;
@@ -66,12 +67,13 @@ function publicProduct(row, media, variants, reviews = {}) {
       options: values.filter(item => typeof item?.option === "string" && typeof item?.value === "string")
         .slice(0, 3).map(item => ({ option: item.option.slice(0, 20), value: item.value.slice(0, 60) })),
       price, stock,
-      available: row.type === "physical" && stock > 0 && price > 0 && weight > 0,
+      available: price > 0 && (row.type === "physical" && stock > 0 && weight > 0 || row.type === "digital" && Boolean(digitalFile)),
       imagePath: imagePath(option.image_upload_id || media?.id),
     };
   });
   const reviewCount=Number(reviews.review_count||0),ratingSum=Number(reviews.rating_sum||0);
   return { id: row.id, name: row.title, description: row.description, type: row.type, imagePath: imagePath(media?.id), choices,
+    ...(row.type==='digital'?{digitalFile}:{}),
     reviewCount,ratingSum,rating:reviewCount?ratingSum/reviewCount:null };
 }
 
@@ -93,5 +95,6 @@ export async function publicStorefront(env, url) {
     env.DB.prepare(`SELECT r.product_id,COUNT(*) AS review_count,SUM(r.rating) AS rating_sum FROM product_reviews r
       WHERE r.seller_id=? AND r.commerce_environment IN (?, 'legacy') AND ${publicReviewSql} GROUP BY r.product_id`).bind(row.id,reviewMode(env)),
   ]);
-  return { store, products: products.results.map(product => publicProduct(product, media.results.find(m => m.product_id === product.id), variants.results.filter(v => v.product_id === product.id),reviews.results.find(r=>r.product_id===product.id))) };
+  const files=await publicDigitalFiles(env,products.results);
+  return { store, products: products.results.map(product => publicProduct(product, media.results.find(m => m.product_id === product.id), variants.results.filter(v => v.product_id === product.id),reviews.results.find(r=>r.product_id===product.id),files.get(product.id))) };
 }

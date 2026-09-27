@@ -94,9 +94,10 @@
                   <label><span>Email address</span><input name="email" type="email" autocomplete="email" placeholder="name@email.com" required maxlength="120" /><small class="field-error"></small></label>
                 </div>
                 <p class="checkout-account-note" id="checkout-account-note">To track your order later, sign in with Google using your checkout email.</p>
+                <p class="checkout-account-note" id="digital-download-note" hidden>Your digital files will be available after payment is confirmed. Sign in with Google using your checkout email to download them from your order.</p>
               </section>
 
-              <section class="form-card" aria-labelledby="address-title">
+              <section class="form-card" id="checkout-address-section" aria-labelledby="address-title">
                 <header class="section-heading">
                   <span>02</span>
                   <div><h2 id="address-title">Shipping address</h2><p>Use an address where someone can receive the package.</p></div>
@@ -158,9 +159,9 @@
     <script src="address-picker.js?v=2"></script>
     <script src="customer-addresses.js?v=4"></script>
     <script src="storefront.js?v=campaign-1"></script>
-    <script src="product-options.js?v=1"></script>
+    <script src="product-options.js?v=2"></script>
     <script src="checkout-attempt.js?v=1"></script>
-    <script src="cart.js?v=campaign-1"></script>
+    <script src="cart.js?v=digital-1"></script>
     <script src="select.js?v=1"></script>
   </body>
 </html>

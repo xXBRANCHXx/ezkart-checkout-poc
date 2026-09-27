@@ -25,6 +25,14 @@ try {
     $payload['store']['logoUrl'] = $mediaUrl($payload['store']['logoPath'] ?? '');
     $payload['store']['backgroundUrl'] = $mediaUrl($payload['store']['backgroundPath'] ?? '');
     foreach ($payload['products'] as &$product) {
+        if (($product['type'] ?? '') === 'digital') {
+            require_once __DIR__ . '/commerce-client.php';
+            if (!ez_central_commerce_enabled()) {
+                $product['digitalFile'] = null;
+                foreach ($product['choices'] as &$heldChoice) $heldChoice['available'] = false;
+                unset($heldChoice);
+            }
+        }
         $product['imageUrl'] = $mediaUrl($product['imagePath'] ?? '');
         foreach ($product['choices'] as &$choice) $choice['imageUrl'] = $mediaUrl($choice['imagePath'] ?? '');
         unset($choice);

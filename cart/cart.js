@@ -8,6 +8,8 @@
     deliveryCoordinate: null,
     shipping: null,
     shippingRequired: true,
+    environmentShippingRequired: true,
+    hasPhysical: true,
     step: "confirm",
     loaded: false,
     shop: "store",
@@ -232,7 +234,7 @@
       if (!choice) {
         byId("catalog-loading").hidden = true;
         byId("catalog-error").hidden = false;
-        byId("catalog-error-message").textContent = hostedProduct.type === "physical" ? "This product is currently unavailable." : "Online checkout is not available for this product yet.";
+        byId("catalog-error-message").textContent = hostedProduct.type === "subscription" ? "Online checkout is not available for this product yet." : "This product is currently unavailable.";
         hostedStore = null;
         return;
       }
@@ -272,11 +274,8 @@
           || config.shipping_required !== (config.environment === "production")) {
         throw new Error(typeof config.error === "string" ? config.error : "Checkout settings could not load. Please try again.");
       }
-      state.shippingRequired = config.shipping_required;
+      state.environmentShippingRequired = config.shipping_required;
       state.durableCheckout = config.durable_checkout === true;
-      byId("get-rates").hidden = !state.shippingRequired;
-      byId("delivery-method").hidden = !state.shippingRequired;
-      document.querySelector('[data-progress-step="checkout"] b').textContent = state.shippingRequired ? "Delivery" : "Details";
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.error || "The selected products are unavailable.");
 
@@ -298,7 +297,7 @@
       if (hostedStore && products.some(product => product.seller_id !== hostedStore.id)) throw new Error("Products from different stores need separate carts.");
 
       state.cart = Object.fromEntries(ids.map((id) => {
-        const stock = Math.max(0, Number(state.products[id].stock ?? Number.MAX_SAFE_INTEGER));
+        const stock = Math.min(10000, Math.max(0, Number(state.products[id].stock ?? 10000)));
         const quantity = Math.min(requested[id], stock);
         return [id, quantity];
       }).filter(([, quantity]) => quantity > 0));
@@ -335,10 +334,11 @@
   function productTitle(product) {
     return product.product_name || product.name;
   }
+  const fileSize = size => size < 1048576 ? Math.ceil(size / 1024) + ' KB' : new Intl.NumberFormat('en', {maximumFractionDigits:1}).format(size / 1048576) + ' MB';
 
   function renderTotals() {
     byId("cart-subtotal").textContent = money(subtotal());
-    byId("shipping-total").textContent = !state.shippingRequired ? "Skipped in sandbox" : state.shipping
+    byId("shipping-total").textContent = !state.hasPhysical ? "No shipping needed" : !state.shippingRequired ? "Skipped in sandbox" : state.shipping
       ? money(shippingPrice())
       : state.step === "confirm" ? "Calculated next" : "Not selected";
     byId("grand-total").textContent = money(total());
@@ -364,6 +364,7 @@
   }
 
   function renderCart() {
+    syncDelivery();
     const entries = cartEntries();
     byId("cart-items").hidden = !state.loaded || !entries.length;
     byId("empty-cart").hidden = !state.loaded || Boolean(entries.length);
@@ -371,8 +372,8 @@
 
     byId("cart-items").innerHTML = entries.map(([id, quantity]) => {
       const product = state.products[id];
-      const stock = Math.max(0, Number(product.stock ?? Number.MAX_SAFE_INTEGER));
-      const details = Number(product.weight) > 0 ? `${Number(product.weight)} g` : "Ready to ship";
+      const stock = Math.min(10000, Math.max(0, Number(product.stock ?? 10000)));
+      const details = product.type === 'digital' ? `Digital download · ${fileSize(product.digital_file.size)} · Version ${product.digital_file.version}` : Number(product.weight) > 0 ? `${Number(product.weight)} g` : "Ready to ship";
 
       return `<article class="cart-item" data-cart-id="${escapeHtml(id)}">
         <div class="cart-item-media">${productImage(product)}</div>
@@ -396,7 +397,22 @@
     renderSummary();
   }
 
+  function syncDelivery() {
+    const entries = cartEntries();
+    state.hasPhysical = !entries.length || entries.some(([id]) => state.products[id].type !== 'digital');
+    const hasDigital = entries.some(([id]) => state.products[id].type === 'digital');
+    state.shippingRequired = state.hasPhysical && state.environmentShippingRequired;
+    byId('checkout-address-section').hidden = !state.hasPhysical;
+    for (const field of byId('checkout-address-section').querySelectorAll('input[name],textarea[name]')) field.disabled = !state.hasPhysical;
+    byId('digital-download-note').hidden = !hasDigital;
+    byId('checkout-account-note').hidden = !state.hasPhysical;
+    byId('get-rates').hidden = !state.shippingRequired;
+    byId('delivery-method').hidden = !state.shippingRequired;
+    document.querySelector('[data-progress-step="checkout"] b').textContent = state.shippingRequired ? 'Delivery' : 'Details';
+  }
+
   function resetDelivery() {
+    syncDelivery();
     state.quoteVersion = (state.quoteVersion || 0) + 1;
     state.shipping = null;
     byId("get-rates").disabled = false;
@@ -410,7 +426,7 @@
   function changeQuantity(id, change) {
     const product = state.products[id];
     if (!product) return;
-    const maximum = Math.max(0, Number(product.stock ?? Number.MAX_SAFE_INTEGER));
+    const maximum = Math.min(10000, Math.max(0, Number(product.stock ?? 10000)));
     state.cart[id] = Math.max(0, Math.min(maximum, (state.cart[id] || 0) + change));
     if (!state.cart[id]) delete state.cart[id];
     saveCart();
@@ -443,6 +459,7 @@
     let valid = true;
     const values = Object.fromEntries(new FormData(form).entries());
     form.querySelectorAll("[required]").forEach((field) => {
+      if (field.disabled) { field.classList.remove('invalid'); field.parentElement.querySelector('.field-error').textContent = ''; return; }
       const value = field.value.trim();
       let message = value ? "" : "This field is required.";
       if (field.name === "email" && value && !/^\S+@\S+\.\S+$/.test(value)) {
@@ -547,7 +564,7 @@
     try {
       const body = {
         cart: state.cart, shop: state.shop,
-        customer: { ...state.customer, ...(state.deliveryCoordinate ? { coordinate: state.deliveryCoordinate } : {}) },
+        customer: { ...state.customer, ...(state.hasPhysical && state.deliveryCoordinate ? { coordinate: state.deliveryCoordinate } : {}) },
         shipping_id: state.shipping?.id || "",
       };
       if (state.durableCheckout) {
@@ -555,6 +572,8 @@
         if (campaignVisit) body.campaign_visit = campaignVisit;
         body.checkout_key = [...crypto.getRandomValues(new Uint8Array(16))].map(value => value.toString(16).padStart(2, "0")).join("");
         body.expected_prices = Object.fromEntries(cartEntries().map(([id]) => [id, Number(state.products[id].price)]));
+        const files = cartEntries().filter(([id]) => state.products[id].type === 'digital');
+        if (files.length) body.expected_file_versions = Object.fromEntries(files.map(([id]) => [id, state.products[id].digital_file.id]));
         body.expected_total = total();
         const attempt = {body: JSON.stringify(body), uncertain: false};
         window.EzkartCheckoutAttempt.save(attempt);
@@ -683,7 +702,7 @@
           const payload = await response.json().catch(() => ({}));
           if (!response.ok || !Array.isArray(payload.products)) throw new Error(payload.error || "We couldn't check this option. Your cart hasn't changed. Please try again.");
           const products = Object.fromEntries(payload.products.map(product => [product.id, product]));
-          if (Object.entries(nextCart).some(([id, count]) => !products[id] || products[id].seller_id !== hostedStore.id || Number(products[id].stock) < count)) {
+          if (Object.entries(nextCart).some(([id, count]) => !products[id] || products[id].seller_id !== hostedStore.id || Math.min(10000, Number(products[id].stock ?? 10000)) < count)) {
             throw new Error("That quantity is no longer available. Your cart hasn't changed. Choose another option or reduce the quantity in your cart.");
           }
           if (Number(products[choice.id].price) !== Number(choice.price)) {

@@ -191,6 +191,21 @@ function ez_refresh_order_tracking(array $order): array
 function ez_public_order_tracking(array $order): array
 {
     $paid = in_array($order['status'] ?? '', ['PAID', 'PARTIALLY_REFUNDED', 'REFUNDED'], true);
+    if (($order['shipping_kind'] ?? '') === 'none') {
+        $downloads = $order['digital_downloads'] ?? [];
+        $access = $downloads['accessState'] ?? 'unavailable';
+        $stage = match ($access) {
+            'available' => !empty($downloads['deliveredAt']) ? 'digital_complete' : 'digital_ready',
+            'payment_review', 'refund_review' => 'digital_review', 'refunded' => 'digital_refunded',
+            'failed', 'cancelled', 'expired' => 'digital_payment_closed',
+            'creating', 'pending' => 'awaiting_payment', default => 'digital_unavailable',
+        };
+        return ['kind' => 'digital', 'stage' => $stage, 'progress' => -1, 'shipment_status' => '',
+            'seller_accepted' => false, 'paid_at' => $paid ? ($order['paid_at'] ?? '') : '', 'accepted_at' => '',
+            'pickup_arranged_at' => '', 'courier' => '', 'waybill_id' => '', 'link' => '', 'live_tracking' => false,
+            'locations' => ['origin' => null, 'destination' => null], 'history' => [], 'latest_location' => null,
+            'updated_at' => ($downloads['deliveredAt'] ?? '') ?: ($order['updated_at'] ?? ''), 'unavailable' => false];
+    }
     $skipped = ez_order_skips_shipping($order);
     $shipment = $paid && !$skipped ? ez_tracking_status((string) ($order['biteship_status'] ?? '')) : '';
     $fulfillment = (string) ($order['fulfillment_status'] ?? 'AWAITING_PAYMENT');

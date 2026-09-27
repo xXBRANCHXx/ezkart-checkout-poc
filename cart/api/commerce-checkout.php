@@ -55,6 +55,16 @@ function ez_checkout_intent(array $input): array
     if (preg_match('/^[a-z0-9][a-z0-9_-]{5,79}$/D', $shop) !== 1) $shop = '';
     $intent = ['cart' => $cart, 'expected_prices' => $prices, 'expected_total' => $total,
         'customer' => $normalized, 'shipping_id' => trim($shippingId), 'shop' => $shop];
+    if (array_key_exists('expected_file_versions', $input)) {
+        $files = $input['expected_file_versions'];
+        if (!is_array($files) || count($files) < 1 || count($files) > count($cart)) throw new InvalidArgumentException('Review the digital files before paying.');
+        foreach ($files as $id => $version) {
+            if (!array_key_exists($id, $cart) || !is_string($version) || preg_match('/^dfile_[a-f0-9]{32}$/D', $version) !== 1) {
+                throw new InvalidArgumentException('A digital file reference is invalid.');
+            }
+        }
+        ksort($files, SORT_STRING); $intent['expected_file_versions'] = $files;
+    }
     if (array_key_exists('campaign_visit', $input)) {
         if (!is_string($input['campaign_visit']) || preg_match('/^[a-f0-9]{64}$/D', $input['campaign_visit']) !== 1) throw new InvalidArgumentException('Campaign visit reference is invalid.');
         $intent['campaign_visit'] = $input['campaign_visit'];
@@ -128,7 +138,8 @@ function ez_central_checkout(array $input, ?array $account): array
         $customer = $checkout['customer'];
         $shipping = ['amount' => $checkout['shipping_price'], 'skipped' => $checkout['shipping_skipped'],
             'destination' => array_intersect_key($customer, array_flip(['location', 'address', 'postalCode', 'note', 'coordinate']))];
-        if (!$shipping['skipped']) {
+        if ($checkout['shipping_kind'] === 'none') $shipping = ['kind' => 'none', 'amount' => 0, 'skipped' => false];
+        elseif (!$shipping['skipped']) {
             $shipping += ['courierCode' => $checkout['shipping']['courier_company'], 'serviceCode' => $checkout['shipping']['courier_type'],
                 'quote' => $checkout['shipping']] + array_intersect_key($checkout['shipping_context'], array_flip([
                     'settingsRevision', 'pickupAddressId', 'returnAddressId', 'origin', 'returnAddress',

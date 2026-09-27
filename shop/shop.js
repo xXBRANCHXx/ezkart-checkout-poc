@@ -13,7 +13,7 @@
     byId("shop-checkout").disabled = !count;
     byId("shop-cart").innerHTML = entries.length ? entries.map(([id, qty]) => {
       const { product, choice } = selections.get(id);
-      return `<div class="shop-cart-line" data-selection="${esc(id)}"><div><b>${esc(product.name)}</b><small>${esc(choice.name)}</small></div><strong>${money(choice.price * qty)}</strong><div class="quantity-control"><button type="button" data-change="-1" aria-label="Decrease ${esc(product.name)} quantity">−</button><output>${qty}</output><button type="button" data-change="1" aria-label="Increase ${esc(product.name)} quantity" ${qty >= choice.stock ? "disabled" : ""}>+</button></div></div>`;
+      return `<div class="shop-cart-line" data-selection="${esc(id)}"><div><b>${esc(product.name)}</b><small>${esc(choice.name)}</small></div><strong>${money(choice.price * qty)}</strong><div class="quantity-control"><button type="button" data-change="-1" aria-label="Decrease ${esc(product.name)} quantity">−</button><output>${qty}</output><button type="button" data-change="1" aria-label="Increase ${esc(product.name)} quantity" ${qty >= Math.min(10000, choice.stock ?? 10000) ? "disabled" : ""}>+</button></div></div>`;
     }).join("") : '<p class="shop-cart-empty">Your cart is empty. Add something you love.</p>';
   }
   function reviewLabel(product) { return product.reviewCount ? `${Number(product.rating).toFixed(1)} / 5 · ${product.reviewCount} reviews` : "No reviews yet"; }
@@ -32,7 +32,7 @@
     const button = card.querySelector("[data-add]");
     button.disabled = !choice?.available;
     button.textContent = choice?.available ? "Add to cart" : choice?.stock === 0 && product.type === "physical" ? "Sold out" : "Unavailable";
-    const input = card.querySelector("input"); input.max = choice?.stock || 1; input.disabled = !choice?.available; input.value = 1;
+    const input = card.querySelector("input"); input.max = choice?.available ? Math.min(10000, choice.stock ?? 10000) : 1; input.disabled = !choice?.available; input.value = 1;
     const media = card.querySelector(".shop-product-media");
     media.innerHTML = choice?.imageUrl || product.imageUrl ? `<img src="${esc(choice?.imageUrl || product.imageUrl)}" alt="${esc(product.name)}" loading="lazy">` : '<span aria-hidden="true">◇</span>';
   }
@@ -50,8 +50,8 @@
       if (store.logoUrl) { logo.src = store.logoUrl; logo.alt = `${store.name} logo`; logo.onerror = () => { logo.hidden = true; byId("shop-avatar").hidden = false; }; }
       selections = new Map(products.flatMap(product => product.choices.map(choice => [choice.id, { product, choice }])));
       const saved = sf.readCart(store);
-      cart = Object.fromEntries(Object.entries(saved).filter(([id, qty]) => selections.get(id)?.choice.available && Number.isSafeInteger(qty) && qty > 0).map(([id, qty]) => [id, Math.min(qty, selections.get(id).choice.stock)]));
-      byId("shop-products").innerHTML = products.map(product => `<article class="shop-product" data-product="${esc(product.id)}"><div class="shop-product-media"></div><div class="shop-product-copy"><h2>${esc(product.name)}</h2><button type="button" class="shop-review-link" data-reviews>${esc(reviewLabel(product))}</button><p class="shop-product-description">${esc(product.description?.slice(0, 220))}</p><strong class="shop-product-price" data-price></strong>${product.choices.length && (product.choices.length > 1 || product.choices[0]?.name !== "Standard") ? `<label class="product-choice-label">Option<select aria-label="Option for ${esc(product.name)}">${product.choices.map(choice => `<option value="${esc(choice.id)}" ${choice.id === (product.choices.find(c => c.available) || product.choices[0])?.id ? "selected" : ""}>${esc(choice.name)}${!choice.available ? " — unavailable" : ""}</option>`).join("")}</select></label>` : ""}${product.type !== "physical" ? '<p class="shop-unavailable">Online checkout is not available for this product yet.</p>' : ""}<a class="shop-review-link" href="/cart/messages.php?product=${encodeURIComponent(product.id)}">Ask about this product</a><div class="shop-product-actions"><input type="number" min="1" step="1" value="1" aria-label="Quantity for ${esc(product.name)}"><button class="shop-add" type="button" data-add>Add to cart</button></div></div></article>`).join("");
+      cart = Object.fromEntries(Object.entries(saved).filter(([id, qty]) => selections.get(id)?.choice.available && Number.isSafeInteger(qty) && qty > 0).map(([id, qty]) => [id, Math.min(qty, selections.get(id).choice.stock ?? 10000, 10000)]));
+      byId("shop-products").innerHTML = products.map(product => `<article class="shop-product" data-product="${esc(product.id)}"><div class="shop-product-media"></div><div class="shop-product-copy"><h2>${esc(product.name)}</h2><button type="button" class="shop-review-link" data-reviews>${esc(reviewLabel(product))}</button><p class="shop-product-description">${esc(product.description?.slice(0, 220))}</p><strong class="shop-product-price" data-price></strong>${product.choices.length && (product.choices.length > 1 || product.choices[0]?.name !== "Standard") ? `<label class="product-choice-label">Option<select aria-label="Option for ${esc(product.name)}">${product.choices.map(choice => `<option value="${esc(choice.id)}" ${choice.id === (product.choices.find(c => c.available) || product.choices[0])?.id ? "selected" : ""}>${esc(choice.name)}${!choice.available ? " — unavailable" : ""}</option>`).join("")}</select></label>` : ""}${product.type === "digital" ? `<p class="shop-unavailable">Digital download${product.digitalFile ? " · Version " + Number(product.digitalFile.version) : " · Currently unavailable"}</p>` : product.type !== "physical" ? '<p class="shop-unavailable">Online checkout is not available for this product yet.</p>' : ""}<a class="shop-review-link" href="/cart/messages.php?product=${encodeURIComponent(product.id)}">Ask about this product</a><div class="shop-product-actions"><input type="number" min="1" step="1" value="1" aria-label="Quantity for ${esc(product.name)}"><button class="shop-add" type="button" data-add>Add to cart</button></div></div></article>`).join("");
       document.querySelectorAll(".shop-product").forEach(updateCard);
       const params=new URLSearchParams(location.search),reviewProduct=products.find(p=>p.id===params.get('review-product'));
       if(reviewProduct)openReviews(reviewProduct,Object.fromEntries(['rating','photos','sort'].map(key=>[key,params.get('review-'+key)||''])));
@@ -70,14 +70,14 @@
     const card = event.target.closest(".shop-product"), product = products.find(p => p.id === card.dataset.product);
     const choice = product.choices.find(c => c.id === card.querySelector("select")?.value) || product.choices[0];
     const qty = Number(card.querySelector("input").value);
-    if (!choice?.available || !Number.isSafeInteger(qty) || qty < 1 || qty + (cart[choice.id] || 0) > choice.stock) { toast("Choose a quantity within the available stock."); return; }
+    if (!choice?.available || !Number.isSafeInteger(qty) || qty < 1 || qty + (cart[choice.id] || 0) > Math.min(10000, choice.stock ?? 10000)) { toast("Choose a quantity within the available stock."); return; }
     cart[choice.id] = (cart[choice.id] || 0) + qty; renderCart(); toast(`${product.name} added to your cart`);
   });
   byId("shop-cart").addEventListener("click", event => {
     const button = event.target.closest("[data-change]"); if (!button) return;
     const id = button.closest("[data-selection]").dataset.selection;
     const next = (cart[id] || 0) + Number(button.dataset.change);
-    if (next > selections.get(id).choice.stock) return;
+    if (next > Math.min(10000, selections.get(id).choice.stock ?? 10000)) return;
     if (next > 0) cart[id] = next; else delete cart[id]; renderCart();
   });
   byId("shop-checkout").addEventListener("click", () => { if (Object.keys(cart).length) location.assign(sf.checkoutUrl(store, cart)); });

@@ -61,7 +61,7 @@
     byId("payment-amount").textContent = byId("order-total").textContent =
       money(data.total);
     byId("order-subtotal").textContent = money(data.subtotal);
-    byId("order-shipping").textContent = data.shipping_skipped
+    byId("order-shipping").textContent = data.shipping_kind === 'none' ? 'No shipping needed' : data.shipping_skipped
       ? "Skipped for test"
       : money(data.shipping_price);
     byId("order-number").textContent = data.order_id;
@@ -87,7 +87,7 @@
       byId("checkout-link").href = "./?shop=" + encodeURIComponent(data.shop);
     }
     byId("order-link").href = "return.php?" + query.toString();
-    byId("order-link").textContent = data.shipping_skipped ? "View order" : "Track your order";
+    byId("order-link").textContent = data.shipping_kind === 'none' ? 'View your downloads' : data.shipping_skipped ? "View order" : "Track your order";
     byId("transfer-details").hidden = byId("payment-instructions").hidden =
       state !== "PENDING" || !available;
     byId("result-panel").hidden = state === "PENDING" && available;
@@ -137,7 +137,7 @@
         "Your payment has been confirmed. Thank you for your order.";
       byId("result-icon").textContent = "✓";
       byId("result-title").textContent = "Payment received";
-      byId("result-message").textContent = data.shipping_skipped
+      byId("result-message").textContent = data.shipping_kind === 'none' ? 'Your payment is confirmed. Open your order to download your purchased files.' : data.shipping_skipped
         ? "Your test payment is complete. Delivery was skipped for this sandbox order."
         : "The seller will review your order and arrange delivery.";
       byId("check-message").textContent =

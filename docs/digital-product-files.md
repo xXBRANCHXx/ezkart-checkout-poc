@@ -3,8 +3,8 @@
 Workbench implementation, 27 September 2026. This is the catalog storage layer.
 The subsequent [digital commerce API](digital-commerce.md) implements immutable
 purchases, payment-bound access, verified-download evidence and a buyer download
-screen. Public checkout, hosted acceptance, refunds and subscription billing remain
-unfinished.
+screen, with public checkout and order-status integration. Hosted acceptance,
+digital reviews/refunds and subscription billing remain unfinished.
 Uploading a file does not
 make a sale, grant a customer access, mark delivery or release wallet earnings.
 
