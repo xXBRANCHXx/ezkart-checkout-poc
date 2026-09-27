@@ -71,6 +71,30 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 28 September: private refund evidence attachments
+
+The [refund workspace](refund-requests.md#private-supporting-files) now retains
+original buyer/store JPG, PNG, WebP and PDF evidence in private storage. Files are
+purchase-bound, bounded and append-only. Exact retries recover interrupted uploads;
+missing or altered originals require review. Decisions atomically require the
+current evidence version. Later evidence preserves the earlier decision and
+changes no money, stock or download entitlement.
+
+All 33 affected cases pass, including both browser screens at desktop/390px,
+maximum-size files, lost acknowledgements, concurrent quotas, changed access and
+stale decisions. The populated migration and fresh beta restore preserve original
+records. Implementation `98c48e1`, migration 0063 and Worker
+`d4528d8b-b067-4655-b2da-dd7070ac0aea` are deployed. Fourteen public health/access
+checks and matching sources pass at 20:35 UTC on 27 September; five signed-in
+merchant checks pass at 20:36. The post-export restores 173 tables, preserving
+original business/financial rows; only migration history and routine sign-in/
+held-runner metadata differ. Hosted refund/evidence/money tables remain empty.
+
+Actual paid-purchase acceptance, dispute decisions, provider-supported refund
+execution, funding/fees, proportional commission reversal, entitlement effects
+and reconciliation remain open. No full completion gate closes; workbench/main
+release holds and the original uncertain wallet remain unchanged.
+
 ### 28 September: installed scheduled payout runner and monitoring
 
 The [scheduled runner](withdrawal-synchronization.md#scheduled-runner-and-liveness)

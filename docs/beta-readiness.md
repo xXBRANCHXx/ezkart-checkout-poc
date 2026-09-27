@@ -14,19 +14,46 @@ deployment now uses the isolated live beta configuration described below, with
 new checkout, provider execution and automatic email sending held.
 Existing sandbox evidence is preserved. Main and `ezkart.id` remain held.
 
-## Current hosted state — 27 September, 20:02 UTC
+## Current hosted state — 27 September, 20:36 UTC
 
 Hostinger's private runtime now selects `beta`, production providers and the beta
 Worker. Its live DOKU client, secret, signing key and verified parent profile are
 installed outside the public root with mode 0600. Reloaded file hashes match the
 private prepared configuration; all earlier provider credentials are preserved.
 Health confirms beta, live DOKU credentials and connected D1/public R2/private R2
-with 171 application tables. At 07:45 UTC, central merchant operations were
+with 172 application tables. At 07:45 UTC, central merchant operations were
 enabled with `commerce_storage=d1`; new checkout remains separately paused in both PHP and
 the Worker. The public checkout configuration returns 503 with `Retry-After: 300`.
 An hourly housekeeping schedule and five-minute held reconciliation runner are
 installed; new checkout, provider execution and email sending remain held.
 See the storage note below.
+
+Private [refund attachments](refund-requests.md#private-supporting-files) are
+deployed from `98c48e1`, migration 0063, to beta Worker
+`d4528d8b-b067-4655-b2da-dd7070ac0aea`. Both parties can retain and download original
+purchase-bound evidence. Exact file/description retries resume their original
+upload, and decisions must include the current evidence version. Access changes,
+storage corruption and missing originals fail closed. Files and descriptions
+remain private and do not change money, stock, entitlements or an earlier decision.
+
+All 33 affected API/PHP/browser cases pass, including maximum-size originals,
+lost replies, stale decisions and sign-in changes during downloads. Desktop and
+390px layouts are inspected. Fourteen public health/access checks and matching
+script/style/document hashes pass at 20:35 UTC. Five signed-in merchant checks
+pass at 20:36:30: the actual empty Refunds workspace loads without errors, foreign
+store access is rejected, and absent purchase references cannot upload or expose
+files. These checks create no hosted refund or attachment; acceptance with an
+actual paid purchase remains open.
+
+The fresh beta export restores 173 tables with clean integrity/foreign keys.
+Of 172 original tables, 169 preserve every row exactly; the only differences are
+migration history, ordinary sign-in timestamps and the existing five-minute held
+runner heartbeat. The original uncertain wallet is preserved. Refund, evidence,
+order and money tables remain empty. Private runtime and Wrangler configuration
+hashes are unchanged. Main, provider execution, checkout and automatic sending
+remain held. Refund execution/accounting and dispute decisions remain required.
+
+The preceding payout runner rollout remains installed:
 
 The [scheduled payout runner](withdrawal-synchronization.md#scheduled-runner-and-liveness)
 is deployed from `1e2f054`, migration 0062, to beta Worker
