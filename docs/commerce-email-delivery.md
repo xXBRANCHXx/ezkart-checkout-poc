@@ -7,10 +7,11 @@ complained, blocked, skipped and review states. **Your emails** includes alerts
 whose in-app channel was disabled. **Store delivery activity** shows processing
 and failures without exposing addresses or provider payloads to other members.
 
-This implementation uses Resend. It is **not connected or activated** in TEST.
-No real email has been sent during implementation or validation. The provider
-choice remains subject to the owner's existing account/preference. Guest identity/receipt coverage, campaign consent/unsubscribe, real mailbox acceptance,
-operational alerts and sustained load testing remain open work. The release hold
+This implementation uses Resend. The isolated beta has a verified sender,
+callback and owner-inbox connection check. The original TEST rollout remains
+separate. See the current beta activation record below; guest receipt coverage,
+real application-message acceptance, operational alerts and sustained load
+acceptance remain open work. The release hold
 and all gates in [the completion plan](commerce-completion-plan.md) still apply.
 
 ## Delivery contract
@@ -134,6 +135,40 @@ Buyer email is opt-in through the account preference workflow. Transactional
 settings do not grant permission for promotional campaigns.
 
 ## Validation and rollout
+
+### Timed beta activation, 28 September 2026
+
+The current beta configuration enables notification processing, transactional
+email, campaign delivery and automation processing, with the existing verified
+Resend profile and a new source-event cutoff of `2026-09-27T23:13:59Z`. Before
+activation, a read-only beta query confirmed zero notification events, email
+jobs/requests, publications, automation rules and email opt-ins. Preferences are
+unchanged. A hosted draft is saved, previewed, archived and never published.
+Future campaigns still require the merchant's explicit publication action and
+recorded recipient permission; new automation rules still start paused.
+
+`COMMERCE_SCHEDULE=compact_v1` is restricted to beta and the single
+`* * * * *` trigger. UTC minute modulo four selects notification source dispatch,
+transactional email, campaigns or automations respectively. Minute 17 runs the
+existing hourly maintenance instead. Each task gets a separate invocation and
+D1 budget. TEST and main triggers are unchanged. This retains beta's one trigger
+slot under [Cloudflare's per-account limits](https://developers.cloudflare.com/workers/platform/limits/).
+
+Existing small batch limits still apply: transactional email runs 14 times/hour
+with up to two messages each, and campaigns run 15 times/hour with their existing
+two-message limit. Normal waits are up to four minutes; the maintenance slot can
+make a transactional wait eight minutes. This is a limited-beta schedule, not
+high-volume capacity acceptance. Structured `commerce_schedule` logs record the
+task, intended time, held/ok/attention/error outcome and nonpersonal counters.
+Turning sending off retains callback and investigation capability. The private
+pre-activation Wrangler copy permits restoring the previous switches and cron.
+
+The 42 existing affected email/automation cases and four compact-schedule cases
+pass, covering uncertain submissions, callback matching, current consent,
+activation cutoffs, retry limits, environment isolation, failure reporting and
+real empty D1 queues. Actual application-message mailbox delivery, complaint
+handling and sustained queue/load acceptance remain separate from the earlier
+standalone connection email.
 
 ### Live beta configuration, 27 September 2026
 

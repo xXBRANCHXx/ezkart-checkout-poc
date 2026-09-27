@@ -75,6 +75,7 @@ import {campaignUnsubscribe} from './campaign-unsubscribe.js';
 import {buyerNotificationPreferences,saveBuyerNotificationPreferences,buyerNotificationPreferenceHistory} from './buyer-notification-preferences.js';
 import {merchantAnalytics} from './commerce-analytics.js';
 import {createAnalyticsExport,readAnalyticsExport,cleanupAnalyticsExports} from './commerce-analytics-exports.js';
+import {betaScheduledTask,runBetaScheduledTask} from './commerce-schedule.js';
 const json = (payload, status = 200, headers = {}) => new Response(JSON.stringify(payload), {
   status,
   headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...headers },
@@ -2148,6 +2149,16 @@ export default {
     }
   },
   async scheduled(controller, env, context) {
+    const betaTask=betaScheduledTask(env,controller);
+    if(betaTask){
+      context.waitUntil(runBetaScheduledTask(betaTask,controller,{
+        notifications:async()=>({...await scheduleNotifications(env),...await dispatchNotifications(env)}),
+        email:()=>dispatchEmails(env),campaigns:()=>dispatchCampaignEmails(env),automations:()=>processMarketingAutomations(env),
+        housekeeping:()=>Promise.all([earningsHousekeeping(env),payoutSyncHousekeeping(env),cleanupDigitalUploads(env),
+          cleanupAbandonedMedia(env),cleanupCampaignVisits(env),cleanupCampaignReportExports(env),cleanupCampaignPerformanceExports(env),
+          cleanupAnalyticsExports(env),cleanupCustomerExports(env),cleanupReviewPhotos(env),cleanupMessagePhotos(env),expireCommerceOrders(env)]),
+      }));return;
+    }
     // One registered trigger, separate invocations: retain sends at :00/:03/...
     // and scan/publish at :01/:04/... without sharing a D1 query budget.
     if(controller.cron==='0-59/3,1-59/3 * * * *'){

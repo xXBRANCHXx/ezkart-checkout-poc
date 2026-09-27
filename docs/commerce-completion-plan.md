@@ -115,6 +115,17 @@ orange/pink styling are preserved. Actual custom-domain connection, ownership,
 TLS, routing and Advanced-specific measurements/entitlements remain unfinished;
 empty hosted reports do not establish maximum-volume acceptance.
 
+### 28 September: timed finish — email and marketing activation
+
+The isolated beta's [automatic delivery schedule](commerce-email-delivery.md#timed-beta-activation-28-september-2026)
+uses its existing one cron slot, preserving TEST/main triggers and separate
+invocation budgets. A prospective activation cutoff excludes old events; all
+recipient preferences are preserved. Pre-activation delivery/publication queues
+are empty. Hosted campaign save, preview and archive are checked without
+publication. Real application-message acceptance, incident alerting and sustained
+capacity remain open; the prior standalone owner email is not relabeled as an
+order notification.
+
 ### 28 September: original DOKU refund request preparation
 
 The [provider handoff](refund-provider-handoffs.md) adds buyer-owned private bank
