@@ -54,7 +54,7 @@ Each row must lie within the requested window and pages must be newest first,
 preserving microseconds. Unknown transaction-type names are retained; unknown
 status or mutation values are rejected.
 
-## Sandbox collection
+## Workbench collection
 
 With an authorized TEST environment, central storage, a confirmed enrollment and
 the matching registered SNAP credentials, run the private CLI:
@@ -66,8 +66,11 @@ php tools/commerce/collect-provider-evidence.php \
   --max-pages=10
 ```
 
-The CLI accepts TEST/sandbox only, validates the completed time window before
-provider access, and cannot run over HTTP. It gets the account mapping from the
+The CLI accepts TEST/sandbox or beta/production only. For the isolated live beta,
+use `--environment=production` with its beta API and private credentials. Main's
+production deployment is rejected, as are mixed deployment/provider/API settings.
+It validates the completed time window before provider access and cannot run
+over HTTP. It gets the account mapping from the
 service rather than accepting a profile or account number from its caller. It
 checks the credential fingerprint before the first DOKU request.
 
@@ -105,6 +108,12 @@ monitoring and the sustained validation period remain open. No top-level commerc
 or production release gate is closed by this evidence layer.
 
 ## Verification
+
+On 27 September the beta extension passes all four focused PHP/Worker cases.
+The added case verifies live-mode history reads, durable original receipts,
+unchanged money journals and rejection of mismatched mode/deployment/API settings
+before provider access. All provider responses in these cases are isolated
+fixtures. The log is `/tmp/ezkart-beta-provider-evidence-01a0d643.log`.
 
 Six Worker cases cover strict JSON and exact values, service/mapping boundaries,
 concurrent replay, immutable rows, changed identities/statuses, duplicate records,

@@ -10,10 +10,45 @@ Business approval is owner-confirmed. The owner also confirmed approval for all
 needed services, including payments, Sub-Account and Kirim DOKU payouts. Technical
 registration, credentials and working provider contracts still need evidence.
 The owner clarified that the target is **live DOKU on workbench**. The current
-deployment still uses sandbox, with central checkout and provider execution held;
-that is the starting state, not the requested beta. Prepare separate beta storage
-for real orders/payments, live provider credentials and supported adapters, while
-preserving existing sandbox evidence. Main and `ezkart.id` remain held.
+deployment now uses the isolated live beta configuration described below, with
+central checkout and provider execution held. Existing sandbox evidence is
+preserved. Main and `ezkart.id` remain held.
+
+## Current hosted state — 27 September, 07:07 UTC
+
+Hostinger's private runtime now selects `beta`, production providers and the beta
+Worker. Its live DOKU client, secret, signing key and verified parent profile are
+installed outside the public root with mode 0600. Reloaded file hashes match the
+private prepared configuration; all earlier provider credentials are preserved.
+Health confirms beta, live DOKU credentials and connected D1/public R2/private R2
+with 146 tables. Checkout remains held (`durable_checkout:false`), as do Worker
+provider jobs and schedules. Live Biteship is still unconfigured.
+
+The beta catalog import is complete: five users/stores/memberships, two physical
+products, 111 variants, 54 media records, 16 product images, two unbound drafts
+and existing address/shipping settings. All 54 original images (1,391,714 bytes)
+were copied and verified by SHA-256. Existing triggers stayed enabled; ordinary
+catalog revisions advanced, while prices, stock and other catalog fields remained
+exact. Beta has 111 explicit opening-stock records and five import audit events.
+No TEST orders, financial history or historic stock movements were imported.
+
+The fresh post-import export has SHA-256
+`d375aa7e373fcecb222b46d7983d2256a0dd657fabbc069dcc2d20ab83aad90e`.
+Every application table matches the rehearsed import, all 146 tables and their
+guards are preserved, and remote/restored foreign keys and restored integrity
+pass. Orders, captures, seller wallet profiles and money journals remain zero.
+Private source/target exports, the guarded SQL and asset/bootstrap/cutover proofs
+are in `/home/branch/.local/share/ezkart/beta-01a0d643/` outside Git.
+
+Fresh hosted sign-in exposed a CSP regression: Chrome blocked the local form's
+redirect to the configured Auth service. The fix permits only that exact HTTPS
+origin and Google for form redirects. Three browser/header cases pass, including
+the actual form/redirect chain, blocked foreign destinations, inline/eval guards
+and preview isolation. The beta login label now says “Beta admin.” Hosted
+verification of this source change follows automatic workbench deployment.
+
+The sections below retain earlier rollout observations; this current-state
+record supersedes their historical “not installed” and empty-catalog statements.
 
 ## Work required for the beta candidate
 

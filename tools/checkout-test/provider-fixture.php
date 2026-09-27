@@ -73,12 +73,12 @@ function curl_exec(object $handle): string|bool {
         if (isset($handle->options[CURLOPT_WRITEFUNCTION])) return ($handle->options[CURLOPT_WRITEFUNCTION])($handle, $body) === strlen($body);
         return $body;
     }
-    if (getenv('EZKART_TEST_WALLET') && preg_match('#^https://api-sandbox.doku.com/(authorization/v1/access-token/b2b|sub-account/v2.0/(register|balance-inquiries|transaction-history-list))$#D', $handle->url, $walletMatch)) {
+    if (getenv('EZKART_TEST_WALLET') && preg_match('#^https://api(?:-sandbox)?\.doku\.com/(authorization/v1/access-token/b2b|sub-account/v2.0/(register|balance-inquiries|transaction-history-list))$#D', $handle->url, $walletMatch)) {
         $directory = dirname(getenv('EZKART_TEST_CAPTURE'));
         $control = is_file($directory . '/wallet-control.json') ? json_decode((string) file_get_contents($directory . '/wallet-control.json'), true) : [];
         $profilesFile = $directory . '/wallet-profiles.json';
         $profiles = is_file($profilesFile) ? json_decode((string) file_get_contents($profilesFile), true) : [];
-        $parent = getenv('EZKART_DOKU_SANDBOX_PARENT_PROFILE_ID');
+        $parent = getenv(str_starts_with($handle->url, 'https://api.doku.com/') ? 'EZKART_DOKU_PRODUCTION_PARENT_PROFILE_ID' : 'EZKART_DOKU_SANDBOX_PARENT_PROFILE_ID');
         if (str_starts_with($walletMatch[1], 'authorization/')) {
             $response = ['responseCode' => '2007300', 'responseMessage' => 'Successful', 'accessToken' => 'fixture-snap-wallet-token', 'tokenType' => 'Bearer', 'expiresIn' => 900];
             if (!empty($control['tokenDenied'])) { $handle->status = 401; $response = ['responseCode' => '4017300']; }

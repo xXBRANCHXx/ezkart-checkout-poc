@@ -71,6 +71,22 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 27 September: hosted beta catalog and private runtime cutover
+
+At 07:07 UTC the hosted workbench reports beta, live DOKU credentials and its
+separate 146-table database/public/private storage. Five existing stores, two
+products, 111 variants and all 54 catalog images are preserved with opening
+inventory and import evidence. The fresh export matches every rehearsed table;
+schema, integrity and foreign keys pass. No TEST financial history is copied.
+All orders, captures, seller wallet profiles and journals remain empty.
+
+Checkout and provider execution remain held while channel, shipping and financial
+acceptance continue. Fresh sign-in exposed a blocked Google redirect; its narrow
+CSP fix passes three browser/header cases. The provider-evidence CLI now explicitly
+supports beta/production, with four integration cases passing. See
+[beta readiness](beta-readiness.md) for cutover hashes and the current limits.
+Main, PR #3, the original TEST resources and the sustained release hold are unchanged.
+
 ### 27 September: live parent wallet evidence
 
 The production parent balance inquiry passes at 06:31:01 UTC with the requested

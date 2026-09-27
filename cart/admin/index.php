@@ -28,7 +28,13 @@ if ($interactivePageView) {
     $adminSecurityPolicy = "default-src 'none'; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline' https:; font-src 'self' data: https:; script-src 'none'; connect-src 'none'; frame-src 'none'; form-action 'none'; frame-ancestors 'self'; base-uri 'none'";
 } else {
     $shippingMapPolicy = ($_GET['page'] ?? '') === 'shipping-settings' ? " https://tiles.openfreemap.org; worker-src 'self' blob:" : '';
-    $adminSecurityPolicy = "default-src 'self'; img-src 'self' data: blob: https:; style-src 'self'; style-src-attr 'unsafe-inline'; script-src 'self' 'sha256-" . $adminStartupHash . "'; connect-src 'self'" . $shippingMapPolicy . "; frame-src 'self'; form-action 'self'; frame-ancestors " . ($previewRepairFrame ? "'self'" : "'none'") . "; base-uri 'none'";
+    // Chrome also checks the redirects after the local OAuth form submission.
+    // Permit only the configured Auth origin and Google, keeping scripts and
+    // background connections restricted to this application.
+    $authSettings = ez_admin_supabase_settings();
+    $authFormSources = $authSettings['configured'] && preg_match('~^https://[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$~iD', $authSettings['url']) === 1
+        ? ' ' . $authSettings['url'] . ' https://accounts.google.com' : '';
+    $adminSecurityPolicy = "default-src 'self'; img-src 'self' data: blob: https:; style-src 'self'; style-src-attr 'unsafe-inline'; script-src 'self' 'sha256-" . $adminStartupHash . "'; connect-src 'self'" . $shippingMapPolicy . "; frame-src 'self'; form-action 'self'" . $authFormSources . "; frame-ancestors " . ($previewRepairFrame ? "'self'" : "'none'") . "; base-uri 'none'";
 }
 header('Content-Security-Policy: ' . $adminSecurityPolicy);
 // Hostinger replaces PHP's CSP. The server-header rule restores this exact
@@ -1704,7 +1710,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
     <section class="login-card">
       <a class="admin-brand" href="../../"><img src="../../assets/ezkart-logo.svg" alt="Ezkart"></a>
       <p class="eyebrow">Internal order monitor</p>
-      <h1><?= $commerceProduction ? 'Production' : 'Sandbox' ?> admin.</h1>
+      <h1><?= $deployment === 'beta' ? 'Beta' : ($commerceProduction ? 'Production' : 'Sandbox') ?> admin.</h1>
       <p class="login-intro">Sign in with a verified Google account. Store owners can also use their approved email link. Ezkart keeps this device signed in for up to 30 days.</p>
       <?php if ($supabaseSettings['configured']): ?>
         <form class="oauth-form" id="google-sign-in-form" method="post">

@@ -8,8 +8,13 @@ try {
         if (preg_match('/^--(environment|seller|from|to|max-pages)=(.+)$/sD', $argument, $match) !== 1 || isset($input[$match[1]])) throw new InvalidArgumentException('Arguments must be named and unique.');
         $input[$match[1]] = $match[2];
     }
-    foreach (['environment', 'seller', 'from', 'to'] as $field) if (!isset($input[$field])) throw new InvalidArgumentException('Required: --environment=sandbox --seller=ID --from=ISO8601 --to=ISO8601 [--max-pages=10].');
-    if ($input['environment'] !== 'sandbox' || ez_config('deployment_environment') !== 'test') throw new InvalidArgumentException('This workbench evidence command accepts sandbox on TEST only.');
+    foreach (['environment', 'seller', 'from', 'to'] as $field) if (!isset($input[$field])) throw new InvalidArgumentException('Required: --environment=sandbox|production --seller=ID --from=ISO8601 --to=ISO8601 [--max-pages=10].');
+    $deployment = ez_config('deployment_environment');
+    if (!(($deployment === 'test' && $input['environment'] === 'sandbox')
+        || ($deployment === 'beta' && $input['environment'] === 'production'))) {
+        throw new InvalidArgumentException('This workbench evidence command accepts TEST/sandbox or beta/production only.');
+    }
+    ez_central_commerce_environment($input['environment']);
     $pages = $input['max-pages'] ?? '10';
     if (preg_match('/^[1-9][0-9]?$/D', $pages) !== 1 || (int) $pages > 40) throw new InvalidArgumentException('Page budget must be between 1 and 40 per account.');
     $report = ez_collect_seller_provider_evidence($input['seller'], $input['from'], $input['to'], (int) $pages);
