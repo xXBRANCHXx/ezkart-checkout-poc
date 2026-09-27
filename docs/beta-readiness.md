@@ -14,7 +14,7 @@ deployment now uses the isolated live beta configuration described below, with
 new checkout and scheduled jobs held. Existing sandbox evidence is
 preserved. Main and `ezkart.id` remain held.
 
-## Current hosted state — 27 September, 09:15 UTC
+## Current hosted state — 27 September, 09:26 UTC
 
 Hostinger's private runtime now selects `beta`, production providers and the beta
 Worker. Its live DOKU client, secret, signing key and verified parent profile are
@@ -105,8 +105,11 @@ saved through the merchant editor and verified after reload at 09:11 UTC. Prices
 stock, weights, options, visibility and media are preserved. Three Drops variants
 normalize their image selector from `main` to `gallery-1`, retaining the same image.
 The private count sheet covers all 111 variants: 147,510 imported units, including
-16,010 in hidden variants. Physical counts and the Syrup MINI size (60 ml in the
-variants, 50 ml in the title) await the owner's confirmation before sales.
+16,010 in hidden variants. The owner instructed that these catalog counts do not
+matter to the platform preparation; they remain unchanged and are not a beta
+preparation blocker or a verified physical count. The owner also clarified that
+50 ml was a sample size and the later 60 ml product is MINI. This is intentional,
+not a catalog bug; the existing title and variants are preserved.
 DOKU BCA still shows UPDATING at 08:39 UTC.
 The catalog's obsolete CV-approval and delivery-readiness claims are replaced
 with the actual checkout pause and links to inventory/payment/shipping settings.
@@ -164,6 +167,15 @@ well as TEST/sandbox, records the deployment with each new evidence file and
 rejects main or mismatched configuration before constructing a reader. All 16
 reader/observer cases and PHP syntax checks pass. No live seller observation was
 attempted: the original uncertain enrollment still has no confirmed profile.
+
+Wallet failures now preserve the stage and bounded provider/storage diagnostics
+in private attempt history without changing retry or confirmation rules. All 14
+dispatcher and merchant checks pass, including recovery without another provider
+registration. This cannot reconstruct the earlier live failure. The 09:20 UTC
+read-only checkpoint still finds one uncertain wallet job, no confirmed wallet,
+orders, captures, journals or application email records, and no foreign-key errors.
+Hosted beta health and checkout/CLI access holds pass. An exact Gmail search finds
+no reply to the new DOKU support thread at that checkpoint.
 
 The sections below retain earlier rollout observations; this current-state
 record supersedes their historical “not installed” and empty-catalog statements.

@@ -54,8 +54,12 @@ test('numeric provider accounts remain exact through registration, confirmation 
 test('lost receipt acknowledgement and failed account reads recover the original registration without another provider write',async t=>{
   const f=await fixture(t),e=await f.enroll();f.control.drop=base+'/registrations/'+e.id+'/receipt';await f.setControl({confirmationUnavailable:true});
   await f.processWallet(e);let saved=await f.registration(e.id);assert.equal(saved.jobState,'uncertain');assert(saved.registrationBody);assert.equal(saved.profile,null);
+  const failedAttempt=await f.db.prepare('SELECT result_json FROM commerce_job_attempts WHERE job_id=?').bind(saved.jobId).first();
+  assert.deepEqual(JSON.parse(failedAttempt.result_json).failure,{stage:'confirm_accounts',category:'provider',reason:'http',httpStatus:503});
   assert.equal(f.control.calls.filter(c=>c.path.endsWith('/receipt')).length,2);
   await f.setControl({});await f.due();await f.processWallet(e);saved=await f.registration(e.id);assert(saved.profile);assert.equal(saved.jobState,'succeeded');assert.equal((await f.registerCalls()).length,1);
+  const attempts=(await f.db.prepare('SELECT result_json FROM commerce_job_attempts WHERE job_id=? ORDER BY attempt').bind(saved.jobId).all()).results;
+  assert.equal(attempts.length,2);assert.equal(attempts[0].result_json,failedAttempt.result_json);assert.equal(JSON.parse(attempts[1].result_json).failure,undefined);
 });
 
 test('unknown registration, duplicate-reference and bind acknowledgements stay under review without blind retries',async t=>{
@@ -71,6 +75,8 @@ test('provider configuration failures consume no job attempts; rejected prefligh
   const missing=await f.run(`ez_wallet_process_enrollment('${a.id}','sandbox');`,{EZKART_DOKU_SANDBOX_SNAP_PRIVATE_KEY:'missing-key'});assert.notEqual(missing.status,0);
   assert.equal((await f.db.prepare('SELECT attempts FROM commerce_jobs').first()).attempts,0);
   await f.setControl({tokenDenied:true});await f.processWallet(a);assert.equal((await f.registration(a.id)).binding,null);assert.equal((await f.registration(a.id)).jobState,'retry');assert.equal((await f.registerCalls()).length,0);
+  const rejected=JSON.parse((await f.db.prepare('SELECT result_json FROM commerce_jobs').first()).result_json);
+  assert.equal(rejected.noEffectConfirmed,true);assert.deepEqual(rejected.failure,{stage:'parent_preflight',category:'provider',reason:'http',httpStatus:401});
   await f.setControl({wrongConfirmation:true});await f.due();await f.processWallet(a);assert.equal((await f.registration(a.id)).profile,null);assert((await f.registration(a.id)).registrationBody);
   await f.setControl({});await f.due();await f.processWallet(a,{EZKART_DOKU_SANDBOX_SECRET_KEY:'different-fixture-secret-key'});assert.equal((await f.registration(a.id)).profile,null);assert.equal((await f.registerCalls()).length,1);
   await f.due();await f.processWallet(a);assert((await f.registration(a.id)).profile);
@@ -156,8 +162,15 @@ test('missing provider credentials and held central storage expose no connect ac
 test('provider duplicate responses and mismatched registration parents cannot trigger alternate references',async t=>{
   const f=await fixture(t);
   for(const [id,control] of [['alice',{duplicate:true}],['bob',{wrongParent:true}]]){
-    const e=await f.enroll(id);await f.setControl(control);await f.processWallet(e);await f.setControl({});await f.due();await f.processWallet(e);
+    const e=await f.enroll(id);await f.setControl(control);await f.processWallet(e);
+    const first=await f.registration(e.id),result=JSON.parse((await f.db.prepare('SELECT result_json FROM commerce_jobs WHERE id=?').bind(first.jobId).first()).result_json);
+    assert.equal(result.recorded,false);assert.equal(result.noEffectConfirmed,undefined);
+    assert.deepEqual(result.failure,{stage:'register_account',category:'provider',reason:control.duplicate?'http':'registration_response',httpStatus:control.duplicate?409:null});
+    assert(!/fixture-snap-wallet-token|PRIVATE KEY|secret|alice@|bob@|SAC-|BRN-/i.test(JSON.stringify(result)));
+    await f.setControl({});await f.due();await f.processWallet(e);
     const saved=await f.registration(e.id);assert.equal(saved.jobState,'uncertain');assert.equal(saved.profile,null);assert.equal(saved.registrationBody,null);
+    const attempts=(await f.db.prepare('SELECT result_json FROM commerce_job_attempts WHERE job_id=? ORDER BY attempt').bind(saved.jobId).all()).results;
+    assert.deepEqual(JSON.parse(attempts[0].result_json),result);assert.deepEqual(JSON.parse(attempts[1].result_json).failure,{stage:'registration_recovery',category:'internal'});
   }
   assert.equal((await f.registerCalls()).length,2);assert.equal(await f.count('commerce_wallet_provider_accounts'),0);
 });

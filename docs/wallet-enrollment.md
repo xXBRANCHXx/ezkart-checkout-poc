@@ -74,6 +74,19 @@ when the first balance read failed. Late verified evidence can be recorded after
 lease expiry; stale workers cannot finish another worker's lease. Job success
 requires the confirmed profile, and a bound request cannot enter ordinary retry.
 
+Future failures also retain bounded diagnostics in the private job and attempt
+records: the stage, provider/storage/internal category, an allowlisted provider
+reason and HTTP status when known. They contain no exception messages, response
+bodies, tokens or traces. These diagnostics cannot establish no effect or allow
+another registration. A later recovery result does not erase the earlier attempt's
+diagnostic. The 27 September change passes all 14 dispatcher/merchant cases,
+including 401 preflight, 503 confirmation, 409 registration, invalid parent and
+recovery without another provider write. PHP syntax also passes.
+
+The original live beta attempt predates this diagnostic change. Its missing
+reason/status cannot be reconstructed, and its intent, binding and history are
+left unchanged for the existing DOKU support investigation.
+
 An unknown registration without its original successful receipt still needs
 provider-supported investigation. The published V2 guide does not establish a
 registration lookup or usable registration webhook contract. No guessed callback,

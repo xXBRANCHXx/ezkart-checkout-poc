@@ -75,13 +75,18 @@ Intermediate commits do not certify the whole workbench as ready.
 
 At 09:11 UTC, the two missing product descriptions are saved through the merchant
 editor and verified after reload. Prices, stock, weights, options, visibility and
-image identities are preserved. The owner has the 111-variant physical count sheet
-and a specific question about the inconsistent Syrup MINI size. One explicitly
+image identities are preserved. The owner has the 111-variant count sheet and
+instructed that these catalog counts should not hold up platform preparation.
+The owner confirmed 50 ml was a sample and 60 ml is the later MINI product;
+their distinct labels are intentional and preserved. One explicitly
 approved Resend connection email reached the owner's Gmail Inbox with passing
 SPF/DKIM/DMARC and actual successful signed callbacks. Automatic email sending
 remains held; transactional jobs and failure operations remain unaccepted.
 The read-only financial observation CLI now supports beta/production, with all
-16 reader/observer cases passing. None of these changes close a broader gate.
+16 reader/observer cases passing. Future wallet failures retain private stage and
+provider-status diagnostics; all 14 dispatcher/merchant cases pass without changing
+the no-repeat registration boundary. The original live attempt is untouched.
+None of these changes close a broader gate.
 
 At 08:55 UTC, the owner-provided pickup/return address and support contacts are
 saved and verified after reload, with the existing courier selection and other
