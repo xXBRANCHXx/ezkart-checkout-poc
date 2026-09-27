@@ -3,7 +3,7 @@ declare(strict_types=1);
 if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }
 require_once dirname(__DIR__, 2) . '/cart/api/doku-financial-observation.php';
 
-/** Private sandbox evidence only. This command has no database or money writes. */
+/** Private workbench evidence only. This command has no database or money writes. */
 function ez_doku_observation_main(array $arguments, ?Closure $readerFactory = null): int
 {
     $file = null; $count = 0;
@@ -13,8 +13,17 @@ function ez_doku_observation_main(array $arguments, ?Closure $readerFactory = nu
             if (preg_match('/^--([a-z-]+)=(.+)$/sD', $argument, $match) !== 1 || !in_array($match[1], $allowed, true) || isset($input[$match[1]])) throw new InvalidArgumentException('Use each named argument once.');
             $input[$match[1]] = $match[2];
         }
-        foreach (['environment', 'profile', 'from', 'to', 'output'] as $key) if (!isset($input[$key])) throw new InvalidArgumentException('Required: --environment=sandbox --profile=ID --from=ISO8601 --to=ISO8601 --output=/private/path.jsonl [--max-pages=10].');
-        if ($input['environment'] !== 'sandbox') throw new InvalidArgumentException('This workbench evidence command accepts sandbox only.');
+        foreach (['environment', 'profile', 'from', 'to', 'output'] as $key) if (!isset($input[$key])) throw new InvalidArgumentException('Required: --environment=sandbox|production --profile=ID --from=ISO8601 --to=ISO8601 --output=/private/path.jsonl [--max-pages=10].');
+        $deployment = ez_config('deployment_environment');
+        $environment = $input['environment'];
+        if (!(($deployment === 'test' && $environment === 'sandbox')
+            || ($deployment === 'beta' && $environment === 'production'))) {
+            throw new InvalidArgumentException('This workbench evidence command accepts TEST/sandbox or beta/production only.');
+        }
+        $configuredEnvironment = ez_config('commerce_environment');
+        if ($configuredEnvironment !== '' && $configuredEnvironment !== $environment) {
+            throw new InvalidArgumentException('The requested provider environment does not match this deployment.');
+        }
         $pages = $input['max-pages'] ?? '10';
         if (preg_match('/^[1-9][0-9]?$/D', $pages) !== 1 || (int) $pages > 40) throw new InvalidArgumentException('Page budget must be between 1 and 40 per account.');
         if (!str_starts_with($input['output'], '/') || !str_ends_with($input['output'], '.jsonl') || str_contains($input['output'], "\0")) throw new InvalidArgumentException('Output must be an absolute private .jsonl path.');
@@ -27,14 +36,14 @@ function ez_doku_observation_main(array $arguments, ?Closure $readerFactory = nu
         // Argument failures must never get as far as token generation or a provider read.
         if (preg_match('/^[A-Za-z0-9][A-Za-z0-9_-]{1,21}$/D', $input['profile']) !== 1) throw new InvalidArgumentException('Profile ID is invalid.');
         EzDokuSubAccountReader::window($input['from'], $input['to']);
-        $reader = $readerFactory === null ? EzDokuSubAccountReader::configured('sandbox') : $readerFactory();
+        $reader = $readerFactory === null ? EzDokuSubAccountReader::configured($environment) : $readerFactory($environment);
         umask(0077); $file = @fopen($target, 'xb');
         if ($file === false) throw new RuntimeException('Cannot create private evidence output.');
         $write = static function (array $row) use ($file): void {
             $line = json_encode($row, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR) . "\n";
             if (fwrite($file, $line) !== strlen($line) || !fflush($file) || !fsync($file)) throw new RuntimeException('Cannot persist provider evidence.');
         };
-        $write(['kind' => 'started', 'version' => 1, 'environment' => 'sandbox', 'credentialFingerprint' => $reader->credentialFingerprint,
+        $write(['kind' => 'started', 'version' => 1, 'deployment' => $deployment, 'environment' => $environment, 'credentialFingerprint' => $reader->credentialFingerprint,
             'profileId' => $input['profile'], 'from' => $input['from'], 'to' => $input['to'], 'maxPagesPerAccount' => (int) $pages, 'startedAt' => gmdate('c')]);
         $report = ez_observe_doku_financial_window($reader, $input['profile'], $input['from'], $input['to'], (int) $pages,
             static function (string $kind, array $response) use ($write, &$count): void {

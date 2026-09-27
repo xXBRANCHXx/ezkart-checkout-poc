@@ -154,11 +154,21 @@ Investigation is configured independently of sending. A non-delivery diagnostic
 with a valid signature returns `ignored`; an invalid signature returns 401.
 Neither probe creates email evidence or proves real provider callback delivery.
 
-No Resend email has been sent yet. One exact connection-check message is prepared
-privately and awaits the owner's explicit send instruction. It will not create a
-purchase or payment record. Actual transactional journeys, mailbox rendering,
-failure/complaint handling, operational alerting, dispatch scheduling and sustained
-acceptance remain open. The observations below describe the original TEST rollout.
+At 09:04:46 UTC the owner-approved connection check was submitted once, using a
+saved idempotency key and the restricted sending key. The recovery API returns
+the original sender, recipient, subject and text with `last_event:delivered`.
+Gmail's Inbox contains that exact message; Show original confirms SPF, DKIM and
+DMARC pass and its message ID matches the provider callbacks. The actual sent
+and delivered callbacks each received HTTP 200 with `ignored:true`, appropriate
+for this standalone connection check without an application delivery tag.
+Private send, provider, inbox, authentication and callback receipts are retained
+under `beta-01a0d643` outside Git. No purchase or payment record was created.
+
+This establishes one real sender/inbox delivery and signed callback transport.
+Automatic transactional and campaign sending remain held. Actual transactional
+jobs, email template rendering, failure/complaint handling, operational alerting,
+dispatch scheduling and sustained acceptance remain open. The observations below
+describe the original TEST rollout.
 
 Tests cover the real Worker send handler and callback endpoint, raw signature
 interoperability, lost POST/database acknowledgements, callbacks arriving first,

@@ -14,7 +14,7 @@ deployment now uses the isolated live beta configuration described below, with
 new checkout and scheduled jobs held. Existing sandbox evidence is
 preserved. Main and `ezkart.id` remain held.
 
-## Current hosted state — 27 September, 08:55 UTC
+## Current hosted state — 27 September, 09:15 UTC
 
 Hostinger's private runtime now selects `beta`, production providers and the beta
 Worker. Its live DOKU client, secret, signing key and verified parent profile are
@@ -99,8 +99,14 @@ email/phone. Both defaults and the original JNE/J&T/SiCepat selection are saved
 and verified after reload (shipping revision 3). The public support details are
 also saved and reloaded (profile revision 3); unrelated profile values are
 unchanged. No entrance pin was invented; instant couriers remain unselected.
-Private address/contact proofs stay outside Git. Both imported products still
-lack descriptions, and imported stock needs a physical count before sales.
+Private address/contact proofs stay outside Git. Both imported products now have
+short Indonesian descriptions grounded in their existing photos and variants,
+saved through the merchant editor and verified after reload at 09:11 UTC. Prices,
+stock, weights, options, visibility and media are preserved. Three Drops variants
+normalize their image selector from `main` to `gallery-1`, retaining the same image.
+The private count sheet covers all 111 variants: 147,510 imported units, including
+16,010 in hidden variants. Physical counts and the Syrup MINI size (60 ml in the
+variants, 50 ml in the title) await the owner's confirmation before sales.
 DOKU BCA still shows UPDATING at 08:39 UTC.
 The catalog's obsolete CV-approval and delivery-readiness claims are replaced
 with the actual checkout pause and links to inventory/payment/shipping settings.
@@ -131,8 +137,14 @@ Worker secret, and the real owner's verified email lookup passes without sending
 mail. Beta Worker version `cdcb7924-727f-4060-9693-ed430fdf019b` preserves checkout,
 transactional-send and campaign-send holds; investigation is enabled. A signed
 non-delivery diagnostic is ignored and an invalid signature rejected. These
-checks establish callback configuration, not provider delivery or inbox placement.
-The owner has been asked to authorize one specific mailbox connection check.
+checks initially established callback configuration. With the owner's explicit
+instruction, one connection email was submitted at 09:04:46 UTC with a saved
+idempotency key. Resend reports delivery and Gmail's Inbox contains the exact
+message; its original headers pass SPF, DKIM and DMARC. Both actual provider
+callbacks received HTTP 200 with `ignored:true`, as expected for a standalone
+connection check without a commerce delivery record. Automatic sending remains
+held. This verifies the sender, inbox and signed callback path; application
+transactional journeys and failure monitoring still need acceptance.
 See [email delivery](commerce-email-delivery.md).
 
 After the owner's separate Wallet authenticator check, the actual store's one
@@ -146,6 +158,12 @@ screens do not establish that the original registration had no effect. With the
 owner's explicit approval, a support email asking DOKU to investigate the original
 reference and service provisioning was sent to `care@doku.com` and verified in
 Sent at 08:54 UTC. No real payment, transfer, refund, shipment or payout was made.
+
+The private financial observation CLI now accepts explicit beta/production as
+well as TEST/sandbox, records the deployment with each new evidence file and
+rejects main or mismatched configuration before constructing a reader. All 16
+reader/observer cases and PHP syntax checks pass. No live seller observation was
+attempted: the original uncertain enrollment still has no confirmed profile.
 
 The sections below retain earlier rollout observations; this current-state
 record supersedes their historical “not installed” and empty-catalog statements.

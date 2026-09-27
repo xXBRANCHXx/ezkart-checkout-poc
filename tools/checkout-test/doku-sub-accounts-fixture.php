@@ -5,6 +5,8 @@ require_once dirname(__DIR__, 2) . '/cart/api/doku-sub-accounts.php';
 require_once dirname(__DIR__, 2) . '/cart/api/doku-financial-observation.php';
 
 $input = json_decode(stream_get_contents(STDIN), true, 64, JSON_THROW_ON_ERROR);
+putenv('EZKART_DEPLOYMENT_ENVIRONMENT=' . ($input['deployment'] ?? 'test'));
+putenv('EZKART_COMMERCE_ENVIRONMENT=' . ($input['configuredEnvironment'] ?? $input['credentials']['environment'] ?? 'sandbox'));
 $requests = []; $results = []; $time = $input['time'] ?? 1790416800;
 try {
     if (array_key_exists('json', $input)) {
@@ -23,8 +25,13 @@ try {
         try {
             if ($action[0] === 'auditCLI') {
                 require_once dirname(__DIR__) . '/commerce/observe-doku.php';
-                ob_start(); $exit = ez_doku_observation_main($action[1], static fn() => $client); $stdout = ob_get_clean();
-                $results[] = ['ok' => true, 'result' => ['exit' => $exit, 'stdout' => json_decode($stdout, true)]];
+                $readerEnvironments = [];
+                ob_start(); $exit = ez_doku_observation_main($action[1], static function ($environment) use ($client, $input, &$readerEnvironments) {
+                    $readerEnvironments[] = $environment;
+                    if ($environment !== $input['credentials']['environment']) throw new InvalidArgumentException('Fixture reader environment mismatch.');
+                    return $client;
+                }); $stdout = ob_get_clean();
+                $results[] = ['ok' => true, 'result' => ['exit' => $exit, 'stdout' => json_decode($stdout, true), 'readerEnvironments' => $readerEnvironments]];
                 continue;
             }
             $result = match ($action[0]) {

@@ -179,7 +179,7 @@ test('the observation CLI creates private complete evidence and preserves bounde
     const data=run({actions:[['auditCLI',args]],responses:[token(),response(balance()),history(full?hundred():[]),history([]),response(balance())]});
     const outcome=data.results[0].result;assert.equal(outcome.exit,full?2:0);assert.equal(outcome.stdout.pagesExhausted,!full);
     assert.equal(statSync(output).mode&0o777,0o600);const raw=readFileSync(output,'utf8'),rows=raw.trim().split('\n').map(JSON.parse);
-    assert.equal(rows[0].kind,'started');assert.equal(rows.at(-1).kind,'finished');assert.equal(rows.at(-1).settlementVerified,false);assert.equal(rows.at(-1).responses,4);
+    assert.equal(rows[0].kind,'started');assert.equal(rows[0].deployment,'test');assert.equal(rows[0].environment,'sandbox');assert.equal(rows.at(-1).kind,'finished');assert.equal(rows.at(-1).settlementVerified,false);assert.equal(rows.at(-1).responses,4);
     assert(!raw.includes('fixture-token'));assert(!raw.includes(credentials.secretKey));assert(!raw.includes('PRIVATE KEY'));
     for(const row of rows.filter(r=>r.evidence)){assert.equal(row.evidence.environment,'sandbox');assert.equal(row.evidence.credentialFingerprint,data.fingerprint);assert.doesNotThrow(()=>JSON.parse(row.evidence.responseBody));}
   }
@@ -190,7 +190,28 @@ test('the observation CLI creates private complete evidence and preserves bounde
   assert.deepEqual(rows.map(r=>r.kind),['started','balance_before','failed']);assert.equal(rows.at(-1).responses,1);assert(!raw.includes('private-provider-error'));assert.equal(statSync(failedOutput).mode&0o777,0o600);
 });
 
-test('the standalone observation CLI rejects production, public output, overwrites and invalid windows before reading credentials',t=>{
+test('the observation CLI binds live beta receipts to production and rejects mixed or main deployments before provider access',t=>{
+  const directory=mkdtempSync(join(tmpdir(),'ezkart-doku-beta-observation-'));chmodSync(directory,0o700);t.after(()=>rmSync(directory,{recursive:true,force:true}));
+  const output=join(directory,'beta.jsonl');
+  const args=['--environment=production','--profile='+profile,'--from='+from,'--to='+to,'--max-pages=1','--output='+output];
+  const data=run({deployment:'beta',credentials:{...credentials,environment:'production'},actions:[['auditCLI',args]],responses:[token(),response(balance()),history([]),history([]),response(balance())]});
+  assert.equal(data.results[0].result.exit,0);assert.deepEqual(data.results[0].result.readerEnvironments,['production']);
+  assert.equal(data.requests.length,5);assert(data.requests.every(r=>new URL(r.url).origin==='https://api.doku.com'));
+  const raw=readFileSync(output,'utf8'),rows=raw.trim().split('\n').map(JSON.parse);
+  assert.equal(statSync(output).mode&0o777,0o600);assert.equal(rows[0].deployment,'beta');assert.equal(rows[0].environment,'production');
+  for(const row of rows.filter(r=>r.evidence)){assert.equal(row.evidence.environment,'production');assert.equal(row.evidence.credentialFingerprint,data.fingerprint);assert.doesNotThrow(()=>JSON.parse(row.evidence.responseBody));}
+  assert.equal(rows.at(-1).atomicSnapshot,false);assert.equal(rows.at(-1).settlementVerified,false);
+  assert(!raw.includes('fixture-token'));assert(!raw.includes(credentials.secretKey));assert(!raw.includes('PRIVATE KEY'));
+  const original=readFileSync(output);
+  const cases=[['test','production','production'],['beta','sandbox','sandbox'],['production','production','production'],['production','sandbox','sandbox'],['unknown','sandbox','sandbox'],['beta','production','sandbox'],['test','sandbox','production']];
+  for(const [deployment,environment,configuredEnvironment] of cases){
+    const rejected=run({deployment,configuredEnvironment,credentials:{...credentials,environment},actions:[['auditCLI',args.map(a=>a.startsWith('--environment=')?'--environment='+environment:a.startsWith('--output=')?'--output='+join(directory,'must-not-exist.jsonl'):a)]],responses:[]},{expectErrorOutput:true});
+    assert.equal(rejected.results[0].result.exit,1);assert.deepEqual(rejected.results[0].result.readerEnvironments,[]);assert.deepEqual(rejected.requests,[]);assert.equal(rejected.errorOutput.ok,false);
+  }
+  assert.deepEqual(readdirSync(directory),['beta.jsonl']);assert.deepEqual(readFileSync(output),original);
+});
+
+test('the standalone observation CLI rejects mixed mode, public output, overwrites and invalid windows before reading credentials',t=>{
   const directory=mkdtempSync(join(tmpdir(),'ezkart-doku-cli-'));chmodSync(directory,0o700);t.after(()=>rmSync(directory,{recursive:true,force:true}));
   const command=fileURLToPath(new URL('../commerce/observe-doku.php',import.meta.url));
   const base=['--environment=sandbox','--profile='+profile,'--from='+from,'--to='+to];
@@ -206,7 +227,7 @@ test('the standalone observation CLI rejects production, public output, overwrit
     [...base,'--output='+join(directory,'bad.jsonl'),'--to='+to],
   ];
   for(const args of cases){
-    const result=spawnSync(php,[command,...args],{encoding:'utf8',env:{...process.env,EZKART_DOKU_SANDBOX_CLIENT_ID:'fixture',EZKART_DOKU_SANDBOX_SECRET_KEY:'fixture-not-a-real-secret',EZKART_DOKU_SANDBOX_SNAP_PRIVATE_KEY:'invalid-fixture-key'}});
+    const result=spawnSync(php,[command,...args],{encoding:'utf8',env:{...process.env,EZKART_DEPLOYMENT_ENVIRONMENT:'test',EZKART_COMMERCE_ENVIRONMENT:'sandbox',EZKART_DOKU_SANDBOX_CLIENT_ID:'fixture',EZKART_DOKU_SANDBOX_SECRET_KEY:'fixture-not-a-real-secret',EZKART_DOKU_SANDBOX_SNAP_PRIVATE_KEY:'invalid-fixture-key'}});
     assert.equal(result.status,1,result.stdout);assert.equal(result.stdout,'');const error=JSON.parse(result.stderr);assert.equal(error.ok,false);assert.notEqual(error.error,'configuration');
   }
   assert.equal(readFileSync(existing,'utf8'),'keep this unchanged');assert.deepEqual(readdirSync(directory).sort(),['exists.jsonl','link.jsonl','public_html']);

@@ -89,7 +89,9 @@ is reported by that invocation; there is no global synchronization watermark or
 durable completed-window certification yet. No scheduler is activated.
 
 The standalone private-file [observation command](doku-financial-reader.md)
-remains available with its existing defaults. The shared observer now accepts a
+accepts explicit TEST/sandbox or beta/production and rejects main/mixed settings
+before provider access. It records deployment/provider identity in its new private
+files and never writes the database. The shared observer now accepts a
 bounded page size; the central collector uses twenty rows to stay within the
 signed service envelope.
 

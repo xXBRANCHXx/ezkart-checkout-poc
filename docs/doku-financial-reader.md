@@ -66,7 +66,7 @@ stops further provider requests. A page budget exposes incomplete coverage. Even
 exhausted pages are not an atomic provider snapshot: late changes and backfills
 still require overlapping synchronization and transaction-level reconciliation.
 
-## Private sandbox observation
+## Private workbench observation
 
 The server-only configuration uses the existing `doku_sandbox_client_id` and
 `doku_sandbox_secret_key`, plus `doku_sandbox_snap_private_key` containing the PEM
@@ -86,13 +86,25 @@ php tools/commerce/observe-doku.php \
 ```
 
 The example profile is the existing isolated sandbox account recorded in
-[commerce-sandbox-setup.md](commerce-sandbox-setup.md). This command was not run
-against DOKU during this delivery. It accepts sandbox only, windows up to 31 days,
-and 1–40 pages per account, 100 rows per page. It is unavailable over HTTP.
+[commerce-sandbox-setup.md](commerce-sandbox-setup.md). The command accepts only
+TEST/sandbox or beta/production. Main and mismatched deployment/provider settings
+are rejected before reader construction or an output file is created.
+
+For the isolated live beta, select `deployment_environment=beta` in private
+server configuration and pass `--environment=production`, a confirmed seller's
+actual profile and a separate new private output path. The reader uses only the
+production credential slots and `api.doku.com`. Do not use a parent profile or an
+uncertain registration reference as a confirmed two-account seller profile. This
+command cannot resolve the unknown outcome of the original wallet registration.
+It does not create a wallet, order, payment or transfer.
+
+Both modes accept windows up to 31 days and 1–40 pages per account, 100 rows per
+page. The command remains unavailable over HTTP. No live seller observation has
+been run while the beta enrollment remains uncertain.
 
 Output is created exclusively with mode 0600. Existing files, symlinks, common web
 directories and repository paths are refused. JSONL records contain the query,
-exact original response, normalized values, request ID, time and credential
+exact original response, normalized values, request ID, time, deployment and credential
 fingerprint. No token, secret or private key is included. Each record is flushed
 and synchronized to disk. A failed observation retains prior evidence and a failure
 record; a crash without a final record must be treated as unfinished.
@@ -103,6 +115,12 @@ Every completed report explicitly states `atomicSnapshot:false` and
 `settlementVerified:false`. Provider balances are never seller withdrawable funds.
 
 ## Verification and remaining integration
+
+The 27 September beta extension passes all 16 reader/observer/CLI cases, including
+live-origin selection, production evidence identity, no reads or output creation
+for main/mixed configurations, unchanged TEST behavior, private evidence and HTTP
+denial. Both changed PHP files pass syntax checks. These are isolated provider
+fixtures, not acceptance of a live seller's wallet or settlement.
 
 Thirteen reader/observer/CLI tests plus both existing commerce signing tests pass.
 They independently verify RSA/HMAC signatures, token expiry, exact large numeric

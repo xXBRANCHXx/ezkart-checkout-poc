@@ -73,6 +73,16 @@ Intermediate commits do not certify the whole workbench as ready.
 
 ### 27 September: hosted beta catalog and private runtime cutover
 
+At 09:11 UTC, the two missing product descriptions are saved through the merchant
+editor and verified after reload. Prices, stock, weights, options, visibility and
+image identities are preserved. The owner has the 111-variant physical count sheet
+and a specific question about the inconsistent Syrup MINI size. One explicitly
+approved Resend connection email reached the owner's Gmail Inbox with passing
+SPF/DKIM/DMARC and actual successful signed callbacks. Automatic email sending
+remains held; transactional jobs and failure operations remain unaccepted.
+The read-only financial observation CLI now supports beta/production, with all
+16 reader/observer cases passing. None of these changes close a broader gate.
+
 At 08:55 UTC, the owner-provided pickup/return address and support contacts are
 saved and verified after reload, with the existing courier selection and other
 profile fields preserved. Beta's ordinary housekeeping run completed successfully.
