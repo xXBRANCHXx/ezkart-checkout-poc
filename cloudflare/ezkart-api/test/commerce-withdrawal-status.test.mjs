@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {setupWithdrawalInquiryFixture,withdrawalPath} from './withdrawal-inquiry-fixture.mjs';
+import {setupWithdrawalInquiryFixture,withdrawalPath,seedLegacyPaymentGrant} from './withdrawal-inquiry-fixture.mjs';
 import {setupCommerceFixture} from './commerce-fixture.mjs';
 import {applyCommerceSchema} from './commerce-schema.mjs';
 
@@ -10,7 +10,7 @@ async function fixture(t,options={}){
   const w=await f.reserve(),i=await f.start(w),bank=await f.receipt(w,f.evidence(i)),c=await f.confirm(w,bank.inquiryDigest);
   const start=()=>f.call(withdrawalPath+'/'+w.id+'/payment/start',{...f.scope(),confirmationId:c.confirmation.id,
     credentialFingerprint:'a'.repeat(64),clientId:'MCH-FIXTURE-SNAP'});
-  const g=await start();assert.equal(g.status,200,g.error);
+  const g=options.through<59?await seedLegacyPaymentGrant(f,w,c.confirmation):await start();assert.equal(g.status,200,g.error);
   const base=Date.now()-90000;let number=100;
   const at=seconds=>new Date(base+seconds*1000).toISOString();
   const evidence=(code='03',sent=0,observed=1,extra={})=>({environment:f.environment,credentialFingerprint:'a'.repeat(64),operation:'transactions-status',
@@ -111,7 +111,7 @@ test('immutable SQL guards bind normalized observations to the original provider
 test('a populated beta migration preserves original grants, journals and reservations',async t=>{
   const f=await fixture(t,{through:57,bindings:{APP_ENVIRONMENT:'beta'}});
   const tables=['commerce_withdrawals','commerce_withdrawal_payment_grants','commerce_withdrawal_confirmations','commerce_financial_journals','commerce_financial_entries'];
-  const before=await Promise.all(tables.map(name=>f.db.prepare('SELECT * FROM '+name).all()));await applyCommerceSchema(f.db,57);
+  const before=await Promise.all(tables.map(name=>f.db.prepare('SELECT * FROM '+name).all()));await applyCommerceSchema(f.db,57,58);
   for(let i=0;i<tables.length;i++)assert.deepEqual((await f.db.prepare('SELECT * FROM '+tables[i]).all()).results,before[i].results);
   assert.deepEqual((await f.db.prepare('PRAGMA foreign_key_check').all()).results,[]);
   assert.equal((await f.save(f.evidence())).status,200);assert.equal((await f.earnings()).reservedWithdrawals,'250000');

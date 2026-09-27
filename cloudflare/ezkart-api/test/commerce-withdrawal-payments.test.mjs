@@ -177,7 +177,7 @@ test('database payment guards independently bind the owner, latest confirmation,
   for(const change of [{owner_auth_id:'bob'},{commerce_environment:'production'},{credential_fingerprint:'b'.repeat(64)},
     {client_id:'MCH-OTHER'},{payment_external_id:'8'.repeat(32)},{inquiry_digest:'b'.repeat(64)},
     {request_body:wire({...request,beneficiaryAccountName:'Other'})},{request_body:wire({...request,amount:{value:'250001.00',currency:'IDR'}})}])
-    await assert.rejects(insert('commerce_withdrawal_payment_grants',{...row,...change}),/withdrawal_payment_source/);
+    await assert.rejects(insert('commerce_withdrawal_payment_grants',{...row,...change}),/withdrawal_payment_(source|platform_required)/);
   await assert.rejects(insert('commerce_withdrawal_payment_grants',{...row,confirmation_id:'wdconf_'+'f'.repeat(40)}),/withdrawal_payment_confirmation/);
   await assert.rejects(insert('commerce_withdrawal_payment_grants',{...row,funds_json:'{}'}),/withdrawal_funds_unavailable/);
   for(const proof_expires_at of [new Date(Date.now()-1000).toISOString(),new Date(Date.now()+700000).toISOString()])

@@ -37,6 +37,37 @@ guess that the absence of a receipt means no money moved.
 
 ## Original response and private recovery
 
+### Original platform account
+
+Migration 0059 freezes the configured platform wallet's enrollment identity in
+every new payment grant. Its active store, distinct confirmed cash account,
+provider parent, client and credential fingerprint are checked inside the grant
+transaction. Browser/service payloads cannot choose the platform account.
+Private grant/recovery responses identify the original account and the fixed
+Ezkart-paid fee policy, with `providerFundingVerified: false`. Configuration
+changes cannot replace that account or renew send authority. Merchant details
+do not expose the platform account.
+
+Earlier grants receive a null account reference. They are never backfilled from
+current configuration and remain non-retryable. Their original receipt/status
+recovery continues working. This preserves uncertain historical transport while
+requiring review of missing fee-account provenance.
+
+This binding does not quote a fee, reserve platform money, establish DOKU's
+billing account or prove fee funding. Those facts and matched payout accounting
+are still required before payment execution can be enabled.
+
+All 29 affected cases pass: 24 Worker cases and five PHP/merchant/browser cases.
+Coverage includes configuration changes, injected/same-seller/inactive provider
+accounts, direct SQL guards and a populated 0058 upgrade, plus original payment
+and status recovery. JavaScript syntax, whitespace and the beta dry build pass.
+The fresh beta export restores 166 tables; migration rehearsal preserves all
+original columns and rows while adding the nullable identity and its new-source
+guard. Private evidence is under `platform-before-0059-20260928/` in the beta
+evidence directory. Hosted rollout is pending.
+
+### Original payment evidence
+
 The service validates the original eight-field transport envelope, exact request
 bytes, original dispatch ID, credential/environment scope, destination, amount,
 currency, source account, bank-returned name and timestamps. It independently

@@ -10,6 +10,14 @@ const ownerFields=['environment','seller','actor'];
 const date=withdrawalEvidenceDate,text=withdrawalEvidenceText,wire=withdrawalEvidenceJSON;
 function scope(env,environment){commerceEnvironment(env,environment);if(!['test','beta'].includes(env.APP_ENVIRONMENT))fail('Withdrawals are not enabled on this deployment',503);}
 const grant=(env,id,environment)=>env.DB.prepare('SELECT * FROM commerce_withdrawal_payment_grants WHERE withdrawal_id=? AND commerce_environment=?').bind(id,environment).first();
+async function feeAccount(env,enrollment){
+  if(!enrollment)return null;
+  const row=await env.DB.prepare(`SELECT e.seller_id,p.profile_id,p.cash_account,b.parent_profile_id FROM commerce_wallet_enrollments e
+    JOIN commerce_wallet_provider_profiles p ON p.enrollment_id=e.id JOIN commerce_wallet_provider_bindings b ON b.enrollment_id=e.id WHERE e.id=?`).bind(enrollment).first();
+  if(!row)fail('The original platform account requires review',409);
+  return {enrollmentId:enrollment,seller:row.seller_id,profileId:row.profile_id,cashAccount:row.cash_account,parentProfileId:row.parent_profile_id,
+    feePayer:'ezkart',sellerWithdrawalFee:'0',providerFundingVerified:false};
+}
 async function inquiry(env,id){
   const row=await env.DB.prepare(`SELECT g.*,r.inquiry_digest,r.evidence_json,r.provider_reference,r.beneficiary_name
     FROM commerce_withdrawal_inquiry_grants g JOIN commerce_withdrawal_inquiry_receipts r ON r.withdrawal_id=g.withdrawal_id WHERE g.withdrawal_id=?`).bind(id).first();
@@ -40,18 +48,25 @@ export async function startWithdrawalPayment(env,id,input){
   const previous=await grant(env,id,input.environment);if(previous)return replay(previous);
   const original=await inquiry(env,id);
   if(original.credential_fingerprint!==input.credentialFingerprint||original.client_id!==input.clientId)fail('Payment credentials differ from the original bank inquiry',409);
+  if(typeof env.COMMERCE_PLATFORM_WALLET_SELLER!=='string'||!/^[A-Za-z0-9][A-Za-z0-9_-]{2,95}$/.test(env.COMMERCE_PLATFORM_WALLET_SELLER)
+    ||env.COMMERCE_PLATFORM_WALLET_SELLER===input.seller)fail('The platform withdrawal-fee account is not configured',503);
+  const platform=await env.DB.prepare(`SELECT p.enrollment_id FROM commerce_wallet_enrollments e
+    JOIN commerce_wallet_provider_profiles p ON p.enrollment_id=e.id AND p.commerce_environment=e.commerce_environment
+    WHERE e.seller_id=? AND e.commerce_environment=?`).bind(env.COMMERCE_PLATFORM_WALLET_SELLER,input.environment).first();
+  if(!platform)fail('A confirmed platform account is required before withdrawal payment',409);
   try{
     await env.DB.prepare(`INSERT INTO commerce_withdrawal_payment_grants(withdrawal_id,commerce_environment,confirmation_id,owner_auth_id,
-      proof_expires_at,credential_fingerprint,client_id,payment_external_id,inquiry_digest,request_body,funds_json,created_at)
-      SELECT ?,?,?,?,?,?,?,?,?,?,f.source_json,strftime('%Y-%m-%dT%H:%M:%fZ','now') FROM commerce_withdrawal_funds f WHERE f.seller_id=? AND f.commerce_environment=?`)
+      proof_expires_at,credential_fingerprint,client_id,payment_external_id,inquiry_digest,request_body,platform_enrollment_id,funds_json,created_at)
+      SELECT ?,?,?,?,?,?,?,?,?,?,?,f.source_json,strftime('%Y-%m-%dT%H:%M:%fZ','now') FROM commerce_withdrawal_funds f WHERE f.seller_id=? AND f.commerce_environment=?`)
       .bind(id,input.environment,input.confirmationId,input.actor.id,input.actor.proofExpiresAt,input.credentialFingerprint,input.clientId,
-        original.payment_external_id,original.inquiry_digest,paymentBody(original),input.seller,input.environment).run();
+        original.payment_external_id,original.inquiry_digest,paymentBody(original),platform.enrollment_id,input.seller,input.environment).run();
   }catch(error){const saved=await grant(env,id,input.environment);if(saved)return replay(saved);paymentFailure(error);}
   if(!await grant(env,id,input.environment))fail('Withdrawal payment could not be prepared',409);
   return {mayPay:true,binding:original.binding,originalInquiry:original.original,inquiryDigest:original.inquiry_digest,
-    confirmationId:input.confirmationId,payoutConfirmed:false};
+    confirmationId:input.confirmationId,feeAccount:await feeAccount(env,platform.enrollment_id),payoutConfirmed:false};
 }
 function paymentFailure(error){
+  if(/withdrawal_payment_platform_required/.test(String(error)))fail('The platform fee account does not match the original provider identity',409);
   if(/withdrawal_payment_confirmation/.test(String(error)))fail('Confirm the original bank details again with fresh Wallet verification',409);
   if(/withdrawal_payment_source/.test(String(error)))fail('The payment no longer matches its original bank inquiry',409);
   withdrawalFailure(error);
@@ -104,7 +119,8 @@ export async function withdrawalPaymentRecovery(env,id,input){
   const r=await env.DB.prepare('SELECT evidence_json,payment_digest FROM commerce_withdrawal_payment_receipts WHERE withdrawal_id=?').bind(id).first();
   const diagnostic=await env.DB.prepare('SELECT stage,reason,provider_status AS providerStatus,recorded_at AS recordedAt FROM commerce_withdrawal_payment_diagnostics WHERE withdrawal_id=?').bind(id).first();
   return {binding:original.binding,clientId:g.client_id,originalInquiry:original.original,inquiryDigest:g.inquiry_digest,confirmationId:g.confirmation_id,
-    requestBody:g.request_body,originalPayment:r?JSON.parse(r.evidence_json):null,paymentDigest:r?.payment_digest||null,diagnostic,mayPay:false,payoutConfirmed:false};
+    requestBody:g.request_body,originalPayment:r?JSON.parse(r.evidence_json):null,paymentDigest:r?.payment_digest||null,diagnostic,
+    feeAccount:await feeAccount(env,g.platform_enrollment_id),mayPay:false,payoutConfirmed:false};
 }
 
 export async function recordWithdrawalPaymentDiagnostic(env,id,input){

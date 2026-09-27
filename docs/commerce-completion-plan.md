@@ -73,6 +73,14 @@ Intermediate commits do not certify the whole workbench as ready.
 
 ### 28 September: withdrawal status observations
 
+The subsequent [platform-account binding](withdrawal-payment-grants.md#original-platform-account)
+freezes Ezkart's confirmed account in each new payment grant, checks its original
+parent/credentials atomically and prevents later configuration from redirecting
+fee responsibility. Existing grants are preserved without inventing an account.
+All 29 affected cases and the populated migration rehearsal pass; hosted rollout
+is pending. Actual fee funding, cash-history matching and final payout accounting
+remain open.
+
 The [status workflow](withdrawal-status-reconciliation.md) adds explicit protected
 DOKU reads of the original transfer, immutable observations and private recovery.
 Wallet distinguishes provider-reported outcomes from reconciled payouts. Late

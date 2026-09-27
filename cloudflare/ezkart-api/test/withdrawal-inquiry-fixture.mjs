@@ -3,6 +3,20 @@ import {setupEarningsFixture,key} from './earnings-fixture.mjs';
 
 export const withdrawalPath='/internal/commerce/finance/withdrawals';
 export const owner=()=>({id:'alice',email:'alice@example.test',proofExpiresAt:new Date(Date.now()+550000).toISOString()});
+// Seed the exact pre-0059 grant shape for populated migration tests. Production
+// code must always use its current validated insertion path.
+export async function seedLegacyPaymentGrant(f,w,confirmation){
+  const original=await f.recover(w),response=JSON.parse(original.originalEvidence.responseBody),scope=f.scope();
+  const requestBody=JSON.stringify({...JSON.parse(original.originalEvidence.requestBody),referenceNo:response.referenceNo,beneficiaryAccountName:response.beneficiaryAccountName})
+    .replace(/\u2028/g,'\\u2028').replace(/\u2029/g,'\\u2029');
+  const binding=await f.db.prepare('SELECT client_id FROM commerce_withdrawal_inquiry_grants WHERE withdrawal_id=?').bind(w.id).first();
+  await f.db.prepare(`INSERT INTO commerce_withdrawal_payment_grants(withdrawal_id,commerce_environment,confirmation_id,owner_auth_id,
+    proof_expires_at,credential_fingerprint,client_id,payment_external_id,inquiry_digest,request_body,funds_json,created_at)
+    SELECT ?,?,?,?,?,?,?,?,?,?,f.source_json,strftime('%Y-%m-%dT%H:%M:%fZ','now') FROM commerce_withdrawal_funds f WHERE f.seller_id=? AND f.commerce_environment=?`)
+    .bind(w.id,f.environment,confirmation.id,scope.actor.id,scope.actor.proofExpiresAt,original.binding.credentialFingerprint,binding.client_id,
+      original.binding.paymentExternalId,original.inquiryDigest,requestBody,scope.seller,f.environment).run();
+  return {status:200,binding:original.binding,originalInquiry:original.originalEvidence,inquiryDigest:original.inquiryDigest,confirmationId:confirmation.id};
+}
 export async function setupWithdrawalInquiryFixture(t,options={}){
   const f=await setupEarningsFixture(t,{...options,bindings:{COMMERCE_WITHDRAWAL_INQUIRY:'enabled',...options.bindings}});
   const scope=()=>({environment:f.environment,seller:'seller_alice',actor:owner()});
