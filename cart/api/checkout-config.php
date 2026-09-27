@@ -14,7 +14,7 @@ try {
     if (ez_central_commerce_enabled()) ez_central_commerce_environment();
     if (!ez_new_checkout_enabled()) {
         header('Retry-After: 300');
-        ez_api_json(['ok' => false, 'error' => 'Checkout is temporarily paused. Please try again later.'], 503);
+        ez_api_json(['ok' => false, 'code' => 'checkout_paused', 'error' => 'Checkout is temporarily paused. Please try again later.'], 503);
     }
     ez_api_json([
         'ok' => true,

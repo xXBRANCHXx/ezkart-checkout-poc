@@ -206,6 +206,10 @@
 
   async function loadCatalog() {
     if (state.pendingCheckout || state.recoveryError) { renderRecovery(); return; }
+    document.querySelector('.checkout-layout').classList.remove('is-paused');
+    document.querySelector('.order-summary').hidden=false;
+    (byId('catalog-error-title')||byId('catalog-error').querySelector('b')).textContent='We couldn’t load your cart';
+    byId('catalog-error').setAttribute('role','alert');
     if (hostedEntry && !hostedStore) {
       try {
         const data = await window.EzkartStorefront.load(params.has("product") ? { product: params.get("product"), ...(params.has("store") ? { store: params.get("store") } : {}) } : { store: params.get("store"), mode: "checkout" });
@@ -272,7 +276,8 @@
       const config = await configResponse.json().catch(() => ({}));
       if (!configResponse.ok || !["sandbox", "production"].includes(config.environment)
           || config.shipping_required !== (config.environment === "production")) {
-        throw new Error(typeof config.error === "string" ? config.error : "Checkout settings could not load. Please try again.");
+        throw Object.assign(new Error(typeof config.error === "string" ? config.error : "Checkout settings could not load. Please try again."),
+          {checkoutPaused:configResponse.status===503&&config.code==='checkout_paused'});
       }
       state.environmentShippingRequired = config.shipping_required;
       state.durableCheckout = config.durable_checkout === true;
@@ -317,6 +322,12 @@
     } catch (error) {
       byId("catalog-loading").hidden = true;
       byId("catalog-error").hidden = false;
+      if(error?.checkoutPaused){
+        (byId('catalog-error-title')||byId('catalog-error').querySelector('b')).textContent='Checkout is paused';
+        byId('catalog-error').setAttribute('role','status');
+        document.querySelector('.order-summary').hidden=true;
+        document.querySelector('.checkout-layout').classList.add('is-paused');
+      }
       byId("catalog-error-message").textContent = friendlyError(
         error instanceof Error ? error.message : "",
         "Please try again.",

@@ -31,7 +31,7 @@ test('PHP checkout activation defaults agree with Worker beta policy and cannot 
 test('beta hold stops checkout before shipping or payment calls while existing paid recovery stays available on desktop and mobile',async t=>{
   const f=await setupCentralFixture(t,beta,{bindings:{APP_ENVIRONMENT:'beta',COMMERCE_CHECKOUT:'held'}});
   const config=await fetch(f.app.base+'/cart/api/checkout-config.php');assert.equal(config.status,503);assert.equal(config.headers.get('retry-after'),'300');
-  assert.match((await config.json()).error,/temporarily paused/);
+  const heldConfig=await config.json();assert.match(heldConfig.error,/temporarily paused/);assert.equal(heldConfig.code,'checkout_paused');
   const request=input(),start=await f.app.request('/cart/api/start.php',request);assert.equal(start.status,503);assert.match(start.data.error,/temporarily paused/);
   assert.equal(start.data.retry_same_checkout,true);
   assert.equal(await f.count('orders'),0);assert.equal(await f.count('inventory_reservations'),0);
@@ -49,6 +49,9 @@ test('beta hold stops checkout before shipping or payment calls while existing p
     await page.goto(f.app.base+'/cart/?shop=alice-shop&cart=tea:2');
     await page.locator('#catalog-error').waitFor({state:'visible'});
     assert.match(await page.locator('#catalog-error-message').innerText(),/temporarily paused/);
+    assert.equal(await page.locator('#catalog-error-title').innerText(),'Checkout is paused');
+    assert.equal(await page.locator('.order-summary').isVisible(),false);
+    assert.equal(await page.locator('#back-to-store').isVisible(),true);
     assert.equal(await page.locator('#to-checkout').isDisabled(),true);
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
     if(process.env.EZKART_TEST_SCREENSHOTS)await page.screenshot({path:join(process.env.EZKART_TEST_SCREENSHOTS,`checkout-held-${width}.png`),fullPage:true,animations:'disabled'});

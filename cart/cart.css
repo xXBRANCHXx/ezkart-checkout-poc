@@ -70,7 +70,7 @@ img { display: block; max-width: 100%; }
 .checkout-recovery h2 { margin: 0 0 8px; font-size: 19px; }
 .checkout-recovery p { margin: 0 0 18px; color: var(--muted); font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
 .checkout-recovery .outline-button { min-height: 44px; }
-.checkout-layout.is-recovering { grid-template-columns: minmax(0, 680px); justify-content: center; }
+.checkout-layout.is-recovering, .checkout-layout.is-paused { grid-template-columns: minmax(0, 680px); justify-content: center; }
 .checkout-recovery #recovery-total { color: var(--ink); font-weight: 600; }
 .visually-hidden {
   position: absolute;

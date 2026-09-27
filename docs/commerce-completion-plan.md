@@ -126,6 +126,17 @@ publication. Real application-message acceptance, incident alerting and sustaine
 capacity remain open; the prior standalone owner email is not relabeled as an
 order notification.
 
+### 28 September: timed finish — hosted journeys
+
+The [hosted acceptance record](hosted-beta-acceptance.md) covers the real shop,
+option/cart navigation, existing customer and merchant screens, analytics,
+marketing drafts and actual compact-scheduler runs. The expected checkout pause
+now displays clearly without an uncomputed zero-total summary, preserving saved
+payment recovery. The latest signed-in DOKU check still shows BCA updating and
+wallet/routing services disabled. Live purchase-to-refund acceptance and a fresh
+seller identity remain unverified; no provider outcomes or customer accounts
+were fabricated to fill those gaps.
+
 ### 28 September: original DOKU refund request preparation
 
 The [provider handoff](refund-provider-handoffs.md) adds buyer-owned private bank
