@@ -94,11 +94,17 @@ export async function refundDetail(env,actor,id,expectedOrder=''){
       FROM commerce_returns r WHERE r.order_id=? AND r.seller_id=? AND EXISTS(SELECT 1 FROM commerce_return_items ri
         JOIN commerce_refund_items fi ON fi.order_item_id=ri.order_item_id WHERE ri.return_id=r.id AND fi.refund_id=?)
       ORDER BY r.created_at DESC,r.id DESC LIMIT 20`).bind(id,row.order_id,row.seller_id,id),
+    env.DB.prepare(`SELECT id,actor_kind,filename,mime_type,size_bytes,content_hash,caption,state,created_at,ready_at
+      FROM commerce_refund_attachments WHERE refund_id=? ORDER BY sequence`).bind(id),
   ]);
   const data=JSON.parse(row.data_json),canWrite=commerceStorageEnabled(env)&&authority.canWrite&&row.state==='requested';
   const payment=result[2].results[0];
   await access(env,actor,row.order_id);
   return {...caseView(row),orderRevision:order.revision,reason:data.reason,note:data.note,shippingAmount:row.shipping_amount,
+    evidenceVersion:result[4].results.reduce((sum,file)=>sum+1+(file.state==='ready'?1:0),0),
+    canUploadEvidence:commerceStorageEnabled(env)&&authority.canWrite,
+    attachments:result[4].results.map(file=>({id:file.id,actor:file.actor_kind==='merchant'?'Store':'Buyer',filename:file.filename,
+      mime:file.mime_type,size:file.size_bytes,sha256:file.content_hash,caption:file.caption,state:file.state,createdAt:file.created_at,readyAt:file.ready_at})),
     items:result[0].results.map(i=>{const snapshot=JSON.parse(i.fulfillment_snapshot_json),file=snapshot.digitalFile;
       return {orderItemId:i.order_item_id,amount:i.amount,title:i.title,variant:snapshot.variantName||'',quantity:i.quantity,price:i.unit_price_amount,type:i.product_type,
         ...(i.product_type==='digital'?{download:file&&i.purchased_file===file.id?{filename:file.filename,version:file.version,size:file.size,confirmedAt:i.downloaded_at||null}:null}:{})};}),
@@ -151,21 +157,23 @@ export async function createRefund(env,actor,orderId,raw){
 
 export async function changeRefund(env,actor,id,raw,expectedOrder=''){
   caseId(id);const detail=await refundDetail(env,actor,id,expectedOrder);await writable(env,actor,detail.orderId);
-  fields(raw,['requestKey','revision','orderRevision','kind','message']);
+  fields(raw,['requestKey','revision','orderRevision','kind','message','evidenceVersion']);
   if(!['approve','decline','withdraw'].includes(raw.kind))fail('Refund action is invalid.');
   if(actor.kind==='buyer'&&raw.kind!=='withdraw')fail('Only the store can decide a refund request.',403);
   const input={requestKey:requestKey(raw.requestKey),revision:integer(raw.revision,'Refund revision',1,Number.MAX_SAFE_INTEGER),
-    orderRevision:integer(raw.orderRevision,'Order revision',1,Number.MAX_SAFE_INTEGER),kind:raw.kind,message:message(raw.message)};
+    orderRevision:integer(raw.orderRevision,'Order revision',1,Number.MAX_SAFE_INTEGER),kind:raw.kind,message:message(raw.message),
+    ...(raw.evidenceVersion===undefined?{}:{evidenceVersion:integer(raw.evidenceVersion,'Evidence version',0,40)})};
   const hash=await commerceHash({actor:{kind:actor.kind,id:actor.id},refundId:id,environment:mode(env),...input});
   const replay=async()=>{const saved=await env.DB.prepare('SELECT refund_id,request_hash FROM commerce_refund_actions WHERE actor_auth_user_id=? AND request_key=?').bind(actor.id,input.requestKey).first();
     if(!saved)return null;if(saved.refund_id!==id||saved.request_hash!==hash)conflict('This request identity was already used for another refund decision.');return refundDetail(env,actor,id,expectedOrder);};
   const previous=await replay();if(previous)return previous;
   if(detail.revision!==input.revision||detail.orderRevision!==input.orderRevision)conflict('The order or refund request changed. Reload before deciding.');
+  if(detail.evidenceVersion!==(input.evidenceVersion??0))conflict('The supporting files changed. Reload and review them before deciding.');
   if(!detail['can'+input.kind[0].toUpperCase()+input.kind.slice(1)])conflict('This action is no longer available. Reload the refund request.');
   const authority=await access(env,actor,detail.orderId),now=new Date().toISOString();
   try{await env.DB.prepare(`INSERT INTO commerce_refund_actions(id,refund_id,seller_id,actor_kind,actor_auth_user_id,request_key,request_hash,
-    previous_revision,order_revision,kind,message,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`)
-    .bind('raction_'+crypto.randomUUID().replaceAll('-',''),id,authority.sellerId,actor.kind,actor.id,input.requestKey,hash,input.revision,input.orderRevision,input.kind,input.message,now).run();}
+    previous_revision,order_revision,kind,message,created_at,evidence_version) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+    .bind('raction_'+crypto.randomUUID().replaceAll('-',''),id,authority.sellerId,actor.kind,actor.id,input.requestKey,hash,input.revision,input.orderRevision,input.kind,input.message,now,input.evidenceVersion??0).run();}
   catch(error){const saved=await replay();if(saved)return saved;databaseFailure(error);}
   return refundDetail(env,actor,id,expectedOrder);
 }

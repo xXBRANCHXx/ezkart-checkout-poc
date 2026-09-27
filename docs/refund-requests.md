@@ -194,6 +194,56 @@ No hosted refund, order, delivery or provider operation was created. Signed-in
 hosted acceptance still awaits the shared Chrome connection. Private rollout
 artifacts are under `/tmp/ezkart-refund-evidence-deploy-01a0d643/`.
 
+## Private supporting files
+
+Migration 0063 adds purchase-bound original attachments. The buyer and current
+store editors can add JPG, PNG, WebP and PDF files to an existing refund request;
+store viewers can read them. Each file is at most 5 MiB, each side has ten slots
+per request, and an account can reserve twenty new uploads per hour. The database
+checks these limits and current ownership/membership inside each write.
+
+Files, filenames and descriptions are retained exactly as supplied, including
+embedded metadata. They are kept in private R2, never public asset URLs. The UI
+explains retention before uploading. It offers authenticated original downloads,
+without embedding documents or interpreting uploaded content in the page. MIME
+signatures and filename extensions are checked; this is not a malware scanner.
+Worker, PHP and browser verify the recorded size/hash before delivering the file.
+PHP buffers the bounded response until its original session is checked again.
+
+An immutable reservation precedes R2 storage. The original actor, refund,
+environment, filename, description, type, size and content hash determine the
+upload identity. Selecting the same original file and description resumes a lost
+reply or interrupted upload without consuming another slot. Ready files are
+never replaced. Missing or changed originals require storage review. Incomplete
+uploads remain visible and resumable; their reserved slots and original metadata
+are retained. No file bytes are placed in browser local storage or email.
+
+Each new reservation and completed upload advances the case's evidence version.
+A decision must reference the exact version reviewed; both the API and database
+reject a stale decision. Original decision retries remain recoverable after later
+evidence. Additional files can be appended after a decision, with their own
+timestamps, and do not alter that decision, payment, ledger, stock or entitlements.
+The existing approval/decline/withdrawal lifecycle is unchanged.
+
+The merchant API adds `POST /v1/commerce/refunds/:refund/evidence` and private
+`GET /v1/commerce/refunds/:refund/evidence/:attachment`. The buyer equivalents
+are below `/v1/customer/orders/:order/refunds/:refund`. Both PHP proxies preserve
+their original account, CSRF and session checks; neither exposes a public file URL.
+
+Six new API cases cover exact original recovery, storage corruption, live access
+revocation, concurrent quotas, maximum-size files, stale decisions and a populated
+upgrade. The eighteen existing refund/evidence/notification cases also pass. The
+historical 0046 fixture now seeds its original refund rows through the original
+database guards rather than calling a current API against an old schema.
+Nine affected PHP/browser cases pass, including exact lost-response retries,
+original downloads on both screens at 1360px/390px, a full 5 MiB file, stale
+decisions and response suppression after a sign-in change. All four attachment
+layouts are visually inspected. These use isolated fixtures and no provider calls.
+The beta build, PHP/JS syntax and diff checks pass. A fresh beta export restores
+172 tables; the 0063 rehearsal preserves every original column and row, adds one
+empty evidence table and defaults older decisions' evidence version to zero.
+Deployed acceptance is recorded in [beta readiness](beta-readiness.md).
+
 ## Provider execution constraints checked on 27 September
 
 The current central payment adapter accepts verified BCA virtual-account captures.

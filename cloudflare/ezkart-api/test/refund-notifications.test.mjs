@@ -118,7 +118,15 @@ test('0046 preserves populated legacy inboxes, reads, preferences and email jobs
   await finishCommerceJob(f.env,job.id,{environment:'sandbox',workerId:'legacy_receipt',leaseToken:job.leaseToken,outcome:'succeeded'});
   const recipient=await f.db.prepare("SELECT id FROM commerce_notification_recipients WHERE actor_kind='merchant'").first();
   await readNotifications(f.env,{kind:'merchant',id:'alice',sellerId:'seller_alice'},{ids:[recipient.id]});
-  const r=await f.request();await f.decide(r,'approve');
+  // Seed through the original 0045 guards, without calling today's detail API,
+  // which also requires the later private-evidence schema.
+  const original=f.input(),refundId='ref_'+key(),capture=await f.db.prepare('SELECT id FROM commerce_payment_captures WHERE order_id=?').bind(f.order.id).first();
+  await f.db.prepare(`INSERT INTO commerce_refunds(id,seller_id,order_id,commerce_environment,capture_id,actor_kind,actor_auth_user_id,request_key,request_hash,order_revision,data_json,amount,shipping_amount,created_at,updated_at)
+    VALUES(?,'seller_alice',?,'sandbox',?,'buyer',?,?,?,?,?,1000,0,?,?)`)
+    .bind(refundId,f.order.id,capture.id,buyer,original.requestKey,'a'.repeat(64),f.order.revision,JSON.stringify({reason:original.reason,note:original.note,items:original.items,shippingAmount:0}),now,now).run();
+  await f.db.prepare(`INSERT INTO commerce_refund_actions(id,refund_id,seller_id,actor_kind,actor_auth_user_id,request_key,request_hash,previous_revision,order_revision,kind,message,created_at)
+    VALUES(?,?,'seller_alice','merchant','alice',?,?,1,?,'approve','Original decision message.',?)`)
+    .bind('raction_'+key(),refundId,key(),'b'.repeat(64),f.order.revision,now).run();
   const tables=(await f.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%' ORDER BY name").all()).results.map(row=>row.name),before=new Map();
   for(const name of tables){const columns=(await f.db.prepare('PRAGMA table_info('+name+')').all()).results.map(c=>'"'+c.name+'"').join(',');before.set(name,{columns,rows:(await f.db.prepare('SELECT '+columns+' FROM '+name).all()).results});}
   assert.equal(before.get('commerce_notification_events').rows.length,1);assert.equal(before.get('commerce_notification_recipients').rows.length,2);assert.equal(before.get('commerce_notification_reads').rows.length,1);

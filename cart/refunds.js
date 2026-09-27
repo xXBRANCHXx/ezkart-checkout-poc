@@ -40,11 +40,12 @@
     const retry=button('Retry confirmation',()=>void send());retry.dataset.refundRetry='';box.append(retry);
     if(rejected){const review=button('Review changes',()=>void reviewChanges());review.dataset.refundReviewChanges='';box.append(review);}controls();
   }
-  async function api(path,body){
+  async function api(path,body,binary=false){
     let url,headers={'Content-Type':'application/json','X-Ezkart-CSRF':root.dataset.csrf};
     if(merchant){url='/cart/admin/?cloud='+encodeURIComponent(path);headers['X-Ezkart-Refund-Account']=root.dataset.account;headers['X-Ezkart-Refund-Store']=root.dataset.store;}
-    else{const parsed=new URL(path,location.origin),id=parsed.pathname.slice(base.length).replace(/^\//,'');url='/cart/admin/customer-refunds.php?'+new URLSearchParams({order:root.dataset.order,...(id?{refund:id}:{}),...Object.fromEntries(parsed.searchParams)});headers['X-Ezkart-Customer-Session']=root.dataset.version;}
+    else{const parsed=new URL(path,location.origin),[id,action,attachment]=parsed.pathname.slice(base.length).replace(/^\//,'').split('/');url='/cart/admin/customer-refunds.php?'+new URLSearchParams({order:root.dataset.order,...(id?{refund:id}:{}),...(action==='evidence'?{evidence:attachment||'upload'}:{}),...Object.fromEntries(parsed.searchParams)});headers['X-Ezkart-Customer-Session']=root.dataset.version;}
     const response=await fetch(url,{method:body===undefined?'GET':'POST',credentials:'same-origin',cache:'no-store',headers,signal:AbortSignal.timeout(35000),...(body===undefined?{}:{body})});
+    if(binary&&response.ok)return {bytes:await response.arrayBuffer(),mime:response.headers.get('content-type'),sha256:response.headers.get('x-ezkart-file-sha256')};
     let data;try{data=await response.json();}catch{throw Error('The response was interrupted. Retry confirmation.');}
     if(!response.ok||data.ok!==true){const e=Error(data.error||'The refund result could not be confirmed.');e.status=response.status;if([401,403].includes(e.status))end(e.message);throw e;}return data;
   }
@@ -104,16 +105,58 @@
     const lines=el('ul',undefined,'refund-lines');for(const i of r.items)lines.append(el('li',i.title+(i.variant?' — '+i.variant:'')+': '+money(i.amount)+' requested from '+money(i.quantity*i.price)));if(r.shippingAmount)lines.append(el('li','Shipping: '+money(r.shippingAmount)));detail.append(lines);
     if(r.state==='approved')detail.append(el('p','Approved by the store. The refund has not been paid. Refund processing is not available yet.'));
     renderEvidence(r);
+    renderAttachments(r);
     const history=el('div',undefined,'refund-history');history.append(el('h4','Request history'),el('p','Requested · '+date(r.createdAt)));
     for(const a of r.history){const row=el('article');row.append(el('b',a.actor+' · '+({approve:'Approved',decline:'Declined',withdraw:'Withdrawn'}[a.kind])),el('time',date(a.createdAt)),el('p',a.message));history.append(row);}detail.append(history);
     const available=['approve','decline','withdraw'].filter(kind=>r['can'+kind[0].toUpperCase()+kind.slice(1)]);
     if(available.length){const decision=el('form',undefined,'refund-decision'),label=el('label',merchant?'Message for the buyer':'Why are you withdrawing?'),note=el('textarea');note.name='message';note.required=true;note.minLength=3;note.maxLength=2000;note.rows=3;label.append(note);decision.append(label);
       if(merchant&&r.canApprove)decision.append(el('p','Approval records your decision. Refund processing is not available yet.'));
       const actions=el('div',undefined,'refund-buttons');for(const kind of available){const action=el('button',({approve:'Approve request',decline:'Decline request',withdraw:'Withdraw request'}[kind]));action.type='submit';action.dataset.kind=kind;actions.append(action);}decision.append(actions);
-      decision.addEventListener('input',()=>{dirty=true;controls();});decision.addEventListener('submit',e=>{e.preventDefault();const kind=e.submitter?.dataset.kind;if(!kind||!decision.reportValidity())return;void persistAndSend(casePath(r.id),{requestKey:crypto.randomUUID().replaceAll('-',''),revision:r.revision,orderRevision:r.orderRevision,kind,message:note.value});});detail.append(decision);
+      decision.addEventListener('input',()=>{dirty=true;controls();});decision.addEventListener('submit',e=>{e.preventDefault();const kind=e.submitter?.dataset.kind;if(!kind||!decision.reportValidity())return;
+        const evidenceForm=detail.querySelector('[data-refund-file-form]');if(evidenceForm&&(evidenceForm.elements.file.value||evidenceForm.elements.caption.value)){error('Add or clear the selected evidence before deciding.');return;}
+        void persistAndSend(casePath(r.id),{requestKey:crypto.randomUUID().replaceAll('-',''),revision:r.revision,orderRevision:r.orderRevision,evidenceVersion:r.evidenceVersion,kind,message:note.value});});detail.append(decision);
     }
     const reload=button('Reload request',()=>void show(r.id)),footer=el('div',undefined,'refund-buttons');reload.dataset.refundDetailReload='';footer.append(reload);
     if(available.length){const discard=button('Discard decision draft',()=>{dirty=false;renderDetail(r);});discard.dataset.refundDiscard='';footer.append(discard);}detail.append(footer);controls();
+  }
+  async function downloadAttachment(r,file){
+    if(busy||loading||pending||ended)return;busy=true;controls();error('');
+    try{const response=await api(casePath(r.id)+'/evidence/'+file.id,undefined,true);if(ended)return;
+      const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',response.bytes))].map(n=>n.toString(16).padStart(2,'0')).join('');
+      if(response.bytes.byteLength!==file.size||response.mime!==file.mime||hash!==file.sha256||response.sha256!==file.sha256)throw Error('The original file could not be verified. Reload before trying again.');
+      const url=URL.createObjectURL(new Blob([response.bytes],{type:file.mime})),link=el('a');link.href=url;link.download=file.filename;document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);notice('The original file is ready to save.');
+    }catch(e){if(!ended)error(e.message);}finally{busy=false;controls();}
+  }
+  function renderAttachments(r){
+    const box=el('section',undefined,'refund-evidence');box.dataset.refundAttachments='';box.append(el('h4','Supporting files'),el('p','Files are private to this purchase’s buyer and store. Originals and descriptions are retained with the request. Evidence added later does not change an earlier decision.'));
+    const files=r.attachments||[];
+    if(!files.length)box.append(el('p','No supporting files yet.'));
+    for(const file of files){const row=el('article');row.append(el('b',file.filename),el('p',file.actor+' · '+date(file.createdAt)+' · '+new Intl.NumberFormat().format(file.size)+' bytes'));
+      if(file.caption)row.append(el('p',file.caption));
+      if(file.state==='ready'){const download=button('Download original: '+file.filename,()=>void downloadAttachment(r,file));row.append(download);}
+      else row.append(el('p','Upload not confirmed. The original uploader can resume by selecting the same file and description.'));
+      box.append(row);
+    }
+    if(r.canUploadEvidence){
+      const upload=el('form');upload.dataset.refundFileForm='';const fileLabel=el('label','Evidence file'),fileInput=el('input'),captionLabel=el('label','File description (optional)'),caption=el('textarea');
+      fileInput.type='file';fileInput.name='file';fileInput.accept='.jpg,.jpeg,.png,.webp,.pdf';fileInput.required=true;fileLabel.append(fileInput);caption.name='caption';caption.maxLength=500;caption.rows=2;captionLabel.append(caption);
+      const add=el('button','Add or retry evidence');add.type='submit';const clear=button('Clear selected evidence',()=>{upload.reset();dirty=Boolean(detail.querySelector('.refund-decision textarea')?.value);error('');controls();}),buttons=el('div',undefined,'refund-buttons');buttons.append(add,clear);
+      upload.append(fileLabel,captionLabel,el('p','JPG, PNG, WebP or PDF, up to 5 MiB each. Up to 10 files per side. Include only information relevant to this request. Files are kept exactly as supplied, including embedded metadata.'),buttons);
+      upload.addEventListener('input',()=>{dirty=true;controls();});
+      upload.addEventListener('submit',event=>{event.preventDefault();void (async()=>{
+        if(busy||loading||pending||ended||!upload.reportValidity())return;
+        if(detail.querySelector('.refund-decision textarea')?.value){error('Save or clear your decision draft before adding evidence.');return;}
+        const file=fileInput.files[0],mime=/\.jpe?g$/i.test(file.name)?'image/jpeg':/\.png$/i.test(file.name)?'image/png':/\.webp$/i.test(file.name)?'image/webp':/\.pdf$/i.test(file.name)?'application/pdf':'';
+        if(!mime||file.size<1||file.size>5242880){error('Choose a JPG, PNG, WebP or PDF file up to 5 MiB.');return;}
+        busy=true;controls();error('');notice('Saving the original evidence file…');
+        try{const dataUrl=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(Error('The selected file could not be read.'));reader.readAsDataURL(new Blob([file],{type:mime}));});
+          if(ended)return;const data=await api(casePath(r.id)+'/evidence',JSON.stringify({filename:file.name,caption:caption.value,dataUrl}));if(ended)return;
+          if(!data.refund?.id)throw Error('The evidence result was incomplete.');dirty=false;renderDetail(data.refund);notice('The original evidence file was saved.');
+        }catch(e){if(!ended){error(e.message+' If confirmation was interrupted, reload this request or retry the same file and description.');notice('Evidence confirmation needs checking.');}}
+        finally{busy=false;controls();}
+      })();});box.append(upload);
+    }
+    detail.append(box);
   }
   async function show(id){
     if(pending||busy||ended)return;loading=true;controls();error('');try{const data=await api(casePath(id));if(ended)return;dirty=false;form.hidden=true;q('[data-refund-lookup]').hidden=true;renderDetail(data.refund);}catch(e){if(!ended)error(e.message);}finally{loading=false;controls();}
