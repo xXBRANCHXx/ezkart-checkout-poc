@@ -80,7 +80,12 @@ fee corrections append only their delta. Explicit failed/voided transfers can
 release their original reservation without renewing send authority. Missing,
 seller-charged, conflicting or changed evidence holds availability for review.
 Protected Wallet distinguishes these outcomes and private recovery makes no
-provider request. Beta rollout verification is recorded in the linked document.
+provider request. All 126 relevant cases pass. Implementation `993a588`, migration
+0060 and beta Worker `6dfd9d15-52f8-498e-8bce-ca1780b83544` are deployed. All 48
+hosted checks pass at 18:05 UTC on 27 September; matching assets and the actual
+Wallet gate pass at 18:06. The post-export restores 169 tables with original
+business/financial records preserved. Only the intended fee account and ordinary
+sign-in metadata change in original tables; reconciliation/money tables stay empty.
 
 Actual fee provisioning, integrated payment execution, provider activation,
 unsupported reversals, refunds and live acceptance remain required. No top-level

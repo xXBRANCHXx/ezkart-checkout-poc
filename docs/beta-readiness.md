@@ -14,20 +14,38 @@ deployment now uses the isolated live beta configuration described below, with
 new checkout, provider dispatch schedules and automatic email sending held.
 Existing sandbox evidence is preserved. Main and `ezkart.id` remain held.
 
-## Current hosted state — 27 September, 17:29 UTC
+## Current hosted state — 27 September, 18:07 UTC
 
 Hostinger's private runtime now selects `beta`, production providers and the beta
 Worker. Its live DOKU client, secret, signing key and verified parent profile are
 installed outside the public root with mode 0600. Reloaded file hashes match the
 private prepared configuration; all earlier provider credentials are preserved.
 Health confirms beta, live DOKU credentials and connected D1/public R2/private R2
-with 165 application tables. At 07:45 UTC, central merchant operations were
+with 168 application tables. At 07:45 UTC, central merchant operations were
 enabled with `commerce_storage=d1`; new checkout remains separately paused in both PHP and
 the Worker. The public checkout configuration returns 503 with `Retry-After: 300`.
 An hourly housekeeping schedule is now installed; new checkout, provider
 dispatch schedules and email sending remain held. See the storage note below.
 
-The [original platform-account binding](withdrawal-payment-grants.md#original-platform-account)
+The [matched payout reconciliation](withdrawal-reconciliation.md) is deployed
+from `993a588`, migration 0060 and beta Worker
+`6dfd9d15-52f8-498e-8bce-ca1780b83544`. Original status observations and complete
+seller/platform histories produce immutable payout results and balanced journals.
+Completed transfers remain deducted from earnings after reservations close;
+actual fee corrections append only the difference. Explicit failed/voided debits
+can release their original reservation without permitting another send. Missing,
+seller-charged, conflicting or changed evidence holds availability for review.
+
+All 126 relevant cases pass: 88 Worker and 38 PHP/merchant/browser cases. The 48
+hosted checks pass at 18:05 UTC; matching assets and the actual Wallet gate pass
+at 18:06. The 18:07 post-export restores 169 tables and preserves original
+business/financial records. The original tables change only by one added fee
+account and a routine sign-in timestamp refresh; all new reconciliation and money
+tables remain empty. The original uncertain wallet, configuration and execution
+holds are unchanged. Actual fee provisioning, payment dispatch, callback/ongoing
+synchronization, unsupported reversals, refunds and live acceptance remain open.
+
+The preceding [original platform-account binding](withdrawal-payment-grants.md#original-platform-account)
 is deployed from `0bb4a9d`, migration 0059 and beta Worker
 `58cc2856-fe8a-4c3e-b73b-a18e0b589ea3`. New grants require an active, distinct,
 confirmed platform wallet under the seller wallet's original provider parent

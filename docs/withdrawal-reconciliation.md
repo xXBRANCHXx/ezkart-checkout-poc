@@ -108,4 +108,23 @@ The final migration rehearsal preserves all original rows, adds only the platfor
 fee account and three empty tables, compiles the new views and passes integrity
 and foreign-key checks. Private evidence is in
 `/home/branch/.local/share/ezkart/beta-01a0d643/payout-before-0060-20260928/`.
-Hosted rollout and post-deployment preservation are still pending at this commit.
+Implementation `993a588`, migration 0060 and beta Worker
+`6dfd9d15-52f8-498e-8bce-ca1780b83544` are deployed. All 48 hosted API checks pass
+at 18:05 UTC on 27 September. At 18:06, Hostinger serves the identified source
+hashes; the helper/CLI return 404, unsigned merchant access returns 401 and the
+actual Wallet gate exposes no earnings or withdrawals. Its loaded script matches
+the tested source. No new verification code or provider operation is requested.
+
+The 18:07 post-export restores all 169 tables with unchanged recovery bookmarks,
+clean integrity and foreign keys. Its SHA-256 is
+`541b54ed0b572850ff9d00ba37e3d321de802b94234a3a9d191b1d53593edcb2`.
+The original 165 application tables preserve their business/financial records;
+the only differences are the added fee account and an ordinary sign-in timestamp
+refresh. Migration history advances to 0060. All new payout tables and existing
+withdrawal, capture, journal, entry and earnings tables remain empty. Original
+wallet records, private runtime, deployment configuration and execution holds
+are unchanged. Only the existing hourly housekeeping schedule runs.
+
+Private proofs are `payout-{hosted,workbench,wallet-gate}-proof.json`,
+`payout-post-preservation.json` and `payout-after-0060-20260928/` under the same
+beta directory. TEST/main are not deployed or migrated.
