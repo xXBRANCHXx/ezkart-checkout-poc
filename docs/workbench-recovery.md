@@ -46,12 +46,13 @@ a 512 MiB SQL-file limit. See Cloudflare's
 
 ## Recovery boundaries
 
-This is a D1 export and local restoration check. It does not restore or back up
-R2 object bytes, Supabase Auth, Hostinger sessions/private configuration, secrets,
-DNS or a provider's records. The current beta catalog's original object copies
-and hashes are preserved with its separate import evidence. Off-device retention,
-encrypted credential custody and a full R2/application recovery rehearsal still
-need operational acceptance. Do not put any of these private artifacts in Git.
+The reusable `workbench-backup.py` command covers D1 export and local restoration.
+It does not itself copy R2 bytes or protect Supabase Auth, Hostinger sessions/
+private configuration, secrets, DNS or provider records. The separate encrypted
+database/asset snapshot below includes the beta's current R2 bytes and verifies
+their local recovery after a private remote readback. Independent key custody,
+recurring retention and full application recovery still need operational
+acceptance. Do not put any of these private artifacts in Git.
 
 D1's native Time Travel history is separate: Cloudflare documents seven days on
 Workers Free and thirty days on Workers Paid. Bookmarks in a local receipt do
@@ -97,3 +98,45 @@ observation exactly. Pickup/return settings and the store profile match their
 saved merchant-UI evidence, including revisions. Two products, 111 variants and
 54 media records remain present; orders, captures and journals remain empty.
 No remote restoration, provider call or application data mutation was performed.
+
+## Encrypted database and asset recovery — 28 September 2026
+
+The timed pass exported the current beta database into
+`/home/branch/.local/share/ezkart/beta-01a0d643/timed-recovery-20260928-2333/`.
+The 822,589-byte SQL export has SHA-256
+`8ea09b48cef9bb3243d4bd7a7a752a4167e1be40b174d42f69608cb3c256eef6`.
+All 179 tables restore with clean integrity/foreign keys and identical typed-row
+hashes. The surrounding D1 bookmarks match. This is a newer snapshot than the
+147-table historical export above.
+
+Paginated R2 inventory and object downloads preserve all 54 public objects
+(1,391,714 bytes); the private bucket contained no application objects. Each
+object's length and ETag match its listing, and both bucket inventories are
+unchanged before/after download. Original keys, HTTP/custom metadata, bytes and
+SHA-256 values are retained in a private manifest. The `operations/backups/`
+prefix is excluded from application-asset snapshots to prevent recursive copies.
+Database and R2 snapshots are separate observations, not a cross-service atomic
+snapshot.
+
+A private archive containing D1, its receipt/rehearsal and those assets is
+encrypted with OpenSSL CMS AES-256-GCM and RSA-3072 OAEP/SHA-256. The private key
+is outside the archive and was never uploaded. The 1,622,336-byte ciphertext was
+saved under a new unique key in `ezkart-beta-private`, downloaded and matched by
+SHA-256 `7ed9ba9326e9096f53e53c98af00cb76121f8fcacfa04b432fcb7b45ebc44cf6`.
+Successful authenticated decryption and archive hashes are required before any
+plaintext is consumed. A deliberately modified ciphertext was rejected; its
+untrusted output was removed.
+
+The downloaded archive was unpacked into a new private directory, with exact
+member names and file hashes checked, and restored locally again. All 179 tables
+and all 54 object hashes match. No remote database or application asset was
+overwritten. The encrypted backup is the only new R2 object.
+
+The private readback receipt, original object locator and extracted rehearsal
+are in `timed-recovery-sealed-20260928-2338/` under the same evidence parent.
+`RECOVERY-HANDOFF.md` there identifies the separate private recovery key and
+the checked restore procedure. This is one off-device copy in the same
+Cloudflare account. It does not protect against losing that account and does
+not become usable after losing this computer unless the owner independently
+secures the recovery key. No retention schedule, credential backup, external
+incident alert or full hosted application restore is claimed.

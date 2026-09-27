@@ -23,6 +23,10 @@ Main and the public production storefront remain unchanged.
 - All five analytics reports pass desktop/mobile checks and a seven-row CSV is
   downloaded and verified. Campaign editing, preview, archive and the actual
   zero-recipient audience are checked without publishing a campaign.
+- Separate anonymous browser runs at 1360/390px verify public shop/cart/pause,
+  the keyboard skip link and protected merchant/customer sign-in screens with
+  no JavaScript errors. These use an isolated test profile, without replacing
+  the owner's shared Chrome connection or creating new customer identities.
 
 The live compact scheduler is observed at 23:20–23:26 UTC: notification source,
 transactional email, campaign and automation invocations all finish without

@@ -137,6 +137,19 @@ wallet/routing services disabled. Live purchase-to-refund acceptance and a fresh
 seller identity remain unverified; no provider outcomes or customer accounts
 were fabricated to fill those gaps.
 
+### 28 September: timed finish — operations and recovery
+
+A fresh [encrypted database/asset recovery](workbench-recovery.md#encrypted-database-and-asset-recovery--28-september-2026)
+passes private remote readback, authenticated decryption, all file hashes and a
+new local restoration of 179 tables and 54 objects. Modified ciphertext is
+rejected. The read-only operations report returns exactly `jobs_uncertain` and
+`payout_runner_held`; storage inspection has no warnings. The held five-minute
+runner has 44 recorded runs, zero failures and zero interruptions at 23:37 UTC.
+External alert delivery, independent key custody, recurring retention and full
+application recovery remain unaccepted. The [timed finish report](beta-finish-2026-09-28.md)
+separates delivered changes from remaining implementation and live acceptance.
+No top-level completion gate is claimed by this partial time-bounded pass.
+
 ### 28 September: original DOKU refund request preparation
 
 The [provider handoff](refund-provider-handoffs.md) adds buyer-owned private bank

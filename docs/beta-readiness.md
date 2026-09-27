@@ -10,11 +10,42 @@ Business approval is owner-confirmed. The owner also confirmed approval for all
 needed services, including payments, Sub-Account and Kirim DOKU payouts. Technical
 registration, credentials and working provider contracts still need evidence.
 The owner clarified that the target is **live DOKU on workbench**. The current
-deployment now uses the isolated live beta configuration described below, with
-new checkout, provider execution and automatic email sending held.
+deployment uses the isolated live beta configuration described below. New
+checkout and financial provider execution remain held; automatic email and
+marketing scheduling were enabled prospectively during the timed pass.
 Existing sandbox evidence is preserved. Main and `ezkart.id` remain held.
 
-## Current hosted state — 27 September, 21:55 UTC
+## Current hosted state — 28 September, timed finish
+
+The [timed finish report](beta-finish-2026-09-28.md) is the current summary. The
+beta is **not accepted for paid soft-launch**. DOKU activation is not the only
+remaining work: actual refund processing/accounting, recurring billing and
+custom domains/Advanced entitlements still need implementation.
+
+- Workbench application revision `94352fd` includes the protected payout caller,
+  refund cost review, subscription purchase guards, accurate domain availability
+  copy and the clear checkout pause. The beta Worker is
+  `ebaf0621-7031-4fc2-9731-1dc8ac9e6a81` from `6812167`, schema 0065.
+- Prospective automatic notifications, transactional email, campaigns and
+  automations use the beta's one compact cron schedule. All four task types were
+  observed completing successfully. Recipient preferences are unchanged; no
+  campaign was published and no application email was sent by these checks.
+- Hosted desktop/mobile shop, existing-account screens, analytics/export and
+  guest sign-in protection pass their focused acceptance checks. Actual paid
+  purchase, delivery, settlement, payout, refund and digital-download journeys
+  remain unverified, as does fresh-seller onboarding through a new real identity.
+- DOKU still shows BCA updating and wallet/routing services disabled. Preserve
+  the original uncertain wallet registration. The owner chose to leave
+  FlexiBill registration pending; no terms were accepted or deposit transferred.
+- A fresh encrypted database/asset backup was uploaded to beta-private storage,
+  downloaded, authenticated and restored locally: 179 tables and 54 objects.
+  Independent recovery-key custody, recurring retention, full application
+  recovery and external alert delivery remain open.
+
+The records below describe earlier rollout states at their stated timestamps;
+their historical email holds do not describe the current automatic schedule.
+
+## Earlier hosted state — 27 September, 21:55 UTC
 
 Hostinger's private runtime now selects `beta`, production providers and the beta
 Worker. Its live DOKU client, secret, signing key and verified parent profile are
