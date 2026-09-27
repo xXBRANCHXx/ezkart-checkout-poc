@@ -25,6 +25,9 @@
 .wallet-balances { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin: 24px 0; padding: 20px 0; border-top: 1px solid #e8ebef; border-bottom: 1px solid #e8ebef; }
 .wallet-balances dt { color: #697382; font-size: 11px; }
 .wallet-balances dd { margin: 8px 0 0; font-size: 22px; font-weight: 600; }
+.wallet-balances > div { min-width: 0; }
+.wallet-balances dd, .wallet-amount { overflow-wrap: anywhere; }
+.wallet-balances > [hidden] { display: none; }
 .wallet-balance > footer { display: flex; align-items: flex-start; gap: 10px; color: #697382; font-size: 11px; line-height: 1.65; }
 .wallet-balance > footer .icon { flex: 0 0 17px; margin-top: 2px; }
 .admin-page.page-wallet a:not(.action-button) { color: #bd3f31; text-underline-offset: 3px; }
@@ -78,5 +81,11 @@
   .wallet-withdrawal > header { flex-wrap: wrap; }
   .wallet-payment-summary { gap: 22px; padding: 20px 18px; }
   .wallet-table-wrap table { min-width: 650px; }
+  [data-wallet-earnings-history-table] table, [data-wallet-earnings-history-table] tbody { display: block; min-width: 0; width: 100%; }
+  [data-wallet-earnings-history-table] thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  [data-wallet-earnings-history-table] tr { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px 18px; padding: 18px; border-top: 1px solid #edf0f4; }
+  [data-wallet-earnings-history-table] td { display: block; min-width: 0; padding: 0; border: 0; white-space: normal; overflow-wrap: anywhere; }
+  [data-wallet-earnings-history-table] td:nth-child(-n+2) { grid-column: 1 / -1; }
+  [data-wallet-earnings-history-table] td:nth-child(n+3)::before { content: attr(data-label); display: block; margin-bottom: 5px; color: #697382; font-size: 11px; }
   .wallet-payments > .surface-header { flex-wrap: wrap; gap: 14px; }
 }

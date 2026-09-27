@@ -1,4 +1,5 @@
 import {commerceEnvironment,commerceHash} from './commerce-orders.js';
+import {earningsForOrder} from './commerce-earnings.js';
 
 const fail=(message,status=422)=>{throw new Response(message,{status});};
 function scope(env,input){
@@ -39,9 +40,11 @@ export async function settlementForOrder(env,input){
     if(!row.history_current)holds.push('provider_history_changed');
   }
   if(context.additional_captures)holds.push('additional_payment_review');
+  const earnings=await earningsForOrder(env,input);
   return {orderId:input.orderId,captureId:context.capture_id,assessment:assessment(row),holds,settlementVerified:holds.length===0,
     recognized:recognized?{assessmentId:recognized.id,state:recognized.state,feeAmount:String(recognized.fee_amount),sellerCashAmount:String(recognized.seller_cash_amount),platformCashAmount:String(recognized.platform_cash_amount)}:null,
-    earningsReleased:false,availableToWithdraw:null};
+    earningsReleased:earnings.reconciled&&BigInt(earnings.availableEarnings)>0n,
+    availableEarnings:earnings.availableEarnings,reservedEarnings:earnings.reservedEarnings,availableToWithdraw:null};
 }
 
 export async function financialSettlementStatus(env,url){

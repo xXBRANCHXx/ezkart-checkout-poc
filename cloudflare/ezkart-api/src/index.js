@@ -33,6 +33,7 @@ import {walletEnrollment,walletRegistration,bindWalletRegistration,saveWalletReg
 import {providerFinancialAccount,recordProviderFinancialEvidence,providerFinancialEvidenceList} from './commerce-provider-evidence.js';
 import {recordProviderFinancialCollection,providerFinancialCollections} from './commerce-provider-collections.js';
 import {reconcileProviderSettlement,financialSettlementStatus} from './commerce-settlements.js';
+import {reconcileEarnings,earningsOrderStatus,earningsSummary,earningsHistory,earningsHousekeeping} from './commerce-earnings.js';
 import {merchantCustomers,merchantCustomer,customerOrderHistory} from './commerce-customers.js';
 import {customerSegments,customerSegment,saveCustomerWorkspace,customerProfileHistory} from './commerce-customer-workspace.js';
 import {createCustomerExport,readCustomerExport,cleanupCustomerExports} from './commerce-customer-exports.js';
@@ -1555,6 +1556,16 @@ export default {
         if(url.pathname==='/internal/commerce/finance/delivery/reconcile'&&request.method==='POST'&&!url.search)return json({ok:true,...await reconcileFinancialDeliveries(env,payload)});
         return json({ok:false,error:'Delivery evidence route or method is unavailable'},404);
       }
+      if(url.pathname.startsWith('/internal/commerce/finance/earnings')){
+        const payload=await authenticateCommerceService(request,env,{strictJSON:true,maxBytes:3000});
+        if(request.method==='GET'&&!Object.keys(payload).length){
+          if(url.pathname==='/internal/commerce/finance/earnings')return json({ok:true,...await earningsOrderStatus(env,url)});
+          if(url.pathname==='/internal/commerce/finance/earnings/summary')return json({ok:true,...await earningsSummary(env,url)});
+          if(url.pathname==='/internal/commerce/finance/earnings/history')return json({ok:true,...await earningsHistory(env,url)});
+        }
+        if(request.method==='POST'&&url.pathname==='/internal/commerce/finance/earnings/reconcile'&&!url.search)return json({ok:true,...await reconcileEarnings(env,payload)});
+        return json({ok:false,error:'Earnings route or method is unavailable'},404);
+      }
       if(url.pathname.startsWith('/internal/commerce/finance/settlement')){
         const payload=await authenticateCommerceService(request,env,{strictJSON:true,maxBytes:3000});
         if(request.method==='GET'&&url.pathname==='/internal/commerce/finance/settlement'&&!Object.keys(payload).length)return json({ok:true,...await financialSettlementStatus(env,url)});
@@ -2076,6 +2087,7 @@ export default {
     if(controller.cron==='* * * * *'){
       context.waitUntil((async()=>{await scheduleNotifications(env);await dispatchNotifications(env);})());return;
     }
+    context.waitUntil(earningsHousekeeping(env));
     context.waitUntil(cleanupDigitalUploads(env));
     context.waitUntil(cleanupAbandonedMedia(env));
     context.waitUntil(cleanupCampaignVisits(env));

@@ -5,13 +5,14 @@ import {generateKeyPairSync,createHash,createHmac,verify,randomBytes} from 'node
 import {writeFile,mkdir} from 'node:fs/promises';
 import {join,resolve} from 'node:path';
 import {setupCentralFixture} from './central-fixture.mjs';
+import {setupEarningsFixture} from '../../cloudflare/ezkart-api/test/earnings-fixture.mjs';
 
 const root=resolve(import.meta.dirname,'../..'),base='/internal/commerce/finance/wallet',screens='/tmp/ezkart-wallet-enrollment-ui-01a0d643';
 const rsa=generateKeyPairSync('rsa',{modulusLength:2048}),privateKey=rsa.privateKey.export({format:'pem',type:'pkcs8'});
 const key=()=>randomBytes(16).toString('hex');
 const proof=(id='alice')=>({id,email:id+'@example.test',proofExpiresAt:new Date(Date.now()+590000).toISOString()});
-async function fixture(t,overrides={}){
-  const f=await setupCentralFixture(t,{EZKART_TEST_WALLET:'1',EZKART_DOKU_SANDBOX_SNAP_PRIVATE_KEY:privateKey,EZKART_DOKU_SANDBOX_PARENT_PROFILE_ID:'BRN-fixture',...overrides});
+async function fixture(t,overrides={},options={}){
+  const f=await setupCentralFixture(t,{EZKART_TEST_WALLET:'1',EZKART_DOKU_SANDBOX_SNAP_PRIVATE_KEY:privateKey,EZKART_DOKU_SANDBOX_PARENT_PROFILE_ID:'BRN-fixture',...overrides},options);
   const setControl=data=>writeFile(join(f.app.directory,'wallet-control.json'),JSON.stringify(data));
   const enroll=async(id='alice')=>{const r=await f.call(base,{environment:'sandbox',seller:'seller_'+id,actor:proof(id),action:'enroll',requestKey:key()});assert.equal(r.status,200,r.error);return r.enrollment;};
   const registration=async id=>(await f.call(base+'/registrations/'+id+'?environment=sandbox')).registration;
@@ -84,8 +85,8 @@ test('provider configuration failures consume no job attempts; rejected prefligh
   assert.equal((await f.registration(b.id)).jobState,'dead');assert.equal((await f.registration(b.id)).binding,null);assert.equal((await f.registerCalls()).length,1);
 });
 
-async function merchantFixture(t,overrides={}){
-  const f=await fixture(t,overrides),token=await f.merchantToken('alice','alice@example.test'),auth={user:{id:'alice',email:'alice@example.test'},wallet_tokens:{access_token:token,refresh_token:'fixture-refresh',expires_in:3600}};
+async function merchantFixture(t,overrides={},options={}){
+  const f=await fixture(t,overrides,options),token=await f.merchantToken('alice','alice@example.test'),auth={user:{id:'alice',email:'alice@example.test'},wallet_tokens:{access_token:token,refresh_token:'fixture-refresh',expires_in:3600}};
   const setAuth=data=>writeFile(join(f.app.directory,'auth-response.json'),JSON.stringify({...auth,...data}));await setAuth({});
   const cookie=f.app.adminCookie({supabase_access_token:token,admin_user:{id:'alice',email:'alice@example.test'}});
   const {chromium}=await import('../builder-mcp/node_modules/playwright/index.mjs'),browser=await chromium.launch({headless:true});t.after(()=>browser.close());
@@ -107,10 +108,33 @@ test('merchant Wallet verifies owner identity, connects through the real proxy, 
   assert.match(await f.page.locator('[data-wallet-setup-name]').innerText(),/<img/);assert.equal(await f.page.locator('[data-wallet-setup] img').count(),0);
   await mkdir(screens,{recursive:true});await f.page.screenshot({path:join(screens,'wallet-ready-1360.png'),fullPage:true});
   await f.page.getByRole('button',{name:'Connect seller wallet',exact:true}).click();await f.page.locator('[data-wallet-setup][data-state=connected][aria-busy=false]').waitFor();
-  assert.equal(await f.page.locator('.wallet-amount').innerText(),'—');assert.equal(await f.page.getByRole('button',{name:'Withdraw funds'}).isDisabled(),true);assert.match(await f.page.locator('[data-wallet-setup-account]').innerText(),/^Ending in [0-9]{4}$/);
+  assert.match(await f.page.locator('.wallet-amount').innerText(),/Rp\s*0$/);assert.equal(await f.page.getByRole('button',{name:'Withdraw funds'}).isDisabled(),true);assert.match(await f.page.locator('[data-wallet-setup-account]').innerText(),/^Ending in [0-9]{4}$/);
   assert.equal((await f.registerCalls()).length,1);assert.equal(await f.count('commerce_wallet_enrollments'),1);assert.equal(await f.count('commerce_financial_journals'),0);
   for(const width of [1360,390]){await f.page.setViewportSize({width,height:1000});await f.page.reload();await f.page.locator('[data-wallet-setup][data-state=connected][aria-busy=false]').waitFor();assert.equal(await f.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await f.page.screenshot({path:join(screens,`wallet-connected-${width}.png`),fullPage:true});}
   assert.equal((await f.registerCalls()).length,1);assert.deepEqual(f.errors,[]);
+});
+
+test('protected Wallet shows actual released earnings, reserves and stable history on desktop and mobile and clears failed or expired reads',async t=>{
+  const bindings={COMMERCE_PLATFORM_WALLET_SELLER:'seller_bob'},f=await merchantFixture(t,{}, {bindings}),e=await setupEarningsFixture(t,{baseFixture:f,bindings});
+  const p=await e.payment();await e.settle(p);await e.deliver(p);
+  for(let i=0;i<11;i++){const r=await e.refund(p);await e.refundAction(r.id,'decline');}
+  await f.unlock();
+  const amount=async name=>(await f.page.locator('[data-wallet-earnings-'+name+']').innerText()).replace(/\D/g,'');
+  assert.equal(await amount('available'),'34250');assert.equal(await amount('reserved'),'0');
+  assert.equal(await f.page.locator('[data-wallet-earnings-history] tr').count(),20);
+  await f.page.locator('[data-wallet-earnings-more]').click();await f.page.locator('[data-wallet-setup][aria-busy=false]').waitFor();
+  assert.equal(await f.page.locator('[data-wallet-earnings-history] tr').count(),23);assert.equal(await f.page.locator('[data-wallet-earnings-more]').isHidden(),true);
+  assert.equal(await f.page.getByRole('button',{name:'Withdraw funds'}).isDisabled(),true);
+  const raw=await f.request('read');assert.equal(raw.status,200);assert(!/fcol_|fobs_|credentialFingerprint|providerReference/.test(JSON.stringify(raw.body)));
+  await mkdir(screens,{recursive:true});
+  for(const width of [1360,390]){await f.page.setViewportSize({width,height:1000});await f.page.reload();await f.page.locator('[data-wallet-setup][aria-busy=false]').waitFor();await f.page.evaluate(()=>window.scrollTo(0,0));assert.equal(await amount('available'),'34250');assert.equal(await f.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);assert.equal(await f.page.locator('[data-wallet-earnings-history-table]').evaluate(el=>el.scrollWidth<=el.clientWidth),true);await f.page.screenshot({path:join(screens,'wallet-earnings-'+width+'.png'),fullPage:true});}
+  await e.refund(p);await f.page.locator('[data-wallet-setup-refresh]').click();await f.page.locator('[data-wallet-setup][aria-busy=false]').waitFor();
+  assert.equal(await amount('available'),'0');assert.equal(await amount('reserved'),'34250');
+  f.control.fail='/internal/commerce/finance/earnings/summary?seller=seller_alice&environment=sandbox';await f.page.locator('[data-wallet-setup-refresh]').click();await f.page.locator('[data-wallet-setup][aria-busy=false]').waitFor();
+  assert.equal(await f.page.locator('.wallet-amount').innerText(),'—');assert.match(await f.page.locator('[data-wallet-earnings-status]').innerText(),/could not be checked/);
+  f.control.fail=null;await f.session("$_SESSION['wallet_access']['expires_at']=time()-1");
+  assert.equal((await f.request('history&cap=99&before=99')).status,401);
+  assert.equal((await f.request('read')).status,401);assert.deepEqual(f.errors,[]);assert.equal((await f.registerCalls()).length,0);
 });
 
 test('wallet proxy requires current owner, unchanged account/store, CSRF and fresh factor-bound proof for every read and write',async t=>{

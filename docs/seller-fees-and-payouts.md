@@ -20,8 +20,10 @@ The following amounts are not available wallet balances.
 Central orders now preserve immutable per-order fee snapshots. The
 [capture financial journal](financial-journal.md) posts verified payments using
 those original fees and keeps additional payments or unknown historical policies
-unallocated. This is the first accounting stage; actual provider fees, settlement,
-earnings release, refunds, reconciliation and payouts remain to be implemented.
+unallocated. [Actual-fee settlement](provider-settlement-accounting.md) and
+[delivery-based earnings release](seller-earnings.md) now extend that journal.
+Live provider acceptance, continuous synchronization, complete refund accounting
+and payouts remain unfinished.
 
 ## Fees shown in the mockup
 
@@ -168,10 +170,12 @@ fees, refunds, and any reserved or already withdrawn amount. The available
 balance must also meet the Rp250,000 minimum.
 
 The merchant Wallet page displays this rule and links paid orders to Payments.
-Until seller wallet mapping, provider settlement synchronization, and the wallet
-ledger are connected, balances and release dates remain unavailable. The page
-must not label payment volume, estimated earnings, or skipped sandbox deliveries
-as withdrawable funds. It does not initiate withdrawals.
+The protected Wallet now shows original available, pending and reserved earnings
+and a paged history. Unknown fees and changed evidence are disclosed; negative
+allocations offset availability. The page does not label payment volume,
+estimated earnings or skipped sandbox deliveries as available earnings. Bank
+withdrawals remain unavailable until their reservations and provider workflow
+are complete and accepted.
 
 ## Wallet access verification — confirmed 22 September 2026
 

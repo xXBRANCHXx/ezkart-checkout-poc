@@ -150,6 +150,8 @@ test('populated beta migration preserves captures and originals, then reconciles
   const snapshots=await Promise.all(tables.map(name=>f.db.prepare('SELECT * FROM '+name).all()));
   await applyCommerceSchema(f.db,52,53);
   for(const [i,table] of tables.entries())assert.deepEqual((await f.db.prepare('SELECT * FROM '+table).all()).results,snapshots[i].results);
+  // The current settlement read also reports earnings from the current schema.
+  await applyCommerceSchema(f.db,53);
   assert.equal((await f.journals()).items.length,1);const result=await f.reconcile(p,pair);assert.equal(result.status,200,result.error);assert.equal(result.settlementVerified,true);assert.equal(result.availableToWithdraw,null);
   assert.deepEqual((await f.db.prepare('PRAGMA foreign_key_check').all()).results,[]);
 });

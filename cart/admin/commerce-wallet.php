@@ -7,9 +7,21 @@ require_once __DIR__ . '/../api/commerce-wallet-jobs.php';
 function ez_admin_wallet_request(string $action, bool $authenticated, string $authenticationMethod, string $csrfToken, bool $isHttps): never
 {
     if (!$authenticated || $authenticationMethod !== 'supabase') ez_admin_json(['ok' => false, 'error' => 'Sign in again to open Wallet.', 'code' => 'wallet_locked'], 401);
-    if (count($_GET) !== 1 || !in_array($action, ['read', 'enroll', 'refresh'], true)) ez_admin_json(['ok' => false, 'error' => 'Wallet request is invalid.'], 400);
+    $allowedQuery = $action === 'history' ? ['wallet', 'before', 'cap'] : ['wallet'];
+    if (array_diff(array_keys($_GET), $allowedQuery) !== [] || !in_array($action, ['read', 'history', 'enroll', 'refresh'], true)) ez_admin_json(['ok' => false, 'error' => 'Wallet request is invalid.'], 400);
+    $seenQuery = [];
+    foreach (explode('&', (string) ($_SERVER['QUERY_STRING'] ?? '')) as $pair) {
+        $key = urldecode(explode('=', $pair, 2)[0]);
+        if (isset($seenQuery[$key])) ez_admin_json(['ok' => false, 'error' => 'Wallet request is invalid.'], 400);
+        $seenQuery[$key] = true;
+    }
+    $historyQuery = [];
+    if ($action === 'history') foreach (['before', 'cap'] as $key) {
+        if (!is_string($_GET[$key] ?? null) || preg_match('/^[1-9][0-9]{0,15}$/D', $_GET[$key]) !== 1) ez_admin_json(['ok' => false, 'error' => 'Earnings history boundary is invalid.'], 422);
+        $historyQuery[$key] = $_GET[$key];
+    }
     $method = (string) ($_SERVER['REQUEST_METHOD'] ?? '');
-    if ($method !== ($action === 'read' ? 'GET' : 'POST')) ez_admin_json(['ok' => false, 'error' => 'Method not allowed.'], 405);
+    if ($method !== (in_array($action, ['read', 'history'], true) ? 'GET' : 'POST')) ez_admin_json(['ok' => false, 'error' => 'Method not allowed.'], 405);
     $account = (string) ($_SESSION['admin_user']['id'] ?? '');
     if ($account === '' || !hash_equals($account, (string) ($_SERVER['HTTP_X_EZKART_WALLET_ACCOUNT'] ?? ''))
         || $csrfToken === '' || !hash_equals($csrfToken, (string) ($_SERVER['HTTP_X_EZKART_CSRF'] ?? ''))) ez_admin_json(['ok' => false, 'error' => 'Your sign-in changed. Reload Wallet.', 'code' => 'wallet_locked'], 401);
@@ -40,19 +52,22 @@ function ez_admin_wallet_request(string $action, bool $authenticated, string $au
             try { ez_wallet_provider_configuration($environment); $ready = true; }
             catch (EzDokuReadException) { /* Provider setup is incomplete; existing requests remain readable. */ }
         }
-        $response = ['ok' => true, 'enabled' => $ready, 'enrollment' => null, 'availableToWithdraw' => null,
+        $response = ['ok' => true, 'enabled' => $ready, 'enrollment' => null, 'availableToWithdraw' => null, 'earnings' => null, 'earningsHistory' => null,
             'owner' => ['storeName' => (string) ($seller['name'] ?? ''), 'email' => $access['email']]];
         $status = 200;
         if ($enabled) {
             $payload = ['environment' => $environment, 'seller' => $sellerId, 'actor' => ['id' => $account, 'email' => $access['email'],
                 'proofExpiresAt' => gmdate('Y-m-d\TH:i:s', $access['expires_at']) . '.000Z']];
-            if ($action !== 'read' && !$ready) throw new EzCommerceStorageException('Wallet setup is temporarily unavailable. Your saved request is preserved.', 503);
+            if (!in_array($action, ['read', 'history'], true) && !$ready) throw new EzCommerceStorageException('Wallet setup is temporarily unavailable. Your saved request is preserved.', 503);
             if ($action === 'enroll') ez_commerce_request('POST', '/internal/commerce/finance/wallet', $payload + ['action' => 'enroll', 'requestKey' => $input['requestKey']]);
             $response = array_replace($response, ez_commerce_request('POST', '/internal/commerce/finance/wallet', $payload + ['action' => 'read']));
             if ($action === 'refresh' && $response['enrollment'] !== null && $response['enrollment']['status'] !== 'connected') {
                 ez_wallet_process_enrollment($response['enrollment']['id'], $environment);
                 $response = array_replace($response, ez_commerce_request('POST', '/internal/commerce/finance/wallet', $payload + ['action' => 'read']));
             }
+            $financialQuery = ['seller' => $sellerId, 'environment' => $environment];
+            $response['earningsHistory'] = ez_commerce_request('GET', '/internal/commerce/finance/earnings/history?' . http_build_query($financialQuery + $historyQuery, '', '&', PHP_QUERY_RFC3986));
+            if ($action !== 'history') $response['earnings'] = ez_commerce_request('GET', '/internal/commerce/finance/earnings/summary?' . http_build_query($financialQuery, '', '&', PHP_QUERY_RFC3986));
         } elseif ($action !== 'read') throw new EzCommerceStorageException('Wallet setup is not available yet.', 503);
     } catch (Throwable $error) {
         $status = $error instanceof EzCommerceStorageException ? $error->httpStatus : 503;

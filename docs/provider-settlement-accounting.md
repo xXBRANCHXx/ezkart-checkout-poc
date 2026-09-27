@@ -100,13 +100,16 @@ time basis are retained in the journal source.
 Both routes require strict JSON/server HMAC and exact store/environment scope;
 merchant/customer bearer tokens cannot post money. `settlementVerified` is true
 only for current supported settlement evidence without additional-payment
-ambiguity. It is independent of delivery confirmation. `earningsReleased` remains
-false and `availableToWithdraw` remains null.
+ambiguity. It is independent of delivery confirmation. With
+[earnings accounting](seller-earnings.md), `earningsReleased` now reports actual
+positive available earnings, alongside exact available/reserved amounts.
+`availableToWithdraw` remains null while bank withdrawals are unfinished.
 
 The capture summary includes counts of saved settlement interpretations and
 reports `settlementConnected` after originals have been assessed. Those aggregate
 counts do not substitute for the current per-order check. Delivery status now
-includes that check and the corresponding holds; `releaseReady` remains false.
+includes that check and the corresponding holds; its `releaseReady` additionally
+requires a current reconciled earnings assessment.
 
 After collecting the two original wallets over the same window:
 

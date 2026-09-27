@@ -17,10 +17,11 @@ if (empty($walletAccess['unlocked'])) {
 $walletOrders = array_values(array_filter($orders, static fn($order) => strtoupper((string) ($order['status'] ?? '')) === 'PAID'));
 $walletProductPayments = array_sum(array_map(static fn($order) => max(0, (int) ($order['subtotal'] ?? 0)), $walletOrders));
 $walletDataAvailable = $authenticationMethod === 'password' || $sellerId !== '';
+$walletOwner = ($activeSeller['role'] ?? '') === 'owner';
 ?>
 <div data-wallet-content data-wallet-seconds="<?= max(0, (int) $walletAccess['expires_at'] - time()) ?>">
 <div class="wallet-unlocked-note"><span><?= ez_admin_icon('shield') ?> Wallet unlocked until <?= ez_admin_escape((new DateTimeImmutable('@' . $walletAccess['expires_at']))->setTimezone(new DateTimeZone('Asia/Jakarta'))->format('H:i')) ?> WIB</span><form method="post" action="?page=wallet"><input type="hidden" name="csrf_token" value="<?= ez_admin_escape($csrfToken) ?>"><input type="hidden" name="action" value="wallet_lock"><button type="submit">Lock Wallet</button></form></div>
-<?php if (($activeSeller['role'] ?? '') === 'owner'): ?>
+<?php if ($walletOwner): ?>
 <section class="surface wallet-setup" data-wallet-setup data-account="<?= ez_admin_escape((string) ($adminUser['id'] ?? '')) ?>" data-store="<?= ez_admin_escape($sellerId) ?>" data-environment="<?= ez_admin_escape($commerceEnvironment) ?>" aria-labelledby="wallet-setup-title" aria-busy="true">
   <header><div><h2 id="wallet-setup-title">Connect your seller wallet</h2><p>Your store’s payment account with DOKU.</p></div><span class="wallet-status" data-wallet-setup-badge>Checking</span></header>
   <p data-wallet-setup-status role="status" aria-live="polite">Checking your wallet setup…</p>
@@ -34,13 +35,20 @@ $walletDataAvailable = $authenticationMethod === 'password' || $sellerId !== '';
 <section class="wallet-overview" aria-label="Wallet overview">
   <article class="surface wallet-balance">
     <header><span class="wallet-heading-icon"><?= ez_admin_icon('wallet') ?></span><span class="wallet-environment"><?= $commerceProduction ? 'Production' : 'Sandbox' ?></span></header>
-    <h2>Current wallet balance</h2>
-    <strong class="wallet-amount" aria-label="Balance unavailable">—</strong>
+    <h2><?= $centralWalletWorkspace ? 'Available earnings' : 'Current wallet balance' ?></h2>
+    <strong class="wallet-amount" aria-label="Balance unavailable"<?= $centralWalletWorkspace ? ' data-wallet-earnings-available' : '' ?>>—</strong>
     <p class="wallet-connection">Wallet connection pending</p>
     <p>Your balance will appear once your seller wallet is connected and its funds are confirmed.</p>
+    <?php if ($centralWalletWorkspace): ?><p data-wallet-earnings-status role="status" aria-live="polite"><?= $walletOwner ? 'Checking recorded earnings…' : 'Only the store owner can view earnings.' ?></p><?php endif; ?>
     <dl class="wallet-balances">
+      <?php if ($centralWalletWorkspace): ?>
+      <div><dt>Pending earnings</dt><dd data-wallet-earnings-pending>—</dd></div>
+      <div><dt>Reserved earnings</dt><dd data-wallet-earnings-reserved>—</dd></div>
+      <div data-wallet-earnings-deficit-row hidden><dt>Negative earnings</dt><dd data-wallet-earnings-deficit>—</dd></div>
+      <?php else: ?>
       <div><dt>Available to withdraw</dt><dd aria-label="Available balance unavailable">—</dd></div>
       <div><dt>Pending release</dt><dd aria-label="Pending balance unavailable">—</dd></div>
+      <?php endif; ?>
     </dl>
     <footer><?= ez_admin_icon('help') ?><span>Payment totals can be checked in <a href="?page=payments">Payments</a>. Final earnings include seller fees and settlement.</span></footer>
   </article>
@@ -52,13 +60,15 @@ $walletDataAvailable = $authenticationMethod === 'password' || $sellerId !== '';
       <li><span><?= ez_admin_icon('check-circle') ?></span><div><b>Provider settlement confirmed</b><p>Payment funds and final fees have been confirmed.</p></div></li>
       <li><span><?= ez_admin_icon('wallet') ?></span><div><b>At least Rp250.000 available</b><p>Minimum seller withdrawal. Ezkart covers the transfer fee.</p></div></li>
     </ol>
-    <div class="wallet-withdraw-action"><button class="ui-button" type="button" disabled aria-describedby="wallet-withdraw-reason" data-ui-icon="wallet">Withdraw funds</button><p id="wallet-withdraw-reason">Withdrawals will open after wallet setup is complete and eligible funds are available. A release date is not available yet.</p></div>
+    <div class="wallet-withdraw-action"><button class="ui-button" type="button" disabled aria-describedby="wallet-withdraw-reason" data-ui-icon="wallet">Withdraw funds</button><p id="wallet-withdraw-reason">Bank withdrawals are not available yet. Your earnings remain recorded here.</p></div>
   </article>
 </section>
-<section class="surface wallet-payments" aria-label="Payments awaiting wallet settlement">
-  <header class="surface-header"><div><h2>Payments behind your earnings</h2><p>Delivery and settlement status for your paid orders.</p></div><a class="action-button" href="?page=payments">Check all payments <?= ez_admin_icon('chevron-right') ?></a></header>
+<section class="surface wallet-payments" aria-label="<?= $centralWalletWorkspace ? 'Earnings history' : 'Payments awaiting wallet settlement' ?>">
+  <header class="surface-header"><div><h2><?= $centralWalletWorkspace ? 'Earnings history' : 'Payments behind your earnings' ?></h2><p><?= $centralWalletWorkspace ? 'Releases, reserves and adjustments for your orders.' : 'Delivery and settlement status for your paid orders.' ?></p></div><a class="action-button" href="?page=payments">Check all payments <?= ez_admin_icon('chevron-right') ?></a></header>
   <?php if ($centralWalletWorkspace): ?>
-  <p class="wallet-empty">Check your confirmed payments in <a href="?page=payments">Payments</a>. Wallet settlement history will appear here once funds and fees are reconciled.</p>
+  <p class="wallet-empty" data-wallet-earnings-history-status role="status"><?= $walletOwner ? 'Checking earnings history…' : 'Only the store owner can view earnings history.' ?></p>
+  <div class="wallet-table-wrap" data-wallet-earnings-history-table hidden><table><thead><tr><th>Order / recorded</th><th>Update</th><th>Available after</th><th>Reserved after</th></tr></thead><tbody data-wallet-earnings-history></tbody></table></div>
+  <div class="wallet-table-note"><button class="action-button" type="button" data-wallet-earnings-more hidden>Load earlier updates</button></div>
   <?php else: ?>
   <div class="wallet-payment-summary"><div><small>Product payments received</small><strong><?= $walletDataAvailable ? ez_admin_money($walletProductPayments) : '—' ?></strong><span>Before seller fees · shipping excluded</span></div><div><small>Paid orders</small><strong><?= $walletDataAvailable ? number_format(count($walletOrders)) : '—' ?></strong><span><?= $commerceProduction ? 'Production payment records' : 'Sandbox payment records' ?></span></div></div>
   <?php if (!$walletDataAvailable): ?><p class="wallet-empty" role="alert">Payment records could not be loaded. Reload to try again.</p>

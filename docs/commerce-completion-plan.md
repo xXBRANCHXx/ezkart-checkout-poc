@@ -71,6 +71,24 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 27 September: seller earnings and protected Wallet history
+
+[Earnings accounting](seller-earnings.md) now connects original net settlement,
+complete delivery and current holds to balanced available/reserved liabilities.
+Single-order changes update them atomically; newer shared-wallet history excludes
+stale availability immediately and is reconciled in bounded batches. Fee changes,
+voids, refunds/returns, negative allocations and exact retries preserve earlier
+entries. The protected Wallet displays exact earnings and paged monetary history,
+with failed/expired reads excluded. It still cannot initiate a bank withdrawal.
+
+The 116 relevant Worker/PHP/browser checks pass, including actual merchant proxy
+flows, both delivery/settlement sequences, mixed delivery, maximum/zero/negative
+amounts, rollback and original evidence. The fresh beta export restores cleanly;
+migration rehearsal preserves all original rows across 155 exported tables and
+adds only two account codes and an empty assessment table. No top-level gate is
+closed: live acceptance, provider synchronization, complete refund/dispute funding,
+negative-balance recovery and owner-authorized bank withdrawals remain open.
+
 ### 27 September: actual-fee settlement journals and corrections
 
 [Settlement accounting](provider-settlement-accounting.md) now derives balanced

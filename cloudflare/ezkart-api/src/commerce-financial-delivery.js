@@ -1,5 +1,6 @@
 import {commerceEnvironment} from './commerce-orders.js';
 import {settlementForOrder} from './commerce-settlements.js';
+import {earningsForOrder} from './commerce-earnings.js';
 
 const fail=(message,status=422)=>{throw new Response(message,{status});};
 function scope(env,input){
@@ -16,14 +17,18 @@ export async function reconcileFinancialDeliveries(env,input){
   const values=[input.seller,input.environment,input.orderId||'',input.orderId||''];
   const pending=`FROM commerce_order_delivery_accounting a WHERE a.seller_id=? AND a.commerce_environment=? AND (?='' OR a.order_id=?)
     AND NOT EXISTS(SELECT 1 FROM commerce_order_delivery_receipts r WHERE r.capture_id=a.capture_id)`;
+  const receipts="FROM commerce_order_delivery_receipts WHERE seller_id=? AND commerce_environment=? AND (?='' OR order_id=?)";
   const results=await env.DB.batch([
+    env.DB.prepare('SELECT COALESCE(MAX(sequence),0) AS n,(SELECT COUNT(*) '+receipts+') AS receipts FROM commerce_financial_journals').bind(...values),
     env.DB.prepare(`INSERT INTO commerce_order_delivery_receipts(id,seller_id,order_id,commerce_environment,capture_id,item_count,source_json,confirmed_at,recorded_at)
       SELECT 'delivery_'||a.capture_id,a.seller_id,a.order_id,a.commerce_environment,a.capture_id,a.item_count,a.source_json,a.confirmed_at,?
       ${pending} ORDER BY a.capture_id LIMIT ?`).bind(new Date().toISOString(),...values,size),
-    env.DB.prepare('SELECT COUNT(*) AS remaining '+pending).bind(...values),
+    env.DB.prepare('SELECT (SELECT COUNT(*) '+pending+') AS remaining,(SELECT COUNT(*) '+receipts+') AS receipts').bind(...values,...values),
+    env.DB.prepare("SELECT sequence,lines_json FROM commerce_financial_journals WHERE kind='earnings' AND seller_id=? AND commerce_environment=? ORDER BY sequence DESC LIMIT 100").bind(input.seller,input.environment),
   ]);
-  return {recorded:results[0].meta.changes,remainingEligible:results[1].results[0].remaining,
-    caughtUp:results[1].results[0].remaining===0,earningsReleased:false};
+  const earningsReleased=results[3].results.some(j=>j.sequence>results[0].results[0].n&&JSON.parse(j.lines_json).some(l=>l.account==='seller_available'&&l.amount<0));
+  return {recorded:results[2].results[0].receipts-results[0].results[0].receipts,remainingEligible:results[2].results[0].remaining,
+    caughtUp:results[2].results[0].remaining===0,earningsReleased};
 }
 
 export async function financialDeliveryStatus(env,url){
@@ -55,10 +60,12 @@ export async function financialDeliveryStatus(env,url){
   if(row.capture_id&&row.allocation_state!=='allocated')reasons.push('capture_accounting_incomplete');
   if(!row.receipt_id)reasons.push('delivery_unconfirmed');
   const settlement=await settlementForOrder(env,input);
+  const earnings=await earningsForOrder(env,input);
   // This immutable receipt preserves the evidence chosen at completion. Later
   // equivalent courier observations need not become the canonical source again.
   return {orderId:input.orderId,deliveryConfirmed:Boolean(row.receipt_id),
     receipt:row.receipt_id?{id:row.receipt_id,confirmedAt:row.confirmed_at,recordedAt:row.recorded_at,source:JSON.parse(row.source_json)}:null,
-    holds:[...new Set([...reasons,...settlement.holds])],settlementVerified:settlement.settlementVerified,
-    settlementAssessmentId:settlement.assessment?.id||null,releaseReady:false,availableToWithdraw:null};
+    holds:[...new Set([...reasons,...settlement.holds,...earnings.holds])],settlementVerified:settlement.settlementVerified,
+    settlementAssessmentId:settlement.assessment?.id||null,releaseReady:earnings.state==='available'&&earnings.reconciled,
+    earningsReleased:settlement.earningsReleased,availableEarnings:earnings.availableEarnings,reservedEarnings:earnings.reservedEarnings,availableToWithdraw:null};
 }

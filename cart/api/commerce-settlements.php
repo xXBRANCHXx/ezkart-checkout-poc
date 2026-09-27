@@ -14,7 +14,7 @@ function ez_reconcile_provider_settlement(array $input): array
         $result = ez_commerce_request('POST', '/internal/commerce/finance/settlement/reconcile', $input);
     }
     if (!is_array($result['recorded'] ?? null) || preg_match('/^stlm_[a-f0-9]{40}$/D', $result['recorded']['id'] ?? '') !== 1
-        || !is_bool($result['settlementVerified'] ?? null) || ($result['earningsReleased'] ?? null) !== false
+        || !is_bool($result['settlementVerified'] ?? null) || !is_bool($result['earningsReleased'] ?? null)
         || !array_key_exists('availableToWithdraw', $result) || $result['availableToWithdraw'] !== null) throw new RuntimeException('Settlement acknowledgement is invalid.');
     return $result;
 }

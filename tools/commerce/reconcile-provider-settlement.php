@@ -18,7 +18,7 @@ try {
         'sellerCollectionId'=>$input['seller-collection'],'platformCollectionId'=>$input['platform-collection']]);
     echo json_encode(['ok'=>true,'assessmentId'=>$result['recorded']['id'],'state'=>$result['recorded']['state'],
         'reason'=>$result['recorded']['reason'],'journalId'=>$result['recorded']['journalId'],'replayed'=>$result['replayed'],
-        'settlementVerified'=>$result['settlementVerified'],'holds'=>$result['holds'],'earningsReleased'=>false,'availableToWithdraw'=>null], JSON_THROW_ON_ERROR) . "\n";
+        'settlementVerified'=>$result['settlementVerified'],'holds'=>$result['holds'],'earningsReleased'=>$result['earningsReleased'],'availableToWithdraw'=>null], JSON_THROW_ON_ERROR) . "\n";
     exit($result['settlementVerified'] ? 0 : 2);
 } catch (Throwable $error) {
     $reason = $error instanceof InvalidArgumentException ? $error->getMessage() : 'Settlement reconciliation did not finish. Retain the original collection IDs and reconcile those provider records.';

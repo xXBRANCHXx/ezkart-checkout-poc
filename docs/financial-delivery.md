@@ -34,8 +34,9 @@ cannot rewrite the receipt or its courier/download sources.
 Delivery remains a historical fact after a return. The service separately reads
 current payment/fulfillment reviews, additional captures, unresolved provider
 jobs, courier returns, refund requests and physical return cases. A closed return
-is not treated as financially reconciled. These checks do not replace the future
-atomic settlement/reserve/refund checks at earnings release or withdrawal.
+is not treated as financially reconciled. [Earnings accounting](seller-earnings.md)
+now applies these checks atomically at release and when single-order holds change.
+Future withdrawal reservations must recheck current evidence in their transaction.
 
 ## Service routes
 
@@ -47,16 +48,19 @@ keys, extra parameters and unbounded requests.
   returns the original receipt and current holds for that exact order. It now
   reads [current provider settlement evidence](provider-settlement-accounting.md)
   for `settlementVerified` and `settlementAssessmentId`, including stale-history
-  and attribution holds. `releaseReady` remains false and `availableToWithdraw`
-  remains null until the release/reserve/refund ledger is implemented.
+  and attribution holds. `releaseReady` now requires a reconciled available
+  earnings assessment; `earningsReleased` reflects positive available earnings.
+  Exact available/reserved earnings are separate from `availableToWithdraw`,
+  which remains null while bank withdrawals are unfinished.
 - `POST /internal/commerce/finance/delivery/reconcile` accepts `seller`,
   `environment`, optional `orderId`, and `limit` from 1–100 (default 25). It
   catches up existing complete evidence after an upgrade. It accepts no delivery
   assertion, item override, amount, timestamp or fee. `caughtUp` means all
   currently eligible receipts were recorded, not that all orders were delivered.
 
-No scheduler or provider call is introduced. No merchant balance or payment
-journal is changed by these routes. Original evidence stays private to the
+No provider call is introduced. With migration 0054, a newly recorded receipt
+can release earnings when original settlement and every current hold permit it;
+the catch-up result reports whether that transaction released funds. Original evidence stays private to the
 service; full file/grant and provider identifiers are not a public wallet API.
 
 ## Validation and remaining work

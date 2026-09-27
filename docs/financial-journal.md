@@ -4,9 +4,10 @@ The financial implementation starts with a durable journal for verified payment
 captures. It is operational accounting, not a provider balance, a completed wallet,
 recognized platform profit, or permission to withdraw. Original provider
 collections can now produce [settlement and correction entries](provider-settlement-accounting.md)
-with actual processing fees. Live provider acceptance, continuous synchronization,
-release/holds, refunds, seller account mapping and payouts remain part of the full
-completion scope.
+with actual processing fees. [Earnings release and holds](seller-earnings.md) now
+use those originals and complete delivery. Live provider acceptance, continuous
+synchronization, refund execution/accounting, accepted seller account mapping
+and complete payouts remain part of the full completion scope.
 
 ## Capture accounting
 
@@ -126,8 +127,9 @@ The [whole-order delivery receipt](financial-delivery.md) now binds every
 physical shipment and complete original digital download to the primary capture.
 It is recorded atomically with the final proof and preserves current refund,
 return and review holds on service reads. Delivery alone never posts available
-earnings; current settlement evidence and the remaining release/reserve/refund
-ledger are still required.
+earnings. [Migration 0054](seller-earnings.md) now joins it with current settlement
+evidence and domain holds, recording balanced available/reserved liabilities.
+Actual refund execution and its financial reversals remain separate.
 
 The [bank payout contract adapter](doku-payouts.md) now binds inquiry and transfer
 to the original amount, verified beneficiary and separate dispatch identities.
@@ -135,11 +137,12 @@ It has no central withdrawal caller and does not create available funds or
 completed payout journals. Durable reservations and execution remain required.
 
 Still required: provider-accepted seller mapping, payment routing and settlement,
-automatic reconciliation operations, delivery-plus-settlement release, reserves
-and disputes, partial/full refunds, negative-balance handling, owner-bound fresh
+automatic provider synchronization, live release acceptance, funded refund reserves
+and disputes, partial/full refunds, negative-balance recovery, owner-bound fresh
 Wallet verification on every protected action, withdrawal reservations and limits,
 beneficiary verification, payout idempotency/recovery, reconciliation and the real
-merchant wallet UI. No provider calls or movement of funds are implemented by the
+withdrawal UI. The protected Wallet now displays recorded earnings and their
+history; its bank withdrawal action remains disabled. No provider calls or movement of funds are implemented by the
 capture journal. No top-level completion/release gate is closed by this stage.
 
 ## Verification — 26 September 2026
