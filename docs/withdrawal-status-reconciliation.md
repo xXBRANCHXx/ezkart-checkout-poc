@@ -53,10 +53,11 @@ the command submits the same observation and returns the same digest.
 The [DOKU Sub-Account integration guide](https://developers.doku.com/wallet-as-a-service/sub-account/sub-account-v2/integration-guide)
 documents the original-reference status lookup and separate `PAYOUT` and
 `PAYOUT_CHARGE` history entries. Status alone does not establish the fee payer,
-actual fee funding or matched account cash movements. Complete history/fee
-reconciliation, final payout journals and outflow deductions, the integrated
-payment caller, provider activation and live acceptance remain required. The
-broader completion gates remain open.
+actual fee funding or matched account cash movements. The subsequent
+[payout reconciliation stage](withdrawal-reconciliation.md) implements matched
+history, final journals and completed-outflow deductions. Actual fee provisioning,
+the integrated payment caller, provider activation, unsupported reversals and
+live acceptance remain required. The broader completion gates remain open.
 
 ## Verification
 

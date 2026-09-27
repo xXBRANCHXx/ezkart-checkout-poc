@@ -22,7 +22,7 @@
   const paymentStarted = row => row.payment && row.payment.state !== 'not_started';
   const providerStatus = {reported_pending:'DOKU reports pending',reported_success:'DOKU reports success · reconciliation pending',
     reported_failed:'DOKU reports failure · reconciliation pending',review:'Transfer status needs review'};
-  const status = row => row.state === 'cancelled' ? 'Cancelled' : paymentStarted(row) ? (providerStatus[row.payment.status?.state] || (row.payment.state === 'response_recorded' ? 'Transfer response saved' : 'Transfer needs review')) : row.confirmation ? 'Bank confirmed' : row.bankVerified ? 'Bank verified' : row.inquiry?.state === 'review' ? 'Bank check needs review' : 'Request saved';
+  const status = row => ({cancelled:'Cancelled',completed:'Transfer completed',failed:'Transfer failed · funds released',review:'Transfer reconciliation needs review'}[row.state]) || (paymentStarted(row) ? (providerStatus[row.payment.status?.state] || (row.payment.state === 'response_recorded' ? 'Transfer response saved' : 'Transfer needs review')) : row.confirmation ? 'Bank confirmed' : row.bankVerified ? 'Bank verified' : row.inquiry?.state === 'review' ? 'Bank check needs review' : 'Request saved');
   const storageName = type => storageScope + ':' + type;
   const storedKey = type => {
     try {
@@ -104,11 +104,14 @@
   }
   function renderDetail(data) {
     const row = data.withdrawal;
-    if (!row || !/^wd_[a-f0-9]{40}$/.test(row.id) || !['reserved','cancelled'].includes(row.state) || typeof row.bank?.accountNumber !== 'string') throw Error('Saved withdrawal details could not be checked.');
+    if (!row || !/^wd_[a-f0-9]{40}$/.test(row.id) || !['reserved','cancelled','completed','failed','review'].includes(row.state) || typeof row.bank?.accountNumber !== 'string') throw Error('Saved withdrawal details could not be checked.');
     if (!dialog.open || stopped) return;
     selected = data; form.hidden = true; q('detail').hidden = false; confirmation.reset(); q('cancel-review').hidden = true;
     q('title').textContent = 'Withdrawal request'; q('message').textContent = row.state === 'cancelled'
       ? 'This request was cancelled. No bank transfer was started.'
+      : row.state === 'completed' ? 'Your bank transfer and its actual fee have been reconciled. The transferred amount stays deducted from your earnings. Ezkart covers the transfer fee.'
+      : row.state === 'failed' ? 'DOKU confirms failure and a voided debit. This request’s reservation has been released. Current earnings and any other holds still determine your available balance.'
+      : row.state === 'review' ? 'The provider evidence needs reconciliation. Earlier accounting entries remain recorded, and available earnings are held while the discrepancy is resolved.'
       : paymentStarted(row) ? 'This request has entered payment processing. Its outcome must be reconciled before the reserved amount can be released. It cannot be cancelled or sent again.'
       : row.bankVerified ? 'Check the bank-returned account-holder name and your original request below.'
       : row.inquiry?.state === 'review' ? 'The bank check needs review. Check its saved status; you can also cancel this request.'
@@ -120,13 +123,15 @@
     const warnings = [];
     if (row.state !== 'cancelled') {
       if (!data.originalOwner) warnings.push(paymentStarted(row) ? 'A previous owner authorized this payment. Its original destination is preserved while the outcome is reconciled.' : 'A previous owner created this request. You can review or cancel it; create your own request to continue.');
-      if (!data.funds.accountingComplete || amount(data.funds.reservationShortfall) > 0n) warnings.push(paymentStarted(row) ? 'Changed earnings no longer cover all withdrawal requests. Resolve the holds while this payment is reconciled.' : 'Changed earnings no longer cover all withdrawal requests. Resolve the holds or cancel a request before continuing.');
+      if (!data.funds.accountingComplete) warnings.push('Wallet accounting needs reconciliation before more funds become available.');
+      if (amount(data.funds.reservationShortfall) > 0n) warnings.push(paymentStarted(row) ? 'Changed earnings no longer cover all withdrawal requests. Resolve the holds while this payment is reconciled.' : 'Changed earnings no longer cover all withdrawal requests. Resolve the holds or cancel a request before continuing.');
       if (!caps().bankVerification && !row.bankVerified) warnings.push('Bank verification is temporarily unavailable. Your saved request is preserved.');
     }
     q('warning').textContent = warnings.join(' '); q('warning').hidden = !warnings.length;
     const check = row.payment?.status;
     q('status-note').hidden = !check;
-    q('status-note').textContent = check ? 'Last DOKU check: ' + date(check.checkedAt) + '. ' + (check.state === 'review'
+    q('status-note').textContent = row.payment?.outcome ? 'Reconciliation recorded: ' + date(row.payment.outcome.recordedAt) + '. ' + (row.payment.outcome.reconciled
+      ? 'Transfer and fee records are matched.' : 'Updated provider evidence still needs review.') : check ? 'Last DOKU check: ' + date(check.checkedAt) + '. ' + (check.state === 'review'
       ? 'The provider results need review. Your withdrawal remains reserved while the outcome is reconciled.'
       : 'Your withdrawal remains reserved until the transfer and its actual fees have been reconciled.') : '';
     q('confirmed').textContent = row.confirmation ? 'Bank details confirmed on ' + date(row.confirmation.confirmedAt) + '. No transfer has been started.' : '';
@@ -234,7 +239,7 @@
     try {
       const result = await call(action,payload); if (action !== 'inquire' && action !== 'status') forgetKey(keyType);
       renderDetail(await call('read',{id}));
-      if (result.statusCheck?.state === 'review') setError('The latest status check needs review. Your withdrawal remains reserved.');
+      if (result.statusCheck?.state === 'review') setError('The latest status check needs review. Earlier accounting entries remain recorded.');
     } catch (error) {
       try { renderDetail(await call('read',{id})); } catch { /* Keep the original reference for the next status check. */ }
       throw error;

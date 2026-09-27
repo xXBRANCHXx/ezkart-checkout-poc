@@ -181,6 +181,8 @@ housekeeping schedule is unchanged. TEST/main are not deployed or migrated.
 The [DOKU transfer contract](https://developers.doku.com/wallet-as-a-service/sub-account/sub-account-v2/integration-guide)
 does not expose a transfer-fee quote or payer override. Actual fee billing and
 funding still need provider evidence so that Ezkart pays without reducing the
-seller's withdrawal. The integrated caller, authenticated status/callback/history
-reconciliation, final payout/refund journals, completed-outflow deductions and
-live acceptance remain required. No launch gate is closed by this stage.
+seller's withdrawal. The subsequent [reconciliation stage](withdrawal-reconciliation.md)
+implements matched status/history, payout journals and completed-outflow deductions.
+The integrated caller, actual fee provisioning, authenticated callbacks,
+unsupported reversals, refund accounting and live acceptance remain required.
+No launch gate is closed by this stage.

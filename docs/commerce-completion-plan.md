@@ -71,6 +71,21 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 28 September: matched payout accounting and recovery
+
+[Payout reconciliation](withdrawal-reconciliation.md) connects the original
+withdrawal, account collections and status observations to immutable results and
+balanced journals. Completed payouts remain deducted after reservations close;
+fee corrections append only their delta. Explicit failed/voided transfers can
+release their original reservation without renewing send authority. Missing,
+seller-charged, conflicting or changed evidence holds availability for review.
+Protected Wallet distinguishes these outcomes and private recovery makes no
+provider request. Beta rollout verification is recorded in the linked document.
+
+Actual fee provisioning, integrated payment execution, provider activation,
+unsupported reversals, refunds and live acceptance remain required. No top-level
+gate is closed, and the existing execution/main holds remain.
+
 ### 28 September: original platform account for withdrawal fees
 
 The [platform-account binding](withdrawal-payment-grants.md#original-platform-account)

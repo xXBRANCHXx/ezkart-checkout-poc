@@ -7,6 +7,7 @@ import {tmpdir} from 'node:os';
 import {join,resolve} from 'node:path';
 import {setupCentralFixture} from './central-fixture.mjs';
 import {setupEarningsFixture} from '../../cloudflare/ezkart-api/test/earnings-fixture.mjs';
+import {payoutFixture} from '../../cloudflare/ezkart-api/test/payout-fixture.mjs';
 
 const root=resolve(import.meta.dirname,'../..'),base='/internal/commerce/finance/wallet',screens='/tmp/ezkart-wallet-enrollment-ui-01a0d643';
 const rsa=generateKeyPairSync('rsa',{modulusLength:2048}),privateKey=rsa.privateKey.export({format:'pem',type:'pkcs8'});
@@ -130,6 +131,60 @@ async function paymentGrantFixture(t,overrides={}){
     credentialFingerprint:f.provider.credentialFingerprint,clientId:f.provider.clientId});assert.equal(g.status,200,g.error);assert.equal(g.mayPay,true);
   return {...f,w,g,paymentPath};
 }
+
+test('payout reconciliation recovers a lost acknowledgement without provider calls and shows completed and stale outcomes in protected Wallet',async t=>{
+  const f=await paymentGrantFixture(t),p=payoutFixture({...f.e,p:f.p},f.w,f.g),cap=await p.payoutStatus(),pair=await p.collectPayout();
+  const input=p.payoutInput(pair,cap),encoded=Buffer.from(JSON.stringify(input)).toString('base64');
+  const providerCalls=async()=>(await f.app.calls()).filter(call=>call.url.includes('doku.com')).length,before=await providerCalls();
+  const code=`require ${JSON.stringify(join(root,'cart/api/commerce-payouts.php'))}; echo json_encode(ez_reconcile_withdrawal_payout('${f.w.id}',json_decode(base64_decode('${encoded}'),true)));`;
+  const path=p.path+'/payout/reconcile';f.control.drop=path;
+  const lost=await f.run(code);assert.equal(lost.status,0,lost.error);assert.equal(JSON.parse(lost.output).replayed,true);
+  assert.equal(f.control.calls.filter(call=>call.path===path).length,2);assert.equal(await f.count('commerce_payout_assessments'),1);
+  assert.equal((await f.db.prepare("SELECT COUNT(*) AS n FROM commerce_financial_journals WHERE kind='payout'").first()).n,1);
+  f.control.drop='';const recovered=await f.run(code);assert.equal(recovered.status,0,recovered.error);
+  assert.equal(JSON.parse(recovered.output).replayed,true);assert.equal(JSON.parse(recovered.output).outcome.payoutConfirmed,true);
+  assert.equal(await providerCalls(),before);
+  const cli=async extra=>new Promise((resolve,reject)=>{
+    const child=spawn(process.env.PHP_BINARY||'php',['-n','-d','auto_prepend_file='+join(root,'tools/checkout-test/provider-fixture.php'),
+      join(root,'tools/commerce/reconcile-withdrawal-payout.php'),'--environment=sandbox','--withdrawal='+f.w.id,
+      '--seller-collection='+pair.sellerCollectionId,'--platform-collection='+pair.platformCollectionId,'--status-cap='+cap,...extra],{env:f.app.env});
+    let output='',error='';child.stdout.on('data',x=>output+=x);child.stderr.on('data',x=>error+=x);child.on('error',reject);child.on('close',status=>resolve({status,output,error}));
+  });
+  const result=await cli([]);assert.equal(result.status,0,result.error);assert.equal(JSON.parse(result.output).providerCalls,0);
+  assert.equal((await cli(['--status-cap='+cap])).status,1);
+  assert.notEqual((await f.run(code,{EZKART_DEPLOYMENT_ENVIRONMENT:'production'})).status,0);
+  await p.refreshEarnings(pair);await f.page.reload();await withdrawalIdle(f);await viewWithdrawal(f);
+  assert.equal(await f.page.locator('[data-withdrawal-status]').innerText(),'Transfer completed');
+  assert.match(await f.page.locator('[data-withdrawal-message]').innerText(),/stays deducted/);
+  assert.doesNotMatch(await f.page.locator('[data-withdrawal-status-note]').innerText(),/remains reserved/);
+  for(const width of [1360,390]){
+    await f.page.setViewportSize({width,height:1000});assert.equal(await f.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+    assert.equal(await f.page.locator('[data-withdrawal-dialog]').evaluate(el=>el.scrollWidth<=el.clientWidth),true);
+    await f.page.screenshot({path:join(screens,'payout-completed-'+width+'.png'),fullPage:true});
+  }
+  await p.payoutStatus();await f.page.getByRole('button',{name:'Refresh request',exact:true}).click();await withdrawalIdle(f);
+  assert.equal(await f.page.locator('[data-withdrawal-status]').innerText(),'Transfer reconciliation needs review');
+  assert.match(await f.page.locator('[data-withdrawal-message]').innerText(),/Earlier accounting entries remain recorded/);
+  assert.equal((await f.e.earnings()).completedWithdrawals,'250000');
+  for(const file of ['/cart/api/commerce-payouts.php','/tools/commerce/reconcile-withdrawal-payout.php'])assert.equal((await fetch(f.app.base+file)).status,404);
+  let expired=false;f.control.afterResponse=async path=>{if(!expired&&path===p.path+'/read'){expired=true;await f.session("$_SESSION['wallet_access']['expires_at']=time()-1");}};
+  await f.page.getByRole('button',{name:'Refresh request',exact:true}).click();await f.page.getByRole('button',{name:'Send email code',exact:true}).waitFor();
+  assert.equal(await f.page.locator('[data-withdrawals]').count(),0);assert.equal((await f.request('withdrawal_read',{id:f.w.id})).status,401);
+  assert.equal(await providerCalls(),before);assert.deepEqual(f.errors,[]);
+});
+
+test('a reconciled voided transfer releases only its reservation and shows the failed outcome without another payment action',async t=>{
+  const f=await paymentGrantFixture(t),p=payoutFixture({...f.e,p:f.p},f.w,f.g),cap=await p.payoutStatus('06');
+  const pair=await p.collectPayout({payouts:[p.row('PAYOUT',250000,'VOID')]});
+  const result=await p.reconcilePayout(pair,cap);assert.equal(result.recorded.state,'failed');assert.equal(result.recorded.feeAmount,'2500');
+  await p.refreshEarnings(pair);assert.equal((await f.e.earnings()).availableEarnings,'756250');
+  await f.page.reload();await withdrawalIdle(f);await viewWithdrawal(f);
+  assert.equal(await f.page.locator('[data-withdrawal-status]').innerText(),'Transfer failed · funds released');
+  assert.match(await f.page.locator('[data-withdrawal-message]').innerText(),/reservation has been released/);
+  for(const selector of ['[data-withdrawal-cancel]','[data-withdrawal-confirm-form]','[data-withdrawal-check]'])assert.equal(await f.page.locator(selector).isHidden(),true);
+  assert.equal((await f.request('withdrawal_pay',{id:f.w.id})).status,400);
+  assert.equal((await f.app.calls()).filter(c=>c.url.endsWith('/sub-account/v2.0/transfer-payment')).length,0);assert.deepEqual(f.errors,[]);
+});
 
 test('withdrawal status uses the original signed provider reference and shows pending/success with funds reserved on desktop and mobile',async t=>{
   const f=await paymentGrantFixture(t,{EZKART_COMMERCE_WITHDRAWAL_STATUS:'enabled'}),before=await f.e.summary();

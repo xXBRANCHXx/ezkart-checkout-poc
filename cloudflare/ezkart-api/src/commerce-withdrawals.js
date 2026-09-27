@@ -1,6 +1,7 @@
 import {commerceHash} from './commerce-orders.js';
 import {walletOwner} from './commerce-wallet-enrollment.js';
 import {withdrawalStatusSummaries} from './commerce-withdrawal-status.js';
+import {payoutSummaries} from './commerce-payouts.js';
 
 const fail=(message,status=422)=>{throw new Response(message,{status});};
 const fields=(input,allowed)=>{if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).some(k=>!allowed.includes(k)))fail('Withdrawal parameters are invalid');};
@@ -36,6 +37,15 @@ const view=row=>({id:row.id,sequence:row.sequence,amount:String(row.amount),curr
     startedAt:row.payment_started_at||null,recordedAt:row.payment_recorded_at||null}});
 const read=(env,id,input)=>env.DB.prepare(rowSQL+' WHERE w.id=? AND w.seller_id=? AND w.commerce_environment=?')
   .bind(id,input.seller,input.environment).first();
+async function outcomes(env,items){
+  const results=await payoutSummaries(env,items.filter(w=>w.payment.startedAt).map(w=>w.id));
+  for(const w of items){
+    w.payment.outcome=results.get(w.id)||null;
+    if(w.payment.outcome){w.state=w.payment.outcome.state;w.payoutConfirmed=w.payment.outcome.payoutConfirmed;}
+  }
+  return items;
+}
+const currentView=async(env,row)=>(await outcomes(env,[view(row)]))[0];
 export function withdrawalFailure(error){
   if(/withdrawal_funds_unavailable/.test(String(error)))fail('Current earnings cannot cover this withdrawal. Refresh Wallet.',409);
   if(/withdrawal_owner_changed|withdrawal_proof_expired/.test(String(error)))fail('Your Wallet authorization changed. Verify your identity again.',409);
@@ -54,7 +64,7 @@ export async function reserveWithdrawal(env,input){
   const suffix=(await commerceHash({seller:input.seller,environment:input.environment,requestKey:input.requestKey})).slice(0,40),id='wd_'+suffix;
   const match=row=>row.owner_auth_id===input.actor.id&&String(row.amount)===input.amount&&row.bank_code===input.bank.code
     &&row.bank_account===input.bank.accountNumber&&row.channel===input.bank.channel;
-  const replay=row=>{if(!match(row))fail('This withdrawal reference already has different details.',409);return {withdrawal:view(row),replayed:true,providerCalls:0};};
+  const replay=async row=>{if(!match(row))fail('This withdrawal reference already has different details.',409);return {withdrawal:await currentView(env,row),replayed:true,providerCalls:0};};
   const prior=await read(env,id,input);if(prior)return replay(prior);
   const wallet=await env.DB.prepare(`SELECT p.enrollment_id FROM commerce_wallet_enrollments e JOIN commerce_wallet_provider_profiles p ON p.enrollment_id=e.id
     WHERE e.seller_id=? AND e.commerce_environment=? AND p.commerce_environment=e.commerce_environment`).bind(input.seller,input.environment).first();
@@ -77,7 +87,7 @@ export async function withdrawalDetail(env,id,input){
   const funds=await env.DB.prepare(`SELECT CAST(reservable_amount AS TEXT) AS available,CAST(reserved_amount AS TEXT) AS reserved,
     CAST(reservation_shortfall AS TEXT) AS shortfall,incomplete_captures,incomplete_journals
     FROM commerce_withdrawal_funds WHERE seller_id=? AND commerce_environment=?`).bind(input.seller,input.environment).first();
-  const withdrawal=view(row);withdrawal.bank.accountNumber=row.bank_account;
+  const withdrawal=await currentView(env,row);withdrawal.bank.accountNumber=row.bank_account;
   withdrawal.payment.status=(await withdrawalStatusSummaries(env,[id])).get(id)||null;
   return {withdrawal,funds:{reservableEarnings:funds.available,reservedWithdrawals:funds.reserved,reservationShortfall:funds.shortfall,
     accountingComplete:funds.incomplete_captures===0&&funds.incomplete_journals===0},
@@ -114,7 +124,7 @@ export async function withdrawalList(env,input){
   const limit=input.limit??20,cap=input.cap??(await env.DB.prepare('SELECT COALESCE(MAX(sequence),0) AS n FROM commerce_withdrawals WHERE seller_id=? AND commerce_environment=?').bind(input.seller,input.environment).first()).n;
   const rows=(await env.DB.prepare(rowSQL+' WHERE w.seller_id=? AND w.commerce_environment=? AND w.sequence<=? AND w.sequence<? ORDER BY w.sequence DESC LIMIT ?')
     .bind(input.seller,input.environment,cap,input.before??Number.MAX_SAFE_INTEGER,limit+1).all()).results;
-  const items=rows.slice(0,limit).map(view),statuses=await withdrawalStatusSummaries(env,items.map(row=>row.id));
+  const items=await outcomes(env,rows.slice(0,limit).map(view)),statuses=await withdrawalStatusSummaries(env,items.map(row=>row.id));
   for(const item of items)item.payment.status=statuses.get(item.id)||null;
   return {items,cap,nextBefore:rows.length>limit?rows[limit-1].sequence:null,withdrawalsEnabled:false};
 }
