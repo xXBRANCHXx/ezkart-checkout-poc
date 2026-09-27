@@ -90,6 +90,16 @@ two intended account codes. Actual provider acceptance, continuous synchronizati
 earnings release, refunds/reserves and withdrawals remain open. Checkout and
 provider/email execution holds remain; no top-level gate is closed by this change.
 
+Implementation `66bafd7` is pushed to workbench; migration 0053 and Worker
+`437c2b87-e0a2-44de-9620-778285a6041b` are deployed only to beta. Ten hosted
+service checks pass at 12:59 UTC, and matching Hostinger source/PHP/health checks
+pass at 13:01 UTC. The post-export restores with 155 tables and preserves all
+original business data. The only changes to existing application rows are two
+new cash account codes and one routine user-profile update timestamp from the
+earlier merchant reload. The original uncertain wallet is unchanged; settlement
+tables and money journals remain empty. No actual payment or earnings release
+occurred. TEST/main and all execution holds remain unchanged.
+
 ### 27 September: durable provider collection coverage and recovery
 
 [Provider collection receipts](provider-financial-evidence.md) now retain the

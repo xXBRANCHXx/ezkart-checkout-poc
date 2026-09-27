@@ -158,3 +158,34 @@ refund accounting, negative-balance recovery and complete withdrawals remain ope
 The original uncertain live wallet is not retried. The owner mailbox search at
 12:46 UTC has no matching reply to the existing DOKU support request. No real
 payment, settlement, refund, payout or earnings release is claimed by these tests.
+
+## Workbench rollout
+
+Implementation `66bafd7` is pushed only to `agent/ezkart-workbench`. Migration
+0053 is applied only to the beta database, and Worker
+`437c2b87-e0a2-44de-9620-778285a6041b` is deployed. Ten hosted service checks pass
+at 12:59 UTC, covering beta health, exact environment/service authorization,
+original-order requirements, money-override rejection, empty settlement summary
+and preservation of the original uncertain wallet. No accepted settlement,
+payment, refund or payout is created by those checks.
+
+At 13:01 UTC, `test.ezkart.id` serves this implementation's exact source document,
+loads the new PHP dependencies and returns 404 for the private CLI over HTTP.
+Health reports live beta and 154 application tables; checkout remains explicitly
+paused. The first hosted check at 12:59 still saw the earlier Hostinger deployment;
+it is retained separately from the successful proof.
+
+The post-export is 684,672 bytes, SHA-256
+`87fac4d70c29c6b1ea27bbc026927ef5c8db7475734d02d0b31d4a195782436b`.
+Its 155 tables restore with no integrity or foreign-key errors. Of the 151
+original application tables, 149 are unchanged, the account table preserves
+its six originals and adds only the two cash codes, and the user table differs
+only by one routine `updated_at` refresh at 12:46:39 UTC from the merchant reload.
+Every other original value, including the uncertain wallet registration, is
+preserved. The three new settlement tables and all financial journals are empty.
+
+Private evidence is `settlement-hosted-proof.json`,
+`settlement-workbench-proof.json`, `settlement-post-preservation.json` and
+`settlement-after-0053-20260927/` under the private beta evidence directory.
+The existing hourly housekeeping schedule is unchanged. No provider, checkout,
+email, TEST or main release hold is lifted by this rollout.

@@ -14,20 +14,39 @@ deployment now uses the isolated live beta configuration described below, with
 new checkout, provider dispatch schedules and automatic email sending held.
 Existing sandbox evidence is preserved. Main and `ezkart.id` remain held.
 
-## Current hosted state — 27 September, 12:12 UTC
+## Current hosted state — 27 September, 13:01 UTC
 
 Hostinger's private runtime now selects `beta`, production providers and the beta
 Worker. Its live DOKU client, secret, signing key and verified parent profile are
 installed outside the public root with mode 0600. Reloaded file hashes match the
 private prepared configuration; all earlier provider credentials are preserved.
 Health confirms beta, live DOKU credentials and connected D1/public R2/private R2
-with 151 application tables. At 07:45 UTC, central merchant operations were
+with 154 application tables. At 07:45 UTC, central merchant operations were
 enabled with `commerce_storage=d1`; new checkout remains separately paused in both PHP and
 the Worker. The public checkout configuration returns 503 with `Retry-After: 300`.
 An hourly housekeeping schedule is now installed; new checkout, provider
 dispatch schedules and email sending remain held. See the storage note below.
 
-The [provider collection receipts](provider-financial-evidence.md) are deployed
+The [settlement accounting](provider-settlement-accounting.md) implementation
+`66bafd7` is pushed to workbench, with migration 0053 and beta Worker
+`437c2b87-e0a2-44de-9620-778285a6041b`. Original capture/routing records and both
+wallets' complete provider collections now derive actual processing fees, seller/
+platform cash entries, corrections and void reversals. Uncertain or stale evidence
+cannot become verified settlement. All 77 relevant fixture cases and ten hosted
+service checks pass. At 13:01 UTC, Hostinger serves the matching workbench source
+and loads the PHP dependencies; the reconciliation CLI is unavailable over HTTP.
+Checkout and execution holds remain in place.
+
+The post-migration export restores cleanly with 155 exported tables. All original
+business data is preserved: 149 original application tables are byte-for-byte
+unchanged, the account table has only the two intended cash codes, and one user
+profile has only its routine `updated_at` refresh from the 12:46 merchant-page
+reload. The original uncertain wallet is unchanged; all three new settlement
+tables and existing money journals remain empty. This delivers settlement
+accounting, not live DOKU acceptance or earnings release. Continuous provider
+collection/reconciliation, reserves/refunds and complete withdrawals remain open.
+
+The earlier [provider collection receipts](provider-financial-evidence.md) were deployed
 from implementation `e5a16c6`, with migration 0052 and beta Worker
 `33dce2ab-f9ac-444d-a26d-6203f58ece81`. Before/after balances and original pages
 now form one durable record; incomplete or ambiguous reads cannot be treated as
@@ -37,8 +56,9 @@ Hostinger serves the matching workbench source, loads its PHP dependencies and
 keeps recovery CLI access unavailable over HTTP. The post-migration export
 restores cleanly and preserves every row in all 149 original application tables.
 Both new tables remain empty and the original uncertain wallet remains intact.
-This adds collection evidence; settlement journals, actual fees and earnings
-release remain unfinished. No provider execution or sending hold is lifted.
+These receipts supply the settlement implementation above. Actual live provider
+acceptance and earnings release remain unfinished. No provider execution or
+sending hold is lifted.
 
 A dedicated live Biteship key is now installed in the private hosted runtime and
 prepared local settings. At 07:19 UTC its read-only `GET /v1/couriers` succeeds
@@ -230,7 +250,7 @@ delivery and operator ownership still need acceptance.
 | --- | --- | --- |
 | Purchases and stock | Central immutable orders, atomic reservations, recoverable payment jobs, fulfillment and physical returns; isolated beta merchant cutover | Legacy ownership/count reconciliation, full signed-in physical/digital purchase and failure journeys |
 | Refunds | Purchase allocations, store decisions, buyer/store notifications and original delivery/return evidence | Provider-supported execution, unknown-result recovery, confirmed refund evidence, fee reversals, item access effects and reconciliation |
-| Wallet | Balanced capture journal, whole-order delivery receipts, confirmed-account routing/split dispatch, seller enrollment, original provider balance/history receipts and an isolated bank-transfer adapter | Live seller/platform wallet provisioning and routing acceptance, actual settlement/fee ingestion and corrections, delivery-plus-settlement release, reserves, negative balances, withdrawal reservations and verified payouts |
+| Wallet | Balanced capture and actual-fee settlement journals, corrections, whole-order delivery receipts, confirmed-account routing/split dispatch, seller enrollment, complete provider collections and an isolated bank-transfer adapter | Live wallet/routing/settlement acceptance, continuous collection/reconciliation, delivery-plus-settlement release, reserves, negative balances, withdrawal reservations and verified payouts |
 | Digital files | Immutable versions, private buyer grants, complete-download proof, reviews and full 500 MiB local transfer/recovery | Hosted signed-in and real-device transfers, storage monitoring/recovery, refund effects and subscription lifecycle |
 | Store/customer operations | Persistent settings, customer workspace, consent, messaging, notifications, campaigns and reporting | Hosted fresh-seller/customer acceptance, actual enabled delivery and failure monitoring, domain/analytics acceptance and accessibility/mobile review |
 | Operations | Private TEST/beta database backups, repeatable local restoration, recovery runbook and guarded deployment checks | Off-device retention, R2/application recovery, monitored execution, alert ownership, sustained financial validation and final acceptance report |
