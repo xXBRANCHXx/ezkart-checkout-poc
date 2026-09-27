@@ -71,6 +71,30 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 28 September: installed scheduled payout runner and monitoring
+
+The [scheduled runner](withdrawal-synchronization.md#scheduled-runner-and-liveness)
+now has an original-storage-bound heartbeat, a private process lock, exact saved
+completion recovery and a workbench-only CLI that loads the private hosted settings.
+The [operations report](commerce-operations.md) exposes missing/stale/failed runner
+state and current reconciliation backlogs without changing jobs or financial data.
+All 28 affected cases pass, including process overlap, held execution, long
+acknowledgement outages and original private configuration precedence.
+
+Implementation `1e2f054`, migration 0062 and beta Worker
+`a27c6c1c-4db6-48b8-97e3-ddf85ef7fdb7` are deployed. The 73 hosted API checks and
+seventeen private-route guards pass at 19:55 UTC on 27 September. Hostinger has
+one five-minute runner; its first ordinary 20:00:02 run finishes held with zero
+provider calls. Host output, D1 and the confirmed private receipt agree. The
+receipt directory is 0700 outside the public root; both operational files are
+0600. All original runtime settings are preserved and financial/provider holds
+remain. The post-export restores 172 tables, preserving every original row in
+170 application tables; only migration history and the new heartbeat differ.
+
+Named operator/alert delivery acceptance, extended histories, callback
+authentication, actual fee funding, payment execution, refunds and live
+owner/provider acceptance remain open. No full completion gate closes; main is untouched.
+
 ### 28 September: queued shared-platform payout synchronization
 
 The [synchronization queue](withdrawal-synchronization.md) adds bounded claims,

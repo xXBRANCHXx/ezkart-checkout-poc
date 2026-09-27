@@ -83,3 +83,11 @@ The first beta inspection at 10:02 UTC on 27 September reports exactly one
 uncertain job: the preserved wallet registration. There are no orders, captures,
 journals or application email requests. `--fail-on-warning` correctly returns 2;
 the command does not retry or change the wallet attempt.
+
+At 19:57 UTC, the runner-enabled report identifies that same uncertain wallet and
+`payout_runner_not_observed`. The first normal Hostinger cron pass at 20:00:02
+records a held heartbeat with no failures, interruptions or provider calls.
+The 20:00:34 read-only report then returns exactly `jobs_uncertain` and
+`payout_runner_held`, with no reconciliation backlog. Warning exit 2 is intentional:
+scheduler liveness does not clear the uncertain wallet or enable provider reads.
+External alert delivery and operational ownership are still unaccepted.
