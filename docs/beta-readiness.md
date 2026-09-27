@@ -14,22 +14,35 @@ deployment now uses the isolated live beta configuration described below, with
 new checkout, provider dispatch schedules and automatic email sending held.
 Existing sandbox evidence is preserved. Main and `ezkart.id` remain held.
 
-## Current hosted state — 27 September, 13:50 UTC
+## Current hosted state — 27 September, 14:24 UTC
 
 Hostinger's private runtime now selects `beta`, production providers and the beta
 Worker. Its live DOKU client, secret, signing key and verified parent profile are
 installed outside the public root with mode 0600. Reloaded file hashes match the
 private prepared configuration; all earlier provider credentials are preserved.
 Health confirms beta, live DOKU credentials and connected D1/public R2/private R2
-with 155 application tables. At 07:45 UTC, central merchant operations were
+with 157 application tables. At 07:45 UTC, central merchant operations were
 enabled with `commerce_storage=d1`; new checkout remains separately paused in both PHP and
 the Worker. The public checkout configuration returns 503 with `Retry-After: 300`.
 An hourly housekeeping schedule is now installed; new checkout, provider
 dispatch schedules and email sending remain held. See the storage note below.
 
-The [seller earnings and Wallet](seller-earnings.md) implementation `9f45d53` is
-pushed to workbench, with migration 0054 and beta Worker
-`ffb6c0df-123e-4029-9454-d7d0d6aed7cd`. Original settled fees and complete delivery
+The [withdrawal reservation](withdrawal-reservations.md) implementation `fd04afa`
+is deployed on workbench with migration 0055 and beta Worker
+`8ad4668d-cdda-40df-b064-6c33afa95f8c`. Current owner verification and eligible
+earnings are rechecked atomically with the request and reservation journal.
+Concurrent requests cannot spend twice; cancellations cannot restore stale or
+held funds. Wallet shows withdrawal reservations and funding shortfalls separately.
+All 72 relevant local checks and 17 hosted checks pass. The 14:23 UTC source
+hashes match, and the 14:24 UTC Wallet gate exposes no balances before verification.
+The post-export restores 158 tables; original financial/provider records are
+unchanged, both withdrawal tables are empty, and normal sign-in/maintenance
+metadata changes are accounted for. Actual bank confirmation, dispatch, fee
+funding and outcome reconciliation remain unfinished. No real transfer is made.
+
+The preceding [seller earnings and Wallet](seller-earnings.md) implementation
+`9f45d53`, migration 0054 and beta Worker
+`ffb6c0df-123e-4029-9454-d7d0d6aed7cd` established earnings release. Original settled fees and complete delivery
 now produce available earnings; refunds/returns, reviews and changed provider
 evidence hold the affected funds. Single-order changes are atomic, and existing
 housekeeping performs bounded catch-up without provider calls. Wallet shows

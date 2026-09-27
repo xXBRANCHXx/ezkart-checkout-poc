@@ -89,6 +89,15 @@ No provider inquiry, transfer, refund or payout is performed. Bank confirmation,
 durable dispatch, Ezkart-funded actual transfer fees, outcome reconciliation and
 merchant withdrawal actions remain required. All top-level gates remain open.
 
+Implementation `fd04afa` and migration 0055 are deployed to beta Worker
+`8ad4668d-cdda-40df-b064-6c33afa95f8c`. Seventeen hosted checks and exact Hostinger
+asset checks pass at 14:23 UTC; the real Wallet verification gate passes at 14:24.
+The post-export restores 158 tables with clean integrity/foreign keys. Of 155
+original application tables, 152 are exactly unchanged; expected changes are the
+new account code, the sign-in timestamp refresh and an empty successful 14:17
+maintenance run. Both new tables and all money journals remain empty. The original
+uncertain wallet, checkout/email/provider holds, TEST and main are unchanged.
+
 ### 27 September: seller earnings and protected Wallet history
 
 [Earnings accounting](seller-earnings.md) now connects original net settlement,

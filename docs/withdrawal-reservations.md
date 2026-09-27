@@ -102,3 +102,30 @@ The migration rehearsal preserves every original row and adds only the
 `seller_withdrawal_reserved` account plus empty withdrawal/cancellation tables.
 Integrity and foreign-key checks pass. Private evidence is in
 `/home/branch/.local/share/ezkart/beta-01a0d643/withdrawals-before-0055-20260927/`.
+
+## Hosted beta rollout
+
+Implementation `fd04afa` is pushed only to workbench. Migration 0055 is installed
+only on beta D1, and Worker `8ad4668d-cdda-40df-b064-6c33afa95f8c` is deployed with
+the unchanged `17 * * * *` housekeeping schedule. Seventeen hosted checks pass
+at 14:23 UTC: healthy storage, empty earnings/history, narrow service access,
+expired or absent withdrawal proof rejection, no transfer route, unchanged
+capture accounting and preservation of the original uncertain wallet registration.
+
+At 14:23 UTC Hostinger serves the matching document, Wallet script and stylesheet
+from the implementation commit. Health reports live beta with 157 application
+tables, checkout remains paused, and the private Wallet proxy is unavailable
+over direct HTTP. At 14:24 UTC the actual Wallet requires fresh verification and
+renders neither protected content nor balances. Populated Wallet behavior is
+established by isolated merchant tests, not a real customer withdrawal.
+
+The post-export restores cleanly with 158 exported tables and unchanged Time
+Travel bookmarks: 712,841 bytes, SHA-256
+`8c87414bb4ef2104d22d79f7b54fe2d5bb4a406d133025bac398c767e32e5bc0`.
+Of 155 original application tables, 152 are exactly unchanged. The account chart
+adds only the reservation liability; the signed-in Wallet visit refreshes only
+`app_users.updated_at`; the existing 14:17 UTC maintenance run updates only its
+run identifier/timestamps, completing with zero selected, removed or failed files.
+Both withdrawal tables, captures and journals remain empty. Original wallet and
+provider evidence are unchanged. No new provider request, money movement, email
+send or execution schedule is created. TEST/main and all release holds remain.
