@@ -179,8 +179,9 @@ export async function customerShipment(env,orderId,input){
 export async function shippingInbox(env,input,source='webhook'){
   const environment=commerceEnvironment(env,input.environment),provider=providerId(input.providerId),data=eventData(input.data);
   const eventId=await commerceHash({environment,provider,source,data}),now=new Date().toISOString();
-  await env.DB.prepare(`INSERT INTO commerce_shipping_inbox(id,commerce_environment,provider_id,source,payload_json,received_at) VALUES (?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING`)
-    .bind(eventId,environment,provider,source,JSON.stringify(data),now).run();
+  await env.DB.prepare(`INSERT INTO commerce_shipping_inbox(id,commerce_environment,provider_id,source,payload_json,received_at)
+    SELECT ?,?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM commerce_shipping_inbox WHERE id=?)`)
+    .bind(eventId,environment,provider,source,JSON.stringify(data),now,eventId).run();
   return {eventId,...await drainShippingInbox(env,environment,provider)};
 }
 
@@ -269,8 +270,9 @@ export async function refreshShipment(env,shipmentId,input){
   // response can never overwrite a webhook that committed in the meantime.
   const data=eventData(input.data),eventId=await commerceHash({environment:input.environment,provider:shipment.providerId,source:'refresh',data,revision:input.revision}),now=new Date().toISOString();
   try{await env.DB.batch([eventStatement(env,order,'shipping_refresh:'+eventId,'shipment.refresh_received',{shipmentId},eventId,now),
-    env.DB.prepare(`INSERT INTO commerce_shipping_inbox(id,commerce_environment,provider_id,source,payload_json,received_at) VALUES (?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING`)
-      .bind(eventId,input.environment,shipment.providerId,'refresh',JSON.stringify(data),now),
+    env.DB.prepare(`INSERT INTO commerce_shipping_inbox(id,commerce_environment,provider_id,source,payload_json,received_at)
+      SELECT ?,?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM commerce_shipping_inbox WHERE id=?)`)
+      .bind(eventId,input.environment,shipment.providerId,'refresh',JSON.stringify(data),now,eventId),
     env.DB.prepare('UPDATE orders SET revision=revision+1,updated_at=? WHERE id=? AND revision=?').bind(now,order.id,order.revision)]);
   }catch(error){databaseFailure(error);}
   return drainShippingInbox(env,input.environment,shipment.providerId);

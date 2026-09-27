@@ -107,6 +107,12 @@ The [wallet enrollment flow](wallet-enrollment.md) now implements owner-authoriz
 seller/provider mapping and fresh verification on every enrollment action. Actual
 hosted/provider acceptance and unknown-registration recovery remain open.
 
+The [whole-order delivery receipt](financial-delivery.md) now binds every
+physical shipment and complete original digital download to the primary capture.
+It is recorded atomically with the final proof and preserves current refund,
+return and review holds on service reads. Delivery alone never posts available
+earnings; actual settlement and the remaining money ledger are still required.
+
 The [bank payout contract adapter](doku-payouts.md) now binds inquiry and transfer
 to the original amount, verified beneficiary and separate dispatch identities.
 It has no central withdrawal caller and does not create available funds or

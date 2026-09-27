@@ -217,7 +217,7 @@ delivery and operator ownership still need acceptance.
 | --- | --- | --- |
 | Purchases and stock | Central immutable orders, atomic reservations, recoverable payment jobs, fulfillment and physical returns; isolated beta merchant cutover | Legacy ownership/count reconciliation, full signed-in physical/digital purchase and failure journeys |
 | Refunds | Purchase allocations, store decisions, buyer/store notifications and original delivery/return evidence | Provider-supported execution, unknown-result recovery, confirmed refund evidence, fee reversals, item access effects and reconciliation |
-| Wallet | Balanced capture journal, seller enrollment, original provider balance/history receipts and an isolated bank-transfer adapter | Actual settlement/fee ingestion and corrections, delivery-plus-settlement release, reserves, negative balances, withdrawal reservations and verified payouts |
+| Wallet | Balanced capture journal, whole-order delivery receipts, seller enrollment, original provider balance/history receipts and an isolated bank-transfer adapter | Actual settlement/fee ingestion and corrections, delivery-plus-settlement release, reserves, negative balances, withdrawal reservations and verified payouts |
 | Digital files | Immutable versions, private buyer grants, complete-download proof, reviews and full 500 MiB local transfer/recovery | Hosted signed-in and real-device transfers, storage monitoring/recovery, refund effects and subscription lifecycle |
 | Store/customer operations | Persistent settings, customer workspace, consent, messaging, notifications, campaigns and reporting | Hosted fresh-seller/customer acceptance, actual enabled delivery and failure monitoring, domain/analytics acceptance and accessibility/mobile review |
 | Operations | Private TEST/beta database backups, repeatable local restoration, recovery runbook and guarded deployment checks | Off-device retention, R2/application recovery, monitored execution, alert ownership, sustained financial validation and final acceptance report |
@@ -236,6 +236,15 @@ durable dispatch, actual transfer-fee funding and outcome reconciliation still
 need integration. No real bank inquiry or transfer was submitted.
 
 ## Financial policy now confirmed
+
+The [delivery prerequisite](financial-delivery.md) now records every purchased
+physical/digital line against actual applied courier evidence or a verified
+complete original download. Mixed orders wait for all lines. Completion and its
+immutable receipt share a transaction; current return/refund/review holds remain
+visible. Nine new cases, 36 existing Worker regressions and 22 PHP/browser cases
+pass. The fresh beta export restores with every original table unchanged after
+migration rehearsal. Delivery remains separate from settlement and available
+earnings; this work does not enable a withdrawal or close the financial gate.
 
 - Seller earnings need both confirmed delivery and provider settlement. A verified
   complete download is sufficient digital delivery; access or a started response

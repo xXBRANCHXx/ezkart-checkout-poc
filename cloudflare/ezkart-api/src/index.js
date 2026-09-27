@@ -27,6 +27,7 @@ import {merchantDashboard} from './commerce-dashboard.js';
 import {merchantPaymentList,merchantPaymentDetail,merchantPaymentHistory} from './commerce-payment-reads.js';
 import {snapPayment,bindSnapPayment,recordSnapPaymentReceipt} from './commerce-snap-payments.js';
 import {reconcileCaptureJournals,financialJournalSummary,financialJournalList} from './commerce-financial-journal.js';
+import {reconcileFinancialDeliveries,financialDeliveryStatus} from './commerce-financial-delivery.js';
 import {walletEnrollment,walletRegistration,bindWalletRegistration,saveWalletRegistrationReceipt,recordWalletRegistration} from './commerce-wallet-enrollment.js';
 import {providerFinancialAccount,recordProviderFinancialEvidence,providerFinancialEvidenceList} from './commerce-provider-evidence.js';
 import {merchantCustomers,merchantCustomer,customerOrderHistory} from './commerce-customers.js';
@@ -1538,6 +1539,12 @@ export default {
         if(url.search||Object.keys(input).some(k=>!['environment','limit','schedule'].includes(k))||input.environment!==(env.APP_ENVIRONMENT==='test'?'sandbox':'production')||input.schedule!==undefined&&typeof input.schedule!=='boolean'||input.limit!==undefined&&(!Number.isSafeInteger(input.limit)||input.limit<1||input.limit>3))return json({ok:false,error:'Notification processing request is invalid'},422);
         const scheduled=input.schedule?await scheduleNotifications(env):null;
         return json({ok:true,scheduled,...await dispatchNotifications(env,input.limit??3)});
+      }
+      if(url.pathname.startsWith('/internal/commerce/finance/delivery')){
+        const payload=await authenticateCommerceService(request,env,{strictJSON:true,maxBytes:3000});
+        if(url.pathname==='/internal/commerce/finance/delivery'&&request.method==='GET'&&!Object.keys(payload).length)return json({ok:true,...await financialDeliveryStatus(env,url)});
+        if(url.pathname==='/internal/commerce/finance/delivery/reconcile'&&request.method==='POST'&&!url.search)return json({ok:true,...await reconcileFinancialDeliveries(env,payload)});
+        return json({ok:false,error:'Delivery evidence route or method is unavailable'},404);
       }
       if(url.pathname.startsWith('/internal/commerce/finance/')){
         const payload=await authenticateCommerceService(request,env);

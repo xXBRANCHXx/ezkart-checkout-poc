@@ -71,6 +71,22 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 27 September: whole-order delivery evidence for financial release
+
+The [financial delivery receipt](financial-delivery.md) requires every original
+order line to have actual courier or complete-download proof. It is bound to
+the primary capture and saved in the same transaction as the last proof.
+Mixed orders, skipped/stale shipping, native/partial downloads, original file
+versions, concurrent replays, source replacement and rollback recovery are covered.
+Current return/refund/review holds remain independent of historical delivery.
+
+Nine new delivery cases, 36 related Worker regressions and 22 PHP/browser cases
+pass. The fresh beta export restores with all 147 original exported tables
+unchanged after migration 0050; integrity and foreign keys pass. Scoped query
+plans use indexed orders, captures, shipments and applied events. Actual
+settlement, provider fees, reserves, refund posting, earnings release and
+withdrawals remain open. No top-level gate is closed by delivery evidence alone.
+
 ### 27 September: bank payout contract
 
 The [DOKU bank payout adapter](doku-payouts.md) implements inquiry and transfer
