@@ -233,7 +233,33 @@ every table count, seller settings and legacy evidence, with all 267 plans still
 compiling. No hosted purchase, grant, download receipt or courier request was
 created. Central commerce and providers remain held.
 
-Outstanding: maximum-size and real-mobile transfers, signed-in hosted acceptance,
+Two opt-in capacity exercises cover the complete 500 MiB boundary with actual
+bytes in local R2 and isolated Chromium at 390px. Buyer recovery loses the receipt
+response after part 50, reloads with the same grant, and avoids retransferring
+verified parts. All 100 receipts create one delivery. The final saved file is
+524,288,000 bytes and matches the original streamed SHA-256; the original order,
+stock, journals and entries remain unchanged. Removing the browser copy preserves
+the delivery. The merchant exercise uploads/resumes all 100 parts, publishes a
+replacement and saves the full original file through PHP.
+
+The merchant exercise exposed a test-transport limitation: its mock cURL buffered
+the complete attachment in PHP. It now invokes the write callback in 8 KiB chunks,
+as the real application transport does. The app's private temporary-file spool
+was already bounded. This is local capacity evidence, not a hosted speed/storage
+or real-phone acceptance claim. Run the explicit capacity cases with:
+
+```sh
+EZKART_LARGE_DOWNLOAD_TESTS=1 node --test --test-force-exit \
+  --test-reporter=tap --test-concurrency=1 --test-name-pattern='500 MiB' \
+  tools/checkout-test/customer-downloads.test.mjs \
+  tools/checkout-test/digital-files.test.mjs
+```
+
+The two large cases are skipped in routine runs. Configure `PHP_BINARY` for the
+test PHP runtime if it is not on PATH. Test data and isolated browser files are
+removed by the fixture cleanup.
+
+Outstanding: hosted maximum-size and real-mobile transfers, signed-in acceptance,
 allocated digital refunds,
 subscription lifecycles, storage operations and financial release/settlement.
 All thirteen top-level completion gates remain open.

@@ -31,8 +31,8 @@ is required for their next digital publication or copy.
 An initial upload can resume for 24 hours. A completed, unpublished file is kept
 for seven days. Published file versions currently remain retained, including
 after catalog deletion. They cannot be cancelled or cleaned up. This preserves
-the historical file identities needed by the upcoming purchase-entitlement
-implementation. Automatic deletion of obsolete published versions is not enabled.
+the historical file identities used by purchase entitlements and delivery evidence.
+Automatic deletion of obsolete published versions is not enabled.
 Ten uploads may be in progress per store; initiation is bounded to twenty per
 hour and one hundred per day. Exact retries do not consume another initiation.
 These are technical upload limits, not a new priced storage allowance.
@@ -59,7 +59,12 @@ An interrupted completion recovers the object using its unique key, expected siz
 and original metadata. Cancellation first fences further publication in D1, then
 aborts the multipart upload and deletes the object. Storage errors leave a durable
 deleting state for retry. Cleanup processes at most five expired/unlinked uploads
-per hourly maintenance invocation; aggregate cleanup capacity and retention costs
+per hourly maintenance invocation. Migration 0047 adds durable attempt/retry
+metadata and one maintenance heartbeat. A failed deletion no longer stops the
+remaining batch; a one-hour retry delay lets other due files make progress.
+Overlapping runs share a twenty-minute lease. See
+[digital-storage-operations.md](digital-storage-operations.md) for the read-only
+TEST report and recovery contract. Aggregate cleanup capacity and retention costs
 remain part of operational acceptance.
 
 Current store membership is checked before and after storage awaits. Transaction
@@ -123,3 +128,12 @@ Signed-in hosted uploads/downloads, maximum-size real-network transfers, storage
 capacity and cleanup monitoring remain unverified. Central commerce, provider
 send/payment holds and the production release hold remain unchanged. All thirteen
 top-level completion gates remain open.
+
+The later 500 MiB merchant capacity exercise passes with actual bytes through the
+editor, PHP and local R2. Losing part 50's reply, reloading and reselecting the
+original file transfers each of the 100 parts exactly once. Publication preserves
+the original version and the complete saved attachment matches its streamed hash.
+It creates no buyer delivery evidence. The buyer capacity case independently
+checks original purchased bytes and verified delivery. Both use isolated Chromium
+at 390px; hosted network and real-device acceptance remain. See the explicit
+capacity command in [digital-commerce.md](digital-commerce.md).

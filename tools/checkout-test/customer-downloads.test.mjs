@@ -1,11 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {randomBytes} from 'node:crypto';
-import {writeFile,readFile,mkdir} from 'node:fs/promises';
+import {randomBytes,createHash} from 'node:crypto';
+import {createReadStream} from 'node:fs';
+import {writeFile,readFile,mkdir,stat} from 'node:fs/promises';
 import {join} from 'node:path';
 import {setupCentralFixture} from './central-fixture.mjs';
 import {digitalFixtureFile} from '../../cloudflare/ezkart-api/test/digital-commerce-fixture.mjs';
-import {digitalPartBytes} from '../../cloudflare/ezkart-api/src/digital-files.js';
+import {digitalPartBytes,digitalMaximumBytes} from '../../cloudflare/ezkart-api/src/digital-files.js';
 import {digitalDownloadProof} from '../../cloudflare/ezkart-api/src/commerce-digital.js';
 
 const buyer='fixture-google-customer',key=()=>randomBytes(16).toString('hex'),endpoint='/cart/admin/customer-downloads.php';
@@ -150,4 +151,65 @@ test('unavailable browser storage prevents grant creation and the buyer page kee
   assert.equal(await p.evaluate(()=>typeof unapprovedDownloadScript),'undefined');
   const next=f.app.cli(`require '${process.cwd()}/cart/api/customer-auth.php';echo ez_customer_next('/cart/downloads.php?order=${f.order.id}&redirect=https://other.example');`);assert.equal(next,'/cart/downloads.php?order='+f.order.id);
   const gate=await fetch(f.app.base+'/cart/downloads.php?order='+f.order.id),html=await gate.text();assert.equal(gate.status,200);assert.match(html,/Sign in to download/);assert(!html.includes('data-customer-downloads'));assert(!html.includes(f.file.version));
+});
+
+// Explicit capacity exercise: uploads and saves 500 MiB in isolated local R2 and
+// Chromium. Keep this out of routine runs; it uses real bytes and device storage.
+test('a 500 MiB purchase resumes after a lost halfway receipt and saves every original byte',{
+  skip:process.env.EZKART_LARGE_DOWNLOAD_TESTS!=='1',timeout:600000
+},async t=>{
+  console.log('Preparing the 500 MiB purchase and its 100 original upload parts.');
+  const f=await fixture(t,randomBytes(digitalMaximumBytes)),expectedHash=createHash('sha256').update(f.file.bytes).digest('hex');
+  const b=await browser(t),p=await pageFor(b,f,390),errors=[];p.on('pageerror',e=>errors.push(e.message));
+  // Release the test's full source buffer before exercising buyer storage. The
+  // final comparison streams the saved file, instead of buffering it again.
+  f.file.bytes=null;
+  const initialOrder=await f.record(f.order.id),initialStock=await f.stock();
+  const accounting=async()=>Promise.all([
+    f.db.prepare('SELECT * FROM commerce_financial_journals ORDER BY sequence').all(),
+    f.db.prepare('SELECT * FROM commerce_financial_entries ORDER BY journal_sequence,line_number').all()
+  ]).then(rows=>rows.map(row=>row.results));
+  const initialAccounting=await accounting();assert.ok(initialAccounting[0].length>0);
+  let interrupted=false;
+  f.control.afterResponse=async path=>{
+    const match=path.match(/\/parts\/(\d+)\/receipt$/);if(!match)return;
+    const part=Number(match[1]);if(part%25===0)console.log('Server verified original download part '+part+' of 100.');
+    if(part===50&&!interrupted){interrupted=true;f.control.drop=path;}
+  };
+  await open(p,f);console.log('Downloading into browser storage.');
+  await ui(p).getByRole('button',{name:'Download file',exact:true}).click();
+  await ui(p).getByRole('button',{name:'Resume download',exact:true}).waitFor({timeout:240000});
+  assert.equal(interrupted,true,'The response interruption must occur after the real halfway receipt commits');
+  assert.equal(await f.count('commerce_digital_part_receipts'),50);
+  assert.equal(await f.count('commerce_digital_deliveries'),0);
+  assert.equal(await f.count('commerce_digital_download_grants'),1);
+  const grant=(await f.db.prepare('SELECT id FROM commerce_digital_download_grants').first()).id;
+  const localSize=await p.evaluate(async()=>{
+    const dir=await(await navigator.storage.getDirectory()).getDirectoryHandle('ezkart-downloads');
+    for await(const [name,handle]of dir.entries())if(name.endsWith('.data'))return(await handle.getFile()).size;
+    return 0;
+  });assert.equal(localSize,50*digitalPartBytes);
+  const firstHalf=f.control.calls.filter(c=>/\/parts\/(?:[1-9]|[1-4][0-9]|50)$/.test(c.path)).length;
+  assert.equal(firstHalf,50);
+  await open(p,f);await ui(p).getByRole('button',{name:'Download file',exact:true}).click();
+  await ui(p).getByText('Download verified. Save your file below.',{exact:true}).waitFor({timeout:240000});
+  assert.equal(f.control.calls.filter(c=>/\/parts\/(?:[1-9]|[1-4][0-9]|50)$/.test(c.path)).length,firstHalf,'Verified original parts are recovered without transferring them again');
+  assert.equal(await f.count('commerce_digital_download_grants'),1);
+  assert.equal((await f.db.prepare('SELECT id FROM commerce_digital_download_grants').first()).id,grant);
+  assert.equal(await f.count('commerce_digital_download_requests'),100);
+  assert.equal(await f.count('commerce_digital_part_receipts'),100);
+  assert.equal(await f.count('commerce_digital_deliveries'),1);
+  const [saved]=await Promise.all([p.waitForEvent('download'),ui(p).getByRole('link',{name:'Save file',exact:true}).click()]);
+  assert.equal(saved.suggestedFilename(),'Panduan café.pdf');const path=await saved.path();assert.equal(await saved.failure(),null);
+  assert.equal((await stat(path)).size,digitalMaximumBytes);
+  const actualHash=createHash('sha256');for await(const chunk of createReadStream(path))actualHash.update(chunk);
+  assert.equal(actualHash.digest('hex'),expectedHash);
+  assert.deepEqual(await f.record(f.order.id),initialOrder);assert.equal(await f.stock(),initialStock);
+  assert.deepEqual(await accounting(),initialAccounting,'Verified delivery does not release funds or change capture accounting');
+  assert.deepEqual(errors,[]);assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  console.log('Saved and streamed-hash-checked all 524,288,000 original bytes.');
+  await ui(p).getByRole('button',{name:'Remove browser copy',exact:true}).click();
+  await ui(p).getByText('Browser copy removed. You can download this purchase again.',{exact:true}).waitFor();
+  assert.equal(await p.evaluate(async()=>{const dir=await(await navigator.storage.getDirectory()).getDirectoryHandle('ezkart-downloads');let n=0;for await(const entry of dir.entries())n++;return n;}),0);
+  assert.equal(await f.count('commerce_digital_deliveries'),1,'Removing the browser copy retains confirmed delivery');
 });

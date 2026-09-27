@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdir,readFile} from 'node:fs/promises';
-import {randomBytes} from 'node:crypto';
+import {mkdir,readFile,open as openFile,stat} from 'node:fs/promises';
+import {createReadStream} from 'node:fs';
+import {join} from 'node:path';
+import {randomBytes,createHash} from 'node:crypto';
 import {setupCentralFixture} from './central-fixture.mjs';
 import {browser,pageFor} from './review-workspace-fixture.mjs';
 import {digest} from '../../cloudflare/ezkart-api/test/commerce-fixture.mjs';
@@ -115,4 +117,41 @@ test('a lost initial digital publication retains its draft and product identity 
   await other.goto(draftUrl);await root(other).getByText('Published file retained. Replacements create a new version.',{exact:true}).waitFor();
   await other.locator('.product-editor-header').getByRole('button',{name:'Create product',exact:true}).click();await other.locator('[data-product-conflict-latest]').waitFor();assert.match(await other.locator('[data-product-conflict-latest]').getAttribute('href'),new RegExp(publishedId));
   assert.equal((await f.db.prepare("SELECT COUNT(*) AS n FROM products WHERE title='New digital recovery guide'").first()).n,1);
+});
+
+test('the merchant editor resumes and publishes a 500 MiB file and saves its original bytes through PHP',{
+  skip:process.env.EZKART_LARGE_DOWNLOAD_TESTS!=='1',timeout:600000
+},async t=>{
+  const f=await fixture(t),b=await browser(t),p=await pageFor(b,f,390),errors=[];p.on('pageerror',e=>errors.push(e.message));
+  const path=join(f.app.directory,'Maximum guide.bin'),source=await openFile(path,'w'),hash=createHash('sha256');
+  try{for(let part=1;part<=100;part++){const bytes=Buffer.alloc(chunk,97);bytes.writeUInt32BE(part);hash.update(bytes);await source.write(bytes);}}finally{await source.close();}
+  const expectedHash=hash.digest('hex');assert.equal((await stat(path)).size,100*chunk);
+  let upload='',interrupted=false;
+  f.control.afterResponse=async requestPath=>{
+    const match=requestPath.match(/^\/v1\/digital-files\/uploads\/(dupl_[a-f0-9]{40})\/parts\/(\d+)$/);if(!match)return;
+    upload=match[1];const part=Number(match[2]);if(part%25===0)console.log('Stored original merchant upload part '+part+' of 100.');
+    if(part===50&&!interrupted){interrupted=true;f.control.drop=requestPath;}
+  };
+  await open(p,f);console.log('Uploading the maximum-size file through the merchant editor and PHP.');
+  await root(p).locator('[data-digital-pick]').setInputFiles(path);
+  await root(p).getByText('The result was not confirmed. Resume the same upload.',{exact:true}).waitFor({timeout:240000});
+  assert.equal(interrupted,true);assert.equal(await f.count('digital_file_uploads'),2);
+  assert.equal((await f.db.prepare('SELECT COUNT(*) AS n FROM digital_file_parts WHERE upload_id=?').bind(upload).first()).n,50);
+  await p.reload();await root(p).getByText('50 of 100 parts confirmed. Select the same file to resume.',{exact:true}).waitFor();
+  await root(p).locator('[data-digital-pick]').setInputFiles(path);
+  await root(p).getByText('File verified. Publish the product to use this file.',{exact:true}).waitFor({timeout:240000});
+  for(let part=1;part<=100;part++)assert.equal(f.control.calls.filter(c=>c.path===prefix+'/uploads/'+upload+'/parts/'+part).length,1,'Each original part transfers once');
+  assert.equal(await f.count('digital_file_uploads'),2);
+  assert.equal((await f.db.prepare('SELECT state FROM digital_file_uploads WHERE id=?').bind(upload).first()).state,'ready');
+  await p.locator('.product-editor-header').getByRole('button',{name:'Publish changes',exact:true}).click();await p.waitForURL('**/?page=products&updated=1');
+  const current=(await f.merchant('/v1/catalog')).products.find(v=>v.id===productId);
+  assert.equal(current.digitalFile.size,100*chunk);assert.equal(current.digitalFile.version,2);assert.equal(current.digitalFile.uploadId,upload);
+  await open(p,f);const download=p.waitForEvent('download',{timeout:120000});
+  await root(p).getByRole('button',{name:'Download selected file',exact:true}).click();let saved;
+  try{saved=await download;}catch(error){console.log('Maximum-size download diagnostics',await root(p).textContent(),f.app.logs().slice(-5000));throw error;}
+  assert.equal(saved.suggestedFilename(),'Maximum guide.bin');const savedPath=await saved.path();assert.equal(await saved.failure(),null);assert.equal((await stat(savedPath)).size,100*chunk);
+  const savedHash=createHash('sha256');for await(const bytes of createReadStream(savedPath))savedHash.update(bytes);assert.equal(savedHash.digest('hex'),expectedHash);
+  assert.deepEqual(errors,[]);assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  assert.equal(await f.count('commerce_digital_deliveries'),0,'A merchant download never proves customer delivery');
+  console.log('Published and streamed-hash-checked the full 524,288,000-byte merchant file.');
 });

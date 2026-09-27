@@ -210,6 +210,12 @@ request still requires processing. Those semantics cannot be generalized to the
 existing BCA flow. Provider account capabilities, completion evidence and safe
 unknown-outcome recovery remain to be implemented and accepted.
 
-The owner has been asked how to reverse Ezkart commission/admin fees and who
-bears actual provider refund fees. Those policies remain undecided; no fee
-reversal or refund-processing charge allocation is implemented by this stage.
+On 27 September the owner selected proportional commission reversal and retention
+of the original admin fee when a refund is confirmed. The original commission
+uses product subtotal; shipping refunds do not reverse product commission.
+Implementation must cap cumulative reversals at the original recorded commission.
+
+The owner assigns actual provider refund-processing fees to whoever currently
+holds the proceeds. Clarification is pending on whether that changes at release
+into the seller's available wallet or at completed payout. No refund fee reversal
+or refund-processing charge allocation is implemented by this stage.

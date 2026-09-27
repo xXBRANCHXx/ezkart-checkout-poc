@@ -6,6 +6,12 @@ not hidden to make the launch checklist smaller. Work stays on
 `agent/ezkart-workbench` and `test.ezkart.id`. The production release hold and the
 roughly one-month financial validation period remain in force.
 
+On 27 September the owner reported DOKU approval and requested complete beta/
+soft-launch preparation, explicitly retaining workbench and the main-branch hold.
+Business approval is received. [Beta readiness](beta-readiness.md) tracks the
+remaining implementation and technical acceptance; the thirteen broader gates
+below remain open until their required evidence exists.
+
 ## Completion evidence
 
 An item is complete only when the implemented behavior, its adversarial tests,
@@ -48,7 +54,7 @@ do not establish provider activation, delivery, settlement or operational histor
   acceptance, backup/restore evidence, monitoring and operational recovery.
 - [ ] All applicable suites and hosted end-to-end tests pass on an identified
   release candidate. Sustained financial/wallet validation is recorded. DOKU
-  approval, supported production payment/payout acceptance and explicit final
+  approval is owner-confirmed; supported production payment/payout acceptance and explicit final
   owner release authorization remain separate gates.
 
 ## Implementation sequence
@@ -63,6 +69,36 @@ do not establish provider activation, delivery, settlement or operational histor
 
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
+
+### 27 September: beta preparation, full-size files and cleanup recovery
+
+DOKU approval is owner-confirmed and beta/soft-launch preparation is authorized
+on workbench. The production/main hold remains. Proportional commission reversal
+and retention of the admin fee are confirmed; the refund-processing fee boundary
+between available wallet funds and completed payout still needs clarification.
+See [beta-readiness.md](beta-readiness.md) for the remaining technical acceptance.
+
+Two maximum-size exercises pass with actual 500 MiB files at 390px in isolated
+Chromium/local R2. Both upload and buyer download recover lost halfway responses
+without duplicating transfers or grants; saved files match streamed hashes.
+Buyer verification preserves the original order, stock and financial entries.
+The shared test cURL transport now streams write callbacks, fixing its full-file
+buffering limit. The complete checkout regression run is in progress.
+
+Migration 0047 makes failed unpublished-file cleanup recoverable and observable:
+six new maintenance cases and nineteen existing file/digital API cases pass.
+Failed files defer retries while later files progress; concurrent invocations
+share a lease; publication/purchase retention remains protected. The read-only
+TEST inspection reports recorded bytes, pending work and missing/stale/interrupted
+heartbeats. The existing hourly schedule is unchanged. See
+[digital-storage-operations.md](digital-storage-operations.md).
+
+The fresh private TEST backup is 694,485 bytes, SHA-256
+`c3ff4374b11176d4e5c61c0e672577a7d8b44adad2e953563571b1ab115c585c`.
+Restoration preserves all original records across 144 physical tables; migration
+0047 changes only upload operational metadata and adds one table/index. Integrity
+and foreign-key checks pass, as do all 417 compatibility plans and the TEST dry-run.
+No financial/provider activation or top-level gate closure is implied.
 
 ### 27 September: purchase and delivery evidence in refund review
 
@@ -79,7 +115,7 @@ merchant layouts were visually inspected. A fresh 694,485-byte private TEST back
 (SHA-256 `c3ff4374b11176d4e5c61c0e672577a7d8b44adad2e953563571b1ab115c585c`)
 restores all 144 physical tables unchanged and passes integrity/foreign-key checks;
 407 compatibility plans compile. No migration is needed. Provider execution and
-refund accounting remain open, including the pending owner fee-policy decisions.
+refund accounting remain open, including the pending refund-fee custody boundary.
 See [refund-requests.md](refund-requests.md). No top-level gate is closed.
 
 Implementation `d81262d` is pushed to workbench and TEST Worker

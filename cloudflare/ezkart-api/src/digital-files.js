@@ -1,4 +1,5 @@
 import {commerceHash,commerceStorageEnabled} from './commerce-orders.js';
+import {runDigitalFileMaintenance} from './digital-file-maintenance.js';
 
 export const digitalPartBytes=5*1024*1024;
 export const digitalMaximumBytes=100*digitalPartBytes;
@@ -198,17 +199,7 @@ export async function cancelDigitalUpload(env,actor,id){
   return digitalUpload(env,actor,id);
 }
 export async function cleanupDigitalUploads(env,now=iso()){
-  const stale=new Date(Date.parse(now)-7*86400000).toISOString();
-  const rows=(await env.DB.prepare(`SELECT u.* FROM digital_file_uploads u WHERE u.retained_at IS NULL AND
-    ((u.state IN ('preparing','uploading','completing') AND u.expires_at<=?) OR u.state='deleting' OR (u.state='ready' AND u.ready_at<=?))
-    AND NOT EXISTS (SELECT 1 FROM digital_product_versions v WHERE v.upload_id=u.id) ORDER BY u.expires_at,u.id LIMIT 5`).bind(now,stale).all()).results;
-  let removed=0;
-  for(const row of rows){
-    const claimed=await env.DB.prepare(`UPDATE digital_file_uploads SET state='deleting' WHERE id=? AND state!='deleted'
-      AND NOT EXISTS (SELECT 1 FROM digital_product_versions WHERE upload_id=?)`).bind(row.id,row.id).run();
-    if(claimed.meta.changes){await purge(env,row);removed++;}
-  }
-  return {removed};
+  return runDigitalFileMaintenance(env,purge,now);
 }
 
 export async function readyDigitalUpload(env,sellerId,id){

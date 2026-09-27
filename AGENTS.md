@@ -31,6 +31,10 @@ Use merchant-facing controls for appearance settings: numeric values with separa
 - PR #3 (legacy sandbox lockout) must remain draft and unmerged during this hold. The owner explicitly declined deploying it now.
 - Continue authorized work on `agent/ezkart-workbench` / `test.ezkart.id` and the separate Executive Dashboard. Dashboard environment selection does not authorize a live storefront deployment or provider activation.
 - See `docs/production-release-gates.md` for the recorded release conditions and current validation limits.
+- On 27 September the owner reported DOKU approval and instructed preparation
+  for beta/soft-launch while explicitly keeping everything on workbench. DOKU
+  business approval is received; technical payment/payout acceptance and the
+  existing main/production release hold remain separate. See `docs/beta-readiness.md`.
 
 ## Sidebar announcements
 

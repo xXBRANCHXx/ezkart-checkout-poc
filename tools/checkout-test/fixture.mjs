@@ -78,6 +78,7 @@ export async function setup(overrides = {}) {
     env,
     base,
     directory,
+    logs: () => logs,
     async close() {
       child.kill();
       await new Promise((r) => child.once("exit", r));

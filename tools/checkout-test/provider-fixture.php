@@ -27,17 +27,29 @@ function curl_exec(object $handle): string|bool {
         if (preg_match('#^http://127\.0\.0\.1:\d+$#D', $relay) !== 1) throw new RuntimeException('Test relay must be local.');
         $path = substr($handle->url, strlen('https://ezkart-api-test.fixture.workers.dev'));
         $context = stream_context_create(['http' => ['method' => $handle->options[CURLOPT_CUSTOMREQUEST] ?? (!empty($handle->options[CURLOPT_POST]) ? 'POST' : 'GET'),
-            'header' => implode("\r\n", $handle->options[CURLOPT_HTTPHEADER] ?? []), 'content' => $handle->options[CURLOPT_POSTFIELDS] ?? '', 'ignore_errors' => true, 'timeout' => 20]]);
-        $response = @file_get_contents($relay . $path, false, $context);
-        $responseHeaders = http_get_last_response_headers();
+            'header' => implode("\r\n", $handle->options[CURLOPT_HTTPHEADER] ?? []), 'content' => $handle->options[CURLOPT_POSTFIELDS] ?? '', 'ignore_errors' => true, 'timeout' => $handle->options[CURLOPT_TIMEOUT] ?? 20]]);
+        // Match cURL's incremental write callback. Buffering an entire private
+        // attachment here bypasses the application's bounded spool and exhausts
+        // PHP's memory limit even when the real transfer uses constant memory.
+        $stream = @fopen($relay . $path, 'rb', false, $context);
+        $responseHeaders = http_get_last_response_headers() ?? [];
         $handle->status = preg_match('#^HTTP/\S+ (\d+)#', $responseHeaders[0] ?? '', $matches) ? (int) $matches[1] : 503;
         foreach ($responseHeaders as $header) {
             if (stripos($header, 'Content-Type:') === 0) $handle->contentType = trim(substr($header, 13));
             if (isset($handle->options[CURLOPT_HEADERFUNCTION])) ($handle->options[CURLOPT_HEADERFUNCTION])($handle, $header . "\r\n");
         }
-        if ($response === false) return '';
-        if (isset($handle->options[CURLOPT_WRITEFUNCTION])) return ($handle->options[CURLOPT_WRITEFUNCTION])($handle, $response) === strlen($response);
-        return $response;
+        if ($stream === false) return false;
+        $response = '';
+        try {
+            while (!feof($stream)) {
+                $bytes = fread($stream, 8192);
+                if ($bytes === false || stream_get_meta_data($stream)['timed_out']) return false;
+                if (isset($handle->options[CURLOPT_WRITEFUNCTION])) {
+                    if (($handle->options[CURLOPT_WRITEFUNCTION])($handle, $bytes) !== strlen($bytes)) return false;
+                } else $response .= $bytes;
+            }
+        } finally { fclose($stream); }
+        return isset($handle->options[CURLOPT_WRITEFUNCTION]) ? true : $response;
     }
     if (getenv('EZKART_TEST_WALLET') && preg_match('#^https://api-sandbox.doku.com/(authorization/v1/access-token/b2b|sub-account/v2.0/(register|balance-inquiries|transaction-history-list))$#D', $handle->url, $walletMatch)) {
         $directory = dirname(getenv('EZKART_TEST_CAPTURE'));
