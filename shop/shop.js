@@ -28,7 +28,13 @@
   function updateCard(card) {
     const product = products.find(p => p.id === card.dataset.product);
     const choice = product.choices.find(c => c.id === card.querySelector("select")?.value) || product.choices[0];
-    card.querySelector("[data-price]").textContent = choice ? money(choice.price) : "Unavailable";
+    const billing=choice?.billing,period=product.type==='subscription'&&billing&&['month','year'].includes(billing.unit)&&Number.isInteger(billing.interval)&&billing.interval>0
+      ? ' / '+(billing.interval===1?'':billing.interval+' ')+billing.unit+(billing.interval===1?'':'s') : '';
+    card.querySelector("[data-price]").textContent = choice ? money(choice.price)+period : "Unavailable";
+    if(product.type==='subscription'){
+      const select=card.querySelector('select');if(select){select.setAttribute('aria-label','Plan for '+product.name);select.parentElement.firstChild.textContent='Plan';}
+      const note=card.querySelector('.shop-unavailable');if(note)note.textContent='Subscription billing is not available yet.';
+    }
     const button = card.querySelector("[data-add]");
     button.disabled = !choice?.available;
     button.textContent = choice?.available ? "Add to cart" : choice?.stock === 0 && product.type === "physical" ? "Sold out" : "Unavailable";

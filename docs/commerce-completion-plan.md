@@ -93,6 +93,16 @@ outcome or ledger entry. The actual DOKU refund service integration, authenticat
 returned-funds evidence, final journals and digital entitlement effects remain
 unfinished. See [the refund handoff](refund-provider-handoffs.md#cost-review).
 
+### 28 September: timed finish — subscription readiness
+
+The live DOKU subscription menu requires separate FlexiBill registration and an
+initial Rp1,000,000 deposit. The owner chose to leave registration pending. The
+shop now shows each subscription plan's month/year cadence, and focused checks
+verify that subscription products cannot enter the one-time BCA flow. Recurring
+billing, customer consent, cancellation and renewal entitlements are still
+unfinished. [The DOKU subscription record](doku-subscriptions.md) distinguishes
+the provider activation decision from the remaining application implementation.
+
 ### 28 September: original DOKU refund request preparation
 
 The [provider handoff](refund-provider-handoffs.md) adds buyer-owned private bank

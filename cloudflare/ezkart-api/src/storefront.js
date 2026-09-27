@@ -55,18 +55,23 @@ export async function merchantStorefront(env, seller, payload = null) {
 function publicProduct(row, media, variants, reviews = {}, digitalFile = null) {
   const options = variants.filter(v => !parse(v.options_json).hidden);
   const choices = (variants.length ? options : [row]).map(option => {
-    const stock = row.type==='digital'?null:Math.max(0, Number(option.stock_quantity ?? row.stock_quantity ?? 0) - Number(option.reserved_quantity ?? 0));
+    const stock = row.type==='physical'?Math.max(0, Number(option.stock_quantity ?? row.stock_quantity ?? 0) - Number(option.reserved_quantity ?? 0)):null;
     const price = Number(option.price_amount ?? row.price_amount ?? 0);
     const weight = Number(option.weight_grams ?? row.weight_grams ?? 0);
     const variant = option !== row;
     const stored = variant ? parse(option.options_json) : [];
     const values = Array.isArray(stored) ? stored : Array.isArray(stored.values) ? stored.values : [];
+    const savedBilling=variant?{unit:option.billing_interval,interval:option.billing_interval_count}:
+      (parse(row.metadata_json)?.subscription||{unit:row.billing_interval,interval:row.billing_interval_count});
+    const billing=row.type==='subscription'&&['month','year'].includes(savedBilling.unit)&&Number.isInteger(savedBilling.interval)
+      &&savedBilling.interval>0&&savedBilling.interval<=(savedBilling.unit==='year'?10:120)?{unit:savedBilling.unit,interval:savedBilling.interval}:null;
     return {
       id: row.id + (variant ? `~${option.id}` : ""),
       name: variant ? option.name : "Standard",
       options: values.filter(item => typeof item?.option === "string" && typeof item?.value === "string")
         .slice(0, 3).map(item => ({ option: item.option.slice(0, 20), value: item.value.slice(0, 60) })),
       price, stock,
+      ...(row.type==='subscription'?{billing}:{}),
       available: price > 0 && (row.type === "physical" && stock > 0 && weight > 0 || row.type === "digital" && Boolean(digitalFile)),
       imagePath: imagePath(option.image_upload_id || media?.id),
     };
