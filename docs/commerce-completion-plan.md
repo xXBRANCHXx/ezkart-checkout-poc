@@ -93,6 +93,14 @@ delivery, hosted live cutover, provider-supported status/unknown-result recovery
 settlement, refunds and payout acceptance remain open. No top-level completion
 gate or main-release hold is closed.
 
+Implementation `905e1aa` is pushed and deployed to isolated beta Worker
+`b19ccea0-7a24-461b-b6f8-eab602b2648b`. Migration 0048 is installed with 146 tables;
+both new tables and all financial/order tables remain empty. Remote foreign keys
+and the private post-export restoration pass, with all original 144 tables'
+rows preserved. Eight beta checks pass at 06:18:50 UTC and four hosted workbench
+checks at 06:21:06 UTC. Hostinger auto-deployed the endpoint; central checkout
+remains held. TEST/main Workers, hosted provider mode and schedules are unchanged.
+
 ### 27 September: live DOKU authentication and separate beta storage
 
 The owner clarified live DOKU on workbench. A dedicated production public key is

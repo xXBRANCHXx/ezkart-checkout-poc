@@ -115,8 +115,7 @@ visually checked at 1360px and 390px. A populated migration rehearsal preserves
 every existing table's rows and passes foreign keys. Existing order/job,
 checkout/signature/adapter, financial-journal/payment-read and beta-isolation
 regressions pass. PHP syntax and beta Worker dry-run checks pass. These are
-isolated provider fixtures; the only real production request remains the earlier
-B2B authentication check.
+isolated provider fixtures and create no real DOKU payment or money movement.
 
 Still required: actual provider channel configuration/acceptance and hosted live
 cutover; verified paid/expired/failed status recovery, including a lost DGPC reply;

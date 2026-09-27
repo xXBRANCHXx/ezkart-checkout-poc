@@ -73,8 +73,8 @@ hosted private credentials and provider jobs, Executive/operations access and
 signed-in merchant/customer acceptance. Existing operator commands restricted
 to TEST must gain explicit beta support before they are used for live recovery.
 
-Implementation `c48f178` is pushed to workbench. The isolated beta Worker is
-deployed at `https://ezkart-api-beta.vincentbranch23.workers.dev`, current version
+The first beta implementation `c48f178` is pushed to workbench. Its Worker was
+deployed at `https://ezkart-api-beta.vincentbranch23.workers.dev`, initial version
 `2eeb80ab-a240-4c6f-ae2b-065ac1eb6675` after installing its dedicated private
 commerce-service secret. All seven hosted infrastructure/access/hold/CORS checks
 pass at 05:39:57 UTC on 27 September. PHP's real cURL health check confirms the
@@ -87,6 +87,24 @@ The existing TEST Worker and hosted storefront still report their original TEST/
 sandbox configuration, healthy data connectivity and `durable_checkout:false`.
 Neither was switched to the new database by this rollout. Main and `ezkart.id`
 remain held. No beta buyer, payment, capture, refund or payout was manufactured.
+
+SNAP implementation `905e1aa` is now pushed and deployed to beta Worker version
+`b19ccea0-7a24-461b-b6f8-eab602b2648b`. Migration 0048 is installed, bringing the
+beta database to 146 application tables. Both new tables are empty; orders and
+captures remain zero. The fresh pre-migration export matches the original
+baseline. The post-migration 427,889-byte export, SHA-256
+`3f6d7860d2f7c3b0ec438e87eaf49532dcd2bd7005dbe6c0bd56ce3775d8d88a`,
+restores with clean integrity/foreign keys and every row in the original 144
+tables unchanged. Remote foreign keys also pass. Eight beta health/access/hold/
+CORS checks pass at 06:18:50 UTC. The Worker retains its dedicated secret,
+commerce hold and empty schedule list.
+
+Hostinger's automatic workbench deployment now serves the SNAP endpoint. Four
+hosted checks pass at 06:21:06 UTC: GET is denied, a callback cannot acknowledge
+while central checkout is held, the original TEST/sandbox data connection is
+healthy with 144 tables, and checkout remains held. No TEST or main Worker was
+deployed, and no hosted provider/storage mode was changed. Ninety-three relevant
+implementation/regression cases pass across the recorded runs.
 
 Verification includes dedicated PHP/Worker beta isolation and destination tests,
 99 checkout/callback/admin/email regressions and 25 DOKU contract/reader cases.
