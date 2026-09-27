@@ -237,6 +237,13 @@ export async function digitalFileHistory(env,actor,productId,before=Number.MAX_S
 
 export async function digitalMerchantFile(env,actor,id,request){
   const row=await rowFor(env,actor,id);await readyDigitalUpload(env,actor.sellerId,id);
+  return serveDigitalFile(env,row,request,async()=>{await access(env,actor);await readyDigitalUpload(env,actor.sellerId,id);});
+}
+
+// Callers supply their own current authorization. Neither a private object key
+// nor an earlier preflight is permission to send a file to a customer.
+export async function serveDigitalFile(env,row,request,authorize){
+  const id=row.id;
   const rawRange=request.headers.get('range');let start=0,end=row.size_bytes-1,status=200;
   if(rawRange){
     const match=/^bytes=(\d*)-(\d*)$/.exec(rawRange);
@@ -250,7 +257,7 @@ export async function digitalMerchantFile(env,actor,id,request){
   if(!object?.body||object.size!==row.size_bytes||object.customMetadata?.digitalUpload!==id||object.customMetadata?.requestHash!==row.request_hash)fail('The stored file is unavailable. Contact support with the upload reference.',503,'digital_integrity');
   // Recheck after the storage await; a cancelled unpublished file or revoked
   // member must not receive bytes from an earlier authorization decision.
-  try{await access(env,actor);await readyDigitalUpload(env,actor.sellerId,id);}
+  try{await authorize();}
   catch(error){await object.body.cancel();throw error;}
   const ascii=row.filename.replace(/[^A-Za-z0-9._ -]/g,'_').replace(/^[. ]+|[. ]+$/g,'')||'download';
   const encoded=encodeURIComponent(row.filename).replace(/[!'()*]/g,c=>'%'+c.charCodeAt(0).toString(16).toUpperCase());

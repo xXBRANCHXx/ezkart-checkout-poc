@@ -61,6 +61,8 @@ function ez_central_courier_payload(array $order, array $shipment): array
     }
     $items = [];
     foreach ($order['items'] as $item) {
+        if (($item['productType'] ?? 'physical') === 'digital') continue;
+        if (($item['productType'] ?? 'physical') !== 'physical') throw new RuntimeException('Stored package type is unsupported.');
         if (($item['fulfillment']['weightGrams'] ?? 0) < 1) throw new RuntimeException('Stored package weight is incomplete.');
         $items[] = ['name' => mb_substr($item['title'] . (!empty($item['fulfillment']['variantName']) ? ' — ' . $item['fulfillment']['variantName'] : ''), 0, 100),
             'description' => mb_substr($item['sku'], 0, 100), 'sku' => $item['sku'], 'value' => $item['price'], 'quantity' => $item['quantity'], 'weight' => $item['fulfillment']['weightGrams']];

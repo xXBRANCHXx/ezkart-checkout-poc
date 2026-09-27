@@ -79,7 +79,7 @@ function ez_central_order_projection(array $record): array
     foreach ($record['items'] as $item) {
         $name = $item['title'] . (!empty($item['fulfillment']['variantName']) ? ' — ' . $item['fulfillment']['variantName'] : '');
         $items[] = ['id' => $item['sku'], 'name' => mb_substr($name, 0, 50), 'price' => $item['price'], 'quantity' => $item['quantity']];
-        $shippingItems[] = ['name' => mb_substr($name, 0, 100), 'description' => $item['sku'], 'sku' => $item['sku'],
+        if (($item['productType'] ?? 'physical') === 'physical') $shippingItems[] = ['name' => mb_substr($name, 0, 100), 'description' => $item['sku'], 'sku' => $item['sku'],
             'value' => $item['price'], 'quantity' => $item['quantity'], 'weight' => $item['fulfillment']['weightGrams']];
     }
     if ($record['shippingAmount'] > 0) $items[] = ['id' => 'EZK-SHIPPING', 'name' => 'Delivery', 'price' => $record['shippingAmount'], 'quantity' => 1];
@@ -88,6 +88,7 @@ function ez_central_order_projection(array $record): array
         'order_id' => $record['id'], 'seller_id' => $record['sellerId'], 'commerce_environment' => $record['environment'],
         'status' => strtoupper($record['state']), 'subtotal' => $record['subtotal'], 'total' => $record['total'],
         'shipping_price' => $record['shippingAmount'], 'shipping_skipped' => $shipping['skipped'],
+        'shipping_kind' => $shipping['kind'] ?? 'carrier',
         'shipping' => $shipping['quote'] ?? null, 'items' => $items, 'shipping_items' => $shippingItems,
         'customer' => ['name' => $customer['name'], 'email' => $customer['email'], 'phone' => $customer['phone'],
             'address' => $destination['address'] ?? '', 'location' => $destination['location'] ?? '',

@@ -36,7 +36,7 @@ const shipmentView=row=>row?{id:row.id,orderId:row.order_id,sequence:row.sequenc
   tracking:parse(row.tracking_json),actualPrice:row.actual_price,createdAt:row.created_at,boundAt:row.bound_at}:null;
 function pickupIssue(order){
   const shipping=order.snapshot.shipping,origin=shipping.origin||{},destination=shipping.destination||{};
-  if(shipping.skipped)return '';
+  if(shipping.skipped||shipping.kind==='none')return '';
   if(!/^[a-z0-9_]{2,60}$/.test(shipping.courierCode||'')||!/^[a-z0-9_]{2,60}$/.test(shipping.serviceCode||''))return 'The saved courier service is incomplete. Contact support before arranging pickup.';
   if(!/^\d{5}$/.test(origin.origin_postal_code||'')||!/^\d{5}$/.test(destination.postalCode||'')
     ||!origin.origin_contact_name||!order.customer.name||!/^\+?\d{8,15}$/.test(origin.origin_contact_phone||'')||!/^\+?\d{8,15}$/.test(order.customer.phone||'')
@@ -68,7 +68,7 @@ export async function fulfillmentDetail(env,actor,orderId,before=''){
   ]);
   const jobs=result[0].results.map(j=>({id:j.id,kind:j.kind,state:j.state,attempts:j.attempts,exhausted:j.attempts>=j.maximum_attempts,error:j.last_error,shipmentId:parse(j.payload_json).shipmentId}));
   const canWrite=commerceStorageEnabled(env)&&actor.role!=='viewer';
-  const issue=pickupIssue(order),eligible=canWrite&&order.state==='paid'&&!order.paymentReview&&!order.fulfillmentReview&&!order.snapshot.shipping.skipped;
+  const issue=pickupIssue(order),eligible=canWrite&&order.state==='paid'&&!order.paymentReview&&!order.fulfillmentReview&&!order.snapshot.shipping.skipped&&order.snapshot.shipping.kind!=='none';
   const cancelPending=current&&result[2].results.some(j=>j.shipment_id===current.id&&j.kind==='shipment.cancel');
   const lastRefresh=result[3].results[0]?.created_at,refreshAvailableAt=lastRefresh?new Date(Date.parse(lastRefresh)+120000).toISOString():null;
   const {payment,paymentRequestId,paymentJobState,paymentJobError,...safeOrder}=order;

@@ -1,8 +1,10 @@
 # Private digital product files
 
 Workbench implementation, 27 September 2026. This is the catalog storage layer.
-Buyer checkout, paid entitlements, digital delivery evidence, refund handling and
-subscription billing remain separate unfinished work. Uploading a file does not
+The subsequent [digital commerce API](digital-commerce.md) implements immutable
+purchases, payment-bound access and verified-download evidence; its customer
+screens, hosted acceptance, refunds and subscription billing remain unfinished.
+Uploading a file does not
 make a sale, grant a customer access, mark delivery or release wallet earnings.
 
 ## Merchant workflow

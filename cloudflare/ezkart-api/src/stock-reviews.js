@@ -11,7 +11,7 @@ export async function stockReviewList(env, seller, url) {
   if(!Number.isInteger(limit)||limit<1||limit>50||cursor.length>150||/[\u0000-\u001f]/.test(cursor))fail('The stock review page is invalid');
   const rows=await env.DB.prepare(`SELECT o.id,o.revision,o.created_at,o.paid_at,o.payment_review,
     json_extract(o.customer_snapshot_json,'$.name') AS customer_name,
-    (SELECT SUM(i.quantity) FROM order_items i WHERE i.order_id=o.id) AS quantity,
+    (SELECT SUM(i.quantity) FROM order_items i WHERE i.order_id=o.id AND i.product_type='physical') AS quantity,
     o.created_at || '~' || o.id AS cursor
     FROM orders o WHERE o.seller_id=? AND o.commerce_environment=? AND o.commerce_version=1
       AND o.checkout_state='paid' AND o.fulfillment_state='stock_review'
@@ -25,7 +25,8 @@ export async function stockReviewList(env, seller, url) {
 
 export async function stockReviewDetails(env, seller, orderId) {
   const order=await commerceOrder(env,seller.id,orderId,environment(env));
-  const keys=order.items.map(item=>item.productId+'~'+(item.fulfillment.variantId||''));
+  const physical=order.items.filter(item=>item.productType==='physical');
+  const keys=physical.map(item=>item.productId+'~'+(item.fulfillment.variantId||''));
   const results=await env.DB.batch([
     env.DB.prepare(`${inventorySql} SELECT * FROM inventory WHERE row_key IN (SELECT value FROM json_each(?))`)
       .bind(seller.id,seller.id,seller.id,seller.id,JSON.stringify(keys)),
@@ -33,7 +34,7 @@ export async function stockReviewDetails(env, seller, orderId) {
     env.DB.prepare("SELECT COUNT(*) AS n FROM commerce_payment_captures WHERE seller_id=? AND order_id=? AND capture_kind='order_payment'").bind(seller.id,orderId),
   ]);
   const stock=new Map(results[0].results.map(row=>[row.row_key,row]));
-  const items=order.items.map(item=>{
+  const items=physical.map(item=>{
     const current=stock.get(item.productId+'~'+(item.fulfillment.variantId||''));
     return {orderItemId:item.id,productId:item.productId,variantId:item.fulfillment.variantId||'',
       title:item.title+(item.fulfillment.variantName?' — '+item.fulfillment.variantName:''),sku:item.sku,quantity:item.quantity,

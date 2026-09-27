@@ -16,7 +16,7 @@ const queueSql=`CASE
      AND ((j.kind='payment.create' AND o.checkout_state IN ('creating','pending')) OR (j.kind IN ('shipment.create','shipment.cancel','shipment.refresh')
        AND json_extract(j.payload_json,'$.shipmentId')=(SELECT s.id FROM commerce_shipments s WHERE s.seller_id=o.seller_id AND s.order_id=o.id ORDER BY s.sequence DESC LIMIT 1)))) THEN 'attention'
  WHEN o.checkout_state NOT IN ('paid','partially_refunded') THEN ''
- WHEN json_extract(o.snapshot_json,'$.shipping.skipped')=1 THEN 'not-required'
+ WHEN json_extract(o.snapshot_json,'$.shipping.skipped')=1 OR json_extract(o.snapshot_json,'$.shipping.kind')='none' THEN 'not-required'
  WHEN o.fulfillment_state='delivered' THEN 'delivered'
  WHEN o.fulfillment_state IN ('picked','in_transit','dropping_off') THEN 'shipped'
  WHEN o.fulfillment_state IN ('awaiting_pickup_arrangement','pickup_requested','confirmed','scheduled','allocated','picking_up') THEN 'processing'
@@ -61,7 +61,7 @@ function orderSummary(row){
   return {id:row.id,revision:row.revision,state:row.checkout_state,fulfillmentState:row.fulfillment_state,
     queue:row.queue,review:row.queue==='attention',customerName:customer.name||'',customerEmail:customer.email||'',
     subtotal:row.subtotal_amount,shippingAmount:row.shipping_amount,total:row.total_amount,currency:row.currency,
-    shippingSkipped:snapshot.shipping?.skipped===true,confirmedAmount:row.confirmed_amount_text??row.confirmed_amount,additionalAmount:row.additional_amount_text??row.additional_amount,
+    shippingSkipped:snapshot.shipping?.skipped===true,shippingKind:snapshot.shipping?.kind||'carrier',confirmedAmount:row.confirmed_amount_text??row.confirmed_amount,additionalAmount:row.additional_amount_text??row.additional_amount,
     itemCount:row.item_count,unitCount:row.unit_count,firstItem:row.first_item||'',createdAt:row.created_at,paidAt:row.paid_at};
 }
 

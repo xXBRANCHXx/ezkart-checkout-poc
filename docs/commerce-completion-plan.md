@@ -64,6 +64,54 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 27 September: digital purchase identity and verified download API
+
+Implemented the central digital checkout, entitlement and download-evidence
+contract in [digital-commerce.md](digital-commerce.md). Checkout freezes the
+actual purchased file and option inside the order transaction; file/price races
+roll back all lines. Exact retries preserve the original purchase. Digital-only
+orders explicitly need no shipping in either environment. Mixed orders reserve,
+recover and ship only physical items while retaining every item in payment/fees.
+The merchant manager distinguishes a digital order from sandbox shipping skips.
+
+Primary verified capture creates one entitlement per digital item. Current buyer
+ownership, environment and payment eligibility are checked for every download,
+including after storage awaits. Download grants expire and recover by request
+key. Original file versions survive catalog changes. Whole-file/range responses
+remain distinct from proof of a complete download.
+
+The owner confirmed that a verified complete download is sufficient digital
+delivery, with provider settlement still separately required. The API checks
+each original part against its immutable checksum, issues a random challenge,
+and accepts a proof requiring possession of the actual bytes. Only all verified
+parts create an immutable delivery record. Reused checksums/proofs, corruption,
+other accounts, payment holds, concurrent completions and uncertain replies are
+covered. Completed-download evidence changes no captured journal or entry and
+does not create available funds or courier-delivery evidence.
+
+Eleven new API cases pass. Thirty-three existing order cases, twenty-seven
+financial/order-read/shipping/fulfillment cases, eight private-file cases and
+twenty-five PHP checkout/courier/order-manager cases pass. The PHP courier case
+checks actual mixed-order contents; merchant regressions cover desktop/mobile.
+The initial runs exposed invalid new fixture assumptions; corrected cases pass.
+
+A fresh 664,953-byte TEST backup restores all existing records in 134 physical
+tables unchanged, passes integrity and foreign-key checks, and compiles all 204
+captured query plans. SHA-256:
+`4e1106f5bd48387f91728d1970472a477a0c2e598c52a1d48f7ce9f3f8568c85`.
+Migration 0043 adds 38 objects and changes only the three intended physical
+shipping/fulfillment triggers. TEST deployment and hosted verification are the
+next rollout steps; the Worker dry-run passes.
+
+The public/PHP digital checkout flow and buyer download/save/resume screens
+remain to be connected and verified. Partial refunds currently produce an
+explicit access-review hold pending real per-item refund allocation; this does
+not complete refunds. Subscriptions, settlement/release, maximum-size/mobile
+transfers and operational retention remain open. Shared Chrome remains
+disconnected with no additional reconnect attempt, so signed-in hosted
+acceptance is pending. All thirteen top-level gates and all existing provider,
+central-commerce, financial and production holds remain unchanged.
+
 ### 27 September: private digital product file storage
 
 Implemented resumable, verified private uploads and immutable catalog file

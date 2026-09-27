@@ -107,7 +107,8 @@ function checkoutInput(env, input) {
     variantId: item.variantId ? identifier(item.variantId, 'Option') : '',
     quantity: integer(item.quantity, 10000, 'Quantity', 1),
     expectedPrice: integer(item.expectedPrice, 1000000000, 'Expected price', 1),
-    ...(item.expectedWeightGrams!==undefined?{expectedWeightGrams:integer(item.expectedWeightGrams,1000000,'Shipping weight',1)}:{}),
+    ...(item.expectedWeightGrams!==undefined?{expectedWeightGrams:integer(item.expectedWeightGrams,1000000,'Shipping weight')} : {}),
+    ...(item.expectedFileVersion!==undefined?{expectedFileVersion:text(item.expectedFileVersion,64,'File version')}:{}),
   })).sort((a, b) => `${a.productId}~${a.variantId}`.localeCompare(`${b.productId}~${b.variantId}`));
   if (new Set(items.map(item => `${item.productId}~${item.variantId}`)).size !== items.length) fail('Combine duplicate product options');
   const customer = customerInput(input.customer);
@@ -115,9 +116,11 @@ function checkoutInput(env, input) {
   if (!shipping || typeof shipping !== 'object' || Array.isArray(shipping)) fail('Shipping details are required');
   const amount = integer(shipping.amount, 100000000, 'Shipping amount');
   if (typeof shipping.skipped !== 'boolean') fail('Shipping selection is invalid');
+  if(shipping.kind!==undefined&&!['none','carrier'].includes(shipping.kind))fail('Shipping kind is invalid');
+  const noShipping=shipping.kind==='none';
+  if(noShipping&&(shipping.skipped||amount!==0||Object.keys(shipping).some(key=>!['kind','amount','skipped'].includes(key))))fail('Digital-only orders do not use a delivery quote or address');
   if (shipping.skipped && (environment !== 'sandbox' || amount !== 0)) fail('Only sandbox orders may skip shipping');
-  if (!shipping.skipped && (!shipping.courierCode || !shipping.serviceCode || !shipping.origin || !shipping.destination)) fail('A delivery quote and its addresses are required');
-  if (!shipping.skipped && items.some(item=>item.expectedWeightGrams===undefined)) fail('Quoted product weights are required');
+  if (!shipping.skipped && !noShipping && (!shipping.courierCode || !shipping.serviceCode || !shipping.origin || !shipping.destination)) fail('A delivery quote and its addresses are required');
   if (JSON.stringify(shipping).length > 8000) fail('Shipping details are too large');
   const expiresAt = new Date(input.expiresAt);
   if (!Number.isFinite(expiresAt.getTime())) fail('Checkout expiry is invalid');
@@ -133,7 +136,7 @@ function orderView(row, items = []) {
     fulfillmentState: row.fulfillment_state, fulfillmentReview:row.fulfillment_review===1, acceptedAt:row.accepted_at||null,
     paymentReview: row.payment_review === 1, expiresAt: row.expires_at, paidAt: row.paid_at,
     createdAt: row.created_at, updatedAt: row.updated_at,
-    items: items.map(item => ({id: item.id, productId: item.product_id, title: item.title,
+    items: items.map(item => ({id: item.id, productId: item.product_id, productType:item.product_type, title: item.title,
       sku: item.sku, quantity: item.quantity, price: item.unit_price_amount,
       fulfillment: parse(item.fulfillment_snapshot_json)})),
   };
@@ -160,6 +163,8 @@ function databaseFailure(error) {
   const message = `${error?.message || ''} ${error?.cause?.message || ''}`;
   if (/commerce_insufficient_stock|commerce_reserved_stock/.test(message)) fail('There is not enough available stock for this checkout', 409);
   if (/commerce_product_changed/.test(message)) fail('A product changed. Refresh its price and availability', 409);
+  if (/commerce_digital_changed/.test(message)) fail('A digital product or file changed. Review the current file and price before paying.',409);
+  if (/commerce_shipping_contract/.test(message)) fail('The shipping selection does not match the products in this order',409);
   if (/commerce_revision_conflict/.test(message)) fail('The order changed. Reload and retry this operation', 409);
   if (/shipping_revision_conflict/.test(message)) fail('Shipping settings changed. Refresh delivery options before paying.',409);
   if (/commerce_payment_mismatch/.test(message)) fail('The payment does not match this order', 409);
@@ -180,7 +185,6 @@ export async function createCommerceOrder(env, payload) {
   };
   const existing = await findExisting();
   if (existing) return replay(existing);
-  await validateShippingSettings(env,input.sellerId,input.environment,input.shipping);
   if (Date.parse(input.expiresAt) <= Date.now() || Date.parse(input.expiresAt) > Date.now() + 86400000) fail('Checkout expiry is invalid');
   const seller = await env.DB.prepare("SELECT id, plan FROM sellers WHERE id = ? AND status = 'active'").bind(input.sellerId).first();
   if (!seller) fail('Store is unavailable', 404);
@@ -189,21 +193,39 @@ export async function createCommerceOrder(env, payload) {
     env.DB.prepare("SELECT * FROM products WHERE seller_id = ? AND id IN (SELECT value FROM json_each(?)) AND status = 'active'").bind(seller.id, JSON.stringify(productIds)),
     env.DB.prepare('SELECT * FROM product_variants WHERE seller_id = ? AND product_id IN (SELECT value FROM json_each(?))').bind(seller.id, JSON.stringify(productIds)),
   ]);
+  const digitalFiles=products.results.some(product=>product.type==='digital')?await env.DB.prepare(`SELECT f.product_id,v.id,v.version,u.filename,u.size_bytes FROM digital_product_files f
+    JOIN digital_product_versions v ON v.id=f.version_id JOIN digital_file_uploads u ON u.id=v.upload_id
+    WHERE f.seller_id=? AND f.product_id IN (SELECT value FROM json_each(?)) AND u.state='ready' AND u.retained_at IS NOT NULL`)
+    .bind(seller.id,JSON.stringify(productIds)).all():{results:[]};
   const now = new Date().toISOString();
   const orderId = `EZK-${input.environment === 'sandbox' ? 'S' : 'P'}-${hex(crypto.getRandomValues(new Uint8Array(12))).toUpperCase()}`;
   const items = input.items.map(item => {
     const product = products.results.find(row => row.id === item.productId);
     const options = variants.results.filter(row => row.product_id === item.productId);
     const option = item.variantId ? options.find(row => row.id === item.variantId) : product;
-    if (!product || product.type !== 'physical' || !option || (!item.variantId && options.length)
+    if (!product || !['physical','digital'].includes(product.type) || !option || (!item.variantId && options.length)
       || (item.variantId && parse(option.options_json).hidden)) fail('A selected product option is unavailable', 409);
     if (option.price_amount !== item.expectedPrice) fail('A product price changed. Review the new total', 409);
-    if (!Number.isSafeInteger(option.weight_grams) || option.weight_grams < 1) fail('Product shipping weight is unavailable', 409);
-    if (item.expectedWeightGrams!==undefined&&item.expectedWeightGrams!==option.weight_grams) fail('A product shipping weight changed. Refresh delivery options',409);
+    let digitalFile;
+    if(product.type==='physical'){
+      if (!Number.isSafeInteger(option.weight_grams) || option.weight_grams < 1) fail('Product shipping weight is unavailable', 409);
+      if (item.expectedWeightGrams!==undefined&&item.expectedWeightGrams!==option.weight_grams) fail('A product shipping weight changed. Refresh delivery options',409);
+      if(!input.shipping.skipped&&item.expectedWeightGrams===undefined)fail('Quoted product weights are required');
+      if(item.expectedFileVersion!==undefined)fail('A selected product type changed. Refresh the cart.',409);
+    }else{
+      const file=digitalFiles.results.find(row=>row.product_id===product.id);
+      if(!file||item.expectedFileVersion!==file.id)fail('A digital product file changed or is unavailable. Review the current file before paying.',409);
+      if(item.expectedWeightGrams!==undefined&&item.expectedWeightGrams!==0)fail('Digital files do not have a shipping weight',409);
+      digitalFile={id:file.id,version:file.version,filename:file.filename,size:file.size_bytes};
+    }
     return {...item, id: `item_${crypto.randomUUID()}`, type: product.type, title: product.title,
       sku: option.sku || product.sku || product.id, price: option.price_amount,
-      fulfillment: {variantId: item.variantId, variantName: item.variantId ? option.name : '', weightGrams: option.weight_grams}};
+      fulfillment: {variantId: item.variantId, variantName: item.variantId ? option.name : '', weightGrams: product.type==='physical'?option.weight_grams:0,
+        ...(digitalFile?{digitalFile}:{})}};
   });
+  const physical=items.some(item=>item.type==='physical');
+  if(physical===(input.shipping.kind==='none'))fail('The shipping selection does not match the products in this order',409);
+  if(physical)await validateShippingSettings(env,input.sellerId,input.environment,input.shipping);
   const subtotal = integer(items.reduce((total, item) => total + item.price * item.quantity, 0), 100000000000, 'Order subtotal', 1);
   const total = integer(subtotal + input.shipping.amount, 100000000000, 'Order total', 1);
   const {campaignVisit,...checkout}=input.checkout;
@@ -233,7 +255,7 @@ export async function createCommerceOrder(env, payload) {
     env.DB.prepare(`INSERT INTO inventory_reservations (id, seller_id, order_id, order_item_id, product_id, variant_id,
       quantity, unit_price_amount, state, created_at, updated_at)
       SELECT 'hold_' || id, seller_id, order_id, id, product_id, json_extract(fulfillment_snapshot_json, '$.variantId'),
-        quantity, unit_price_amount, 'reserved', ?, ? FROM order_items WHERE order_id = ? AND seller_id = ?`)
+        quantity, unit_price_amount, 'reserved', ?, ? FROM order_items WHERE order_id = ? AND seller_id = ? AND product_type='physical'`)
       .bind(now, now, orderId, seller.id),
     env.DB.prepare(`INSERT INTO commerce_order_events (id, seller_id, order_id, event_key, event_type, payload_hash,
       previous_revision, data_json, created_at) VALUES (?, ?, ?, 'created', 'checkout.created', ?, 0, '{}', ?)`)
@@ -304,8 +326,8 @@ export async function applyCommerceEvent(env, orderId, input) {
         // evidence and put fulfillment on hold; never silently oversell or lose
         // a customer's paid transaction by rejecting its notification.
         const holds = await env.DB.prepare("SELECT COUNT(*) AS count FROM inventory_reservations WHERE order_id = ? AND state = 'reserved'").bind(orderId).first();
-        if (holds.count !== order.items.length) fulfillment = 'stock_review';
-        else { reservation = 'committed'; fulfillment = order.snapshot.shipping.skipped ? 'not_required' : 'awaiting_acceptance'; }
+        if (holds.count !== order.items.filter(item=>item.productType==='physical').length) fulfillment = 'stock_review';
+        else { reservation = 'committed'; fulfillment = order.snapshot.shipping.kind==='none'?'digital_access_ready':order.snapshot.shipping.skipped ? 'not_required' : 'awaiting_acceptance'; }
       }
     } else if (!paid) {
       if (input.type === 'payment.created' && order.state === 'creating') {

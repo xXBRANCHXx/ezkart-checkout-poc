@@ -7,11 +7,13 @@ import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {setupCentralFixture} from './central-fixture.mjs';
 import {fixtureShipping as shipping} from '../../cloudflare/ezkart-api/test/commerce-fixture.mjs';
+import {digitalFixtureFile} from '../../cloudflare/ezkart-api/test/digital-commerce-fixture.mjs';
 
 const key=()=>randomBytes(16).toString('hex');
-async function fixture(t,arrange=true){
+async function fixture(t,arrange=true,mixed=false){
   const f=await setupCentralFixture(t,{EZKART_TEST_CENTRAL_COURIER:'1'});
-  const create=await f.create(f.input({shipping,customer:{name:'Shipment Buyer',email:'checkout@example.com',phone:'081234567892',authUserId:'fixture-google-customer'}}));assert.equal(create.status,200,create.error);
+  const items=f.input().items;if(mixed)items.push((await digitalFixtureFile(f)).item);
+  const create=await f.create(f.input({shipping,items,customer:{name:'Shipment Buyer',email:'checkout@example.com',phone:'081234567892',authUserId:'fixture-google-customer'}}));assert.equal(create.status,200,create.error);
   const paid=await f.paid(create.order);assert.equal(paid.status,200,paid.error);const order=paid.order;
   const detail=()=>f.merchant('/v1/fulfillment/'+order.id);
   const action=async(kind,note='')=>{const view=await detail();const r=await f.merchant('/v1/fulfillment/'+order.id,{kind,note,revision:view.order.revision,requestKey:key()},{method:'POST'});assert.equal(r.status,200,r.error);return r.receipt;};
@@ -173,4 +175,13 @@ test('courier recovery cannot resend an uncertain pickup under a different API c
   const count=(await f.calls()).length;assert.equal((await f.dispatch()).code,2);assert.equal((await f.calls()).length,count);
   assert.match((await f.detail()).jobs[0].error,/credentials changed/);
   f.app.env.EZKART_BITESHIP_SANDBOX_API_KEY=original;await f.available();await f.configureCourier({});assert.equal((await f.dispatch()).code,0);assert.equal(Object.keys(await f.providerOrders()).length,1);
+});
+
+test('a mixed purchase sends only physical units to the courier and preserves digital access',async t=>{
+  const f=await fixture(t,true,true),run=await f.dispatch();assert.equal(run.code,0,run.stderr+run.stdout);
+  const calls=await f.calls(),payload=JSON.parse(calls[0].body);assert.equal(payload.items.length,1);
+  assert.equal(payload.items[0].weight,100);assert.equal(payload.items[0].quantity,2);assert.equal(payload.items[0].value,20000);
+  const purchases=await f.merchant('/v1/customer/orders/'+f.order.id+'/downloads',undefined,{seller:'fixture-google-customer'});
+  assert.equal(purchases.status,200,purchases.error);assert.equal(purchases.items.length,1);assert.equal(purchases.items[0].canDownload,true);
+  assert.equal(purchases.items[0].deliveryConfirmed,false);assert.equal(await f.stock(),8);
 });

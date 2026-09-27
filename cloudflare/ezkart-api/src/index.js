@@ -1,4 +1,5 @@
 import {beginDigitalUpload,digitalUpload,uploadDigitalPart,completeDigitalUpload,cancelDigitalUpload,digitalMerchantFile,digitalFileHistory,readyDigitalUpload,digitalVersionStatements,digitalCatalogSql,digitalCatalogFile,cleanupDigitalUploads} from './digital-files.js';
+import {buyerDigitalPurchases,createDigitalDownloadGrant,buyerDigitalFile,readDigitalDownloadGrant,buyerDigitalPart,acknowledgeDigitalPart} from './commerce-digital.js';
 import {hostedLandingResponse, landingPageLinks} from './landing-page-hosting.js';
 import {sellerPageAddress, sellerByPageAddress} from './seller-page-address.js';
 import { adminPreferences } from './admin-preferences.js';
@@ -1694,6 +1695,19 @@ export default {
           if(id.startsWith('conv_'))return json({ok:true,...await (action==='media'?uploadMessagePhoto(env,actor,id,body):action==='read'?markConversationRead(env,actor,id,body):sendMessage(env,actor,id,body))},200,cors);
         }
         return json({ok:false,error:'Method or parameters not allowed'},405,cors);
+      }
+      const buyerDigital=/^\/v1\/customer\/orders\/(EZK-[SP]-[A-F0-9]{24})\/downloads(?:\/(item_[A-Za-z0-9-]{3,90})\/grants(?:\/(dgrant_[a-f0-9]{32})(?:\/(file)|\/parts\/([1-9][0-9]{0,2})(\/receipt)?)?)?)?$/.exec(url.pathname);
+      if(url.pathname.startsWith('/v1/customer/orders/')&&url.pathname.includes('/downloads')&&!buyerDigital)return json({ok:false,error:'Download reference is invalid.'},400,cors);
+      if(buyerDigital){
+        const user=await authenticatedUser(request,env),[,orderId,itemId,grantId,file,part,receipt]=buyerDigital;
+        if(url.search)return json({ok:false,error:'Download parameters are not allowed.'},400,cors);
+        if(request.method==='GET'&&!itemId)return json({ok:true,...await buyerDigitalPurchases(env,user,orderId)},200,cors);
+        if(request.method==='POST'&&itemId&&!grantId)return json({ok:true,...await createDigitalDownloadGrant(env,user,orderId,itemId,await reviewRequestJson(request,2000,parseMessageJSON))},200,cors);
+        if(request.method==='GET'&&grantId&&!file&&!part)return json({ok:true,...await readDigitalDownloadGrant(env,user,orderId,itemId,grantId)},200,cors);
+        if(['GET','HEAD'].includes(request.method)&&file)return await buyerDigitalFile(env,user,orderId,itemId,grantId,request);
+        if(request.method==='GET'&&part&&!receipt&&!request.headers.has('range'))return await buyerDigitalPart(env,user,orderId,itemId,grantId,Number(part));
+        if(request.method==='POST'&&receipt)return json({ok:true,...await acknowledgeDigitalPart(env,user,orderId,itemId,grantId,Number(part),await reviewRequestJson(request,2000,parseMessageJSON))},200,cors);
+        return json({ok:false,error:'Download method is not allowed.'},405,cors);
       }
       const buyerReviewMatch=/^\/v1\/customer\/orders\/(EZK-[SP]-[A-F0-9]{24})\/reviews(?:\/([A-Za-z0-9_-]{3,96})\/history)?$/.exec(url.pathname);
       const buyerPhotoUpload=/^\/v1\/customer\/orders\/(EZK-[SP]-[A-F0-9]{24})\/review-media$/.exec(url.pathname);
