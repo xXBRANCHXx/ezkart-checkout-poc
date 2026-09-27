@@ -10,7 +10,7 @@ test('sync scope freezes original accounts independently of current platform con
   const scope=await f.call(path,input);assert.equal(scope.status,200,scope.error);
   assert.equal(scope.original.sellerAccount.seller,'seller_alice');assert.equal(scope.original.platformAccount.seller,'seller_bob');
   assert.equal(scope.original.sellerAccount.pendingAccount,'2030000001');assert.equal(scope.original.platformAccount.cashAccount,'2010000002');
-  assert.deepEqual(scope.plan.settlements,[{seller:'seller_alice',orderId:f.p.order.id}]);assert.equal(scope.plan.truncated,false);
+  assert.deepEqual(scope.plan.settlements,[{seller:'seller_alice',orderId:f.p.order.id,sellerEnrollmentId:scope.original.sellerAccount.enrollmentId}]);assert.equal(scope.plan.truncated,false);
   assert(Date.parse(scope.plan.from)<=Date.parse(scope.original.grantedAt)-300000);assert.equal(scope.mayPay,false);assert.equal(scope.providerCalls,0);
   const changed=await payoutSyncScope({DB:f.db,APP_ENVIRONMENT:'test',COMMERCE_PLATFORM_WALLET_SELLER:'different_seller'},f.w.id,input);
   assert.deepEqual(changed.original,scope.original);

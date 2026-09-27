@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import {randomBytes} from 'node:crypto';
 
-export async function seedRoutingWallets(f,{environment='sandbox',fingerprint='a'.repeat(64),clientId='MCH-FIXTURE-SNAP',platformParent='BRN-fixture'}={}){
+export async function seedRoutingWallets(f,{environment='sandbox',fingerprint='a'.repeat(64),clientId='MCH-FIXTURE-SNAP',platformParent='BRN-fixture',wallets}={}){
   const ids={};
-  for(const [user,number,parent] of [['alice','1','BRN-fixture'],['bob','2',platformParent]]){
+  for(const [user,number,parent] of wallets||[['alice','1','BRN-fixture'],['bob','2',platformParent]]){
     const base='/internal/commerce/finance/wallet',seller='seller_'+user;
     const enrolled=await f.call(base,{environment,seller,action:'enroll',requestKey:randomBytes(16).toString('hex'),
       actor:{id:user,email:user+'@example.test',proofExpiresAt:new Date(Date.now()+550000).toISOString()}});

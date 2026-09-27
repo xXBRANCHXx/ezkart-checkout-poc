@@ -5,6 +5,7 @@ require_once __DIR__ . '/commerce-withdrawal-status.php';
 require_once __DIR__ . '/commerce-provider-evidence.php';
 require_once __DIR__ . '/commerce-payouts.php';
 require_once __DIR__ . '/commerce-settlements.php';
+require_once __DIR__ . '/commerce-payout-cohort.php';
 
 /** One private run, one process, immutable atomic files. No credentials stored. */
 final class EzPayoutSyncFiles
@@ -28,6 +29,10 @@ final class EzPayoutSyncFiles
     }
     public function __destruct()
     {
+        $this->release();
+    }
+    public function release(): void
+    {
         if (is_resource($this->lock)) { flock($this->lock, LOCK_UN); fclose($this->lock); }
     }
     private function checkFile(string $file, int $minimum = 2, int $maximum = 4200000): void
@@ -38,7 +43,7 @@ final class EzPayoutSyncFiles
     }
     private function path(string $name): string
     {
-        if (preg_match('/^[a-z][a-z0-9-]{0,100}\.json$/D', $name) !== 1) throw new RuntimeException('Synchronization evidence name is invalid.');
+        if (preg_match('/^[a-z][a-z0-9_-]{0,100}\.json$/D', $name) !== 1) throw new RuntimeException('Synchronization evidence name is invalid.');
         return $this->directory . '/' . $name;
     }
     public function read(string $name): ?array
@@ -80,24 +85,44 @@ final class EzPayoutSyncFiles
 }
 
 /** Replay typed responses in their original order; only collect fills gaps. */
+final class EzPayoutSyncReadBudget extends RuntimeException
+{
+    public function __construct(public readonly int $providerCalls) { parent::__construct('The provider read budget was reached; resume this same run.'); }
+}
+
 final class EzPayoutSyncReader implements EzDokuFinancialReader
 {
     private int $step = 0;
     public int $providerCalls = 0;
     private ?EzDokuSubAccountReader $live = null;
-    public function __construct(private readonly EzPayoutSyncFiles $files, private readonly array $original, private readonly bool $collect) {}
+    public function __construct(private readonly EzPayoutSyncFiles $files, private readonly array $original, private readonly bool $collect,
+        private readonly int $maxReads = 20, private readonly ?Closure $heartbeat = null, private readonly bool $retainFailures = false) {}
     private function read(string $operation, array $request, Closure $call): array
     {
+        if ($this->heartbeat !== null) ($this->heartbeat)();
         $name = 'read-' . str_pad((string) ++$this->step, 4, '0', STR_PAD_LEFT) . '.json';
         $saved = $this->files->read($name);
+        if ($saved !== null && (($saved['operation'] ?? null) !== $operation || ($saved['request'] ?? null) !== $request))
+            throw new RuntimeException('Saved provider response differs from the original read.');
+        if (isset($saved['failure'])) {
+            if (!$this->retainFailures || !is_string($saved['failure']['reason'] ?? null) || preg_match('/^[a-z_]{1,64}$/D', $saved['failure']['reason']) !== 1
+                || !is_int($saved['failure']['status'] ?? null)) throw new RuntimeException('Saved provider failure is invalid.');
+            throw new EzDokuReadException($saved['failure']['reason'], $saved['failure']['status']);
+        }
         if ($saved === null) {
             if (!$this->collect) throw new RuntimeException('Recovery has reached an unsaved provider read. Resume collection explicitly.');
+            if ($this->providerCalls >= $this->maxReads) throw new EzPayoutSyncReadBudget($this->providerCalls);
             $this->live ??= EzDokuSubAccountReader::configured($this->original['environment']);
             $identity = $this->live->providerIdentity();
             if ($identity !== ['environment'=>$this->original['environment'], 'clientId'=>$this->original['clientId'], 'credentialFingerprint'=>$this->original['binding']['credentialFingerprint']])
                 throw new RuntimeException('Configured provider differs from the original payout.');
             $this->providerCalls++;
-            $response = $call($this->live);
+            try { $response = $call($this->live); }
+            catch (EzDokuReadException $error) {
+                if ($this->retainFailures) $this->files->save($name, ['operation'=>$operation,'request'=>$request,
+                    'failure'=>['reason'=>$error->reason,'status'=>$error->providerStatus]]);
+                throw $error;
+            }
             $saved = ['operation'=>$operation, 'request'=>$request, 'response'=>$response];
             // Save the original response before D1 delivery or another read.
             $this->files->save($name, $saved);
@@ -136,13 +161,16 @@ function ez_payout_sync_request(string $path, array $body): array
 }
 
 /** Read-only at DOKU. Recovery uses no provider credentials or network requests. */
-function ez_sync_withdrawal_payout(string $id, string $environment, string $run, string $mode = 'recover', int $maxPages = 10): array
+function ez_sync_withdrawal_payout(string $id, string $environment, string $run, string $mode = 'recover', int $maxPages = 10,
+    int $maxReads = 20, ?Closure $heartbeat = null): array
 {
     if (preg_match('/^wd_[a-f0-9]{40}$/D', $id) !== 1 || preg_match('/^[a-f0-9]{32}$/D', $run) !== 1
-        || !in_array($mode, ['collect','recover'], true) || $maxPages < 1 || $maxPages > 40) throw new InvalidArgumentException('Synchronization scope, mode or page budget is invalid.');
+        || !in_array($mode, ['collect','recover'], true) || $maxPages < 1 || $maxPages > 40 || $maxReads < 1 || $maxReads > 50)
+        throw new InvalidArgumentException('Synchronization scope, mode or read/page budget is invalid.');
     ez_withdrawal_workbench($environment);
     if ($mode === 'collect' && ez_config('commerce_withdrawal_sync') !== 'enabled') throw new RuntimeException('Payout provider synchronization is held.');
     $files = new EzPayoutSyncFiles(ez_withdrawal_receipt_directory() . '/' . $id . '-sync-' . $run, $mode === 'collect');
+    try {
     $path = '/internal/commerce/finance/withdrawals/' . $id;
     $scope = ez_payout_sync_request($path . '/payout/sync-scope', ['environment'=>$environment]);
     if (($scope['original']['withdrawalId'] ?? null) !== $id || ($scope['original']['environment'] ?? null) !== $environment
@@ -151,13 +179,14 @@ function ez_sync_withdrawal_payout(string $id, string $environment, string $run,
     if ($intent === null) {
         if ($mode !== 'collect') throw new RuntimeException('The original synchronization intent is missing.');
         EzDokuSubAccountReader::window($scope['plan']['from'], gmdate('Y-m-d\TH:i:s\Z'));
-        $intent = ['version'=>1,'run'=>$run,'original'=>$scope['original'],'plan'=>$scope['plan'],'maxPages'=>$maxPages];
+        $intent = ['version'=>2,'run'=>$run,'original'=>$scope['original'],'plan'=>$scope['plan'],'maxPages'=>$maxPages];
         $files->save('intent.json', $intent);
     }
-    if (($intent['version'] ?? null) !== 1 || ($intent['run'] ?? null) !== $run || ($intent['original'] ?? null) !== $scope['original']
+    if (!in_array($intent['version'] ?? null, [1,2], true) || ($intent['run'] ?? null) !== $run || ($intent['original'] ?? null) !== $scope['original']
         || ($intent['maxPages'] ?? null) !== $maxPages) throw new RuntimeException('The original synchronization scope cannot change.');
     $original = $intent['original'];
-    $reader = new EzPayoutSyncReader($files, $original, $mode === 'collect');
+    $reader = new EzPayoutSyncReader($files, $original, $mode === 'collect', $maxReads, $heartbeat, $intent['version'] === 2);
+    if ($intent['version'] === 2) return ez_payout_sync_cohort($files, $reader, $intent, $heartbeat);
     $status = $reader->transactionStatus($original['binding']['partnerReferenceNo']);
     ez_finalize_withdrawal_status(['version'=>1,'withdrawalId'=>$id,'environment'=>$environment,'confirmationId'=>$original['confirmationId'],
         'binding'=>$original['binding'],'evidence'=>$status['evidence']]);
@@ -238,4 +267,5 @@ function ez_sync_withdrawal_payout(string $id, string $environment, string $run,
     return [...$base,'state'=>$done?'synchronized':'review','reason'=>$done?'reconciled':'reconciliation_required',
         'reconciled'=>$done,'payoutConfirmed'=>$current['outcome']['payoutConfirmed'] ?? false,'outcome'=>$current['outcome'],
         'relatedReviews'=>$reviews,'sharedHistoryReview'=>$shared,'planTruncated'=>$intent['plan']['truncated']];
+    } finally { $files->release(); }
 }

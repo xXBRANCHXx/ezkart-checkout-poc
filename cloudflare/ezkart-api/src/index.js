@@ -40,6 +40,7 @@ import {startWithdrawalPayment,saveWithdrawalPaymentReceipt,withdrawalPaymentRec
 import {saveWithdrawalStatus,withdrawalStatusHistory} from './commerce-withdrawal-status.js';
 import {reconcilePayout,payoutStatus} from './commerce-payouts.js';
 import {payoutSyncScope} from './commerce-payout-sync.js';
+import {requestPayoutSync,schedulePayoutSync,claimPayoutSync,heartbeatPayoutSync,finishPayoutSync,listPayoutSync,payoutSyncHousekeeping} from './commerce-payout-sync-jobs.js';
 import {merchantCustomers,merchantCustomer,customerOrderHistory} from './commerce-customers.js';
 import {customerSegments,customerSegment,saveCustomerWorkspace,customerProfileHistory} from './commerce-customer-workspace.js';
 import {createCustomerExport,readCustomerExport,cleanupCustomerExports} from './commerce-customer-exports.js';
@@ -1562,6 +1563,13 @@ export default {
         if(url.pathname==='/internal/commerce/finance/delivery/reconcile'&&request.method==='POST'&&!url.search)return json({ok:true,...await reconcileFinancialDeliveries(env,payload)});
         return json({ok:false,error:'Delivery evidence route or method is unavailable'},404);
       }
+      if(url.pathname.startsWith('/internal/commerce/finance/payout-sync/')){
+        const payload=await authenticateCommerceService(request,env,{strictJSON:true,maxBytes:30000});
+        const actions={request:requestPayoutSync,schedule:schedulePayoutSync,claim:claimPayoutSync,heartbeat:heartbeatPayoutSync,finish:finishPayoutSync,list:listPayoutSync};
+        const name=url.pathname.slice('/internal/commerce/finance/payout-sync/'.length),action=Object.hasOwn(actions,name)?actions[name]:null;
+        if(request.method!=='POST'||url.search||!action)return json({ok:false,error:'Synchronization job route is unavailable'},404);
+        return json({ok:true,...await action(env,payload)});
+      }
       if(url.pathname.startsWith('/internal/commerce/finance/withdrawals')){
         const payload=await authenticateCommerceService(request,env,{strictJSON:true,maxBytes:/\/(inquiry|payment|status)\/receipt$/.test(url.pathname)?50000:3000});
         if(request.method!=='POST'||url.search)return json({ok:false,error:'Withdrawal route or method is unavailable'},404);
@@ -2111,6 +2119,7 @@ export default {
       context.waitUntil((async()=>{await scheduleNotifications(env);await dispatchNotifications(env);})());return;
     }
     context.waitUntil(earningsHousekeeping(env));
+    context.waitUntil(payoutSyncHousekeeping(env));
     context.waitUntil(cleanupDigitalUploads(env));
     context.waitUntil(cleanupAbandonedMedia(env));
     context.waitUntil(cleanupCampaignVisits(env));
