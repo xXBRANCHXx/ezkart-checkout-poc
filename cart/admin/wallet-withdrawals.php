@@ -40,7 +40,8 @@ if (empty($walletAccess['unlocked']) || empty($walletOwner) || empty($centralWal
         <div class="wallet-withdraw-reference"><dt>Reference</dt><dd data-withdrawal-reference></dd></div>
       </dl>
       <p class="wallet-withdraw-warning" data-withdrawal-warning role="status" hidden></p>
-      <div class="wallet-withdraw-actions"><button class="action-button" type="button" data-withdrawal-check>Verify bank account</button><button class="action-button" type="button" data-withdrawal-detail-refresh>Refresh request</button></div>
+      <p data-withdrawal-status-note role="status" hidden></p>
+      <div class="wallet-withdraw-actions"><button class="action-button" type="button" data-withdrawal-check>Verify bank account</button><button class="action-button" type="button" data-withdrawal-status-check hidden>Check transfer status</button><button class="action-button" type="button" data-withdrawal-detail-refresh>Refresh request</button></div>
       <form class="wallet-withdraw-confirm" data-withdrawal-confirm-form hidden>
         <label><input type="checkbox" name="confirmed" required> I have checked the amount, bank, account number and account-holder name.</label>
         <button class="action-button primary" type="submit" data-withdrawal-confirm>Confirm bank details</button>

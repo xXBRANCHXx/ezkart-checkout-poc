@@ -1,5 +1,6 @@
 import {commerceHash} from './commerce-orders.js';
 import {walletOwner} from './commerce-wallet-enrollment.js';
+import {withdrawalStatusSummaries} from './commerce-withdrawal-status.js';
 
 const fail=(message,status=422)=>{throw new Response(message,{status});};
 const fields=(input,allowed)=>{if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).some(k=>!allowed.includes(k)))fail('Withdrawal parameters are invalid');};
@@ -77,6 +78,7 @@ export async function withdrawalDetail(env,id,input){
     CAST(reservation_shortfall AS TEXT) AS shortfall,incomplete_captures,incomplete_journals
     FROM commerce_withdrawal_funds WHERE seller_id=? AND commerce_environment=?`).bind(input.seller,input.environment).first();
   const withdrawal=view(row);withdrawal.bank.accountNumber=row.bank_account;
+  withdrawal.payment.status=(await withdrawalStatusSummaries(env,[id])).get(id)||null;
   return {withdrawal,funds:{reservableEarnings:funds.available,reservedWithdrawals:funds.reserved,reservationShortfall:funds.shortfall,
     accountingComplete:funds.incomplete_captures===0&&funds.incomplete_journals===0},
     originalOwner:row.owner_auth_id===input.actor.id,withdrawalsEnabled:false,providerCalls:0};
@@ -112,5 +114,7 @@ export async function withdrawalList(env,input){
   const limit=input.limit??20,cap=input.cap??(await env.DB.prepare('SELECT COALESCE(MAX(sequence),0) AS n FROM commerce_withdrawals WHERE seller_id=? AND commerce_environment=?').bind(input.seller,input.environment).first()).n;
   const rows=(await env.DB.prepare(rowSQL+' WHERE w.seller_id=? AND w.commerce_environment=? AND w.sequence<=? AND w.sequence<? ORDER BY w.sequence DESC LIMIT ?')
     .bind(input.seller,input.environment,cap,input.before??Number.MAX_SAFE_INTEGER,limit+1).all()).results;
-  return {items:rows.slice(0,limit).map(view),cap,nextBefore:rows.length>limit?rows[limit-1].sequence:null,withdrawalsEnabled:false};
+  const items=rows.slice(0,limit).map(view),statuses=await withdrawalStatusSummaries(env,items.map(row=>row.id));
+  for(const item of items)item.payment.status=statuses.get(item.id)||null;
+  return {items,cap,nextBefore:rows.length>limit?rows[limit-1].sequence:null,withdrawalsEnabled:false};
 }

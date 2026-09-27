@@ -103,7 +103,7 @@ export async function withdrawalPaymentRecovery(env,id,input){
   const original=await inquiry(env,id);
   const r=await env.DB.prepare('SELECT evidence_json,payment_digest FROM commerce_withdrawal_payment_receipts WHERE withdrawal_id=?').bind(id).first();
   const diagnostic=await env.DB.prepare('SELECT stage,reason,provider_status AS providerStatus,recorded_at AS recordedAt FROM commerce_withdrawal_payment_diagnostics WHERE withdrawal_id=?').bind(id).first();
-  return {binding:original.binding,originalInquiry:original.original,inquiryDigest:g.inquiry_digest,confirmationId:g.confirmation_id,
+  return {binding:original.binding,clientId:g.client_id,originalInquiry:original.original,inquiryDigest:g.inquiry_digest,confirmationId:g.confirmation_id,
     requestBody:g.request_body,originalPayment:r?JSON.parse(r.evidence_json):null,paymentDigest:r?.payment_digest||null,diagnostic,mayPay:false,payoutConfirmed:false};
 }
 

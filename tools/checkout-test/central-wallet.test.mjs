@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
 import {generateKeyPairSync,createHash,createHmac,verify,randomBytes} from 'node:crypto';
-import {writeFile,mkdir,mkdtemp,rm,readFile,stat,chmod} from 'node:fs/promises';
+import {writeFile,mkdir,mkdtemp,rm,readFile,readdir,stat,chmod} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join,resolve} from 'node:path';
 import {setupCentralFixture} from './central-fixture.mjs';
@@ -120,8 +120,8 @@ async function bankInquiryFixture(t,overrides={},extraBindings={}){
   return {...f,e,p,provider,recovery,reserve,inquire,bankCalls};
 }
 
-async function paymentGrantFixture(t){
-  const f=await bankInquiryFixture(t,{}, {COMMERCE_WITHDRAWAL_PAYMENT:'enabled'}),w=await f.reserve();
+async function paymentGrantFixture(t,overrides={}){
+  const f=await bankInquiryFixture(t,overrides, {COMMERCE_WITHDRAWAL_PAYMENT:'enabled'}),w=await f.reserve();
   await f.setControl({inquiryName:'Bank Owner Ω\u2028\u2029',inquiryLiteralUnicode:true});
   const bank=await f.inquire(w);assert.equal(bank.status,200,JSON.stringify(bank.data));
   const confirmation=await f.request('withdrawal_confirm',{id:w.id,requestKey:key(),inquiryDigest:bank.data.withdrawal.inquiry.digest});assert.equal(confirmation.status,200);
@@ -130,6 +130,82 @@ async function paymentGrantFixture(t){
     credentialFingerprint:f.provider.credentialFingerprint,clientId:f.provider.clientId});assert.equal(g.status,200,g.error);assert.equal(g.mayPay,true);
   return {...f,w,g,paymentPath};
 }
+
+test('withdrawal status uses the original signed provider reference and shows pending/success with funds reserved on desktop and mobile',async t=>{
+  const f=await paymentGrantFixture(t,{EZKART_COMMERCE_WITHDRAWAL_STATUS:'enabled'}),before=await f.e.summary();
+  const result=await f.request('withdrawal_status',{id:f.w.id});assert.equal(result.status,200,JSON.stringify(result.data));
+  assert.equal(result.data.statusCheck.state,'recorded');assert.equal(result.data.withdrawal.payment.status.state,'reported_pending');
+  const calls=async()=>(await f.app.calls()).filter(c=>c.url.endsWith('/sub-account/v2.0/transactions-status'));
+  const call=(await calls())[0],h=Object.fromEntries(call.headers.map(x=>[x.slice(0,x.indexOf(':')).toLowerCase(),x.slice(x.indexOf(':')+1).trim()]));
+  assert.deepEqual(JSON.parse(call.body),{partnerReferenceNo:f.g.binding.partnerReferenceNo});
+  const canonical=['POST',new URL(call.url).pathname,'fixture-snap-wallet-token',createHash('sha256').update(call.body).digest('hex'),h['x-timestamp']].join(':');
+  assert.equal(h['x-signature'],createHmac('sha512','fixture-doku-sandbox-secret').update(canonical).digest('base64'));assert.match(h['x-external-id'],/^[0-9]{32}$/);
+  const files=(await readdir(f.recovery)).filter(name=>name.includes('-status-'));assert.equal(files.length,1);const file=join(f.recovery,files[0]),raw=await readFile(file,'utf8');
+  assert.equal((await stat(file)).mode&0o777,0o600);
+  await f.page.reload();await f.page.locator('[data-withdrawals][aria-busy=false]').waitFor();await f.page.getByRole('button',{name:'View withdrawal 1',exact:true}).click();
+  await f.page.locator('[data-withdrawals][aria-busy=false]').waitFor();assert.equal(await f.page.locator('[data-withdrawal-status]').innerText(),'DOKU reports pending');
+  // Separate observations beyond the provider transport's second resolution.
+  await new Promise(resolve=>setTimeout(resolve,1100));await f.setControl({statusResponse:{latestTransactionStatus:'00',latestTransactionDesc:'success'}});
+  await f.page.getByRole('button',{name:'Check transfer status',exact:true}).click();await f.page.locator('[data-withdrawals][aria-busy=false]').waitFor();
+  assert.equal(await f.page.locator('[data-withdrawal-status]').innerText(),'DOKU reports success · reconciliation pending');
+  assert.match(await f.page.locator('[data-withdrawal-status-note]').innerText(),/remains reserved/);
+  assert.equal(await f.page.locator('[data-withdrawal-cancel]').isHidden(),true);assert.equal((await f.request('withdrawal_cancel',{id:f.w.id,requestKey:key()})).status,409);
+  await f.page.screenshot({path:join(screens,'withdrawal-status-1360.png')});await f.page.setViewportSize({width:390,height:844});
+  assert.equal(await f.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await f.page.screenshot({path:join(screens,'withdrawal-status-390.png')});
+  assert.equal((await calls()).length,2);assert.equal(await readFile(file,'utf8'),raw);assert.equal((await readdir(f.recovery)).filter(name=>name.includes('-status-')).length,2);
+  assert.equal((await f.app.calls()).filter(c=>c.url.endsWith('/sub-account/v2.0/transfer-payment')).length,0);
+  assert.deepEqual(await f.e.summary(),before);assert.equal((await f.e.earnings()).reservedWithdrawals,'250000');assert.deepEqual(f.errors,[]);
+  for(const path of ['/cart/api/commerce-withdrawal-status.php','/tools/commerce/finalize-withdrawal-status.php'])assert.equal((await fetch(f.app.base+path)).status,404);
+});
+
+test('withdrawal status receipts recover failed and lost acknowledgements from private originals without repeating a provider check',async t=>{
+  const f=await paymentGrantFixture(t,{EZKART_COMMERCE_WITHDRAWAL_STATUS:'enabled'}),path=f.paymentPath+'/status/receipt';
+  f.control.fail=path;let result=await f.request('withdrawal_status',{id:f.w.id});assert.equal(result.status,200,JSON.stringify(result.data));
+  assert.equal(result.data.statusCheck.state,'review');assert.equal(await f.count('commerce_withdrawal_status_observations'),0);
+  f.control.fail='';f.control.drop=path;result=await f.request('withdrawal_status',{id:f.w.id});assert.equal(result.status,200,JSON.stringify(result.data));
+  assert.equal(result.data.statusCheck.state,'review');assert.equal(await f.count('commerce_withdrawal_status_observations'),1);
+  const before=(await f.app.calls()).filter(c=>c.url.includes('doku.com')).length;
+  const files=(await readdir(f.recovery)).filter(name=>name.includes('-status-'));assert.equal(files.length,2);
+  for(const name of files){
+    const file=join(f.recovery,name),raw=await readFile(file,'utf8');
+    const finalize=()=>new Promise((resolve,reject)=>{
+      const child=spawn(process.env.PHP_BINARY||'php',['-n','-d','auto_prepend_file='+join(root,'tools/checkout-test/provider-fixture.php'),
+        join(root,'tools/commerce/finalize-withdrawal-status.php'),'--receipt-file='+file],{env:{...f.app.env,EZKART_COMMERCE_WITHDRAWALS:'held',EZKART_COMMERCE_WITHDRAWAL_STATUS:'held'}});
+      let output='',error='';child.stdout.on('data',x=>output+=x);child.stderr.on('data',x=>error+=x);child.on('error',reject);child.on('close',status=>resolve({status,output,error}));
+    });
+    const recovered=await finalize();assert.equal(recovered.status,0,recovered.error);assert.equal(JSON.parse(recovered.output).providerCalls,0);
+    assert.equal(JSON.parse(recovered.output).payoutConfirmed,false);assert.equal((await finalize()).status,0);assert.equal(await readFile(file,'utf8'),raw);
+    await chmod(file,0o644);assert.equal((await finalize()).status,1);await chmod(file,0o600);
+  }
+  assert.equal(await f.count('commerce_withdrawal_status_observations'),2);assert.equal((await f.app.calls()).filter(c=>c.url.includes('doku.com')).length,before);
+  assert.equal((await f.e.earnings()).reservedWithdrawals,'250000');
+});
+
+test('withdrawal status rejects injected identity and held or changed credentials before provider access, and preserves the response when Wallet expires',async t=>{
+  const f=await paymentGrantFixture(t,{EZKART_COMMERCE_WITHDRAWAL_STATUS:'enabled'});
+  const calls=async()=>(await f.app.calls()).filter(c=>c.url.endsWith('/sub-account/v2.0/transactions-status'));
+  for(const extra of [{actor:proof('bob')},{environment:'production'},{seller:'seller_bob'},{partnerReferenceNo:'foreign'}])
+    assert.equal((await f.request('withdrawal_status',{id:f.w.id,...extra})).status,422);
+  assert.equal((await f.request('withdrawal_status',{id:f.w.id},{'X-Ezkart-Csrf':'wrong'})).status,401);
+  assert.equal((await f.request('withdrawal_status',{id:f.w.id},{'X-Ezkart-Wallet-Store':'seller_bob'})).status,401);
+  const scope=Buffer.from(JSON.stringify({environment:'sandbox',seller:'seller_alice',actor:proof()})).toString('base64');
+  const code=`require ${JSON.stringify(join(root,'cart/api/commerce-withdrawal-status.php'))}; echo json_encode(ez_check_withdrawal_status('${f.w.id}',json_decode(base64_decode('${scope}'),true)));`;
+  for(const extra of [{EZKART_COMMERCE_WITHDRAWAL_STATUS:'held'},{EZKART_DOKU_SANDBOX_SECRET_KEY:'foreign-fixture-secret'},
+    {EZKART_COMMERCE_WITHDRAWAL_RECOVERY_DIRECTORY:join(root,'cart')}])assert.notEqual((await f.run(code,extra)).status,0);
+  assert.equal((await calls()).length,0);
+  // A read remains available while new withdrawal requests are independently held.
+  const held=await f.run(code,{EZKART_COMMERCE_WITHDRAWALS:'held'});assert.equal(held.status,0,held.error);
+  assert.equal(JSON.parse(held.output).state,'recorded');
+  await f.setControl({statusFailure:true});assert.equal((await f.request('withdrawal_status',{id:f.w.id})).status,503);
+  assert.equal(await f.count('commerce_withdrawal_status_observations'),1);await f.setControl({});
+  await f.page.reload();await f.page.locator('[data-withdrawals][aria-busy=false]').waitFor();await f.page.getByRole('button',{name:'View withdrawal 1',exact:true}).click();
+  await f.page.locator('[data-withdrawals][aria-busy=false]').waitFor();
+  let expired=false;f.control.afterResponse=async path=>{if(!expired&&path===f.paymentPath+'/status/receipt'){expired=true;await f.session("$_SESSION['wallet_access']['expires_at']=time()-1");}};
+  await f.page.getByRole('button',{name:'Check transfer status',exact:true}).click();await f.page.getByRole('button',{name:'Send email code',exact:true}).waitFor();
+  assert.equal(await f.count('commerce_withdrawal_status_observations'),2);assert.equal(await f.page.locator('[data-withdrawals]').count(),0);
+  assert.equal((await f.request('withdrawal_status',{id:f.w.id})).status,401);assert.equal((await calls()).length,3);
+  assert.equal((await f.e.earnings()).reservedWithdrawals,'250000');
+});
 
 test('a payment-granted withdrawal keeps its reserved money and hides cancellation, confirmation and repeat bank actions in Wallet',async t=>{
   const f=await paymentGrantFixture(t);await f.page.reload();await f.page.locator('[data-withdrawals][aria-busy=false]').waitFor();

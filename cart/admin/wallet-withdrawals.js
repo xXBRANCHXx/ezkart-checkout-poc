@@ -20,7 +20,9 @@
   const bankName = code => banks().find(bank => bank.code === code)?.name || code;
   const method = channel => channel === 'BI_FAST' ? 'BI-FAST' : 'Online bank transfer';
   const paymentStarted = row => row.payment && row.payment.state !== 'not_started';
-  const status = row => row.state === 'cancelled' ? 'Cancelled' : paymentStarted(row) ? (row.payment.state === 'response_recorded' ? 'Transfer response saved' : 'Transfer needs review') : row.confirmation ? 'Bank confirmed' : row.bankVerified ? 'Bank verified' : row.inquiry?.state === 'review' ? 'Bank check needs review' : 'Request saved';
+  const providerStatus = {reported_pending:'DOKU reports pending',reported_success:'DOKU reports success · reconciliation pending',
+    reported_failed:'DOKU reports failure · reconciliation pending',review:'Transfer status needs review'};
+  const status = row => row.state === 'cancelled' ? 'Cancelled' : paymentStarted(row) ? (providerStatus[row.payment.status?.state] || (row.payment.state === 'response_recorded' ? 'Transfer response saved' : 'Transfer needs review')) : row.confirmation ? 'Bank confirmed' : row.bankVerified ? 'Bank verified' : row.inquiry?.state === 'review' ? 'Bank check needs review' : 'Request saved';
   const storageName = type => storageScope + ':' + type;
   const storedKey = type => {
     try {
@@ -41,7 +43,7 @@
   function clearDialog() {
     form.reset(); confirmation.reset(); selected = null; q('detail').hidden = true; form.hidden = true;
     q('message').textContent = ''; setError('');
-    for (const name of ['amount','bank','account','beneficiary','channel','status','created','reference','confirmed','warning']) q(name).textContent = '';
+    for (const name of ['amount','bank','account','beneficiary','channel','status','status-note','created','reference','confirmed','warning']) q(name).textContent = '';
     q('cancel-review').hidden = true;
   }
   function lock() {
@@ -91,6 +93,8 @@
     q('check').hidden = cancelled || started || row.bankVerified;
     q('check').disabled = busy || !caps().bankVerification || !caps().requests || !own || !funded;
     q('check').textContent = row.inquiry?.state === 'review' ? 'Check bank verification' : 'Verify bank account';
+    q('status-check').hidden = !started;
+    q('status-check').disabled = busy || !caps().paymentStatus;
     confirmation.hidden = cancelled || started || !row.bankVerified || !!confirmed || !own;
     confirmation.querySelector('input').disabled = busy || !caps().requests || !funded;
     q('confirm').disabled = busy || !caps().requests || !funded;
@@ -120,6 +124,11 @@
       if (!caps().bankVerification && !row.bankVerified) warnings.push('Bank verification is temporarily unavailable. Your saved request is preserved.');
     }
     q('warning').textContent = warnings.join(' '); q('warning').hidden = !warnings.length;
+    const check = row.payment?.status;
+    q('status-note').hidden = !check;
+    q('status-note').textContent = check ? 'Last DOKU check: ' + date(check.checkedAt) + '. ' + (check.state === 'review'
+      ? 'The provider results need review. Your withdrawal remains reserved while the outcome is reconciled.'
+      : 'Your withdrawal remains reserved until the transfer and its actual fees have been reconciled.') : '';
     q('confirmed').textContent = row.confirmation ? 'Bank details confirmed on ' + date(row.confirmation.confirmedAt) + '. No transfer has been started.' : '';
     controls();
   }
@@ -221,16 +230,18 @@
     const id = selected.withdrawal.id, payload = {id}, keyType = action + ':' + id;
     if (action === 'confirm') Object.assign(payload,{requestKey:actionKey(keyType),inquiryDigest:selected.withdrawal.inquiry.digest});
     if (action === 'cancel') payload.requestKey = actionKey(keyType);
-    q('message').textContent = action === 'inquire' ? 'Checking your bank account…' : action === 'confirm' ? 'Saving your bank confirmation…' : 'Cancelling this request…';
+    q('message').textContent = action === 'inquire' ? 'Checking your bank account…' : action === 'status' ? 'Checking the original transfer with DOKU…' : action === 'confirm' ? 'Saving your bank confirmation…' : 'Cancelling this request…';
     try {
-      await call(action,payload); if (action !== 'inquire') forgetKey(keyType);
+      const result = await call(action,payload); if (action !== 'inquire' && action !== 'status') forgetKey(keyType);
       renderDetail(await call('read',{id}));
+      if (result.statusCheck?.state === 'review') setError('The latest status check needs review. Your withdrawal remains reserved.');
     } catch (error) {
       try { renderDetail(await call('read',{id})); } catch { /* Keep the original reference for the next status check. */ }
       throw error;
     } finally { await changed(); }
   }
   q('check').addEventListener('click', () => run(() => act('inquire')));
+  q('status-check').addEventListener('click', () => run(() => act('status')));
   confirmation.addEventListener('submit',event => { event.preventDefault(); if (confirmation.elements.confirmed.checked) void run(() => act('confirm')); });
   q('detail-refresh').addEventListener('click', () => run(async () => { if (selected) renderDetail(await call('read',{id:selected.withdrawal.id})); }));
   q('cancel').addEventListener('click', () => { if (!busy) { q('cancel-review').hidden = false; controls(); q('keep').focus(); } });

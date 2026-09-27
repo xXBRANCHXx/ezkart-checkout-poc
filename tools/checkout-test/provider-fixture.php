@@ -79,7 +79,7 @@ function curl_exec(object $handle): string|bool {
         if (isset($handle->options[CURLOPT_WRITEFUNCTION])) return ($handle->options[CURLOPT_WRITEFUNCTION])($handle, $body) === strlen($body);
         return $body;
     }
-    if (getenv('EZKART_TEST_WALLET') && preg_match('#^https://api(?:-sandbox)?\.doku\.com/(authorization/v1/access-token/b2b|sub-account/v2.0/(register|balance-inquiries|transaction-history-list|transfer-inquiry))$#D', $handle->url, $walletMatch)) {
+    if (getenv('EZKART_TEST_WALLET') && preg_match('#^https://api(?:-sandbox)?\.doku\.com/(authorization/v1/access-token/b2b|sub-account/v2.0/(register|balance-inquiries|transaction-history-list|transactions-status|transfer-inquiry))$#D', $handle->url, $walletMatch)) {
         $directory = dirname(getenv('EZKART_TEST_CAPTURE'));
         $control = is_file($directory . '/wallet-control.json') ? json_decode((string) file_get_contents($directory . '/wallet-control.json'), true) : [];
         $profilesFile = $directory . '/wallet-profiles.json';
@@ -93,6 +93,13 @@ function curl_exec(object $handle): string|bool {
                 ...$payload, 'beneficiaryAccountName' => $control['inquiryName'] ?? 'Fixture Bank Owner'];
             if (!empty($control['inquiryFailure'])) { $handle->status = 503; $response = ['responseCode' => '5030000']; }
             if (!empty($control['inquiryWrongAccount'])) $response['beneficiaryAccountNumber'] = '001234567899';
+        } elseif ($walletMatch[2] === 'transactions-status') {
+            if (!empty($control['statusDelay'])) usleep((int) $control['statusDelay']);
+            $response = ['responseCode' => '2000000', 'partnerReferenceNo' => $payload['partnerReferenceNo'],
+                'transactionType' => 'PAYOUT', 'latestTransactionStatus' => '03', 'latestTransactionDesc' => 'pending',
+                'amount' => ['value' => '250000.00', 'currency' => 'IDR'], 'transactionDate' => gmdate('Y-m-d\TH:i:s\Z'),
+                ...($control['statusResponse'] ?? [])];
+            if (!empty($control['statusFailure'])) { $handle->status = 503; $response = ['responseCode' => '5030000']; }
         } elseif ($walletMatch[2] === 'register') {
             $reference = $payload['partnerReferenceNo'];
             if (isset($profiles[$reference]) || !empty($control['duplicate'])) { $handle->status = 409; $response = ['responseCode' => '4090000']; }

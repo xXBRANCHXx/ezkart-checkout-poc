@@ -4,12 +4,13 @@ if (realpath((string) ($_SERVER['SCRIPT_FILENAME'] ?? '')) === __FILE__) { http_
 require_once __DIR__ . '/../api/commerce-checkout.php';
 require_once __DIR__ . '/../api/commerce-wallet-jobs.php';
 require_once __DIR__ . '/../api/commerce-withdrawal-inquiries.php';
+require_once __DIR__ . '/../api/commerce-withdrawal-status.php';
 
 function ez_admin_wallet_request(string $action, bool $authenticated, string $authenticationMethod, string $csrfToken, bool $isHttps): never
 {
     if (!$authenticated || $authenticationMethod !== 'supabase') ez_admin_json(['ok' => false, 'error' => 'Sign in again to open Wallet.', 'code' => 'wallet_locked'], 401);
     $allowedQuery = $action === 'history' ? ['wallet', 'before', 'cap'] : ['wallet'];
-    $withdrawalActions = ['withdrawal_read', 'withdrawal_lookup', 'withdrawal_list', 'withdrawal_reserve', 'withdrawal_cancel', 'withdrawal_inquire', 'withdrawal_confirm'];
+    $withdrawalActions = ['withdrawal_read', 'withdrawal_lookup', 'withdrawal_list', 'withdrawal_reserve', 'withdrawal_cancel', 'withdrawal_inquire', 'withdrawal_confirm', 'withdrawal_status'];
     $isWithdrawal = in_array($action, $withdrawalActions, true);
     if (array_diff(array_keys($_GET), $allowedQuery) !== [] || !in_array($action, ['read', 'history', 'enroll', 'refresh', ...$withdrawalActions], true)) ez_admin_json(['ok' => false, 'error' => 'Wallet request is invalid.'], 400);
     $seenQuery = [];
@@ -91,6 +92,10 @@ function ez_admin_wallet_request(string $action, bool $authenticated, string $au
                     // A lost acknowledgement may already have committed the receipt.
                     if (($response['withdrawal']['bankVerified'] ?? null) === true) $result['state'] = 'verified';
                     $response['bankCheck'] = $result;
+                } elseif ($action === 'withdrawal_status') {
+                    $result = ez_check_withdrawal_status($id, $payload);
+                    $response = ez_commerce_request('POST', $path . '/' . $id . '/read', $payload);
+                    $response['statusCheck'] = $result;
                 } else {
                     $target = match ($action) {
                         'withdrawal_list' => $path . '/list',
@@ -117,6 +122,7 @@ function ez_admin_wallet_request(string $action, bool $authenticated, string $au
                     'requests' => $ready && ez_config('commerce_withdrawals') === 'enabled' && ($response['enrollment']['status'] ?? '') === 'connected',
                     'bankVerification' => $ready && ez_config('commerce_withdrawals') === 'enabled' && ez_config('commerce_withdrawal_inquiry') === 'enabled',
                     'transfers' => false,
+                    'paymentStatus' => $ready && ez_config('commerce_withdrawal_status') === 'enabled',
                     'banks' => ez_withdrawal_bank_catalog(),
                 ];
             }

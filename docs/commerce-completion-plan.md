@@ -71,6 +71,22 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 28 September: withdrawal status observations
+
+The [status workflow](withdrawal-status-reconciliation.md) adds explicit protected
+DOKU reads of the original transfer, immutable observations and private recovery.
+Wallet distinguishes provider-reported outcomes from reconciled payouts. Late
+responses cannot overwrite newer observations; overlapping conflicts, terminal
+regressions and unsupported reversal contexts remain under review. All outcomes
+preserve reserved funds and the original payment fence.
+
+All 82 relevant local cases pass, including original receipt recovery, owner/CSRF
+checks and expiry after persistence. Desktop/mobile layouts are inspected. The
+fresh beta backup restores cleanly and migration rehearsal preserves every row
+in all 165 original tables. Hosted rollout is pending. Matched cash-history and
+actual fee reconciliation, final accounting, integrated payment execution and
+live acceptance remain required; no top-level gate is closed.
+
 ### 27 September: payment grants and original payment receipts
 
 The [payment grant](withdrawal-payment-grants.md) now rechecks the original owner,
