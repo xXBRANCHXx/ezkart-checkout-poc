@@ -180,6 +180,15 @@ no reply to the new DOKU support thread at that checkpoint.
 The sections below retain earlier rollout observations; this current-state
 record supersedes their historical “not installed” and empty-catalog statements.
 
+The landing-page editor now reflects the configured checkout pause and reads
+DOKU's actual health field instead of the removed Midtrans field. A configured
+key is described as a credential, not proof that commerce is ready. The legacy
+global Biteship pickup flag is no longer used to judge the store's central
+shipping settings. Four isolated status checks and the two checkout-pause cases
+pass. A blank page created through the isolated merchant UI also loads at 1894px
+and 820px: the desktop status is readable and the existing narrow-editor hiding
+rule is preserved. No hosted page was created for this check.
+
 ## Work required for the beta candidate
 
 | Area | Implemented foundation | Acceptance still required |

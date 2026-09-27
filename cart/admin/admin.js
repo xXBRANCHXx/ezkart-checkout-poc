@@ -9028,18 +9028,26 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
     const syncCommerceStatus = async () => {
       const status = sqStudio.querySelector("[data-sq-commerce-status]");
       if (!status) return;
+      const display = (configured, label, description) => {
+        status.classList.toggle("ready", configured);
+        status.classList.toggle("warning", !configured);
+        status.lastChild.textContent = ` ${label}`;
+        status.title = description;
+      };
+      if (status.dataset.checkoutPaused === "true") {
+        display(false, "Checkout is paused", "New purchases are paused. You can continue editing your page and managing existing orders.");
+        return;
+      }
       try {
         const response = await fetch("../api/health.php", { headers: { Accept: "application/json" }, cache: "no-store" });
         const payload = await response.json();
-        const ready = response.ok && payload.midtrans?.configured && payload.biteship?.configured && payload.biteship?.fulfillment_configured;
-        status.classList.toggle("ready", ready);
-        status.classList.toggle("warning", !ready);
+        if (!response.ok || payload.ok !== true) throw new Error("Commerce status unavailable");
+        const configured = payload.doku?.configured === true && payload.biteship?.configured === true;
         const production = payload.commerce_environment === "production";
-        status.lastChild.textContent = ready ? ` Midtrans + Biteship ${production ? "production" : "sandbox"} ready` : ` Complete ${production ? "production" : "sandbox"} payment, rates, and pickup setup`;
-        status.title = ready ? `Checkout creates a Midtrans ${production ? "production" : "sandbox"} payment. Biteship pickup is created only after the merchant accepts the order and selects Arrange pickup.` : "Add matching Midtrans and Biteship credentials, postcode, pickup contact, and pickup address.";
+        display(configured, configured ? `DOKU + Biteship ${production ? "live" : "test"} credentials configured` : "Payment or shipping setup required",
+          "Check channel activation in Payments and this store's pickup details in Shipping settings before accepting orders.");
       } catch (_) {
-        status.classList.add("warning");
-        status.lastChild.textContent = " Commerce status unavailable";
+        display(false, "Commerce status unavailable", "Check Payments and Shipping settings for the current setup.");
       }
     };
 

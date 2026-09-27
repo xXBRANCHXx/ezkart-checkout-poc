@@ -1,5 +1,7 @@
 <?php
 declare(strict_types=1);
+require_once dirname(__DIR__) . '/api/commerce-client.php';
+$builderCheckoutPaused = !ez_new_checkout_enabled();
 ?>
 <section class="sq-studio sq-site-loading" id="visual-builder" aria-label="Landing page builder" aria-busy="true">
   <div class="sq-site-loader" role="status" aria-live="polite" aria-atomic="true">
@@ -176,7 +178,7 @@ declare(strict_types=1);
             <output data-sq-zoom>90%</output>
           </label>
         </div>
-        <span data-sq-commerce-status><?= ez_admin_icon('shield') ?> Checking commerce integrations…</span>
+        <span data-sq-commerce-status data-checkout-paused="<?= $builderCheckoutPaused ? 'true' : 'false' ?>" class="<?= $builderCheckoutPaused ? 'warning' : '' ?>"><?= ez_admin_icon('shield') ?> <?= $builderCheckoutPaused ? 'Checkout is paused' : 'Checking commerce integrations…' ?></span>
       </footer>
       <div class="sq-grid-settings" id="sq-grid-settings" popover="auto" role="dialog" aria-labelledby="sq-grid-settings-title">
         <header><h3 id="sq-grid-settings-title">Grid settings</h3><button type="button" popovertarget="sq-grid-settings" popovertargetaction="hide" aria-label="Close grid settings">×</button></header>

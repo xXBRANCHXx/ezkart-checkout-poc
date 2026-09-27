@@ -88,6 +88,12 @@ provider-status diagnostics; all 14 dispatcher/merchant cases pass without chang
 the no-repeat registration boundary. The original live attempt is untouched.
 None of these changes close a broader gate.
 
+The editor's commerce status now reports the actual checkout pause and DOKU
+credentials, without equating configured credentials with launch readiness.
+Four status states, two existing checkout-pause cases, PHP/JS syntax and loaded
+desktop/narrow isolated editor checks pass. This changes only status reporting;
+no checkout, provider or email hold is lifted.
+
 At 08:55 UTC, the owner-provided pickup/return address and support contacts are
 saved and verified after reload, with the existing courier selection and other
 profile fields preserved. Beta's ordinary housekeeping run completed successfully.
