@@ -113,10 +113,11 @@ async function bankInquiryFixture(t,overrides={}){
   await e.product('bank-inquiry-merchant',10,'seller_alice',400000);
   const p=await e.payment({items:[{productId:'bank-inquiry-merchant',quantity:2,expectedPrice:400000,expectedWeightGrams:100}]});await e.settle(p);await e.deliver(p);
   await f.unlock();
+  await f.page.locator('[data-withdrawals][aria-busy=false]').waitFor();
   const reserve=async()=>{const r=await f.request('withdrawal_reserve',{requestKey:key(),amount:'250000',bank:{code:'CENAIDJA',accountNumber:'001234567890',channel:'BI_FAST'}});assert.equal(r.status,200,JSON.stringify(r.data));return r.data.withdrawal;};
   const inquire=w=>f.request('withdrawal_inquire',{id:w.id});
   const bankCalls=async()=>(await f.app.calls()).filter(c=>c.url.endsWith('/sub-account/v2.0/transfer-inquiry'));
-  return {...f,e,recovery,reserve,inquire,bankCalls};
+  return {...f,e,p,recovery,reserve,inquire,bankCalls};
 }
 
 test('the protected merchant bank inquiry persists its receipt, confirms the returned beneficiary and never sends a payment',async t=>{
@@ -192,6 +193,164 @@ test('held merchant withdrawals and unavailable private recovery storage consume
   assert.equal((await f.inquire(w)).status,503);assert.equal(await f.count('commerce_withdrawal_inquiry_grants'),0);assert.equal((await f.bankCalls()).length,0);
 });
 
+const withdrawalIdle=f=>f.page.locator('[data-withdrawals][aria-busy=false]').waitFor();
+async function chooseWithdrawalBank(f,name){
+  await f.page.getByLabel('Find your bank',{exact:true}).fill(name);
+  const control=f.page.getByRole('combobox',{name:'Bank',exact:true});
+  if(await control.evaluate(node=>node.tagName==='SELECT'))await control.selectOption({label:name});
+  else {await control.click();await f.page.getByRole('option',{name,exact:true}).click();}
+}
+async function fillWithdrawal(f){
+  await f.page.getByRole('button',{name:'Withdraw funds',exact:true}).click();await withdrawalIdle(f);
+  await f.page.getByLabel('Withdrawal amount (IDR)',{exact:true}).fill('250000');
+  await chooseWithdrawalBank(f,'BANK BCA');
+  await f.page.getByLabel('Bank account number',{exact:true}).fill('001234567890');
+}
+async function saveWithdrawal(f){
+  await fillWithdrawal(f);await f.page.getByRole('button',{name:'Save withdrawal request',exact:true}).click();await withdrawalIdle(f);
+  await f.page.locator('[data-withdrawal-detail]').waitFor({state:'visible'});
+  return (await f.db.prepare('SELECT id FROM commerce_withdrawals ORDER BY sequence DESC LIMIT 1').first()).id;
+}
+async function viewWithdrawal(f,sequence=1){
+  await f.page.getByRole('button',{name:'View withdrawal '+sequence,exact:true}).click();await withdrawalIdle(f);
+}
+
+test('withdrawal screens save, verify, confirm and cancel the original request on desktop and mobile without claiming a transfer',async t=>{
+  const f=await bankInquiryFixture(t);await f.setControl({inquiryName:'Owner <img src=x onerror=alert(1)>'});
+  await fillWithdrawal(f);await mkdir(screens,{recursive:true});
+  await f.page.setViewportSize({width:390,height:844});await f.page.screenshot({path:join(screens,'withdrawal-request-form-390.png'),fullPage:true});
+  await f.page.getByRole('button',{name:'Save withdrawal request',exact:true}).click();await withdrawalIdle(f);
+  const id=(await f.db.prepare('SELECT id FROM commerce_withdrawals').first()).id;assert.equal(await f.count('commerce_withdrawals'),1);assert.equal((await f.bankCalls()).length,0);
+  assert.equal(await f.page.locator('[data-withdrawal-account]').innerText(),'001234567890');
+  await f.page.getByRole('button',{name:'Verify bank account',exact:true}).click();await withdrawalIdle(f);
+  assert.equal((await f.bankCalls()).length,1);assert.equal(await f.page.locator('[data-withdrawal-beneficiary]').innerText(),'Owner <img src=x onerror=alert(1)>');
+  assert.equal(await f.page.locator('[data-withdrawal-dialog] img').count(),0);
+  await f.page.getByRole('button',{name:'Confirm bank details',exact:true}).click();assert.equal(await f.count('commerce_withdrawal_confirmations'),0);
+  await mkdir(screens,{recursive:true});
+  for(const width of [1360,390]){
+    await f.page.setViewportSize({width,height:width===390?844:1000});
+    assert.equal(await f.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+    assert.equal(await f.page.locator('[data-withdrawal-dialog]').evaluate(node=>node.scrollWidth<=node.clientWidth),true);
+    await f.page.screenshot({path:join(screens,'withdrawal-bank-review-'+width+'.png'),fullPage:true});
+  }
+  await f.page.getByRole('checkbox').check();await f.page.getByRole('button',{name:'Confirm bank details',exact:true}).click();await withdrawalIdle(f);
+  assert.equal(await f.count('commerce_withdrawal_confirmations'),1);assert.match(await f.page.locator('[data-withdrawal-confirmed]').innerText(),/No transfer has been started/);
+  await f.page.getByRole('button',{name:'Close withdrawal details',exact:true}).click();
+  assert(!(await f.page.locator('body').innerText()).includes('001234567890'));
+  assert(!(await f.page.evaluate(()=>JSON.stringify({...sessionStorage,...localStorage}))).includes('001234567890'));
+  await f.page.reload();await withdrawalIdle(f);await viewWithdrawal(f);
+  assert.equal(await f.page.locator('[data-withdrawal-reference]').innerText(),id);assert.equal(await f.count('commerce_withdrawals'),1);
+  await f.page.getByRole('button',{name:'Cancel request',exact:true}).click();await f.page.getByRole('button',{name:'Keep request',exact:true}).click();
+  assert.equal(await f.count('commerce_withdrawal_cancellations'),0);
+  await f.page.getByRole('button',{name:'Cancel request',exact:true}).click();await f.page.getByRole('button',{name:'Confirm cancellation',exact:true}).click();await withdrawalIdle(f);
+  assert.equal(await f.page.locator('[data-withdrawal-status]').innerText(),'Cancelled');assert.equal((await f.e.earnings()).availableEarnings,'756250');
+  assert.equal((await f.bankCalls()).length,1);assert(!(await f.app.calls()).some(call=>call.url.endsWith('/transfer-payment')));assert.deepEqual(f.errors,[]);
+});
+
+test('withdrawal recovery survives lost reservation or detail replies and reloads without saving a second intent',async t=>{
+  for(const mode of ['lost_ack','lost_detail','not_committed']){
+    await t.test(mode,async t=>{
+      const f=await bankInquiryFixture(t);let blocked=true;
+      await f.page.route('**/cart/admin/?wallet=withdrawal_lookup',async route=>{
+        if(blocked)await route.fulfill({status:503,json:{ok:false,error:'Temporary lookup failure'}});
+        else await route.continue();
+      });
+      if(mode==='lost_ack')await f.page.route('**/cart/admin/?wallet=withdrawal_reserve',async route=>{const response=await route.fetch();await route.fulfill({status:503,json:{ok:false,error:'Lost reservation reply'}});assert.equal(response.status(),200);});
+      if(mode==='lost_detail')await f.page.route('**/cart/admin/?wallet=withdrawal_read',route=>route.fulfill({status:503,json:{ok:false,error:'Temporary detail failure'}}));
+      if(mode==='not_committed')f.control.fail='/internal/commerce/finance/withdrawals';
+      await fillWithdrawal(f);await f.page.getByRole('button',{name:'Save withdrawal request',exact:true}).click();await withdrawalIdle(f);
+      const storage='ezkart-withdrawal:alice:seller_alice:sandbox:reserve',savedKey=await f.page.evaluate(name=>sessionStorage.getItem(name),storage);
+      assert.match(savedKey,/^[a-f0-9]{32}$/);assert.equal(await f.count('commerce_withdrawals'),mode==='not_committed'?0:1);
+      assert(!(await f.page.evaluate(()=>JSON.stringify(sessionStorage))).includes('001234567890'));
+      blocked=false;f.control.fail='';await f.page.unroute('**/cart/admin/?wallet=withdrawal_reserve');await f.page.unroute('**/cart/admin/?wallet=withdrawal_read');
+      await f.page.reload();await withdrawalIdle(f);
+      if(mode==='not_committed'){
+        await fillWithdrawal(f);await f.page.getByRole('button',{name:'Save withdrawal request',exact:true}).click();await withdrawalIdle(f);
+      }else{await f.page.getByRole('button',{name:'Check previous request',exact:true}).click();await withdrawalIdle(f);}
+      assert.equal(await f.count('commerce_withdrawals'),1);
+      assert.equal((await f.db.prepare('SELECT request_key FROM commerce_withdrawals').first()).request_key,savedKey);
+      assert.equal(await f.page.locator('[data-withdrawal-account]').innerText(),'001234567890');assert.equal((await f.e.earnings()).reservedWithdrawals,'250000');
+      assert.equal((await f.bankCalls()).length,0);assert.deepEqual(f.errors,[]);
+    });
+  }
+});
+
+test('withdrawal UI shows current funding holds and preserves one uncertain bank check across retries and cancellation',async t=>{
+  const f=await bankInquiryFixture(t);await saveWithdrawal(f);const refund=await f.e.refund(f.p);
+  await f.page.getByRole('button',{name:'Refresh request',exact:true}).click();await withdrawalIdle(f);
+  assert.match(await f.page.locator('[data-withdrawal-warning]').innerText(),/no longer cover/);assert.equal(await f.page.getByRole('button',{name:'Verify bank account',exact:true}).isDisabled(),true);
+  await f.e.refundAction(refund.id,'decline');await f.page.getByRole('button',{name:'Refresh request',exact:true}).click();await withdrawalIdle(f);
+  await f.setControl({inquiryFailure:true});await f.page.getByRole('button',{name:'Verify bank account',exact:true}).click();await withdrawalIdle(f);
+  assert.equal(await f.page.locator('[data-withdrawal-status]').innerText(),'Bank check needs review');assert.equal((await f.bankCalls()).length,1);
+  await f.setControl({});await f.page.getByRole('button',{name:'Check bank verification',exact:true}).click();await withdrawalIdle(f);
+  assert.equal((await f.bankCalls()).length,1);assert.equal(await f.page.getByRole('button',{name:'Confirm bank details',exact:true}).isVisible(),false);
+  await f.page.getByRole('button',{name:'Cancel request',exact:true}).click();await f.page.getByRole('button',{name:'Confirm cancellation',exact:true}).click();await withdrawalIdle(f);
+  assert.equal(await f.count('commerce_withdrawal_cancellations'),1);assert.equal((await f.e.summary()).balanced,true);assert.deepEqual(f.errors,[]);
+});
+
+test('withdrawal UI closes and clears bank details on expired authorization after an already saved provider receipt',async t=>{
+  const f=await bankInquiryFixture(t);await saveWithdrawal(f);let expired=false;
+  f.control.afterResponse=async path=>{if(!expired&&path.endsWith('/inquiry/receipt')){expired=true;await f.session("$_SESSION['wallet_access']['expires_at']=time()-1");}};
+  await f.page.getByRole('button',{name:'Verify bank account',exact:true}).click();
+  await f.page.getByRole('button',{name:'Send email code',exact:true}).waitFor();
+  assert.equal(await f.page.locator('[data-wallet-content]').count(),0);
+  assert.equal(await f.page.locator('dialog[open]').count(),0);assert(!(await f.page.content()).includes('001234567890'));
+  assert.equal(await f.count('commerce_withdrawal_inquiry_receipts'),1);assert.equal((await f.bankCalls()).length,1);
+  await f.page.getByRole('button',{name:'Send email code',exact:true}).click();
+  await f.page.getByText('Wait one minute before requesting another email code.',{exact:true}).waitFor();
+  // The fixture advanced the grant expiry, so advance only its local send
+  // cooldown as well; re-verification still goes through the actual code form.
+  const rateFile=join(f.app.env.EZKART_ADMIN_SESSION_STORAGE,'wallet-rate-limits',createHash('sha256').update(f.app.env.EZKART_SUPABASE_URL+'|alice').digest('hex')+'.json');
+  const rate=JSON.parse(await readFile(rateFile,'utf8'));rate.send=rate.send.map(at=>at-61);await writeFile(rateFile,JSON.stringify(rate));
+  f.control.afterResponse=null;await f.unlock();await withdrawalIdle(f);await viewWithdrawal(f);
+  assert.equal(await f.page.locator('[data-withdrawal-status]').innerText(),'Bank verified');assert.equal((await f.bankCalls()).length,1);assert.deepEqual(f.errors,[]);
+  let cleared=null;
+  f.page.on('console',message=>{if(message.text().startsWith('withdrawal-lock-check:'))cleared=JSON.parse(message.text().slice('withdrawal-lock-check:'.length));});
+  await f.page.evaluate(()=>window.addEventListener('ezkart:wallet-locked',()=>console.info('withdrawal-lock-check:'+JSON.stringify({
+    open:!!document.querySelector('[data-withdrawal-dialog][open]'),
+    bankText:document.querySelector('[data-withdrawal-account]').textContent.length,
+    accountInput:document.getElementById('withdrawal-account').value.length,
+  }))));
+  await f.session("$_SESSION['wallet_access']['expires_at']=time()-1");
+  await f.page.evaluate(()=>window.dispatchEvent(new Event('ezkart:wallet-refresh')));
+  await f.page.getByRole('button',{name:'Send email code',exact:true}).waitFor();
+  assert.deepEqual(cleared,{open:false,bankText:0,accountInput:0});
+  assert.equal(await f.count('commerce_withdrawal_inquiry_receipts'),1);assert.equal((await f.bankCalls()).length,1);
+});
+
+test('withdrawal history pages retain their original cohort, mask accounts and allow cancellation while new requests are held',async t=>{
+  const f=await bankInquiryFixture(t);
+  for(let i=0;i<11;i++){const w=await f.reserve();assert.equal((await f.request('withdrawal_cancel',{id:w.id,requestKey:key()})).status,200);}
+  await f.page.getByRole('button',{name:'Refresh requests',exact:true}).click();await withdrawalIdle(f);assert.equal(await f.page.locator('[data-withdrawal-history] tr').count(),10);
+  const later=await f.reserve();await f.page.getByRole('button',{name:'Load earlier requests',exact:true}).click();await withdrawalIdle(f);
+  assert.equal(await f.page.locator('[data-withdrawal-history] tr').count(),11);assert.equal(await f.page.locator('[data-withdrawal-id="'+later.id+'"]').count(),0);
+  assert(!(await f.page.locator('[data-withdrawal-history]').innerText()).includes('001234567890'));
+  await f.page.getByRole('button',{name:'Refresh requests',exact:true}).click();await withdrawalIdle(f);assert.equal(await f.page.locator('[data-withdrawal-id="'+later.id+'"]').count(),1);
+  await f.page.setViewportSize({width:390,height:844});await f.page.reload();await withdrawalIdle(f);
+  assert.equal(await f.page.locator('[data-withdrawal-history-table]').evaluate(node=>node.scrollWidth<=node.clientWidth),true);
+  await mkdir(screens,{recursive:true});
+  await f.page.locator('[data-withdrawals]').evaluate(node=>node.scrollIntoView({block:'start',behavior:'instant'}));
+  await f.page.screenshot({path:join(screens,'withdrawal-history-390.png')});
+  const held=await bankInquiryFixture(t,{EZKART_COMMERCE_WITHDRAWALS:'held'}),created=await held.call('/internal/commerce/finance/withdrawals',{environment:'sandbox',seller:'seller_alice',actor:proof(),requestKey:key(),amount:'250000',bank:{code:'CENAIDJA',accountNumber:'001234567890',channel:'BI_FAST'}});
+  assert.equal(created.status,200,created.error);await held.page.getByRole('button',{name:'Refresh requests',exact:true}).click();await withdrawalIdle(held);
+  assert.equal(await held.page.getByRole('button',{name:'Withdraw funds',exact:true}).isDisabled(),true);await viewWithdrawal(held);
+  assert.equal(await held.page.getByRole('button',{name:'Verify bank account',exact:true}).isDisabled(),true);
+  await held.page.getByRole('button',{name:'Cancel request',exact:true}).click();await held.page.getByRole('button',{name:'Confirm cancellation',exact:true}).click();await withdrawalIdle(held);
+  assert.equal(await held.count('commerce_withdrawal_cancellations'),1);assert.equal((await held.bankCalls()).length,0);
+});
+
+test('merchant bank choices use the published channel catalog and cannot submit unsupported bank methods or caller identities',async t=>{
+  const f=await bankInquiryFixture(t),read=await f.request('read');assert.equal(read.data.withdrawalCapabilities.banks.length,125);
+  await fillWithdrawal(f);await chooseWithdrawalBank(f,'BANK DANAMON UUS (SYARIAH)');
+  assert.deepEqual(await f.page.locator('#withdrawal-channel option').allTextContents(),['BI-FAST']);
+  for(const bank of [{code:'SYBDIDJ1',accountNumber:'001234567890',channel:'ONLINE'},{code:'FAKEIDJA',accountNumber:'001234567890',channel:'BI_FAST'}]){
+    assert.equal((await f.request('withdrawal_reserve',{requestKey:key(),amount:'250000',bank})).status,422);
+  }
+  assert.equal((await f.request('withdrawal_lookup',{requestKey:key(),seller:'seller_bob'})).status,422);
+  assert.equal(await f.count('commerce_withdrawals'),0);assert.equal((await f.bankCalls()).length,0);
+  assert.equal((await fetch(f.app.base+'/cart/admin/wallet-withdrawals.php')).status,404);
+});
+
 test('merchant Wallet verifies owner identity, connects through the real proxy, and survives desktop/mobile reloads without inventing earnings',async t=>{
   const f=await merchantFixture(t);await mkdir(join(f.app.directory,'orders'),{recursive:true});await writeFile(join(f.app.directory,'orders','legacy-wallet.json'),JSON.stringify({order_id:'EZK-S-LEGACYWALLETSENTINEL',seller_id:'seller_alice',status:'PAID',subtotal:999999}));await f.unlock();assert.equal((await f.registerCalls()).length,0);
   assert(!(await f.page.content()).includes('LEGACYWALLETSENTINEL'));assert.equal(await f.page.locator('.wallet-payment-summary').count(),0);
@@ -223,6 +382,7 @@ test('protected Wallet shows actual released earnings, reserves and stable histo
   assert.equal(await amount('available'),'0');assert.equal(await amount('reserved'),'34250');
   f.control.fail='/internal/commerce/finance/earnings/summary?seller=seller_alice&environment=sandbox';await f.page.locator('[data-wallet-setup-refresh]').click();await f.page.locator('[data-wallet-setup][aria-busy=false]').waitFor();
   assert.equal(await f.page.locator('.wallet-amount').innerText(),'—');assert.match(await f.page.locator('[data-wallet-earnings-status]').innerText(),/could not be checked/);
+  assert.match(await f.page.locator('#wallet-withdraw-reason').innerText(),/could not be checked/);assert.equal(await f.page.getByRole('button',{name:'Withdraw funds',exact:true}).isDisabled(),true);
   f.control.fail=null;await f.session("$_SESSION['wallet_access']['expires_at']=time()-1");
   assert.equal((await f.request('history&cap=99&before=99')).status,401);
   assert.equal((await f.request('read')).status,401);assert.deepEqual(f.errors,[]);assert.equal((await f.registerCalls()).length,0);

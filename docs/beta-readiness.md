@@ -47,9 +47,12 @@ remain empty. The original uncertain wallet and execution holds are preserved;
 TEST/main deployment configuration hashes are unchanged. The scoped owner-mailbox
 search still finds no matching reply to the DOKU support request.
 
-Merchant request/confirmation/history UI, durable payment dispatch, actual
-Ezkart-funded transfer fees, final payout/refund accounting, outcome
-reconciliation and live acceptance remain required.
+The [merchant request/confirmation/history UI](withdrawal-merchant-workflow.md)
+is implemented and verified locally, including original-request recovery,
+verification expiry, mobile layouts and cancellation while held. Its workbench
+rollout is in progress. Durable payment dispatch, actual Ezkart-funded transfer
+fees, final payout/refund accounting, outcome reconciliation and live acceptance
+remain required.
 
 The preceding [withdrawal reservation](withdrawal-reservations.md) implementation
 `fd04afa` was deployed with migration 0055 and beta Worker

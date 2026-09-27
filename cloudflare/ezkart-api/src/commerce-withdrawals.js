@@ -71,7 +71,16 @@ export async function withdrawalDetail(env,id,input){
     FROM commerce_withdrawal_funds WHERE seller_id=? AND commerce_environment=?`).bind(input.seller,input.environment).first();
   const withdrawal=view(row);withdrawal.bank.accountNumber=row.bank_account;
   return {withdrawal,funds:{reservableEarnings:funds.available,reservedWithdrawals:funds.reserved,reservationShortfall:funds.shortfall,
-    accountingComplete:funds.incomplete_captures===0&&funds.incomplete_journals===0},withdrawalsEnabled:false,providerCalls:0};
+    accountingComplete:funds.incomplete_captures===0&&funds.incomplete_journals===0},
+    originalOwner:row.owner_auth_id===input.actor.id,withdrawalsEnabled:false,providerCalls:0};
+}
+
+// Recover a reservation after a lost acknowledgement without retaining bank
+// details in browser storage or creating another intent.
+export async function withdrawalLookup(env,input){
+  fields(input,[...base,'requestKey']);await authorizeWithdrawalOwner(env,input);requestKey(input.requestKey);
+  const id='wd_'+(await commerceHash({seller:input.seller,environment:input.environment,requestKey:input.requestKey})).slice(0,40);
+  return withdrawalDetail(env,id,{environment:input.environment,seller:input.seller,actor:input.actor});
 }
 
 // No provider payment dispatch exists in this stage. A later integration must

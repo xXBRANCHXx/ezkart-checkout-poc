@@ -5,7 +5,7 @@
   const status = find('setup-status'), badge = find('setup-badge'), connect = find('connect'), refresh = find('setup-refresh');
   const scope = ['ezkart-wallet-request', root.dataset.account, root.dataset.store, root.dataset.environment].join(':');
   const headers = {'X-Ezkart-Csrf': document.body.dataset.adminCsrfToken, 'X-Ezkart-Wallet-Account': root.dataset.account, 'X-Ezkart-Wallet-Store': root.dataset.store};
-  let current = null, busy = false, controller, stopped = false, requestKey = '';
+  let current = null, busy = false, controller, stopped = false, requestKey = '', pendingRefresh = false;
   const earnings = name => document.querySelector(`[data-wallet-earnings-${name}]`);
   const more = earnings('more');
   let historyPage = null;
@@ -13,7 +13,8 @@
     if (typeof value !== 'string' || !/^-?(0|[1-9][0-9]{0,30})$/.test(value)) throw Error('Earnings could not be verified.');
     return new Intl.NumberFormat('id-ID', {style: 'currency', currency: 'IDR', maximumFractionDigits: 0}).format(BigInt(value));
   };
-  const clearEarnings = message => {
+  const clearEarnings = (message, checking = false) => {
+    window.dispatchEvent(new CustomEvent('ezkart:wallet-unavailable', {detail:{message,checking}}));
     if (!earnings('available')) return;
     for (const name of ['available', 'pending', 'reserved', 'deficit']) earnings(name).textContent = '—';
     earnings('available').setAttribute('aria-label', 'Earnings unavailable');
@@ -55,7 +56,7 @@
       earnings('withdrawals').textContent = money(reservedWithdrawals);
       earnings('withdrawals-row').hidden = BigInt(reservedWithdrawals) === 0n;
     }
-    const messages = ['Available earnings require complete delivery and confirmed settlement. Withdrawals are not open yet.'];
+    const messages = ['Available earnings require complete delivery and confirmed settlement.' + (data.withdrawalCapabilities?.transfers ? '' : ' Bank transfers are not open yet.')];
     if (report.unknownProcessingFees) messages.push('Some pending orders still need their actual payment fees confirmed.');
     if (report.unreconciledOrders) messages.push('Changed records are being reconciled; affected earnings are held.');
     if (report.incompleteCaptures || !report.balanced) messages.push('Payment accounting needs review before earnings can be used.');
@@ -100,6 +101,7 @@
       ? 'Earnings below come from your recorded orders, after fees and current holds.'
       : 'Complete wallet setup before using funds. Recorded earnings are separate from your DOKU account balance.';
     renderEarnings(data);
+    window.dispatchEvent(new CustomEvent('ezkart:wallet-loaded', {detail:data}));
   };
   const lock = () => {
     stopped = true; controller?.abort();
@@ -113,7 +115,7 @@
       const response = await fetch('?wallet=' + action, {method: body === undefined ? 'GET' : 'POST', cache: 'no-store', credentials: 'same-origin',
         headers: {...headers, ...(body === undefined ? {} : {'Content-Type': 'application/json'})}, ...(body === undefined ? {} : {body: JSON.stringify(body)}), signal: controller.signal});
       const data = await response.json();
-      if (data.code === 'wallet_locked' || response.status === 401) { lock(); location.replace('?page=wallet'); throw Error('Verify your identity again.'); }
+      if (data.code === 'wallet_locked' || response.status === 401 || response.status === 403) { window.dispatchEvent(new Event('ezkart:wallet-locked')); location.replace('?page=wallet'); throw Error('Verify your identity again.'); }
       if (!response.ok || !data.ok) throw Error(data.error || 'Wallet could not be checked.');
       return data;
     } finally { clearTimeout(timer); }
@@ -121,7 +123,7 @@
   const run = async action => {
     if (busy || stopped) return;
     busy = true; controls();
-    clearEarnings('Checking recorded earnings…');
+    clearEarnings('Checking recorded earnings…', true);
     status.textContent = action === 'enroll' ? 'Saving your wallet setup request…' : 'Checking your wallet setup…';
     try {
       let data = await request(action, action === 'read' ? undefined : (action === 'enroll' ? {requestKey: key()} : {}));
@@ -139,10 +141,11 @@
         catch { /* A later read can recover it without a fresh identity. */ }
       }
       if (!stopped) { status.textContent = (error.name === 'AbortError' ? 'The check took too long.' : error.message) + ' Check setup status to recover the saved result.'; clearEarnings('Earnings could not be checked. Refresh Wallet to try again.'); }
-    } finally { busy = false; if (!stopped) controls(); }
+    } finally { busy = false; if (!stopped) { controls(); if (pendingRefresh) { pendingRefresh = false; void run('read'); } } }
   };
   connect.addEventListener('click', () => run('enroll'));
   refresh.addEventListener('click', () => run(current?.enabled && current.enrollment && current.enrollment.status !== 'connected' ? 'refresh' : 'read'));
+  window.addEventListener('ezkart:wallet-refresh', () => { if (busy) pendingRefresh = true; else void run('read'); });
   more?.addEventListener('click', async () => {
     if (busy || stopped || !historyPage?.nextBefore) return;
     busy = true; controls();

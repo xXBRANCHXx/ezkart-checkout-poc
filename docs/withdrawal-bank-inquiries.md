@@ -101,8 +101,9 @@ withdrawal workflow is ready:
 
 No provider-payment endpoint, grant, caller or schedule is added. Ezkart-funded
 actual transfer fees, final payout/refund journals, completed-outflow deductions,
-payment outcome reconciliation, request/confirmation/history UI and live
-acceptance remain required before enabling withdrawals.
+payment outcome reconciliation and live acceptance remain required before
+enabling withdrawals. The [merchant request/confirmation/history workflow](withdrawal-merchant-workflow.md)
+is now implemented with original-request recovery and verification-expiry checks.
 
 ## Verification
 

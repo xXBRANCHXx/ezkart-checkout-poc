@@ -56,6 +56,21 @@ test('simultaneous identical requests produce one reservation and one exact jour
   assert.equal(await count(f,'commerce_withdrawals'),1);assert.equal((await f.earnings()).reservedWithdrawals,'250000');assert.equal((await f.summary()).balanced,true);
 });
 
+test('lookup by the original request key recovers owner-protected bank details without another reservation',async t=>{
+  const f=await funded(t),input=request(f),saved=await f.call(path,input);assert.equal(saved.status,200,saved.error);
+  const lookup=extra=>f.call(path+'/lookup',scope(f,{requestKey:input.requestKey,...extra})),before=await f.summary();
+  const found=await lookup();assert.equal(found.status,200,found.error);assert.equal(found.withdrawal.id,saved.withdrawal.id);
+  assert.equal(found.withdrawal.bank.accountNumber,input.bank.accountNumber);assert.equal(found.originalOwner,true);
+  assert.equal((await lookup({requestKey:key()})).status,404);
+  assert.equal((await lookup({seller:'seller_bob',actor:{...actor(),id:'bob'}})).status,404);
+  assert.equal((await lookup({environment:'production'})).status,403);
+  assert.equal((await lookup({actor:{...actor(),proofExpiresAt:new Date(Date.now()-1000).toISOString()}})).status,401);
+  assert.equal((await lookup({requestKey:'bad'})).status,422);assert.equal((await lookup({amount:'250000'})).status,422);
+  assert.equal((await f.merchant(path+'/lookup',scope(f,{requestKey:input.requestKey}),{method:'POST'})).status,401);
+  assert.deepEqual(await f.summary(),before);assert.equal(await count(f,'commerce_withdrawals'),1);
+  await cancel(f,saved.withdrawal.id);assert.equal((await lookup()).withdrawal.state,'cancelled');
+});
+
 test('refund holds and newer provider evidence cannot be bypassed by reservations or cancellation',async t=>{
   const f=await funded(t),r=await f.call(path,request(f));assert.equal(r.status,200,r.error);
   const refund=await f.refund(f.p);let current=await detail(f,r.withdrawal.id);

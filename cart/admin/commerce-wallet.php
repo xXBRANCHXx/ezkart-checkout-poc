@@ -9,7 +9,7 @@ function ez_admin_wallet_request(string $action, bool $authenticated, string $au
 {
     if (!$authenticated || $authenticationMethod !== 'supabase') ez_admin_json(['ok' => false, 'error' => 'Sign in again to open Wallet.', 'code' => 'wallet_locked'], 401);
     $allowedQuery = $action === 'history' ? ['wallet', 'before', 'cap'] : ['wallet'];
-    $withdrawalActions = ['withdrawal_read', 'withdrawal_list', 'withdrawal_reserve', 'withdrawal_cancel', 'withdrawal_inquire', 'withdrawal_confirm'];
+    $withdrawalActions = ['withdrawal_read', 'withdrawal_lookup', 'withdrawal_list', 'withdrawal_reserve', 'withdrawal_cancel', 'withdrawal_inquire', 'withdrawal_confirm'];
     $isWithdrawal = in_array($action, $withdrawalActions, true);
     if (array_diff(array_keys($_GET), $allowedQuery) !== [] || !in_array($action, ['read', 'history', 'enroll', 'refresh', ...$withdrawalActions], true)) ez_admin_json(['ok' => false, 'error' => 'Wallet request is invalid.'], 400);
     $seenQuery = [];
@@ -39,13 +39,14 @@ function ez_admin_wallet_request(string $action, bool $authenticated, string $au
                 $input = json_decode($raw, true, 8, JSON_THROW_ON_ERROR);
                 $fields = match ($action) {
                     'withdrawal_list' => ['before', 'cap', 'limit'],
+                    'withdrawal_lookup' => ['requestKey'],
                     'withdrawal_reserve' => ['requestKey', 'amount', 'bank'],
                     'withdrawal_confirm' => ['id', 'requestKey', 'inquiryDigest'],
                     'withdrawal_cancel' => ['id', 'requestKey'],
                     default => ['id'],
                 };
                 if (!is_array($input) || !str_starts_with(ltrim($raw), '{') || array_diff(array_keys($input), $fields) !== []) throw new InvalidArgumentException();
-                if (!in_array($action, ['withdrawal_list', 'withdrawal_reserve'], true)
+                if (!in_array($action, ['withdrawal_list', 'withdrawal_lookup', 'withdrawal_reserve'], true)
                     && (!is_string($input['id'] ?? null) || preg_match('/^wd_[a-f0-9]{40}$/D', $input['id']) !== 1)) throw new InvalidArgumentException();
             } catch (Throwable) { ez_admin_json(['ok' => false, 'error' => 'Withdrawal request is invalid.'], 422); }
         } else {
@@ -82,6 +83,7 @@ function ez_admin_wallet_request(string $action, bool $authenticated, string $au
                 if (in_array($action, ['withdrawal_reserve', 'withdrawal_inquire', 'withdrawal_confirm'], true) && ez_config('commerce_withdrawals') !== 'enabled')
                     throw new EzCommerceStorageException('Bank withdrawals are not available yet.', 503);
                 $path = '/internal/commerce/finance/withdrawals';
+                if ($action === 'withdrawal_reserve') ez_withdrawal_check_bank_choice($input['bank'] ?? null);
                 $id = $input['id'] ?? null; unset($input['id']);
                 if ($action === 'withdrawal_inquire') {
                     $result = ez_inquire_withdrawal_bank($id, $payload);
@@ -92,6 +94,7 @@ function ez_admin_wallet_request(string $action, bool $authenticated, string $au
                 } else {
                     $target = match ($action) {
                         'withdrawal_list' => $path . '/list',
+                        'withdrawal_lookup' => $path . '/lookup',
                         'withdrawal_reserve' => $path,
                         'withdrawal_read' => $path . '/' . $id . '/read',
                         'withdrawal_cancel' => $path . '/' . $id . '/cancel',
@@ -110,6 +113,12 @@ function ez_admin_wallet_request(string $action, bool $authenticated, string $au
                 $financialQuery = ['seller' => $sellerId, 'environment' => $environment];
                 $response['earningsHistory'] = ez_commerce_request('GET', '/internal/commerce/finance/earnings/history?' . http_build_query($financialQuery + $historyQuery, '', '&', PHP_QUERY_RFC3986));
                 if ($action !== 'history') $response['earnings'] = ez_commerce_request('GET', '/internal/commerce/finance/earnings/summary?' . http_build_query($financialQuery, '', '&', PHP_QUERY_RFC3986));
+                if ($action !== 'history') $response['withdrawalCapabilities'] = [
+                    'requests' => $ready && ez_config('commerce_withdrawals') === 'enabled' && ($response['enrollment']['status'] ?? '') === 'connected',
+                    'bankVerification' => $ready && ez_config('commerce_withdrawals') === 'enabled' && ez_config('commerce_withdrawal_inquiry') === 'enabled',
+                    'transfers' => false,
+                    'banks' => ez_withdrawal_bank_catalog(),
+                ];
             }
         } elseif ($action !== 'read') throw new EzCommerceStorageException('Wallet setup is not available yet.', 503);
     } catch (Throwable $error) {

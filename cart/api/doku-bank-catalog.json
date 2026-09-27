@@ -1,0 +1,979 @@
+{
+  "source": "https://developers.doku.com/payout/kirim-doku#list-of-supported-banks",
+  "checkedAt": "2026-09-27",
+  "banks": [
+    {
+      "code": "SYACIDJ1",
+      "name": "BANK ACEH",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "NETBIDJA",
+      "name": "BANK ALADIN SYARIAH",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "ALOBIDJA",
+      "name": "BANK ALLO",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "LOMAIDJ1",
+      "name": "BANK AMAR",
+      "channels": [
+        "BI_FAST"
+      ]
+    },
+    {
+      "code": "ANZBIDJX",
+      "name": "BANK ANZ INDONESIA",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "ARTGIDJA",
+      "name": "BANK ARTHA GRAHA",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "CENAIDJA",
+      "name": "BANK BCA",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "BSYAIDJA",
+      "name": "BANK BCA SYARIAH",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "BNINIDJA",
+      "name": "BANK BNI 46",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "BNPAIDJA",
+      "name": "BANK BNP PARIBAS",
+      "channels": [
+        "BI_FAST"
+      ]
+    },
+    {
+      "code": "PDYKIDJ1",
+      "name": "BANK BPD DIY",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "SYYKIDJ1",
+      "name": "BANK BPD DIY UUS (SYARIAH)",
+      "channels": [
+        "BI_FAST"
+      ]
+    },
+    {
+      "code": "BRINIDJA",
+      "name": "BANK BRI",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "BSMDIDJA",
+      "name": "BANK BSI (BANK SYARIAH INDONESIA)",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "BTANIDJA",
+      "name": "BANK BTN",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "PUBAIDJ1",
+      "name": "BANK BTPN SYARIAH",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "SDOBIDJ1",
+      "name": "BANK BUKOPIN SYARIAH",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "BBAIIDJA",
+      "name": "BANK BUMI ARTA",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "BCIAIDJA",
+      "name": "BANK CAPITAL",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "MCORIDJA",
+      "name": "BANK CCB INDONESIA",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "BNIAIDJA",
+      "name": "BANK CIMB NIAGA",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "SYNAIDJ1",
+      "name": "BANK CIMB NIAGA UUS (SYARIAH)",
+      "channels": [
+        "BI_FAST"
+      ]
+    },
+    {
+      "code": "BICNIDJA",
+      "name": "BANK COMMONWEALTH",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "CTCBIDJA",
+      "name": "BANK CTBC INDONESIA",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "BDINIDJA",
+      "name": "BANK DANAMON",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "SYBDIDJ1",
+      "name": "BANK DANAMON UUS (SYARIAH)",
+      "channels": [
+        "BI_FAST"
+      ]
+    },
+    {
+      "code": "DBSBIDJA",
+      "name": "BANK DBS INDONESIA",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "BBLUIDJA",
+      "name": "BANK DIGITAL BCA",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "BDKIIDJ1",
+      "name": "BANK DKI",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "SYDKIDJ1",
+      "name": "BANK DKI UUS (SYARIAH)",
+      "channels": [
+        "BI_FAST"
+      ]
+    },
+    {
+      "code": "GNESIDJA",
+      "name": "BANK GANESHA",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "MAYOIDJA",
+      "name": "BANK HIBANK INDONESIA",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "HSBCIDJA",
+      "name": "BANK HSBC INDONESIA",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "IBKOIDJA",
+      "name": "BANK IBK INDONESIA",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "ICBKIDJA",
+      "name": "BANK ICBC",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "IAPTIDJA",
+      "name": "BANK INA PERDANA",
+      "channels": [
+        "BI_FAST"
+      ]
+    },
+    {
+      "code": "BIDXIDJA",
+      "name": "BANK INDEX",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "PDJBIDJA",
+      "name": "BANK JABAR",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "SYJBIDJ1",
+      "name": "BANK JABAR BANTEN SYARIAH",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "JAGBIDJA",
+      "name": "BANK JAGO",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "JSABDJI1",
+      "name": "BANK JASA JAKARTA",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "PDJGIDJ1",
+      "name": "BANK JATENG",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "SYJGIDJ1",
+      "name": "BANK JATENG UUS (SYARIAH)",
+      "channels": [
+        "BI_FAST"
+      ]
+    },
+    {
+      "code": "PDJTIDJ1",
+      "name": "BANK JATIM",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "SYJTIDJ1",
+      "name": "BANK JATIM UUS (SYARIAH)",
+      "channels": [
+        "BI_FAST"
+      ]
+    },
+    {
+      "code": "CICTIDJA",
+      "name": "BANK JTRUST INDONESIA",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "BBUKIDJA",
+      "name": "BANK KB BUKOPIN",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "HNBNIDJA",
+      "name": "BANK KEB HANA",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "PDLPIDJ1",
+      "name": "BANK LAMPUNG",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "BMRIIDJA",
+      "name": "BANK MANDIRI",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "SIHBIDJ1",
+      "name": "BANK MANDIRI TASPEN",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "MASDIDJ1",
+      "name": "BANK MASPION INDONESIA",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "MAYAIDJA",
+      "name": "BANK MAYAPADA INTERNATIONAL",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "IBBKIDJA",
+      "name": "BANK MAYBANK",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "SYBKIDJ1",
+      "name": "BANK MAYBANK UUS (SYARIAH)",
+      "channels": [
+        "BI_FAST"
+      ]
+    },
+    {
+      "code": "MEGAIDJA",
+      "name": "BANK MEGA",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "BUTGIDJ1",
+      "name": "BANK MEGA SYARIAH",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "MEDHIDS1",
+      "name": "BANK MESTIKA DHARMA",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "MHCCIDJA",
+      "name": "BANK MIZUHO INDONESIA",
+      "channels": [
+        "BI_FAST"
+      ]
+    },
+    {
+      "code": "BUMIIDJA",
+      "name": "BANK MNC INTERNATIONAL",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "MUABIDJA",
+      "name": "BANK MUAMALAT INDONESIA",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "BMSEIDJA",
+      "name": "BANK MULTI ARTA SENTOSA",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "SYSBIDJ1",
+      "name": "BANK NAGARI UUS (SYARIAH)",
+      "channels": [
+        "BI_FAST"
+      ]
+    },
+    {
+      "code": "NANOIDJ1",
+      "name": "BANK NANO SYARIAH",
+      "channels": [
+        "BI_FAST"
+      ]
+    },
+    {
+      "code": "NOBUIDJA",
+      "name": "BANK NATIONAL NOBU",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "YUDBIDJ1",
+      "name": "BANK NEO COMMERCE",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "PDNBIDJ1",
+      "name": "BANK NTB",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "PDNTIDJA",
+      "name": "BANK NTT",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "NISPIDJA",
+      "name": "BANK OCBC NISP",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "SYONIDJ1",
+      "name": "BANK OCBS NISP UUS (SYARIAH)",
+      "channels": [
+        "BI_FAST"
+      ]
+    },
+    {
+      "code": "BOFAID2X",
+      "name": "BANK OF AMERICA NA",
+      "channels": [
+        "BI_FAST"
+      ]
+    },
+    {
+      "code": "BKCHIDJA",
+      "name": "BANK OF CHINA HK. LTD.",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "BKIDIDJA",
+      "name": "BANK OF INDIA INDONESIA",
+      "channels": [
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "LMANIDJ1",
+      "name": "BANK OKE INDONESIA",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "PINBIDJA",
+      "name": "BANK PANIN",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "ARFAIDJ1",
+      "name": "BANK PANIN DUBAI SYARIAH",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "BBBAIDJA",
+      "name": "BANK PERMATA",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "SYBBIDJ1",
+      "name": "BANK PERMATA UUS (SYARIAH)",
+      "channels": [
+        "BI_FAST"
+      ]
+    },
+    {
+      "code": "PMASIDJ1",
+      "name": "BANK PRIMA MASTER",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "AWANIDJA",
+      "name": "BANK QNB INDONESIA",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "AGTBIDJA",
+      "name": "BANK RAYA INDONESIA",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "BPIAIDJA",
+      "name": "BANK RESONA PERDANIA",
+      "channels": [
+        "BI_FAST"
+      ]
+    },
+    {
+      "code": "PDRIIDJA",
+      "name": "BANK RIAU",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "SAHMIDJA",
+      "name": "BANK SAHABAT SAMPOERNA",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "IDMOIDJ1",
+      "name": "BANK SBI INDONESIA",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "SSPIIDJA",
+      "name": "BANK SEABANK INDONESIA",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "MEEKIDJ1",
+      "name": "BANK SHINHAN INDONESIA",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "SBJKIDJA",
+      "name": "BANK SINARMAS",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "SUNIIDJA",
+      "name": "BANK SMBC INDONESIA",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "SCBLIDJX",
+      "name": "BANK STANDARD CHARTERED",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "PDWSIDJA",
+      "name": "BANK SULSELBAR",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "SYWSIDJ1",
+      "name": "BANK SULSELBAR UUS (SYARIAH)",
+      "channels": [
+        "BI_FAST"
+      ]
+    },
+    {
+      "code": "PDWUIDJ1",
+      "name": "BANK SULUTGO",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "PDSUIDJ1",
+      "name": "BANK SUMUT",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "SYSUIDJ1",
+      "name": "BANK SUMUT UUS (SYARIAH)",
+      "channels": [
+        "BI_FAST"
+      ]
+    },
+    {
+      "code": "SWAGIDJ1",
+      "name": "BANK SYARIAH NASIONAL",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "BBIJIDJA",
+      "name": "BANK UOB INDONESIA",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "VICTIDJ1",
+      "name": "BANK VICTORIA INTERNATIONAL",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "BSDRIDJA",
+      "name": "BANK WOORI SAUDARA",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "ABALIDBS",
+      "name": "BPD BALI",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "PDBBIDJ1",
+      "name": "BPD BANTEN",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "PDBKIDJ1",
+      "name": "BPD BENGKULU",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "PDJMIDJ1",
+      "name": "BPD JAMBI",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "SYJMIDJ1",
+      "name": "BPD JAMBI UUS (SYARIAH)",
+      "channels": [
+        "BI_FAST"
+      ]
+    },
+    {
+      "code": "PDKBIDJ1",
+      "name": "BPD KALBAR",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "SYKBIDJ1",
+      "name": "BPD KALBAR UUS (SYARIAH)",
+      "channels": [
+        "BI_FAST"
+      ]
+    },
+    {
+      "code": "PDKSIDBB",
+      "name": "BPD KALSEL",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "SYKSIDJ1",
+      "name": "BPD KALSEL UUS (SYARIAH)",
+      "channels": [
+        "BI_FAST"
+      ]
+    },
+    {
+      "code": "PDKGIDJ1",
+      "name": "BPD KALTENG",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "PDKTIDJ1",
+      "name": "BPD KALTIMTARA",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "SYKTIDJ1",
+      "name": "BPD KALTIMTARA UUS (SYARIAH)",
+      "channels": [
+        "BI_FAST"
+      ]
+    },
+    {
+      "code": "PDMLIDJ1",
+      "name": "BPD MALUKU",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "PDIJIDJ1",
+      "name": "BPD PAPUA",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "PDWGIDJ1",
+      "name": "BPD SULTENG",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "PDWRIDJ1",
+      "name": "BPD SULTRA",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "PDSBIDJ1",
+      "name": "BPD SUMATERA BARAT/BANK NAGARI",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "BSSPIDSP",
+      "name": "BPD SUMSEL BABEL",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "SYSSIDJ1",
+      "name": "BPD SUMSEL BABEL UUS (SYARIAH)",
+      "channels": [
+        "BI_FAST"
+      ]
+    },
+    {
+      "code": "CITIIDJX",
+      "name": "CITIBANK",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "DEUTIDJA",
+      "name": "DEUTSCHE BANK",
+      "channels": [
+        "BI_FAST"
+      ]
+    },
+    {
+      "code": "CHASIDJX",
+      "name": "JPMORGAN BANK",
+      "channels": [
+        "BI_FAST"
+      ]
+    },
+    {
+      "code": "BUSTIDJ1",
+      "name": "KROM BANK",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "BOTKIDJX",
+      "name": "MUFG BANK",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "SYATIDJ1",
+      "name": "PT. BANK JAGO SYARIAH",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    },
+    {
+      "code": "FAMAIDJ1",
+      "name": "SUPERBANK INDONESIA",
+      "channels": [
+        "BI_FAST",
+        "ONLINE"
+      ]
+    }
+  ]
+}

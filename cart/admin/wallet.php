@@ -54,16 +54,17 @@ $walletOwner = ($activeSeller['role'] ?? '') === 'owner';
     <footer><?= ez_admin_icon('help') ?><span>Payment totals can be checked in <a href="?page=payments">Payments</a>. Final earnings include seller fees and settlement.</span></footer>
   </article>
   <article class="surface wallet-withdrawal">
-    <header><h2>When can I withdraw?</h2><span class="wallet-status">Not available yet</span></header>
+    <header><h2>When can I withdraw?</h2><span class="wallet-status" data-wallet-withdraw-badge>Not available yet</span></header>
     <p>Earnings become available after both delivery and provider settlement are confirmed.</p>
     <ol class="wallet-release-steps">
       <li><span><?= ez_admin_icon('truck') ?></span><div><b>Delivery confirmed</b><p>Your customer has received the order.</p></div></li>
       <li><span><?= ez_admin_icon('check-circle') ?></span><div><b>Provider settlement confirmed</b><p>Payment funds and final fees have been confirmed.</p></div></li>
       <li><span><?= ez_admin_icon('wallet') ?></span><div><b>At least Rp250.000 available</b><p>Minimum seller withdrawal. Ezkart covers the transfer fee.</p></div></li>
     </ol>
-    <div class="wallet-withdraw-action"><button class="ui-button" type="button" disabled aria-describedby="wallet-withdraw-reason" data-ui-icon="wallet">Withdraw funds</button><p id="wallet-withdraw-reason">Bank withdrawals are not available yet. Your earnings remain recorded here.</p></div>
+    <div class="wallet-withdraw-action"><button class="action-button primary" type="button" disabled aria-describedby="wallet-withdraw-reason" data-wallet-withdraw-start data-ui-icon="wallet">Withdraw funds</button><p id="wallet-withdraw-reason">Bank withdrawals are not available yet. Your earnings remain recorded here.</p></div>
   </article>
 </section>
+<?php if ($centralWalletWorkspace && $walletOwner) require __DIR__ . '/wallet-withdrawals.php'; ?>
 <section class="surface wallet-payments" aria-label="<?= $centralWalletWorkspace ? 'Earnings history' : 'Payments awaiting wallet settlement' ?>">
   <header class="surface-header"><div><h2><?= $centralWalletWorkspace ? 'Earnings history' : 'Payments behind your earnings' ?></h2><p><?= $centralWalletWorkspace ? 'Releases, reserves and adjustments for your orders.' : 'Delivery and settlement status for your paid orders.' ?></p></div><a class="action-button" href="?page=payments">Check all payments <?= ez_admin_icon('chevron-right') ?></a></header>
   <?php if ($centralWalletWorkspace): ?>

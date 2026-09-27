@@ -71,6 +71,20 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 27 September: merchant withdrawal workflow
+
+The [merchant withdrawal workflow](withdrawal-merchant-workflow.md) now implements
+request creation, published bank/channel selection, bank-returned destination
+review and confirmation, cancellation and paged history. Lost responses recover
+the same original request key without persisting bank details in browser storage.
+Wallet expiry clears open details and preserves the server's original receipt.
+
+Relevant coverage comprises 25 Worker and 31 PHP/browser cases; focused reruns
+resolve the initial mobile clipping and expiry-test cooldown failures. The
+workbench rollout is in progress. No migration or live money movement is added.
+Payment dispatch, fees, final payout/refund accounting, reconciliation and live
+acceptance remain required. No top-level gate is closed.
+
 ### 27 September: durable bank inquiries and owner confirmation
 
 [Bank verification](withdrawal-bank-inquiries.md) now permits one inquiry per
@@ -96,8 +110,9 @@ has only its ordinary sign-in timestamp refresh. All four new tables and all
 money journals remain empty.
 
 Payment grants, transfer fees funded by Ezkart, final payout/refund accounting,
-payment outcome reconciliation, merchant request/confirmation/history UI and live
-acceptance remain required. Execution holds and the original uncertain wallet
+payment outcome reconciliation and live acceptance remain required. The merchant
+request/confirmation/history UI is implemented in the later stage above.
+Execution holds and the original uncertain wallet
 remain unchanged. No top-level gate is closed.
 
 ### 27 September: owner withdrawal reservations and cancellation

@@ -4,6 +4,24 @@ if (realpath((string) ($_SERVER['SCRIPT_FILENAME'] ?? '')) === __FILE__) { http_
 require_once __DIR__ . '/commerce-checkout.php';
 require_once __DIR__ . '/doku-payout.php';
 
+function ez_withdrawal_bank_catalog(): array
+{
+    static $banks;
+    if (!is_array($banks)) {
+        $catalog = json_decode((string) file_get_contents(__DIR__ . '/doku-bank-catalog.json'), true, 16, JSON_THROW_ON_ERROR);
+        $banks = $catalog['banks'];
+    }
+    return $banks;
+}
+
+function ez_withdrawal_check_bank_choice(mixed $bank): void
+{
+    if (is_array($bank)) foreach (ez_withdrawal_bank_catalog() as $supported) {
+        if (($bank['code'] ?? null) === $supported['code'] && in_array($bank['channel'] ?? null, $supported['channels'], true)) return;
+    }
+    throw new EzCommerceStorageException('Choose a supported bank and transfer method.', 422);
+}
+
 function ez_withdrawal_workbench(string $environment): void
 {
     $deployment = ez_deployment_profile()['environment'];

@@ -6,6 +6,8 @@ withdrawal button remains unavailable until bank confirmation, durable dispatch,
 actual Ezkart-funded transfer fees and outcome reconciliation are integrated.
 Migration 0056 adds [durable bank inquiry and owner confirmation](withdrawal-bank-inquiries.md)
 with independent execution holds; it still has no payment dispatcher.
+The [merchant request workflow](withdrawal-merchant-workflow.md) now provides
+bank review, confirmation, saved history, cancellation and request recovery.
 
 ## Funds and transaction boundary
 
@@ -54,6 +56,8 @@ scheduled dispatcher is enabled.
   `actor`, `requestKey`, `amount` and `bank` (`code`, `accountNumber`, `channel`).
 - `POST /internal/commerce/finance/withdrawals/{id}/read` accepts only the owner
   scope and returns the saved request plus current aggregate funding/shortfall.
+- `POST /internal/commerce/finance/withdrawals/lookup` accepts the owner scope and
+  original `requestKey`, recovering a lost response without creating an intent.
 - `POST /internal/commerce/finance/withdrawals/{id}/cancel` also requires a new
   cancellation `requestKey`. The current owner may cancel a former owner's
   unsubmitted request; ownership changes cannot reuse that original request key.
@@ -73,11 +77,12 @@ earnings; it does not claim to be completed bank-transfer history.
 
 The [bank inquiry](withdrawal-bank-inquiries.md) now has a single-use grant,
 original private receipt and owner confirmation bound to that receipt.
-Connect payment dispatch to its own durable grant and original receipt,
-show the bank-returned beneficiary in Wallet, recheck authority/funds at dispatch,
+The [merchant workflow](withdrawal-merchant-workflow.md) displays that beneficiary
+and supports request/history/recovery flows. Connect payment dispatch to its own
+durable grant and original receipt, recheck authority/funds at dispatch,
 fund the actual transfer fee from Ezkart, and reconcile authenticated status,
-callbacks and account history into final journals. Complete the owner-facing
-request/history/recovery flows and live acceptance before opening withdrawals.
+callbacks and account history into final journals. Complete payment execution
+and live acceptance before opening withdrawals.
 
 ## Verification
 

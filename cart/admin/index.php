@@ -2005,7 +2005,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
   <?php if ($page === 'shipping-settings'): ?><script src="../address-picker.js?v=<?= (int) filemtime(__DIR__ . '/../address-picker.js') ?>"></script><script src="shipping-settings.js?v=<?= (int) filemtime(__DIR__ . '/shipping-settings.js') ?>"></script><?php endif; ?>
   <?php if ($page === 'analytics'): ?><script src="analytics.js?v=<?= (int) filemtime(__DIR__ . '/analytics.js') ?>"></script><?php endif; ?>
   <?php if ($centralAnalyticsWorkspace): ?><script src="commerce-analytics.js?v=<?= (int) filemtime(__DIR__ . '/commerce-analytics.js') ?>"></script><?php endif; ?>
-  <?php if ($page === 'wallet'): ?><script src="wallet-access.js?v=<?= (int) filemtime(__DIR__ . '/wallet-access.js') ?>"></script><script src="wallet-enrollment.js?v=<?= (int) filemtime(__DIR__ . '/wallet-enrollment.js') ?>"></script><?php endif; ?>
+  <?php if ($page === 'wallet'): ?><script src="wallet-access.js?v=<?= (int) filemtime(__DIR__ . '/wallet-access.js') ?>"></script><script src="wallet-withdrawals.js?v=<?= (int) filemtime(__DIR__ . '/wallet-withdrawals.js') ?>"></script><script src="wallet-enrollment.js?v=<?= (int) filemtime(__DIR__ . '/wallet-enrollment.js') ?>"></script><?php endif; ?>
   <script src="admin-language.js?v=<?= (int) filemtime(__DIR__ . '/admin-language.js') ?>"></script>
   <?php if ($page === 'sites'): ?><script src="builder-image.js?v=<?= (int) filemtime(__DIR__ . '/builder-image.js') ?>"></script><script src="builder-choice.js?v=<?= (int) filemtime(__DIR__ . '/builder-choice.js') ?>"></script><?php endif; ?>
   <?php if ($page === 'product-new'): ?><script src="digital-files.js?v=<?= (int) filemtime(__DIR__ . '/digital-files.js') ?>"></script><?php endif; ?>
