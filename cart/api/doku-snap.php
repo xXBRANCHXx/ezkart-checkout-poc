@@ -116,15 +116,35 @@ abstract class EzDokuSnapClient
     {
         // The target is selected by these methods, never by an HTTP caller.
         if (!in_array($operation, ['balance-inquiries', 'transaction-history-list', 'transactions-status', 'register'], true)) throw new EzDokuReadException('operation');
+        return $this->signedPost($operation, '/sub-account/v2.0/' . $operation, $payload);
+    }
+
+    /** A create uses the caller's durable dispatch identity, never a fresh retry ID. */
+    protected function bcaRequest(string $operation, array $payload, ?string $externalId = null): array
+    {
+        $path = match ($operation) {
+            'bca-create' => '/virtual-accounts/bi-snap-va/v1.1/transfer-va/create-va',
+            'bca-status' => '/orders/v1.0/transfer-va/status',
+            default => throw new EzDokuReadException('operation'),
+        };
+        if (($operation === 'bca-create' && $externalId === null)
+            || ($externalId !== null && preg_match('/^[0-9]{32}$/D', $externalId) !== 1)) throw new EzDokuReadException('external_id');
+        return $this->signedPost($operation, $path, $payload, $externalId, $operation === 'bca-create' ? 'H2H' : null);
+    }
+
+    protected function now(): int { return ($this->clock)(); }
+
+    private function signedPost(string $operation, string $path, array $payload, ?string $externalId = null, ?string $channel = null): array
+    {
         $token = $this->token(); $timestamp = gmdate('Y-m-d\TH:i:s\Z', ($this->clock)());
-        $path = '/sub-account/v2.0/' . $operation;
         $body = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
-        $externalId = ''; for ($i = 0; $i < 32; $i++) $externalId .= (string) random_int(0, 9);
+        if ($externalId === null) { $externalId = ''; for ($i = 0; $i < 32; $i++) $externalId .= (string) random_int(0, 9); }
         $canonical = 'POST:' . $path . ':' . $token . ':' . hash('sha256', $body) . ':' . $timestamp;
         try {
             [$response, $raw] = $this->send($path, [
                 'Authorization: Bearer ' . $token, 'X-PARTNER-ID: ' . $this->credentials['clientId'], 'X-TIMESTAMP: ' . $timestamp,
                 'X-EXTERNAL-ID: ' . $externalId, 'X-SIGNATURE: ' . base64_encode(hash_hmac('sha512', $canonical, $this->credentials['secretKey'], true)),
+                ...($channel === null ? [] : ['CHANNEL-ID: ' . $channel]),
             ], $body);
         } catch (EzDokuReadException $error) {
             if ($error->providerStatus === 401) { $this->accessToken = ''; $this->expiresAt = 0; }
@@ -138,5 +158,14 @@ abstract class EzDokuSnapClient
     public function providerIdentity(): array
     {
         return ['environment' => $this->credentials['environment'], 'clientId' => $this->credentials['clientId'], 'credentialFingerprint' => $this->credentialFingerprint];
+    }
+
+    /** Authentication only; never exposes the bearer token or claims service activation. */
+    public function verifyAuthentication(): array
+    {
+        $this->token();
+        return ['authenticated' => true, 'environment' => $this->credentials['environment'],
+            'credentialFingerprint' => $this->credentialFingerprint,
+            'expiresAt' => gmdate('Y-m-d\TH:i:s\Z', $this->expiresAt)];
     }
 }

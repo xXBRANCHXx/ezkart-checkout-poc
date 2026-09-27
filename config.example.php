@@ -44,6 +44,12 @@ return [
     'doku_production_payment_flow' => '', // Direct production VA requires SNAP migration; never falls back to hosted.
     'doku_production_client_id' => '',
     'doku_production_secret_key' => '',
+    // SNAP signing keys are server-only PEM contents. Keep the private files
+    // outside the web root; register only each corresponding public key at DOKU.
+    'doku_sandbox_snap_private_key' => '',
+    'doku_production_snap_private_key' => '',
+    'doku_sandbox_parent_profile_id' => '',
+    'doku_production_parent_profile_id' => '',
     'biteship_sandbox_api_key' => 'biteship_test.REPLACE_WITH_TEST_API_KEY',
     'biteship_production_api_key' => '',
     // Separate random values of at least 32 characters for each webhook mode.

@@ -8,10 +8,12 @@ validation and explicit final production-release decision remain recorded in
 
 Business approval is owner-confirmed. The owner also confirmed approval for all
 needed services, including payments, Sub-Account and Kirim DOKU payouts. Technical
-registration, credentials and working provider contracts still need evidence. The current
-workbench deployment is sandbox, with central checkout and financial/provider
-execution held. Changing those holds needs a concrete, verified beta candidate;
-approval does not silently change the financial environment or existing records.
+registration, credentials and working provider contracts still need evidence.
+The owner clarified that the target is **live DOKU on workbench**. The current
+deployment still uses sandbox, with central checkout and provider execution held;
+that is the starting state, not the requested beta. Prepare separate beta storage
+for real orders/payments, live provider credentials and supported adapters, while
+preserving existing sandbox evidence. Main and `ezkart.id` remain held.
 
 ## Work required for the beta candidate
 
@@ -44,6 +46,29 @@ is not a closed top-level gate.
   Original payment fees, refund-processing fees and withdrawal fees are distinct.
 
 ## Current evidence and limits
+
+The signed-in production DOKU dashboard was inspected on 27 September. Its
+Service page shows active SNAP VAs for BJB, BNC, BNI, BRI, BSI, BSS, BTN, CIMB,
+DOKU, Danamon, Maybank, Permata and Sinarmas. BCA SNAP is not in the active list;
+it is offered unchecked under Add Service. Balance Management and Fund Connector
+are unchecked and disabled in that dialog. The Sub Account list is empty. These
+observations do not establish that the separately approved payout/Sub-Account
+capabilities are technically provisioned.
+
+The production API Keys page initially said the merchant public key had not
+been set. A dedicated production public key is now registered and matched after
+dashboard reload; its private half is stored outside the repository. Retrieval
+of the existing secret is being completed through DOKU's own OTP prompt; no
+secret is being rotated. DOKU's active VA configuration shows
+SNAP 1.1, aggregator/DGPC, closed amount and an empty payment-notification URL.
+No service or callback setting was changed during that inspection.
+The empty Token URL is not itself a DGPC blocker: DOKU's
+[integration guide](https://docs.doku.com/get-started/manage-business/set-up-integration)
+requires that setting for DIPC.
+
+The typed [BCA SNAP adapter](doku-snap-payments.md) now passes 25 contract/reader
+cases and 15 wallet/signing regression cases. Its central dispatch, durable
+callback and checkout wiring remain required before selecting it for real orders.
 
 Implementation `56c6fab` is on workbench and TEST Worker
 `32567d92-a27e-42f2-9ff5-9ecd27c2afdb`. Migration 0047 is installed with 144

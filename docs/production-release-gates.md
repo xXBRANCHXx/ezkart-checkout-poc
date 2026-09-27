@@ -8,6 +8,11 @@ stays on workbench and is not pushed to main. Business approval is no longer an
 outstanding application task; actual supported payment, settlement, refund and
 payout acceptance still needs evidence. See [beta-readiness.md](beta-readiness.md).
 
+The owner subsequently clarified that the workbench beta should use **live DOKU**.
+Prepare isolated beta financial storage and live credentials on workbench. That
+clarification changes the beta provider target; it does not authorize a main push
+or release to `ezkart.id`. Preserve the existing sandbox evidence separately.
+
 ## Required evidence before release
 
 - DOKU approval (owner-confirmed 27 September) and a supported production payment integration with the Ezkart payment UI (technical acceptance pending).

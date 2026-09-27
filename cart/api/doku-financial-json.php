@@ -23,6 +23,26 @@ final class EzDokuFinancialJson
         return $value;
     }
 
+    /** Remove JSON whitespace only, preserving signed string/number spelling. */
+    public static function minify(string $source): string
+    {
+        self::decode($source);
+        $result = ''; $quoted = false; $escaped = false;
+        for ($i = 0, $length = strlen($source); $i < $length; $i++) {
+            $character = $source[$i];
+            if ($quoted) {
+                $result .= $character;
+                if ($escaped) $escaped = false;
+                elseif ($character === '\\') $escaped = true;
+                elseif ($character === '"') $quoted = false;
+            } elseif (!str_contains(" \t\r\n", $character)) {
+                $result .= $character;
+                if ($character === '"') $quoted = true;
+            }
+        }
+        return $result;
+    }
+
     private static function invalid(): never { throw new UnexpectedValueException('Provider JSON is invalid or ambiguous.'); }
     private function space(): void
     {

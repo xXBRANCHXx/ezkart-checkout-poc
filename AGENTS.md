@@ -35,6 +35,10 @@ Use merchant-facing controls for appearance settings: numeric values with separa
   for beta/soft-launch while explicitly keeping everything on workbench. DOKU
   business approval is received; technical payment/payout acceptance and the
   existing main/production release hold remain separate. See `docs/beta-readiness.md`.
+- The owner clarified the beta target is live DOKU on workbench, not a sandbox
+  launch. Prepare a separate beta environment for real payment records and live
+  credentials. Main and `ezkart.id` remain held; local fixture testing does not
+  determine the beta's provider mode. Preserve the existing sandbox evidence.
 
 ## Sidebar announcements
 
