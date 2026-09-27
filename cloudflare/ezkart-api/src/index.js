@@ -39,6 +39,7 @@ import {startWithdrawalInquiry,saveWithdrawalInquiryReceipt,withdrawalInquiryRec
 import {startWithdrawalPayment,saveWithdrawalPaymentReceipt,withdrawalPaymentRecovery,recordWithdrawalPaymentDiagnostic} from './commerce-withdrawal-payments.js';
 import {saveWithdrawalStatus,withdrawalStatusHistory} from './commerce-withdrawal-status.js';
 import {reconcilePayout,payoutStatus} from './commerce-payouts.js';
+import {payoutSyncScope} from './commerce-payout-sync.js';
 import {merchantCustomers,merchantCustomer,customerOrderHistory} from './commerce-customers.js';
 import {customerSegments,customerSegment,saveCustomerWorkspace,customerProfileHistory} from './commerce-customer-workspace.js';
 import {createCustomerExport,readCustomerExport,cleanupCustomerExports} from './commerce-customer-exports.js';
@@ -1567,13 +1568,13 @@ export default {
         if(url.pathname==='/internal/commerce/finance/withdrawals')return json({ok:true,...await reserveWithdrawal(env,payload)});
         if(url.pathname==='/internal/commerce/finance/withdrawals/list')return json({ok:true,...await withdrawalList(env,payload)});
         if(url.pathname==='/internal/commerce/finance/withdrawals/lookup')return json({ok:true,...await withdrawalLookup(env,payload)});
-        const match=/^\/internal\/commerce\/finance\/withdrawals\/(wd_[a-f0-9]{40})\/(read|cancel|confirm|(?:inquiry|payment)\/(?:start|receipt|read|diagnostic)|payment\/status\/(?:receipt|history)|payout\/(?:reconcile|read))$/.exec(url.pathname);
+        const match=/^\/internal\/commerce\/finance\/withdrawals\/(wd_[a-f0-9]{40})\/(read|cancel|confirm|(?:inquiry|payment)\/(?:start|receipt|read|diagnostic)|payment\/status\/(?:receipt|history)|payout\/(?:reconcile|read|sync-scope))$/.exec(url.pathname);
         if(match){
           const action={read:withdrawalDetail,cancel:cancelWithdrawal,confirm:confirmWithdrawalBank,'inquiry/start':startWithdrawalInquiry,
             'inquiry/receipt':saveWithdrawalInquiryReceipt,'inquiry/read':withdrawalInquiryRecovery,'inquiry/diagnostic':recordWithdrawalInquiryDiagnostic,
             'payment/start':startWithdrawalPayment,'payment/receipt':saveWithdrawalPaymentReceipt,'payment/read':withdrawalPaymentRecovery,
             'payment/diagnostic':recordWithdrawalPaymentDiagnostic,'payment/status/receipt':saveWithdrawalStatus,'payment/status/history':withdrawalStatusHistory,
-            'payout/reconcile':reconcilePayout,'payout/read':payoutStatus}[match[2]];
+            'payout/reconcile':reconcilePayout,'payout/read':payoutStatus,'payout/sync-scope':payoutSyncScope}[match[2]];
           return json({ok:true,...await action(env,match[1],payload)});
         }
         return json({ok:false,error:'Withdrawal route or method is unavailable'},404);

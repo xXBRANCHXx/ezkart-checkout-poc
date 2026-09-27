@@ -7,7 +7,7 @@ require_once __DIR__ . '/doku-sub-accounts.php';
  * offers offset pages, not an atomic snapshot: exhaustion never proves settlement.
  * The callback must durably save private evidence or throw before another read.
  */
-function ez_observe_doku_financial_window(EzDokuSubAccountReader $reader, string $profile, string $from, string $to, int $maxPages, callable $record, int $pageSize = 100): array
+function ez_observe_doku_financial_window(EzDokuFinancialReader $reader, string $profile, string $from, string $to, int $maxPages, callable $record, int $pageSize = 100): array
 {
     if ($maxPages < 1 || $maxPages > 40) throw new EzDokuReadException('page_budget');
     if ($pageSize < 1 || $pageSize > 100) throw new EzDokuReadException('page_size');

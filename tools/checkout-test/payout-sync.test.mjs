@@ -1,0 +1,168 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {spawn} from 'node:child_process';
+import {generateKeyPairSync,randomBytes} from 'node:crypto';
+import {mkdtemp,rm,writeFile,readFile,readdir,stat,chmod,symlink} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join,resolve} from 'node:path';
+import {setupCentralFixture} from './central-fixture.mjs';
+import {setupWithdrawalInquiryFixture,withdrawalPath} from '../../cloudflare/ezkart-api/test/withdrawal-inquiry-fixture.mjs';
+import {payoutFixture} from '../../cloudflare/ezkart-api/test/payout-fixture.mjs';
+
+const root=resolve(import.meta.dirname,'../..'),key=generateKeyPairSync('rsa',{modulusLength:2048}).privateKey.export({format:'pem',type:'pkcs8'});
+const evidencePath='/internal/commerce/finance/provider-evidence',collectionPath='/internal/commerce/finance/provider-collections';
+async function fixture(t,{beta=false}={}){
+  const environment=beta?'production':'sandbox',recovery=await mkdtemp(join(tmpdir(),'ezkart-payout-sync-'));
+  t.after(()=>rm(recovery,{recursive:true,force:true}));
+  const bindings={COMMERCE_PLATFORM_WALLET_SELLER:'seller_bob',COMMERCE_WITHDRAWAL_INQUIRY:'enabled',COMMERCE_WITHDRAWAL_PAYMENT:'enabled',...(beta?{APP_ENVIRONMENT:'beta'}:{})};
+  const base=await setupCentralFixture(t,{EZKART_TEST_WALLET:'1',EZKART_COMMERCE_WITHDRAWAL_SYNC:'enabled',EZKART_COMMERCE_WITHDRAWAL_RECOVERY_DIRECTORY:recovery,
+    EZKART_DOKU_SANDBOX_SNAP_PRIVATE_KEY:key,EZKART_DOKU_SANDBOX_PARENT_PROFILE_ID:'BRN-fixture',
+    ...(beta?{EZKART_DEPLOYMENT_ENVIRONMENT:'beta',EZKART_COMMERCE_ENVIRONMENT:'production',EZKART_CLOUDFLARE_API_URL:'https://ezkart-api-beta.fixture.workers.dev',
+      EZKART_DOKU_PRODUCTION_SNAP_PRIVATE_KEY:key,EZKART_DOKU_PRODUCTION_PARENT_PROFILE_ID:'BRN-fixture'}:{})},{bindings});
+  const php=(code,overrides={})=>new Promise((resolve,reject)=>{
+    const child=spawn(process.env.PHP_BINARY||'php',['-n','-r',`require ${JSON.stringify(join(root,'tools/checkout-test/provider-fixture.php'))}; ${code}`],{env:{...base.app.env,...overrides}});
+    let output='',error='';child.stdout.on('data',x=>output+=x);child.stderr.on('data',x=>error+=x);child.on('error',reject);child.on('close',status=>resolve({status,output,error}));
+  });
+  const identityResult=await php(`require ${JSON.stringify(join(root,'cart/api/doku-sub-accounts.php'))}; echo json_encode(EzDokuSubAccountReader::configured('${environment}')->providerIdentity());`);
+  assert.equal(identityResult.status,0,identityResult.error);const identity=JSON.parse(identityResult.output);
+  const f=await setupWithdrawalInquiryFixture(t,{baseFixture:base,bindings,fingerprint:identity.credentialFingerprint,clientId:identity.clientId});
+  const grant=async()=>{
+    const w=await f.reserve(),i=await f.start(w,{credentialFingerprint:identity.credentialFingerprint,clientId:identity.clientId});assert.equal(i.status,200,i.error);
+    const r=await f.receipt(w,f.evidence(i)),c=await f.confirm(w,r.inquiryDigest);
+    const g=await f.call(withdrawalPath+'/'+w.id+'/payment/start',{...f.scope(),credentialFingerprint:identity.credentialFingerprint,clientId:identity.clientId,confirmationId:c.confirmation.id});
+    assert.equal(g.status,200,g.error);return {w,g,...payoutFixture(f,w,g)};
+  };
+  const current=await grant(),scope=await f.call(current.path+'/payout/sync-scope',{environment});assert.equal(scope.status,200,scope.error);
+  const accounts=[scope.original.sellerAccount,scope.original.platformAccount];
+  await writeFile(join(f.app.directory,'wallet-profiles.json'),JSON.stringify(Object.fromEntries(accounts.map((a,i)=>[i,{responseCode:'2000000',profileId:a.profileId,accounts:[
+    {type:'DOKU_MERCHANT_IDR',currency:'IDR',accountNo:a.cashAccount},{type:'DOKU_MERCHANT_PENDING_IDR',currency:'IDR',accountNo:a.pendingAccount}]}]))));
+  const control=value=>writeFile(join(f.app.directory,'wallet-control.json'),JSON.stringify(value));
+  await control({statusResponse:{latestTransactionStatus:'00',latestTransactionDesc:'success'}});
+  const history=async({fee=2500,sellerFee=false,payouts=[current],extra=[]}={})=>{
+    const rows=f.legs(f.p);
+    for(const p of payouts){rows.sellerCash.push(p.row('PAYOUT',250000));rows[sellerFee?'sellerCash':'platformCash'].push(p.row('PAYOUT_CHARGE',fee));}
+    rows.sellerCash.push(...extra);
+    for(const items of Object.values(rows))items.sort((a,b)=>b.dateTime.localeCompare(a.dateTime));
+    await writeFile(join(f.app.directory,'wallet-history.json'),JSON.stringify(Object.fromEntries([
+      [accounts[0].cashAccount,rows.sellerCash],[accounts[0].pendingAccount,rows.sellerPending],[accounts[1].cashAccount,rows.platformCash],[accounts[1].pendingAccount,rows.platformPending]])));
+    // The real history API's completed boundary has second precision.
+    await new Promise(resolve=>setTimeout(resolve,1005-Date.now()%1000));
+  };
+  await history();
+  const run=randomBytes(16).toString('hex'),directory=join(recovery,current.w.id+'-sync-'+run);
+  const sync=(changes={},overrides={})=>{
+    const args=['sync-withdrawal-payout.php',...Object.entries({environment,withdrawal:current.w.id,run,mode:'collect',...changes}).map(([k,v])=>'--'+k+'='+v)];
+    return php(`$argv=json_decode(base64_decode('${Buffer.from(JSON.stringify(args)).toString('base64')}'),true); require ${JSON.stringify(join(root,'tools/commerce/sync-withdrawal-payout.php'))};`,overrides);
+  };
+  const reads=async()=>(await f.app.calls()).filter(c=>c.url.includes('/sub-account/v2.0/'));
+  const funds=()=>f.call('/internal/commerce/finance/earnings/summary?seller=seller_alice&environment='+environment);
+  return {...f,...current,php,identity,environment,recovery,directory,run,scope,history,controlProvider:control,sync,reads,grant,funds};
+}
+
+test('beta payout synchronization connects original status, both account histories, payout and settlement accounting; recovery uses no provider credentials',async t=>{
+  const f=await fixture(t,{beta:true}),before=await f.funds();f.control.drop=evidencePath;
+  const run=await f.sync();assert.equal(run.status,0,run.error+run.output);const result=JSON.parse(run.output);
+  assert.equal(result.providerCalls,9);assert.equal(result.responses,8);assert.equal(result.payoutConfirmed,true);assert.equal(result.mayPay,false);
+  assert.deepEqual(result.sharedHistoryReview,{settlements:0,payouts:0});assert.deepEqual(result.relatedReviews,[]);
+  // Reserved money becomes a completed outflow; it never becomes available again.
+  assert.equal((await f.funds()).availableEarnings,before.availableEarnings);
+  assert.equal((await f.funds()).reservedWithdrawals,'0');assert.equal((await f.funds()).completedWithdrawals,'250000');
+  assert.equal(await f.count('commerce_payout_assessments'),1);assert.equal((await f.readPayout()).outcome.paidAmount,'250000');
+  const reads=await f.reads();assert.equal(reads.length,9);assert(reads.every(c=>c.url.startsWith('https://api.doku.com/')));
+  assert(reads.every(c=>!/transfer-payment|transfer-inquiry|register/.test(c.url)));
+  const originals=Object.fromEntries(await Promise.all((await readdir(f.directory)).filter(x=>x.endsWith('.json')).map(async name=>[name,await readFile(join(f.directory,name),'utf8')])));
+  assert.equal((await stat(f.directory)).mode&0o777,0o700);
+  for(const name of Object.keys(originals))assert.equal((await stat(join(f.directory,name))).mode&0o777,0o600);
+  await f.controlProvider({tokenDenied:true});
+  const recovered=await f.sync({mode:'recover'},{EZKART_COMMERCE_WITHDRAWAL_SYNC:'held',EZKART_DOKU_PRODUCTION_SNAP_PRIVATE_KEY:'unavailable'});
+  assert.equal(recovered.status,0,recovered.error);assert.equal(JSON.parse(recovered.output).providerCalls,0);assert.equal((await f.reads()).length,9);
+  for(const [name,raw] of Object.entries(originals))assert.equal(await readFile(join(f.directory,name),'utf8'),raw);
+  assert.equal(await f.count('commerce_payout_assessments'),1);
+  for(const file of ['/cart/api/commerce-payout-sync.php','/tools/commerce/sync-withdrawal-payout.php'])assert.equal((await fetch(f.app.base+file)).status,404);
+  for(const privateValue of ['2010000001','2030000002',f.identity.credentialFingerprint,'fixture-doku'])assert(!run.output.includes(privateValue));
+});
+
+test('interrupted observation delivery recovers original bytes and resumes only missing provider reads',async t=>{
+  const f=await fixture(t);f.control.fail=evidencePath;
+  const failed=await f.sync();assert.equal(failed.status,1);assert.equal((await f.reads()).length,2);
+  const saved=await readFile(join(f.directory,'read-0002.json'),'utf8');assert.equal(await f.count('commerce_withdrawal_status_observations'),1);
+  f.control.fail='';
+  const recovery=await f.sync({mode:'recover'},{EZKART_DOKU_SANDBOX_SNAP_PRIVATE_KEY:'missing'});assert.equal(recovery.status,1);assert.equal((await f.reads()).length,2);
+  const resumed=await f.sync();assert.equal(resumed.status,0,resumed.error);assert.equal(JSON.parse(resumed.output).providerCalls,7);
+  assert.equal(await readFile(join(f.directory,'read-0002.json'),'utf8'),saved);assert.equal((await f.reads()).length,9);
+  assert.equal(await f.count('commerce_withdrawal_status_observations'),1);assert.equal(await f.count('commerce_payout_assessments'),1);
+});
+
+test('lost collection and payout acknowledgements recover exactly without another provider read',async t=>{
+  const f=await fixture(t);let blocked=false;
+  f.control.afterResponse=async path=>{if(path===collectionPath&&!blocked){blocked=true;f.control.fail=collectionPath;f.control.drop=collectionPath;}};
+  const failed=await f.sync();assert.equal(failed.status,1);assert.equal((await f.reads()).length,5);assert.equal(await f.count('commerce_provider_financial_collections'),3);
+  f.control.afterResponse=null;f.control.fail='';
+  f.control.drop=f.path+'/payout/reconcile';const resumed=await f.sync();assert.equal(resumed.status,0,resumed.error);
+  assert.equal(JSON.parse(resumed.output).providerCalls,4);assert.equal((await f.reads()).length,9);assert.equal(await f.count('commerce_payout_assessments'),1);
+  const requests=f.control.calls.filter(c=>c.path===f.path+'/payout/reconcile');assert.equal(requests.length,2);assert.deepEqual(requests[0].body,requests[1].body);
+});
+
+test('a payout committed before a prolonged outage recovers entirely while provider synchronization is held',async t=>{
+  const f=await fixture(t),target=f.path+'/payout/reconcile';let lost=false;
+  f.control.afterResponse=async path=>{if(path===target&&!lost){lost=true;f.control.fail=target;f.control.drop=target;}};
+  const failed=await f.sync();assert.equal(failed.status,1);assert.equal((await f.reads()).length,9);assert.equal(await f.count('commerce_payout_assessments'),1);
+  const input=await readFile(join(f.directory,'payout-input.json'),'utf8');
+  f.control.afterResponse=null;f.control.fail='';await f.controlProvider({tokenDenied:true});
+  const recovered=await f.sync({mode:'recover'},{EZKART_COMMERCE_WITHDRAWAL_SYNC:'held',EZKART_DOKU_SANDBOX_SNAP_PRIVATE_KEY:'unavailable'});
+  assert.equal(recovered.status,0,recovered.error);assert.equal(JSON.parse(recovered.output).providerCalls,0);
+  assert.equal((await f.reads()).length,9);assert.equal(await f.count('commerce_payout_assessments'),1);
+  assert.equal(await readFile(join(f.directory,'payout-input.json'),'utf8'),input);
+});
+
+test('one active process owns a synchronization run; a competing invocation cannot read DOKU',async t=>{
+  const f=await fixture(t);assert.equal((await f.sync()).status,0);
+  const code=`$f=fopen(${JSON.stringify(join(f.directory,'lock'))},'r+b'); flock($f,LOCK_EX); echo "locked\\n"; fflush(STDOUT); sleep(15);`;
+  const holder=spawn(process.env.PHP_BINARY||'php',['-n','-r',code]);
+  t.after(()=>holder.kill());await new Promise((resolve,reject)=>{holder.stdout.once('data',resolve);holder.once('error',reject);});
+  const busy=await f.sync();assert.equal(busy.status,1);assert.equal((await f.reads()).length,9);
+  holder.kill();await new Promise(resolve=>holder.once('close',resolve));
+  assert.equal((await f.sync({mode:'recover'})).status,0);assert.equal((await f.reads()).length,9);
+});
+
+test('new evidence makes an old run report review, and a fresh run applies fee corrections without restoring payout principal',async t=>{
+  const f=await fixture(t);assert.equal((await f.sync()).status,0);const paid=(await f.funds()).completedWithdrawals;
+  await f.payoutStatus();
+  const old=await f.sync({mode:'recover'});assert.equal(old.status,2,old.error);assert.equal(JSON.parse(old.output).providerCalls,0);assert.equal(JSON.parse(old.output).payoutConfirmed,false);
+  assert.equal((await f.funds()).completedWithdrawals,paid);assert.equal((await f.funds()).availableEarnings,'0');
+  await f.history({fee:4000});const fresh=await f.sync({run:randomBytes(16).toString('hex')});assert.equal(fresh.status,0,fresh.error+fresh.output);
+  assert.equal((await f.readPayout()).assessment.feeAmount,'4000');assert.equal((await f.funds()).completedWithdrawals,paid);
+  const fees=await f.db.prepare("SELECT SUM(amount) AS amount FROM commerce_financial_entries WHERE account='platform_withdrawal_fee'").first();assert.equal(fees.amount,4000);
+});
+
+test('shared original histories refresh a second payout and its supporting earnings in the same run',async t=>{
+  const f=await fixture(t),other=await f.grant();await other.payoutStatus();await f.history({payouts:[f,other]});
+  const result=await f.sync();assert.equal(result.status,0,result.error+result.output);
+  assert.equal((await other.readPayout()).outcome.payoutConfirmed,true);assert.equal((await f.funds()).completedWithdrawals,'500000');
+  assert.equal(await f.count('commerce_payout_assessments'),2);assert.deepEqual(JSON.parse(result.output).sharedHistoryReview,{settlements:0,payouts:0});
+});
+
+test('seller-paid fees and incomplete history cannot become reconciled payouts',async t=>{
+  const f=await fixture(t);await f.history({sellerFee:true});
+  const fee=await f.sync();assert.equal(fee.status,2,fee.error);assert.equal(JSON.parse(fee.output).outcome.reason,'seller_fee_unfunded');
+  assert.equal((await f.funds()).availableEarnings,'0');assert.equal((await f.readPayout()).outcome.paidAmount,'0');
+  const extra=Array.from({length:21},(_,i)=>({...f.row('PAYOUT',1),partnerReferenceNo:'unrelated-'+i,referenceNo:'other-'+i}));
+  await f.history({extra});const run=randomBytes(16).toString('hex'),partial=await f.sync({run,'max-pages':'1'});
+  assert.equal(partial.status,2,partial.error);assert.equal(JSON.parse(partial.output).reason,'history_incomplete');assert.equal(JSON.parse(partial.output).pagesExhausted,false);
+  const before=(await f.reads()).length;const recovery=await f.sync({run,'max-pages':'1',mode:'recover'});assert.equal(recovery.status,2);assert.equal((await f.reads()).length,before);
+  assert.equal((await f.sync({run,'max-pages':'2'})).status,1);assert.equal((await f.reads()).length,before);
+});
+
+test('synchronization rejects main, held dispatch, wrong scope, unsafe recovery files and changed credentials before provider reads',async t=>{
+  const f=await fixture(t,{beta:true});
+  for(const [changes,overrides] of [[{}, {EZKART_DEPLOYMENT_ENVIRONMENT:'production'}],[{}, {EZKART_COMMERCE_WITHDRAWAL_SYNC:'held'}],
+    [{environment:'sandbox'},{}],[{run:'../escape'},{}],[{mode:'send'},{}],[{'max-pages':'41'},{}],
+    [{}, {EZKART_DOKU_PRODUCTION_SECRET_KEY:'a-different-production-secret'}]])assert.equal((await f.sync(changes,overrides)).status,1);
+  assert.equal((await f.reads()).length,0);
+  assert.equal((await f.call(f.path+'/payout/sync-scope',{environment:f.environment,seller:'seller_bob'})).status,422);
+  assert.equal((await f.call(f.path+'/payout/sync-scope',{environment:'sandbox'})).status,403);
+  assert.equal((await f.sync()).status,0);
+  const file=join(f.directory,'read-0001.json');await chmod(file,0o644);assert.equal((await f.sync({mode:'recover'})).status,1);await chmod(file,0o600);
+  const raw=await readFile(file);await rm(file);const other=join(f.recovery,'foreign.json');await writeFile(other,raw,{mode:0o600});await symlink(other,file);
+  assert.equal((await f.sync({mode:'recover'})).status,1);assert.equal((await f.reads()).length,9);
+});

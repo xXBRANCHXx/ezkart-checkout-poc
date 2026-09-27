@@ -84,6 +84,10 @@ unavailable through direct HTTP access.
 
 ## Remaining work
 
+The [private synchronization command](withdrawal-synchronization.md) now assembles
+status, both original account histories and related settlement/earnings work in
+one recoverable run. Continuous scheduling and cross-seller catch-up remain open.
+
 Actual Ezkart-funded fee provisioning, integrated payment transport, authenticated
 callback integration, ongoing provider synchronization, unsupported reversal
 recovery and real owner/provider acceptance remain required. Refund accounting is

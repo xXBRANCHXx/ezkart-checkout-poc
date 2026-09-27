@@ -71,6 +71,23 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 28 September: integrated payout observation and recovery
+
+[Withdrawal synchronization](withdrawal-synchronization.md) now connects an
+original payout to its status read, both original wallets' histories, payout
+accounting and related settlement/earnings reconciliation. Each response is saved
+privately before D1 delivery; interrupted runs resume their missing reads and
+recovery works without DOKU credentials. The process lock prevents concurrent
+use of one run. New or incomplete evidence, seller-funded fees, oversized plans
+and remaining shared-wallet work require review rather than silently restoring
+availability. All 73 affected PHP/Worker cases pass, including full beta-mode
+adapter integration, extended outages and two related payouts.
+
+The code introduces no migration or payment caller. Recurring/cross-seller
+synchronization, extended-history aggregation, callback authentication, actual
+fee provisioning, payment execution, refunds and live acceptance remain open.
+No top-level gate is closed. Hosted rollout evidence is recorded in beta readiness.
+
 ### 28 September: matched payout accounting and recovery
 
 [Payout reconciliation](withdrawal-reconciliation.md) connects the original

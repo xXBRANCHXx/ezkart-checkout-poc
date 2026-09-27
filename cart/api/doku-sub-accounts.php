@@ -2,8 +2,14 @@
 declare(strict_types=1);
 require_once __DIR__ . '/doku-snap.php';
 
+interface EzDokuFinancialReader
+{
+    public function balances(string $profileId): array;
+    public function historyPage(string $accountNo, string $from, string $to, int $page = 0, int $size = 100): array;
+}
+
 /** Typed read-only Sub-Account operations. */
-class EzDokuSubAccountReader extends EzDokuSnapClient
+class EzDokuSubAccountReader extends EzDokuSnapClient implements EzDokuFinancialReader
 {
     private static function text(mixed $value, int $maximum, bool $empty = false): string
     {
