@@ -16,6 +16,12 @@ clean integrity/foreign-key checks; 0044 changes only the review-change guard an
 all 337 captured compatibility plans compile. Syntax, diff and TEST dry-run checks
 pass. Hosted rollout evidence is recorded in the completion plan.
 
+Implementation `74cae58` and TEST migration 0044 are deployed with Worker
+`7f677be7-c9dd-427f-8254-3ba8de65ec19`. Thirty-three hosted checks pass at
+02:36 UTC on 27 September; final remote verification preserves existing data and
+settings and compiles all 337 plans. Central checkout remains held. These are
+access/deployment checks; signed-in hosted purchase/review acceptance remains.
+
 ## Purchase and identity
 
 One review belongs to one original order item. New reviews require a central

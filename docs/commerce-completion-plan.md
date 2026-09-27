@@ -87,6 +87,14 @@ and compiles all 337 captured compatibility plans. It adds no schema objects.
 Signed-in hosted acceptance, allocated refunds, subscriptions and financial
 release remain open, as do all thirteen top-level gates and all existing holds.
 
+Implementation `74cae58` is pushed on workbench. TEST migration 0044 and Worker
+`7f677be7-c9dd-427f-8254-3ba8de65ec19` are installed. Fifteen Worker checks pass
+at 02:36:27 UTC and eighteen hosted checks at 02:36:28 UTC on 27 September,
+covering private review/download access, existing physical checkout, source hashes
+and central holds. Final remote verification preserves all counts, settings and
+legacy evidence, matches the restored trigger and compiles all 337 plans. No
+migration is pending; no hosted purchase, review or download record was created.
+
 ### 27 September: digital storefront, checkout and order status
 
 Connected public shop choices and PHP checkout to actual published file versions.
