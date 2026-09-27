@@ -82,6 +82,14 @@ restores all 144 physical tables unchanged and passes integrity/foreign-key chec
 refund accounting remain open, including the pending owner fee-policy decisions.
 See [refund-requests.md](refund-requests.md). No top-level gate is closed.
 
+Implementation `d81262d` is pushed to workbench and TEST Worker
+`8eff8633-cacf-467d-8779-8f2e9ad3df08` is deployed without a migration.
+Twenty-five Worker checks pass at 03:54:12 UTC and twenty-nine hosted checks at
+03:56:18 UTC on 27 September. Source hashes match and authentication, commerce
+and email holds remain intact. Final remote checks preserve existing counts,
+settings and legacy evidence, compile all 407 plans and find no foreign-key
+errors or pending migration. Signed-in hosted acceptance remains pending.
+
 ### 27 September: refund request notifications
 
 Refund requests and decisions now create durable notification sources in the same

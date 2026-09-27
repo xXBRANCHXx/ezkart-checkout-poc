@@ -182,6 +182,18 @@ Its 144 physical tables restore unchanged with clean integrity/foreign-key check
 all 407 captured compatibility plans compile. Syntax, diff and Worker dry-run
 checks pass. All thirteen wider gates stay open.
 
+Evidence implementation `d81262d` is pushed to workbench and TEST Worker
+`8eff8633-cacf-467d-8779-8f2e9ad3df08` is deployed without a migration.
+Twenty-five Worker checks pass at 03:54:12 UTC and twenty-nine hosted checks at
+03:56:18 UTC on 27 September. All thirteen checked assets match their source;
+private route guards, buyer sign-in continuation and physical checkout at both
+widths pass. Central commerce and notification/email sending remain held. Final
+remote verification preserves existing counts, settings and legacy evidence,
+compiles all 407 plans, and finds no foreign-key errors or pending migration.
+No hosted refund, order, delivery or provider operation was created. Signed-in
+hosted acceptance still awaits the shared Chrome connection. Private rollout
+artifacts are under `/tmp/ezkart-refund-evidence-deploy-01a0d643/`.
+
 ## Provider execution constraints checked on 27 September
 
 The current central payment adapter accepts verified BCA virtual-account captures.
