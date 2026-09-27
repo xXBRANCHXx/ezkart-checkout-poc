@@ -103,6 +103,18 @@ billing, customer consent, cancellation and renewal entitlements are still
 unfinished. [The DOKU subscription record](doku-subscriptions.md) distinguishes
 the provider activation decision from the remaining application implementation.
 
+### 28 September: timed finish — domains and analytics
+
+[Hosted analytics acceptance](central-analytics.md#hosted-beta-acceptance--28-september-2026)
+passes all five reports on desktop/mobile and an actual complete CSV download
+from the signed-in beta store. The existing populated fixture verifies filters,
+pagination and keyboard chart inspection. Current reports are available on both
+plans; the Advanced page now says so. The obsolete shipped sidebar default no
+longer promises custom-domain availability, while custom announcements and the
+orange/pink styling are preserved. Actual custom-domain connection, ownership,
+TLS, routing and Advanced-specific measurements/entitlements remain unfinished;
+empty hosted reports do not establish maximum-volume acceptance.
+
 ### 28 September: original DOKU refund request preparation
 
 The [provider handoff](refund-provider-handoffs.md) adds buyer-owned private bank

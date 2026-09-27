@@ -1,11 +1,11 @@
 # Merchant analytics
 
 The D1-backed version retains these five reports and adds verified-capture
-calculations, bounded database pages and immutable CSV snapshots. It is prepared
-behind the central flag and the authenticated TEST `analytics-preview=1` route.
+calculations, bounded database pages and immutable CSV snapshots. It is active in the isolated beta and also available
+behind the authenticated TEST `analytics-preview=1` route.
 See [central-analytics.md](central-analytics.md) for its contract, validation and
 remaining hosted/scale gates. The legacy definitions below remain applicable to
-the default file-backed view until the coordinated commerce cutover.
+file-backed deployments; the beta uses the central definitions.
 
 The Analytics overview links to dedicated Revenue, Orders, Payments, and Products
 reports through `?page=analytics&report=…`. The report navigation preserves the

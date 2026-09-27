@@ -4,8 +4,8 @@
   const element = document.querySelector('.upgrade-card');
   if (!element) return;
   let timer, generation = 0, lastDate = '', fallback = {
-    icon: 'globe', title: 'Launch on your own domain',
-    description: 'Hosted pages, checkout, payments & shipping.',
+    icon: 'globe', title: 'Build your storefront',
+    description: 'Create and manage your product landing pages.',
     label: 'Manage Landing Pages', href: '?page=sites',
   };
   const localDate = () => {

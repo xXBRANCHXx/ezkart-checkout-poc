@@ -5,8 +5,8 @@ require_once __DIR__ . '/executive-bridge.php';
 // Dates are merchant-local calendar dates, with an exclusive end at midnight.
 function ez_tips_default(): array
 {
-    return ['icon' => 'globe', 'title' => 'Launch on your own domain',
-        'description' => 'Hosted pages, checkout, payments & shipping.',
+    return ['icon' => 'globe', 'title' => 'Build your storefront',
+        'description' => 'Create and manage your product landing pages.',
         'label' => 'Manage Landing Pages', 'href' => '?page=sites'];
 }
 function ez_tips_icons(): array { return ['globe', 'sparkles', 'rocket', 'box', 'store', 'chart', 'link', 'help', 'star', 'truck']; }
@@ -49,6 +49,10 @@ function ez_tips_read(): array
     $state = json_decode((string) file_get_contents($path), true, 32, JSON_THROW_ON_ERROR);
     if (!is_array($state) || !is_int($state['revision'] ?? null) || !in_array($state['cadence_days'] ?? null, [1, 3, 7], true) || !is_array($state['fallback'] ?? null) || !is_array($state['tips'] ?? null) || count($state['tips']) > 500) throw new RuntimeException('Invalid tip schedule.');
     $state['fallback'] = ez_tips_card($state['fallback']);
+    // Replace only the obsolete shipped default; preserve custom announcements.
+    if ($state['fallback'] == ['icon' => 'globe', 'title' => 'Launch on your own domain',
+        'description' => 'Hosted pages, checkout, payments & shipping.',
+        'label' => 'Manage Landing Pages', 'href' => '?page=sites']) $state['fallback'] = ez_tips_default();
     $previousEnd = ''; $ids = [];
     foreach ($state['tips'] as &$tip) {
         if (!is_array($tip) || !preg_match('/^[a-f0-9]{24}$/D', (string) ($tip['id'] ?? '')) || isset($ids[$tip['id']])) throw new RuntimeException('Invalid scheduled tip.');

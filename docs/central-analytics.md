@@ -99,11 +99,31 @@ behavior, storage/cleanup capacity and supported-device memory remain release
 acceptance work. Refund accounting, buyer consent/review workflows, hosted
 payment workspace acceptance,
 operational migration and monitored provider execution remain separate tasks.
-The central storage flags stay disabled, and no top-level workbench gate closes.
+These limits describe the original TEST rollout. The separate live beta now
+uses central D1 reads; the hosted check below supersedes the earlier browser
+connection blocker. No maximum-volume or full-workbench gate is claimed.
 
-Hosted signed-in analytics acceptance is pending shared Chrome access. After the
-owner indicated readiness, one further broker reconnect timed out; it was not
-retried in a loop. Local browser acceptance does not replace the hosted check.
+## Hosted beta acceptance — 28 September 2026
+
+The signed-in Branch Vincent store loads all five reports at 1360px and 390px
+without report alerts or document overflow. The store has zero live orders, so
+this accepts the genuine empty state, not populated live payment calculations.
+Applying the seven-day period returns the matching seven chart buckets. The
+actual browser download contains all seven overview metric rows, correct Jakarta
+dates and IDR metadata; undefined payment rate and average stay blank. The
+export creation and retrieval both return HTTP 200. Shared Chrome saved the
+422-byte file even though its download event was not exposed to the broker;
+the saved CSV was read and verified directly. Private evidence is in
+`beta-01a0d643/timed-analytics-*.json` outside Git.
+
+The existing populated fixture browser check passes for filters, navigation,
+pagination, chart keyboard inspection, date changes and desktop/mobile layout.
+This fixture evidence is distinct from the empty hosted store. Representative
+maximum-volume acceptance remains open. Current sales reports are available to
+both Basic and Advanced; Advanced-specific measurements and entitlements are
+not implemented. Custom-domain connection, ownership validation, TLS and routing
+are also not implemented. The Advanced page preserves that coming-soon state,
+and the sidebar no longer claims custom domains can already be launched.
 
 ## TEST deployment — 25 September 2026
 

@@ -4,10 +4,10 @@ ez_page_header('Advanced Mode', 'More room for your store to grow.', [['label' =
 ?>
 <div class="advanced-layout" data-advanced-page>
   <section class="surface advanced-benefits" aria-labelledby="advanced-benefits-title">
-    <header><h2 id="advanced-benefits-title">What you get</h2><p>Higher limits now, with more ways to understand and build your business.</p></header>
+    <header><h2 id="advanced-benefits-title">What you get</h2><p>Higher limits for your catalog and landing pages.</p></header>
     <div class="advanced-feature"><?= ez_admin_icon('layout') ?><div><h3>Up to 24 landing pages</h3><p>Create more pages for your products, campaigns, and audiences.</p><span>Basic includes 6 pages</span></div><strong>24</strong></div>
     <div class="advanced-feature"><?= ez_admin_icon('box') ?><div><h3>Up to 50 products</h3><p>Expand your catalog while keeping everything in one place.</p><span>Basic includes 10 products</span></div><strong>50</strong></div>
-    <div class="advanced-feature"><?= ez_admin_icon('chart') ?><div><h3>Richer analytics <span class="advanced-availability">Coming soon</span></h3><p>More detailed insights into your store’s performance.</p></div></div>
+    <div class="advanced-feature"><?= ez_admin_icon('chart') ?><div><h3>Sales reports <span class="advanced-availability">Available on both plans</span></h3><p>Explore revenue, orders, payments and products, with chart details and CSV downloads. <a href="?page=analytics">Open analytics</a>.</p></div></div>
     <div class="advanced-feature"><?= ez_admin_icon('globe') ?><div><h3>Your own domain <span class="advanced-availability">Coming soon</span></h3><p>Connect your domain to your landing pages for a branded web address.</p></div></div>
   </section>
   <section class="surface advanced-plan" aria-labelledby="advanced-price-title">
