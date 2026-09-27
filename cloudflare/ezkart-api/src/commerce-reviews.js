@@ -26,12 +26,17 @@ export function readReviewCursor(value,scope){
   if(data?.v!==1||data.scope!==scope)reviewFail('Review page belongs to another view');
   return data;
 }
-export const eligibleReviewSql=`i.product_id IS NOT NULL AND i.product_type='physical' AND o.checkout_state IN ('paid','partially_refunded','refunded')
+export const eligibleReviewSql=`i.product_id IS NOT NULL AND o.checkout_state IN ('paid','partially_refunded','refunded')
   AND EXISTS(SELECT 1 FROM commerce_payment_captures c WHERE c.order_id=o.id AND c.capture_kind='order_payment' AND c.amount=o.total_amount)
-  AND (EXISTS(SELECT 1 FROM inventory_reservations h WHERE h.order_item_id=i.id AND h.state='committed')
-    OR EXISTS(SELECT 1 FROM commerce_stock_allocations x WHERE x.order_item_id=i.id))
-  AND EXISTS(SELECT 1 FROM commerce_shipments s WHERE s.order_id=o.id AND s.commerce_environment=o.commerce_environment
-    AND s.provider_id IS NOT NULL AND s.provider_account_hash IS NOT NULL AND s.delivered_at IS NOT NULL)`;
+  AND ((i.product_type='physical'
+    AND (EXISTS(SELECT 1 FROM inventory_reservations h WHERE h.order_item_id=i.id AND h.state='committed')
+      OR EXISTS(SELECT 1 FROM commerce_stock_allocations x WHERE x.order_item_id=i.id))
+    AND EXISTS(SELECT 1 FROM commerce_shipments s WHERE s.order_id=o.id AND s.commerce_environment=o.commerce_environment
+      AND s.provider_id IS NOT NULL AND s.provider_account_hash IS NOT NULL AND s.delivered_at IS NOT NULL))
+  OR (i.product_type='digital' AND EXISTS(SELECT 1 FROM commerce_digital_deliveries d
+    JOIN commerce_digital_entitlements e ON e.order_item_id=d.order_item_id
+    JOIN commerce_payment_captures c ON c.id=e.capture_id AND c.order_id=o.id AND c.capture_kind='order_payment' AND c.amount=o.total_amount
+    WHERE d.order_item_id=i.id AND d.evidence_version=1)))`;
 export const reviewSelect=`SELECT r.*,p.title AS product_title,i.order_id,i.title AS purchased_title,
   json_extract(i.fulfillment_snapshot_json,'$.variantName') AS option_name
   FROM product_reviews r JOIN products p ON p.id=r.product_id AND p.seller_id=r.seller_id
@@ -77,7 +82,7 @@ export async function buyerReviews(env,user,orderId,url){
     return {orderItemId:line.id,productId:line.product_id,title:line.title,option:JSON.parse(line.fulfillment_snapshot_json).variantName||'',
       canPublish,canWithdraw:enabled&&owned&&row?.buyer_state==='published',review:reviewView(row),
       reason:canPublish?'':!enabled?'Reviews will open when central checkout is enabled.':!owned?'This is a historical review and cannot be edited from this account.':
-        line.product_type!=='physical'?'Reviews are currently unavailable for this item.':'Reviews open after verified payment and courier delivery.'};
+        line.product_type==='digital'?'Reviews open after payment and a complete, verified download.':line.product_type!=='physical'?'Reviews are currently unavailable for this item.':'Reviews open after verified payment and courier delivery.'};
   })};
 }
 export function reviewWritable(env){if(!commerceStorageEnabled(env))reviewFail('Review changes are not enabled',503);}

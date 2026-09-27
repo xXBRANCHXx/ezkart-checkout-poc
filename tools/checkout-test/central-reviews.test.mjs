@@ -5,6 +5,7 @@ import {join} from 'node:path';
 import {randomBytes} from 'node:crypto';
 import {setupCentralFixture} from './central-fixture.mjs';
 import {fixtureShipping} from '../../cloudflare/ezkart-api/test/commerce-fixture.mjs';
+import {digitalFixtureFile} from '../../cloudflare/ezkart-api/test/digital-commerce-fixture.mjs';
 
 const buyer='fixture-google-customer',key=()=>randomBytes(16).toString('hex'),endpoint='/cart/admin/customer-reviews.php',screens='/tmp/ezkart-reviews-ui-01a0d643';
 async function fixture(t){
@@ -29,6 +30,28 @@ async function fill(p,text='The stitching could be stronger.'){
   await root(p).locator('[name=rating][value="2"]').check();await root(p).getByLabel('Public name',{exact:true}).fill('Tea fan');await root(p).getByLabel('Title (optional)',{exact:true}).fill('After trying it');await root(p).getByLabel('Your experience (optional)',{exact:true}).fill(text);
 }
 const headers=async(p,f)=>({Cookie:f.cookie.name+'='+f.cookie.value,'X-Ezkart-Customer-Session':await root(p).getAttribute('data-version'),'X-Ezkart-CSRF':await root(p).getAttribute('data-csrf')});
+
+test('digital buyers unlock reviews only by completing their verified download, then recover lost publication replies on desktop and mobile',async t=>{
+  const f=await setupCentralFixture(t),file=await digitalFixtureFile(f),b=await browser(t),directory='/tmp/ezkart-digital-reviews-ui-01a0d643';await mkdir(directory,{recursive:true});
+  for(const width of [1360,390]){
+    const created=await f.create(f.input({items:[file.item],shipping:{kind:'none',amount:0,skipped:false},customer:{name:'Private digital buyer',email:'checkout@example.com',phone:'081234567890',authUserId:buyer}}));assert.equal(created.status,200,created.error);
+    f.order=created.order;assert.equal((await f.paid(f.order)).status,200);f.cookie=f.app.customerCookie('checkout@example.com',buyer,3600,await f.merchantToken(buyer,'checkout@example.com'));
+    const p=await pageFor(b,f,width),errors=[];p.on('pageerror',e=>errors.push(e.message));await open(p,f);
+    assert.equal(await root(p).getByRole('button',{name:'Write a review',exact:true}).count(),0);await root(p).getByText('Reviews open after payment and a complete, verified download.',{exact:true}).waitFor();
+    await p.getByRole('link',{name:'Open downloads',exact:true}).click();await p.getByRole('button',{name:'Download file',exact:true}).click();await p.getByText('Download verified. Save your file below.',{exact:true}).waitFor();
+    await p.getByRole('link',{name:'Back to your order',exact:true}).click();await root(p).getByRole('button',{name:'Write a review',exact:true}).waitFor();await edit(p);await fill(p,'The original file is useful; the instructions could be clearer.');
+    const path='/v1/customer/orders/'+f.order.id+'/reviews';f.control.drop=path;
+    const interrupted=p.waitForResponse(r=>r.url().includes('/cart/admin/customer-reviews.php?')&&r.request().method()==='POST');
+    await root(p).getByRole('button',{name:'Publish review',exact:true}).click();assert.equal((await interrupted).status(),503);await root(p).getByRole('button',{name:'Retry confirmation',exact:true}).waitFor();
+    const sent=f.control.calls.filter(c=>c.path===path&&c.body);assert(sent.length,JSON.stringify({paths:f.control.calls.slice(-8).map(c=>({path:c.path,hasBody:Boolean(c.body)})),notice:await root(p).innerText()}));
+    const original=sent.at(-1).body;
+    await root(p).getByRole('button',{name:'Retry confirmation',exact:true}).click();await root(p).getByText('Your review was saved.',{exact:true}).waitFor();
+    assert.deepEqual(f.control.calls.filter(c=>c.path===path&&c.body).at(-1).body,original);assert.equal(await f.count('commerce_review_changes'),width===1360?1:2);
+    await root(p).screenshot({path:directory+'/review-'+width+'.png'});assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);assert.deepEqual(errors,[]);await p.context().close();
+  }
+  const publicReviews=await(await f.mf.dispatchFetch('https://api.fixture.test/v1/public/reviews?product=guide')).json();assert.equal(publicReviews.summary.count,2);assert.equal(publicReviews.summary.average,2);assert(publicReviews.items.every(r=>r.verifiedPurchase));
+  assert(!JSON.stringify(publicReviews).match(/checkout@example|Private digital buyer|dfile_|dgrant_/));assert.equal((await f.providerCalls()).length,0);
+});
 
 test('buyers publish photos, edit and withdraw real reviews through PHP on desktop and mobile',async t=>{
   const f=await fixture(t),b=await browser(t);await mkdir(screens,{recursive:true});

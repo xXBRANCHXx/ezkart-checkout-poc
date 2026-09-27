@@ -7,15 +7,35 @@ customer-operations completion gate remains open. The existing central-commerce
 flag controls review writes and buyer controls; these deliveries do not enable
 checkout or providers.
 
+Digital review verification on 27 September passes all twenty relevant cases:
+eleven existing API cases, four new digital API cases and five PHP/browser cases.
+The 1360px/390px buyer journeys verify actual file bytes before publication and
+recover an interrupted result without duplication. Layouts were visually checked.
+The fresh private TEST backup restores all 141 physical tables unchanged with
+clean integrity/foreign-key checks; 0044 changes only the review-change guard and
+all 337 captured compatibility plans compile. Syntax, diff and TEST dry-run checks
+pass. Hosted rollout evidence is recorded in the completion plan.
+
 ## Purchase and identity
 
-One review belongs to one original order item. New reviews require a physical
-product, a central order, its full primary verified payment capture, committed
-inventory or a recorded recovery allocation, and an account-bound courier
-shipment with delivery evidence. Skipped sandbox shipping and a courier return
-without delivery do not qualify. Refunds or returns after delivery do not erase
-the buyer's experience. Digital and subscription eligibility awaits their real
-delivery workflows.
+One review belongs to one original order item. New reviews require a central
+order and its full primary verified payment capture. Physical purchases also
+require committed inventory or a recorded recovery allocation and an
+account-bound courier shipment with delivery evidence. Skipped sandbox shipping
+and a courier return without delivery do not qualify.
+
+Digital purchases require the original payment entitlement and complete verified
+delivery of that exact purchased file. Availability, a native whole-file response
+or verification of only some parts does not qualify. Each item in a mixed order
+has its own eligibility; another file or physical shipment cannot substitute.
+Review photos use the same eligibility and remain separate from private purchased
+files. Refunds, returns, archival or file replacements after delivery do not erase
+the buyer's experience. Subscription eligibility remains unimplemented.
+
+Migration 0044 updates only the review-change guard's purchase condition. All
+existing ownership, authorship, revision, moderation and photo guards remain.
+The transaction rechecks eligibility, including a change after API preflight.
+Review publication and download evidence never release earnings.
 
 Migration 0022 adds permanent `commerce_shipments.delivered_at`. Accepted delivery
 events preserve that time across later returns. Dated history from a verified read

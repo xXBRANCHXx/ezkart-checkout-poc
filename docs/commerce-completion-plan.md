@@ -64,6 +64,29 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 27 September: verified digital purchase reviews
+
+The original verified complete download now unlocks reviews and review photos
+for that purchased item. Partial/native downloads and another line's delivery
+cannot qualify. Physical delivery rules remain intact. Buyers can publish low
+ratings, recover uncertain publication, edit and withdraw. A later refund,
+archival or replacement cannot erase the buyer's experience. Transaction guards
+recheck eligibility after API preflight; review activity changes no accounting.
+
+All twenty relevant review cases pass: eleven existing API cases, four new
+digital API cases and five PHP/browser cases. The desktop 1360px and narrow 390px
+journeys download and verify original bytes before publishing, recover a lost
+response exactly once, and preserve privacy. Layouts were visually inspected.
+Syntax/diff checks and the TEST Worker dry-run pass.
+
+The fresh TEST backup is 680,095 bytes, SHA-256
+`887e027415a84eaf9ac61910386c494fb827f113c7315ea444422f5cfa65cfc8`.
+Restoring and applying migration 0044 preserves every record in 141 physical
+tables, passes integrity/foreign-key checks, changes only the review-change guard
+and compiles all 337 captured compatibility plans. It adds no schema objects.
+Signed-in hosted acceptance, allocated refunds, subscriptions and financial
+release remain open, as do all thirteen top-level gates and all existing holds.
+
 ### 27 September: digital storefront, checkout and order status
 
 Connected public shop choices and PHP checkout to actual published file versions.

@@ -1,7 +1,8 @@
 # Digital checkout and verified download records
 
 Workbench implementation, 27 September 2026. This implements the central API
-contract, public/PHP checkout, order status and authenticated buyer downloads.
+contract, public/PHP checkout, order status, authenticated buyer downloads and
+verified purchase reviews.
 Real-device storage/resume behavior and signed-in hosted acceptance remain.
 Central-commerce and provider holds remain in place. Subscription billing,
 allocated refunds and wallet release are separate unfinished work.
@@ -132,6 +133,14 @@ including the response-only Hostinger header bridge.
 
 ## API and schema
 
+Verified complete delivery also unlocks the existing buyer review workflow for
+that original item, including review photos, edits, withdrawal and exact request
+recovery. Native downloads, partial proofs and another item's delivery do not
+qualify. Refunds and catalog replacement after delivery preserve eligibility and
+history. Migration 0044 changes only the review transaction's purchase guard;
+ownership, content, photo and moderation guards remain. See
+[purchase-reviews.md](purchase-reviews.md). This does not post wallet entries.
+
 All routes below require a verified buyer session and current central-commerce
 availability. Paths and query parameters are strict; JSON writes are bounded and
 reject ambiguous duplicate object keys.
@@ -222,6 +231,6 @@ compiling. No hosted purchase, grant, download receipt or courier request was
 created. Central commerce and providers remain held.
 
 Outstanding: maximum-size and real-mobile transfers, signed-in hosted acceptance,
-digital purchase reviews, allocated digital refunds,
+allocated digital refunds,
 subscription lifecycles, storage operations and financial release/settlement.
 All thirteen top-level completion gates remain open.
