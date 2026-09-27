@@ -88,6 +88,13 @@ fresh beta restore, adding three empty tables. No live provider request is sent.
 Provider outcomes, refund accounting/funding/fees, entitlements, notifications
 and live purchase acceptance remain open. No full completion gate closes.
 
+Implementation `d3dc861`, migration 0065 and beta Worker
+`039f2436-f199-4b0e-966b-bb65a29a3a09` are deployed. At 21:55 UTC, 22 public
+hosted checks, four matching sources and three signed-in operator checks pass.
+The new queue is empty. The post-export restores 179 tables, preserving original
+business records; only migration history and the held runner metadata change.
+New handoff tables remain empty, the uncertain wallet is preserved and main is untouched.
+
 ### 28 September: protected refund appeals and operator decisions
 
 The [review workflow](refund-reviews.md) now lets buyers and stores appeal an

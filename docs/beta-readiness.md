@@ -14,19 +14,45 @@ deployment now uses the isolated live beta configuration described below, with
 new checkout, provider execution and automatic email sending held.
 Existing sandbox evidence is preserved. Main and `ezkart.id` remain held.
 
-## Current hosted state — 27 September, 21:27 UTC
+## Current hosted state — 27 September, 21:55 UTC
 
 Hostinger's private runtime now selects `beta`, production providers and the beta
 Worker. Its live DOKU client, secret, signing key and verified parent profile are
 installed outside the public root with mode 0600. Reloaded file hashes match the
 private prepared configuration; all earlier provider credentials are preserved.
 Health confirms beta, live DOKU credentials and connected D1/public R2/private R2
-with 175 application tables. At 07:45 UTC, central merchant operations were
+with 178 application tables. At 07:45 UTC, central merchant operations were
 enabled with `commerce_storage=d1`; new checkout remains separately paused in both PHP and
 the Worker. The public checkout configuration returns 503 with `Retry-After: 300`.
 An hourly housekeeping schedule and five-minute held reconciliation runner are
 installed; new checkout, provider execution and email sending remain held.
 See the storage note below.
+
+The [DOKU refund handoff](refund-provider-handoffs.md) is deployed from
+`d3dc861`, migration 0065, to beta Worker
+`039f2436-f199-4b0e-966b-bb65a29a3a09`. Buyers can retain private bank details;
+freshly verified reviewers can prepare one original settled-payment request,
+download its private packet and record actual submission. The processing queue
+includes approved refunds without requiring an appeal. Preparation and submission
+never confirm returned funds, release earnings, change stock or revoke downloads.
+
+All 32 affected API and 11 PHP/browser cases pass. The initial outdated copy
+assertion and new browser fixture account mismatch are corrected and rerun.
+Desktop/390px workflows and private packet session protection pass. At 21:55,
+22 public hosted checks, four exact source hashes and three signed-in operator
+checks pass. The actual approved-refund queue is empty, its filter is visible,
+and the fresh-verification gate remains present. No challenge was submitted.
+
+The post-migration export restores 179 tables. All original business records
+remain unchanged; only migration history and ordinary held-runner metadata differ
+among the 176 original tables. The three new tables remain empty. Owner review
+permission still matches its original receipt; the original uncertain wallet,
+private configuration, checkout/provider/email holds and main remain unchanged.
+No provider refund or outgoing support message was sent. Actual outcomes,
+refund funding/accounting/fees, entitlement effects, processing notifications
+and live purchase acceptance remain required. This closes no full completion gate.
+
+The preceding refund review rollout remains installed:
 
 [Refund reviews](refund-reviews.md) are deployed from `ac02e27`, migration 0064,
 to beta Worker `89939b58-6774-4efe-8cf0-49028c60577c`. Buyers and stores can request
