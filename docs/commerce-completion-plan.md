@@ -87,6 +87,15 @@ tables, pass integrity/foreign-key checks and compile 399 captured plans. Actual
 refund execution, verified money movement, ledger reversals, digital-access effects,
 disputes and reconciliation remain. All thirteen top-level gates remain open.
 
+Implementation `c416d94`, migration 0046 and TEST Worker
+`69fce451-7dbe-4113-94c4-ec9876c015cf` are deployed. Twenty-five Worker checks pass
+at 03:34:25 UTC and twenty-nine hosted checks at 03:36:13 UTC on 27 September.
+Assets match; buyer sign-in preserves the request reference; authentication,
+commerce and email holds remain. Remote checks preserve existing counts, settings
+and legacy evidence, match the restored schema, and compile all 399 plans. No
+migration is pending and refund/notification tables remain empty. Signed-in hosted
+acceptance still awaits the shared Chrome connection; no reconnect was attempted.
+
 ### 27 September: purchase-linked refund requests and decisions
 
 Implemented buyer and merchant refund requests with original item/shipping amount

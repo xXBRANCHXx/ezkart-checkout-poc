@@ -46,6 +46,13 @@ email evidence stay intact. An event can identify exactly one return or refund.
 Existing refunds receive distinct source jobs retaining their original times;
 old recipients are not re-created. See [refund-requests.md](refund-requests.md).
 
+Refund notification implementation `c416d94` and migration 0046 are deployed only
+on workbench/TEST, with Worker `69fce451-7dbe-4113-94c4-ec9876c015cf`. The 67 relevant
+local cases, 25 hosted Worker checks and 29 hosted web checks pass. The new event
+reference does not add a table or schedule. Restored/remote records and settings
+match and all 399 compatibility plans compile. Central commerce and actual email
+delivery remain held; no hosted notifications or provider calls were created.
+
 Scheduled sources:
 
 - An unpaid order older than 30 minutes produces at most one reminder. The

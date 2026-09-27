@@ -138,3 +138,15 @@ central checkout stays disabled. Final remote verification matches restoration,
 compiles all 351 plans and preserves existing counts, settings and legacy evidence.
 The three new tables remain empty. No hosted refund, decision or provider request
 was created. Shared Chrome remains disconnected, with signed-in acceptance pending.
+
+Notification implementation `c416d94` is pushed on workbench. Migration 0046 and
+TEST Worker `69fce451-7dbe-4113-94c4-ec9876c015cf` are installed; health remains
+143 application tables. Twenty-five Worker checks pass at 03:34:25 UTC and
+twenty-nine hosted checks at 03:36:13 UTC on 27 September. Changed frontend assets
+match the commit and the hosted buyer sign-in retains the exact order/refund link.
+Notification/email source endpoints preserve authentication and commerce holds.
+Existing physical checkout works at both widths. Remote verification compiles
+all 399 plans, matches the restored schema and preserves existing counts, settings
+and legacy evidence. No migrations are pending. Refund and notification tables
+remain empty; no hosted alert, email, refund or provider operation was created.
+Private rollout artifacts are under `/tmp/ezkart-refund-notifications-deploy-01a0d643/`.
