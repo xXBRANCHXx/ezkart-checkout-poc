@@ -21,6 +21,13 @@ try {
     echo json_encode(['ok' => true, ...$report], JSON_THROW_ON_ERROR) . "\n";
     exit($report['pagesExhausted'] ? 0 : 2);
 } catch (Throwable $error) {
+    if ($error instanceof EzProviderCollectionPending) {
+        // Safe source IDs only: no credentials, account numbers or provider body.
+        // Preserve stderr privately and finalize this exact manifest without a
+        // second collection or provider request.
+        fwrite(STDERR, json_encode(['ok' => false, 'error' => $error->getMessage(), 'pendingCollection' => $error->pendingCollection], JSON_THROW_ON_ERROR) . "\n");
+        exit(1);
+    }
     $reason = $error instanceof InvalidArgumentException ? $error->getMessage() : ($error instanceof EzDokuReadException ? $error->reason : 'Provider evidence collection did not finish. Saved observations remain available.');
     fwrite(STDERR, json_encode(['ok' => false, 'error' => $reason], JSON_THROW_ON_ERROR) . "\n");
     exit(1);

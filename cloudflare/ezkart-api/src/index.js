@@ -31,6 +31,7 @@ import {reconcileCaptureJournals,financialJournalSummary,financialJournalList} f
 import {reconcileFinancialDeliveries,financialDeliveryStatus} from './commerce-financial-delivery.js';
 import {walletEnrollment,walletRegistration,bindWalletRegistration,saveWalletRegistrationReceipt,recordWalletRegistration} from './commerce-wallet-enrollment.js';
 import {providerFinancialAccount,recordProviderFinancialEvidence,providerFinancialEvidenceList} from './commerce-provider-evidence.js';
+import {recordProviderFinancialCollection,providerFinancialCollections} from './commerce-provider-collections.js';
 import {merchantCustomers,merchantCustomer,customerOrderHistory} from './commerce-customers.js';
 import {customerSegments,customerSegment,saveCustomerWorkspace,customerProfileHistory} from './commerce-customer-workspace.js';
 import {createCustomerExport,readCustomerExport,cleanupCustomerExports} from './commerce-customer-exports.js';
@@ -1552,6 +1553,13 @@ export default {
         if(url.pathname==='/internal/commerce/finance/delivery'&&request.method==='GET'&&!Object.keys(payload).length)return json({ok:true,...await financialDeliveryStatus(env,url)});
         if(url.pathname==='/internal/commerce/finance/delivery/reconcile'&&request.method==='POST'&&!url.search)return json({ok:true,...await reconcileFinancialDeliveries(env,payload)});
         return json({ok:false,error:'Delivery evidence route or method is unavailable'},404);
+      }
+      const providerCollectionPath=/^\/internal\/commerce\/finance\/provider-collections(?:\/(fcol_[a-f0-9]{40}))?$/.exec(url.pathname);
+      if(providerCollectionPath){
+        const payload=await authenticateCommerceService(request,env,{strictJSON:true,maxBytes:8000});
+        if(request.method==='GET'&&!Object.keys(payload).length)return json({ok:true,...await providerFinancialCollections(env,url,providerCollectionPath[1]||null)});
+        if(request.method==='POST'&&!url.search&&!providerCollectionPath[1])return json({ok:true,...await recordProviderFinancialCollection(env,payload)});
+        return json({ok:false,error:'Provider collection route or method is unavailable'},404);
       }
       if(url.pathname.startsWith('/internal/commerce/finance/')){
         const payload=await authenticateCommerceService(request,env);

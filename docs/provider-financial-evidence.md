@@ -33,6 +33,21 @@ the earlier evidence. Missing merchant references remain missing. A shared DOKU
 reference is not assumed to identify one unique row or one Ezkart order. Observation
 rows must never be summed as if they were a deduplicated money ledger.
 
+Migration 0052 adds immutable collection receipts and their original observation
+links. A receipt binds one confirmed wallet and credential identity to a balance
+before collection, sequential pages for both IDR accounts, and a balance after
+collection. Source IDs are the only caller input. The Worker and database reject
+missing/reordered pages, different windows or page sizes, cross-page overlap,
+backwards transaction dates, mixed wallets and histories whose end was still in
+the future when collection began. Identical rows within one page remain intact.
+
+Every collection retains its exact source IDs, time window, per-account counts,
+page exhaustion and whether its surrounding balances changed. A full final page
+at the page budget is recorded as partial. Even exhausted pages with unchanged
+balances do not establish an atomic snapshot: DOKU uses offset pagination, and
+later status changes or corrections require new observations. There is no global
+synchronization watermark and no change to available funds or money journals.
+
 ## Service contract
 
 All routes require the existing server HMAC and central-storage configuration:
@@ -46,6 +61,15 @@ All routes require the existing server HMAC and central-storage configuration:
 - `GET /internal/commerce/finance/provider-evidence?seller=…&environment=sandbox`
   reads normalized observations with stable `cap`/`before` paging, up to twenty
   receipts per page. It always reports `settlementVerified: false` and
+  `availableToWithdraw: null`.
+- `POST /internal/commerce/finance/provider-collections` seals an ordered list of
+  4–82 `observationIds`, together with `seller` and `environment`. Completeness,
+  amounts and wallet mappings cannot be supplied or overridden. Concurrent or
+  lost-acknowledgement retries return the same original collection.
+- `GET /internal/commerce/finance/provider-collections?seller=…&environment=sandbox`
+  provides stable `cap`/`before` paging, at most twenty summaries per page. Add
+  `/fcol_…` before the query to read one scoped collection and its source IDs.
+  Both forms retain `atomicSnapshot: false`, `settlementVerified: false` and
   `availableToWithdraw: null`.
 
 Balances require both confirmed IDR accounts and exclude point accounts. History
@@ -85,8 +109,24 @@ already-recorded responses. Same-page identical rows remain intact.
 report; exhausted pages yield exit 0. A failed run yields exit 1. None proves an
 atomic snapshot or settlement. The CLI prints counts and coverage, without bank
 account numbers, raw provider responses or credentials. Completion/partial status
-is reported by that invocation; there is no global synchronization watermark or
-durable completed-window certification yet. No scheduler is activated.
+and the durable `collectionId` are reported by that invocation. The final receipt
+and all source links commit atomically. A collection failure leaves the individual
+observations available and cannot create a completed-window receipt. No scheduler
+is activated.
+
+After two failed finalization acknowledgements, stderr contains a recovery JSON
+document with `pendingCollection` and the original response IDs. Keep this file
+private (mode 0600), then retry only that document:
+
+```sh
+php tools/commerce/finalize-provider-collection.php \
+  --receipt-file=/absolute/private/pending-collection.json
+```
+
+This command performs no DOKU request. It accepts only TEST/sandbox or
+beta/production, rejects main and mixed origins, and preserves the receipt on
+failure. Replaying it cannot duplicate a collection or replace original provider
+observations. Exit 0 means exhausted pages; exit 2 still means partial coverage.
 
 The standalone private-file [observation command](doku-financial-reader.md)
 accepts explicit TEST/sandbox or beta/production and rejects main/mixed settings
@@ -110,6 +150,31 @@ monitoring and the sustained validation period remain open. No top-level commerc
 or production release gate is closed by this evidence layer.
 
 ## Verification
+
+The collection implementation passes nine new Worker cases, including the
+maximum 82-response/1,600-row partial collection, database guard enforcement,
+concurrent finalization, source-link rollback and populated beta migration.
+Six PHP/Worker collection integrations cover ordinary collection, partial reads,
+provider changes, beta isolation, lost acknowledgements and private recovery
+without another DOKU request. Fifteen existing evidence/journal cases and sixteen
+reader/observer cases also pass. All provider responses in these tests are
+isolated fixtures. Checkout, provider dispatch and email holds remain unchanged.
+
+Logs are `/tmp/ezkart-provider-collections-worker-01a0d643.log`,
+`/tmp/ezkart-provider-collections-capacity-01a0d643.log`,
+`/tmp/ezkart-provider-collections-php-01a0d643.log`,
+`/tmp/ezkart-provider-collections-recovery-01a0d643.log`,
+`/tmp/ezkart-provider-collections-worker-regression-01a0d643.log` and
+`/tmp/ezkart-provider-collections-reader-01a0d643.log`. The recovery-focused run
+corrects the first integration run's test expectation: storage retries make
+central service requests, while making no provider requests.
+
+The fresh beta export contains 650,688 bytes, SHA-256
+`96df786363ee17ea776381fee43aa7999818ebb6f0377bccff2e67710e1de7e7`.
+Its local restore and migration 0052 rehearsal preserve every row of all 150
+original exported tables. Integrity passes, foreign keys are clean and both new
+tables are empty. Private export, restoration and comparison evidence are in
+`/home/branch/.local/share/ezkart/beta-01a0d643/collections-before-0052-20260927/`.
 
 On 27 September the beta extension passes all four focused PHP/Worker cases.
 The added case verifies live-mode history reads, durable original receipts,

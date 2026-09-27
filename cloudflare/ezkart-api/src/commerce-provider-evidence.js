@@ -24,7 +24,7 @@ function date(value){
 }
 function parse(raw){try{return parseFinancialEvidenceJSON(raw);}catch{fail('Provider JSON is invalid or ambiguous');}}
 function query(url,allowed){const result={};for(const [key,value] of url.searchParams){if(!allowed.includes(key)||key in result)fail('Provider evidence query is invalid');result[key]=value;}return result;}
-async function mapping(env,input){
+export async function providerFinancialMapping(env,input){
   scope(env,input);
   const row=await env.DB.prepare(`SELECT e.id,e.seller_id,e.commerce_environment,p.profile_id,p.cash_account,p.pending_account,b.credential_fingerprint
     FROM commerce_wallet_enrollments e JOIN commerce_wallet_provider_profiles p ON p.enrollment_id=e.id JOIN commerce_wallet_provider_bindings b ON b.enrollment_id=e.id
@@ -32,7 +32,7 @@ async function mapping(env,input){
   if(!row)fail('A confirmed seller wallet is required before provider evidence can be recorded',409);return row;
 }
 export async function providerFinancialAccount(env,url){
-  const row=await mapping(env,query(url,['seller','environment']));
+  const row=await providerFinancialMapping(env,query(url,['seller','environment']));
   return {enrollmentId:row.id,seller:row.seller_id,environment:row.commerce_environment,profileId:row.profile_id,
     cashAccount:row.cash_account,pendingAccount:row.pending_account,credentialFingerprint:row.credential_fingerprint};
 }
@@ -72,7 +72,7 @@ function history(row,request,response,observedAt){
   return {accountNo:number,from,to,page:Number(request.pageNumber),pageSize:size,items,exhausted:items.length<size};
 }
 export async function recordProviderFinancialEvidence(env,input){
-  fields(input,['seller','environment','evidence']);const row=await mapping(env,input),e=input.evidence;
+  fields(input,['seller','environment','evidence']);const row=await providerFinancialMapping(env,input),e=input.evidence;
   fields(e,['environment','credentialFingerprint','operation','externalId','requestedAt','observedAt','requestBody','responseBody']);
   if(e.environment!==input.environment||e.credentialFingerprint!==row.credential_fingerprint)fail('Provider evidence credentials do not match the confirmed seller wallet',409);
   if(!['balance-inquiries','transaction-history-list'].includes(e.operation)||typeof e.externalId!=='string'||!/^[0-9]{32}$/.test(e.externalId))fail('Provider evidence request identity is invalid');

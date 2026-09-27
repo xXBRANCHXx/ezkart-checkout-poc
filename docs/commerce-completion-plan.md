@@ -71,6 +71,23 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 27 September: durable provider collection coverage and recovery
+
+[Provider collection receipts](provider-financial-evidence.md) now retain the
+before/after balances and every original history page for both wallet accounts.
+Missing, mixed, reordered or overlapping pages cannot become an accepted
+collection; page-budget exhaustion stays partial. Finalization retries and a
+private recovery command use the same saved observation IDs without another
+provider request. Collection/source links commit atomically, with immutable
+database guards and stable private paging. Forty-six relevant Worker/PHP cases
+pass, including the 82-response/1,600-row bound and populated beta migration.
+
+This closes the missing durable collection record, not the financial gate.
+Actual fee/settlement correlation, corrections, release, refunds, reserves and
+withdrawals remain unfinished. The DOKU support search at 11:53 UTC finds no
+matching reply in the owner's mailbox. No real provider request or money movement
+was performed by this implementation; checkout and all execution holds remain.
+
 ### 27 September: bound seller routing and original flat split rules
 
 [Payment routing](doku-payment-routing.md) now joins confirmed seller and platform
