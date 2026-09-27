@@ -74,11 +74,36 @@
     if(!orderId){q('[data-refund-lookup]').hidden=false;q('[data-refund-lookup] input').focus();return;}
     loading=true;controls();error('');try{const data=await api(orderPath(orderId));if(!ended)renderForm(data,draft);}catch(e){if(!ended)error(e.message);}finally{loading=false;controls();}
   }
+  function renderEvidence(r){
+    const facts=r.evidence;if(!facts)return;
+    const box=el('section',undefined,'refund-evidence');box.dataset.refundEvidence='';box.append(el('h4','Purchase and delivery'));
+    box.append(el('p',facts.payment?'Original payment: '+money(facts.payment.amount)+' confirmed · '+date(facts.payment.confirmedAt):'Original payment evidence is unavailable.'));
+    if(facts.paymentReview)box.append(el('p','This payment needs a support review.'));
+    if(facts.fulfillmentReview)box.append(el('p','The shipment history needs a support review.'));
+    if(r.items.some(i=>i.type==='physical')||r.shippingAmount>0)box.append(el('p',facts.courierDeliveredAt?'Courier delivery recorded · '+date(facts.courierDeliveredAt):facts.shippingSkipped?'Shipping was skipped in sandbox. No courier delivery is confirmed.':'Courier delivery has not been confirmed.'));
+    for(const item of r.items.filter(i=>i.type==='digital')){
+      const line=el('article');line.append(el('b',item.title+(item.variant?' — '+item.variant:'')));
+      if(item.download){line.append(el('p','Purchased file: '+item.download.filename+' · version '+item.download.version+' · '+new Intl.NumberFormat().format(item.download.size)+' bytes'));
+        line.append(el('p',item.download.confirmedAt?'Verified complete download · '+date(item.download.confirmedAt):'A complete download has not been verified.'));
+      }else line.append(el('p','Original file evidence is unavailable. A complete download has not been verified.'));
+      box.append(line);
+    }
+    if(facts.returns.length){box.append(el('h4','Returns for these items'));const states={requested:'Awaiting store review',approved:'Approved',declined:'Declined',withdrawn:'Withdrawn',receiving:'Partly received',inspected:'Inspected',closed:'Closed'};
+      for(const returned of facts.returns){const line=el('article');line.append(el('b',states[returned.state]||'Return update'),el('p','Return requested · '+date(returned.createdAt)));
+        for(const item of returned.items){const original=r.items.find(i=>i.orderItemId===item.orderItemId);line.append(el('p',(original?.title||'Purchased item')+': '+item.received+' of '+item.quantity+' return units received and inspected.'));}
+        if(merchant){const link=el('a','View return');link.href='?page=returns&return='+encodeURIComponent(returned.id);line.append(link);}box.append(line);
+      }
+      if(facts.moreReturns)box.append(el('p','Showing the 20 most recent related returns. More history is available in Returns.'));
+      box.append(el('p','A received return does not confirm that a refund was paid.'));
+    }
+    detail.append(box);
+  }
   function renderDetail(r){
     detail.hidden=false;detail.replaceChildren();detail.append(el('h3',r.stateLabel),el('p',r.orderId),el('strong',money(r.amount)),el('p','Reason: '+([...form.elements.reason.options].find(o=>o.value===r.reason)?.textContent||r.reason)),el('p',r.note));
     if(merchant){const orderLink=el('a','View original order');orderLink.href='?page=orders&order='+encodeURIComponent(r.orderId);detail.append(orderLink);}
     const lines=el('ul',undefined,'refund-lines');for(const i of r.items)lines.append(el('li',i.title+(i.variant?' — '+i.variant:'')+': '+money(i.amount)+' requested from '+money(i.quantity*i.price)));if(r.shippingAmount)lines.append(el('li','Shipping: '+money(r.shippingAmount)));detail.append(lines);
     if(r.state==='approved')detail.append(el('p','Approved by the store. The refund has not been paid. Refund processing is not available yet.'));
+    renderEvidence(r);
     const history=el('div',undefined,'refund-history');history.append(el('h4','Request history'),el('p','Requested · '+date(r.createdAt)));
     for(const a of r.history){const row=el('article');row.append(el('b',a.actor+' · '+({approve:'Approved',decline:'Declined',withdraw:'Withdrawn'}[a.kind])),el('time',date(a.createdAt)),el('p',a.message));history.append(row);}detail.append(history);
     const available=['approve','decline','withdraw'].filter(kind=>r['can'+kind[0].toUpperCase()+kind.slice(1)]);

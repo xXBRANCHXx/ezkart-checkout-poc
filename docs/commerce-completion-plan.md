@@ -64,6 +64,24 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 27 September: purchase and delivery evidence in refund review
+
+Refund review shows original payment evidence, immutable purchased file details,
+verified complete downloads, provider-bound courier delivery and relevant return
+inspection quantities. It excludes private inspection notes and unrelated item
+lines; the merchant opens the exact return through its link. Native/partial
+downloads, catalog replacements and sandbox shipping skips cannot create delivery
+evidence. Related history is bounded and omissions are explicit. Reads recheck
+authority and change no money, stock, refund decision or download entitlement.
+
+All eighteen relevant API/PHP/browser cases pass. Both desktop and phone buyer/
+merchant layouts were visually inspected. A fresh 694,485-byte private TEST backup
+(SHA-256 `c3ff4374b11176d4e5c61c0e672577a7d8b44adad2e953563571b1ab115c585c`)
+restores all 144 physical tables unchanged and passes integrity/foreign-key checks;
+407 compatibility plans compile. No migration is needed. Provider execution and
+refund accounting remain open, including the pending owner fee-policy decisions.
+See [refund-requests.md](refund-requests.md). No top-level gate is closed.
+
 ### 27 September: refund request notifications
 
 Refund requests and decisions now create durable notification sources in the same

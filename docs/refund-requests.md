@@ -85,8 +85,8 @@ It restores every existing record in 141 physical tables with clean integrity an
 foreign-key checks. Migration 0045 adds eighteen objects and changes none of the
 existing objects. All 351 captured compatibility plans compile against the restore.
 
-Still required: return/dispute evidence
-integration, owner-authorized execution with fresh financial verification,
+Still required: dispute evidence and decision workflows,
+owner-authorized execution with fresh financial verification,
 provider capability and amount checks, unknown-outcome recovery, verified refund
 receipts, fee/ledger reversals, precise digital-access effects, and reconciliation.
 Approval never creates a provider job that could execute later without that
@@ -150,3 +150,54 @@ all 399 plans, matches the restored schema and preserves existing counts, settin
 and legacy evidence. No migrations are pending. Refund and notification tables
 remain empty; no hosted alert, email, refund or provider operation was created.
 Private rollout artifacts are under `/tmp/ezkart-refund-notifications-deploy-01a0d643/`.
+
+## Purchase and delivery evidence during review
+
+Refund detail now shows the original capture amount and confirmation time,
+payment/shipping review flags, provider-bound courier delivery, and each requested
+digital item's original file name, version, size and verified complete-download
+time. A partial or native download does not qualify. File replacement, catalog
+archival and another item's delivery cannot replace the purchased evidence.
+Sandbox shipping skips and mutable order labels do not prove courier delivery.
+
+The latest twenty related returns show only the refund's item lines and their
+actual received/inspected quantities. Older omitted cases are identified. A store
+member can open each exact return for its complete history. Buyer and merchant
+summaries omit private warehouse notes, storage keys, download grants, provider
+references and account identities. The display distinguishes the date a return
+was requested from its current state. Inspection is not refund-payment evidence.
+Existing authorization is checked again after the evidence read.
+
+All eighteen relevant cases pass: eight refund regressions, four evidence API
+cases and six PHP/browser cases. The original complete download, native/partial
+access, replacement, separate items, fixture courier lifecycle, inspections,
+foreign actors, revoked membership, held/skipped orders and bounded return history
+are covered. Desktop 1360px and mobile 390px buyer/store views and return links
+were visually inspected. Reading this context changes no requests, stock or
+financial entries. No new migration or provider operation is needed.
+
+The fresh private TEST backup is 694,485 bytes, SHA-256
+`c3ff4374b11176d4e5c61c0e672577a7d8b44adad2e953563571b1ab115c585c`.
+Its 144 physical tables restore unchanged with clean integrity/foreign-key checks;
+all 407 captured compatibility plans compile. Syntax, diff and Worker dry-run
+checks pass. All thirteen wider gates stay open.
+
+## Provider execution constraints checked on 27 September
+
+The current central payment adapter accepts verified BCA virtual-account captures.
+It does not establish card or QRIS refund capability. DOKU documents separate
+non-card refund flows using disbursement or a refund service, requiring an
+appropriate destination and funding. Payment receipt alone must not select a
+refund destination or authorize a transfer. See
+[DOKU's refund terms and flows](https://docs.doku.com/accept-payments/finance-and-settlement/refund-and-chargeback/refund-and-chargeback).
+
+DOKU's [card refund API](https://developers.doku.com/accept-payments/direct-api/non-snap/card/refund)
+binds the original invoice, original payment/capture request ID and refund amount.
+Its response can distinguish online and manual refund types; a successful manual
+request still requires processing. Those semantics cannot be generalized to the
+existing BCA flow. Provider account capabilities, completion evidence and safe
+unknown-outcome recovery remain to be implemented and accepted.
+
+The owner has been asked how to reverse Ezkart commission/admin fees and who
+bears actual provider refund fees. Those policies remain undecided; no fee
+reversal or refund-processing charge allocation is implemented by this stage.

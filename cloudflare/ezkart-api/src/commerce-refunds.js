@@ -73,14 +73,38 @@ export async function refundDetail(env,actor,id,expectedOrder=''){
   if(!row||(expectedOrder&&row.order_id!==expectedOrder))fail('Refund request not found.',404);
   const {order,authority}=await orderFor(env,actor,row.order_id);if(order.seller_id!==row.seller_id)fail('Refund request not found.',404);
   const result=await env.DB.batch([
-    env.DB.prepare(`SELECT ri.order_item_id,ri.amount,i.title,i.quantity,i.unit_price_amount,i.product_type,i.fulfillment_snapshot_json
-      FROM commerce_refund_items ri JOIN order_items i ON i.id=ri.order_item_id WHERE ri.refund_id=? ORDER BY ri.order_item_id`).bind(id),
+    env.DB.prepare(`SELECT ri.order_item_id,ri.amount,i.title,i.quantity,i.unit_price_amount,i.product_type,i.fulfillment_snapshot_json,
+      p.version_id AS purchased_file,d.verified_at AS downloaded_at
+      FROM commerce_refund_items ri JOIN order_items i ON i.id=ri.order_item_id
+      LEFT JOIN commerce_digital_purchases p ON p.order_item_id=i.id AND p.order_id=i.order_id AND p.seller_id=i.seller_id
+      LEFT JOIN commerce_digital_entitlements e ON e.order_item_id=p.order_item_id AND e.capture_id=?
+      LEFT JOIN commerce_digital_deliveries d ON d.order_item_id=e.order_item_id AND d.evidence_version=1
+      WHERE ri.refund_id=? ORDER BY ri.order_item_id`).bind(row.capture_id,id),
     env.DB.prepare('SELECT kind,actor_kind,message,created_at FROM commerce_refund_actions WHERE refund_id=? ORDER BY sequence').bind(id),
+    env.DB.prepare(`SELECT c.amount,c.currency,c.verified_at,o.payment_review,o.fulfillment_review,
+      json_extract(o.snapshot_json,'$.shipping.skipped') AS shipping_skipped,
+      (SELECT MIN(s.delivered_at) FROM commerce_shipments s WHERE s.order_id=o.id AND s.seller_id=o.seller_id
+        AND s.commerce_environment=o.commerce_environment AND s.provider_id IS NOT NULL AND s.provider_account_hash IS NOT NULL AND s.delivered_at IS NOT NULL) AS courier_delivered_at
+      FROM commerce_payment_captures c JOIN orders o ON o.id=c.order_id AND o.seller_id=c.seller_id
+      WHERE c.id=? AND c.order_id=? AND c.seller_id=? AND c.commerce_environment=? AND c.capture_kind='order_payment'`).bind(row.capture_id,row.order_id,row.seller_id,row.commerce_environment),
+    env.DB.prepare(`SELECT r.id,r.state,r.created_at,COUNT(*) OVER() AS related_count,
+      (SELECT json_group_array(json_object('orderItemId',ri.order_item_id,'quantity',ri.quantity,'received',
+        COALESCE((SELECT SUM(n.received_quantity) FROM commerce_return_inspections n WHERE n.return_id=ri.return_id AND n.order_item_id=ri.order_item_id),0)))
+        FROM commerce_return_items ri WHERE ri.return_id=r.id AND EXISTS(SELECT 1 FROM commerce_refund_items fi WHERE fi.refund_id=? AND fi.order_item_id=ri.order_item_id)) AS items_json
+      FROM commerce_returns r WHERE r.order_id=? AND r.seller_id=? AND EXISTS(SELECT 1 FROM commerce_return_items ri
+        JOIN commerce_refund_items fi ON fi.order_item_id=ri.order_item_id WHERE ri.return_id=r.id AND fi.refund_id=?)
+      ORDER BY r.created_at DESC,r.id DESC LIMIT 20`).bind(id,row.order_id,row.seller_id,id),
   ]);
   const data=JSON.parse(row.data_json),canWrite=commerceStorageEnabled(env)&&authority.canWrite&&row.state==='requested';
+  const payment=result[2].results[0];
   await access(env,actor,row.order_id);
   return {...caseView(row),orderRevision:order.revision,reason:data.reason,note:data.note,shippingAmount:row.shipping_amount,
-    items:result[0].results.map(i=>({orderItemId:i.order_item_id,amount:i.amount,title:i.title,variant:JSON.parse(i.fulfillment_snapshot_json).variantName||'',quantity:i.quantity,price:i.unit_price_amount,type:i.product_type})),
+    items:result[0].results.map(i=>{const snapshot=JSON.parse(i.fulfillment_snapshot_json),file=snapshot.digitalFile;
+      return {orderItemId:i.order_item_id,amount:i.amount,title:i.title,variant:snapshot.variantName||'',quantity:i.quantity,price:i.unit_price_amount,type:i.product_type,
+        ...(i.product_type==='digital'?{download:file&&i.purchased_file===file.id?{filename:file.filename,version:file.version,size:file.size,confirmedAt:i.downloaded_at||null}:null}:{})};}),
+    evidence:{payment:payment?{amount:payment.amount,currency:payment.currency,confirmedAt:payment.verified_at}:null,
+      paymentReview:Boolean(payment?.payment_review),fulfillmentReview:Boolean(payment?.fulfillment_review),shippingSkipped:Boolean(payment?.shipping_skipped),courierDeliveredAt:payment?.courier_delivered_at||null,
+      returns:result[3].results.map(r=>({id:r.id,state:r.state,createdAt:r.created_at,items:JSON.parse(r.items_json)})),moreReturns:Number(result[3].results[0]?.related_count||0)>20},
     history:result[1].results.map(a=>({kind:a.kind,actor:a.actor_kind==='merchant'?'Store':'Buyer',message:a.message,createdAt:a.created_at})),
     canApprove:canWrite&&actor.kind==='merchant'&&!reasonFor(order),canDecline:canWrite&&actor.kind==='merchant',
     canWithdraw:canWrite&&(actor.kind==='buyer'||row.actor_kind==='merchant'&&row.actor_auth_user_id===actor.id)};
