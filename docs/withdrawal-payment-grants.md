@@ -64,7 +64,21 @@ and status recovery. JavaScript syntax, whitespace and the beta dry build pass.
 The fresh beta export restores 166 tables; migration rehearsal preserves all
 original columns and rows while adding the nullable identity and its new-source
 guard. Private evidence is under `platform-before-0059-20260928/` in the beta
-evidence directory. Hosted rollout is pending.
+evidence directory. Implementation `0bb4a9d`, migration 0059 and beta Worker
+`58cc2856-fe8a-4c3e-b73b-a18e0b589ea3` are deployed. All 42 hosted checks pass
+at 17:27 UTC on 27 September; matching workbench source/access checks pass at
+17:28. No UI or merchant authentication behavior changes in this migration.
+
+The post-export restores 166 tables, SHA-256
+`6dc494857705e79408884ac61330604b658dcd3cc187b81cc64848e1103e2d9e`.
+Every original application column and row across 165 tables is unchanged. Only
+the intended nullable column, its insertion guard and migration-history entry
+are added. There are no payment grants, and original wallet records, deployment
+configuration and private runtime are unchanged. Proofs are
+`withdrawal-platform-{hosted,workbench}-proof.json`,
+`withdrawal-platform-post-preservation.json` and `platform-after-0059-20260928/`
+under the private beta directory. Payment, checkout and automatic sending holds
+remain. TEST/main are untouched.
 
 ### Original payment evidence
 

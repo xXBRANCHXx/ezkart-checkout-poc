@@ -14,7 +14,7 @@ deployment now uses the isolated live beta configuration described below, with
 new checkout, provider dispatch schedules and automatic email sending held.
 Existing sandbox evidence is preserved. Main and `ezkart.id` remain held.
 
-## Current hosted state — 27 September, 17:12 UTC
+## Current hosted state — 27 September, 17:29 UTC
 
 Hostinger's private runtime now selects `beta`, production providers and the beta
 Worker. Its live DOKU client, secret, signing key and verified parent profile are
@@ -27,7 +27,19 @@ the Worker. The public checkout configuration returns 503 with `Retry-After: 300
 An hourly housekeeping schedule is now installed; new checkout, provider
 dispatch schedules and email sending remain held. See the storage note below.
 
-The [withdrawal status workflow](withdrawal-status-reconciliation.md) is deployed
+The [original platform-account binding](withdrawal-payment-grants.md#original-platform-account)
+is deployed from `0bb4a9d`, migration 0059 and beta Worker
+`58cc2856-fe8a-4c3e-b73b-a18e0b589ea3`. New grants require an active, distinct,
+confirmed platform wallet under the seller wallet's original provider parent
+and credentials. Later configuration cannot change that account; older grants
+remain unassigned. Account identity does not establish fee billing or funding.
+All 29 affected local cases and 42 hosted checks pass. The post-export restores
+166 tables and preserves every original application column and row across all
+165 application tables. Payment grants remain empty, configuration and runtime
+are unchanged, and execution holds remain. Matched history, actual fee funding,
+final accounting, payment dispatch and live acceptance are still required.
+
+The preceding [withdrawal status workflow](withdrawal-status-reconciliation.md) is deployed
 from `98c506b`, migration 0058 and beta Worker
 `aeaa2f30-799c-4a9b-99af-af16146d5414`. Protected explicit reads retain the original
 transfer's provider responses and observation times. Wallet distinguishes

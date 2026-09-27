@@ -71,15 +71,21 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
-### 28 September: withdrawal status observations
+### 28 September: original platform account for withdrawal fees
 
-The subsequent [platform-account binding](withdrawal-payment-grants.md#original-platform-account)
+The [platform-account binding](withdrawal-payment-grants.md#original-platform-account)
 freezes Ezkart's confirmed account in each new payment grant, checks its original
-parent/credentials atomically and prevents later configuration from redirecting
-fee responsibility. Existing grants are preserved without inventing an account.
-All 29 affected cases and the populated migration rehearsal pass; hosted rollout
-is pending. Actual fee funding, cash-history matching and final payout accounting
-remain open.
+parent/credentials atomically and prevents later configuration from replacing
+the original platform account. Existing grants are preserved without inventing
+an account. All 29 affected cases and the populated migration rehearsal pass.
+Implementation `0bb4a9d`, migration 0059 and Worker
+`58cc2856-fe8a-4c3e-b73b-a18e0b589ea3` are deployed. The 42 hosted checks pass
+at 17:27 UTC on 27 September; source/access checks pass at 17:28. The post-export
+restores 166 tables and preserves every original column and row across all 165
+application tables. Actual fee funding, cash-history matching and final payout
+accounting remain open; no top-level gate is closed.
+
+### 28 September: withdrawal status observations
 
 The [status workflow](withdrawal-status-reconciliation.md) adds explicit protected
 DOKU reads of the original transfer, immutable observations and private recovery.
