@@ -71,6 +71,24 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 27 September: owner withdrawal reservations and cancellation
+
+[Withdrawal reservations](withdrawal-reservations.md) now check current eligible
+earnings, negative allocations, existing reservations, ledger completeness and
+fresh owner authorization inside the insertion transaction. Original bank details
+and the request reference are immutable. Reservation/cancellation journals commit
+with their sources; concurrent requests and exact retries cannot spend twice.
+Later refunds or settlement changes expose a funding shortfall and cannot be
+bypassed by cancelling the request. Protected Wallet shows withdrawal reservations
+separately and subtracts them from available earnings.
+
+All 72 relevant financial/PHP/browser cases pass, including desktop/mobile Wallet
+coverage. A fresh beta export restores cleanly; migration rehearsal preserves all
+original rows in 156 tables and adds one ledger account and two empty tables.
+No provider inquiry, transfer, refund or payout is performed. Bank confirmation,
+durable dispatch, Ezkart-funded actual transfer fees, outcome reconciliation and
+merchant withdrawal actions remain required. All top-level gates remain open.
+
 ### 27 September: seller earnings and protected Wallet history
 
 [Earnings accounting](seller-earnings.md) now connects original net settlement,

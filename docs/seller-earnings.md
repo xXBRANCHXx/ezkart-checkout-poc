@@ -58,9 +58,9 @@ It runs only for enabled TEST/beta storage and makes no provider or email calls.
 
 The comparison in `commerce_earnings_positions` checks current source and target
 amounts against the latest saved assessment. An unreconciled order cannot report
-available earnings. The future withdrawal reservation must recheck this and all
-other financial holds in its own transaction; a cached Wallet response is never
-spending authority. Provider synchronization and complete withdrawal reservations,
+available earnings. The [withdrawal reservation](withdrawal-reservations.md) now
+rechecks this and current financial holds in its insertion transaction; a cached
+Wallet response is never spending authority. Provider synchronization, bank confirmation,
 dispatch, reconciliation and actual bank/provider acceptance remain required.
 
 ## Private service and recovery
@@ -113,6 +113,10 @@ unconfirmed-fee/reconciliation messages and a paged order history. It formats
 decimal strings with `BigInt`, clears balances on failed reads and hides protected
 content when the proof expires. Its figures are order earnings, not a substitute
 for DOKU's account balance. The bank withdrawal action remains unavailable.
+
+Withdrawal reservations are deducted from the available figure and shown in a
+separate row. Order holds remain separate; any reservation shortfall caused by
+changed earnings is disclosed and cannot authorize another reservation.
 
 ## Verification and rollout
 

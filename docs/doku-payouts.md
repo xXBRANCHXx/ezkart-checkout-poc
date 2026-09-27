@@ -47,7 +47,10 @@ fallbacks. This adapter alone does not fence separate calls or process restarts.
 
 ## Required integration before real use
 
-The central withdrawal workflow must:
+The [central reservation workflow](withdrawal-reservations.md) now freezes an
+owner's intent and bank destination, reserves current eligible earnings atomically
+and supports cancellation before any provider dispatch. It does not call this
+adapter or enable withdrawals. The complete workflow must:
 
 1. Resolve the confirmed seller/provider mapping and its cash account. Determine
    available funds from settled and delivered earnings, actual fees, refunds,

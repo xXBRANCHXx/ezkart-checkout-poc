@@ -275,7 +275,7 @@ delivery and operator ownership still need acceptance.
 | --- | --- | --- |
 | Purchases and stock | Central immutable orders, atomic reservations, recoverable payment jobs, fulfillment and physical returns; isolated beta merchant cutover | Legacy ownership/count reconciliation, full signed-in physical/digital purchase and failure journeys |
 | Refunds | Purchase allocations, store decisions, buyer/store notifications and original delivery/return evidence | Provider-supported execution, unknown-result recovery, confirmed refund evidence, fee reversals, item access effects and reconciliation |
-| Wallet | Balanced capture/settlement/earnings journals, actual-fee corrections, delivery-based release and order holds, protected earnings history, confirmed-account routing, provider collections and a bank-transfer adapter | Live wallet/routing/settlement/release acceptance, continuous provider synchronization, funded refunds/disputes, negative-balance recovery, withdrawal reservations and verified payouts |
+| Wallet | Balanced capture/settlement/earnings journals, actual-fee corrections, delivery-based release and order holds, protected earnings history, confirmed-account routing, provider collections, atomic withdrawal reservations/cancellation and a bank-transfer adapter | Live wallet/routing/settlement/release acceptance, continuous provider synchronization, funded refunds/disputes, negative-balance recovery, bank confirmation/dispatch, actual transfer-fee funding and verified payouts |
 | Digital files | Immutable versions, private buyer grants, complete-download proof, reviews and full 500 MiB local transfer/recovery | Hosted signed-in and real-device transfers, storage monitoring/recovery, refund effects and subscription lifecycle |
 | Store/customer operations | Persistent settings, customer workspace, consent, messaging, notifications, campaigns and reporting | Hosted fresh-seller/customer acceptance, actual enabled delivery and failure monitoring, domain/analytics acceptance and accessibility/mobile review |
 | Operations | Private TEST/beta database backups, repeatable local restoration, recovery runbook and guarded deployment checks | Off-device retention, R2/application recovery, monitored execution, alert ownership, sustained financial validation and final acceptance report |
@@ -289,9 +289,11 @@ The [bank payout adapter](doku-payouts.md) now validates the original amount,
 bank-confirmed beneficiary, credential scope and separate inquiry/payment dispatch
 identities. Ten isolated cases pass. It enforces the seller minimum and makes no
 automatic retry after an uncertain transfer. It has no application caller or
-public payout endpoint; settled balances, owner verification, reservations,
-durable dispatch, actual transfer-fee funding and outcome reconciliation still
-need integration. No real bank inquiry or transfer was submitted.
+public payout endpoint. The [reservation workflow](withdrawal-reservations.md)
+now integrates eligible earnings, current owner verification, atomic reservations
+and cancellation. Durable inquiry/payment dispatch, bank confirmation, actual
+transfer-fee funding and outcome reconciliation still need integration. No real
+bank inquiry or transfer was submitted.
 
 The [delivery prerequisite](financial-delivery.md) now records every purchased
 physical/digital line against actual applied courier evidence or a verified

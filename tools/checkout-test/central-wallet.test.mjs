@@ -137,6 +137,29 @@ test('protected Wallet shows actual released earnings, reserves and stable histo
   assert.equal((await f.request('read')).status,401);assert.deepEqual(f.errors,[]);assert.equal((await f.registerCalls()).length,0);
 });
 
+test('protected Wallet separates withdrawal reservations and reports changed funding without exposing bank details',async t=>{
+  const bindings={COMMERCE_PLATFORM_WALLET_SELLER:'seller_bob'},f=await merchantFixture(t,{}, {bindings}),e=await setupEarningsFixture(t,{baseFixture:f,bindings});
+  await e.product('withdrawal-ui',10,'seller_alice',400000);
+  const p=await e.payment({items:[{productId:'withdrawal-ui',quantity:2,expectedPrice:400000,expectedWeightGrams:100}]});await e.settle(p);await e.deliver(p);
+  const payload={environment:'sandbox',seller:'seller_alice',actor:proof()},withdrawals='/internal/commerce/finance/withdrawals';
+  const reserved=await f.call(withdrawals,{...payload,requestKey:key(),amount:'500000',bank:{code:'CENAIDJA',accountNumber:'001234567890',channel:'BI_FAST'}});assert.equal(reserved.status,200,reserved.error);
+  await f.unlock();const amount=async name=>(await f.page.locator('[data-wallet-earnings-'+name+']').innerText()).replace(/\D/g,'');
+  for(const width of [1360,390]){
+    await f.page.setViewportSize({width,height:1000});await f.page.reload();await f.page.locator('[data-wallet-setup][aria-busy=false]').waitFor();
+    assert.equal(await amount('available'),'256250');assert.equal(await amount('withdrawals'),'500000');assert.equal(await f.page.locator('[data-wallet-earnings-withdrawals-row]').isVisible(),true);
+    assert.match(await f.page.locator('[data-wallet-earnings-status]').innerText(),/already deducted/);assert(!(await f.page.locator('body').innerText()).includes('001234567890'));
+    assert.equal(await f.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+    await mkdir(screens,{recursive:true});await f.page.screenshot({path:join(screens,'wallet-withdrawal-reservation-'+width+'.png'),fullPage:true});
+  }
+  const refund=await e.refund(p);await f.page.locator('[data-wallet-setup-refresh]').click();await f.page.locator('[data-wallet-setup][aria-busy=false]').waitFor();
+  assert.equal(await amount('available'),'0');assert.equal(await amount('reserved'),'756250');assert.match(await f.page.locator('[data-wallet-earnings-status]').innerText(),/no longer cover/);
+  const cancelled=await f.call(withdrawals+'/'+reserved.withdrawal.id+'/cancel',{...payload,requestKey:key()});assert.equal(cancelled.status,200,cancelled.error);
+  await f.page.locator('[data-wallet-setup-refresh]').click();await f.page.locator('[data-wallet-setup][aria-busy=false]').waitFor();
+  assert.equal(await f.page.locator('[data-wallet-earnings-withdrawals-row]').isHidden(),true);assert.equal(await amount('available'),'0');
+  await e.refundAction(refund.id,'decline');await f.page.locator('[data-wallet-setup-refresh]').click();await f.page.locator('[data-wallet-setup][aria-busy=false]').waitFor();assert.equal(await amount('available'),'756250');
+  assert.equal(await f.page.getByRole('button',{name:'Withdraw funds'}).isDisabled(),true);assert.equal((await f.registerCalls()).length,0);assert.deepEqual(f.errors,[]);
+});
+
 test('wallet proxy requires current owner, unchanged account/store, CSRF and fresh factor-bound proof for every read and write',async t=>{
   const f=await merchantFixture(t);await f.page.goto(f.app.base+'/cart/admin/?page=wallet');
   assert.equal((await f.request('read')).status,401);assert.equal(await f.count('commerce_wallet_enrollments'),0);

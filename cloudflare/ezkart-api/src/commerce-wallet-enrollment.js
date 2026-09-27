@@ -18,7 +18,7 @@ const view=row=>row?{id:row.id,environment:row.commerce_environment,status:row.p
   accountName:row.account_name,email:row.owner_email,createdAt:row.created_at,connectedAt:row.recorded_at||null,attempts:row.attempts,
   providerAccountSuffix:row.cash_account?row.cash_account.slice(-4):null}:null;
 
-async function owner(env,input){
+export async function walletOwner(env,input){
   commerceEnvironment(env,input.environment);fields(input.actor,['id','email','proofExpiresAt']);
   if(!id(input.seller)||!id(input.actor.id)||typeof input.actor.email!=='string'||input.actor.email.length>160||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.actor.email))fail('Verified wallet identity is invalid');
   const expiry=Date.parse(input.actor.proofExpiresAt),now=Date.now();
@@ -29,7 +29,7 @@ async function owner(env,input){
 }
 
 export async function walletEnrollment(env,input){
-  fields(input,['environment','seller','actor','action','requestKey']);const seller=await owner(env,input);
+  fields(input,['environment','seller','actor','action','requestKey']);const seller=await walletOwner(env,input);
   if(!['read','enroll'].includes(input.action)||input.action==='read'&&input.requestKey!==undefined)fail('Wallet action is invalid');
   const read=()=>env.DB.prepare(walletRowSQL+' WHERE e.seller_id=? AND e.commerce_environment=?').bind(input.seller,input.environment).first();
   const current=await read();

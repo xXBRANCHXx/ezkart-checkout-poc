@@ -67,15 +67,20 @@ export async function earningsSummary(env,url){
     env.DB.prepare(`SELECT COUNT(*) AS invalid FROM commerce_financial_journals j WHERE j.seller_id=? AND j.commerce_environment=?
       AND ((SELECT COUNT(*) FROM commerce_financial_entries e WHERE e.journal_sequence=j.sequence)!=json_array_length(j.lines_json)
         OR COALESCE((SELECT SUM(e.amount) FROM commerce_financial_entries e WHERE e.journal_sequence=j.sequence),1)!=0)`).bind(...values),
+    env.DB.prepare(`SELECT CAST(reserved_amount AS TEXT) AS reserved,CAST(reservation_shortfall AS TEXT) AS shortfall,incomplete_journals
+      FROM commerce_withdrawal_funds WHERE seller_id=? AND commerce_environment=?`).bind(...values),
   ]);
-  const row=results[0].results[0],incomplete=results[1].results[0].missing,invalid=results[2].results[0].invalid;
-  const net=BigInt(row.available)-BigInt(row.deficit),holds=[];
+  const row=results[0].results[0],incomplete=results[1].results[0].missing,withdrawals=results[3].results[0],
+    invalid=Math.max(results[2].results[0].invalid,withdrawals?.incomplete_journals??0),reservedWithdrawals=withdrawals?.reserved??'0';
+  const net=BigInt(row.available)-BigInt(row.deficit)-BigInt(reservedWithdrawals),holds=[];
   if(row.unreconciled)holds.push('earnings_reconciliation_required');
   if(incomplete||invalid)holds.push('capture_accounting_incomplete');
   if(BigInt(row.deficit)>0n)holds.push('negative_seller_allocation');
+  if(BigInt(withdrawals?.shortfall??'0')>0n)holds.push('withdrawal_reservation_shortfall');
   return {currency:'IDR',orders:row.orders,unreconciledOrders:row.unreconciled,incompleteCaptures:incomplete,balanced:invalid===0,
     availableEarnings:incomplete||invalid?'0':String(net>0n?net:0n),reservedEarnings:row.reserved,pendingEarnings:row.pending,
     negativeAllocations:row.deficit,recordedAvailable:row.recorded_available,recordedReserved:row.recorded_reserved,
+    reservedWithdrawals,withdrawalReservationShortfall:withdrawals?.shortfall??'0',
     unknownProcessingFees:row.unknown_fees,holds,withdrawalMinimum:'250000',sellerWithdrawalFee:'0',withdrawalsEnabled:false,availableToWithdraw:null};
 }
 

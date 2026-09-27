@@ -44,6 +44,7 @@ $walletOwner = ($activeSeller['role'] ?? '') === 'owner';
       <?php if ($centralWalletWorkspace): ?>
       <div><dt>Pending earnings</dt><dd data-wallet-earnings-pending>—</dd></div>
       <div><dt>Reserved earnings</dt><dd data-wallet-earnings-reserved>—</dd></div>
+      <div data-wallet-earnings-withdrawals-row hidden><dt>Reserved for withdrawals</dt><dd data-wallet-earnings-withdrawals>—</dd></div>
       <div data-wallet-earnings-deficit-row hidden><dt>Negative earnings</dt><dd data-wallet-earnings-deficit>—</dd></div>
       <?php else: ?>
       <div><dt>Available to withdraw</dt><dd aria-label="Available balance unavailable">—</dd></div>

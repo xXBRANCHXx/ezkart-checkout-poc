@@ -18,6 +18,7 @@
     for (const name of ['available', 'pending', 'reserved', 'deficit']) earnings(name).textContent = '—';
     earnings('available').setAttribute('aria-label', 'Earnings unavailable');
     earnings('deficit-row').hidden = true;
+    if (earnings('withdrawals-row')) earnings('withdrawals-row').hidden = true;
     earnings('status').textContent = message;
   };
   const renderHistory = (data, append = false) => {
@@ -49,11 +50,18 @@
     for (const [name, value] of Object.entries(values)) earnings(name).textContent = money(value);
     earnings('available').setAttribute('aria-label', 'Available earnings ' + money(values.available));
     earnings('deficit-row').hidden = BigInt(values.deficit) === 0n;
+    if (earnings('withdrawals-row')) {
+      const reservedWithdrawals = report.reservedWithdrawals ?? '0';
+      earnings('withdrawals').textContent = money(reservedWithdrawals);
+      earnings('withdrawals-row').hidden = BigInt(reservedWithdrawals) === 0n;
+    }
     const messages = ['Available earnings require complete delivery and confirmed settlement. Withdrawals are not open yet.'];
     if (report.unknownProcessingFees) messages.push('Some pending orders still need their actual payment fees confirmed.');
     if (report.unreconciledOrders) messages.push('Changed records are being reconciled; affected earnings are held.');
     if (report.incompleteCaptures || !report.balanced) messages.push('Payment accounting needs review before earnings can be used.');
     if (BigInt(values.deficit) > 0n) messages.push('Negative earnings have been deducted from the available amount.');
+    if (BigInt(report.reservedWithdrawals ?? '0') > 0n) messages.push('Withdrawal reservations are already deducted from available earnings. A reservation does not mean a bank transfer has completed.');
+    if (BigInt(report.withdrawalReservationShortfall ?? '0') > 0n) messages.push('Changed earnings no longer cover all withdrawal reservations. The affected funds need review before transfer.');
     earnings('status').textContent = messages.join(' ');
     renderHistory(data.earningsHistory);
   };
