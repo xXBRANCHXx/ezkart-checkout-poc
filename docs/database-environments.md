@@ -40,13 +40,14 @@ Order files and default merchant/customer session directories have a beta
 namespace. Beta cannot switch into sandbox through the old Executive mode file.
 Email, campaign, unsubscribe and storefront links use the deployment origin.
 
-The beta database and two APAC buckets were created on 27 September. All 47
-migrations are installed, yielding 144 application tables and zero orders,
-captures or sellers. The private exported baseline restores with clean SQLite
-integrity and foreign keys; the remote foreign-key check is also clean. Existing
-TEST and main bindings remain byte-for-byte equivalent. The private bucket has
-the default seven-day incomplete-multipart abort rule, without object expiry.
-See [beta-readiness.md](beta-readiness.md) for activation and data-preparation work.
+The beta database and two APAC buckets were created on 27 September. Migrations
+through 0049 are installed, yielding 146 application tables. Five merchant stores,
+two products, 111 variants and 54 catalog objects were preserved during cutover.
+The current beta export restores with clean integrity and foreign keys, including
+the original uncertain seller-wallet attempt. Orders and captures remain empty.
+The private bucket has the default seven-day incomplete-multipart abort rule,
+without object expiry. See [beta readiness](beta-readiness.md) and
+[workbench recovery](workbench-recovery.md) for current evidence and boundaries.
 
 ## One-time setup
 
@@ -99,11 +100,10 @@ state belong in D1; the generated HTML and images belong in R2.
 
 ## Current boundary
 
-The hosted workbench already uses D1/R2 for merchant profiles, catalog, settings,
-and page projects. Central commerce, customer operations, messaging, digital
-delivery and financial foundations are implemented behind authenticated routes,
-but the hosted checkout still uses private legacy sandbox order files while its
-central cutover is held. The separate beta baseline starts empty. Catalog/assets
-preparation, legacy ownership reconciliation, supported live provider execution
-and hosted acceptance remain explicit work in
+The hosted workbench now uses the separate live beta D1/R2 resources for merchant
+operations. New checkout is explicitly paused in PHP and the beta Worker while
+channel, wallet, financial and hosted acceptance remain incomplete. The original
+TEST resources and sandbox financial history are preserved; they were not copied
+into beta. Main remains held. Legacy ownership reconciliation, supported live
+provider execution and the full acceptance scope remain tracked in
 [the completion plan](commerce-completion-plan.md).

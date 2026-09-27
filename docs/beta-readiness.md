@@ -188,6 +188,18 @@ shipping settings. Four isolated status checks and the two checkout-pause cases
 pass. A blank page created through the isolated merchant UI also loads at 1894px
 and 820px: the desktop status is readable and the existing narrow-editor hiding
 rule is preserved. No hosted page was created for this check.
+Implementation `fd9a8d9` is pushed and hosted at 09:41 UTC: the authenticated
+HTML contains the pause flag/message and the public script's SHA-256 matches.
+
+The repeatable [workbench recovery command](workbench-recovery.md) now validates
+the explicit database identity, preserves a private SQL export and rehearses its
+restoration locally. Nine failure/privacy/integrity cases pass. The actual beta
+630,381-byte export restores all 146 application tables plus migration history
+with clean integrity/foreign keys and matching surrounding recovery bookmarks.
+Offline re-verification passes. The original uncertain wallet/binding/attempt,
+merchant profile and shipping settings match the saved private evidence. No
+remote restoration or provider retry was performed. Off-device retention and
+R2/application recovery remain separate operational acceptance work.
 
 ## Work required for the beta candidate
 
@@ -198,7 +210,7 @@ rule is preserved. No hosted page was created for this check.
 | Wallet | Balanced capture journal, seller enrollment and original provider balance/history receipts | Actual settlement/fee ingestion and corrections, delivery-plus-settlement release, reserves, negative balances, withdrawal reservations and verified payouts |
 | Digital files | Immutable versions, private buyer grants, complete-download proof, reviews and full 500 MiB local transfer/recovery | Hosted signed-in and real-device transfers, storage monitoring/recovery, refund effects and subscription lifecycle |
 | Store/customer operations | Persistent settings, customer workspace, consent, messaging, notifications, campaigns and reporting | Hosted fresh-seller/customer acceptance, actual enabled delivery and failure monitoring, domain/analytics acceptance and accessibility/mobile review |
-| Operations | Private TEST database backups and restoration rehearsals, guarded deployment checks | Identified beta revision, recovery runbooks, monitored execution, alert ownership, sustained financial validation and final acceptance report |
+| Operations | Private TEST/beta database backups, repeatable local restoration, recovery runbook and guarded deployment checks | Off-device retention, R2/application recovery, monitored execution, alert ownership, sustained financial validation and final acceptance report |
 
 Continue completing the full scope in
 [commerce-completion-plan.md](commerce-completion-plan.md). Optional features are

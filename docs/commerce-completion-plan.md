@@ -94,6 +94,14 @@ Four status states, two existing checkout-pause cases, PHP/JS syntax and loaded
 desktop/narrow isolated editor checks pass. This changes only status reporting;
 no checkout, provider or email hold is lifted.
 
+The beta recovery command passes nine isolated integrity/failure/privacy cases
+and an actual 630,381-byte export/local restore plus offline re-verification.
+All 146 application tables and migration history restore cleanly; the original
+uncertain wallet attempt/binding, store profile and shipping settings match their
+saved evidence. The [recovery runbook](workbench-recovery.md) separates database
+restoration from external payment/provider reconciliation and records the remaining
+R2/off-device recovery work. No remote database was restored.
+
 At 08:55 UTC, the owner-provided pickup/return address and support contacts are
 saved and verified after reload, with the existing courier selection and other
 profile fields preserved. Beta's ordinary housekeeping run completed successfully.
