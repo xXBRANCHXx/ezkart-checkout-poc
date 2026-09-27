@@ -118,8 +118,19 @@ The fresh private TEST export is 664,953 bytes, SHA-256
 `4e1106f5bd48387f91728d1970472a477a0c2e598c52a1d48f7ce9f3f8568c85`.
 Restoration preserves every record in 134 existing physical tables, passes
 integrity and foreign-key checks, adds 38 objects and changes only the three
-intended triggers. All 204 captured compatibility query plans compile. TEST
-deployment and hosted checks are recorded in the completion plan when finished.
+intended triggers. All 204 captured compatibility query plans compile.
+
+Implementation `c768151` is pushed to workbench. TEST migration 0043 and Worker
+`27598d28-23ce-4c35-8a7b-99fc2224afc6` are installed. Eleven new digital cases,
+thirty-three existing order cases, twenty-seven financial/order-read/shipping/
+fulfillment cases, eight private-file cases and twenty-five PHP cases pass.
+The two strengthened path/proof access cases also pass. The Worker dry-run,
+syntax and diff checks pass. Hosted checks on 27 September pass: sixty-five
+Worker checks at 01:31:02 UTC, thirteen asset hashes at 01:30:58 UTC and thirty-five
+access/header guards at 01:31:01 UTC. Final remote verification matches the
+restored schema and all 204 plans, preserves existing counts/settings/legacy
+evidence, and finds no pending migration or foreign-key error. All seven new
+tables remain empty. The central-commerce/provider holds are unchanged.
 
 Outstanding: storefront/PHP checkout integration, buyer download/save/resume
 screens, verified client-side persistence before acknowledgement, maximum-size

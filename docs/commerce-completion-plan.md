@@ -100,8 +100,15 @@ tables unchanged, passes integrity and foreign-key checks, and compiles all 204
 captured query plans. SHA-256:
 `4e1106f5bd48387f91728d1970472a477a0c2e598c52a1d48f7ce9f3f8568c85`.
 Migration 0043 adds 38 objects and changes only the three intended physical
-shipping/fulfillment triggers. TEST deployment and hosted verification are the
-next rollout steps; the Worker dry-run passes.
+shipping/fulfillment triggers. The Worker dry-run passes. Implementation `c768151`
+is pushed to workbench; TEST migration 0043 and Worker
+`27598d28-23ce-4c35-8a7b-99fc2224afc6` are installed. Sixty-five Worker checks pass
+at 01:31:02 UTC on 27 September with 140 healthy application tables. Thirteen
+hosted assets match at 01:30:58 UTC and thirty-five hosted access/header guards
+pass at 01:31:01 UTC. Final remote verification preserves existing counts,
+settings and legacy evidence, matches the restored schema and compiles all 204
+plans. No migration or foreign-key error remains. All seven new tables are empty;
+hosted checks created no purchase, download grant, file or delivery record.
 
 The public/PHP digital checkout flow and buyer download/save/resume screens
 remain to be connected and verified. Partial refunds currently produce an
