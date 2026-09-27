@@ -36,6 +36,7 @@ import {reconcileProviderSettlement,financialSettlementStatus} from './commerce-
 import {reconcileEarnings,earningsOrderStatus,earningsSummary,earningsHistory,earningsHousekeeping} from './commerce-earnings.js';
 import {reserveWithdrawal,cancelWithdrawal,withdrawalDetail,withdrawalList,withdrawalLookup} from './commerce-withdrawals.js';
 import {startWithdrawalInquiry,saveWithdrawalInquiryReceipt,withdrawalInquiryRecovery,recordWithdrawalInquiryDiagnostic,confirmWithdrawalBank} from './commerce-withdrawal-inquiries.js';
+import {startWithdrawalPayment,saveWithdrawalPaymentReceipt,withdrawalPaymentRecovery,recordWithdrawalPaymentDiagnostic} from './commerce-withdrawal-payments.js';
 import {merchantCustomers,merchantCustomer,customerOrderHistory} from './commerce-customers.js';
 import {customerSegments,customerSegment,saveCustomerWorkspace,customerProfileHistory} from './commerce-customer-workspace.js';
 import {createCustomerExport,readCustomerExport,cleanupCustomerExports} from './commerce-customer-exports.js';
@@ -1559,15 +1560,17 @@ export default {
         return json({ok:false,error:'Delivery evidence route or method is unavailable'},404);
       }
       if(url.pathname.startsWith('/internal/commerce/finance/withdrawals')){
-        const payload=await authenticateCommerceService(request,env,{strictJSON:true,maxBytes:url.pathname.endsWith('/inquiry/receipt')?50000:3000});
+        const payload=await authenticateCommerceService(request,env,{strictJSON:true,maxBytes:/\/(inquiry|payment)\/receipt$/.test(url.pathname)?50000:3000});
         if(request.method!=='POST'||url.search)return json({ok:false,error:'Withdrawal route or method is unavailable'},404);
         if(url.pathname==='/internal/commerce/finance/withdrawals')return json({ok:true,...await reserveWithdrawal(env,payload)});
         if(url.pathname==='/internal/commerce/finance/withdrawals/list')return json({ok:true,...await withdrawalList(env,payload)});
         if(url.pathname==='/internal/commerce/finance/withdrawals/lookup')return json({ok:true,...await withdrawalLookup(env,payload)});
-        const match=/^\/internal\/commerce\/finance\/withdrawals\/(wd_[a-f0-9]{40})\/(read|cancel|confirm|inquiry\/(?:start|receipt|read|diagnostic))$/.exec(url.pathname);
+        const match=/^\/internal\/commerce\/finance\/withdrawals\/(wd_[a-f0-9]{40})\/(read|cancel|confirm|(?:inquiry|payment)\/(?:start|receipt|read|diagnostic))$/.exec(url.pathname);
         if(match){
           const action={read:withdrawalDetail,cancel:cancelWithdrawal,confirm:confirmWithdrawalBank,'inquiry/start':startWithdrawalInquiry,
-            'inquiry/receipt':saveWithdrawalInquiryReceipt,'inquiry/read':withdrawalInquiryRecovery,'inquiry/diagnostic':recordWithdrawalInquiryDiagnostic}[match[2]];
+            'inquiry/receipt':saveWithdrawalInquiryReceipt,'inquiry/read':withdrawalInquiryRecovery,'inquiry/diagnostic':recordWithdrawalInquiryDiagnostic,
+            'payment/start':startWithdrawalPayment,'payment/receipt':saveWithdrawalPaymentReceipt,'payment/read':withdrawalPaymentRecovery,
+            'payment/diagnostic':recordWithdrawalPaymentDiagnostic}[match[2]];
           return json({ok:true,...await action(env,match[1],payload)});
         }
         return json({ok:false,error:'Withdrawal route or method is unavailable'},404);

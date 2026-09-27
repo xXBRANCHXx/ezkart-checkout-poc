@@ -99,7 +99,9 @@ withdrawal workflow is ready:
 - PHP `commerce_withdrawal_recovery_directory` must name the private directory.
   It is checked before consuming a grant.
 
-No provider-payment endpoint, grant, caller or schedule is added. Ezkart-funded
+Migration 0056 adds no provider-payment grant, caller or schedule. The later
+[payment grant](withdrawal-payment-grants.md) fences cancellation and retains
+original payment receipts, with payment execution still held. Ezkart-funded
 actual transfer fees, final payout/refund journals, completed-outflow deductions,
 payment outcome reconciliation and live acceptance remain required before
 enabling withdrawals. The [merchant request/confirmation/history workflow](withdrawal-merchant-workflow.md)

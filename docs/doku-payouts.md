@@ -3,8 +3,10 @@
 Workbench contract implementation, 27 September 2026. The bank-transfer adapter
 exists; **seller withdrawals are not operational**. The later
 [bank inquiry integration](withdrawal-bank-inquiries.md) adds protected bank
-verification and owner confirmation with execution held. There is no bank payment
-grant, caller or schedule. Checkout and money-execution holds remain in place.
+verification and owner confirmation with execution held. The later
+[payment grant](withdrawal-payment-grants.md) atomically fences cancellation and
+retains original payment receipts. There is no integrated bank-payment caller
+or schedule. Checkout and money-execution holds remain in place.
 
 ## Provider contract
 
@@ -62,7 +64,7 @@ corresponding requirements:
    withdrawal intent and reserve its funds atomically; concurrent requests must
    not spend the same earnings.
 3. Persist separate inquiry/payment dispatch grants and original private receipts.
-   Each provider call needs a committed, single-use grant before transport.
+Each provider call needs a committed, single-use grant before transport.
 4. Show the bank-confirmed beneficiary and original amount for owner confirmation.
    Bind that decision to the inquiry digest and recheck owner verification at
    dispatch. The client does not impose an invented DOKU inquiry expiry.

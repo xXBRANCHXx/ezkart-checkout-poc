@@ -19,7 +19,8 @@
   const banks = () => Array.isArray(caps().banks) ? caps().banks : [];
   const bankName = code => banks().find(bank => bank.code === code)?.name || code;
   const method = channel => channel === 'BI_FAST' ? 'BI-FAST' : 'Online bank transfer';
-  const status = row => row.state === 'cancelled' ? 'Cancelled' : row.confirmation ? 'Bank confirmed' : row.bankVerified ? 'Bank verified' : row.inquiry?.state === 'review' ? 'Bank check needs review' : 'Request saved';
+  const paymentStarted = row => row.payment && row.payment.state !== 'not_started';
+  const status = row => row.state === 'cancelled' ? 'Cancelled' : paymentStarted(row) ? (row.payment.state === 'response_recorded' ? 'Transfer response saved' : 'Transfer needs review') : row.confirmation ? 'Bank confirmed' : row.bankVerified ? 'Bank verified' : row.inquiry?.state === 'review' ? 'Bank check needs review' : 'Request saved';
   const storageName = type => storageScope + ':' + type;
   const storedKey = type => {
     try {
@@ -83,18 +84,19 @@
     q('detail-refresh').disabled = busy; q('cancel-confirm').disabled = busy; q('keep').disabled = busy;
     try { q('recovery').hidden = !storedKey('reserve'); } catch { q('recovery').hidden = false; }
     if (!selected) return;
-    const row = selected.withdrawal, cancelled = row.state === 'cancelled';
+    const row = selected.withdrawal, cancelled = row.state === 'cancelled', started = paymentStarted(row);
     const funded = selected.funds.accountingComplete && amount(selected.funds.reservationShortfall) === 0n;
     const own = selected.originalOwner === true;
     const confirmed = row.confirmation && Date.parse(row.confirmation.proofExpiresAt) > Date.now();
-    q('check').hidden = cancelled || row.bankVerified;
+    q('check').hidden = cancelled || started || row.bankVerified;
     q('check').disabled = busy || !caps().bankVerification || !caps().requests || !own || !funded;
     q('check').textContent = row.inquiry?.state === 'review' ? 'Check bank verification' : 'Verify bank account';
-    confirmation.hidden = cancelled || !row.bankVerified || !!confirmed || !own;
+    confirmation.hidden = cancelled || started || !row.bankVerified || !!confirmed || !own;
     confirmation.querySelector('input').disabled = busy || !caps().requests || !funded;
     q('confirm').disabled = busy || !caps().requests || !funded;
-    q('cancel').hidden = cancelled || !q('cancel-review').hidden; q('cancel').disabled = busy;
-    q('confirmed').hidden = cancelled || !confirmed;
+    q('cancel').hidden = cancelled || started || !q('cancel-review').hidden; q('cancel').disabled = busy;
+    if (started) q('cancel-review').hidden = true;
+    q('confirmed').hidden = cancelled || started || !confirmed;
   }
   function renderDetail(data) {
     const row = data.withdrawal;
@@ -103,6 +105,7 @@
     selected = data; form.hidden = true; q('detail').hidden = false; confirmation.reset(); q('cancel-review').hidden = true;
     q('title').textContent = 'Withdrawal request'; q('message').textContent = row.state === 'cancelled'
       ? 'This request was cancelled. No bank transfer was started.'
+      : paymentStarted(row) ? 'This request has entered payment processing. Its outcome must be reconciled before the reserved amount can be released. It cannot be cancelled or sent again.'
       : row.bankVerified ? 'Check the bank-returned account-holder name and your original request below.'
       : row.inquiry?.state === 'review' ? 'The bank check needs review. Check its saved status; you can also cancel this request.'
       : 'Your request is saved and the amount is reserved. Verify the bank account before confirming the destination.';
@@ -112,8 +115,8 @@
     for (const [name,value] of Object.entries(values)) q(name).textContent = value;
     const warnings = [];
     if (row.state !== 'cancelled') {
-      if (!data.originalOwner) warnings.push('A previous owner created this request. You can review or cancel it; create your own request to continue.');
-      if (!data.funds.accountingComplete || amount(data.funds.reservationShortfall) > 0n) warnings.push('Changed earnings no longer cover all withdrawal requests. Resolve the holds or cancel a request before continuing.');
+      if (!data.originalOwner) warnings.push(paymentStarted(row) ? 'A previous owner authorized this payment. Its original destination is preserved while the outcome is reconciled.' : 'A previous owner created this request. You can review or cancel it; create your own request to continue.');
+      if (!data.funds.accountingComplete || amount(data.funds.reservationShortfall) > 0n) warnings.push(paymentStarted(row) ? 'Changed earnings no longer cover all withdrawal requests. Resolve the holds while this payment is reconciled.' : 'Changed earnings no longer cover all withdrawal requests. Resolve the holds or cancel a request before continuing.');
       if (!caps().bankVerification && !row.bankVerified) warnings.push('Bank verification is temporarily unavailable. Your saved request is preserved.');
     }
     q('warning').textContent = warnings.join(' '); q('warning').hidden = !warnings.length;

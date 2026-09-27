@@ -78,9 +78,10 @@ earnings; it does not claim to be completed bank-transfer history.
 The [bank inquiry](withdrawal-bank-inquiries.md) now has a single-use grant,
 original private receipt and owner confirmation bound to that receipt.
 The [merchant workflow](withdrawal-merchant-workflow.md) displays that beneficiary
-and supports request/history/recovery flows. Connect payment dispatch to its own
-durable grant and original receipt, recheck authority/funds at dispatch,
-fund the actual transfer fee from Ezkart, and reconcile authenticated status,
+and supports request/history/recovery flows. The [payment grant](withdrawal-payment-grants.md)
+now fences cancellation, rechecks authority/funds and retains original response
+evidence. Connect its transport caller, fund the actual transfer fee from Ezkart,
+and reconcile authenticated status,
 callbacks and account history into final journals. Complete payment execution
 and live acceptance before opening withdrawals.
 

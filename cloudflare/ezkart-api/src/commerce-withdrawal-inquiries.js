@@ -2,6 +2,9 @@ import {commerceEnvironment,commerceHash} from './commerce-orders.js';
 import {authorizeWithdrawalOwner,withdrawalFailure} from './commerce-withdrawals.js';
 import {parseFinancialEvidenceJSON,FinancialJsonNumber} from './financial-evidence-json.js';
 
+export {ownerWithdrawal as withdrawalInquiryOwner,validateReceipt as validateWithdrawalInquiryReceipt,date as withdrawalEvidenceDate,
+  text as withdrawalEvidenceText,phpJSON as withdrawalEvidenceJSON,sha as withdrawalEvidenceHash};
+
 const fail=(message,status=422)=>{throw new Response(message,{status});};
 const fields=(input,allowed)=>{if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).some(k=>!allowed.includes(k)))fail('Bank inquiry parameters are invalid');};
 const ownerFields=['environment','seller','actor'];

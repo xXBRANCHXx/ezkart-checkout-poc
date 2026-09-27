@@ -102,9 +102,9 @@ async function merchantFixture(t,overrides={},options={}){
   return {...f,page,context,browser,errors,setAuth,session,unlock,request};
 }
 
-async function bankInquiryFixture(t,overrides={}){
+async function bankInquiryFixture(t,overrides={},extraBindings={}){
   const recovery=await mkdtemp(join(tmpdir(),'ezkart-bank-inquiry-'));t.after(()=>rm(recovery,{recursive:true,force:true}));
-  const bindings={COMMERCE_PLATFORM_WALLET_SELLER:'seller_bob',COMMERCE_WITHDRAWAL_INQUIRY:'enabled'};
+  const bindings={COMMERCE_PLATFORM_WALLET_SELLER:'seller_bob',COMMERCE_WITHDRAWAL_INQUIRY:'enabled',...extraBindings};
   const f=await merchantFixture(t,{EZKART_COMMERCE_WITHDRAWALS:'enabled',EZKART_COMMERCE_WITHDRAWAL_INQUIRY:'enabled',
     EZKART_COMMERCE_WITHDRAWAL_RECOVERY_DIRECTORY:recovery,...overrides},{bindings});
   const identity=await f.run(`require ${JSON.stringify(join(root,'cart/api/doku-payout.php'))}; echo json_encode(EzDokuPayoutClient::configured('sandbox')->providerIdentity());`);
@@ -117,8 +117,74 @@ async function bankInquiryFixture(t,overrides={}){
   const reserve=async()=>{const r=await f.request('withdrawal_reserve',{requestKey:key(),amount:'250000',bank:{code:'CENAIDJA',accountNumber:'001234567890',channel:'BI_FAST'}});assert.equal(r.status,200,JSON.stringify(r.data));return r.data.withdrawal;};
   const inquire=w=>f.request('withdrawal_inquire',{id:w.id});
   const bankCalls=async()=>(await f.app.calls()).filter(c=>c.url.endsWith('/sub-account/v2.0/transfer-inquiry'));
-  return {...f,e,p,recovery,reserve,inquire,bankCalls};
+  return {...f,e,p,provider,recovery,reserve,inquire,bankCalls};
 }
+
+async function paymentGrantFixture(t){
+  const f=await bankInquiryFixture(t,{}, {COMMERCE_WITHDRAWAL_PAYMENT:'enabled'}),w=await f.reserve();
+  await f.setControl({inquiryName:'Bank Owner Ω\u2028\u2029',inquiryLiteralUnicode:true});
+  const bank=await f.inquire(w);assert.equal(bank.status,200,JSON.stringify(bank.data));
+  const confirmation=await f.request('withdrawal_confirm',{id:w.id,requestKey:key(),inquiryDigest:bank.data.withdrawal.inquiry.digest});assert.equal(confirmation.status,200);
+  const paymentPath='/internal/commerce/finance/withdrawals/'+w.id+'/payment';
+  const g=await f.call(paymentPath+'/start',{environment:'sandbox',seller:'seller_alice',actor:proof(),confirmationId:confirmation.data.confirmation.id,
+    credentialFingerprint:f.provider.credentialFingerprint,clientId:f.provider.clientId});assert.equal(g.status,200,g.error);assert.equal(g.mayPay,true);
+  return {...f,w,g,paymentPath};
+}
+
+test('a payment-granted withdrawal keeps its reserved money and hides cancellation, confirmation and repeat bank actions in Wallet',async t=>{
+  const f=await paymentGrantFixture(t);await f.page.reload();await f.page.locator('[data-withdrawals][aria-busy=false]').waitFor();
+  await f.page.getByRole('button',{name:'View withdrawal 1',exact:true}).click();await f.page.locator('[data-withdrawals][aria-busy=false]').waitFor();
+  assert.equal(await f.page.locator('[data-withdrawal-status]').innerText(),'Transfer needs review');
+  assert.match(await f.page.locator('[data-withdrawal-message]').innerText(),/cannot be cancelled or sent again/);
+  for(const selector of ['[data-withdrawal-cancel]','[data-withdrawal-confirm-form]','[data-withdrawal-check]'])assert.equal(await f.page.locator(selector).isHidden(),true);
+  assert.equal((await f.request('withdrawal_cancel',{id:f.w.id,requestKey:key()})).status,409);
+  for(const action of ['withdrawal_pay','withdrawal_payment_start'])assert.equal((await f.request(action,{id:f.w.id})).status,400);
+  assert.equal((await f.e.earnings()).reservedWithdrawals,'250000');assert.equal((await f.e.summary()).balanced,true);
+  assert.equal((await f.app.calls()).filter(c=>c.url.endsWith('/sub-account/v2.0/transfer-payment')).length,0);
+  // Exercise only the presentation of a current read from a changed owner;
+  // server ownership and payment/cancellation guards have separate real tests.
+  await f.page.route('**/cart/admin/?wallet=withdrawal_read',async route=>{
+    const response=await route.fetch(),data=await response.json();
+    await route.fulfill({response,json:{...data,originalOwner:false,funds:{...data.funds,reservationShortfall:'1'}}});
+  });
+  await f.page.locator('[data-withdrawal-detail-refresh]').click();await f.page.locator('[data-withdrawals][aria-busy=false]').waitFor();
+  const warning=await f.page.locator('[data-withdrawal-warning]').innerText();assert.match(warning,/previous owner authorized/);assert(!warning.includes('cancel'));
+  await f.page.setViewportSize({width:390,height:844});assert.equal(await f.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  await f.page.screenshot({path:join(screens,'withdrawal-payment-review-390.png')});
+});
+
+test('original private payment evidence survives failed and lost acknowledgements and recovers in a fresh PHP process without a provider call',async t=>{
+  const f=await paymentGrantFixture(t),input=join(f.recovery,'payment-input.json'),file=join(f.recovery,f.w.id+'-bank-payment.json');
+  await writeFile(input,JSON.stringify(f.g),{mode:0o600});
+  const encoded=await f.run(`require ${JSON.stringify(join(root,'cart/api/commerce-withdrawal-payments.php'))}; $g=json_decode(file_get_contents(${JSON.stringify(input)}),true); $c=EzDokuPayoutClient::configured('sandbox'); echo json_encode(['body'=>json_encode($c->paymentPayload($g['binding'],$g['originalInquiry'],$g['inquiryDigest']),JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR)]);`);
+  assert.equal(encoded.status,0,encoded.error);const requestBody=JSON.parse(encoded.output).body;
+  assert.equal((await f.call(f.paymentPath+'/read',{environment:'sandbox'})).requestBody,requestBody);
+  const at=new Date().toISOString(),evidence={environment:'sandbox',credentialFingerprint:f.provider.credentialFingerprint,operation:'transfer-payment',
+    externalId:f.g.binding.paymentExternalId,requestedAt:at,observedAt:at,requestBody,
+    responseBody:JSON.stringify({...JSON.parse(requestBody),responseCode:'2000000',referenceNo:'PAY-'+f.w.id,referenceNumber:'BANK-'+f.w.id,transactionDate:at})};
+  const document={version:1,withdrawalId:f.w.id,environment:'sandbox',confirmationId:f.g.confirmationId,binding:f.g.binding,evidence};
+  await writeFile(input,JSON.stringify(document));
+  const store=()=>f.run(`require ${JSON.stringify(join(root,'cart/api/commerce-withdrawal-payments.php'))}; ez_withdrawal_store_payment(${JSON.stringify(file)},json_decode(file_get_contents(${JSON.stringify(input)}),true));`);
+  assert.equal((await store()).status,0);assert.equal((await store()).status,0);assert.equal((await stat(file)).mode&0o777,0o600);
+  const raw=await readFile(file,'utf8'),before=(await f.app.calls()).filter(c=>c.url.includes('doku.com')).length;
+  const finalize=()=>new Promise((resolve,reject)=>{
+    const child=spawn(process.env.PHP_BINARY||'php',['-n','-d','auto_prepend_file='+join(root,'tools/checkout-test/provider-fixture.php'),
+      join(root,'tools/commerce/finalize-withdrawal-payment.php'),'--receipt-file='+file],{env:f.app.env});
+    let output='',error='';child.stdout.on('data',x=>output+=x);child.stderr.on('data',x=>error+=x);child.on('error',reject);child.on('close',status=>resolve({status,output,error}));
+  });
+  f.control.fail=f.paymentPath+'/receipt';assert.equal((await finalize()).status,1);assert.equal(await f.count('commerce_withdrawal_payment_receipts'),0);
+  f.control.fail='';f.control.drop=f.paymentPath+'/receipt';assert.equal((await finalize()).status,1);assert.equal(await f.count('commerce_withdrawal_payment_receipts'),1);
+  f.control.drop='';const recovered=await finalize();assert.equal(recovered.status,0,recovered.error);assert.equal(JSON.parse(recovered.output).providerCalls,0);assert.equal(JSON.parse(recovered.output).payoutConfirmed,false);
+  assert.equal((await finalize()).status,0);assert.equal(await readFile(file,'utf8'),raw);assert.equal(await f.count('commerce_withdrawal_payment_receipts'),1);
+  await writeFile(input,JSON.stringify({...document,confirmationId:'wdconf_'+'f'.repeat(40)}));assert.notEqual((await store()).status,0);assert.equal(await readFile(file,'utf8'),raw);
+  await chmod(file,0o644);assert.equal((await finalize()).status,1);await chmod(file,0o600);assert.equal((await finalize()).status,0);
+  assert.equal((await f.app.calls()).filter(c=>c.url.includes('doku.com')).length,before);
+  assert.equal((await f.e.earnings()).reservedWithdrawals,'250000');
+  await f.page.reload();await f.page.locator('[data-withdrawals][aria-busy=false]').waitFor();await f.page.getByRole('button',{name:'View withdrawal 1',exact:true}).click();
+  await f.page.locator('[data-withdrawals][aria-busy=false]').waitFor();assert.equal(await f.page.locator('[data-withdrawal-status]').innerText(),'Transfer response saved');
+  assert.equal(await f.page.locator('[data-withdrawal-cancel]').isHidden(),true);
+  for(const path of ['/cart/api/commerce-withdrawal-payments.php','/tools/commerce/finalize-withdrawal-payment.php'])assert.equal((await fetch(f.app.base+path)).status,404);
+});
 
 test('the protected merchant bank inquiry persists its receipt, confirms the returned beneficiary and never sends a payment',async t=>{
   const f=await bankInquiryFixture(t),w=await f.reserve(),name='Fixture Bank Owner Ω\u2028\u2029';await f.setControl({inquiryName:name,inquiryLiteralUnicode:true});

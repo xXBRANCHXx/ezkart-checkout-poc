@@ -7,11 +7,14 @@ const requestKey=value=>{if(typeof value!=='string'||!/^[a-f0-9]{32}$/.test(valu
 const base=['environment','seller','actor'];
 const rowSQL=`SELECT w.*,c.created_at AS cancelled_at,c.request_key AS cancellation_key,c.owner_auth_id AS cancelled_by,
   g.created_at AS inquiry_started_at,r.inquiry_digest,r.beneficiary_name,
-  a.id AS confirmation_id,a.created_at AS confirmed_at,a.proof_expires_at AS confirmation_expires_at
+  a.id AS confirmation_id,a.created_at AS confirmed_at,a.proof_expires_at AS confirmation_expires_at,
+  pg.created_at AS payment_started_at,pr.recorded_at AS payment_recorded_at
   FROM commerce_withdrawals w LEFT JOIN commerce_withdrawal_cancellations c ON c.withdrawal_id=w.id
   LEFT JOIN commerce_withdrawal_inquiry_grants g ON g.withdrawal_id=w.id
   LEFT JOIN commerce_withdrawal_inquiry_receipts r ON r.withdrawal_id=w.id
-  LEFT JOIN commerce_withdrawal_confirmations a ON a.sequence=(SELECT MAX(x.sequence) FROM commerce_withdrawal_confirmations x WHERE x.withdrawal_id=w.id)`;
+  LEFT JOIN commerce_withdrawal_confirmations a ON a.sequence=(SELECT MAX(x.sequence) FROM commerce_withdrawal_confirmations x WHERE x.withdrawal_id=w.id)
+  LEFT JOIN commerce_withdrawal_payment_grants pg ON pg.withdrawal_id=w.id
+  LEFT JOIN commerce_withdrawal_payment_receipts pr ON pr.withdrawal_id=w.id`;
 export async function authorizeWithdrawalOwner(env,input){
   if(!['test','beta'].includes(env.APP_ENVIRONMENT))fail('Withdrawals are not enabled on this deployment',503);
   return walletOwner(env,input);
@@ -26,7 +29,10 @@ const view=row=>({id:row.id,sequence:row.sequence,amount:String(row.amount),curr
   bank:{code:row.bank_code,accountSuffix:row.bank_account.slice(-4),channel:row.channel,beneficiaryName:row.beneficiary_name||null},
   createdAt:row.created_at,cancelledAt:row.cancelled_at,bankVerified:!!row.inquiry_digest,payoutConfirmed:false,
   inquiry:{state:row.inquiry_digest?'verified':row.inquiry_started_at?'review':'not_requested',digest:row.inquiry_digest||null},
-  confirmation:row.confirmation_id?{id:row.confirmation_id,confirmedAt:row.confirmed_at,proofExpiresAt:row.confirmation_expires_at}:null});
+  confirmation:row.confirmation_id?{id:row.confirmation_id,confirmedAt:row.confirmed_at,proofExpiresAt:row.confirmation_expires_at}:null,
+  canCancel:!row.cancelled_at&&!row.payment_started_at,
+  payment:{state:row.payment_recorded_at?'response_recorded':row.payment_started_at?'review':'not_started',
+    startedAt:row.payment_started_at||null,recordedAt:row.payment_recorded_at||null}});
 const read=(env,id,input)=>env.DB.prepare(rowSQL+' WHERE w.id=? AND w.seller_id=? AND w.commerce_environment=?')
   .bind(id,input.seller,input.environment).first();
 export function withdrawalFailure(error){
@@ -34,6 +40,7 @@ export function withdrawalFailure(error){
   if(/withdrawal_owner_changed|withdrawal_proof_expired/.test(String(error)))fail('Your Wallet authorization changed. Verify your identity again.',409);
   if(/withdrawal_wallet_mismatch/.test(String(error)))fail('A confirmed seller payment account is required.',409);
   if(/withdrawal_cancelled/.test(String(error)))fail('This withdrawal was cancelled. Refresh its status.',409);
+  if(/withdrawal_payment_started/.test(String(error)))fail('This withdrawal has entered payment processing and cannot be cancelled. Its outcome needs reconciliation.',409);
   throw error;
 }
 
@@ -83,9 +90,8 @@ export async function withdrawalLookup(env,input){
   return withdrawalDetail(env,id,{environment:input.environment,seller:input.seller,actor:input.actor});
 }
 
-// No provider payment dispatch exists in this stage. A later integration must
-// forbid cancellation once its payment grant may have left the server. Timeouts
-// and missing acknowledgements will never be cancellation evidence.
+// The SQL payment fence shares this insertion transaction. Once a payment grant
+// exists, timeouts and missing acknowledgements cannot authorize cancellation.
 export async function cancelWithdrawal(env,id,input){
   fields(input,[...base,'requestKey']);await authorizeWithdrawalOwner(env,input);requestKey(input.requestKey);
   const row=await read(env,id,input);if(!row)fail('Withdrawal was not found',404);

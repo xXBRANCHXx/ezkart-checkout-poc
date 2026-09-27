@@ -71,6 +71,23 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 27 September: payment grants and original payment receipts
+
+The [payment grant](withdrawal-payment-grants.md) now rechecks the original owner,
+latest fresh bank confirmation and current funds inside the transaction that
+blocks cancellation. Only the first committed response permits transport;
+replays, timeouts and missing replies never authorize another send. Original
+payment response storage/recovery preserves the exact inquiry, confirmation,
+amount and bank destination without clearing reservations or claiming delivery.
+Wallet reflects the pending reconciliation and hides invalid cancellation actions.
+
+All 80 relevant Worker/PHP/browser cases pass. The fresh beta backup restores
+cleanly, and migration rehearsal preserves all original rows in 162 tables,
+adding only three empty tables. The workbench rollout is in progress. The
+integrated payment caller, actual Ezkart-funded fees, authenticated outcome
+reconciliation, final payout/refund accounting and live acceptance remain open.
+No top-level gate is closed.
+
 ### 27 September: merchant withdrawal workflow
 
 The [merchant withdrawal workflow](withdrawal-merchant-workflow.md) now implements

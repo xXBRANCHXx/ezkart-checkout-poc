@@ -42,6 +42,13 @@ execution holds and TEST/main configuration are unchanged. No transfer occurs.
 Durable payment dispatch, actual Ezkart-funded transfer fees, final payout/refund
 accounting, outcome reconciliation and live acceptance remain required.
 
+The later [payment grant and original receipt](withdrawal-payment-grants.md)
+implementation is verified locally and its workbench rollout is in progress.
+It adds the atomic cancellation fence, current owner/confirmation/funding checks
+and private original-response recovery. All 80 relevant cases and the populated
+migration rehearsal pass. It does not enable an integrated payment caller or
+close the actual-fee, outcome-accounting or live-acceptance requirements.
+
 The preceding [bank inquiry and owner confirmation](withdrawal-bank-inquiries.md)
 implementation `4810fec` was deployed with migration 0056 and beta Worker
 `34752837-315d-4c1a-8fd1-bc167728c8cd`. One committed grant permits one bank

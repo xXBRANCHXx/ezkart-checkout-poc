@@ -103,9 +103,10 @@ hourly housekeeping trigger remains scheduled. TEST/main are not deployed.
 
 ## Remaining work
 
-Payment dispatch still needs its own durable grant and atomic cancellation
-fence, fresh authority/funding checks, original transport recovery, actual
-Ezkart-funded fees, authenticated outcome reconciliation, completed payout
+The [payment grant and original receipt](withdrawal-payment-grants.md) now fence
+cancellation and repeat send authority, recheck authorization/funding and support
+private receipt recovery. Payment execution still needs its integrated caller,
+actual Ezkart-funded fees, authenticated outcome reconciliation, completed payout
 journals and completed-outflow deductions. Full refund funding/accounting and
 live acceptance remain required. This delivery adds no migration, scheduled
 dispatch or provider-payment endpoint and closes no top-level launch gate.
