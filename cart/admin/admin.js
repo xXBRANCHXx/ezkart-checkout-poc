@@ -823,11 +823,12 @@
     };
     const setText = (selector, value) => { const target = q(selector); if (target) target.textContent = value; };
     const showError = (message) => { if (!errorTarget) return; errorTarget.textContent = message; errorTarget.hidden = false; errorTarget.scrollIntoView({ behavior: "smooth", block: "center" }); };
+    let publishingProductId = editingProduct?.id || "";
     const showProductConflict = () => {
       showError("This product changed since these edits started. Your edits stay in this tab so you can compare and reapply them to the latest product. ");
-      if (!errorTarget || !editingProduct) return;
+      if (!errorTarget || !publishingProductId) return;
       const latest = document.createElement("a");
-      latest.href = `?${new URLSearchParams({ page: "product-new", product: editingProduct.id, fresh: "1" })}`;
+      latest.href = `?${new URLSearchParams({ page: "product-new", product: publishingProductId, fresh: "1" })}`;
       latest.target = "_blank"; latest.rel = "noopener";
       latest.textContent = "Open latest product in a new tab";
       latest.dataset.productConflictLatest = "";
@@ -1130,8 +1131,10 @@
       window.clearTimeout(draftTimer);
       draftTimer = window.setTimeout(() => saveDraft(false), 550);
     };
+    const digitalFiles = globalThis.EzkartDigitalFiles?.mount({root:q('[data-digital-file-editor]'),enabled:cloudEnabled,draftKey:draftId,product:editingProduct,onChange:markDraftChanged});
     const draftSnapshot = () => ({
       id: draftId,
+      digitalUpload: digitalFiles?.snapshot() || null,
       baseRevision,
       productId: editingProduct && cloudCatalogProducts.some((product) => product.id === editingProduct.id) ? editingProduct.id : null,
       name: String(productCreateForm.elements.name?.value || "").trim(),
@@ -1659,6 +1662,7 @@
       // A legacy draft without a revision must be reviewed against a fresh copy.
       // Giving it today's revision would allow its old stock count to erase sales.
       baseRevision = Number.isSafeInteger(snapshot.baseRevision) ? snapshot.baseRevision : null;
+      void digitalFiles?.restore(snapshot.digitalUpload);
       productCreateForm.elements.name.value = snapshot.name || "";
       Object.entries(snapshot.fields || {}).forEach(([name, value]) => { if (productCreateForm.elements[name]) productCreateForm.elements[name].value = value; });
       selectedImages = (snapshot.images || []).filter((item) => item.data).map((item) => ({ id: item.id || `image-${Date.now()}-${Math.random()}`, cloudId: item.cloudId || null, data: item.data, url: item.data }));
@@ -1681,6 +1685,7 @@
       const draft = readProductDrafts().find((item) => item.id === draftId);
       if (draft) { restoreSnapshot(draft, editingProduct ? "Unsaved edits restored" : "Draft restored"); return; }
       if (editingProduct) restoreSnapshot(productSnapshot(editingProduct), "Product loaded");
+      else void digitalFiles?.restore(null);
     };
 
     variantToggle?.addEventListener("change", syncVariantMode);
@@ -1775,15 +1780,23 @@
       try {
         // Finish an in-flight autosave before publishing/deleting its draft.
         await draftSavePromise;
+        const digitalFile = type === 'digital' && cloudEnabled ? await digitalFiles?.ready() : null;
+        if (type === 'digital' && cloudEnabled && !digitalFile) throw new Error('Upload a private product file before publishing.');
+        digitalFiles?.suspend(true);
         await ensureEditorMediaCloud();
+        if (digitalFile) await saveCloudDraft(draftSnapshot());
         const images = await Promise.all(selectedImages.map(imageData));
         const suffix = globalThis.crypto?.randomUUID?.().replace(/-/g, "").slice(0, 10) || String(Date.now());
+        if (type === 'digital' && cloudEnabled && !editingProduct) {
+          const identity = new TextEncoder().encode(JSON.stringify({kind:'digital-product-v1',store:document.body.dataset.adminFileStore,draft:draftId}));
+          publishingProductId = 'custom-' + Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', identity)), byte=>byte.toString(16).padStart(2,'0')).join('').slice(0,32);
+        }
         const product = {
           revision: baseRevision,
-          id: editingProduct?.id || `custom-${suffix}`, sku: editingProduct?.sku || `EZK-${type.slice(0, 3).toUpperCase()}-${suffix.toUpperCase()}`, name: String(productCreateForm.elements.name.value).trim(), category: String(productCreateForm.elements.category.value).trim(), categoryKey: currentCategoryEntry() ? categoryKey(productCreateForm.elements.category.value) : "", description: String(productCreateForm.elements.description.value).trim(), type,
+          id: editingProduct?.id || publishingProductId || `custom-${suffix}`, sku: editingProduct?.sku || `EZK-${type.slice(0, 3).toUpperCase()}-${suffix.toUpperCase()}`, name: String(productCreateForm.elements.name.value).trim(), category: String(productCreateForm.elements.category.value).trim(), categoryKey: currentCategoryEntry() ? categoryKey(productCreateForm.elements.category.value) : "", description: String(productCreateForm.elements.description.value).trim(), type,
           price: variantToggle.checked ? Math.min(...sellableVariants.map((variant) => variant.price)) : Math.round(Number(productCreateForm.elements.price.value) || 0), images, mediaIds: selectedImages.map((image) => image.cloudId), image: images[0],
           ...(type === "physical" ? { stock: variantToggle.checked ? sellableVariants.reduce((total, variant) => total + variant.stock, 0) : Math.max(0, Math.round(Number(productCreateForm.elements.stock.value) || 0)), weightGrams: variantToggle.checked ? Math.max(...sellableVariants.map((variant) => variant.weightGrams)) : Math.max(1, Math.round(Number(productCreateForm.elements.weight.value) || 0)) } : {}),
-          ...(type === "digital" ? { digitalFileName: String(productCreateForm.elements.digital_name.value || "").trim() } : {}),
+          ...(type === "digital" ? { digitalFileName: digitalFile?.filename || String(productCreateForm.elements.digital_name.value || "").trim(), digitalUploadId: digitalFile?.id || null } : {}),
           ...(type === "subscription" ? { subscription: { interval, unit: selectedBillingUnit } } : {}),
           ...(variantToggle.checked ? { options: optionSnapshot(), variants: variants.map(({ customImage, useCustomImage, ...variant }) => ({ ...variant, imageUploadId: useCustomImage ? customImage?.cloudId || null : null, image: useCustomImage && customImage?.data ? customImage.data : Number.isInteger(variant.imageIndex) ? images[variant.imageIndex] || images[0] : images[0], imageSource: useCustomImage && customImage?.data ? "variant-upload" : Number.isInteger(variant.imageIndex) ? `gallery-${variant.imageIndex + 1}` : "main" })) } : {}), createdAt: editingProduct?.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString(),
         };
@@ -1798,6 +1811,7 @@
           await cloudRequest("DELETE", `/v1/drafts/${encodeURIComponent(draftId)}`).catch(() => {});
           cloudProductDrafts = cloudProductDrafts.filter((draft) => draft.id !== draftId);
         }
+        await digitalFiles?.published();
         removeLocalDraft(draftId); sessionStorage.removeItem(activeProductDraftKey);
         window.opener?.postMessage({ type: editingProduct ? "ezkart:catalog-product-updated" : "ezkart:catalog-product-created", productId: product.id }, window.location.origin); window.location.href = `?page=products&${editingProduct ? "updated" : "created"}=1`;
       } catch (error) {
@@ -1807,6 +1821,7 @@
       finally {
         publishingProduct = false;
         editorControls.forEach(control => { control.disabled = false; });
+        digitalFiles?.suspend(false);
         if (saveDraftButton) saveDraftButton.disabled = false;
         submitButtons.forEach((button) => { button.disabled = false; button.textContent = button.dataset.originalText || (editingProduct ? "Publish changes" : "Create product"); });
       }

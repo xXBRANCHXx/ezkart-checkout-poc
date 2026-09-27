@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises';
 import { build } from 'esbuild';
 import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
 import { advancedMode, AdvancedModeLimitError } from '../src/advanced-mode.js';
+import {beginDigitalUpload,uploadDigitalPart,completeDigitalUpload} from '../src/digital-files.js';
 
 test('Advanced persists per store, enforces permissions, and changes page and product limits', async t => {
   const key=await crypto.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},true,['sign','verify']);
@@ -73,7 +74,12 @@ test('Advanced persists per store, enforces permissions, and changes page and pr
   assert.equal((await call('me')).user.active_seller.plan,'advanced');
   assert.deepEqual(JSON.parse((await db.prepare("SELECT settings_json FROM sellers WHERE id='seller_alice'").first()).settings_json),{keep:true});
   await db.prepare("INSERT INTO media_uploads(id,seller_id,r2_key,mime_type,size_bytes,created_by_auth_user_id,created_at) VALUES ('media_capacity','seller_alice','capacity','image/png',1,'alice','now')").run();
-  const product={name:'Extra digital product',type:'digital',price:100000,digitalFileName:'guide.pdf',imageUploadIds:['media_capacity']};
+  const download=new TextEncoder().encode('Capacity fixture download'),fileEnv={DB:db,PRIVATE_ASSETS:await mf.getR2Bucket('PRIVATE_ASSETS')},actor={sellerId:'seller_alice',id:'alice',role:'owner'};
+  const checksum=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',download)),b=>b.toString(16).padStart(2,'0')).join('');
+  const file=await beginDigitalUpload(fileEnv,actor,{requestKey:crypto.randomUUID(),filename:'guide.pdf',size:download.length,parts:[checksum]});
+  await uploadDigitalPart(fileEnv,actor,file.id,1,new Request('https://fixture/part',{method:'PUT',headers:{'content-type':'application/octet-stream'},body:download}));
+  await completeDigitalUpload(fileEnv,actor,file.id);
+  const product={name:'Extra digital product',type:'digital',price:100000,digitalUploadId:file.id,imageUploadIds:['media_capacity']};
   assert.equal((await call('products/product_10',product)).status,200,'Advanced can save its eleventh product through the API');
   for(let i=6;i<24;i++)assert.equal((await call('landing-pages/page-'+i,page)).status,200);
   assert.equal((await call('landing-pages/page-24',page)).status,409);

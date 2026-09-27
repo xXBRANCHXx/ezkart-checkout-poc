@@ -708,6 +708,7 @@ function ez_admin_sync_cloudflare_user(string $accessToken): array
 
 function ez_admin_proxy_cloud_request(string $accessToken, string $path, string $method): never
 {
+    if (str_starts_with($path, '/v1/digital-files')) { require_once __DIR__ . '/digital-file-proxy.php'; ez_admin_digital_file_proxy($accessToken, $path, $method); }
     if (str_starts_with($path, '/v1/commerce/notifications')) { require_once __DIR__ . '/notification-proxy.php'; ez_admin_notification_proxy($accessToken, $path, $method); }
     if (str_starts_with($path, '/v1/commerce/settings')) { require_once __DIR__ . '/settings-proxy.php'; ez_admin_settings_proxy($accessToken, $path, $method); }
     if (str_starts_with($path, '/v1/commerce/marketing')) { require_once __DIR__ . '/marketing-proxy.php'; ez_admin_marketing_proxy($accessToken, $path, $method); }
@@ -1303,7 +1304,8 @@ if ($cloudPath !== '') {
         if (($_SESSION['mfa_enabled'] ?? false) === true && ($_SESSION['mfa_aal'] ?? 'aal1') !== 'aal2') {
             ez_admin_json(['ok' => false, 'error' => 'Enter your authenticator code before changing protected store data.'], 403);
         }
-        $cloudCsrf = (string) ($_SERVER['HTTP_X_EZKART_CSRF'] ?? '');
+        $fileDownloadForm = $cloudMethod === 'POST' && preg_match('#^/v1/digital-files/uploads/dupl_[a-f0-9]{40}/file$#D', $cloudPath) === 1 && is_string($_POST['csrf'] ?? null);
+        $cloudCsrf = (string) ($_SERVER['HTTP_X_EZKART_CSRF'] ?? ($fileDownloadForm ? $_POST['csrf'] : ''));
         if (!hash_equals($csrfToken, $cloudCsrf)) {
             ez_admin_json(['ok' => false, 'error' => 'The save request expired. Reload and try again.'], 403);
         }
@@ -1664,6 +1666,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
   <?php if ($centralCustomerWorkspace): ?><link rel="stylesheet" href="commerce-customers.css?v=<?= (int) filemtime(__DIR__ . '/commerce-customers.css') ?>"><?php endif; ?>
   <?php if ($centralCustomerWorkspace || $page === 'product-new'): ?><link rel="stylesheet" href="../review-display.css?v=<?= (int) filemtime(__DIR__ . '/../review-display.css') ?>"><?php endif; ?>
   <?php if ($centralCustomerWorkspace): ?><link rel="stylesheet" href="commerce-reviews.css?v=<?= (int) filemtime(__DIR__ . '/commerce-reviews.css') ?>"><?php endif; ?>
+  <?php if ($page === 'product-new'): ?><link rel="stylesheet" href="digital-files.css?v=<?= (int) filemtime(__DIR__ . '/digital-files.css') ?>"><?php endif; ?>
   <link rel="stylesheet" href="advanced.css?v=<?= (int) filemtime(__DIR__ . '/advanced.css') ?>">
   <?php if ($page === 'sites'): ?><link rel="stylesheet" href="builder-choice.css?v=<?= (int) filemtime(__DIR__ . '/builder-choice.css') ?>"><link rel="stylesheet" href="builder-image.css?v=<?= (int) filemtime(__DIR__ . '/builder-image.css') ?>"><?php endif; ?>
   <link rel="stylesheet" href="profile-logo.css?v=<?= (int) filemtime(__DIR__ . '/profile-logo.css') ?>">
@@ -1672,7 +1675,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
   <link rel="stylesheet" href="../select.css?v=<?= (int) filemtime(__DIR__ . '/../select.css') ?>">
   <title><?= $authenticated ? ez_admin_escape($pageTitles[$page]) : ($pendingMfa !== null ? 'Two-step verification' : 'Admin Login') ?> · Ezkart</title>
 </head>
-<body class="<?= $authenticated ? 'dashboard-page page-' . ez_admin_escape($page) . ($page === 'sites' ? ($siteEditor ? ' page-site-editor' : ' page-sites-library') : '') : 'login-page' ?>" data-admin-review-account="<?= ez_admin_escape((string) ($adminUser['id'] ?? '')) ?>" data-admin-date-preferences="<?= ez_admin_escape(json_encode($storeDisplayPreferences)) ?>" data-admin-language="<?= ez_admin_escape($adminLanguage) ?>" data-admin-advanced-mode="<?= !empty($advancedPlan['enabled']) ? 'true' : 'false' ?>" data-admin-landing-limit="<?= !empty($advancedPlan['enabled']) ? 24 : 6 ?>" data-admin-profile="<?= ez_admin_escape(json_encode($adminProfile)) ?>" data-admin-storage-scope="<?= ez_admin_escape($adminStorageScope) ?>" data-admin-checkout-brand="<?= ez_admin_escape($adminDisplayName) ?>" data-admin-migrate-legacy-storage="<?= $legacyDataAccess ? 'true' : 'false' ?>" data-admin-cloud-enabled="<?= $authenticated && $authenticationMethod === 'supabase' ? 'true' : 'false' ?>" data-admin-cloud-media-base="<?= $authenticated && $authenticationMethod === 'supabase' ? ez_admin_escape($cloudMediaBase) : '' ?>" data-admin-csrf-token="<?= ez_admin_escape($csrfToken) ?>">
+<body class="<?= $authenticated ? 'dashboard-page page-' . ez_admin_escape($page) . ($page === 'sites' ? ($siteEditor ? ' page-site-editor' : ' page-sites-library') : '') : 'login-page' ?>" data-admin-file-store="<?= ez_admin_escape($sellerId) ?>" data-admin-review-account="<?= ez_admin_escape((string) ($adminUser['id'] ?? '')) ?>" data-admin-date-preferences="<?= ez_admin_escape(json_encode($storeDisplayPreferences)) ?>" data-admin-language="<?= ez_admin_escape($adminLanguage) ?>" data-admin-advanced-mode="<?= !empty($advancedPlan['enabled']) ? 'true' : 'false' ?>" data-admin-landing-limit="<?= !empty($advancedPlan['enabled']) ? 24 : 6 ?>" data-admin-profile="<?= ez_admin_escape(json_encode($adminProfile)) ?>" data-admin-storage-scope="<?= ez_admin_escape($adminStorageScope) ?>" data-admin-checkout-brand="<?= ez_admin_escape($adminDisplayName) ?>" data-admin-migrate-legacy-storage="<?= $legacyDataAccess ? 'true' : 'false' ?>" data-admin-cloud-enabled="<?= $authenticated && $authenticationMethod === 'supabase' ? 'true' : 'false' ?>" data-admin-cloud-media-base="<?= $authenticated && $authenticationMethod === 'supabase' ? ez_admin_escape($cloudMediaBase) : '' ?>" data-admin-csrf-token="<?= ez_admin_escape($csrfToken) ?>">
 <?php if (!$authenticated): ?>
   <main class="login-shell">
     <?php if ($pendingMfa !== null): ?>
@@ -1996,6 +1999,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
   <?php if ($page === 'wallet'): ?><script src="wallet-access.js?v=<?= (int) filemtime(__DIR__ . '/wallet-access.js') ?>"></script><script src="wallet-enrollment.js?v=<?= (int) filemtime(__DIR__ . '/wallet-enrollment.js') ?>"></script><?php endif; ?>
   <script src="admin-language.js?v=<?= (int) filemtime(__DIR__ . '/admin-language.js') ?>"></script>
   <?php if ($page === 'sites'): ?><script src="builder-image.js?v=<?= (int) filemtime(__DIR__ . '/builder-image.js') ?>"></script><script src="builder-choice.js?v=<?= (int) filemtime(__DIR__ . '/builder-choice.js') ?>"></script><?php endif; ?>
+  <?php if ($page === 'product-new'): ?><script src="digital-files.js?v=<?= (int) filemtime(__DIR__ . '/digital-files.js') ?>"></script><?php endif; ?>
   <script src="admin.js?v=<?= ez_admin_escape($adminJsVersion) ?>"></script>
   <?php if ($page === 'advanced'): ?><script src="advanced.js?v=<?= (int) filemtime(__DIR__ . '/advanced.js') ?>"></script><?php endif; ?>
   <script src="profile-logo.js?v=<?= (int) filemtime(__DIR__ . '/profile-logo.js') ?>"></script>

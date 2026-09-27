@@ -142,13 +142,32 @@ function ez_orders_table(array $rows, string $tableId, string $csrfToken, string
             <label><span>Price (IDR)</span><input name="price" type="number" required min="1000" step="500" value="75000" data-product-preview-price></label>
             <label data-product-physical><span>Stock</span><input name="stock" type="number" min="0" max="999999" value="10" data-product-preview-stock></label>
             <label data-product-physical><span>Shipping weight (grams)</span><input name="weight" type="number" min="1" max="50000" value="500"></label>
-            <label data-product-digital hidden><span>Download filename</span><input name="digital_name" maxlength="100" placeholder="freelance-guide.pdf"><small>The protected file upload is connected separately.</small></label>
+
             <div class="product-subscription-settings product-field-wide" data-product-subscription hidden>
               <label><span>Bill every</span><input name="interval" type="number" min="1" max="120" value="1" data-product-preview-interval></label>
               <label><span>Billing period</span><select name="unit" data-product-preview-unit><option value="month">Month</option><option value="year">Year</option></select></label>
               <p>Customers will be billed automatically on the schedule you choose.</p>
             </div>
           </div>
+        </section>
+
+        <section class="product-form-card digital-file-card" data-product-digital data-digital-file-editor data-can-edit="<?= ($activeSeller['role'] ?? 'viewer') !== 'viewer' ? 'true' : 'false' ?>" hidden>
+          <header><span>05</span><div><h2>Private download file</h2><p>Upload the file included with this product. All variants use the same file.</p></div></header>
+          <input type="hidden" name="digital_name">
+          <div class="digital-file-summary"><b data-digital-name>No private file selected</b><small data-digital-size>One file · up to 500 MiB</small></div>
+          <input type="file" data-digital-pick aria-label="Private product file" hidden>
+          <p data-digital-status role="status" aria-live="polite">Upload the file customers will receive. The file stays private.</p>
+          <progress max="100" value="0" hidden></progress>
+          <div class="digital-file-actions">
+            <button class="action-button" type="button" data-digital-choose>Choose file</button>
+            <button class="action-button" type="button" data-digital-resume hidden>Resume upload</button>
+            <button class="action-button" type="button" data-digital-pause hidden>Pause upload</button>
+            <button class="action-button" type="button" data-digital-download hidden>Download selected file</button>
+            <button class="action-button" type="button" data-digital-discard hidden>Discard selected upload</button>
+          </div>
+          <small data-digital-expiry hidden></small>
+          <p class="product-editor-error" data-digital-error role="alert" hidden></p>
+          <details data-digital-history hidden><summary>Published file versions</summary><p>Replacing a file creates a new version. Previous versions are retained.</p><p data-digital-history-empty>No file versions have been published.</p><ol data-digital-history-items></ol><button class="action-button" type="button" data-digital-history-more hidden>Load earlier versions</button></details>
         </section>
 
         <p class="product-editor-error" data-product-create-error role="alert" hidden></p>

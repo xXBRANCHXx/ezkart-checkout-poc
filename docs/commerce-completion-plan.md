@@ -64,6 +64,36 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 27 September: private digital product file storage
+
+Implemented resumable, verified private uploads and immutable catalog file
+versions. Merchants can pause/resume across reloads, reject a different file,
+recover lost upload/discard responses, publish replacements, inspect history and
+download original bytes without assembling large browser Blobs. Exact initial
+publication identity survives reload and another store editor, preventing a
+second product after a lost response. Copies share the retained private file;
+cancellation, cleanup and catalog changes are fenced against concurrent writes
+and membership changes. See [digital-product-files.md](digital-product-files.md).
+
+All eight D1/R2 storage cases, both Advanced plan cases, thirty-three existing
+order cases and two publication cases pass. Five new PHP/browser cases, thirteen
+existing checkout/order-read proxy cases and two security-policy cases pass.
+Desktop/390px file controls are visually checked. Twelve builder cases pass; the
+flow-grid case passes on focused rerun after a transient missing-cell failure in
+the concurrent run. Syntax, diff and the TEST Worker dry-run pass.
+
+The fresh 655,349-byte TEST backup preserves every record in all 130 existing
+physical tables, passes integrity/foreign-key checks and compiles all 150 captured
+compatibility queries. Migration 0042 adds 22 objects and changes none. Backup
+SHA-256: `8aac26501fe6d7c26b293bbd49705a29b2b660673a434533418221ea2bafff1b`.
+Deployment and hosted verification follow this implementation check.
+
+Buyer digital checkout, payment-bound entitlements, delivery evidence, refunds,
+subscription lifecycles, maximum-size hosted transfers and storage operations
+remain open. Shared Chrome is still disconnected without a new reconnect attempt;
+signed-in hosted acceptance remains pending. Financial, provider, central-commerce
+and production holds remain unchanged. All thirteen completion gates remain open.
+
 ### 27 September: hosted merchant content-security policy
 
 Fixed Hostinger's replacement of PHP's dashboard/map/preview policy with its

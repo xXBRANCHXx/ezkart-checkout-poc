@@ -1,3 +1,4 @@
+import {beginDigitalUpload,digitalUpload,uploadDigitalPart,completeDigitalUpload,cancelDigitalUpload,digitalMerchantFile,digitalFileHistory,readyDigitalUpload,digitalVersionStatements,digitalCatalogSql,digitalCatalogFile,cleanupDigitalUploads} from './digital-files.js';
 import {hostedLandingResponse, landingPageLinks} from './landing-page-hosting.js';
 import {sellerPageAddress, sellerByPageAddress} from './seller-page-address.js';
 import { adminPreferences } from './admin-preferences.js';
@@ -381,7 +382,7 @@ function shapeProduct(row, media = [], variants = [], performance = {}) {
 
 async function catalog(request, env) {
   const { seller } = await sellerContext(request, env);
-  const [productsResult, mediaResult, variantsResult, draftsResult, salesResult, reviewsResult] = await env.DB.batch([
+  const [productsResult, mediaResult, variantsResult, draftsResult, salesResult, reviewsResult, digitalResult] = await env.DB.batch([
     env.DB.prepare("SELECT * FROM products WHERE seller_id = ? AND status IN ('active', 'archived') ORDER BY updated_at DESC").bind(seller.id),
     env.DB.prepare(`
       SELECT pm.id, pm.product_id, pm.mime_type, pm.sort_order, pm.alt_text
@@ -404,6 +405,7 @@ async function catalog(request, env) {
       WHERE r.seller_id = ? AND r.commerce_environment IN (?, 'legacy') AND ${publicReviewSql}
       GROUP BY product_id
     `).bind(seller.id,reviewMode(env)),
+    env.DB.prepare(digitalCatalogSql).bind(seller.id),
   ]);
   const media = Array.isArray(mediaResult.results) ? mediaResult.results : [];
   const variants = Array.isArray(variantsResult.results) ? variantsResult.results : [];
@@ -415,6 +417,8 @@ async function catalog(request, env) {
     variants.filter((item) => item.product_id === row.id),
     { ...sales.get(row.id), ...reviews.get(row.id) },
   ));
+  const digitalFiles = new Map(digitalResult.results.map(row=>[row.product_id,digitalCatalogFile(row)]));
+  for (const product of products) product.digitalFile = digitalFiles.get(product.id) || null;
   const drafts = (Array.isArray(draftsResult.results) ? draftsResult.results : []).map((row) => ({
     ...parseJson(row.snapshot_json, {}),
     id: row.id,
@@ -1201,7 +1205,8 @@ async function saveProduct(request, env, rawId) {
   const displayBillingInterval = type === "subscription" ? (firstPlan?.billingInterval || Math.max(1, Math.min(displayBillingUnit === "year" ? 10 : 120, Math.round(Number(payload.subscription?.interval) || 1)))) : null;
   const billingUnit = type === "subscription" ? "month" : null;
   const billingInterval = type === "subscription" ? displayBillingInterval * (displayBillingUnit === "year" ? 12 : 1) : null;
-  const digitalFilename = type === "digital" ? cleanText(payload.digitalFileName, 180) : null;
+  const digitalFile = type === "digital" ? await readyDigitalUpload(env,seller.id,payload.digitalUploadId) : null;
+  const digitalFilename = digitalFile?.filename || null;
   const now = new Date().toISOString();
   const createdAt = existing?.created_at || now;
   const eventId = `event_${crypto.randomUUID()}`;
@@ -1247,6 +1252,7 @@ async function saveProduct(request, env, rawId) {
       billing_interval_count = excluded.billing_interval_count, image_source = excluded.image_source,
       image_upload_id = excluded.image_upload_id, updated_at = excluded.updated_at` : ""}
   `).bind(variant.id, seller.id, id, variant.name, JSON.stringify({ values: variant.options, hidden: variant.hidden, position: index + 1 }), variant.sku, variant.price, type === "physical" ? variant.stock : null, type === "physical" ? variant.weightGrams : null, variant.billingUnit, variant.billingInterval, variant.imageSource, variant.imageUploadId, variant.slot, now, now)));
+  statements.push(...digitalVersionStatements(env,seller.id,authUserId,id,digitalFile,now));
   await env.DB.batch(statements);
   await cleanupUnusedMedia(env, seller.id, [...replacedMediaIds, ...requestedMediaIds]);
   const result = await catalog(request, env);
@@ -1312,6 +1318,8 @@ async function duplicateProduct(request, env, productId) {
   ]);
   if (!product) throw new Response("Product not found", { status: 404 });
   await assertProductCapacity(env, seller);
+  const digitalSource = product.type === 'digital' ? await env.DB.prepare(digitalCatalogSql+' AND f.product_id=?').bind(seller.id,sourceId).first() : null;
+  const digitalFile = product.type === 'digital' ? await readyDigitalUpload(env,seller.id,digitalSource?.upload_id) : null;
 
   const sourceMedia = Array.isArray(mediaResult.results) ? mediaResult.results : [];
   const sourceVariants = Array.isArray(variantsResult.results) ? variantsResult.results : [];
@@ -1389,6 +1397,7 @@ async function duplicateProduct(request, env, productId) {
       VALUES (?, ?, ?, 'product.duplicated', 'product', ?, ?, ?)
     `).bind(duplicateEventId, seller.id, authUserId, copyId, JSON.stringify({ source_product_id: sourceId, title: copyTitle }), now));
 
+    statements.push(...digitalVersionStatements(env,seller.id,authUserId,copyId,digitalFile,now));
     await env.DB.batch(statements);
     persisted = true;
     const result = await catalog(request, env);
@@ -1918,6 +1927,26 @@ export default {
       if (request.method === "POST" && productDuplicateMatch) return json({ ok: true, product: await duplicateProduct(request, env, productDuplicateMatch[1]) }, 201, cors);
       const productStatusMatch = /^\/v1\/products\/([a-zA-Z0-9_-]+)\/status$/.exec(url.pathname);
       if (request.method === "PATCH" && productStatusMatch) return json({ ok: true, product: await setProductStatus(request, env, productStatusMatch[1]) }, 200, cors);
+      if (url.pathname.startsWith('/v1/digital-files')) {
+        const {seller,authUserId}=await sellerContext(request,env),actor={sellerId:seller.id,id:authUserId,role:seller.role};
+        if(request.headers.get('x-ezkart-file-store')!==seller.id)throw new Response('Your store changed. Reload this page.',{status:409,headers:{'x-ezkart-error-code':'digital_store_changed'}});
+        const upload=/^\/v1\/digital-files\/uploads(?:\/(dupl_[a-f0-9]{40})(?:\/(complete|cancel|file)|\/parts\/([1-9][0-9]{0,2}))?)?$/.exec(url.pathname);
+        const history=/^\/v1\/digital-files\/products\/([A-Za-z0-9][A-Za-z0-9_-]{0,99})$/.exec(url.pathname);
+        const method=request.method;
+        if(history&&method==='GET'&&[...url.searchParams.keys()].every(k=>k==='before')&&url.searchParams.getAll('before').length<=1)
+          return json({ok:true,...await digitalFileHistory(env,actor,history[1],Number(url.searchParams.get('before')||Number.MAX_SAFE_INTEGER))},200,cors);
+        if(!upload||url.search)throw new Response('File path is invalid.',{status:400});
+        const [,id,action,part]=upload;
+        if(action==='file'&&['GET','HEAD'].includes(method))return await digitalMerchantFile(env,actor,id,request);
+        if(!id&&method==='POST')return json({ok:true,upload:await beginDigitalUpload(env,actor,await reviewRequestJson(request,12000))},200,cors);
+        if(id&&!action&&!part&&method==='GET')return json({ok:true,upload:await digitalUpload(env,actor,id)},200,cors);
+        if(part&&method==='PUT')return json({ok:true,upload:await uploadDigitalPart(env,actor,id,Number(part),request)},200,cors);
+        if(['complete','cancel'].includes(action)&&method==='POST'){
+          const input=await reviewRequestJson(request,1000);if(Object.keys(input).length)throw new Response('File action must have an empty object body.',{status:400});
+          return json({ok:true,upload:await (action==='complete'?completeDigitalUpload:cancelDigitalUpload)(env,actor,id)},200,cors);
+        }
+        throw new Response('File method is not allowed.',{status:405});
+      }
       const productMatch = /^\/v1\/products\/([a-zA-Z0-9_-]+)$/.exec(url.pathname);
       if (["PUT", "POST"].includes(request.method) && productMatch) return json({ ok: true, product: await saveProduct(request, env, productMatch[1]) }, 200, cors);
       if (request.method === "DELETE" && productMatch) { await deleteProduct(request, env, productMatch[1]); return json({ ok: true }, 200, cors); }
@@ -1929,6 +1958,8 @@ export default {
       if (error instanceof AdvancedModeLimitError) return json({ ok: false, code: 'basic_limits_exceeded', error: error.message, plan: error.plan }, 409, cors);
       if (error instanceof Response) return json({ ok: false, error: await error.text(), ...(error.headers.has("x-ezkart-error-code") ? { code: error.headers.get("x-ezkart-error-code") } : {}) }, error.status, cors);
       const failure = `${error?.message || error || ""} ${error?.cause?.message || ""}`;
+      if (failure.includes('digital_membership_changed')) return json({ok:false,error:'Your store access changed. Reload this page.',code:'digital_membership_changed'},403,cors);
+      if (failure.includes("digital_file_unavailable")) return json({ok:false,error:"The private file changed or expired. Verify the file before publishing.",code:"digital_file_unavailable"},409,cors);
       if (failure.includes("catalog_revision_conflict")) {
         return json({ ok: false, code: "catalog_revision_conflict", error: "This product changed since these edits started. Load the latest product and review your changes before publishing." }, 409, cors);
       }
@@ -1970,6 +2001,7 @@ export default {
     if(controller.cron==='* * * * *'){
       context.waitUntil((async()=>{await scheduleNotifications(env);await dispatchNotifications(env);})());return;
     }
+    context.waitUntil(cleanupDigitalUploads(env));
     context.waitUntil(cleanupAbandonedMedia(env));
     context.waitUntil(cleanupCampaignVisits(env));
     context.waitUntil(cleanupCampaignReportExports(env));

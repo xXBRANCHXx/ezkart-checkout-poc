@@ -8,11 +8,11 @@ export async function setupCentralFixture(t, overrides = {}, commerce = {}) {
   const relay = createServer(async (req, res) => {
     try {
       const chunks = []; for await (const chunk of req) chunks.push(chunk);
-      const body = Buffer.concat(chunks).toString();
+      const bytes = Buffer.concat(chunks), body = bytes.toString();
       control.calls.push({path: req.url, body: body ? (/^application\/json(?:;|$)/i.test(req.headers['content-type']||'') ? JSON.parse(body) : body) : null});
       if (control.fail && req.url === control.fail) { res.writeHead(503); res.end('{"ok":false}'); return; }
       const response = await f.mf.dispatchFetch('https://api.fixture.test' + req.url, {method: req.method, headers: req.headers,
-        ...(body ? {body} : {})});
+        ...(bytes.length ? {body:bytes} : {})});
       let responseBody = Buffer.from(await response.arrayBuffer());
       if (control.afterResponse) await control.afterResponse(req.url);
       // Simulate an elapsed minute for the PHP status-check guard without rewriting immutable database snapshots.
@@ -21,7 +21,8 @@ export async function setupCentralFixture(t, overrides = {}, commerce = {}) {
       }
       if (control.drop && req.url === control.drop) { control.drop = ''; res.writeHead(503); res.end('lost response'); return; }
       const responseHeaders={'content-type':response.headers.get('content-type')||'application/json','cache-control':response.headers.get('cache-control')||'no-store'};
-      for(const name of ['x-ezkart-campaign-store','x-ezkart-campaign-environment'])if(response.headers.has(name))responseHeaders[name]=response.headers.get(name);
+      for(const name of ['x-ezkart-campaign-store','x-ezkart-campaign-environment','content-disposition','content-length','content-range','accept-ranges'])if(response.headers.has(name))responseHeaders[name]=response.headers.get(name);
+      if(req.method!=='HEAD'&&responseHeaders['content-length'])responseHeaders['content-length']=String(responseBody.length);
       res.writeHead(response.status,responseHeaders); res.end(responseBody);
     } catch (error) { res.writeHead(500); res.end(JSON.stringify({ok: false, error: error.message})); }
   });

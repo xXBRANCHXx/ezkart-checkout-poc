@@ -22,3 +22,9 @@ Owner instruction confirmed on 19 September 2026: ezkart.id remains unchanged un
 The current checkout suite verifies sandbox and fixture-based production provider selection, signed callbacks, shipping, and the Executive bridge. Executive tests verify browser access, environment isolation, reporting calculations, user drilldowns, and exports. These checks do not establish a month of operational reliability and do not certify a completed wallet or payout implementation. Wallet rules documented elsewhere are not an operational ledger.
 
 The Executive Dashboard reports payment/order records; its paid value metrics are not seller wallet balances or Ezkart revenue. Production D1 currently has no Ezkart application tables. No production database initialization or release is authorized by this testing work.
+
+Private digital product storage has local D1/R2 and merchant-browser coverage;
+see [digital-product-files.md](digital-product-files.md). Catalog file publication
+is not buyer delivery evidence. Paid download entitlements, refund/revocation
+rules, digital earning eligibility, subscriptions and signed-in hosted acceptance
+remain open, with existing financial and provider holds unchanged.

@@ -1,0 +1,15 @@
+/* Private product file upload, recovery, and retained versions. */
+.digital-file-card { min-width: 0; }
+.digital-file-summary { display: grid; gap: 5px; overflow-wrap: anywhere; }
+.digital-file-summary small, .digital-file-card > small { color: var(--muted, #64748b); font-size: 12px; }
+.digital-file-card > p, .digital-file-card details > p { font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.digital-file-card progress { width: 100%; height: 12px; accent-color: var(--accent, #4f46e5); margin: 6px 0 12px; }
+.digital-file-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.digital-file-actions .action-button { white-space: normal; text-align: left; }
+.digital-file-card details { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border, #e2e8f0); }
+.digital-file-card summary { cursor: pointer; font-size: 13px; font-weight: 650; }
+.digital-file-card ol { list-style: none; padding: 0; display: grid; gap: 12px; }
+.digital-file-card li { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 12px; line-height: 1.6; }
+.digital-file-card li > span { overflow-wrap: anywhere; min-width: 0; }
+.digital-file-card li .action-button { flex-shrink: 0; }
+@media (max-width: 640px) { .digital-file-card li { align-items: flex-start; flex-direction: column; } }
