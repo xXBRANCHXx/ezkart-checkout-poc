@@ -43,7 +43,11 @@ return [
     'doku_sandbox_client_id' => 'REPLACE_WITH_DOKU_SANDBOX_CLIENT_ID',
     'doku_sandbox_secret_key' => 'REPLACE_WITH_DOKU_SANDBOX_SECRET_KEY',
     'doku_sandbox_payment_flow' => 'direct_bca', // Ezkart UI; non-SNAP BCA sandbox API.
-    'doku_production_payment_flow' => '', // Direct production VA requires SNAP migration; never falls back to hosted.
+    'doku_production_payment_flow' => '', // Select snap_bca only after channel, callbacks and central storage acceptance.
+    'doku_sandbox_snap_bca_partner_service_id' => '', // Assigned BCA BIN digits; padded by the adapter.
+    'doku_sandbox_snap_bca_customer_prefix' => '', // Assigned BCA customer prefix, including any leading zero.
+    'doku_production_snap_bca_partner_service_id' => '', // Do not substitute another bank's BIN.
+    'doku_production_snap_bca_customer_prefix' => '',
     'doku_production_client_id' => '',
     'doku_production_secret_key' => '',
     // SNAP signing keys are server-only PEM contents. Keep the private files

@@ -2,7 +2,7 @@
 declare(strict_types=1);
 require_once __DIR__ . '/doku-snap.php';
 
-/** BCA SNAP 1.1, aggregator/DGPC, closed amount, non-reusable. No HTTP entry point. */
+/** BCA SNAP 1.1, aggregator/DGPC, closed amount, non-reusable. */
 final class EzDokuBcaSnapClient extends EzDokuSnapClient
 {
     public const NOTIFICATION_PATH = '/cart/api/doku-snap-webhook.php';
@@ -76,6 +76,7 @@ final class EzDokuBcaSnapClient extends EzDokuSnapClient
         $expiry = self::date($binding['expiresAt'])->getTimestamp();
         if ($expiry <= $this->now() || $expiry > $this->now() + 86400) throw new EzDokuReadException('expiry');
         [$response, $evidence] = $this->bcaRequest('bca-create', $payload, $binding['externalId']);
+        if (strlen($evidence['responseBody']) > 262144) throw new EzDokuReadException('response_size');
         $data = $response->virtualAccountData ?? null;
         if ($response->responseCode !== '2002700' || !$data instanceof stdClass
             || ($data->trxId ?? null) !== $binding['orderId'] || ($data->virtualAccountName ?? null) !== $binding['name']
@@ -90,11 +91,9 @@ final class EzDokuBcaSnapClient extends EzDokuSnapClient
             'expiresAt' => $returnedExpiry->format('Y-m-d\TH:i:s\Z')], 'evidence' => $evidence];
     }
 
-    /** Authenticated evidence only. The caller acknowledges after its durable capture commit. */
-    public function paymentNotification(#[SensitiveParameter] string $body, #[SensitiveParameter] array $headers,
-        string $target, array $binding, ?string $expectedAccount = null): array
+    /** Authenticate before any order lookup. This alone does not confirm a payment. */
+    public function authenticateNotification(#[SensitiveParameter] string $body, #[SensitiveParameter] array $headers, string $target): stdClass
     {
-        $this->paymentPayload($binding);
         if ($target !== self::NOTIFICATION_PATH || strlen($body) > 262144) throw new EzDokuReadException('notification');
         foreach (['authorization' => 2055, 'x-partner-id' => 128, 'x-external-id' => 36, 'x-timestamp' => 25, 'x-signature' => 88, 'channel-id' => 3] as $key => $limit) {
             if (!is_string($headers[$key] ?? null) || $headers[$key] === '' || strlen($headers[$key]) > $limit
@@ -110,6 +109,15 @@ final class EzDokuBcaSnapClient extends EzDokuSnapClient
         catch (Throwable) { throw new EzDokuReadException('notification_json'); }
         $canonical = 'POST:' . $target . ':' . $token[1] . ':' . hash('sha256', $minified) . ':' . $headers['x-timestamp'];
         if (!hash_equals(base64_encode(hash_hmac('sha512', $canonical, $this->credentials['secretKey'], true)), $headers['x-signature'])) throw new EzDokuReadException('notification_signature');
+        return $data;
+    }
+
+    /** Authenticated evidence only. The caller acknowledges after its durable capture commit. */
+    public function paymentNotification(#[SensitiveParameter] string $body, #[SensitiveParameter] array $headers,
+        string $target, array $binding, ?string $expectedAccount = null): array
+    {
+        $this->paymentPayload($binding);
+        $data = $this->authenticateNotification($body, $headers, $target);
         if (($data->trxId ?? null) !== $binding['orderId'] || ($data->additionalInfo->channel ?? null) !== 'VIRTUAL_ACCOUNT_BCA'
             || (property_exists($data, 'virtualAccountTrxType') && $data->virtualAccountTrxType !== 'C')
             || !is_string($data->paymentRequestId ?? null) || preg_match('/^[A-Za-z0-9_-]{1,30}$/D', $data->paymentRequestId) !== 1) throw new EzDokuReadException('notification_payment');
@@ -129,7 +137,7 @@ final class EzDokuBcaSnapClient extends EzDokuSnapClient
                 'paidAmount' => ['value' => (string) $binding['amount'] . '.00', 'currency' => 'IDR']]],
             'evidence' => ['environment' => $binding['environment'], 'credentialFingerprint' => $this->credentialFingerprint,
                 'operation' => 'bca-notification', 'externalId' => $headers['x-external-id'], 'sentAt' => $headers['x-timestamp'],
-                'observedAt' => gmdate('Y-m-d\TH:i:s\Z', $this->now()), 'bodyHash' => hash('sha256', $minified), 'body' => $body]];
+                'observedAt' => gmdate('Y-m-d\TH:i:s\Z', $this->now()), 'bodyHash' => hash('sha256', EzDokuFinancialJson::minify($body)), 'body' => $body]];
     }
 
     /** Preserve status evidence; HTTP 200 and paidAmount alone do not confirm a payment. */
@@ -142,6 +150,7 @@ final class EzDokuBcaSnapClient extends EzDokuSnapClient
         [$response, $evidence] = $this->bcaRequest('bca-status', ['partnerServiceId' => $binding['partnerServiceId'],
             'customerNo' => substr($accountNumber, strlen($bin)), 'virtualAccountNo' => $binding['partnerServiceId'] . substr($accountNumber, strlen($bin)),
             ...($paymentRequestId === null ? [] : ['paymentRequestId' => $paymentRequestId])]);
+        if (strlen($evidence['responseBody']) > 262144) throw new EzDokuReadException('response_size');
         if ($response->responseCode !== '2002600') throw new EzDokuReadException('status');
         $rows = $response->virtualAccountData ?? null;
         if ($rows instanceof stdClass) $rows = [$rows];

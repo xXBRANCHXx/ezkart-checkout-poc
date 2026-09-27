@@ -68,7 +68,7 @@ copied into the real-payment database.
 The beta configuration keeps commerce held and has no scheduled provider or
 email work. Creating these resources does not cut over the hosted frontend.
 Still required before that cutover: owned catalog/settings/assets preparation,
-central SNAP dispatch and durable callback wiring, configured/accepted channels,
+configured/accepted SNAP channels and callback delivery,
 hosted private credentials and provider jobs, Executive/operations access and
 signed-in merchant/customer acceptance. Existing operator commands restricted
 to TEST must gain explicit beta support before they are used for live recovery.
@@ -119,9 +119,16 @@ The empty Token URL is not itself a DGPC blocker: DOKU's
 [integration guide](https://docs.doku.com/get-started/manage-business/set-up-integration)
 requires that setting for DIPC.
 
-The typed [BCA SNAP adapter](doku-snap-payments.md) now passes 25 contract/reader
-cases and 15 wallet/signing regression cases. Its central dispatch, durable
-callback and checkout wiring remain required before selecting it for real orders.
+The [BCA SNAP integration](doku-snap-payments.md) now includes central dispatch,
+immutable request bindings, private receipts, the signed public callback and
+checkout/payment-page wiring. Migration 0048 preserves the earlier payment
+contracts and introduces two tables. Its dispatch grant cannot be replayed;
+receipts and captures commit together, including callbacks that arrive before a
+create reply. Existing checkout, financial journal and deployment checks pass,
+alongside nine new Worker and ten PHP/HTTP/browser cases. Actual channel and
+callback acceptance, hosted configuration/cutover, financial settlement and
+provider-supported uncertain-result recovery remain required. The flow is not
+selected in any hosted runtime.
 
 Implementation `56c6fab` is on workbench and TEST Worker
 `32567d92-a27e-42f2-9ff5-9ecd27c2afdb`. Migration 0047 is installed with 144

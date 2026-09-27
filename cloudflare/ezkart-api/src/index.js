@@ -25,6 +25,7 @@ import {fulfillmentList,fulfillmentDetail,fulfillmentAction,serviceShipment,cust
 import {merchantOrderList,merchantOrderDetail,merchantOrderHistory} from './commerce-order-reads.js';
 import {merchantDashboard} from './commerce-dashboard.js';
 import {merchantPaymentList,merchantPaymentDetail,merchantPaymentHistory} from './commerce-payment-reads.js';
+import {snapPayment,bindSnapPayment,recordSnapPaymentReceipt} from './commerce-snap-payments.js';
 import {reconcileCaptureJournals,financialJournalSummary,financialJournalList} from './commerce-financial-journal.js';
 import {walletEnrollment,walletRegistration,bindWalletRegistration,saveWalletRegistrationReceipt,recordWalletRegistration} from './commerce-wallet-enrollment.js';
 import {providerFinancialAccount,recordProviderFinancialEvidence,providerFinancialEvidenceList} from './commerce-provider-evidence.js';
@@ -1488,6 +1489,16 @@ export default {
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
     const url = new URL(request.url);
     try {
+      const snapPath=/^\/internal\/commerce\/snap-payments\/(EZK-[SP]-[A-F0-9]{24})(?:\/(bind|receipt))?$/.exec(url.pathname);
+      if(snapPath){
+        const input=await authenticateCommerceService(request,env,{strictJSON:true,maxBytes:snapPath[2]==='receipt'?600000:2000});
+        if(request.method==='GET'&&!snapPath[2]){
+          if([...url.searchParams.keys()].some(key=>key!=='environment')||url.searchParams.getAll('environment').length!==1)return json({ok:false,error:'SNAP request parameters are invalid'},422);
+          return json({ok:true,payment:await snapPayment(env,snapPath[1],url.searchParams.get('environment'))});
+        }
+        if(request.method==='POST'&&snapPath[2]&&!url.search)return json({ok:true,...await (snapPath[2]==='bind'?bindSnapPayment:recordSnapPaymentReceipt)(env,snapPath[1],input)});
+        return json({ok:false,error:'SNAP payment route is invalid'},405);
+      }
       const emailCallback=/^\/webhooks\/commerce-email\/resend\/([A-Za-z0-9][A-Za-z0-9_-]{2,63})$/.exec(url.pathname);
       if(emailCallback){
         if(url.search)return json({ok:false,error:'Email callback parameters are invalid'},422);

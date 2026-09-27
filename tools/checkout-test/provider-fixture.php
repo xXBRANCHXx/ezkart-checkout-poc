@@ -51,6 +51,28 @@ function curl_exec(object $handle): string|bool {
         } finally { fclose($stream); }
         return isset($handle->options[CURLOPT_WRITEFUNCTION]) ? true : $response;
     }
+    if (getenv('EZKART_TEST_SNAP') && preg_match('#^https://api(?:-sandbox)?\.doku\.com/(authorization/v1/access-token/b2b|virtual-accounts/bi-snap-va/v1.1/transfer-va/create-va|orders/v1.0/transfer-va/status)$#D', $handle->url, $snapMatch)) {
+        $directory = dirname(getenv('EZKART_TEST_CAPTURE'));
+        $control = is_file($directory . '/snap-control.json') ? json_decode((string) file_get_contents($directory . '/snap-control.json'), true) : [];
+        if (str_starts_with($snapMatch[1], 'authorization/')) {
+            $response = ['responseCode' => '2007300', 'tokenType' => 'Bearer', 'accessToken' => 'fixture-snap-payment-token', 'expiresIn' => 900];
+            if (!empty($control['tokenDenied'])) { $handle->status = 401; $response = ['responseCode' => '4017300']; }
+        } elseif (str_starts_with($snapMatch[1], 'virtual-accounts/')) {
+            $file = $directory . '/snap-accounts.json';
+            $accounts = is_file($file) ? json_decode((string) file_get_contents($file), true) : [];
+            if (isset($accounts[$payload['trxId']])) { $handle->status = 409; $response = ['responseCode' => '4092700']; }
+            else {
+                $data = $payload; $data['customerNo'] = '00000347140'; $data['virtualAccountNo'] = $payload['partnerServiceId'] . $data['customerNo'];
+                $response = ['responseCode' => '2002700', 'responseMessage' => 'Successful', 'virtualAccountData' => $data];
+                $accounts[$payload['trxId']] = $response; file_put_contents($file, json_encode($accounts));
+                if (!empty($control['loseCreate'])) { $handle->status = 503; $response = ['responseCode' => '5032700']; }
+                if (!empty($control['wrongAmount'])) $response['virtualAccountData']['totalAmount']['value'] = '1.00';
+            }
+        } else $response = ['responseCode' => '2002600', 'virtualAccountData' => []];
+        $body = json_encode($response);
+        if (isset($handle->options[CURLOPT_WRITEFUNCTION])) return ($handle->options[CURLOPT_WRITEFUNCTION])($handle, $body) === strlen($body);
+        return $body;
+    }
     if (getenv('EZKART_TEST_WALLET') && preg_match('#^https://api-sandbox.doku.com/(authorization/v1/access-token/b2b|sub-account/v2.0/(register|balance-inquiries|transaction-history-list))$#D', $handle->url, $walletMatch)) {
         $directory = dirname(getenv('EZKART_TEST_CAPTURE'));
         $control = is_file($directory . '/wallet-control.json') ? json_decode((string) file_get_contents($directory . '/wallet-control.json'), true) : [];

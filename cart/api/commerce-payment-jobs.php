@@ -30,6 +30,10 @@ function ez_central_payment_job(array $job, string $worker): array
     $outcome = 'uncertain'; $result = ['recorded' => false]; $errorMessage = '';
     try {
         $order = ez_central_order($job['orderId'], $job['environment']);
+        if ($order['snapshot']['checkout']['paymentFlow'] === 'snap_bca') {
+            require_once __DIR__ . '/commerce-snap-payments.php';
+            return ez_central_snap_payment_job($job, $worker);
+        }
         if ($order['payment'] !== null || in_array($order['state'], ['paid', 'partially_refunded', 'refunded'], true)) {
             $outcome = 'succeeded'; $result = ['recorded' => true];
         } elseif ($job['mode'] === 'reconcile') {

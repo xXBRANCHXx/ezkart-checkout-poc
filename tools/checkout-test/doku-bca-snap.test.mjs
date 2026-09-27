@@ -154,9 +154,10 @@ test('status observations retain pending amount evidence without claiming paymen
   assert.equal(run({actions:[['status',account,'different-payment']],responses:[token(),response(pending)]}).results[0].ok,false);
 });
 
-test('the SNAP adapter adds no public execution endpoint and its fixture is unavailable over HTTP',async t=>{
+test('SNAP tooling stays private and the notification endpoint refuses held commerce',async t=>{
   const f=await setup();t.after(()=>f.close());
   const fixture=await fetch(f.base+'/tools/checkout-test/doku-bca-snap-fixture.php');assert.equal(fixture.status,404);assert.equal(await fixture.text(),'');
   const cli=await fetch(f.base+'/tools/commerce/doku-check-connection.php');assert.equal(cli.status,404);assert.equal(await cli.text(),'');
-  const endpoint=await fetch(f.base+target,{method:'POST',body:JSON.stringify(notice())});assert.equal(endpoint.status,404);assert.equal((await f.calls()).length,0);
+  const endpoint=await fetch(f.base+target,{method:'POST',body:JSON.stringify(notice())});assert.equal(endpoint.status,503);assert.notEqual((await endpoint.json()).responseCode,'2002500');assert.equal((await f.calls()).length,0);
+  assert.equal((await fetch(f.base+target)).status,405);
 });

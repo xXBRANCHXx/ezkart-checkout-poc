@@ -71,6 +71,28 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 27 September: durable SNAP payment dispatch and callbacks
+
+The explicit BCA SNAP flow now freezes its original request and credentials
+before provider creation, grants dispatch once, and records private provider
+receipts atomically with payment/account/inventory/journal changes. Its public
+signed handler acknowledges only durable captures. Early and redelivered
+callbacks, additional/late charges, missing replies and storage failures have
+dedicated coverage. A CLI-only status observer preserves original read evidence
+without claiming payment, settlement or permission to recreate an account.
+
+Nine Worker and ten PHP/HTTP/browser cases pass. Existing order/job,
+checkout/signature/adapter, financial-journal/payment-read and beta-isolation
+regressions pass. The 1360px/390px payment page was visually checked. Migration
+0048 preserves populated legacy data; the fresh beta backup also restores with
+all 144 original tables unchanged and clean integrity/foreign keys. See
+[DOKU SNAP payments](doku-snap-payments.md) for recovery behavior and limits.
+
+This is implementation/fixture acceptance. Actual BCA activation, callback
+delivery, hosted live cutover, provider-supported status/unknown-result recovery,
+settlement, refunds and payout acceptance remain open. No top-level completion
+gate or main-release hold is closed.
+
 ### 27 September: live DOKU authentication and separate beta storage
 
 The owner clarified live DOKU on workbench. A dedicated production public key is

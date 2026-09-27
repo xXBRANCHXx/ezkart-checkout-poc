@@ -98,6 +98,10 @@ export async function finishCommerceJob(env, jobId, input) {
     const bound=await env.DB.prepare(`SELECT b.enrollment_id FROM commerce_wallet_provider_bindings b JOIN commerce_wallet_enrollments e ON e.id=b.enrollment_id WHERE e.job_id=?`).bind(row.id).first();
     if(bound)fail('A bound wallet registration requires reconciliation before retrying',409);
   }
+  if(row.kind==='payment.create'&&input.outcome==='retry'
+    &&await env.DB.prepare('SELECT order_id FROM commerce_snap_payment_bindings WHERE job_id=?').bind(row.id).first()){
+    fail('A dispatched SNAP payment requires reconciliation before retrying',409);
+  }
   if(row.kind.startsWith('shipment.')&&input.outcome==='succeeded'){
     const shipmentId=JSON.parse(row.payload_json).shipmentId;
     const shipment=await env.DB.prepare('SELECT * FROM commerce_shipments WHERE id=? AND order_id=? AND commerce_environment=?').bind(shipmentId,row.order_id,environment).first();

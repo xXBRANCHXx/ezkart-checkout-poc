@@ -22,7 +22,13 @@ function ez_doku_payment_flow(string $environment): string
 {
     $flow = ez_provider_config('doku', 'payment_flow', $environment);
     if ($flow === '') $flow = 'direct_bca';
-    if (!in_array($flow, ['direct_bca', 'hosted'], true)) throw new RuntimeException('Invalid DOKU payment flow.');
+    if (!in_array($flow, ['direct_bca', 'snap_bca', 'hosted'], true)) throw new RuntimeException('Invalid DOKU payment flow.');
+    if ($flow === 'snap_bca') {
+        require_once __DIR__ . '/commerce-snap-payments.php';
+        if (!ez_central_commerce_enabled()) throw new RuntimeException('SNAP requires central checkout storage.');
+        ez_snap_bca_parameters($environment);
+        EzDokuBcaSnapClient::configured($environment);
+    }
     // The legacy direct API is available for sandbox evaluation only. DOKU requires
     // SNAP migration for production virtual accounts; never silently change the UI.
     if ($flow === 'direct_bca' && $environment !== 'sandbox') {
@@ -127,8 +133,10 @@ function ez_doku_checkout_payload(array $order, string $publicUrl): array
 
 function ez_create_doku_payment(array $order): array
 {
+    $flow = $order['payment_flow'] ?? ez_doku_payment_flow($order['commerce_environment']);
+    if ($flow === 'snap_bca') throw new RuntimeException('SNAP creation requires its durable dispatch job.');
     $legacyLease = ez_legacy_provider_lease((string) $order['commerce_environment']);
-    if (($order['payment_flow'] ?? ez_doku_payment_flow($order['commerce_environment'])) === 'direct_bca') {
+    if ($flow === 'direct_bca') {
         return ez_create_doku_direct_bca_payment($order);
     }
     $credentials = ez_doku_credentials($order['commerce_environment']);

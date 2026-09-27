@@ -22,9 +22,10 @@ function ez_central_commerce_enabled(): bool
 /** Signing is shared by ordinary requests and the provider-job dispatcher. */
 function ez_commerce_request_headers(string $method, string $target, string $body, string $environment, string $secret, ?int $timestamp = null, ?string $nonce = null): array
 {
+    $maximum = $method === 'POST' && preg_match('~^/internal/commerce/snap-payments/EZK-[SP]-[A-F0-9]{24}/receipt$~D', $target) === 1 ? 600000 : 64000;
     if (!in_array($method, ['GET', 'POST'], true) || !in_array($environment, ['test', 'beta', 'production'], true)
         || !preg_match('~^/internal/commerce/[A-Za-z0-9_/?=&%.:-]+$~D', $target)
-        || strlen($secret) < 32 || strlen($body) > 64000) {
+        || strlen($secret) < 32 || strlen($body) > $maximum) {
         throw new InvalidArgumentException('Invalid central commerce request.');
     }
     $timestamp ??= time();
