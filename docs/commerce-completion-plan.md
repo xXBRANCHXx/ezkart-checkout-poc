@@ -8,7 +8,8 @@ roughly one-month financial validation period remain in force.
 
 On 27 September the owner reported DOKU approval and requested complete beta/
 soft-launch preparation, explicitly retaining workbench and the main-branch hold.
-Business approval is received. [Beta readiness](beta-readiness.md) tracks the
+Business approval and the needed payment/Sub-Account/payout services are
+owner-confirmed. [Beta readiness](beta-readiness.md) tracks the
 remaining implementation and technical acceptance; the thirteen broader gates
 below remain open until their required evidence exists.
 
@@ -83,7 +84,8 @@ Chromium/local R2. Both upload and buyer download recover lost halfway responses
 without duplicating transfers or grants; saved files match streamed hashes.
 Buyer verification preserves the original order, stock and financial entries.
 The shared test cURL transport now streams write callbacks, fixing its full-file
-buffering limit. The complete checkout regression run is in progress.
+buffering limit. The complete checkout regression passes: 308 cases, zero failures, with the two
+opt-in maximum-size cases skipped in the regular run and separately passing.
 
 Migration 0047 makes failed unpublished-file cleanup recoverable and observable:
 six new maintenance cases and nineteen existing file/digital API cases pass.

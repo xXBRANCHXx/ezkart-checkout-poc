@@ -6,8 +6,9 @@ Do not push main, merge PR #3 or deploy `ezkart.id`. The separate month of finan
 validation and explicit final production-release decision remain recorded in
 [production-release-gates.md](production-release-gates.md).
 
-Business approval is owner-confirmed. It does not yet establish which payment,
-refund, Sub-Account or payout capabilities are registered and working. The current
+Business approval is owner-confirmed. The owner also confirmed approval for all
+needed services, including payments, Sub-Account and Kirim DOKU payouts. Technical
+registration, credentials and working provider contracts still need evidence. The current
 workbench deployment is sandbox, with central checkout and financial/provider
 execution held. Changing those holds needs a concrete, verified beta candidate;
 approval does not silently change the financial environment or existing records.
@@ -44,10 +45,15 @@ is not a closed top-level gate.
 
 ## Current evidence and limits
 
-Refund evidence implementation `d81262d` is on workbench and TEST Worker
-`8eff8633-cacf-467d-8779-8f2e9ad3df08`. Its eighteen relevant local cases, twenty-five
-Worker checks and twenty-nine hosted asset/access/guest workflow checks pass.
-Existing records and holds remain intact. See [refund-requests.md](refund-requests.md).
+Implementation `56c6fab` is on workbench and TEST Worker
+`32567d92-a27e-42f2-9ff5-9ecd27c2afdb`. Migration 0047 is installed with 144
+application tables. Twenty-five Worker checks pass at 04:24:15 UTC and twenty-nine
+hosted asset/access/guest checks pass at 04:24:18 UTC on 27 September. Existing
+records, legacy evidence and holds remain intact; no migration is pending.
+The read-only storage inspection correctly reports that the first ordinary
+hourly maintenance run has not yet been observed. See
+[digital-storage-operations.md](digital-storage-operations.md) and
+[refund-requests.md](refund-requests.md).
 
 The maximum-size buyer exercise uploaded 100 actual original parts, purchased the
 file in an isolated fixture, recovered a lost halfway receipt without another
@@ -55,10 +61,12 @@ grant or retransferring verified bytes, and saved all 524,288,000 bytes with an
 exact streamed hash. Order, stock and accounting remained unchanged by delivery.
 The merchant exercise uploaded, resumed, published and saved a full-size original
 file through the editor/PHP path. These use local R2 and isolated Chromium at
-390px; they do not establish mobile-device or hosted network capacity.
+390px; they do not establish mobile-device or hosted network capacity. The full
+checkout regression passes all 308 executed cases; its two opt-in capacity cases
+were verified separately.
 
-Shared Chrome is still disconnected after its earlier rejected connection.
-Signed-in hosted acceptance remains pending; the connection has not been retried
-in a loop. Local fixture progress and guest-hosted checks continue independently.
+One explicit shared-Chrome reconnect succeeded on 27 September. The existing
+TEST merchant session and owner-approved DOKU dashboard session are accessible;
+signed-in hosted acceptance and provider configuration review are in progress.
 No beta invitations, real payment/refund/payout, production deployment or main
 push are established by this readiness record.

@@ -77,3 +77,17 @@ Restoration/migration preserves original records in 144 physical tables with
 clean integrity/foreign-key checks and all 417 captured compatibility plans.
 It changes the upload table only by adding four operational columns and adds
 the retry index and heartbeat table. Syntax, diff and TEST dry-run checks pass.
+
+Implementation `56c6fab` is pushed to workbench. TEST migration 0047 and Worker
+`32567d92-a27e-42f2-9ff5-9ecd27c2afdb` are installed. All twenty-five Worker checks
+pass at 04:24:15 UTC and all twenty-nine hosted asset/access/guest checks pass at
+04:24:18 UTC on 27 September. Final remote verification matches the restored
+schema, preserves original record counts/settings/legacy evidence, compiles all
+417 query plans and finds no pending migration or foreign-key error.
+
+The initial inspection at 04:24:14 UTC reports zero uploaded files and no
+maintenance heartbeat, with `maintenance_not_observed` and warning exit 2.
+Deployment followed the ordinary hourly :17 run; the next scheduled invocation
+must establish the heartbeat. No synthetic file, cleanup invocation, purchase,
+delivery or money movement was created for hosted verification. Financial and
+provider holds remain unchanged.
