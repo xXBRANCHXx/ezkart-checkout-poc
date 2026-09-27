@@ -14,20 +14,37 @@ deployment now uses the isolated live beta configuration described below, with
 new checkout, provider dispatch schedules and automatic email sending held.
 Existing sandbox evidence is preserved. Main and `ezkart.id` remain held.
 
-## Current hosted state — 27 September, 16:27 UTC
+## Current hosted state — 27 September, 17:12 UTC
 
 Hostinger's private runtime now selects `beta`, production providers and the beta
 Worker. Its live DOKU client, secret, signing key and verified parent profile are
 installed outside the public root with mode 0600. Reloaded file hashes match the
 private prepared configuration; all earlier provider credentials are preserved.
 Health confirms beta, live DOKU credentials and connected D1/public R2/private R2
-with 164 application tables. At 07:45 UTC, central merchant operations were
+with 165 application tables. At 07:45 UTC, central merchant operations were
 enabled with `commerce_storage=d1`; new checkout remains separately paused in both PHP and
 the Worker. The public checkout configuration returns 503 with `Retry-After: 300`.
 An hourly housekeeping schedule is now installed; new checkout, provider
 dispatch schedules and email sending remain held. See the storage note below.
 
-The [payment grant and original receipt](withdrawal-payment-grants.md)
+The [withdrawal status workflow](withdrawal-status-reconciliation.md) is deployed
+from `98c506b`, migration 0058 and beta Worker
+`aeaa2f30-799c-4a9b-99af-af16146d5414`. Protected explicit reads retain the original
+transfer's provider responses and observation times. Wallet distinguishes
+reported outcomes from reconciled payouts; late/conflicting evidence cannot
+release reservations or authorize another payment. Private recovery reuses the
+saved observation without another DOKU read. Status checks remain independently held.
+
+All 82 relevant local cases and 42 hosted checks pass. At 17:09 UTC, matching
+assets and the actual Wallet verification gate pass. The post-export restores
+166 tables; 163 of 164 original application tables are unchanged, and one user
+has only its routine sign-in timestamp refresh. The new table and all financial
+records remain empty. Original wallet records, runtime, configuration and
+execution holds are preserved. The 17:05 UTC scoped mailbox search finds no
+matching reply to the original DOKU support email. Matched payout/fee history,
+final accounting, integrated payment execution and live acceptance remain open.
+
+The preceding [payment grant and original receipt](withdrawal-payment-grants.md)
 implementation `8960126`, migration 0057 and beta Worker
 `581b21e5-81a0-4b49-99a2-0e714b089c3a` are deployed. Payment grants atomically
 fence cancellation and repeat send authority, recheck current original-owner
@@ -348,7 +365,7 @@ delivery and operator ownership still need acceptance.
 | --- | --- | --- |
 | Purchases and stock | Central immutable orders, atomic reservations, recoverable payment jobs, fulfillment and physical returns; isolated beta merchant cutover | Legacy ownership/count reconciliation, full signed-in physical/digital purchase and failure journeys |
 | Refunds | Purchase allocations, store decisions, buyer/store notifications and original delivery/return evidence | Provider-supported execution, unknown-result recovery, confirmed refund evidence, fee reversals, item access effects and reconciliation |
-| Wallet | Balanced capture/settlement/earnings journals, actual-fee corrections, delivery-based release and order holds, protected earnings history, confirmed-account routing, provider collections, atomic withdrawal reservations/cancellation and a bank-transfer adapter | Live wallet/routing/settlement/release acceptance, continuous provider synchronization, funded refunds/disputes, negative-balance recovery, bank confirmation/dispatch, actual transfer-fee funding and verified payouts |
+| Wallet | Balanced capture/settlement/earnings journals, actual-fee corrections, delivery-based release and holds, protected earnings history, confirmed-account routing, provider collections, withdrawal reservations, bank confirmation, single-use payment grants and protected status observations/recovery | Live wallet/routing/settlement/release acceptance, continuous provider synchronization, funded refunds/disputes, negative-balance recovery, integrated payment dispatch, actual transfer-fee funding, matched payout history and final accounting |
 | Digital files | Immutable versions, private buyer grants, complete-download proof, reviews and full 500 MiB local transfer/recovery | Hosted signed-in and real-device transfers, storage monitoring/recovery, refund effects and subscription lifecycle |
 | Store/customer operations | Persistent settings, customer workspace, consent, messaging, notifications, campaigns and reporting | Hosted fresh-seller/customer acceptance, actual enabled delivery and failure monitoring, domain/analytics acceptance and accessibility/mobile review |
 | Operations | Private TEST/beta database backups, repeatable local restoration, recovery runbook and guarded deployment checks | Off-device retention, R2/application recovery, monitored execution, alert ownership, sustained financial validation and final acceptance report |

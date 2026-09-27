@@ -83,7 +83,12 @@ preserve reserved funds and the original payment fence.
 All 82 relevant local cases pass, including original receipt recovery, owner/CSRF
 checks and expiry after persistence. Desktop/mobile layouts are inspected. The
 fresh beta backup restores cleanly and migration rehearsal preserves every row
-in all 165 original tables. Hosted rollout is pending. Matched cash-history and
+in all 165 original tables. Implementation `98c506b`, migration 0058 and Worker
+`aeaa2f30-799c-4a9b-99af-af16146d5414` are deployed to beta. All 42 hosted checks
+pass at 17:08 UTC on 27 September; matching workbench assets and the real Wallet
+gate pass at 17:09. The post-export restores 166 tables and preserves original
+business/financial records; only one ordinary sign-in timestamp changes. Status
+and money tables remain empty and execution holds are unchanged. Matched cash-history and
 actual fee reconciliation, final accounting, integrated payment execution and
 live acceptance remain required; no top-level gate is closed.
 

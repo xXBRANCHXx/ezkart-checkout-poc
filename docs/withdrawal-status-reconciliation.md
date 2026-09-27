@@ -79,4 +79,25 @@ bookmarks. Its SHA-256 is
 Migration rehearsal preserves every original row and adds one empty table;
 integrity and foreign-key checks pass. Private evidence is under
 `/home/branch/.local/share/ezkart/beta-01a0d643/status-before-0058-20260928/`.
-Hosted rollout evidence follows after deployment.
+Implementation `98c506b`, migration 0058 and beta Worker
+`aeaa2f30-799c-4a9b-99af-af16146d5414` are deployed. All 42 hosted API checks
+pass at 17:08 UTC on 27 September. At 17:09, Hostinger serves the identified
+workbench source hashes, private helper/CLI routes return 404 and unsigned
+merchant status access returns 401. The real Wallet gate exposes no withdrawal
+details or earnings and loads the exact tested script. No new verification code
+or live provider check is requested.
+
+The post-export restores 166 tables with clean integrity/foreign keys and
+unchanged recovery bookmarks. Its SHA-256 is
+`338e5b777dfef8d6bf11aa329be767c13e327f608f036f19782d24b978785aa3`.
+Of 164 original application tables, 163 are exactly unchanged; one user has only
+the routine `updated_at` refresh from the hosted Wallet read. Migration history
+advances from 57 to 58. The new status table and all withdrawals, payment grants,
+captures, journals, entries and earnings assessments remain empty. Original
+wallet records, private runtime and all deployment configuration are unchanged.
+
+Proofs are `withdrawal-status-{hosted,workbench,wallet-gate}-proof.json`,
+`withdrawal-status-post-preservation.json` and `status-after-0058-20260928/`
+under the private beta directory. Status reads, payment dispatch, new checkout
+and automatic sending remain held. The only schedule remains the existing hourly
+housekeeping job. TEST/main are not deployed or migrated.
