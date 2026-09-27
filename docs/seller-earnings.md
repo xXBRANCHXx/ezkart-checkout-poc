@@ -148,3 +148,34 @@ foreign keys pass. Private evidence is under
 `/home/branch/.local/share/ezkart/beta-01a0d643/earnings-before-0054-retry-20260927/`.
 The owner mailbox search at 13:37 UTC has no matching DOKU support reply; the
 original uncertain wallet remains untouched.
+
+## Hosted beta rollout
+
+Implementation `9f45d53` is pushed only to workbench. Migration 0054 is installed
+only on beta D1, and Worker `ffb6c0df-123e-4029-9454-d7d0d6aed7cd` is deployed
+with the existing hourly housekeeping schedule. Twelve hosted service checks
+pass at 13:46 UTC: healthy storage, zero earnings/history, narrow signed scope,
+missing-order and amount-override rejection, empty bounded reconciliation,
+unchanged capture summary and preservation of the original uncertain wallet.
+
+At 13:49 UTC, Hostinger serves the exact document, Wallet JavaScript and stylesheet
+from the implementation commit. PHP dependencies load; the private reconciliation
+CLI and Wallet include both return 404 over direct HTTP. Health reports live beta
+with 155 application tables, and checkout remains paused. At 13:50 UTC the hosted
+Wallet requires fresh verification and renders no protected earnings. Actual
+populated merchant acceptance remains separate from the isolated desktop/mobile
+workflows; the owner was not asked for another code during this rollout.
+
+The post-export contains 702,202 bytes, SHA-256
+`8257d60bed0070020daac21a1e00db867630e81bbb87d996561e728aa82c747f`.
+All 156 exported tables restore with clean integrity and foreign keys. Every
+original row across the 154 earlier application tables is preserved; the account
+chart adds only `seller_available` and `seller_reserved`. The new assessment
+table and existing financial journals are empty. No real earnings, refund,
+payment or payout was created by the checks.
+
+Private evidence is `earnings-hosted-proof.json`, `earnings-workbench-proof.json`,
+`earnings-wallet-gate-proof.json`, `earnings-post-preservation.json` and
+`earnings-after-0054-20260927/` under the private beta evidence directory.
+Checkout, provider dispatch and automatic email holds remain, and TEST/main
+resources are untouched. This rollout does not close a top-level release gate.

@@ -89,6 +89,16 @@ adds only two account codes and an empty assessment table. No top-level gate is
 closed: live acceptance, provider synchronization, complete refund/dispute funding,
 negative-balance recovery and owner-authorized bank withdrawals remain open.
 
+Implementation `9f45d53`, migration 0054 and Worker
+`ffb6c0df-123e-4029-9454-d7d0d6aed7cd` are deployed to beta only. Twelve hosted
+checks pass at 13:46 UTC; exact Hostinger source/style/dependency checks pass at
+13:49 UTC. The Wallet gate at 13:50 UTC still requires fresh verification and
+exposes no earnings before it. The post-export restores with 156 tables and
+preserves every original row in all 154 earlier application tables, adding only
+the two account codes. Earnings assessments and money journals remain empty;
+the original uncertain wallet is unchanged. Main/TEST, checkout, provider
+dispatch and automatic email holds remain. No real money movement is claimed.
+
 ### 27 September: actual-fee settlement journals and corrections
 
 [Settlement accounting](provider-settlement-accounting.md) now derives balanced
