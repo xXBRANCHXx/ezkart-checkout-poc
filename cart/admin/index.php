@@ -22,14 +22,18 @@ header('X-Frame-Options: ' . ($embeddedPreviewFrame ? 'SAMEORIGIN' : 'DENY'));
 header('Referrer-Policy: no-referrer');
 header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
 if ($interactivePageView) {
-    header("Content-Security-Policy: default-src 'none'; img-src 'self' data: https:; media-src 'self' data: blob: https:; style-src 'unsafe-inline' https:; script-src 'unsafe-inline' https:; font-src 'self' data: https:; connect-src 'self' https:; form-action 'self' https:; frame-src 'self' about: https:; frame-ancestors 'self'; base-uri 'none'; sandbox allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation");
+    $adminSecurityPolicy = "default-src 'none'; img-src 'self' data: https:; media-src 'self' data: blob: https:; style-src 'unsafe-inline' https:; script-src 'unsafe-inline' https:; font-src 'self' data: https:; connect-src 'self' https:; form-action 'self' https:; frame-src 'self' about: https:; frame-ancestors 'self'; base-uri 'none'; sandbox allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation";
     header('X-Robots-Tag: noindex, nofollow');
 } elseif ($previewDocumentFrame) {
-    header("Content-Security-Policy: default-src 'none'; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline' https:; font-src 'self' data: https:; script-src 'none'; connect-src 'none'; frame-src 'none'; form-action 'none'; frame-ancestors 'self'; base-uri 'none'");
+    $adminSecurityPolicy = "default-src 'none'; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline' https:; font-src 'self' data: https:; script-src 'none'; connect-src 'none'; frame-src 'none'; form-action 'none'; frame-ancestors 'self'; base-uri 'none'";
 } else {
     $shippingMapPolicy = ($_GET['page'] ?? '') === 'shipping-settings' ? " https://tiles.openfreemap.org; worker-src 'self' blob:" : '';
-    header("Content-Security-Policy: default-src 'self'; img-src 'self' data: blob: https:; style-src 'self'; style-src-attr 'unsafe-inline'; script-src 'self' 'sha256-" . $adminStartupHash . "'; connect-src 'self'" . $shippingMapPolicy . "; frame-src 'self'; form-action 'self'; frame-ancestors " . ($previewRepairFrame ? "'self'" : "'none'") . "; base-uri 'none'");
+    $adminSecurityPolicy = "default-src 'self'; img-src 'self' data: blob: https:; style-src 'self'; style-src-attr 'unsafe-inline'; script-src 'self' 'sha256-" . $adminStartupHash . "'; connect-src 'self'" . $shippingMapPolicy . "; frame-src 'self'; form-action 'self'; frame-ancestors " . ($previewRepairFrame ? "'self'" : "'none'") . "; base-uri 'none'";
 }
+header('Content-Security-Policy: ' . $adminSecurityPolicy);
+// Hostinger replaces PHP's CSP. The server-header rule restores this exact
+// response-only value after inherited headers, then removes the bridge header.
+header('X-Ezkart-Content-Security-Policy: ' . $adminSecurityPolicy);
 
 const EZ_ADMIN_SESSION_LIFETIME = 60 * 60 * 24 * 30;
 

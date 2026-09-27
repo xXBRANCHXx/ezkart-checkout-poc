@@ -1,0 +1,11 @@
+# Keep the policy selected by PHP for the dashboard, maps and isolated previews.
+# Read only a response header; client request headers cannot select the policy.
+<IfModule mod_headers.c>
+  <Files "index.php">
+    Header onsuccess unset Content-Security-Policy
+    Header always set Content-Security-Policy "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
+    Header always set Content-Security-Policy "expr=%{resp:X-Ezkart-Content-Security-Policy}" "expr=-n %{resp:X-Ezkart-Content-Security-Policy}"
+    Header always unset X-Ezkart-Content-Security-Policy
+    Header onsuccess unset X-Ezkart-Content-Security-Policy
+  </Files>
+</IfModule>

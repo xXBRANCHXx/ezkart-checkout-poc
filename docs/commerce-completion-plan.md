@@ -64,6 +64,15 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### In progress: hosted merchant content-security policy
+
+Prepared server-header restoration of PHP's exact dashboard/map/preview policy
+after Hostinger's global override. Two new security cases, six shipping-setting
+cases, the startup/editor case and the isolated-hosting case pass. Hosted
+expression support and delivered headers still require verification. See
+[merchant-content-security.md](merchant-content-security.md). No completion
+gate is closed on local PHP tests alone.
+
 ### 27 September: event-driven marketing automations
 
 Implemented versioned welcome, payment, expired-checkout and inactivity rules;
