@@ -98,6 +98,14 @@ Signed-in hosted/real-device/maximum-size acceptance, digital reviews/refunds,
 subscriptions and settlement/release remain open. All thirteen top-level gates
 and all provider, central-commerce, financial and production holds remain.
 
+Implementation `02bb01b` is on workbench; TEST Worker
+`1ad7758c-3ace-40b1-af15-065c2a786f69` is deployed. Twelve Worker checks pass at
+02:18:24 UTC and sixteen hosted asset/access/catalog/layout checks at 02:18:04 UTC.
+The existing physical checkout remains usable at 1360px and 390px. Final remote
+verification preserves schema, all table counts, settings and legacy evidence,
+and all 267 plans compile. Hosted QA creates no purchase, grant, receipt or
+courier request; central checkout remains disabled and all holds remain.
+
 ### 27 September: buyer download, storage and recovery
 
 Implemented the authenticated buyer download page and bounded PHP proxy described

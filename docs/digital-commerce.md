@@ -211,6 +211,16 @@ The fresh TEST export is 680,095 bytes, SHA-256
 It restores 141 physical tables with clean integrity/foreign-key checks. All 267
 captured plans compile locally and remotely. No schema migration is needed.
 
+Checkout implementation `02bb01b` is on workbench and TEST Worker
+`1ad7758c-3ace-40b1-af15-065c2a786f69` is deployed. Twelve Worker checks pass at
+02:18:24 UTC on 27 September, including healthy D1/R2, private download access,
+central holds and the existing physical catalog. Sixteen hosted checks pass at
+02:18:04 UTC: eight source hashes, config/catalog/access guards and the existing
+physical checkout at 1360px/390px. Final remote verification preserves schema,
+every table count, seller settings and legacy evidence, with all 267 plans still
+compiling. No hosted purchase, grant, download receipt or courier request was
+created. Central commerce and providers remain held.
+
 Outstanding: maximum-size and real-mobile transfers, signed-in hosted acceptance,
 digital purchase reviews, allocated digital refunds,
 subscription lifecycles, storage operations and financial release/settlement.
