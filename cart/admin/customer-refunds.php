@@ -19,7 +19,7 @@ try {
     foreach (explode('&', (string) ($_SERVER['QUERY_STRING'] ?? '')) as $pair) {
         if ($pair === '') continue;
         [$key, $value] = array_pad(explode('=', $pair, 2), 2, ''); $key = urldecode($key); $value = urldecode($value);
-        if (isset($query[$key]) || !in_array($key, ['order','refund','state','cursor','evidence','dispute','before'], true)) ez_api_json(['ok' => false, 'error' => 'Refund reference is invalid.'], 400);
+        if (isset($query[$key]) || !in_array($key, ['order','refund','state','cursor','evidence','dispute','before','bank'], true)) ez_api_json(['ok' => false, 'error' => 'Refund reference is invalid.'], 400);
         $query[$key] = $value;
     }
     $refundOrder = $query['order'] ?? ''; $refundId = $query['refund'] ?? '';
@@ -27,9 +27,11 @@ try {
     $refundEvidence = $query['evidence'] ?? ''; $refundDownload = str_starts_with($refundEvidence, 'rattach_');
     if (isset($query['evidence']) && ($refundId === '' || preg_match('/^(?:upload|rattach_[a-f0-9]{32})$/D', $refundEvidence) !== 1)) ez_api_json(['ok' => false], 400);
     if ($refundEvidence !== '' && (($refundMethod === 'GET' && !$refundDownload) || ($refundMethod === 'POST' && $refundDownload))) ez_api_json(['ok' => false], 405);
+    $refundBank = isset($query['bank']);
+    if ($refundBank && ($query['bank'] !== '1' || $refundId === '' || $refundEvidence !== '' || isset($query['dispute']) || $refundMethod !== 'POST')) ez_api_json(['ok' => false], 400);
     $refundDispute = isset($query['dispute']);
     if ($refundDispute && ($query['dispute'] !== '1' || $refundId === '' || $refundEvidence !== '')) ez_api_json(['ok' => false], 400);
-    $filters = array_diff_key($query, ['order' => '', 'refund' => '', 'evidence' => '', 'dispute' => '']);
+    $filters = array_diff_key($query, ['order' => '', 'refund' => '', 'evidence' => '', 'dispute' => '', 'bank' => '']);
     if ($refundDispute) {
         if ($refundMethod === 'GET' && (count($filters) !== 1 || !isset($filters['before']) || preg_match('/^[1-9][0-9]{0,14}$/D', $filters['before']) !== 1)) ez_api_json(['ok' => false], 400);
         if ($refundMethod === 'POST' && $filters !== []) ez_api_json(['ok' => false], 400);
@@ -39,7 +41,7 @@ try {
         if (isset($filters['cursor']) && preg_match('/^[A-Za-z0-9_-]{1,1800}$/D', $filters['cursor']) !== 1) ez_api_json(['ok' => false], 400);
     }
     $refundTarget = '/v1/customer/orders/' . $refundOrder . '/refunds' . ($refundId !== '' ? '/' . $refundId : '')
-        . ($refundDispute ? '/dispute' : '') . ($refundEvidence !== '' ? '/evidence' . ($refundDownload ? '/' . $refundEvidence : '') : '') . ($filters !== [] ? '?' . http_build_query($filters) : '');
+        . ($refundBank ? '/bank' : '') . ($refundDispute ? '/dispute' : '') . ($refundEvidence !== '' ? '/evidence' . ($refundDownload ? '/' . $refundEvidence : '') : '') . ($filters !== [] ? '?' . http_build_query($filters) : '');
     $refundMaximum = $refundEvidence === 'upload' ? 6994000 : 16000;
     if ($refundMethod === 'POST' && preg_match('#^application/json(?:;|$)#i', (string) ($_SERVER['CONTENT_TYPE'] ?? '')) !== 1) ez_api_json(['ok' => false, 'error' => 'Use a JSON request.'], 415);
     $refundBody = $refundMethod === 'POST' ? file_get_contents('php://input', false, null, 0, $refundMaximum + 1) : '';

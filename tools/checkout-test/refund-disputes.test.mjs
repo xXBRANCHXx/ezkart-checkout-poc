@@ -39,7 +39,7 @@ test('buyer, store and operator review screens recover saved actions and complet
   }
   const target='/v1/support/refunds/'+f.refund.id+'/dispute';f.control.drop=target;await review(staff).locator('textarea').fill('Original purchase, delivery and supplied evidence support the requested amount.');await review(staff).getByRole('button',{name:'Approve refund request',exact:true}).click();await staff.getByRole('button',{name:'Retry confirmation',exact:true}).waitFor();
   await staff.reload();await staff.getByRole('button',{name:'Retry confirmation',exact:true}).click();await staff.getByText('Your refund request was saved.',{exact:true}).waitFor();
-  await staff.getByText('This refund request is approved. The refund has not been paid. Refund processing is not available yet.',{exact:true}).waitFor();assert.equal((await f.db.prepare("SELECT COUNT(*) n FROM commerce_refund_dispute_actions WHERE kind='approve'").first()).n,1);
+  await staff.getByText('This refund request is approved. Refund payment has not been confirmed.',{exact:true}).waitFor();assert.equal((await f.db.prepare("SELECT COUNT(*) n FROM commerce_refund_dispute_actions WHERE kind='approve'").first()).n,1);
   assert.deepEqual(errors,[]);assert.equal((await f.providerCalls()).length,0);
 });
 

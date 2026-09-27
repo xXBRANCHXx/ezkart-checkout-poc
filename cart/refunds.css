@@ -6,3 +6,6 @@
 
 .refund-review{border-color:#c8c2e0}.refund-review [data-review-form]{padding:0;border:0}.refund-review [data-review-history] article{padding:12px 0}.refund-review a{display:inline-block;margin:8px 0}
 @media(max-width:600px){.refund-review .refund-buttons{display:grid;grid-template-columns:1fr}.refund-review .refund-buttons button{width:100%;overflow-wrap:normal}}
+
+.refunds-workspace .refund-bank-consent{display:flex;align-items:flex-start;gap:10px;font-weight:400}.refunds-workspace .refund-bank-consent input{width:18px;height:18px;flex:none;margin-top:3px;padding:0}
+.refunds-workspace [data-refund-processing] button{max-width:100%;overflow-wrap:normal}

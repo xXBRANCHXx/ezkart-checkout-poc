@@ -26,11 +26,12 @@ export async function disputeView(env,actor,refundId,authority){
   if(!row)return null;
   const result=await env.DB.prepare('SELECT * FROM commerce_refund_dispute_actions WHERE dispute_id=? ORDER BY sequence DESC LIMIT 51').bind(row.id).all();
   const actions=result.results.slice(0,50).reverse(),active=disputeActive(row.state),write=commerceStorageEnabled(env)&&authority.canWrite;
+  const handedOff=Boolean(await env.DB.prepare('SELECT id FROM commerce_refund_provider_requests WHERE refund_id=?').bind(refundId).first());
   return {id:row.id,state:row.state,stateLabel:labels[row.state],revision:row.revision,active,openedBy:actorLabel(row.actor_kind),message:row.message,
     createdAt:row.created_at,updatedAt:row.updated_at,actions:actions.map(a=>eventView(a,actor.kind==='support')),
     olderBefore:result.results.length>50?actions[0].sequence:null,canReply:write&&active,
     canWithdraw:write&&active&&actor.kind===row.actor_kind&&actor.id===row.actor_auth_user_id,
-    canDecide:write&&active&&actor.kind==='support',canReopen:write&&!active&&actor.kind==='support',
+    canAsk:write&&active&&actor.kind==='support',canDecide:write&&active&&actor.kind==='support'&&!handedOff,canReopen:write&&!active&&actor.kind==='support',
     requiresVerification:actor.kind==='support'&&!authority.canWrite&&authority.role==='reviewer'};
 }
 export async function disputeHistory(env,actor,refundId,before,expectedOrder=''){
@@ -62,7 +63,7 @@ export async function changeDispute(env,actor,refundId,raw,expectedOrder=''){
       VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind('dsp_'+crypto.randomUUID().replaceAll('-',''),refundId,authority.sellerId,detail.orderId,mode(env),actor.kind,actor.id,input.requestKey,hash,input.refundRevision,input.evidenceVersion,input.message,now,now).run();}
     catch(error){const saved=await replay();if(saved)return saved;databaseFailure(error);}
   }else{
-    const d=detail.dispute,capability=kind==='reopen'?'canReopen':kind==='withdraw'?'canWithdraw':kind==='reply'?'canReply':'canDecide';
+    const d=detail.dispute,capability=kind==='reopen'?'canReopen':kind==='withdraw'?'canWithdraw':kind==='reply'?'canReply':kind.startsWith('ask_')?'canAsk':'canDecide';
     if(!d||d.revision!==input.revision||!d[capability])fail('This review changed or the action is no longer available. Reload before continuing.',409);
     if(['approve','decline','reopen'].includes(kind)&&(detail.revision!==input.refundRevision||detail.orderRevision!==input.orderRevision||detail.evidenceVersion!==input.evidenceVersion))fail('The purchase or supporting files changed. Reload and review them before deciding.',409);
     try{await env.DB.prepare(`INSERT INTO commerce_refund_dispute_actions(id,dispute_id,actor_kind,actor_auth_user_id,request_key,request_hash,previous_revision,refund_revision,order_revision,evidence_version,proof_expires_at,kind,message,created_at)
@@ -74,9 +75,20 @@ export async function changeDispute(env,actor,refundId,raw,expectedOrder=''){
 export async function supportRefunds(env,actor,url){
   await supportAccess(env,actor);
   for(const key of url.searchParams.keys())if(!['state','cursor'].includes(key)||url.searchParams.getAll(key).length!==1)fail('Review filters are invalid.');
-  const state=url.searchParams.get('state')||'open';if(!['all','open','awaiting_buyer','awaiting_store','closed'].includes(state))fail('Review filter is invalid.');
+  const state=url.searchParams.get('state')||'open';if(!['all','open','awaiting_buyer','awaiting_store','closed','processing'].includes(state))fail('Review filter is invalid.');
   const scope=await commerceHash({actor:actor.id,environment:mode(env),state}),cursor=url.searchParams.has('cursor')?readReviewCursor(url.searchParams.get('cursor'),scope):null;
   if(cursor&&(!Number.isSafeInteger(cursor.cap)||!Number.isSafeInteger(cursor.before)||cursor.before<1||cursor.cap<cursor.before))fail('Review page is invalid.');
+  if(state==='processing'){
+    const cap=cursor?.cap??(await env.DB.prepare('SELECT COALESCE(MAX(sequence),0) cap FROM commerce_refunds WHERE commerce_environment=?').bind(mode(env)).first()).cap;
+    const rows=(await env.DB.prepare(`SELECT r.*,s.name AS store_name,q.id AS provider_request_id,x.id AS submitted_id FROM commerce_refunds r JOIN sellers s ON s.id=r.seller_id
+      LEFT JOIN commerce_refund_provider_requests q ON q.refund_id=r.id LEFT JOIN commerce_refund_provider_submissions x ON x.provider_request_id=q.id
+      WHERE r.commerce_environment=? AND r.state='approved' AND r.sequence<=? AND r.sequence<? ORDER BY r.sequence DESC LIMIT 26`)
+      .bind(mode(env),cap,cursor?.before??cap+1).all()).results;
+    await supportAccess(env,actor);return {refunds:rows.slice(0,25).map(r=>({id:r.id,orderId:r.order_id,state:r.state,
+      stateLabel:r.submitted_id?'Submitted to DOKU — refund not confirmed':r.provider_request_id?'DOKU request prepared':'Approved — prepare refund',
+      amount:r.amount,createdAt:r.created_at,storeName:r.store_name,paymentConfirmed:false,processingAvailable:false})),enabled:commerceStorageEnabled(env),
+      nextCursor:rows.length>25?reviewCursor({v:1,scope,cap,before:rows[24].sequence}):null};
+  }
   const cap=cursor?.cap??(await env.DB.prepare('SELECT COALESCE(MAX(sequence),0) cap FROM commerce_refund_disputes WHERE commerce_environment=?').bind(mode(env)).first()).cap;
   const rows=(await env.DB.prepare(`SELECT r.*,d.state AS review_state,d.sequence AS review_sequence,d.created_at AS review_created_at,s.name AS store_name
     FROM commerce_refund_disputes d JOIN commerce_refunds r ON r.id=d.refund_id JOIN sellers s ON s.id=d.seller_id

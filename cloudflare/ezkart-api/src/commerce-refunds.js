@@ -3,6 +3,7 @@ import {currentCommerceEnvironment as mode,customerOrderSeller} from './commerce
 import {reviewCursor,readReviewCursor} from './commerce-reviews.js';
 import {disputeView,disputeActive} from './commerce-refund-disputes.js';
 import {supportAccess} from './commerce-support.js';
+import {refundProcessingView} from './commerce-refund-processing.js';
 
 const fail=(message,status=422,code='')=>{throw new Response(message,{status,headers:code?{'x-ezkart-error-code':code}:{}});};
 const conflict=message=>fail(message,409,'refund_conflict');
@@ -78,7 +79,7 @@ export async function refundDetail(env,actor,id,expectedOrder=''){
   caseId(id);
   const row=await env.DB.prepare('SELECT * FROM commerce_refunds WHERE id=? AND commerce_environment=?').bind(id,mode(env)).first();
   if(!row||(expectedOrder&&row.order_id!==expectedOrder))fail('Refund request not found.',404);
-  if(actor.kind==='support'&&!await env.DB.prepare('SELECT id FROM commerce_refund_disputes WHERE refund_id=?').bind(id).first())fail('Review not found.',404);
+  if(actor.kind==='support'&&row.state!=='approved'&&!await env.DB.prepare('SELECT id FROM commerce_refund_disputes WHERE refund_id=?').bind(id).first())fail('Review not found.',404);
   const {order,authority}=await orderFor(env,actor,row.order_id);if(order.seller_id!==row.seller_id)fail('Refund request not found.',404);
   const result=await env.DB.batch([
     env.DB.prepare(`SELECT ri.order_item_id,ri.amount,i.title,i.quantity,i.unit_price_amount,i.product_type,i.fulfillment_snapshot_json,
@@ -107,9 +108,10 @@ export async function refundDetail(env,actor,id,expectedOrder=''){
   ]);
   const dispute=await disputeView(env,actor,id,authority),data=JSON.parse(row.data_json),canWrite=commerceStorageEnabled(env)&&authority.canWrite&&row.state==='requested'&&!dispute?.active&&actor.kind!=='support';
   const payment=result[2].results[0];
+  const processing=await refundProcessingView(env,actor,row,authority,dispute);
   await access(env,actor,row.order_id);
   return {...caseView({...row,dispute_state:dispute?.state}),orderRevision:order.revision,reason:data.reason,note:data.note,shippingAmount:row.shipping_amount,
-    dispute,canRequestReview:commerceStorageEnabled(env)&&authority.canWrite&&actor.kind!=='support'&&!dispute&&row.state!=='withdrawn',
+    processing,dispute,canRequestReview:commerceStorageEnabled(env)&&authority.canWrite&&actor.kind!=='support'&&!dispute&&row.state!=='withdrawn',
     evidenceVersion:result[4].results.reduce((sum,file)=>sum+1+(file.state==='ready'?1:0),0),
     canUploadEvidence:commerceStorageEnabled(env)&&authority.canWrite&&actor.kind!=='support',
     attachments:result[4].results.map(file=>({id:file.id,actor:file.actor_kind==='merchant'?'Store':'Buyer',filename:file.filename,

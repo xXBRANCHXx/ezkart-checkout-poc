@@ -2,7 +2,7 @@
 if (!isset($authenticated) || !$authenticated) { http_response_code(404); exit; }
 $refundAudience='support'; $refundOrderId=''; $refundAccount=(string) ($adminUser['id'] ?? ''); $refundStore=''; $refundCsrf=$csrfToken; $refundVersion='';
 ?>
-<div class="page-heading"><div><h1>Ezkart reviews</h1><p>Review disputed refund requests against their original purchase, delivery and supporting files.</p></div></div>
+<div class="page-heading"><div><h1>Ezkart reviews</h1><p>Review refunds against their original purchase and evidence, and prepare approved DOKU requests.</p></div></div>
 <?php if (empty($supportAccess['authorized'])): ?>
 <section class="refunds-workspace"><h2>Review access required</h2><p>This account has no Ezkart review permission. Store membership does not grant this access.</p><?php if (!empty($supportAccess['error'])): ?><p role="alert"><?= htmlspecialchars($supportAccess['error'], ENT_QUOTES, 'UTF-8') ?></p><?php endif; ?></section>
 <?php else: ?>

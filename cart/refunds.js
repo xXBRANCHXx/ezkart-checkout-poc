@@ -28,7 +28,7 @@
   async function readPending(){
     const raw=localStorage.getItem(storageKey);if(raw===null)return null;
     const value=JSON.parse(raw),path=typeof value?.path==='string'?value.path:'';
-    const validPath=support?/^\/v1\/support\/refunds\/ref_[a-f0-9]{32}\/dispute$/.test(path):merchant?/^\/v1\/commerce\/refunds\/(?:orders\/EZK-[SP]-[A-F0-9]{24}|ref_[a-f0-9]{32}(?:\/dispute)?)$/.test(path):path===base||new RegExp('^'+base+'/ref_[a-f0-9]{32}(?:/dispute)?$').test(path);
+    const validPath=support?/^\/v1\/support\/refunds\/ref_[a-f0-9]{32}\/(?:dispute|processing)$/.test(path):merchant?/^\/v1\/commerce\/refunds\/(?:orders\/EZK-[SP]-[A-F0-9]{24}|ref_[a-f0-9]{32}(?:\/dispute)?)$/.test(path):path===base||new RegExp('^'+base+'/ref_[a-f0-9]{32}(?:/dispute)?$').test(path);
     if(value?.v!==1||value.scope!==scope||!validPath||typeof value.body!=='string'||value.body.length>16000)throw Error('Saved retry data is damaged.');
     const body=JSON.parse(value.body);if(!/^[A-Za-z0-9_-]{16,100}$/.test(body?.requestKey||'')||(!body.kind&&(!Array.isArray(body.items)||body.items.some(i=>!i||!Number.isSafeInteger(i.amount)||i.amount<1))))throw Error('Saved retry data is damaged.');
     if(value.checksum!==await checksum(value)||localStorage.getItem(storageKey)!==raw)throw Error('Saved retry data is damaged or changed.');
@@ -43,7 +43,7 @@
   async function api(path,body,binary=false){
     let url,headers={'Content-Type':'application/json','X-Ezkart-CSRF':root.dataset.csrf};
     if(merchant||support){url='/cart/admin/?cloud='+encodeURIComponent(path);headers['X-Ezkart-Refund-Account']=root.dataset.account;headers['X-Ezkart-Refund-Store']=root.dataset.store;}
-    else{const parsed=new URL(path,location.origin),[id,action,attachment]=parsed.pathname.slice(base.length).replace(/^\//,'').split('/');url='/cart/admin/customer-refunds.php?'+new URLSearchParams({order:root.dataset.order,...(id?{refund:id}:{}),...(action==='evidence'?{evidence:attachment||'upload'}:action==='dispute'?{dispute:'1'}:{}),...Object.fromEntries(parsed.searchParams)});headers['X-Ezkart-Customer-Session']=root.dataset.version;}
+    else{const parsed=new URL(path,location.origin),[id,action,attachment]=parsed.pathname.slice(base.length).replace(/^\//,'').split('/');url='/cart/admin/customer-refunds.php?'+new URLSearchParams({order:root.dataset.order,...(id?{refund:id}:{}),...(action==='evidence'?{evidence:attachment||'upload'}:action==='dispute'?{dispute:'1'}:action==='bank'?{bank:'1'}:{}),...Object.fromEntries(parsed.searchParams)});headers['X-Ezkart-Customer-Session']=root.dataset.version;}
     const response=await fetch(url,{method:body===undefined?'GET':'POST',credentials:'same-origin',cache:'no-store',headers,signal:AbortSignal.timeout(35000),...(body===undefined?{}:{body})});
     if(binary&&response.ok)return {bytes:await response.arrayBuffer(),mime:response.headers.get('content-type'),sha256:response.headers.get('x-ezkart-file-sha256')};
     let data;try{data=await response.json();}catch{throw Error('The response was interrupted. Retry confirmation.');}
@@ -75,6 +75,67 @@
     if(!orderId){q('[data-refund-lookup]').hidden=false;q('[data-refund-lookup] input').focus();return;}
     loading=true;controls();error('');try{const data=await api(orderPath(orderId));if(!ended)renderForm(data,draft);}catch(e){if(!ended)error(e.message);}finally{loading=false;controls();}
   }
+  function renderProcessing(r){
+    const p=r.processing;if(!p||r.state!=='approved'&&!p.request)return;
+    const box=el('section',undefined,'refund-evidence');box.dataset.refundProcessing='';box.append(el('h4','Refund payment'),el('p',p.stateLabel));
+    if(p.reason)box.append(el('p',p.reason));
+    if(p.bank)box.append(el('p',p.bank.bankName+' · '+p.bank.accountName+' · account ending '+p.bank.accountEnding));
+    else if(p.bankProvided)box.append(el('p','The buyer has provided private refund bank details to Ezkart.'));
+    if(p.request)box.append(el('p','Original provider request prepared · '+date(p.request.preparedAt)),el('p','The destination is fixed for this request. Contact Ezkart if it needs correction; do not submit a replacement refund.'));
+    if(p.submission)box.append(el('p','Submission recorded · '+date(p.submission.submittedAt)),el('p','DOKU processing and the returned funds still need verification.'));
+    if(p.requiresVerification){const link=el('a','Verify your authenticator to update refund processing');link.href='?page=support-refunds&refund='+encodeURIComponent(r.id)+'#review-verification';box.append(link);}
+    if(p.canProvideBank){
+      const bank=el('form');bank.dataset.refundBank='';const inputs={};
+      for(const [name,label,max] of [['bankName','Bank name',100],['accountName','Account holder name',100],['accountNumber','Bank account number',34],['repeatNumber','Confirm bank account number',34]]){
+        const field=el('label',label),input=el('input');input.type='text';input.name=name;input.required=true;input.maxLength=max;input.autocomplete='off';
+        if(name.includes('Number')){input.inputMode='numeric';input.pattern='[0-9]{5,34}';}else input.minLength=2;
+        inputs[name]=input;field.append(input);bank.append(field);
+      }
+      const consent=el('label',undefined,'refund-bank-consent'),check=el('input');check.type='checkbox';check.required=true;consent.append(check,document.createTextNode(' I have checked these details and authorize this account to receive this refund.'));
+      const save=el('button',p.bank?'Save corrected bank details':'Save refund bank details');save.type='submit';bank.append(consent,el('p','Bank details are retained privately for this refund. Ezkart shares them with DOKU for processing. They are not saved in browser storage or included in messages to the store.'),save);
+      let original=null;
+      bank.addEventListener('input',()=>{dirty=true;controls();});bank.addEventListener('submit',e=>{e.preventDefault();void(async()=>{
+        if(busy||loading||pending||ended||!bank.reportValidity())return;
+        if(otherDraft(bank)){error('Save or clear your other draft before saving bank details.');return;}
+        if(inputs.accountNumber.value!==inputs.repeatNumber.value){error('The bank account numbers must match.');return;}
+        await locked(async()=>{
+          busy=true;controls();error('');
+          try{original??={previousId:p.bank?.id||null,bankName:inputs.bankName.value,accountName:inputs.accountName.value,accountNumber:inputs.accountNumber.value,confirmed:check.checked};
+            const data=await api(casePath(r.id)+'/bank',JSON.stringify(original));if(ended)return;dirty=false;renderDetail(data.refund);notice('Your refund bank details were saved.');
+          }catch(e){if(!ended){error(e.message+' Reload to check saved bank details, or retry these exact details.');save.textContent='Retry bank confirmation';Object.values(inputs).forEach(n=>n.readOnly=true);}}
+          finally{busy=false;controls();}
+        });
+      })();});box.append(bank);
+    }
+    if(p.canPrepare){const prepare=button('Prepare DOKU refund request',()=>{
+      if(dirty){error('Save or clear your draft before preparing this request.');return;}
+      if(!confirm('Prepare the original '+money(r.amount)+' request using the buyer’s saved bank details? This fixes the destination and amount. Submit it to DOKU separately.'))return;
+      void persistAndSend(casePath(r.id)+'/processing',{kind:'prepare_provider_request',requestKey:crypto.randomUUID().replaceAll('-',''),bankId:p.bank.id,refundRevision:r.revision,orderRevision:r.orderRevision,evidenceVersion:r.evidenceVersion});
+    });box.append(el('p','Review the buyer’s bank details, original purchase and all evidence. Preparation fixes one provider request; it does not send it or authorize a payout.'),prepare);}
+    if(p.canDownload){const download=button('Download original DOKU request',()=>void(async()=>{
+      if(busy||loading||pending||dirty||ended)return;busy=true;controls();error('');
+      try{const data=await api(casePath(r.id)+'/packet');if(ended)return;const packet=data.packet;
+        const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(packet.content)))].map(n=>n.toString(16).padStart(2,'0')).join('');
+        if(hash!==packet.sha256||packet.requestId!==p.request.id||packet.filename!==p.request.id+'.txt')throw Error('The original request could not be verified.');
+        const url=URL.createObjectURL(new Blob([packet.content],{type:'text/plain;charset=utf-8'})),link=el('a');link.href=url;link.download=packet.filename;document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);notice('The original request is ready to save. It has not been sent by Ezkart.');
+      }catch(e){if(!ended)error(e.message);}finally{busy=false;controls();}
+    })());box.append(download,el('p','This private file includes the full bank account. Use DOKU’s official support ticket or care@doku.com. Follow up on the same original request if sending was interrupted or its outcome is uncertain.'));
+      if(r.dispute?.active)box.append(el('p','An Ezkart review is open. Resolve it before submitting; the download is the original archived request.'));
+    }
+    if(p.canRecordSubmission){
+      const submitted=el('form');submitted.dataset.refundSubmission='';const channelLabel=el('label','Submission channel'),channel=el('select');channel.name='channel';
+      for(const [value,label] of [['support_ticket','DOKU support ticket'],['email','Email to DOKU']]){const option=el('option',label);option.value=value;channel.append(option);}channelLabel.append(channel);
+      const refLabel=el('label','Ticket or sent-message reference'),reference=el('input');reference.type='text';reference.required=true;reference.minLength=3;reference.maxLength=200;refLabel.append(reference);
+      const atLabel=el('label','Actual submission time'),at=el('input');at.type='datetime-local';at.required=true;at.step='1';atLabel.append(at);
+      const consent=el('label',undefined,'refund-bank-consent'),check=el('input');check.type='checkbox';check.required=true;consent.append(check,document.createTextNode(' I verified this original request was sent to DOKU. This does not confirm a paid refund.'));
+      const save=el('button','Record DOKU submission');save.type='submit';submitted.append(channelLabel,refLabel,atLabel,consent,save);
+      submitted.addEventListener('input',()=>{dirty=true;controls();});submitted.addEventListener('submit',e=>{e.preventDefault();if(!submitted.reportValidity())return;
+        if(otherDraft(submitted)){error('Save or clear your other draft before recording the submission.');return;}
+        void persistAndSend(casePath(r.id)+'/processing',{kind:'record_provider_submission',requestKey:crypto.randomUUID().replaceAll('-',''),providerRequestId:p.request.id,channel:channel.value,reference:reference.value,submittedAt:new Date(at.value).toISOString(),confirmed:check.checked});
+      });box.append(submitted);
+    }
+    detail.append(box);
+  }
   function renderEvidence(r){
     const facts=r.evidence;if(!facts)return;
     const box=el('section',undefined,'refund-evidence');box.dataset.refundEvidence='';box.append(el('h4','Purchase and delivery'));
@@ -103,7 +164,8 @@
     detail.hidden=false;detail.replaceChildren();detail.append(el('h3',r.stateLabel),el('p',r.orderId),el('strong',money(r.amount)),el('p','Reason: '+([...form.elements.reason.options].find(o=>o.value===r.reason)?.textContent||r.reason)),el('p',r.note));
     if(merchant){const orderLink=el('a','View original order');orderLink.href='?page=orders&order='+encodeURIComponent(r.orderId);detail.append(orderLink);}
     const lines=el('ul',undefined,'refund-lines');for(const i of r.items)lines.append(el('li',i.title+(i.variant?' — '+i.variant:'')+': '+money(i.amount)+' requested from '+money(i.quantity*i.price)));if(r.shippingAmount)lines.append(el('li','Shipping: '+money(r.shippingAmount)));detail.append(lines);
-    if(r.state==='approved')detail.append(el('p','This refund request is approved. The refund has not been paid. Refund processing is not available yet.'));
+    if(r.state==='approved')detail.append(el('p','This refund request is approved. Refund payment has not been confirmed.'));
+    renderProcessing(r);
     renderEvidence(r);
     renderAttachments(r);
     const history=el('div',undefined,'refund-history');history.append(el('h4','Request history'),el('p','Requested · '+date(r.createdAt)));
@@ -111,7 +173,7 @@
     renderDispute(r);
     const available=['approve','decline','withdraw'].filter(kind=>r['can'+kind[0].toUpperCase()+kind.slice(1)]);
     if(available.length){const decision=el('form',undefined,'refund-decision'),label=el('label',merchant?'Message for the buyer':'Why are you withdrawing?'),note=el('textarea');note.name='message';note.required=true;note.minLength=3;note.maxLength=2000;note.rows=3;label.append(note);decision.append(label);
-      if(merchant&&r.canApprove)decision.append(el('p','Approval records your decision. Refund processing is not available yet.'));
+      if(merchant&&r.canApprove)decision.append(el('p','Approval records your decision. Ezkart must process and verify the refund separately.'));
       const actions=el('div',undefined,'refund-buttons');for(const kind of available){const action=el('button',({approve:'Approve request',decline:'Decline request',withdraw:'Withdraw request'}[kind]));action.type='submit';action.dataset.kind=kind;actions.append(action);}decision.append(actions);
       decision.addEventListener('input',()=>{dirty=true;controls();});decision.addEventListener('submit',e=>{e.preventDefault();const kind=e.submitter?.dataset.kind;if(!kind||!decision.reportValidity())return;
         if(otherDraft(decision)){error('Save or clear your other draft before deciding.');return;}
@@ -122,7 +184,7 @@
   }
   const reviewLabels={open:'Request Ezkart review',reply:'Send information',ask_buyer:'Ask buyer for information',ask_store:'Ask store for information',approve:'Approve refund request',decline:'Decline refund request',withdraw:'Withdraw Ezkart review',reopen:'Reopen Ezkart review'};
   const reviewEvents={reply:'Added information',ask_buyer:'Requested buyer information',ask_store:'Requested store information',approve:'Approved refund request',decline:'Declined refund request',withdraw:'Withdrew review',reopen:'Reopened review'};
-  const otherDraft=except=>[...detail.querySelectorAll('form')].filter(f=>f!==except).some(f=>[...f.querySelectorAll('textarea,input[type=file]')].some(n=>Boolean(n.value)));
+  const otherDraft=except=>[...detail.querySelectorAll('form')].filter(f=>f!==except).some(f=>[...f.querySelectorAll('textarea,input[type=file],input[type=text],input:not([type]),input[type=datetime-local]')].some(n=>Boolean(n.value)));
   function renderDispute(r){
     const d=r.dispute;if(!d&&!r.canRequestReview)return;
     const box=el('section',undefined,'refund-evidence refund-review');box.dataset.refundReview='';box.append(el('h4','Ezkart review'));
@@ -140,7 +202,7 @@
       })());older.dataset.refundDetailReload='';box.append(older);}
       if(d.requiresVerification){const link=el('a','Verify your authenticator to update this review');link.href='?page=support-refunds&refund='+encodeURIComponent(r.id)+'#review-verification';box.append(link);}
     }else box.append(el('p','Ask Ezkart to review the original purchase, supporting files and store decision. Explain what needs reviewing.'));
-    const kinds=d?[...(d.canReply?['reply']:[]),...(d.canDecide?['ask_buyer','ask_store','approve','decline']:[]),...(d.canWithdraw?['withdraw']:[]),...(d.canReopen?['reopen']:[])]:['open'];
+    const kinds=d?[...(d.canReply?['reply']:[]),...(d.canAsk?['ask_buyer','ask_store']:[]),...(d.canDecide?['approve','decline']:[]),...(d.canWithdraw?['withdraw']:[]),...(d.canReopen?['reopen']:[])]:['open'];
     if(kinds.length){const review=el('form'),label=el('label',d?'Information for this review':'Why should Ezkart review this request?'),note=el('textarea');review.dataset.reviewForm='';
       note.name='message';note.rows=4;note.required=true;note.minLength=3;note.maxLength=2000;label.append(note);review.append(label);
       review.append(el('p','Your message is retained with the case and visible to the buyer, store and authorized Ezkart reviewers.'));

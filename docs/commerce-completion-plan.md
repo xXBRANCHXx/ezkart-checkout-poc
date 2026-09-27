@@ -71,6 +71,23 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 28 September: original DOKU refund request preparation
+
+The [provider handoff](refund-provider-handoffs.md) adds buyer-owned private bank
+details, an approved-refund processing queue, one immutable request derived from
+the original settled BCA payment, protected packet download and submission
+tracking. Concurrent changes and lost replies preserve the original request.
+Later appeals cannot release a prepared refund's allocation. Submission is not
+payment evidence; existing money and digital-access holds remain.
+
+The 32 affected API and 11 PHP/browser cases pass after correcting an outdated
+copy assertion and the new browser fixture's buyer identity. Desktop/390px views,
+private download session changes and original request recovery are verified.
+Migration 0065 preserves all 176 existing tables and both earnings views in a
+fresh beta restore, adding three empty tables. No live provider request is sent.
+Provider outcomes, refund accounting/funding/fees, entitlements, notifications
+and live purchase acceptance remain open. No full completion gate closes.
+
 ### 28 September: protected refund appeals and operator decisions
 
 The [review workflow](refund-reviews.md) now lets buyers and stores appeal an

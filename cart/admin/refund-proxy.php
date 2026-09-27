@@ -14,15 +14,15 @@ function ez_admin_refund_proxy(string $token, string $path, string $method, bool
     $parts = parse_url($path);
     $route = is_array($parts) ? ($parts['path'] ?? '') : '';
     $pattern = $support
-        ? '#^/v1/support/refunds(?:/(ref_[a-f0-9]{32})(?:/(evidence|dispute)(?:/(rattach_[a-f0-9]{32}))?)?)?$#D'
+        ? '#^/v1/support/refunds(?:/(ref_[a-f0-9]{32})(?:/(evidence|dispute|processing|packet)(?:/(rattach_[a-f0-9]{32}))?)?)?$#D'
         : '#^/v1/commerce/refunds(?:/(ref_[a-f0-9]{32})(?:/(evidence|dispute)(?:/(rattach_[a-f0-9]{32}))?)?|/orders/(EZK-[SP]-[A-F0-9]{24}))?$#D';
     if (strlen($path) > 2400 || str_contains($path, '#') || preg_match($pattern, $route, $match) !== 1) ez_admin_json(['ok' => false, 'error' => 'Refund reference is invalid.'], 400);
     $evidence = ($match[2] ?? '') === 'evidence'; $dispute = ($match[2] ?? '') === 'dispute'; $download = !empty($match[3]);
     if ($download && !$evidence) ez_admin_json(['ok' => false], 400);
     if ($evidence && (($method === 'GET' && !$download) || ($method === 'POST' && $download))) ez_admin_json(['ok' => false], 405);
-    if ($support && $method === 'POST' && !$dispute) ez_admin_json(['ok' => false], 405);
+    if ($support && $method === 'POST' && !$dispute && ($match[2] ?? '') !== 'processing') ez_admin_json(['ok' => false], 405);
     $query = [];
-    $states = $support ? ['all','open','awaiting_buyer','awaiting_store','closed'] : ['all','open','requested','approved','declined','withdrawn'];
+    $states = $support ? ['all','open','awaiting_buyer','awaiting_store','closed','processing'] : ['all','open','requested','approved','declined','withdrawn'];
     foreach (explode('&', (string) ($parts['query'] ?? '')) as $pair) {
         if ($pair === '') continue;
         [$key, $value] = array_pad(explode('=', $pair, 2), 2, ''); $key = rawurldecode($key); $value = rawurldecode($value);

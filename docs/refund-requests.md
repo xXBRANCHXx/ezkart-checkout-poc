@@ -8,6 +8,8 @@ store decision and holds the affected earnings while an appeal is open. This imp
 request allocation and review, not provider execution, refunded-payment evidence,
 financial reversal or digital entitlement revocation. Central checkout remains held.
 
+Approved BCA refunds can now use the [private bank-details and DOKU handoff](refund-provider-handoffs.md). Preparing or recording submission still does not confirm a returned payment.
+
 ## Original amounts and decisions
 
 Each request binds one original central order and its full primary verified IDR

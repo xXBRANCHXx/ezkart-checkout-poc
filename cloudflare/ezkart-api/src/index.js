@@ -22,6 +22,7 @@ import { claimCommerceOrder } from "./commerce-access.js";
 import { returnList, returnOrder, returnDetail, customerReturns, createReturn, returnAction } from "./commerce-returns.js";
 import {refundOrder,refundList,refundDetail,createRefund,changeRefund} from './commerce-refunds.js';
 import {changeDispute,disputeHistory,supportRefunds} from './commerce-refund-disputes.js';
+import {saveRefundBank,changeRefundProcessing,refundProviderPacket} from './commerce-refund-processing.js';
 import {supportSession,supportActor,recordSupportPermission} from './commerce-support.js';
 import {uploadRefundAttachment,refundAttachment,refundAttachmentJsonBytes} from './commerce-refund-media.js';
 import {fulfillmentList,fulfillmentDetail,fulfillmentAction,serviceShipment,customerShipment,bindShipmentAccount,bindShipment,shippingInbox,refreshShipment,drainPendingShipping} from './commerce-fulfillment.js';
@@ -1810,10 +1811,12 @@ export default {
         if(request.method!=='GET'||url.search)return json({ok:false,error:'Review session method is invalid.'},405,cors);
         return json({ok:true,support:await supportSession(env,user)},200,cors);
       }
-      const supportRefund=/^\/v1\/support\/refunds(?:\/(ref_[a-f0-9]{32})(?:\/(dispute|evidence)(?:\/(rattach_[a-f0-9]{32}))?)?)?$/.exec(url.pathname);
+      const supportRefund=/^\/v1\/support\/refunds(?:\/(ref_[a-f0-9]{32})(?:\/(dispute|evidence|processing|packet)(?:\/(rattach_[a-f0-9]{32}))?)?)?$/.exec(url.pathname);
       if(url.pathname.startsWith('/v1/support/')&&!supportRefund)return json({ok:false,error:'Review reference is invalid.'},400,cors);
       if(supportRefund){
         const actor=await supportActor(env,await authenticatedUser(request,env,true)),[,id,action,file]=supportRefund;
+        if(action==='processing'&&!file&&request.method==='POST'&&!url.search)return json({ok:true,refund:await changeRefundProcessing(env,actor,id,await reviewRequestJson(request,4000,parseMessageJSON))},200,cors);
+        if(action==='packet'&&!file&&request.method==='GET'&&!url.search)return json({ok:true,packet:await refundProviderPacket(env,actor,id)},200,cors);
         if(action==='dispute'&&!file){
           if(request.method==='POST'&&!url.search)return json({ok:true,refund:await changeDispute(env,actor,id,await reviewRequestJson(request,16000,parseMessageJSON))},200,cors);
           if(request.method==='GET'&&[...url.searchParams.keys()].length===1&&url.searchParams.has('before'))return json({ok:true,disputeHistory:await disputeHistory(env,actor,id,url.searchParams.get('before'))},200,cors);
@@ -1825,7 +1828,7 @@ export default {
         }
         return json({ok:false,error:'Review method or parameters are invalid.'},405,cors);
       }
-      const buyerRefund=/^\/v1\/customer\/orders\/(EZK-[SP]-[A-F0-9]{24})\/refunds(?:\/(ref_[a-f0-9]{32})(?:\/(evidence|dispute)(?:\/(rattach_[a-f0-9]{32}))?)?)?$/.exec(url.pathname);
+      const buyerRefund=/^\/v1\/customer\/orders\/(EZK-[SP]-[A-F0-9]{24})\/refunds(?:\/(ref_[a-f0-9]{32})(?:\/(evidence|dispute|bank)(?:\/(rattach_[a-f0-9]{32}))?)?)?$/.exec(url.pathname);
       const merchantRefund=/^\/v1\/commerce\/refunds(?:\/(ref_[a-f0-9]{32})(?:\/(evidence|dispute)(?:\/(rattach_[a-f0-9]{32}))?)?|\/orders\/(EZK-[SP]-[A-F0-9]{24}))?$/.exec(url.pathname);
       if((url.pathname.startsWith('/v1/customer/orders/')&&url.pathname.includes('/refunds')||url.pathname.startsWith('/v1/commerce/refunds'))&&!buyerRefund&&!merchantRefund)return json({ok:false,error:'Refund reference is invalid.'},400,cors);
       if(buyerRefund||merchantRefund){
@@ -1833,6 +1836,10 @@ export default {
         if(buyerRefund){const user=await authenticatedUser(request,env);actor={kind:'buyer',id:user.id};[,orderId,id,evidence,attachment]=buyerRefund;}
         else{const {seller,authUserId}=await sellerContext(request,env);actor={kind:'merchant',id:authUserId,sellerId:seller.id};[,id,evidence,attachment,orderId]=merchantRefund;
           if(request.headers.has('x-ezkart-refund-store')&&request.headers.get('x-ezkart-refund-store')!==seller.id)return json({ok:false,error:'Your active store changed. Reload this page.'},409,cors);}
+        if(evidence==='bank'){
+          if(buyerRefund&&!attachment&&request.method==='POST'&&!url.search)return json({ok:true,refund:await saveRefundBank(env,actor,id,await reviewRequestJson(request,2000,parseMessageJSON),orderId)},200,cors);
+          return json({ok:false,error:'Bank details method is invalid.'},405,cors);
+        }
         if(evidence==='dispute'){
           if(attachment)return json({ok:false,error:'Review reference is invalid.'},400,cors);
           if(request.method==='POST'&&!url.search)return json({ok:true,refund:await changeDispute(env,actor,id,await reviewRequestJson(request,16000,parseMessageJSON),orderId)},200,cors);
