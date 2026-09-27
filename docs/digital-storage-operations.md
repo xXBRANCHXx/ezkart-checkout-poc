@@ -109,5 +109,9 @@ email-send activation or Resend key, so its `*/2 * * * *` email trigger does no
 work. That inactive trigger was removed and its slot reassigned to beta's hourly
 `:17` housekeeping. Both trigger updates succeeded without uploading application
 code or changing data, provider configuration, TEST's other three schedules or
-main's schedule. Beta's first ordinary run still needs to be observed. This
-schedule does not enable transactional or campaign email delivery.
+main's schedule. Beta's first ordinary run started at 08:17:55 UTC and completed
+at 08:17:56 UTC, selecting zero files with zero failures. The 08:30 read-only
+inspection returns no warnings and exit 0. Its private proof is
+`/home/branch/.local/share/ezkart/beta-01a0d643/digital-storage-first-success.json`.
+This establishes ordinary scheduling with an empty batch, not real-file cleanup
+capacity. The schedule does not enable transactional or campaign email delivery.

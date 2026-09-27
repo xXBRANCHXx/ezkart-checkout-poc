@@ -14,7 +14,7 @@ deployment now uses the isolated live beta configuration described below, with
 new checkout and scheduled jobs held. Existing sandbox evidence is
 preserved. Main and `ezkart.id` remain held.
 
-## Current hosted state — 27 September, 07:49 UTC
+## Current hosted state — 27 September, 08:55 UTC
 
 Hostinger's private runtime now selects `beta`, production providers and the beta
 Worker. Its live DOKU client, secret, signing key and verified parent profile are
@@ -94,10 +94,14 @@ verified after reload, restored and verified again; both versions appear in
 the store history. Products, Shipping settings, Shop and Advanced also load.
 These checks are not acceptance of real purchases or provider money movement.
 
-The active store currently has no pickup/return address or public support
-email/phone. The owner has been asked for those actual details. Both imported
-products also lack descriptions, and imported stock needs a physical count
-before sales. DOKU BCA still shows UPDATING after fresh login at 07:44 UTC.
+The owner supplied the actual Sinduadi pickup/return address and public support
+email/phone. Both defaults and the original JNE/J&T/SiCepat selection are saved
+and verified after reload (shipping revision 3). The public support details are
+also saved and reloaded (profile revision 3); unrelated profile values are
+unchanged. No entrance pin was invented; instant couriers remain unselected.
+Private address/contact proofs stay outside Git. Both imported products still
+lack descriptions, and imported stock needs a physical count before sales.
+DOKU BCA still shows UPDATING at 08:39 UTC.
 The catalog's obsolete CV-approval and delivery-readiness claims are replaced
 with the actual checkout pause and links to inventory/payment/shipping settings.
 
@@ -113,8 +117,35 @@ cases pass. Live beta reports zero uploaded/retained/unavailable files and no
 cleanup backlog. Cloudflare's free-account cron limit initially blocked beta's
 housekeeping. An inactive TEST email trigger was verified against the deployed
 version and reassigned to beta's hourly `:17` housekeeping; the application
-versions and stored TEST evidence are unchanged. The first beta maintenance
-heartbeat remains pending. See [storage operations](digital-storage-operations.md).
+versions and stored TEST evidence are unchanged. Beta's first ordinary run
+completed at 08:17:56 UTC with zero selected files and zero failures. The 08:30
+read-only report returns no warnings and exit 0. See
+[storage operations](digital-storage-operations.md).
+
+The dedicated Resend domain `beta-mail.ezkart.id` is verified. Its three DNS
+records are saved at Hostinger; all twelve original domain records are unchanged.
+Click/open tracking and receiving are disabled. A domain-restricted sending key,
+separate recovery key and signed callback for seven email lifecycle events are
+installed only in beta. The original Supabase server credential is stored as a
+Worker secret, and the real owner's verified email lookup passes without sending
+mail. Beta Worker version `cdcb7924-727f-4060-9693-ed430fdf019b` preserves checkout,
+transactional-send and campaign-send holds; investigation is enabled. A signed
+non-delivery diagnostic is ignored and an invalid signature rejected. These
+checks establish callback configuration, not provider delivery or inbox placement.
+The owner has been asked to authorize one specific mailbox connection check.
+See [email delivery](commerce-email-delivery.md).
+
+After the owner's separate Wallet authenticator check, the actual store's one
+production enrollment was saved and dispatched at 08:24:58 UTC. It has one
+attempt, a durable provider binding, no accepted registration receipt and no
+confirmed provider profile; its state is `uncertain` / Needs review. The original
+reference is preserved and registration is not repeated. DOKU's dashboard shows
+zero sub-accounts and still offers Activate Service; Balance Management, Collect
+and Route, Embedded Wallet and Fund Connector are unchecked and disabled. Those
+screens do not establish that the original registration had no effect. With the
+owner's explicit approval, a support email asking DOKU to investigate the original
+reference and service provisioning was sent to `care@doku.com` and verified in
+Sent at 08:54 UTC. No real payment, transfer, refund, shipment or payout was made.
 
 The sections below retain earlier rollout observations; this current-state
 record supersedes their historical “not installed” and empty-catalog statements.
@@ -123,7 +154,7 @@ record supersedes their historical “not installed” and empty-catalog stateme
 
 | Area | Implemented foundation | Acceptance still required |
 | --- | --- | --- |
-| Purchases and stock | Central immutable orders, atomic reservations, recoverable payment jobs, fulfillment and physical returns | Hosted cutover, legacy ownership/count reconciliation, full signed-in physical/digital purchase and failure journeys |
+| Purchases and stock | Central immutable orders, atomic reservations, recoverable payment jobs, fulfillment and physical returns; isolated beta merchant cutover | Legacy ownership/count reconciliation, full signed-in physical/digital purchase and failure journeys |
 | Refunds | Purchase allocations, store decisions, buyer/store notifications and original delivery/return evidence | Provider-supported execution, unknown-result recovery, confirmed refund evidence, fee reversals, item access effects and reconciliation |
 | Wallet | Balanced capture journal, seller enrollment and original provider balance/history receipts | Actual settlement/fee ingestion and corrections, delivery-plus-settlement release, reserves, negative balances, withdrawal reservations and verified payouts |
 | Digital files | Immutable versions, private buyer grants, complete-download proof, reviews and full 500 MiB local transfer/recovery | Hosted signed-in and real-device transfers, storage monitoring/recovery, refund effects and subscription lifecycle |

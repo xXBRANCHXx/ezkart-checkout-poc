@@ -73,6 +73,17 @@ Intermediate commits do not certify the whole workbench as ready.
 
 ### 27 September: hosted beta catalog and private runtime cutover
 
+At 08:55 UTC, the owner-provided pickup/return address and support contacts are
+saved and verified after reload, with the existing courier selection and other
+profile fields preserved. Beta's ordinary housekeeping run completed successfully.
+Its dedicated Resend domain, restricted send key, recovery key, signed callback
+and server-side recipient verification are configured; actual mailbox acceptance
+remains pending and sending stays held. The live seller-wallet registration has
+one uncertain attempt, preserved without resubmission. DOKU still shows wallet/
+routing services disabled and BCA UPDATING. The owner-approved support request is
+sent. These are current observations; the earlier missing-address and zero-job
+statements below describe the initial cutover only.
+
 At 07:45 UTC, implementation `017e445` and beta Worker
 `a87edd2b-3903-4de8-859d-226611a0443e` enable central merchant operations while
 separately pausing new checkout. Beta defaults to held unless explicitly enabled

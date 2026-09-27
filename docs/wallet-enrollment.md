@@ -5,6 +5,17 @@ environment, dispatch it through DOKU Sub-Account V2, and confirm the resulting
 cash and pending account identities. Enrollment creates no financial entries,
 settlement, available balance, payment routing or withdrawal capability.
 
+On 27 September at 08:24:58 UTC, the freshly verified owner submitted the actual
+beta store's first production request. One attempt committed its provider binding
+but yielded no accepted registration receipt or confirmed profile. It remains
+uncertain, and no second registration is attempted. DOKU's Sub Account list is
+empty while the V2 activation screen and disabled wallet/routing services remain;
+the empty list does not prove that the original request had no effect. The
+owner-approved provider investigation was emailed to DOKU and verified in Sent
+at 08:54 UTC. Exact references and private evidence are outside Git in
+`/home/branch/.local/share/ezkart/beta-01a0d643/`. Enrollment recovery and live
+technical acceptance remain open; no seller funds or transfers were created.
+
 ## Merchant flow and authorization
 
 An owner opens Wallet with the existing fresh email or authenticator challenge.

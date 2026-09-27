@@ -94,7 +94,8 @@ notification retention, production rate/load limits and external alerting remain
 
 No credentials belong in tracked files. Sending requires all of:
 
-- `APP_ENVIRONMENT=test` or `production`, with `COMMERCE_STORAGE=d1`.
+- `APP_ENVIRONMENT=test`, `beta` or `production`, with `COMMERCE_STORAGE=d1`.
+  Beta uses production provider credentials and workbench destinations.
 - `COMMERCE_EMAIL_PROVIDER=resend` and `COMMERCE_EMAIL_SEND=enabled`.
 - `COMMERCE_EMAIL_FROM`: a normalized sender address on the verified mail domain.
 - `COMMERCE_EMAIL_PROFILE`: a stable provider-account/environment profile name.
@@ -133,6 +134,31 @@ Buyer email is opt-in through the account preference workflow. Transactional
 settings do not grant permission for promotional campaigns.
 
 ## Validation and rollout
+
+### Live beta configuration, 27 September 2026
+
+Resend verified `beta-mail.ezkart.id` in its Tokyo region. Three isolated DNS
+additions preserve all twelve original Hostinger records. Tracking and receiving
+remain disabled. The sending key is restricted to this domain; the separate
+same-account recovery key permits the existing read-only investigation adapter.
+The subscribed callback is
+`https://ezkart-api-beta.vincentbranch23.workers.dev/webhooks/commerce-email/resend/ezkart_beta_20260927`,
+with sent, delivered, delayed, bounced, complained, failed and suppressed events.
+
+Both provider keys, the webhook profile secret and Supabase server credential are
+installed only on beta. No key is placed in PHP/browser settings or tracked files.
+Worker version `cdcb7924-727f-4060-9693-ed430fdf019b` retains checkout,
+transactional-send and campaign-send holds and the sole hourly housekeeping cron.
+The real owner's confirmed identity lookup passes through the production adapter.
+Investigation is configured independently of sending. A non-delivery diagnostic
+with a valid signature returns `ignored`; an invalid signature returns 401.
+Neither probe creates email evidence or proves real provider callback delivery.
+
+No Resend email has been sent yet. One exact connection-check message is prepared
+privately and awaits the owner's explicit send instruction. It will not create a
+purchase or payment record. Actual transactional journeys, mailbox rendering,
+failure/complaint handling, operational alerting, dispatch scheduling and sustained
+acceptance remain open. The observations below describe the original TEST rollout.
 
 Tests cover the real Worker send handler and callback endpoint, raw signature
 interoperability, lost POST/database acknowledgements, callbacks arriving first,
