@@ -1,0 +1,145 @@
+(() => {
+  'use strict';
+  const root=document.querySelector('[data-refunds]');if(!root)return;
+  const q=s=>root.querySelector(s),merchant=root.dataset.audience==='merchant',form=q('[data-refund-form]'),list=q('[data-refund-list]'),detail=q('[data-refund-detail]');
+  const el=(tag,text,cls='')=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;};
+  const button=(text,fn)=>{const n=el('button',text);n.type='button';n.addEventListener('click',fn);return n;};
+  const money=n=>'Rp'+Number(n).toLocaleString('id-ID'),date=s=>new Date(s).toLocaleString('en-GB',{timeZone:'Asia/Jakarta'});
+  const base=merchant?'/v1/commerce/refunds':'/v1/customer/orders/'+root.dataset.order+'/refunds';
+  const orderPath=id=>merchant?base+'/orders/'+id:base,casePath=id=>base+'/'+id;
+  const scope=JSON.stringify([root.dataset.audience,root.dataset.account,root.dataset.store,root.dataset.order]),storageKey='ezkart.refunds.pending.v1:'+scope;
+  let pending=null,busy=false,loading=false,ended=false,damaged=false,rejected=false,enabled=true,cursor=null,generation=0,overview=null,dirty=false;
+  const checksum=async record=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify([record.v,record.scope,record.path,record.body]))))].map(n=>n.toString(16).padStart(2,'0')).join('');
+  const notice=text=>q('[data-refund-status]').textContent=text;
+  const error=text=>{q('[data-refund-error]').textContent=text;q('[data-refund-error]').hidden=!text;};
+  function controls(){
+    root.querySelectorAll('button,input,select,textarea').forEach(n=>n.disabled=busy||loading||ended||Boolean(pending)||damaged);
+    q('[data-refund-refresh]').disabled=!ended&&(busy||loading||Boolean(pending)||dirty);
+    q('[data-refund-new]').disabled=busy||loading||ended||Boolean(pending)||damaged||dirty||!enabled;
+    root.querySelectorAll('[data-refund-retry]').forEach(n=>n.disabled=busy||ended||damaged);
+    root.querySelectorAll('[data-refund-review-changes]').forEach(n=>n.disabled=busy||ended||damaged);
+    list.querySelectorAll('button').forEach(n=>n.disabled=busy||loading||ended||Boolean(pending)||dirty);
+    q('[data-refund-filter]').disabled=busy||loading||ended||Boolean(pending)||dirty;
+    root.querySelectorAll('[data-refund-detail-reload]').forEach(n=>n.disabled=busy||loading||ended||Boolean(pending)||dirty);
+    root.querySelectorAll('[data-refund-discard]').forEach(n=>n.hidden=!dirty);
+    if(overview&&!overview.canCreate)q('[data-refund-submit]').disabled=true;
+  }
+  function end(text){ended=true;generation++;list.replaceChildren();detail.replaceChildren();detail.hidden=true;form.hidden=true;q('[data-refund-lookup]').hidden=true;q('[data-refund-recovery]').replaceChildren();q('[data-refund-refresh]').textContent='Reload sign-in';error(text);controls();}
+  async function readPending(){
+    const raw=localStorage.getItem(storageKey);if(raw===null)return null;
+    const value=JSON.parse(raw),path=typeof value?.path==='string'?value.path:'';
+    const validPath=merchant?/^\/v1\/commerce\/refunds\/(?:orders\/EZK-[SP]-[A-F0-9]{24}|ref_[a-f0-9]{32})$/.test(path):path===base||new RegExp('^'+base+'/ref_[a-f0-9]{32}$').test(path);
+    if(value?.v!==1||value.scope!==scope||!validPath||typeof value.body!=='string'||value.body.length>16000)throw Error('Saved retry data is damaged.');
+    const body=JSON.parse(value.body);if(!/^[A-Za-z0-9_-]{16,100}$/.test(body?.requestKey||'')||(!body.kind&&(!Array.isArray(body.items)||body.items.some(i=>!i||!Number.isSafeInteger(i.amount)||i.amount<1))))throw Error('Saved retry data is damaged.');
+    if(value.checksum!==await checksum(value)||localStorage.getItem(storageKey)!==raw)throw Error('Saved retry data is damaged or changed.');
+    return value;
+  }
+  function recovery(){
+    const box=q('[data-refund-recovery]');box.replaceChildren();box.hidden=!pending;if(!pending)return;
+    const body=JSON.parse(pending.body);box.append(el('h3','Confirm your saved request'),el('p',body.kind?'Decision: '+body.kind:money(body.items.reduce((sum,i)=>sum+i.amount,body.shippingAmount||0))+' requested'),el('p','Your original details are saved. Retry confirmation to check the result.'));
+    const retry=button('Retry confirmation',()=>void send());retry.dataset.refundRetry='';box.append(retry);
+    if(rejected){const review=button('Review changes',()=>void reviewChanges());review.dataset.refundReviewChanges='';box.append(review);}controls();
+  }
+  async function api(path,body){
+    let url,headers={'Content-Type':'application/json','X-Ezkart-CSRF':root.dataset.csrf};
+    if(merchant){url='/cart/admin/?cloud='+encodeURIComponent(path);headers['X-Ezkart-Refund-Account']=root.dataset.account;headers['X-Ezkart-Refund-Store']=root.dataset.store;}
+    else{const parsed=new URL(path,location.origin),id=parsed.pathname.slice(base.length).replace(/^\//,'');url='/cart/admin/customer-refunds.php?'+new URLSearchParams({order:root.dataset.order,...(id?{refund:id}:{}),...Object.fromEntries(parsed.searchParams)});headers['X-Ezkart-Customer-Session']=root.dataset.version;}
+    const response=await fetch(url,{method:body===undefined?'GET':'POST',credentials:'same-origin',cache:'no-store',headers,signal:AbortSignal.timeout(35000),...(body===undefined?{}:{body})});
+    let data;try{data=await response.json();}catch{throw Error('The response was interrupted. Retry confirmation.');}
+    if(!response.ok||data.ok!==true){const e=Error(data.error||'The refund result could not be confirmed.');e.status=response.status;if([401,403].includes(e.status))end(e.message);throw e;}return data;
+  }
+  async function load(append=false){
+    if(ended)return;const version=++generation;loading=true;controls();
+    try{const data=await api(base+'?'+new URLSearchParams({state:q('[data-refund-filter]').value,...(append&&cursor?{cursor}:{})}));if(ended||version!==generation)return;
+      if(!append)list.replaceChildren();for(const r of data.refunds){const card=button('',()=>void show(r.id));card.className='refund-case';card.append(el('b',r.stateLabel),el('small',r.orderId+' · '+date(r.createdAt)),el('strong',money(r.amount)));card.dataset.refundCase=r.id;list.append(card);}
+      cursor=data.nextCursor;enabled=data.enabled;q('[data-refund-more]').hidden=!cursor;
+      notice(data.enabled?(list.children.length?'Your refund requests are up to date.':'No refund requests yet.'):'Refund requests will open when order processing is enabled.');
+      if(!merchant)overview=data;
+    }catch(e){if(!ended)error(e.message);}finally{if(version===generation){loading=false;controls();}}
+  }
+  function renderForm(data,draft){
+    overview=data;dirty=true;form.hidden=false;q('[data-refund-lookup]').hidden=true;detail.hidden=true;
+    q('[data-refund-order]').textContent=data.order.id;form.elements.reason.value=draft?.reason||'not_received';form.elements.note.value=draft?.note||'';
+    const amounts=q('[data-refund-amounts]');amounts.replaceChildren();
+    for(const item of [...data.items.map(i=>({...i,key:i.orderItemId,label:i.title+(i.variant?' — '+i.variant:'')})),{key:'shipping',label:'Shipping',...data.shipping}]){
+      const row=el('div',undefined,'refund-amount'),text=el('div'),label=el('label','Requested amount for '+item.label),input=el('input');
+      text.append(el('b',item.label),el('small',money(item.availableAmount)+' remaining from '+money(item.paidAmount)));input.type='number';input.min='0';input.max=String(item.availableAmount);input.step='1';input.inputMode='numeric';input.dataset.refundAmount=item.key;
+      input.value=String(item.key==='shipping'?(draft?.shippingAmount||0):(draft?.items?.find(i=>i.orderItemId===item.key)?.amount||0));label.append(input);row.append(text,label);amounts.append(row);
+    }
+    error(data.reason||'');total();controls();form.elements.reason.dispatchEvent(new Event('change',{bubbles:true}));
+  }
+  function total(){const n=[...form.querySelectorAll('[data-refund-amount]')].reduce((sum,input)=>sum+Number(input.value||0),0);q('[data-refund-total]').textContent='Requested total: '+money(n);}
+  async function begin(orderId=root.dataset.order,draft){
+    if(ended||pending||busy)return;
+    if(!orderId){q('[data-refund-lookup]').hidden=false;q('[data-refund-lookup] input').focus();return;}
+    loading=true;controls();error('');try{const data=await api(orderPath(orderId));if(!ended)renderForm(data,draft);}catch(e){if(!ended)error(e.message);}finally{loading=false;controls();}
+  }
+  function renderDetail(r){
+    detail.hidden=false;detail.replaceChildren();detail.append(el('h3',r.stateLabel),el('p',r.orderId),el('strong',money(r.amount)),el('p','Reason: '+([...form.elements.reason.options].find(o=>o.value===r.reason)?.textContent||r.reason)),el('p',r.note));
+    if(merchant){const orderLink=el('a','View original order');orderLink.href='?page=orders&order='+encodeURIComponent(r.orderId);detail.append(orderLink);}
+    const lines=el('ul',undefined,'refund-lines');for(const i of r.items)lines.append(el('li',i.title+(i.variant?' — '+i.variant:'')+': '+money(i.amount)+' requested from '+money(i.quantity*i.price)));if(r.shippingAmount)lines.append(el('li','Shipping: '+money(r.shippingAmount)));detail.append(lines);
+    if(r.state==='approved')detail.append(el('p','Approved by the store. The refund has not been paid. Refund processing is not available yet.'));
+    const history=el('div',undefined,'refund-history');history.append(el('h4','Request history'),el('p','Requested · '+date(r.createdAt)));
+    for(const a of r.history){const row=el('article');row.append(el('b',a.actor+' · '+({approve:'Approved',decline:'Declined',withdraw:'Withdrawn'}[a.kind])),el('time',date(a.createdAt)),el('p',a.message));history.append(row);}detail.append(history);
+    const available=['approve','decline','withdraw'].filter(kind=>r['can'+kind[0].toUpperCase()+kind.slice(1)]);
+    if(available.length){const decision=el('form',undefined,'refund-decision'),label=el('label',merchant?'Message for the buyer':'Why are you withdrawing?'),note=el('textarea');note.name='message';note.required=true;note.minLength=3;note.maxLength=2000;note.rows=3;label.append(note);decision.append(label);
+      if(merchant&&r.canApprove)decision.append(el('p','Approval records your decision. Refund processing is not available yet.'));
+      const actions=el('div',undefined,'refund-buttons');for(const kind of available){const action=el('button',({approve:'Approve request',decline:'Decline request',withdraw:'Withdraw request'}[kind]));action.type='submit';action.dataset.kind=kind;actions.append(action);}decision.append(actions);
+      decision.addEventListener('input',()=>{dirty=true;controls();});decision.addEventListener('submit',e=>{e.preventDefault();const kind=e.submitter?.dataset.kind;if(!kind||!decision.reportValidity())return;void persistAndSend(casePath(r.id),{requestKey:crypto.randomUUID().replaceAll('-',''),revision:r.revision,orderRevision:r.orderRevision,kind,message:note.value});});detail.append(decision);
+    }
+    const reload=button('Reload request',()=>void show(r.id)),footer=el('div',undefined,'refund-buttons');reload.dataset.refundDetailReload='';footer.append(reload);
+    if(available.length){const discard=button('Discard decision draft',()=>{dirty=false;renderDetail(r);});discard.dataset.refundDiscard='';footer.append(discard);}detail.append(footer);controls();
+  }
+  async function show(id){
+    if(pending||busy||ended)return;loading=true;controls();error('');try{const data=await api(casePath(id));if(ended)return;dirty=false;form.hidden=true;q('[data-refund-lookup]').hidden=true;renderDetail(data.refund);}catch(e){if(!ended)error(e.message);}finally{loading=false;controls();}
+  }
+  async function locked(work){
+    if(!navigator.locks){error('This browser cannot protect saved refund requests. Use a current browser to continue.');return;}
+    await navigator.locks.request(storageKey,{ifAvailable:true},async lock=>{if(!lock){error('Another tab is confirming a refund request. Wait for it to finish.');return;}await work();});
+  }
+  async function persistAndSend(path,body){
+    if(busy||pending||ended||damaged)return;
+    await locked(async()=>{
+      try{const existing=await readPending();if(existing){pending=existing;recovery();error('Confirm the earlier saved request before submitting another.');return;}
+        const record={v:1,scope,path,body:JSON.stringify(body)};record.checksum=await checksum(record);const serialized=JSON.stringify(record);localStorage.setItem(storageKey,serialized);
+        if(localStorage.getItem(storageKey)!==serialized)throw Error('Browser storage did not retain the request. Nothing was submitted.');pending=record;rejected=false;recovery();await deliver();
+      }catch(e){if(!ended)error(e.message||'The request could not be saved in this browser. Nothing was submitted.');}finally{controls();}
+    });
+  }
+  async function send(){if(!pending||busy||ended||damaged)return;await locked(deliver);}
+  async function deliver(){
+    const original=pending;busy=true;rejected=false;recovery();controls();error('');
+    try{
+      const stored=await readPending();if(stored&&JSON.stringify(stored)!==JSON.stringify(original))throw Error('Another saved request needs to be checked first. Reload this page.');
+      const data=await api(original.path,original.body);if(ended)return;
+      if(!data.refund?.id)throw Error('The saved refund response was incomplete. Retry confirmation.');
+      if(stored)localStorage.removeItem(storageKey);
+      if(localStorage.getItem(storageKey)!==null)throw Error('The result is saved, but browser recovery could not be cleared. Retry confirmation.');
+      pending=null;dirty=false;rejected=false;form.hidden=true;q('[data-refund-lookup]').hidden=true;recovery();renderDetail(data.refund);await load();notice('Your refund request was saved.');
+    }catch(e){if(!ended){rejected=[400,405,409,413,415,422,429].includes(e.status);error(e.message);recovery();}}
+    finally{busy=false;controls();}
+  }
+  async function reviewChanges(){
+    if(!pending||busy||ended||!rejected)return;const original=pending,body=JSON.parse(original.body);
+    try{if(JSON.stringify(await readPending())!==JSON.stringify(original))throw Error('The saved retry changed. Reload this page.');localStorage.removeItem(storageKey);if(localStorage.getItem(storageKey)!==null)throw Error('Browser recovery could not be cleared.');}
+    catch(e){error(e.message);return;}
+    pending=null;rejected=false;dirty=false;recovery();error('');
+    if(body.kind)await show(original.path.split('/').at(-1));else await begin(merchant?original.path.split('/').at(-1):root.dataset.order,body);
+  }
+  form.addEventListener('input',()=>{dirty=true;total();controls();});
+  form.addEventListener('submit',e=>{e.preventDefault();if(!overview?.canCreate||!form.reportValidity())return;
+    const inputs=[...form.querySelectorAll('[data-refund-amount]')],items=inputs.filter(i=>i.dataset.refundAmount!=='shipping'&&Number(i.value)>0).map(i=>({orderItemId:i.dataset.refundAmount,amount:Number(i.value)}));
+    const shippingAmount=Number(inputs.find(i=>i.dataset.refundAmount==='shipping').value||0);
+    if(items.length===0&&shippingAmount===0){error('Enter at least one amount to request.');return;}
+    void persistAndSend(orderPath(overview.order.id),{requestKey:crypto.randomUUID().replaceAll('-',''),orderRevision:overview.order.revision,reason:form.elements.reason.value,note:form.elements.note.value,items,shippingAmount});
+  });
+  q('[data-refund-new]').addEventListener('click',()=>void begin());
+  q('[data-refund-cancel]').addEventListener('click',()=>{dirty=false;form.hidden=true;error('');controls();});
+  q('[data-refund-lookup]').addEventListener('submit',e=>{e.preventDefault();const id=e.currentTarget.elements.order.value.trim();if(!/^EZK-[SP]-[A-F0-9]{24}$/.test(id)){error('Enter a valid order reference.');return;}void begin(id);});
+  q('[data-refund-refresh]').addEventListener('click',()=>{if(ended)location.reload();else{error('');void load();}});
+  q('[data-refund-filter]').addEventListener('change',()=>void load());q('[data-refund-more]').addEventListener('click',()=>void load(true));
+  addEventListener('beforeunload',e=>{if(dirty&&!pending){e.preventDefault();e.returnValue='';}});
+  addEventListener('storage',async e=>{if(e.key!==storageKey||busy||ended)return;try{pending=await readPending();recovery();controls();}catch{damaged=true;error('Saved retry data could not be read. Reload and review your request history before continuing.');controls();}});
+  void (async()=>{loading=true;controls();try{pending=await readPending();recovery();}catch{damaged=true;error('Saved retry data could not be read. Review your request history and contact support before submitting again.');}
+    await load();if(!pending&&!ended){const id=new URL(location.href).searchParams.get('refund');if(/^ref_[a-f0-9]{32}$/.test(id||''))void show(id);}})();
+})();

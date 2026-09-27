@@ -4,6 +4,9 @@ This stage implements customer/merchant return requests and audited physical
 intake for central commerce orders. It does not complete the refund, return
 courier, dispute, settlement, or central checkout rollout. Test writes remain
 behind `COMMERCE_STORAGE=d1`, which is still disabled on the hosted test service.
+The separate [refund request workspace](refund-requests.md) records original
+purchase amounts and store decisions for physical and digital items. Approval
+does not issue money or substitute for this physical inspection history.
 
 ## Request and intake rules
 

@@ -47,6 +47,7 @@ function ez_orders_table(array $rows, string $tableId, string $csrfToken, string
   <?php if ($centralOrderWorkspace) { require __DIR__ . '/commerce-orders.php'; break; } ?>
   <?php ez_page_header('Orders', 'Manage orders, payments, and deliveries.', [
       ['label' => 'Returns', 'icon' => 'refund', 'href' => '?page=returns'],
+      ['label' => 'Refunds', 'icon' => 'refund', 'href' => '?page=refunds'],
       ['label' => 'Fulfillment', 'icon' => 'truck', 'href' => '?page=fulfillment'],
       ['label' => 'Refresh data', 'icon' => 'refresh', 'href' => '?page=orders'], ['label' => 'Open checkout', 'icon' => 'external-link', 'href' => '../', 'style' => 'primary'],
   ]); ?>
@@ -218,6 +219,7 @@ function ez_orders_table(array $rows, string $tableId, string $csrfToken, string
   </section>
 
 <?php break; case 'returns': require __DIR__ . '/returns.php'; ?>
+<?php break; case 'refunds': require __DIR__ . '/refunds.php'; ?>
 <?php break; case 'shipping-settings': require __DIR__ . '/shipping-settings.php'; ?>
 
 <?php break; case 'fulfillment': require __DIR__ . '/fulfillment.php'; ?>

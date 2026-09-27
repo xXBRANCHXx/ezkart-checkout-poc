@@ -64,6 +64,30 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 27 September: purchase-linked refund requests and decisions
+
+Implemented buyer and merchant refund requests with original item/shipping amount
+allocations, approval, decline, withdrawal and immutable history. Physical and
+digital items can be reviewed together; concurrent requests cannot overclaim the
+purchase. A later catalog change cannot change the original amount. Approval is
+explicitly separate from payment and changes no accounting, stock or download
+access. See [refund-requests.md](refund-requests.md) for the contract and remaining
+execution, notification, evidence, entitlement and reconciliation work.
+
+All fifty relevant cases pass: eight refund API cases, eleven digital API cases,
+eight financial journal cases, five refund PHP/browser cases, three order-manager
+cases, and fifteen buyer review/digital checkout regressions. The final five
+browser cases also pass after adding checksummed recovery. Desktop 1360px and
+narrow 390px buyer/merchant layouts were visually inspected. Syntax/diff and TEST
+Worker dry-run checks pass.
+
+The fresh private TEST backup is 680,604 bytes, SHA-256
+`342329c6a6df53b170e3a7282b91bbc1a3328dcfd9301c15f63d342b6ba75726`.
+Restoration and migration 0045 preserve every existing row in 141 physical tables,
+pass integrity/foreign-key checks and compile 351 captured plans. Eighteen objects
+are added; no existing object changes. Provider refund execution and financial
+release remain unimplemented. All thirteen top-level gates and all holds remain.
+
 ### 27 September: verified digital purchase reviews
 
 The original verified complete download now unlocks reviews and review photos

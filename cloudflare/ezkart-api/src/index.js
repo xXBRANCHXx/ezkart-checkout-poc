@@ -20,6 +20,7 @@ import { inventoryOverview, inventoryHistory, inventoryDraft, adjustInventory, c
 import { stockReviewList, stockReviewDetails, resolveStockReview } from "./stock-reviews.js";
 import { claimCommerceOrder } from "./commerce-access.js";
 import { returnList, returnOrder, returnDetail, customerReturns, createReturn, returnAction } from "./commerce-returns.js";
+import {refundOrder,refundList,refundDetail,createRefund,changeRefund} from './commerce-refunds.js';
 import {fulfillmentList,fulfillmentDetail,fulfillmentAction,serviceShipment,customerShipment,bindShipmentAccount,bindShipment,shippingInbox,refreshShipment,drainPendingShipping} from './commerce-fulfillment.js';
 import {merchantOrderList,merchantOrderDetail,merchantOrderHistory} from './commerce-order-reads.js';
 import {merchantDashboard} from './commerce-dashboard.js';
@@ -1710,6 +1711,24 @@ export default {
         if(request.method==='GET'&&part&&!receipt&&!request.headers.has('range'))return await buyerDigitalPart(env,user,orderId,itemId,grantId,Number(part));
         if(request.method==='POST'&&receipt)return json({ok:true,...await acknowledgeDigitalPart(env,user,orderId,itemId,grantId,Number(part),await reviewRequestJson(request,2000,parseMessageJSON))},200,cors);
         return json({ok:false,error:'Download method is not allowed.'},405,cors);
+      }
+      const buyerRefund=/^\/v1\/customer\/orders\/(EZK-[SP]-[A-F0-9]{24})\/refunds(?:\/(ref_[a-f0-9]{32}))?$/.exec(url.pathname);
+      const merchantRefund=/^\/v1\/commerce\/refunds(?:\/(ref_[a-f0-9]{32})|\/orders\/(EZK-[SP]-[A-F0-9]{24}))?$/.exec(url.pathname);
+      if((url.pathname.startsWith('/v1/customer/orders/')&&url.pathname.includes('/refunds')||url.pathname.startsWith('/v1/commerce/refunds'))&&!buyerRefund&&!merchantRefund)return json({ok:false,error:'Refund reference is invalid.'},400,cors);
+      if(buyerRefund||merchantRefund){
+        let actor,orderId,id;
+        if(buyerRefund){const user=await authenticatedUser(request,env);actor={kind:'buyer',id:user.id};[,orderId,id]=buyerRefund;}
+        else{const {seller,authUserId}=await sellerContext(request,env);actor={kind:'merchant',id:authUserId,sellerId:seller.id};[,id,orderId]=merchantRefund;
+          if(request.headers.has('x-ezkart-refund-store')&&request.headers.get('x-ezkart-refund-store')!==seller.id)return json({ok:false,error:'Your active store changed. Reload this page.'},409,cors);}
+        if(request.method==='GET'){
+          if(id){if(url.search)return json({ok:false,error:'Refund parameters are invalid.'},400,cors);return json({ok:true,refund:await refundDetail(env,actor,id,orderId)},200,cors);}
+          return json({ok:true,...(orderId?await refundOrder(env,actor,orderId):{}),...await refundList(env,actor,url,orderId)},200,cors);
+        }
+        if(request.method==='POST'&&!url.search&&(id||orderId)){
+          const body=await reviewRequestJson(request,16000,parseMessageJSON);
+          return json({ok:true,refund:await(id?changeRefund(env,actor,id,body,orderId):createRefund(env,actor,orderId,body))},200,cors);
+        }
+        return json({ok:false,error:'Refund method or parameters are invalid.'},405,cors);
       }
       const buyerReviewMatch=/^\/v1\/customer\/orders\/(EZK-[SP]-[A-F0-9]{24})\/reviews(?:\/([A-Za-z0-9_-]{3,96})\/history)?$/.exec(url.pathname);
       const buyerPhotoUpload=/^\/v1\/customer\/orders\/(EZK-[SP]-[A-F0-9]{24})\/review-media$/.exec(url.pathname);

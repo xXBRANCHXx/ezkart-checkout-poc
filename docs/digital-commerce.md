@@ -69,6 +69,9 @@ Payment review and full refunds prevent further access. Until the allocated
 refund lifecycle is implemented, a partially refunded order has an explicit
 `refund_review` hold with support guidance. This is not a completed partial-refund
 or per-item revocation implementation, and does not erase delivery history.
+The [refund request workflow](refund-requests.md) now allocates requested item
+amounts and records store decisions. A request or approval does not itself revoke
+access, change payment state or establish that money was returned.
 
 ## Completed-download evidence
 

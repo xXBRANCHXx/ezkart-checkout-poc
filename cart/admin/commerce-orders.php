@@ -4,6 +4,7 @@ if (!isset($authenticated) || !$authenticated) { http_response_code(404); exit; 
 ez_page_header('Orders', 'Find every order and review its payment and delivery progress.', [
     ['label'=>'Fulfillment','icon'=>'truck','href'=>'?page=fulfillment'],
     ['label'=>'Returns','icon'=>'undo','href'=>'?page=returns'],
+    ['label'=>'Refunds','icon'=>'undo','href'=>'?page=refunds'],
 ]);
 ?>
 <section class="commerce-orders" data-commerce-orders data-preview="<?= ez_config('commerce_storage') === 'd1' ? '0' : '1' ?>">
