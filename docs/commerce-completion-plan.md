@@ -82,6 +82,12 @@ real-device and maximum-size transfers remain acceptance tasks. Public digital
 checkout, allocated refunds, subscriptions and financial release remain open.
 All thirteen gates and all provider/central-commerce/production holds remain.
 
+Implementation `9d23ef6` is on workbench. Eleven hosted asset/access/header/config
+checks pass at 01:55:49 UTC: the three new assets match, the sign-in page keeps
+one restrictive CSP despite forged request headers, the private proxy rejects
+unauthenticated GET/HEAD/POST, and central checkout remains disabled. No Worker
+deployment, schema change, provider request or hosted purchase was needed.
+
 ### 27 September: digital purchase identity and verified download API
 
 Implemented the central digital checkout, entitlement and download-evidence

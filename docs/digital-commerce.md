@@ -166,6 +166,14 @@ forged paths, missing CSRF, ambiguous replies and strict CSP are covered. Both
 layouts were visually inspected. This is isolated Chromium evidence, not
 real-device or signed-in hosted acceptance.
 
+Buyer implementation `9d23ef6` is pushed to workbench. Eleven hosted checks pass
+at 01:55:49 UTC on 27 September: all three new asset hashes match, GET/HEAD show
+only the sign-in gate with one restrictive CSP, forged request headers cannot
+replace that policy, and unauthenticated proxy GET/HEAD/POST return 401 without
+purchase data. The internal CSP bridge header is removed. Checkout remains
+sandbox with `durable_checkout:false`. No database migration, provider request
+or Worker redeployment was needed for this PHP/browser delivery.
+
 Outstanding: storefront/PHP checkout integration, maximum-size
 and real-mobile transfers, signed-in hosted acceptance, allocated digital refunds,
 subscription lifecycles, storage operations and financial release/settlement.
