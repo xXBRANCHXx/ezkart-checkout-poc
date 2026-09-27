@@ -64,14 +64,23 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
-### In progress: hosted merchant content-security policy
+### 27 September: hosted merchant content-security policy
 
-Prepared server-header restoration of PHP's exact dashboard/map/preview policy
-after Hostinger's global override. Two new security cases, six shipping-setting
-cases, the startup/editor case and the isolated-hosting case pass. Hosted
-expression support and delivered headers still require verification. See
-[merchant-content-security.md](merchant-content-security.md). No completion
-gate is closed on local PHP tests alone.
+Fixed Hostinger's replacement of PHP's dashboard/map/preview policy with its
+global `upgrade-insecure-requests` header. The server now preserves PHP's exact
+response policy without trusting client headers or reparsing query parameters.
+Two new security cases, six shipping-setting cases, the startup/editor case and
+the isolated-hosting case pass. See
+[merchant-content-security.md](merchant-content-security.md).
+
+Implementation `c316c2b` is pushed and automatically deployed on workbench. All
+eleven hosted GET/HEAD checks at 00:01:35 UTC on 27 September return exactly one
+correct policy and remove the intermediate header. Preview/map distinctions,
+frame restrictions and no-store behavior are preserved. The hosted sign-in
+screen blocks an injected inline script and fits both 1360px and 390px widths;
+screenshots are visually checked. No account or commerce write was performed.
+Shared Chrome remains disconnected with no new attempt. Signed-in hosted
+acceptance and all thirteen top-level gates remain open.
 
 ### 27 September: event-driven marketing automations
 

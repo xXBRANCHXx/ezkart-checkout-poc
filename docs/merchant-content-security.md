@@ -1,9 +1,9 @@
 # Merchant content-security policy
 
-The hosted merchant response has been replacing PHP's content-security policy
-with `upgrade-insecure-requests`. That does not enforce the intended script,
-connection, form, frame and base-URL restrictions. The merchant release gate
-remains open until the full selected policy is verified on TEST.
+Hosted merchant responses now preserve PHP's full content-security policy.
+Previously Hostinger replaced it with `upgrade-insecure-requests`, losing the
+intended script, connection, form, frame and base-URL restrictions. The fix is
+verified on TEST; signed-in workflow acceptance remains a separate requirement.
 
 PHP now emits its existing policy in both the standard CSP header and an
 intermediate header, `X-Ezkart-Content-Security-Policy`. The merchant
@@ -22,8 +22,8 @@ is reconstructed from raw query-string matching in the server configuration.
 
 Apache documents [response header expressions and the two header tables](https://httpd.apache.org/docs/2.4/mod/mod_headers.html).
 LiteSpeed documents [security headers in `.htaccess` and wire verification](https://docs.litespeedtech.com/lsws/security-headers/).
-Hostinger's exact expression behavior must be verified on the hosted TEST
-response; local PHP's built-in server does not execute `.htaccess`.
+Hostinger's expression behavior is verified on the hosted TEST response; local
+PHP's built-in server does not execute `.htaccess`.
 
 Two new local HTTP/browser cases pass. They cover dashboard/map/preview/repair
 policy selection, duplicate query parameters, forged client policy headers,
@@ -33,5 +33,22 @@ pass. The hosted-page/isolated-preview regression requires the local PHP curl
 extension; its first run omitted that extension and stopped before page hosting.
 The corrected preview run passes with that extension loaded, including markup
 isolation and checkout navigation. Syntax and diff checks pass. Deployed
-evidence follows below. These checks do not replace
-signed-in hosted merchant/customer acceptance or close a top-level gate.
+evidence is recorded below. These checks do not replace signed-in hosted
+merchant/customer acceptance or close a top-level gate.
+
+## Hosted verification
+
+Implementation `c316c2b` is pushed and automatically deployed on workbench.
+At 00:01:35 UTC on 27 September, eleven GET/HEAD cases each return one CSP header
+that exactly matches the local PHP policy. The intermediate header is absent.
+This includes both index URL forms, dashboard, map, editor repair, preview/view
+API error responses, duplicate query parameters and forged client headers.
+Cache and frame restrictions are preserved and HEAD bodies are empty.
+
+An isolated browser verifies the hosted sign-in screen at 1360px and 390px:
+unapproved inline script execution is blocked, the sign-in control renders and
+there is no horizontal overflow. Both screenshots were visually checked. No
+sign-in, email, merchant action or commerce record was created. A read-only
+shared-browser status check still reports disconnected, with six historical
+connection attempts and no new attempt. Authenticated hosted workflows remain
+pending. Main and production are unchanged.

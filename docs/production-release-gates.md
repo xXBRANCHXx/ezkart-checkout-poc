@@ -10,11 +10,12 @@ Owner instruction confirmed on 19 September 2026: ezkart.id remains unchanged un
 - Wallet ledger correctness, pending versus available funds, concurrent withdrawal requests, balance reservations, payout retries and failures, fee reconciliation, and protection against duplicate credits or payouts.
 - Seller policy validation: release earnings only after confirmed delivery and provider settlement; actual DOKU fees with estimates shown beforehand; withdrawals of at least Rp250,000; Ezkart covers the seller transfer fee. Future affiliate withdrawals below Rp250,000 carry the Rp2,500 fee. Affiliate support is not part of the current release.
 - Explicit owner confirmation of the release candidate and deployment.
-- Verify the delivered security headers, including the application's per-page
-  CSP. On 25 September, the hosted test merchant response exposed only
-  `upgrade-insecure-requests` instead of the detailed policy emitted by PHP in
-  the local integration fixture. Investigate hosting/edge header replacement
-  and verify the final policy on the deployed test site before release.
+- Verify delivered security headers on the final release candidate. The TEST
+  merchant CSP replacement found on 25 September is fixed in `c316c2b`:
+  eleven hosted GET/HEAD cases on 27 September preserve PHP's exact selected
+  policy, and desktop/mobile browser checks block unapproved inline scripts.
+  See [merchant-content-security.md](merchant-content-security.md). Signed-in
+  hosted workflow acceptance remains pending; this is not production approval.
 
 ## Current validation limits
 
