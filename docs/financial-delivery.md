@@ -78,3 +78,33 @@ unrelated orders. This does not establish sustained-load or real delivery
 acceptance. Actual provider settlement/fees, reserves, refund accounting,
 available-balance posting and withdrawals remain required in
 [the financial ledger](financial-journal.md).
+
+## Hosted beta rollout — 27 September 2026
+
+Implementation `c7dfe3a` and migration 0050 are installed on isolated beta Worker
+`7021b8ab-e8be-4b54-b120-f543585fcd46`. At 10:58 UTC, seven hosted checks pass:
+storage health, empty evidence catch-up, missing-order handling, unsigned-request
+rejection, environment isolation, unchanged financial summary and preservation
+of the original uncertain wallet registration. Catch-up records zero receipts
+and releases no earnings. No actual delivery or provider money movement is
+claimed by these route checks.
+
+The post-migration private export restores all 148 exported tables, including
+migration history, with clean integrity and foreign keys. Every row in all 146
+original application tables matches the pre-migration export exactly; the new
+delivery-receipt table is empty. The 640,433-byte export has SHA-256
+`14a7ab9663a098e860f07239a303c5a1c72f6e1c5128f56f5b66b3087a5fb644`.
+The restoration was local; no remote database was restored.
+
+Hosted PHP health also confirms live provider mode, the beta database and both
+storage buckets with 147 application tables. Checkout remains paused with HTTP
+503. Transactional and campaign sending remain held; no provider dispatch schedule
+or main release is enabled. The existing hourly housekeeping schedule is unchanged.
+The original TEST and main resources are untouched by this delivery.
+
+Private evidence is retained under
+`/home/branch/.local/share/ezkart/beta-01a0d643/` in
+`financial-delivery-hosted-proof.json`,
+`financial-delivery-preservation-proof.json`,
+`financial-delivery-final-hosted-check.json` and
+`delivery-after-0050-20260927/receipt.json`.

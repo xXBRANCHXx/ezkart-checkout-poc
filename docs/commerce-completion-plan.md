@@ -87,6 +87,15 @@ plans use indexed orders, captures, shipments and applied events. Actual
 settlement, provider fees, reserves, refund posting, earnings release and
 withdrawals remain open. No top-level gate is closed by delivery evidence alone.
 
+Implementation `c7dfe3a` and migration 0050 are deployed to isolated beta Worker
+`7021b8ab-e8be-4b54-b120-f543585fcd46`. Seven hosted checks pass at 10:58 UTC,
+including the original uncertain wallet's preservation and zero earnings release.
+The post-migration export restores cleanly, with every row of all 146 original
+application tables unchanged and the new receipt table empty. Hosted PHP health
+reports live beta with 147 application tables; checkout remains paused. No actual
+delivery, payment, refund or payout was performed. TEST/main resources and all
+existing execution holds are unchanged by this rollout.
+
 ### 27 September: bank payout contract
 
 The [DOKU bank payout adapter](doku-payouts.md) implements inquiry and transfer

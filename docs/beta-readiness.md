@@ -11,18 +11,18 @@ needed services, including payments, Sub-Account and Kirim DOKU payouts. Technic
 registration, credentials and working provider contracts still need evidence.
 The owner clarified that the target is **live DOKU on workbench**. The current
 deployment now uses the isolated live beta configuration described below, with
-new checkout and scheduled jobs held. Existing sandbox evidence is
-preserved. Main and `ezkart.id` remain held.
+new checkout, provider dispatch schedules and automatic email sending held.
+Existing sandbox evidence is preserved. Main and `ezkart.id` remain held.
 
-## Current hosted state — 27 September, 09:26 UTC
+## Current hosted state — 27 September, 11:05 UTC
 
 Hostinger's private runtime now selects `beta`, production providers and the beta
 Worker. Its live DOKU client, secret, signing key and verified parent profile are
 installed outside the public root with mode 0600. Reloaded file hashes match the
 private prepared configuration; all earlier provider credentials are preserved.
 Health confirms beta, live DOKU credentials and connected D1/public R2/private R2
-with 146 tables. At 07:45 UTC, central merchant operations were enabled with
-`commerce_storage=d1`; new checkout remains separately paused in both PHP and
+with 147 application tables. At 07:45 UTC, central merchant operations were
+enabled with `commerce_storage=d1`; new checkout remains separately paused in both PHP and
 the Worker. The public checkout configuration returns 503 with `Retry-After: 300`.
 An hourly housekeeping schedule is now installed; new checkout, provider
 dispatch schedules and email sending remain held. See the storage note below.
@@ -235,16 +235,21 @@ public payout endpoint; settled balances, owner verification, reservations,
 durable dispatch, actual transfer-fee funding and outcome reconciliation still
 need integration. No real bank inquiry or transfer was submitted.
 
-## Financial policy now confirmed
-
 The [delivery prerequisite](financial-delivery.md) now records every purchased
 physical/digital line against actual applied courier evidence or a verified
 complete original download. Mixed orders wait for all lines. Completion and its
 immutable receipt share a transaction; current return/refund/review holds remain
 visible. Nine new cases, 36 existing Worker regressions and 22 PHP/browser cases
-pass. The fresh beta export restores with every original table unchanged after
-migration rehearsal. Delivery remains separate from settlement and available
-earnings; this work does not enable a withdrawal or close the financial gate.
+pass. Implementation `c7dfe3a` and migration 0050 are deployed to beta Worker
+`7021b8ab-e8be-4b54-b120-f543585fcd46`; seven hosted checks pass at 10:58 UTC.
+The post-migration export restores cleanly and preserves every row in all 146
+original application tables, including the original uncertain wallet attempt.
+No delivery receipt or available balance was created. Hosted PHP confirms live
+beta, 147 application tables and the checkout pause. Delivery remains separate
+from settlement and available earnings; this work does not enable a withdrawal
+or close the financial gate. TEST/main resources and execution holds are unchanged.
+
+## Financial policy now confirmed
 
 - Seller earnings need both confirmed delivery and provider settlement. A verified
   complete download is sufficient digital delivery; access or a started response
