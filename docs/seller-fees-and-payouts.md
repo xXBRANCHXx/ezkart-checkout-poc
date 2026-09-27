@@ -11,9 +11,10 @@ same date. The PDF is unchanged.
 
 A DOKU sandbox seller sub-account has been created, as recorded in
 [the sandbox setup](commerce-sandbox-setup.md#seller-wallets-fee-rules-and-payouts).
-Seller onboarding, checkout routing, split-rule creation and payouts are not yet
-implemented in Ezkart. The following amounts are a specification, not configured
-provider rules or available wallet balances.
+Verified seller [wallet enrollment](wallet-enrollment.md) is implemented, with
+live acceptance still outstanding. Checkout routing, split-rule creation and
+payouts remain to be completed. The following amounts are a specification, not
+configured provider rules or available wallet balances.
 
 Central orders now preserve immutable per-order fee snapshots. The
 [capture financial journal](financial-journal.md) posts verified payments using

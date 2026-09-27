@@ -11,18 +11,20 @@ needed services, including payments, Sub-Account and Kirim DOKU payouts. Technic
 registration, credentials and working provider contracts still need evidence.
 The owner clarified that the target is **live DOKU on workbench**. The current
 deployment now uses the isolated live beta configuration described below, with
-central checkout and provider execution held. Existing sandbox evidence is
+new checkout and scheduled jobs held. Existing sandbox evidence is
 preserved. Main and `ezkart.id` remain held.
 
-## Current hosted state — 27 September, 07:07 UTC
+## Current hosted state — 27 September, 07:49 UTC
 
 Hostinger's private runtime now selects `beta`, production providers and the beta
 Worker. Its live DOKU client, secret, signing key and verified parent profile are
 installed outside the public root with mode 0600. Reloaded file hashes match the
 private prepared configuration; all earlier provider credentials are preserved.
 Health confirms beta, live DOKU credentials and connected D1/public R2/private R2
-with 146 tables. Checkout remains held (`durable_checkout:false`), as do Worker
-provider jobs and schedules.
+with 146 tables. At 07:45 UTC, central merchant operations were enabled with
+`commerce_storage=d1`; new checkout remains separately paused in both PHP and
+the Worker. The public checkout configuration returns 503 with `Retry-After: 300`.
+Worker schedules remain empty and email sending remains disabled.
 
 A dedicated live Biteship key is now installed in the private hosted runtime and
 prepared local settings. At 07:19 UTC its read-only `GET /v1/couriers` succeeds
@@ -77,7 +79,26 @@ Four focused cases and the checkout/SNAP/beta regressions pass (30 distinct
 cases across the focused and regression runs). Desktop and 390px checks include
 the pause and recovery of an existing paid order without provider calls.
 The beta Worker build and PHP syntax checks pass. Hosted deployment of this
-separate pause is the next cutover step; it does not close the financial gates.
+separate pause is complete: implementation `017e445`, Worker version
+`a87edd2b-3903-4de8-859d-226611a0443e`, private hosted settings SHA-256
+`ceb4a14bd26fabd00c0cd19e0de67e92fdb92e767a6c2ffb09e24328c677a4a4`.
+An authenticated central resume read succeeds without creating an order.
+Orders, captures, wallet profiles, financial journals and jobs remain zero.
+The original TEST/main bindings and provider credentials are preserved.
+
+The freshly authenticated owner opened Dashboard, Orders, Customers, Analytics,
+Marketing, Payments, Messages and Settings against beta with no JavaScript or
+HTTP errors and no desktop overflow. A store date-format change was saved,
+verified after reload, restored and verified again; both versions appear in
+the store history. Products, Shipping settings, Shop and Advanced also load.
+These checks are not acceptance of real purchases or provider money movement.
+
+The active store currently has no pickup/return address or public support
+email/phone. The owner has been asked for those actual details. Both imported
+products also lack descriptions, and imported stock needs a physical count
+before sales. DOKU BCA still shows UPDATING after fresh login at 07:44 UTC.
+The catalog's obsolete CV-approval and delivery-readiness claims are replaced
+with the actual checkout pause and links to inventory/payment/shipping settings.
 
 The sections below retain earlier rollout observations; this current-state
 record supersedes their historical “not installed” and empty-catalog statements.

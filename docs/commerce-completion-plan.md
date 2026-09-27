@@ -73,6 +73,23 @@ Intermediate commits do not certify the whole workbench as ready.
 
 ### 27 September: hosted beta catalog and private runtime cutover
 
+At 07:45 UTC, implementation `017e445` and beta Worker
+`a87edd2b-3903-4de8-859d-226611a0443e` enable central merchant operations while
+separately pausing new checkout. Beta defaults to held unless explicitly enabled
+in both application layers. Thirty relevant cases pass, including existing
+checkout recovery and payment callbacks during the pause. Hosted health and
+authenticated service reads pass with no orders, captures, wallet profiles,
+journals or jobs. Eight owner pages load without JS/HTTP errors; a reversible
+store preference save, reload, restore and history check pass. The original
+TEST and main remain unchanged.
+
+Biteship's dedicated live beta key now has Rates, Order and Tracking active after
+provider-approved activation, with its authenticated callback registered.
+Its balance remains zero and real shipping acceptance is outstanding. The active
+store still needs actual pickup/return and public support details; product
+descriptions and a verified opening physical stock count are also outstanding.
+These observations do not close any full financial or hosted journey gate.
+
 At 07:07 UTC the hosted workbench reports beta, live DOKU credentials and its
 separate 146-table database/public/private storage. Five existing stores, two
 products, 111 variants and all 54 catalog images are preserved with opening

@@ -226,6 +226,7 @@ function ez_orders_table(array $rows, string $tableId, string $csrfToken, string
 <?php break; case 'inventory': require __DIR__ . '/inventory.php'; ?>
 
 <?php break; case 'products': ?>
+  <?php require_once dirname(__DIR__) . '/api/commerce-client.php'; $productCheckoutPaused = !ez_new_checkout_enabled(); ?>
   <?php $productPageInventory = []; // Legacy demonstrations stay out of the signed-in seller catalog. ?>
   <?php ez_page_header('Products', 'Manage your products, prices, and stock.', [
       ['label'=>'Shop & checkout appearance', 'icon' => 'palette','href'=>'?page=shop'], ['label'=>'Copy cart link', 'icon' => 'copy','copy_cart_link'=>true], ['label'=>'Create product', 'icon' => 'plus','href'=>'?page=product-new&new=1','new_tab'=>true,'style'=>'primary'],
@@ -236,7 +237,12 @@ function ez_orders_table(array $rows, string $tableId, string $csrfToken, string
       ['icon'=>'money','label'=>'Catalog revenue','value'=>ez_admin_short_money(array_sum(array_column($productSales, 'sales'))),'detail'=>$paidUnits . ' paid units'],
       ['icon'=>'trend','label'=>'Sell-through','value'=>$paidUnits > 0 ? number_format(($paidUnits / max(1, $paidUnits + array_sum(array_column($productPageInventory, 'stock')))) * 100, 1) . '%' : '0.0%','detail'=>'Paid units vs availability'],
   ]); ?>
-  <section class="product-commerce-strip" aria-label="Product commerce connections"><article><span><?= ez_admin_icon('box') ?></span><div><small>Product data</small><b>Complete catalog record</b><p>Price, stock, weight, media, and fulfillment origin</p></div><em>Ready</em></article><i><?= ez_admin_icon('chevron-right') ?></i><article><span><?= ez_admin_icon('layout') ?></span><div><small>Shop &amp; checkout</small><b>One checkout link per product</b><p>Sell from any website or share your whole catalog</p></div><a href="?page=shop">Set up shop</a></article><i><?= ez_admin_icon('chevron-right') ?></i><article><span><?= ez_admin_icon('credit-card') ?></span><div><small>Checkout data</small><b>DOKU onboarding pending</b><p>Awaiting CV approval; merchant disbursement is required</p></div><em>Pending</em></article><i><?= ez_admin_icon('chevron-right') ?></i><article><span><?= ez_admin_icon('truck') ?></span><div><small>Delivery</small><b><?= $integrationStatus['biteship'] ? 'Biteship rates enabled' : 'Biteship setup required' ?></b><p>Weights and origin feed live courier quotes</p></div><em class="<?= $integrationStatus['biteship'] ? 'connected' : '' ?>"><?= $integrationStatus['biteship'] ? 'Ready' : 'Setup' ?></em></article></section>
+  <section class="product-commerce-strip" aria-label="Product commerce connections">
+    <article><span><?= ez_admin_icon('box') ?></span><div><small>Product data</small><b>Catalog details</b><p>Manage product prices, stock, weight, and media</p></div><a href="?page=inventory">Review stock</a></article><i><?= ez_admin_icon('chevron-right') ?></i>
+    <article><span><?= ez_admin_icon('layout') ?></span><div><small>Shop &amp; checkout</small><b>One checkout link per product</b><p>Sell from any website or share your whole catalog</p></div><a href="?page=shop">Set up shop</a></article><i><?= ez_admin_icon('chevron-right') ?></i>
+    <article><span><?= ez_admin_icon('credit-card') ?></span><div><small>Payments</small><b><?= $productCheckoutPaused ? 'Checkout paused' : 'Payment setup' ?></b><p><?= $productCheckoutPaused ? 'New orders are paused while payment setup is completed' : 'Review your payment connection and confirmed payments' ?></p></div><a href="?page=payments">View payments</a></article><i><?= ez_admin_icon('chevron-right') ?></i>
+    <article><span><?= ez_admin_icon('truck') ?></span><div><small>Delivery</small><b>Pickup and return addresses</b><p>Choose your addresses and delivery couriers</p></div><a href="?page=shipping-settings">Review delivery</a></article>
+  </section>
   <section class="surface product-drafts-panel" data-product-drafts-panel hidden><header class="surface-header"><div><h2>Product drafts</h2><p>Continue products that are not ready to publish yet.</p></div><a class="action-button" href="?page=product-new&new=1" data-ui-icon="plus">New draft</a></header><div class="product-draft-list" data-product-draft-list></div></section>
   <section class="product-catalog-controls" data-product-catalog-controls>
     <div class="product-catalog-summary">
