@@ -47,9 +47,10 @@ function ez_customer_next(string $value): string
 {
     $parts = parse_url($value);
     if (!is_array($parts) || isset($parts['scheme']) || isset($parts['host'])
-        || !in_array($parts['path'] ?? '', ['/cart/return.php', '/cart/tracking-sandbox.php', '/cart/addresses.php', '/cart/preferences.php', '/cart/messages.php', '/cart/notifications.php', '/cart/', '/cart/index.html'], true)) return '/cart/return.php';
+        || !in_array($parts['path'] ?? '', ['/cart/return.php', '/cart/tracking-sandbox.php', '/cart/addresses.php', '/cart/preferences.php', '/cart/downloads.php', '/cart/messages.php', '/cart/notifications.php', '/cart/', '/cart/index.html'], true)) return '/cart/return.php';
     parse_str($parts['query'] ?? '', $query);
     if ($parts['path'] === '/cart/notifications.php') return '/cart/notifications.php';
+    if ($parts['path'] === '/cart/downloads.php') return '/cart/downloads.php' . (is_string($query['order'] ?? null) && preg_match('/^EZK-[SP]-[A-F0-9]{24}$/D', $query['order']) === 1 ? '?order=' . rawurlencode($query['order']) : '');
     if ($parts['path'] === '/cart/messages.php') {
         $safe = [];
         foreach (['order','product','store','conversation'] as $key) if (is_string($query[$key] ?? null)

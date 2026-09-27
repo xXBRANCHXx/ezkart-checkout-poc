@@ -1,8 +1,8 @@
 # Digital checkout and verified download records
 
 Workbench implementation, 27 September 2026. This implements the central API
-contract. The storefront/PHP purchase flow, customer download screen, mobile
-storage/resume behavior and signed-in hosted acceptance still need integration.
+contract and the authenticated buyer download screen. The storefront/PHP purchase
+flow, real-device storage/resume behavior and signed-in hosted acceptance remain.
 Central-commerce and provider holds remain in place. Subscription billing,
 allocated refunds and wallet release are separate unfinished work.
 
@@ -73,14 +73,40 @@ verification time. Concurrent acknowledgements and retries after a lost result
 cannot duplicate it. The grant, purchase and entitlement provide the original
 version and capture chain. This establishes possession of all original bytes;
 it does not attest that the buyer opened the file or saved it in a particular
-folder. The upcoming client must acknowledge only after receiving, checking and
-storing each complete part, and must handle interrupted storage/network writes.
+folder. The buyer client acknowledges only after receiving, checking, flushing
+and reading back each complete part from browser storage.
 
 The original authenticated attachment endpoint supports whole files, one byte
 range and HEAD, but never marks a verified delivery. Raw response-start records
 are deliberately separate from completed-download evidence. Delivery receipts
 do not post accounting entries, mark courier delivery or create available funds.
 Order-level release still needs the full delivery/settlement/refund rules.
+
+## Buyer download screen and recovery
+
+`/cart/downloads.php?order=...` uses the existing verified Google sign-in and
+permanent order claim. Its same-origin PHP proxy revalidates the current account,
+session version, ownership and environment. Writes require CSRF and origin checks.
+It forwards only the bounded part/manifest/grant/receipt routes, checks original
+bytes and verification headers, and checks the PHP session again after transfer.
+Receiving a complete file on PHP never acknowledges delivery for the buyer.
+
+A dedicated worker stores the file in the origin-private filesystem. It holds an
+exclusive file lock, processes at most one five-MiB part at a time, flushes and
+reads back the part before calculating its receipt, and returns a file-backed
+download without assembling a maximum-size ArrayBuffer. The buyer can pause,
+resume after a reload, save the original file, and remove their browser copy.
+Removing cached bytes does not delete their purchase or its delivery evidence.
+
+The grant request intent is durably journaled before sending it. Each append is
+hashed, flushed and read back. An interrupted final append is ignored; a complete
+corrupt record blocks further grants until the buyer removes that browser copy.
+Lost grant or receipt replies recover the exact request and original progress.
+An expired grant gets a new durable intent while retaining checked original
+bytes. Pausing closes the file lock so another tab can resume the same purchase.
+Account changes clear the controls and object URLs. Unavailable storage stops
+before creating a grant. The page and proxy have separate restrictive CSPs,
+including the response-only Hostinger header bridge.
 
 ## API and schema
 
@@ -132,8 +158,15 @@ restored schema and all 204 plans, preserves existing counts/settings/legacy
 evidence, and finds no pending migration or foreign-key error. All seven new
 tables remain empty. The central-commerce/provider holds are unchanged.
 
-Outstanding: storefront/PHP checkout integration, buyer download/save/resume
-screens, verified client-side persistence before acknowledgement, maximum-size
-and mobile transfers, signed-in hosted acceptance, allocated digital refunds,
+The buyer screen passes eight PHP/browser cases plus two existing CSP cases.
+Five customer sign-in, ownership and review regressions also pass. At 1360px
+and 390px, saved original bytes match, pause/reload/cross-tab recovery works,
+and corrupt or unavailable storage stops before new grants. Session changes,
+forged paths, missing CSRF, ambiguous replies and strict CSP are covered. Both
+layouts were visually inspected. This is isolated Chromium evidence, not
+real-device or signed-in hosted acceptance.
+
+Outstanding: storefront/PHP checkout integration, maximum-size
+and real-mobile transfers, signed-in hosted acceptance, allocated digital refunds,
 subscription lifecycles, storage operations and financial release/settlement.
 All thirteen top-level completion gates remain open.

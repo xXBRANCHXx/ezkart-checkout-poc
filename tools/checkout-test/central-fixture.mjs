@@ -21,7 +21,7 @@ export async function setupCentralFixture(t, overrides = {}, commerce = {}) {
       }
       if (control.drop && req.url === control.drop) { control.drop = ''; res.writeHead(503); res.end('lost response'); return; }
       const responseHeaders={'content-type':response.headers.get('content-type')||'application/json','cache-control':response.headers.get('cache-control')||'no-store'};
-      for(const name of ['x-ezkart-campaign-store','x-ezkart-campaign-environment','content-disposition','content-length','content-range','accept-ranges'])if(response.headers.has(name))responseHeaders[name]=response.headers.get(name);
+      for(const name of ['x-ezkart-campaign-store','x-ezkart-campaign-environment','x-ezkart-file-part','x-ezkart-file-challenge','x-ezkart-file-sha256','content-disposition','content-length','content-range','accept-ranges'])if(response.headers.has(name))responseHeaders[name]=response.headers.get(name);
       if(req.method!=='HEAD'&&responseHeaders['content-length'])responseHeaders['content-length']=String(responseBody.length);
       res.writeHead(response.status,responseHeaders); res.end(responseBody);
     } catch (error) { res.writeHead(500); res.end(JSON.stringify({ok: false, error: error.message})); }

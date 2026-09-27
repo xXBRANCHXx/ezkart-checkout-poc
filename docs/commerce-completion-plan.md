@@ -64,6 +64,24 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 27 September: buyer download, storage and recovery
+
+Implemented the authenticated buyer download page and bounded PHP proxy described
+in [digital-commerce.md](digital-commerce.md). The browser stores and verifies each
+original part before acknowledging it. Downloads can pause, survive reloads and
+lost responses, resume in another tab, and save the exact original file without
+assembling a maximum-size memory buffer. Durable grant intents survive uncertain
+results; damaged recovery journals block new grants. A storage failure cannot be
+mistaken for verified delivery. Removing a browser copy preserves the purchase.
+
+The proxy revalidates buyer identity, ownership, environment and session after
+network work. Eight new PHP/browser cases and two existing CSP cases pass, plus
+five sign-in/ownership/review regressions. Desktop 1360px and narrow 390px layouts
+were visually inspected; saved files match the original bytes. Signed-in hosted,
+real-device and maximum-size transfers remain acceptance tasks. Public digital
+checkout, allocated refunds, subscriptions and financial release remain open.
+All thirteen gates and all provider/central-commerce/production holds remain.
+
 ### 27 September: digital purchase identity and verified download API
 
 Implemented the central digital checkout, entitlement and download-evidence
@@ -110,8 +128,8 @@ settings and legacy evidence, matches the restored schema and compiles all 204
 plans. No migration or foreign-key error remains. All seven new tables are empty;
 hosted checks created no purchase, download grant, file or delivery record.
 
-The public/PHP digital checkout flow and buyer download/save/resume screens
-remain to be connected and verified. Partial refunds currently produce an
+The public/PHP digital checkout flow remains to be connected and verified. The
+subsequent buyer download screen is described above. Partial refunds produce an
 explicit access-review hold pending real per-item refund allocation; this does
 not complete refunds. Subscriptions, settlement/release, maximum-size/mobile
 transfers and operational retention remain open. Shared Chrome remains

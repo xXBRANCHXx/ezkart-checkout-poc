@@ -9,3 +9,12 @@
     Header onsuccess unset X-Ezkart-Content-Security-Policy
   </Files>
 </IfModule>
+
+<IfModule mod_headers.c>
+  <Files "customer-downloads.php">
+    Header onsuccess unset Content-Security-Policy
+    Header always set Content-Security-Policy "default-src 'none'; sandbox"
+    Header always unset X-Ezkart-Content-Security-Policy
+    Header onsuccess unset X-Ezkart-Content-Security-Policy
+  </Files>
+</IfModule>

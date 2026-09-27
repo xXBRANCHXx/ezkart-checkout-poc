@@ -1,6 +1,13 @@
 # Hostinger supplies a global CSP after PHP. Preserve the stricter policy for
 # the public, script-free email withdrawal page at the server-header layer.
 <IfModule mod_headers.c>
+  <Files "downloads.php">
+    Header onsuccess unset Content-Security-Policy
+    Header always set Content-Security-Policy "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
+    Header always set Content-Security-Policy "expr=%{resp:X-Ezkart-Content-Security-Policy}" "expr=-n %{resp:X-Ezkart-Content-Security-Policy}"
+    Header always unset X-Ezkart-Content-Security-Policy
+    Header onsuccess unset X-Ezkart-Content-Security-Policy
+  </Files>
   <Files "unsubscribe.php">
     Header always set Content-Security-Policy "default-src 'none'; style-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'"
     Header always set X-Frame-Options "DENY"
