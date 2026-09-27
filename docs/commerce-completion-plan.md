@@ -71,6 +71,38 @@ do not establish provider activation, delivery, settlement or operational histor
 Each delivery must update this record with actual evidence and outstanding work.
 Intermediate commits do not certify the whole workbench as ready.
 
+### 28 September: protected refund appeals and operator decisions
+
+The [review workflow](refund-reviews.md) now lets buyers and stores appeal an
+existing refund, retain information and receive an authorized Ezkart decision.
+Original store decisions remain in history. Current evidence and fresh signed
+authenticator proof protect operator changes; a separate permission registry
+prevents store membership from granting platform authority. Open reviews reserve
+original allocations and earnings atomically. Closing a review cannot release
+funds held by another financial prerequisite. Approval does not execute or
+confirm a refund, change stock or revoke downloads.
+
+All 62 affected Worker and 22 PHP/browser cases pass, including desktop/390px,
+concurrent decisions, stale evidence, authenticator refresh, lost replies,
+private files, bounded history, notifications and financial holds. Implementation
+`ac02e27`, migration 0064 and beta Worker
+`89939b58-6774-4efe-8cf0-49028c60577c` are deployed. Eighteen public health/access
+checks and four matching sources pass at 21:23 UTC on 27 September; eight signed-in
+operator checks pass at 21:24. The verified owner has beta review access, with an
+empty queue and the fresh-verification gate visible.
+
+The fresh export restores 176 tables. Original business and financial rows are
+preserved; only migration history and ordinary sign-in/runner/maintenance
+metadata differ. One original owner permission is recorded; reviews, refunds,
+evidence and money remain empty. Operations still reports the original uncertain
+wallet and deliberately held payout runner. The 21:27 scoped mailbox search
+finds no reply to the original DOKU support request. Main is untouched.
+
+Provider-supported refund execution, fees/accounting, entitlements, negative
+balances and actual paid-purchase/operator acceptance remain open. The remaining
+product, operations and sustained financial gates stay in scope. No full
+completion gate closes from this delivery.
+
 ### 28 September: private refund evidence attachments
 
 The [refund workspace](refund-requests.md#private-supporting-files) now retains

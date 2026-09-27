@@ -14,19 +14,59 @@ deployment now uses the isolated live beta configuration described below, with
 new checkout, provider execution and automatic email sending held.
 Existing sandbox evidence is preserved. Main and `ezkart.id` remain held.
 
-## Current hosted state — 27 September, 20:36 UTC
+## Current hosted state — 27 September, 21:27 UTC
 
 Hostinger's private runtime now selects `beta`, production providers and the beta
 Worker. Its live DOKU client, secret, signing key and verified parent profile are
 installed outside the public root with mode 0600. Reloaded file hashes match the
 private prepared configuration; all earlier provider credentials are preserved.
 Health confirms beta, live DOKU credentials and connected D1/public R2/private R2
-with 172 application tables. At 07:45 UTC, central merchant operations were
+with 175 application tables. At 07:45 UTC, central merchant operations were
 enabled with `commerce_storage=d1`; new checkout remains separately paused in both PHP and
 the Worker. The public checkout configuration returns 503 with `Retry-After: 300`.
 An hourly housekeeping schedule and five-minute held reconciliation runner are
 installed; new checkout, provider execution and email sending remain held.
 See the storage note below.
+
+[Refund reviews](refund-reviews.md) are deployed from `ac02e27`, migration 0064,
+to beta Worker `89939b58-6774-4efe-8cf0-49028c60577c`. Buyers and stores can request
+an appeal, retain information and follow an authorized reviewer’s decision.
+Open cases hold the original purchase allocation and earnings, including after
+a store decline. Decisions retain the original store history and require current
+evidence. No review action sends money, marks a refund paid or changes stock or
+download entitlements.
+
+The verified owner has the beta reviewer role through the signed private access
+registry. Ezkart reviews is available in the workbench sidebar. Reading requires
+verified AAL2; changes require a current reviewer role and a fresh authenticator
+verification. The real hosted page correctly shows the verification form and an
+empty queue. No authenticator challenge was submitted for this inspection.
+
+All 62 affected Worker and 22 PHP/browser cases pass. Desktop and 390px workflows,
+interrupted writes, stale evidence, changed sessions, notification sources and
+atomic earnings holds are verified. The populated migration rehearsal preserves
+all original rows and earnings views. Eighteen hosted public health/access checks
+and four exact source hashes pass at 21:23 UTC. Eight signed-in operator checks
+pass at 21:24; missing references expose no files or cases, and forged account,
+CSRF and unsupported decision paths are rejected. The actual paid-purchase and
+live operator decision journeys remain unaccepted because beta has no paid orders.
+
+The post-export restores 176 tables with clean integrity and foreign keys.
+Of 173 original tables, 169 are exactly unchanged; the differences are migration
+history, ordinary sign-in metadata, the held five-minute runner and the ordinary
+empty 21:17 file-maintenance heartbeat. The three new tables contain one verified
+owner permission and no review cases/actions. All refund/evidence/money tables
+remain empty, and the original uncertain wallet is unchanged. Both read-only
+operations reports succeed: commerce retains exactly `jobs_uncertain` and
+`payout_runner_held`; digital storage has no warnings. The scoped mailbox search
+at 21:27 still finds no DOKU reply to the original support request.
+
+Private runtime and Wrangler configuration are unchanged. Checkout, provider
+execution, automatic sending and main remain held. Provider-supported refund
+execution, fees/accounting, entitlements and live purchase acceptance remain open;
+this delivery closes no full completion gate.
+
+The preceding private refund attachment rollout remains installed:
 
 Private [refund attachments](refund-requests.md#private-supporting-files) are
 deployed from `98c48e1`, migration 0063, to beta Worker
@@ -485,8 +525,8 @@ delivery and operator ownership still need acceptance.
 | Area | Implemented foundation | Acceptance still required |
 | --- | --- | --- |
 | Purchases and stock | Central immutable orders, atomic reservations, recoverable payment jobs, fulfillment and physical returns; isolated beta merchant cutover | Legacy ownership/count reconciliation, full signed-in physical/digital purchase and failure journeys |
-| Refunds | Purchase allocations, store decisions, buyer/store notifications and original delivery/return evidence | Provider-supported execution, unknown-result recovery, confirmed refund evidence, fee reversals, item access effects and reconciliation |
-| Wallet | Balanced capture/settlement/earnings journals, actual-fee corrections, delivery-based release and holds, protected earnings history, confirmed-account routing, provider collections, withdrawal reservations, bank confirmation, single-use payment grants and protected status observations/recovery | Live wallet/routing/settlement/release acceptance, continuous provider synchronization, funded refunds/disputes, negative-balance recovery, integrated payment dispatch, actual transfer-fee funding, matched payout history and final accounting |
+| Refunds | Purchase allocations, store decisions, private original files, protected Ezkart appeals/decisions, buyer/store notifications and delivery/return evidence | Provider-supported execution, unknown-result recovery, confirmed refund evidence, fee reversals, item access effects and reconciliation |
+| Wallet | Balanced capture/settlement/earnings journals, actual-fee corrections, delivery-based release and holds, protected earnings history, confirmed-account routing, provider collections, withdrawal reservations, bank confirmation, single-use payment grants, protected observations/recovery, matched payout accounting and installed held synchronization/monitoring | Live wallet/routing/settlement/release acceptance, extended provider history, callback authentication, funded refunds/disputes, negative-balance recovery, integrated payment dispatch, actual transfer-fee funding and live reconciliation acceptance |
 | Digital files | Immutable versions, private buyer grants, complete-download proof, reviews and full 500 MiB local transfer/recovery | Hosted signed-in and real-device transfers, storage monitoring/recovery, refund effects and subscription lifecycle |
 | Store/customer operations | Persistent settings, customer workspace, consent, messaging, notifications, campaigns and reporting | Hosted fresh-seller/customer acceptance, actual enabled delivery and failure monitoring, domain/analytics acceptance and accessibility/mobile review |
 | Operations | Private TEST/beta database backups, repeatable local restoration, recovery runbook and guarded deployment checks | Off-device retention, R2/application recovery, monitored execution, alert ownership, sustained financial validation and final acceptance report |

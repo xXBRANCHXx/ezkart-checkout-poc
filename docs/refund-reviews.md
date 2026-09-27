@@ -118,3 +118,22 @@ Actual paid-purchase acceptance, funded/provider-supported refund execution,
 unknown-outcome recovery, confirmed refund receipts, proportional commission
 reversal, actual fee custody, entitlement changes and negative-balance recovery
 remain separate work. Main and final release remain held.
+
+
+## Beta rollout
+
+Implementation `ac02e27`, migration 0064 and Worker
+`89939b58-6774-4efe-8cf0-49028c60577c` are deployed only to beta/workbench.
+Eighteen public access/health checks and four exact deployed source hashes pass
+at 21:23 UTC on 27 September; eight signed-in operator checks pass at 21:24.
+The verified owner has reviewer access. The actual empty queue is readable,
+while the fresh authenticator form protects changes. No real case or refund
+was fabricated for hosted acceptance.
+
+The post-export is 805,272 bytes, SHA-256
+`14eb733c19a2b7f6458910bbfa460383cace7dbc603f78fcd9845033d4eddcbc`,
+and restores 176 tables. All original business/financial rows are preserved.
+Only migration history and normal sign-in, held-runner and empty file-maintenance
+metadata differ. One owner permission is present; both new case tables remain
+empty. Actual purchase/decision acceptance and the remaining financial execution
+work above stay open. Main and the execution holds are unchanged.
