@@ -88,6 +88,13 @@ withdrawals remain unfinished. The DOKU support search at 11:53 UTC finds no
 matching reply in the owner's mailbox. No real provider request or money movement
 was performed by this implementation; checkout and all execution holds remain.
 
+Implementation `e5a16c6` is pushed to workbench. Migration 0052 and Worker
+`33dce2ab-f9ac-444d-a26d-6203f58ece81` are deployed to beta only. Nine hosted
+service checks pass at 12:10 UTC; Hostinger source/health/dependency checks pass
+at 12:12 UTC. The restored post-export preserves every row of the 149 original
+application tables, with empty collection tables and the original wallet
+unchanged. This does not close a top-level gate or change TEST/main.
+
 ### 27 September: bound seller routing and original flat split rules
 
 [Payment routing](doku-payment-routing.md) now joins confirmed seller and platform

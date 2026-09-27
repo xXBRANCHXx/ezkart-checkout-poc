@@ -14,18 +14,31 @@ deployment now uses the isolated live beta configuration described below, with
 new checkout, provider dispatch schedules and automatic email sending held.
 Existing sandbox evidence is preserved. Main and `ezkart.id` remain held.
 
-## Current hosted state — 27 September, 11:42 UTC
+## Current hosted state — 27 September, 12:12 UTC
 
 Hostinger's private runtime now selects `beta`, production providers and the beta
 Worker. Its live DOKU client, secret, signing key and verified parent profile are
 installed outside the public root with mode 0600. Reloaded file hashes match the
 private prepared configuration; all earlier provider credentials are preserved.
 Health confirms beta, live DOKU credentials and connected D1/public R2/private R2
-with 149 application tables. At 07:45 UTC, central merchant operations were
+with 151 application tables. At 07:45 UTC, central merchant operations were
 enabled with `commerce_storage=d1`; new checkout remains separately paused in both PHP and
 the Worker. The public checkout configuration returns 503 with `Retry-After: 300`.
 An hourly housekeeping schedule is now installed; new checkout, provider
 dispatch schedules and email sending remain held. See the storage note below.
+
+The [provider collection receipts](provider-financial-evidence.md) are deployed
+from implementation `e5a16c6`, with migration 0052 and beta Worker
+`33dce2ab-f9ac-444d-a26d-6203f58ece81`. Before/after balances and original pages
+now form one durable record; incomplete or ambiguous reads cannot be treated as
+exhausted coverage. Exact-source recovery makes no additional DOKU request.
+All 46 relevant fixture cases and nine hosted service checks pass. At 12:12 UTC,
+Hostinger serves the matching workbench source, loads its PHP dependencies and
+keeps recovery CLI access unavailable over HTTP. The post-migration export
+restores cleanly and preserves every row in all 149 original application tables.
+Both new tables remain empty and the original uncertain wallet remains intact.
+This adds collection evidence; settlement journals, actual fees and earnings
+release remain unfinished. No provider execution or sending hold is lifted.
 
 A dedicated live Biteship key is now installed in the private hosted runtime and
 prepared local settings. At 07:19 UTC its read-only `GET /v1/couriers` succeeds

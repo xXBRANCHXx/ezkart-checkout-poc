@@ -176,6 +176,30 @@ original exported tables. Integrity passes, foreign keys are clean and both new
 tables are empty. Private export, restoration and comparison evidence are in
 `/home/branch/.local/share/ezkart/beta-01a0d643/collections-before-0052-20260927/`.
 
+### Hosted beta collection rollout — 27 September 2026
+
+Implementation `e5a16c6` is pushed to workbench. Migration 0052 is installed only
+on beta D1; Worker `33dce2ab-f9ac-444d-a26d-6203f58ece81` is deployed. All nine
+hosted service checks pass at 12:10 UTC: health, empty collection paging, scoped
+missing receipt, unsigned/wrong-environment/bad-query rejection, refusal to seal
+without a confirmed wallet, unchanged empty journals and preservation of the
+original uncertain enrollment. No collection or money entry was created.
+
+The fresh post-export contains 660,934 bytes, SHA-256
+`945fc2c7c6e5a898ce30a20cca411614b05b9f2c0689429340ca2c04c4c5c27f`.
+All 152 exported tables restore cleanly. Every row in the 149 original application
+tables is unchanged, migration 0052 is recorded and both new tables are empty.
+The proof is `provider-collections-preservation-proof.json` in the private beta
+directory; the export is in `collections-after-0052-20260927/`.
+
+At 12:12 UTC, hosted workbench health confirms live beta, connected storage and
+151 application tables. The served source matches implementation `e5a16c6`, PHP
+dependencies load, recovery remains unavailable over HTTP, and checkout still
+returns the explicit pause. Provider/email execution holds and the hourly storage
+schedule are unchanged. TEST and main resources are untouched by this rollout.
+
+### Earlier evidence-layer verification
+
 On 27 September the beta extension passes all four focused PHP/Worker cases.
 The added case verifies live-mode history reads, durable original receipts,
 unchanged money journals and rejection of mismatched mode/deployment/API settings
