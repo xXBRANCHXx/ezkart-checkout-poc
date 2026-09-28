@@ -7,7 +7,8 @@ The smallest supported physical pilot is one admitted adult seller, one in-stock
 Read-only signed-in checks on 28 September 2026 established:
 
 - **BCA Close Amount SNAP: UPDATING**, requested 27 September at 13:36 WIB. Its presence in the service list does not establish live payment activation.
-- **Sub-Account / Collect & Route:** opening Sub-Account V2 → Activate Service navigates to Settings → Service. Add Service → Wallet as a Service shows Balance Management, Collect and Route / Deposit System / Fund Oversight, Embedded Wallet and Fund Connector unchecked and disabled. Collect & Route → Discover explicitly requires verification by the sales/account manager and names `enterprise.sales@doku.com`. There is no available self-service selection for this account. No activation, terms acceptance or new registration was submitted.
+- **QRIS:** the owner-authorized request was submitted once on 28 September at 13:38 WIB, with brand Ezkart and MCC 5262 (Marketplaces). It is **UPDATING**, not active; no new fee/contract acceptance appeared. Card service choices remain disabled. See [coverage and the QRIS receipt](bca-payment-coverage.md).
+- **Sub-Account / Collect & Route:** opening Sub-Account V2 → Activate Service navigates to Settings → Service. Add Service → Wallet as a Service shows Balance Management, Collect and Route / Deposit System / Fund Oversight, Embedded Wallet and Fund Connector unchecked and disabled. Collect & Route → Discover explicitly requires verification by the sales/account manager and names `enterprise.sales@doku.com`. There is no available self-service selection for this account. No Sub-Account activation, terms acceptance or new wallet registration was submitted.
 - **Biteship:** the beta key shows Rates/Order/Tracking active, but dashboard available balance is **IDR 0 / 0 Pts**. Top-up or a confirmed billing-credit agreement is required for physical bookings. No funding transaction was made.
 - **DOKU transfer contract:** the actual charged account and inclusive per-channel fee ceiling are not established by the dashboard. Ezkart paying fees is already owner policy; the provider must confirm how that happens. A public API request without a fee-payer override cannot move the fee to Ezkart by assertion.
 
@@ -23,6 +24,41 @@ Follow up on the existing DOKU case for the original uncertain wallet; never rep
 6. Admit the small supervised cohort. Observe the original order through payment, seller acceptance/pickup, tracking and delivery, actual settlement and eligible earnings. Use the original saved withdrawal/treasury references. For a refund, the approved buyer principal remains product plus approved shipping; retained original fees are seller accounting, not an extra buyer deduction. Use one original DOKU support case and the native [refund follow-up flow](refund-provider-handoffs.md). A reported completion remains unverified until actual original returned-funds evidence is available.
 
 An unknown original outcome pauses that original operation and is investigated; it does not authorize a second payment, shipment or refund. Receipt replay and owned tracking/callback reads stay available while new actions are held. Publishing recurring products, custom domains, campaigns or model moderation is outside this minimal one-time pilot; their independent integration work does not need to be misrepresented as a BCA activation prerequisite.
+
+## Native BCA and hosted QRIS/cards
+
+The owner approved retaining Ezkart’s cart/order screen and native BCA VA while
+using DOKU’s payment window for QRIS/supported cards. The shopper’s typed choice
+is stored in the original checkout intent: closing the window, reloading or
+recovering a lost response retains the same choice and provider session.
+A browser return or success message cannot mark an order paid.
+
+The existing `EZKART_DOKU_PRODUCTION_PAYMENT_FLOW=snap_bca` keeps BCA-only mode.
+For the mixed mode, the private PHP setting is
+`EZKART_DOKU_PRODUCTION_PAYMENT_FLOW=routed_hosted` with
+`EZKART_DOKU_PRODUCTION_CHECKOUT_METHODS` containing only actual enabled methods,
+comma-separated: `VIRTUAL_ACCOUNT_BCA` exposes the native BCA choice; `QRIS`
+and/or `CREDIT_CARD` expose the provider window. This is an activation procedure,
+not a claim these settings or services are enabled now. The existing assigned
+SNAP settings remain necessary for native BCA. Before hosted sends, configure
+`EZKART_COMMERCE_PAYMENT_RECOVERY_DIRECTORY` as a persistent 0700 private directory
+outside public roots, following [original-response recovery](routed-checkout.md).
+Its saved receipts permit recovery without a second provider create.
+Sub-Account/Collect & Route,
+original wallet confirmation and the checkout holds above still apply.
+
+DOKU’s documented Checkout response exposes a payment URL, not a routed QR
+payload API. Do not scrape the iframe or substitute generic direct QRIS without
+its seller-wallet route. Hosted download/share controls have not been observed
+in an actual active-channel session and are not promised by this implementation.
+
+Payment processing fees remain **actual provider fees** for the selected method;
+QRIS/card amounts must not copy a BCA fee or treat missing evidence as zero.
+Settlement and releasable earnings still require original seller/company wallet
+history and actual fee evidence. Missing or unsupported evidence remains held.
+Company-paid bank-transfer fees are the separate funding contract in step 4.
+The smallest BCA pilot remains the entry path above; QRIS/cards can join only
+when their own provider activation and routing conditions exist.
 
 ## Current delivery boundary
 
