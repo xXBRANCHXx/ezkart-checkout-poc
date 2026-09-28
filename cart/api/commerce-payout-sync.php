@@ -178,15 +178,15 @@ function ez_sync_withdrawal_payout(string $id, string $environment, string $run,
     $intent = $files->read('intent.json');
     if ($intent === null) {
         if ($mode !== 'collect') throw new RuntimeException('The original synchronization intent is missing.');
-        EzDokuSubAccountReader::window($scope['plan']['from'], gmdate('Y-m-d\TH:i:s\Z'));
-        $intent = ['version'=>2,'run'=>$run,'original'=>$scope['original'],'plan'=>$scope['plan'],'maxPages'=>$maxPages];
+        ez_payout_sync_windows($scope['plan']['from'], gmdate('Y-m-d\TH:i:s\Z'), $maxPages);
+        $intent = ['version'=>3,'run'=>$run,'original'=>$scope['original'],'plan'=>$scope['plan'],'maxPages'=>$maxPages];
         $files->save('intent.json', $intent);
     }
-    if (!in_array($intent['version'] ?? null, [1,2], true) || ($intent['run'] ?? null) !== $run || ($intent['original'] ?? null) !== $scope['original']
+    if (!in_array($intent['version'] ?? null, [1,2,3], true) || ($intent['run'] ?? null) !== $run || ($intent['original'] ?? null) !== $scope['original']
         || ($intent['maxPages'] ?? null) !== $maxPages) throw new RuntimeException('The original synchronization scope cannot change.');
     $original = $intent['original'];
-    $reader = new EzPayoutSyncReader($files, $original, $mode === 'collect', $maxReads, $heartbeat, $intent['version'] === 2);
-    if ($intent['version'] === 2) return ez_payout_sync_cohort($files, $reader, $intent, $heartbeat);
+    $reader = new EzPayoutSyncReader($files, $original, $mode === 'collect', $maxReads, $heartbeat, $intent['version'] >= 2);
+    if ($intent['version'] >= 2) return ez_payout_sync_cohort($files, $reader, $intent, $heartbeat);
     $status = $reader->transactionStatus($original['binding']['partnerReferenceNo']);
     ez_finalize_withdrawal_status(['version'=>1,'withdrawalId'=>$id,'environment'=>$environment,'confirmationId'=>$original['confirmationId'],
         'binding'=>$original['binding'],'evidence'=>$status['evidence']]);

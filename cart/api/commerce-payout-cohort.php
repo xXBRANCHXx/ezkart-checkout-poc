@@ -2,6 +2,21 @@
 declare(strict_types=1);
 if (realpath((string) ($_SERVER['SCRIPT_FILENAME'] ?? '')) === __FILE__) { http_response_code(404); exit; }
 
+/** Closed intervals share their endpoint; Worker evidence validates both copies. */
+function ez_payout_sync_windows(string $from, string $to, int $maxPages): array
+{
+    $start = new DateTimeImmutable($from); $end = new DateTimeImmutable($to); $windows = [];
+    if ($end <= $start) throw new RuntimeException('The payout history range is invalid.');
+    while ($start < $end) {
+        if (count($windows) >= min(12, $maxPages)) throw new RuntimeException('The complete payout history exceeds the window/page budget.');
+        $next = $start->modify('+31 days'); if ($next > $end) $next = $end;
+        $window = ['from'=>$start->format('Y-m-d\TH:i:s\Z'),'to'=>$next->format('Y-m-d\TH:i:s\Z')];
+        EzDokuSubAccountReader::window($window['from'], $window['to']);
+        $windows[] = $window; $start = $next;
+    }
+    return $windows;
+}
+
 function ez_payout_sync_review_reason(array $assessment, array $required): string
 {
     $reason = $assessment['reason'] ?? 'provider_review';
@@ -57,12 +72,14 @@ function ez_payout_sync_cohort(EzPayoutSyncFiles $files, EzPayoutSyncReader $rea
         $window = ['from'=>$plan['from'],'to'=>gmdate('Y-m-d\TH:i:s\Z')];
         foreach ($boundaries as $boundary) if (new DateTimeImmutable($boundary['checkedAt']) > new DateTimeImmutable($window['to']))
             throw new RuntimeException('The status observation is outside a completed history window.');
-        EzDokuSubAccountReader::window($window['from'], $window['to']); $files->save('window.json', $window);
+        if ($intent['version'] === 3) $window['windows'] = ez_payout_sync_windows($window['from'], $window['to'], $intent['maxPages']);
+        else EzDokuSubAccountReader::window($window['from'], $window['to']);
+        $files->save('window.json', $window);
     }
     foreach ($plan['wallets'] as $account) {
         $ids = []; $enrollment = $account['enrollmentId'];
         try {
-            $report = ez_observe_doku_financial_window($reader, $account['profileId'], $window['from'], $window['to'], $intent['maxPages'],
+            $report = ez_observe_doku_financial_windows($reader, $account['profileId'], $window['windows'] ?? [$window], $intent['maxPages'],
                 static function (string $kind, array $response) use ($files, $account, $environment, &$ids, &$responses): void {
                     if ($kind !== 'history_page') {
                         $numbers = $response['data']['accounts'] ?? [];

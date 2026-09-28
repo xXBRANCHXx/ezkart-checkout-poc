@@ -18,30 +18,50 @@ function validateSources(mapping,rows){
     if(row.operation!==(i===0||i===rows.length-1?'balance-inquiries':'transaction-history-list'))fail('Provider collection requires balances around both account histories');
   }
   const first=rows[1].data,accounts=new Map([[mapping.cash_account,[]],[mapping.pending_account,[]]]);
-  if(first.to>rows[0].requested_at)fail('Provider collection requires a completed history window');
   for(const row of rows.slice(1,-1)){
     const data=row.data,pages=accounts.get(data.accountNo);
-    if(!pages||data.from!==first.from||data.to!==first.to||data.pageSize!==first.pageSize)fail('Provider collection history scope changed');
-    if(pages.length>=40||data.page!==pages.length||pages.at(-1)?.exhausted)fail('Provider collection history pages are missing or out of order');
+    if(!pages||data.pageSize!==first.pageSize||data.to>rows[0].requested_at)fail('Provider collection history scope changed');
+    if(pages.length>=40)fail('Provider collection page budget exceeded');
     pages.push(data);
   }
+  let plan=null;
   for(const pages of accounts.values()){
     if(!pages.length)fail('Provider collection requires both account histories');
-    const seen=new Map();let previous=null;
-    for(const page of pages)for(const item of page.items){
-      const key=JSON.stringify(item);
-      // Identical legs inside a page may be genuine. Across offset pages they
-      // make coverage ambiguous; preserve the observations but refuse to seal.
-      if(seen.has(key)&&seen.get(key)!==page.page)fail('Provider collection history pages overlap');
-      if(previous!==null&&item.dateTime>previous)fail('Provider collection history order changed');
-      seen.set(key,page.page);previous=item.dateTime;
+    const windows=[];
+    for(const page of pages){
+      let window=windows.at(-1);
+      if(!window||page.from!==window.from||page.to!==window.to){
+        if(window&&page.from!==window.to)fail('Provider collection history windows have gaps or overlap');
+        window={from:page.from,to:page.to,pages:[],items:[]};windows.push(window);
+      }
+      if(page.page!==window.pages.length||window.pages.at(-1)?.exhausted)fail('Provider collection history pages are missing or out of order');
+      window.pages.push(page);window.items.push(...page.items);
+    }
+    if(windows.length>12)fail('Provider collection window budget exceeded');
+    const shape=JSON.stringify(windows.map(({from,to})=>({from,to})));
+    if(plan!==null&&shape!==plan)fail('Provider collection history scope changed');plan=shape;
+    for(const [index,window] of windows.entries()){
+      const seen=new Map();let previous=null;
+      for(const page of window.pages)for(const item of page.items){
+        const key=JSON.stringify(item);
+        if(seen.has(key)&&seen.get(key)!==page.page)fail('Provider collection history pages overlap');
+        if(previous!==null&&item.dateTime>previous)fail('Provider collection history order changed');
+        seen.set(key,page.page);previous=item.dateTime;
+      }
+      // Closed intervals share one endpoint. Match the entire multiset there;
+      // only its second occurrence is excluded from financial projections.
+      if(index){
+        const boundary=items=>JSON.stringify(items.filter(x=>x.dateTime===window.from).map(x=>JSON.stringify(x)).sort());
+        if(boundary(windows[index-1].items)!==boundary(window.items))fail('Provider collection boundary evidence differs');
+      }
     }
   }
 }
 
 const select=`SELECT c.*,b.requested_at AS started_at,a.observed_at AS finished_at,
   b.normalized_json AS balance_before,a.normalized_json AS balance_after,
-  json_extract(h.normalized_json,'$.from') AS from_at,json_extract(h.normalized_json,'$.to') AS to_at,
+  (SELECT MIN(json_extract(o.normalized_json,'$.from')) FROM commerce_provider_collection_observations m JOIN commerce_provider_financial_observations o ON o.sequence=m.observation_sequence WHERE m.collection_sequence=c.sequence AND m.role='history_page') AS from_at,
+  (SELECT MAX(json_extract(o.normalized_json,'$.to')) FROM commerce_provider_collection_observations m JOIN commerce_provider_financial_observations o ON o.sequence=m.observation_sequence WHERE m.collection_sequence=c.sequence AND m.role='history_page') AS to_at,
   json_extract(h.normalized_json,'$.pageSize') AS page_size
   FROM commerce_provider_financial_collections c
   JOIN commerce_provider_collection_observations bm ON bm.collection_sequence=c.sequence AND bm.position=0
@@ -53,11 +73,13 @@ const select=`SELECT c.*,b.requested_at AS started_at,a.observed_at AS finished_
 
 async function summarize(env,rows){
   if(!rows.length)return [];
-  const coverage=(await env.DB.prepare(`SELECT m.collection_sequence,m.account_type,COUNT(*) AS pages,
+  const coverage=(await env.DB.prepare(`SELECT collection_sequence,account_type,SUM(pages) AS pages,SUM(rows) AS rows,MIN(exhausted) AS exhausted FROM (
+    SELECT m.collection_sequence,m.account_type,COUNT(*) AS pages,
     SUM(json_array_length(o.normalized_json,'$.items')) AS rows,MAX(json_extract(o.normalized_json,'$.exhausted')) AS exhausted
     FROM commerce_provider_collection_observations m JOIN commerce_provider_financial_observations o ON o.sequence=m.observation_sequence
     WHERE m.collection_sequence IN (${rows.map(()=>'?').join(',')}) AND m.role='history_page'
-    GROUP BY m.collection_sequence,m.account_type`).bind(...rows.map(row=>row.sequence)).all()).results;
+    GROUP BY m.collection_sequence,m.account_type,json_extract(o.normalized_json,'$.from'),json_extract(o.normalized_json,'$.to'))
+    GROUP BY collection_sequence,account_type`).bind(...rows.map(row=>row.sequence)).all()).results;
   return rows.map(row=>{
     const accounts=Object.fromEntries(coverage.filter(x=>x.collection_sequence===row.sequence).map(x=>[x.account_type,{pages:x.pages,rows:x.rows,exhausted:!!x.exhausted}]));
     if(!types.every(type=>accounts[type]))fail('Provider collection coverage is unavailable',500);

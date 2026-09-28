@@ -334,3 +334,105 @@ test('synchronization rejects main, held dispatch, wrong scope, unsafe recovery 
   const raw=await readFile(file);await rm(file);const other=join(f.recovery,'foreign.json');await writeFile(other,raw,{mode:0o600});await symlink(other,file);
   assert.equal((await f.sync({mode:'recover'})).status,1);assert.equal((await f.reads()).length,9);
 });
+
+// Age only the isolated fixture's grant, restoring its immutable SQL guard before
+// invoking production code. No live records or provider endpoints are involved.
+async function ageGrant(f,days=70){
+  const trigger=await f.db.prepare("SELECT sql FROM sqlite_master WHERE type='trigger' AND name='withdrawal_payment_grants_no_update'").first();
+  await f.db.prepare('DROP TRIGGER withdrawal_payment_grants_no_update').run();
+  const at=new Date(Date.now()-days*86400000).toISOString();
+  await f.db.prepare('UPDATE commerce_withdrawal_payment_grants SET created_at=? WHERE withdrawal_id=?').bind(at,f.w.id).run();
+  await f.db.prepare(trigger.sql).run();
+  return at;
+}
+
+test('seventy-day payout uses three complete windows, boundary copies once, and durable interrupted recovery',async t=>{
+  const f=await fixture(t,{queue:true}),grantedAt=await ageGrant(f);
+  const scope=await f.call(f.path+'/payout/sync-scope',{environment:f.environment});
+  assert.equal(scope.plan.version,3);assert(Date.parse(scope.plan.from)<=Date.parse(grantedAt)-300000);
+  const boundary=new Date(Date.parse(scope.plan.from)+31*86400000).toISOString();
+  const rows=f.legs(f.p);
+  rows.sellerCash.push({...f.row('PAYOUT',250000),dateTime:boundary});
+  rows.platformCash.push({...f.row('PAYOUT_CHARGE',2500),dateTime:boundary});
+  for(const items of Object.values(rows))items.sort((a,b)=>b.dateTime.localeCompare(a.dateTime));
+  const a=scope.original;
+  await writeFile(join(f.app.directory,'wallet-history.json'),JSON.stringify({
+    [a.sellerAccount.cashAccount]:rows.sellerCash,[a.sellerAccount.pendingAccount]:rows.sellerPending,
+    [a.platformAccount.cashAccount]:rows.platformCash,[a.platformAccount.pendingAccount]:rows.platformPending}));
+  await f.controlProvider({filterHistoryWindows:true,statusResponse:{latestTransactionStatus:'00'}});
+  const scheduled=await f.call('/internal/commerce/finance/payout-sync/schedule',{environment:f.environment,limit:1});assert.equal(scheduled.queued,1);
+  await new Promise(resolve=>setTimeout(resolve,1005-Date.now()%1000));
+  const first=await f.sync({'max-reads':'4'});assert.equal(first.status,2,first.error);assert.equal(JSON.parse(first.output).reason,'read_budget');
+  const plan=await readFile(join(f.directory,'window.json'),'utf8'),intent=await readFile(join(f.directory,'intent.json'),'utf8');
+  const windows=JSON.parse(plan).windows;assert.equal(windows.length,3);
+  for(const [i,w] of windows.entries()){
+    assert(Date.parse(w.to)-Date.parse(w.from)<=31*86400000);
+    if(i)assert.equal(w.from,windows[i-1].to);
+  }
+  assert.equal(windows[0].from,scope.plan.from);
+  const boundaryStatus=JSON.parse(await readFile(join(f.directory,'status-'+f.w.id+'-boundary.json'),'utf8'));
+  assert(Date.parse(windows.at(-1).to)>=Date.parse(boundaryStatus.checkedAt));
+  const saved=await readFile(join(f.directory,'read-0004.json'),'utf8');
+  const recovery=await f.sync({mode:'recover'});assert.equal(recovery.status,1);assert.equal((await f.reads()).length,4);
+  const done=await f.sync({'max-reads':'20'});assert.equal(done.status,0,done.error+done.output);
+  assert.equal(JSON.parse(done.output).providerCalls,13);assert.equal((await f.reads()).length,17);
+  assert.equal(await readFile(join(f.directory,'window.json'),'utf8'),plan);assert.equal(await readFile(join(f.directory,'intent.json'),'utf8'),intent);
+  assert.equal(await readFile(join(f.directory,'read-0004.json'),'utf8'),saved);
+  const payout=await f.readPayout();assert.equal(payout.outcome.payoutConfirmed,true);assert.equal(payout.assessment.feeAmount,'2500');
+  assert.equal(payout.assessment.source.legs.length,2);
+  assert.equal((await f.sync({mode:'recover'},{EZKART_COMMERCE_WITHDRAWAL_SYNC:'held',EZKART_DOKU_SANDBOX_SNAP_PRIVATE_KEY:'missing'})).status,0);
+  assert.equal((await f.reads()).length,17);assert.equal(await f.count('commerce_payout_assessments'),1);
+  // A contiguous subset is valid history but cannot replace the full original
+  // grant-to-status range, even when it still contains the payout leg.
+  for(const remove of [[1,4],[3,6]]){
+    const ids=[];
+    for(const account of [a.sellerAccount,a.platformAccount]){
+      const manifest=JSON.parse(await readFile(join(f.directory,'collection-'+account.enrollmentId+'.json'),'utf8'));
+      manifest.observationIds=manifest.observationIds.filter((_,i)=>!remove.includes(i));
+      const sealed=await f.call(collectionPath,manifest);assert.equal(sealed.status,200,sealed.error);ids.push(sealed.collection.id);
+    }
+    const incomplete=await f.call(f.path+'/payout/reconcile',{environment:f.environment,sellerCollectionId:ids[0],platformCollectionId:ids[1],statusCap:boundaryStatus.statusCap});
+    assert.equal(incomplete.status,409);
+  }
+  // The same provider reference at a different time is a duplicate financial
+  // leg, not another endpoint copy. Preserve it and hold the new assessment.
+  rows.sellerCash.push({...f.row('PAYOUT',250000),dateTime:new Date(Date.parse(grantedAt)+86400000).toISOString()});
+  rows.sellerCash.sort((x,y)=>y.dateTime.localeCompare(x.dateTime));
+  await writeFile(join(f.app.directory,'wallet-history.json'),JSON.stringify({
+    [a.sellerAccount.cashAccount]:rows.sellerCash,[a.sellerAccount.pendingAccount]:rows.sellerPending,
+    [a.platformAccount.cashAccount]:rows.platformCash,[a.platformAccount.pendingAccount]:rows.platformPending}));
+  const duplicate=await f.sync({run:randomBytes(16).toString('hex')});assert.equal(duplicate.status,2,duplicate.error+duplicate.output);
+  assert.equal(JSON.parse(duplicate.output).outcome.reason,'incomplete_or_duplicate_legs');
+  assert.equal((await f.funds()).completedWithdrawals,'250000');assert.equal(await f.count('commerce_withdrawal_payment_grants'),1);
+  rows.sellerCash.push(...Array.from({length:20},(_,i)=>({...f.row('PAYOUT',1),referenceNo:'unrelated-old-'+i,partnerReferenceNo:'unrelated-old-'+i,
+    dateTime:new Date(Date.parse(grantedAt)+86400000).toISOString()})));
+  rows.sellerCash.sort((x,y)=>y.dateTime.localeCompare(x.dateTime));
+  await writeFile(join(f.app.directory,'wallet-history.json'),JSON.stringify({
+    [a.sellerAccount.cashAccount]:rows.sellerCash,[a.sellerAccount.pendingAccount]:rows.sellerPending,
+    [a.platformAccount.cashAccount]:rows.platformCash,[a.platformAccount.pendingAccount]:rows.platformPending}));
+  const partial=await f.sync({run:randomBytes(16).toString('hex'),'max-pages':'3'});assert.equal(partial.status,2,partial.error+partial.output);
+  assert.equal(JSON.parse(partial.output).reason,'history_incomplete');assert.equal(JSON.parse(partial.output).pagesExhausted,false);
+});
+
+test('an original version-two single-window intent remains recoverable unchanged',async t=>{
+  const f=await fixture(t),legacy={version:2,run:f.run,original:f.scope.original,plan:{...f.scope.plan,version:2},maxPages:10};
+  delete legacy.plan.maxWindows;
+  await mkdir(f.directory,{mode:0o700});const file=join(f.directory,'intent.json');await writeFile(file,JSON.stringify(legacy)+'\n',{mode:0o600});
+  const raw=await readFile(file,'utf8'),result=await f.sync();assert.equal(result.status,0,result.error+result.output);
+  assert.equal(await readFile(file,'utf8'),raw);assert.equal(JSON.parse(await readFile(join(f.directory,'window.json'),'utf8')).windows,undefined);
+  assert.equal((await f.sync({mode:'recover'},{EZKART_COMMERCE_WITHDRAWAL_SYNC:'held'})).status,0);
+  assert.equal((await f.reads()).length,9);assert.equal(await f.count('commerce_payout_assessments'),1);
+});
+
+test('later independent evidence in an older window invalidates an interrupted multi-window run',async t=>{
+  const f=await fixture(t);await ageGrant(f);
+  await f.controlProvider({filterHistoryWindows:true,statusResponse:{latestTransactionStatus:'00'}});
+  const paused=await f.sync({'max-reads':'3'});assert.equal(paused.status,2,paused.error);
+  const window=JSON.parse(await readFile(join(f.directory,'window.json'),'utf8')).windows[0],at=new Date().toISOString();
+  await f.record('transaction-history-list',{accountNo:f.scope.original.sellerAccount.cashAccount,
+    fromDateTime:window.from,toDateTime:window.to,pageSize:'20',pageNumber:'0'},
+    {responseCode:'2000000',detailData:[]},{requestedAt:at,observedAt:at});
+  const resumed=await f.sync();assert.equal(resumed.status,2,resumed.error+resumed.output);
+  assert.equal(JSON.parse(resumed.output).relatedReviews.find(x=>x.kind==='payout').reason,'sources_changed_or_incomplete');
+  assert.equal(await f.count('commerce_payout_assessments'),0);assert.equal(await f.count('commerce_withdrawal_payment_grants'),1);
+});

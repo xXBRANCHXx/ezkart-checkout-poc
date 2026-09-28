@@ -40,7 +40,7 @@ export async function requestPayoutSync(env,input){
 export async function schedulePayoutSync(env,input){
   scope(env,input,['limit']);const limit=input.limit??4;if(!Number.isInteger(limit)||limit<1||limit>10)fail('Synchronization schedule size is invalid');
   if(env.COMMERCE_WITHDRAWAL_SYNC!=='enabled')return {held:true,queued:0,providerCalls:0};
-  const now=new Date().toISOString(),cutoff=new Date(Date.now()-31*86400000+600000).toISOString();
+  const now=new Date().toISOString(),cutoff=new Date(Date.now()-12*31*86400000+600000).toISOString();
   const due=(await env.DB.prepare(`WITH candidates AS (
     SELECT g.*,ROW_NUMBER() OVER(PARTITION BY g.commerce_environment,g.credential_fingerprint,g.platform_enrollment_id
       ORDER BY COALESCE(p.reconciled,0),g.created_at DESC,g.withdrawal_id) AS position,
@@ -171,7 +171,7 @@ export async function listPayoutSync(env,input){
     ORDER BY created_at DESC,id DESC LIMIT ?`).bind(input.environment,input.before||'',input.before||'',limit+1).all()).results;
   const counts=(await env.DB.prepare('SELECT state,COUNT(*) AS count FROM commerce_payout_sync_jobs WHERE commerce_environment=? GROUP BY state').bind(input.environment).all()).results;
   const outside=await env.DB.prepare(`SELECT COUNT(*) AS count FROM commerce_withdrawal_payment_grants g LEFT JOIN commerce_payout_positions p ON p.withdrawal_id=g.withdrawal_id
-    WHERE g.commerce_environment=? AND g.created_at<? AND COALESCE(p.reconciled,0)=0`).bind(input.environment,new Date(Date.now()-31*86400000+600000).toISOString()).first();
+    WHERE g.commerce_environment=? AND g.created_at<? AND COALESCE(p.reconciled,0)=0`).bind(input.environment,new Date(Date.now()-12*31*86400000+600000).toISOString()).first();
   const last=rows[Math.min(rows.length,limit)-1];
   return {items:rows.slice(0,limit).map(view),nextBefore:rows.length>limit?last.created_at+'/'+last.id:null,
     counts:Object.fromEntries(counts.map(x=>[x.state,x.count])),outsideWindow:outside.count,held:env.COMMERCE_WITHDRAWAL_SYNC!=='enabled',providerCalls:0,mayPay:false};

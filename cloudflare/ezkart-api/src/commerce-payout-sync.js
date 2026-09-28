@@ -14,9 +14,9 @@ export async function payoutSyncScope(env,id,input){
     JOIN commerce_wallet_enrollments pe ON pe.id=g.platform_enrollment_id WHERE w.id=?`).bind(id).first();
   if(!source)throw new Response('The original payout accounts require review',{status:409});
   const pair=[source.enrollment_id,source.platform_enrollment_id];
-  // DOKU accepts at most 31 days per history window. Older work and batches over
-  // the limit stay explicit; this plan never silently claims a complete sweep.
-  const cutoff=new Date(Date.now()-31*86400000+600000).toISOString();
+  // Bound the cohort to twelve legal windows, retaining the target's original
+  // grant even when it is outside this budget (collection then requires review).
+  const cutoff=new Date(Date.now()-12*31*86400000+600000).toISOString();
   const orders=(await env.DB.prepare(`SELECT o.seller_id AS seller,o.id AS orderId,o.created_at AS createdAt,b.seller_enrollment_id AS sellerEnrollmentId
     FROM orders o JOIN commerce_payment_route_bindings b ON b.order_id=o.id
     JOIN commerce_payment_captures c ON c.order_id=o.id AND c.capture_kind='order_payment'
@@ -53,6 +53,6 @@ export async function payoutSyncScope(env,id,input){
     confirmationId:payment.confirmationId,grantedAt:source.created_at,
     sellerAccount:{seller:source.seller_id,enrollmentId:source.enrollment_id,profileId:source.seller_profile,cashAccount:source.seller_cash,pendingAccount:source.seller_pending},
     platformAccount:{seller:source.platform_seller,enrollmentId:source.platform_enrollment_id,profileId:source.platform_profile,cashAccount:source.platform_cash,pendingAccount:source.platform_pending}},
-    plan:{version:2,from,wallets,settlements:settlements.map(({createdAt,...row})=>row),withdrawals:payouts.map(({createdAt,...row})=>row),truncated:orders.length>100||withdrawals.length>100},
+    plan:{version:3,maxWindows:12,from,wallets,settlements:settlements.map(({createdAt,...row})=>row),withdrawals:payouts.map(({createdAt,...row})=>row),truncated:orders.length>100||withdrawals.length>100},
     sharedHistoryReview:{settlements:staleOrders.n,payouts:stalePayouts.n},providerCalls:0,mayPay:false};
 }

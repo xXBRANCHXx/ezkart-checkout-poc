@@ -128,6 +128,9 @@ function curl_exec(object $handle): string|bool {
             $historyFile = $directory . '/wallet-history.json';
             $history = is_file($historyFile) ? json_decode((string) file_get_contents($historyFile), true) : [];
             $rows = $history[$payload['accountNo']] ?? [];
+            if (!empty($control['filterHistoryWindows'])) $rows = array_values(array_filter($rows, static fn($row) =>
+                new DateTimeImmutable($row['dateTime']) >= new DateTimeImmutable($payload['fromDateTime'])
+                && new DateTimeImmutable($row['dateTime']) <= new DateTimeImmutable($payload['toDateTime'])));
             $response = ['responseCode' => '2000000', 'detailData' => array_slice($rows, (int) $payload['pageSize'] * (int) $payload['pageNumber'], (int) $payload['pageSize'])];
             if (!empty($control['historyUnavailable'])) { $handle->status = 503; $response = ['responseCode' => '5030000']; }
         } else {
