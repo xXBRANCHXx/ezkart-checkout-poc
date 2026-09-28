@@ -63,8 +63,9 @@ and direct API versus hosted checkout. Call the platform fee commission.
   original uncertain registrations and in-flight withdrawal destinations.
 - Required onboarding includes full legal name, verified email, phone, bank
   details, and pickup/return addresses with confirmed map pins. The owner also
-  requires age/identity verification. A declaration is not a verified identity;
-  do not invent provider evidence or infer the age threshold from PSE registration.
+  requires age/identity verification, with a minimum seller age of **18** as
+  explicitly confirmed on 28 September. A declaration is not a verified identity;
+  do not invent provider evidence or call this a statutory PSE age threshold.
 - Ezkart's commission must reach its company bank. Distinguish commission
   allocation, credit to the platform's DOKU balance, and confirmed bank payout.
   DOKU knowing a bank account does not prove the Sub-Account payout connection.
