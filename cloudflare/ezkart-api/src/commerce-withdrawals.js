@@ -1,3 +1,4 @@
+import {requireSellerOnboarding,savedOnboardingBank,onboardingFailure} from './seller-onboarding.js';
 import {commerceHash} from './commerce-orders.js';
 import {walletOwner} from './commerce-wallet-enrollment.js';
 import {withdrawalStatusSummaries} from './commerce-withdrawal-status.js';
@@ -52,30 +53,36 @@ export function withdrawalFailure(error){
   if(/withdrawal_wallet_mismatch/.test(String(error)))fail('A confirmed seller payment account is required.',409);
   if(/withdrawal_cancelled/.test(String(error)))fail('This withdrawal was cancelled. Refresh its status.',409);
   if(/withdrawal_payment_started/.test(String(error)))fail('This withdrawal has entered payment processing and cannot be cancelled. Its outcome needs reconciliation.',409);
-  throw error;
+  onboardingFailure(error);
 }
 
 // The SQL statement reads current funds, validates ownership/proof, freezes the
 // intent and posts its balanced reservation journal in the same transaction.
 export async function reserveWithdrawal(env,input){
-  fields(input,[...base,'requestKey','amount','bank']);await authorizeWithdrawalOwner(env,input);requestKey(input.requestKey);bank(input.bank);
+  fields(input,[...base,'requestKey','amount','bank','bankRevision']);await authorizeWithdrawalOwner(env,input);requestKey(input.requestKey);
+  if(input.environment==='production' && input.bank)fail('Withdrawals use your bank saved during onboarding. Refresh Wallet.');
+  const requestedRevision=input.bankRevision;
+  if(requestedRevision!==undefined){if(!Number.isSafeInteger(requestedRevision)||requestedRevision<1)fail('Saved bank revision is invalid.');}
+  else if(input.environment==='production')fail('Save a bank during onboarding before withdrawing.',409);
   if(typeof input.amount!=='string'||!/^[1-9][0-9]{5,15}$/.test(input.amount)
     ||BigInt(input.amount)<250000n||BigInt(input.amount)>9007199254740991n)fail('Withdrawal amount must be whole rupiah, at least Rp250,000 and within the ledger limit.');
   const suffix=(await commerceHash({seller:input.seller,environment:input.environment,requestKey:input.requestKey})).slice(0,40),id='wd_'+suffix;
-  const match=row=>row.owner_auth_id===input.actor.id&&String(row.amount)===input.amount&&row.bank_code===input.bank.code
-    &&row.bank_account===input.bank.accountNumber&&row.channel===input.bank.channel;
+  const match=row=>row.owner_auth_id===input.actor.id&&String(row.amount)===input.amount&&(requestedRevision!==undefined ? row.bank_revision===requestedRevision : row.bank_code===input.bank?.code && row.bank_account===input.bank?.accountNumber && row.channel===input.bank?.channel);
   const replay=async row=>{if(!match(row))fail('This withdrawal reference already has different details.',409);return {withdrawal:await currentView(env,row),replayed:true,providerCalls:0};};
   const prior=await read(env,id,input);if(prior)return replay(prior);
+  await requireSellerOnboarding(env,input.seller,input.environment);
+  if(requestedRevision!==undefined)input={...input,bank:await savedOnboardingBank(env,input,requestedRevision)};
+  bank(input.bank);
   const wallet=await env.DB.prepare(`SELECT p.enrollment_id FROM commerce_wallet_enrollments e JOIN commerce_wallet_provider_profiles p ON p.enrollment_id=e.id
     WHERE e.seller_id=? AND e.commerce_environment=? AND p.commerce_environment=e.commerce_environment`).bind(input.seller,input.environment).first();
   if(!wallet)fail('A confirmed seller payment account is required.',409);
   try{
     await env.DB.prepare(`INSERT INTO commerce_withdrawals(id,seller_id,commerce_environment,request_key,owner_auth_id,proof_expires_at,
-      enrollment_id,amount,bank_code,bank_account,channel,partner_reference,funds_json,created_at)
-      SELECT ?,?,?,?,?,?,?,CAST(? AS INTEGER),?,?,?,?,f.source_json,strftime('%Y-%m-%dT%H:%M:%fZ','now')
+      enrollment_id,amount,bank_code,bank_account,channel,partner_reference,bank_revision,funds_json,created_at)
+      SELECT ?,?,?,?,?,?,?,CAST(? AS INTEGER),?,?,?,?,?,f.source_json,strftime('%Y-%m-%dT%H:%M:%fZ','now')
       FROM commerce_withdrawal_funds f WHERE f.seller_id=? AND f.commerce_environment=?`)
       .bind(id,input.seller,input.environment,input.requestKey,input.actor.id,input.actor.proofExpiresAt,wallet.enrollment_id,input.amount,
-        input.bank.code,input.bank.accountNumber,input.bank.channel,'EZK-PAYOUT-'+(input.environment==='sandbox'?'S':'P')+'-'+suffix,input.seller,input.environment).run();
+        input.bank.code,input.bank.accountNumber,input.bank.channel,'EZK-PAYOUT-'+(input.environment==='sandbox'?'S':'P')+'-'+suffix,requestedRevision??null,input.seller,input.environment).run();
   }catch(error){const saved=await read(env,id,input);if(saved)return replay(saved);withdrawalFailure(error);}
   const saved=await read(env,id,input);if(!saved)fail('Withdrawal could not be reserved. Refresh Wallet.',409);
   return {withdrawal:view(saved),replayed:false,providerCalls:0};

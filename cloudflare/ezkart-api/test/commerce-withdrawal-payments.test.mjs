@@ -201,3 +201,17 @@ test('database payment guards independently bind the owner, latest confirmation,
     await assert.rejects(insert('commerce_withdrawal_payment_receipts',{...receipt,...change},'recorded_at'),/withdrawal_payment_receipt_mismatch/);
   assert.equal(await count(f,'commerce_withdrawal_payment_receipts'),0);assert.equal((await f.paymentReceipt(p,e)).status,200);
 });
+
+
+test('beta bank changes fence unsent dispatch while original started payment recovery survives incomplete onboarding',async t=>{
+ const f=await fixture(t,{bindings:{APP_ENVIRONMENT:'beta'}}),sent=await f.prepare(),unsent=await f.prepare(),g=await f.startPayment(sent);
+ assert.equal(g.status,200,g.error);assert.equal(g.mayPay,true);
+ const bank=await f.call('/internal/commerce/onboarding',{...f.scope(),action:'bank',revision:1,requestKey:key(),bank:{code:'CENAIDJA',accountNumber:'009999999999',channel:'BI_FAST'}});assert.equal(bank.status,200,bank.error);
+ const denied=await f.startPayment(unsent);assert.equal(denied.status,409,denied.error);assert.match(denied.error,/saved bank changed/);
+ assert.equal((await f.readWithdrawal(unsent.w)).withdrawal.bank.accountNumber,'001234567890');
+ await f.db.prepare("DELETE FROM fixture_authenticated_identity WHERE seller_id='seller_alice'").run();
+ assert.equal((await f.call('/internal/commerce/onboarding',{...f.scope(),action:'read'})).onboarding.ready,false);
+ assert.equal((await f.startPayment(sent)).mayPay,false);assert.equal((await f.paymentReceipt(sent,f.paymentEvidence(g))).status,200);
+ const recovered=await f.recoverPayment(sent);assert.equal(recovered.status,200,recovered.error);assert.equal(recovered.binding.beneficiaryAccountNumber,'001234567890');assert.equal(recovered.mayPay,false);
+ assert.equal((await f.cancel(unsent.w)).status,200);assert.equal(await count(f,'commerce_withdrawal_payment_grants'),1);
+});

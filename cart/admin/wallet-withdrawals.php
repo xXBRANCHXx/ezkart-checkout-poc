@@ -18,11 +18,8 @@ if (empty($walletAccess['unlocked']) || empty($walletOwner) || empty($centralWal
       <p class="wallet-withdraw-available">Available earnings <strong data-withdrawal-available>—</strong></p>
       <label for="withdrawal-amount">Withdrawal amount (IDR)</label><input id="withdrawal-amount" name="amount" type="text" inputmode="numeric" pattern="[1-9][0-9]{5,15}" maxlength="16" placeholder="250000" aria-describedby="withdrawal-amount-help" required>
       <small id="withdrawal-amount-help">Minimum Rp250.000. Enter whole rupiah without dots or commas.</small>
-      <label for="withdrawal-bank-search">Find your bank</label><input id="withdrawal-bank-search" type="search" placeholder="Search bank names" data-withdrawal-bank-search>
-      <label for="withdrawal-bank">Bank</label><select id="withdrawal-bank" name="bank" required><option value="">Choose your bank</option></select>
-      <label for="withdrawal-account">Bank account number</label><input id="withdrawal-account" name="account" type="text" inputmode="numeric" pattern="[0-9]{1,22}" maxlength="22" aria-describedby="withdrawal-account-help" required>
-      <small id="withdrawal-account-help">Use the account number exactly as shown by your bank, including any leading zeroes.</small>
-      <label for="withdrawal-channel">Transfer method</label><select id="withdrawal-channel" name="channel" required><option value="">Choose a bank first</option></select>
+      <p data-withdrawal-saved-bank>Your saved onboarding bank will be used.</p>
+      <a href="?page=onboarding">Review or change saved bank</a>
       <p class="wallet-withdraw-fee">Your withdrawal fee: <strong>Rp0</strong>. Ezkart covers the transfer fee.</p>
       <p>Saving reserves this amount from your available earnings. You will check the bank-returned name before confirming the destination.</p>
       <button class="action-button primary" type="submit" data-withdrawal-save>Save withdrawal request</button>

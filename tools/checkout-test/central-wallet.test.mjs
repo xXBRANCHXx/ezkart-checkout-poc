@@ -7,6 +7,7 @@ import {tmpdir} from 'node:os';
 import {join,resolve} from 'node:path';
 import {setupCentralFixture} from './central-fixture.mjs';
 import {setupEarningsFixture} from '../../cloudflare/ezkart-api/test/earnings-fixture.mjs';
+import {seedVerifiedOnboarding} from '../../cloudflare/ezkart-api/test/onboarding-fixture.mjs';
 import {payoutFixture} from '../../cloudflare/ezkart-api/test/payout-fixture.mjs';
 
 const root=resolve(import.meta.dirname,'../..'),base='/internal/commerce/finance/wallet',screens='/tmp/ezkart-wallet-enrollment-ui-01a0d643';
@@ -108,6 +109,7 @@ async function bankInquiryFixture(t,overrides={},extraBindings={}){
   const bindings={COMMERCE_PLATFORM_WALLET_SELLER:'seller_bob',COMMERCE_WITHDRAWAL_INQUIRY:'enabled',...extraBindings};
   const f=await merchantFixture(t,{EZKART_COMMERCE_WITHDRAWALS:'enabled',EZKART_COMMERCE_WITHDRAWAL_INQUIRY:'enabled',
     EZKART_COMMERCE_WITHDRAWAL_RECOVERY_DIRECTORY:recovery,...overrides},{bindings});
+  await seedVerifiedOnboarding(f.db);
   const identity=await f.run(`require ${JSON.stringify(join(root,'cart/api/doku-payout.php'))}; echo json_encode(EzDokuPayoutClient::configured('sandbox')->providerIdentity());`);
   assert.equal(identity.status,0,identity.error);const provider=JSON.parse(identity.output);
   const e=await setupEarningsFixture(t,{baseFixture:f,bindings,fingerprint:provider.credentialFingerprint,clientId:provider.clientId});
@@ -115,7 +117,7 @@ async function bankInquiryFixture(t,overrides={},extraBindings={}){
   const p=await e.payment({items:[{productId:'bank-inquiry-merchant',quantity:2,expectedPrice:400000,expectedWeightGrams:100}]});await e.settle(p);await e.deliver(p);
   await f.unlock();
   await f.page.locator('[data-withdrawals][aria-busy=false]').waitFor();
-  const reserve=async()=>{const r=await f.request('withdrawal_reserve',{requestKey:key(),amount:'250000',bank:{code:'CENAIDJA',accountNumber:'001234567890',channel:'BI_FAST'}});assert.equal(r.status,200,JSON.stringify(r.data));return r.data.withdrawal;};
+  const reserve=async()=>{const r=await f.request('withdrawal_reserve',{requestKey:key(),amount:'250000',bankRevision:1});assert.equal(r.status,200,JSON.stringify(r.data));return r.data.withdrawal;};
   const inquire=w=>f.request('withdrawal_inquire',{id:w.id});
   const bankCalls=async()=>(await f.app.calls()).filter(c=>c.url.endsWith('/sub-account/v2.0/transfer-inquiry'));
   return {...f,e,p,provider,recovery,reserve,inquire,bankCalls};
@@ -451,7 +453,6 @@ test('held merchant withdrawals and unavailable private recovery storage consume
 
 const withdrawalIdle=f=>f.page.locator('[data-withdrawals][aria-busy=false]').waitFor();
 async function chooseWithdrawalBank(f,name){
-  await f.page.getByLabel('Find your bank',{exact:true}).fill(name);
   const control=f.page.getByRole('combobox',{name:'Bank',exact:true});
   if(await control.evaluate(node=>node.tagName==='SELECT'))await control.selectOption({label:name});
   else {await control.click();await f.page.getByRole('option',{name,exact:true}).click();}
@@ -459,8 +460,7 @@ async function chooseWithdrawalBank(f,name){
 async function fillWithdrawal(f){
   await f.page.getByRole('button',{name:'Withdraw funds',exact:true}).click();await withdrawalIdle(f);
   await f.page.getByLabel('Withdrawal amount (IDR)',{exact:true}).fill('250000');
-  await chooseWithdrawalBank(f,'BANK BCA');
-  await f.page.getByLabel('Bank account number',{exact:true}).fill('001234567890');
+  assert.match(await f.page.locator('[data-withdrawal-saved-bank]').innerText(),/7890/);
 }
 async function saveWithdrawal(f){
   await fillWithdrawal(f);await f.page.getByRole('button',{name:'Save withdrawal request',exact:true}).click();await withdrawalIdle(f);
@@ -597,10 +597,11 @@ test('withdrawal history pages retain their original cohort, mask accounts and a
 
 test('merchant bank choices use the published channel catalog and cannot submit unsupported bank methods or caller identities',async t=>{
   const f=await bankInquiryFixture(t),read=await f.request('read');assert.equal(read.data.withdrawalCapabilities.banks.length,125);
-  await fillWithdrawal(f);await chooseWithdrawalBank(f,'BANK DANAMON UUS (SYARIAH)');
-  assert.deepEqual(await f.page.locator('#withdrawal-channel option').allTextContents(),['BI-FAST']);
+  await f.page.goto(f.app.base+'/cart/admin/?page=onboarding');await f.page.getByLabel('Full legal name',{exact:true}).waitFor();await f.page.waitForFunction(()=>document.querySelector('[name=code]').options.length>1);
+  await chooseWithdrawalBank(f,'BANK DANAMON UUS (SYARIAH)');
+  assert.deepEqual(await f.page.locator('[name=channel] option').allTextContents(),['BI-FAST']);
   for(const bank of [{code:'SYBDIDJ1',accountNumber:'001234567890',channel:'ONLINE'},{code:'FAKEIDJA',accountNumber:'001234567890',channel:'BI_FAST'}]){
-    assert.equal((await f.request('withdrawal_reserve',{requestKey:key(),amount:'250000',bank})).status,422);
+    assert.equal((await f.request('onboarding_bank',{requestKey:key(),revision:1,bank})).status,422);
   }
   assert.equal((await f.request('withdrawal_lookup',{requestKey:key(),seller:'seller_bob'})).status,422);
   assert.equal(await f.count('commerce_withdrawals'),0);assert.equal((await f.bankCalls()).length,0);
@@ -736,4 +737,27 @@ test('bounded wallet CLI processes only wallet jobs and reports uncertainty with
   assert.equal((await f.db.prepare("SELECT state FROM commerce_jobs WHERE kind='payment.create'").first()).state,'queued');
   const again=await f.run(command);assert.equal(again.status,0,again.error);assert.equal(JSON.parse(again.output).processed,0);
   assert(!/alice|bob|SAC-|fixture-snap-wallet-token|PRIVATE KEY|secret/i.test(run.output+run.error));
+});
+
+
+test('merchant onboarding saves declarations and bank through protected forms, recovers lost replies and keeps identity pending',async t=>{
+ const f=await merchantFixture(t);await f.unlock();await f.page.goto(f.app.base+'/cart/admin/?page=onboarding');
+ await f.page.waitForFunction(()=>document.querySelector('[name=email]')?.value==='alice@example.test');
+ assert.equal((await f.request('onboarding_read',{}, {'X-Ezkart-Csrf':'wrong'})).status,401);
+ assert.equal((await f.request('onboarding_profile',{revision:0,requestKey:key(),legalName:'Alice Legal',birthDate:'1990-01-01',phone:'081234567890',verified:true})).status,422);
+ await f.page.getByLabel('Full legal name',{exact:true}).fill('Alice Legal');await f.page.getByLabel('Date of birth',{exact:true}).fill('1990-01-01');await f.page.getByLabel('Phone number',{exact:true}).fill('081234567890');
+ f.control.drop='/internal/commerce/onboarding';await f.page.getByRole('button',{name:'Save legal details',exact:true}).click();
+ await f.page.waitForFunction(()=>!document.querySelector('[data-onboarding-confirm-pins]').disabled);
+ assert.equal(await f.count('seller_onboarding_profiles'),1);
+ await chooseWithdrawalBank(f,'BANK BCA');await f.page.getByLabel('Account number',{exact:true}).fill('001234567890');
+ f.control.drop='/internal/commerce/onboarding';await f.page.getByRole('button',{name:'Save bank destination',exact:true}).click();
+ await f.page.locator('[data-onboarding-bank-summary]').filter({hasText:'7890'}).waitFor();assert.equal(await f.count('seller_onboarding_banks'),1);
+ await f.page.getByRole('button',{name:'I confirm these addresses and map pins',exact:true}).click();
+ await f.page.waitForFunction(()=>document.querySelector('[data-onboarding-confirm-pins]').disabled&&document.querySelector('[data-onboarding-status]').textContent==='Still needed: authenticated identity verification.');
+ const read=await f.request('onboarding_read',{});assert.equal(read.status,200,JSON.stringify(read.data));assert.equal(read.data.onboarding.ready,false);assert.equal(read.data.onboarding.identity.status,'pending_authenticated_verification');assert.equal(read.data.onboarding.shipping.confirmed,true);
+ assert(!JSON.stringify(read.data).includes('001234567890'));assert.equal((await f.registerCalls()).length,0);
+ for(const width of [1360,390]){await f.page.setViewportSize({width,height:1000});await f.page.reload();await f.page.waitForFunction(()=>document.querySelector('[name=legalName]')?.value==='Alice Legal');assert.equal(await f.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await mkdir(screens,{recursive:true});await f.page.screenshot({path:join(screens,'onboarding-'+width+'.png'),fullPage:true});}
+ assert.equal(await f.page.getByLabel('Account number',{exact:true}).inputValue(),'');
+ assert.equal(await f.page.evaluate(()=>[...Object.values(localStorage),...Object.values(sessionStorage)].some(x=>x.includes('001234567890')||x.includes('1990-01-01'))),false);
+ assert.deepEqual(f.errors,[]);assert.equal(await f.count('commerce_wallet_enrollments'),0);
 });

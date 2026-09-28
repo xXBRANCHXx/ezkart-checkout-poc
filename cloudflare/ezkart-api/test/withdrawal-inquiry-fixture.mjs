@@ -22,7 +22,7 @@ export async function setupWithdrawalInquiryFixture(t,options={}){
   const scope=()=>({environment:f.environment,seller:'seller_alice',actor:owner()});
   await f.product('bank-inquiry',10,'seller_alice',400000);
   const p=await f.payment({items:[{productId:'bank-inquiry',quantity:2,expectedPrice:400000,expectedWeightGrams:100}]});await f.settle(p);await f.deliver(p);
-  const reserve=async(extra={})=>{const r=await f.call(withdrawalPath,{...scope(),requestKey:key(),amount:'250000',bank:{code:'CENAIDJA',accountNumber:'001234567890',channel:'BI_FAST'},...extra});assert.equal(r.status,200,r.error);return r.withdrawal;};
+  const reserve=async(extra={})=>{const r=await f.call(withdrawalPath,{...scope(),requestKey:key(),amount:'250000',...(f.environment==='production'?{bankRevision:1}:{bank:{code:'CENAIDJA',accountNumber:'001234567890',channel:'BI_FAST'}}),...extra});assert.equal(r.status,200,r.error);return r.withdrawal;};
   const start=(w,extra={})=>f.call(withdrawalPath+'/'+w.id+'/inquiry/start',{...scope(),credentialFingerprint:'a'.repeat(64),clientId:'MCH-FIXTURE-SNAP',...extra});
   function evidence(g,change={}){
     const b=g.binding,at=new Date().toISOString().replace(/\.\d{3}Z$/,'Z');

@@ -189,7 +189,7 @@ test('the populated upgrade preserves original journals, earnings and wallet evi
 });
 
 test('beta uses production references, while a missing confirmed wallet cannot create a reservation',async t=>{
-  const f=await funded(t,{bindings:{APP_ENVIRONMENT:'beta'}}),r=await f.call(path,request(f));assert.equal(r.status,200,r.error);
+  const f=await funded(t,{bindings:{APP_ENVIRONMENT:'beta'}}),input=request(f);delete input.bank;input.bankRevision=1;const r=await f.call(path,input);assert.equal(r.status,200,r.error);
   const saved=await f.db.prepare('SELECT partner_reference FROM commerce_withdrawals WHERE id=?').bind(r.withdrawal.id).first();assert.match(saved.partner_reference,/^EZK-PAYOUT-P-/);
   const missing=await setupCommerceFixture(t);missing.environment='sandbox';const noWallet=await missing.call(path,request(missing));assert.equal(noWallet.status,409);assert.equal(await count(missing,'commerce_withdrawals'),0);
   const main=await setupCommerceFixture(t,{bindings:{APP_ENVIRONMENT:'production'}});main.environment='production';

@@ -14,6 +14,7 @@ import { customerAddressBook, changeCustomerAddressBook } from "./customer-addre
 import { validatePublication } from "./landing-publication.js";
 import { merchantStorefront, publicStorefront } from "./storefront.js";
 import { adminProfile } from "./admin-profile.js";
+import {sellerOnboarding,onboardingFailure} from './seller-onboarding.js';
 import {customDomainResponse, listCustomDomains, enrollCustomDomain, customDomainAction, recheckCustomDomains} from './custom-domains.js';
 import { advancedMode, AdvancedModeLimitError, sellerPlan } from "./advanced-mode.js";
 import { authenticateCommerceService, commerceServiceRoute, expireCommerceOrders, reservedStockSql } from "./commerce-orders.js";
@@ -1514,6 +1515,10 @@ export default {
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
     const url = new URL(request.url);
     try {
+      if(url.pathname==='/internal/commerce/onboarding' && request.method==='POST'){
+        const input=await authenticateCommerceService(request,env,{strictJSON:true,maxBytes:4000});
+        return json({ok:true,onboarding:await sellerOnboarding(env,input)});
+      }
       const domainMatch = /^\/v1\/custom-domains(?:\/(dom_[a-f0-9]{32})\/(verify|renew|disconnect))?$/.exec(url.pathname);
       if (domainMatch) {
         const {seller} = await sellerContext(request, env);
@@ -2190,6 +2195,7 @@ export default {
       if (failure.includes("seller_product_limit")) {
         return json({ ok: false, error: "Your store has reached its product limit. Review Advanced Mode or remove a product before creating another." }, 409, cors);
       }
+      if(/seller_onboarding_required|onboarding_bank_changed/.test(failure)){try{onboardingFailure(error);}catch(block){if(block instanceof Response)return json({ok:false,error:await block.text()},block.status,cors);}}
       console.error("Ezkart Worker request failed", error);
       return json({ ok: false, error: "The API could not complete this request." }, 500, cors);
     }

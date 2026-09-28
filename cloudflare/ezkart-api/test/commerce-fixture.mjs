@@ -1,3 +1,4 @@
+import {seedVerifiedOnboarding} from './onboarding-fixture.mjs';
 import {applyCommerceSchema} from './commerce-schema.mjs';
 import {createHash, createHmac, randomBytes} from 'node:crypto';
 import {build} from 'esbuild';
@@ -6,13 +7,13 @@ import {Miniflare, convertV4MiniflareOptions} from 'miniflare';
 export const secret = 'commerce-service-fixture-secret-only-not-a-real-key';
 export const customer = {name: 'Order Tester', email: 'orders@example.test', phone: '081234567890'};
 export const digest = value => createHash('sha256').update(value).digest('hex');
-export const shippingAddress={id:'addr_'+'a'.repeat(32),label:'Main warehouse',name:'Original Warehouse',phone:'081234567891',email:'',organization:'',address:'Jalan Saved Warehouse 18',location:'Jakarta',postalCode:'54321',note:''};
+export const shippingAddress={id:'addr_'+'a'.repeat(32),label:'Main warehouse',name:'Original Warehouse',phone:'081234567891',email:'',organization:'',address:'Jalan Saved Warehouse 18',location:'Jakarta',postalCode:'54321',note:'',coordinate:{latitude:-6.2,longitude:106.8}};
 export const shippingConfiguration={addresses:[shippingAddress],pickupAddressId:shippingAddress.id,returnAddressId:shippingAddress.id,couriers:['jne','sicepat','jnt']};
 export const fixtureShipping={amount:18000,skipped:false,courierCode:'jne',serviceCode:'reg',settingsRevision:1,pickupAddressId:shippingAddress.id,returnAddressId:shippingAddress.id,returnAddress:shippingAddress,
-  origin:{origin_contact_name:shippingAddress.name,origin_contact_phone:shippingAddress.phone,origin_contact_email:'',origin_address:shippingAddress.address+', '+shippingAddress.location,origin_postal_code:shippingAddress.postalCode,origin_note:'',shipper_organization:''},
+  origin:{origin_contact_name:shippingAddress.name,origin_contact_phone:shippingAddress.phone,origin_contact_email:'',origin_address:shippingAddress.address+', '+shippingAddress.location,origin_postal_code:shippingAddress.postalCode,origin_note:'',shipper_organization:'',coordinate:{latitude:-6.2,longitude:106.8}},
   destination:{location:'Jakarta',address:'Jalan Saved Destination 12',postalCode:'12345',coordinate:{latitude:-6.2,longitude:106.8}},quote:{courier:'JNE',service:'Regular',courier_company:'jne',courier_type:'reg',price:18000}};
 
-export async function setupCommerceFixture(t,{through=Infinity,notifications='off',bindings={},outbound}={}) {
+export async function setupCommerceFixture(t,{through=Infinity,verifiedOnboarding=true,notifications='off',bindings={},outbound}={}) {
   const deployment=bindings.APP_ENVIRONMENT||'test',environment=deployment==='test'?'sandbox':'production';
   const key = await crypto.subtle.generateKey({name: 'ECDSA', namedCurve: 'P-256'}, true, ['sign', 'verify']);
   const publicKey = {...await crypto.subtle.exportKey('jwk', key.publicKey), kid: 'catalog-fixture', alg: 'ES256'};
@@ -71,5 +72,6 @@ export async function setupCommerceFixture(t,{through=Infinity,notifications='of
   const stock = async (id = 'tea') => (await db.prepare('SELECT stock_quantity FROM products WHERE id = ?').bind(id).first()).stock_quantity;
   const shippingSetup=await merchant('/v1/shipping-settings',{revision:0,requestKey:randomBytes(16).toString('hex'),configuration:shippingConfiguration});
   if(shippingSetup.status!==200)throw Error('Fixture shipping setup failed: '+JSON.stringify(shippingSetup));
+  if(environment==='production' && through>=71 && verifiedOnboarding)for(const seller of ['alice','bob'])await seedVerifiedOnboarding(db,seller);
   return {mf, db, headers, call, product, input, create, event, paid, session, stock, merchant,merchantToken};
 }

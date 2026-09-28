@@ -11,8 +11,10 @@ function ez_admin_wallet_request(string $action, bool $authenticated, string $au
     if (!$authenticated || $authenticationMethod !== 'supabase') ez_admin_json(['ok' => false, 'error' => 'Sign in again to open Wallet.', 'code' => 'wallet_locked'], 401);
     $allowedQuery = $action === 'history' ? ['wallet', 'before', 'cap'] : ['wallet'];
     $withdrawalActions = ['withdrawal_read', 'withdrawal_lookup', 'withdrawal_list', 'withdrawal_reserve', 'withdrawal_cancel', 'withdrawal_inquire', 'withdrawal_confirm', 'withdrawal_pay', 'withdrawal_status'];
+    $onboardingActions = ['onboarding_read','onboarding_profile','onboarding_bank','onboarding_confirm_pins'];
+    $isOnboarding = in_array($action, $onboardingActions, true);
     $isWithdrawal = in_array($action, $withdrawalActions, true);
-    if (array_diff(array_keys($_GET), $allowedQuery) !== [] || !in_array($action, ['read', 'history', 'enroll', 'refresh', ...$withdrawalActions], true)) ez_admin_json(['ok' => false, 'error' => 'Wallet request is invalid.'], 400);
+    if (array_diff(array_keys($_GET), $allowedQuery) !== [] || !in_array($action, ['read', 'history', 'enroll', 'refresh', ...$withdrawalActions, ...$onboardingActions], true)) ez_admin_json(['ok' => false, 'error' => 'Wallet request is invalid.'], 400);
     $seenQuery = [];
     foreach (explode('&', (string) ($_SERVER['QUERY_STRING'] ?? '')) as $pair) {
         $key = urldecode(explode('=', $pair, 2)[0]);
@@ -34,14 +36,25 @@ function ez_admin_wallet_request(string $action, bool $authenticated, string $au
         $raw = (string) file_get_contents('php://input', false, null, 0, $isWithdrawal ? 4097 : 1025);
         // Provider and owner identities come only from the verified server session/configuration.
         if (strlen($raw) > ($isWithdrawal ? 4096 : 1024) || !str_starts_with(strtolower((string) ($_SERVER['CONTENT_TYPE'] ?? '')), 'application/json')) ez_admin_json(['ok' => false, 'error' => 'Wallet request is invalid.'], 422);
-        if ($isWithdrawal) {
+        if ($isOnboarding) {
+            try {
+                EzDokuFinancialJson::decode($raw);
+                $input = json_decode($raw, true, 8, JSON_THROW_ON_ERROR);
+                $allowed = match ($action) {
+                    'onboarding_read' => [], 'onboarding_profile' => ['revision','requestKey','legalName','birthDate','phone'],
+                    'onboarding_bank' => ['revision','requestKey','bank'], 'onboarding_confirm_pins' => ['revision','requestKey','shippingRevision'],
+                };
+                if (!is_array($input) || array_diff(array_keys($input), $allowed) !== []) throw new InvalidArgumentException();
+                if ($action === 'onboarding_bank') ez_withdrawal_check_bank_choice($input['bank'] ?? null);
+            } catch (Throwable) { ez_admin_json(['ok'=>false,'error'=>'Onboarding request is invalid.'],422); }
+        } elseif ($isWithdrawal) {
             try {
                 EzDokuFinancialJson::decode($raw);
                 $input = json_decode($raw, true, 8, JSON_THROW_ON_ERROR);
                 $fields = match ($action) {
                     'withdrawal_list' => ['before', 'cap', 'limit'],
                     'withdrawal_lookup' => ['requestKey'],
-                    'withdrawal_reserve' => ['requestKey', 'amount', 'bank'],
+                    'withdrawal_reserve' => ['requestKey', 'amount', 'bankRevision'],
                     'withdrawal_confirm' => ['id', 'requestKey', 'inquiryDigest'],
                     'withdrawal_pay' => ['id', 'confirmationId'],
                     'withdrawal_cancel' => ['id', 'requestKey'],
@@ -81,11 +94,14 @@ function ez_admin_wallet_request(string $action, bool $authenticated, string $au
         if ($enabled) {
             $payload = ['environment' => $environment, 'seller' => $sellerId, 'actor' => ['id' => $account, 'email' => $access['email'],
                 'proofExpiresAt' => gmdate('Y-m-d\TH:i:s', $access['expires_at']) . '.000Z']];
-            if ($isWithdrawal) {
+            if ($isOnboarding) {
+                $response = ez_commerce_request('POST', '/internal/commerce/onboarding', $payload + $input + ['action'=>substr($action, 11)]);
+                $response['banks'] = ez_withdrawal_bank_catalog();
+            } elseif ($isWithdrawal) {
                 if (in_array($action, ['withdrawal_reserve', 'withdrawal_inquire', 'withdrawal_confirm'], true) && ez_config('commerce_withdrawals') !== 'enabled')
                     throw new EzCommerceStorageException('Bank withdrawals are not available yet.', 503);
                 $path = '/internal/commerce/finance/withdrawals';
-                if ($action === 'withdrawal_reserve') ez_withdrawal_check_bank_choice($input['bank'] ?? null);
+
                 $id = $input['id'] ?? null; unset($input['id']);
                 if ($action === 'withdrawal_inquire') {
                     $result = ez_inquire_withdrawal_bank($id, $payload);
@@ -125,8 +141,13 @@ function ez_admin_wallet_request(string $action, bool $authenticated, string $au
                 $financialQuery = ['seller' => $sellerId, 'environment' => $environment];
                 $response['earningsHistory'] = ez_commerce_request('GET', '/internal/commerce/finance/earnings/history?' . http_build_query($financialQuery + $historyQuery, '', '&', PHP_QUERY_RFC3986));
                 if ($action !== 'history') $response['earnings'] = ez_commerce_request('GET', '/internal/commerce/finance/earnings/summary?' . http_build_query($financialQuery, '', '&', PHP_QUERY_RFC3986));
+                if ($action !== 'history') {
+                    $onboarding = ez_commerce_request('POST','/internal/commerce/onboarding',$payload + ['action'=>'read']);
+                    $response['onboarding'] = $onboarding['onboarding'];
+                    $response['onboardingRequired'] = $environment === 'production' && !$response['onboarding']['ready'];
+                }
                 if ($action !== 'history') $response['withdrawalCapabilities'] = [
-                    'requests' => $ready && ez_config('commerce_withdrawals') === 'enabled' && ($response['enrollment']['status'] ?? '') === 'connected',
+                    'requests' => $ready && !($response['onboardingRequired'] ?? false) && ez_config('commerce_withdrawals') === 'enabled' && ($response['enrollment']['status'] ?? '') === 'connected',
                     'bankVerification' => $ready && ez_config('commerce_withdrawals') === 'enabled' && ez_config('commerce_withdrawal_inquiry') === 'enabled',
                     'transfers' => $ready && ez_config('commerce_withdrawals') === 'enabled' && ez_config('commerce_withdrawal_payment') === 'enabled',
                     'paymentStatus' => $ready && ez_config('commerce_withdrawal_status') === 'enabled',

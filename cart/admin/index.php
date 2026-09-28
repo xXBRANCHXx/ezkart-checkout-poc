@@ -1444,7 +1444,7 @@ $adminStorageIdentity = $authenticationMethod === 'supabase'
 $adminStorageScope = substr(hash('sha256', $deployment . '|' . $adminStorageIdentity), 0, 24);
 $nowJakarta = new DateTimeImmutable('now', new DateTimeZone('Asia/Jakarta'));
 $dashboardPeriod = ez_dashboard_period($_GET, $nowJakarta);
-$allowedPages = ['dashboard', 'orders', 'returns', 'refunds', 'support-refunds', 'fulfillment', 'shipping-settings', 'products', 'product-new', 'inventory', 'shop', 'sites', 'customers', 'analytics', 'marketing', 'payments', 'messages', 'notifications', 'wallet', 'settings', 'advanced'];
+$allowedPages = ['dashboard', 'orders', 'returns', 'refunds', 'support-refunds', 'fulfillment', 'shipping-settings', 'products', 'product-new', 'inventory', 'shop', 'sites', 'customers', 'analytics', 'marketing', 'payments', 'messages', 'notifications', 'wallet', 'onboarding', 'settings', 'advanced'];
 $requestedPage = strtolower(trim((string) ($_GET['page'] ?? 'dashboard')));
 $page = in_array($requestedPage, $allowedPages, true) ? $requestedPage : 'dashboard';
 $isDashboard = $page === 'dashboard';
@@ -1601,14 +1601,14 @@ if ($authenticated && $authenticationMethod === 'supabase') {
     require_once __DIR__ . '/support-access.php';
     $supportAccess = ez_support_access($page === 'support-refunds', $csrfToken, $isHttps);
 }
-$walletAccess = $page === 'wallet' && $authenticated ? ez_wallet_access($authenticationMethod, $sellerId, $csrfToken, $isHttps) : ['unlocked' => false];
+$walletAccess = in_array($page, ['wallet','onboarding'], true) && $authenticated ? ez_wallet_access($authenticationMethod, $sellerId, $csrfToken, $isHttps) : ['unlocked' => false];
 $requestedSite = trim((string) ($_GET['edit'] ?? ''));
 $siteEditor = $page === 'sites' && $requestedSite !== '' && strlen($requestedSite) <= 180;
 $pageTitles = [
     'dashboard' => 'Dashboard', 'orders' => 'Orders', 'returns' => 'Returns', 'refunds' => 'Refunds', 'support-refunds' => 'Ezkart reviews', 'fulfillment' => 'Fulfillment', 'shipping-settings' => 'Shipping settings', 'products' => 'Products', 'product-new' => 'Create product', 'inventory' => 'Inventory', 'shop' => 'Shop', 'sites' => 'Landing Pages',
     'customers' => 'Customers', 'analytics' => 'Analytics', 'marketing' => 'Marketing',
     'payments' => 'Payments', 'messages' => 'Messages', 'notifications' => 'Notifications',
-    'wallet' => 'Wallet', 'settings' => 'Settings', 'advanced' => 'Advanced Mode',
+    'onboarding' => 'Seller onboarding', 'wallet' => 'Wallet', 'settings' => 'Settings', 'advanced' => 'Advanced Mode',
 ];
 $orderQueueFilter = is_string($_GET['fulfillment'] ?? null) && isset($orderQueues[$_GET['fulfillment']]) ? $_GET['fulfillment'] : '';
 if ($analytics !== null) $pageTitles['analytics'] = ez_analytics_reports()[$analytics['report']]['title'];
@@ -1682,7 +1682,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
   <?php if ($authenticated && $page === 'sites'): ?><link rel="stylesheet" href="builder-templates.css?v=<?= (int) filemtime(__DIR__ . '/builder-templates.css') ?>"><?php endif; ?>
   <?php if ($authenticated && $page === 'sites' && $siteEditor): ?><link rel="stylesheet" href="builder-native.css?v=<?= (int) filemtime(__DIR__ . '/builder-native.css') ?>"><link rel="stylesheet" href="builder-fonts.css?v=<?= (int) filemtime(__DIR__ . '/builder-fonts.css') ?>"><link rel="stylesheet" href="builder-help.css?v=<?= (int) filemtime(__DIR__ . '/builder-help.css') ?>"><link rel="stylesheet" href="builder-components.css?v=<?= (int) filemtime(__DIR__ . '/builder-components.css') ?>"><link rel="stylesheet" href="builder-flow.css?v=<?= (int) filemtime(__DIR__ . '/builder-flow.css') ?>"><link rel="stylesheet" href="builder-showcase.css?v=<?= (int) filemtime(__DIR__ . '/builder-showcase.css') ?>"><link rel="stylesheet" href="builder-chrome.css?v=<?= (int) filemtime(__DIR__ . '/builder-chrome.css') ?>"><link rel="stylesheet" href="builder-assets.css?v=<?= (int) filemtime(__DIR__ . '/builder-assets.css') ?>"><?php endif; ?>
   <?php if ($authenticated && $page === 'products'): ?><link rel="stylesheet" href="catalog.css?v=<?= ez_admin_escape($catalogCssVersion) ?>"><?php endif; ?>
-  <?php if ($authenticated && $page === 'wallet'): ?><link rel="stylesheet" href="wallet.css?v=<?= (int) filemtime(__DIR__ . '/wallet.css') ?>"><?php endif; ?>
+  <?php if ($authenticated && in_array($page, ['wallet','onboarding'], true)): ?><link rel="stylesheet" href="wallet.css?v=<?= (int) filemtime(__DIR__ . '/wallet.css') ?>"><?php endif; ?>
   <link rel="stylesheet" href="dashboard-data.css?v=<?= (int) filemtime(__DIR__ . '/dashboard-data.css') ?>">
   <link rel="stylesheet" href="admin-ui.css?v=<?= (int) filemtime(__DIR__ . '/admin-ui.css') ?>">
   <?php if ($authenticated && $page === 'analytics'): ?><link rel="stylesheet" href="analytics.css?v=<?= (int) filemtime(__DIR__ . '/analytics.css') ?>"><?php endif; ?>
@@ -1868,6 +1868,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
         <a class="<?= $page === 'marketing' ? 'active' : '' ?>" href="?page=marketing"><?= ez_admin_icon('send') ?><span>Marketing</span></a>
         <a class="<?= $page === 'payments' ? 'active' : '' ?>" href="?page=payments"><?= ez_admin_icon('credit-card') ?><span>Payments</span></a>
         <a class="<?= $page === 'messages' ? 'active' : '' ?>" href="?page=messages"><?= ez_admin_icon('message') ?><span>Messages</span></a>
+        <a class="<?= $page === 'onboarding' ? 'active' : '' ?>" href="?page=onboarding"><?= ez_admin_icon('shield') ?><span>Seller onboarding</span></a>
         <a class="<?= $page === 'wallet' ? 'active' : '' ?>" href="?page=wallet"><?= ez_admin_icon('wallet') ?><span>Wallet</span></a>
         <a class="<?= in_array($page, ['settings','shipping-settings'], true) ? 'active' : '' ?>" href="?page=settings"><?= ez_admin_icon('settings') ?><span>Settings</span></a>
       </nav>
@@ -2023,6 +2024,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
   <?php if ($page === 'shipping-settings'): ?><script src="../address-picker.js?v=<?= (int) filemtime(__DIR__ . '/../address-picker.js') ?>"></script><script src="shipping-settings.js?v=<?= (int) filemtime(__DIR__ . '/shipping-settings.js') ?>"></script><?php endif; ?>
   <?php if ($page === 'analytics'): ?><script src="analytics.js?v=<?= (int) filemtime(__DIR__ . '/analytics.js') ?>"></script><?php endif; ?>
   <?php if ($centralAnalyticsWorkspace): ?><script src="commerce-analytics.js?v=<?= (int) filemtime(__DIR__ . '/commerce-analytics.js') ?>"></script><?php endif; ?>
+  <?php if ($page === 'onboarding'): ?><script src="wallet-access.js?v=<?= (int) filemtime(__DIR__ . '/wallet-access.js') ?>"></script><link rel="stylesheet" href="seller-onboarding.css?v=<?= (int) filemtime(__DIR__ . '/seller-onboarding.css') ?>"><script src="seller-onboarding.js?v=<?= (int) filemtime(__DIR__ . '/seller-onboarding.js') ?>"></script><?php endif; ?>
   <?php if ($page === 'wallet'): ?><script src="wallet-access.js?v=<?= (int) filemtime(__DIR__ . '/wallet-access.js') ?>"></script><script src="wallet-withdrawals.js?v=<?= (int) filemtime(__DIR__ . '/wallet-withdrawals.js') ?>"></script><script src="wallet-enrollment.js?v=<?= (int) filemtime(__DIR__ . '/wallet-enrollment.js') ?>"></script><?php endif; ?>
   <script src="admin-language.js?v=<?= (int) filemtime(__DIR__ . '/admin-language.js') ?>"></script>
   <?php if ($page === 'sites'): ?><script src="builder-image.js?v=<?= (int) filemtime(__DIR__ . '/builder-image.js') ?>"></script><script src="builder-choice.js?v=<?= (int) filemtime(__DIR__ . '/builder-choice.js') ?>"></script><?php endif; ?>

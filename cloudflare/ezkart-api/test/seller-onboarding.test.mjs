@@ -1,0 +1,75 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {setupCommerceFixture} from './commerce-fixture.mjs';
+import {declaredSellerAge} from '../src/seller-onboarding.js';
+const key=()=>crypto.randomUUID().replaceAll('-','');
+const actor=(id='alice')=>({id,email:id+'@example.test',proofExpiresAt:new Date(Date.now()+550000).toISOString()});
+const input=(action,extra={})=>({environment:'production',seller:'seller_alice',actor:actor(),action,...extra});
+const path='/internal/commerce/onboarding';
+test('18+ declaration uses the Indonesian calendar including leap dates',()=>{
+ assert.equal(declaredSellerAge('2008-09-29',Date.parse('2026-09-28T16:59:59Z')),17);
+ assert.equal(declaredSellerAge('2008-09-29',Date.parse('2026-09-28T17:00:00Z')),18);
+ assert.equal(declaredSellerAge('2008-02-29',Date.parse('2026-02-28T05:00:00Z')),17);
+ assert.equal(declaredSellerAge('2008-02-29',Date.parse('2026-03-01T05:00:00Z')),18);
+ for(const date of ['2008-02-30','2007-02-29','2027-01-01','bad'])assert.throws(()=>declaredSellerAge(date,Date.parse('2026-09-28T00:00:00Z')),Response);
+});
+test('owner/MFA scope, immutable revisions, pinned address confirmation and closed identity source',async t=>{
+ const f=await setupCommerceFixture(t,{bindings:{APP_ENVIRONMENT:'beta'},verifiedOnboarding:false});
+ assert.equal((await f.merchant(path,input('read'),{method:'POST'})).status,401);
+ assert.equal((await f.call(path,input('read',{actor:actor('bob')}))).status,403);
+ assert.equal((await f.call(path,input('read',{actor:{...actor(),proofExpiresAt:new Date(Date.now()-1).toISOString()}}))).status,401);
+ const initial=await f.call(path,input('read'));assert.equal(initial.status,200,initial.error);assert.equal(initial.onboarding.ready,false);assert.equal(initial.onboarding.identity.minimumAge,18);
+ const profile=input('profile',{revision:0,requestKey:key(),legalName:'Alice Legal',birthDate:'1990-09-28',phone:'+6281234567890'});
+ assert.equal((await f.call(path,{...profile,verified:true})).status,422);
+ assert.equal((await f.call(path,{...profile,birthDate:'2015-01-01'})).status,422);
+ const saved=await f.call(path,profile);assert.equal(saved.status,200,saved.error);assert.equal(saved.onboarding.email,'alice@example.test');assert.equal(saved.onboarding.emailVerified,true);
+ assert.equal((await f.call(path,profile)).onboarding.profile.revision,1);
+ assert.equal((await f.call(path,{...profile,phone:'081111111111'})).status,409);
+ assert.equal((await f.call(path,{...profile,requestKey:key()})).status,409);
+ const bank=input('bank',{revision:0,requestKey:key(),bank:{code:'CENAIDJA',accountNumber:'0000123456789',channel:'BI_FAST'}});
+ assert.equal((await f.call(path,bank)).status,200);
+ const confirmed=await f.call(path,input('confirm_pins',{revision:1,requestKey:key(),shippingRevision:1}));assert.equal(confirmed.status,200,confirmed.error);assert.equal(confirmed.onboarding.shipping.confirmed,true);assert.equal(confirmed.onboarding.ready,false);
+ assert(!JSON.stringify(confirmed).includes('0000123456789'));
+ assert.equal((await f.create(f.input())).status,409,'New paid checkout needs authentic identity evidence');
+ assert.equal((await f.call('/internal/commerce/finance/wallet',input('enroll',{requestKey:key()}))).status,409);
+ assert.equal((await f.db.prepare('SELECT COUNT(*) AS n FROM seller_authenticated_identity').first()).n,0);
+ assert.equal((await f.db.prepare('SELECT COUNT(*) AS n FROM commerce_wallet_enrollments').first()).n,0);
+ await assert.rejects(f.db.prepare("UPDATE seller_onboarding_banks SET account_number='999'").run(),/onboarding_immutable/);
+ // A shipping change invalidates the owner's earlier confirmation.
+ const shipping=(await f.merchant('/v1/shipping-settings')).settings.configuration;delete shipping.addresses[0].coordinate;
+ assert.equal((await f.merchant('/v1/shipping-settings',{revision:1,requestKey:key(),configuration:shipping})).status,200);
+ const missing=await f.call(path,input('read'));assert.equal(missing.onboarding.shipping.confirmed,false);assert.equal(missing.onboarding.shipping.pinsPresent,false);
+ assert.equal((await f.call(path,input('confirm_pins',{revision:2,requestKey:key(),shippingRevision:2}))).status,409);
+});
+test('authenticated identity survives phone, bank and pin edits but invalidates on legal identity change',async t=>{
+ const f=await setupCommerceFixture(t,{bindings:{APP_ENVIRONMENT:'beta'}});
+ const read=async()=>(await f.call(path,input('read'))).onboarding;
+ assert.equal((await read()).ready,true);
+ assert.equal((await f.call('/internal/commerce/finance/withdrawals',{environment:'production',seller:'seller_alice',actor:actor(),requestKey:key(),amount:'250000',bank:{code:'CENAIDJA',accountNumber:'99999',channel:'BI_FAST'}})).status,422);
+ const phone=await f.call(path,input('profile',{revision:2,requestKey:key(),legalName:'Fixture alice',birthDate:'1990-01-01',phone:'081111111111'}));assert.equal(phone.status,200,phone.error);
+ assert.equal(phone.onboarding.identity.status,'verified');assert.equal(phone.onboarding.profile.identityRevision,1);
+ const bank=await f.call(path,input('bank',{revision:1,requestKey:key(),bank:{code:'CENAIDJA',accountNumber:'99900012345',channel:'BI_FAST'}}));assert.equal(bank.status,200,bank.error);assert.equal(bank.onboarding.ready,true);
+ const shipping=(await f.merchant('/v1/shipping-settings')).settings.configuration;shipping.addresses[0].address='Jalan Updated Warehouse 19';
+ assert.equal((await f.merchant('/v1/shipping-settings',{revision:1,requestKey:key(),configuration:shipping})).status,200);
+ const pending=await read();assert.equal(pending.ready,false);assert.equal(pending.identity.status,'verified');assert.deepEqual(pending.requirements,['confirmed_pickup_return_pins']);
+ const pinned=await f.call(path,input('confirm_pins',{revision:3,requestKey:key(),shippingRevision:2}));assert.equal(pinned.status,200,pinned.error);assert.equal(pinned.onboarding.ready,true);assert.equal(pinned.onboarding.profile.identityRevision,1);
+ const changed=await f.call(path,input('profile',{revision:4,requestKey:key(),legalName:'Alice Changed',birthDate:'1990-01-01',phone:'081234567890'}));assert.equal(changed.status,200,changed.error);assert.equal(changed.onboarding.profile.identityRevision,5);
+ assert.equal((await read()).ready,false);assert.equal((await read()).identity.status,'pending_authenticated_verification');
+ assert.equal((await f.create(f.input())).status,409);
+});
+
+test('original uncertain production wallet remains readable and cannot register again after identity becomes incomplete',async t=>{
+ const f=await setupCommerceFixture(t,{bindings:{APP_ENVIRONMENT:'beta'}}),wallet='/internal/commerce/finance/wallet',enrollmentInput=input('enroll',{requestKey:key()});
+ const created=await f.call(wallet,enrollmentInput);assert.equal(created.status,200,created.error);const id=created.enrollment.id;
+ const registration=await f.call(wallet+'/registrations/'+id+'?environment=production');const jobId=registration.registration.jobId;
+ const claimed=await f.call('/internal/commerce/jobs/claim',{environment:'production',workerId:'wallet_worker',kinds:['wallet.register'],jobId,mode:'execute',limit:1,leaseSeconds:120});assert.equal(claimed.status,200,claimed.error);const job=claimed.jobs[0];
+ const bind={environment:'production',workerId:'wallet_worker',leaseToken:job.leaseToken,credentialFingerprint:'a'.repeat(64),clientId:'MCH-fixture',parentProfileId:'BRN-fixture'};
+ assert.equal((await f.call(wallet+'/registrations/'+id+'/bind',bind)).mayRegister,true);
+ assert.equal((await f.call('/internal/commerce/jobs/'+job.id+'/finish',{environment:'production',workerId:'wallet_worker',leaseToken:job.leaseToken,outcome:'uncertain',result:{recorded:false}})).status,200);
+ await f.db.prepare("DELETE FROM fixture_authenticated_identity WHERE seller_id='seller_alice'").run();
+ assert.equal((await f.call(path,input('read'))).onboarding.wallet.status,'review');
+ const replay=await f.call(wallet,enrollmentInput);assert.equal(replay.status,200,replay.error);assert.equal(replay.enrollment.id,id);
+ assert.equal((await f.call(wallet,input('enroll',{requestKey:key()}))).status,409);
+ const recovery=await f.call(wallet+'/registrations/'+id+'?environment=production');assert.equal(recovery.status,200);assert.equal(recovery.registration.jobState,'uncertain');assert(recovery.registration.binding);
+ assert.equal((await f.db.prepare('SELECT COUNT(*) AS n FROM commerce_wallet_enrollments').first()).n,1);
+});

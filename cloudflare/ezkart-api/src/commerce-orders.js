@@ -1,3 +1,4 @@
+import {requireSellerOnboarding} from './seller-onboarding.js';
 import {campaignVisitHash} from './campaign-attribution.js';
 import {checkoutContext,paymentSession,paymentSessionStatements,paymentAccountStatement} from './commerce-payments.js';
 import {validateShippingSettings} from './shipping-settings.js';
@@ -194,6 +195,7 @@ export async function createCommerceOrder(env, payload) {
   if (Date.parse(input.expiresAt) <= Date.now() || Date.parse(input.expiresAt) > Date.now() + 86400000) fail('Checkout expiry is invalid');
   const seller = await env.DB.prepare("SELECT id, plan FROM sellers WHERE id = ? AND status = 'active'").bind(input.sellerId).first();
   if (!seller) fail('Store is unavailable', 404);
+  await requireSellerOnboarding(env,seller.id,input.environment);
   const productIds = [...new Set(input.items.map(item => item.productId))];
   const [products, variants] = await env.DB.batch([
     env.DB.prepare("SELECT * FROM products WHERE seller_id = ? AND id IN (SELECT value FROM json_each(?)) AND status = 'active'").bind(seller.id, JSON.stringify(productIds)),

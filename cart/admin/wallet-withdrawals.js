@@ -76,6 +76,7 @@
     start.disabled = busy || !ready;
     document.querySelector('[data-wallet-withdraw-badge]').textContent = !report ? (checking ? 'Checking' : 'Unavailable') : caps().requests ? (ready ? 'Request available' : 'Below minimum') : 'Not available yet';
     document.getElementById('wallet-withdraw-reason').textContent = !report ? unavailableMessage
+      : report.onboardingRequired ? 'Complete seller onboarding before starting a new withdrawal. Existing requests and recovery remain available.'
       : !caps().requests ? 'Bank withdrawals are not available yet. Your earnings remain recorded here.'
       : !ready ? 'At least Rp250.000 in available earnings is needed for a new request.'
       : caps().transfers ? 'Save a request, verify your bank details and confirm the transfer.' : 'Save a request and confirm your bank details. Bank transfers are currently paused.';
@@ -187,18 +188,6 @@
     catch { if (!stopped) q('history-status').textContent = 'The saved request changed, but history could not refresh. Refresh requests to check it.'; }
     if (!stopped) window.dispatchEvent(new Event('ezkart:wallet-refresh'));
   }
-  function bankOptions() {
-    const search = q('bank-search').value.trim().toLocaleLowerCase(), choice = form.elements.bank.value;
-    const options = banks().filter(bank => bank.name.toLocaleLowerCase().includes(search));
-    form.elements.bank.replaceChildren(new Option(options.length ? 'Choose your bank' : 'No matching banks',''), ...options.map(bank => new Option(bank.name,bank.code)));
-    if (options.some(bank => bank.code === choice)) form.elements.bank.value = choice;
-    channelOptions();
-  }
-  function channelOptions() {
-    const bank = banks().find(bank => bank.code === form.elements.bank.value), current = form.elements.channel.value;
-    form.elements.channel.replaceChildren(...(bank ? bank.channels.map(channel => new Option(method(channel),channel)) : [new Option('Choose a bank first','')]));
-    if (bank?.channels.includes(current)) form.elements.channel.value = current;
-  }
   const openSaved = id => run(async () => {
     openDialog(); q('title').textContent = 'Withdrawal request'; q('message').textContent = 'Checking the saved request…';
     renderDetail(await call('read',{id}));
@@ -206,14 +195,14 @@
   start.addEventListener('click', () => run(async () => {
     openDialog(); q('title').textContent = 'Withdraw funds';
     const recovered = await lookupPending(); if (recovered) { renderDetail(recovered); await changed(); return; }
-    form.hidden = false; bankOptions(); q('available').textContent = money(report.earnings.availableEarnings);
-    q('message').textContent = storedKey('reserve') ? 'Your previous request has not been confirmed. Enter the same details to try again; the original request will be recovered if it was saved.' : 'Choose your bank and the amount to withdraw.';
+    if (!report?.onboarding?.bank) throw Error('Save your bank during seller onboarding first.');
+    form.hidden = false; q('saved-bank').textContent = bankName(report.onboarding.bank.code)+' · ending in '+report.onboarding.bank.accountSuffix+' · saved version '+report.onboarding.bank.revision; q('available').textContent = money(report.earnings.availableEarnings);
+    q('message').textContent = storedKey('reserve') ? 'Your previous request has not been confirmed. Enter the same details to try again; the original request will be recovered if it was saved.' : 'Enter an amount to withdraw to your saved onboarding bank.';
     form.elements.amount.focus();
   }));
-  q('bank-search').addEventListener('input',bankOptions); form.elements.bank.addEventListener('change',channelOptions);
   form.addEventListener('submit',event => {
     event.preventDefault();
-    const payload = {amount:form.elements.amount.value,bank:{code:form.elements.bank.value,accountNumber:form.elements.account.value,channel:form.elements.channel.value}};
+    const payload = {amount:form.elements.amount.value,bankRevision:report?.onboarding?.bank?.revision};
     void run(async () => {
       const recovered = await lookupPending(); if (recovered) { renderDetail(recovered); await changed(); return; }
       if (!/^[1-9][0-9]{5,15}$/.test(payload.amount) || amount(payload.amount) < 250000n || amount(payload.amount) > 9007199254740991n) throw Error('Enter a whole-rupiah amount of at least Rp250.000 within the withdrawal limit.');

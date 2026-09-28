@@ -77,22 +77,22 @@
   const controls = () => { connect.disabled = busy || !current?.enabled; refresh.disabled = busy; if (more) more.disabled = busy; root.setAttribute('aria-busy', String(busy)); };
   const render = data => {
     current = data;
-    const enrollment = data.enrollment, state = enrollment?.status || 'not_connected';
-    badge.textContent = ({connected: 'Connected', review: 'Needs review', connecting: 'Connecting', queued: 'Setup requested'})[state] || (data.enabled ? 'Ready to connect' : 'Not available yet');
+    const enrollment = data.enrollment, state = enrollment?.status || 'not_connected', needsOnboarding = !enrollment && data.onboardingRequired === true;
+    badge.textContent = ({connected: 'Connected', review: 'Needs review', connecting: 'Connecting', queued: 'Setup requested'})[state] || (needsOnboarding ? 'Complete onboarding' : data.enabled ? 'Ready to connect' : 'Not available yet');
     const messages = {
       connected: 'Your seller payment account is connected. Check recorded earnings and any holds below.',
       review: 'Your original setup request needs review. Check its status here; you do not need to create another wallet.',
       connecting: 'Your wallet setup is being processed. Check its status again shortly.',
       queued: 'Your setup request is saved. Continue setup to connect your seller account.',
     };
-    status.textContent = messages[state] || (data.enabled ? 'Review the saved store name and verified email below.' : 'Wallet setup is not available yet. Check back after Ezkart enables seller wallets.');
+    status.textContent = messages[state] || (needsOnboarding ? 'Complete seller onboarding and authenticated identity verification, then return here to prepare your one DOKU seller Sub-Account.' : data.enabled ? 'Review the saved store name and verified email below.' : 'Wallet setup is not available yet. Check back after Ezkart enables seller wallets.');
     find('setup-details').hidden = false;
     find('setup-name').textContent = enrollment?.accountName || data.owner?.storeName || 'Unavailable';
     find('setup-email').textContent = enrollment?.email || data.owner?.email || 'Unavailable';
     find('setup-account-row').hidden = !enrollment?.providerAccountSuffix;
     find('setup-account').textContent = enrollment?.providerAccountSuffix ? 'Ending in ' + enrollment.providerAccountSuffix : '';
-    find('setup-disclosure').hidden = !!enrollment || !data.enabled;
-    connect.hidden = !!enrollment || !data.enabled;
+    find('setup-disclosure').hidden = !!enrollment || !data.enabled || needsOnboarding;
+    connect.hidden = !!enrollment || !data.enabled || needsOnboarding;
     refresh.textContent = state === 'queued' && data.enabled ? 'Continue setup' : 'Check setup status';
     root.dataset.state = state;
     root.querySelector('h2').textContent = state === 'connected' ? 'Your seller wallet' : 'Connect your seller wallet';

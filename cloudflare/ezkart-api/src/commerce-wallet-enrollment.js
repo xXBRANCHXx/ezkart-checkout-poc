@@ -1,3 +1,4 @@
+import {requireSellerOnboarding,onboardingFailure} from './seller-onboarding.js';
 import {commerceEnvironment,commerceHash} from './commerce-orders.js';
 import {parseFinancialEvidenceJSON,FinancialJsonNumber} from './financial-evidence-json.js';
 
@@ -36,6 +37,7 @@ export async function walletEnrollment(env,input){
   if(input.action==='read')return {enrollment:view(current),owner:{storeName:seller.name,email:input.actor.email.toLowerCase()},availableToWithdraw:null};
   if(typeof input.requestKey!=='string'||!/^[a-f0-9]{32}$/.test(input.requestKey))fail('Wallet request reference is invalid');
   if(current){if(current.request_key!==input.requestKey||current.owner_auth_id!==input.actor.id)fail('Wallet setup already exists. Refresh its current status.',409);return {enrollment:view(current),replayed:true};}
+  await requireSellerOnboarding(env,input.seller,input.environment);
   const email=input.actor.email.toLowerCase();
   if(email.length>25||!/^\S+@\S+\.\S+$/.test(email))fail('This verified email is longer than the wallet provider supports. Contact support before setup.');
   if(!seller.name.trim()||[...seller.name].length>128||/[\x00-\x1f\x7f]/.test(seller.name))fail('Save a valid store name before connecting Wallet.');
@@ -54,7 +56,7 @@ export async function walletEnrollment(env,input){
     if(saved&&saved.request_key===input.requestKey&&saved.owner_auth_id===input.actor.id)return {enrollment:view(saved),replayed:true};
     if(saved)fail('Wallet setup already exists. Refresh its current status.',409);
     if(/wallet_owner_changed|wallet_proof_expired/.test(String(error)))fail('Your wallet authorization changed. Unlock Wallet again.',409);
-    throw error;
+    onboardingFailure(error);
   }
   return {enrollment:view(await read()),replayed:false};
 }

@@ -7,6 +7,7 @@ ez_page_header('Wallet', 'Your balance, withdrawal availability, and the payment
     ['label' => 'View payments', 'icon' => 'credit-card', 'href' => '?page=payments', 'style' => 'primary'],
     ['label' => 'Refresh', 'icon' => 'refresh', 'href' => '?page=wallet'],
 ]);
+echo '<p><a href="?page=onboarding">Complete seller onboarding and manage your saved bank</a></p>';
 if (empty($walletAccess['unlocked'])) {
     require __DIR__ . '/wallet-verification.php';
     return;
