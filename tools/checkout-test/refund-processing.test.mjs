@@ -1,3 +1,4 @@
+import {operatorPage,revokeOperatorConnection} from '../../../Ezkart-Executive-Dashboard/tools/operations-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdir,readFile,writeFile} from 'node:fs/promises';
@@ -9,7 +10,7 @@ async function fixture(t){
   await writeFile(app.app.directory+'/auth-response.json',JSON.stringify({user:{id:f.buyer,email:'earnings@example.test',email_confirmed_at:'2026-09-01T00:00:00Z',factors:[]}}));
   const cookies={buyer:app.app.customerCookie('earnings@example.test',f.buyer,3600,await f.merchantToken(f.buyer,'earnings@example.test')),
     support:app.app.adminCookie({supabase_access_token:await f.merchantToken('bob','bob@example.test',claims()),mfa_enabled:true,mfa_aal:'aal2',admin_user:{id:'bob',email:'bob@example.test'}})};
-  const page=async(kind,width=390)=>{const p=await pageFor(b,app,width,cookies[kind]);p.on('dialog',d=>void d.accept());
+  const page=async(kind,width=390)=>{if(kind==='support'){const p=await operatorPage(t,app,b,cookies.support,{tab:'refunds',width,params:{refund:f.refund.id}});p.on('dialog',d=>void d.accept());return p;}const p=await pageFor(b,app,width,cookies[kind]);p.on('dialog',d=>void d.accept());
     await p.goto(app.app.base+(kind==='buyer'?'/cart/return.php?order='+f.p.order.id+'&refund='+f.refund.id:'/cart/admin/?page=support-refunds&refund='+f.refund.id));return p;};
   return {...f,...app,page};
 }
@@ -43,7 +44,7 @@ test('buyer bank confirmation stays out of browser storage; desktop/mobile provi
   const directory='/tmp/ezkart-refund-processing-ui-01a0d643';await mkdir(directory,{recursive:true});
   for(const [kind,p] of [['buyer',buyer],['support',staff]])for(const width of [1360,390]){
     await p.setViewportSize({width,height:1000});await p.getByRole('button',{name:'Reload request',exact:true}).click();await p.waitForFunction(()=>!document.querySelector('[data-refund-detail-reload]')?.disabled);
-    assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await p.locator('[data-refund-processing]').screenshot({path:directory+'/'+kind+'-'+width+'.png'});
+    await p.screenshot({path:'/tmp/refund-layout-'+kind+'-'+width+'.png',fullPage:true});await p.waitForFunction(()=>document.documentElement.scrollWidth<=innerWidth);assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,kind+' '+width+' '+JSON.stringify(await p.evaluate(()=>[...document.querySelectorAll('body *')].filter(e=>e.getBoundingClientRect().right>innerWidth+1&&e.getBoundingClientRect().width>0).map(e=>[e.tagName,e.className,e.getBoundingClientRect().right]).slice(0,25))));await p.locator('[data-refund-processing]').screenshot({path:directory+'/'+kind+'-'+width+'.png'});
   }
   assert.deepEqual(errors,[]);assert((await f.app.calls()).every(c=>!c.url.includes('doku.com')));
 });
@@ -51,7 +52,7 @@ test('buyer bank confirmation stays out of browser storage; desktop/mobile provi
 test('the PHP proxy protects the original bank packet against changed sessions and stale authenticator proof',async t=>{
   const f=await fixture(t);await f.bank();assert.equal((await f.prepare()).status,200);const p=await f.page('support');
   f.control.afterResponse=async path=>{if(path!==f.support+'/packet')return;f.control.afterResponse=null;
-    const cookie=(await p.context().cookies()).find(c=>c.name==='ezkart_admin');f.app.cli(`define('EZ_CUSTOMER_SESSION_BRIDGE',true); session_id('${cookie.value}'); require '${process.cwd()}/cart/admin/index.php'; $_SESSION['authenticated']=false; session_write_close();`);};
+    await revokeOperatorConnection(p);};
   let downloads=0;p.on('download',()=>downloads++);await p.getByRole('button',{name:'Download original DOKU request',exact:true}).click();await p.getByRole('button',{name:'Reload sign-in',exact:true}).waitFor();assert.equal(downloads,0);
   assert.equal((await f.merchant(f.support+'/packet',undefined,{seller:'bob',claims:claims(601)})).status,401);
 });

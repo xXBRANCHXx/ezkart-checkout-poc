@@ -48,3 +48,12 @@ export async function sellerAlertRescan(env,actor,input){
  catch(e){if(/jev_|UNIQUE/.test(String(e)))fail('The review changed. Reload this alert before continuing.',409);throw e;}
  return {queued:true,...await sellerAlerts(env,actor)};
 }
+
+// Public-to-the-owner completion flag; no legal, banking or address fields.
+export async function sellerOnboardingStatus(env,actor){
+ await access(env,actor);
+ const member=await env.DB.prepare("SELECT role FROM seller_memberships WHERE seller_id=? AND auth_user_id=?").bind(actor.sellerId,actor.id).first();
+ if(member?.role!=='owner')return {owner:false,complete:false};
+ const ready=await env.DB.prepare('SELECT 1 FROM seller_onboarding_ready r JOIN seller_onboarding_current p ON p.seller_id=r.seller_id WHERE r.seller_id=? AND r.owner_auth_id=? AND p.verified_email=?').bind(actor.sellerId,actor.id,String(actor.email||'').toLowerCase()).first();
+ await access(env,actor);return {owner:true,complete:!!ready};
+}

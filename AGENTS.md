@@ -124,3 +124,13 @@ The sidebar promo card's orange-to-pink gradient is intentional. Preserve it
 when changing shared controls or navigation styles. Its title, description, icon,
 button label, and destination live in `cart/admin/sidebar-promo.php` so it can
 promote Advanced or future announcements without redesigning the sidebar.
+
+## Seller and Executive navigation (owner, 28 September 2026)
+
+- Seller admin is seller-only. Internal page moderation, platform refund support
+  and company treasury belong in the separate Executive Dashboard Operations view.
+- Seller content issues appear as Alerts in Notifications, with links from held,
+  grayed-out landing pages to reasons, original countdown and rescan requests.
+  Do not label seller navigation Jev or expose internal moderation controls.
+- Seller onboarding has no sidebar entry. Keep the top-bar setup reminder visible
+  to owners until saved onboarding requirements are complete.

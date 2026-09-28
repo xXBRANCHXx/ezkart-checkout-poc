@@ -1,3 +1,4 @@
+import {operatorPage,revokeOperatorConnection,operatorRequest} from '../../../Ezkart-Executive-Dashboard/tools/operations-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomBytes} from 'node:crypto';
@@ -15,7 +16,7 @@ async function fixture(t){
   const admin=async(id,age=0)=>f.app.adminCookie({supabase_access_token:await f.merchantToken(id,id+'@example.test',claims(age)),mfa_enabled:true,mfa_aal:'aal2',admin_user:{id,email:id+'@example.test'}});
   const cookies={buyer:f.app.customerCookie('checkout@example.com',buyer,3600,await f.merchantToken(buyer,'checkout@example.com')),merchant:await admin('alice'),support:await admin('bob')};
   const url=kind=>f.app.base+(kind==='buyer'?'/cart/return.php?order='+order.id+'&refund='+refund.id:'/cart/admin/?page='+(kind==='support'?'support-refunds':'refunds')+'&refund='+refund.id);
-  const page=async(kind,width=390,cookie=cookies[kind])=>{const p=await pageFor(b,f,width,cookie);p.on('dialog',d=>void d.accept());await p.goto(url(kind));return p;};
+  const page=async(kind,width=390,cookie=cookies[kind])=>{if(kind==='support'){const p=await operatorPage(t,f,b,cookie,{tab:'refunds',width,params:{refund:refund.id}});p.on('dialog',d=>void d.accept());return p;}const p=await pageFor(b,f,width,cookie);p.on('dialog',d=>void d.accept());await p.goto(url(kind));return p;};
   const open=async()=>{const r=(await f.merchant(path+'/'+refund.id,undefined,{seller:buyer})).refund;const out=await f.merchant(path+'/'+refund.id+'/dispute',{requestKey:key(),kind:'review_open',revision:0,refundRevision:r.revision,orderRevision:r.orderRevision,evidenceVersion:r.evidenceVersion,message:'Review the original evidence.'},{seller:buyer,method:'POST'});assert.equal(out.status,200,out.error);return out.refund;};
   return {...f,b,order,path,refund,permission,admin,cookies,url,page,open};
 }
@@ -45,14 +46,14 @@ test('buyer, store and operator review screens recover saved actions and complet
 
 test('operator access refresh uses a current signed authenticator result, preserves the case and never grants access to store ownership',async t=>{
   const f=await fixture(t);await f.open();const stale=await f.admin('bob',601),p=await f.page('support',390,stale);
-  await p.getByRole('heading',{name:'Verify your authenticator',exact:true}).waitFor();await review(p).getByText('Ezkart review requested',{exact:true}).waitFor();assert.equal(await review(p).getByRole('button',{name:'Approve refund request',exact:true}).count(),0);
+  await p.getByRole('button',{name:'Verify operator access',exact:true}).waitFor();await review(p).getByText('Ezkart review requested',{exact:true}).waitFor();assert.equal(await review(p).getByRole('button',{name:'Approve refund request',exact:true}).count(),0);
   const fresh=await f.merchantToken('bob','bob@example.test',claims()),user={id:'bob',email:'bob@example.test',factors:[{id:'11111111-1111-4111-8111-111111111111',factor_type:'totp',status:'verified'}]};
   await writeFile(f.app.directory+'/auth-response.json',JSON.stringify({user,wallet_tokens:{access_token:fresh,refresh_token:'fixture-refresh',expires_in:3600}}));
-  const crossSite=await p.request.post(f.url('support'),{form:{action:'support_verify',csrf_token:await p.locator('#review-verification [name=csrf_token]').inputValue(),code:'123456'},headers:{Origin:'null','Sec-Fetch-Site':'cross-site'}});assert.equal(crossSite.status(),403);
-  await p.getByLabel('Authenticator code',{exact:true}).fill('111111');await p.getByRole('button',{name:'Verify review access',exact:true}).click();await p.getByText('Review access could not be verified. Check your sign-in and try again.',{exact:true}).waitFor();
-  await p.getByLabel('Authenticator code',{exact:true}).fill('123456');await p.getByRole('button',{name:'Verify review access',exact:true}).click();await review(p).getByRole('button',{name:'Approve refund request',exact:true}).waitFor();assert.equal(new URL(p.url()).searchParams.get('refund'),f.refund.id);
-  await f.permission('revoked');await p.reload();await p.getByRole('heading',{name:'Review access required',exact:true}).waitFor();assert.equal(await p.locator('[data-refunds]').count(),0);
-  const merchant=await f.page('support',390,f.cookies.merchant);await merchant.getByRole('heading',{name:'Review access required',exact:true}).waitFor();assert.equal(await merchant.locator('[data-refunds]').count(),0);
+  const crossSite=await p.request.post(p.executiveFixture.base+'/api/operations.php?action=verify',{data:{code:'123456'},headers:{Origin:'null','Sec-Fetch-Site':'cross-site'}});assert.equal(crossSite.status(),403);
+  await p.getByLabel('Authenticator code',{exact:true}).fill('111111');await p.getByRole('button',{name:'Verify operator access',exact:true}).click();await p.locator('[data-operations-error]').filter({hasText:/./}).waitFor();
+  await p.getByLabel('Authenticator code',{exact:true}).fill('123456');await p.getByRole('button',{name:'Verify operator access',exact:true}).click();await review(p).getByRole('button',{name:'Approve refund request',exact:true}).waitFor();assert.equal(new URL(p.url()).searchParams.get('refund'),f.refund.id);
+  await f.permission('revoked');await p.reload();await p.locator('[data-operations-error]').filter({hasText:/revoked|permission/i}).waitFor();assert.equal(await p.locator('[data-refunds]').count(),0);
+  await assert.rejects(()=>f.page('support',390,f.cookies.merchant),/operator permission/);
 });
 
 test('private support provisioning recovers its exact receipt, reports the latest role and rejects a different deployment',async t=>{
@@ -72,13 +73,12 @@ test('private support provisioning recovers its exact receipt, reports the lates
 test('operator proxy binds the signed-in account and withholds private evidence after a session change',async t=>{
   const f=await fixture(t);await f.open();const png='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a8x8AAAAASUVORK5CYII=';
   const uploaded=await f.merchant(f.path+'/'+f.refund.id+'/evidence',{filename:'Original.png',caption:'Private evidence',dataUrl:'data:image/png;base64,'+png},{seller:buyer,method:'POST'});assert.equal(uploaded.status,200,uploaded.error);
-  const p=await f.page('support'),path='/v1/support/refunds/'+f.refund.id,headers={Cookie:f.cookies.support.name+'='+f.cookies.support.value,'X-Ezkart-Refund-Account':'bob','X-Ezkart-CSRF':await p.locator('[data-refunds]').getAttribute('data-csrf')};
-  const endpoint=target=>'/cart/admin/?cloud='+encodeURIComponent(target);
-  assert.equal((await f.app.request(endpoint(path),undefined,{...headers,'X-Ezkart-Refund-Account':'alice'})).status,401);
-  for(const [invalid,status] of [[path+'?before=1',400],[path+'/dispute?before=1&before=2',400],[path+'/dispute/evidence',400],[path+'/evidence?before=1',405]])assert.equal((await f.app.request(endpoint(invalid),undefined,headers)).status,status);
-  assert.equal((await f.app.request(endpoint(path+'/evidence'),{},headers)).status,405);
-  assert.equal((await f.app.request(endpoint(path+'/dispute'),{}, {...headers,'X-Ezkart-CSRF':'forged'})).status,403);
-  const file=uploaded.refund.attachments[0];f.control.afterResponse=async target=>{if(target!==path+'/evidence/'+file.id)return;f.control.afterResponse=null;f.app.cli(`define('EZ_CUSTOMER_SESSION_BRIDGE',true); session_id('${f.cookies.support.value}'); require '${process.cwd()}/cart/admin/index.php'; $_SESSION['authenticated']=false; session_write_close();`);};
+  const p=await f.page('support'),path='/v1/support/refunds/'+f.refund.id;
+  assert.equal((await operatorRequest(p,path,undefined,'alice')).status,409);
+  for(const invalid of [path+'?before=1',path+'/dispute?before=1&before=2',path+'/dispute/evidence',path+'/evidence'])assert.equal((await operatorRequest(p,invalid)).status,400);
+  assert.equal((await operatorRequest(p,path+'/evidence',{})).status,400);
+  const unsigned=await p.request.post(p.executiveFixture.base+'/api/operations.php?action=request',{data:{path:path+'/dispute',method:'POST',account:'bob',body:{}}});assert.equal(unsigned.status(),403);
+  const file=uploaded.refund.attachments[0];f.control.afterResponse=async target=>{if(target!==path+'/evidence/'+file.id)return;f.control.afterResponse=null;await revokeOperatorConnection(p);};
   let downloads=0;p.on('download',()=>downloads++);await p.getByRole('button',{name:'Download original: Original.png',exact:true}).click();await p.getByRole('button',{name:'Reload sign-in',exact:true}).waitFor();assert.equal(downloads,0);
   for(const route of ['/cart/admin/support-access.php','/tools/commerce/support-access.php'])assert.equal((await fetch(f.app.base+route)).status,404);
 });

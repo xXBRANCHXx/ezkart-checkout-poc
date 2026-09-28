@@ -7,7 +7,7 @@
   let response;try{response=await fetch('./?wallet=onboarding_'+action,{method:'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json','X-Ezkart-Csrf':document.body.dataset.adminCsrfToken,'X-Ezkart-Wallet-Account':root.dataset.account,'X-Ezkart-Wallet-Store':root.dataset.store},body:JSON.stringify(payload)});}catch(error){if(retry&&action!=='read')return call(action,payload,false);throw Error('Connection interrupted. Refresh saved details to check whether this revision was saved.');}
   if(response.status===401||response.status===403){root.hidden=true;location.replace('?page=wallet');throw Error('Unlock Wallet again to view personal details.');}
   if(response.status>=500&&retry&&action!=='read')return call(action,payload,false);
-  const data=await response.json();if(!response.ok||!data.ok)throw Error(data.error||'Could not save onboarding details.');state=data.onboarding;banks=data.banks||banks;render();
+  const data=await response.json();if(!response.ok||!data.ok)throw Error(data.error||'Could not save onboarding details.');state=data.onboarding;window.dispatchEvent(new Event('ezkart:onboarding-changed'));banks=data.banks||banks;render();
  }
  function channels(){const available=banks.find(b=>b.code===bank.elements.code.value)?.channels||[];bank.elements.channel.replaceChildren(...available.map(value=>new Option(value==='BI_FAST'?'BI-FAST':'Online bank transfer',value)));}
  function render(){

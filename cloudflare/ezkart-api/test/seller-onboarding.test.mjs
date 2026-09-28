@@ -108,3 +108,18 @@ test('SQL readiness independently applies declared DOB age policy and snapshots 
  assert.equal(await f.db.prepare("SELECT * FROM seller_onboarding_ready WHERE seller_id='seller_alice'").first(),null);
  const state=(await f.call(path,input('read'))).onboarding;assert.equal(state.ready,false);assert(state.requirements.includes('age_declaration'));assert.equal(state.identity.status,'not_assessed');assert.equal((await f.create(f.input())).status,409);
 });
+
+test('topbar completion flag contains no personal details and follows confirmed onboarding and ownership',async t=>{
+ const f=await setupCommerceFixture(t,{bindings:{APP_ENVIRONMENT:'beta'},declaredOnboarding:false}),route='/v1/commerce/notifications/onboarding';
+ await f.db.prepare("UPDATE app_users SET email='alice@example.test' WHERE auth_user_id='alice'").run();
+ const status=()=>f.merchant(route,undefined,{email:'alice@example.test'});
+ const first=await status();assert.equal(first.status,200,first.error);assert.equal(first.owner,true);assert.equal(first.complete,false);
+ assert.deepEqual(Object.keys(first).sort(),['complete','ok','owner','status']);
+ await f.call(path,input('profile',{revision:0,requestKey:key(),legalName:'Alice Legal',birthDate:'1990-01-01',phone:'081234567890'}));
+ await f.call(path,input('bank',{revision:0,requestKey:key(),bank:{code:'CENAIDJA',accountNumber:'0000123456789',channel:'BI_FAST'}}));
+ assert.equal((await status()).complete,false);
+ await f.call(path,input('confirm_pins',{revision:1,requestKey:key(),shippingRevision:1}));assert.equal((await status()).complete,true);
+ const shipping=(await f.merchant('/v1/shipping-settings')).settings.configuration;shipping.addresses[0].address='Changed pickup address';await f.merchant('/v1/shipping-settings',{revision:1,requestKey:key(),configuration:shipping});assert.equal((await status()).complete,false);
+ await f.db.prepare("UPDATE seller_memberships SET role='viewer' WHERE seller_id='seller_alice' AND auth_user_id='alice'").run();assert.equal((await status()).owner,false);
+ assert.equal((await f.merchant('/v1/customer/notifications/onboarding')).status,404);
+});

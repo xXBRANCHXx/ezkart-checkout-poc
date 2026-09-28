@@ -597,7 +597,7 @@ test('withdrawal history pages retain their original cohort, mask accounts and a
 
 test('merchant bank choices use the published channel catalog and cannot submit unsupported bank methods or caller identities',async t=>{
   const f=await bankInquiryFixture(t),read=await f.request('read');assert.equal(read.data.withdrawalCapabilities.banks.length,125);
-  await f.page.goto(f.app.base+'/cart/admin/?page=onboarding');await f.page.getByLabel('Full legal name',{exact:true}).waitFor();await f.page.waitForFunction(()=>document.querySelector('[name=code]').options.length>1);
+  await f.page.goto(f.app.base+'/cart/admin/?page=onboarding');await f.page.locator('[data-onboarding-topbar]').waitFor({state:'visible'});assert.equal(await f.page.locator('.primary-nav a[href="?page=onboarding"]').count(),0);await f.page.getByLabel('Full legal name',{exact:true}).waitFor();await f.page.waitForFunction(()=>document.querySelector('[name=code]').options.length>1);
   await chooseWithdrawalBank(f,'BANK DANAMON UUS (SYARIAH)');
   assert.deepEqual(await f.page.locator('[name=channel] option').allTextContents(),['BI-FAST']);
   for(const bank of [{code:'SYBDIDJ1',accountNumber:'001234567890',channel:'ONLINE'},{code:'FAKEIDJA',accountNumber:'001234567890',channel:'BI_FAST'}]){
@@ -741,7 +741,7 @@ test('bounded wallet CLI processes only wallet jobs and reports uncertainty with
 
 
 test('merchant onboarding saves declarations and bank through protected forms, recovers lost replies and records declared age without asserting identity verification',async t=>{
- const f=await merchantFixture(t);await f.unlock();await f.page.goto(f.app.base+'/cart/admin/?page=onboarding');
+ const f=await merchantFixture(t);await f.unlock();await f.page.goto(f.app.base+'/cart/admin/?page=onboarding');await f.page.locator('[data-onboarding-topbar]').waitFor({state:'visible'});assert.equal(await f.page.locator('.primary-nav a[href="?page=onboarding"]').count(),0);
  await f.page.waitForFunction(()=>document.querySelector('[name=email]')?.value==='alice@example.test');
  assert.equal((await f.request('onboarding_read',{}, {'X-Ezkart-Csrf':'wrong'})).status,401);
  assert.equal((await f.request('onboarding_profile',{revision:0,requestKey:key(),legalName:'Alice Legal',birthDate:'1990-01-01',phone:'081234567890',verified:true})).status,422);
@@ -754,7 +754,7 @@ test('merchant onboarding saves declarations and bank through protected forms, r
  await f.page.locator('[data-onboarding-bank-summary]').filter({hasText:'7890'}).waitFor();assert.equal(await f.count('seller_onboarding_banks'),1);
  await f.page.getByRole('button',{name:'I confirm these addresses and map pins',exact:true}).click();
  await f.page.waitForFunction(()=>document.querySelector('[data-onboarding-confirm-pins]').disabled&&document.querySelector('[data-onboarding-status]').textContent.startsWith('Onboarding requirements met.'));
- const read=await f.request('onboarding_read',{});assert.equal(read.status,200,JSON.stringify(read.data));assert.equal(read.data.onboarding.ready,true);assert.equal(read.data.onboarding.identity.status,'not_assessed');assert.equal(read.data.onboarding.age.source,'seller_declared');assert.equal(read.data.onboarding.age.meetsPolicy,true);assert.equal(read.data.onboarding.shipping.confirmed,true);
+ await f.page.locator('[data-onboarding-topbar]').waitFor({state:'hidden'});const read=await f.request('onboarding_read',{});assert.equal(read.status,200,JSON.stringify(read.data));assert.equal(read.data.onboarding.ready,true);assert.equal(read.data.onboarding.identity.status,'not_assessed');assert.equal(read.data.onboarding.age.source,'seller_declared');assert.equal(read.data.onboarding.age.meetsPolicy,true);assert.equal(read.data.onboarding.shipping.confirmed,true);
  assert(!JSON.stringify(read.data).includes('001234567890'));assert.equal((await f.registerCalls()).length,0);
  for(const width of [1360,390]){await f.page.setViewportSize({width,height:1000});await f.page.reload();await f.page.waitForFunction(()=>document.querySelector('[name=legalName]')?.value==='Alice Legal');assert.equal(await f.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await mkdir(screens,{recursive:true});await f.page.screenshot({path:join(screens,'onboarding-'+width+'.png'),fullPage:true});}
  assert.equal(await f.page.getByLabel('Account number',{exact:true}).inputValue(),'');

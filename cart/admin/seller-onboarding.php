@@ -2,7 +2,7 @@
 if (empty($authenticated)) { http_response_code(404); return; }
 ez_page_header('Seller onboarding', 'Save your seller details before starting money actions. You can keep exploring your dashboard.');
 if (($activeSeller['role'] ?? '') !== 'owner') { echo '<p>Only the current store owner can complete onboarding.</p>'; return; }
-if (empty($walletAccess['unlocked'])) { echo '<p>Use Wallet verification to protect your personal and bank details. After unlocking, return to Seller onboarding.</p>'; require __DIR__ . '/wallet-verification.php'; return; }
+if (empty($walletAccess['unlocked'])) { echo '<p>Verify your identity to protect your personal and bank details while completing setup.</p>'; require __DIR__ . '/wallet-verification.php'; return; }
 ?>
 <div class="onboarding-workspace" data-wallet-content data-wallet-seconds="<?= max(0, (int) $walletAccess['expires_at'] - time()) ?>" data-onboarding data-account="<?= ez_admin_escape((string) ($adminUser['id'] ?? '')) ?>" data-store="<?= ez_admin_escape($sellerId) ?>">
  <p data-onboarding-status role="status" aria-live="polite">Loading your saved details…</p>

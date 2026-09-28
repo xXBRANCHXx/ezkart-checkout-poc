@@ -1,4 +1,5 @@
 <?php
-declare(strict_types=1);
-// Keep the review endpoint inside the existing narrow admin cookie path.
-require dirname(__DIR__) . '/api/jev.php';
+http_response_code(410);
+header('Content-Type: application/json');
+header('Cache-Control: no-store');
+echo json_encode(['ok'=>false,'error'=>'Page review operations have moved to Ezkart Executive.']);

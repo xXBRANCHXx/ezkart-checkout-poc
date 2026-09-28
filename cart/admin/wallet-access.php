@@ -131,6 +131,6 @@ function ez_wallet_access(string $authenticationMethod, string $sellerId, string
         ez_admin_log_auth_error('Wallet verification failed', $error);
         $_SESSION['wallet_flash'] = ['error' => $error instanceof InvalidArgumentException ? $error->getMessage() : ($action === 'wallet_email_send' ? 'The email code could not be sent. Please try again shortly.' : 'That code was not accepted. Check your code and try again.')];
     }
-    header('Location: ?page=wallet', true, 303);
+    header('Location: ?page=' . (($_GET['page'] ?? '') === 'onboarding' ? 'onboarding' : 'wallet'), true, 303);
     exit;
 }

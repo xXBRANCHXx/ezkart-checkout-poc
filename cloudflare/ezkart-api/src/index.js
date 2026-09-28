@@ -1,4 +1,4 @@
-import {sellerAlerts,sellerAlertRescan} from './seller-alerts.js';
+import {sellerAlerts,sellerAlertRescan,sellerOnboardingStatus} from './seller-alerts.js';
 import {jevEvidenceImage,importJevEvaluation,jevPageHeld,jevPages,jevList,jevDetail,createJevReview,runJevReview,gradeJevReview,restoreJevPage} from './jev-reviews.js';
 import {putJevPage,beginJevPageWrite,finishJevPageWrite} from './jev-page-state.js';
 import {saveTreasuryStatus,treasuryStatusHistory} from './commerce-treasury-status.js';
@@ -1807,19 +1807,20 @@ export default {
         if(request.method==='POST'&&!history&&!url.search)return json({ok:true,...await saveBuyerNotificationPreferences(env,actor,await reviewRequestJson(request,3000,parseMessageJSON))},200,cors);
         return json({ok:false,error:'Method or parameters not allowed'},405,cors);
       }
-      const noticeMatch=/^\/v1\/(customer|commerce)\/notifications(?:\/(stats|processing|email|read|alerts|alert-rescan))?$/.exec(url.pathname);
+      const noticeMatch=/^\/v1\/(customer|commerce)\/notifications(?:\/(stats|processing|email|read|alerts|alert-rescan|onboarding))?$/.exec(url.pathname);
       if(noticeMatch){
         const user=await authenticatedUser(request,env);let actor={kind:'buyer',id:user.id};
         if(noticeMatch[1]==='commerce'){
           const seller=await env.DB.prepare(`SELECT s.id FROM seller_memberships m JOIN sellers s ON s.id=m.seller_id WHERE m.auth_user_id=? AND s.status='active' ORDER BY m.created_at ASC LIMIT 1`).bind(user.id).first();
           if(!seller)return json({ok:false,error:'Your store membership is no longer available'},403,cors);
           if(request.headers.has('x-ezkart-notification-store')&&request.headers.get('x-ezkart-notification-store')!==seller.id)return json({ok:false,error:'Your active store changed. Reload this page.',code:'notification_session_changed'},409,cors);
-          actor={kind:'merchant',id:user.id,sellerId:seller.id};
+          actor={kind:'merchant',id:user.id,sellerId:seller.id,email:user.email};
         }
         const action=noticeMatch[2];
+        if(action==='onboarding'&&request.method==='GET'&&!url.search)return json({ok:true,...await sellerOnboardingStatus(env,actor)},200,cors);
         if(action==='alerts'&&request.method==='GET'&&!url.search)return json({ok:true,...await sellerAlerts(env,actor)},200,cors);
         if(action==='alert-rescan'&&request.method==='POST'&&!url.search)return json({ok:true,...await sellerAlertRescan(env,actor,await reviewRequestJson(request,3000,parseMessageJSON))},200,cors);
-        if(['alerts','alert-rescan'].includes(action))return json({ok:false,error:'Method or parameters not allowed'},405,cors);
+        if(['alerts','alert-rescan','onboarding'].includes(action))return json({ok:false,error:'Method or parameters not allowed'},405,cors);
         if(request.method==='GET'&&action!=='read')return json({ok:true,...await(action==='stats'?notificationStats(env,actor,url):action==='processing'?notificationProcessing(env,actor,url):notificationInbox(env,actor,url,action==='email'?'email':'inbox'))},200,cors);
         if(request.method==='POST'&&action==='read'&&!url.search)return json({ok:true,...await readNotifications(env,actor,await reviewRequestJson(request,3000,parseMessageJSON))},200,cors);
         return json({ok:false,error:'Method or parameters not allowed'},405,cors);
