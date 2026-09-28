@@ -7,7 +7,7 @@
   "harnessVersion": "jev-direct-evidence-v1",
   "benchmarkSha256": "16bc595a9dec8da15ed9138ff4801467861eb67e1fb8335370ac9b495012a0df",
   "savedResultsSha256": "4fc03830bab1371e9e79305336a0807fae1f19c557c18362a8d62a57dcdf7e1b",
-  "harnessSha256": "7902f2435a9915a82eddd7ec1d2d072a4aeb3aa5e2899fc414d6314a694ebe54",
+  "harnessSha256": "9eb79bfadb0ad8bd414f8aa4cf9ea29953ff1fe1bd025f660d3945568008dcef",
   "counts": {
     "cases": 500,
     "oldArchiveEligible": 152,
@@ -2951,6 +2951,7 @@
         "decisionVerdict": "escalate",
         "humanReviewRequired": true,
         "decisionReasons": [
+          "Human review: the quotation does not explicitly establish this requirement: A direct seller instruction asking the shopper to disclose a secret.",
           "Human review: the quotation does not explicitly establish this requirement: The secret is explicitly identified as a password, bank/payment OTP, authentication code, PIN or card security code. An unspecified code/reference is insufficient.",
           "The recommendation includes uncertainty."
         ]
@@ -2966,6 +2967,7 @@
         "decisionVerdict": "escalate",
         "humanReviewRequired": true,
         "decisionReasons": [
+          "Human review: the quotation does not explicitly establish this requirement: A direct seller instruction asking the shopper to disclose a secret.",
           "Human review: the quotation does not explicitly establish this requirement: The secret is explicitly identified as a password, bank/payment OTP, authentication code, PIN or card security code. An unspecified code/reference is insufficient."
         ]
       }
@@ -2980,6 +2982,7 @@
         "decisionVerdict": "escalate",
         "humanReviewRequired": true,
         "decisionReasons": [
+          "Human review: the quotation does not explicitly establish this requirement: A direct seller instruction asking the shopper to disclose a secret.",
           "Human review: the quotation does not explicitly establish this requirement: The secret is explicitly identified as a password, bank/payment OTP, authentication code, PIN or card security code. An unspecified code/reference is insufficient."
         ]
       }
@@ -2994,6 +2997,7 @@
         "decisionVerdict": "escalate",
         "humanReviewRequired": true,
         "decisionReasons": [
+          "Human review: the quotation does not explicitly establish this requirement: A direct seller instruction asking the shopper to disclose a secret.",
           "Human review: the quotation does not explicitly establish this requirement: The secret is explicitly identified as a password, bank/payment OTP, authentication code, PIN or card security code. An unspecified code/reference is insufficient."
         ]
       }
@@ -3008,6 +3012,7 @@
         "decisionVerdict": "escalate",
         "humanReviewRequired": true,
         "decisionReasons": [
+          "Human review: the quotation does not explicitly establish this requirement: A direct seller instruction asking the shopper to disclose a secret.",
           "Human review: the quotation does not explicitly establish this requirement: The secret is explicitly identified as a password, bank/payment OTP, authentication code, PIN or card security code. An unspecified code/reference is insufficient."
         ]
       }
@@ -3022,6 +3027,7 @@
         "decisionVerdict": "escalate",
         "humanReviewRequired": true,
         "decisionReasons": [
+          "Human review: the quotation does not explicitly establish this requirement: A direct seller instruction asking the shopper to disclose a secret.",
           "Human review: the quotation does not explicitly establish this requirement: The secret is explicitly identified as a password, bank/payment OTP, authentication code, PIN or card security code. An unspecified code/reference is insufficient."
         ]
       }
@@ -3036,6 +3042,7 @@
         "decisionVerdict": "escalate",
         "humanReviewRequired": true,
         "decisionReasons": [
+          "Human review: the quotation does not explicitly establish this requirement: A direct seller instruction asking the shopper to disclose a secret.",
           "Human review: the quotation does not explicitly establish this requirement: The secret is explicitly identified as a password, bank/payment OTP, authentication code, PIN or card security code. An unspecified code/reference is insufficient."
         ]
       }
@@ -3050,6 +3057,7 @@
         "decisionVerdict": "escalate",
         "humanReviewRequired": true,
         "decisionReasons": [
+          "Human review: the quotation does not explicitly establish this requirement: A direct seller instruction asking the shopper to disclose a secret.",
           "Human review: the quotation does not explicitly establish this requirement: The secret is explicitly identified as a password, bank/payment OTP, authentication code, PIN or card security code. An unspecified code/reference is insufficient."
         ]
       }
@@ -3064,6 +3072,7 @@
         "decisionVerdict": "escalate",
         "humanReviewRequired": true,
         "decisionReasons": [
+          "Human review: the quotation does not explicitly establish this requirement: A direct seller instruction asking the shopper to disclose a secret.",
           "Human review: the quotation does not explicitly establish this requirement: The secret is explicitly identified as a password, bank/payment OTP, authentication code, PIN or card security code. An unspecified code/reference is insufficient."
         ]
       }
@@ -3078,6 +3087,7 @@
         "decisionVerdict": "escalate",
         "humanReviewRequired": true,
         "decisionReasons": [
+          "Human review: the quotation does not explicitly establish this requirement: A direct seller instruction asking the shopper to disclose a secret.",
           "Human review: the quotation does not explicitly establish this requirement: The secret is explicitly identified as a password, bank/payment OTP, authentication code, PIN or card security code. An unspecified code/reference is insufficient."
         ]
       }

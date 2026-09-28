@@ -11,6 +11,9 @@ export const JEV_HARNESS_INSTRUCTIONS=`Flagged-page decision harness ${JEV_HARNE
 
 const secret=/\b(?:password|(?:bank|payment|card) pin|cvv|cvc|otp|one[- ]time (?:payment|bank|security|authentication) code|(?:bank|payment|security|authentication) (?:verification )?code|card security code|kata sandi|sandi bank|kode (?:otp|pin|keamanan|autentikasi))\b/i;
 const request=/^(?:please\s+)?(?:send|give|tell|share|provide)\b[\s\S]{0,160}\b(?:your|us|our|me)\b|^(?:silakan\s+)?(?:kirim(?:kan)?|beri(?:kan)?|bagikan)\b[\s\S]{0,160}\b(?:anda|kami|saya)\b/i;
+// The secret must be the requested object, not just a word somewhere in a
+// request for a poster, article, reset link or policy document about credentials.
+const secretObject=/^(?:please\s+)?(?:send|give|tell|share|provide)(?:\s+(?:us|me|our (?:shop|seller|support)(?: chat)?))?\s+(?:your|the)\s+(?:(?:online banking|bank|account|payment|card)\s+)?(?:password|cvv|cvc|otp|pin|one[- ]time (?:payment|bank|security|authentication) code|(?:bank|payment|security|authentication) (?:verification )?code|card security code)(?=$|[.,!?:;]|\s+(?:to|so|for|and|now|here|sent|via|from)\b)|^(?:silakan\s+)?(?:kirim(?:kan)?|beri(?:kan)?|bagikan)(?:\s+(?:kami|saya|toko kami|penjual kami))?\s+(?:kata sandi(?: bank(?: online)?)?|sandi bank|kode (?:otp|pin|keamanan|autentikasi)(?: pembayaran)?|cvv|cvc)(?=$|[.,!?:;]|\s+(?:anda|kamu|ke|untuk|yang|dan|sekarang)\b)/i;
 const speaker=/\b(?:we (?:will|shall)|we'll|i (?:will|shall)|i'll|kami akan|saya akan)\b/i;
 const target=/\b(?:you|your|anda|kamu)\b/i;
 const injury=/\b(?:(?:kill|hurt|injure|beat|stab|shoot) you|break your (?:arm|leg|neck)|(?:membunuh|melukai|memukul|menikam|menembak) (?:anda|kamu)|mematahkan (?:lengan|kaki|leher) (?:anda|kamu))\b/i;
@@ -42,7 +45,7 @@ export function jevDirectEvidenceReasons(outcome,snapshot){
   // be removed from consideration by choosing a short quote. Unknown context defers.
   if(contextual.test(allText)||qualification.test(allText)){reasons.push('Quoted, qualified, negative or educational context requires human interpretation.');continue;}
   let checks=[];
-  if(f.code==='credential_request')checks=[request.test(quote),secret.test(quote)];
+  if(f.code==='credential_request')checks=[request.test(quote)&&secretObject.test(quote),secret.test(quote)];
   if(f.code==='explicit_threat')checks=[speaker.test(quote)&&target.test(quote),injury.test(quote)||disclosure.test(quote)];
   if(f.code==='id_unlicensed_gambling_offer')checks=[gamblingOffer.test(quote)&&publicOffer.test(quote),indonesia.test(quote),noGamblingPermission.test(quote)];
   if(f.code==='id_unlawful_narcotics_sale')checks=[narcoticSale.test(quote)&&groupOne.test(quote),indonesia.test(quote),noRight.test(quote)];
