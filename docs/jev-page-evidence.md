@@ -106,3 +106,8 @@ cited the right image and reached human review through the backend gate. It is
 one correctly interpreted image, not a new accuracy estimate. There were 43
 passing scoped checks across confidence, evidence, page revision, backend and
 browser suites, plus PHP/JS syntax and beta Worker dry-build checks.
+
+The hosted `test.ezkart.id` reviewer page was checked through the shared browser:
+the selected-reason options, Other explanation prompt and updated $3.10 allowance
+loaded successfully. This was read-only verification; no additional model call,
+report or page action was created.
