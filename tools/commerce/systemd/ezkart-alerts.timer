@@ -1,0 +1,11 @@
+[Unit]
+Description=Check Ezkart operations alert outbox every minute
+
+[Timer]
+OnCalendar=*-*-* *:*:00
+Persistent=true
+AccuracySec=10s
+Unit=ezkart-alerts.service
+
+[Install]
+WantedBy=timers.target

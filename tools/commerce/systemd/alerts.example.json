@@ -1,0 +1,17 @@
+{
+  "deployment": "beta",
+  "stateDirectory": "/absolute/private/alert-state",
+  "endpointEnv": "EZKART_ALERT_ENDPOINT",
+  "tokenEnv": "EZKART_ALERT_TOKEN",
+  "inputs": [
+    {"source": "commerce", "path": "/absolute/private/reports/commerce.json", "maxAgeSeconds": 900},
+    {"source": "backup", "path": "/absolute/private/reports/backup.json", "maxAgeSeconds": 900}
+  ],
+  "timeoutSeconds": 10,
+  "maxDeliveries": 4,
+  "retrySeconds": 60,
+  "maxRetrySeconds": 3600,
+  "overdueSeconds": 900,
+  "reminderSeconds": 3600,
+  "maxEvents": 10000
+}

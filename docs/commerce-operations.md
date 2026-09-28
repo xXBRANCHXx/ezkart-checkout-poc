@@ -111,3 +111,13 @@ and original failure are recorded durably; the report does not contact R2 or
 establish fresh remote durability. A successful commerce report does not imply
 healthy host backups. See [backup runner and installation](workbench-backup-command.md#recurring-execution-and-machine-readable-monitoring)
 for the schema, timer, credential dependencies and remaining alert-routing step.
+
+## Durable external alert outbox
+
+The [alert runner](operations-alert-delivery.md) now ingests private commerce and
+backup machine-report files, queues warning changes/recoveries/reminders and
+supports bounded authenticated HTTPS delivery with durable original IDs and
+explicit endpoint deduplication. Missing/stale inputs and overdue delivery remain
+visible. Its `queue` command never sends. The delivery adapter, input collectors,
+recipient, credentials, independent watchdog and schedule still require an
+accepted installation; none is configured or enabled by this implementation.
