@@ -1,0 +1,12 @@
+{
+  "readAt": "2026-09-28T09:25:31.290Z",
+  "limit": 5,
+  "limitReset": null,
+  "keyUsageBefore": 0.06015925,
+  "keyUsageAfter": 0.3720765,
+  "keyRemaining": 4.6279235,
+  "keyUsageDelta": 0.31191725,
+  "externalReservationMicrousd": 2720000,
+  "appBudgetMicrousd": 440000,
+  "budgetDeploymentVersion": "b0b84d58-f537-4c28-b59c-b409de978fe7"
+}

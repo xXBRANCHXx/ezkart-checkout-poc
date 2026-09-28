@@ -43,3 +43,27 @@ Every send is fenced and never retried; up to four reserved calls run per batch.
 Every received HTTP body is saved, including invalid/incomplete responses.
 Unknown outcomes keep their full reservation. Expected labels are never sent.
 Run `verify.mjs` and `report.py` offline to rebuild analysis without paid calls.
+
+## Completed run
+
+Labels froze in commit `5fe9568`; all500 attempts ran once. Results:378 matching
+raw verdicts,121 mismatches,1 unavailable503;443 accepted,56 rejected. Effective
+routing:152archive-eligible (42unsupported),13clear (0false-clear),335human.
+Mean claimed confidence97.6%; even100%cutoff leaves15unsupported archives.
+See [full findings](../../../docs/jev-500-evaluation-results-2026-09-28.md).
+
+Budget-only beta deployment: `b0b84d58-f537-4c28-b59c-b409de978fe7`.
+Later authenticated usage delta: $0.31191725; remaining provider cap:$4.6279235.
+Immediate metadata lagged; original receipt and later accounting are separate.
+Known rounded response costs total$0.312098; one response cost is unknown.
+No retry, model/policy edit or actual page action occurred. All observed bounds
+held. Run `node tools/jev-evaluation/expanded500-20260928/verify.mjs` for immutable
+fixture/image/response/source integrity and exact backend replay.
+
+Offline PDF rebuild (the runner must never be rerun merely to reproduce charts):
+
+```sh
+~/.local/share/ezkart/owner-guide-tools/bin/python \
+  tools/jev-evaluation/expanded500-20260928/report.py \
+  --results tools/jev-evaluation/expanded500-20260928/results.json
+```

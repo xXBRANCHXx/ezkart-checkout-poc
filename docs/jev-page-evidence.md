@@ -111,3 +111,10 @@ The hosted `test.ezkart.id` reviewer page was checked through the shared browser
 the selected-reason options, Other explanation prompt and updated $3.10 allowance
 loaded successfully. This was read-only verification; no additional model call,
 report or page action was created.
+
+## Subsequent 500-case evaluation
+
+The expanded adapter now has a separate [500-case synthetic evaluation](jev-500-evaluation-results-2026-09-28.md).
+It observed 42 unsupported archive-eligible decisions and substantial additional
+human-review load. Richer evidence and high confidence did not establish safe
+automatic moderation; the report distinguishes raw answers, validation and routing.

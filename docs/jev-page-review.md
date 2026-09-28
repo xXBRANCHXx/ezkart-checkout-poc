@@ -141,3 +141,8 @@ correctness. This evaluation preserved model/policy settings and made no real
 page actions; the evidence-v2 prompt now reinforces those missing-context rules. This prompt
 change has not been validated by another 120-case evaluation, so the old accuracy
 figures do not establish the new adapter’s accuracy.
+
+The subsequent [500-case evidence-v2 evaluation](jev-500-evaluation-results-2026-09-28.md)
+found 378 matching raw verdicts, 42 unsupported archive-eligible decisions and
+335 human-review outcomes. Its synthetic references and changed sample do not
+establish production accuracy or a controlled improvement over the older run.
