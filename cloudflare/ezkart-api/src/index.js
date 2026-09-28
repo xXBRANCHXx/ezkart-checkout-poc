@@ -27,6 +27,7 @@ import {refundOrder,refundList,refundDetail,createRefund,changeRefund} from './c
 import {changeDispute,disputeHistory,supportRefunds} from './commerce-refund-disputes.js';
 import {saveRefundBank,changeRefundProcessing,refundProviderPacket} from './commerce-refund-processing.js';
 import {supportSession,supportActor,recordSupportPermission} from './commerce-support.js';
+import {treasurySummary,reserveTreasury,readTreasury,lookupTreasury,cancelTreasury} from './commerce-treasury.js';
 import {uploadRefundAttachment,refundAttachment,refundAttachmentJsonBytes} from './commerce-refund-media.js';
 import {fulfillmentList,fulfillmentDetail,fulfillmentAction,serviceShipment,customerShipment,bindShipmentAccount,bindShipment,shippingInbox,refreshShipment,drainPendingShipping} from './commerce-fulfillment.js';
 import {merchantOrderList,merchantOrderDetail,merchantOrderHistory} from './commerce-order-reads.js';
@@ -1840,6 +1841,17 @@ export default {
         if(request.method==='GET'&&part&&!receipt&&!request.headers.has('range'))return await buyerDigitalPart(env,user,orderId,itemId,grantId,Number(part));
         if(request.method==='POST'&&receipt)return json({ok:true,...await acknowledgeDigitalPart(env,user,orderId,itemId,grantId,Number(part),await reviewRequestJson(request,2000,parseMessageJSON))},200,cors);
         return json({ok:false,error:'Download method is not allowed.'},405,cors);
+      }
+      if(url.pathname.startsWith('/v1/treasury/')){
+        const user=await authenticatedUser(request,env,true);
+        if(url.search)return json({ok:false,error:'Treasury query parameters are invalid.'},400,cors);
+        if(url.pathname==='/v1/treasury/commissions'&&request.method==='GET')return json({ok:true,...await treasurySummary(env,user)},200,cors);
+        if(url.pathname==='/v1/treasury/intents'&&request.method==='POST')return json({ok:true,...await reserveTreasury(env,user,await reviewRequestJson(request,2000,parseMessageJSON))},200,cors);
+        if(url.pathname==='/v1/treasury/intents/lookup'&&request.method==='POST')return json({ok:true,...await lookupTreasury(env,user,await reviewRequestJson(request,2000,parseMessageJSON))},200,cors);
+        const target=/^\/v1\/treasury\/intents\/(try_[a-f0-9]{40})(\/cancel)?$/.exec(url.pathname);
+        if(target&&!target[2]&&request.method==='GET')return json({ok:true,...await readTreasury(env,user,target[1])},200,cors);
+        if(target&&target[2]&&request.method==='POST')return json({ok:true,...await cancelTreasury(env,user,target[1],await reviewRequestJson(request,2000,parseMessageJSON))},200,cors);
+        return json({ok:false,error:'Treasury route or method is unavailable.'},404,cors);
       }
       if(url.pathname==='/v1/support/session'){
         const user=await authenticatedUser(request,env,true);

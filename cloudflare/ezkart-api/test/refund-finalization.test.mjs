@@ -71,6 +71,10 @@ for(const plan of ['standard','advanced'])test(plan+' original commission uses c
     const r=await prepare(f,p,[{orderItemId:p.order.items[0].id,amount}],i===2?18000:0),e=await evidence(f,r,i===2?{refund_fee_amount:750}:{});
     const out=ok(await post(f,r,e));cumulative+=amount;const target=Number((BigInt(cumulative)*BigInt(commission)*2n+20006n)/(40012n));
     assert.equal(out.commissionReversal,String(target-reversed));reversed=target;
+    const treasury=await f.db.prepare('SELECT * FROM commerce_treasury_commissions WHERE order_id=?').bind(p.order.id).first();
+    assert.equal(treasury.original_commission,commission);assert.equal(treasury.reversed_commission,reversed);
+    assert.equal(treasury.net_commission,commission-reversed);assert.equal(treasury.current_eligible,0);assert(treasury.funding_unreconciled>0);
+    assert.equal((await f.db.prepare('SELECT reservable_commission FROM commerce_treasury_funds WHERE platform_enrollment_id=?').bind(treasury.platform_enrollment_id).first()).reservable_commission,0);
     const detail=ok(await f.merchant('/v1/commerce/refunds/'+r.id)).refund;assert.equal(detail.state,'confirmed');assert.equal(detail.paymentConfirmed,true);assert.equal(detail.processing.paymentConfirmed,true);
     assert.equal(detail.processing.costs,null);
     const queue=ok(await f.merchant('/v1/support/refunds?state=processing',undefined,{seller:'bob',claims:claims()}));assert.equal(queue.refunds.find(x=>x.id===r.id).paymentConfirmed,true);
