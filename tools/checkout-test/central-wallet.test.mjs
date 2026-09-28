@@ -7,7 +7,7 @@ import {tmpdir} from 'node:os';
 import {join,resolve} from 'node:path';
 import {setupCentralFixture} from './central-fixture.mjs';
 import {setupEarningsFixture} from '../../cloudflare/ezkart-api/test/earnings-fixture.mjs';
-import {seedVerifiedOnboarding} from '../../cloudflare/ezkart-api/test/onboarding-fixture.mjs';
+import {seedDeclaredOnboarding} from '../../cloudflare/ezkart-api/test/onboarding-fixture.mjs';
 import {payoutFixture} from '../../cloudflare/ezkart-api/test/payout-fixture.mjs';
 
 const root=resolve(import.meta.dirname,'../..'),base='/internal/commerce/finance/wallet',screens='/tmp/ezkart-wallet-enrollment-ui-01a0d643';
@@ -109,7 +109,7 @@ async function bankInquiryFixture(t,overrides={},extraBindings={}){
   const bindings={COMMERCE_PLATFORM_WALLET_SELLER:'seller_bob',COMMERCE_WITHDRAWAL_INQUIRY:'enabled',...extraBindings};
   const f=await merchantFixture(t,{EZKART_COMMERCE_WITHDRAWALS:'enabled',EZKART_COMMERCE_WITHDRAWAL_INQUIRY:'enabled',
     EZKART_COMMERCE_WITHDRAWAL_RECOVERY_DIRECTORY:recovery,...overrides},{bindings});
-  await seedVerifiedOnboarding(f.db);
+  await seedDeclaredOnboarding(f.db);
   const identity=await f.run(`require ${JSON.stringify(join(root,'cart/api/doku-payout.php'))}; echo json_encode(EzDokuPayoutClient::configured('sandbox')->providerIdentity());`);
   assert.equal(identity.status,0,identity.error);const provider=JSON.parse(identity.output);
   const e=await setupEarningsFixture(t,{baseFixture:f,bindings,fingerprint:provider.credentialFingerprint,clientId:provider.clientId});
@@ -740,7 +740,7 @@ test('bounded wallet CLI processes only wallet jobs and reports uncertainty with
 });
 
 
-test('merchant onboarding saves declarations and bank through protected forms, recovers lost replies and keeps identity pending',async t=>{
+test('merchant onboarding saves declarations and bank through protected forms, recovers lost replies and records declared age without asserting identity verification',async t=>{
  const f=await merchantFixture(t);await f.unlock();await f.page.goto(f.app.base+'/cart/admin/?page=onboarding');
  await f.page.waitForFunction(()=>document.querySelector('[name=email]')?.value==='alice@example.test');
  assert.equal((await f.request('onboarding_read',{}, {'X-Ezkart-Csrf':'wrong'})).status,401);
@@ -753,8 +753,8 @@ test('merchant onboarding saves declarations and bank through protected forms, r
  f.control.drop='/internal/commerce/onboarding';await f.page.getByRole('button',{name:'Save bank destination',exact:true}).click();
  await f.page.locator('[data-onboarding-bank-summary]').filter({hasText:'7890'}).waitFor();assert.equal(await f.count('seller_onboarding_banks'),1);
  await f.page.getByRole('button',{name:'I confirm these addresses and map pins',exact:true}).click();
- await f.page.waitForFunction(()=>document.querySelector('[data-onboarding-confirm-pins]').disabled&&document.querySelector('[data-onboarding-status]').textContent==='Still needed: authenticated identity verification.');
- const read=await f.request('onboarding_read',{});assert.equal(read.status,200,JSON.stringify(read.data));assert.equal(read.data.onboarding.ready,false);assert.equal(read.data.onboarding.identity.status,'pending_authenticated_verification');assert.equal(read.data.onboarding.shipping.confirmed,true);
+ await f.page.waitForFunction(()=>document.querySelector('[data-onboarding-confirm-pins]').disabled&&document.querySelector('[data-onboarding-status]').textContent.startsWith('Onboarding requirements met.'));
+ const read=await f.request('onboarding_read',{});assert.equal(read.status,200,JSON.stringify(read.data));assert.equal(read.data.onboarding.ready,true);assert.equal(read.data.onboarding.identity.status,'not_assessed');assert.equal(read.data.onboarding.age.source,'seller_declared');assert.equal(read.data.onboarding.age.meetsPolicy,true);assert.equal(read.data.onboarding.shipping.confirmed,true);
  assert(!JSON.stringify(read.data).includes('001234567890'));assert.equal((await f.registerCalls()).length,0);
  for(const width of [1360,390]){await f.page.setViewportSize({width,height:1000});await f.page.reload();await f.page.waitForFunction(()=>document.querySelector('[name=legalName]')?.value==='Alice Legal');assert.equal(await f.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await mkdir(screens,{recursive:true});await f.page.screenshot({path:join(screens,'onboarding-'+width+'.png'),fullPage:true});}
  assert.equal(await f.page.getByLabel('Account number',{exact:true}).inputValue(),'');

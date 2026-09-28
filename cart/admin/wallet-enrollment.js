@@ -85,7 +85,7 @@
       connecting: 'Your wallet setup is being processed. Check its status again shortly.',
       queued: 'Your setup request is saved. Continue setup to connect your seller account.',
     };
-    status.textContent = messages[state] || (needsOnboarding ? 'Complete seller onboarding and authenticated identity verification, then return here to prepare your one DOKU seller Sub-Account.' : data.enabled ? 'Review the saved store name and verified email below.' : 'Wallet setup is not available yet. Check back after Ezkart enables seller wallets.');
+    status.textContent = messages[state] || (needsOnboarding ? 'Complete seller onboarding, then return here to prepare your one DOKU seller Sub-Account.' : data.enabled ? 'Review the saved store name and verified email below.' : 'Wallet setup is not available yet. Check back after Ezkart enables seller wallets.');
     find('setup-details').hidden = false;
     find('setup-name').textContent = enrollment?.accountName || data.owner?.storeName || 'Unavailable';
     find('setup-email').textContent = enrollment?.email || data.owner?.email || 'Unavailable';

@@ -209,7 +209,7 @@ test('beta bank changes fence unsent dispatch while original started payment rec
  const bank=await f.call('/internal/commerce/onboarding',{...f.scope(),action:'bank',revision:1,requestKey:key(),bank:{code:'CENAIDJA',accountNumber:'009999999999',channel:'BI_FAST'}});assert.equal(bank.status,200,bank.error);
  const denied=await f.startPayment(unsent);assert.equal(denied.status,409,denied.error);assert.match(denied.error,/saved bank changed/);
  assert.equal((await f.readWithdrawal(unsent.w)).withdrawal.bank.accountNumber,'001234567890');
- await f.db.prepare("DELETE FROM fixture_authenticated_identity WHERE seller_id='seller_alice'").run();
+ await f.db.prepare("UPDATE app_users SET email='changed@example.test' WHERE auth_user_id='alice'").run();
  assert.equal((await f.call('/internal/commerce/onboarding',{...f.scope(),action:'read'})).onboarding.ready,false);
  assert.equal((await f.startPayment(sent)).mayPay,false);assert.equal((await f.paymentReceipt(sent,f.paymentEvidence(g))).status,200);
  const recovered=await f.recoverPayment(sent);assert.equal(recovered.status,200,recovered.error);assert.equal(recovered.binding.beneficiaryAccountNumber,'001234567890');assert.equal(recovered.mayPay,false);

@@ -14,7 +14,7 @@ export function declaredSellerAge(value,now=Date.now()){
 }
 export function onboardingFailure(error){
  const text=String(error);
- if(/seller_onboarding_required/.test(text))fail('Complete seller onboarding, including verified identity, saved bank and confirmed pickup/return pins, before starting new money actions.',409);
+ if(/seller_onboarding_required/.test(text))fail('Complete seller onboarding, including your 18+ age declaration, saved bank and confirmed pickup/return pins, before starting new money actions.',409);
  if(/onboarding_bank_changed/.test(text))fail('Your saved bank changed. Cancel this unsent withdrawal and create a request for the current bank.',409);
  if(/onboarding_revision_conflict|onboarding_shipping_changed/.test(text))fail('Your saved details changed. Refresh onboarding before saving again.',409);
  if(/onboarding_owner_required/.test(text))fail('Only the current owner can complete onboarding.',403);
@@ -41,17 +41,17 @@ async function snapshot(env,input){
  // exposing or copying the previous owner's personal declarations or bank.
  const profile=storedProfile?.owner_auth_id===input.actor.id?storedProfile:null,bank=storedBank?.owner_auth_id===input.actor.id?storedBank:null;
  const email=input.actor.email.toLowerCase(),emailChanged=!!profile&&(profile.verified_email!==email||profile.verified_email!==user?.email?.toLowerCase());
- const identity=profile?await env.DB.prepare(`SELECT i.provider_reference FROM seller_authenticated_identity i WHERE i.seller_id=? AND i.owner_auth_id=? AND i.profile_revision=? AND i.verified_age>=? AND i.policy_version=? AND length(trim(i.provider_reference,char(9)||char(10)||char(11)||char(12)||char(13)||' '))>0 AND i.expires_at>?`).bind(input.seller,input.actor.id,profile.identity_revision,policy.minimum_age,policy.policy_version,new Date().toISOString()).first():null;
+ const age=profile?declaredSellerAge(profile.declared_birth_date):null,ageEligible=age!==null&&age>=policy.minimum_age;
  const config=shipping?JSON.parse(shipping.configuration_json):{addresses:[]};
  const pickup=config.addresses.find(a=>a.id===config.pickupAddressId),returns=config.addresses.find(a=>a.id===config.returnAddressId);
  const pins=!!pickup?.coordinate&&!!returns?.coordinate;
  return {seller:input.seller,email,emailVerified:true,profileRevision:storedProfile?.revision||0,bankRevision:storedBank?.revision||0,
-  profile:profile?{revision:profile.revision,identityRevision:profile.identity_revision,legalName:profile.legal_name,birthDate:profile.declared_birth_date,phone:profile.phone,confirmedShippingRevision:profile.confirmed_shipping_revision}:null,
+  profile:profile?{revision:profile.revision,legalName:profile.legal_name,birthDate:profile.declared_birth_date,phone:profile.phone,confirmedShippingRevision:profile.confirmed_shipping_revision}:null,
   bank:bank?{revision:bank.revision,code:bank.bank_code,accountSuffix:bank.account_number.slice(-4),channel:bank.channel}:null,
   shipping:{revision:shipping?.revision||0,pickup:pickup?{label:pickup.label,address:pickup.address,location:pickup.location,coordinate:pickup.coordinate||null}:null,returns:returns?{label:returns.label,address:returns.address,location:returns.location,coordinate:returns.coordinate||null}:null,pinsPresent:pins,confirmed:!!profile&&profile.confirmed_shipping_revision===shipping?.revision&&pins},
-  identity:{status:identity?'verified':'pending_authenticated_verification',minimumAge:policy.minimum_age,policyVersion:policy.policy_version},
-  ready:!!ready&&ready.owner_auth_id===input.actor.id&&ready.revision===profile?.revision&&ready.bank_revision===bank?.revision&&!!identity&&pins&&profile.confirmed_shipping_revision===shipping?.revision&&!emailChanged,wallet:wallet?{id:wallet.id,status:wallet.profile_id?'confirmed':wallet.state==='uncertain'?'review':wallet.state}:null,
-  requirements:[...(!profile?['legal_name_phone']:[]),...(emailChanged?['refresh_legal_profile']:[]),...(!bank?['saved_bank']:[]),...(!pins||profile?.confirmed_shipping_revision!==shipping?.revision?['confirmed_pickup_return_pins']:[]),...(!policy.minimum_age?['age_policy']:[]),...(!identity?['authenticated_identity_verification']:[])],providerCalls:0};
+  age:{source:'seller_declared',years:profile?.declared_age??null,asOfDate:profile?.age_as_of_date||null,currentYears:age,meetsPolicy:ageEligible,minimumAge:policy.minimum_age,policyVersion:policy.policy_version},identity:{status:'not_assessed'},
+  ready:!!ready&&ready.owner_auth_id===input.actor.id&&ready.revision===profile?.revision&&ready.bank_revision===bank?.revision&&ageEligible&&pins&&profile.confirmed_shipping_revision===shipping?.revision&&!emailChanged,wallet:wallet?{id:wallet.id,status:wallet.profile_id?'confirmed':wallet.state==='uncertain'?'review':wallet.state}:null,
+  requirements:[...(!profile?['legal_name_phone']:[]),...(emailChanged?['refresh_legal_profile']:[]),...(!bank?['saved_bank']:[]),...(!pins||profile?.confirmed_shipping_revision!==shipping?.revision?['confirmed_pickup_return_pins']:[]),...(!policy.minimum_age?['age_policy']:[]),...(!ageEligible?['age_declaration']:[])],providerCalls:0};
 }
 export async function sellerOnboarding(env,input){
  fields(input,['environment','seller','actor','action','revision','requestKey','legalName','birthDate','phone','bank','shippingRevision']);
@@ -74,10 +74,10 @@ export async function sellerOnboarding(env,input){
    name=current.legal_name;birthDate=current.declared_birth_date;phone=current.phone;pins=input.shippingRevision;
   }
   if(typeof name!=='string'||name.trim().length<2||name.length>128||/[\u0000-\u001f\u007f]/.test(name)||typeof phone!=='string'||!/^\+?\d{8,15}$/.test(phone))fail('Enter your full legal name and a valid phone number.');
-  if(declaredSellerAge(birthDate)<18)fail('Sellers must be at least 18 years old under Ezkart’s seller policy.');
-  const identityRevision=current && current.owner_auth_id===input.actor.id && current.legal_name===name.trim() && current.declared_birth_date===birthDate ? current.identity_revision : input.revision+1;
-  values=[identityRevision,name.trim(),birthDate,input.actor.email.toLowerCase(),phone,pins];table='seller_onboarding_profiles';
-  sql='INSERT INTO seller_onboarding_profiles(seller_id,revision,request_key,request_hash,owner_auth_id,identity_revision,legal_name,declared_birth_date,verified_email,phone,confirmed_shipping_revision,proof_expires_at,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)';
+  const age=declaredSellerAge(birthDate,Date.parse(now)),asOfDate=new Date(Date.parse(now)+7*3600000).toISOString().slice(0,10);
+  if(age<18)fail('Sellers must be at least 18 years old under Ezkart’s seller policy.');
+  values=[age,asOfDate,name.trim(),birthDate,input.actor.email.toLowerCase(),phone,pins];table='seller_onboarding_profiles';
+  sql='INSERT INTO seller_onboarding_profiles(seller_id,revision,request_key,request_hash,owner_auth_id,declared_age,age_as_of_date,legal_name,declared_birth_date,verified_email,phone,confirmed_shipping_revision,proof_expires_at,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)';
  }
  const hash=await commerceHash({action:input.action,revision:input.revision,owner:input.actor.id,values});
  const previous=()=>env.DB.prepare('SELECT request_hash FROM '+table+' WHERE seller_id=? AND request_key=?').bind(input.seller,input.requestKey).first();

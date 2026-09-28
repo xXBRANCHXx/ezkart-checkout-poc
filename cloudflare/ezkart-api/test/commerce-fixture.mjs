@@ -1,4 +1,4 @@
-import {seedVerifiedOnboarding} from './onboarding-fixture.mjs';
+import {seedDeclaredOnboarding} from './onboarding-fixture.mjs';
 import {applyCommerceSchema} from './commerce-schema.mjs';
 import {createHash, createHmac, randomBytes} from 'node:crypto';
 import {build} from 'esbuild';
@@ -13,7 +13,7 @@ export const fixtureShipping={amount:18000,skipped:false,courierCode:'jne',servi
   origin:{origin_contact_name:shippingAddress.name,origin_contact_phone:shippingAddress.phone,origin_contact_email:'',origin_address:shippingAddress.address+', '+shippingAddress.location,origin_postal_code:shippingAddress.postalCode,origin_note:'',shipper_organization:'',coordinate:{latitude:-6.2,longitude:106.8}},
   destination:{location:'Jakarta',address:'Jalan Saved Destination 12',postalCode:'12345',coordinate:{latitude:-6.2,longitude:106.8}},quote:{courier:'JNE',service:'Regular',courier_company:'jne',courier_type:'reg',price:18000}};
 
-export async function setupCommerceFixture(t,{through=Infinity,verifiedOnboarding=true,notifications='off',bindings={},outbound}={}) {
+export async function setupCommerceFixture(t,{through=Infinity,declaredOnboarding=true,notifications='off',bindings={},outbound}={}) {
   const deployment=bindings.APP_ENVIRONMENT||'test',environment=deployment==='test'?'sandbox':'production';
   const key = await crypto.subtle.generateKey({name: 'ECDSA', namedCurve: 'P-256'}, true, ['sign', 'verify']);
   const publicKey = {...await crypto.subtle.exportKey('jwk', key.publicKey), kid: 'catalog-fixture', alg: 'ES256'};
@@ -72,6 +72,6 @@ export async function setupCommerceFixture(t,{through=Infinity,verifiedOnboardin
   const stock = async (id = 'tea') => (await db.prepare('SELECT stock_quantity FROM products WHERE id = ?').bind(id).first()).stock_quantity;
   const shippingSetup=await merchant('/v1/shipping-settings',{revision:0,requestKey:randomBytes(16).toString('hex'),configuration:shippingConfiguration});
   if(shippingSetup.status!==200)throw Error('Fixture shipping setup failed: '+JSON.stringify(shippingSetup));
-  if(environment==='production' && through>=71 && verifiedOnboarding)for(const seller of ['alice','bob'])await seedVerifiedOnboarding(db,seller);
+  if(environment==='production' && through>=71 && declaredOnboarding)for(const seller of ['alice','bob'])await seedDeclaredOnboarding(db,seller);
   return {mf, db, headers, call, product, input, create, event, paid, session, stock, merchant,merchantToken};
 }

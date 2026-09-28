@@ -2,7 +2,7 @@
 CREATE TABLE seller_onboarding_profiles (
  seller_id TEXT NOT NULL REFERENCES sellers(id), revision INTEGER NOT NULL CHECK(revision>0),
  request_key TEXT NOT NULL, request_hash TEXT NOT NULL, owner_auth_id TEXT NOT NULL,
- identity_revision INTEGER NOT NULL, legal_name TEXT NOT NULL, declared_birth_date TEXT NOT NULL, verified_email TEXT NOT NULL, phone TEXT NOT NULL,
+ declared_age INTEGER NOT NULL CHECK(declared_age BETWEEN 18 AND 120), age_as_of_date TEXT NOT NULL, legal_name TEXT NOT NULL, declared_birth_date TEXT NOT NULL, verified_email TEXT NOT NULL, phone TEXT NOT NULL,
  confirmed_shipping_revision INTEGER, proof_expires_at TEXT NOT NULL, created_at TEXT NOT NULL,
  PRIMARY KEY(seller_id,revision), UNIQUE(seller_id,request_key)
 );
@@ -17,16 +17,6 @@ CREATE TABLE seller_onboarding_policy (
  id INTEGER PRIMARY KEY CHECK(id=1), minimum_age INTEGER CHECK(minimum_age BETWEEN 1 AND 100), policy_version TEXT NOT NULL
 );
 INSERT INTO seller_onboarding_policy VALUES(1,18,'owner-18-plus-2026-09-28');
--- Only an authenticated verification source may replace this empty view: an
--- approved external service or authorized staff review of actual evidence.
--- profile_revision identifies the immutable identity_revision, not address or
--- bank edits. provider_reference may be the authenticated internal review ID.
--- Neither owner payloads nor self-declared birthdays create verified facts.
-CREATE VIEW seller_authenticated_identity AS SELECT
- CAST(NULL AS TEXT) AS seller_id, CAST(NULL AS TEXT) AS owner_auth_id,
- CAST(NULL AS INTEGER) AS profile_revision, CAST(NULL AS INTEGER) AS verified_age,
- CAST(NULL AS TEXT) AS provider_reference, CAST(NULL AS TEXT) AS policy_version,
- CAST(NULL AS TEXT) AS expires_at WHERE 0;
 CREATE VIEW seller_onboarding_current AS
  SELECT p.* FROM seller_onboarding_profiles p WHERE p.revision=(SELECT MAX(x.revision) FROM seller_onboarding_profiles x WHERE x.seller_id=p.seller_id);
 CREATE VIEW seller_onboarding_current_bank AS
@@ -39,16 +29,14 @@ CREATE VIEW seller_onboarding_ready AS
  JOIN seller_onboarding_current_bank b ON b.seller_id=p.seller_id AND b.owner_auth_id=p.owner_auth_id
  JOIN seller_shipping_settings h ON h.seller_id=p.seller_id AND h.revision=p.confirmed_shipping_revision
  JOIN seller_onboarding_policy policy ON policy.id=1 AND policy.minimum_age IS NOT NULL
- JOIN seller_authenticated_identity i ON i.seller_id=p.seller_id AND i.owner_auth_id=p.owner_auth_id
-   AND i.profile_revision=p.identity_revision AND i.verified_age>=policy.minimum_age AND i.policy_version=policy.policy_version
-   AND length(trim(i.provider_reference,char(9)||char(10)||char(11)||char(12)||char(13)||' '))>0 AND i.expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now')
- WHERE EXISTS(SELECT 1 FROM json_each(h.configuration_json,'$.addresses') a WHERE json_extract(a.value,'$.id')=json_extract(h.configuration_json,'$.pickupAddressId') AND json_type(a.value,'$.coordinate.latitude') IN ('real','integer') AND json_type(a.value,'$.coordinate.longitude') IN ('real','integer'))
+ WHERE (CAST(strftime('%Y','now','+7 hours') AS INTEGER)-CAST(substr(p.declared_birth_date,1,4) AS INTEGER)-(strftime('%m-%d','now','+7 hours')<substr(p.declared_birth_date,6,5)))>=policy.minimum_age
+ AND EXISTS(SELECT 1 FROM json_each(h.configuration_json,'$.addresses') a WHERE json_extract(a.value,'$.id')=json_extract(h.configuration_json,'$.pickupAddressId') AND json_type(a.value,'$.coordinate.latitude') IN ('real','integer') AND json_type(a.value,'$.coordinate.longitude') IN ('real','integer'))
  AND EXISTS(SELECT 1 FROM json_each(h.configuration_json,'$.addresses') a WHERE json_extract(a.value,'$.id')=json_extract(h.configuration_json,'$.returnAddressId') AND json_type(a.value,'$.coordinate.latitude') IN ('real','integer') AND json_type(a.value,'$.coordinate.longitude') IN ('real','integer'));
 CREATE TRIGGER onboarding_profile_guard BEFORE INSERT ON seller_onboarding_profiles BEGIN
  SELECT RAISE(ABORT,'onboarding_owner_required') WHERE NOT EXISTS(SELECT 1 FROM seller_memberships m JOIN sellers s ON s.id=m.seller_id WHERE m.seller_id=NEW.seller_id AND m.auth_user_id=NEW.owner_auth_id AND m.role='owner' AND s.status='active');
  SELECT RAISE(ABORT,'onboarding_revision_conflict') WHERE NEW.revision!=COALESCE((SELECT MAX(revision) FROM seller_onboarding_profiles WHERE seller_id=NEW.seller_id),0)+1;
  SELECT RAISE(ABORT,'onboarding_proof_expired') WHERE NEW.proof_expires_at<=strftime('%Y-%m-%dT%H:%M:%fZ','now') OR NEW.proof_expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now','+630 seconds');
- SELECT RAISE(ABORT,'onboarding_identity_revision') WHERE NEW.identity_revision!=COALESCE((SELECT identity_revision FROM seller_onboarding_current p WHERE p.seller_id=NEW.seller_id AND p.owner_auth_id=NEW.owner_auth_id AND p.legal_name=NEW.legal_name AND p.declared_birth_date=NEW.declared_birth_date),NEW.revision);
+ SELECT RAISE(ABORT,'onboarding_declared_age_invalid') WHERE NEW.age_as_of_date!=date('now','+7 hours') OR NEW.declared_age!=(CAST(strftime('%Y','now','+7 hours') AS INTEGER)-CAST(substr(NEW.declared_birth_date,1,4) AS INTEGER)-(strftime('%m-%d','now','+7 hours')<substr(NEW.declared_birth_date,6,5)));
  SELECT RAISE(ABORT,'onboarding_shipping_changed') WHERE NEW.confirmed_shipping_revision IS NOT NULL AND NOT EXISTS(SELECT 1 FROM seller_shipping_settings WHERE seller_id=NEW.seller_id AND revision=NEW.confirmed_shipping_revision);
 END;
 CREATE TRIGGER onboarding_bank_guard BEFORE INSERT ON seller_onboarding_banks BEGIN
