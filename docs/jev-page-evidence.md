@@ -51,8 +51,10 @@ state or every possible external destination. Such pages require human inspectio
 
 ## Decisions and traceability
 
-Both clear and needs_change still require confidence >=80%, no material uncertainty
-and complete coverage. A visual, URL or source-code finding additionally requires
+The later [direct-evidence harness](jev-direct-evidence-harness.md) requires
+confidence >=80%, no material uncertainty, complete coverage and a clearly proven
+rule breach for automatic archive eligibility. A raw clear answer now goes to
+human review for these flagged pages. A visual, URL or source-code finding additionally requires
 human verification. Image findings use an image source ID, empty exact-text quote
 and a visual explanation; generated OCR is not accepted as an exact page quote.
 Text findings retain exact-substring checking. All unknown/missing media and source

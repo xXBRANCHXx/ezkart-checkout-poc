@@ -7,7 +7,7 @@ import {JEV_MODEL,JEV_POLICY,jevRequest,normalizeJevOutcome,callJev} from '../sr
 const key=()=>randomBytes(16).toString('hex'),claims=()=>({aal:'aal2',amr:[{method:'totp',timestamp:Math.floor(Date.now()/1000)}]});
 async function fixture(t,bindings={}){
  const controls={calls:[],reply:null,after:null,fail:false};
- const f=await setupCommerceFixture(t,{bindings:{JEV_EVALUATION_SELLER_ID:'seller_bob',JEV_ENABLED:'enabled',JEV_OPENROUTER_API_KEY:'fixture-private-model-key-never-real',JEV_MAX_CALLS:'6',JEV_BUDGET_MICROUSD:'60000',JEV_APPROVED_POLICY:JEV_POLICY,JEV_ARCHIVE:'enabled',CUSTOM_DOMAIN_API_HOSTS:'api.fixture.test',CUSTOM_DOMAIN_ZONE_ID:'a'.repeat(32),CUSTOM_DOMAIN_CNAME_TARGET:'custom.ezkart.id',...bindings},outbound:async request=>{assert.equal(request.url,'https://openrouter.ai/api/v1/chat/completions');controls.calls.push(await request.json());if(controls.after)await controls.after();if(controls.fail)throw Error('fixture transport lost');return Response.json({id:'gen-fixture',model:JEV_MODEL,choices:[{finish_reason:'stop',message:{content:JSON.stringify(controls.reply)}}],usage:{cost:0.001,prompt_tokens:400,completion_tokens:100}});}});
+ const f=await setupCommerceFixture(t,{bindings:{JEV_EVALUATION_SELLER_ID:'seller_bob',JEV_ENABLED:'enabled',JEV_OPENROUTER_API_KEY:'fixture-private-model-key-never-real',JEV_MAX_CALLS:'6',JEV_BUDGET_MICROUSD:'200000',JEV_APPROVED_POLICY:JEV_POLICY,JEV_ARCHIVE:'enabled',CUSTOM_DOMAIN_API_HOSTS:'api.fixture.test',CUSTOM_DOMAIN_ZONE_ID:'a'.repeat(32),CUSTOM_DOMAIN_CNAME_TARGET:'custom.ezkart.id',...bindings},outbound:async request=>{assert.equal(request.url,'https://openrouter.ai/api/v1/chat/completions');controls.calls.push(await request.json());if(controls.after)await controls.after();if(controls.fail)throw Error('fixture transport lost');return Response.json({id:'gen-fixture',model:JEV_MODEL,choices:[{finish_reason:'stop',message:{content:JSON.stringify(controls.reply)}}],usage:{cost:0.001,prompt_tokens:400,completion_tokens:100}});}});
  await f.db.prepare("INSERT INTO commerce_support_permissions(id,commerce_environment,auth_user_id,role,request_key,request_hash,operator,reason,created_at) VALUES('jev-support','sandbox','alice','reviewer',?,'fixture','operator','Fixture reviewer',?)").bind(key(),new Date().toISOString()).run();
  const bucket=await f.mf.getR2Bucket('PRIVATE_ASSETS'),path='sellers/seller_alice/landing-pages/notebook.json';
  const save=async(text='<p>Send us your bank password to receive this notebook.</p>')=>{const p={id:'notebook',name:'Notebook',status:'published',publishedHtml:text,updatedAt:new Date().toISOString(),state:null};const head=await bucket.head(path);return putJevPage({DB:f.db,PRIVATE_ASSETS:bucket},'seller_alice','notebook',head?.etag||'',JSON.stringify(p),{customMetadata:{name:'Notebook',status:'published'}});};
@@ -69,7 +69,7 @@ test('an archive revision race retains the completed original model result witho
 
 test('80% threshold and uncertainty control actual archive actions and no-archive decisions',async t=>{
  const f=await fixture(t);
- for(const [verdict,confidence,uncertainties,expected] of [['needs_change',0.7999,[],'escalate'],['clear',0.79,[],'escalate'],['clear',0.8,[],'clear'],['needs_change',1,['Missing context'],'escalate'],['clear',1,['Unknown licence'],'escalate'],['needs_change',0.8,[],'needs_change']]){
+ for(const [verdict,confidence,uncertainties,expected] of [['needs_change',0.7999,[],'escalate'],['clear',0.79,[],'escalate'],['clear',0.8,[],'escalate'],['needs_change',1,['Missing context'],'escalate'],['clear',1,['Unknown licence'],'escalate'],['needs_change',0.8,[],'needs_change']]){
   const r=await f.create();f.controls.reply={...f.violation(r),verdict,confidence,uncertainties,...(verdict==='clear'?{findings:[]}: {})};
   const done=await f.api('/reviews/'+r.id+'/run',{requestKey:key()});assert.equal(done.status,200,done.error);
   assert.equal(done.review.decisionVerdict,expected);assert.equal(done.review.humanReviewRequired,expected==='escalate');assert.equal(done.review.outcome.verdict,verdict);
@@ -118,4 +118,12 @@ test('seller alerts isolate stores, queue changes once without spending, and cle
  assert.equal((await f.mf.dispatchFetch('https://api.fixture.test/v1/public/landing-pages/alice/notebook')).status,404);
  const current=(await f.api('/reviews/'+r.id)).review;assert.equal((await f.api('/reviews/'+r.id+'/restore',{requestKey:key(),reason:'Human checked correction',expectedRevision:current.currentRevision,expectedArchiveId:current.archiveId})).status,200);
  assert.equal((await f.merchant(path+'/alerts')).items.length,0);assert.equal((await f.merchant(path+'/stats')).unread,0);
+});
+test('new review harness blocks confident suspected breaches and clear verdicts before any archive write',async t=>{
+ const f=await fixture(t);
+ for(const [text,code,verdict] of [['Send us your code to finish this order.','credential_request','needs_change'],['Complain again and you will regret it.','explicit_threat','needs_change'],['Open to the public: bet real rupiah on our casino now. We operate without gambling permission.','id_unlicensed_gambling_offer','needs_change'],['An ordinary notebook.',null,'clear']]){
+  await f.save('<p>'+text+'</p>');const r=await f.create();assert.equal(r.harnessVersion,'jev-direct-evidence-v1');
+  f.controls.reply={verdict,confidence:1,summary:'Fixture original confident recommendation.',findings:code?[{code,sourceId:'page:1',quote:text,explanation:'Fixture model assumes a violation.'}]:[],uncertainties:[]};
+  const done=await f.api('/reviews/'+r.id+'/run',{requestKey:key()});assert.equal(done.status,200,done.error);assert.equal(done.review.state,'completed');assert.equal(done.review.outcome.verdict,verdict);assert.equal(done.review.decisionVerdict,'escalate');assert.equal(done.review.archiveState,'active');assert.equal(done.mode.automaticClearance,false);assert.match(f.controls.calls.at(-1).messages[0].content,/Flagged-page decision harness/);
+ }assert.equal((await f.db.prepare('SELECT COUNT(*) n FROM jev_page_actions').first()).n,0);
 });

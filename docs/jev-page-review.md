@@ -41,11 +41,14 @@ unsupported allegations require human review. See the closed registry and
 primary citations in [the provider registry](../cloudflare/ezkart-api/src/jev-provider.js) and [the evaluation guide](jev-evaluation.md).
 This is narrow platform moderation, not comprehensive legal clearance.
 
-Both archive and no-archive decisions require a finite model confidence of at
-least 0.8. Below that threshold, missing historical confidence, uncertainty,
-limitation findings or incomplete coverage route to human review. The backend
-preserves the original recommendation alongside its effective decision; a
-self-reported confidence is not measured accuracy.
+The [direct-evidence harness](jev-direct-evidence-harness.md) now requires a clearly
+established rule breach before automatic archive eligibility. New model requests
+receive every rule's required elements; the backend independently checks the
+exact quotation. The 80% confidence minimum remains, with uncertainty and coverage
+limits overriding it. A flagged page without a proven breach, including a raw
+model `clear`, goes to human review. Original model answers remain recorded;
+confidence is not measured accuracy. Historical evidence without the harness
+marker cannot authorize a new automatic archive.
 
 Only a supported needs_change outcome with exact current-page evidence, no
 uncertainty, complete evidence coverage and approved archive configuration may
