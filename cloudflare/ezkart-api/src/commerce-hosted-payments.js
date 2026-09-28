@@ -8,7 +8,7 @@ const fields=(o,keys)=>{if(!o||typeof o!=='object'||Array.isArray(o)||Object.key
 const text=(v,max=128)=>typeof v==='string'&&v.length>0&&v.length<=max&&!/[\x00-\x1f\x7f]/.test(v);
 const date=v=>{if(typeof v!=='string'||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(v)||!Number.isFinite(Date.parse(v))||new Date(v).toISOString().replace('.000Z','Z')!==v)fail('Checkout timestamp is invalid');return Date.parse(v);};
 const decode=(v,max=262144)=>{try{if(typeof v!=='string'||new TextEncoder().encode(v).length>max)throw Error();const o=parseMessageJSON(v);if(!o||typeof o!=='object'||Array.isArray(o))throw Error();return o;}catch{fail('Checkout evidence is invalid or ambiguous');}};
-const methods=v=>Array.isArray(v)&&v.length>0&&v.length<=3&&new Set(v).size===v.length&&v.every(x=>['QRIS','CREDIT_CARD','VIRTUAL_ACCOUNT_BCA'].includes(x));
+const methods=v=>Array.isArray(v)&&v.length>0&&v.length<=4&&new Set(v).size===v.length&&v.every(x=>['QRIS','CREDIT_CARD','VIRTUAL_ACCOUNT_BCA','EMONEY_SHOPEEPAY'].includes(x));
 const exactAmount=(raw,path,amount)=>{let v;try{v=parseFinancialEvidenceJSON(raw);for(const p of path)v=v?.[p];}catch{}v=v instanceof FinancialJsonNumber?v.value:v;if(typeof v!=='string'||!new RegExp('^'+amount+'(?:\\.00)?$').test(v))fail('Checkout amount does not match the original order',409);};
 async function context(env,orderId,environment){
  commerceEnvironment(env,environment);
@@ -29,6 +29,8 @@ export async function bindHostedPayment(env,orderId,input){
  const {row,order,binding}=await context(env,orderId,input.environment),now=new Date().toISOString();
  if(row.state!=='running'||row.lease_mode!=='execute'||row.lease_owner!==input.workerId||row.lease_token!==input.leaseToken||row.lease_until<=now)fail('This worker cannot start Checkout',409);
  if(binding){if(binding.credentialFingerprint!==input.credentialFingerprint||row.client_id!==input.clientId)fail('Original Checkout credentials cannot change',409);return {mayCreate:false,binding};}
+ const shopee=order.snapshot.checkout.paymentChoice==='shopeepay';
+ if(shopee ? input.methods.length!==1||input.methods[0]!=='EMONEY_SHOPEEPAY' : input.methods.includes('EMONEY_SHOPEEPAY'))fail('Checkout methods do not match the original choice',409);
  const minutes=Math.floor((Date.parse(order.expiresAt)-Date.now())/60000);
  if(order.state!=='creating'||minutes<1||minutes>1440||order.total>999999999999)fail('This order cannot start another Checkout',409);
  const route=await paymentRoute(env,orderId,input.environment);
@@ -67,7 +69,7 @@ export async function recordHostedPaymentReceipt(env,orderId,input){
   if(url.search||url.hash||!/^\/(?:checkout-link(?:-v2)?|checkout\/link)\/[A-Za-z0-9_-]+$/.test(url.pathname)||url.pathname.split('/').pop()!==p.token_id)fail('Checkout token does not match the payment URL',409);
   type='payment.created';eventKey='hosted_created:'+b.externalId;data={provider:'doku',providerRequestId:b.externalId,amount:order.total,currency:'IDR',expiresAt:new Date(stamp).toISOString(),paymentUrl:p.url};
  }else{
-  if(input.requestBody!==null||raw.order?.invoice_number!==orderId||(raw.order.currency!==undefined&&raw.order.currency!=='IDR')||!b.methods.includes(raw.channel?.id==='QRIS_DOKU'?'QRIS':raw.channel?.id))fail('Checkout notification does not match the original payment',409);
+  if(input.requestBody!==null||raw.order?.invoice_number!==orderId||(raw.order.currency!==undefined&&raw.order.currency!=='IDR')||!b.methods.includes(raw.channel?.id==='QRIS_DOKU'?'QRIS':raw.channel?.id==='EMONEY_SHOPEE_PAY'?'EMONEY_SHOPEEPAY':raw.channel?.id))fail('Checkout notification does not match the original payment',409);
   exactAmount(input.body,['order','amount'],order.total);
   // Channel-specific stable payment references are checked below; Request-Id
   // identifies delivery, never a charge. Pending/failed observations save only.
@@ -94,6 +96,15 @@ function hostedCharge(raw){
  if(channel==='QRIS_DOKU'){
   if(raw.service?.id!=='QRIS'||!text(raw.emoney_payment?.account_id)||!text(raw.emoney_payment?.approval_code))fail('QRIS payment details are incomplete',409);
   return JSON.stringify([acquirer,at,raw.emoney_payment.account_id,raw.emoney_payment.approval_code]);
+ }
+ if(channel==='EMONEY_SHOPEE_PAY'){
+  const p=raw.shopeepay_payment;
+  if(raw.service?.id!=='EMONEY'||acquirer!=='SHOPEE_PAY'||!text(raw.transaction?.original_request_id)
+   ||(p?.transaction_status!==undefined&&p.transaction_status!=='3')
+   ||(p?.transaction_message!==undefined&&p.transaction_message!=='SUCCESS'))fail('ShopeePay payment details are incomplete or inconsistent',409);
+  // Mandatory original request identifies the payment; optional issuer fields
+  // must not change its identity between redeliveries of the same payment.
+  return JSON.stringify([acquirer,raw.transaction.original_request_id]);
  }
  if(channel==='CREDIT_CARD'){
   if(raw.service?.id!=='CREDIT_CARD'||raw.transaction?.type!=='SALE'||!text(raw.transaction?.original_request_id)||!text(raw.card_payment?.approval_code)

@@ -285,12 +285,14 @@
       state.environmentShippingRequired = config.shipping_required;
       state.durableCheckout = config.durable_checkout === true;
       if (config.payment_choices !== undefined && (!Array.isArray(config.payment_choices)
-          || config.payment_choices.length > 2 || config.payment_choices.some(value => !["bca_va", "doku_checkout"].includes(value))
+          || config.payment_choices.length > 3 || config.payment_choices.some(value => !["bca_va", "doku_checkout", "shopeepay"].includes(value))
           || new Set(config.payment_choices).size !== config.payment_choices.length)) throw new Error("Payment options could not load. Please try again.");
       const choices = state.durableCheckout ? config.payment_choices || [] : [];
       const hostedMethods = config.hosted_payment_methods || [];
-      if (choices.includes("doku_checkout") && (!Array.isArray(hostedMethods) || !hostedMethods.length
-          || hostedMethods.some(value => !["QRIS", "CREDIT_CARD"].includes(value)))) throw new Error("Payment options could not load. Please try again.");
+      if ((choices.includes("doku_checkout") || choices.includes("shopeepay")) && (!Array.isArray(hostedMethods) || !hostedMethods.length
+          || hostedMethods.some(value => !["QRIS", "CREDIT_CARD", "EMONEY_SHOPEEPAY"].includes(value)))) throw new Error("Payment options could not load. Please try again.");
+      if ((choices.includes("shopeepay") && !hostedMethods.includes("EMONEY_SHOPEEPAY"))
+          || (choices.includes("doku_checkout") && !hostedMethods.some(method => ["QRIS", "CREDIT_CARD"].includes(method)))) throw new Error("Payment options could not load. Please try again.");
       state.paymentChoices = choices;
       state.hostedPaymentMethods = hostedMethods;
       if (!choices.includes(state.paymentChoice)) state.paymentChoice = choices.includes("bca_va") ? "bca_va" : choices[0] || "";
@@ -370,8 +372,9 @@
       radio.value = choice; radio.checked = choice === state.paymentChoice;
       radio.addEventListener("change", () => { if (!state.pendingCheckout) state.paymentChoice = choice; });
       const details = document.createElement("span"), title = document.createElement("b"), description = document.createElement("small");
-      title.textContent = choice === "bca_va" ? "BCA Virtual Account" : state.hostedPaymentMethods.map(method => method === "QRIS" ? "QRIS" : "Debit or credit card").join(" / ");
-      description.textContent = choice === "bca_va" ? "Pay from myBCA, BCA mobile, KlikBCA or an ATM." : "Opens DOKU’s secure payment window. Your order stays here.";
+      title.textContent = choice === "bca_va" ? "BCA Virtual Account" : choice === "shopeepay" ? "ShopeePay" : state.hostedPaymentMethods.filter(method => method !== "EMONEY_SHOPEEPAY").map(method => method === "QRIS" ? "QRIS" : "Debit or credit card").join(" / ");
+      description.textContent = choice === "bca_va" ? "Pay from myBCA, BCA mobile, KlikBCA or an ATM." : choice === "shopeepay" ? "Pay with ShopeePay in DOKU’s secure payment window." : "Opens DOKU’s secure payment window. Your order stays here.";
+      if (choice === "doku_checkout" && state.hostedPaymentMethods.includes("QRIS")) description.textContent += " QRIS also accepts ShopeePay.";
       details.append(title, description); label.append(radio, details); return label;
     }));
   }

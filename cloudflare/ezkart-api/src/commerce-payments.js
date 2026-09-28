@@ -7,7 +7,7 @@ export function checkoutContext(input,environment){
   const shop=input.shop||'';
   if(typeof shop!=='string'||(shop&&!/^[a-z0-9][a-z0-9_-]{5,79}$/.test(shop)))fail('Checkout store reference is invalid');
   if(input.campaignVisit!==undefined&&(typeof input.campaignVisit!=='string'||!/^[a-f0-9]{64}$/.test(input.campaignVisit)))fail('Campaign visit reference is invalid');
-  if(input.paymentChoice!==undefined&&(!['bca_va','doku_checkout'].includes(input.paymentChoice)||input.paymentFlow!==(input.paymentChoice==='bca_va'?'snap_bca':'routed_hosted')))fail('Checkout choice does not match the saved payment flow');
+  if(input.paymentChoice!==undefined&&(!['bca_va','doku_checkout','shopeepay'].includes(input.paymentChoice)||input.paymentFlow!==(input.paymentChoice==='bca_va'?'snap_bca':'routed_hosted')))fail('Checkout choice does not match the saved payment flow');
   return {...(input.paymentChoice===undefined?{}:{paymentChoice:input.paymentChoice}),intentHash:input.intentHash,paymentFlow:input.paymentFlow,shop,...(input.campaignVisit===undefined?{}:{campaignVisit:input.campaignVisit})};
 }
 

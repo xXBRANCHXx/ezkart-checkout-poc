@@ -7,7 +7,7 @@ function ez_hosted_checkout_methods(string $environment): array
 {
     $raw = ez_provider_config('doku', 'checkout_methods', $environment);
     $methods = $raw === '' ? [] : explode(',', $raw);
-    if (count($methods) < 1 || count($methods) > 3 || array_diff($methods, ['QRIS','CREDIT_CARD','VIRTUAL_ACCOUNT_BCA'])
+    if (count($methods) < 1 || count($methods) > 4 || array_diff($methods, ['QRIS','CREDIT_CARD','VIRTUAL_ACCOUNT_BCA','EMONEY_SHOPEEPAY'])
         || count(array_unique($methods)) !== count($methods)) throw new EzDokuReadException('checkout_methods_configuration');
     sort($methods); return $methods;
 }
@@ -57,7 +57,8 @@ function ez_central_hosted_payment_job(array $job, string $worker): array
                 // No fence means no provider write could have been dispatched.
                 $outcome = 'retry'; $result = ['noEffectConfirmed' => true];
             } else {
-                $methods = array_values(array_intersect(ez_hosted_checkout_methods($order['environment']), ['QRIS','CREDIT_CARD']));
+                $allowed = ($order['snapshot']['checkout']['paymentChoice'] ?? null) === 'shopeepay' ? ['EMONEY_SHOPEEPAY'] : ['QRIS','CREDIT_CARD'];
+                $methods = array_values(array_intersect(ez_hosted_checkout_methods($order['environment']), $allowed));
                 if (!$methods) throw new EzDokuReadException('checkout_methods_configuration');
                 $client->verifyAuthentication();
                 $route = $payment['route'];

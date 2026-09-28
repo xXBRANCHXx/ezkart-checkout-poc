@@ -51,8 +51,8 @@ function ez_doku_checkout_choices(string $environment): array
     if ($flow !== 'routed_hosted') return ['payment_choices'=>[],'hosted_payment_methods'=>[]];
     require_once __DIR__ . '/commerce-hosted-payments.php';
     $methods = ez_hosted_checkout_methods($environment);
-    $hosted = array_values(array_intersect($methods, ['QRIS','CREDIT_CARD']));
-    return ['payment_choices'=>[...(in_array('VIRTUAL_ACCOUNT_BCA',$methods,true)?['bca_va']:[]),...($hosted?['doku_checkout']:[])], 'hosted_payment_methods'=>$hosted];
+    $hosted = array_values(array_intersect($methods, ['QRIS','CREDIT_CARD','EMONEY_SHOPEEPAY']));
+    return ['payment_choices'=>[...(in_array('VIRTUAL_ACCOUNT_BCA',$methods,true)?['bca_va']:[]),...(array_diff($hosted,['EMONEY_SHOPEEPAY'])?['doku_checkout']:[]),...(in_array('EMONEY_SHOPEEPAY',$hosted,true)?['shopeepay']:[])], 'hosted_payment_methods'=>$hosted];
 }
 function ez_doku_selected_payment_flow(string $environment, ?string $choice): string
 {

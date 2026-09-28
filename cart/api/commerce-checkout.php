@@ -70,7 +70,7 @@ function ez_checkout_intent(array $input): array
         $intent['campaign_visit'] = $input['campaign_visit'];
     }
     if (array_key_exists('payment_choice', $input)) {
-        if (!is_string($input['payment_choice']) || !in_array($input['payment_choice'], ['bca_va','doku_checkout'], true)) throw new InvalidArgumentException('Choose an available payment method.');
+        if (!is_string($input['payment_choice']) || !in_array($input['payment_choice'], ['bca_va','doku_checkout','shopeepay'], true)) throw new InvalidArgumentException('Choose an available payment method.');
         $intent['payment_choice'] = $input['payment_choice'];
     }
     return ['key' => $key, 'hash' => hash('sha256', ez_json_encode($intent)), 'input' => $intent];
@@ -134,6 +134,8 @@ function ez_central_checkout(array $input, ?array $account): array
         // Check credentials before the billable shipping quote, and reserve only a reviewed price.
         ez_doku_credentials($environment);
         $flow = ez_doku_selected_payment_flow($environment, $intent['input']['payment_choice'] ?? null);
+        $choice = $intent['input']['payment_choice'] ?? null;
+        if ($choice === null && $flow === 'routed_hosted') $choice = ez_doku_checkout_choices($environment)['payment_choices'][0] ?? null;
         $checkout = ez_checkout_request($intent['input']);
         if ($checkout['seller_id'] === 'demo') throw new InvalidArgumentException('Choose a store product to start a real checkout. Demo products are for preview only.');
         foreach ($checkout['commerce_items'] as $id => $item) {
@@ -154,7 +156,7 @@ function ez_central_checkout(array $input, ?array $account): array
             $order = ez_commerce_request('POST', '/internal/commerce/orders', [
                 'environment' => $environment, 'checkoutKey' => $intent['key'], 'sellerId' => $checkout['seller_id'],
                 'checkout' => ['intentHash' => $intent['hash'], 'paymentFlow' => $flow, 'shop' => $intent['input']['shop']]
-                    + (isset($intent['input']['payment_choice']) ? ['paymentChoice' => $intent['input']['payment_choice']] : [])
+                    + ($choice !== null ? ['paymentChoice' => $choice] : [])
                     + (isset($intent['input']['campaign_visit']) ? ['campaignVisit' => $intent['input']['campaign_visit']] : []),
                 'customer' => ['name' => $customer['name'], 'email' => $customer['email'], 'phone' => $customer['phone'], 'authUserId' => $account['id'] ?? ''],
                 'items' => array_values($checkout['commerce_items']), 'shipping' => $shipping,

@@ -15,8 +15,8 @@ final class EzDokuHostedCheckoutClient extends EzDokuPaymentRoutingClient
             || !is_string($b['name'] ?? null) || $b['name'] === '' || strlen($b['name']) > 1020
             || !is_string($b['email'] ?? null) || strlen($b['email']) > 128 || !filter_var($b['email'], FILTER_VALIDATE_EMAIL)
             || !is_int($b['paymentDueMinutes'] ?? null) || $b['paymentDueMinutes'] < 1 || $b['paymentDueMinutes'] > 1440
-            || !is_array($b['methods'] ?? null) || count($b['methods']) < 1 || count($b['methods']) > 3
-            || array_diff($b['methods'], ['QRIS','CREDIT_CARD','VIRTUAL_ACCOUNT_BCA']) || count(array_unique($b['methods'])) !== count($b['methods'])
+            || !is_array($b['methods'] ?? null) || count($b['methods']) < 1 || count($b['methods']) > 4
+            || array_diff($b['methods'], ['QRIS','CREDIT_CARD','VIRTUAL_ACCOUNT_BCA','EMONEY_SHOPEEPAY']) || count(array_unique($b['methods'])) !== count($b['methods'])
             || preg_match('/^SAC-[A-Za-z0-9_-]{1,18}$/D', $b['routing']['profileId'] ?? '') !== 1
             || preg_match('/^[A-Za-z0-9][A-Za-z0-9_-]{0,35}$/D', $b['routing']['splitRuleId'] ?? '') !== 1) throw new EzDokuReadException('checkout_binding');
         $origin = parse_url($b['returnUrl'], PHP_URL_SCHEME) . '://' . parse_url($b['returnUrl'], PHP_URL_HOST);

@@ -10,13 +10,13 @@ import {setupCentralFixture} from './central-fixture.mjs';
 import {seedRoutingWallets} from '../../cloudflare/ezkart-api/test/payment-routing-fixture.mjs';
 const keys=generateKeyPairSync('rsa',{modulusLength:2048,publicKeyEncoding:{type:'spki',format:'pem'},privateKeyEncoding:{type:'pkcs8',format:'pem'}}),hash=v=>createHash('sha256').update(v).digest('hex');
 const stamp=()=>new Date().toISOString().replace(/\.\d{3}Z$/,'Z'),target='/cart/api/doku-hosted-webhook.php';
-async function fixture(t){
+async function fixture(t,methods='QRIS,CREDIT_CARD,VIRTUAL_ACCOUNT_BCA'){
  const recovery=await mkdtemp(join(tmpdir(),'ezkart-checkout-recovery-'));
  t.after(async()=>{const {rm}=await import('node:fs/promises');await rm(recovery,{recursive:true,force:true});});
- const f=await setupCentralFixture(t,{EZKART_COMMERCE_PAYMENT_RECOVERY_DIRECTORY:recovery,EZKART_TEST_SNAP:'1',EZKART_DOKU_SANDBOX_SNAP_BCA_PARTNER_SERVICE_ID:'19008',EZKART_DOKU_SANDBOX_SNAP_BCA_CUSTOMER_PREFIX:'0',EZKART_DOKU_SANDBOX_PAYMENT_FLOW:'routed_hosted',EZKART_DOKU_SANDBOX_CHECKOUT_METHODS:'QRIS,CREDIT_CARD,VIRTUAL_ACCOUNT_BCA',EZKART_DOKU_SANDBOX_SNAP_PRIVATE_KEY:keys.privateKey},{bindings:{COMMERCE_PLATFORM_WALLET_SELLER:'seller_bob'}});
+ const f=await setupCentralFixture(t,{EZKART_COMMERCE_PAYMENT_RECOVERY_DIRECTORY:recovery,EZKART_TEST_SNAP:'1',EZKART_DOKU_SANDBOX_SNAP_BCA_PARTNER_SERVICE_ID:'19008',EZKART_DOKU_SANDBOX_SNAP_BCA_CUSTOMER_PREFIX:'0',EZKART_DOKU_SANDBOX_PAYMENT_FLOW:'routed_hosted',EZKART_DOKU_SANDBOX_CHECKOUT_METHODS:methods,EZKART_DOKU_SANDBOX_SNAP_PRIVATE_KEY:keys.privateKey},{bindings:{COMMERCE_PLATFORM_WALLET_SELLER:'seller_bob'}});
  await seedRoutingWallets(f,{environment:'sandbox',clientId:'MCH-SANDBOX-TEST',fingerprint:hash(JSON.stringify(['sandbox','MCH-SANDBOX-TEST',hash('fixture-doku-sandbox-secret'),hash(keys.publicKey)]))});
  f.recovery=recovery;
- f.createHosted=async()=>{const r=await f.create(f.input({checkout:{intentHash:'a'.repeat(64),paymentFlow:'routed_hosted',shop:'alice-shop'}}));assert.equal(r.status,200,JSON.stringify(r));return r.order;};
+ f.createHosted=async(paymentChoice)=>{const r=await f.create(f.input({checkout:{intentHash:'a'.repeat(64),paymentFlow:'routed_hosted',shop:'alice-shop',...(paymentChoice?{paymentChoice}:{})}}));assert.equal(r.status,200,JSON.stringify(r));return r.order;};
  f.payment=async id=>(await f.call('/internal/commerce/hosted-payments/'+id+'?environment=sandbox')).payment;
  f.creates=async()=>(await f.app.calls()).filter(c=>c.url.endsWith('/checkout/v1/payment'));
  return f;
@@ -91,19 +91,56 @@ test('private original create receipt recovers after storage failure with no pro
  assert.equal((await fetch(f.app.base+'/tools/commerce/finalize-hosted-payment.php')).status,404);
 });
 
-test('hosted capture settles only matched original routed wallet history with actual fee evidence',async t=>{
+for(const method of ['QRIS','EMONEY_SHOPEEPAY'])test(`hosted ${method} capture settles only matched original routed wallet history with actual fee evidence`,async t=>{
  const {setupSettlementFixture}=await import('../../cloudflare/ezkart-api/test/settlement-fixture.mjs');
  const {prepareFixtureRoute}=await import('../../cloudflare/ezkart-api/test/payment-routing-fixture.mjs');
- const f=await setupSettlementFixture(t),made=await f.create(f.checkoutInput({checkout:{intentHash:'f'.repeat(64),paymentFlow:'routed_hosted',shop:'alice-shop'}}));assert.equal(made.status,200,made.error);const order=made.order;
+ const f=await setupSettlementFixture(t),made=await f.create(f.checkoutInput({checkout:{intentHash:'f'.repeat(64),paymentFlow:'routed_hosted',shop:'alice-shop',...(method==='EMONEY_SHOPEEPAY'?{paymentChoice:'shopeepay'}:{})}}));assert.equal(made.status,200,made.error);const order=made.order;
  const workerId='hosted_settlement_fixture',job=(await f.call('/internal/commerce/jobs/claim',{environment:'sandbox',workerId,kinds:['payment.create'],orderId:order.id,limit:1,leaseSeconds:120})).jobs[0];
  await prepareFixtureRoute(f,order,job,{workerId});const path='/internal/commerce/hosted-payments/'+order.id;
- const bound=await f.call(path+'/bind',{environment:'sandbox',workerId,leaseToken:job.leaseToken,credentialFingerprint:'a'.repeat(64),clientId:'MCH-FIXTURE-SNAP',methods:['QRIS']});assert.equal(bound.status,200,bound.error);
- const paid=await f.call(path+'/receipt',{environment:'sandbox',credentialFingerprint:'a'.repeat(64),operation:'checkout-notification',externalId:'hosted-notice',sentAt:stamp(),observedAt:stamp(),requestBody:null,body:JSON.stringify(notice(order))});assert.equal(paid.status,200,paid.error);
+ const wrong=await f.call(path+'/bind',{environment:'sandbox',workerId,leaseToken:job.leaseToken,credentialFingerprint:'a'.repeat(64),clientId:'MCH-FIXTURE-SNAP',methods:[method==='QRIS'?'EMONEY_SHOPEEPAY':'QRIS']});assert.equal(wrong.status,409);
+ const bound=await f.call(path+'/bind',{environment:'sandbox',workerId,leaseToken:job.leaseToken,credentialFingerprint:'a'.repeat(64),clientId:'MCH-FIXTURE-SNAP',methods:[method]});assert.equal(bound.status,200,bound.error);
+ const paid=await f.call(path+'/receipt',{environment:'sandbox',credentialFingerprint:'a'.repeat(64),operation:'checkout-notification',externalId:'hosted-notice',sentAt:stamp(),observedAt:stamp(),requestBody:null,body:JSON.stringify(method==='QRIS'?notice(order):shopeeNotice(order))});assert.equal(paid.status,200,paid.error);
  const payment=(await f.call(path+'?environment=sandbox')).payment,p={order:paid.order,route:payment.route},rows=f.legs(p,{fee:321});
- for(const list of Object.values(rows))for(const r of list)r.channel='QRIS';
+ for(const list of Object.values(rows))for(const r of list)r.channel=method==='QRIS'?'QRIS':'EMONEY_SHOPEE_PAY';
  const missing=structuredClone(rows);missing.sellerPending=missing.sellerPending.filter(r=>r.transactionType!=='SETTLEMENT_FEE');
  const held=await f.reconcile(p,await f.collect(p,missing));assert.equal(held.status,200,held.error);assert.equal(held.settlementVerified,false);assert.equal((await f.journals()).items.length,1);
  const result=await f.reconcile(p,await f.collect(p,rows));assert.equal(result.status,200,result.error);assert.equal(result.settlementVerified,true);assert.equal(result.assessment.feeAmount,'321');assert.equal(result.earningsReleased,false);
  const balances=(await f.summary()).accounts;assert.equal(balances.provider_receivable,'0');assert.equal(balances.provider_cash_seller,String(order.total-321-p.route.binding.platformAmount));assert.equal(balances.provider_cash_platform,String(p.route.binding.platformAmount));
  const journals=(await f.journals()).items;assert.equal(journals.length,2);for(const j of journals)assert.equal(j.entries.reduce((sum,e)=>sum+BigInt(e.amount),0n),0n);
+});
+
+function shopeeNotice(order){return {service:{id:'EMONEY'},acquirer:{id:'SHOPEE_PAY'},channel:{id:'EMONEY_SHOPEE_PAY'},order:{invoice_number:order.id,amount:order.total},transaction:{status:'SUCCESS',date:stamp(),original_request_id:'shopee-original-request'},shopeepay_payment:{transaction_status:'3',transaction_message:'SUCCESS'}};}
+test('ShopeePay choice sends only ShopeePay, authenticates and deduplicates payment, and preserves original recovery',async t=>{
+ const f=await fixture(t,'QRIS,CREDIT_CARD,VIRTUAL_ACCOUNT_BCA,EMONEY_SHOPEEPAY'),order=await f.createHosted('shopeepay');
+ const config=await f.app.request('/cart/api/checkout-config.php');assert.deepEqual(config.data.payment_choices,['bca_va','doku_checkout','shopeepay']);
+ f.control.fail='/internal/commerce/hosted-payments/'+order.id+'/receipt';assert.equal((await dispatch(f)).code,2);
+ const calls=await f.creates();assert.equal(calls.length,1);assert.deepEqual(JSON.parse(calls[0].body).payment.payment_method_types,['EMONEY_SHOPEEPAY']);
+ const p=await f.payment(order.id);assert(p.binding.routing.profileId);assert(p.binding.routing.splitRuleId);
+ f.control.fail='';const n=shopeeNotice(order);
+ assert.equal((await notify(f,n,{invalid:true})).status,400);
+ for(const status of ['PENDING','FAILED','TIMEOUT','EXPIRED','REDIRECT'])assert.equal((await notify(f,{...n,transaction:{...n.transaction,status}},{id:status})).status,200);
+ assert.equal(await f.count('commerce_payment_captures'),0);assert.equal((await f.payment(order.id)).order.state,'creating');
+ for(const bad of [notice(order),{...n,order:{...n.order,amount:1}},{...n,service:{id:'QRIS'}},{...n,acquirer:{id:'OTHER'}},{...n,transaction:{...n.transaction,original_request_id:''}},{...n,shopeepay_payment:{transaction_status:'4'}},{...n,transaction:{...n.transaction,status:'REFUNDED'}}])assert.equal((await notify(f,bad)).status,503);
+ assert.equal((await notify(f,n)).status,200);assert.equal((await f.payment(order.id)).order.state,'paid');
+ const replay=structuredClone(n);delete replay.shopeepay_payment;assert.equal((await notify(f,replay,{id:'redelivery'})).status,200);assert.equal(await f.count('commerce_payment_captures'),1);assert.equal(await f.stock(),8);
+ n.transaction.original_request_id='second-charge';assert.equal((await notify(f,n,{id:'extra-charge'})).status,200);assert.equal(await f.count('commerce_payment_captures'),2);assert.equal(await f.stock(),8);assert.equal((await f.payment(order.id)).order.paymentReview,true);
+ assert.equal((await dispatch(f)).code,0);assert.equal((await f.creates()).length,1);
+});
+test('ShopeePay is unavailable unless configured and cannot replace an existing checkout choice',async t=>{
+ const f=await fixture(t),cookie=f.app.customerCookie(),headers={Cookie:cookie.name+'='+cookie.value};
+ const body={checkout_key:randomBytes(16).toString('hex'),cart:{tea:2},expected_prices:{tea:20000},expected_total:40000,shop:'alice-shop',shipping_id:'',payment_choice:'shopeepay',customer:{fullName:'Checkout Tester',email:'checkout@example.com',phone:'081234567890',location:'Jakarta Selatan',address:'Jalan Test Nomor 12',postalCode:'12345',note:'',coordinate:{latitude:-6.2,longitude:106.8}}};
+ assert.equal((await f.app.request('/cart/api/start.php',body,headers)).status,422);assert.equal(await f.count('orders'),0);assert.equal((await f.creates()).length,0);
+});
+
+test('PHP ShopeePay-only checkout freezes the default choice and changed original intents cannot create another session',async t=>{
+ const f=await fixture(t,'EMONEY_SHOPEEPAY'),cookie=f.app.customerCookie(),headers={Cookie:cookie.name+'='+cookie.value};
+ const config=await f.app.request('/cart/api/checkout-config.php');assert.deepEqual(config.data.payment_choices,['shopeepay']);
+ const body={checkout_key:randomBytes(16).toString('hex'),cart:{tea:2},expected_prices:{tea:20000},expected_total:40000,shop:'alice-shop',shipping_id:'',customer:{fullName:'Checkout Tester',email:'checkout@example.com',phone:'081234567890',location:'Jakarta Selatan',address:'Jalan Test Nomor 12',postalCode:'12345',note:'',coordinate:{latitude:-6.2,longitude:106.8}}};
+ const created=await f.app.request('/cart/api/start.php',body,headers);assert.equal(created.status,201,JSON.stringify(created)+f.app.logs());
+ const original=await f.record(created.data.order_id);assert.equal(original.snapshot.checkout.paymentChoice,'shopeepay');assert.deepEqual((await f.payment(original.id)).binding.methods,['EMONEY_SHOPEEPAY']);
+ assert.equal((await f.app.request('/cart/api/start.php',body,headers)).data.order_id,original.id);
+ assert.equal((await f.app.request('/cart/api/start.php',{...body,payment_choice:'doku_checkout'},headers)).status,409);
+ const explicit={...body,checkout_key:randomBytes(16).toString('hex'),payment_choice:'shopeepay'};
+ const second=await f.app.request('/cart/api/start.php',explicit,headers);assert.equal(second.status,201,JSON.stringify(second));assert.equal((await f.record(second.data.order_id)).snapshot.checkout.paymentChoice,'shopeepay');
+ assert.equal((await f.creates()).length,2);
 });

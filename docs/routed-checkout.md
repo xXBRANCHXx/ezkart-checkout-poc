@@ -1,6 +1,6 @@
 # Routed DOKU Checkout on workbench
 
-This adds DOKU's payment window for QRIS and one-time card SALE while keeping
+This adds DOKU's payment window for QRIS, ShopeePay and one-time card SALE while keeping
 Ezkart's cart, order and native BCA SNAP VA option. It creates one original
 Checkout session, with its original Sub-Account and flat split rule. No live
 payment, provider activation or financial hold changes were performed by this
@@ -18,8 +18,8 @@ Reviewed 28 September 2026:
 
 ## Frozen choices and recognition
 
-`checkout-config.php` publishes `payment_choices` (`bca_va`, `doku_checkout`)
-and `hosted_payment_methods` (`QRIS`, `CREDIT_CARD`). Optional POST
+`checkout-config.php` publishes `payment_choices` (`bca_va`, `doku_checkout`, `shopeepay`)
+and `hosted_payment_methods` (`QRIS`, `CREDIT_CARD`, `EMONEY_SHOPEEPAY`). Optional POST
 `payment_choice` is included in the original intent hash and immutable snapshot.
 The server chooses the flow; arbitrary shopper flow names are not accepted.
 Same-key changes are rejected, and original intent replay precedes current
@@ -77,8 +77,9 @@ code are installed:
    `doku_production_payment_flow=routed_hosted` and explicit comma-list
    `doku_production_checkout_methods` only after those merchant methods are
    approved. `VIRTUAL_ACCOUNT_BCA` exposes native BCA; `QRIS,CREDIT_CARD` expose
-   hosted choices. The provider hosted request contains only QRIS/cards. There
-   is no default method or automatic activation. Sandbox uses sandbox-prefixed
+   the QRIS/card choice; `EMONEY_SHOPEEPAY` exposes the separate ShopeePay choice.
+   Each ShopeePay session allows only `EMONEY_SHOPEEPAY`; QRIS/card sessions
+   exclude it. There is no default configured method or automatic activation. Sandbox uses sandbox-prefixed
    settings and cannot share production bindings.
 3. Enable new checkout only under the existing paid-beta activation procedure.
    Exercise one authorized original payment per approved method and verify its
@@ -105,3 +106,39 @@ binding remains uncertain: callbacks may confirm payment, but another Checkout
 create is prohibited. Current public status documentation does not expose the
 original hosted payment URL/token for a no-payment lost-create case; resolve that
 original invoice with DOKU, without replacing it or fabricating success.
+
+## ShopeePay — 28 September 2026
+
+The shopper can select **ShopeePay** when explicitly configured by the server.
+The choice is frozen in the original intent and order snapshot, and the Worker
+rejects a binding whose method list contradicts that choice. Existing bound
+sessions recover with their original methods. ShopeePay-only configurations also
+freeze the default for older callers omitting `payment_choice` without changing
+their request hash. QRIS guidance explains that ShopeePay can pay QRIS too.
+
+The [Checkout request](https://developers.doku.com/accept-payments/doku-checkout/integration-guide/backend-integration)
+uses `EMONEY_SHOPEEPAY`, whereas the documented
+[non-SNAP notification](https://developers.doku.com/get-started-with-doku-api/notification/http-notification-sample-non-snap)
+uses channel `EMONEY_SHOPEE_PAY`, service `EMONEY`, and acquirer `SHOPEE_PAY`.
+The adapter maps only that documented channel to the original allowed method.
+Success requires the original-request identifier; optional ShopeePay status fields
+must agree with success if present. The local charge correlation uses the
+invoice-scoped original request and acquirer, excluding delivery IDs and optional
+issuer fields so redelivery cannot cause another capture. Pending/failed events
+cannot mark an order paid. Browser redirects and popup closure remain non-authoritative.
+
+Account activation is **unconfirmed**: the current DOKU dashboard inspection
+rendered navigation but no service/settings content, including in the existing
+user tab. No activation request or configuration change was made. Before enabling
+`EMONEY_SHOPEEPAY`, confirm actual merchant activation, Collect & Route and the
+original seller/company wallets; verify the actual hosted app handoff and live
+payment/settlement during authorized beta acceptance. Fixtures establish our
+integration behavior, not DOKU's live account readiness.
+
+Verification: the hosted payment, payment-choice and popup suites passed all
+23 checks; the ShopeePay-only PHP checkout/default-choice check passed, and two
+additional QRIS/ShopeePay settlement checks passed with mismatched binding
+rejection. Desktop (1360px) and mobile (390px) screenshots were inspected with no
+clipping. PHP syntax, JavaScript syntax and the actual beta Worker dry-run passed.
+The ten broader central-checkout regression checks also passed. These tests use
+isolated provider fixtures and create no real charges.

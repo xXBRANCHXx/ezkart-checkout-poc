@@ -7,7 +7,7 @@ const order='EZK-S-1234567890ABCDEF12345678';
 async function fixture(t,width){
  const f=await setup();t.after(()=>f.close());const browser=await chromium.launch({headless:true});t.after(()=>browser.close());
  const page=await browser.newPage({viewport:{width,height:940}});page.setDefaultTimeout(7000);
- const state={choices:['bca_va','doku_checkout'],methods:['QRIS','CREDIT_CARD'],attempts:[],lost:true};
+ const state={choices:['bca_va','doku_checkout','shopeepay'],methods:['QRIS','CREDIT_CARD','EMONEY_SHOPEEPAY'],attempts:[],lost:true};
  await page.route('**/*',async route=>{
   const target=new URL(route.request().url());
   if(target.origin!==f.base)return route.abort();
@@ -24,13 +24,13 @@ async function fixture(t,width){
  await page.goto(f.base+'/cart/?shop=alice-shop&cart=tea:2');await page.locator('#to-checkout').click();
  return{f,page,state};
 }
-for(const [width,choice]of[[1360,'bca_va'],[390,'doku_checkout']])test(`shopper ${width}px chooses configured ${choice}; lost response and reload retain exact method and intent`,async t=>{
+for(const [width,choice]of[[1360,'bca_va'],[390,'doku_checkout'],[1360,'shopeepay'],[390,'shopeepay']])test(`shopper ${width}px chooses configured ${choice}; lost response and reload retain exact method and intent`,async t=>{
  const {f,page,state}=await fixture(t,width);
  await page.locator('#payment-choice-section').waitFor({state:'visible'});
  assert.equal(await page.locator('input[name=paymentChoice]:checked').inputValue(),'bca_va');
  await page.locator(`input[value=${choice}]`).check();
  for(const [name,value]of Object.entries({fullName:'Checkout Tester',phone:'081234567890',email:'checkout@example.com',location:'Jakarta Selatan',address:'Jalan Test Nomor 12',postalCode:'12345'}))await page.locator(`#customer-form [name=${name}]`).fill(value);
- await mkdir('/tmp/ezkart-hosted-payment-ui',{recursive:true});await page.locator('#payment-choice-section').screenshot({path:`/tmp/ezkart-hosted-payment-ui/choice-${width}.png`});
+ await mkdir('/tmp/ezkart-hosted-payment-ui',{recursive:true});await page.locator('#payment-choice-section').screenshot({path:`/tmp/ezkart-hosted-payment-ui/choice-${width}-${choice}.png`});
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
  await page.locator('#pay-button').click();await page.locator('#checkout-recovery').waitFor({state:'visible'});await page.locator('#recover-checkout:not([disabled])').waitFor();
  assert.equal(state.attempts.length,1);assert.equal(JSON.parse(state.attempts[0]).payment_choice,choice);assert.equal(JSON.parse(state.attempts[0]).customer.paymentChoice,undefined);
@@ -44,4 +44,11 @@ test('checkout shows only configured payment options and rejects unknown public 
  await page.reload();await page.locator('#to-checkout').click();await page.locator('#payment-choice-section').waitFor({state:'visible'});
  assert.equal(await page.locator('input[name=paymentChoice]').count(),1);assert.equal(await page.locator('input[name=paymentChoice]:checked').inputValue(),'doku_checkout');assert.match(await page.locator('#payment-choices').innerText(),/QRIS/);assert.doesNotMatch(await page.locator('#payment-choices').innerText(),/credit card/);
  state.choices=['unsupported'];await page.reload();await page.locator('#catalog-error').waitFor({state:'visible'});assert.equal(await page.locator('#to-checkout').isEnabled(),false);assert.equal(state.attempts.length,0);
+});
+
+test('ShopeePay-only configuration has a named choice and rejects missing method availability',async t=>{
+ const {page,state}=await fixture(t,390);state.choices=['shopeepay'];state.methods=['EMONEY_SHOPEEPAY'];
+ await page.reload();await page.locator('#to-checkout').click();await page.locator('#payment-choice-section').waitFor({state:'visible'});
+ assert.equal(await page.locator('input[name=paymentChoice]').count(),1);assert.equal(await page.locator('input[name=paymentChoice]:checked').inputValue(),'shopeepay');assert.match(await page.locator('#payment-choices').innerText(),/ShopeePay/);assert.doesNotMatch(await page.locator('#payment-choices').innerText(),/credit card|QRIS/);
+ state.methods=['QRIS'];await page.reload();await page.locator('#catalog-error').waitFor({state:'visible'});assert.equal(await page.locator('#to-checkout').isEnabled(),false);
 });
