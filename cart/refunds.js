@@ -82,7 +82,7 @@
     if(p.bank)box.append(el('p',p.bank.bankName+' · '+p.bank.accountName+' · account ending '+p.bank.accountEnding));
     else if(p.bankProvided)box.append(el('p','The buyer has provided private refund bank details to Ezkart.'));
     if(p.request)box.append(el('p','Original provider request prepared · '+date(p.request.preparedAt)),el('p','The destination is fixed for this request. Contact Ezkart if it needs correction; do not submit a replacement refund.'));
-    if(p.submission)box.append(el('p','Submission recorded · '+date(p.submission.submittedAt)),el('p','DOKU processing and the returned funds still need verification.'));
+    if(p.submission)box.append(el('p','Submission recorded · '+date(p.submission.submittedAt)),el('p',p.paymentConfirmed?'Returned funds are confirmed. The original submission is retained.':'DOKU processing and the returned funds still need verification.'));
     if(p.costs){
       const costs=p.costs,range=value=>value.minimum===value.maximum?money(value.minimum):money(value.minimum)+'–'+money(value.maximum),plan=el('section');plan.dataset.refundCosts='';
       plan.append(el('h4','Cost after a confirmed refund'),el('p','Planning amounts only. No refund payment or accounting entry is confirmed.'));

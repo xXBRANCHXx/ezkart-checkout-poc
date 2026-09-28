@@ -19,22 +19,24 @@ function databaseFailure(error){const value=String(error)+' '+String(error?.caus
   throw error;
 }
 export async function refundProcessingView(env,actor,row,authority,dispute){
-  const [bank,request,source]=await Promise.all([bankFor(env,row.id),requestFor(env,row.id),
-    env.DB.prepare('SELECT bank_id,settlement_id FROM commerce_refund_handoff_sources WHERE refund_id=?').bind(row.id).first()]);
+  const [bank,request,source,finalization]=await Promise.all([bankFor(env,row.id),requestFor(env,row.id),
+    env.DB.prepare('SELECT bank_id,settlement_id FROM commerce_refund_handoff_sources WHERE refund_id=?').bind(row.id).first(),env.DB.prepare('SELECT * FROM commerce_refund_finalizations WHERE refund_id=?').bind(row.id).first()]);
   const submission=request?await env.DB.prepare('SELECT * FROM commerce_refund_provider_submissions WHERE provider_request_id=?').bind(request.id).first():null;
   const approved=row.state==='approved',enabled=commerceStorageEnabled(env),staff=actor.kind==='support',fresh=staff&&authority.canWrite&&enabled;
   const reason=!approved?'Bank details are collected after approval.':dispute?.active?'An Ezkart review is open.':!bank?'Waiting for the buyer’s bank details.':
     !source?'The original payment and current settled funds must be verified before preparing a DOKU request.':'';
-  return {state:submission?'submitted':request?'prepared':approved?'awaiting_preparation':'not_approved',
-    stateLabel:submission?'Submitted to DOKU — refund not confirmed':request?'DOKU request prepared — submission not recorded':'Refund payment not confirmed',
+  return {state:finalization?'confirmed':submission?'submitted':request?'prepared':approved?'awaiting_preparation':'not_approved',
+    stateLabel:finalization?(actor.kind==='buyer'?'Refund confirmed':'Refund confirmed — funding reconciliation pending'):submission?'Submitted to DOKU — refund not confirmed':request?'DOKU request prepared — submission not recorded':'Refund payment not confirmed',
     bankProvided:Boolean(bank),bank:bank&&actor.kind!=='merchant'?{id:bank.id,bankName:bank.bank_name,accountName:bank.account_name,
       accountEnding:bank.account_number.slice(-4),savedAt:bank.created_at}:null,
     canProvideBank:enabled&&actor.kind==='buyer'&&approved&&!request&&!dispute?.active,
-    canPrepare:fresh&&!request&&Boolean(source),canDownload:fresh&&Boolean(request),canRecordSubmission:fresh&&Boolean(request)&&!submission,
+    canPrepare:fresh&&!request&&Boolean(source),canDownload:fresh&&Boolean(request),canRecordSubmission:!finalization&&fresh&&Boolean(request)&&!submission,
     requiresVerification:staff&&authority.role==='reviewer'&&!authority.canWrite,
     reason:request?'':reason,request:request?{id:request.id,preparedAt:request.created_at,...(staff?{settlementId:request.settlement_id}: {})}:null,
     submission:submission?{submittedAt:submission.submitted_at,recordedAt:submission.recorded_at,...(staff?{channel:submission.channel,reference:submission.reference}: {})}:null,
-    ...(actor.kind==='buyer'?{}:{costs:await refundCostPreview(env,row)}),paymentConfirmed:false};
+    ...(actor.kind==='buyer'?{}:{costs:finalization?null:await refundCostPreview(env,row)}),paymentConfirmed:Boolean(finalization),
+    ...(finalization?{confirmedAt:finalization.returned_at,fundingState:'unreconciled',refundFeeState:finalization.refund_fee_amount===null?'unknown':'custody_unresolved',
+      ...(actor.kind==='buyer'?{}:{commissionReversal:String(finalization.commission_reversal),actualRefundFee:finalization.refund_fee_amount===null?null:String(finalization.refund_fee_amount),refundFeePayer:null})}: {})};
 }
 
 export async function saveRefundBank(env,actor,refundId,raw,expectedOrder=''){

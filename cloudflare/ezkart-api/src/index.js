@@ -1,3 +1,4 @@
+import {finalizeConfirmedRefund} from './commerce-refund-finalization.js';
 import {beginDigitalUpload,digitalUpload,uploadDigitalPart,completeDigitalUpload,cancelDigitalUpload,digitalMerchantFile,digitalFileHistory,readyDigitalUpload,digitalVersionStatements,digitalCatalogSql,digitalCatalogFile,cleanupDigitalUploads,publicDigitalFiles} from './digital-files.js';
 import {buyerDigitalPurchases,createDigitalDownloadGrant,buyerDigitalFile,readDigitalDownloadGrant,buyerDigitalPart,acknowledgeDigitalPart} from './commerce-digital.js';
 import {hostedLandingResponse, landingPageLinks} from './landing-page-hosting.js';
@@ -1609,6 +1610,11 @@ export default {
         }
         if(request.method==='POST'&&url.pathname==='/internal/commerce/finance/earnings/reconcile'&&!url.search)return json({ok:true,...await reconcileEarnings(env,payload)});
         return json({ok:false,error:'Earnings route or method is unavailable'},404);
+      }
+      if(url.pathname==='/internal/commerce/finance/refunds/finalize'){
+        const payload=await authenticateCommerceService(request,env,{strictJSON:true,maxBytes:3000});
+        if(request.method!=='POST'||url.search)return json({ok:false,error:'Refund finalization route is unavailable'},404);
+        return json({ok:true,...await finalizeConfirmedRefund(env,payload)});
       }
       if(url.pathname.startsWith('/internal/commerce/finance/settlement')){
         const payload=await authenticateCommerceService(request,env,{strictJSON:true,maxBytes:3000});

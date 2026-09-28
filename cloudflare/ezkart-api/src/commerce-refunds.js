@@ -17,7 +17,7 @@ const labels={requested:'Awaiting store review',approved:'Approved — awaiting 
 const reservationSql="(r.state IN ('requested','approved') OR EXISTS(SELECT 1 FROM commerce_refund_disputes d WHERE d.refund_id=r.id AND d.state IN ('open','awaiting_buyer','awaiting_store')))";
 const reservedSql=`COALESCE((SELECT SUM(ri.amount) FROM commerce_refund_items ri JOIN commerce_refunds r ON r.id=ri.refund_id
   WHERE ri.order_item_id=i.id AND ${reservationSql}),0)`;
-const reasonFor=order=>order.payment_review?'This payment needs a support review.':order.checkout_state!=='paid'?
+const reasonFor=order=>order.payment_review?'This payment needs a support review.':!(order.checkout_state==='paid'||order.checkout_state==='partially_refunded'&&order.allocated_refund)?
   (['partially_refunded','refunded'].includes(order.checkout_state)?'This order’s refunds need a support review.':'Refund requests open after payment is confirmed.'):
   !order.capture_id?'This payment needs a support review.':'';
 
@@ -37,6 +37,7 @@ async function orderFor(env,actor,orderId){
   if(!/^EZK-[SP]-[A-F0-9]{24}$/.test(orderId||''))fail('Order not found.',404);
   const authority=await access(env,actor,orderId);
   const order=await env.DB.prepare(`SELECT o.id,o.seller_id,o.checkout_state,o.payment_review,o.revision,o.shipping_amount,o.total_amount,
+    EXISTS(SELECT 1 FROM commerce_refund_order_totals t WHERE t.order_id=o.id AND t.refunded_amount<o.total_amount) AS allocated_refund,
     json_extract(o.customer_snapshot_json,'$.name') AS customer_name,
     (SELECT c.id FROM commerce_payment_captures c WHERE c.order_id=o.id AND c.capture_kind='order_payment' AND c.amount=o.total_amount) AS capture_id
     FROM orders o WHERE o.id=? AND o.seller_id=? AND o.commerce_environment=? AND o.commerce_version=1`).bind(orderId,authority.sellerId,mode(env)).first();
@@ -53,9 +54,9 @@ function databaseFailure(error){
   if(/refund_|UNIQUE constraint failed/.test(text))conflict('The order or refund allocation changed. Reload and review the saved request.');
   throw error;
 }
-const caseView=row=>({id:row.id,orderId:row.order_id,revision:row.revision,state:row.state,stateLabel:disputeActive(row.dispute_state)?'Ezkart review in progress':labels[row.state],
-  amount:row.amount,currency:'IDR',createdAt:row.created_at,updatedAt:row.updated_at,
-  paymentConfirmed:false,processingAvailable:false});
+const caseView=row=>({id:row.id,orderId:row.order_id,revision:row.revision,state:row.finalized_at?'confirmed':row.state,stateLabel:row.finalized_at?'Refund confirmed':disputeActive(row.dispute_state)?'Ezkart review in progress':labels[row.state],
+  amount:row.amount,currency:'IDR',createdAt:row.created_at,updatedAt:row.finalized_at||row.updated_at,
+  paymentConfirmed:Boolean(row.finalized_at),processingAvailable:false});
 
 export async function refundOrder(env,actor,orderId){
   const {order,authority}=await orderFor(env,actor,orderId);
@@ -77,7 +78,7 @@ export async function refundOrder(env,actor,orderId){
 
 export async function refundDetail(env,actor,id,expectedOrder=''){
   caseId(id);
-  const row=await env.DB.prepare('SELECT * FROM commerce_refunds WHERE id=? AND commerce_environment=?').bind(id,mode(env)).first();
+  const row=await env.DB.prepare(`SELECT r.*,(SELECT f.returned_at FROM commerce_refund_finalizations f WHERE f.refund_id=r.id) AS finalized_at FROM commerce_refunds r WHERE r.id=? AND r.commerce_environment=?`).bind(id,mode(env)).first();
   if(!row||(expectedOrder&&row.order_id!==expectedOrder))fail('Refund request not found.',404);
   if(actor.kind==='support'&&row.state!=='approved'&&!await env.DB.prepare('SELECT id FROM commerce_refund_disputes WHERE refund_id=?').bind(id).first())fail('Review not found.',404);
   const {order,authority}=await orderFor(env,actor,row.order_id);if(order.seller_id!==row.seller_id)fail('Refund request not found.',404);
@@ -111,7 +112,7 @@ export async function refundDetail(env,actor,id,expectedOrder=''){
   const processing=await refundProcessingView(env,actor,row,authority,dispute);
   await access(env,actor,row.order_id);
   return {...caseView({...row,dispute_state:dispute?.state}),orderRevision:order.revision,reason:data.reason,note:data.note,shippingAmount:row.shipping_amount,
-    processing,dispute,canRequestReview:commerceStorageEnabled(env)&&authority.canWrite&&actor.kind!=='support'&&!dispute&&row.state!=='withdrawn',
+    processing,dispute,canRequestReview:!row.finalized_at&&commerceStorageEnabled(env)&&authority.canWrite&&actor.kind!=='support'&&!dispute&&row.state!=='withdrawn',
     evidenceVersion:result[4].results.reduce((sum,file)=>sum+1+(file.state==='ready'?1:0),0),
     canUploadEvidence:commerceStorageEnabled(env)&&authority.canWrite&&actor.kind!=='support',
     attachments:result[4].results.map(file=>({id:file.id,actor:file.actor_kind==='merchant'?'Store':'Buyer',filename:file.filename,
@@ -130,13 +131,13 @@ export async function refundDetail(env,actor,id,expectedOrder=''){
 export async function refundList(env,actor,url,orderId=''){
   const authority=orderId?(await orderFor(env,actor,orderId)).authority:await access(env,actor,'');
   for(const key of url.searchParams.keys())if(!['state','cursor'].includes(key)||url.searchParams.getAll(key).length!==1)fail('Refund filters are invalid.');
-  const state=url.searchParams.get('state')||'all';if(!['all','open','requested','approved','declined','withdrawn'].includes(state))fail('Refund status is invalid.');
+  const state=url.searchParams.get('state')||'all';if(!['all','open','requested','approved','confirmed','declined','withdrawn'].includes(state))fail('Refund status is invalid.');
   const scope=await commerceHash({actor,environment:mode(env),orderId,state}),cursor=url.searchParams.has('cursor')?readReviewCursor(url.searchParams.get('cursor'),scope):null;
   if(cursor&&(!Number.isSafeInteger(cursor.cap)||!Number.isSafeInteger(cursor.before)||cursor.before<1||cursor.cap<cursor.before))fail('Refund page is invalid.');
   const cap=cursor?.cap??(await env.DB.prepare('SELECT COALESCE(MAX(sequence),0) AS cap FROM commerce_refunds WHERE seller_id=? AND commerce_environment=?').bind(authority.sellerId,mode(env)).first()).cap;
-  const result=await env.DB.prepare(`SELECT r.*,(SELECT d.state FROM commerce_refund_disputes d WHERE d.refund_id=r.id) AS dispute_state
+  const result=await env.DB.prepare(`SELECT r.*,(SELECT f.returned_at FROM commerce_refund_finalizations f WHERE f.refund_id=r.id) AS finalized_at,(SELECT d.state FROM commerce_refund_disputes d WHERE d.refund_id=r.id) AS dispute_state
     FROM commerce_refunds r WHERE r.seller_id=? AND r.commerce_environment=? AND (?='' OR r.order_id=?)
-    AND r.sequence<=? AND r.sequence<? AND (?='all' OR (?='open' AND ${reservationSql}) OR r.state=?) ORDER BY r.sequence DESC LIMIT 26`)
+    AND r.sequence<=? AND r.sequence<? AND (?='all' OR (?='open' AND ${reservationSql}) OR (CASE WHEN EXISTS(SELECT 1 FROM commerce_refund_finalizations f WHERE f.refund_id=r.id) THEN 'confirmed' ELSE r.state END)=?) ORDER BY r.sequence DESC LIMIT 26`)
     .bind(authority.sellerId,mode(env),orderId,orderId,cap,cursor?.before??cap+1,state,state,state).all();
   const rows=result.results.slice(0,25);await access(env,actor,orderId);
   return {refunds:rows.map(caseView),nextCursor:result.results.length>25?reviewCursor({v:1,scope,cap,before:rows.at(-1).sequence}):null,enabled:commerceStorageEnabled(env)};

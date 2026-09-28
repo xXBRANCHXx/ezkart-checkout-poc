@@ -80,22 +80,22 @@ export async function supportRefunds(env,actor,url){
   if(cursor&&(!Number.isSafeInteger(cursor.cap)||!Number.isSafeInteger(cursor.before)||cursor.before<1||cursor.cap<cursor.before))fail('Review page is invalid.');
   if(state==='processing'){
     const cap=cursor?.cap??(await env.DB.prepare('SELECT COALESCE(MAX(sequence),0) cap FROM commerce_refunds WHERE commerce_environment=?').bind(mode(env)).first()).cap;
-    const rows=(await env.DB.prepare(`SELECT r.*,s.name AS store_name,q.id AS provider_request_id,x.id AS submitted_id FROM commerce_refunds r JOIN sellers s ON s.id=r.seller_id
+    const rows=(await env.DB.prepare(`SELECT r.*,(SELECT f.returned_at FROM commerce_refund_finalizations f WHERE f.refund_id=r.id) AS finalized_at,s.name AS store_name,q.id AS provider_request_id,x.id AS submitted_id FROM commerce_refunds r JOIN sellers s ON s.id=r.seller_id
       LEFT JOIN commerce_refund_provider_requests q ON q.refund_id=r.id LEFT JOIN commerce_refund_provider_submissions x ON x.provider_request_id=q.id
       WHERE r.commerce_environment=? AND r.state='approved' AND r.sequence<=? AND r.sequence<? ORDER BY r.sequence DESC LIMIT 26`)
       .bind(mode(env),cap,cursor?.before??cap+1).all()).results;
-    await supportAccess(env,actor);return {refunds:rows.slice(0,25).map(r=>({id:r.id,orderId:r.order_id,state:r.state,
-      stateLabel:r.submitted_id?'Submitted to DOKU — refund not confirmed':r.provider_request_id?'DOKU request prepared':'Approved — prepare refund',
-      amount:r.amount,createdAt:r.created_at,storeName:r.store_name,paymentConfirmed:false,processingAvailable:false})),enabled:commerceStorageEnabled(env),
+    await supportAccess(env,actor);return {refunds:rows.slice(0,25).map(r=>({id:r.id,orderId:r.order_id,state:r.finalized_at?'confirmed':r.state,
+      stateLabel:r.finalized_at?'Refund confirmed — funding reconciliation pending':r.submitted_id?'Submitted to DOKU — refund not confirmed':r.provider_request_id?'DOKU request prepared':'Approved — prepare refund',
+      amount:r.amount,createdAt:r.created_at,storeName:r.store_name,paymentConfirmed:Boolean(r.finalized_at),processingAvailable:false})),enabled:commerceStorageEnabled(env),
       nextCursor:rows.length>25?reviewCursor({v:1,scope,cap,before:rows[24].sequence}):null};
   }
   const cap=cursor?.cap??(await env.DB.prepare('SELECT COALESCE(MAX(sequence),0) cap FROM commerce_refund_disputes WHERE commerce_environment=?').bind(mode(env)).first()).cap;
-  const rows=(await env.DB.prepare(`SELECT r.*,d.state AS review_state,d.sequence AS review_sequence,d.created_at AS review_created_at,s.name AS store_name
+  const rows=(await env.DB.prepare(`SELECT r.*,(SELECT f.returned_at FROM commerce_refund_finalizations f WHERE f.refund_id=r.id) AS finalized_at,d.state AS review_state,d.sequence AS review_sequence,d.created_at AS review_created_at,s.name AS store_name
     FROM commerce_refund_disputes d JOIN commerce_refunds r ON r.id=d.refund_id JOIN sellers s ON s.id=d.seller_id
     WHERE d.commerce_environment=? AND d.sequence<=? AND d.sequence<? AND (?='all' OR (?='open' AND d.state IN ('open','awaiting_buyer','awaiting_store'))
       OR (?='closed' AND d.state IN ('approved','declined','withdrawn')) OR d.state=?) ORDER BY d.sequence DESC LIMIT 26`)
     .bind(mode(env),cap,cursor?.before??cap+1,state,state,state,state).all()).results;
-  await supportAccess(env,actor);return {refunds:rows.slice(0,25).map(r=>({id:r.id,orderId:r.order_id,state:r.state,stateLabel:labels[r.review_state],amount:r.amount,
-    createdAt:r.review_created_at,storeName:r.store_name,paymentConfirmed:false,processingAvailable:false})),enabled:commerceStorageEnabled(env),
+  await supportAccess(env,actor);return {refunds:rows.slice(0,25).map(r=>({id:r.id,orderId:r.order_id,state:r.finalized_at?'confirmed':r.state,stateLabel:r.finalized_at?'Refund confirmed':labels[r.review_state],amount:r.amount,
+    createdAt:r.review_created_at,storeName:r.store_name,paymentConfirmed:Boolean(r.finalized_at),processingAvailable:false})),enabled:commerceStorageEnabled(env),
     nextCursor:rows.length>25?reviewCursor({v:1,scope,cap,before:rows[24].review_sequence}):null};
 }
