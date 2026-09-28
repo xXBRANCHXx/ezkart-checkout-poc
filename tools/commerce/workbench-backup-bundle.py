@@ -5,6 +5,7 @@ from contextlib import contextmanager
 import datetime
 import fcntl
 import hashlib
+import hmac
 import importlib.util
 import json
 import os
@@ -20,6 +21,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
+import xml.etree.ElementTree as ET
 
 spec = importlib.util.spec_from_file_location("database_backup", Path(__file__).with_name("workbench-backup.py"))
 db = importlib.util.module_from_spec(spec)
@@ -115,23 +117,43 @@ class NoStorageRedirect(urllib.request.HTTPRedirectHandler):
 
 
 class CloudflareStorage:
-    """REST adapter; credentials are supplied by the scheduler's environment only."""
+    """R2 S3 adapter. SigV4, no redirects/retries; operator environment only."""
     def __init__(self, deployment):
         self.deployment = deployment
         self.buckets = buckets(deployment)
         account = os.environ.get("CLOUDFLARE_ACCOUNT_ID", "")
-        token = os.environ.get("CLOUDFLARE_API_TOKEN", "")
-        require(re.fullmatch(r"[0-9a-f]{32}", account) and token, "Supply CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN.")
-        self.base = f"https://api.cloudflare.com/client/v4/accounts/{account}/r2/buckets/"
-        self.headers = {"Authorization": "Bearer " + token, "User-Agent": TOOL}
+        self.access_key = os.environ.get("R2_ACCESS_KEY_ID", "")
+        self.secret_key = os.environ.get("R2_SECRET_ACCESS_KEY", "")
+        require(re.fullmatch(r"[0-9a-f]{32}", account) and self.access_key and self.secret_key,
+                "Supply CLOUDFLARE_ACCOUNT_ID, R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY.")
+        self.base = f"https://{account}.r2.cloudflarestorage.com"
 
     def url(self, bucket, key=None):
         require(bucket in self.buckets, "Bucket is outside the selected workbench environment.")
-        url = self.base + bucket + "/objects"
+        url = self.base + "/" + bucket
         if key is not None:
             require(isinstance(key, str) and key and "\x00" not in key, "Invalid object key.")
-            url += "/" + urllib.parse.quote(key, safe="")
+            url += "/" + urllib.parse.quote(key, safe="/-_.~")
         return url
+
+    def signed_headers(self, url, method, payload_hash, extra=None, at=None, region="auto"):
+        """AWS Signature Version 4; S3 paths must never be normalized."""
+        at = at or datetime.datetime.now(datetime.timezone.utc)
+        stamp, day = at.strftime("%Y%m%dT%H%M%SZ"), at.strftime("%Y%m%d")
+        parsed = urllib.parse.urlsplit(url)
+        headers = {"host": parsed.netloc, "x-amz-date": stamp, "x-amz-content-sha256": payload_hash,
+                   **{k.lower(): " ".join(v.split()) for k, v in (extra or {}).items()}}
+        names = ";".join(sorted(headers))
+        canonical = "\n".join([method, parsed.path, parsed.query,
+                               "".join(f"{k}:{headers[k]}\n" for k in sorted(headers)), names, payload_hash])
+        scope = day + "/" + region + "/s3/aws4_request"
+        signing = ("AWS4" + self.secret_key).encode()
+        for value in (day, region, "s3", "aws4_request"):
+            signing = hmac.new(signing, value.encode(), hashlib.sha256).digest()
+        to_sign = "\n".join(["AWS4-HMAC-SHA256", stamp, scope, hashlib.sha256(canonical.encode()).hexdigest()])
+        signature = hmac.new(signing, to_sign.encode(), hashlib.sha256).hexdigest()
+        headers["Authorization"] = f"AWS4-HMAC-SHA256 Credential={self.access_key}/{scope}, SignedHeaders={names}, Signature={signature}"
+        return headers
 
     def writable(self, bucket, key):
         prefix = f"{EXCLUDED}{TOOL}/{self.deployment}/"
@@ -140,7 +162,13 @@ class CloudflareStorage:
         require(key == object_key(self.deployment, run_id), "Refusing an arbitrary backup path.")
 
     def request(self, url, method="GET", data=None, extra=None):
-        request = urllib.request.Request(url, method=method, data=data, headers={**self.headers, **(extra or {})})
+        payload_hash = hashlib.sha256(b"").hexdigest()
+        if data is not None:
+            position = data.tell()
+            payload_hash = hashlib.file_digest(data, "sha256").hexdigest()
+            data.seek(position)
+        headers = self.signed_headers(url, method, payload_hash, extra)
+        request = urllib.request.Request(url, method=method, data=data, headers=headers)
         try:
             return urllib.request.build_opener(NoStorageRedirect()).open(request, timeout=40)
         except urllib.error.HTTPError as error:
@@ -153,19 +181,37 @@ class CloudflareStorage:
             raise BackupError("Storage request failed; private run state is retained.") from None
 
     def list_page(self, bucket, cursor):
-        query = {"per_page": 1000}
+        query = {"list-type": "2", "max-keys": "1000", "encoding-type": "url"}
         if cursor:
-            query["cursor"] = cursor
-        with self.request(self.url(bucket) + "?" + urllib.parse.urlencode(query)) as response:
+            query["continuation-token"] = cursor
+        encoded = urllib.parse.urlencode(sorted(query.items()), quote_via=urllib.parse.quote, safe="-_.~")
+        with self.request(self.url(bucket) + "?" + encoded) as response:
             raw = response.read(8 * 1024 ** 2 + 1)
-        require(len(raw) <= 8 * 1024 ** 2, "Storage listing exceeded its bound.")
-        value = json.loads(raw)
-        require(value.get("success") is True and isinstance(value.get("result"), list), "Storage inventory did not succeed.")
-        info = value.get("result_info", {})
-        if info.get("is_truncated", False):
-            require(isinstance(info.get("cursor"), str) and info["cursor"], "Truncated inventory has no continuation cursor.")
-            return value["result"], info["cursor"]
-        return value["result"], None
+        require(len(raw) <= 8 * 1024 ** 2 and b"<!DOCTYPE" not in raw and b"<!ENTITY" not in raw,
+                "Storage listing exceeded its bound or contains unsafe XML.")
+        try:
+            root = ET.fromstring(raw)
+        except ET.ParseError:
+            raise BackupError("Invalid S3 inventory XML.") from None
+        ns = "{http://s3.amazonaws.com/doc/2006-03-01/}"
+        require(root.tag == ns + "ListBucketResult" and root.findtext(ns + "Name") == bucket
+                and root.findtext(ns + "EncodingType") == "url", "Storage inventory scope/encoding mismatch.")
+        truncated = root.findtext(ns + "IsTruncated")
+        require(truncated in ("true", "false"), "Storage inventory has no truncation status.")
+        rows = []
+        for entry in root.findall(ns + "Contents"):
+            key = entry.findtext(ns + "Key")
+            require(isinstance(key, str), "Storage inventory has no key.")
+            rows.append({"key": urllib.parse.unquote(key, errors="strict"), "size": entry.findtext(ns + "Size"),
+                         "etag": entry.findtext(ns + "ETag"), "last_modified": entry.findtext(ns + "LastModified"),
+                         "storage_class": entry.findtext(ns + "StorageClass")})
+        require(len(rows) <= 1000 and not root.findall(ns + "CommonPrefixes"), "Incomplete storage inventory.")
+        cursor = root.findtext(ns + "NextContinuationToken")
+        if truncated == "true":
+            require(isinstance(cursor, str) and cursor, "Truncated inventory has no continuation cursor.")
+            return rows, cursor
+        require(not cursor, "Untruncated inventory unexpectedly has a continuation cursor.")
+        return rows, None
 
     def download(self, bucket, key, path, limit):
         with self.request(self.url(bucket, key)) as response:
@@ -183,7 +229,7 @@ class CloudflareStorage:
     def upload_new(self, bucket, key, path):
         self.writable(bucket, key)
         try:
-            with self.request(self.url(bucket, key)):
+            with self.request(self.url(bucket, key), "HEAD"):
                 pass
         except FileNotFoundError:
             pass
@@ -193,14 +239,12 @@ class CloudflareStorage:
             "Content-Length": str(db.private_file(path).st_size),
             "Content-Type": "application/pkcs7-mime", "If-None-Match": "*",
         }) as response:
-            raw = response.read(1024 ** 2 + 1)
-            require(len(raw) <= 1024 ** 2 and json.loads(raw).get("success") is True, "Upload acknowledgement is unknown; use recover, never retry this upload.")
+            require(response.status == 200, "Upload acknowledgement is unknown; use recover, never retry this upload.")
 
     def delete_verified(self, bucket, key):
         self.writable(bucket, key)
         with self.request(self.url(bucket, key), "DELETE") as response:
-            raw = response.read(1024 ** 2 + 1)
-            require(len(raw) <= 1024 ** 2 and json.loads(raw).get("success") is True, "Retention deletion was not acknowledged.")
+            require(response.status == 204, "Retention deletion was not acknowledged.")
 
 
 def inventory(storage, bucket, max_pages, max_objects, max_object_bytes):
@@ -411,7 +455,7 @@ def retain(storage, root, deployment, newest, keep):
 DEFAULT_LIMITS = {"pages": 100, "objects": 10000, "object_bytes": 32 * 1024 ** 2, "total_bytes": 256 * 1024 ** 2}
 
 
-def archive(deployment, state, public_certificate, storage, run=db.command, keep=0, limits=None):
+def archive(deployment, state, public_certificate, storage, run=db.command, keep=0, limits=None, run_id=None):
     buckets(deployment)
     require(storage.deployment == deployment, "Storage adapter environment does not match the database target.")
     limits = dict(DEFAULT_LIMITS if limits is None else limits)
@@ -420,7 +464,8 @@ def archive(deployment, state, public_certificate, storage, run=db.command, keep
     require(isinstance(keep, int) and keep >= 0, "Retention count must be nonnegative.")
     cert = certificate(public_certificate)
     with locked(state, deployment) as root:
-        run_id = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ-") + uuid.uuid4().hex
+        run_id = run_id or datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ-") + uuid.uuid4().hex
+        object_key(deployment, run_id)
         directory = db.private_directory(root / run_id, create=True)
         progress = {"tool": TOOL, "deployment": deployment, "runId": run_id, "stage": "database", "startedAt": db.now(),
                     "bucket": buckets(deployment)[1], "key": object_key(deployment, run_id)}
@@ -588,6 +633,8 @@ def main(argv=None):
     with bounded(args.timeout_seconds):
         if args.action == "restore":
             return restore(args.deployment, args.ciphertext, args.receipt, args.private_key, args.output)
+        if args.action == "archive":
+            require(os.environ.get("CLOUDFLARE_API_TOKEN"), "Supply CLOUDFLARE_API_TOKEN for D1 export.")
         storage = CloudflareStorage(args.deployment)
         if args.action == "recover":
             return recover(args.deployment, args.state_directory, args.run_id, storage)

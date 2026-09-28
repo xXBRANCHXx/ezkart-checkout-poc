@@ -1,0 +1,16 @@
+[Unit]
+Description=Bounded Ezkart workbench encrypted backup
+
+[Service]
+Type=oneshot
+# Install the repository (with Wrangler dependencies) at this fixed reviewed path.
+WorkingDirectory=%h/ezkart-operations
+EnvironmentFile=%h/.config/ezkart-backup/credentials.env
+Environment=WRANGLER_SEND_METRICS=false
+ExecStart=/usr/bin/python3 -B %h/ezkart-operations/tools/commerce/workbench-backup-runner.py run --config=%h/.config/ezkart-backup/runner.json
+TimeoutStartSec=65min
+TimeoutStopSec=30s
+KillMode=control-group
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true

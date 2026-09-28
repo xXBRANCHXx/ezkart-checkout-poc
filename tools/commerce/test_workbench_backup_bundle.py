@@ -97,7 +97,7 @@ class BundleTests(unittest.TestCase):
             thread = Thread(target=server.serve_forever, daemon=True)
             thread.start()
             try:
-                with patch.dict(os.environ, {'CLOUDFLARE_ACCOUNT_ID': 'a' * 32, 'CLOUDFLARE_API_TOKEN': 'fixture-only'}):
+                with patch.dict(os.environ, {'CLOUDFLARE_ACCOUNT_ID': 'a' * 32, 'R2_ACCESS_KEY_ID': 'fixture', 'R2_SECRET_ACCESS_KEY': 'fixture-secret'}):
                     storage = bundle.CloudflareStorage('beta')
                 with self.assertRaises(bundle.BackupError):
                     storage.request(f'http://127.0.0.1:{server.server_port}/original')
@@ -270,7 +270,7 @@ class BundleTests(unittest.TestCase):
         with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
             bundle.main(["archive", "--once", "--deployment=beta", "--deployment=test", "--state-directory=" + str(self.state), "--certificate=" + str(self.cert)])
         self.assertEqual(self.calls, [])
-        with patch.dict(os.environ, {"CLOUDFLARE_ACCOUNT_ID": "a" * 32, "CLOUDFLARE_API_TOKEN": "offline-fixture"}):
+        with patch.dict(os.environ, {"CLOUDFLARE_ACCOUNT_ID": "a" * 32, "R2_ACCESS_KEY_ID": "fixture", "R2_SECRET_ACCESS_KEY": "fixture-secret"}):
             adapter = bundle.CloudflareStorage("beta")
             for bucket, key in (("ezkart-test-private", bundle.object_key("beta", "20000101T000000Z-" + "d" * 32)),
                                 ("ezkart-beta-private", "products/app.bin"),
@@ -380,8 +380,8 @@ class BundleTests(unittest.TestCase):
         with self.assertRaises(bundle.BackupError):
             bundle.authenticated_envelope(cipher)
 
-    def test_rest_adapter_uses_conditional_upload_and_rejects_truncated_inventory(self):
-        with patch.dict(os.environ, {"CLOUDFLARE_ACCOUNT_ID": "a" * 32, "CLOUDFLARE_API_TOKEN": "offline-fixture"}):
+    def test_s3_adapter_uses_conditional_upload_and_rejects_truncated_inventory(self):
+        with patch.dict(os.environ, {"CLOUDFLARE_ACCOUNT_ID": "a" * 32, "R2_ACCESS_KEY_ID": "fixture", "R2_SECRET_ACCESS_KEY": "fixture-secret"}):
             adapter = bundle.CloudflareStorage("beta")
         payload = self.state / "cipher.cms"
         bundle.save_bytes(payload, b"encrypted fixture")
@@ -389,17 +389,19 @@ class BundleTests(unittest.TestCase):
         calls = []
         def request(url, method="GET", data=None, extra=None):
             calls.append((url, method, extra))
-            if method == "GET":
+            if method == "HEAD":
                 raise FileNotFoundError()
             self.assertEqual(data.read(), b"encrypted fixture")
-            return io.BytesIO(b'{"success":true}')
+            response = io.BytesIO(b"")
+            response.status = 200
+            return response
         with patch.object(adapter, "request", side_effect=request):
             adapter.upload_new("ezkart-beta-private", key, payload)
-        self.assertEqual([call[1] for call in calls], ["GET", "PUT"])
+        self.assertEqual([call[1] for call in calls], ["HEAD", "PUT"])
         self.assertEqual(calls[1][2]["If-None-Match"], "*")
-        self.assertIn("operations%2Fbackups%2F", calls[1][0])
-        truncated = {"success": True, "result": [], "result_info": {"is_truncated": True}}
-        with patch.object(adapter, "request", return_value=io.BytesIO(json.dumps(truncated).encode())):
+        self.assertIn("operations/backups/", calls[1][0])
+        truncated = b'<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Name>ezkart-beta-private</Name><EncodingType>url</EncodingType><IsTruncated>true</IsTruncated></ListBucketResult>'
+        with patch.object(adapter, "request", return_value=io.BytesIO(truncated)):
             with self.assertRaisesRegex(bundle.BackupError, "continuation cursor"):
                 adapter.list_page("ezkart-beta-private", None)
         with patch.object(adapter, "request", return_value=io.BytesIO(b"existing ciphertext")) as request_mock:

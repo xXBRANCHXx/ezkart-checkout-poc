@@ -1,0 +1,10 @@
+{
+  "deployment": "beta",
+  "stateDirectory": "/absolute/private/backup-state",
+  "certificate": "/absolute/public/recovery-certificate.pem",
+  "intervalSeconds": 86400,
+  "retrySeconds": 3600,
+  "graceSeconds": 3600,
+  "timeoutSeconds": 900,
+  "retain": 0
+}

@@ -93,3 +93,21 @@ The 20:00:34 read-only report then returns exactly `jobs_uncertain` and
 `payout_runner_held`, with no reconciliation backlog. Warning exit 2 is intentional:
 scheduler liveness does not clear the uncertain wallet or enable provider reads.
 External alert delivery and operational ownership are still unaccepted.
+
+
+## Host backup signal adapter
+
+The backup host supplies a separate read-only JSON report (no schema migration):
+
+```sh
+python3 -B tools/commerce/workbench-backup-runner.py report --config=/absolute/private/runner.json
+```
+
+Poll this alongside the commerce report every five minutes. Exit 2 and the
+`backup_*` warning codes expose missing/overdue scheduler polls, never-successful
+or overdue backups, failed/interrupted attempts and clock problems. Exit 1 or a
+missing host response is an inspection failure. Last attempt, verified success
+and original failure are recorded durably; the report does not contact R2 or
+establish fresh remote durability. A successful commerce report does not imply
+healthy host backups. See [backup runner and installation](workbench-backup-command.md#recurring-execution-and-machine-readable-monitoring)
+for the schema, timer, credential dependencies and remaining alert-routing step.
