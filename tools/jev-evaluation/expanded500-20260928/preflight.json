@@ -1,0 +1,13 @@
+{
+  "cases": 500,
+  "images": 100,
+  "totalReservationMicrousd": 2713494,
+  "maxTextBytes": 6369,
+  "benchmarkSha256": "16bc595a9dec8da15ed9138ff4801467861eb67e1fb8335370ac9b495012a0df",
+  "adapterSha256": "a9ceb4abc8c410ffd1d21fb0edeeee4d41272a6f6d33a1fc1224bdb20696ea60",
+  "priceCeiling": {
+    "prompt": 0.25,
+    "completion": 1.5
+  },
+  "maxTokens": 2000
+}
