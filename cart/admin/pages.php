@@ -219,7 +219,7 @@ function ez_orders_table(array $rows, string $tableId, string $csrfToken, string
   </section>
 
 <?php break; case 'returns': require __DIR__ . '/returns.php'; ?>
-<?php break; case 'treasury': require __DIR__ . '/treasury.php'; break; case 'support-refunds': require __DIR__ . '/support-refunds.php'; ?>
+<?php break; case 'jev': require __DIR__ . '/jev.php'; break; case 'treasury': require __DIR__ . '/treasury.php'; break; case 'support-refunds': require __DIR__ . '/support-refunds.php'; ?>
 <?php break; case 'refunds': require __DIR__ . '/refunds.php'; ?>
 <?php break; case 'shipping-settings': require __DIR__ . '/shipping-settings.php'; ?>
 
