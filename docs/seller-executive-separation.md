@@ -48,3 +48,21 @@ Onboarding API tests cover owner/non-owner isolation and readiness transitions;
 merchant onboarding UI verifies the toast disappears only on completion.
 Executive `tools/operations.test.mjs` and `tools/access.test.mjs` cover the signed
 connection, isolated sessions, native workspaces and browser approval boundaries.
+
+## Hosted acceptance — 28 September 2026
+
+Workbench commit `63977bb` and Executive `96e8e33` / `bea3647` were pushed to
+their configured branches and observed on their separate hosts. Beta Worker
+version `1e028ada-8cc2-41c6-a72c-9774fb38206b` supplies the completion endpoint.
+The existing signed-in seller shows no onboarding or internal-operation sidebar
+entries and has a visible setup reminder at desktop and 390px, with no horizontal
+overflow. Its MFA screen now names and returns to seller setup. Completion and
+reminder removal were verified in the isolated merchant workflow, without changing
+the real seller's legal or bank details.
+
+The approved Executive browser completed the real operator connection and loaded
+the saved moderation queue and native refund workspace. The company treasury
+workspace preserved the existing operator-access denial for that account; no role
+was granted and no authenticator, financial dispatch or model run was performed.
+All targeted API, approved-browser, onboarding and migrated workflow checks pass,
+including treasury lost-response recovery and responsive refund processing.
