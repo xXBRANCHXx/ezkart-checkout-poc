@@ -167,8 +167,9 @@ Private local metadata was read without revealing the key: the key file is mode
 0600, labelled Ezkart Jev Beta, with $5 total/no reset and 27 December 2026 expiry.
 Operations separately verified the actual authenticated key metadata before the
 run: limit $5, remaining $5, usage $0 and that expiry. Do not commit the secret
-or copy it into fixtures. This document does not claim calls have run; record the
-six actual outcomes, costs and human grades after the adapter produces them.
+or copy it into fixtures. The six approved calls ran once on 28 September 2026. See
+[the initial diagnostic results](jev-evaluation-results-2026-09-28.md). Agent
+review notes are distinct from the owner’s saved grades.
 
 Run the offline fixture consistency check with
 `node tools/jev-evaluation/check-fixtures.mjs`. It checks this small bundle only;
