@@ -40,6 +40,7 @@ Use merchant-facing controls for appearance settings: numeric values with separa
   credentials. Main and `ezkart.id` remain held; local fixture testing does not
   determine the beta's provider mode. Preserve the existing sandbox evidence.
 - For continuation after the 28 September handoff, start with
+  `docs/beta-wave2-2026-09-28.md`, then the older
   `docs/beta-finish-2026-09-28.md` and its private continuation-record link.
   It distinguishes implemented work from remaining code and live acceptance,
   and preserves the owner's FlexiBill-pending decision and current email state.
@@ -62,14 +63,24 @@ and direct API versus hosted checkout. Call the platform fee commission.
   that setup; it is not a request to choose a different wallet model. Preserve
   original uncertain registrations and in-flight withdrawal destinations.
 - Required onboarding includes full legal name, verified email, phone, bank
-  details, and pickup/return addresses with confirmed map pins. The owner also
-  requires age/identity verification, with a minimum seller age of **18** as
-  explicitly confirmed on 28 September. A declaration is not a verified identity;
-  do not invent provider evidence or call this a statutory PSE age threshold.
+  details, and pickup/return addresses with confirmed map pins. The minimum
+  seller age is **18**, explicitly confirmed on 28 September. The owner later
+  clarified that the government declaration promised to STORE age, not to verify
+  identity. Do not infer mandatory KTP/selfie/KYC from that data-category
+  declaration. Store and label seller-declared DOB/age accurately; do not call
+  it verified identity or call 18 a statutory PSE threshold. Separate legal and
+  provider verification obligations need their own evidence. See
+  `docs/seller-age-declaration.md` for the checked distinction and limits.
 - Ezkart's commission must reach its company bank. Distinguish commission
   allocation, credit to the platform's DOKU balance, and confirmed bank payout.
   DOKU knowing a bank account does not prove the Sub-Account payout connection.
   Shipping, admin charges, refund obligations and fees are distinct from commission.
+- Calculate 18+ eligibility from DOB using ordinary code. The owner moved
+  Jev/OpenRouter toward reports and page flags, not identity proof. A dedicated
+  limited OpenRouter key is held privately and is not installed in Ezkart.
+  See `docs/jev-page-review.md` for the requested three-re-scan/five-day page
+  lifecycle and the outstanding enforcement clarification. No automatic page
+  termination or external model calls are enabled by creating that key.
 
 ## Sidebar announcements
 

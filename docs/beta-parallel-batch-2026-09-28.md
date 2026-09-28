@@ -1,5 +1,8 @@
 # Focused beta batch — 28 September 2026
 
+**Later work:** [Second focused beta batch](beta-wave2-2026-09-28.md) records
+subsequent implementation, onboarding/age clarifications and the Jev request.
+
 Three independent Codex CLI workers completed concrete tasks in 13.25, 15.48 and
 16.28 minutes, each in a separate worktree with a twenty-minute cap. These times
 exclude coordinator integration, deployment and owner-guide rendering.
