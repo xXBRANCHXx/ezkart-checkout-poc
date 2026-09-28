@@ -47,6 +47,19 @@ Use merchant-facing controls for appearance settings: numeric values with separa
   work from remaining code and live acceptance,
   and preserves the owner's FlexiBill-pending decision and current email state.
 
+## Beta readiness clarification (owner, 28 September 2026)
+
+- The owner confirms DOKU is ready; live testing remains. Treat this as the
+  current provider-readiness status, superseding earlier activation-pending
+  summaries. A blank dashboard panel is not evidence that activation is missing.
+- Prepare Ezkart Workbench for beta. Record ShopeePay as implemented/deployed
+  with live app handoff, payment and settlement testing pending. Do not turn
+  unperformed beta tests into a new pre-beta DOKU activation requirement.
+- Preserve historical observations as dated evidence, distinguishing owner
+  confirmation from independently observed transaction results. This correction
+  does not itself change runtime switches, initiate money movement or release
+  main/ezkart.id.
+
 ## Payment window (owner decision, 28 September 2026)
 
 - Keep Ezkart’s cart, order/status page and native BCA Virtual Account flow.

@@ -2,7 +2,17 @@
 
 The smallest supported physical pilot is one admitted adult seller, one in-stock one-time product, one domestic buyer, BCA SNAP payment and one pickup package. Use `test.ezkart.id` with the isolated **beta/production-provider** configuration. Real payment, delivery, settlement, withdrawal and refund observations happen during this controlled beta. They are not a prerequisite to the existence of beta. Main/public release has the separate owner-approved sustained-validation hold.
 
-## Concrete account requirements
+## Current owner-confirmed status — 28 September 2026
+
+DOKU is ready; live testing remains. Prepare Ezkart Workbench for beta, including
+ShopeePay, whose integration is implemented and deployed. Earlier activation
+observations below are historical and do not override this later owner update.
+The actual app handoff, payment, callback and settlement are beta acceptance
+work, not an additional provider-activation gate. Preserve original account and
+operation references; readiness confirmation does not fabricate transaction
+results or by itself change runtime switches or the main/public release hold.
+
+## Earlier account observations
 
 Account observations and the later owner update on 28 September 2026:
 
@@ -14,9 +24,9 @@ Account observations and the later owner update on 28 September 2026:
 
 Follow up on the existing DOKU case for the original uncertain wallet; never repeat that registration. The private owner-review draft combines activation, original-reference recovery, seller/beneficiary responsibility, transfer billing and manual-refund evidence questions. It has not been sent. The named Sales route and exact original reference are in the private continuation record.
 
-## Activation sequence
+## Workbench beta preparation sequence
 
-1. Obtain BCA ACTIVE confirmation and the correct assigned SNAP service/prefix; complete DOKU Sales verification for the actual seller/platform Sub-Account and routing product. Recover the original uncertain registration through its original case/reference. Bind actual confirmed seller and company account identities; do not fabricate profile IDs or create a replacement wallet.
+1. Use the owner-confirmed ready DOKU setup. Ensure Workbench uses its actual assigned SNAP service/prefix, approved payment methods and original seller/company Sub-Account bindings. Reconcile any original uncertain registration using its original case/reference; do not create a replacement wallet. Treat real payment and routing observations as beta testing, not as evidence that activation is still pending.
 2. Complete the seller's DOB-only onboarding: declared calendar age 18+, legal name, verified email, phone, saved bank, pickup/return addresses and confirmed map pins. The bank verification and financial-provider duties remain distinct from self-declared DOB. See [the narrow age review](seller-age-declaration.md).
 3. The owner has confirmed Biteship funding; retain the production callback configuration. Do not probe or test the top-up under the current instruction. When shipping activation is separately authorized, configure the matching PHP and Worker shipping switches and scheduler from [shipping readiness](beta-shipping-readiness.md). Product weights, stock and selected pickup couriers must be usable.
 4. Configure the private `COMMERCE_TRANSFER_FEE_CONTRACT`, actual company funding and original receipt recovery described in [transfer fee funding](transfer-fee-funding.md) and [company treasury](platform-treasury.md). Do not enable an unsupported seller-charged billing arrangement. Keep bank dispatch held until its actual contract and account conditions exist; trial outcomes themselves are learned during beta.

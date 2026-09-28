@@ -127,13 +127,13 @@ invoice-scoped original request and acquirer, excluding delivery IDs and optiona
 issuer fields so redelivery cannot cause another capture. Pending/failed events
 cannot mark an order paid. Browser redirects and popup closure remain non-authoritative.
 
-Account activation is **unconfirmed**: the current DOKU dashboard inspection
-rendered navigation but no service/settings content, including in the existing
-user tab. No activation request or configuration change was made. Before enabling
-`EMONEY_SHOPEEPAY`, confirm actual merchant activation, Collect & Route and the
-original seller/company wallets; verify the actual hosted app handoff and live
-payment/settlement during authorized beta acceptance. Fixtures establish our
-integration behavior, not DOKU's live account readiness.
+**Later owner clarification, 28 September:** DOKU is ready; live testing remains.
+The task is to prepare Ezkart Workbench for beta. The earlier dashboard check
+rendered no service content and therefore supplied no new activation evidence;
+it must not be treated as an activation blocker. Provider readiness is
+owner-confirmed. The actual hosted ShopeePay app handoff, payment, cancellation
+and settlement remain to be observed during beta testing. Fixture results are
+not represented as completed live transactions.
 
 Verification: the hosted payment, payment-choice and popup suites passed all
 23 checks; the ShopeePay-only PHP checkout/default-choice check passed, and two
@@ -148,5 +148,5 @@ The beta Worker is version `b40f99f0-25c8-463e-8407-5ecc601a7674`; its health
 check confirms beta D1/public R2/private R2 and 209 application tables.
 At 08:53 UTC on 28 September, hosted `cart.js` matched the committed source.
 No migration or provider configuration change was needed. Checkout remains
-`checkout_paused`; activation and actual ShopeePay payment acceptance are still
-pending. Main and `ezkart.id` were not deployed.
+`checkout_paused` at deployment. The owner subsequently confirmed DOKU ready;
+actual ShopeePay payment acceptance remains beta testing work. Main and `ezkart.id` were not deployed.
