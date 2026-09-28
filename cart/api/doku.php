@@ -22,12 +22,18 @@ function ez_doku_payment_flow(string $environment): string
 {
     $flow = ez_provider_config('doku', 'payment_flow', $environment);
     if ($flow === '') $flow = 'direct_bca';
-    if (!in_array($flow, ['direct_bca', 'snap_bca', 'hosted'], true)) throw new RuntimeException('Invalid DOKU payment flow.');
+    if (!in_array($flow, ['direct_bca', 'snap_bca', 'hosted', 'routed_hosted'], true)) throw new RuntimeException('Invalid DOKU payment flow.');
     if ($flow === 'snap_bca') {
         require_once __DIR__ . '/commerce-snap-payments.php';
         if (!ez_central_commerce_enabled()) throw new RuntimeException('SNAP requires central checkout storage.');
         ez_snap_bca_parameters($environment);
         EzDokuBcaSnapClient::configured($environment);
+    }
+    if ($flow === 'routed_hosted') {
+        require_once __DIR__ . '/commerce-hosted-payments.php';
+        if (!ez_central_commerce_enabled()) throw new RuntimeException('Routed Checkout requires central storage.');
+        ez_hosted_checkout_methods($environment);
+        EzDokuHostedCheckoutClient::configured($environment);
     }
     // The legacy direct API is available for sandbox evaluation only. DOKU requires
     // SNAP migration for production virtual accounts; never silently change the UI.
@@ -35,6 +41,32 @@ function ez_doku_payment_flow(string $environment): string
         throw new RuntimeException('Direct bank-transfer production payments require DOKU SNAP migration.');
     }
     return $flow;
+}
+
+/** Availability is configured by the server, never selected by a browser flow name. */
+function ez_doku_checkout_choices(string $environment): array
+{
+    $flow = ez_provider_config('doku', 'payment_flow', $environment);
+    if ($flow === 'snap_bca') return ['payment_choices'=>['bca_va'],'hosted_payment_methods'=>[]];
+    if ($flow !== 'routed_hosted') return ['payment_choices'=>[],'hosted_payment_methods'=>[]];
+    require_once __DIR__ . '/commerce-hosted-payments.php';
+    $methods = ez_hosted_checkout_methods($environment);
+    $hosted = array_values(array_intersect($methods, ['QRIS','CREDIT_CARD']));
+    return ['payment_choices'=>[...(in_array('VIRTUAL_ACCOUNT_BCA',$methods,true)?['bca_va']:[]),...($hosted?['doku_checkout']:[])], 'hosted_payment_methods'=>$hosted];
+}
+function ez_doku_selected_payment_flow(string $environment, ?string $choice): string
+{
+    $flow = ez_doku_payment_flow($environment);
+    if ($choice === null && $flow !== 'routed_hosted') return $flow;
+    $choices = ez_doku_checkout_choices($environment)['payment_choices'];
+    $choice ??= $choices[0] ?? null;
+    if (!in_array($choice,$choices,true)) throw new InvalidArgumentException('This payment method is not currently available.');
+    if ($choice === 'bca_va') {
+        require_once __DIR__ . '/commerce-snap-payments.php';
+        ez_snap_bca_parameters($environment); EzDokuBcaSnapClient::configured($environment);
+        return 'snap_bca';
+    }
+    return 'routed_hosted';
 }
 
 function ez_create_doku_direct_bca_payment(array $order): array
@@ -134,7 +166,7 @@ function ez_doku_checkout_payload(array $order, string $publicUrl): array
 function ez_create_doku_payment(array $order): array
 {
     $flow = $order['payment_flow'] ?? ez_doku_payment_flow($order['commerce_environment']);
-    if ($flow === 'snap_bca') throw new RuntimeException('SNAP creation requires its durable dispatch job.');
+    if (in_array($flow, ['snap_bca', 'routed_hosted'], true)) throw new RuntimeException('SNAP creation requires its durable dispatch job.');
     $legacyLease = ez_legacy_provider_lease((string) $order['commerce_environment']);
     if ($flow === 'direct_bca') {
         return ez_create_doku_direct_bca_payment($order);

@@ -128,7 +128,7 @@ function checkoutInput(env, input) {
   if (JSON.stringify(shipping).length > 8000) fail('Shipping details are too large');
   const expiresAt = new Date(input.expiresAt);
   if (!Number.isFinite(expiresAt.getTime())) fail('Checkout expiry is invalid');
-  if(input.checkout?.paymentFlow==='snap_bca')expiresAt.setUTCMilliseconds(0);
+  if(['snap_bca','routed_hosted'].includes(input.checkout?.paymentFlow))expiresAt.setUTCMilliseconds(0);
   return {environment, sellerId, checkoutKey, checkout:checkoutContext(input.checkout,environment), items, customer, shipping: {...shipping, amount}, expiresAt: expiresAt.toISOString()};
 }
 
@@ -293,7 +293,7 @@ export async function applyCommerceEvent(env, orderId, input, {paymentReceipt=nu
   const hash = await commerceHash({type: input.type, data, sellerId, environment});
   for (let attempt = 0; attempt < 4; attempt++) {
     const order = await commerceOrder(env, sellerId, orderId, environment);
-    if(order.snapshot.checkout?.paymentFlow==='snap_bca'&&['payment.created','payment.succeeded'].includes(input.type)
+    if(['snap_bca','routed_hosted'].includes(order.snapshot.checkout?.paymentFlow)&&['payment.created','payment.succeeded'].includes(input.type)
       &&(!paymentReceipt||paymentReceipt.orderId!==orderId||paymentReceipt.type!==input.type))fail('Record the verified original SNAP receipt before applying this payment',409);
     const previous = await env.DB.prepare('SELECT payload_hash FROM commerce_order_events WHERE order_id = ? AND event_key = ?').bind(orderId, eventKey).first();
     if (previous) {

@@ -6,7 +6,7 @@ require_once __DIR__ . '/commerce-checkout.php';
 /** Normalizes only verified DOKU responses. Notification signatures are checked by doku.php first. */
 function ez_apply_central_doku_result(array $order, array $notification): array
 {
-    if ($order['snapshot']['checkout']['paymentFlow'] === 'snap_bca') throw new InvalidArgumentException('SNAP requires its signed notification endpoint.');
+    if (in_array($order['snapshot']['checkout']['paymentFlow'], ['snap_bca', 'routed_hosted'], true)) throw new InvalidArgumentException('SNAP requires its signed notification endpoint.');
     if (($notification['order']['invoice_number'] ?? '') !== $order['id']
         || !ez_doku_amount_matches($notification['order']['amount'] ?? null, $order['total'])
         || (isset($notification['order']['currency']) && $notification['order']['currency'] !== 'IDR')) {
@@ -47,7 +47,7 @@ function ez_apply_central_doku_result(array $order, array $notification): array
 
 function ez_doku_central_status(array $order): array
 {
-    if ($order['snapshot']['checkout']['paymentFlow'] === 'snap_bca') throw new RuntimeException('Use the original SNAP status contract.');
+    if (in_array($order['snapshot']['checkout']['paymentFlow'], ['snap_bca', 'routed_hosted'], true)) throw new RuntimeException('Use the original SNAP status contract.');
     if (strtotime($order['createdAt']) > time() - 60) throw new RuntimeException('Wait before checking provider status.');
     $credentials = ez_doku_credentials($order['environment']);
     $target = '/orders/v1/status/' . rawurlencode($order['id']);

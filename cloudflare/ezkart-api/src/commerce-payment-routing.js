@@ -28,7 +28,7 @@ export async function bindPaymentRoute(env,orderId,input){
     ||typeof input.clientId!=='string'||!/^[A-Za-z0-9_-]{3,128}$/.test(input.clientId))fail('Payment routing identity is invalid');
   const row=await env.DB.prepare(`SELECT o.*,j.id AS job_id,j.attempts,j.lease_owner,j.lease_token,j.lease_mode,j.lease_until,j.state AS job_state,
     json_extract(j.payload_json,'$.providerRequestId') AS payment_request_id FROM orders o JOIN commerce_jobs j ON j.order_id=o.id AND j.kind='payment.create'
-    WHERE o.id=? AND o.commerce_environment=? AND o.commerce_version=1 AND json_extract(o.snapshot_json,'$.checkout.paymentFlow')='snap_bca'`).bind(orderId,input.environment).first();
+    WHERE o.id=? AND o.commerce_environment=? AND o.commerce_version=1 AND json_extract(o.snapshot_json,'$.checkout.paymentFlow') IN ('snap_bca','routed_hosted')`).bind(orderId,input.environment).first();
   if(!row)fail('SNAP payment not found',404);
   const now=new Date().toISOString();
   if(row.job_state!=='running'||row.lease_owner!==input.workerId||row.lease_token!==input.leaseToken||row.lease_until<=now)fail('This worker cannot prepare payment routing',409);

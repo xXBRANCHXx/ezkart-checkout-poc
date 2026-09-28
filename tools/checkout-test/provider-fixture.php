@@ -369,6 +369,19 @@ function curl_exec(object $handle): string|bool {
         return json_encode($response);
     }
     if (in_array($handle->url, ['https://api-sandbox.doku.com/checkout/v1/payment', 'https://api.doku.com/checkout/v1/payment'], true)) {
+        if (isset($payload['additionalInfo']['account'])) {
+            $control = json_decode(@file_get_contents(dirname((string) getenv('EZKART_TEST_CAPTURE')) . '/hosted-control.json') ?: '{}', true);
+            if (!empty($control['loseCreate'])) throw new RuntimeException('Fixture lost Checkout reply');
+            $host = str_contains($handle->url, 'api-sandbox') ? 'sandbox.doku.com' : 'jokul.doku.com';
+            $expiry = (new DateTimeImmutable('+' . $payload['payment']['payment_due_date'] . ' minutes', new DateTimeZone('Asia/Jakarta')))->format('YmdHis');
+            $result = ['message'=>['SUCCESS'],'response'=>['order'=>['invoice_number'=>$payload['order']['invoice_number'],'amount'=>(string)$payload['order']['amount'],'currency'=>'IDR','session_id'=>'fixture-session'],
+                'payment'=>['token_id'=>'fixture-token','url'=>'https://'.$host.'/checkout-link-v2/fixture-token','payment_due_date'=>$payload['payment']['payment_due_date'],
+                    'expired_date'=>$expiry,'payment_method_types'=>$payload['payment']['payment_method_types']]]];
+            if (!empty($control['wrongAmount'])) $result['response']['order']['amount']='1';
+            $body=json_encode($result);
+            if (isset($handle->options[CURLOPT_WRITEFUNCTION])) return ($handle->options[CURLOPT_WRITEFUNCTION])($handle, $body) === strlen($body);
+            return $body;
+        }
         if (getenv('EZKART_TEST_DOKU_FAILURE')) { $handle->status = 503; return '{"error_messages":["Fixture unavailable"]}'; }
         $host = str_contains($handle->url, 'api-sandbox') ? 'staging.doku.com' : 'jokul.doku.com';
         return json_encode(['response' => ['order' => $payload['order'], 'payment' => ['url' => 'https://' . $host . '/checkout-link-v2/fixture', 'expired_date' => (new DateTimeImmutable('+1 hour', new DateTimeZone('Asia/Jakarta')))->format('YmdHis')]]]);

@@ -92,6 +92,24 @@ abstract class EzDokuSnapClient
         return [$decoded, $raw];
     }
 
+    /** Non-SNAP Checkout uses its own HMAC contract over the same pinned origin.
+     * The typed caller must already hold its durable one-send grant. */
+    protected function checkoutRequest(array $payload, string $externalId): array
+    {
+        $timestamp = gmdate('Y-m-d\TH:i:s\Z', $this->now());
+        $body = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+        $path = '/checkout/v1/payment';
+        $signature = ez_doku_signature($this->credentials['clientId'], $externalId, $timestamp, $path, $body, $this->credentials['secretKey']);
+        try { [$status, $raw] = ($this->transport)($this->origin . $path, ['Accept: application/json', 'Content-Type: application/json',
+            'Client-Id: ' . $this->credentials['clientId'], 'Request-Id: ' . $externalId, 'Request-Timestamp: ' . $timestamp, 'Signature: ' . $signature], $body); }
+        catch (Throwable) { throw new EzDokuReadException('transport'); }
+        if ($status !== 200 || !is_string($raw) || strlen($raw) > 262144) throw new EzDokuReadException('checkout_response');
+        try { $decoded = EzDokuFinancialJson::decode($raw); } catch (Throwable) { throw new EzDokuReadException('checkout_response'); }
+        return [$decoded, ['environment' => $this->credentials['environment'], 'credentialFingerprint' => $this->credentialFingerprint,
+            'operation' => 'checkout-create', 'externalId' => $externalId, 'sentAt' => $timestamp,
+            'observedAt' => gmdate('Y-m-d\TH:i:s\Z', $this->now()), 'requestBody' => $body, 'body' => $raw]];
+    }
+
     private function token(): string
     {
         $now = ($this->clock)();

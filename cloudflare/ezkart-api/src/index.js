@@ -37,6 +37,7 @@ import {fulfillmentList,fulfillmentDetail,fulfillmentAction,serviceShipment,cust
 import {merchantOrderList,merchantOrderDetail,merchantOrderHistory} from './commerce-order-reads.js';
 import {merchantDashboard} from './commerce-dashboard.js';
 import {merchantPaymentList,merchantPaymentDetail,merchantPaymentHistory} from './commerce-payment-reads.js';
+import {hostedPayment,bindHostedPayment,recordHostedPaymentReceipt} from './commerce-hosted-payments.js';
 import {snapPayment,bindSnapPayment,recordSnapPaymentReceipt} from './commerce-snap-payments.js';
 import {bindPaymentRoute,recordPaymentRoute} from './commerce-payment-routing.js';
 import {reconcileCaptureJournals,financialJournalSummary,financialJournalList} from './commerce-financial-journal.js';
@@ -1532,11 +1533,21 @@ export default {
           : enrollCustomDomain(env,seller,await requestJson(request,2000)))},200,cors);
         return json({ok:false,error:'Method not allowed'},405,cors);
       }
-      const routePath=/^\/internal\/commerce\/snap-payments\/(EZK-[SP]-[A-F0-9]{24})\/route\/(bind|receipt)$/.exec(url.pathname);
+      const routePath=/^\/internal\/commerce\/(?:snap-payments|hosted-payments)\/(EZK-[SP]-[A-F0-9]{24})\/route\/(bind|receipt)$/.exec(url.pathname);
       if(routePath){
         const input=await authenticateCommerceService(request,env,{strictJSON:true,maxBytes:routePath[2]==='receipt'?40000:2000});
         if(request.method!=='POST'||url.search)return json({ok:false,error:'Payment routing request is invalid'},405);
         return json({ok:true,...await (routePath[2]==='bind'?bindPaymentRoute:recordPaymentRoute)(env,routePath[1],input)});
+      }
+      const hostedPath=/^\/internal\/commerce\/hosted-payments\/(EZK-[SP]-[A-F0-9]{24})(?:\/(bind|receipt))?$/.exec(url.pathname);
+      if(hostedPath){
+        const input=await authenticateCommerceService(request,env,{strictJSON:true,maxBytes:hostedPath[2]==='receipt'?600000:3000});
+        if(request.method==='GET'&&!hostedPath[2]){
+          if([...url.searchParams.keys()].some(k=>k!=='environment')||url.searchParams.getAll('environment').length!==1)return json({ok:false,error:'Checkout parameters are invalid'},422);
+          return json({ok:true,payment:await hostedPayment(env,hostedPath[1],url.searchParams.get('environment'))});
+        }
+        if(request.method==='POST'&&hostedPath[2]&&!url.search)return json({ok:true,...await(hostedPath[2]==='bind'?bindHostedPayment:recordHostedPaymentReceipt)(env,hostedPath[1],input)});
+        return json({ok:false,error:'Checkout route is invalid'},405);
       }
       const snapPath=/^\/internal\/commerce\/snap-payments\/(EZK-[SP]-[A-F0-9]{24})(?:\/(bind|receipt))?$/.exec(url.pathname);
       if(snapPath){

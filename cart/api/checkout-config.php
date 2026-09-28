@@ -22,6 +22,7 @@ try {
         'provider' => 'doku',
         'shipping_required' => $environment === 'production',
         'durable_checkout' => ez_central_commerce_enabled(),
+        ...(ez_central_commerce_enabled() ? ez_doku_checkout_choices($environment) : []),
     ]);
 } catch (EzLegacyOrderStorageException $error) {
     header('Retry-After: 30');
