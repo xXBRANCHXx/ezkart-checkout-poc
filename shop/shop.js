@@ -34,6 +34,8 @@
     if(product.type==='subscription'){
       const select=card.querySelector('select');if(select){select.setAttribute('aria-label','Plan for '+product.name);select.parentElement.firstChild.textContent='Plan';}
       const note=card.querySelector('.shop-unavailable');if(note)note.textContent='Subscription billing is not available yet.';
+      let request=card.querySelector('[data-subscription-request]');
+      if(choice?.id.includes('~')){if(!request){request=document.createElement('a');request.dataset.subscriptionRequest='';request.className='shop-review-link';request.textContent='Review subscription request';note?.after(request);}request.href='/cart/subscriptions.php?'+new URLSearchParams({sellerId:store.id,productId:product.id,variantId:choice.id.split('~')[1]});}else request?.remove();
     }
     const button = card.querySelector("[data-add]");
     button.disabled = !choice?.available;

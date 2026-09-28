@@ -15,6 +15,7 @@
   function csvCell(value){let text=value==null?'':String(value);if(typeof value==='string'&&/^(?:[\p{White_Space}\p{Cf}\u0000-\u001f]*[=+@-]|[\t\r\n])/u.test(text.normalize('NFKC')))text="'"+text;return '"'+text.replaceAll('"','""')+'"';}
   const csvRow=cells=>cells.map(csvCell).join(',')+'\r\n';
   function mount({request}){
+    globalThis.EzkartSubscriptions?.mountMerchant({request});
     const root=document.querySelector('[data-commerce-customers]');if(!root||root.dataset.mounted)return;root.dataset.mounted='1';
     const q=s=>root.querySelector(s),form=q('[data-customers-filters]'),rows=q('[data-customers-rows]'),detail=q('[data-customers-detail]'),globalSearch=document.getElementById('global-search');
     const api=path=>request('GET',path,undefined,{timeoutMs:15000}),write=(method,path,body)=>request(method,path,body,{timeoutMs:20000});

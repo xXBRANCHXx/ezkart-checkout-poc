@@ -1,3 +1,4 @@
+import {customerSubscriptions,subscriptionList,subscriptionDetail,cancelSubscription} from './commerce-subscriptions.js';
 import {finalizeConfirmedRefund} from './commerce-refund-finalization.js';
 import {beginDigitalUpload,digitalUpload,uploadDigitalPart,completeDigitalUpload,cancelDigitalUpload,digitalMerchantFile,digitalFileHistory,readyDigitalUpload,digitalVersionStatements,digitalCatalogSql,digitalCatalogFile,cleanupDigitalUploads,publicDigitalFiles} from './digital-files.js';
 import {buyerDigitalPurchases,createDigitalDownloadGrant,buyerDigitalFile,readDigitalDownloadGrant,buyerDigitalPart,acknowledgeDigitalPart} from './commerce-digital.js';
@@ -1657,6 +1658,20 @@ export default {
         if(request.method==='GET'&&url.pathname==='/internal/commerce/finance/summary')return json({ok:true,...await financialJournalSummary(env,url)});
         if(request.method==='GET'&&url.pathname==='/internal/commerce/finance/journals')return json({ok:true,...await financialJournalList(env,url)});
         return json({ok:false,error:'Financial route or method is unavailable'},404);
+      }
+      if(url.pathname==='/internal/commerce/customer-subscriptions'){
+        if(request.method!=='POST'||url.search)return json({ok:false,error:'Subscription method is invalid'},405,cors);
+        return json({ok:true,...await customerSubscriptions(env,await authenticateCommerceService(request,env))});
+      }
+      const subscriptionMatch=/^\/v1\/commerce\/subscriptions(?:\/(sub_[a-f0-9]{40})(?:\/(cancel))?)?$/.exec(url.pathname);
+      if(subscriptionMatch){
+        const {seller}=await sellerContext(request,env),actor={kind:'merchant',id:seller.id,role:seller.role},[,id,action]=subscriptionMatch;
+        if(request.method==='GET'&&!action){
+          if([...url.searchParams.keys()].some(k=>k!=='cursor')||(id&&url.search))return json({ok:false,error:'Invalid subscription parameters'},422,cors);
+          return json({ok:true,...await(id?subscriptionDetail(env,actor,id):subscriptionList(env,actor,url.searchParams.get('cursor')||''))},200,cors);
+        }
+        if(request.method==='POST'&&action==='cancel'&&!url.search)return json({ok:true,...await cancelSubscription(env,actor,id,await requestJson(request,2000))},200,cors);
+        return json({ok:false,error:'Subscription method is invalid'},405,cors);
       }
       if(url.pathname==='/internal/commerce/customer-consents'){
         const payload=await authenticateCommerceService(request,env);

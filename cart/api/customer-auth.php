@@ -48,7 +48,7 @@ function ez_customer_next(string $value): string
 {
     $parts = parse_url($value);
     if (!is_array($parts) || isset($parts['scheme']) || isset($parts['host'])
-        || !in_array($parts['path'] ?? '', ['/cart/return.php', '/cart/tracking-sandbox.php', '/cart/addresses.php', '/cart/preferences.php', '/cart/downloads.php', '/cart/messages.php', '/cart/notifications.php', '/cart/', '/cart/index.html'], true)) return '/cart/return.php';
+        || !in_array($parts['path'] ?? '', ['/cart/return.php', '/cart/tracking-sandbox.php', '/cart/addresses.php', '/cart/preferences.php', '/cart/subscriptions.php', '/cart/downloads.php', '/cart/messages.php', '/cart/notifications.php', '/cart/', '/cart/index.html'], true)) return '/cart/return.php';
     parse_str($parts['query'] ?? '', $query);
     if ($parts['path'] === '/cart/notifications.php') return '/cart/notifications.php';
     if ($parts['path'] === '/cart/downloads.php') return '/cart/downloads.php' . (is_string($query['order'] ?? null) && preg_match('/^EZK-[SP]-[A-F0-9]{24}$/D', $query['order']) === 1 ? '?order=' . rawurlencode($query['order']) : '');
@@ -59,6 +59,14 @@ function ez_customer_next(string $value): string
         return '/cart/messages.php' . ($safe ? '?' . http_build_query($safe) : '');
     }
     if ($parts['path'] === '/cart/addresses.php') return '/cart/addresses.php' . (($query['new'] ?? '') === '1' ? '?new=1' : '');
+    if ($parts['path'] === '/cart/subscriptions.php') {
+        $plan = [];
+        foreach (['sellerId','productId','variantId'] as $field) {
+            if (!is_string($query[$field] ?? null) || preg_match('/^[A-Za-z0-9][A-Za-z0-9_-]{2,95}$/D', $query[$field]) !== 1) return '/cart/subscriptions.php';
+            $plan[$field] = $query[$field];
+        }
+        return '/cart/subscriptions.php?' . http_build_query($plan, '', '&', PHP_QUERY_RFC3986);
+    }
     if ($parts['path'] === '/cart/preferences.php') return '/cart/preferences.php' . (is_string($query['order'] ?? null) && preg_match('/^EZK-[SP]-[A-F0-9]{24}$/D', $query['order']) === 1 ? '?order=' . rawurlencode($query['order']) : '');
     if (in_array($parts['path'], ['/cart/', '/cart/index.html'], true)) {
         $safe = [];

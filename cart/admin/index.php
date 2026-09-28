@@ -745,6 +745,16 @@ function ez_admin_proxy_cloud_request(string $accessToken, string $path, string 
         if (str_contains($path, '#')) ez_admin_json(['ok' => false, 'error' => 'Review reference is invalid.'], 400);
         $path = $inventoryPath . ($reviewQuery !== [] ? '?' . http_build_query($reviewQuery, '', '&', PHP_QUERY_RFC3986) : '');
     }
+    $isSubscriptionPath = preg_match('#^/v1/commerce/subscriptions(?:/sub_[a-f0-9]{40}(?:/cancel)?)?$#D', $inventoryPath) === 1;
+    if ($isSubscriptionPath) {
+        $subscriptionCancel = str_ends_with($inventoryPath, '/cancel');
+        if (($subscriptionCancel && $method !== 'POST') || (!$subscriptionCancel && $method !== 'GET')) ez_admin_json(['ok' => false], 405);
+        require_once __DIR__ . '/../api/review-query.php';
+        try { $subscriptionQuery = ez_review_query((string) parse_url($path, PHP_URL_QUERY), $inventoryPath === '/v1/commerce/subscriptions' ? ['cursor'] : []); }
+        catch (InvalidArgumentException $error) { ez_admin_json(['ok' => false, 'error' => $error->getMessage()], 400); }
+        if (str_contains($path, '#')) ez_admin_json(['ok' => false], 400);
+        $path = $inventoryPath . ($subscriptionQuery !== [] ? '?' . http_build_query($subscriptionQuery, '', '&', PHP_QUERY_RFC3986) : '');
+    }
     $isInventoryPath = preg_match('#^/v1/inventory(?:/(?:history|adjustments|draft|reviews(?:/EZK-[SP]-[A-F0-9]{24})?))?$#D', $inventoryPath) === 1;
     $isReturnsPath = preg_match('#^/v1/returns(?:/(?:orders/EZK-[SP]-[A-F0-9]{24}|ret_[a-f0-9]{32}))?$#D', $inventoryPath) === 1;
     $isFulfillmentPath = preg_match('#^/v1/fulfillment(?:/EZK-[SP]-[A-F0-9]{24})?$#D', $inventoryPath) === 1;
@@ -774,7 +784,7 @@ function ez_admin_proxy_cloud_request(string $accessToken, string $path, string 
         $path = $inventoryPath . ($inventoryQuery !== [] ? '?' . http_build_query($inventoryQuery, '', '&', PHP_QUERY_RFC3986) : '');
     }
     $allowedPath = preg_match('#^/v1/(?:catalog|storefront|admin-preferences|admin-profile|shipping-settings|advanced-mode|media(?:/[a-zA-Z0-9_-]+)?|assets(?:/[a-zA-Z0-9_-]+)?|fonts(?:/font_[a-f0-9]{64})?|products/[a-zA-Z0-9_-]+(?:/(?:duplicate|status))?|drafts/[a-zA-Z0-9_-]+|landing-pages(?:/[a-z0-9-]+(?:/(?:preview|export|editor|view|confirmation))?)?|components(?:/[a-z0-9-]+)?)$#', $path) === 1;
-    if (!$isReviewPath && !$isInventoryPath && !$isReturnsPath && !$isFulfillmentPath && !$isCommerceReadPath && !$isAnalyticsExportWrite && !$isCustomerPath && (!$allowedPath || str_contains($path, '?') || str_contains($path, '#'))) {
+    if (!$isSubscriptionPath && !$isReviewPath && !$isInventoryPath && !$isReturnsPath && !$isFulfillmentPath && !$isCommerceReadPath && !$isAnalyticsExportWrite && !$isCustomerPath && (!$allowedPath || str_contains($path, '?') || str_contains($path, '#'))) {
         ez_admin_json(['ok' => false, 'error' => 'That saved-data path is not allowed.'], 400);
     }
     if (!in_array($method, ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'], true) || ($method === 'PATCH' && preg_match('#^/v1/products/[a-zA-Z0-9_-]+/status$#D', $path) !== 1)) {
@@ -792,6 +802,7 @@ function ez_admin_proxy_cloud_request(string $accessToken, string $path, string 
     $isFontUpload = $path === '/v1/fonts' && $method === 'POST';
     $maximumBodyBytes = $isFontUpload ? 7_100_000 : ($isLandingPagePreviewWrite ? 20_000_000 : ($isLandingPageRequest ? 16_001_000 : 3_200_000));
     if ($isReviewPath) $maximumBodyBytes = 24000;
+    if ($isSubscriptionPath) $maximumBodyBytes = 2000;
     if ($contentLength > $maximumBodyBytes) {
         ez_admin_json(['ok' => false, 'error' => $isReviewPath ? 'The review request is too large.' : ($isFontUpload ? 'Choose a font up to 5 MB.' : ($isLargeLandingPageRequest ? 'Landing page project is too large.' : 'Upload is larger than the 2 MB image limit.'))], 413);
     }
@@ -2004,7 +2015,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
   <?php if ($page === 'fulfillment'): ?><script src="fulfillment.js?v=<?= (int) filemtime(__DIR__ . '/fulfillment.js') ?>"></script><?php endif; ?>
   <?php if ($centralOrderWorkspace): ?><script src="commerce-orders.js?v=<?= (int) filemtime(__DIR__ . '/commerce-orders.js') ?>"></script><?php endif; ?>
   <?php if ($centralPaymentWorkspace): ?><script src="commerce-payments.js?v=<?= (int) filemtime(__DIR__ . '/commerce-payments.js') ?>"></script><?php endif; ?>
-  <?php if ($centralCustomerWorkspace): ?><script src="commerce-customers.js?v=<?= (int) filemtime(__DIR__ . '/commerce-customers.js') ?>"></script><?php endif; ?>
+  <?php if ($centralCustomerWorkspace): ?><script src="../customer-subscriptions.js?v=<?= (int) filemtime(__DIR__ . '/../customer-subscriptions.js') ?>"></script><script src="commerce-customers.js?v=<?= (int) filemtime(__DIR__ . '/commerce-customers.js') ?>"></script><?php endif; ?>
   <?php if ($centralCustomerWorkspace || $page === 'product-new'): ?><script src="../review-display.js?v=<?= (int) filemtime(__DIR__ . '/../review-display.js') ?>"></script><?php endif; ?>
   <?php if ($centralCustomerWorkspace): ?><script src="commerce-reviews.js?v=<?= (int) filemtime(__DIR__ . '/commerce-reviews.js') ?>"></script><?php endif; ?>
   <?php if ($page === 'product-new'): ?><script src="../public-reviews.js?v=<?= (int) filemtime(__DIR__ . '/../public-reviews.js') ?>"></script><script src="product-reviews.js?v=<?= (int) filemtime(__DIR__ . '/product-reviews.js') ?>"></script><?php endif; ?>

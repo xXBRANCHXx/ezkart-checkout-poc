@@ -3,13 +3,15 @@ declare(strict_types=1);
 if (!isset($authenticated) || !$authenticated) { http_response_code(404); exit; }
 $customerPreview = ez_config('commerce_storage') !== 'd1';
 $customerPreviewQuery = $customerPreview ? '&amp;customer-preview=1' : '';
-$customerTab = ($_GET['tab'] ?? '') === 'reviews' ? 'reviews' : 'directory';
+$customerTab = in_array($_GET['tab'] ?? '', ['reviews','subscriptions'], true) ? $_GET['tab'] : 'directory';
 ez_page_header('Customers', 'Customer profiles, purchase history, and saved groups.');
 ?>
 <nav class="customer-page-tabs" aria-label="Customer sections">
   <a href="?page=customers<?= $customerPreviewQuery ?>"<?= $customerTab === 'directory' ? ' aria-current="page"' : '' ?>><?= ez_admin_icon('users') ?>Customer directory</a>
   <a href="?page=customers&amp;tab=reviews<?= $customerPreviewQuery ?>"<?= $customerTab === 'reviews' ? ' aria-current="page"' : '' ?>><?= ez_admin_icon('star') ?>Reviews</a>
+  <a href="?page=customers&amp;tab=subscriptions"<?= $customerTab === 'subscriptions' ? ' aria-current="page"' : '' ?>>Subscriptions</a>
 </nav>
+<?php if ($customerTab === 'subscriptions'): ?><section class="surface" data-merchant-subscriptions><header class="surface-header"><h2>Subscriptions</h2><button class="ui-button" type="button" data-subscription-refresh>Refresh subscriptions</button></header><p data-subscription-status role="status"></p><div data-subscription-list></div><button class="ui-button" type="button" data-subscription-more hidden>Load more subscriptions</button></section><?php return; endif; ?>
 <?php if ($customerTab === 'reviews'): ?>
 <?php require __DIR__ . '/commerce-reviews.php'; ?>
 <?php return; endif; ?>
