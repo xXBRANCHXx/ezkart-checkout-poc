@@ -1,3 +1,4 @@
+import {jevPageHeld} from './jev-reviews.js';
 import {sellerPageAddress} from './seller-page-address.js';
 import {hostedLandingResponse} from './landing-page-hosting.js';
 import {verifyDomainDNS, cloudflareDomain} from './custom-domain-provider.js';
@@ -126,7 +127,7 @@ export async function customDomainResponse(request,env) {
   const row=await env.DB.prepare(`SELECT d.* FROM custom_domains d JOIN sellers s ON s.id=d.seller_id
     WHERE d.hostname=? AND d.state='active' AND d.ownership_verified_at IS NOT NULL AND d.provider_status='active' AND d.tls_status='active'
     AND d.checked_at>? AND d.zone_id=? AND d.cname_target=? AND s.status='active' AND s.plan='advanced'`).bind(hostname,new Date(Date.now()-86400000).toISOString(),env.CUSTOM_DOMAIN_ZONE_ID,env.CUSTOM_DOMAIN_CNAME_TARGET).first();
-  if (!row || !['/',row.public_path].includes(url.pathname)) return absent();
+  if (!row || !['/',row.public_path].includes(url.pathname) || await jevPageHeld(env,row.seller_id,row.page_id)) return absent();
   let page;try {page=await publishedPage(env,row.seller_id,row.page_id);} catch {return absent();}
   const response=hostedLandingResponse(request.method==='HEAD'?null:page.publishedHtml,{noindex:env.APP_ENVIRONMENT!=='production'});
   response.headers.set('x-ezkart-public-path',row.public_path);return response;

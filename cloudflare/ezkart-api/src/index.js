@@ -1,3 +1,5 @@
+import {importJevEvaluation,jevPageHeld,jevPages,jevList,jevDetail,createJevReview,runJevReview,gradeJevReview,restoreJevPage} from './jev-reviews.js';
+import {putJevPage,beginJevPageWrite,finishJevPageWrite} from './jev-page-state.js';
 import {saveTreasuryStatus,treasuryStatusHistory} from './commerce-treasury-status.js';
 import {treasuryObservationScope,treasuryOutcomeRead,reconcileTreasuryOutcome} from './commerce-treasury-outcomes.js';
 import {startTreasuryBank,confirmTreasuryBank,treasuryBankRecovery,saveTreasuryBankReceipt} from './commerce-treasury-bank.js';
@@ -633,7 +635,7 @@ async function landingPages(request, env) {
     const summary = await readLandingSummary(bucket, seller.id, object, landingPageSummary);
     if (!summary) return null;
     const preview = previewByKey.get(landingPagePreviewKey(seller.id, id));
-    return {...landingPageLinks(summary, seller),
+    return {...landingPageLinks(summary, seller), archived:await jevPageHeld(env,seller.id,id),
       previewUpdatedAt: preview?.customMetadata?.updatedAt || null,
       previewBytes: preview?.size || 0,
       previewSourceUpdatedAt: preview?.customMetadata?.sourceUpdatedAt || null,
@@ -655,6 +657,7 @@ async function saveLandingPage(request, env, rawId, context) {
   const saveId = String(payload.saveId || '');
   if (saveId && !/^[a-f0-9-]{36}$/.test(saveId)) throw new Response('Save identifier is invalid', {status: 400});
   let existing = null;
+  const existingObject = await env.PRIVATE_ASSETS.head(landingPageKey(seller.id, id));
   // A publication supplies every editable field and replaces the old HTML.
   // Only its original creation date is needed from storage. Downloading the
   // previous image-heavy project here adds a needless failure point to publish.
@@ -664,11 +667,11 @@ async function saveLandingPage(request, env, rawId, context) {
     && Object.hasOwn(payload, 'publishedHtml');
   try {
     if (completePublication) {
-      const object = await env.PRIVATE_ASSETS.head(landingPageKey(seller.id, id));
+      const object = existingObject;
       if (object) existing = object.customMetadata?.createdAt
         ? {createdAt: object.customMetadata.createdAt}
         : await landingPageObject(env, seller.id, id);
-    } else existing = await landingPageObject(env, seller.id, id);
+    } else if (existingObject) existing = await landingPageObject(env, seller.id, id);
   } catch (error) {
     if (!(error instanceof Response) || error.status !== 404) throw error;
   }
@@ -721,7 +724,7 @@ async function saveLandingPage(request, env, rawId, context) {
   if (new TextEncoder().encode(serialized).byteLength > maximumLandingPageBytes) {
     throw new Response("Landing page project is too large", { status: 413 });
   }
-  const savedObject = await env.PRIVATE_ASSETS.put(landingPageKey(seller.id, id), serialized, {
+  const savedObject = await putJevPage(env, seller.id, id, existingObject?.etag || '', serialized, {
     httpMetadata: { contentType: "application/json; charset=utf-8" },
     customMetadata: { sellerId: seller.id, landingPageId: id, status, updatedAt: now, saveId, name, createdAt: page.createdAt, publishedAt: page.publishedAt || '' },
   });
@@ -777,7 +780,7 @@ async function publicLandingPage(env, store, rawId) {
   const seller = await sellerByPageAddress(env, store);
   if (!seller) throw new Response("Page not found", {status: 404});
   const page = await landingPageObject(env, seller.id, cleanLandingPageId(rawId));
-  if (page.status !== 'published' || !page.publishedHtml) throw new Response("Page not found", {status: 404});
+  if (page.status !== 'published' || !page.publishedHtml || await jevPageHeld(env,seller.id,page.id)) throw new Response("Page not found", {status: 404,headers:{'cache-control':'no-store'}});
   // Never serve editable state or the draft preview from the public route.
   const response = hostedLandingResponse(page.publishedHtml, {noindex: env.APP_ENVIRONMENT !== 'production'});
   response.headers.set('x-ezkart-public-path', landingPageLinks(page, seller).publicPath);
@@ -828,8 +831,13 @@ async function deleteLandingPage(request, env, rawId) {
   const { seller } = await sellerContext(request, env);
   const id = cleanLandingPageId(rawId);
   const key = landingPageKey(seller.id, id);
-  if (!(await env.PRIVATE_ASSETS.head(key))) throw new Response("Landing page not found", { status: 404 });
+  const object = await env.PRIVATE_ASSETS.head(key);
+  if (!object) throw new Response("Landing page not found", { status: 404 });
+  const token = await beginJevPageWrite(env, seller.id, id, object.etag);
   await env.PRIVATE_ASSETS.delete([key, landingPagePreviewKey(seller.id, id), landingPageThumbnailKey(seller.id, id), landingSummaryKey(seller.id, id)]);
+  // Keep moderation history on the address. A successful seller delete allows
+  // recreation, but never releases an archive; an unknown delete stays fenced.
+  await finishJevPageWrite(env, seller.id, id, token, '');
 }
 
 const componentPrefix = (sellerId) => `sellers/${sellerId}/components/`;
@@ -1532,6 +1540,24 @@ export default {
           ? customDomainAction(env,seller,domainMatch[1],domainMatch[2])
           : enrollCustomDomain(env,seller,await requestJson(request,2000)))},200,cors);
         return json({ok:false,error:'Method not allowed'},405,cors);
+      }
+      if(url.pathname==='/internal/commerce/jev/evaluation'){
+        const input=await authenticateCommerceService(request,env,{strictJSON:true,maxBytes:64000});
+        if(request.method!=='POST'||url.search)return json({ok:false,error:'Evaluation import route is invalid'},405);
+        return json({ok:true,...await importJevEvaluation(env,input)});
+      }
+      const jevPath=/^\/v1\/jev\/(pages|reviews)(?:\/(jev_[a-f0-9]{32})(?:\/(run|grade|restore|rescan))?)?$/.exec(url.pathname);
+      if(jevPath){
+        const actor=await supportActor(env,await authenticatedUser(request,env,true)),[,kind,id,action]=jevPath;
+        if(kind==='pages'&&!id&&request.method==='GET')return json({ok:true,...await jevPages(env,actor,url)},200,cors);
+        if(kind==='reviews'&&!id&&request.method==='GET')return json({ok:true,...await jevList(env,actor,url)},200,cors);
+        if(kind==='reviews'&&id&&!action&&request.method==='GET'&&!url.search)return json({ok:true,...await jevDetail(env,actor,id)},200,cors);
+        if(kind==='reviews'&&request.method==='POST'&&!url.search){
+          const input=await reviewRequestJson(request,5000,parseMessageJSON);
+          const result=!id?await createJevReview(env,actor,input):action==='run'?await runJevReview(env,actor,id,input):action==='grade'?await gradeJevReview(env,actor,id,input):action==='restore'?await restoreJevPage(env,actor,id,input):action==='rescan'?await createJevReview(env,actor,input,id):null;
+          if(result)return json({ok:true,...result},200,cors);
+        }
+        return json({ok:false,error:'Jev route is invalid'},405,cors);
       }
       const routePath=/^\/internal\/commerce\/(?:snap-payments|hosted-payments)\/(EZK-[SP]-[A-F0-9]{24})\/route\/(bind|receipt)$/.exec(url.pathname);
       if(routePath){
