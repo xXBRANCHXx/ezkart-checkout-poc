@@ -1,3 +1,4 @@
+import {fixtureTransferContract} from './transfer-funding-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {setupEarningsFixture,key} from './earnings-fixture.mjs';
@@ -8,7 +9,7 @@ async function setup(t,options={}){
  const f=await setupEarningsFixture(t,{bindings:{COMMERCE_TREASURY_OPERATORS:'bob',COMMERCE_TREASURY_BANK:JSON.stringify(bank),COMMERCE_TREASURY_INQUIRY:'enabled',COMMERCE_TREASURY_PAYMENT:'enabled',...options}});
  ok(await f.call('/internal/commerce/support/access',{environment:f.environment,authUserId:'bob',role:'reviewer',requestKey:key(),operator:'Local fixture',reason:'Treasury fixture.'}));
  const api=(path,input,extra={})=>f.merchant('/v1/treasury'+path,input,{seller:'bob',claims:claims(),method:input===undefined?'GET':'POST',...extra});
- const p=await f.payment();await f.settle(p);const reserved=ok(await api('/intents',{requestKey:key(),amount:'1000'})),id=reserved.intent.id;
+ const p=await f.payment();await f.settle(p,{},{balance:'1000000'});if(options.COMMERCE_TRANSFER_FEE_CONTRACT)await f.deliver(p);const reserved=ok(await api('/intents',{requestKey:key(),amount:'1000'})),id=reserved.intent.id;
  const identity=await f.db.prepare('SELECT credential_fingerprint AS credentialFingerprint,client_id AS clientId FROM commerce_wallet_provider_bindings WHERE enrollment_id=(SELECT platform_enrollment_id FROM commerce_treasury_intents WHERE id=?)').bind(id).first();
  const start=(stage,input={})=>api('/intents/'+id+'/'+stage+'/start',{...identity,...input});
  const internal=(stage,action,input={})=>f.call('/internal/commerce/finance/treasury/'+id+'/'+stage+'/'+action,{environment:f.environment,...input});
@@ -34,10 +35,9 @@ test('original company inquiry grants send once, preserves response, confirms ex
  const detail=ok(await f.api('/intents/'+f.id));assert.equal(detail.intent.state,'bank_inquiry_recorded');assert.equal(detail.bank[0].beneficiaryName,bank.beneficiaryName);assert.equal(detail.intent.payoutConfirmed,false);
  ok(await f.api('/intents/'+f.id+'/cancel',{requestKey:key()}));assert.equal((await f.start('payment',{confirmationId:c.confirmationId})).status,409);
 });
-test('fixture-only released policy exercises one transfer grant, unknown fence, original recovery and immutable successful response',async t=>{
- const f=await setup(t),{r}=await inquire(f),c=await confirm(f,r);
- // No such writer or eligibility exists in the deployed schema.
- await f.db.prepare('DROP VIEW commerce_treasury_execution_eligibility').run();await f.db.prepare('CREATE VIEW commerce_treasury_execution_eligibility AS SELECT id AS intent_id FROM commerce_treasury_intents').run();
+test('real source-derived release and offline fee contract exercise one transfer grant, unknown fence, original recovery and immutable successful response',async t=>{
+ const f=await setup(t,{COMMERCE_TRANSFER_FEE_CONTRACT:fixtureTransferContract()}),{r}=await inquire(f),c=await confirm(f,r);
+
  const sent=await Promise.all([f.start('payment',{confirmationId:c.confirmationId}),f.start('payment',{confirmationId:c.confirmationId})]);sent.forEach(ok);assert.equal(sent.filter(x=>x.mayPay).length,1);
  const g=sent.find(x=>x.mayPay);assert.equal(ok(await f.api('/intents/'+f.id)).intent.state,'transfer_outcome_unknown');
  assert.equal((await f.api('/intents/'+f.id+'/cancel',{requestKey:key()})).status,409);
@@ -55,4 +55,11 @@ test('wrong beneficiary name is shown but cannot authorize transfer; stale autho
  assert.equal((await f.api('/intents/'+f.id+'/confirm',{requestKey:key(),inquiryDigest:r.digest})).status,409);
  const n=ok(await f.api('/intents',{requestKey:key(),amount:'1000'}));await f.refund(f.p);
  assert.equal((await f.api('/intents/'+n.intent.id+'/inquiry/start',f.identity)).status,409);
+});
+
+test('an explicitly free company fee cannot bypass missing principal cash',async t=>{
+ const f=await setup(t,{COMMERCE_TRANSFER_FEE_CONTRACT:fixtureTransferContract({channels:{BI_FAST:'0'}})});
+ const pair=await f.collect(f.p,f.legs(f.p),{balance:'0'});ok(await f.reconcile(f.p,pair));
+ const {r}=await inquire(f),c=await confirm(f,r);assert.equal((await f.start('payment',{confirmationId:c.confirmationId})).status,409);
+ assert.equal((await f.db.prepare("SELECT COUNT(*) n FROM commerce_treasury_bank_grants WHERE stage='payment'").first()).n,0);
 });

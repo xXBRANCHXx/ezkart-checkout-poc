@@ -34,13 +34,13 @@ export async function setupSettlementFixture(t,options={}){
     const collections=[];
     for(const [seller,number,rows] of [['seller_alice','1',[items.sellerCash,items.sellerPending]],['seller_bob','2',[items.platformCash,items.platformPending]]]){
       const stamp=()=>({seller,requestedAt:new Date().toISOString(),observedAt:new Date().toISOString()});
-      const ids=[await f.balance('0',stamp())];
+      const ids=[await f.balance(options.balance||'0',stamp())];
       for(const [index,entries] of rows.entries()){
         const pages=[];for(let i=0;i<entries.length;i+=20)pages.push(entries.slice(i,i+20));
         if(!entries.length||entries.length%20===0)pages.push([]);
         for(const [page,values] of pages.slice(0,options.maxPages||40).entries())ids.push(await f.history(values,{accountNo:(index===0?'201':'203')+'000000'+number,fromDateTime:from,toDateTime:to,pageNumber:String(page)},stamp()));
       }
-      ids.push(await f.balance('0',stamp()));
+      ids.push(await f.balance(options.balance||'0',stamp()));
       const sealed=await f.call('/internal/commerce/finance/provider-collections',{seller,environment,observationIds:ids});assert.equal(sealed.status,200,sealed.error);collections.push(sealed.collection);
     }
     return {sellerCollectionId:collections[0].id,platformCollectionId:collections[1].id,collections,from,to};

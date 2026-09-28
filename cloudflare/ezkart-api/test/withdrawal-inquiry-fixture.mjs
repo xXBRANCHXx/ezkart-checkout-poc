@@ -1,3 +1,4 @@
+import {fixtureTransferContract} from './transfer-funding-fixture.mjs';
 import assert from 'node:assert/strict';
 import {setupEarningsFixture,key} from './earnings-fixture.mjs';
 
@@ -18,10 +19,10 @@ export async function seedLegacyPaymentGrant(f,w,confirmation){
   return {status:200,binding:original.binding,originalInquiry:original.originalEvidence,inquiryDigest:original.inquiryDigest,confirmationId:confirmation.id};
 }
 export async function setupWithdrawalInquiryFixture(t,options={}){
-  const f=await setupEarningsFixture(t,{...options,bindings:{COMMERCE_WITHDRAWAL_INQUIRY:'enabled',...options.bindings}});
+  const f=await setupEarningsFixture(t,{...options,bindings:{COMMERCE_TRANSFER_FEE_CONTRACT:fixtureTransferContract({environment:options.bindings?.APP_ENVIRONMENT==='beta'?'production':'sandbox',credentialFingerprint:options.fingerprint||'a'.repeat(64),clientId:options.clientId||'MCH-FIXTURE-SNAP'}),COMMERCE_WITHDRAWAL_INQUIRY:'enabled',...options.bindings}});
   const scope=()=>({environment:f.environment,seller:'seller_alice',actor:owner()});
   await f.product('bank-inquiry',10,'seller_alice',400000);
-  const p=await f.payment({items:[{productId:'bank-inquiry',quantity:2,expectedPrice:400000,expectedWeightGrams:100}]});await f.settle(p);await f.deliver(p);
+  const p=await f.payment({items:[{productId:'bank-inquiry',quantity:2,expectedPrice:400000,expectedWeightGrams:100}]});await f.settle(p,{},{balance:'1000000'});await f.deliver(p);
   const reserve=async(extra={})=>{const r=await f.call(withdrawalPath,{...scope(),requestKey:key(),amount:'250000',...(f.environment==='production'?{bankRevision:1}:{bank:{code:'CENAIDJA',accountNumber:'001234567890',channel:'BI_FAST'}}),...extra});assert.equal(r.status,200,r.error);return r.withdrawal;};
   const start=(w,extra={})=>f.call(withdrawalPath+'/'+w.id+'/inquiry/start',{...scope(),credentialFingerprint:'a'.repeat(64),clientId:'MCH-FIXTURE-SNAP',...extra});
   function evidence(g,change={}){
@@ -37,4 +38,12 @@ export async function setupWithdrawalInquiryFixture(t,options={}){
   const confirm=(w,inquiryDigest,extra={})=>f.call(withdrawalPath+'/'+w.id+'/confirm',{...scope(),requestKey:key(),inquiryDigest,...extra});
   const cancel=w=>f.call(withdrawalPath+'/'+w.id+'/cancel',{...scope(),requestKey:key()});
   return {...f,p,scope,reserve,start,evidence,receipt,readWithdrawal:read,recover,confirm,cancel};
+}
+
+export async function seedPreFundingPaymentGrant(f,w,confirmation){
+ const original=await f.recover(w),response=JSON.parse(original.originalEvidence.responseBody),scope=f.scope();
+ const requestBody=JSON.stringify({...JSON.parse(original.originalEvidence.requestBody),referenceNo:response.referenceNo,beneficiaryAccountName:response.beneficiaryAccountName});
+ await f.db.prepare(`INSERT INTO commerce_withdrawal_payment_grants(withdrawal_id,commerce_environment,confirmation_id,owner_auth_id,proof_expires_at,credential_fingerprint,client_id,payment_external_id,inquiry_digest,request_body,platform_enrollment_id,funds_json,created_at)
+ SELECT ?,?,?,?,?,?,?,?,?,?,?,source_json,strftime('%Y-%m-%dT%H:%M:%fZ','now') FROM commerce_withdrawal_funds WHERE seller_id=? AND commerce_environment=?`)
+ .bind(w.id,f.environment,confirmation.id,scope.actor.id,scope.actor.proofExpiresAt,original.binding.credentialFingerprint,'MCH-FIXTURE-SNAP',original.binding.paymentExternalId,original.inquiryDigest,requestBody,f.enrollments.bob,scope.seller,f.environment).run();
 }

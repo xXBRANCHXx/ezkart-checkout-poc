@@ -1,3 +1,4 @@
+import {prepareTransferFunding,originalTransferFunding} from './commerce-transfer-funding.js';
 import {commerceEnvironment,commerceHash} from './commerce-orders.js';
 import {currentCommerceEnvironment as mode} from './commerce-access.js';
 import {treasuryAuthorize,treasuryDestination,treasuryPlatform,treasuryOriginal} from './commerce-treasury.js';
@@ -8,7 +9,7 @@ const fields=(x,allowed)=>{if(!x||typeof x!=='object'||Array.isArray(x)||Object.
 const grant=(env,id,stage)=>env.DB.prepare('SELECT * FROM commerce_treasury_bank_grants WHERE intent_id=? AND stage=? AND commerce_environment=?').bind(id,stage,mode(env)).first();
 const receipt=(env,id,stage)=>env.DB.prepare('SELECT * FROM commerce_treasury_bank_receipts WHERE intent_id=? AND stage=?').bind(id,stage).first();
 const payload=b=>({partnerReferenceNo:b.partnerReferenceNo,type:'BANK_ACCOUNT',channel:b.channel,amount:{value:b.amount+'.00',currency:'IDR'},fromAccount:b.fromAccount,beneficiaryBankCode:b.beneficiaryBankCode,beneficiaryAccountNumber:b.beneficiaryAccountNumber});
-const failure=e=>{if(/treasury_|UNIQUE constraint/.test(String(e)))fail('The original treasury source, authorization or confirmation changed; review it before continuing.',409);throw e;};
+const failure=e=>{if(/treasury_|transfer_funding_|UNIQUE constraint/.test(String(e)))fail('The original treasury source, authorization or confirmation changed; review it before continuing.',409);throw e;};
 async function current(env,id){
  const row=await treasuryOriginal(env,id);if(!row)fail('Treasury intent was not found.',404);
  const wallet=await treasuryPlatform(env),bank=treasuryDestination(env,true);
@@ -33,25 +34,27 @@ export async function startTreasuryBank(env,user,id,stage,input){
  if(env[stage==='inquiry'?'COMMERCE_TREASURY_INQUIRY':'COMMERCE_TREASURY_PAYMENT']!=='enabled')fail('Treasury '+stage+' dispatch is held.',503);
  const {row,wallet,funds}=await current(env,id);
  if(wallet.credential_fingerprint!==input.credentialFingerprint||wallet.client_id!==input.clientId)fail('Provider credentials differ from the original company wallet.',409);
- let binding,body,original;
+ let binding,body,original,funding;
  if(stage==='payment'){
   if(typeof input.confirmationId!=='string'||!/^tryconf_[a-f0-9]{40}$/.test(input.confirmationId))fail('Original bank confirmation is required.');
-  if(!await env.DB.prepare('SELECT intent_id FROM commerce_treasury_execution_eligibility WHERE intent_id=?').bind(id).first())fail('Treasury payment is held pending verified fee funding, release policy and outcome accounting.',503);
+
   original=await originalInquiry(env,id);binding=JSON.parse(original.g.binding_json);
   if(original.g.client_id!==input.clientId||binding.credentialFingerprint!==input.credentialFingerprint)fail('The original inquiry provider identity changed.',409);
   body=wire({...JSON.parse(original.g.request_body),referenceNo:original.r.provider_reference,beneficiaryAccountName:original.r.beneficiary_name});
+  funding=await prepareTransferFunding(env,{kind:'treasury',id,channel:binding.channel,fingerprint:input.credentialFingerprint,clientId:input.clientId,platform:wallet.id});
  }else{
   const bank=JSON.parse(row.destination_json),external=async name=>BigInt('0x'+(await commerceHash('treasury-'+name+':'+id)).slice(0,26)).toString().padStart(32,'0');
   binding={environment:mode(env),credentialFingerprint:input.credentialFingerprint,partnerReferenceNo:row.partner_reference,fromAccount:wallet.cash_account,
    beneficiaryBankCode:bank.code,beneficiaryAccountNumber:bank.accountNumber,amount:String(row.amount),channel:bank.channel,inquiryExternalId:await external('inquiry'),paymentExternalId:await external('payment')};
   body=wire(payload(binding));
  }
- try{await env.DB.prepare(`INSERT INTO commerce_treasury_bank_grants(intent_id,stage,commerce_environment,operator_id,proof_expires_at,credential_fingerprint,client_id,
-  inquiry_external_id,payment_external_id,binding_json,request_body,source_json,destination_hash,confirmation_id,created_at)
-  VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,strftime('%Y-%m-%dT%H:%M:%fZ','now'))`).bind(id,stage,mode(env),actor.id,actor.proofExpiresAt,input.credentialFingerprint,input.clientId,
-   binding.inquiryExternalId,binding.paymentExternalId,JSON.stringify(binding),body,funds.source_json,row.destination_hash,input.confirmationId||null).run();}
+ try{const statement=env.DB.prepare(`INSERT INTO commerce_treasury_bank_grants(intent_id,stage,commerce_environment,operator_id,proof_expires_at,credential_fingerprint,client_id,
+  inquiry_external_id,payment_external_id,binding_json,request_body,source_json,destination_hash,confirmation_id,funding_contract_id,funding_balance_sequence,created_at)
+  VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,strftime('%Y-%m-%dT%H:%M:%fZ','now'))`).bind(id,stage,mode(env),actor.id,actor.proofExpiresAt,input.credentialFingerprint,input.clientId,
+   binding.inquiryExternalId,binding.paymentExternalId,JSON.stringify(binding),body,funds.source_json,row.destination_hash,input.confirmationId||null,funding?.contract.id||null,funding?.balanceSequence||null);
+  if(funding)await env.DB.batch([funding.statement,statement]);else await statement.run();}
  catch(e){const saved=await grant(env,id,stage);if(saved)return replay(saved);failure(e);}
- return {binding,mayInquire:stage==='inquiry',mayPay:stage==='payment',payoutConfirmed:false,...(original?{originalInquiry:original.evidence,inquiryDigest:original.r.digest,confirmationId:input.confirmationId}:{})};
+ return {funding:await originalTransferFunding(env,'treasury',id),binding,mayInquire:stage==='inquiry',mayPay:stage==='payment',payoutConfirmed:false,...(original?{originalInquiry:original.evidence,inquiryDigest:original.r.digest,confirmationId:input.confirmationId}:{})};
 }
 export async function confirmTreasuryBank(env,user,id,input){
  fields(input,['requestKey','inquiryDigest']);const actor=await treasuryAuthorize(env,user);
@@ -70,7 +73,7 @@ export async function treasuryBankRecovery(env,id,stage,input){
  fields(input,['environment']);commerceEnvironment(env,input.environment);
  const g=await grant(env,id,stage);if(!g)fail('Original treasury dispatch was not found.',404);
  const r=await receipt(env,id,stage),original=stage==='payment'?await originalInquiry(env,id):null;
- return {binding:JSON.parse(g.binding_json),clientId:g.client_id,requestBody:g.request_body,originalEvidence:r?JSON.parse(r.evidence_json):null,
+ return {funding:await originalTransferFunding(env,'treasury',id),binding:JSON.parse(g.binding_json),clientId:g.client_id,requestBody:g.request_body,originalEvidence:r?JSON.parse(r.evidence_json):null,
   digest:r?.digest||null,mayInquire:false,mayPay:false,payoutConfirmed:false,...(original?{originalInquiry:original.evidence,inquiryDigest:original.r.digest,confirmationId:g.confirmation_id}:{})};
 }
 async function paymentReceipt(env,id,g,e){

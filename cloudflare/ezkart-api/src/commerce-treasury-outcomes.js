@@ -1,3 +1,4 @@
+import {releaseTransferFeeStatement} from './commerce-transfer-funding.js';
 import {commerceEnvironment,commerceHash} from './commerce-orders.js';
 import {currentCommerceEnvironment as mode} from './commerce-access.js';
 const fail=(m,s=422)=>{throw new Response(m,{status:s});};
@@ -41,7 +42,7 @@ export async function reconcileTreasuryOutcome(env,id,input){
  env.DB.prepare(`INSERT INTO commerce_treasury_recognitions(assessment_sequence,intent_id,previous_sequence,paid_amount,fee_amount,recorded_at)
  SELECT c.assessment_sequence,c.intent_id,c.previous_sequence,c.paid_amount,c.fee_amount,strftime('%Y-%m-%dT%H:%M:%fZ','now')
  FROM commerce_treasury_recognition_candidates c JOIN commerce_treasury_outcome_assessments a ON a.sequence=c.assessment_sequence
- WHERE a.id=? AND NOT EXISTS(SELECT 1 FROM commerce_treasury_recognitions n WHERE n.assessment_sequence=c.assessment_sequence)`).bind(assessmentId)];
+ WHERE a.id=? AND NOT EXISTS(SELECT 1 FROM commerce_treasury_recognitions n WHERE n.assessment_sequence=c.assessment_sequence)`).bind(assessmentId),releaseTransferFeeStatement(env,'treasury',id,assessmentId)];
  [saved]=await env.DB.batch(statements);}
  catch(e){if(/treasury_outcome_|treasury_recognition_|treasury_cash_reference_|CHECK constraint/.test(String(e)))fail('Original treasury observations are incomplete, stale or conflicting. Keep the transfer reserved and review its original evidence.',409);throw e;}
  return {assessmentId,replayed:saved.meta.changes===0,...await treasuryOutcomeRead(env,id,{environment:input.environment})};

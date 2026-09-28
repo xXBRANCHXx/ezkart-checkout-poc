@@ -1,3 +1,4 @@
+import {fixtureTransferContract} from './transfer-funding-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {setupEarningsFixture,key} from './earnings-fixture.mjs';
@@ -8,7 +9,7 @@ async function setup(t,options={}){
  const f=await setupEarningsFixture(t,{bindings:{COMMERCE_TREASURY_OPERATORS:'bob',COMMERCE_TREASURY_BANK:JSON.stringify(bank),COMMERCE_TREASURY_INQUIRY:'enabled',COMMERCE_TREASURY_PAYMENT:'enabled',...options}});
  ok(await f.call('/internal/commerce/support/access',{environment:f.environment,authUserId:'bob',role:'reviewer',requestKey:key(),operator:'Local fixture',reason:'Treasury fixture.'}));
  const api=(path,input,extra={})=>f.merchant('/v1/treasury'+path,input,{seller:'bob',claims:claims(),method:input===undefined?'GET':'POST',...extra});
- const p=await f.payment();await f.settle(p);const reserved=ok(await api('/intents',{requestKey:key(),amount:'1000'})),id=reserved.intent.id;
+ const p=await f.payment();await f.settle(p,{},{balance:'1000000'});if(options.COMMERCE_TRANSFER_FEE_CONTRACT)await f.deliver(p);const reserved=ok(await api('/intents',{requestKey:key(),amount:'1000'})),id=reserved.intent.id;
  const identity=await f.db.prepare('SELECT credential_fingerprint AS credentialFingerprint,client_id AS clientId FROM commerce_wallet_provider_bindings WHERE enrollment_id=(SELECT platform_enrollment_id FROM commerce_treasury_intents WHERE id=?)').bind(id).first();
  const start=(stage,input={})=>api('/intents/'+id+'/'+stage+'/start',{...identity,...input});
  const internal=(stage,action,input={})=>f.call('/internal/commerce/finance/treasury/'+id+'/'+stage+'/'+action,{environment:f.environment,...input});
@@ -25,8 +26,8 @@ async function confirm(f,r){return ok(await f.api('/intents/'+f.id+'/confirm',{r
 
 let external=700000;
 async function ready(t,{withReceipt=true}={}){
- const f=await setup(t),{r}=await inquire(f),c=await confirm(f,r);
- await f.db.prepare('DROP VIEW commerce_treasury_execution_eligibility').run();await f.db.prepare('CREATE VIEW commerce_treasury_execution_eligibility AS SELECT id AS intent_id FROM commerce_treasury_intents').run();
+ const f=await setup(t,{COMMERCE_TRANSFER_FEE_CONTRACT:fixtureTransferContract()}),{r}=await inquire(f),c=await confirm(f,r);
+
  const g=ok(await f.start('payment',{confirmationId:c.confirmationId}));if(withReceipt)ok(await f.internal('payment','receipt',{evidence:evidence(g,'payment')}));
  const path='/internal/commerce/finance/treasury/'+f.id,call=(action,input={})=>f.call(path+'/'+action,{environment:f.environment,...input});
  const at=new Date().toISOString();
@@ -43,6 +44,7 @@ async function ready(t,{withReceipt=true}={}){
 test('complete original company history plus matching bank receipt/status records immutable cash accounting, consumes commission and keeps actual fees distinct',async t=>{
  const f=await ready(t),before=(await f.db.prepare('SELECT COUNT(*) n FROM commerce_financial_journals').first()).n,cap=await f.status(),pair=await f.collectOutcome();
  const r=ok(await f.reconcileOutcome(pair,cap));assert.equal(r.outcome.state,'matched_success');assert.equal(r.outcome.observedFee,'2500');assert.equal(r.outcome.payoutConfirmed,true);assert.equal(r.outcome.reservationConsumed,true);assert.equal(r.outcome.reservationReleased,false);
+ assert.equal((await f.db.prepare('SELECT COUNT(*) n FROM commerce_transfer_fee_releases').first()).n,1);
  assert.equal(ok(await f.reconcileOutcome(pair,cap)).replayed,true);assert.equal((await f.db.prepare('SELECT COUNT(*) n FROM commerce_financial_journals').first()).n,before+1);
  assert.equal((await f.db.prepare('SELECT reserved_commission FROM commerce_treasury_funds WHERE platform_enrollment_id=(SELECT platform_enrollment_id FROM commerce_treasury_intents WHERE id=?)').bind(f.id).first()).reserved_commission,0);
  const entries=(await f.db.prepare("SELECT e.account,e.amount FROM commerce_financial_entries e JOIN commerce_financial_journals j ON j.sequence=e.journal_sequence WHERE j.kind='treasury_payout' ORDER BY e.account").all()).results;
@@ -59,6 +61,9 @@ test('complete original company history plus matching bank receipt/status record
  // A later overlapping cash history invalidates the source immediately, even before collection finalization.
  await f.history([],{accountNo:f.g.binding.fromAccount,fromDateTime:pair.from,toDateTime:pair.to},{seller:'seller_bob',requestedAt:new Date().toISOString(),observedAt:new Date().toISOString()});
  assert.equal(ok(await f.call('outcome/read')).outcome.reason,'provider_evidence_changed');assert.equal(ok(await f.call('outcome/read')).outcome.payoutConfirmed,false);
+ assert.equal(ok(await f.reconcileOutcome(pair,cap)).outcome.reconciled,false);
+ assert.equal((await f.db.prepare('SELECT COUNT(*) n FROM commerce_transfer_fee_releases').first()).n,1);
+ assert.equal((await f.db.prepare('SELECT reserved_fee FROM commerce_transfer_fee_positions WHERE transfer_id=?').bind(f.id).first()).reserved_fee,500);
  const held=ok(await f.call('outcome/read')).outcome;assert.equal(held.reservationConsumed,true);assert.equal(held.recognizedPrincipal,'1000');assert.equal(held.recognizedFee,'2500');assert.equal(ok(await f.api('/commissions')).funds.accountingHolds,1);
 });
 test('missing, duplicate, foreign and pending legs cannot become zero fees or completed company payouts',async t=>{

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {setupWithdrawalInquiryFixture,withdrawalPath,seedLegacyPaymentGrant} from './withdrawal-inquiry-fixture.mjs';
+import {setupWithdrawalInquiryFixture,withdrawalPath,seedLegacyPaymentGrant,seedPreFundingPaymentGrant} from './withdrawal-inquiry-fixture.mjs';
 import {startWithdrawalPayment,withdrawalPaymentRecovery} from '../src/commerce-withdrawal-payments.js';
 import {applyCommerceSchema} from './commerce-schema.mjs';
 
@@ -16,8 +16,8 @@ const rejected=status=>e=>e instanceof Response&&e.status===status;
 test('payment grants freeze the confirmed platform identity and retain it after configuration changes without claiming fee funding',async t=>{
   const f=await fixture(t),p=await f.prepare(),env=await f.mf.getBindings(),before=await f.summary();
   const g=await startWithdrawalPayment(env,p.w.id,f.input(p));assert.equal(g.mayPay,true);
-  assert.deepEqual(g.feeAccount,{enrollmentId:f.enrollments.bob,seller:'seller_bob',profileId:'SAC-bob',cashAccount:'2010000002',
-    parentProfileId:'BRN-fixture',feePayer:'ezkart',sellerWithdrawalFee:'0',providerFundingVerified:false});
+  assert.deepEqual(g.feeAccount,{...g.feeAccount,enrollmentId:f.enrollments.bob,seller:'seller_bob',profileId:'SAC-bob',cashAccount:'2010000002',
+    parentProfileId:'BRN-fixture',feePayer:'ezkart',sellerWithdrawalFee:'0',providerFundingVerified:true});assert.equal(g.feeAccount.feeLimit,'500');assert.equal(g.feeAccount.budgetReserved,true);
   for(const configured of ['',undefined,'seller_alice','seller_other']){
     const changed={...env,COMMERCE_PLATFORM_WALLET_SELLER:configured};
     assert.equal((await startWithdrawalPayment(changed,p.w.id,f.input(p))).mayPay,false);
@@ -47,20 +47,20 @@ test('missing, self-selected, inactive and mismatched platform accounts cannot a
   const insert=change=>{const row={...record,...change};return f.db.prepare('INSERT INTO commerce_withdrawal_payment_grants('+Object.keys(row).join(',')+",created_at) VALUES("+Object.keys(row).map(()=>'?').join(',')+",strftime('%Y-%m-%dT%H:%M:%fZ','now'))").bind(...Object.values(row)).run();};
   for(const change of [{platform_enrollment_id:null},{platform_enrollment_id:f.enrollments.alice},{platform_enrollment_id:'unknown'},
     {client_id:'MCH-FOREIGN'},{credential_fingerprint:'b'.repeat(64)},{commerce_environment:'production'}])
-    await assert.rejects(insert(change),/withdrawal_payment_platform_required/);
+    await assert.rejects(insert(change),/withdrawal_payment_platform_required|seller_onboarding_required|transfer_funding_/);
   assert.equal(original.feeAccount.sellerWithdrawalFee,'0');assert.equal((await startWithdrawalPayment(env,q.w.id,f.input(q))).mayPay,true);
 });
 
-test('a populated 0058 upgrade preserves legacy grants without inventing a platform account or renewing send authority',async t=>{
-  const f=await fixture(t,{through:58}),p=await f.prepare();await seedLegacyPaymentGrant(f,p.w,p.c.confirmation);
+test('a populated 0075 upgrade preserves original grants without inventing fee funding or renewing send authority',async t=>{
+  const f=await fixture(t,{through:75}),p=await f.prepare();await seedPreFundingPaymentGrant(f,p.w,p.c.confirmation);
   const before=(await f.db.prepare('SELECT * FROM commerce_withdrawal_payment_grants').all()).results;
   const money=(await f.db.prepare('SELECT * FROM commerce_financial_journals').all()).results;
-  await applyCommerceSchema(f.db,58);
+  await applyCommerceSchema(f.db,75);
   const after=(await f.db.prepare('SELECT * FROM commerce_withdrawal_payment_grants').all()).results;
-  assert.deepEqual(after,before.map(row=>({...row,platform_enrollment_id:null})));
+  assert.deepEqual(after,before.map(row=>({...row,funding_contract_id:null,funding_balance_sequence:null})));
   assert.deepEqual((await f.db.prepare('SELECT * FROM commerce_financial_journals').all()).results,money);
   const env=await f.mf.getBindings();assert.equal((await startWithdrawalPayment(env,p.w.id,f.input(p))).mayPay,false);
-  const recovered=await withdrawalPaymentRecovery(env,p.w.id,{environment:f.environment});assert.equal(recovered.feeAccount,null);assert.equal(recovered.payoutConfirmed,false);
+  const recovered=await withdrawalPaymentRecovery(env,p.w.id,{environment:f.environment});assert.equal(recovered.feeAccount.providerFundingVerified,false);assert.equal(recovered.payoutConfirmed,false);
   assert.equal((await f.cancel(p.w)).status,409);assert.deepEqual((await f.db.prepare('PRAGMA foreign_key_check').all()).results,[]);
-  const next=await f.prepare();assert.equal((await startWithdrawalPayment(env,next.w.id,f.input(next))).feeAccount.enrollmentId,f.enrollments.bob);
+  const next=await f.prepare();await assert.rejects(startWithdrawalPayment(env,next.w.id,f.input(next)),rejected(409));
 });

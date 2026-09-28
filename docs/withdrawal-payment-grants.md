@@ -204,3 +204,13 @@ implements matched status/history, payout journals and completed-outflow deducti
 The integrated caller, actual fee provisioning, authenticated callbacks,
 unsupported reversals, refund accounting and live acceptance remain required.
 No launch gate is closed by this stage.
+
+## Funded grants (0077)
+
+New grants require the actual merchant fee contract and atomically reserve its
+inclusive channel ceiling against both released company commission and current
+company cash. Original contract/balance identity survives config changes; old
+grants receive no invented funding. See [fee funding and activation](transfer-fee-funding.md)
+for exact settings and supported direct-company-billing semantics. Seller-source
+charging remains held pending its explicit funding/reimbursement implementation.
+No transport flag was enabled.

@@ -1,3 +1,4 @@
+import {prepareTransferFunding,originalTransferFunding} from './commerce-transfer-funding.js';
 import {commerceEnvironment} from './commerce-orders.js';
 import {withdrawalFailure} from './commerce-withdrawals.js';
 import {withdrawalInquiryOwner,validateWithdrawalInquiryReceipt,withdrawalEvidenceDate,withdrawalEvidenceText,withdrawalEvidenceJSON,withdrawalEvidenceHash} from './commerce-withdrawal-inquiries.js';
@@ -54,18 +55,20 @@ export async function startWithdrawalPayment(env,id,input){
     JOIN commerce_wallet_provider_profiles p ON p.enrollment_id=e.id AND p.commerce_environment=e.commerce_environment
     WHERE e.seller_id=? AND e.commerce_environment=?`).bind(env.COMMERCE_PLATFORM_WALLET_SELLER,input.environment).first();
   if(!platform)fail('A confirmed platform account is required before withdrawal payment',409);
+  const funding=await prepareTransferFunding(env,{kind:'withdrawal',id,channel:original.binding.channel,fingerprint:input.credentialFingerprint,clientId:input.clientId,platform:platform.enrollment_id});
   try{
-    await env.DB.prepare(`INSERT INTO commerce_withdrawal_payment_grants(withdrawal_id,commerce_environment,confirmation_id,owner_auth_id,
-      proof_expires_at,credential_fingerprint,client_id,payment_external_id,inquiry_digest,request_body,platform_enrollment_id,funds_json,created_at)
-      SELECT ?,?,?,?,?,?,?,?,?,?,?,f.source_json,strftime('%Y-%m-%dT%H:%M:%fZ','now') FROM commerce_withdrawal_funds f WHERE f.seller_id=? AND f.commerce_environment=?`)
+    await env.DB.batch([funding.statement,env.DB.prepare(`INSERT INTO commerce_withdrawal_payment_grants(withdrawal_id,commerce_environment,confirmation_id,owner_auth_id,
+      proof_expires_at,credential_fingerprint,client_id,payment_external_id,inquiry_digest,request_body,platform_enrollment_id,funding_contract_id,funding_balance_sequence,funds_json,created_at)
+      SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,f.source_json,strftime('%Y-%m-%dT%H:%M:%fZ','now') FROM commerce_withdrawal_funds f WHERE f.seller_id=? AND f.commerce_environment=?`)
       .bind(id,input.environment,input.confirmationId,input.actor.id,input.actor.proofExpiresAt,input.credentialFingerprint,input.clientId,
-        original.payment_external_id,original.inquiry_digest,paymentBody(original),platform.enrollment_id,input.seller,input.environment).run();
+        original.payment_external_id,original.inquiry_digest,paymentBody(original),platform.enrollment_id,funding.contract.id,funding.balanceSequence,input.seller,input.environment)]);
   }catch(error){const saved=await grant(env,id,input.environment);if(saved)return replay(saved);paymentFailure(error);}
   if(!await grant(env,id,input.environment))fail('Withdrawal payment could not be prepared',409);
   return {mayPay:true,binding:original.binding,originalInquiry:original.original,inquiryDigest:original.inquiry_digest,
-    confirmationId:input.confirmationId,feeAccount:await feeAccount(env,platform.enrollment_id),payoutConfirmed:false};
+    confirmationId:input.confirmationId,feeAccount:{...await feeAccount(env,platform.enrollment_id),...await originalTransferFunding(env,'withdrawal',id)},payoutConfirmed:false};
 }
 function paymentFailure(error){
+  if(/transfer_funding_/.test(String(error)))fail('Original company fee funding changed. Refresh original evidence before proceeding.',409);
   if(/withdrawal_payment_platform_required/.test(String(error)))fail('The platform fee account does not match the original provider identity',409);
   if(/withdrawal_payment_confirmation/.test(String(error)))fail('Confirm the original bank details again with fresh Wallet verification',409);
   if(/withdrawal_payment_source/.test(String(error)))fail('The payment no longer matches its original bank inquiry',409);
@@ -120,7 +123,7 @@ export async function withdrawalPaymentRecovery(env,id,input){
   const diagnostic=await env.DB.prepare('SELECT stage,reason,provider_status AS providerStatus,recorded_at AS recordedAt FROM commerce_withdrawal_payment_diagnostics WHERE withdrawal_id=?').bind(id).first();
   return {binding:original.binding,clientId:g.client_id,originalInquiry:original.original,inquiryDigest:g.inquiry_digest,confirmationId:g.confirmation_id,
     requestBody:g.request_body,originalPayment:r?JSON.parse(r.evidence_json):null,paymentDigest:r?.payment_digest||null,diagnostic,
-    feeAccount:await feeAccount(env,g.platform_enrollment_id),mayPay:false,payoutConfirmed:false};
+    feeAccount:g.platform_enrollment_id?{...await feeAccount(env,g.platform_enrollment_id),...await originalTransferFunding(env,'withdrawal',id)}:null,mayPay:false,payoutConfirmed:false};
 }
 
 export async function recordWithdrawalPaymentDiagnostic(env,id,input){

@@ -1,3 +1,4 @@
+import {releaseTransferFeeStatement} from './commerce-transfer-funding.js';
 import {commerceEnvironment,commerceHash} from './commerce-orders.js';
 
 const fail=(message,status=422)=>{throw new Response(message,{status});};
@@ -53,9 +54,9 @@ export async function reconcilePayout(env,id,input){
   const prior=await env.DB.prepare('SELECT id FROM commerce_payout_assessments WHERE withdrawal_id=? ORDER BY sequence DESC LIMIT 1').bind(id).first();
   let saved;
   try{
-    saved=await env.DB.prepare(`INSERT INTO commerce_payout_assessments(id,version,withdrawal_id,seller_collection_sequence,platform_collection_sequence,status_sequence,previous_id,recorded_at)
+    [saved]=await env.DB.batch([env.DB.prepare(`INSERT INTO commerce_payout_assessments(id,version,withdrawal_id,seller_collection_sequence,platform_collection_sequence,status_sequence,previous_id,recorded_at)
       SELECT ?,1,?,?,?,?,?,strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE NOT EXISTS(SELECT 1 FROM commerce_payout_assessments WHERE id=?)`)
-      .bind(assessmentId,id,seller.sequence,platform.sequence,input.statusCap,prior?.id||null,assessmentId).run();
+      .bind(assessmentId,id,seller.sequence,platform.sequence,input.statusCap,prior?.id||null,assessmentId),releaseTransferFeeStatement(env,'withdrawal',id,assessmentId)]);
   }catch(error){
     if(/payout_(original_accounts_required|complete_window_required|history_superseded|status_superseded|concurrent_assessment|reference_conflict)/.test(String(error)))
       fail('Payout evidence is incomplete, superseded or conflicts with the original transfer. Reconcile the original provider records.',409);
