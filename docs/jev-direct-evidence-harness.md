@@ -15,7 +15,9 @@ untrusted allegations. No new prohibited-content rule or legal theory was added.
 A separate backend gate independently checks the cited visible-text quotation:
 
 - Credentials require a direct request and an explicitly named secret. Generic
-  code, order reference, bare PIN or discount-code wording is insufficient.
+  code, order reference, bare PIN or discount-code wording is insufficient. The
+  named secret must be the requested object, not a word in a request for a poster,
+  document or reset link.
 - Threats require a direct speaker/target and specific physical harm or disclosure
   of identified private information. Vague retaliation is insufficient.
 - Gambling requires a direct public real-money offer, explicit Indonesia context
@@ -62,3 +64,17 @@ a new accuracy estimate. Expected labels are synthetic and agent-authored. The
 new model prompt has not been run in a new paid evaluation. Original benchmark,
 responses, labels, PDFs and their recorded hashes are untouched. Replay results
 are a separate artifact and create no page actions or provider charges.
+
+## Delivery
+
+Backend changes `1efa800` and `8fd7fb7` were pushed to both workbench remotes.
+Beta Worker version `62c5ed3d-bcd5-4554-b735-68d11c4ecc44` contains the guard,
+including the latest seller/Executive separation changes. The private runtime
+configuration hash was identical before and after deployment; budget, provider
+switches and unrelated settings were unchanged. No model requests were sent.
+
+Two Executive bridge/browser checks also passed after integration (48 distinct
+scoped checks total), covering actual intake/run/grade recovery and effective
+human-review display. The live Executive Operations view loaded its review queue
+and unchanged $0.38 allowance. The explanatory copy was separately updated in
+Executive commit `dbf6d41` to remove the former automatic-clearance wording.
