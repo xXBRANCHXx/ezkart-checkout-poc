@@ -8,7 +8,9 @@ if (preg_match('/^EZK-[SP]-[A-F0-9]{24}$/D', $orderId) !== 1) {
 header('Cache-Control: no-store');
 header('Referrer-Policy: no-referrer');
 header('X-Content-Type-Options: nosniff');
-header("Content-Security-Policy: default-src 'self'; script-src 'self' https://jokul.doku.com/jokul-checkout-js/v1/jokul-checkout-1.0.0.js https://sandbox.doku.com/jokul-checkout-js/v1/jokul-checkout-1.0.0.js; style-src 'self' https://jokul.doku.com/jokul-checkout-js/v1/jokul-checkout-1.0.0.css https://sandbox.doku.com/jokul-checkout-js/v1/jokul-checkout-1.0.0.css; frame-src https://jokul.doku.com https://checkout.doku.com https://sandbox.doku.com https://staging.doku.com; img-src 'self'; connect-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'");
+$paymentSecurityPolicy = "default-src 'self'; script-src 'self' https://jokul.doku.com/jokul-checkout-js/v1/jokul-checkout-1.0.0.js https://sandbox.doku.com/jokul-checkout-js/v1/jokul-checkout-1.0.0.js; style-src 'self' https://jokul.doku.com/jokul-checkout-js/v1/jokul-checkout-1.0.0.css https://sandbox.doku.com/jokul-checkout-js/v1/jokul-checkout-1.0.0.css; frame-src https://jokul.doku.com https://checkout.doku.com https://sandbox.doku.com https://staging.doku.com; img-src 'self'; connect-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'";
+header("Content-Security-Policy: " . $paymentSecurityPolicy);
+header("X-Ezkart-Content-Security-Policy: " . $paymentSecurityPolicy);
 ?>
 <!doctype html>
 <html lang="en">
