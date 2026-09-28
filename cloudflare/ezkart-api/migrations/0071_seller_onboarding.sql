@@ -41,7 +41,7 @@ CREATE VIEW seller_onboarding_ready AS
  JOIN seller_onboarding_policy policy ON policy.id=1 AND policy.minimum_age IS NOT NULL
  JOIN seller_authenticated_identity i ON i.seller_id=p.seller_id AND i.owner_auth_id=p.owner_auth_id
    AND i.profile_revision=p.identity_revision AND i.verified_age>=policy.minimum_age AND i.policy_version=policy.policy_version
-   AND length(trim(i.provider_reference))>0 AND i.expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now')
+   AND length(trim(i.provider_reference,char(9)||char(10)||char(11)||char(12)||char(13)||' '))>0 AND i.expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now')
  WHERE EXISTS(SELECT 1 FROM json_each(h.configuration_json,'$.addresses') a WHERE json_extract(a.value,'$.id')=json_extract(h.configuration_json,'$.pickupAddressId') AND json_type(a.value,'$.coordinate.latitude') IN ('real','integer') AND json_type(a.value,'$.coordinate.longitude') IN ('real','integer'))
  AND EXISTS(SELECT 1 FROM json_each(h.configuration_json,'$.addresses') a WHERE json_extract(a.value,'$.id')=json_extract(h.configuration_json,'$.returnAddressId') AND json_type(a.value,'$.coordinate.latitude') IN ('real','integer') AND json_type(a.value,'$.coordinate.longitude') IN ('real','integer'));
 CREATE TRIGGER onboarding_profile_guard BEFORE INSERT ON seller_onboarding_profiles BEGIN

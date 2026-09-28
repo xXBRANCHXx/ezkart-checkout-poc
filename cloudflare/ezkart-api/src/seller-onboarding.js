@@ -31,22 +31,27 @@ export async function savedOnboardingBank(env,input,revision){
  return {code:bank.bank_code,accountNumber:bank.account_number,channel:bank.channel};
 }
 async function snapshot(env,input){
- const [profile,bank,shipping,policy,ready,wallet]=await Promise.all([
+ const [storedProfile,storedBank,shipping,policy,ready,wallet,user]=await Promise.all([
   read(env,'seller_onboarding_current',input.seller),read(env,'seller_onboarding_current_bank',input.seller),read(env,'seller_shipping_settings',input.seller),
   env.DB.prepare('SELECT * FROM seller_onboarding_policy WHERE id=1').first(),read(env,'seller_onboarding_ready',input.seller),
   env.DB.prepare(`SELECT e.id,p.profile_id,j.state FROM commerce_wallet_enrollments e JOIN commerce_jobs j ON j.id=e.job_id LEFT JOIN commerce_wallet_provider_profiles p ON p.enrollment_id=e.id WHERE e.seller_id=? AND e.commerce_environment=?`).bind(input.seller,input.environment).first(),
+  env.DB.prepare('SELECT email FROM app_users WHERE auth_user_id=?').bind(input.actor.id).first(),
  ]);
- const identity=profile?await env.DB.prepare(`SELECT i.provider_reference FROM seller_authenticated_identity i WHERE i.seller_id=? AND i.owner_auth_id=? AND i.profile_revision=? AND i.verified_age>=? AND i.policy_version=? AND length(trim(i.provider_reference))>0 AND i.expires_at>?`).bind(input.seller,input.actor.id,profile.identity_revision,policy.minimum_age,policy.policy_version,new Date().toISOString()).first():null;
+ // A store may gain another owner. Revision counters remain usable without
+ // exposing or copying the previous owner's personal declarations or bank.
+ const profile=storedProfile?.owner_auth_id===input.actor.id?storedProfile:null,bank=storedBank?.owner_auth_id===input.actor.id?storedBank:null;
+ const email=input.actor.email.toLowerCase(),emailChanged=!!profile&&(profile.verified_email!==email||profile.verified_email!==user?.email?.toLowerCase());
+ const identity=profile?await env.DB.prepare(`SELECT i.provider_reference FROM seller_authenticated_identity i WHERE i.seller_id=? AND i.owner_auth_id=? AND i.profile_revision=? AND i.verified_age>=? AND i.policy_version=? AND length(trim(i.provider_reference,char(9)||char(10)||char(11)||char(12)||char(13)||' '))>0 AND i.expires_at>?`).bind(input.seller,input.actor.id,profile.identity_revision,policy.minimum_age,policy.policy_version,new Date().toISOString()).first():null;
  const config=shipping?JSON.parse(shipping.configuration_json):{addresses:[]};
  const pickup=config.addresses.find(a=>a.id===config.pickupAddressId),returns=config.addresses.find(a=>a.id===config.returnAddressId);
  const pins=!!pickup?.coordinate&&!!returns?.coordinate;
- return {seller:input.seller,email:input.actor.email.toLowerCase(),emailVerified:true,
+ return {seller:input.seller,email,emailVerified:true,profileRevision:storedProfile?.revision||0,bankRevision:storedBank?.revision||0,
   profile:profile?{revision:profile.revision,identityRevision:profile.identity_revision,legalName:profile.legal_name,birthDate:profile.declared_birth_date,phone:profile.phone,confirmedShippingRevision:profile.confirmed_shipping_revision}:null,
   bank:bank?{revision:bank.revision,code:bank.bank_code,accountSuffix:bank.account_number.slice(-4),channel:bank.channel}:null,
   shipping:{revision:shipping?.revision||0,pickup:pickup?{label:pickup.label,address:pickup.address,location:pickup.location,coordinate:pickup.coordinate||null}:null,returns:returns?{label:returns.label,address:returns.address,location:returns.location,coordinate:returns.coordinate||null}:null,pinsPresent:pins,confirmed:!!profile&&profile.confirmed_shipping_revision===shipping?.revision&&pins},
   identity:{status:identity?'verified':'pending_authenticated_verification',minimumAge:policy.minimum_age,policyVersion:policy.policy_version},
-  ready:!!ready,wallet:wallet?{id:wallet.id,status:wallet.profile_id?'confirmed':wallet.state==='uncertain'?'review':wallet.state}:null,
-  requirements:[...(!profile?['legal_name_phone']:[]),...(!bank?['saved_bank']:[]),...(!pins||profile?.confirmed_shipping_revision!==shipping?.revision?['confirmed_pickup_return_pins']:[]),...(!policy.minimum_age?['age_policy']:[]),...(!identity?['authenticated_identity_verification']:[])],providerCalls:0};
+  ready:!!ready&&ready.owner_auth_id===input.actor.id&&ready.revision===profile?.revision&&ready.bank_revision===bank?.revision&&!!identity&&pins&&profile.confirmed_shipping_revision===shipping?.revision&&!emailChanged,wallet:wallet?{id:wallet.id,status:wallet.profile_id?'confirmed':wallet.state==='uncertain'?'review':wallet.state}:null,
+  requirements:[...(!profile?['legal_name_phone']:[]),...(emailChanged?['refresh_legal_profile']:[]),...(!bank?['saved_bank']:[]),...(!pins||profile?.confirmed_shipping_revision!==shipping?.revision?['confirmed_pickup_return_pins']:[]),...(!policy.minimum_age?['age_policy']:[]),...(!identity?['authenticated_identity_verification']:[])],providerCalls:0};
 }
 export async function sellerOnboarding(env,input){
  fields(input,['environment','seller','actor','action','revision','requestKey','legalName','birthDate','phone','bank','shippingRevision']);
@@ -61,10 +66,10 @@ export async function sellerOnboarding(env,input){
   values=[input.bank.code,input.bank.accountNumber,input.bank.channel];table='seller_onboarding_banks';
   sql='INSERT INTO seller_onboarding_banks(seller_id,revision,request_key,request_hash,owner_auth_id,bank_code,account_number,channel,proof_expires_at,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)';
  }else{
-  let name=input.legalName,birthDate=input.birthDate,phone=input.phone,pins=current?.confirmed_shipping_revision||null;
+  let name=input.legalName,birthDate=input.birthDate,phone=input.phone,pins=current?.owner_auth_id===input.actor.id?current.confirmed_shipping_revision:null;
   if(pins&&(await read(env,'seller_shipping_settings',input.seller))?.revision!==pins)pins=null;
   if(input.action==='confirm_pins'){
-   if(!current)fail('Save your full legal name and phone first.',409);
+   if(!current||current.owner_auth_id!==input.actor.id)fail('Save your own full legal name and phone first.',409);
    const state=await snapshot(env,input);if(!state.shipping.pinsPresent||state.shipping.revision!==input.shippingRevision)fail('Save pickup and return addresses with map pins, then refresh onboarding.',409);
    name=current.legal_name;birthDate=current.declared_birth_date;phone=current.phone;pins=input.shippingRevision;
   }

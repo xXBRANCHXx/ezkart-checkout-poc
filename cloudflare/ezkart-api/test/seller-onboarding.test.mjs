@@ -73,3 +73,30 @@ test('original uncertain production wallet remains readable and cannot register 
  const recovery=await f.call(wallet+'/registrations/'+id+'?environment=production');assert.equal(recovery.status,200);assert.equal(recovery.registration.jobState,'uncertain');assert(recovery.registration.binding);
  assert.equal((await f.db.prepare('SELECT COUNT(*) AS n FROM commerce_wallet_enrollments').first()).n,1);
 });
+
+
+test('blank identity references fail SQL readiness and email changes require a visible profile refresh',async t=>{
+ const f=await setupCommerceFixture(t,{bindings:{APP_ENVIRONMENT:'beta'}}),read=async actorOverride=>(await f.call(path,input('read',actorOverride?{actor:actorOverride}:{}))).onboarding;
+ for(const reference of [null,'','   ','\t\n\r ']){
+  await f.db.prepare("UPDATE fixture_authenticated_identity SET provider_reference=? WHERE seller_id='seller_alice'").bind(reference).run();
+  assert.equal(await f.db.prepare("SELECT * FROM seller_onboarding_ready WHERE seller_id='seller_alice'").first(),null);
+  const state=await read();assert.equal(state.ready,false);assert.equal(state.identity.status,'pending_authenticated_verification');assert(state.requirements.includes('authenticated_identity_verification'));
+ }
+ await f.db.prepare("UPDATE fixture_authenticated_identity SET provider_reference='real-reviewed-reference' WHERE seller_id='seller_alice'").run();assert.equal((await read()).ready,true);
+ await f.db.prepare("UPDATE app_users SET email='new@example.test' WHERE auth_user_id='alice'").run();
+ const changedActor={...actor(),email:'new@example.test'},changed=await read(changedActor);assert.equal(changed.ready,false);assert.equal(changed.identity.status,'verified');assert.deepEqual(changed.requirements,['refresh_legal_profile']);
+ const saved=await f.call(path,input('profile',{actor:changedActor,revision:changed.profileRevision,requestKey:key(),legalName:changed.profile.legalName,birthDate:changed.profile.birthDate,phone:changed.profile.phone}));assert.equal(saved.status,200,saved.error);assert.equal(saved.onboarding.ready,true);assert.equal(saved.onboarding.profile.identityRevision,1);
+});
+
+test('a newly added owner cannot read or copy prior owner declarations and bank but can save a new revision',async t=>{
+ const f=await setupCommerceFixture(t,{bindings:{APP_ENVIRONMENT:'beta'}});
+ await f.db.prepare("INSERT INTO seller_memberships(seller_id,auth_user_id,role,created_at) VALUES('seller_alice','bob','owner','now')").run();
+ const other=extra=>input('read',{actor:actor('bob'),...extra}),response=await f.call(path,other());assert.equal(response.status,200,response.error);const state=response.onboarding;
+ assert.equal(state.ready,false);assert.equal(state.profile,null);assert.equal(state.bank,null);assert.equal(state.profileRevision,2);assert.equal(state.bankRevision,1);assert.equal(state.shipping.confirmed,false);
+ assert(!JSON.stringify(state).includes('Fixture alice'));assert(!JSON.stringify(state).includes('1990-01-01'));assert(!JSON.stringify(state).includes('7890'));
+ assert(state.requirements.includes('legal_name_phone'));assert(state.requirements.includes('saved_bank'));assert.equal(state.identity.status,'pending_authenticated_verification');
+ assert.equal((await f.call(path,other({action:'confirm_pins',revision:2,shippingRevision:1,requestKey:key()}))).status,409);
+ const saved=await f.call(path,other({action:'profile',revision:state.profileRevision,requestKey:key(),legalName:'Bob Own Legal Name',birthDate:'1995-05-01',phone:'081111111111'}));assert.equal(saved.status,200,saved.error);assert.equal(saved.onboarding.profile.identityRevision,3);assert.equal(saved.onboarding.profile.legalName,'Bob Own Legal Name');assert.equal(saved.onboarding.shipping.confirmed,false);assert.equal(saved.onboarding.ready,false);
+ const bank=await f.call(path,other({action:'bank',revision:state.bankRevision,requestKey:key(),bank:{code:'CENAIDJA',accountNumber:'000999999999',channel:'BI_FAST'}}));assert.equal(bank.status,200,bank.error);assert.equal(bank.onboarding.bank.revision,2);
+ const previous=await f.call(path,input('read'));assert.equal(previous.onboarding.profile,null);assert.equal(previous.onboarding.bank,null);assert.equal(previous.onboarding.ready,false);
+});
