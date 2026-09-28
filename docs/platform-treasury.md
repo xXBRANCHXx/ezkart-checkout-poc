@@ -1,6 +1,6 @@
 # Ezkart commission treasury
 
-Migrations 0070, 0072 and 0073 add company commission reservations, bank inquiries, confirmations and durable transfer grants.
+Migrations 0070, 0072, 0073 and 0075 add company commission reservations, bank inquiries, confirmations, durable transfer grants and actual-outflow accounting.
 It reserves only original order commission supported by current verified routed
 settlements. It does not move money, mark a company bank as verified, or treat
 platform cash as withdrawable commission. Seller withdrawals and their journal
@@ -122,7 +122,7 @@ Recovery compares the private receipt with the original signed Worker grant read
 
 ## Remaining execution requirements
 
-Matched original company status/history collection and immutable provider-outcome assessment are implemented below. Commission cash/fee accounting and funding/custody/release policy remain held. Reservations stay reserved even after matched provider success or explicit VOID failure. No paid finalization, failure-based release, provider call, deployment, bank configuration or flag enablement was performed.
+Matched original company status/history collection, immutable provider-outcome assessment and confirmed actual-outflow accounting are implemented below. New transfer funding and release eligibility remain held. Matched successes consume the original reservation; explicit VOID failures remain reserved. No provider call, deployment, bank configuration or flag enablement was performed.
 
 Before actual payment authority can be enabled, the company bank and dedicated
 platform account still need real verification, and the commission release/reserve
@@ -150,7 +150,7 @@ All raw responses remain immutable. Every status observation uses the original p
 
 An outcome assessment pins the complete exhausted company cash **and pending** collection, exact original status sequence frontier and original transfer receipt digest. It appends a new result rather than modifying an old one. A later overlapping or related history read, a new status, or a late original transfer receipt makes the older assessment noncurrent immediately. Reconciliation of stale/incomplete collections is rejected; a previously saved result is still visible with `provider_evidence_changed`. A provider reference already bound to seller payout/settlement or another company receipt cannot support a company match. Shared closed-window endpoints are checked and counted once without erasing genuine duplicate legs.
 
-`matched_failure` means an original failed status and explicit VOID principal/fee observations agree; it does not authorize reserve release. FAILED rows alone do not prove the debit was removed. Provider matching is separate from cash accounting: all results expose `payoutConfirmed:false`, `reconciled:false`, `reservationReleased:false` and `accountingState:held_fee_funding_custody_release_unverified`. No company cash journal is posted, because the actual funding/custody/release evidence needed to justify the accounting still does not exist. Seller earnings, minimums, reserve accounts and journal semantics are not reused. The empty execution eligibility view remains unchanged.
+`matched_failure` means an original failed status and explicit VOID principal/fee observations agree; it does not authorize reserve release. FAILED rows alone do not prove the debit was removed. Migration 0075 adds accounting for source-confirmed successful company outflows, described below. Failed, ambiguous and stale outcomes still cannot release a reservation. Seller earnings, minimums and reserve-account semantics are not reused. The empty execution eligibility view remains unchanged.
 
 Signed internal routes:
 
@@ -176,3 +176,70 @@ php tools/commerce/sync-treasury-observations.php --intent=try_<40hex> --environ
 Use sandbox only with the TEST deployment; beta uses production identity. A private locked run is stored beneath `commerce_treasury_recovery_directory`. Before requesting the next provider response, each read is committed atomically as a mode0600 file in a mode0700 directory. Run scope, company identity, pagination/window plan, collection input and outcome input cannot change. Collection uses at most 12 contiguous 31-day windows, at most 40 pages per original pocket and a bounded per-invocation read budget. A budget pause resumes the same run and never repeats successful reads. A retained provider failure stops the same run; another explicitly requested read run may be needed. Read failures never authorize transfer retries.
 
 `recover` replays saved response bytes and D1 finalization only, without loading provider credentials or making DOKU calls. If it reaches an unsaved read, it stops and requires explicit collection. Recovery works with dispatch/observation flags held. An unsaved or unknown transfer response is never replaced by a second transfer. New shared company history can invalidate earlier settlement/payout source snapshots; the collector reports `sharedHistoryRefreshRequired:true` and does not silently rewrite related accounting.
+
+## Confirmed actual company outflows (0075)
+
+A successful provider transfer that has already happened must remain in the cash
+ledger even while new transfer authorization is held. The existing original
+receipt binds the bank; the complete company-account history proves both the
+principal debit and the actual company fee. Migration 0075 therefore recognizes
+only a current `matched_success` with an explicit actual charge, including a
+provider-observed zero charge. It never uses a guessed fee or caller-supplied
+amount. Principal plus fee must fit the exact integer journal range.
+
+`outcome/reconcile` atomically saves its assessment and immutable recognition.
+The general financial journal debits `company_bank_transfer_clearing` for the
+principal, debits `platform_withdrawal_fee` for the actual expense, and credits
+`provider_cash_platform` for their sum. Commission revenue is not recorded a
+second time. The clearing account records DOKU's confirmed bank transfer; it is
+not a fabricated bank statement or a manual-paid switch.
+
+The reservation is **consumed**, not restored to available commission. Owner
+output includes `paidCommission`, `paidTransferFees`, `recognizedPrincipal`,
+`recognizedFee`, `reservationConsumed`, and current `reconciled` state. The
+commission pool deducts recognized company principal and actual company/seller
+transfer fees before admitting another reservation. Shipping, admin allocation
+and seller earnings are never added to that commission budget. An actual fee
+larger than the remaining commission is still booked honestly and creates a
+visible shortfall instead of spending someone else's allocation silently.
+
+A refreshed exact match with a changed actual charge posts only the fee delta.
+An unchanged result posts no duplicate cash journal. Later missing fees,
+contradictory status or stale history preserve the last recognized principal and
+fee and hold new availability. Original identities, cancellation fences and
+no-resend behavior remain intact. Recognition and every journal line reject
+replacement, alteration and deletion. Replaying a current pre-0075 assessment
+through the same reconciliation route can append its missing recognition; the
+migration does not guess or auto-finalize old observations.
+
+### Exact remaining dispatch work and activation order
+
+The owner has already decided that Ezkart pays withdrawal fees and seller
+withdrawals start at Rp250,000. That decision is not a missing input. The DOKU
+[V2 bank transfer request](https://developers.doku.com/wallet-as-a-service/sub-account/sub-account-v2/integration-guide)
+contains no fee quote or billing-account override. Before releasing payment
+execution, the actual merchant contract must establish the charged account and
+inclusive fee ceiling for each supported channel, including tax. In particular,
+a seller-source transfer cannot be assumed to charge the Ezkart account just
+because Ezkart owes the fee. If DOKU charges the seller source, an explicit
+company-to-seller funding/reimbursement workflow is required; none is invented
+by this migration.
+
+The next code boundary is an immutable fee-contract identity and atomic fee
+budget reservation, bound to current company sources and current provider
+balance, before either original one-send grant. It must preserve original
+contract/funding identities during uncertain recovery and reconcile the
+reservation against the actual charge. Company release eligibility also needs
+its source-derived rule; the existing verified whole-order delivery plus actual
+settlement rule is available as a conservative basis. These are remaining code
+tasks, so BCA approval alone does not activate bank dispatch yet.
+
+Activation proceeds in this order: obtain the actual merchant fee/billing
+contract; implement and fixture-test the funding/reservation and company
+release boundary; independently verify the dedicated Ezkart Sub-Account and
+server-pinned registered company bank; configure the private receipt directory,
+operator MFA and actual provider identity; collect and reconcile original
+settlement/delivery sources; then enable the separate inquiry/observation/payment
+flags for the approved beta. No settings were changed in this slice. Follow the
+same original private receipt and observation recovery commands above for any
+uncertain result, with no repeat transfer.

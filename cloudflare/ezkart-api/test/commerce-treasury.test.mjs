@@ -165,7 +165,7 @@ test('bounded source capacity is visible and cannot silently reserve an incomple
     await f.db.prepare(row.sql.replace('CREATE VIEW commerce_treasury_fund_inputs','CREATE VIEW fixture_original_inputs')).run();
   }
   await f.db.prepare(`CREATE VIEW commerce_treasury_fund_inputs AS SELECT platform_enrollment_id,commerce_environment,net_commission,eligible_commission,
-    reversed_commission,held_captures,unattributed_captures,refund_holds,reserved_commission,incomplete_journals,
+    reversed_commission,held_captures,unattributed_captures,refund_holds,reserved_commission,paid_commission,paid_transfer_fees,accounting_holds,incomplete_journals,
     json_array(hex(zeroblob(100001))) AS captures_json FROM fixture_original_inputs`).run();
   const report=ok(await f.api('/commissions'));assert.equal(report.funds.sourceCapacityExceeded,1);assert.equal(report.funds.reservableCommission,'0');
   assert(report.blockers.includes('commission_source_capacity_exceeded'));assert.equal((await f.reserve()).status,409);
