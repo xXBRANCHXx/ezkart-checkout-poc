@@ -142,3 +142,11 @@ rejection. Desktop (1360px) and mobile (390px) screenshots were inspected with n
 clipping. PHP syntax, JavaScript syntax and the actual beta Worker dry-run passed.
 The ten broader central-checkout regression checks also passed. These tests use
 isolated provider fixtures and create no real charges.
+
+Deployment: implementation `d11f928` is pushed to `agent/ezkart-workbench`.
+The beta Worker is version `b40f99f0-25c8-463e-8407-5ecc601a7674`; its health
+check confirms beta D1/public R2/private R2 and 209 application tables.
+At 08:53 UTC on 28 September, hosted `cart.js` matched the committed source.
+No migration or provider configuration change was needed. Checkout remains
+`checkout_paused`; activation and actual ShopeePay payment acceptance are still
+pending. Main and `ezkart.id` were not deployed.
