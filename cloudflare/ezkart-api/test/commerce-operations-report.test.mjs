@@ -6,6 +6,7 @@ import {campaignDeliveryFixture} from './campaign-delivery-fixture.mjs';
 import {dispatchEmails,recordEmailWebhook} from '../src/commerce-email-delivery.js';
 import {emailFixtureEvent,emailFixtureCallback} from './email-fixture.mjs';
 import {main as inspect} from '../../../tools/commerce/operations-report.mjs';
+import {setupPayoutFixture} from './payout-fixture.mjs';
 
 const now=()=>new Date().toISOString();
 const query=f=>async sql=>{
@@ -14,6 +15,22 @@ const query=f=>async sql=>{
   return result.results;
 };
 const report=(f,deployment='test',at=now())=>inspect(['--deployment='+deployment,'--fail-on-warning'],query(f),at);
+
+test('payout monitoring respects all twelve history windows and still warns beyond their coverage',async t=>{
+  const f=await setupPayoutFixture(t);
+  const grant=await f.db.prepare('SELECT created_at FROM commerce_withdrawal_payment_grants WHERE withdrawal_id=?').bind(f.w.id).first();
+  const created=Date.parse(grant.created_at),lastCovered=created+372*86400000-600000;
+  for(const at of [created+70*86400000,lastCovered]){
+    const result=await report(f,'test',new Date(at).toISOString());
+    assert.equal(result.payoutSync.unreconciledPayouts,1);
+    assert.equal(result.payoutSync.outsideWindow,0);
+    assert(!result.warnings.includes('payout_history_outside_window'));
+    assert(result.warnings.includes('payouts_need_reconciliation'));
+  }
+  const overdue=await report(f,'test',new Date(lastCovered+1).toISOString());
+  assert.equal(overdue.payoutSync.outsideWindow,1);
+  assert(overdue.warnings.includes('payout_history_outside_window'));
+});
 async function job(f,id,state,{environment='sandbox',available='2000-01-01T00:00:00.000Z',lease=null}={}){
   await f.db.prepare(`INSERT INTO commerce_jobs(id,seller_id,commerce_environment,job_key,kind,state,payload_json,result_json,
     available_at,lease_until,created_at,updated_at) VALUES (?,'seller_alice',?,?,'wallet.register',?,'{"private":"never-print@example.test"}',

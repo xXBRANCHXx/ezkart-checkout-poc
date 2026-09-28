@@ -58,7 +58,7 @@ export function commerceOperationsStatement(environment, now) {
       'overdue',(SELECT COUNT(*) FROM sync_jobs WHERE state IN ('queued','retry') AND available_at<strftime('%Y-%m-%dT%H:%M:%fZ',(SELECT observed_at FROM scope),'-15 minutes')),
       'unreconciledPayouts',(SELECT COUNT(*) FROM payout_grants WHERE reconciled=0),
       'unassignedAccounts',(SELECT COUNT(*) FROM payout_grants WHERE platform_enrollment_id IS NULL),
-      'outsideWindow',(SELECT COUNT(*) FROM payout_grants WHERE reconciled=0 AND created_at<strftime('%Y-%m-%dT%H:%M:%fZ',(SELECT observed_at FROM scope),'-31 days','+10 minutes')),
+      'outsideWindow',(SELECT COUNT(*) FROM payout_grants WHERE reconciled=0 AND created_at<strftime('%Y-%m-%dT%H:%M:%fZ',(SELECT observed_at FROM scope),'-372 days','+10 minutes')),
       'staleSettlements',(SELECT COUNT(*) FROM commerce_settlement_scopes s JOIN commerce_settlement_source_freshness f ON f.assessment_sequence=s.sequence
         WHERE s.commerce_environment=(SELECT environment FROM scope) AND f.current=0
           AND NOT EXISTS(SELECT 1 FROM commerce_settlement_assessments later WHERE later.capture_id=s.capture_id AND later.sequence>s.sequence))),
