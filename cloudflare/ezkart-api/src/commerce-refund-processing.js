@@ -8,6 +8,7 @@ const fields=(input,allowed)=>{if(!input||typeof input!=='object'||Array.isArray
 const text=(value,label,min,max)=>{if(typeof value!=='string'||value.trim().length<min||value.trim().length>max||/[\u0000-\u001f\u007f]/.test(value))fail(label+' is invalid.');return value.trim();};
 const key=value=>{if(typeof value!=='string'||!/^[A-Za-z0-9_-]{16,100}$/.test(value))fail('Request identity is invalid.');return value;};
 const id=(value,prefix)=>{if(typeof value!=='string'||!new RegExp('^'+prefix+'_[a-f0-9]{32}$').test(value))fail('Refund processing reference is invalid.');return value;};
+const stamp=value=>{if(typeof value!=='string'||!/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(value)||!Number.isFinite(Date.parse(value))||new Date(value).toISOString()!==value)fail('The provider observation time is invalid.');return value;};
 const integer=value=>{if(!Number.isSafeInteger(value)||value<0)fail('Refund processing version is invalid.');return value;};
 const bankFor=(env,refund)=>env.DB.prepare('SELECT * FROM commerce_refund_current_bank WHERE refund_id=?').bind(refund).first();
 const requestFor=(env,refund)=>env.DB.prepare('SELECT * FROM commerce_refund_provider_requests WHERE refund_id=?').bind(refund).first();
@@ -22,14 +23,19 @@ export async function refundProcessingView(env,actor,row,authority,dispute){
   const [bank,request,source,finalization]=await Promise.all([bankFor(env,row.id),requestFor(env,row.id),
     env.DB.prepare('SELECT bank_id,settlement_id FROM commerce_refund_handoff_sources WHERE refund_id=?').bind(row.id).first(),env.DB.prepare('SELECT * FROM commerce_refund_finalizations WHERE refund_id=?').bind(row.id).first()]);
   const submission=request?await env.DB.prepare('SELECT * FROM commerce_refund_provider_submissions WHERE provider_request_id=?').bind(request.id).first():null;
+  const followup=request?await env.DB.prepare('SELECT * FROM commerce_refund_current_followup WHERE provider_request_id=?').bind(request.id).first():null;
+  const labels={started:'Original DOKU handoff started — submission not confirmed',uncertain:'Original DOKU request needs investigation',processing:'DOKU processing reported — refund not confirmed',needs_information:'DOKU needs information — refund not confirmed',declined:'DOKU declined the request — review required',returned_reported:'DOKU completion reported — returned funds not verified'};
   const approved=row.state==='approved',enabled=commerceStorageEnabled(env),staff=actor.kind==='support',fresh=staff&&authority.canWrite&&enabled;
   const reason=!approved?'Bank details are collected after approval.':dispute?.active?'An Ezkart review is open.':!bank?'Waiting for the buyer’s bank details.':
     !source?'The original payment and current settled funds must be verified before preparing a DOKU request.':'';
   return {state:finalization?'confirmed':submission?'submitted':request?'prepared':approved?'awaiting_preparation':'not_approved',
-    stateLabel:finalization?(actor.kind==='buyer'?'Refund confirmed':'Refund confirmed — funding reconciliation pending'):submission?'Submitted to DOKU — refund not confirmed':request?'DOKU request prepared — submission not recorded':'Refund payment not confirmed',
+    stateLabel:finalization?(actor.kind==='buyer'?'Refund confirmed':'Refund confirmed — funding reconciliation pending'):followup&&followup.state!=='started'?labels[followup.state]:submission?'Submitted to DOKU — refund not confirmed':followup?labels.started:request?'DOKU request prepared — submission not recorded':'Refund payment not confirmed',
     bankProvided:Boolean(bank),bank:bank&&actor.kind!=='merchant'?{id:bank.id,bankName:bank.bank_name,accountName:bank.account_name,
       accountEnding:bank.account_number.slice(-4),savedAt:bank.created_at}:null,
     canProvideBank:enabled&&actor.kind==='buyer'&&approved&&!request&&!dispute?.active,
+    canStartHandoff:fresh&&Boolean(request)&&Boolean(source)&&!submission&&!followup&&!dispute?.active,
+    canFollowUp:fresh&&!finalization&&Boolean(submission||followup),
+    followup:followup?{id:followup.id,state:followup.state,observedAt:followup.observed_at,recordedAt:followup.recorded_at,...(staff?{reference:followup.reference}: {})}:null,
     canPrepare:fresh&&!request&&Boolean(source),canDownload:fresh&&Boolean(request),canRecordSubmission:!finalization&&fresh&&Boolean(request)&&!submission,
     requiresVerification:staff&&authority.role==='reviewer'&&!authority.canWrite,
     reason:request?'':reason,request:request?{id:request.id,preparedAt:request.created_at,...(staff?{settlementId:request.settlement_id}: {})}:null,
@@ -60,6 +66,7 @@ export async function saveRefundBank(env,actor,refundId,raw,expectedOrder=''){
 export async function changeRefundProcessing(env,actor,refundId,raw){
   const detail=await refundDetail(env,actor,refundId);await supportAccess(env,actor,true);
   if(!commerceStorageEnabled(env))fail('Refund processing is unavailable.',503);
+  if(raw?.kind==='record_provider_followup')return recordProviderFollowup(env,actor,refundId,raw,detail);
   if(!['prepare_provider_request','record_provider_submission'].includes(raw?.kind))fail('Refund processing action is invalid.');
   const prepare=raw.kind==='prepare_provider_request';
   fields(raw,prepare?['kind','requestKey','bankId','refundRevision','orderRevision','evidenceVersion']:
@@ -87,6 +94,24 @@ export async function changeRefundProcessing(env,actor,refundId,raw){
       VALUES(?,?,?,?,?,?,?,?,?,?)`).bind('rsubmit_'+crypto.randomUUID().replaceAll('-',''),input.providerRequestId,actor.id,actor.proofExpiresAt,input.requestKey,hash,input.channel,input.reference,input.submittedAt,now).run();}
     catch(error){if(!await replay())databaseFailure(error);}
   }
+  return refundDetail(env,actor,refundId);
+}
+
+async function recordProviderFollowup(env,actor,refundId,raw,detail){
+  fields(raw,['kind','requestKey','providerRequestId','previousId','state','reference','observedAt']);
+  const input={kind:raw.kind,requestKey:key(raw.requestKey),providerRequestId:id(raw.providerRequestId,'rprov'),
+    previousId:raw.previousId===null?null:id(raw.previousId,'rfollow'),state:raw.state,
+    reference:text(raw.reference,'Original case or sent-message reference',3,200),observedAt:stamp(raw.observedAt)};
+  if(!['started','uncertain','processing','needs_information','declined','returned_reported'].includes(input.state))fail('Provider follow-up state is invalid.');
+  const hash=await commerceHash({actor:actor.id,environment:mode(env),refundId,...input});
+  const replay=async()=>{const saved=await env.DB.prepare('SELECT request_hash FROM commerce_refund_provider_followups WHERE actor_auth_user_id=? AND request_key=?').bind(actor.id,input.requestKey).first();
+    if(!saved)return false;if(saved.request_hash!==hash)fail('This follow-up identity was used for different details.',409);return true;};
+  if(await replay())return refundDetail(env,actor,refundId);
+  if(detail.processing.request?.id!==input.providerRequestId||!(input.state==='started'?detail.processing.canStartHandoff:detail.processing.canFollowUp)
+    ||(detail.processing.followup?.id||null)!==input.previousId)fail('Review the original DOKU request and latest follow-up before continuing.',409);
+  try{await env.DB.prepare(`INSERT INTO commerce_refund_provider_followups(id,provider_request_id,previous_id,actor_auth_user_id,proof_expires_at,request_key,request_hash,state,reference,observed_at,recorded_at)
+    VALUES(?,?,?,?,?,?,?,?,?,?,?)`).bind('rfollow_'+crypto.randomUUID().replaceAll('-',''),input.providerRequestId,input.previousId,actor.id,actor.proofExpiresAt,input.requestKey,hash,input.state,input.reference,input.observedAt,new Date().toISOString()).run();}
+  catch(error){if(!await replay())databaseFailure(error);}
   return refundDetail(env,actor,refundId);
 }
 

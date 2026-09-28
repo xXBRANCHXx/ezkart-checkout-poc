@@ -28,10 +28,18 @@ test('buyer bank confirmation stays out of browser storage; desktop/mobile provi
   assert.equal((await f.db.prepare('SELECT COUNT(*) n FROM commerce_refund_provider_requests').first()).n,1);
   const [download]=await Promise.all([staff.waitForEvent('download'),staff.getByRole('button',{name:'Download original DOKU request',exact:true}).click()]);
   const content=await readFile(await download.path(),'utf8');assert(content.includes('Account number: '+f.bankBody.accountNumber));
+  f.control.drop=f.support+'/processing';await staff.getByRole('button',{name:'Start original DOKU handoff',exact:true}).click();
+  await staff.getByRole('button',{name:'Retry confirmation',exact:true}).waitFor();await staff.reload();await staff.getByRole('button',{name:'Retry confirmation',exact:true}).click();
+  await staff.getByRole('link',{name:'Open official DOKU support',exact:true}).waitFor();assert.equal(await staff.getByRole('button',{name:'Start original DOKU handoff',exact:true}).count(),0);
+  assert.equal((await f.db.prepare('SELECT COUNT(*) n FROM commerce_refund_provider_followups').first()).n,1);
   const form=staff.locator('[data-refund-submission]');await form.getByLabel('Ticket or sent-message reference',{exact:true}).fill('DOKU-FIXTURE-BROWSER');
   const local=await staff.evaluate(()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,19);});
   await form.getByLabel('Actual submission time',{exact:true}).fill(local);await form.getByRole('checkbox').check();await form.getByRole('button',{name:'Record DOKU submission',exact:true}).click();
   await staff.getByText('Submitted to DOKU — refund not confirmed',{exact:true}).waitFor();
+  const follow=staff.locator('[data-refund-followup]');await follow.getByLabel('Original case update',{exact:true}).selectOption('returned_reported');await follow.getByLabel('Original ticket or response reference',{exact:true}).fill('DOKU-FIXTURE-BROWSER-RESPONSE');
+  await follow.getByLabel('Time of this observation',{exact:true}).fill(await staff.evaluate(()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,23);}));
+  await follow.getByRole('button',{name:'Save original-case update',exact:true}).click();await staff.getByText('DOKU completion reported — returned funds not verified',{exact:true}).waitFor();
+  assert.equal((await f.db.prepare('SELECT COUNT(*) n FROM commerce_refund_finalizations').first()).n,0);
   const directory='/tmp/ezkart-refund-processing-ui-01a0d643';await mkdir(directory,{recursive:true});
   for(const [kind,p] of [['buyer',buyer],['support',staff]])for(const width of [1360,390]){
     await p.setViewportSize({width,height:1000});await p.getByRole('button',{name:'Reload request',exact:true}).click();await p.waitForFunction(()=>!document.querySelector('[data-refund-detail-reload]')?.disabled);

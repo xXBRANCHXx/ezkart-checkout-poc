@@ -83,6 +83,7 @@
     else if(p.bankProvided)box.append(el('p','The buyer has provided private refund bank details to Ezkart.'));
     if(p.request)box.append(el('p','Original provider request prepared · '+date(p.request.preparedAt)),el('p','The destination is fixed for this request. Contact Ezkart if it needs correction; do not submit a replacement refund.'));
     if(p.submission)box.append(el('p','Submission recorded · '+date(p.submission.submittedAt)),el('p',p.paymentConfirmed?'Returned funds are confirmed. The original submission is retained.':'DOKU processing and the returned funds still need verification.'));
+    if(support&&p.submission)box.append(el('p','Original submission reference: '+p.submission.reference));
     if(p.costs){
       const costs=p.costs,range=value=>value.minimum===value.maximum?money(value.minimum):money(value.minimum)+'–'+money(value.maximum),plan=el('section');plan.dataset.refundCosts='';
       plan.append(el('h4','Cost after a confirmed refund'),el('p','Planning amounts only. No refund payment or accounting entry is confirmed.'));
@@ -133,6 +134,32 @@
       }catch(e){if(!ended)error(e.message);}finally{busy=false;controls();}
     })());box.append(download,el('p','This private file includes the full bank account. Use DOKU’s official support ticket or care@doku.com. Follow up on the same original request if sending was interrupted or its outcome is uncertain.'));
       if(r.dispute?.active)box.append(el('p','An Ezkart review is open. Resolve it before submitting; the download is the original archived request.'));
+    }
+    if(p.followup){
+      box.append(el('p','Latest original-case update · '+date(p.followup.observedAt)));
+      if(support)box.append(el('p','Original case reference: '+p.followup.reference));
+      if(!p.submission)box.append(el('p','Check DOKU’s support history or sent mail for this original request before doing anything else. A missing acknowledgement does not authorize another refund request.'));
+    }
+    if(p.canStartHandoff)box.append(button('Start original DOKU handoff',()=>{
+      if(dirty){error('Save or clear your draft before starting the handoff.');return;}
+      if(!confirm('Record that you are starting this original DOKU support request? If submission is interrupted, investigate this same request before sending again.'))return;
+      void persistAndSend(casePath(r.id)+'/processing',{kind:'record_provider_followup',requestKey:crypto.randomUUID().replaceAll('-',''),providerRequestId:p.request.id,previousId:null,state:'started',reference:p.request.id,observedAt:new Date().toISOString()});
+    }));
+    if(support&&p.followup&&p.followup.state==='started'&&!p.submission){
+      const link=el('a','Open official DOKU support');link.href='https://help.doku.com/en/support/tickets/new';link.target='_blank';link.rel='noopener noreferrer';box.append(link,
+        el('p','Submit the downloaded original request once, or use care@doku.com. If you already attempted to send it, recover the existing ticket or sent-message reference first.'));
+    }
+    if(p.canFollowUp){
+      const follow=el('form');follow.dataset.refundFollowup='';const stateLabel=el('label','Original case update'),state=el('select');state.name='caseState';state.setAttribute('aria-label','Original case update');
+      for(const [value,label] of [['uncertain','Submission or outcome uncertain'],['processing','DOKU reports processing'],['needs_information','DOKU requests more information'],['declined','DOKU reports declined'],['returned_reported','DOKU reports completion; funds unverified']]){const option=el('option',label);option.value=value;state.append(option);}stateLabel.append(state);
+      const refLabel=el('label','Original ticket or response reference'),reference=el('input');reference.required=true;reference.minLength=3;reference.maxLength=200;reference.placeholder=p.submission?.reference||p.followup?.reference||'';refLabel.append(reference);
+      const atLabel=el('label','Time of this observation'),at=el('input');at.type='datetime-local';at.required=true;at.step='0.001';atLabel.append(at);
+      const save=el('button','Save original-case update');save.type='submit';follow.append(stateLabel,refLabel,atLabel,
+        el('p','Record the reference only. Keep bank details and provider correspondence in the private original case. This update does not confirm returned money, change earnings or remove digital access.'),save);
+      follow.addEventListener('input',()=>{dirty=true;controls();});follow.addEventListener('submit',e=>{e.preventDefault();if(!follow.reportValidity())return;
+        if(otherDraft(follow)){error('Save or clear your other draft before adding a follow-up.');return;}
+        void persistAndSend(casePath(r.id)+'/processing',{kind:'record_provider_followup',requestKey:crypto.randomUUID().replaceAll('-',''),providerRequestId:p.request.id,previousId:p.followup?.id||null,state:state.value,reference:reference.value,observedAt:new Date(at.value).toISOString()});
+      });box.append(follow);
     }
     if(p.canRecordSubmission){
       const submitted=el('form');submitted.dataset.refundSubmission='';const channelLabel=el('label','Submission channel'),channel=el('select');channel.name='channel';

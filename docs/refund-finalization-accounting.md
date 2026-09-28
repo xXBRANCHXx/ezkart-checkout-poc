@@ -13,6 +13,13 @@ a prepared packet, a support submission, settlement history, and payment success
 cannot populate it. Production code therefore cannot finalize a refund yet.
 Tests replace this boundary only inside isolated local databases.
 
+Migration 0074 adds supervised original-case follow-ups, including “completion
+reported — returned funds not verified.” These operator observations deliberately
+have no connection to the verified outcome view. The published DOKU support route
+can be used during controlled beta; an authenticated completion collector remains
+unfinished until DOKU supplies the supported outcome/correlation contract. See
+[the original-case workflow and provider requirements](refund-provider-handoffs.md).
+
 A future provider-specific verifier must project immutable successful outcomes
 bound to the original provider request, environment, credential fingerprint,
 brand, capture, original payment reference, fixed destination, exact requested
