@@ -76,5 +76,12 @@ Official contracts consulted 28 September 2026:
 Validation: lifecycle and hostile input fixtures in
 `cloudflare/ezkart-api/test/custom-domains.test.mjs`, existing Advanced plan tests,
 and isolated browser management checks in
-`tools/builder-mcp/test/custom-domains.test.mjs`. These establish local behavior;
+`tools/builder-mcp/test/custom-domains.test.mjs`. The realistic commerce fixture
+`tools/builder-mcp/test/custom-domain-commerce.test.mjs` publishes through the
+existing builder, serves the exact snapshot on a vanity hostname, loads product
+and variant photos, embedded fonts and layout styles, adds a variant to the cart,
+and opens the configured canonical checkout with its seller, cart and vanity
+return URL. It verifies an opaque script origin, no opener, and no authenticated
+API or checkout routing on the vanity host. All destinations are local fixtures.
+These establish local behavior;
 they do not establish real certificate issuance or DNS configuration.
