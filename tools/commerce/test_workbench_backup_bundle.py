@@ -12,6 +12,8 @@ import subprocess
 import tarfile
 import tempfile
 import unittest
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from threading import Thread
 from unittest.mock import patch
 
 spec = importlib.util.spec_from_file_location("bundle", Path(__file__).with_name("workbench-backup-bundle.py"))
@@ -81,6 +83,29 @@ class FakeStorage:
 
 
 class BundleTests(unittest.TestCase):
+    def test_storage_redirect_never_forwards_authorization(self):
+        requests = []
+        class Redirect(BaseHTTPRequestHandler):
+            def do_GET(self):
+                requests.append(self.path)
+                self.send_response(302)
+                self.send_header('Location', '/credential-target')
+                self.end_headers()
+            def log_message(self, *args):
+                pass
+        with HTTPServer(('127.0.0.1', 0), Redirect) as server:
+            thread = Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            try:
+                with patch.dict(os.environ, {'CLOUDFLARE_ACCOUNT_ID': 'a' * 32, 'CLOUDFLARE_API_TOKEN': 'fixture-only'}):
+                    storage = bundle.CloudflareStorage('beta')
+                with self.assertRaises(bundle.BackupError):
+                    storage.request(f'http://127.0.0.1:{server.server_port}/original')
+                self.assertEqual(requests, ['/original'])
+            finally:
+                server.shutdown()
+                thread.join()
+
     @classmethod
     def setUpClass(cls):
         cls.old_umask = os.umask(0o077)

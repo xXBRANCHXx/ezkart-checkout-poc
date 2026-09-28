@@ -128,9 +128,12 @@ test('allocated digital refunds revoke only their files, including outstanding g
   const raced={...env,PRIVATE_ASSETS:{async get(...args){const object=await env.PRIVATE_ASSETS.get(...args);ok(await post(f,r,e));return object;}}};
   await assert.rejects(buyerDigitalFile(raced,{id:'earnings-buyer'},p.order.id,ia.id,ga.id,new Request('https://fixture.test')),err=>err instanceof Response&&err.status===409);
   const purchases=ok(await f.merchant(base,undefined,{seller:'earnings-buyer'}));assert.equal(purchases.items.find(i=>i.orderItemId===ia.id).canDownload,false);assert.equal(purchases.items.find(i=>i.orderItemId===ib.id).canDownload,true);
+  assert.equal(purchases.items.find(i=>i.orderItemId===ia.id).state,'refund_review');
   assert.equal(await count(f,'commerce_digital_refund_revocations'),1);assert.equal(await count(f,'commerce_digital_entitlements'),2);
   const downloaded=await buyerDigitalFile(env,{id:'earnings-buyer'},p.order.id,ib.id,gb.id,new Request('https://fixture.test'));assert.equal(downloaded.status,200);assert.deepEqual(Buffer.from(await downloaded.arrayBuffer()),b.bytes);await grant(ib);
   await assert.rejects(f.db.prepare('INSERT INTO commerce_digital_download_requests(id,grant_id,requested_range,authorized_at) VALUES(?,?,?,?)').bind('dreq_'+key(),ga.id,'',new Date().toISOString()).run(),/access_changed/);
+  const remainder=await prepare(f,p,[{orderItemId:ia.id,amount:12500}]);ok(await post(f,remainder,await evidence(f,remainder)));
+  const after=ok(await f.merchant(base,undefined,{seller:'earnings-buyer'}));assert.equal(after.items.find(i=>i.orderItemId===ia.id).state,'refunded');assert.equal(after.items.find(i=>i.orderItemId===ib.id).canDownload,true);
   await balanced(f);
 });
 

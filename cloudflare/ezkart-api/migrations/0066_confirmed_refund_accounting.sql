@@ -115,10 +115,13 @@ FROM commerce_refund_finalizations f;
 
 -- Entitlements and delivery history remain immutable. Only positively allocated
 -- digital lines on a confirmed refund lose access; shipping never selects a file.
+-- A partially refunded line is held for review, not labeled fully refunded.
 CREATE VIEW commerce_digital_refund_revocations AS
-SELECT DISTINCT i.order_item_id,f.capture_id FROM commerce_refund_finalizations f
+SELECT i.order_item_id,f.capture_id,SUM(i.amount)>=o.quantity*o.unit_price_amount AS fully_refunded FROM commerce_refund_finalizations f
 JOIN commerce_refund_items i ON i.refund_id=f.refund_id
-JOIN commerce_digital_entitlements e ON e.order_item_id=i.order_item_id AND e.capture_id=f.capture_id;
+JOIN order_items o ON o.id=i.order_item_id
+JOIN commerce_digital_entitlements e ON e.order_item_id=i.order_item_id AND e.capture_id=f.capture_id
+GROUP BY i.order_item_id,f.capture_id;
 CREATE VIEW commerce_refund_order_totals AS
 SELECT order_id,SUM(product_amount+shipping_amount) AS refunded_amount FROM commerce_refund_finalizations GROUP BY order_id;
 CREATE TRIGGER refund_finalization_post AFTER INSERT ON commerce_refund_finalizations BEGIN

@@ -45,8 +45,12 @@ is unresolved. Funding and fee holds prevent withdrawal availability; reconcilin
 actual funding, fee custody and recovery remains separate work.
 
 Only digital lines positively allocated to the confirmed refund lose future
-access, including old grants and checks after storage awaits. Unrelated digital
-lines on a native partial refund remain available. Shipping-only refunds revoke
+access, including old grants and checks after storage awaits. A partially
+refunded line is held as `refund_review`;
+only a cumulatively fully refunded line is labeled `refunded`. Releasing a partial
+line's hold needs an explicit policy and implementation; this slice does not
+invent permanent partial-refund revocation or silently restore access. Unrelated
+digital lines on a native partial refund remain available. Shipping-only refunds revoke
 none. Legacy partial refunds without allocated evidence retain their existing
 review hold. Approved/confirmed allocations remain reserved against additional
 refund requests; remaining unallocated amounts can follow the original workflow.

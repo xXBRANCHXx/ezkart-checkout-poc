@@ -109,6 +109,11 @@ def bounded(seconds):
         signal.signal(signal.SIGALRM, previous)
 
 
+class NoStorageRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, request, fp, code, msg, headers, newurl):
+        return None
+
+
 class CloudflareStorage:
     """REST adapter; credentials are supplied by the scheduler's environment only."""
     def __init__(self, deployment):
@@ -137,7 +142,7 @@ class CloudflareStorage:
     def request(self, url, method="GET", data=None, extra=None):
         request = urllib.request.Request(url, method=method, data=data, headers={**self.headers, **(extra or {})})
         try:
-            return urllib.request.urlopen(request, timeout=40)
+            return urllib.request.build_opener(NoStorageRedirect()).open(request, timeout=40)
         except urllib.error.HTTPError as error:
             code = error.code
             error.close()

@@ -6,7 +6,7 @@ const fail=(message,status=422,code='')=>{throw new Response(message,{status,hea
 const iso=()=>new Date().toISOString();
 const enabled=env=>{if(!commerceStorageEnabled(env))fail('Central commerce storage is not enabled',503);};
 const itemId=value=>{if(typeof value!=='string'||!/^item_[A-Za-z0-9-]{3,90}$/.test(value))fail('Download not found.',404);};
-const state=row=>row.payment_review?'payment_review':row.refund_revoked?'refunded':row.checkout_state==='partially_refunded'&&!row.allocated_refund?'refund_review':
+const state=row=>row.payment_review?'payment_review':row.refund_partial?'refund_review':row.refund_revoked?'refunded':row.checkout_state==='partially_refunded'&&!row.allocated_refund?'refund_review':
   ['paid','partially_refunded'].includes(row.checkout_state)?(row.capture_id?'available':'unavailable'):row.checkout_state;
 const requireAvailable=row=>{if(state(row)!=='available')fail(state(row)==='refund_review'?
   'Downloads are on hold while the refunded items are reviewed. Contact support.':
@@ -22,6 +22,7 @@ const purchaseSql=`SELECT p.order_item_id,p.order_id,p.seller_id,p.version_id,i.
   o.checkout_state,o.payment_review,
   EXISTS(SELECT 1 FROM commerce_refund_order_totals t WHERE t.order_id=o.id AND t.refunded_amount<o.total_amount) AS allocated_refund,
   EXISTS(SELECT 1 FROM commerce_digital_refund_revocations r WHERE r.order_item_id=p.order_item_id AND r.capture_id=e.capture_id) AS refund_revoked,
+  EXISTS(SELECT 1 FROM commerce_digital_refund_revocations r WHERE r.order_item_id=p.order_item_id AND r.capture_id=e.capture_id AND r.fully_refunded=0) AS refund_partial,
   e.capture_id,u.*,v.version,d.verified_at AS delivered_at FROM commerce_digital_purchases p
   JOIN order_items i ON i.id=p.order_item_id JOIN orders o ON o.id=p.order_id
   JOIN digital_product_versions v ON v.id=p.version_id JOIN digital_file_uploads u ON u.id=v.upload_id
