@@ -14,6 +14,7 @@ import { customerAddressBook, changeCustomerAddressBook } from "./customer-addre
 import { validatePublication } from "./landing-publication.js";
 import { merchantStorefront, publicStorefront } from "./storefront.js";
 import { adminProfile } from "./admin-profile.js";
+import {customDomainResponse, listCustomDomains, enrollCustomDomain, customDomainAction, recheckCustomDomains} from './custom-domains.js';
 import { advancedMode, AdvancedModeLimitError, sellerPlan } from "./advanced-mode.js";
 import { authenticateCommerceService, commerceServiceRoute, expireCommerceOrders, reservedStockSql } from "./commerce-orders.js";
 import {merchantShippingSettings,saveShippingSettings,checkoutShippingSettings} from './shipping-settings.js';
@@ -1506,10 +1507,22 @@ async function authorizeLandingExport(request, env, id) {
 
 export default {
   async fetch(request, env, context) {
+    const domainResponse = await customDomainResponse(request, env);
+    if (domainResponse) return domainResponse;
     const cors = corsHeaders(request, env);
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
     const url = new URL(request.url);
     try {
+      const domainMatch = /^\/v1\/custom-domains(?:\/(dom_[a-f0-9]{32})\/(verify|renew|disconnect))?$/.exec(url.pathname);
+      if (domainMatch) {
+        const {seller} = await sellerContext(request, env);
+        if (url.search) return json({ok:false,error:'Domain requests do not accept query parameters'},422,cors);
+        if (request.method==='GET' && !domainMatch[1]) return json({ok:true,...await listCustomDomains(env,seller)},200,cors);
+        if (request.method==='POST') return json({ok:true,domain:await (domainMatch[1]
+          ? customDomainAction(env,seller,domainMatch[1],domainMatch[2])
+          : enrollCustomDomain(env,seller,await requestJson(request,2000)))},200,cors);
+        return json({ok:false,error:'Method not allowed'},405,cors);
+      }
       const routePath=/^\/internal\/commerce\/snap-payments\/(EZK-[SP]-[A-F0-9]{24})\/route\/(bind|receipt)$/.exec(url.pathname);
       if(routePath){
         const input=await authenticateCommerceService(request,env,{strictJSON:true,maxBytes:routePath[2]==='receipt'?40000:2000});
@@ -2175,7 +2188,7 @@ export default {
       context.waitUntil(runBetaScheduledTask(betaTask,controller,{
         notifications:async()=>({...await scheduleNotifications(env),...await dispatchNotifications(env)}),
         email:()=>dispatchEmails(env),campaigns:()=>dispatchCampaignEmails(env),automations:()=>processMarketingAutomations(env),
-        housekeeping:()=>Promise.all([earningsHousekeeping(env),payoutSyncHousekeeping(env),cleanupDigitalUploads(env),
+        housekeeping:()=>Promise.all([recheckCustomDomains(env),earningsHousekeeping(env),payoutSyncHousekeeping(env),cleanupDigitalUploads(env),
           cleanupAbandonedMedia(env),cleanupCampaignVisits(env),cleanupCampaignReportExports(env),cleanupCampaignPerformanceExports(env),
           cleanupAnalyticsExports(env),cleanupCustomerExports(env),cleanupReviewPhotos(env),cleanupMessagePhotos(env),expireCommerceOrders(env)]),
       }));return;
@@ -2200,6 +2213,7 @@ export default {
     if(controller.cron==='* * * * *'){
       context.waitUntil((async()=>{await scheduleNotifications(env);await dispatchNotifications(env);})());return;
     }
+    context.waitUntil(recheckCustomDomains(env));
     context.waitUntil(earningsHousekeeping(env));
     context.waitUntil(payoutSyncHousekeeping(env));
     context.waitUntil(cleanupDigitalUploads(env));

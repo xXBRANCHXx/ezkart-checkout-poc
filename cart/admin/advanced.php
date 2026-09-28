@@ -8,7 +8,7 @@ ez_page_header('Advanced Mode', 'More room for your store to grow.', [['label' =
     <div class="advanced-feature"><?= ez_admin_icon('layout') ?><div><h3>Up to 24 landing pages</h3><p>Create more pages for your products, campaigns, and audiences.</p><span>Basic includes 6 pages</span></div><strong>24</strong></div>
     <div class="advanced-feature"><?= ez_admin_icon('box') ?><div><h3>Up to 50 products</h3><p>Expand your catalog while keeping everything in one place.</p><span>Basic includes 10 products</span></div><strong>50</strong></div>
     <div class="advanced-feature"><?= ez_admin_icon('chart') ?><div><h3>Sales reports <span class="advanced-availability">Available on both plans</span></h3><p>Explore revenue, orders, payments and products, with chart details and CSV downloads. <a href="?page=analytics">Open analytics</a>.</p></div></div>
-    <div class="advanced-feature"><?= ez_admin_icon('globe') ?><div><h3>Your own domain <span class="advanced-availability">Coming soon</span></h3><p>Connect your domain to your landing pages for a branded web address.</p></div></div>
+    <div class="advanced-feature"><?= ez_admin_icon('globe') ?><div><h3>Your own domain</h3><p>Connect a domain below, verify DNS ownership, and activate HTTPS for a published landing page.</p></div></div>
   </section>
   <section class="surface advanced-plan" aria-labelledby="advanced-price-title">
     <div class="advanced-price">
@@ -38,3 +38,16 @@ ez_page_header('Advanced Mode', 'More room for your store to grow.', [['label' =
     </div>
   </section>
 </div>
+<section class="surface domain-management" data-domain-management aria-labelledby="domain-title">
+  <h2 id="domain-title">Connect your domain</h2>
+  <p>Connect a public subdomain, such as shop.yourbrand.com, to one published landing page. Add the DNS records shown below, then check the connection. HTTPS must be ready before your page goes live here. Ezkart checks connected domains regularly. If a check is overdue or fails, use Check DNS and HTTPS to restore the connection.</p>
+  <p>Switching to Basic suspends custom domains immediately. Your original Ezkart page addresses keep working. After returning to Advanced, generate a new ownership code and check the connection again.</p>
+  <form data-domain-form>
+    <label>Domain <input name="hostname" type="text" placeholder="shop.yourbrand.com" maxlength="253" required autocomplete="off"></label>
+    <fieldset data-domain-pages><legend>Published landing page</legend><p>Loading pages…</p></fieldset>
+    <button class="ui-button" type="submit">Connect domain</button>
+  </form>
+  <p data-domain-status role="status" aria-live="polite">Loading domain connections…</p>
+  <button class="ui-button" type="button" data-domain-refresh>Refresh connections</button>
+  <div data-domain-list></div>
+</section>
