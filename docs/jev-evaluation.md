@@ -71,7 +71,11 @@ or legal category. Missing jurisdiction, status or context goes to human review.
 
 The [system prompt](../tools/jev-evaluation/system-prompt.txt) and
 [output schema](../tools/jev-evaluation/output.schema.json) match the backend's
-agreed four-field contract: `verdict`, `summary`, `findings`, `uncertainties`.
+current five-field contract: `verdict`, `confidence`, `summary`, `findings`,
+`uncertainties`. Confidence must be a finite number from 0 to 1. The initial
+six historical results retain their original four-field format without invented
+confidence. Both decisive verdicts require confidence >= 0.8 and no remaining
+evidence/coverage uncertainty; otherwise the backend routes to human review.
 Verdicts are `clear`, `needs_change`, `escalate`. Findings contain `code`,
 `sourceId`, `quote`, `explanation`. Quotes must be nonempty exact substrings of
 the cited page source. A report is never a page evidence source.

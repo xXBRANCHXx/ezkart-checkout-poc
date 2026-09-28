@@ -38,6 +38,12 @@ unsupported allegations require human review. See the closed registry and
 primary citations in [the provider registry](../cloudflare/ezkart-api/src/jev-provider.js) and [the evaluation guide](jev-evaluation.md).
 This is narrow platform moderation, not comprehensive legal clearance.
 
+Both archive and no-archive decisions require a finite model confidence of at
+least 0.8. Below that threshold, missing historical confidence, uncertainty,
+limitation findings or incomplete coverage route to human review. The backend
+preserves the original recommendation alongside its effective decision; a
+self-reported confidence is not measured accuracy.
+
 Only a supported needs_change outcome with exact current-page evidence, no
 uncertainty, complete text coverage and approved archive configuration may
 create a temporary hold. Mere report submission, malformed output, transport
@@ -114,3 +120,8 @@ this import-only setting or DOKU readiness. The import seeds exactly six synthet
 grading, creates no published page, sends no model request and cannot archive,
 restore or rescan a real page. Expected verdicts are separate display metadata
 and are never supplied to the model.
+
+## Confidence follow-up
+
+See [the ten-case confidence diagnostic](jev-confidence-results-2026-09-28.md)
+for the owner-requested 80% cutoff and fresh model observations.

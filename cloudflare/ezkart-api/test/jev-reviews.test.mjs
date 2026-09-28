@@ -13,7 +13,7 @@ async function fixture(t){
  const save=async(text='<p>Send us your bank password to receive this notebook.</p>')=>{const p={id:'notebook',name:'Notebook',status:'published',publishedHtml:text,updatedAt:new Date().toISOString(),state:null};const head=await bucket.head(path);return putJevPage({DB:f.db,PRIVATE_ASSETS:bucket},'seller_alice','notebook',head?.etag||'',JSON.stringify(p),{customMetadata:{name:'Notebook',status:'published'}});};
  await save();const api=(path,input,extra={})=>f.merchant('/v1/jev'+path,input,{claims:claims(),method:input===undefined?'GET':'POST',...extra});
  const create=async()=>{const p=(await api('/pages?store=alice')).pages[0];const r=await api('/reviews',{requestKey:key(),store:'alice',pageId:p.id,expectedRevision:p.revision,reportText:'The page asks for a bank password.'});assert.equal(r.status,200,r.error);return r.review;};
- const violation=review=>({verdict:'needs_change',summary:'The page directly requests a bank password.',findings:[{code:'credential_request',sourceId:review.sources[0].id,quote:'Send us your bank password',explanation:'Customers must not disclose bank passwords to a seller.'}],uncertainties:[]});
+ const violation=review=>({verdict:'needs_change',confidence:0.95,summary:'The page directly requests a bank password.',findings:[{code:'credential_request',sourceId:review.sources[0].id,quote:'Send us your bank password',explanation:'Customers must not disclose bank passwords to a seller.'}],uncertainties:[]});
  return {...f,controls,api,save,create,violation};
 }
 test('Jev requires platform MFA; review queues without spend; archive gates canonical/custom pages and owner restore is exact and audited',async t=>{
@@ -65,4 +65,15 @@ test('an archive revision race retains the completed original model result witho
  await f.db.exec("CREATE TRIGGER fixture_raced_archive BEFORE INSERT ON jev_page_actions WHEN NEW.action='archive' BEGIN SELECT RAISE(ABORT,'jev_page_revision_changed'); END;");
  const body={requestKey:key()},done=await f.api('/reviews/'+r.id+'/run',body);assert.equal(done.status,200,done.error);assert.equal(done.review.state,'completed');assert.equal(done.review.archiveState,'active');assert.equal(done.review.outcome.verdict,'needs_change');
  assert.equal((await f.api('/reviews/'+r.id+'/run',body)).status,200);assert.equal(f.controls.calls.length,1);assert.equal((await f.db.prepare('SELECT COUNT(*) AS n FROM jev_results').first()).n,1);
+});
+
+test('80% threshold and uncertainty control actual archive actions and no-archive decisions',async t=>{
+ const f=await fixture(t);
+ for(const [verdict,confidence,uncertainties,expected] of [['needs_change',0.7999,[],'escalate'],['clear',0.79,[],'escalate'],['clear',0.8,[],'clear'],['needs_change',1,['Missing context'],'escalate'],['clear',1,['Unknown licence'],'escalate'],['needs_change',0.8,[],'needs_change']]){
+  const r=await f.create();f.controls.reply={...f.violation(r),verdict,confidence,uncertainties,...(verdict==='clear'?{findings:[]}: {})};
+  const done=await f.api('/reviews/'+r.id+'/run',{requestKey:key()});assert.equal(done.status,200,done.error);
+  assert.equal(done.review.decisionVerdict,expected);assert.equal(done.review.humanReviewRequired,expected==='escalate');assert.equal(done.review.outcome.verdict,verdict);
+  assert.equal(done.review.archiveState,expected==='needs_change'?'archived':'active');
+ }
+ assert.equal((await f.db.prepare('SELECT COUNT(*) n FROM jev_page_actions').first()).n,1);
 });

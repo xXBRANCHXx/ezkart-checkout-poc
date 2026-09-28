@@ -3,7 +3,7 @@ import {commerceHash} from './commerce-orders.js';
 import {sellerByPageAddress} from './seller-page-address.js';
 import {decodeHTML} from 'entities';
 import {seedJevPageRevision} from './jev-page-state.js';
-import {JEV_MODEL,JEV_POLICY,JEV_RULES,JEV_VIOLATIONS,normalizeJevOutcome,jevRequest,callJev} from './jev-provider.js';
+import {JEV_MIN_CONFIDENCE,jevDecision,JEV_MODEL,JEV_POLICY,JEV_RULES,JEV_VIOLATIONS,normalizeJevOutcome,jevRequest,callJev} from './jev-provider.js';
 const fail=(m,s=422)=>{throw new Response(m,{status:s});};
 const now=()=>new Date().toISOString(),id=p=>p+crypto.randomUUID().replaceAll('-','');
 const fields=(v,ks)=>{if(!v||typeof v!=='object'||Array.isArray(v)||Object.keys(v).some(k=>!ks.includes(k)))fail('Jev request is invalid.');};
@@ -13,7 +13,7 @@ const pid=p=>typeof p==='string'&&/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(p)&&p.length
 const pageKey=(s,p)=>`sellers/${s}/landing-pages/${p}.json`;
 export async function jevPageHeld(env,sellerId,pageId){return !!await env.DB.prepare('SELECT 1 FROM jev_page_holds WHERE seller_id=? AND page_id=?').bind(sellerId,pageId).first();}
 export function jevMode(env){return {advisory:true,reviewerTriggered:true,model:JEV_MODEL,modelEnabled:env.JEV_ENABLED==='enabled'&&!!env.JEV_OPENROUTER_API_KEY,
- policyVersion:JEV_POLICY,policyRules:JEV_RULES,policyApproved:env.JEV_APPROVED_POLICY===JEV_POLICY,archiveEnabled:env.JEV_ARCHIVE==='enabled'&&env.JEV_APPROVED_POLICY===JEV_POLICY,deletionEnabled:false};}
+ minimumConfidence:JEV_MIN_CONFIDENCE,policyVersion:JEV_POLICY,policyRules:JEV_RULES,policyApproved:env.JEV_APPROVED_POLICY===JEV_POLICY,archiveEnabled:env.JEV_ARCHIVE==='enabled'&&env.JEV_APPROVED_POLICY===JEV_POLICY,deletionEnabled:false};}
 async function page(env,sellerId,pageId){const object=await env.PRIVATE_ASSETS.get(pageKey(sellerId,pageId));if(!object)fail('Page not found.',404);if(object.size>8000000)fail('Page is too large to review.',413);const value=await object.json();return {value,revision:object.etag};}
 const redact=s=>s.replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi,'[email redacted]').replace(/\+?[0-9][0-9 ()-]{8,}[0-9]/g,'[number redacted]');
 async function snapshot(p){
@@ -33,6 +33,7 @@ const read=async(env,rid)=>{const r=await env.DB.prepare(`SELECT r.*,c.seller_id
 async function shape(env,r,full=false){const result=await env.DB.prepare('SELECT * FROM jev_results WHERE review_id=?').bind(r.id).first(),attempt=await env.DB.prepare('SELECT created_at FROM jev_attempts WHERE review_id=?').bind(r.id).first();
  const archive=await env.DB.prepare('SELECT id,action,reason,created_at,review_id FROM jev_page_actions WHERE seller_id=? AND page_id=? ORDER BY sequence DESC LIMIT 1').bind(r.seller_id,r.page_id).first();
  const state=result?.state||(attempt?'uncertain':'queued'),out={id:r.id,caseId:r.case_id,store:r.store_slug,pageId:r.page_id,revision:r.revision,createdAt:r.created_at,state,canGrade:!!result,deadlineAt:r.deadline_at,rescanCount:r.ordinal,due:!r.evaluation_only&&now()>=r.deadline_at,archiveState:archive?.action==='archive'?'archived':'active',archiveReason:archive?.reason||'',archiveId:archive?.action==='archive'?archive.id:null,evaluationOnly:!!r.evaluation_only,policyVersion:r.policy_version,outcome:result?.outcome_json?JSON.parse(result.outcome_json):null,failureCode:result?.failure_code||null};
+ Object.assign(out,jevDecision(out.outcome,JSON.parse(r.snapshot_json)));
  if(full){const snap=JSON.parse(r.snapshot_json);Object.assign(out,{reportText:r.report_text,sources:snap.sources,coverage:snap.coverage,caseTitle:r.evaluation_only?snap.name:null,expectedVerdict:r.evaluation_only?snap.expectedVerdict||null:null,model:JEV_MODEL,costMicrousd:result?.cost_microusd??null,rejectedOutput:result?.rejected_output||null,inputTokens:result?.input_tokens??null,outputTokens:result?.output_tokens??null,
  grades:(await env.DB.prepare('SELECT id,score,agreement,comment,created_by AS createdBy,created_at AS createdAt FROM jev_grades WHERE review_id=? ORDER BY created_at DESC,id DESC').bind(r.id).all()).results});try{const current=await page(env,r.seller_id,r.page_id);out.currentRevision=current.revision;if(current.revision!==r.revision){const source=await snapshot(current);out.currentSources=source.sources;out.currentCoverage=source.coverage;}}catch{out.currentRevision=null;}out.stale=!r.evaluation_only&&out.currentRevision!==r.revision;}
  return out;}
@@ -63,7 +64,7 @@ export async function runJevReview(env,actor,rid,input){await supportAccess(env,
  let current=null;try{current=await page(env,r.seller_id,r.page_id);}catch{}
  let authority=true;try{await supportAccess(env,actor,true);}catch{authority=false;}
  const override=await env.DB.prepare("SELECT 1 FROM jev_page_actions WHERE seller_id=? AND page_id=? AND actor_kind='reviewer' AND created_at>=?").bind(r.seller_id,r.page_id,at).first();
- if(authority&&!override&&jevMode(env).archiveEnabled&&r.policy_version===JEV_POLICY&&current?.revision===r.revision&&result.outcome.verdict==='needs_change'&&!result.outcome.uncertainties.length&&!snap.coverage.unreviewedMedia&&!snap.coverage.truncated&&result.outcome.findings.some(f=>JEV_VIOLATIONS.includes(f.code))){
+ if(authority&&!override&&jevMode(env).archiveEnabled&&r.policy_version===JEV_POLICY&&current?.revision===r.revision&&jevDecision(result.outcome,snap).decisionVerdict==='needs_change'&&!result.outcome.uncertainties.length&&!snap.coverage.unreviewedMedia&&!snap.coverage.truncated&&result.outcome.findings.some(f=>JEV_VIOLATIONS.includes(f.code))){
   entries.push(action(env,r,'archive','jev',attemptId,'auto:'+attemptId,result.outcome.summary));}
  try{await env.DB.batch(entries);}catch(e){if(entries.length>1&&/jev_page_revision_changed|jev_human_override/.test(String(e)))await entries[0].run();else throw e;}return jevDetail(env,actor,rid);}
 function action(env,r,type,kind,actor,requestKey,reason,hash='',targetRevision=r.revision,holdId=null){return env.DB.prepare('INSERT INTO jev_page_actions(id,seller_id,page_id,review_id,revision,target_revision,action,actor_kind,actor_id,request_key,request_hash,reason,created_at,supersedes_action_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(id('jact_'),r.seller_id,r.page_id,r.id,r.revision,targetRevision,type,kind,actor,requestKey,hash,reason,now(),holdId);}
@@ -82,7 +83,7 @@ export async function importJevEvaluation(env,input){
  const statements=[],ids=[];let index=0;
  for(const record of input.records){fields(record,['caseId','title','input','result','expectedVerdict']);if(!txt(record.caseId,70)||!/^[a-z0-9-]+$/.test(record.caseId)||!txt(record.title,120))fail('Synthetic case identity is invalid.');
   const snap=record.input;if(!snap||!Array.isArray(snap.sources)||snap.sources.length<1||snap.sources.length>6||snap.sources.some(s=>!txt(s.id,32)||!txt(s.text,3000))||!txt(snap.report?.text,1200)||!snap.coverage||snap.coverage.textOnly!==true)fail('Synthetic source is invalid.');
-  const result=record.result;fields(result,['outcome','providerId','costMicrousd','inputTokens','outputTokens','failureCode','rejectedOutput']);if(result.outcome!==null)normalizeJevOutcome(result.outcome,snap);else if(typeof result.failureCode!=='string'||!/^jev_[a-z_]+$/.test(result.failureCode))fail('Rejected synthetic outcome needs its original validation reason.');
+  const result=record.result;fields(result,['outcome','providerId','costMicrousd','inputTokens','outputTokens','failureCode','rejectedOutput']);if(result.outcome!==null)normalizeJevOutcome(result.outcome,snap,{historical:true});else if(typeof result.failureCode!=='string'||!/^jev_[a-z_]+$/.test(result.failureCode))fail('Rejected synthetic outcome needs its original validation reason.');
   if((result.providerId!==null&&!txt(result.providerId,160))||![result.costMicrousd,result.inputTokens,result.outputTokens].every(v=>v===null||Number.isSafeInteger(v)&&v>=0)||result.costMicrousd>10000)fail('Synthetic provider evidence is invalid.');
   const payload=jevRequest(snap,snap.report.text,JEV_POLICY),digest=await commerceHash({batch:input.requestKey,index:index++,record}),requestKey=(await commerceHash(input.requestKey+record.caseId)).slice(0,32),rid='jev_'+digest.slice(0,32),caseId='jcase_'+digest.slice(0,32),attempt='jrun_'+digest.slice(0,32),at=now();ids.push(rid);
   const old=await env.DB.prepare('SELECT id,request_hash FROM jev_reviews WHERE request_key=?').bind(requestKey).first();if(old){if(old.request_hash!==digest)fail('Original benchmark import cannot change.',409);continue;}

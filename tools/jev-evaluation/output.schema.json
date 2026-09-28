@@ -3,6 +3,7 @@
   "additionalProperties": false,
   "required": [
     "verdict",
+    "confidence",
     "summary",
     "findings",
     "uncertainties"
@@ -72,6 +73,11 @@
         "maxLength": 300,
         "description": "Specific missing information or coverage limit."
       }
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
     }
   }
 }
