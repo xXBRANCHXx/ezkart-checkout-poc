@@ -74,3 +74,10 @@ for unresolved threat meaning, credential meaning, permission or jurisdiction;
 confidence and exact quotations alone did not resolve those weaknesses. Such a
 policy change would require separately declared evaluation on a fresh holdout.
 This evaluation does not silently change runtime archive policy.
+
+Final beta version `78b95f48-7de9-45b8-a0f2-1aea88a4fd9e` preserves the
+concurrently completed seller-notification Worker changes together with the
+$0.44 app ceiling. Main/production were neither pushed nor deployed. Verification
+passed 25 confidence/evidence tests, all 500 immutable receipt/hash and backend
+replay checks, independent report grading, and PDF inspection including all 500
+unique case identifiers.

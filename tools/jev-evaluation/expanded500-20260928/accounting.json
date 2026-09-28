@@ -8,5 +8,6 @@
   "keyUsageDelta": 0.31191725,
   "externalReservationMicrousd": 2720000,
   "appBudgetMicrousd": 440000,
-  "budgetDeploymentVersion": "b0b84d58-f537-4c28-b59c-b409de978fe7"
+  "budgetDeploymentVersion": "b0b84d58-f537-4c28-b59c-b409de978fe7",
+  "finalBetaVersion": "78b95f48-7de9-45b8-a0f2-1aea88a4fd9e"
 }
