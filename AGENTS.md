@@ -50,6 +50,25 @@ For future animated explainers, the owner means visual teaching through concrete
 events and cause/effect: a shopper, order, money moving, holds, failures and
 recovery. Moving text cards or diagram boxes do not satisfy that intent. Narration
 should explain the events shown. Prioritize the video over mobile player polish.
+The preferred treatment is newspaper/ink miniatures with selectable chapters and
+zoom. Use plain English and a gentle male narrator; the first female voice was
+uncomfortable for the owner. Explain terms, including FlexiBill recurring billing
+and direct API versus hosted checkout. Call the platform fee commission.
+
+## Seller onboarding and company commission (owner clarification, 28 September 2026)
+
+- Each seller gets one DOKU Sub-Account backing Ezkart Wallet and withdraws to
+  the bank destination saved during onboarding. Provider confirmation verifies
+  that setup; it is not a request to choose a different wallet model. Preserve
+  original uncertain registrations and in-flight withdrawal destinations.
+- Required onboarding includes full legal name, verified email, phone, bank
+  details, and pickup/return addresses with confirmed map pins. The owner also
+  requires age/identity verification. A declaration is not a verified identity;
+  do not invent provider evidence or infer the age threshold from PSE registration.
+- Ezkart's commission must reach its company bank. Distinguish commission
+  allocation, credit to the platform's DOKU balance, and confirmed bank payout.
+  DOKU knowing a bank account does not prove the Sub-Account payout connection.
+  Shipping, admin charges, refund obligations and fees are distinct from commission.
 
 ## Sidebar announcements
 
