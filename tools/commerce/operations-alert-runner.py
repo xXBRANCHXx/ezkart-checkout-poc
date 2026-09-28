@@ -91,12 +91,16 @@ def read_json(path, maximum=131072):
 def configuration(path):
     require(not Path(path).resolve().is_relative_to(ROOT), 'private_configuration_required')
     value = read_json(path, 16384)
-    fields = {'deployment','stateDirectory','inputs','endpoint','endpointEnv','tokenEnv','timeoutSeconds','maxDeliveries','retrySeconds','maxRetrySeconds','overdueSeconds','reminderSeconds','maxEvents'}
+    fields = {'deployment','stateDirectory','inputs','endpoint','endpointEnv','tokenEnv','timeoutSeconds','maxDeliveries','retrySeconds','maxRetrySeconds','overdueSeconds','reminderSeconds','maxEvents','transport','fromEnv','toEnv'}
     require(isinstance(value, dict) and not set(value) - fields and value.get('deployment') in ('test','beta'), 'configuration_invalid')
     private_directory(value['stateDirectory'])
+    value.setdefault('transport', 'webhook')
+    require(value['transport'] in ('webhook','resend'), 'configuration_invalid')
+    value.setdefault('fromEnv', 'EZKART_ALERT_FROM')
+    value.setdefault('toEnv', 'EZKART_ALERT_TO')
     value.setdefault('endpointEnv', 'EZKART_ALERT_ENDPOINT')
     value.setdefault('tokenEnv', 'EZKART_ALERT_TOKEN')
-    for key in ('endpointEnv','tokenEnv'):
+    for key in ('endpointEnv','tokenEnv','fromEnv','toEnv'):
         require(isinstance(value[key], str) and re.fullmatch(r'EZKART_[A-Z0-9_]{3,80}', value[key]), 'configuration_invalid')
     for key, default, low, high in (
         ('timeoutSeconds', 10, 1, 30), ('maxDeliveries', 4, 1, 10), ('retrySeconds', 60, 1, 3600),
@@ -133,7 +137,31 @@ def destination(config):
         return None
     validate_endpoint(endpoint)
     require(isinstance(token, str) and 16 <= len(token) <= 4096 and all(33 <= ord(c) <= 126 for c in token), 'authentication_invalid')
+    if config.get('transport') == 'resend':
+        require(endpoint == 'https://api.resend.com/emails', 'destination_invalid')
+        sender, recipient = os.environ.get(config['fromEnv'], ''), os.environ.get(config['toEnv'], '')
+        if not sender or not recipient:
+            return None
+        require(all(valid_email(value) for value in (sender,recipient)), 'configuration_invalid')
     return endpoint, token
+
+
+def valid_email(value):
+    return isinstance(value, str) and len(value) <= 160 and value == value.strip().lower() and bool(re.fullmatch(r"[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?\.[a-z]{2,63}", value))
+
+
+def resend_payload(config, original):
+    event = json.loads(original)
+    sender, recipient = os.environ.get(config['fromEnv'], ''), os.environ.get(config['toEnv'], '')
+    require(valid_email(sender) and valid_email(recipient), 'configuration_invalid')
+    lines = ['Ezkart operations alert', 'Deployment: ' + event['deployment'], 'Source: ' + event['source'],
+             'State: ' + event['kind'], 'Observed: ' + str(event['observedAt']), 'Created: ' + event['createdAt'],
+             'Warnings: ' + (', '.join(event['warningCodes']) or 'none'),
+             'Resolved: ' + (', '.join(event['resolvedWarningCodes']) or 'none'), 'Event: ' + event['id'],
+             'Review the private operations report. This message does not authorize retries or financial execution.']
+    return canonical({'from':'Ezkart Operations <' + sender + '>','to':[recipient],
+      'subject':'[Ezkart ' + event['deployment'] + '] ' + event['source'] + ' ' + event['kind'].replace('_',' '),
+      'text':'\n'.join(lines), 'tags':[{'name':'ezkart_alert','value':event['id']},{'name':'ezkart_deployment','value':event['deployment']}]})
 
 @contextmanager
 def lock(config):
@@ -170,6 +198,8 @@ def connect(config, create=True):
         connection.executescript('''
         CREATE TABLE IF NOT EXISTS metadata(key TEXT PRIMARY KEY,value TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS sources(source TEXT PRIMARY KEY,codes TEXT NOT NULL,accepted_at REAL,accepted_codes TEXT NOT NULL,last_event_at REAL NOT NULL);
+        CREATE TABLE IF NOT EXISTS resend_requests(event_id TEXT PRIMARY KEY,request_json TEXT NOT NULL,
+          credential_hash TEXT NOT NULL,first_attempt_at REAL NOT NULL,retry_until REAL NOT NULL,provider_id TEXT);
         CREATE TABLE IF NOT EXISTS events(sequence INTEGER PRIMARY KEY AUTOINCREMENT,id TEXT UNIQUE NOT NULL,payload TEXT NOT NULL,created_at REAL NOT NULL,
           state TEXT NOT NULL CHECK(state IN ('queued','attempting','delivered')),attempts INTEGER NOT NULL DEFAULT 0,next_attempt_at REAL NOT NULL,
           attempted_at REAL,delivered_at REAL,last_error TEXT,destination_hash TEXT);
@@ -256,7 +286,7 @@ def deadline(seconds):
         signal.setitimer(signal.ITIMER_REAL, 0)
         signal.signal(signal.SIGALRM, previous)
 
-def send_https(endpoint, token, event_id, body, timeout, context=None):
+def send_https(endpoint, token, event_id, body, timeout, context=None, acknowledgement_kind='webhook'):
     parts = validate_endpoint(endpoint)
     connection = http.client.HTTPSConnection(parts.hostname, parts.port or 443, timeout=timeout, context=context or ssl.create_default_context())
     try:
@@ -275,17 +305,27 @@ def send_https(endpoint, token, event_id, body, timeout, context=None):
                 acknowledgement = json.loads(raw)
             except (ValueError, UnicodeError):
                 raise AlertError('transport_ack_invalid') from None
+            if acknowledgement_kind == 'resend':
+                require(response.status == 200 and isinstance(acknowledgement, dict) and isinstance(acknowledgement.get('id'), str) and re.fullmatch(r'[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}', acknowledgement['id']), 'transport_ack_invalid')
+                return acknowledgement['id']
             require(isinstance(acknowledgement, dict) and acknowledgement.get('id') == event_id and acknowledgement.get('accepted') is True, 'transport_ack_invalid')
     except (OSError, http.client.HTTPException, ValueError):
         raise AlertError('transport_unconfirmed') from None
     finally:
         connection.close()
 
+def send_resend(endpoint, token, event_id, body, timeout, context=None):
+    return send_https(endpoint, token, event_id, body, timeout, context=context, acknowledgement_kind='resend')
+
+
 def deliver(config, connection, target, sender, now):
     if not target:
         return
     endpoint, token = target
-    destination_hash = hashlib.sha256(endpoint.encode()).hexdigest()
+    resend = config.get('transport') == 'resend'
+    # Include the operator recipient/sender and provider account credential scope.
+    target_identity = endpoint if not resend else canonical({'endpoint':endpoint,'transport':'resend','from':os.environ.get(config['fromEnv'],''),'to':os.environ.get(config['toEnv'],'')})
+    destination_hash = hashlib.sha256(target_identity.encode()).hexdigest()
     # A lost acknowledgement must never be redirected to a newly configured recipient.
     require(not connection.execute("SELECT 1 FROM events WHERE state!='delivered' AND destination_hash IS NOT NULL AND destination_hash!=? LIMIT 1", (destination_hash,)).fetchone(), 'alert_destination_changed')
     rows = connection.execute("SELECT * FROM events WHERE state!='delivered' ORDER BY sequence LIMIT ?", (config['maxDeliveries'],)).fetchall()
@@ -294,17 +334,38 @@ def deliver(config, connection, target, sender, now):
             break  # Preserve ordering: an old warning is never delivered after its recovery.
         attempts = row['attempts'] + 1
         observed = now()
+        request_body = row['payload']
+        if resend:
+            credential_hash = hashlib.sha256(token.encode()).hexdigest()
+            saved = connection.execute('SELECT * FROM resend_requests WHERE event_id=?', (row['id'],)).fetchone()
+            if saved:
+                envelope = json.loads(saved['request_json'])
+                envelope_changed = envelope.get('from') != 'Ezkart Operations <' + os.environ.get(config['fromEnv'], '') + '>' or envelope.get('to') != [os.environ.get(config['toEnv'], '')]
+                code = 'transport_destination_changed' if envelope_changed else 'transport_credential_changed' if saved['credential_hash'] != credential_hash else 'transport_retry_window_expired' if observed + config['timeoutSeconds'] >= saved['retry_until'] else None
+                if code:
+                    with connection:
+                        connection.execute('UPDATE events SET last_error=? WHERE id=?', (code,row['id']))
+                    break
+                request_body = saved['request_json']
+            else:
+                request_body = resend_payload(config, row['payload'])
+                with connection:
+                    connection.execute('INSERT INTO resend_requests VALUES(?,?,?,?,?,NULL)', (row['id'],request_body,credential_hash,observed,observed + 23*3600))
         delay = min(config['maxRetrySeconds'], config['retrySeconds'] * 2 ** min(attempts - 1, 20))
         with connection:
             connection.execute("UPDATE events SET state='attempting',attempts=?,attempted_at=?,next_attempt_at=?,destination_hash=?,last_error='transport_unconfirmed' WHERE id=?", (attempts, observed, observed + delay, destination_hash, row['id']))
         try:
-            sender(endpoint, token, row['id'], row['payload'], config['timeoutSeconds'])
+            submitted = sender(endpoint, token, row['id'], request_body, config['timeoutSeconds'])
+            if resend:
+                require(isinstance(submitted, str) and re.fullmatch(r'[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}', submitted), 'transport_ack_invalid')
         except Exception as error:
             code = str(error) if isinstance(error, AlertError) and str(error).startswith('transport_') else 'transport_unconfirmed'
             with connection:
                 connection.execute("UPDATE events SET state='queued',last_error=? WHERE id=?", (code, row['id']))
             break
         with connection:
+            if resend:
+                connection.execute('UPDATE resend_requests SET provider_id=? WHERE event_id=?', (submitted,row['id']))
             connection.execute("UPDATE events SET state='delivered',delivered_at=?,last_error=NULL WHERE id=?", (now(), row['id']))
 
 def summary(config, connection, now, target_present):
@@ -317,6 +378,8 @@ def summary(config, connection, now, target_present):
         warnings.append('alert_runner_overdue')
     elif float(seen[0]) > now + 60:
         warnings.append('alert_clock_invalid')
+    if connection.execute("SELECT 1 FROM events WHERE state!='delivered' AND last_error IN ('transport_retry_window_expired','transport_credential_changed','transport_destination_changed') LIMIT 1").fetchone():
+        warnings.append('alert_delivery_needs_review')
     if not target_present:
         warnings.append('alert_destination_unconfigured')
     if connection.execute('SELECT COUNT(*) FROM events').fetchone()[0] >= config['maxEvents']:
@@ -332,7 +395,7 @@ def summary(config, connection, now, target_present):
             'delivered':connection.execute("SELECT COUNT(*) FROM events WHERE state='delivered'").fetchone()[0],
             'oldestPendingAt':iso(pending['oldest']) if pending['count'] else None,'sources':sources,'warnings':warnings,'exitCode':2 if warnings else 0}
 
-def run_once(config, send=False, sender=send_https, now=time.time):
+def run_once(config, send=False, sender=None, now=time.time):
     with lock(config) as acquired:
         if not acquired:
             return {'version':1,'deployment':config['deployment'],'status':'overlap_skipped','exitCode':0}
@@ -350,7 +413,7 @@ def run_once(config, send=False, sender=send_https, now=time.time):
                     connection.execute("INSERT INTO metadata VALUES('seen_at',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (str(now()),))
             target = destination(config)
             if send:
-                deliver(config, connection, target, sender, now)
+                deliver(config, connection, target, sender or (send_resend if config.get('transport') == 'resend' else send_https), now)
             result = {**summary(config, connection, now(), bool(target)), 'status':'processed' if send else 'queued_only'}
             if collection_error:
                 result['exitCode'] = 1

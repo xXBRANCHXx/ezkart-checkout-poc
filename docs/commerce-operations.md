@@ -118,6 +118,8 @@ The [alert runner](operations-alert-delivery.md) now ingests private commerce an
 backup machine-report files, queues warning changes/recoveries/reminders and
 supports bounded authenticated HTTPS delivery with durable original IDs and
 explicit endpoint deduplication. Missing/stale inputs and overdue delivery remain
-visible. Its `queue` command never sends. The delivery adapter, input collectors,
-recipient, credentials, independent watchdog and schedule still require an
+visible. Its `queue` command never sends. A concrete Resend email transport uses the
+existing provider API and a conservative 23-hour retry window; the optional
+webhook mode requires a receiver implementing its acknowledgement contract.
+The input collectors, recipient, credentials, independent watchdog and schedule still require an
 accepted installation; none is configured or enabled by this implementation.

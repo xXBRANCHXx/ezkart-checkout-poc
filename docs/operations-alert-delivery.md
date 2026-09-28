@@ -41,12 +41,50 @@ The destination is an explicit HTTPS URL from private `endpoint` configuration
 or `EZKART_ALERT_ENDPOINT`. Authentication is a bearer token from
 `EZKART_ALERT_TOKEN` (the two environment variable names may be configured).
 There is no default recipient, discovery, command-line credential, webhook
-query-token support, or built-in Slack/email destination. Missing credentials
+query-token support, or built-in Slack destination. A concrete Resend email
+transport is available through the separate configuration below. Missing credentials
 leave events queued and report `alert_destination_unconfigured`. Queue ingestion
 works without credentials. Use a private `0600` environment file for systemd;
 never put credentials into the checked-in example or process arguments.
 
-## Durable outbox and transport contract
+## Concrete Resend email transport
+
+Use `tools/commerce/systemd/alerts-resend.example.json` as the private configuration
+for `transport: "resend"`. A custom receiver is not required for this mode. Supply
+these values only through its private environment file:
+
+- `EZKART_ALERT_ENDPOINT`: exactly `https://api.resend.com/emails`.
+- `EZKART_ALERT_TOKEN`: an authorized Resend sending API key.
+- `EZKART_ALERT_FROM`: one verified sending-domain email address, lowercase.
+- `EZKART_ALERT_TO`: the explicitly selected operator email address, lowercase.
+
+None is configured by the example. Sender/recipient are envelope addresses;
+email subjects and plain-text bodies contain only sanitized operational codes,
+source/deployment, timestamps and the stable alert ID. This creates operational
+alerts independently of customer-commerce email jobs and their activation cutoff.
+
+The adapter implements Resend's documented [Send Email API](https://resend.com/docs/api-reference/emails/send-email):
+POST `/emails`, bearer authentication, `from`, `to`, `subject`, `text`, tags and
+a confirmed provider email ID. It uses the event ID as `Idempotency-Key` and
+stores the exact original email body before the first network attempt. Resend
+keeps [idempotency keys for 24 hours](https://resend.com/docs/dashboard/emails/idempotency-keys),
+so this implementation stops retries after 23 hours from its first durable
+attempt, allowing margin for time and request duration. It retains expired
+uncertainty with `alert_delivery_needs_review`; it never creates a new key to
+resend that uncertain email. Sender, recipient and credential changes also
+cannot silently move an unresolved attempt into another recipient/account.
+This follows the existing commerce email delivery's conservative retry window.
+
+A successful provider response and UUID are saved atomically with local transport
+acknowledgement. The outbox's `delivered` count means **submission accepted by
+Resend**, not inbox delivery. Bounces, suppression and human receipt still require
+provider monitoring/independent escalation; this slice does not connect alert
+emails to the customer-commerce webhook tables. Unknown submissions outside the
+retry window require inspection of the original provider request, not reset.
+Official API contracts were checked on 28 September 2026. Only local fixtures
+were used; no alert email was sent.
+
+## Durable outbox and webhook transport contract
 
 Each warning-set change, recovery and periodic reminder gets a stable event ID
 under a durable installation identity. An unchanged warning set produces no
@@ -63,10 +101,11 @@ network request; a crash or lost acknowledgement retries its **same ID and exact
 body**. Exponential retry delay is bounded by `maxRetrySeconds`; a pass sends at
 most `maxDeliveries` (default four). Earlier uncertain events block later events
 so recovery cannot overtake its warning. Destination changes are refused while
-an attempted event remains unresolved; token rotation for the same endpoint is
-allowed. Nothing clears or reassigns an uncertain delivery automatically.
+an attempted event remains unresolved; token rotation for the same webhook endpoint is
+allowed. Resend holds unresolved submissions when the credential changes. Nothing clears or reassigns an uncertain delivery automatically.
 
-The endpoint must implement a durable inbox with this contract:
+For `transport: "webhook"` (the default), the custom endpoint must implement
+a durable inbox with this contract:
 
 1. Authenticate `Authorization: Bearer …` and require `Idempotency-Key` to equal
    the JSON body's `id`.
@@ -85,8 +124,9 @@ fragments and control characters are rejected. Redirects are never followed.
 The configured 1–30 second total deadline includes connection, request and
 response processing. The standard HTTP parser also bounds response headers.
 “Delivered” means the adapter durably acknowledged the event; it does not prove
-that an email/chat message reached a person. The recipient adapter must implement
-and monitor downstream delivery itself. There is no safe exactly-once delivery
+that an email/chat message reached a person. A custom webhook recipient adapter must implement
+and monitor downstream delivery itself. Resend submission uses the concrete
+provider response described above. There is no safe exactly-once delivery
 claim without endpoint deduplication.
 
 ## Bounds, reporting and ownership
@@ -138,5 +178,7 @@ missing and stale reports, failed inspections, report scope and privacy,
 uncertain-send retries, crash recovery, endpoint changes, capacity, overlap and
 permissions. A local HTTPS server verifies the actual authentication/idempotency
 headers, exact acknowledgement, rejected redirects, failed/malformed/oversized
-responses, dropped connections, certificate verification and total timeout. No
-real destination is configured or contacted by these tests.
+responses, dropped connections, certificate verification and total timeout. The Resend
+cases also cover its actual UUID response, frozen retry body, missing recipient,
+recipient/account changes and refusal to retry outside the safe idempotency window.
+No real destination is configured or contacted by these tests.

@@ -176,6 +176,77 @@ class AlertsTests(unittest.TestCase):
         backup['deployment']='test'; self.write(self.input,backup)
         self.assertIn('input_scope_invalid',self.run_once()['sources']['backup'])
 
+    def resend_config(self):
+        self.config.update(transport='resend',endpoint='https://api.resend.com/emails')
+        return {'EZKART_ALERT_FROM':'alerts@example.test','EZKART_ALERT_TO':'operator@example.test'}
+
+    def test_resend_frozen_payload_lost_ack_and_original_provider_id(self):
+        environment=self.resend_config()
+        original_id='49a3999c-0ce1-4ea6-ab68-afcd6dc2e794'
+        def lost(*args):
+            self.send(*args); raise OSError('unknown Resend acknowledgement')
+        def confirmed(*args):
+            self.send(*args); return original_id
+        with patch.dict(os.environ,environment):
+            self.run_once(True,lost); first=self.sent[0]
+            self.assertEqual(first[1]['to'],['operator@example.test'])
+            self.assertEqual(first[1]['from'],'Ezkart Operations <alerts@example.test>')
+            self.assertIn('jobs_uncertain',first[1]['text'])
+            self.assertNotIn('operator@example.test',first[1]['text'])
+            self.clock+=2
+            with patch.dict(os.environ,{'EZKART_ALERT_TO':'another@example.test'}):
+                with self.assertRaisesRegex(alerts.AlertError,'alert_destination_changed'):self.run_once(True,confirmed)
+            result=self.run_once(True,confirmed)
+            self.assertEqual(result['queued'],0);self.assertEqual(self.sent[1],first)
+            connection=alerts.connect(self.config)
+            try:self.assertEqual(connection.execute('SELECT provider_id FROM resend_requests').fetchone()[0],original_id)
+            finally:connection.close()
+
+    def test_resend_retry_window_expiry_and_credential_change_never_resend(self):
+        environment=self.resend_config()
+        def lost(*args):self.send(*args);raise OSError('unknown')
+        with patch.dict(os.environ,environment):
+            self.run_once(True,lost)
+            self.clock+=23*3600
+            result=self.run_once(True,lost)
+            self.assertIn('alert_delivery_needs_review',result['warnings'])
+            self.assertEqual(len(self.sent),1);self.assertEqual(self.rows()[0]['attempts'],1)
+            self.assertEqual(self.rows()[0]['last_error'],'transport_retry_window_expired')
+        # New installation exercises account-key changes before the cutoff.
+        connection=alerts.connect(self.config)
+        try:
+            with connection:connection.execute('UPDATE resend_requests SET retry_until=?,credential_hash=?',(self.clock+1000,'another-account'))
+        finally:connection.close()
+        with patch.dict(os.environ,environment):
+            result=self.run_once(True,lost)
+            self.assertIn('alert_delivery_needs_review',result['warnings'])
+            self.assertEqual(len(self.sent),1)
+            self.assertEqual(self.rows()[0]['last_error'],'transport_credential_changed')
+
+    def test_resend_staged_envelope_cannot_change_before_network_start(self):
+        environment=self.resend_config()
+        with patch.dict(os.environ,environment):
+            self.run_once()
+            connection=alerts.connect(self.config)
+            try:
+                event=connection.execute('SELECT * FROM events').fetchone()
+                with connection:connection.execute('INSERT INTO resend_requests VALUES(?,?,?,?,?,NULL)',(event['id'],alerts.resend_payload(self.config,event['payload']),'original-account',self.clock,self.clock+23*3600))
+            finally:connection.close()
+            with patch.dict(os.environ,{'EZKART_ALERT_TO':'changed@example.test'}):
+                result=self.run_once(True)
+            self.assertIn('alert_delivery_needs_review',result['warnings'])
+            self.assertEqual(self.sent,[])
+            self.assertEqual(self.rows()[0]['last_error'],'transport_destination_changed')
+
+    def test_resend_missing_recipient_and_fixed_provider_endpoint(self):
+        self.resend_config()
+        with patch.dict(os.environ,{},clear=True):
+            result=self.run_once(True)
+            self.assertIn('alert_destination_unconfigured',result['warnings']);self.assertEqual(self.sent,[])
+        with patch.dict(os.environ,{'EZKART_ALERT_FROM':'alerts@example.test','EZKART_ALERT_TO':'operator@example.test'}):
+            self.config['endpoint']='https://unrelated.example.test/emails'
+            with self.assertRaisesRegex(alerts.AlertError,'destination_invalid'):self.run_once(True)
+
     def test_https_destination_rejects_redirect_like_userinfo_query_and_http(self):
         for endpoint in ['http://localhost/','https://user:pass@example.test','https://example.test?token=secret','https://example.test/#x','https://example.test/\nheader']:
             with self.assertRaises(alerts.AlertError): alerts.validate_endpoint(endpoint)
@@ -194,6 +265,7 @@ class HTTPTests(unittest.TestCase):
                     self.close_connection=True;return
                 if cls.behavior=='slow': time.sleep(1.5)
                 payload=json.dumps({'id':self.headers.get('Idempotency-Key'),'accepted':True}).encode()
+                if cls.behavior=='resend': payload=b'{"id":"49a3999c-0ce1-4ea6-ab68-afcd6dc2e794"}'
                 if cls.behavior=='wrong': payload=b'{"id":"wrong","accepted":true}'
                 if cls.behavior=='large': payload=b' ' * 4097
                 self.send_response(302 if cls.behavior=='redirect' else 503 if cls.behavior=='failed' else 200)
@@ -223,6 +295,17 @@ class HTTPTests(unittest.TestCase):
             type(self).behavior=behavior;before=len(self.calls)
             with self.assertRaises(alerts.AlertError): self.send()
             self.assertEqual(len(self.calls),before+1,behavior)
+
+    def test_resend_https_submission_response_and_idempotency_wire(self):
+        type(self).behavior='resend'
+        payload='{"from":"alerts@example.test","to":["operator@example.test"],"subject":"Alert","text":"jobs_uncertain"}'
+        result=alerts.send_resend(self.endpoint,'fixture-resend-token','ezalert_stable',payload,1,context=self.context)
+        self.assertEqual(result,'49a3999c-0ce1-4ea6-ab68-afcd6dc2e794')
+        self.assertEqual(self.calls[-1][1]['Idempotency-Key'],'ezalert_stable')
+        self.assertEqual(self.calls[-1][2].decode(),payload)
+        for behavior in ('wrong','redirect','large','failed'):
+            type(self).behavior=behavior
+            with self.assertRaises(alerts.AlertError):alerts.send_resend(self.endpoint,'fixture-resend-token','ezalert_stable',payload,1,context=self.context)
 
     def test_total_timeout_and_certificate_verification(self):
         type(self).behavior='slow';start=time.monotonic()
