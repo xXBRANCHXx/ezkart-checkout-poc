@@ -9,12 +9,15 @@ try {
     if (($argv[1] ?? '') !== '--once' || count($argv) > 2) throw new InvalidArgumentException('Usage: php fulfillment-dispatch.php --once');
     if (!ez_central_commerce_enabled()) throw new RuntimeException('Central commerce storage is not enabled.');
     $environment = ez_central_commerce_environment(); $worker = 'fulfillment_dispatch_' . bin2hex(random_bytes(12));
+    $writes = ez_courier_writes_enabled();
+    $kinds = $writes ? ['shipment.create', 'shipment.cancel', 'shipment.refresh'] : ['shipment.refresh'];
     $summary = ['environment' => $environment, 'processed' => 0, 'succeeded' => 0, 'uncertain' => 0, 'dead' => 0, 'eventsApplied' => 0];
+    if (!$writes) $summary['dispatch'] = 'held';
     $summary['eventsApplied'] += ez_commerce_request('POST', '/internal/commerce/shipping-events/drain', ['environment' => $environment])['applied'];
     foreach (['reconcile', 'execute'] as $mode) {
         for ($n = 0; $n < 5; $n++) {
             $jobs = ez_commerce_request('POST', '/internal/commerce/jobs/claim', [
-                'environment' => $environment, 'workerId' => $worker, 'kinds' => ['shipment.create', 'shipment.cancel', 'shipment.refresh'],
+                'environment' => $environment, 'workerId' => $worker, 'kinds' => $kinds,
                 'mode' => $mode, 'limit' => 1, 'leaseSeconds' => 120,
             ])['jobs'];
             if ($jobs === []) break;

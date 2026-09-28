@@ -14,6 +14,7 @@ const rates=async f=>(await f.app.calls()).filter(c=>c.url.endsWith('/rates/cour
 
 test('PHP quotes use the seller origin without global pickup configuration, hide contacts, and fail closed on missing settings',async t=>{
   const f=await setupCentralFixture(t,{EZKART_BITESHIP_ORIGIN_POSTAL_CODE:'',EZKART_BITESHIP_ORIGIN_ADDRESS:'',EZKART_BITESHIP_ORIGIN_CONTACT_NAME:''});
+  const health=await f.app.request('/cart/api/health.php');assert.equal(health.data.biteship.fulfillment_configured,true);assert.equal(health.data.biteship.pickup_source,'seller_shipping_settings');
   const quoted=await f.app.request('/cart/api/rates.php',{cart:{tea:2},postal_code:'12345',seller_id:'seller_bob',origin_postal_code:'99999'});
   assert.equal(quoted.status,200,JSON.stringify(quoted.data));assert.equal(quoted.data.quotes[0].price,18000);
   assert(!JSON.stringify(quoted.data).match(/Original Warehouse|Jalan Saved|081234567891|addr_|settingsRevision/));
@@ -119,4 +120,15 @@ test('unavailable map data cannot confirm a suggested pin and still permits a st
   await page.getByRole('button',{name:'Use this address',exact:true}).click();await page.locator('[data-shipping-save]').click();await page.locator('[data-shipping-confirm]').click();await page.waitForFunction(()=>!document.querySelector('[data-shipping-review]').open);
   const saved=await read(f);assert.equal(saved.configuration.addresses.length,2);assert.equal(saved.configuration.addresses[1].coordinate,undefined);assert.deepEqual(f.errors,[]);
   const ordinary=await fetch(f.app.base+'/cart/admin/?page=settings');assert.match(ordinary.headers.get('content-security-policy'),/connect-src 'self';/);assert(!ordinary.headers.get('content-security-policy').includes('worker-src'));
+});
+
+
+test('pickup checkout excludes drop-off-only rates and held shipping makes no rate or payment calls',async t=>{
+ const f=await setupCentralFixture(t);const rate=(type,methods)=>({company:'jne',type,price:18000,available_collection_method:methods});
+ await writeFile(join(f.app.directory,'rates-control.json'),JSON.stringify({default:[rate('drop',['drop_off']),rate('malformed','pickup'),rate('pickup',['pickup','drop_off'])]}));
+ const quote=await f.app.request('/cart/api/rates.php',{cart:{tea:2},postal_code:'12345'});assert.equal(quote.status,200,JSON.stringify(quote.data));assert.deepEqual(quote.data.quotes.map(q=>q.id),['jne-pickup']);
+ assert.equal((await f.app.request('/cart/api/start.php',input())).status,422);assert.equal(await f.count('orders'),0);
+ const held=await setupCentralFixture(t,{EZKART_COMMERCE_FULFILLMENT:'held'});
+ assert.equal((await held.app.request('/cart/api/rates.php',{cart:{tea:2},postal_code:'12345'})).status,503);
+ assert.equal((await held.app.request('/cart/api/start.php',input())).status,503);assert.equal((await rates(held)).length,0);assert.equal((await held.providerCalls()).length,0);assert.equal(await held.count('orders'),0);
 });

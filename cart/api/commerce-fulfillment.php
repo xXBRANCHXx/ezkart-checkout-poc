@@ -20,6 +20,7 @@ function ez_central_courier_id(mixed $value): string
 
 function ez_central_courier_request(string $environment, string $suffix, ?array $payload = null): array
 {
+    if ($payload !== null && !ez_courier_writes_enabled()) throw new RuntimeException('Courier booking and cancellation are paused.');
     if ($suffix !== '' && preg_match('~^/[A-Za-z0-9_-]{3,160}(?:/cancel)?$~D', $suffix) !== 1) throw new RuntimeException('Invalid courier route.');
     $handle = curl_init(EZ_BITESHIP_ORDERS_URL . $suffix);
     if ($handle === false) throw new RuntimeException('Courier connection is unavailable.');

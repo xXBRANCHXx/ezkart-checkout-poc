@@ -21,6 +21,8 @@ ez_api_json([
         'configured' => $status['biteship'],
         'fulfillment_configured' => $status['biteship_fulfillment'],
         'webhook_configured' => ez_biteship_webhook_configured(),
+        'booking_enabled' => ez_courier_writes_enabled(),
+        'pickup_source' => ez_config('commerce_storage') === 'd1' ? 'seller_shipping_settings' : 'legacy_configuration',
         'mode' => $commerceEnvironment,
     ],
 ]);

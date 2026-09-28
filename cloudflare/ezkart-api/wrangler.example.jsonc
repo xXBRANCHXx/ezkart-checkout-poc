@@ -41,6 +41,7 @@
         "APP_ENVIRONMENT": "beta",
         "COMMERCE_STORAGE": "legacy",
         "COMMERCE_CHECKOUT": "held",
+        "COMMERCE_FULFILLMENT": "held",
         // Before routing acceptance, configure COMMERCE_PLATFORM_WALLET_SELLER
         // only to a dedicated Ezkart fee store with a confirmed Sub-Account.
         // See docs/doku-payment-routing.md. No default destination is safe.

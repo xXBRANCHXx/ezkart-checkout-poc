@@ -54,7 +54,7 @@
           b.append(badge(item.fulfillmentState,item.review),el('b',item.customerName||'Customer'),el('small',item.id),el('small',money(item.total)+' · '+date(item.createdAt)));
           b.addEventListener('click',()=>{if(!busy)void loadDetail(item.id,true);});li.append(b);q('[data-fulfillment-list]').append(li);}
         message('[data-fulfillment-list-status]',q('[data-fulfillment-list]').children.length?'':'No orders match this view.');q('[data-fulfillment-more]').hidden=!cursor;
-        if(storageReady)status(!enabled?'Fulfillment will be available when central order processing is enabled for this store.':data.canWrite?'Only paid orders with allocated stock can be prepared for delivery.':'You can review shipments. Your account cannot change fulfillment.');
+        if(storageReady)status(!enabled?'Fulfillment will be available when central order processing is enabled for this store.':data.courierWritesEnabled===false?'Courier booking and cancellation are paused. You can review orders and refresh existing tracking.':data.canWrite?'Only paid orders with allocated stock can be prepared for delivery.':'You can review shipments. Your account cannot change fulfillment.');
         recoveryNotice();controls();return true;
       }catch(error){if(version===listVersion)message('[data-fulfillment-list-status]',error.message+' Use Refresh to try again.');return false;}
       finally{if(version===listVersion)q('[data-fulfillment-more]').disabled=false;}
@@ -87,6 +87,7 @@
       const order=data.order,shipping=order.snapshot.shipping,content=q('[data-fulfillment-detail]');content.replaceChildren();historyVersion++;
       q('[data-fulfillment-title]').textContent=order.customer.name||'Order details';q('[data-fulfillment-subtitle]').textContent=order.id+' · '+date(order.createdAt);
       const overview=el('div',undefined,'fulfillment-overview');overview.append(badge(order.fulfillmentState),el('span','Payment: '+order.state.replaceAll('_',' '),'fulfillment-badge'));content.append(overview);
+      if(data.courierWritesEnabled===false)content.append(el('p','Courier booking and cancellation are paused. Existing tracking remains available.','fulfillment-warning'));
       if(order.paymentReview||order.fulfillmentReview){const warning=el('div',undefined,'fulfillment-warning');warning.append(el('b','This order needs review'),el('p',order.paymentReview?'Payment requires review before a pickup can be arranged.':'Courier events conflict with an earlier cancelled shipment. Review all shipment attempts before proceeding.'));content.append(warning);}
       if(data.pickupIssue)content.append(el('p',data.pickupIssue,'fulfillment-warning'));
       if(order.acceptedAt)content.append(el('p','Accepted '+date(order.acceptedAt)));

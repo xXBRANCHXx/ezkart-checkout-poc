@@ -56,6 +56,8 @@ function databaseFailure(error){
 }
 async function shipments(env,order){return (await env.DB.prepare('SELECT * FROM commerce_shipments WHERE order_id=? AND seller_id=? ORDER BY sequence DESC').bind(order.id,order.sellerId).all()).results;}
 
+export const fulfillmentWritesEnabled=env=>['test','beta'].includes(env.APP_ENVIRONMENT)&&(env.COMMERCE_FULFILLMENT==='enabled'||(env.APP_ENVIRONMENT==='test'&&env.COMMERCE_FULFILLMENT===undefined));
+
 export async function fulfillmentDetail(env,actor,orderId,before=''){
   if(before&&(before.length>120||!/^\d{4}-.*~[a-f0-9]{64}$/.test(before)))fail('History cursor is invalid');
   const order=await commerceOrder(env,actor.sellerId,orderId,currentCommerceEnvironment(env));
@@ -76,8 +78,8 @@ export async function fulfillmentDetail(env,actor,orderId,before=''){
   return {order:safeOrder,shipments:rows.map(shipmentView),jobs,
     history:result[1].results.slice(0,50).map(r=>({id:r.id,shipmentId:r.shipment_id,source:r.source,receivedAt:r.received_at,...parse(r.payload_json)})),
     historyCursor:result[1].results.length>50?result[1].results[49].received_at+'~'+result[1].results[49].id:null,
-    pickupIssue:issue,canAccept:eligible&&order.fulfillmentState==='awaiting_acceptance',canPickup:eligible&&!issue&&['awaiting_pickup_arrangement','cancelled'].includes(order.fulfillmentState),
-    canCancel:!!(canWrite&&current?.provider_id&&cancellable.includes(current.state)&&current.maximum_stage<40&&!cancelPending),
+    pickupIssue:issue,courierWritesEnabled:fulfillmentWritesEnabled(env),canAccept:eligible&&order.fulfillmentState==='awaiting_acceptance',canPickup:fulfillmentWritesEnabled(env)&&eligible&&!issue&&['awaiting_pickup_arrangement','cancelled'].includes(order.fulfillmentState),
+    canCancel:!!(fulfillmentWritesEnabled(env)&&canWrite&&current?.provider_id&&cancellable.includes(current.state)&&current.maximum_stage<40&&!cancelPending),
     refreshAvailableAt,canRefresh:canWrite&&!!current?.provider_id&&(!refreshAvailableAt||Date.parse(refreshAvailableAt)<=Date.now())&&!result[2].results.some(j=>j.kind==='shipment.refresh'&&j.shipment_id===current.id),enabled:commerceStorageEnabled(env)};
 }
 
@@ -91,7 +93,7 @@ export async function fulfillmentList(env,actor,url){
   const result=await env.DB.prepare(`SELECT o.* FROM orders o WHERE o.seller_id=? AND o.commerce_environment=? AND o.commerce_version=1
     AND ${where} AND (?='' OR o.created_at||'~'||o.id<?) AND (?='' OR instr(lower(o.id),lower(?))>0 OR instr(lower(json_extract(o.customer_snapshot_json,'$.name')),lower(?))>0)
     ORDER BY o.created_at DESC,o.id DESC LIMIT ?`).bind(actor.sellerId,currentCommerceEnvironment(env),cursor,cursor,q,q,q,limit+1).all();
-  return {sellerId:actor.sellerId,enabled:commerceStorageEnabled(env),canWrite:commerceStorageEnabled(env)&&actor.role!=='viewer',items:result.results.slice(0,limit).map(r=>({id:r.id,revision:r.revision,state:r.checkout_state,
+  return {sellerId:actor.sellerId,courierWritesEnabled:fulfillmentWritesEnabled(env),enabled:commerceStorageEnabled(env),canWrite:commerceStorageEnabled(env)&&actor.role!=='viewer',items:result.results.slice(0,limit).map(r=>({id:r.id,revision:r.revision,state:r.checkout_state,
     fulfillmentState:r.fulfillment_state,review:Boolean(r.payment_review||r.fulfillment_review),customerName:parse(r.customer_snapshot_json).name,total:r.total_amount,createdAt:r.created_at})),
     nextCursor:result.results.length>limit?result.results[limit-1].created_at+'~'+result.results[limit-1].id:null};
 }
@@ -106,6 +108,7 @@ export async function fulfillmentAction(env,actor,orderId,input){
   const existing=()=>env.DB.prepare('SELECT request_hash,receipt_json FROM commerce_fulfillment_actions WHERE seller_id=? AND request_key=?').bind(actor.sellerId,input.requestKey).first();
   const replay=row=>{if(row.request_hash!==hash)fail('This request key already belongs to another operation',409);return parse(row.receipt_json);};
   const previous=await existing();if(previous)return replay(previous);
+  if(['pickup','cancel_pickup'].includes(input.kind)&&!fulfillmentWritesEnabled(env))fail('Courier booking and cancellation are paused. Existing tracking remains available.',503);
   const view=await fulfillmentDetail(env,actor,orderId),order=view.order;
   if(order.revision!==input.revision)fail('The order changed. Reload and review it before continuing.',409);
   if(!({accept:view.canAccept,pickup:view.canPickup,cancel_pickup:view.canCancel,refresh:view.canRefresh})[input.kind])fail('This fulfillment action is not currently available',409);

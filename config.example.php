@@ -20,6 +20,9 @@ return [
     // Keep withdrawals held until the complete payout workflow is accepted.
     // Bank inquiries also require Worker COMMERCE_WITHDRAWAL_INQUIRY=enabled.
     // See docs/withdrawal-bank-inquiries.md; this does not enable bank payments.
+    // Separate courier booking/cancellation activation. Also requires Worker
+    // COMMERCE_FULFILLMENT=enabled. Webhooks and tracking reads remain available.
+    'commerce_fulfillment' => 'held',
     'commerce_withdrawals' => 'held',
     'commerce_withdrawal_inquiry' => 'held',
     // Also requires Worker COMMERCE_WITHDRAWAL_PAYMENT=enabled. Keep both held

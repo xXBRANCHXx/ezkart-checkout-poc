@@ -125,16 +125,19 @@ acknowledgments and lost responses remain uncertain. A lease expiring is not
 permission for an ordinary retry. Existing maximum attempts remain in force;
 exhausted work is visible in the merchant attention queue and needs operator review.
 
-## Remaining activation work
+## Controlled beta activation
 
-The hosted central-storage flag stays disabled. Before cutover, complete private
-legacy-order reconciliation, central dashboard/customer/payment reads, per-seller
-pickup settings and quotes, an installed and monitored expiry/payment/fulfillment
-scheduler, notification delivery, and operator exception/credential-rotation
-procedures. Confirm the Biteship account and fee contract, balance, webhook
-delivery and live Order API independently. Fixture tests establish recovery logic,
-not a real pickup or delivery. Return policy/evidence handling, financial refunds,
-wallet accounting/release and sustained operational testing remain broader gates.
+The central beta path uses seller shipping settings and the existing order/job
+store. Booking and cancellation require both PHP
+`EZKART_COMMERCE_FULFILLMENT=enabled` and Worker
+`COMMERCE_FULFILLMENT=enabled`; beta defaults to held. A hold leaves callbacks,
+owned tracking reads, existing action replay and tracking refresh jobs available.
+The dispatcher does not consume create/cancel attempts while held. Resumption
+keeps the original references. See [the shipping activation procedure](beta-shipping-readiness.md)
+for settings, account funding/entitlement facts and focused local evidence.
+Actual booking and delivery observation occurs during controlled beta; local
+fixtures do not represent a live pickup or delivery. Public main release remains
+held independently.
 
 The implementation currently books one whole-order package per attempt. Split
 shipments, package dimensions/insurance options, scheduled pickup selection,

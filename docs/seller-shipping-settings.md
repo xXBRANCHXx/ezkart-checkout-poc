@@ -2,7 +2,7 @@
 
 Shipping settings are stored per seller in D1. The merchant workspace is under
 Settings → Shipping and linked from Fulfillment. It supports ten named addresses,
-separate default pickup and return addresses, optional confirmed map pins, courier
+separate default pickup and return addresses, confirmed map pins, courier
 selection and the ten most recent save records. One pickup location is used for
 an order; the address book does not partition inventory between warehouses.
 
@@ -55,7 +55,7 @@ It does not borrow the customer's authentication session or expose provider keys
 Only the shipping page permits the map SDK's blob worker and connections to
 `tiles.openfreemap.org`; other merchant pages retain their original policy.
 Initial map-data failures show the retry state and cannot confirm a suggested
-pin. A standard-courier address can still be saved without a pin.
+pin. The editor can save a standard-courier address without a pin, but production onboarding requires confirmed pickup and return pins before new money actions.
 
 ## Checkout binding
 
@@ -83,10 +83,10 @@ settings, preserving its original paid-for delivery and return details.
 
 ## Rollout limits
 
-Central processing remains disabled on the hosted test site until the separate
-legacy migration, order-read cutover and monitored-job gates are satisfied. The
-legacy path retains its server configuration while this gate is closed. The new
-settings page explicitly reports that condition. No real merchant address is
+Central processing follows the deployment’s D1 activation. Shipping booking has
+its own PHP/Worker switches, described in [beta shipping readiness](beta-shipping-readiness.md).
+When booking is held, customer shipping checkout pauses before a provider call.
+The legacy path retains its separate server configuration when D1 is disabled. No real merchant address is
 inferred from a server-wide warehouse or from account identity.
 
 This change does not arrange return couriers or labels, provide multiple-warehouse

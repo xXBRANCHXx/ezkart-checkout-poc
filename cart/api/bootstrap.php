@@ -146,6 +146,15 @@ function ez_biteship_credentials(?string $environment = null): array
     ];
 }
 
+/** A separate switch controls bookings/cancellations; webhook and owned reads continue. */
+function ez_courier_writes_enabled(): bool
+{
+    $deployment = strtolower(ez_config('deployment_environment'));
+    if (!in_array($deployment, ['test', 'beta'], true)) return false;
+    $flag = ez_config('commerce_fulfillment');
+    return $flag === 'enabled' || ($flag === '' && $deployment === 'test');
+}
+
 function ez_biteship_api_key(string $environment): string
 {
     $key = ez_provider_config('biteship', 'api_key', $environment);
@@ -222,13 +231,15 @@ function ez_integration_status(): array
         $doku = false;
     }
     try {
-        ez_biteship_credentials();
+        if (ez_config('commerce_storage') === 'd1') ez_biteship_api_key(ez_commerce_environment());
+        else ez_biteship_credentials();
         $biteship = true;
     } catch (Throwable) {
         $biteship = false;
     }
     try {
-        ez_biteship_fulfillment_credentials();
+        if (ez_config('commerce_storage') === 'd1') ez_biteship_api_key(ez_commerce_environment());
+        else ez_biteship_fulfillment_credentials();
         $biteshipFulfillment = true;
     } catch (Throwable) {
         $biteshipFulfillment = false;
@@ -361,11 +372,12 @@ function ez_catalog(array $requestedIds = []): array
     return $ordered;
 }
 
-function ez_normalize_biteship_quotes(array $pricing): array
+function ez_normalize_biteship_quotes(array $pricing, bool $pickupOnly = false): array
 {
     $quotes = [];
     foreach ($pricing as $rate) {
         if (!is_array($rate) || !is_numeric($rate['price'] ?? null) || (float) $rate['price'] !== (float) (int) $rate['price'] || (int) $rate['price'] < 1 || (int) $rate['price'] > 100000000) continue;
+        if ($pickupOnly && array_key_exists('available_collection_method', $rate) && (!is_array($rate['available_collection_method']) || !in_array('pickup', $rate['available_collection_method'], true))) continue;
         $companyCode = trim((string) ($rate['company'] ?? $rate['courier_company'] ?? $rate['courier_code'] ?? ''));
         $serviceCode = trim((string) ($rate['type'] ?? $rate['courier_type'] ?? $rate['courier_service_code'] ?? ''));
         if (preg_match('/^[a-zA-Z0-9_]{2,60}$/D', $companyCode) !== 1 || preg_match('/^[a-zA-Z0-9_]{2,60}$/D', $serviceCode) !== 1) continue;
@@ -441,6 +453,7 @@ function ez_biteship_rate_context(array $cart, string $destinationPostalCode, ?a
     require_once __DIR__ . '/commerce-checkout.php';
     $context = [];
     if (ez_central_commerce_enabled()) {
+        if (!ez_courier_writes_enabled()) throw new EzCommerceStorageException('Shipping bookings are paused. Try checkout again when delivery is available.', 503);
         if ($sellerIds[0] === 'demo') throw new InvalidArgumentException('Choose a store product to get delivery options.');
         $environment = ez_central_commerce_environment();
         $apiKey = ez_biteship_api_key($environment);
@@ -466,7 +479,7 @@ function ez_biteship_rate_context(array $cart, string $destinationPostalCode, ?a
             'Accept: application/json', 'Content-Type: application/json', 'Authorization: ' . $apiKey,
         ], ez_commerce_is_production() ? 'Biteship production' : 'Biteship test-mode');
         $allowed = explode(',', $request['couriers']);
-        foreach (ez_normalize_biteship_quotes(is_array($response['pricing'] ?? null) ? $response['pricing'] : []) as $quote) {
+        foreach (ez_normalize_biteship_quotes(is_array($response['pricing'] ?? null) ? $response['pricing'] : [], ez_central_commerce_enabled()) as $quote) {
             if (!in_array($quote['courier_company'], $allowed, true)) continue;
             if (ez_central_commerce_enabled() && !$hasPins && in_array($quote['courier_type'], ['instant', 'instant_car', 'instant_bike', 'same_day'], true)) continue;
             $quotes[$quote['id']] = $quote;

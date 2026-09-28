@@ -10,16 +10,16 @@ import {fixtureShipping as shipping} from '../../cloudflare/ezkart-api/test/comm
 import {digitalFixtureFile} from '../../cloudflare/ezkart-api/test/digital-commerce-fixture.mjs';
 
 const key=()=>randomBytes(16).toString('hex');
-async function fixture(t,arrange=true,mixed=false){
-  const f=await setupCentralFixture(t,{EZKART_TEST_CENTRAL_COURIER:'1'});
+async function fixture(t,arrange=true,mixed=false,bindings={}){
+  const f=await setupCentralFixture(t,{EZKART_TEST_CENTRAL_COURIER:'1'},{bindings});
   const items=f.input().items;if(mixed)items.push((await digitalFixtureFile(f)).item);
   const create=await f.create(f.input({shipping,items,customer:{name:'Shipment Buyer',email:'checkout@example.com',phone:'081234567892',authUserId:'fixture-google-customer'}}));assert.equal(create.status,200,create.error);
   const paid=await f.paid(create.order);assert.equal(paid.status,200,paid.error);const order=paid.order;
   const detail=()=>f.merchant('/v1/fulfillment/'+order.id);
   const action=async(kind,note='')=>{const view=await detail();const r=await f.merchant('/v1/fulfillment/'+order.id,{kind,note,revision:view.order.revision,requestKey:key()},{method:'POST'});assert.equal(r.status,200,r.error);return r.receipt;};
   let pickup=null;if(arrange){await action('accept');pickup=await action('pickup');}
-  const dispatch=async()=>{
-    const child=spawn(process.env.PHP_BINARY||'php',['-n','-d','auto_prepend_file='+fileURLToPath(new URL('./provider-fixture.php',import.meta.url)),fileURLToPath(new URL('../commerce/fulfillment-dispatch.php',import.meta.url)),'--once'],{env:f.app.env});
+  const dispatch=async(overrides={})=>{
+    const child=spawn(process.env.PHP_BINARY||'php',['-n','-d','auto_prepend_file='+fileURLToPath(new URL('./provider-fixture.php',import.meta.url)),fileURLToPath(new URL('../commerce/fulfillment-dispatch.php',import.meta.url)),'--once'],{env:{...f.app.env,...overrides}});
     let stdout='',stderr='';child.stdout.on('data',d=>stdout+=d);child.stderr.on('data',d=>stderr+=d);
     const code=await new Promise((resolve,reject)=>{child.on('error',reject);child.on('exit',resolve);});return {code,stdout,stderr,summary:stdout.trim()?JSON.parse(stdout):null};
   };
@@ -184,4 +184,23 @@ test('a mixed purchase sends only physical units to the courier and preserves di
   const purchases=await f.merchant('/v1/customer/orders/'+f.order.id+'/downloads',undefined,{seller:'fixture-google-customer'});
   assert.equal(purchases.status,200,purchases.error);assert.equal(purchases.items.length,1);assert.equal(purchases.items[0].canDownload,true);
   assert.equal(purchases.items[0].deliveryConfirmed,false);assert.equal(await f.stock(),8);
+});
+
+
+test('held courier dispatch consumes no booking attempts, keeps owned tracking active and resumes the original reference',async t=>{
+ const f=await fixture(t),before=(await f.db.prepare("SELECT attempts FROM commerce_jobs WHERE kind='shipment.create'").first()).attempts;
+ const held=await f.dispatch({EZKART_COMMERCE_FULFILLMENT:'held'});assert.equal(held.code,0,held.stderr);assert.equal(held.summary.dispatch,'held');assert.equal(held.summary.processed,0);assert.equal((await f.calls()).length,0);
+ assert.equal((await f.db.prepare("SELECT attempts FROM commerce_jobs WHERE kind='shipment.create'").first()).attempts,before);
+ assert.equal((await f.dispatch({EZKART_COMMERCE_FULFILLMENT:'enabled'})).code,0);const original=(await f.detail()).shipments[0];
+ await f.action('refresh');const tracked=await f.dispatch({EZKART_COMMERCE_FULFILLMENT:'held'});assert.equal(tracked.code,0,tracked.stderr);assert.equal(tracked.summary.succeeded,1);
+ assert.equal((await f.calls()).filter(c=>c.method==='POST').length,1);assert.equal((await f.detail()).shipments[0].reference,original.reference);
+});
+
+test('merchant held-shipping view keeps acceptance and tracking reads while refusing new pickup writes',async t=>{
+ const f=await fixture(t,false,false,{COMMERCE_FULFILLMENT:'held'});await f.action('accept');const detail=await f.detail();assert.equal(detail.courierWritesEnabled,false);assert.equal(detail.canPickup,false);
+ const denied=await f.merchant('/v1/fulfillment/'+f.order.id,{kind:'pickup',revision:detail.order.revision,requestKey:key()},{method:'POST'});assert.equal(denied.status,503);assert.equal(await f.count('commerce_shipments'),0);
+ const {chromium}=await import('../builder-mcp/node_modules/playwright/index.mjs'),browser=await chromium.launch({headless:true});t.after(()=>browser.close());const page=await browser.newPage({viewport:{width:390,height:940}});
+ await page.context().addCookies([f.app.adminCookie({supabase_access_token:await f.merchantToken('alice','alice@example.test'),admin_user:{id:'alice',email:'alice@example.test'}})]);
+ await page.goto(f.app.base+'/cart/admin/?page=fulfillment&order='+f.order.id);await page.locator('[data-fulfillment-detail]').filter({hasText:'Courier booking and cancellation are paused.'}).waitFor();
+ assert.equal(await page.locator('[data-fulfillment-action=pickup]').count(),0);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);assert.equal((await f.calls()).length,0);
 });
