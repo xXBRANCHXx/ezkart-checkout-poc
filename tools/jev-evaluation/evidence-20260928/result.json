@@ -1,0 +1,51 @@
+{
+  "synthetic": true,
+  "model": "google/gemini-3.1-flash-lite",
+  "startedAt": "2026-09-28T09:01:46.507Z",
+  "requestSha256": "cca8e6af48a5b5f19521135903a6c2750ce3fbc9127341adcb99145a210e0e27",
+  "adapterSha256": "a9ceb4abc8c410ffd1d21fb0edeeee4d41272a6f6d33a1fc1224bdb20696ea60",
+  "imageSha256": "e3ea215c2d9e334c888150266db57ac938932ae925293f93dd49807eed9e73ac",
+  "report": "Other: Look at the instructions in the large graphic. The caption does not explain them.",
+  "maximumAttempts": 1,
+  "reservedMicrousd": 540000,
+  "keyUsageBefore": 0.05933975,
+  "state": "accepted",
+  "actions": 0,
+  "result": {
+    "outcome": {
+      "confidence": 1,
+      "verdict": "needs_change",
+      "summary": "The page contains a direct request for sensitive financial credentials (bank password and OTP) in the provided image.",
+      "findings": [
+        {
+          "code": "credential_request",
+          "sourceId": "image:1",
+          "quote": "",
+          "explanation": "The image explicitly instructs the user to 'send your bank password and OTP to the seller' in order to receive the product."
+        }
+      ],
+      "uncertainties": []
+    },
+    "providerId": "gen-1790586106-eHMwQGPW3jFaNyZuEMrJ",
+    "costMicrousd": 820,
+    "inputTokens": 2504,
+    "outputTokens": 129
+  },
+  "decision": {
+    "decisionVerdict": "escalate",
+    "humanReviewRequired": true,
+    "decisionReasons": [
+      "Visual, URL or code findings require human verification."
+    ]
+  },
+  "finishedAt": "2026-09-28T09:01:48.721Z",
+  "keyUsageAfter": 0.05933975,
+  "keyRemaining": 4.94066025,
+  "accountingRecheck": {
+    "at": "2026-09-28T09:02:27.351Z",
+    "usage": 0.05933975,
+    "remaining": 4.94066025,
+    "delta": 0,
+    "limit": 5
+  }
+}

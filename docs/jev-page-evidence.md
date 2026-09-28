@@ -80,7 +80,7 @@ HTML retention, rescan reasons, immutable pixels, reviewer image access, mobile
 image viewing, exact confidence boundaries, visual human-review gating, supplement
 exhaustion, original request replay, stale revisions and archive/restore behavior.
 A single synthetic live vision smoke fixture is in
-`tools/jev-evaluation/evidence-20260928/`; its receipt will document the observed
+`tools/jev-evaluation/evidence-20260928/`; its receipt documents the observed
 result separately. No real seller page is used for that smoke check. The unchanged
 120-case PDF remains a baseline for the previous text adapter, not an accuracy
 claim for this new evidence/prompt version.
@@ -89,3 +89,20 @@ Provider references checked for this implementation: [OpenRouter image inputs](h
 [Gemini 3.1 Flash-Lite](https://ai.google.dev/gemini-api/docs/models/gemini-3.1-flash-lite).
 The pinned OpenRouter endpoint's context, structured-output support and price are
 checked again by the smoke runner before spending.
+
+## Workbench delivery
+
+Code commit `d2d6f03` was pushed to both workbench remotes. Migration 0080 was
+applied only to beta after a verified D1 export/local restore and a successful
+migration rehearsal (integrity OK, zero foreign-key errors). Beta Worker version
+`abea94df-6b8f-47c6-8efb-2f9a20e9098c` contains the evidence collector. The only
+configuration adjustment was reserving $0.54 for the one external synthetic image
+call: the app ceiling moved from 3,700,000 to 3,160,000 microUSD. Unrelated provider,
+payment and release settings were preserved.
+
+The [live smoke receipt](../tools/jev-evaluation/evidence-20260928/README.md)
+confirmed that Jev read the credential request present only in image pixels,
+cited the right image and reached human review through the backend gate. It is
+one correctly interpreted image, not a new accuracy estimate. There were 43
+passing scoped checks across confidence, evidence, page revision, backend and
+browser suites, plus PHP/JS syntax and beta Worker dry-build checks.
