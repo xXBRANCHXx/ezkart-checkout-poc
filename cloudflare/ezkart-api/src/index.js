@@ -1,4 +1,4 @@
-import {importJevEvaluation,jevPageHeld,jevPages,jevList,jevDetail,createJevReview,runJevReview,gradeJevReview,restoreJevPage} from './jev-reviews.js';
+import {jevEvidenceImage,importJevEvaluation,jevPageHeld,jevPages,jevList,jevDetail,createJevReview,runJevReview,gradeJevReview,restoreJevPage} from './jev-reviews.js';
 import {putJevPage,beginJevPageWrite,finishJevPageWrite} from './jev-page-state.js';
 import {saveTreasuryStatus,treasuryStatusHistory} from './commerce-treasury-status.js';
 import {treasuryObservationScope,treasuryOutcomeRead,reconcileTreasuryOutcome} from './commerce-treasury-outcomes.js';
@@ -1546,6 +1546,8 @@ export default {
         if(request.method!=='POST'||url.search)return json({ok:false,error:'Evaluation import route is invalid'},405);
         return json({ok:true,...await importJevEvaluation(env,input)});
       }
+      const jevImage=/^\/v1\/jev\/reviews\/(jev_[a-f0-9]{32})\/image\/([1-9][0-9]?)$/.exec(url.pathname);
+      if(jevImage&&request.method==='GET'&&!url.search){const actor=await supportActor(env,await authenticatedUser(request,env,true));return json({ok:true,...await jevEvidenceImage(env,actor,jevImage[1],jevImage[2])},200,cors);}
       const jevPath=/^\/v1\/jev\/(pages|reviews)(?:\/(jev_[a-f0-9]{32})(?:\/(run|grade|restore|rescan))?)?$/.exec(url.pathname);
       if(jevPath){
         const actor=await supportActor(env,await authenticatedUser(request,env,true)),[,kind,id,action]=jevPath;

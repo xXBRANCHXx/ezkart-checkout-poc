@@ -8,27 +8,30 @@ customer accounts, payment credentials or provider secrets.
 
 ## Current implementation
 
-Migration 0079 records original page reports, exact R2 revisions, minimized
-text snapshots, one-send model attempts, outcomes or failures, human grades and
+Migration 0079 records original page reports, exact R2 revisions, immutable
+page evidence snapshots, one-send model attempts, outcomes or failures, human grades and
 archive/restore audit events. The existing explicit platform support reviewer
 registry and fresh TOTP proof authorize writes. Store ownership alone confers
 no access to other stores' reports. Viewer permission permits reading only.
 
 `/v1/jev/pages?store=...` selects a page from the real store. The authenticated
 reviewer creates an original report at `/v1/jev/reviews` with requestKey, store,
-pageId, expectedRevision and reportText. This queues evidence without spending.
+pageId, expectedRevision, reportReason and reportText. This queues evidence without spending.
 A deliberate `/reviews/ID/run` with its original requestKey performs at most one
 model call. Replays read the original state; changed keys cannot repeat an
 uncertain call. Unknown billing keeps its reservation. No public report can
 launch a model call, and there is no background scanning scheduler.
 
-The server reads published page text from private storage. It does not fetch
-links, execute page code, inspect images/video, or send page HTML/scripts, bank
-information, customer records or headers to OpenRouter. Email addresses and
-long number sequences are redacted; bounded text truncation and unreviewed media
-are explicit. Every policy finding must cite an exact supplied page-text quote.
-Reports and page text are untrusted data and cannot change instructions or tools.
-The model receives no tools. The UI escapes all output and preserves the report.
+The server now collects evidence package v2: preserved page text and ASCII spacing,
+published HTML/CSS/JavaScript, URLs/slugs, selected report reason and written
+explanation (including Other), and supported captured image pixels. Original HTML
+and captured resources live in private R2. Exact image hashes are checked before
+model submission and reviewer display. Reports remain allegations, not evidence.
+The model receives no tools and must treat all page/report/code/image content as
+untrusted input. The UI displays source as inert text. See
+[page evidence coverage and limits](jev-page-evidence.md) for collection limits,
+unsupported resources and the distinction between source inspection and runtime
+rendering. Private account, payment and identity records are not collected.
 
 The trusted `jev-beta-policy-v1` registry contains owner-approved credential
 requests and direct threats, plus narrow sourced Indonesian unlicensed gambling
@@ -45,7 +48,7 @@ preserves the original recommendation alongside its effective decision; a
 self-reported confidence is not measured accuracy.
 
 Only a supported needs_change outcome with exact current-page evidence, no
-uncertainty, complete text coverage and approved archive configuration may
+uncertainty, complete evidence coverage and approved archive configuration may
 create a temporary hold. Mere report submission, malformed output, transport
 failure, stale content, unseen-media allegations and unsupported rules cannot
 archive. The normal public URL and custom-domain path share the hold gate and
@@ -73,9 +76,13 @@ a human decision due; it never deletes or terminates a page.
 The adapter pins `google/gemini-3.1-flash-lite` and `google-vertex/global`, with
 strict JSON schema, required parameter support, no provider fallback, no retries,
 no tools, data-collection denied and ZDR requested. Its serialized request must
-fit 8,000 UTF-8 bytes (a conservative input-token bound), and max output is 1,000
-tokens. Provider maximum prices are $0.50/M input and $2.50/M output; each
-attempt reserves $0.01 before sending. Immutable reservations bound concurrency
+fit 8,000 UTF-8 bytes for legacy snapshots. Evidence v2 permits bounded larger
+text and up to 32 captured images with a 2,000 output-token cap. Provider maximum
+prices remain $0.50/M input and $2.50/M output. Text calls reserve at least $0.01,
+increasing with serialized input bytes; image calls reserve $0.54 against the
+whole pinned model context. Migration 0080 adds atomic immutable supplements to
+the original $0.01 attempt record. These are conservative ceilings, not expected
+charges. Immutable reservations bound concurrency
 and retain unknown costs; actual returned cost is separate and never guessed.
 
 The dedicated Ezkart Jev Beta key has a verified $5 total provider hard limit,
@@ -131,4 +138,6 @@ found nine unsupported archive-eligible decisions surviving the 80% and evidence
 checks. Missing permit status, missing jurisdiction and ambiguous threats remain
 observed weaknesses. The confidence score is not a calibrated probability of
 correctness. This evaluation preserved model/policy settings and made no real
-page actions; its recommended enforcement changes are not yet implemented.
+page actions; the evidence-v2 prompt now reinforces those missing-context rules. This prompt
+change has not been validated by another 120-case evaluation, so the old accuracy
+figures do not establish the new adapter’s accuracy.
