@@ -47,6 +47,17 @@ Use merchant-facing controls for appearance settings: numeric values with separa
   work from remaining code and live acceptance,
   and preserves the owner's FlexiBill-pending decision and current email state.
 
+## Payment window (owner decision, 28 September 2026)
+
+- Keep Ezkart’s cart, order/status page and native BCA Virtual Account flow.
+- The owner subsequently approved DOKU’s hosted popup for QRIS/cards because
+  their payment instructions belong inside that provider window. Earlier
+  direct-API-only preferences do not override this decision. Preserve the seller
+  Sub-Account route, original saved payment sessions and server-confirmed status.
+- Do not promise QR download/share controls until observed in the actual hosted
+  UI. The popup wrapper is implemented separately from provider activation;
+  pending BCA/QRIS approval and Collect & Route requirements still apply.
+
 ## Owner learning materials
 
 For future animated explainers, the owner means visual teaching through concrete

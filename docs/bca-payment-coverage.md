@@ -1,8 +1,8 @@
 # BCA payment coverage
 
 Checked 28 September 2026 against primary BCA/DOKU documentation and Ezkart
-workbench `226325c` (beta Worker `7004fa9`, schema 0077). This is a coverage and
-implementation record, not an activation receipt. The owner wants BCA coverage
+workbench `226325c` (beta Worker `7004fa9`, schema 0077). The initial coverage check is distinct from the later QRIS activation receipt
+recorded below. The owner wants BCA coverage
 while keeping Ezkart's own checkout design and seller Sub-Account model.
 
 ## Coverage and account requirements
@@ -31,7 +31,7 @@ the original SNAP adapter. No payment or wallet operation was made in this check
    settlement behavior. An ordinary merchant payment is not a safe fallback.
 3. DOKU documents hosted Checkout as either a redirect or modal overlay. A modal
    can retain the surrounding Ezkart page, but its inner payment UI remains DOKU's.
-   It is a design/architecture option, not an implemented or approved replacement.
+   The owner approved this mixed approach on 28 September: Ezkart keeps its cart, order page and native BCA VA; QRIS/cards may use DOKU’s payment window. The new frontend opens only a saved, unexpired `routed_hosted` session after a deliberate click.
    Existing legacy hosted sessions do not supply a new routed checkout path.
 4. A routed hosted implementation needs its own original immutable dispatch,
    accepted split binding, typed receipt and signed callback checks, status and
@@ -39,6 +39,31 @@ the original SNAP adapter. No payment or wallet operation was made in this check
    Preserve the original uncertain operations and existing financial holds.
    Prefer provider confirmation of direct QRIS/Card Sub-Account support if fully
    native payment UI remains required; do not invent `additionalInfo` routing.
+
+## QRIS activation receipt and payment window
+
+At 13:38:41 WIB on 28 September, the owner-authorized QRIS request was submitted
+once with brand short name Ezkart and MCC 5262 (Marketplaces). DOKU displayed its
+success confirmation and QRIS `UPDATING`, requested 28 September 13:38 GMT+7.
+The final form presented no new fee, contract or terms acceptance. Service Details
+still showed Updating, no activation date and no QRIS image at 13:42 WIB; it showed
+no separate request reference. BCA Close Amount SNAP remained `UPDATING`.
+Cards and Collect & Route remain unavailable in the ordinary service selector.
+No checkout session, payment, wallet retry or support email was sent by this step.
+
+The payment window uses DOKU’s documented SDK and strict permitted URL origins.
+Closing/reopening or reloading uses the original saved session. Browser messages
+and return URLs cannot confirm payment; only the server status does. SDK loading
+failure gives a retry for that same order. The native BCA and legacy hosted paths
+remain distinct. Focused local desktop/mobile fixtures cover those cases plus
+expired/hostile URLs, without provider calls. The fixture verifies Ezkart’s modal
+wrapper, not DOKU’s internal payment UI.
+
+DOKU documents displaying a dynamic QRIS code in Checkout. Its explicit static
+QRIS download instructions do not prove hosted dynamic QRIS download/share
+controls. Those exact controls need observation in an authorized active-channel
+session; the Ezkart page does not promise them. Checkout and financial execution
+remain held until their actual activation/configuration requirements are met.
 
 No current primary source found establishes that 85% of people use BCA. That
 estimate is not needed to prioritize BCA. BCA's 2025 annual report describes

@@ -15,6 +15,92 @@
   let pollTimer;
   let feedbackTimer;
   let failures = 0;
+  let sdkPromise;
+  let modal;
+  let modalObserver;
+  let hostedOpening = false;
+  function hostedPaymentUrl(data, flow) {
+    if (data?.payment_flow !== flow || data.status !== "PENDING") return "";
+    const expiry = Date.parse(data.payment_expires_at || "");
+    if (!Number.isFinite(expiry) || expiry <= Date.now()) return "";
+    try {
+      const url = new URL(data.payment_url);
+      const hosts = data.environment === "production" ? ["jokul.doku.com"]
+        : data.environment === "sandbox" ? ["sandbox.doku.com", "staging.doku.com"] : [];
+      if (url.protocol === "https:" && hosts.includes(url.hostname) && !url.username && !url.password && !url.port && !url.hash && !url.search
+          && /^\/(?:checkout-link(?:-v2)?\/|checkout\/link\/)[A-Za-z0-9_-]+$/.test(url.pathname)) return url.href;
+    } catch (_) {}
+    return "";
+  }
+  function loadHostedSdk(environment) {
+    if (sdkPromise) return sdkPromise;
+    sdkPromise = new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = (environment === "production" ? "https://jokul.doku.com" : "https://sandbox.doku.com") + "/jokul-checkout-js/v1/jokul-checkout-1.0.0.js";
+      script.referrerPolicy = "no-referrer";
+      const timeout = setTimeout(() => fail(), 12000);
+      const fail = () => { clearTimeout(timeout); script.remove(); sdkPromise = null; reject(new Error("sdk_unavailable")); };
+      script.onerror = fail;
+      script.onload = () => { clearTimeout(timeout); typeof window.loadJokulCheckout === "function" ? resolve() : fail(); };
+      document.head.append(script);
+    });
+    return sdkPromise;
+  }
+  function closeHostedPayment() {
+    if (!modal || modal.hidden) return;
+    modalObserver?.disconnect();
+    modal.hidden = true;
+    modal.style.display = "none";
+    modal.querySelector("iframe")?.remove();
+    document.body.classList.remove("hosted-payment-open");
+    shell.inert = false;
+    document.querySelector(".payment-header").inert = false;
+    byId("open-hosted-payment").focus();
+    byId("hosted-payment-message").hidden = false;
+    byId("hosted-payment-message").textContent = "The payment window is closed. We’re checking this order; you can reopen the same payment if needed.";
+    check();
+  }
+  async function openHostedPayment() {
+    if (hostedOpening || !hostedPaymentUrl(payment, "routed_hosted")) return;
+    hostedOpening = true;
+    const button = byId("open-hosted-payment"), message = byId("hosted-payment-message");
+    button.disabled = true; button.setAttribute("aria-busy", "true");
+    message.hidden = false; message.textContent = "Opening secure payment…";
+    try {
+      await loadHostedSdk(payment.environment);
+      // Expiry or server confirmation may change while the SDK is loading.
+      const url = hostedPaymentUrl(payment, "routed_hosted");
+      if (!url) { render(); message.textContent = "Check this order’s latest payment status before continuing."; return; }
+      modalObserver?.disconnect();
+      document.getElementById("jokul_checkout_modal")?.remove();
+      window.loadJokulCheckout(url);
+      modal = document.getElementById("jokul_checkout_modal");
+      const frame = modal?.querySelector("iframe");
+      if (!frame) throw new Error("window_unavailable");
+      modal.classList.add("ezkart-hosted-payment");
+      modal.setAttribute("role", "dialog"); modal.setAttribute("aria-modal", "true");
+      modal.setAttribute("aria-label", "Secure DOKU payment");
+      frame.title = "Secure DOKU payment";
+      frame.referrerPolicy = "no-referrer";
+      const close = document.createElement("button");
+      close.type = "button"; close.className = "hosted-payment-close";
+      close.textContent = "Close payment window"; close.addEventListener("click", closeHostedPayment);
+      modal.prepend(close);
+      modal.addEventListener("keydown", event => {
+        if (event.key === "Escape") { event.preventDefault(); closeHostedPayment(); }
+        if (event.key === "Tab" && event.shiftKey && event.target === close) { event.preventDefault(); frame.focus(); }
+      });
+      modalObserver = new MutationObserver(() => {
+        if (modal.style.display === "none") closeHostedPayment();
+      });
+      modalObserver.observe(modal, {attributes:true, attributeFilter:["style"]});
+      shell.inert = true; document.querySelector(".payment-header").inert = true;
+      document.body.classList.add("hosted-payment-open"); close.focus();
+      message.textContent = "Complete payment in the secure window. This page will confirm your order when payment is received.";
+    } catch (_) {
+      message.textContent = "We couldn’t open the payment window. Try again to reopen the same payment; your order is saved.";
+    } finally { hostedOpening = false; button.disabled = false; button.removeAttribute("aria-busy"); }
+  }
   const notice = (text) => {
     byId("page-notice").textContent = text;
     byId("page-notice").hidden = !text;
@@ -54,6 +140,10 @@
             && /^\/(?:checkout-link(?:-v2)?\/|checkout\/link\/).+/.test(url.pathname)) hostedUrl = url.href;
       } catch (_) {}
     }
+    const routedUrl = hostedPaymentUrl(data, "routed_hosted");
+    if (modal && !modal.hidden && !routedUrl) closeHostedPayment();
+    byId("open-hosted-payment").hidden = !routedUrl;
+    if (state === "PAID") byId("hosted-payment-message").hidden = true;
     shell.dataset.state = state;
     byId("payment-layout").hidden = false;
     byId("sandbox-badge").hidden = byId("sandbox-note").hidden =
@@ -171,12 +261,12 @@
       byId("result-title").textContent = "Payment setup is still being confirmed";
       byId("result-message").textContent = "Keep this order number. You can leave this page and return to the same payment; don’t start another order while this is being checked.";
       if (!manualCheck) byId("check-message").textContent = "We’ll keep checking this order automatically.";
-    } else if (hostedUrl) {
+    } else if (hostedUrl || routedUrl) {
       byId("payment-title").textContent = "Complete your payment";
       byId("payment-description").textContent = "Your secure payment session is ready.";
       byId("result-icon").textContent = "→";
       byId("result-title").textContent = "Continue to secure payment";
-      byId("result-message").textContent = "Choose your payment method and complete the payment on the secure payment page. Return here to check confirmation.";
+      byId("result-message").textContent = routedUrl ? "Choose a payment method in DOKU’s secure window. Your order and payment confirmation stay here." : "Choose your payment method and complete the payment on the secure payment page. Return here to check confirmation.";
       if (!manualCheck) byId("check-message").textContent = "Your order will update when payment is confirmed.";
     } else if (!available) {
       byId("result-icon").textContent = "…";
@@ -279,6 +369,7 @@
       }
     }),
   );
+  byId("open-hosted-payment").addEventListener("click", openHostedPayment);
   byId("check-payment").addEventListener("click", () => check(true));
   byId("retry-details").addEventListener("click", () => check(true));
   document.addEventListener("visibilitychange", () => {

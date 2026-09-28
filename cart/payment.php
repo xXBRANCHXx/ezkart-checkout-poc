@@ -8,7 +8,7 @@ if (preg_match('/^EZK-[SP]-[A-F0-9]{24}$/D', $orderId) !== 1) {
 header('Cache-Control: no-store');
 header('Referrer-Policy: no-referrer');
 header('X-Content-Type-Options: nosniff');
-header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'");
+header("Content-Security-Policy: default-src 'self'; script-src 'self' https://jokul.doku.com/jokul-checkout-js/v1/jokul-checkout-1.0.0.js https://sandbox.doku.com/jokul-checkout-js/v1/jokul-checkout-1.0.0.js; style-src 'self' https://jokul.doku.com/jokul-checkout-js/v1/jokul-checkout-1.0.0.css https://sandbox.doku.com/jokul-checkout-js/v1/jokul-checkout-1.0.0.css; frame-src https://jokul.doku.com https://checkout.doku.com https://sandbox.doku.com https://staging.doku.com; img-src 'self'; connect-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'");
 ?>
 <!doctype html>
 <html lang="en">
@@ -62,6 +62,8 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-sr
         <div id="result-panel" class="result-panel" hidden><div id="result-icon" class="result-icon" aria-hidden="true">✓</div><h2 id="result-title"></h2><p id="result-message"></p></div>
         <div class="payment-actions">
           <a id="provider-payment-link" class="primary-button" href="#" rel="noreferrer" hidden>Continue to secure payment</a>
+          <button id="open-hosted-payment" class="primary-button" type="button" hidden>Choose payment method</button>
+          <p id="hosted-payment-message" role="status" aria-live="polite" hidden></p>
           <button id="check-payment" class="primary-button" type="button">Check payment status</button>
           <a id="order-link" class="primary-button" href="return.php" hidden>View order</a>
           <p id="check-message" role="status" aria-live="polite">Your payment will be confirmed automatically after the transfer.</p>
