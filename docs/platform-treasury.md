@@ -1,6 +1,6 @@
 # Ezkart commission treasury
 
-Migrations 0070 and 0072 add company commission reservations, bank inquiries, confirmations and durable transfer grants.
+Migrations 0070, 0072 and 0073 add company commission reservations, bank inquiries, confirmations and durable transfer grants.
 It reserves only original order commission supported by current verified routed
 settlements. It does not move money, mark a company bank as verified, or treat
 platform cash as withdrawable commission. Seller withdrawals and their journal
@@ -122,7 +122,7 @@ Recovery compares the private receipt with the original signed Worker grant read
 
 ## Remaining execution requirements
 
-Matched company transfer status/history collection and reconciliation with cash/fee journals remain. Reservations therefore stay reserved after a recorded transfer response. There is no paid finalization or failure-based release. No provider call, deployment, bank configuration or flag enablement was performed.
+Matched original company status/history collection and immutable provider-outcome assessment are implemented below. Commission cash/fee accounting and funding/custody/release policy remain held. Reservations stay reserved even after matched provider success or explicit VOID failure. No paid finalization, failure-based release, provider call, deployment, bank configuration or flag enablement was performed.
 
 Before actual payment authority can be enabled, the company bank and dedicated
 platform account still need real verification, and the commission release/reserve
@@ -138,3 +138,41 @@ transaction rollback and migration preservation. All provider evidence in these
 tests is isolated fixture data, never live financial acceptance.
 
 Phase-two fixtures cover concurrent one-send grants, exact company holder, enabled-flag policy holds, post-grant cancellation fences, altered/duplicate financial evidence, revoked-authority recovery, typed transfer transport, private-file permissions, lost delivery and unknown-outcome no-resend. Only isolated fixtures replace the empty eligibility view; no such writer ships.
+
+
+## Original status/history and immutable outcomes (0073)
+
+The DOKU [V2 integration contract](https://developers.doku.com/wallet-as-a-service/sub-account/sub-account-v2/integration-guide) was checked again on 28 September 2026. `transactions-status` returns merchant reference, amount, transaction type/status/date and debit cancellation context. It does **not** return source account or destination bank. `transaction-history-list` scopes rows to the requested account and returns provider/merchant references, mutation/type, amount, channel and outcome; it also has **no destination bank fields**. A `PAYOUT_CHARGE` row records a fee mutation; the contract does not establish which mixed company funds legally fund it, commission custody or release entitlement.
+
+For those reasons, `matched_success` requires the original strict transfer receipt to bind the company bank, a matching successful PAYOUT status and exactly one matching successful cash DEBIT principal plus one explicit resolved PAYOUT_CHARGE in the original company account collection. Principal, reference, source pocket, amount, IDR, channel, timing and any foreign/extra group rows are checked. Missing transfer receipt remains `destination_not_confirmed_by_transfer_receipt` even when status/history suggest success. No bank destination is invented from a status read. A missing/duplicate charge is unknown; `observedFee` stays nullable. An explicit successful zero-value charge can report `"0"`; absence cannot.
+
+All raw responses remain immutable. Every status observation uses the original provider fingerprint/client/reference and a distinct request ID; strict financial JSON rejects ambiguous numeric/duplicate-key evidence. Overlapping conflicting frontiers, terminal regressions, conflicting terminal outcomes, refund/cancellation context, wrong transaction types, pending results, unknown references and unsupported rows stay held. Arrival order never replaces provider observation order.
+
+An outcome assessment pins the complete exhausted company cash **and pending** collection, exact original status sequence frontier and original transfer receipt digest. It appends a new result rather than modifying an old one. A later overlapping or related history read, a new status, or a late original transfer receipt makes the older assessment noncurrent immediately. Reconciliation of stale/incomplete collections is rejected; a previously saved result is still visible with `provider_evidence_changed`. A provider reference already bound to seller payout/settlement or another company receipt cannot support a company match. Shared closed-window endpoints are checked and counted once without erasing genuine duplicate legs.
+
+`matched_failure` means an original failed status and explicit VOID principal/fee observations agree; it does not authorize reserve release. FAILED rows alone do not prove the debit was removed. Provider matching is separate from cash accounting: all results expose `payoutConfirmed:false`, `reconciled:false`, `reservationReleased:false` and `accountingState:held_fee_funding_custody_release_unverified`. No company cash journal is posted, because the actual funding/custody/release evidence needed to justify the accounting still does not exist. Seller earnings, minimums, reserve accounts and journal semantics are not reused. The empty execution eligibility view remains unchanged.
+
+Signed internal routes:
+
+| Route suffix under `/internal/commerce/finance/treasury/:id/` | Purpose |
+| --- | --- |
+| `observations/scope` | Original transfer binding and original company enrollment/profile/cash/pending accounts; independent of current pinned configuration or owner role. |
+| `status/receipt` | Save original typed status evidence. |
+| `status/history` | Bounded immutable history with fixed sequence cap and current provider frontier. |
+| `outcome/reconcile` | Only original `collectionId` and `statusCap`; append immutable source-derived classification. |
+| `outcome/read` | Current outcome, nullable fee, original evidence provenance and accounting hold. |
+
+The owner screen shows the latest observed status and source-current outcome, separate from payment confirmation and cash accounting.
+
+### Bounded read-only collection and recovery
+
+`commerce_treasury_observations` defaults held; no setting was enabled. With separately approved actual provider reads, the CLI runs the existing typed status, balance and history readers against only the original company account. It takes no bank override, seller override, arbitrary URL, transfer capability or accounting override.
+
+```sh
+php tools/commerce/sync-treasury-observations.php --intent=try_<40hex> --environment=production --run=<32hex> --mode=collect --max-pages=10 --max-reads=20
+php tools/commerce/sync-treasury-observations.php --intent=try_<40hex> --environment=production --run=<same32hex> --mode=recover --max-pages=10 --max-reads=20
+```
+
+Use sandbox only with the TEST deployment; beta uses production identity. A private locked run is stored beneath `commerce_treasury_recovery_directory`. Before requesting the next provider response, each read is committed atomically as a mode0600 file in a mode0700 directory. Run scope, company identity, pagination/window plan, collection input and outcome input cannot change. Collection uses at most 12 contiguous 31-day windows, at most 40 pages per original pocket and a bounded per-invocation read budget. A budget pause resumes the same run and never repeats successful reads. A retained provider failure stops the same run; another explicitly requested read run may be needed. Read failures never authorize transfer retries.
+
+`recover` replays saved response bytes and D1 finalization only, without loading provider credentials or making DOKU calls. If it reaches an unsaved read, it stops and requires explicit collection. Recovery works with dispatch/observation flags held. An unsaved or unknown transfer response is never replaced by a second transfer. New shared company history can invalidate earlier settlement/payout source snapshots; the collector reports `sharedHistoryRefreshRequired:true` and does not silently rewrite related accounting.

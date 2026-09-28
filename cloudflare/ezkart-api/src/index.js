@@ -1,3 +1,5 @@
+import {saveTreasuryStatus,treasuryStatusHistory} from './commerce-treasury-status.js';
+import {treasuryObservationScope,treasuryOutcomeRead,reconcileTreasuryOutcome} from './commerce-treasury-outcomes.js';
 import {startTreasuryBank,confirmTreasuryBank,treasuryBankRecovery,saveTreasuryBankReceipt} from './commerce-treasury-bank.js';
 import {customerSubscriptions,subscriptionList,subscriptionDetail,cancelSubscription} from './commerce-subscriptions.js';
 import {finalizeConfirmedRefund} from './commerce-refund-finalization.js';
@@ -1604,6 +1606,13 @@ export default {
         const name=url.pathname.slice('/internal/commerce/finance/payout-sync/'.length),action=Object.hasOwn(actions,name)?actions[name]:null;
         if(request.method!=='POST'||url.search||!action)return json({ok:false,error:'Synchronization job route is unavailable'},404);
         return json({ok:true,...await action(env,payload)});
+      }
+      const treasuryOutcome=/^\/internal\/commerce\/finance\/treasury\/(try_[a-f0-9]{40})\/(status\/(?:receipt|history)|observations\/scope|outcome\/(?:read|reconcile))$/.exec(url.pathname);
+      if(treasuryOutcome){
+        const input=await authenticateCommerceService(request,env,{strictJSON:true,maxBytes:50000});
+        if(request.method!=='POST'||url.search)return json({ok:false,error:'Treasury observation method is invalid.'},405);
+        const action={'status/receipt':saveTreasuryStatus,'status/history':treasuryStatusHistory,'observations/scope':treasuryObservationScope,'outcome/read':treasuryOutcomeRead,'outcome/reconcile':reconcileTreasuryOutcome}[treasuryOutcome[2]];
+        return json({ok:true,...await action(env,treasuryOutcome[1],input)});
       }
       const treasuryBank=/^\/internal\/commerce\/finance\/treasury\/(try_[a-f0-9]{40})\/(inquiry|payment)\/(read|receipt)$/.exec(url.pathname);
       if(treasuryBank){

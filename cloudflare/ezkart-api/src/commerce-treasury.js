@@ -1,3 +1,5 @@
+import {treasuryOutcomeSummary} from './commerce-treasury-outcomes.js';
+import {treasuryStatusSummaries} from './commerce-treasury-status.js';
 import {commerceHash,commerceStorageEnabled} from './commerce-orders.js';
 import {currentCommerceEnvironment as mode} from './commerce-access.js';
 import {supportActor,supportAccess} from './commerce-support.js';
@@ -38,7 +40,7 @@ async function funds(env,enrollment){
     held_captures AS heldCaptures,unattributed_captures AS unattributedCaptures,refund_holds AS refundHolds,incomplete_journals AS incompleteJournals,source_capacity_exceeded AS sourceCapacityExceeded,length(source_json) AS sourceBytes
     FROM commerce_treasury_funds WHERE platform_enrollment_id=? AND commerce_environment=?`).bind(enrollment,mode(env)).first();
 }
-const constraints=['transfer_fee_funding_unverified','commission_release_policy_unset','treasury_reconciliation_not_integrated'];
+const constraints=['transfer_fee_funding_unverified','commission_release_policy_unset','treasury_cash_accounting_policy_unverified'];
 export async function treasurySummary(env,user){
   await authorize(env,user);const wallet=await platform(env),bank=destination(env),projection=await funds(env,wallet?.id);
   const recent=await env.DB.prepare(`SELECT i.id,CAST(i.amount AS TEXT) AS amount,i.created_at AS createdAt,c.created_at AS cancelledAt,EXISTS(SELECT 1 FROM commerce_treasury_bank_grants g WHERE g.intent_id=i.id AND g.stage='payment') AS transferStarted FROM commerce_treasury_intents i LEFT JOIN commerce_treasury_cancellations c ON c.intent_id=i.id WHERE i.commerce_environment=? ORDER BY i.sequence DESC LIMIT 30`).bind(mode(env)).all();
@@ -61,7 +63,8 @@ async function detail(env,row){
   if(payment)result.state=payment.receivedAt?'transfer_response_recorded_pending_reconciliation':'transfer_outcome_unknown';
   else if(!row.cancelled_at&&inquiry)result.state=inquiry.receivedAt?'bank_inquiry_recorded':'bank_inquiry_outcome_unknown';
   const eligible=await env.DB.prepare('SELECT intent_id FROM commerce_treasury_execution_eligibility WHERE intent_id=?').bind(row.id).first();
-  return {paymentConfirmationId:payment?.confirmationId||null,intent:result,bank:bank.results,confirmations:confirmations.results,originalSources:JSON.parse(row.source_json),funds:await funds(env,row.platform_enrollment_id),
+  const outcome=await treasuryOutcomeSummary(env,row.id),providerStatus=(await treasuryStatusSummaries(env,[row.id])).get(row.id)||null;
+  return {outcome,providerStatus,paymentConfirmationId:payment?.confirmationId||null,intent:result,bank:bank.results,confirmations:confirmations.results,originalSources:JSON.parse(row.source_json),funds:await funds(env,row.platform_enrollment_id),
     configurationChanged:!current||await commerceHash(current)!==row.destination_hash||wallet?.id!==row.platform_enrollment_id,
     executionAvailable:!!eligible&&env.COMMERCE_TREASURY_PAYMENT==='enabled',blockers:constraints,providerCalls:0};
 }

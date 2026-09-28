@@ -96,7 +96,7 @@ final class EzPayoutSyncReader implements EzDokuFinancialReader
     public int $providerCalls = 0;
     private ?EzDokuSubAccountReader $live = null;
     public function __construct(private readonly EzPayoutSyncFiles $files, private readonly array $original, private readonly bool $collect,
-        private readonly int $maxReads = 20, private readonly ?Closure $heartbeat = null, private readonly bool $retainFailures = false) {}
+        private readonly int $maxReads = 20, private readonly ?Closure $heartbeat = null, private readonly bool $retainFailures = false, ?EzDokuSubAccountReader $reader = null) { $this->live = $reader; }
     private function read(string $operation, array $request, Closure $call): array
     {
         if ($this->heartbeat !== null) ($this->heartbeat)();
