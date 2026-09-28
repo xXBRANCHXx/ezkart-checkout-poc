@@ -41,3 +41,7 @@ This supports the current whole-order pickup workflow. Drop-off, split packages,
 - Beta Worker dry build and PHP/JavaScript syntax checks passed. Browser screenshots are in `/tmp/ezkart-beta-shipping-01a0e5b6/`.
 
 All provider responses in these tests are isolated fixtures. No real quote, shipment, cancellation, provider configuration change, or money action was performed. No database migration is needed for this slice.
+
+## Account observation — 28 September 2026
+
+A signed-in, read-only dashboard check at approximately 05:15 UTC showed the Ezkart Workbench Beta key with Rates, Order and Tracking API marked active. The available balance was IDR 0 / 0 Pts. No billing-credit agreement was established in that view. Funding or confirmed credit is therefore a concrete shipping activation requirement; the key status alone is insufficient. No top-up, quote, order or configuration change was performed.

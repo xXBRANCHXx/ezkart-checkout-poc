@@ -42,7 +42,9 @@ Use merchant-facing controls for appearance settings: numeric values with separa
 - For continuation after the 28 September handoff, start with
   `docs/beta-wave2-2026-09-28.md`, then the older
   `docs/beta-finish-2026-09-28.md` and its private continuation-record link.
-  It distinguishes implemented work from remaining code and live acceptance,
+  Use `docs/beta-one-time-entry.md` for the concrete minimal paid-beta activation
+  sequence and account requirements. The batch report distinguishes implemented
+  work from remaining code and live acceptance,
   and preserves the owner's FlexiBill-pending decision and current email state.
 
 ## Owner learning materials
@@ -68,8 +70,11 @@ and direct API versus hosted checkout. Call the platform fee commission.
   clarified that the government declaration promised to STORE age, not to verify
   identity. Do not infer mandatory KTP/selfie/KYC from that data-category
   declaration. Store and label seller-declared DOB/age accurately; do not call
-  it verified identity or call 18 a statutory PSE threshold. Separate legal and
-  provider verification obligations need their own evidence. See
+  it verified identity or call 18 a statutory PSE threshold. The owner briefly
+  considered collecting NIK/passport numbers, then reversed that request: keep
+  DOB input only. No ID-number/photo requirement is authorized by that reversal.
+  Separate legal and provider verification obligations need their own evidence;
+  DOB-only collection is not a blanket legal-compliance conclusion. See
   `docs/seller-age-declaration.md` for the checked distinction and limits.
 - Ezkart's commission must reach its company bank. Distinguish commission
   allocation, credit to the platform's DOKU balance, and confirmed bank payout.
