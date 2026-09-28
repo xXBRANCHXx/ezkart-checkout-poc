@@ -123,3 +123,8 @@ existing provider API and a conservative 23-hour retry window; the optional
 webhook mode requires a receiver implementing its acknowledgement contract.
 The input collectors, recipient, credentials, independent watchdog and schedule still require an
 accepted installation; none is configured or enabled by this implementation.
+
+[Atomic collectors and a separate local watchdog](operations-monitoring.md) now
+provide bounded report publication plus direct monitor/backup/alert heartbeat
+inspection. Their templates are uninstalled, require the host's existing private
+credentials/state, and do not send notifications or start financial work.

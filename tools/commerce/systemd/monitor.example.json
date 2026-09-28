@@ -1,0 +1,9 @@
+{
+  "deployment": "beta",
+  "reportsDirectory": "/absolute/private/reports",
+  "backupConfig": "/absolute/private/backup-runner.json",
+  "alertStateDirectory": "/absolute/private/alert-state",
+  "commerceTimeoutSeconds": 120,
+  "backupTimeoutSeconds": 15,
+  "staleSeconds": 900
+}

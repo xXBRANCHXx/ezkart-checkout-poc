@@ -182,3 +182,8 @@ responses, dropped connections, certificate verification and total timeout. The 
 cases also cover its actual UUID response, frozen retry body, missing recipient,
 recipient/account changes and refusal to retry outside the safe idempotency window.
 No real destination is configured or contacted by these tests.
+
+The [atomic collectors and independent local watchdog](operations-monitoring.md)
+now provide the report-publishing and local liveness checks described above.
+Their separate service/timer templates remain uninstalled; remote host monitoring
+and an accepted escalation recipient still require configuration.

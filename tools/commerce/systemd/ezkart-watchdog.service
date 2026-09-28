@@ -1,0 +1,15 @@
+[Unit]
+Description=Independently inspect Ezkart monitor backup and alert heartbeats
+# No Requires/After dependency on any monitored service. No credentials or sends.
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/ezkart-operations
+ExecStart=/usr/bin/python3 -B %h/ezkart-operations/tools/commerce/operations-monitor.py watchdog --config=%h/.config/ezkart-monitor/monitor.json
+# Exit 2 deliberately marks this service failed for independent local monitoring.
+TimeoutStartSec=30s
+TimeoutStopSec=5s
+KillMode=control-group
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
