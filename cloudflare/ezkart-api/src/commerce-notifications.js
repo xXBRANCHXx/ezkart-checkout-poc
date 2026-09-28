@@ -1,3 +1,4 @@
+import {sellerAlertCount} from './seller-alerts.js';
 import {commerceHash} from './commerce-orders.js';
 import {currentCommerceEnvironment as mode} from './commerce-access.js';
 import {reviewCursor,readReviewCursor} from './commerce-reviews.js';
@@ -27,7 +28,7 @@ export async function notificationStats(env,actor,url){
     COALESCE(SUM(r.in_app),0) AS total,COALESCE(SUM(CASE WHEN r.email_requested=1 AND mb.request_id IS NULL AND ms.job_id IS NULL AND (mj.state IS NULL OR mj.state!='dead') THEN 1 ELSE 0 END),0) AS email_waiting,
     COALESCE(SUM(CASE WHEN r.email_requested=1 AND ((ms.uncertain=1 AND NOT EXISTS(SELECT 1 FROM commerce_email_resolutions mr WHERE mr.request_id=mx.id)) OR mj.state='dead' OR EXISTS(SELECT 1 FROM commerce_email_delivery_evidence me WHERE me.request_id=mx.id AND me.kind IN ('bounced','complained','failed','suppressed'))) THEN 1 ELSE 0 END),0) AS email_attention
     FROM ${tables} ${emailStatusJoins} WHERE ${visibleWhere(actor)}`).bind(...bindings(env,actor)).first();
-  await access(env,actor);return {...row,enabled:notificationsEnabled(env),emailEnabled:emailConfiguration(env).ready};
+  await access(env,actor);const alerts=await sellerAlertCount(env,actor);return {...row,unread:Number(row.unread)+alerts,total:Number(row.total)+alerts,alerts,enabled:notificationsEnabled(env),emailEnabled:emailConfiguration(env).ready};
 }
 export async function notificationInbox(env,actor,url,channel='inbox'){
   await access(env,actor);query(url,channel==='email'?['category','q','cursor']:['category','state','q','cursor']);

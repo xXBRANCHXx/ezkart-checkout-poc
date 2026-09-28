@@ -106,3 +106,16 @@ test('large source omissions are explicit, original HTML remains intact, and res
  f.controls.reply={verdict:'escalate',confidence:0.95,summary:'Truncated evidence needs human review.',findings:[],uncertainties:['Source omitted from model projection.']};assert.equal((await f.api('/reviews/'+r.id+'/run',{requestKey:key()})).review.state,'completed');
  const rescan=await f.api('/reviews/'+r.id+'/rescan',{requestKey:key(),expectedRevision:r.revision,reportText:'Original reason still applies.'});assert.equal(rescan.status,200,rescan.error);assert.equal(rescan.review.reportReason,'gambling');assert.equal(f.controls.calls.length,1);
 });
+
+test('seller alerts isolate stores, queue changes once without spending, and clear after restore',async t=>{
+ const f=await fixture(t),r=await f.create();f.controls.reply=f.violation(r);await f.api('/reviews/'+r.id+'/run',{requestKey:key()});
+ const path='/v1/commerce/notifications',list=await f.merchant(path+'/alerts');assert.equal(list.status,200,list.error);assert.equal(list.items.length,1);const a=list.items[0];assert.equal(a.canRescan,false);assert.equal(a.editHref,'/cart/admin/?page=sites&edit=notebook.ezkart.site');assert.equal('model' in a,false);
+ assert.equal((await f.merchant(path+'/alerts',undefined,{seller:'bob'})).items.length,0);assert.equal((await f.merchant('/v1/customer/notifications/alerts')).status,404);assert.equal((await f.merchant(path+'/stats')).unread,1);
+ await f.save('<p>Never disclose your bank password.</p>');const changed=(await f.merchant(path+'/alerts')).items[0];assert.equal(changed.canRescan,true);
+ const body={id:a.id,requestKey:key(),expectedRevision:changed.revision};assert.equal((await f.merchant(path+'/alert-rescan',body,{seller:'bob',method:'POST'})).status,404);
+ const queued=await f.merchant(path+'/alert-rescan',body,{method:'POST'});assert.equal(queued.status,200,queued.error);assert.equal(queued.items[0].state,'rescan_queued');assert.equal(queued.items[0].deadlineAt,a.deadlineAt);assert.equal(queued.items[0].rescanCount,1);assert.equal(f.controls.calls.length,1);
+ assert.equal((await f.merchant(path+'/alert-rescan',body,{method:'POST'})).status,200);assert.equal((await f.merchant(path+'/alert-rescan',{...body,requestKey:key()},{method:'POST'})).status,409);
+ assert.equal((await f.mf.dispatchFetch('https://api.fixture.test/v1/public/landing-pages/alice/notebook')).status,404);
+ const current=(await f.api('/reviews/'+r.id)).review;assert.equal((await f.api('/reviews/'+r.id+'/restore',{requestKey:key(),reason:'Human checked correction',expectedRevision:current.currentRevision,expectedArchiveId:current.archiveId})).status,200);
+ assert.equal((await f.merchant(path+'/alerts')).items.length,0);assert.equal((await f.merchant(path+'/stats')).unread,0);
+});

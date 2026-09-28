@@ -4,9 +4,9 @@ function ez_notification_target(string $target, string $method, bool $merchant):
 {
     if (strlen($target) > 2600 || str_contains($target, '#')) throw new InvalidArgumentException('Notification reference is invalid.');
     $parts = explode('?', $target, 2); $route = $parts[0];
-    if (!in_array($route, ['', '/stats', '/read', '/processing', '/email', '/preferences', '/preferences/history'], true) || ($route === '/processing' && !$merchant)
+    if (!in_array($route, ['', '/stats', '/read', '/processing', '/email', '/preferences', '/preferences/history', '/alerts', '/alert-rescan'], true) || (in_array($route, ['/processing','/alerts','/alert-rescan'], true) && !$merchant)
         || ($merchant && str_starts_with($route, '/preferences'))
-        || ($method === 'POST' && (!in_array($route, ['/read','/preferences'], true) || isset($parts[1]))) || ($method === 'GET' && $route === '/read')
+        || ($method === 'POST' && (!in_array($route, ['/read','/preferences','/alert-rescan'], true) || isset($parts[1]))) || ($method === 'GET' && in_array($route, ['/read','/alert-rescan'], true))
         || !in_array($method, ['GET','POST'], true)) throw new InvalidArgumentException('Notification method is invalid.');
     $allowed = $route === '' ? ['category','state','q','cursor'] : ($route === '/processing' ? ['state','cursor'] : ($route === '/email' ? ['category','q','cursor'] : ($route === '/preferences/history' ? ['cursor'] : [])));
     $query = [];

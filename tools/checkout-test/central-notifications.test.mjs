@@ -103,7 +103,7 @@ test('refund alerts open the exact saved request for buyer and store on desktop 
     assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await p.screenshot({path:directory+'/'+(merchant?'merchant':'buyer')+'-'+width+'.png',fullPage:true});
     await root(p).getByRole('link',{name:'View refund request',exact:true}).first().click();
     const detail=p.locator('[data-refund-detail]');await detail.getByText('The exact refund request from the notification.',{exact:true}).waitFor();
-    await detail.getByText('This refund request is approved. The refund has not been paid. Refund processing is not available yet.',{exact:true}).waitFor();assert.equal(new URL(p.url()).searchParams.get('refund'),r.id);assert.deepEqual(errors,[]);await p.context().close();
+    await detail.getByText('This refund request is approved. Refund payment has not been confirmed.',{exact:true}).waitFor();assert.equal(new URL(p.url()).searchParams.get('refund'),r.id);assert.deepEqual(errors,[]);await p.context().close();
   }
   const guest=await pageFor(b,f,390,null),link='/cart/return.php?order='+f.order.id+'&refund='+r.id;
   await guest.goto(f.app.base+link);assert.equal(await guest.locator('input[name=next]').first().inputValue(),link);

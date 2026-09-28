@@ -11,7 +11,7 @@ async function fixture(t,commerce={}){
  assert.equal((await permission('reviewer')).status,200);
  const admin=async(id='bob',age=0)=>f.app.adminCookie({supabase_access_token:await f.merchantToken(id,id+'@example.test',claims(age)),mfa_enabled:true,mfa_aal:'aal2',admin_user:{id,email:id+'@example.test'}});
  const page=async(width=1360,cookie=null)=>pageFor(b,f,width,cookie||await admin());
- return {...f,b,permission,admin,page,url:f.app.base+'/cart/admin/?page=jev'};
+ return {...f,b,permission,admin,page,url:f.app.base+'/cart/admin/review-tools.php?page=jev'};
 }
 const mode={remainingBudgetMicrousd:4940000,remainingCalls:494,perCallReservationMicrousd:10000,benchmarkCalls:6,reviewerCalls:0,modelEnabled:true,policyApproved:true,archiveEnabled:true,model:'fixture-model',policyVersion:'fixture-policy',policyRules:[{code:'credential_request',label:'Credential requests',basis:'Fixture-only policy'}]};
 const sample=()=>({id:'jrv_fixture',caseId:'jcase_fixture',store:'alice',pageId:'page-one',revision:'revision-one',createdAt:new Date().toISOString(),state:'queued',deadlineAt:new Date(Date.now()+5*86400000).toISOString(),rescanCount:0,due:false,archiveState:'active',archiveId:null,archiveReason:null,policyVersion:'fixture-policy',outcome:null,failureCode:null,reportText:'A report is an allegation.',sources:[{id:'text_1',text:'Send your bank password <img src=x onerror=alert(1)>.'}],coverage:{textOnly:true,unreviewedMedia:false,truncated:false},model:'fixture-model',grades:[],currentRevision:'revision-one',stale:false});
