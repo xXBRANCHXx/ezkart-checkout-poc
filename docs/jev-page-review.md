@@ -125,3 +125,10 @@ and are never supplied to the model.
 
 See [the ten-case confidence diagnostic](jev-confidence-results-2026-09-28.md)
 for the owner-requested 80% cutoff and fresh model observations.
+
+The later [120-case evaluation](jev-expanded-evaluation-results-2026-09-28.md)
+found nine unsupported archive-eligible decisions surviving the 80% and evidence
+checks. Missing permit status, missing jurisdiction and ambiguous threats remain
+observed weaknesses. The confidence score is not a calibrated probability of
+correctness. This evaluation preserved model/policy settings and made no real
+page actions; its recommended enforcement changes are not yet implemented.

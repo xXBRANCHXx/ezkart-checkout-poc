@@ -178,3 +178,12 @@ review notes are distinct from the owner’s saved grades.
 Run the offline fixture consistency check with
 `node tools/jev-evaluation/check-fixtures.mjs`. It checks this small bundle only;
 it never contacts OpenRouter or changes a page.
+
+## Expanded confidence evaluation
+
+The owner's later request authorized 120 fresh synthetic cases and a charted PDF.
+See [the expanded results](jev-expanded-evaluation-results-2026-09-28.md).
+Reference answers were frozen before calls; this is an unchanged-prompt baseline,
+not a rerun selected to improve the initial diagnostic. Nine unsupported archive
+outcomes survived the guards. This supersedes any inference that the small
+six-/ten-case diagnostics established sufficiently reliable automatic enforcement.
