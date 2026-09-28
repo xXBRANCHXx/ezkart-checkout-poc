@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "benchmarkVersion": 1,
+  "score": null,
+  "agreement": null,
+  "comment": "",
+  "apiContract": {
+    "score": "integer1..5",
+    "agreement": [
+      "agree",
+      "disagree",
+      "uncertain"
+    ],
+    "comment": "at most1200 characters"
+  },
+  "notesGuide": {
+    "verdict": "0 wrong/missing;1 partial;2 correct",
+    "evidence": "0 wrong/missing;1 partial;2 correct",
+    "restraint": "0 wrong/missing;1 partial;2 correct",
+    "usefulness": "0 wrong/missing;1 partial;2 correct"
+  },
+  "instruction": "Keep the four dimension observations, preferred verdict, false-positive/restore outcome and critical failures in comment; send only score/agreement/comment to the grade API. Owner fills score after actual result review; this is not a recorded grade."
+}

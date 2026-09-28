@@ -1,0 +1,63 @@
+{
+  "version": "jev-beta-policy-v1",
+  "status": "owner_approved_starter_policy",
+  "rules": [
+    {
+      "code": "credential_request",
+      "text": "A page must not ask shoppers to disclose bank passwords, card security codes or one-time payment/authentication codes to the seller. Safety education warning against disclosure is allowed.",
+      "basis": "owner_policy",
+      "source": {
+        "title": "Owner instruction, 28 September 2026",
+        "article": null,
+        "url": null
+      }
+    },
+    {
+      "code": "explicit_threat",
+      "text": "A page must not directly threaten to harm shoppers or expose their private information. A report alleging a threat is insufficient without supporting page evidence.",
+      "basis": "owner_policy",
+      "source": {
+        "title": "Owner instruction, 28 September 2026",
+        "article": null,
+        "url": null
+      }
+    },
+    {
+      "code": "id_unlicensed_gambling_offer",
+      "basis": "indonesia_statute",
+      "text": "A current page directly offering or operating public real-money wagering in Indonesia, with text explicitly establishing lack of permission. Do not infer missing permission from silence. News, education, prevention and reporting are not an offer. Ambiguous permission, context or jurisdiction requires human review.",
+      "source": {
+        "title": "UU 1/2023 KUHP",
+        "article": "426(1)(a)-(b); effective-date Article 624",
+        "url": "https://peraturan.go.id/files/uu1-2023.pdf",
+        "pdfPage": 146,
+        "effectiveDate": "2026-01-02",
+        "currentCheck": "UU 1/2026 amending section checked; Article 426 not replaced. Use current KUHP, not former Article 303."
+      }
+    },
+    {
+      "code": "id_unlawful_narcotics_sale",
+      "basis": "indonesia_statute",
+      "text": "A current page directly offering or selling identified Narkotika Golongan I in Indonesia, with text explicitly establishing that the offer is without right or unlawful. Do not infer drug classification from slang or lack of permission from silence. Generic medicine, uncertain classification/authorization, news, education, prevention or reporting requires human review rather than this finding.",
+      "source": {
+        "title": "UU 35/2009 on Narcotics, as adjusted in 2026",
+        "article": "114(1); UU 1/2026 Article II(10)-(11), Annex II and Article IX",
+        "url": "https://peraturan.go.id/files/uu35-2009.pdf",
+        "amendingUrl": "https://peraturan.go.id/files/uu-no-1-tahun-2026.pdf",
+        "amendingPdfPage": 230,
+        "effectiveDateOfAdjustment": "2026-01-02",
+        "currentCheck": "Article 114 retained and penalties adjusted in Annex II. Updated KUHP Article 622 repeal list covers 112/113/117/118/122/123, not 114."
+      }
+    }
+  ],
+  "archiveEligibleCodes": [
+    "credential_request",
+    "explicit_threat",
+    "id_unlicensed_gambling_offer",
+    "id_unlawful_narcotics_sale"
+  ],
+  "note": "Owner-approved starter rules for reversible temporary archive; not exhaustive unlawful-content coverage or a legal-compliance certification. This copy is used by synthetic fixtures; backend policy installation is separate. Other unresolved unlawful-content concerns escalate for human review.",
+  "jurisdiction": "Indonesia",
+  "approvedAt": "2026-09-28",
+  "checkedAt": "2026-09-28"
+}

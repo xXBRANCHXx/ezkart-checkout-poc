@@ -1,0 +1,77 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "verdict",
+    "summary",
+    "findings",
+    "uncertainties"
+  ],
+  "properties": {
+    "verdict": {
+      "type": "string",
+      "enum": [
+        "clear",
+        "needs_change",
+        "escalate"
+      ]
+    },
+    "summary": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Brief advisory conclusion about supplied text only; no claim an action occurred."
+    },
+    "findings": {
+      "type": "array",
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "sourceId",
+          "quote",
+          "explanation"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "credential_request",
+              "explicit_threat",
+              "id_unlicensed_gambling_offer",
+              "id_unlawful_narcotics_sale",
+              "insufficient_evidence",
+              "unreviewed_media"
+            ],
+            "description": "Closed trusted policy/rule ID. The application supplies source/article attribution from its pinned registry; never invent a legal code."
+          },
+          "sourceId": {
+            "type": "string",
+            "maxLength": 80,
+            "description": "Exact supplied page source id; a report is never page evidence."
+          },
+          "quote": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Nonempty exact substring of the cited page text, preserving original language."
+          },
+          "explanation": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Connect the quotation to the supplied policy rule, or explain the evidence limitation."
+          }
+        }
+      }
+    },
+    "uncertainties": {
+      "type": "array",
+      "maxItems": 6,
+      "items": {
+        "type": "string",
+        "maxLength": 300,
+        "description": "Specific missing information or coverage limit."
+      }
+    }
+  }
+}
