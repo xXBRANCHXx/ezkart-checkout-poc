@@ -1,5 +1,10 @@
 # Beta timed finish — 28 September 2026
 
+**Later update:** [Focused parallel batch](beta-parallel-batch-2026-09-28.md)
+records subsequent implementation, schema 0067 and owner clarifications:
+direct DOKU API and real transaction acceptance during beta. The report below
+is the earlier snapshot, not the latest code status.
+
 **Paid soft-launch is not ready.** The timed pass delivered the changes below
 on `agent/ezkart-workbench` and the isolated beta at `test.ezkart.id`. It did not
 complete all seven areas. Main, `ezkart.id`, TEST data/Worker and draft PR #3

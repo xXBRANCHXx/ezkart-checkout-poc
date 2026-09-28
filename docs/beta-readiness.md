@@ -1,5 +1,8 @@
 # Workbench beta preparation
 
+Latest continuation: [28 September focused batch](beta-parallel-batch-2026-09-28.md)
+records schema 0067, subsequent implementation and the owner's beta/API decisions.
+
 Owner instruction, 27 September 2026: DOKU has approved Ezkart; prepare everything
 for beta/soft-launch and keep all work on `agent/ezkart-workbench` / `test.ezkart.id`.
 Do not push main, merge PR #3 or deploy `ezkart.id`. The separate month of financial

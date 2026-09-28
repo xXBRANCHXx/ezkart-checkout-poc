@@ -44,6 +44,13 @@ Use merchant-facing controls for appearance settings: numeric values with separa
   It distinguishes implemented work from remaining code and live acceptance,
   and preserves the owner's FlexiBill-pending decision and current email state.
 
+## Owner learning materials
+
+For future animated explainers, the owner means visual teaching through concrete
+events and cause/effect: a shopper, order, money moving, holds, failures and
+recovery. Moving text cards or diagram boxes do not satisfy that intent. Narration
+should explain the events shown. Prioritize the video over mobile player polish.
+
 ## Sidebar announcements
 
 The sidebar promo card's orange-to-pink gradient is intentional. Preserve it
