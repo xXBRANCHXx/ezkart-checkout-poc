@@ -1862,7 +1862,6 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
       <a class="sidebar-brand" href="../../"><img src="../../assets/ezkart-logo.svg" alt="Ezkart"></a>
       <nav class="primary-nav" aria-label="Main navigation">
         <a class="<?= $page === 'dashboard' ? 'active' : '' ?>" href="?page=dashboard"><?= ez_admin_icon('grid') ?><span>Dashboard</span></a>
-        <?php if (!empty($supportAccess['authorized'])): ?><a class="<?= $page === 'support-refunds' ? 'active' : '' ?>" href="?page=support-refunds"><?= ez_admin_icon('refund') ?><span>Ezkart reviews</span></a><a class="<?= $page === 'treasury' ? 'active' : '' ?>" href="?page=treasury"><?= ez_admin_icon('wallet') ?><span>Ezkart treasury</span></a><?php endif; ?>
         <a class="<?= in_array($page, ['orders','returns','refunds','fulfillment'], true) ? 'active' : '' ?>" href="?page=orders"><?= ez_admin_icon('cart') ?><span>Orders</span><b data-order-total><?= $centralReadWorkspace ? '—' : $allOrderCount ?></b></a>
         <a class="<?= in_array($page, ['products', 'product-new', 'inventory', 'shop'], true) ? 'active' : '' ?>" href="?page=products"><?= ez_admin_icon('box') ?><span>Products</span></a>
         <a class="<?= $page === 'sites' ? 'active' : '' ?>" href="?page=sites"><?= ez_admin_icon('layout') ?><span>Landing Pages</span><b data-site-count>0</b></a>
