@@ -51,6 +51,11 @@ no separate request reference. BCA Close Amount SNAP remained `UPDATING`.
 Cards and Collect & Route remain unavailable in the ordinary service selector.
 No checkout session, payment, wallet retry or support email was sent by this step.
 
+The checkout displays only configured payment choices: native BCA Virtual Account
+or the QRIS/card payment window. The chosen method is frozen in the original
+checkout intent and retained through lost-response recovery. DOKU’s window never
+replaces the native BCA choice.
+
 The payment window uses DOKU’s documented SDK and strict permitted URL origins.
 Closing/reopening or reloading uses the original saved session. Browser messages
 and return URLs cannot confirm payment; only the server status does. SDK loading

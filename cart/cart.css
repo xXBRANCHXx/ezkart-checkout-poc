@@ -1075,3 +1075,12 @@ textarea.invalid {
   }
 }
 .checkout-account-note { color: var(--muted); font-size: 11px; line-height: 1.7; margin: 16px 0 0; }
+
+.payment-choices { display: grid; gap: 10px; margin-top: 20px; }
+.checkout-payment-choice { display: flex; gap: 12px; align-items: center; padding: 16px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; }
+.checkout-payment-choice:has(input:checked) { background: var(--checkout-accent-soft); border-color: var(--checkout-accent); }
+.checkout-payment-choice:has(input:focus-visible) { outline: 2px solid var(--checkout-accent); outline-offset: 3px; }
+.checkout-payment-choice input { flex: none; width: 18px; height: 18px; margin: 0; accent-color: var(--checkout-accent); }
+.checkout-payment-choice b, .checkout-payment-choice small { display: block; line-height: 1.6; }
+.checkout-payment-choice b { font-size: 12px; }
+.checkout-payment-choice small { margin-top: 3px; color: #636c7b; font-size: 11px; }

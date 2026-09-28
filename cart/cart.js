@@ -17,6 +17,9 @@
     durableCheckout: false,
     pendingCheckout: null,
     paymentBusy: false,
+    paymentChoices: [],
+    paymentChoice: "",
+    hostedPaymentMethods: [],
     recoveryError: "",
   };
 
@@ -281,6 +284,17 @@
       }
       state.environmentShippingRequired = config.shipping_required;
       state.durableCheckout = config.durable_checkout === true;
+      if (config.payment_choices !== undefined && (!Array.isArray(config.payment_choices)
+          || config.payment_choices.length > 2 || config.payment_choices.some(value => !["bca_va", "doku_checkout"].includes(value))
+          || new Set(config.payment_choices).size !== config.payment_choices.length)) throw new Error("Payment options could not load. Please try again.");
+      const choices = state.durableCheckout ? config.payment_choices || [] : [];
+      const hostedMethods = config.hosted_payment_methods || [];
+      if (choices.includes("doku_checkout") && (!Array.isArray(hostedMethods) || !hostedMethods.length
+          || hostedMethods.some(value => !["QRIS", "CREDIT_CARD"].includes(value)))) throw new Error("Payment options could not load. Please try again.");
+      state.paymentChoices = choices;
+      state.hostedPaymentMethods = hostedMethods;
+      if (!choices.includes(state.paymentChoice)) state.paymentChoice = choices.includes("bca_va") ? "bca_va" : choices[0] || "";
+      renderPaymentChoices();
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.error || "The selected products are unavailable.");
 
@@ -346,6 +360,21 @@
     return product.product_name || product.name;
   }
   const fileSize = size => size < 1048576 ? Math.ceil(size / 1024) + ' KB' : new Intl.NumberFormat('en', {maximumFractionDigits:1}).format(size / 1048576) + ' MB';
+
+  function renderPaymentChoices() {
+    const section = byId("payment-choice-section"), list = byId("payment-choices");
+    section.hidden = !state.paymentChoices.length;
+    list.replaceChildren(...state.paymentChoices.map(choice => {
+      const label = document.createElement("label"); label.className = "checkout-payment-choice";
+      const radio = document.createElement("input"); radio.type = "radio"; radio.name = "paymentChoice";
+      radio.value = choice; radio.checked = choice === state.paymentChoice;
+      radio.addEventListener("change", () => { if (!state.pendingCheckout) state.paymentChoice = choice; });
+      const details = document.createElement("span"), title = document.createElement("b"), description = document.createElement("small");
+      title.textContent = choice === "bca_va" ? "BCA Virtual Account" : state.hostedPaymentMethods.map(method => method === "QRIS" ? "QRIS" : "Debit or credit card").join(" / ");
+      description.textContent = choice === "bca_va" ? "Pay from myBCA, BCA mobile, KlikBCA or an ATM." : "Opens DOKU’s secure payment window. Your order stays here.";
+      details.append(title, description); label.append(radio, details); return label;
+    }));
+  }
 
   function renderTotals() {
     byId("cart-subtotal").textContent = money(subtotal());
@@ -469,6 +498,7 @@
   function validateForm(form) {
     let valid = true;
     const values = Object.fromEntries(new FormData(form).entries());
+    delete values.paymentChoice;
     form.querySelectorAll("[required]").forEach((field) => {
       if (field.disabled) { field.classList.remove('invalid'); field.parentElement.querySelector('.field-error').textContent = ''; return; }
       const value = field.value.trim();
@@ -581,6 +611,10 @@
       if (state.durableCheckout) {
         const campaignVisit = window.EzkartStorefront.campaignVisit(hostedStore);
         if (campaignVisit) body.campaign_visit = campaignVisit;
+        if (state.paymentChoices.length) {
+          if (!state.paymentChoices.includes(state.paymentChoice)) throw new Error("Choose an available payment method.");
+          body.payment_choice = state.paymentChoice;
+        }
         body.checkout_key = [...crypto.getRandomValues(new Uint8Array(16))].map(value => value.toString(16).padStart(2, "0")).join("");
         body.expected_prices = Object.fromEntries(cartEntries().map(([id]) => [id, Number(state.products[id].price)]));
         const files = cartEntries().filter(([id]) => state.products[id].type === 'digital');
