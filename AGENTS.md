@@ -92,11 +92,18 @@ and direct API versus hosted checkout. Call the platform fee commission.
   DOKU knowing a bank account does not prove the Sub-Account payout connection.
   Shipping, admin charges, refund obligations and fees are distinct from commission.
 - Calculate 18+ eligibility from DOB using ordinary code. The owner moved
-  Jev/OpenRouter toward reports and page flags, not identity proof. A dedicated
-  limited OpenRouter key is held privately and is not installed in Ezkart.
-  See `docs/jev-page-review.md` for the requested three-re-scan/five-day page
-  lifecycle and the outstanding enforcement clarification. No automatic page
-  termination or external model calls are enabled by creating that key.
+  Jev/OpenRouter toward reports and page flags, not identity proof. The owner
+  subsequently approved recommendations and reversible temporary archive for
+  evidenced violations of the approved starter rules, with human grading and
+  restore. Automatic deletion remains off. The three-rescan/five-day limit
+  escalates to human review; it does not erase a page. Reports are allegations,
+  and ambiguous or unseen content must not be treated as substantiated.
+  The initial six synthetic model calls have a separate $0.10 benchmark cap.
+  Owner-triggered reviews with fresh MFA are authorized within the existing $5
+  total key cap and per-call limits; reports never trigger spending automatically.
+  Saved grades are evaluation records, not automatic model training. See `docs/jev-page-review.md` and
+  `docs/jev-evaluation.md`; public visitor report intake and comprehensive
+  unlawful-content coverage are not claimed.
 
 ## Sidebar announcements
 

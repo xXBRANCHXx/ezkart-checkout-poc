@@ -12,7 +12,7 @@ if (!isset($authenticated) || !$authenticated) { http_response_code(404); exit; 
 <?php endif; ?>
 <?php if (!empty($supportAccess['canRead'])): ?>
 <div class="jev-workspace" data-jev data-account="<?= ez_admin_escape($adminUser['id'] ?? '') ?>" data-csrf="<?= ez_admin_escape($csrfToken) ?>" data-can-write="<?= !empty($supportAccess['canWrite']) ? 'true' : 'false' ?>">
-<section class="jev-card jev-notice"><p>Jev’s recommendations need human judgment. A permitted temporary archive hides the page from visitors while the seller can edit and existing orders remain available. No automatic deletion.</p><p data-jev-mode>Loading review configuration…</p></section>
+<section class="jev-card jev-notice"><p>Jev’s recommendations need human judgment. A permitted temporary archive hides the page from visitors while the seller can edit and existing orders remain available. No automatic deletion.</p><p data-jev-mode>Loading review configuration…</p><p data-jev-budget></p></section>
 <p role="status" aria-live="polite" data-jev-message></p>
 <div class="jev-recovery" data-jev-recovery hidden><p>An action has not been confirmed. Recover the original action before starting another.</p><button type="button" class="action-button" data-jev-retry>Retry confirmation</button></div>
 <div class="jev-layout">
