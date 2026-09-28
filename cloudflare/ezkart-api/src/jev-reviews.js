@@ -78,7 +78,7 @@ export async function restoreJevPage(env,actor,rid,input){await supportAccess(en
 export async function importJevEvaluation(env,input){
  if(!['test','beta'].includes(env.APP_ENVIRONMENT))fail('Synthetic evaluation import is restricted to workbench.',403);
  fields(input,['requestKey','records']);key(input.requestKey);if(!Array.isArray(input.records)||input.records.length!==6)fail('Import exactly six synthetic cases.');
- const seller=await env.DB.prepare("SELECT id,slug FROM sellers WHERE id=? AND status='active'").bind(env.COMMERCE_PLATFORM_WALLET_SELLER||'').first();if(!seller)fail('Configured Ezkart store is required for the private evaluation.',503);
+ const seller=await env.DB.prepare("SELECT id,slug FROM sellers WHERE id=? AND status='active'").bind(env.JEV_EVALUATION_SELLER_ID||'').first();if(!seller)fail('Configured private evaluation store is required.',503);
  const statements=[],ids=[];let index=0;
  for(const record of input.records){fields(record,['caseId','title','input','result','expectedVerdict']);if(!txt(record.caseId,70)||!/^[a-z0-9-]+$/.test(record.caseId)||!txt(record.title,120))fail('Synthetic case identity is invalid.');
   const snap=record.input;if(!snap||!Array.isArray(snap.sources)||snap.sources.length<1||snap.sources.length>6||snap.sources.some(s=>!txt(s.id,32)||!txt(s.text,3000))||!txt(snap.report?.text,1200)||!snap.coverage||snap.coverage.textOnly!==true)fail('Synthetic source is invalid.');

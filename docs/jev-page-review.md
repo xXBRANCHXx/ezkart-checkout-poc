@@ -106,7 +106,11 @@ failure, at the Jev admin page. The UI calls clear “No violation flagged”.
 
 `tools/jev-evaluation/run-benchmark.mjs` uses the same adapter and an exclusive
 private run file to prevent accidental repeated sends. The signed workbench-only
-`/internal/commerce/jev/evaluation` import seeds exactly six synthetic records for
+`/internal/commerce/jev/evaluation` import uses the explicit private
+`JEV_EVALUATION_SELLER_ID` to anchor its records to an existing Ezkart store.
+This setting is independent of financial wallet configuration; it neither
+creates a wallet nor changes an account. Normal reviewer runs do not require
+this import-only setting or DOKU readiness. The import seeds exactly six synthetic records for
 grading, creates no published page, sends no model request and cannot archive,
 restore or rescan a real page. Expected verdicts are separate display metadata
 and are never supplied to the model.
