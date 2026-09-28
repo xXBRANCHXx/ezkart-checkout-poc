@@ -61,3 +61,18 @@ grades or automatic training.
 [Inputs, original answers, rejected outputs and effective decisions](../tools/jev-evaluation/confidence-results-2026-09-28.json)
 are committed without credentials. The private original receipts are under
 `~/.local/share/ezkart/jev-beta/evaluation-confidence-20260928-*`.
+
+## Workbench delivery
+
+Committed as `5918063` and pushed to both workbench remotes. The beta Worker
+version is `7201219b-f29b-444c-99af-461af8eddce3`. Authenticated read-only checks
+on `test.ezkart.id` confirmed `minimumConfidence: 0.8`, original historical
+results requiring human review, and the updated 80% reviewer message. Existing
+MFA requirements remain in place. No new live model or page-action call was made
+for deployment verification.
+
+The beta app ceiling is now $4.90, reserving $0.10 for these external diagnostic
+calls; after its existing $0.06 benchmark reservations it reports $4.84 available.
+A structural comparison confirmed every other private Worker setting remained
+unchanged. No schema migration was required. Main and public production remain
+held.
