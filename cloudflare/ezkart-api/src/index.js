@@ -1,3 +1,4 @@
+import {startTreasuryBank,confirmTreasuryBank,treasuryBankRecovery,saveTreasuryBankReceipt} from './commerce-treasury-bank.js';
 import {customerSubscriptions,subscriptionList,subscriptionDetail,cancelSubscription} from './commerce-subscriptions.js';
 import {finalizeConfirmedRefund} from './commerce-refund-finalization.js';
 import {beginDigitalUpload,digitalUpload,uploadDigitalPart,completeDigitalUpload,cancelDigitalUpload,digitalMerchantFile,digitalFileHistory,readyDigitalUpload,digitalVersionStatements,digitalCatalogSql,digitalCatalogFile,cleanupDigitalUploads,publicDigitalFiles} from './digital-files.js';
@@ -1604,6 +1605,12 @@ export default {
         if(request.method!=='POST'||url.search||!action)return json({ok:false,error:'Synchronization job route is unavailable'},404);
         return json({ok:true,...await action(env,payload)});
       }
+      const treasuryBank=/^\/internal\/commerce\/finance\/treasury\/(try_[a-f0-9]{40})\/(inquiry|payment)\/(read|receipt)$/.exec(url.pathname);
+      if(treasuryBank){
+        const input=await authenticateCommerceService(request,env,{strictJSON:true,maxBytes:50000});
+        if(request.method!=='POST'||url.search)return json({ok:false,error:'Treasury recovery method is invalid.'},405);
+        return json({ok:true,...await (treasuryBank[3]==='read'?treasuryBankRecovery:saveTreasuryBankReceipt)(env,treasuryBank[1],treasuryBank[2],input)});
+      }
       if(url.pathname.startsWith('/internal/commerce/finance/withdrawals')){
         const payload=await authenticateCommerceService(request,env,{strictJSON:true,maxBytes:/\/(inquiry|payment|status)\/receipt$/.test(url.pathname)?50000:3000});
         if(request.method!=='POST'||url.search)return json({ok:false,error:'Withdrawal route or method is unavailable'},404);
@@ -1853,6 +1860,11 @@ export default {
         if(url.pathname==='/v1/treasury/commissions'&&request.method==='GET')return json({ok:true,...await treasurySummary(env,user)},200,cors);
         if(url.pathname==='/v1/treasury/intents'&&request.method==='POST')return json({ok:true,...await reserveTreasury(env,user,await reviewRequestJson(request,2000,parseMessageJSON))},200,cors);
         if(url.pathname==='/v1/treasury/intents/lookup'&&request.method==='POST')return json({ok:true,...await lookupTreasury(env,user,await reviewRequestJson(request,2000,parseMessageJSON))},200,cors);
+        const bank=/^\/v1\/treasury\/intents\/(try_[a-f0-9]{40})\/(confirm|(?:inquiry|payment)\/start)$/.exec(url.pathname);
+        if(bank&&request.method==='POST'){
+          const input=await reviewRequestJson(request,3000,parseMessageJSON);
+          return json({ok:true,...await (bank[2]==='confirm'?confirmTreasuryBank(env,user,bank[1],input):startTreasuryBank(env,user,bank[1],bank[2].split('/')[0],input))},200,cors);
+        }
         const target=/^\/v1\/treasury\/intents\/(try_[a-f0-9]{40})(\/cancel)?$/.exec(url.pathname);
         if(target&&!target[2]&&request.method==='GET')return json({ok:true,...await readTreasury(env,user,target[1])},200,cors);
         if(target&&target[2]&&request.method==='POST')return json({ok:true,...await cancelTreasury(env,user,target[1],await reviewRequestJson(request,2000,parseMessageJSON))},200,cors);

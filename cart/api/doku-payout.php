@@ -27,10 +27,10 @@ final class EzDokuPayoutClient extends EzDokuSnapClient
     }
 
     /** Exact whole-rupiah string. No float conversion, estimates or fee deduction. */
-    private static function amount(mixed $value): string
+    private static function amount(mixed $value, bool $treasury = false): string
     {
-        if (!is_string($value) || preg_match('/^[1-9][0-9]{5,18}$/D', $value) !== 1
-            || (strlen($value) === 6 && strcmp($value, '250000') < 0)
+        if (!is_string($value) || preg_match('/^[1-9][0-9]{0,18}$/D', $value) !== 1
+            || (!$treasury && (strlen($value) < 6 || (strlen($value) === 6 && strcmp($value, '250000') < 0)))
             || (strlen($value) === 19 && strcmp($value, '9223372036854775807') > 0)) throw new EzDokuReadException('payout_amount');
         return $value;
     }
@@ -44,7 +44,7 @@ final class EzDokuPayoutClient extends EzDokuSnapClient
             || ($binding['environment'] ?? null) !== $this->credentials['environment']
             || ($binding['credentialFingerprint'] ?? null) !== $this->credentialFingerprint
             || !is_string($binding['partnerReferenceNo'] ?? null)
-            || preg_match('/^EZK-PAYOUT-' . $prefix . '-[a-f0-9]{40}$/D', $binding['partnerReferenceNo']) !== 1
+            || preg_match('/^EZK-(?:PAYOUT|TREASURY)-' . $prefix . '-[a-f0-9]{40}$/D', $binding['partnerReferenceNo']) !== 1
             || !is_string($binding['fromAccount'] ?? null) || preg_match('/^[0-9]{1,10}$/D', $binding['fromAccount']) !== 1
             || !is_string($binding['beneficiaryAccountNumber'] ?? null) || preg_match('/^[0-9]{1,22}$/D', $binding['beneficiaryAccountNumber']) !== 1
             || !is_string($binding['beneficiaryBankCode'] ?? null) || preg_match('/^[A-Z0-9]{4,16}$/D', $binding['beneficiaryBankCode']) !== 1
@@ -53,7 +53,7 @@ final class EzDokuPayoutClient extends EzDokuSnapClient
             || !is_string($binding['paymentExternalId'] ?? null) || preg_match('/^[0-9]{32}$/D', $binding['paymentExternalId']) !== 1
             || $binding['inquiryExternalId'] === $binding['paymentExternalId']) throw new EzDokuReadException('payout_binding');
         return ['partnerReferenceNo' => $binding['partnerReferenceNo'], 'type' => 'BANK_ACCOUNT', 'channel' => $binding['channel'],
-            'amount' => ['value' => self::amount($binding['amount']) . '.00', 'currency' => 'IDR'],
+            'amount' => ['value' => self::amount($binding['amount'], str_starts_with($binding['partnerReferenceNo'], 'EZK-TREASURY-')) . '.00', 'currency' => 'IDR'],
             'fromAccount' => $binding['fromAccount'], 'beneficiaryBankCode' => $binding['beneficiaryBankCode'],
             'beneficiaryAccountNumber' => $binding['beneficiaryAccountNumber']];
     }

@@ -45,6 +45,8 @@ function ez_support_access(bool $reviewPage, string $csrf, bool $isHttps): array
         $_SESSION['support_flash'] = $state['error'];
     }
     $refund = (string) ($_GET['refund'] ?? '');
-    header('Location: ?page=support-refunds' . (preg_match('/^ref_[a-f0-9]{32}$/D', $refund) === 1 ? '&refund=' . $refund : ''), true, 303);
+    $intent = (string) ($_GET['intent'] ?? '');
+    $target = ($_GET['page'] ?? '') === 'treasury' ? 'treasury' . (preg_match('/^try_[a-f0-9]{40}$/D', $intent) === 1 ? '&intent=' . $intent : '') : 'support-refunds' . (preg_match('/^ref_[a-f0-9]{32}$/D', $refund) === 1 ? '&refund=' . $refund : '');
+    header('Location: ?page=' . $target, true, 303);
     exit;
 }

@@ -173,3 +173,11 @@ test('payout fixture is inaccessible over HTTP and the adapter itself performs n
     assert.equal(await adapter.text(),'');assert.equal((await f.calls()).length,0);
   }
 });
+
+test('treasury uses its own original reference and exact whole commission amount without the seller withdrawal minimum',()=>{
+  for(const amount of ['1','1000','249999','9007199254740991']){
+    const input={...binding,partnerReferenceNo:'EZK-TREASURY-S-'+'b'.repeat(40),amount};
+    const result=run({binding:input,actions:[action('inquire'),action('pay')],responses:[token(),response(inquiry(input)),response(payment(input))]});
+    assert(result.results.every(r=>r.ok),JSON.stringify(result.results));assert.equal(JSON.parse(result.requests[2].body).amount.value,amount+'.00');
+  }
+});

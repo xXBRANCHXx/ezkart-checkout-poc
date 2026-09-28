@@ -1444,7 +1444,7 @@ $adminStorageIdentity = $authenticationMethod === 'supabase'
 $adminStorageScope = substr(hash('sha256', $deployment . '|' . $adminStorageIdentity), 0, 24);
 $nowJakarta = new DateTimeImmutable('now', new DateTimeZone('Asia/Jakarta'));
 $dashboardPeriod = ez_dashboard_period($_GET, $nowJakarta);
-$allowedPages = ['dashboard', 'orders', 'returns', 'refunds', 'support-refunds', 'fulfillment', 'shipping-settings', 'products', 'product-new', 'inventory', 'shop', 'sites', 'customers', 'analytics', 'marketing', 'payments', 'messages', 'notifications', 'wallet', 'onboarding', 'settings', 'advanced'];
+$allowedPages = ['dashboard', 'orders', 'returns', 'refunds', 'support-refunds', 'treasury', 'fulfillment', 'shipping-settings', 'products', 'product-new', 'inventory', 'shop', 'sites', 'customers', 'analytics', 'marketing', 'payments', 'messages', 'notifications', 'wallet', 'onboarding', 'settings', 'advanced'];
 $requestedPage = strtolower(trim((string) ($_GET['page'] ?? 'dashboard')));
 $page = in_array($requestedPage, $allowedPages, true) ? $requestedPage : 'dashboard';
 $isDashboard = $page === 'dashboard';
@@ -1599,13 +1599,15 @@ if ($page === 'analytics' && ($_GET['export'] ?? '') === 'csv') {
 $supportAccess = ['authorized' => false];
 if ($authenticated && $authenticationMethod === 'supabase') {
     require_once __DIR__ . '/support-access.php';
-    $supportAccess = ez_support_access($page === 'support-refunds', $csrfToken, $isHttps);
+    $supportAccess = ez_support_access(in_array($page, ['support-refunds','treasury'], true), $csrfToken, $isHttps);
 }
+$treasury = ['summary' => null, 'detail' => null, 'error' => 'Sign in with an authorized treasury account.'];
+if ($page === 'treasury' && $authenticated && $authenticationMethod === 'supabase') { require_once __DIR__ . '/treasury-access.php'; $treasury = ez_admin_treasury_access($csrfToken); }
 $walletAccess = in_array($page, ['wallet','onboarding'], true) && $authenticated ? ez_wallet_access($authenticationMethod, $sellerId, $csrfToken, $isHttps) : ['unlocked' => false];
 $requestedSite = trim((string) ($_GET['edit'] ?? ''));
 $siteEditor = $page === 'sites' && $requestedSite !== '' && strlen($requestedSite) <= 180;
 $pageTitles = [
-    'dashboard' => 'Dashboard', 'orders' => 'Orders', 'returns' => 'Returns', 'refunds' => 'Refunds', 'support-refunds' => 'Ezkart reviews', 'fulfillment' => 'Fulfillment', 'shipping-settings' => 'Shipping settings', 'products' => 'Products', 'product-new' => 'Create product', 'inventory' => 'Inventory', 'shop' => 'Shop', 'sites' => 'Landing Pages',
+    'dashboard' => 'Dashboard', 'orders' => 'Orders', 'returns' => 'Returns', 'refunds' => 'Refunds', 'support-refunds' => 'Ezkart reviews', 'treasury' => 'Ezkart treasury', 'fulfillment' => 'Fulfillment', 'shipping-settings' => 'Shipping settings', 'products' => 'Products', 'product-new' => 'Create product', 'inventory' => 'Inventory', 'shop' => 'Shop', 'sites' => 'Landing Pages',
     'customers' => 'Customers', 'analytics' => 'Analytics', 'marketing' => 'Marketing',
     'payments' => 'Payments', 'messages' => 'Messages', 'notifications' => 'Notifications',
     'onboarding' => 'Seller onboarding', 'wallet' => 'Wallet', 'settings' => 'Settings', 'advanced' => 'Advanced Mode',
@@ -1672,7 +1674,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
   <?php if ($authenticated): ?><link rel="stylesheet" href="assets/vendor/leaflet.css"><?php endif; ?>
   <link rel="stylesheet" href="admin.css?v=<?= ez_admin_escape($adminCssVersion) ?>">
   <?php if (in_array($page, ['inventory','products'], true)): ?><link rel="stylesheet" href="inventory.css?v=<?= (int) filemtime(__DIR__ . '/inventory.css') ?>"><?php endif; ?>
-  <?php if (in_array($page, ['refunds','support-refunds'], true)): ?><link rel="stylesheet" href="../refunds.css?v=<?= (int) filemtime(__DIR__ . '/../refunds.css') ?>"><?php endif; ?>
+  <?php if (in_array($page, ['refunds','support-refunds','treasury'], true)): ?><link rel="stylesheet" href="../refunds.css?v=<?= (int) filemtime(__DIR__ . '/../refunds.css') ?>"><?php endif; ?>
   <?php if ($page === 'returns'): ?><link rel="stylesheet" href="returns.css?v=<?= (int) filemtime(__DIR__ . '/returns.css') ?>"><?php endif; ?>
   <?php if ($page === 'fulfillment'): ?><link rel="stylesheet" href="fulfillment.css?v=<?= (int) filemtime(__DIR__ . '/fulfillment.css') ?>"><?php endif; ?>
   <?php if ($centralOrderWorkspace || $centralPaymentWorkspace || $centralCustomerWorkspace): ?><link rel="stylesheet" href="commerce-orders.css?v=<?= (int) filemtime(__DIR__ . '/commerce-orders.css') ?>"><?php endif; ?>
@@ -1859,7 +1861,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
       <a class="sidebar-brand" href="../../"><img src="../../assets/ezkart-logo.svg" alt="Ezkart"></a>
       <nav class="primary-nav" aria-label="Main navigation">
         <a class="<?= $page === 'dashboard' ? 'active' : '' ?>" href="?page=dashboard"><?= ez_admin_icon('grid') ?><span>Dashboard</span></a>
-        <?php if (!empty($supportAccess['authorized'])): ?><a class="<?= $page === 'support-refunds' ? 'active' : '' ?>" href="?page=support-refunds"><?= ez_admin_icon('refund') ?><span>Ezkart reviews</span></a><?php endif; ?>
+        <?php if (!empty($supportAccess['authorized'])): ?><a class="<?= $page === 'support-refunds' ? 'active' : '' ?>" href="?page=support-refunds"><?= ez_admin_icon('refund') ?><span>Ezkart reviews</span></a><a class="<?= $page === 'treasury' ? 'active' : '' ?>" href="?page=treasury"><?= ez_admin_icon('wallet') ?><span>Ezkart treasury</span></a><?php endif; ?>
         <a class="<?= in_array($page, ['orders','returns','refunds','fulfillment'], true) ? 'active' : '' ?>" href="?page=orders"><?= ez_admin_icon('cart') ?><span>Orders</span><b data-order-total><?= $centralReadWorkspace ? '—' : $allOrderCount ?></b></a>
         <a class="<?= in_array($page, ['products', 'product-new', 'inventory', 'shop'], true) ? 'active' : '' ?>" href="?page=products"><?= ez_admin_icon('box') ?><span>Products</span></a>
         <a class="<?= $page === 'sites' ? 'active' : '' ?>" href="?page=sites"><?= ez_admin_icon('layout') ?><span>Landing Pages</span><b data-site-count>0</b></a>

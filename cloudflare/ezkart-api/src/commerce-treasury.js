@@ -38,10 +38,11 @@ async function funds(env,enrollment){
     held_captures AS heldCaptures,unattributed_captures AS unattributedCaptures,refund_holds AS refundHolds,incomplete_journals AS incompleteJournals,source_capacity_exceeded AS sourceCapacityExceeded,length(source_json) AS sourceBytes
     FROM commerce_treasury_funds WHERE platform_enrollment_id=? AND commerce_environment=?`).bind(enrollment,mode(env)).first();
 }
-const constraints=['company_bank_inquiry_not_integrated','transfer_fee_funding_unverified','commission_release_policy_unset','treasury_payment_and_reconciliation_not_integrated'];
+const constraints=['transfer_fee_funding_unverified','commission_release_policy_unset','treasury_reconciliation_not_integrated'];
 export async function treasurySummary(env,user){
   await authorize(env,user);const wallet=await platform(env),bank=destination(env),projection=await funds(env,wallet?.id);
-  return {environment:mode(env),platformConfigured:!!wallet,companyBank:masked(bank),funds:projection,
+  const recent=await env.DB.prepare(`SELECT i.id,CAST(i.amount AS TEXT) AS amount,i.created_at AS createdAt,c.created_at AS cancelledAt,EXISTS(SELECT 1 FROM commerce_treasury_bank_grants g WHERE g.intent_id=i.id AND g.stage='payment') AS transferStarted FROM commerce_treasury_intents i LEFT JOIN commerce_treasury_cancellations c ON c.intent_id=i.id WHERE i.commerce_environment=? ORDER BY i.sequence DESC LIMIT 30`).bind(mode(env)).all();
+  return {recentIntents:recent.results,inquiryAvailable:env.COMMERCE_TREASURY_INQUIRY==='enabled',environment:mode(env),platformConfigured:!!wallet,companyBank:masked(bank),funds:projection,
     amountMeaning:'Commission reservation projection; not bank-withdrawable cash.',withdrawableCommission:null,
     executionAvailable:false,blockers:[...(!wallet?['platform_wallet_unconfigured']:[]),...(!bank?['company_bank_unconfigured']:[]),...(projection?.sourceCapacityExceeded?['commission_source_capacity_exceeded']:[]),...constraints],providerCalls:0};
 }
@@ -54,13 +55,20 @@ function view(row){return {id:row.id,sequence:row.sequence,environment:row.comme
 async function detail(env,row){
   if(!row)fail('Treasury intent was not found.',404);
   const current=destination(env),wallet=await platform(env);
-  return {intent:view(row),originalSources:JSON.parse(row.source_json),funds:await funds(env,row.platform_enrollment_id),
+  const bank=await env.DB.prepare(`SELECT g.stage,g.confirmation_id AS confirmationId,g.created_at AS startedAt,r.digest,r.beneficiary_name AS beneficiaryName,r.recorded_at AS receivedAt FROM commerce_treasury_bank_grants g LEFT JOIN commerce_treasury_bank_receipts r ON r.intent_id=g.intent_id AND r.stage=g.stage WHERE g.intent_id=?`).bind(row.id).all();
+  const confirmations=await env.DB.prepare('SELECT id,inquiry_digest AS inquiryDigest,created_at AS confirmedAt,proof_expires_at AS proofExpiresAt FROM commerce_treasury_bank_confirmations WHERE intent_id=? ORDER BY created_at DESC LIMIT 5').bind(row.id).all();
+  const result=view(row),payment=bank.results.find(x=>x.stage==='payment'),inquiry=bank.results.find(x=>x.stage==='inquiry');
+  if(payment)result.state=payment.receivedAt?'transfer_response_recorded_pending_reconciliation':'transfer_outcome_unknown';
+  else if(!row.cancelled_at&&inquiry)result.state=inquiry.receivedAt?'bank_inquiry_recorded':'bank_inquiry_outcome_unknown';
+  const eligible=await env.DB.prepare('SELECT intent_id FROM commerce_treasury_execution_eligibility WHERE intent_id=?').bind(row.id).first();
+  return {paymentConfirmationId:payment?.confirmationId||null,intent:result,bank:bank.results,confirmations:confirmations.results,originalSources:JSON.parse(row.source_json),funds:await funds(env,row.platform_enrollment_id),
     configurationChanged:!current||await commerceHash(current)!==row.destination_hash||wallet?.id!==row.platform_enrollment_id,
-    executionAvailable:false,blockers:constraints,providerCalls:0};
+    executionAvailable:!!eligible&&env.COMMERCE_TREASURY_PAYMENT==='enabled',blockers:constraints,providerCalls:0};
 }
 function admissionFailure(error){
   if(/treasury_funds_unavailable|treasury_platform_inactive/.test(String(error)))fail('Current verified commission cannot cover this reservation.',409);
   if(/treasury_operator_changed|treasury_proof_expired/.test(String(error)))fail('Treasury authorization changed. Verify your authenticator again.',401);
+  if(/treasury_payment_in_flight/.test(String(error)))fail('This transfer already has a send grant and cannot be cancelled.',409);
   throw error;
 }
 export async function reserveTreasury(env,user,input){
@@ -94,3 +102,5 @@ export async function cancelTreasury(env,user,id,input){
   catch(error){const saved=await cancellation();if(saved)return replay(saved);admissionFailure(error);}
   return {...await detail(env,await original(env,id)),replayed:false};
 }
+
+export {authorize as treasuryAuthorize,destination as treasuryDestination,platform as treasuryPlatform,original as treasuryOriginal};
