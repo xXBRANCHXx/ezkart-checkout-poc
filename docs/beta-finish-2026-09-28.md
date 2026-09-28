@@ -9,6 +9,21 @@ unfinished application code are separate remaining work.
 The owner allowed at most twenty minutes per area, 140 minutes total. The pass
 started at 22:23 UTC on 27 September (05:23 WIB on 28 September). Each area was
 closed within its cap; the private tracker retains precise start/finish times.
+The pass ended at 23:44 UTC after 80.57 minutes; the result is partial.
+
+## Continue in a new conversation
+
+Read this report and `AGENTS.md` first. The private continuation record is
+`/home/branch/.local/share/ezkart/beta-01a0d643/NEXT-CONVERSATION.md`.
+It records the exact deployment, prior owner decisions and permissions, financial
+rules, unresolved provider identity, evidence locations, recovery-key handoff,
+remaining implementation and browser/session instructions. It contains no key
+material and stays outside Git because it includes private account information.
+
+Continue from those records without restarting the audit or requesting already
+answered decisions. Recheck time-sensitive state only when relevant to the next
+action. The prior browser tab was released while preserving the shared Chrome
+connection; a new conversation must use its own `CODEX_THREAD_ID`.
 
 ## Delivered and checked
 

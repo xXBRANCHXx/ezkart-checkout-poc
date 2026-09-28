@@ -39,6 +39,10 @@ Use merchant-facing controls for appearance settings: numeric values with separa
   launch. Prepare a separate beta environment for real payment records and live
   credentials. Main and `ezkart.id` remain held; local fixture testing does not
   determine the beta's provider mode. Preserve the existing sandbox evidence.
+- For continuation after the 28 September handoff, start with
+  `docs/beta-finish-2026-09-28.md` and its private continuation-record link.
+  It distinguishes implemented work from remaining code and live acceptance,
+  and preserves the owner's FlexiBill-pending decision and current email state.
 
 ## Sidebar announcements
 
