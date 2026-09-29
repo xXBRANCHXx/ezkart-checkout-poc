@@ -1848,6 +1848,7 @@
     let sheet = document.querySelector("[data-sq-native-styles]");
     if (!sheet) {
       sheet = document.createElement("style");
+      sheet.nonce = document.querySelector('meta[name="ezkart-builder-style-nonce"]')?.content || "";
       sheet.dataset.sqNativeStyles = "";
       document.head.append(sheet);
     }

@@ -255,6 +255,7 @@
     const node = EzkartNative.create(config);
     canvas.append(node);
     const sheet = document.createElement('style');
+    sheet.nonce = document.querySelector('meta[name="ezkart-builder-style-nonce"]')?.content || '';
     sheet.textContent = EzkartNative.stylesheet(canvas);
     for (const element of canvas.querySelectorAll('.sq-native')) {
       // CSS needs these selectors, but previews need no persisted configs,

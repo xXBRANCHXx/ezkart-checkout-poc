@@ -14,6 +14,7 @@ $previewDocumentFrame = preg_match('#^/v1/landing-pages/[a-z0-9-]+/preview$#', (
 $interactivePageView = preg_match('#^/v1/landing-pages/[a-z0-9-]+/view$#', (string) ($_GET['cloud'] ?? '')) === 1;
 $adminStartupScript = (string) file_get_contents(__DIR__ . '/admin-startup.js');
 $adminStartupHash = base64_encode(hash('sha256', $adminStartupScript, true));
+$builderStyleNonce = base64_encode(random_bytes(24));
 $embeddedPreviewFrame = $previewRepairFrame || $previewDocumentFrame;
 
 header('Cache-Control: no-store');
@@ -34,7 +35,7 @@ if ($interactivePageView) {
     $authSettings = ez_admin_supabase_settings();
     $authFormSources = $authSettings['configured'] && preg_match('~^https://[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$~iD', $authSettings['url']) === 1
         ? ' ' . $authSettings['url'] . ' https://accounts.google.com' : '';
-    $adminSecurityPolicy = "default-src 'self'; img-src 'self' data: blob: https:; style-src 'self'; style-src-attr 'unsafe-inline'; script-src 'self' 'sha256-" . $adminStartupHash . "'; connect-src 'self'" . $shippingMapPolicy . "; frame-src 'self'; form-action 'self'" . $authFormSources . "; frame-ancestors " . ($previewRepairFrame ? "'self'" : "'none'") . "; base-uri 'none'";
+    $adminSecurityPolicy = "default-src 'self'; img-src 'self' data: blob: https:; style-src 'self' 'nonce-" . $builderStyleNonce . "'; style-src-attr 'unsafe-inline'; script-src 'self' 'sha256-" . $adminStartupHash . "'; connect-src 'self'" . $shippingMapPolicy . "; frame-src 'self'; form-action 'self'" . $authFormSources . "; frame-ancestors " . ($previewRepairFrame ? "'self'" : "'none'") . "; base-uri 'none'";
 }
 header('Content-Security-Policy: ' . $adminSecurityPolicy);
 // Hostinger replaces PHP's CSP. The server-header rule restores this exact
@@ -1683,6 +1684,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="robots" content="noindex,nofollow">
+  <?php if ($authenticated && $page === 'sites'): ?><meta name="ezkart-builder-style-nonce" content="<?= ez_admin_escape($builderStyleNonce) ?>"><?php endif; ?>
   <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
   <?php if ($authenticated && $authenticationMethod === 'supabase' && $cloudMediaBase !== ''): ?><link rel="preconnect" href="<?= ez_admin_escape($cloudMediaBase) ?>"><?php endif; ?>
   <?php if ($authenticated): ?><script id="ezkart-admin-startup" data-admin-cloud-enabled="<?= $authenticationMethod === 'supabase' ? 'true' : 'false' ?>"><?= $adminStartupScript ?></script><?php endif; ?>
