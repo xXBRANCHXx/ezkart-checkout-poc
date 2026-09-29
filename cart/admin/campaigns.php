@@ -20,7 +20,7 @@ ez_page_header('Campaigns', 'See which landing pages and sources turn visits int
         <label class="tracking-create-name"><span id="tracking-name-label">Campaign name</span><input aria-labelledby="tracking-name-label" name="name" required maxlength="120" placeholder="e.g. September Launch" autocomplete="off" autofocus></label>
         <fieldset class="tracking-page-picker">
           <legend>Landing pages</legend>
-          <p>Select one or more landing pages to include in this campaign.</p>
+          <p>Select one or more published landing pages to include in this campaign.</p>
           <div data-page-options></div>
         </fieldset>
         <p class="tracking-create-next">After creating the campaign, you can add up to 40 custom source URLs per landing page.</p>
