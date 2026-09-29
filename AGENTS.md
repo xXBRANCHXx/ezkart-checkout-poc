@@ -202,3 +202,11 @@ Use a megaphone icon for Campaigns. The email Marketing page is not part of
 this beta: keep it out of navigation and redirect its old page URL to Campaigns.
 Retain its saved data and code for later; do not reintroduce the page without
 an owner request. Analytics remains a separate page.
+
+## Professional dashboard styling (owner, 29 September 2026)
+
+Professionalism takes priority in seller UI. Requests for a more visual or fun
+interface mean useful visual content such as actual landing-page covers, not
+playful decoration. Keep campaign dialogs neutral with plain headings and direct
+copy. Avoid pastel header banners, oversized decorative badges, slogans and
+numbered labels. Preserve the existing branded primary action buttons.
