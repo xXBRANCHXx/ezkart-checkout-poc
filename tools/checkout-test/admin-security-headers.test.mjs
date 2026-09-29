@@ -27,7 +27,10 @@ test('merchant policy selection preserves preview isolation and ignores forged c
     assert.match(policy,pattern,query);assert.doesNotMatch(policy,/allow-same-origin|unsafe-eval|default-src \*/);assert.equal(response.headers.get(bridge),policy);
     assert.equal(response.headers.get('x-frame-options'),frame);assert.match(response.headers.get('cache-control'),/no-store/);
   }
-  const spoof=await fetch(f.base+'/cart/admin/?page=marketing',{headers:{[bridge]:'default-src *'}});assert.equal(spoof.headers.get('content-security-policy'),baseline);
+  const spoof=await fetch(f.base+'/cart/admin/?page=marketing',{headers:{[bridge]:'default-src *'}});
+  const normalizeNonce=policy=>policy.replace(/'nonce-[^']+'/g,"'nonce-per-response'");
+  assert.equal(normalizeNonce(spoof.headers.get('content-security-policy')),normalizeNonce(baseline));
+  assert.notEqual(spoof.headers.get('content-security-policy'),baseline,'Each response uses a fresh style nonce');
 });
 
 test('the merchant browser blocks unapproved inline scripts, handlers and eval under the emitted policy',async t=>{
@@ -65,7 +68,7 @@ test('fresh beta Google sign-in follows the actual form redirect chain while una
       }else await transport.send('Fetch.fulfillRequest',{requestId:event.requestId,responseCode:200,responseHeaders:[{name:'Content-Type',value:'text/html'}],body:Buffer.from('<h1>Choose your Google account</h1>').toString('base64')});
     })().catch(async error=>{interceptionFailures.push(error.message);await transport.send('Fetch.failRequest',{requestId:event.requestId,errorReason:'Failed'}).catch(()=>{});});
   });
-  const response=await page.goto(f.base+'/cart/admin/');assert.equal(await page.locator('h1').innerText(),'Beta admin.');
+  const response=await page.goto(f.base+'/cart/admin/');assert.equal(await page.locator('h1').innerText(),'Your store starts here.');
   assert.match(response.headers()['content-security-policy'],/form-action 'self' https:\/\/auth.ezkart.test https:\/\/accounts.google.com;/);
   await page.getByRole('button',{name:'Continue with Google',exact:true}).click();
   await page.waitForURL('https://accounts.google.com/fixture-account-chooser');assert.deepEqual(interceptionFailures,[]);assert.deepEqual(redirects,['https://auth.ezkart.test','https://accounts.google.com']);

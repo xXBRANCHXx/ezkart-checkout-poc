@@ -407,7 +407,7 @@
       const enabled=active();host.hidden=!enabled;studio.classList.toggle('sq-image-editor',enabled);document.body.classList.toggle('page-image-editor',enabled);
       const pageMenu=studio.querySelector('.sq-page-identity [data-sq-open-panel="pages"]');
       if(pageMenu)pageMenu.disabled=enabled;
-      if(!enabled){frame.removeAttribute('srcdoc');return;}
+      if(!enabled){frame.onload=null;frame.removeAttribute('src');return;}
       translateChrome();
       const {images,productId,navigation}=read(root);rows.replaceChildren();
       syncNavigation(images,productId,navigation);
@@ -437,7 +437,15 @@
       if(images.length){
         previewChannel=crypto.randomUUID();
         const bridge=`<script>(${installPreviewUpdates.toString()})(${JSON.stringify(previewChannel)},${paintNavigation.toString()})<\/script>`;
-        frame.srcdoc=html().replace('</body>',bridge+'</body>');
+        const documentHtml=html().replace('</body>',bridge+'</body>');
+        // Use the isolated preview document's policy, as the visual builder
+        // does. srcdoc inherits the admin policy and blocks generated styles
+        // and scripts, even inside a sandbox.
+        frame.onload=()=>{
+          frame.onload=null;
+          frame.contentWindow?.postMessage({type:'ezkart-render-page',html:documentHtml},'*');
+        };
+        frame.src=`page-preview.php?image=${previewChannel}`;
       }
       controls.disabled=busy;
     }

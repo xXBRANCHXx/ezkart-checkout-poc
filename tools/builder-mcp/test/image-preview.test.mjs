@@ -24,7 +24,7 @@ const navValue=(page,key)=>page.evaluate(key=>JSON.parse(document.querySelector(
 test('navbar colors preview immediately without rebuilding the page; apply, cancel, history and checkout state remain correct',async t=>{
  const {page,browser}=await fixture(t),phone=page.frameLocator('.ib-phone');
  await phone.locator('[data-product-card] select').selectOption('500 g');await phone.locator('[data-ezkart-add]').click();await phone.locator('.ezkart-cart-layer.is-open').waitFor();await phone.locator('.ezkart-cart-close').click();await phone.locator('[data-ezkart-cart-layer]').waitFor({state:'hidden'});
- const frame=page.frames().find(f=>f.url()==='about:srcdoc');
+ const frame=page.frames().find(f=>f.url().includes('/page-preview.php?image='));
  await frame.evaluate(()=>{window.previewInstance=crypto.randomUUID();scrollTo({top:400,behavior:'instant'});});
  const instance=await frame.evaluate(()=>window.previewInstance),scroll=await frame.evaluate(()=>scrollY);
  await page.evaluate(()=>{window.previewReloads=0;document.querySelector('.ib-phone').addEventListener('load',()=>window.previewReloads++);window.artworkBefore=document.querySelector('[data-image-upload]');window.cardBefore=document.querySelector('[data-product-card]');});
