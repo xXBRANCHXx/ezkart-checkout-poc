@@ -58,8 +58,8 @@
     function renderRows(items){
       rows.replaceChildren();
       for(const item of items){
-        const row=el('tr'),contact=el('td'),open=button(item.name||'Customer',()=>void loadDetail(item.id,true));open.className='order-link';open.dataset.customerOpen=item.id;open.setAttribute('aria-controls','commerce-customer-detail');open.setAttribute('aria-expanded',String(selected===item.id));
-        contact.append(open,el('small',item.email),el('small',item.phone));const location=el('td',item.location||'Not recorded'),tags=el('div',undefined,'commerce-customer-tags');for(const tag of item.tags)tags.append(el('span',tag));location.append(tags);
+        const row=el('tr'),contact=el('td'),open=button(item.name||'Customer',()=>void loadDetail(item.id,true));open.translate=false;open.className='order-link';open.dataset.customerOpen=item.id;open.setAttribute('aria-controls','commerce-customer-detail');open.setAttribute('aria-expanded',String(selected===item.id));
+        contact.append(open,el('small',item.email),el('small',item.phone));const location=el('td',item.location||'Not recorded'),tags=el('div',undefined,'commerce-customer-tags');for(const tag of item.tags)tags.append(el('span',tag));location.translate=!item.location;tags.translate=false;location.append(tags);
         const orders=el('td');orders.append(el('b',item.orders+(item.orders===1?' order':' orders')),el('small',item.paidOrders+' verified paid'));
         const spend=el('td');spend.append(el('b',money(item.gross)));if(BigInt(item.additional)>0n)spend.append(el('small',money(item.additional)+' additional'));
         row.append(contact,location,orders,spend,el('td',date(item.lastAt)));rows.append(row);
@@ -129,11 +129,11 @@
       return form;
     }
     async function loadDetail(id,focus=false,rebase=false){
-      if(!customerId.test(id||''))return;const version=++detailVersion;selected=id;detail.hidden=false;q('[data-customers-detail-content]').replaceChildren();q('#commerce-customer-detail-title').textContent='Customer profile';q('[data-customers-reference]').textContent=id;message('[data-customers-detail-status]','Loading profile…');urlUpdate(focus);
+      if(!customerId.test(id||''))return;const version=++detailVersion;selected=id;detail.hidden=false;q('[data-customers-detail-content]').replaceChildren();q('#commerce-customer-detail-title').translate=true;q('#commerce-customer-detail-title').textContent='Customer profile';q('[data-customers-reference]').textContent=id;message('[data-customers-detail-status]','Loading profile…');urlUpdate(focus);
       rows.querySelectorAll('[data-customer-open]').forEach(n=>n.setAttribute('aria-expanded',String(n.dataset.customerOpen===id)));
       if(focus){q('#commerce-customer-detail-title').focus({preventScroll:true});detail.scrollIntoView({block:'start',behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'instant':'smooth'});}
       try{const data=await api(base+'/'+id);if(version!==detailVersion)return;const c=data.customer;if(!c||!c.profile||!Array.isArray(data.orders?.items))throw Error('The profile response was incomplete.');
-        const content=q('[data-customers-detail-content]'),columns=el('div',undefined,'commerce-order-columns');q('#commerce-customer-detail-title').textContent=c.name||'Customer profile';
+        const content=q('[data-customers-detail-content]'),columns=el('div',undefined,'commerce-order-columns');q('#commerce-customer-detail-title').translate=false;q('#commerce-customer-detail-title').textContent=c.name||'Customer profile';
         columns.append(card('Latest checkout contact',[c.name,c.email,c.phone]),card('Latest delivery address',[c.address.address,c.address.location,c.address.postalCode||(!c.address.address?'No delivery address recorded.':'')]),card('Customer history',['First order '+date(c.firstAt),'Last order '+date(c.lastAt),c.orders+(c.orders===1?' order':' orders')+' · '+c.paidOrders+' verified paid']));content.append(columns);
         const totals=el('dl',undefined,'commerce-order-totals');for(const [name,amount] of [['Verified customer value',c.gross],['Additional payments',c.additional]]){const row=el('div');if(String(amount).length>12)row.dataset.wideMoney='true';row.append(el('dt',name),el('dd',money(amount)));totals.append(row);}content.append(totals);
         const consent=c.marketingConsent==='granted'?'The buyer allowed promotional emails to this address.':c.marketingConsent==='withdrawn'?'The buyer withdrew permission for promotional emails to this address.':'Marketing consent is not recorded. A checkout email or phone number is not permission to send promotions.';

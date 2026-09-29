@@ -4,6 +4,7 @@
   const actions={approve:'Approve return',decline:'Decline request',withdraw:'Withdraw request',inspect:'Record inspection',close:'Close remaining intake'};
   const newKey=()=>crypto.randomUUID().replaceAll('-','');
   const el=(tag,text,className='')=>{const node=document.createElement(tag);if(text!==undefined)node.textContent=String(text);if(className)node.className=className;return node;};
+  const dataEl=(tag,text)=>{const node=el(tag,text);node.translate=false;return node;};
   const date=value=>window.EzkartAdminFormat.date(value);
   const path=id=>'/v1/returns'+(id?'/'+encodeURIComponent(id):'');
   const orderPath=id=>'/v1/returns/orders/'+encodeURIComponent(id);
@@ -53,7 +54,7 @@
       q('[data-return-title]').textContent=states[data.state]||data.state;q('[data-return-subtitle]').textContent=data.order.id+' · '+data.order.customerName;
       const content=q('[data-return-detail]');content.replaceChildren(el('h3',reasons[data.reason]),el('p',data.customerNote));
       content.append(el('p',data.state==='inspected'?'Inspection is complete. A refund decision is still separate from this stock record.':'Receiving a return records goods and stock. It does not issue a refund.','returns-help'));
-      const items=el('div',undefined,'returns-items');for(const item of data.items){const card=el('article',undefined,'returns-item');card.append(el('b',item.title),el('small',item.sku),quantities([['Requested',item.quantity],['Received',item.received],['Restocked',item.restocked],['Kept out of stock',item.received-item.restocked]]));
+      const items=el('div',undefined,'returns-items');for(const item of data.items){const card=el('article',undefined,'returns-item');card.append(dataEl('b',item.title),el('small',item.sku),quantities([['Requested',item.quantity],['Received',item.received],['Restocked',item.restocked],['Kept out of stock',item.received-item.restocked]]));
         if(item.current)card.append(el('small',`Current inventory: ${item.current.title} · ${item.current.sku} · ${item.current.onHand} on hand${item.current.hidden?' · Hidden option':''}${item.current.status==='archived'?' · Archived':''}`));
         else card.append(el('small','Original option is unavailable. Received units can be recorded, but cannot be restocked to a different option.'));items.append(card);}
       content.append(el('h3','Original items'),items,el('h3','Return history'));const timeline=el('ol',undefined,'returns-timeline');
@@ -74,7 +75,7 @@
       catch(error){if(version===detailVersion){q('[data-return-title]').textContent='Return could not be loaded';q('[data-return-detail]').replaceChildren();message('[data-return-error]',error.message+' Use Reload to try again.');}return false;}
     }
     function inputRow(item,inspect,preserved={}){
-      const row=el('article',undefined,'returns-item');row.dataset.returnLine=item.orderItemId;row.append(el('b',item.title),el('small',item.sku));
+      const row=el('article',undefined,'returns-item');row.dataset.returnLine=item.orderItemId;row.append(dataEl('b',item.title),el('small',item.sku));
       row.append(el('small',inspect?`${item.remaining} units still expected. ${item.current?item.current.onHand+' on hand now.':'Original option unavailable; keep received units out of stock.'}`:`${item.availableToReturn} of ${item.ordered} units available to return.`));
       const fields=el('div',undefined,'returns-line-inputs');
       const number=(labelText,attribute,max,value,unavailable=false)=>{const label=el('label',labelText),input=el('input');input.type='number';input.min='0';input.max=String(max);input.step='1';input.inputMode='numeric';input.value=String(value??0);input.setAttribute(attribute,'');input.setAttribute('aria-label',labelText+' — '+item.title);if(unavailable)input.dataset.unavailable='true';label.append(input);fields.append(label);return input;};

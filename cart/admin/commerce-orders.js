@@ -6,6 +6,7 @@
   const money=value=>new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(typeof value==='string'?BigInt(value):value);
   const date=value=>window.EzkartAdminFormat.date(value);
   const el=(tag,text,className='')=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=String(text);if(className)n.className=className;return n;};
+  const dataEl=(tag,text)=>{const n=el(tag,text);n.translate=false;return n;};
   const button=(label,action)=>{const n=el('button',label,'ui-button');n.type='button';n.addEventListener('click',action);return n;};
   const badge=state=>el('span',labels[state]||state||'Awaiting payment','commerce-order-badge'+(['paid','delivered'].includes(state)?' good':state==='attention'?' attention':''));
   const link=(label,view,id)=>{const a=el('a',label,'ui-button');a.href='?'+new URLSearchParams({page:view,order:id});return a;};
@@ -41,7 +42,7 @@
       rows.replaceChildren();
       for(const item of items){const row=el('tr'),orderCell=el('td'),open=button(item.id,()=>void loadDetail(item.id,true));open.className='order-link';open.dataset.orderOpen=item.id;
         open.setAttribute('aria-expanded',String(selected===item.id));open.setAttribute('aria-controls','commerce-order-detail-title');orderCell.append(open);
-        const customer=el('td');customer.append(el('b',item.customerName||'Customer'),el('small',item.customerEmail));
+        const customer=el('td');customer.append(dataEl('b',item.customerName||'Customer'),el('small',item.customerEmail));
         const products=el('td');products.append(el('b',item.firstItem||'Order items'),el('small',`${item.unitCount||0} units · ${item.itemCount} items`));
         const payment=el('td');payment.append(badge(item.state));if(item.additionalAmount>0)payment.append(el('small','Additional payment requires review'));
         const fulfillment=el('td');fulfillment.append(badge(item.queue));row.append(orderCell,customer,products,payment,fulfillment,el('td',money(item.total)),el('td',date(item.createdAt)));rows.append(row);
@@ -78,10 +79,10 @@
     }
     function renderDetail(data,version){
       const order=data.order,content=q('[data-orders-detail-content]');content.replaceChildren();
-      q('#commerce-order-detail-title').textContent=order.snapshot.customer.name||'Order details';q('[data-orders-reference]').textContent=order.id+' · '+date(order.createdAt);
+      q('#commerce-order-detail-title').translate=false;q('#commerce-order-detail-title').textContent=order.snapshot.customer.name||'Order details';q('[data-orders-reference]').textContent=order.id+' · '+date(order.createdAt);
       const badges=el('div',undefined,'commerce-order-buttons');badges.append(badge(order.state),badge(order.queue));content.append(badges);
       if(order.review)content.append(el('p','Review the payment, stock and delivery records before continuing fulfillment.','commerce-orders-notice'));
-      const items=el('section');items.append(el('h3','Ordered items'));for(const item of order.items){const row=el('div',undefined,'commerce-order-line'),info=el('div');info.append(el('b',item.title),el('small',[item.variantName,item.sku].filter(Boolean).join(' · ')),el('small',`${item.quantity} × ${money(item.price)}`));row.append(info,el('b',money(item.quantity*item.price)));items.append(row);}content.append(items);
+      const items=el('section');items.append(el('h3','Ordered items'));for(const item of order.items){const row=el('div',undefined,'commerce-order-line'),info=el('div');info.append(dataEl('b',item.title),el('small',[item.variantName,item.sku].filter(Boolean).join(' · ')),el('small',`${item.quantity} × ${money(item.price)}`));row.append(info,el('b',money(item.quantity*item.price)));items.append(row);}content.append(items);
       const totals=el('dl',undefined,'commerce-order-totals');for(const [label,value] of [['Products',order.subtotal],['Shipping',order.shippingAmount],['Order total',order.total],['Confirmed order payment',order.confirmedAmount],['Additional payments',order.additionalAmount]]){const pair=el('div');pair.append(el('dt',label),el('dd',money(value)));totals.append(pair);}content.append(totals);
       if(order.expiresAt)content.append(el('small','Payment expiry: '+date(order.expiresAt)));
       const addresses=el('div',undefined,'commerce-order-columns');addresses.append(addressCard('Customer',order.snapshot.customer,order.snapshot.destination));
@@ -97,7 +98,7 @@
     }
     async function loadDetail(id,focus=false){
       if(!reference.test(id||''))return;const version=++detailVersion;selected=id;detail.hidden=false;q('[data-orders-detail-content]').replaceChildren();
-      q('#commerce-order-detail-title').textContent='Order details';q('[data-orders-reference]').textContent=id;message('[data-orders-detail-status]','Loading order…');urlUpdate(focus);
+      q('#commerce-order-detail-title').translate=false;q('#commerce-order-detail-title').textContent='Order details';q('[data-orders-reference]').textContent=id;message('[data-orders-detail-status]','Loading order…');urlUpdate(focus);
       rows.querySelectorAll('[data-order-open]').forEach(n=>n.setAttribute('aria-expanded',String(n.dataset.orderOpen===id)));
       if(focus){q('#commerce-order-detail-title').focus({preventScroll:true});detail.scrollIntoView({block:'start',behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'instant':'smooth'});}
       try{const data=await api(base+'/'+id);if(version!==detailVersion)return;renderDetail(data,version);message('[data-orders-detail-status]','');}

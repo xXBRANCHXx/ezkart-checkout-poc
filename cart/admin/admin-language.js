@@ -1,5 +1,6 @@
 /* Shared account language, resolved by the admin host. Merchant artwork stays unchanged. */
 (() => {
+  if (globalThis.EzkartLanguage) return;
   const strings = {
     'Image Stack':'Susun Gambar', 'Page Studio':'Studio Halaman',
     'Use Image Stack':'Gunakan Susun Gambar', 'Use Page Studio':'Gunakan Studio Halaman',
@@ -231,25 +232,91 @@
   "No conversations match this view.": "Tidak ada percakapan yang sesuai."
 });
   Object.assign(strings, {"You're all set!":"Semuanya siap!", "You're ready to sell!":"Kamu siap berjualan!", 'Your seller details are saved. Head to your store to take the next step.':'Data penjualmu sudah tersimpan. Buka tokomu untuk langkah berikutnya.', 'Personal details saved':'Data pribadi tersimpan', 'Pickup and return addresses confirmed':'Alamat penjemputan dan pengembalian dikonfirmasi', 'Withdrawal bank saved':'Rekening penarikan tersimpan', 'Add your bank before your first withdrawal':'Tambahkan rekening sebelum penarikan pertama', 'Review my details':'Tinjau dataku', 'Finish setup':'Selesaikan pengaturan'});
+  Object.assign(strings, globalThis.EzkartIndonesian || {});
   let language = document.body.dataset.adminLanguage === 'id' ? 'id' : 'en';
-  const t = text => language === 'id' ? strings[text] || text : text;
-  function apply(root) {
-    if (!root) return;
-    const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
-    while(walker.nextNode()){
-      const node=walker.currentNode;if(node.parentElement?.closest('script,style,textarea,[contenteditable],.msg-thread,.msg-timeline,.profile,.store-switcher'))continue;const text=node.textContent.trim();
-      if(text&&t(text)!==text)node.textContent=node.textContent.replace(text,t(text));
+  const normalize = value => String(value).replace(/\s+/g, ' ').trim();
+  const dictionary = new Map(Object.entries(strings).map(([key,value])=>[normalize(key),value]));
+  const patterns = [
+    [/^(\S+) total orders · (\S+) delivered · (\S+) delivery not required$/, '$1 total pesanan · $2 terkirim · $3 tidak memerlukan pengiriman'],
+    [/^(.+) · (Sandbox|Production) · Order creation dates in Jakarta · Updated (.+)$/, (_,dates,env,at)=>`${dates} · ${t(env)} · Tanggal pesanan dalam waktu Jakarta · Diperbarui ${at}`],
+    [/^(Daily|Weekly|Monthly|Yearly) totals by order date( · Grouped for this history length)?\.$/, (_,group,extra)=>`Total ${t(group).toLowerCase()} berdasarkan tanggal pesanan${extra?' · Dikelompokkan sesuai panjang riwayat':''}.`],
+    [/^([\d.,]+) (active products|published reviews|paid units|units ordered|units|orders|products|customers|items|pages|conversations loaded)$/, (_,n,label)=>`${n} ${({'active products':'produk aktif','published reviews':'ulasan diterbitkan','paid units':'unit dibayar','units ordered':'unit dipesan',units:'unit',orders:'pesanan',products:'produk',customers:'pelanggan',items:'barang',pages:'halaman','conversations loaded':'percakapan dimuat'})[label]}`],
+    [/^Order placed · (.+)$/, (_,state)=>`Pesanan dibuat · ${t(state)}`],
+    [/^([\d.,]+) shown · ([\d.,]+) matching (orders|customers)$/, (_,n,total,kind)=>`${n} ditampilkan · ${total} ${kind==='orders'?'pesanan':'pelanggan'} sesuai`],
+    [/^([\d.,]+) (image|images|in stock|sold|available|items shown|unread|in-app updates|notifications shown)$/, (_,n,label)=>`${n} ${({image:'gambar',images:'gambar','in stock':'tersedia',sold:'terjual',available:'tersedia','items shown':'barang ditampilkan',unread:'belum dibaca','in-app updates':'pembaruan aplikasi','notifications shown':'notifikasi ditampilkan'})[label]}`],
+    [/^You can create (\d+) more projects\.$/, 'Kamu dapat membuat $1 proyek lagi.'],
+    [/^(\d+) SKUs are at or below their alert threshold\.$/, '$1 SKU mencapai atau di bawah batas peringatan stok.'],
+    [/^(.+) · alert at (\d+)$/, '$1 · peringatan pada $2'],
+    [/^Stock: (\d+)$/, 'Stok: $1'],
+    [/^(Paid|No paid order) · (\d+)$/, (_,label,n)=>`${t(label)} · ${n}`],
+    [/^(.+): (in-app|email)$/, (_,label,channel)=>`${t(label)}: ${channel==='in-app'?'aplikasi':'email'}`],
+    [/^Previous \((.+)\): (.+)$/, 'Sebelumnya ($1): $2'],
+    [/^Compared with (.+)$/, 'Dibandingkan dengan $1'],
+    [/^(Sandbox|Production) order records · (.+) · Updated (.+) · Current payment and delivery statuses$/, (_,env,zone,at)=>`${t(env)} · Catatan pesanan · ${zone} · Diperbarui ${at} · Status pembayaran dan pengiriman terkini`],
+    [/^(\d+) of (\d+) orders · (.+) paid$/, '$1 dari $2 pesanan · $3 dibayar'],
+    [/^(\d+) unpaid orders awaiting payment$/, '$1 pesanan belum dibayar menunggu pembayaran'],
+    [/^Published (.+) to (.+) · (.+) · (\d+) campaigns · (\d+) recipients across those campaigns\.$/, 'Diterbitkan $1 hingga $2 · $3 · $4 kampanye · $5 penerima dalam kampanye tersebut.'],
+    [/^Outcomes checked (.+)\. Comparison: (.+) to (.+)\.$/, 'Hasil diperiksa $1. Perbandingan: $2 hingga $3.'],
+    [/^(\d+) conversations loaded\.$/, '$1 percakapan dimuat.'],
+    [/^Conversation (reopened|resolved|blocked) · (.+)$/, (_,state,at)=>`Percakapan ${t(state)} · ${at}`],
+    [/^(open|resolved|blocked|You|Store|Customer) · (.+?)( · Read)?$/, (_,who,at,read)=>`${t(who)} · ${at}${read?' · Dibaca':''}`],
+    [/^([+−–-]?[\d.,]+)(%| pp) vs previous period$/, '$1$2 dibanding periode sebelumnya'],
+    [/^(\d+) orders in this period$/, '$1 pesanan pada periode ini'],
+    [/^Search (headings|buttons|paragraphs|layouts|accordions|images|icons|dividers|product controls|video)…$/, (_,kind)=>`Cari ${t(kind[0].toUpperCase()+kind.slice(1)).toLowerCase()}…`],
+    [/^(Display heading|Editorial heading|Section heading|Solid button|Outline button|Text link|Body text|Lead paragraph|Caption) added$/, (_,kind)=>`${t(kind)} ditambahkan`],
+    [/^Add (Display heading|Editorial heading|Section heading|Solid button|Outline button|Text link|Body text|Lead paragraph|Caption)$/, (_,kind)=>`Tambah ${t(kind).toLowerCase()}`],
+    [/^Step (\d+) of (\d+)$/, 'Langkah $1 dari $2'],
+    [/^Last (\d+) days$/, '$1 hari terakhir'],
+    [/^(.+) Use Refresh to try again\.(.*)$/, (_,error,rest)=>`${t(error)} ${t('Use Refresh to try again.')} ${t(rest)}`],
+  ];
+  function t(value) {
+    if (language !== 'id' || typeof value !== 'string') return value;
+    const text=normalize(value),exact=dictionary.get(text);
+    if(exact!==undefined)return exact;
+    for(const [match,replacement] of patterns)if(match.test(text))return text.replace(match,replacement);
+    return value;
+  }
+  // Never translate authored storefronts or customer/merchant data. Renderers
+  // mark data with translate=no; form values and editable content are excluded.
+  const excluded='script,style,textarea,code,pre,[contenteditable],[translate="no"],.notranslate,.sq-page-preview,.sq-asset-preview,[data-current-site-name],.sq-reference-preview,.sq-template-preview,.bc-preview,.msg-bubble,.msg-context,[data-msg-detail-name],[data-msg-draft-context],.profile,.store-switcher';
+  function skip(node){return Boolean(node?.closest?.(excluded));}
+  function translateText(node){
+    if(skip(node.parentElement))return;
+    const original=node.textContent,trimmed=normalize(original),translated=t(trimmed).replace(/\b(\d{1,2}) (May|Aug|Oct|Dec)\b/g,(_,day,month)=>day+' '+({May:'Mei',Aug:'Agu',Oct:'Okt',Dec:'Des'})[month]);
+    if(trimmed&&translated!==trimmed)node.textContent=original.replace(original.trim(),translated);
+  }
+  function translateAttributes(node){
+    if(skip(node))return;
+    for(const name of ['aria-label','placeholder','title','alt']){
+      const original=node.getAttribute(name);
+      if(original){const translated=t(original);if(translated!==original)node.setAttribute(name,translated);}
     }
-    [root,...root.querySelectorAll('[aria-label],[placeholder]')].forEach(node=>{
-      if(node.hasAttribute('placeholder'))node.setAttribute('placeholder',t(node.getAttribute('placeholder')));
-      if(node.hasAttribute('aria-label'))node.setAttribute('aria-label',t(node.getAttribute('aria-label')));
+  }
+  function apply(root=document.body) {
+    if(!root||language!=='id')return;
+    if(root.nodeType===Node.TEXT_NODE){translateText(root);return;}
+    if(skip(root))return;
+    if(root.nodeType===Node.ELEMENT_NODE)translateAttributes(root);
+    const walker=document.createTreeWalker(root,NodeFilter.SHOW_ELEMENT|NodeFilter.SHOW_TEXT,{
+      acceptNode:node=>node.nodeType===Node.ELEMENT_NODE&&skip(node)?NodeFilter.FILTER_REJECT:NodeFilter.FILTER_ACCEPT
     });
+    while(walker.nextNode()){
+      const node=walker.currentNode;
+      if(node.nodeType===Node.TEXT_NODE)translateText(node);else translateAttributes(node);
+    }
   }
   globalThis.EzkartLanguage = {t, apply, get:()=>language};
   document.documentElement.lang=language;
-  const surfaces=()=>document.querySelectorAll('.login-shell,.login-language,.onboarding-workspace,.wallet-verification,.page-onboarding .page-heading,.topbar,.sidebar,.msg-page-header,.msg-folders,.msg-filters,.msg-list-status,.msg-empty');
-  surfaces().forEach(apply);
-  if(language==='id')new MutationObserver(records=>{const parents=new Set();for(const record of records){const node=record.target.nodeType===3?record.target.parentElement:record.target;if(node?.closest?.('.onboarding-workspace,.wallet-verification,.login-shell,.msg-folders,.msg-list-status'))parents.add(node);}parents.forEach(apply);}).observe(document.body,{subtree:true,childList:true,characterData:true});
+  document.title=document.title.split(' · ').map(t).join(' · ');
+  apply(document.body);
+  if(language==='id')new MutationObserver(records=>{
+    const roots=new Set();
+    for(const record of records){
+      if(record.type==='childList')for(const node of record.addedNodes)roots.add(node);
+      else roots.add(record.target);
+    }
+    for(const node of roots)if(node.isConnected)apply(node);
+  }).observe(document.body,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['aria-label','placeholder','title','alt']});
   for(const picker of document.querySelectorAll('[data-entry-language]')){
     picker.value=language;
     picker.addEventListener('change',()=>{document.cookie='ezkart_language='+picker.value+'; Path=/; Max-Age=31536000; SameSite=Lax'+(location.protocol==='https:'?'; Secure':'');location.reload();});
@@ -268,6 +335,7 @@
       language=result.preferences.language;document.body.dataset.adminLanguage=language;document.cookie='ezkart_language='+language+'; Path=/; Max-Age=31536000; SameSite=Lax'+(location.protocol==='https:'?'; Secure':'');
       status.textContent=t('Language saved.');
       document.dispatchEvent(new CustomEvent('ezkart:language-changed'));
+      location.reload();
     } catch {select.value=previous;status.textContent=t('Could not save the language. Try again.');}
     finally {select.disabled=false;}
   });

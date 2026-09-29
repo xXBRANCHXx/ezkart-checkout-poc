@@ -4,6 +4,7 @@
   const jobLabels={'shipment.create':'Pickup request','shipment.cancel':'Pickup cancellation','shipment.refresh':'Tracking refresh'};
   const attention=new Set(['on_hold','rejected','courier_not_found','stock_review','return_in_transit','returned','disposed']);
   const el=(tag,text,className='')=>{const node=document.createElement(tag);if(text!==undefined)node.textContent=String(text);if(className)node.className=className;return node;};
+  const dataEl=(tag,text)=>{const node=el(tag,text);node.translate=false;return node;};
   const button=(text,click,primary=false)=>{const node=el('button',text,'ui-button'+(primary?' primary':''));node.type='button';node.addEventListener('click',click);return node;};
   const money=value=>new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(value);
   const date=value=>window.EzkartAdminFormat.date(value);
@@ -71,7 +72,7 @@
     }
     function items(order){
       const box=el('div',undefined,'fulfillment-items');for(const item of order.items){const row=el('div',undefined,'fulfillment-item'),info=el('div');
-        info.append(el('b',item.title),el('small',[item.fulfillment.variantName,item.sku].filter(Boolean).join(' · ')),el('small',`${item.quantity} × ${money(item.price)} · ${item.fulfillment.weightGrams} g each`));row.append(info,el('span',money(item.price*item.quantity)));box.append(row);}return box;
+        info.append(dataEl('b',item.title),el('small',[item.fulfillment.variantName,item.sku].filter(Boolean).join(' · ')),el('small',`${item.quantity} × ${money(item.price)} · ${item.fulfillment.weightGrams} g each`));row.append(info,el('span',money(item.price*item.quantity)));box.append(row);}return box;
     }
     function renderHistory(target,events,shipments){
       for(const event of events){const sequence=shipments.find(s=>s.id===event.shipmentId)?.sequence;const li=el('li');

@@ -1720,6 +1720,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
 </head>
 <body class="<?= $authenticated ? 'dashboard-page page-' . ez_admin_escape($page) . ($page === 'sites' ? ($siteEditor ? ' page-site-editor' : ' page-sites-library') : '') : 'login-page' ?>" data-admin-file-store="<?= ez_admin_escape($sellerId) ?>" data-admin-review-account="<?= ez_admin_escape((string) ($adminUser['id'] ?? '')) ?>" data-admin-date-preferences="<?= ez_admin_escape(json_encode($storeDisplayPreferences)) ?>" data-admin-language="<?= ez_admin_escape($adminLanguage) ?>" data-admin-advanced-mode="<?= !empty($advancedPlan['enabled']) ? 'true' : 'false' ?>" data-admin-landing-limit="<?= !empty($advancedPlan['enabled']) ? 24 : 6 ?>" data-admin-profile="<?= ez_admin_escape(json_encode($adminProfile)) ?>" data-admin-storage-scope="<?= ez_admin_escape($adminStorageScope) ?>" data-admin-checkout-brand="<?= ez_admin_escape($adminDisplayName) ?>" data-admin-migrate-legacy-storage="<?= $legacyDataAccess ? 'true' : 'false' ?>" data-admin-cloud-enabled="<?= $authenticated && $authenticationMethod === 'supabase' ? 'true' : 'false' ?>" data-admin-cloud-media-base="<?= $authenticated && $authenticationMethod === 'supabase' ? ez_admin_escape($cloudMediaBase) : '' ?>" data-admin-csrf-token="<?= ez_admin_escape($csrfToken) ?>">
 <?php if (!$authenticated): ?>
+<script src="admin-language-id.js?v=<?= (int) filemtime(__DIR__ . '/admin-language-id.js') ?>"></script>
 <script src="admin-language.js?v=<?= (int) filemtime(__DIR__ . '/admin-language.js') ?>" defer></script>
   <div class="login-language"><?php require __DIR__ . '/language-picker.php'; ?></div>
   <main class="login-shell">
@@ -2047,7 +2048,8 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
   <?php if ($centralAnalyticsWorkspace): ?><script src="commerce-analytics.js?v=<?= (int) filemtime(__DIR__ . '/commerce-analytics.js') ?>"></script><?php endif; ?>
   <?php if ($page === 'onboarding'): ?><script src="wallet-access.js?v=<?= (int) filemtime(__DIR__ . '/wallet-access.js') ?>"></script><script src="seller-onboarding.js?v=<?= (int) filemtime(__DIR__ . '/seller-onboarding.js') ?>"></script><?php endif; ?>
   <?php if ($page === 'wallet'): ?><script src="wallet-access.js?v=<?= (int) filemtime(__DIR__ . '/wallet-access.js') ?>"></script><script src="wallet-withdrawals.js?v=<?= (int) filemtime(__DIR__ . '/wallet-withdrawals.js') ?>"></script><script src="wallet-enrollment.js?v=<?= (int) filemtime(__DIR__ . '/wallet-enrollment.js') ?>"></script><?php endif; ?>
-  <script src="admin-language.js?v=<?= (int) filemtime(__DIR__ . '/admin-language.js') ?>"></script>
+  <script src="admin-language-id.js?v=<?= (int) filemtime(__DIR__ . '/admin-language-id.js') ?>"></script>
+<script src="admin-language.js?v=<?= (int) filemtime(__DIR__ . '/admin-language.js') ?>"></script>
   <?php if ($page === 'sites'): ?><script src="builder-image.js?v=<?= (int) filemtime(__DIR__ . '/builder-image.js') ?>"></script><script src="builder-choice.js?v=<?= (int) filemtime(__DIR__ . '/builder-choice.js') ?>"></script><?php endif; ?>
   <?php if ($page === 'product-new'): ?><script src="digital-files.js?v=<?= (int) filemtime(__DIR__ . '/digital-files.js') ?>"></script><?php endif; ?>
   <script src="admin.js?v=<?= ez_admin_escape($adminJsVersion) ?>"></script>

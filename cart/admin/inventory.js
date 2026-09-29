@@ -9,6 +9,7 @@
     alert:['Alert at','Enter the available-stock level that should trigger a low-stock alert. Stock quantities stay the same.'],
   };
   const el = (tag, text, className = '') => {const node=document.createElement(tag);if(text!==undefined)node.textContent=String(text);if(className)node.className=className;return node;};
+  const dataEl=(tag,text)=>{const node=el(tag,text);node.translate=false;return node;};
   const key = row => row.productId+'~'+row.variantId;
   const newKey = () => crypto.randomUUID().replaceAll('-','');
   const fmt = value => Number(value).toLocaleString();
@@ -22,7 +23,7 @@
       if(root.inventoryReadVersion!==version)return;
       const total=zero.summary.skuCount+low.summary.skuCount;
       status.textContent=total?`${counted(total,'SKU')} ${total===1?'is':'are'} at or below their alert threshold.`:'No items with low stock. Open inventory to review all quantities.';
-      target.replaceChildren(...[...zero.items,...low.items].slice(0,5).map(row=>{const item=el('div',undefined,'inv-mini-row'),copy=el('div'),link=el('a',row.title);link.href='?page=inventory&q='+encodeURIComponent(row.sku||row.title);copy.append(link,el('small',`${row.sku} · alert at ${fmt(row.reorderPoint)}`));item.append(copy,el('strong',`${fmt(row.available)} available`,row.available<=0?'inv-zero':'inv-low'));return item;}));
+      target.replaceChildren(...[...zero.items,...low.items].slice(0,5).map(row=>{const item=el('div',undefined,'inv-mini-row'),copy=el('div'),link=dataEl('a',row.title);link.href='?page=inventory&q='+encodeURIComponent(row.sku||row.title);copy.append(link,el('small',`${row.sku} · alert at ${fmt(row.reorderPoint)}`));item.append(copy,el('strong',`${fmt(row.available)} available`,row.available<=0?'inv-zero':'inv-low'));return item;}));
     } catch(error) {if(root.inventoryReadVersion===version)status.textContent=error.message||'Inventory could not be loaded.';}
   }
   async function workspace(root,request) {
@@ -66,7 +67,7 @@
     function renderRows() {
       const fragment=document.createDocumentFragment();
       for(const row of rows){
-        const tr=el('tr');tr.dataset.inventoryKey=row.key;const name=el('td'),link=el('button',undefined,'inv-item-link');link.type='button';link.append(el('b',row.title));link.addEventListener('click',()=>{historyProduct=row.productId;historyVariant=row.variantId;q('[data-inv-history-filter]').textContent='History: '+row.title;void loadHistory();});name.append(link,el('small',row.sku));
+        const tr=el('tr');tr.dataset.inventoryKey=row.key;const name=el('td'),link=el('button',undefined,'inv-item-link');link.type='button';link.append(dataEl('b',row.title));link.addEventListener('click',()=>{historyProduct=row.productId;historyVariant=row.variantId;q('[data-inv-history-filter]').textContent='History: '+row.title;void loadHistory();});name.append(link,el('small',row.sku));
         if(row.hidden||row.status==='archived')name.append(el('span',row.status==='archived'?'Archived product':'Hidden option','inv-badge'));
         const available=el('td',fmt(row.available),row.available<=0?'inv-zero':row.available<=row.reorderPoint?'inv-low':'');
         const cell=el('td'),input=el('input');input.type='number';input.max='1000000000';input.step='1';input.placeholder='—';input.dataset.invValue=row.key;input.setAttribute('aria-label',modes[kind.value][0]+' for '+row.title);input.value=queue.get(row.key)?.quantity??'';
@@ -91,7 +92,7 @@
     async function loadHistory(more=false){
       const version=++historyVersion,params=new URLSearchParams({limit:'30'});if(more&&historyCursor)params.set('cursor',historyCursor);if(historyProduct)params.set('product',historyProduct);if(historyVariant!==null)params.set('variant',historyVariant);
       try{const data=await request('GET','/v1/inventory/history?'+params);if(version!==historyVersion)return;const target=q('[data-inv-history-rows]');if(!more)target.replaceChildren();
-        for(const item of data.items){const row=el('tr'),who=el('td'),product=el('td'),reason=el('td');who.append(el('span',time(item.createdAt)),el('small',item.actor));product.append(el('b',item.title),el('small',item.sku));reason.append(el('b',labels[item.reason]||item.reason),el('small',item.note),el('small',item.reference));row.append(who,product,el('td',item.reason==='alert'?'Stock unchanged':`${fmt(item.before)} → ${fmt(item.after)} (${item.delta>0?'+':''}${fmt(item.delta)})`),reason);target.append(row);}
+        for(const item of data.items){const row=el('tr'),who=el('td'),product=el('td'),reason=el('td');who.append(el('span',time(item.createdAt)),el('small',item.actor));product.append(dataEl('b',item.title),el('small',item.sku));reason.append(el('b',labels[item.reason]||item.reason),dataEl('small',item.note),dataEl('small',item.reference));row.append(who,product,el('td',item.reason==='alert'?'Stock unchanged':`${fmt(item.before)} → ${fmt(item.after)} (${item.delta>0?'+':''}${fmt(item.delta)})`),reason);target.append(row);}
         if(!data.items.length&&!more){const row=el('tr'),cell=el('td','No inventory changes recorded yet.');cell.colSpan=4;row.append(cell);target.append(row);}historyCursor=data.nextCursor;q('[data-inv-history-more]').hidden=!historyCursor;
       }catch(err){error(err.message);}
     }

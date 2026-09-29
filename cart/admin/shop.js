@@ -30,7 +30,7 @@
     const card = product => {
       const media = product.media?.[0]?.id, url = media ? `${mediaBase}/v1/public/media/${media}` : "";
       const choice = product.variants?.find(v => !v.hidden && v.stock > 0) || product.variants?.find(v => !v.hidden);
-      return `<article class="shop-preview-card shop-product"><div class="shop-preview-media">${url ? `<img src="${esc(url)}" alt="">` : "◇"}</div><div class="shop-preview-card-copy"><b>${esc(product.name)}</b><small>${choice ? `${esc(choice.name)} · ` : ""}${money(choice?.price ?? product.price)}</small>${mode === "shop" ? '<span class="shop-preview-button">Add to cart</span>' : '<small>Quantity: 1</small>'}</div></article>`;
+      return `<article class="shop-preview-card shop-product"><div class="shop-preview-media">${url ? `<img src="${esc(url)}" alt="">` : "◇"}</div><div class="shop-preview-card-copy"><b translate="no">${esc(product.name)}</b><small>${choice ? `${esc(choice.name)} · ` : ""}${money(choice?.price ?? product.price)}</small>${mode === "shop" ? '<span class="shop-preview-button">Add to cart</span>' : '<small>Quantity: 1</small>'}</div></article>`;
     };
     target.innerHTML = `<div class="shop-preview-head">${logoUrl ? `<img src="${esc(logoUrl)}" alt="">` : `<span class="shop-preview-avatar">${esc((value.name || "S").charAt(0))}</span>`}<strong>${esc(value.name || "Your store")}</strong></div><div class="shop-preview-body"><div class="shop-preview-heading"><b>${mode === "shop" ? "Shop all products" : "Review your cart"}</b><p>${mode === "shop" ? "Choose your items and check out together." : "Check your items before continuing."}</p></div>${visible.length ? `<div class="shop-preview-grid">${visible.map(card).join("")}</div>` : '<div class="shop-preview-heading"><p>Create a product to see it here.</p></div>'}${mode === "checkout" && selected ? `<div class="shop-preview-order"><p><b>Your order</b><span>${money((selected.variants?.find(v => !v.hidden && v.stock > 0) || selected.variants?.find(v => !v.hidden))?.price ?? selected.price)}</span></p><p>Delivery calculated at checkout</p><span class="shop-preview-button">Continue to checkout</span></div>` : ""}</div>`;
   }
@@ -41,7 +41,7 @@
     byId("shop-publish-status").textContent = store.enabled ? "Your shop is enabled. Share this link anywhere." : "Your shop is disabled. Product checkout links still work.";
     byId("shop-product-links").innerHTML = products.length ? products.map(product => {
       const url = new URL(`/cart/?product=${encodeURIComponent(product.id)}`, location.origin).href;
-      return `<article class="shop-product-link"><div><b>${esc(product.name)}</b><small>${product.type === "physical" ? "Uses your shared checkout appearance" : "Online checkout currently supports physical products"}</small></div><div><a data-ui-icon="external-link" class="action-button" href="${esc(url)}" target="_blank" rel="noopener">Open</a><button data-ui-icon="copy" type="button" class="action-button" data-copy-product="${esc(url)}">Copy checkout link</button></div></article>`;
+      return `<article class="shop-product-link"><div><b translate="no">${esc(product.name)}</b><small>${product.type === "physical" ? "Uses your shared checkout appearance" : "Online checkout currently supports physical products"}</small></div><div><a data-ui-icon="external-link" class="action-button" href="${esc(url)}" target="_blank" rel="noopener">Open</a><button data-ui-icon="copy" type="button" class="action-button" data-copy-product="${esc(url)}">Copy checkout link</button></div></article>`;
     }).join("") : '<p class="shop-field-note">Your active products will appear here. <a href="?page=product-new&new=1">Create a product</a> to get started.</p>';
   }
   async function copy(value) {
@@ -55,7 +55,7 @@
       store = settings.store; products = catalog.products.filter(product => product.status === "active");
       for (const key of ["name", "accent", "button", "background", "animation"]) fields[key].value = store[key];
       fields.enabled.checked = store.enabled; images = { logoId: store.logoId, backgroundId: store.backgroundId }; previewImages = {};
-      byId("shop-preview-product").innerHTML = products.map(product => `<option value="${esc(product.id)}">${esc(product.name)}</option>`).join("");
+      byId("shop-preview-product").innerHTML = products.map(product => `<option translate="no" value="${esc(product.id)}">${esc(product.name)}</option>`).join("");
       dirty = false; renderPreview(); updateLinks(); byId("shop-settings").disabled = false; status("Appearance saved across all your checkout links.");
     } catch (error) { status(error.message, true); byId("shop-admin-retry").hidden = false; }
   }

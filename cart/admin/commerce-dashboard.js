@@ -5,6 +5,7 @@
   const date=value=>window.EzkartAdminFormat.date(value,{time:false,calendar:true});
   const time=value=>window.EzkartAdminFormat.date(value);
   const el=(tag,text,cls='')=>{const node=document.createElement(tag);if(text!==undefined)node.textContent=String(text);if(cls)node.className=cls;return node;};
+  const dataEl=(tag,text)=>{const node=el(tag,text);node.setAttribute('translate','no');return node;};
   const svg=(tag,attrs={})=>{const node=document.createElementNS('http://www.w3.org/2000/svg',tag);for(const [k,v] of Object.entries(attrs))node.setAttribute(k,String(v));return node;};
 
   function drawChart(container,values,chart){
@@ -26,7 +27,7 @@
     buckets.forEach((b,i)=>{
       if(ticks.has(i)){
         const x=left+i/Math.max(1,buckets.length-1)*(right-left),label=svg('text',{x,y:205,'text-anchor':i===0?'start':i===buckets.length-1?'end':'middle',class:'chart-axis'});
-        label.textContent=new Intl.DateTimeFormat('en-GB',{year:chart.group==='yearly'?'numeric':chart.group==='monthly'?'2-digit':undefined,month:chart.group==='yearly'?undefined:'short',day:['daily','weekly'].includes(chart.group)?'numeric':undefined,timeZone:'UTC'}).format(new Date(b.date+'T00:00:00Z'));plot.append(label);
+        label.textContent=new Intl.DateTimeFormat(document.body.dataset.adminLanguage==='id'?'id-ID':'en-GB',{year:chart.group==='yearly'?'numeric':chart.group==='monthly'?'2-digit':undefined,month:chart.group==='yearly'?undefined:'short',day:['daily','weekly'].includes(chart.group)?'numeric':undefined,timeZone:'UTC'}).format(new Date(b.date+'T00:00:00Z'));plot.append(label);
       }
       const row=el('tr');row.append(el('td',date(b.date)),el('td',money(b.amount)),el('td',number(b.paidOrders)));values.append(row);
     });
@@ -69,11 +70,11 @@
       q('[data-dashboard-chart-note]').textContent=`${data.chart.group[0].toUpperCase()+data.chart.group.slice(1)} totals by order date${data.chart.group!==data.chart.requestedGroup?' · Grouped for this history length':''}.`;
       const rows=q('[data-dashboard-recent]');rows.replaceChildren();
       for(const order of recent){
-        const row=el('tr'),identity=el('td'),link=el('a',order.id);link.href=href({order:order.id});identity.append(link,el('small',order.customerName||'Customer'));
-        row.append(identity,el('td',order.firstItem||'Order items'),el('td',labels[order.state]||order.state),el('td',money(order.total)),el('td',time(order.createdAt)));rows.append(row);
+        const row=el('tr'),identity=el('td'),link=el('a',order.id);link.href=href({order:order.id});identity.append(link,dataEl('small',order.customerName||'Customer'));
+        row.append(identity,dataEl('td',order.firstItem||'Order items'),el('td',labels[order.state]||order.state),el('td',money(order.total)),el('td',time(order.createdAt)));rows.append(row);
       }
       if(!recent.length){const row=el('tr'),cell=el('td','No orders in this period.','commerce-dashboard-empty');cell.colSpan=5;row.append(cell);rows.append(row);}
-      const ranked=(item,i,showMoney)=>{const row=el('li'),info=el('div');info.append(el('b',item.title),el('small',number(item.quantity)+' units'));row.append(el('span',i+1,'commerce-dashboard-rank'));
+      const ranked=(item,i,showMoney)=>{const row=el('li'),info=el('div');info.append(dataEl('b',item.title),el('small',number(item.quantity)+' units'));row.append(el('span',i+1,'commerce-dashboard-rank'));
         if(photos.has(item.id)){const image=el('img');image.src='./?cloud='+encodeURIComponent('/v1/media/'+photos.get(item.id));image.alt='';image.title='Current catalog image';image.loading='lazy';image.width=36;image.height=36;image.addEventListener('error',()=>image.hidden=true);row.append(image);}
         row.append(info);if(showMoney)row.append(el('strong',money(item.amount)));return row;};
       list(q('[data-dashboard-products]'),data.topProducts,'No paid product sales in this period.',(item,i)=>ranked(item,i,true));
@@ -81,7 +82,7 @@
       q('[data-dashboard-paid-units]').textContent=number(summary.paidUnits)+' paid units';q('[data-dashboard-ordered-units]').textContent=number(summary.orderedUnits)+' units ordered';
       list(q('[data-dashboard-states]'),Object.entries(data.statuses),'No orders.',([state,count])=>{const row=el('li'),link=el('a'),bar=el('i'),fill=el('span');link.href=href({...periodFilter,state});link.append(el('span',labels[state]),el('b',number(count)));fill.style.width=(summary.orders?count/summary.orders*100:0)+'%';bar.append(fill);row.append(link,bar);return row;});
       amounts(q('[data-dashboard-amounts]'),[['Paid products',money(summary.productAmount)],['Paid shipping',money(summary.shippingAmount)],['Awaiting payment',money(summary.pendingAmount)],['Failed or expired',money(summary.failedAmount)],['Cancelled orders',money(summary.cancelledAmount)]]);
-      list(q('[data-dashboard-activity]'),recent.slice(0,4),'No customer activity in this period.',order=>{const row=el('li'),link=el('a',order.customerName||'Customer');link.href=href({order:order.id});row.append(link,el('small','Order placed · '+(labels[order.state]||order.state)),el('time',time(order.createdAt)));return row;});
+      list(q('[data-dashboard-activity]'),recent.slice(0,4),'No customer activity in this period.',order=>{const row=el('li'),link=dataEl('a',order.customerName||'Customer');link.href=href({order:order.id});row.append(link,el('small','Order placed · '+(labels[order.state]||order.state)),el('time',time(order.createdAt)));return row;});
       amounts(q('[data-dashboard-fulfillment]'),[['Orders in period',number(summary.orders)],['Orders with verified payment',number(summary.paidOrders)],['Courier bookings',number(summary.bookedOrders)],['Latest order destination',recent[0]?.destination||'No destination recorded']]);
       report.hidden=false;
       drawChart(q('[data-dashboard-chart]'),q('[data-dashboard-chart-values]'),data.chart);chartWidth=q('[data-dashboard-chart]').clientWidth;

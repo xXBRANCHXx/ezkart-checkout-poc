@@ -1,5 +1,6 @@
 (() => {
   const el=(tag,text,cls='')=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;};
+  const dataEl=(tag,text)=>{const node=el(tag,text);node.translate=false;return node;};
   const button=(text,click)=>{const n=el('button',text,'ui-button');n.type='button';n.addEventListener('click',click);return n;};
   const copy=value=>structuredClone(value),key=()=>crypto.randomUUID().replaceAll('-','');
   const date=value=>window.EzkartAdminFormat.date(value);
@@ -29,7 +30,7 @@
     function card(address,actions=false){
       const item=el('article',undefined,'shipping-address-card'),tags=el('div',undefined,'shipping-address-tags');
       if(address.id===draft.pickupAddressId)tags.append(el('span','Pickup'));if(address.id===draft.returnAddressId)tags.append(el('span','Returns'));if(address.coordinate)tags.append(el('span','Pin saved'));
-      item.append(el('h3',address.label),tags,el('b',address.name),el('p',address.address+', '+address.location+' '+address.postalCode),el('p',address.phone));
+      item.append(dataEl('h3',address.label),tags,dataEl('b',address.name),dataEl('p',address.address+', '+address.location+' '+address.postalCode),el('p',address.phone));
       if(address.email)item.append(el('p',address.email));if(address.note)item.append(el('small',address.note));
       if(actions){const row=el('div',undefined,'shipping-address-actions'),edit=button('Edit address',()=>openAddress(address)),remove=button('Remove',()=>openReview('remove',address.id));edit.dataset.shippingEdit=address.id;remove.dataset.shippingRemove=address.id;edit.setAttribute('aria-label','Edit '+address.label);remove.setAttribute('aria-label','Remove '+address.label);row.append(edit,remove);item.append(row);}return item;
     }
