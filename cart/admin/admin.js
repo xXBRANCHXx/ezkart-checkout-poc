@@ -593,6 +593,40 @@
     }
     return new URL(cloudUrl(`/v1/landing-pages/${encodeURIComponent(landingPageId(page?.id || page?.url))}/view`), window.location.href).href;
   };
+  const sharePreview = async (site) => {
+    const dialog = document.createElement('dialog');
+    dialog.className = 'preview-share-dialog';
+    dialog.setAttribute('aria-labelledby', 'preview-share-title');
+    dialog.innerHTML = `<h2 id="preview-share-title">Share preview</h2><p>Share the URL and key separately. Visitors enter the key before the page loads. Access lasts one hour.</p><label>Preview URL<input data-preview-share-url readonly></label><label>Preview key<input data-preview-share-key readonly value="Loading…"></label><p data-preview-share-status role="status"></p><div class="preview-share-actions"><button class="ui-button" data-ui-icon="copy" data-copy="url">Copy URL</button><button class="ui-button primary" data-ui-icon="copy" data-copy="key" disabled>Copy key</button><button class="ui-button" data-ui-icon="refresh" data-preview-rotate disabled>Replace key</button><button class="ui-button" data-ui-icon="x" data-preview-close>Close</button></div>`;
+    document.body.append(dialog);
+    dialog.querySelector('[data-preview-share-url]').value = hostedPageUrl(site, false);
+    const keyField = dialog.querySelector('[data-preview-share-key]');
+    const status = dialog.querySelector('[data-preview-share-status]');
+    const rotate = dialog.querySelector('[data-preview-rotate]');
+    const copyKey = dialog.querySelector('[data-copy="key"]');
+    const load = async (replace = false) => {
+      rotate.disabled = true; copyKey.disabled = true;
+      try {
+        const result = await cloudRequest(replace ? 'PUT' : 'POST', `/v1/landing-pages/${encodeURIComponent(landingPageId(site.id || site.url))}/preview-access`, {});
+        keyField.value = result.previewAccess.key;
+        status.textContent = replace ? 'Key replaced. Previous keys and unlock sessions no longer work.' : 'Anyone with this key can view the preview.';
+        copyKey.disabled = false;
+      } catch (error) { keyField.value = ''; status.textContent = error.message; }
+      finally { rotate.disabled = false; }
+    };
+    dialog.querySelectorAll('[data-copy]').forEach(button => button.addEventListener('click', async () => {
+      const field = button.dataset.copy === 'key' ? keyField : dialog.querySelector('[data-preview-share-url]');
+      try { await navigator.clipboard.writeText(field.value); status.textContent = button.dataset.copy === 'key' ? 'Preview key copied.' : 'Preview URL copied.'; }
+      catch { field.focus(); field.select(); status.textContent = 'Select and copy the highlighted text.'; }
+    }));
+    rotate.addEventListener('click', () => {
+      if (window.confirm('Replace the preview key? The previous key and all existing preview sessions will stop working.')) void load(true);
+    });
+    dialog.querySelector('[data-preview-close]').addEventListener('click', () => dialog.close());
+    dialog.addEventListener('close', () => dialog.remove(), {once:true});
+    dialog.showModal();
+    await load();
+  };
   const replaceCloudLandingPage = (page) => {
     const index = cloudLandingPages.findIndex((item) => item.id === page?.id);
     const normalized = normalizeCloudLandingPage({ ...(index >= 0 ? cloudLandingPages[index] : {}), ...page });
@@ -1952,12 +1986,13 @@
       card.dataset.siteUrl = site.url;
       const published = site.status === "published";
       const pageUrl = hostedPageUrl(site);
-      const copyLabel = published ? 'Copy published page URL' : 'Copy private preview URL';
+      const copyLabel = published ? 'Copy published page URL' : 'Share preview';
       card.innerHTML = `<a class="landing-project-card-link" href="${href}" aria-label="Open ${escapeHtml(site.name)} in the editor"><span class="landing-project-preview tone-${tone}${site.previewUrl ? " has-preview" : ""}"><span class="project-browser"><i></i><i></i><i></i><small>${escapeHtml(pageUrl.replace(/^https?:\/\//, ""))}</small></span>${pagePreview}</span><span class="landing-project-details"><span><span class="project-status ${published ? "live" : "draft"}"><i></i>${published ? "Published" : "Draft"}</span><h2 translate="no">${escapeHtml(site.name)}</h2></span></span></a><button class="project-url-copy" type="button" data-project-copy-url aria-label="${copyLabel}" title="${copyLabel}"><svg class="icon" aria-hidden="true"><use href="#icon-copy"></use></svg></button><button class="project-actions" type="button" data-project-menu aria-label="Project actions" aria-haspopup="menu" aria-expanded="false"><span class="project-action-dots" aria-hidden="true"><i></i><i></i><i></i></span></button>`;
       const previewFrame = card.querySelector(".project-page-thumbnail iframe");
       previewFrame?.addEventListener("load", () => card.querySelector(".landing-project-preview")?.classList.add("preview-ready"));
       const copyUrl = card.querySelector("[data-project-copy-url]");
       copyUrl?.addEventListener("click", async () => {
+        if (!published) { await sharePreview(site); return; }
         const url = pageUrl;
         try { await navigator.clipboard.writeText(url); }
         catch (_) {
@@ -1988,11 +2023,12 @@
         const menu = document.createElement("div");
         menu.className = "landing-project-menu";
         menu.setAttribute("role", "menu");
-        menu.innerHTML = '<button type="button" role="menuitem" data-ui-icon="trash">Delete landing page</button>';
+        menu.innerHTML = '<button type="button" role="menuitem" data-ui-icon="shield" data-share-preview>Share preview</button><button type="button" role="menuitem" data-ui-icon="trash" data-delete-page>Delete landing page</button>';
+        menu.querySelector('[data-share-preview]').onclick = () => { const site = readLandingSites().find(item => item.url === card.dataset.siteUrl); closeProjectMenu(); if (site) void sharePreview(site); };
         button.setAttribute("aria-expanded", "true");
         const rect = button.getBoundingClientRect();
         menu.style.left = `${Math.max(8, rect.right - 160)}px`; menu.style.top = `${rect.bottom + 5}px`;
-        menu.querySelector("button").onclick = async () => {
+        menu.querySelector("[data-delete-page]").onclick = async () => {
           if (!window.confirm(`Delete “${card.dataset.siteName}”? This permanently removes the landing page from your account.`)) return;
           const url = card.dataset.siteUrl;
           try {
@@ -8169,6 +8205,7 @@
         clearTimeout(previewScheduleTimer);
         await refreshLandingPreviewIfDue();
         if (activeSiteDocument.previewSourceUpdatedAt !== activeSiteDocument.updatedAt) throw Error('Your preview could not be saved. Please try again.');
+        await sharePreview(activeSiteDocument);
         if (!tab.closed) {
           tab.location.replace(hostedPageUrl(activeSiteDocument, false));
           previewTabs.set(tab, {id: activeSiteDocument.id, url: hostedPageUrl(activeSiteDocument, false)});

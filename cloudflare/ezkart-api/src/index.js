@@ -1,3 +1,4 @@
+import {previewAccessPath, readPreviewAccess, managePreviewAccess, unlockPreview, validPreviewSession, previewSessionSeconds} from './landing-preview-access.js';
 import {createTrackingCampaign,addTrackingSource,endTrackingCampaign,trackingReport,listTrackingCampaigns,startTrackingVisit,recordTrackingEvent} from './tracking-campaigns.js';
 import {reviewBankChanges} from './seller-bank-changes.js';
 import {sellerAlerts,sellerAlertRescan,sellerOnboardingStatus} from './seller-alerts.js';
@@ -781,6 +782,36 @@ async function landingPageView(request, env, rawId) {
   return response;
 }
 
+async function landingPreviewAccess(request, env, rawId) {
+  const {seller} = await sellerContext(request, env);
+  const id = cleanLandingPageId(rawId);
+  if (!await env.PRIVATE_ASSETS.head(landingPageKey(seller.id, id))) throw new Response('Page not found', {status:404});
+  const record = await managePreviewAccess(env.PRIVATE_ASSETS, seller.id, id, request.method === 'PUT');
+  return {key: record.key, updatedAt: record.updatedAt, sessionSeconds: previewSessionSeconds};
+}
+
+async function sharedLandingPreview(request, env, store, rawId, unlock) {
+  const seller = await sellerByPageAddress(env, store);
+  if (!seller) throw new Response('Preview not found', {status:404});
+  const id = cleanLandingPageId(rawId);
+  if (!await env.PRIVATE_ASSETS.head(landingPageKey(seller.id, id))) throw new Response('Preview not found', {status:404});
+  const record = (await readPreviewAccess(env.PRIVATE_ASSETS, seller.id, id))?.record;
+  if (unlock) {
+    const payload = await requestJson(request, 1024);
+    const token = await unlockPreview(record, seller.id, id, payload.key);
+    if (!token) return json({ok:false, error:'That preview key is not valid. Ask the owner for the current key.'}, 403, {'cache-control':'private, no-store'});
+    return json({ok:true, token, expiresIn:previewSessionSeconds}, 200, {'cache-control':'private, no-store'});
+  }
+  if (!await validPreviewSession(record, seller.id, id, request.headers.get('x-ezkart-preview-token'))) {
+    return json({ok:false, error:'Enter the preview key to continue.'}, 401, {'cache-control':'private, no-store'});
+  }
+  // Fetch authored content only after access is verified. Never expose project JSON.
+  const object = await env.PRIVATE_ASSETS.get(landingPagePreviewKey(seller.id, id));
+  if (!object) throw new Response('Save a preview in the editor first', {status:404});
+  return new HTMLRewriter().on('#ezkart-library-preview-style', {element(node) {node.remove();}})
+    .transform(hostedLandingResponse(object.body));
+}
+
 async function publicLandingPage(env, store, rawId) {
   const seller = await sellerByPageAddress(env, store);
   if (!seller) throw new Response("Page not found", {status: 404});
@@ -839,7 +870,7 @@ async function deleteLandingPage(request, env, rawId) {
   const object = await env.PRIVATE_ASSETS.head(key);
   if (!object) throw new Response("Landing page not found", { status: 404 });
   const token = await beginJevPageWrite(env, seller.id, id, object.etag);
-  await env.PRIVATE_ASSETS.delete([key, landingPagePreviewKey(seller.id, id), landingPageThumbnailKey(seller.id, id), landingSummaryKey(seller.id, id)]);
+  await env.PRIVATE_ASSETS.delete([key, previewAccessPath(seller.id, id), landingPagePreviewKey(seller.id, id), landingPageThumbnailKey(seller.id, id), landingSummaryKey(seller.id, id)]);
   // Keep moderation history on the address. A successful seller delete allows
   // recreation, but never releases an archive; an unknown delete stays fenced.
   await finishJevPageWrite(env, seller.id, id, token, '');
@@ -1805,6 +1836,8 @@ export default {
         return json({ok:true,...await(url.pathname.endsWith('/visit')?startTrackingVisit(env,input):recordTrackingEvent(env,input))});
       }
       if (url.pathname.startsWith('/internal/commerce/')) return json({ok: true, ...await commerceServiceRoute(request, env)});
+      const sharedPreviewMatch = /^\/v1\/public\/landing-pages\/([a-z0-9-]+)\/([a-z0-9-]+)\/preview(\/unlock)?$/.exec(url.pathname);
+      if (sharedPreviewMatch && request.method === (sharedPreviewMatch[3] ? 'POST' : 'GET')) return await sharedLandingPreview(request, env, sharedPreviewMatch[1], sharedPreviewMatch[2], Boolean(sharedPreviewMatch[3]));
       const publicLandingMatch = /^\/v1\/public\/landing-pages\/([a-z0-9-]+)\/([a-z0-9-]+)$/.exec(url.pathname);
       if (request.method === "GET" && publicLandingMatch) return await publicLandingPage(env, publicLandingMatch[1], publicLandingMatch[2]);
       const landingViewMatch = /^\/v1\/landing-pages\/([a-z0-9-]+)\/view$/.exec(url.pathname);
@@ -2185,6 +2218,8 @@ export default {
       if (request.method === "GET" && url.pathname === "/v1/landing-pages") return json({ ok: true, pages: await landingPages(request, env) }, 200, cors);
       const landingExportMatch = /^\/v1\/landing-pages\/([a-z0-9-]+)\/export$/.exec(url.pathname);
       if (request.method === "POST" && landingExportMatch) return json(await authorizeLandingExport(request, env, landingExportMatch[1]), 200, cors);
+      const previewAccessMatch = /^\/v1\/landing-pages\/([a-z0-9-]+)\/preview-access$/.exec(url.pathname);
+      if (previewAccessMatch && ['POST','PUT'].includes(request.method)) return json({ok:true, previewAccess:await landingPreviewAccess(request, env, previewAccessMatch[1])}, 200, {...cors, 'cache-control':'private, no-store'});
       const landingPagePreviewMatch = /^\/v1\/landing-pages\/([a-z0-9-]+)\/preview$/.exec(url.pathname);
       if (request.method === "GET" && landingPagePreviewMatch) {
         const response = await landingPagePreview(request, env, landingPagePreviewMatch[1]);

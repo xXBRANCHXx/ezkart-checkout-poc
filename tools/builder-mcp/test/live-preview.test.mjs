@@ -53,6 +53,13 @@ test("the editor Preview renders current edits, local media and commerce at ever
     viewport: { width: 1600, height: 1000 },
     reducedMotion: "reduce",
   });
+  // The loopback-only workspace keeps local previews open. Exercise the hosted
+  // sharing controls here; the real key gate is covered by landing-hosting.test.
+  let previewKey = '12345678-12345678-12345678-12345678';
+  await page.route(url => url.searchParams.get('cloud')?.endsWith('/preview-access'), async route => {
+    if (route.request().method() === 'PUT') previewKey = 'abcdefab-abcdefab-abcdefab-abcdefab';
+    await route.fulfill({json:{ok:true,previewAccess:{key:previewKey,sessionSeconds:3600}}});
+  });
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
   page.on("console", (msg) => {
@@ -185,6 +192,21 @@ test("the editor Preview renders current edits, local media and commerce at ever
     const popupPromise = page.context().waitForEvent("page");
     await page.locator("[data-sq-preview-new-tab]").click();
     const popup = await popupPromise;
+    const shareDialog = page.getByRole('dialog', {name:'Share preview'});
+    await shareDialog.locator('[data-copy="key"]:enabled').waitFor();
+    assert.equal(await shareDialog.locator('[data-preview-share-key]').inputValue(), previewKey);
+    assert.equal(new URL(await shareDialog.locator('[data-preview-share-url]').inputValue()).search,'');
+    for (const width of [390,1600]) {
+      await page.setViewportSize({width,height:1000});
+      const box = await shareDialog.boundingBox();
+      assert.ok(box.x >= 0 && box.x + box.width <= width);
+      assert.match(await shareDialog.locator('[data-preview-rotate]').evaluate(el=>getComputedStyle(el,'::before').maskImage),/url/);
+    }
+    page.once('dialog', dialog => dialog.accept());
+    await shareDialog.locator('[data-preview-rotate]').click();
+    await shareDialog.getByRole('status').filter({hasText:'Key replaced'}).waitFor();
+    assert.equal(await shareDialog.locator('[data-preview-share-key]').inputValue(), previewKey);
+    await shareDialog.getByRole('button',{name:'Close',exact:true}).click();
     const popupFrame = await popup.locator('[data-hosted-page]').elementHandle().then(node=>node.contentFrame());
     await popupFrame.locator("#native-headline").waitFor();
     assert.equal(
@@ -212,6 +234,7 @@ test("the editor Preview renders current edits, local media and commerce at ever
     assert.match(await reopenedFrame.locator('.ezkart-cart-row').innerText(), /Orange/);
     await reopened.close();
     await page.locator("[data-sq-preview-close]").click();
+    await page.locator("[data-native-id=headline]").click();
     await field.fill("A second edit");
     await field.dispatchEvent("change");
     frame = await openPreview();

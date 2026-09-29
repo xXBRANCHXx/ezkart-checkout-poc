@@ -5,9 +5,10 @@ Implemented on `agent/ezkart-workbench`, 24 September 2026.
 ## Merchant behavior
 
 - Preview → Open in new tab saves the current page and its full preview to the
-  existing private R2 store, then opens an authenticated HTTPS view. The URL
-  survives closing the editor, reopening a tab and refreshing. Other accounts
-  cannot read the draft.
+  existing private R2 store, opens its HTTPS preview URL, and shows **Share preview**
+  with separate URL and key controls. Visitors enter the key before receiving any
+  page content; no Ezkart account is required. The URL survives closing the editor.
+  An unlock lasts one hour. **Replace key** revokes the previous key and sessions.
 - Publish keeps the existing ownership, product, stock and artwork checks. The
   saved publication is served publicly at
   `/<business-slug>/shop/<page-name>` on the current site host. Private previews
@@ -29,8 +30,8 @@ Implemented on `agent/ezkart-workbench`, 24 September 2026.
   Preview tabs opened from the same editor switch to the public page when publishing
   succeeds. **View live** beside Publish opens the public page; **Open draft preview**
   remains available for reviewing unpublished edits. The library's Copy URL
-  control copies the public link for published pages and the private preview
-  link for drafts. Page creation no longer advertises an unconfigured
+  control copies the public link for published pages and opens **Share preview**
+  for drafts. The project actions menu offers **Share preview** for both. Page creation no longer advertises an unconfigured
   `*.ezkart.site` hostname.
 - Autosave and preview do not replace the public snapshot. Publishing again
   updates the same public URL. Draft/unpublished pages, missing pages and pages
@@ -61,16 +62,31 @@ forwarding visitor or merchant credentials. It applies the same sandbox policy,
 returns no-store responses, and suppresses indexing on the test environment.
 The public route never returns editable state or private preview content.
 
-The readable private-preview route loads the authenticated document with a
-same-origin fetch to `/cart/admin`, retaining the existing cookie path. Its
-small loader replaces the loading document with the trusted sandboxed shell,
-so the address bar and checkout return URL stay readable. It shows a sign-in
-link to anonymous visitors. The API rejects a preview requested for a different
-business even when the visitor is signed into another account. No session-cookie
-scope is broadened. Old public query-string links and authenticated admin-view
-links redirect to their readable equivalents; trailing slashes normalize too.
-Legacy business addresses containing account IDs also resolve to the same seller
-and redirect to its reserved public address. Concurrent reservations and duplicate
+The readable preview route renders a server-side key form through
+`cart/page-preview.php`. A POST sends the separately supplied key to
+`POST /v1/public/landing-pages/:store/:id/preview/unlock`; a valid key produces a
+signed, page-and-seller-bound one-hour token. PHP keeps this token in a path-scoped,
+HttpOnly, SameSite=Strict cookie (Secure over HTTPS). Keys are never appended to
+URLs. Refreshing fetches `GET /v1/public/landing-pages/:store/:id/preview` with the
+token; the Worker verifies access before fetching authored HTML. Unauthorized
+responses contain no page content, title, description or media. All responses
+are no-store and previews are noindex. Merchant session cookies remain scoped
+to `/cart/admin`; authored content retains the existing opaque iframe sandbox.
+
+The authenticated `POST /v1/landing-pages/:id/preview-access` gets or creates a
+128-bit random share key. `PUT` rotates both the key and signing secret, with
+conditional R2 writes protecting concurrent generation/replacement. Records
+live in private R2 outside editable/exportable page documents and are removed
+when their page is deleted. PHP key-management requests retain the existing
+admin authentication and CSRF checks. Existing pages need no data migration;
+the first **Share preview** action creates their key. Normal saves preserve it.
+The loopback-only builder workspace retains its local development preview;
+server-side sharing enforcement is tested against the actual Worker and PHP.
+
+Old authenticated admin-view links redirect to the key-gated pretty URL; trailing
+slashes normalize too. Legacy business addresses remain bound to the same seller
+but each preview URL needs its own unlock cookie. Public legacy addresses continue
+to redirect to the reserved public address. Concurrent reservations and duplicate
 business names cannot take ownership of an existing or legacy address.
 
 The rewrite matches only `/<business>/shop/<page>` and its `/preview` suffix;
@@ -169,3 +185,14 @@ blank-page editing and section actions. The image sorting check passed on rerun;
 the flow-grid check passed when run alone, both with this change and at the
 unchanged baseline. The initial failures concerned pointer geometry, not save
 content. JavaScript syntax, PHP lint and diff checks pass.
+
+## Preview-key validation — 29 September 2026
+
+Worker integration tests cover authentication for key management, wrong keys,
+query-string bypass attempts, rotation, stale sessions, deleted pages and normal
+publication. Session tests cover expiration, tampering and cross-page/store reuse.
+The PHP browser fixture checks the form before content, successful unlock, cookie
+scope, reload, rotation, iframe isolation and 390/1440px layouts. Builder checks
+cover the sharing dialog and existing blank editing, sections and grid workflows.
+The key is a sharing barrier, not a prohibition on a merchant distributing both
+the URL and key publicly.

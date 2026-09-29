@@ -8,6 +8,7 @@ import {join} from 'node:path';
 import {once} from 'node:events';
 import {setTimeout as delay} from 'node:timers/promises';
 import {fileURLToPath} from 'node:url';
+import {unlockPreview, validPreviewSession} from '../../cloudflare/ezkart-api/src/landing-preview-access.js';
 import {chromium} from '../builder-mcp/node_modules/playwright/index.mjs';
 
 test('PHP page hosting serves only the current environment publication with an isolated runtime', async t => {
@@ -15,8 +16,21 @@ test('PHP page hosting serves only the current environment publication with an i
   const savePreferences=[];
   const sessions=await mkdtemp(join(tmpdir(),'ezkart-url-sessions-'));
   t.after(()=>rm(sessions,{recursive:true,force:true}));
-  const upstream=createServer((req,res)=>{
+  let previewRecord = {key:'12345678-12345678-12345678-12345678',secret:'fixture-secret'};
+  const upstream=createServer(async (req,res)=>{
     requests.push({url:req.url,authorization:req.headers.authorization});
+    const shared = /^\/v1\/public\/landing-pages\/(coffee-shop(?:-0123456789)?)\/launch\/preview(\/unlock)?$/.exec(req.url);
+    if (shared?.[2]) {
+      const chunks=[];for await(const chunk of req)chunks.push(chunk);
+      const key=JSON.parse(Buffer.concat(chunks).toString()).key;
+      const token=await unlockPreview(previewRecord,'seller','launch',key);
+      res.writeHead(token?200:403,{'Content-Type':'application/json'});
+      res.end(JSON.stringify(token?{ok:true,token,expiresIn:3600}:{ok:false}));return;
+    }
+    if (req.url.endsWith('/preview')) {
+      if(!shared){res.writeHead(404);res.end('Not found');return;}
+      if(!await validPreviewSession(previewRecord,'seller','launch',req.headers['x-ezkart-preview-token'])){res.writeHead(401);res.end('Key required');return;}
+    }
     if(req.url==='/v1/landing-pages/launch' && req.method==='PUT') {
       savePreferences.push(req.headers.prefer);
       res.writeHead(200,{'Content-Type':'application/json'});
@@ -28,6 +42,7 @@ test('PHP page hosting serves only the current environment publication with an i
       res.end(JSON.stringify({ok:true,saveId:'confirmed-save',page:{id:'launch',status:'published'}}));
       return;
     }
+    if(req.url.endsWith('/preview/unlock')) {res.writeHead(404);res.end('Not found');return;}
     if(req.url.endsWith('/view')) {
       if(!req.headers.authorization){res.writeHead(401);res.end('Sign in');return;}
       if(req.headers['x-ezkart-preview-store'] && !['coffee-shop','coffee-shop-0123456789'].includes(req.headers['x-ezkart-preview-store'])){res.writeHead(404);res.end('Page not found');return;}
@@ -113,7 +128,12 @@ test('PHP page hosting serves only the current environment publication with an i
   await page.unrouteAll();
   const previewUrl=publicUrl+'/preview';
   await page.goto(previewUrl);
-  await page.locator('[data-preview-sign-in]').waitFor({state:'visible'});
+  await page.locator('#preview-key').waitFor({state:'visible'});
+  assert.doesNotMatch(await page.content(),/Stored publication/);
+  assert.doesNotMatch(await (await fetch(previewUrl+'?key='+previewRecord.key)).text(),/Stored publication/);
+  await page.locator('#preview-key').fill('wrong');
+  await page.getByRole('button',{name:'Open preview'}).click();
+  await page.getByRole('alert').filter({hasText:'not valid'}).waitFor();
   assert.equal(page.url(),previewUrl);
   assert.equal(await page.locator('[data-hosted-page]').count(),0);
   const csrf='fixture-publication-csrf-token-1234567890';
@@ -132,15 +152,22 @@ test('PHP page hosting serves only the current environment publication with an i
   const savedConfirmation=await context.request.get(base+'/cart/admin/?cloud='+encodeURIComponent('/v1/landing-pages/launch/confirmation'));
   assert.equal(savedConfirmation.status(),200);
   assert.equal((await savedConfirmation.json()).saveId,'confirmed-save');
+  await page.locator('#preview-key').fill(previewRecord.key);
+  await page.getByRole('button',{name:'Open preview'}).click();
+  await page.locator('[data-hosted-page]').waitFor();
+  const accessCookie=(await context.cookies()).find(cookie=>cookie.name.startsWith('ezkart_preview_'));
+  assert.equal(accessCookie.httpOnly,true);assert.equal(accessCookie.sameSite,'Strict');assert.equal(accessCookie.path,'/coffee-shop/shop/launch/preview');
   const navigation=page.waitForRequest(previewUrl);
   await page.reload();
-  assert.equal((await (await navigation).allHeaders()).cookie,undefined,'Admin cookies stay outside public URL paths');
+  assert.doesNotMatch((await (await navigation).allHeaders()).cookie || '',/ezkart_admin/,'Admin cookies stay outside public URL paths');
   const previewFrame=await page.locator('[data-hosted-page]').elementHandle().then(node=>node.contentFrame());
   assert.equal(await previewFrame.locator('h1').innerText(),'Stored publication');
   assert.equal(page.url(),previewUrl);
   assert.equal(await previewFrame.evaluate(()=>document.baseURI),previewUrl);
+  // Each address needs its own unlock; credentials never ride in redirects.
   await page.goto(base+'/coffee-shop-0123456789/shop/launch/preview');
-  await page.waitForURL(previewUrl);
+  await page.locator('#preview-key').waitFor();
+  await page.goto(previewUrl);
   await page.locator('[data-hosted-page]').waitFor();
   const canonicalFrame=await page.locator('[data-hosted-page]').elementHandle().then(node=>node.contentFrame());
   const oldPreview=base+'/cart/admin/?cloud='+encodeURIComponent('/v1/landing-pages/launch/view');
@@ -153,7 +180,18 @@ test('PHP page hosting serves only the current environment publication with an i
   assert.equal(new URL(checkout.url()).searchParams.get('return'),previewUrl);
   await checkout.close();
   await page.goto(base+'/another-business/shop/launch/preview');
-  await page.waitForFunction(()=>document.querySelector('[data-preview-status]')?.textContent.includes('could not be loaded'));
+  await page.locator('#preview-key').waitFor();
+  await page.locator('#preview-key').fill(previewRecord.key);
+  await page.getByRole('button',{name:'Open preview'}).click();
+  await page.getByRole('alert').filter({hasText:'unavailable'}).waitFor();
   assert.equal(await page.locator('[data-hosted-page]').count(),0);
-
+  previewRecord = {key:'abcdefab-abcdefab-abcdefab-abcdefab',secret:'new-fixture-secret'};
+  await page.goto(previewUrl);
+  await page.locator('#preview-key').waitFor();
+  assert.equal(await page.locator('[data-hosted-page]').count(),0,'Replacing the key removes previously unlocked content');
+  for (const width of [390,1440]) {
+    await page.setViewportSize({width,height:900});
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+    assert.match(await page.getByRole('button',{name:'Open preview'}).evaluate(el=>getComputedStyle(el).backgroundImage),/linear-gradient/);
+  }
 });

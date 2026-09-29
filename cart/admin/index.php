@@ -785,7 +785,7 @@ function ez_admin_proxy_cloud_request(string $accessToken, string $path, string 
         if (str_contains($path, '#') || ($method !== 'GET' && $inventoryQuery !== [])) ez_admin_json(['ok' => false, 'error' => 'Inventory path is invalid.'], 400);
         $path = $inventoryPath . ($inventoryQuery !== [] ? '?' . http_build_query($inventoryQuery, '', '&', PHP_QUERY_RFC3986) : '');
     }
-    $allowedPath = preg_match('#^/v1/(?:catalog|storefront|admin-preferences|admin-profile|shipping-settings|advanced-mode|custom-domains(?:/dom_[a-f0-9]{32}/(?:verify|renew|disconnect))?|media(?:/[a-zA-Z0-9_-]+)?|assets(?:/[a-zA-Z0-9_-]+)?|fonts(?:/font_[a-f0-9]{64})?|products/[a-zA-Z0-9_-]+(?:/(?:duplicate|status))?|drafts/[a-zA-Z0-9_-]+|landing-pages(?:/[a-z0-9-]+(?:/(?:preview|export|editor|view|confirmation))?)?|components(?:/[a-z0-9-]+)?)$#', $path) === 1;
+    $allowedPath = preg_match('#^/v1/(?:catalog|storefront|admin-preferences|admin-profile|shipping-settings|advanced-mode|custom-domains(?:/dom_[a-f0-9]{32}/(?:verify|renew|disconnect))?|media(?:/[a-zA-Z0-9_-]+)?|assets(?:/[a-zA-Z0-9_-]+)?|fonts(?:/font_[a-f0-9]{64})?|products/[a-zA-Z0-9_-]+(?:/(?:duplicate|status))?|drafts/[a-zA-Z0-9_-]+|landing-pages(?:/[a-z0-9-]+(?:/(?:preview|preview-access|export|editor|view|confirmation))?)?|components(?:/[a-z0-9-]+)?)$#', $path) === 1;
     if (!$isSubscriptionPath && !$isReviewPath && !$isInventoryPath && !$isReturnsPath && !$isFulfillmentPath && !$isCommerceReadPath && !$isAnalyticsExportWrite && !$isCustomerPath && (!$allowedPath || str_contains($path, '?') || str_contains($path, '#'))) {
         ez_admin_json(['ok' => false, 'error' => 'That saved-data path is not allowed.'], 400);
     }
