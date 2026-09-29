@@ -121,3 +121,10 @@ it does not activate providers, send messages or initiate real payments.
 - Beta migration 0083 applied successfully. The old sandbox backend has unrelated
   pending migrations and was left on its historical runtime. Current workbench
   delivery targets the beta backend, with its existing runtime variables preserved.
+- Beta Worker version `e086ec37-04d5-4d8c-931b-530a6d42322c` deployed;
+  its plaintext runtime variables were compared with the previous deployment and
+  preserved. Health reports all three storage checks healthy and 219 tables;
+  unauthenticated Campaigns API access returns 401. No beta migrations remain.
+- Feature commit `9f76974` was pushed to both origin and the workbench deployment
+  mirror. Follow-up UI polish keeps the selected status visible, removes stale
+  comparison selections after refresh, and wraps long source names/URL fallbacks.
