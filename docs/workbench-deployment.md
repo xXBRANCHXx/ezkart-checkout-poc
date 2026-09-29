@@ -49,3 +49,11 @@ workbench                 ●──●──●──QA───┘
 - Preserved experimental tag: `workbench-snapshot-2026-08-12`
 - Workbench branch: `agent/ezkart-workbench`
 - Workbench continues from production on `agent/ezkart-workbench`
+
+## Delivery verification (29 September 2026)
+
+The local `deployment` remote points to `xXBRANCHXx/ezkart-checkout-poc`.
+The current workbench host follows its `agent/ezkart-workbench` branch. Push
+completed workbench changes to both `origin` and this deployment mirror, then
+compare hosted assets with source. Pushing only to `origin` did not refresh the
+hosted files during the bank-change-review delivery. Neither push targets main.
