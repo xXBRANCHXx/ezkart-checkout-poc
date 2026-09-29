@@ -85,7 +85,7 @@
       connecting: 'Your wallet setup is being processed. Check its status again shortly.',
       queued: 'Your setup request is saved. Continue setup to connect your seller account.',
     };
-    status.textContent = messages[state] || (needsOnboarding ? 'Complete seller onboarding, then return here to prepare your one DOKU seller Sub-Account.' : data.enabled ? 'Review the saved store name and verified email below.' : 'Wallet setup is not available yet. Check back after Ezkart enables seller wallets.');
+    status.textContent = messages[state] || (needsOnboarding ? 'Complete seller onboarding, then return here to prepare your Ezpay seller account.' : data.enabled ? 'Review the saved store name and verified email below.' : 'Wallet setup is not available yet. Check back after Ezkart enables seller wallets.');
     find('setup-details').hidden = false;
     find('setup-name').textContent = enrollment?.accountName || data.owner?.storeName || 'Unavailable';
     find('setup-email').textContent = enrollment?.email || data.owner?.email || 'Unavailable';
@@ -99,7 +99,7 @@
     document.querySelector('.wallet-connection').textContent = state === 'connected' ? 'Seller account connected' : state === 'review' ? 'Wallet setup needs review' : 'Wallet connection pending';
     document.querySelector('.wallet-connection + p').textContent = state === 'connected'
       ? 'Earnings below come from your recorded orders, after fees and current holds.'
-      : 'Complete wallet setup before using funds. Recorded earnings are separate from your DOKU account balance.';
+      : 'Complete wallet setup before using funds. Recorded earnings are separate from your Ezpay account balance.';
     renderEarnings(data);
     window.dispatchEvent(new CustomEvent('ezkart:wallet-loaded', {detail:data}));
   };
@@ -116,7 +116,7 @@
         headers: {...headers, ...(body === undefined ? {} : {'Content-Type': 'application/json'})}, ...(body === undefined ? {} : {body: JSON.stringify(body)}), signal: controller.signal});
       const data = await response.json();
       if (data.code === 'wallet_locked' || response.status === 401 || response.status === 403) { window.dispatchEvent(new Event('ezkart:wallet-locked')); location.replace('?page=wallet'); throw Error('Verify your identity again.'); }
-      if (!response.ok || !data.ok) throw Error(data.error || 'Wallet could not be checked.');
+      if (!response.ok || !data.ok) throw Error(String(data.error || 'Wallet could not be checked.').replace(/\bDOKU\b/gi, 'Ezpay'));
       return data;
     } finally { clearTimeout(timer); }
   };

@@ -258,11 +258,11 @@ test('withdrawal status uses the original signed provider reference and shows pe
   const files=(await readdir(f.recovery)).filter(name=>name.includes('-status-'));assert.equal(files.length,1);const file=join(f.recovery,files[0]),raw=await readFile(file,'utf8');
   assert.equal((await stat(file)).mode&0o777,0o600);
   await f.page.reload();await f.page.locator('[data-withdrawals][aria-busy=false]').waitFor();await f.page.getByRole('button',{name:'View withdrawal 1',exact:true}).click();
-  await f.page.locator('[data-withdrawals][aria-busy=false]').waitFor();assert.equal(await f.page.locator('[data-withdrawal-status]').innerText(),'DOKU reports pending');
+  await f.page.locator('[data-withdrawals][aria-busy=false]').waitFor();assert.equal(await f.page.locator('[data-withdrawal-status]').innerText(),'Ezpay reports pending');
   // Separate observations beyond the provider transport's second resolution.
   await new Promise(resolve=>setTimeout(resolve,1100));await f.setControl({statusResponse:{latestTransactionStatus:'00',latestTransactionDesc:'success'}});
   await f.page.getByRole('button',{name:'Check transfer status',exact:true}).click();await f.page.locator('[data-withdrawals][aria-busy=false]').waitFor();
-  assert.equal(await f.page.locator('[data-withdrawal-status]').innerText(),'DOKU reports success · reconciliation pending');
+  assert.equal(await f.page.locator('[data-withdrawal-status]').innerText(),'Ezpay reports success · reconciliation pending');
   assert.match(await f.page.locator('[data-withdrawal-status-note]').innerText(),/remains reserved/);
   assert.equal(await f.page.locator('[data-withdrawal-cancel]').isHidden(),true);assert.equal((await f.request('withdrawal_cancel',{id:f.w.id,requestKey:key()})).status,409);
   await f.page.screenshot({path:join(screens,'withdrawal-status-1360.png')});await f.page.setViewportSize({width:390,height:844});

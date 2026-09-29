@@ -3,13 +3,14 @@ import assert from 'node:assert/strict';
 import {mkdir,readdir} from 'node:fs/promises';
 import {join} from 'node:path';
 import {setupCentralFixture} from './central-fixture.mjs';
+import {seedDeclaredOnboarding} from '../../cloudflare/ezkart-api/test/onboarding-fixture.mjs';
 
 const base='/v1/commerce/payments',screens='/tmp/ezkart-central-payments-ui-01a0d643';
 const loaded=page=>page.waitForFunction(()=>document.querySelector('[data-payments-count]')?.textContent.includes('matching orders'));
 const detailLoaded=page=>page.waitForFunction(()=>document.querySelector('[data-payments-detail-content]')?.textContent.includes('Verified payment history'));
 const ids=page=>page.locator('[data-payment-open]').evaluateAll(es=>es.map(e=>e.dataset.paymentOpen));
 async function fixture(t,count=28,overrides={}){
-  const f=await setupCentralFixture(t,overrides);await f.db.prepare("UPDATE products SET stock_quantity=1000 WHERE id='tea'").run();
+  const f=await setupCentralFixture(t,overrides);await seedDeclaredOnboarding(f.db);await f.db.prepare("UPDATE products SET stock_quantity=1000 WHERE id='tea'").run();
   const orders=[];
   for(let n=0;n<count;n++){
     const result=await f.create(f.input({customer:{name:n===0?'Buyer <img src=x onerror=alert(1)>':'Buyer '+n,email:'buyer'+n+'@example.test',phone:'081234567890'}}));
@@ -42,6 +43,9 @@ test('payments preserve server paging and failed-page position, search provider 
     await page.goto(f.app.base+'/cart/admin/?page=payments');await loaded(page);
     assert.equal(await page.locator('[data-payments-rows] tr').count(),25);assert.equal(await page.locator('[data-payments-total=paidOrders]').textContent(),'1');assert.equal(await page.locator('[data-payments-total=needsReview]').textContent(),'1');
     await page.screenshot({path:join(screens,`payments-${width}.png`)});
+    assert.equal(await page.getByRole('img',{name:'Ezpay',exact:true}).count(),1);
+    assert.equal(await page.locator('.ezpay-logo img').evaluate(img=>img.complete&&img.naturalWidth===2000),true);
+    assert.doesNotMatch(await page.locator('main').innerText(),/doku/i);
     const first=await ids(page);await page.locator('input[name=q]').fill('unapplied draft');
     failNext=true;await page.locator('[data-payments-next]').click();await page.waitForFunction(()=>document.querySelector('[data-payments-list-status]').textContent.includes('Read interrupted'));assert.deepEqual(await ids(page),first);
     await page.locator('[data-payments-next]').click();await page.waitForFunction(()=>document.querySelectorAll('[data-payments-rows] tr').length===3);
@@ -52,7 +56,7 @@ test('payments preserve server paging and failed-page position, search provider 
     assert.match(await page.locator('[data-payments-summary-detail=paidOrders]').innerText(),/1 of 28/);
     await page.locator('[data-payment-open]').click();await detailLoaded(page);
     const heading=await page.locator('#commerce-payment-detail-title').boundingBox();assert(heading.y>=70&&heading.y<850);
-    const content=await page.locator('[data-payments-detail-content]').innerText();assert.match(content,/Buyer <img src=x onerror=alert\(1\)>/);assert(!/PRIVATE_|081234567890/.test(content));assert.equal(await page.locator('[data-payments-detail-content] img').count(),0);
+    const content=await page.locator('[data-payments-detail-content]').innerText();assert.match(content,/Buyer <img src=x onerror=alert\(1\)>/);assert(!/PRIVATE_|081234567890/.test(content));assert.doesNotMatch(content,/doku/i);assert.match(content,/Ezpay/);assert.equal(await page.locator('[data-payments-detail-content] img').count(),0);
     assert.equal(await page.getByRole('link',{name:'Open order',exact:true}).getAttribute('href'),'?page=orders&order='+f.orders[0].id);
     const captures=page.locator('[data-payment-history=captures]');assert.equal(await captures.locator('li').count(),20);
     failHistory=true;await captures.getByRole('button',{name:'Load older entries'}).click();await page.waitForFunction(()=>document.querySelector('[data-payment-history=captures] [role=status]').textContent.includes('Read interrupted'));assert.equal(await captures.locator('li').count(),20);

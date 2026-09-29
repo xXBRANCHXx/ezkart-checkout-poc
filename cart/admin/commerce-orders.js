@@ -72,7 +72,7 @@
     function historySection(kind,data,id,version){
       const section=el('section'),title=kind==='captures'?'Verified payments':'Order activity',list=el('ol',undefined,'commerce-order-history');section.append(el('h3',title),list);
       function append(items){for(const entry of items){const li=el('li');li.append(el('b',kind==='captures'?`${money(entry.amount)} · ${entry.kind==='duplicate_payment'?'Additional payment — review required':'Order payment'}`:activityLabels[entry.type]||entry.type.replaceAll(/[._]/g,' ')),el('time',(kind==='captures'?'Verified ':'Recorded ')+date(entry.createdAt)));
-          if(kind==='captures')li.append(el('small','DOKU reference: '+entry.reference));else li.append(el('small','Order revision '+entry.revision));list.append(li);}}
+          if(kind==='captures')li.append(el('small','Ezpay reference: '+entry.reference));else li.append(el('small','Order revision '+entry.revision));list.append(li);}}
       append(data.items);if(!data.items.length)list.append(el('li',kind==='captures'?'No verified payments recorded.':'No activity recorded.'));
       let cursor=data.nextCursor;if(cursor){const more=button('Load older '+(kind==='captures'?'payments':'activity'),async()=>{more.disabled=true;try{const older=await api(base+'/'+id+'/'+kind+'?cursor='+encodeURIComponent(cursor));if(version!==detailVersion)return;append(older.items);cursor=older.nextCursor;more.hidden=!cursor;more.textContent='Load older '+(kind==='captures'?'payments':'activity');}catch{if(version===detailVersion)more.textContent='Could not load history. Retry';}finally{more.disabled=false;}});section.append(more);}
       return section;

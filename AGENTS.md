@@ -183,3 +183,7 @@ do not recolor the overall accent palette purple.
 Keep the orange-to-pink gradient for primary actions. Keep report controls compact
 and place useful charts directly beneath them; do not stack export, metadata and
 empty-state panels above the report data.
+
+## Seller payment branding (owner, 29 September 2026)
+
+Use **Ezpay** and the supplied Ezpay logo for seller-facing payment branding. Do not expose DOKU in seller interface copy, statuses, or payment-provider display labels. Keep internal provider identifiers, integration protocols, and financial records unchanged.

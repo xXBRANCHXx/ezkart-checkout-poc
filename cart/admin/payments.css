@@ -110,3 +110,7 @@
   .page-payments .ledger-table .payment-state { grid-column: 2; grid-row: 2 / 4; justify-self: end; }
   .payment-amount { grid-column: 2; grid-row: 1; padding-top: 2px; }
 }
+
+/* Display the supplied logo without its surrounding image whitespace. */
+.ezpay-logo { display: inline-block; position: relative; overflow: hidden; width: 88px; aspect-ratio: 1718 / 443; flex: 0 0 auto; }
+.ezpay-logo img { position: absolute; width: 116.4145%; max-width: none; height: auto; left: -8.4983%; top: -83.07%; }

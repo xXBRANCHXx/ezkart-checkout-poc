@@ -20,8 +20,8 @@
   const bankName = code => banks().find(bank => bank.code === code)?.name || code;
   const method = channel => channel === 'BI_FAST' ? 'BI-FAST' : 'Online bank transfer';
   const paymentStarted = row => row.payment && row.payment.state !== 'not_started';
-  const providerStatus = {reported_pending:'DOKU reports pending',reported_success:'DOKU reports success · reconciliation pending',
-    reported_failed:'DOKU reports failure · reconciliation pending',review:'Transfer status needs review'};
+  const providerStatus = {reported_pending:'Ezpay reports pending',reported_success:'Ezpay reports success · reconciliation pending',
+    reported_failed:'Ezpay reports failure · reconciliation pending',review:'Transfer status needs review'};
   const status = row => ({cancelled:'Cancelled',completed:'Transfer completed',failed:'Transfer failed · funds released',review:'Transfer reconciliation needs review'}[row.state]) || (paymentStarted(row) ? (providerStatus[row.payment.status?.state] || (row.payment.state === 'response_recorded' ? 'Transfer response saved' : 'Transfer needs review')) : row.confirmation ? 'Bank confirmed' : row.bankVerified ? 'Bank verified' : row.inquiry?.state === 'review' ? 'Bank check needs review' : 'Request saved');
   const storageName = type => storageScope + ':' + type;
   const storedKey = type => {
@@ -64,7 +64,7 @@
         window.dispatchEvent(new Event('ezkart:wallet-locked')); location.replace('?page=wallet'); throw Error('Verify your identity again.');
       }
       const data = await response.json();
-      if (!response.ok || !data.ok) { const error = Error(data.error || 'The request could not be checked.'); error.status = response.status; throw error; }
+      if (!response.ok || !data.ok) { const error = Error(String(data.error || 'The request could not be checked.').replace(/\bDOKU\b/gi, 'Ezpay')); error.status = response.status; throw error; }
       if (stopped) throw Error('Verify your identity again.');
       return data;
     } finally { clearTimeout(timer); controllers.delete(controller); }
@@ -114,7 +114,7 @@
     q('title').textContent = 'Withdrawal request'; q('message').textContent = row.state === 'cancelled'
       ? 'This request was cancelled. No bank transfer was started.'
       : row.state === 'completed' ? 'Your bank transfer and its actual fee have been reconciled. The transferred amount stays deducted from your earnings. Ezkart covers the transfer fee.'
-      : row.state === 'failed' ? 'DOKU confirms failure and a voided debit. This request’s reservation has been released. Current earnings and any other holds still determine your available balance.'
+      : row.state === 'failed' ? 'Ezpay confirms failure and a voided debit. This request’s reservation has been released. Current earnings and any other holds still determine your available balance.'
       : row.state === 'review' ? 'The provider evidence needs reconciliation. Earlier accounting entries remain recorded, and available earnings are held while the discrepancy is resolved.'
       : paymentStarted(row) ? 'This request has entered payment processing. Its outcome must be reconciled before the reserved amount can be released. It cannot be cancelled or sent again.'
       : row.bankVerified ? 'Check the bank-returned account-holder name and your original request below.'
@@ -135,7 +135,7 @@
     const check = row.payment?.status;
     q('status-note').hidden = !check;
     q('status-note').textContent = row.payment?.outcome ? 'Reconciliation recorded: ' + date(row.payment.outcome.recordedAt) + '. ' + (row.payment.outcome.reconciled
-      ? 'Transfer and fee records are matched.' : 'Updated provider evidence still needs review.') : check ? 'Last DOKU check: ' + date(check.checkedAt) + '. ' + (check.state === 'review'
+      ? 'Transfer and fee records are matched.' : 'Updated provider evidence still needs review.') : check ? 'Last Ezpay check: ' + date(check.checkedAt) + '. ' + (check.state === 'review'
       ? 'The provider results need review. Your withdrawal remains reserved while the outcome is reconciled.'
       : 'Your withdrawal remains reserved until the transfer and its actual fees have been reconciled.') : '';
     q('confirmed').textContent = row.confirmation ? 'Bank details confirmed on ' + date(row.confirmation.confirmedAt) + '. No transfer has been started.' : '';
@@ -228,7 +228,7 @@
     if (action === 'confirm') Object.assign(payload,{requestKey:actionKey(keyType),inquiryDigest:selected.withdrawal.inquiry.digest});
     if (action === 'pay') payload.confirmationId = selected.withdrawal.confirmation.id;
     if (action === 'cancel') payload.requestKey = actionKey(keyType);
-    q('message').textContent = action === 'pay' ? 'Sending this bank transfer. Keep this request open while its response is saved…' : action === 'inquire' ? 'Checking your bank account…' : action === 'status' ? 'Checking the original transfer with DOKU…' : action === 'confirm' ? 'Saving your bank confirmation…' : 'Cancelling this request…';
+    q('message').textContent = action === 'pay' ? 'Sending this bank transfer. Keep this request open while its response is saved…' : action === 'inquire' ? 'Checking your bank account…' : action === 'status' ? 'Checking the original transfer with Ezpay…' : action === 'confirm' ? 'Saving your bank confirmation…' : 'Cancelling this request…';
     try {
       const result = await call(action,payload); if (action !== 'inquire' && action !== 'status') forgetKey(keyType);
       renderDetail(await call('read',{id}));

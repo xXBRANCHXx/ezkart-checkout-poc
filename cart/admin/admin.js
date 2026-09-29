@@ -248,7 +248,7 @@
     }) : await fetch(cloudUrl(path), {method, credentials: "same-origin", headers, body, cache: "no-store", ...(timeoutMs ? {signal: AbortSignal.timeout(timeoutMs)} : {})});
     const result = await response.json().catch(() => ({}));
     if (!response.ok || result.ok !== true) {
-      const error = new Error(String(result.error || `Ezkart returned ${response.status}.`));
+      const error = new Error(String(result.error || `Ezkart returned ${response.status}.`).replace(/\bDOKU\b/gi, "Ezpay"));
       error.status = response.status;
       error.code = typeof result.code === "string" ? result.code : "";
       throw error;
@@ -9064,7 +9064,7 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
         if (!response.ok || payload.ok !== true) throw new Error("Commerce status unavailable");
         const configured = payload.doku?.configured === true && payload.biteship?.configured === true;
         const production = payload.commerce_environment === "production";
-        display(configured, configured ? `DOKU + Biteship ${production ? "live" : "test"} credentials configured` : "Payment or shipping setup required",
+        display(configured, configured ? `Ezpay payments and shipping ${production ? "live" : "test"} setup configured` : "Payment or shipping setup required",
           "Check channel activation in Payments and this store's pickup details in Shipping settings before accepting orders.");
       } catch (_) {
         display(false, "Commerce status unavailable", "Check Payments and Shipping settings for the current setup.");

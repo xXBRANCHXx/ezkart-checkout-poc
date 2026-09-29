@@ -5,7 +5,7 @@
   const reference = /^EZK-[SP]-[A-F0-9]{24}$/;
   const money = value => value == null ? '—' : new Intl.NumberFormat('id-ID', {style:'currency', currency:'IDR', maximumFractionDigits:0}).format(BigInt(value));
   const date=value=>window.EzkartAdminFormat.date(value);
-  const label = value => String(value || '').replaceAll('_', ' ').replace(/^./, s => s.toUpperCase());
+  const label = value => String(value || '').replace(/^doku(?=_|$)/i, 'Ezpay').replaceAll('_', ' ').replace(/^./, s => s.toUpperCase());
   const events = {'payment.instructions':'Payment instructions saved', 'payment.succeeded':'Payment confirmed', 'payment.failed':'Payment failed'};
   const outcomes = {succeeded:'Completed', retry:'Retry scheduled', uncertain:'Confirmation needed', dead:'Needs investigation', cancelled:'Cancelled'};
   const el = (tag, text, className = '') => {

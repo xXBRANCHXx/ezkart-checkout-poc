@@ -23,8 +23,8 @@ ez_page_header('Payments', 'Follow every payment from request to confirmation.',
     <?php endforeach; ?>
   </section>
   <details class="payment-setup">
-    <summary><span class="payment-setup-title"><?= ez_admin_icon('credit-card') ?><b>DOKU checkout</b><span class="payment-environment"><?= $commerceProduction ? 'Live mode' : 'Test mode' ?></span></span><span class="payment-setup-state"><?= $integrationStatus['doku'] ? 'Credentials configured' : 'Setup required' ?><?= ez_admin_icon('chevron-down') ?></span></summary>
-    <div class="payment-setup-details"><p><?= $commerceProduction ? 'This workspace uses the production payment environment.' : 'You are viewing sandbox payments. These transactions do not represent live funds.' ?></p><p>Before public orders, merchant onboarding, refunds, reconciliation, and verified disbursement must pass acceptance checks.</p><a href="../../docs/production-commerce-checklist.md" data-ui-icon="external-link">View setup requirements</a></div>
+    <summary><span class="payment-setup-title"><span class="ezpay-logo"><img src="assets/ezpay-logo.png" alt="Ezpay" width="2000" height="1000"></span><span class="payment-environment"><?= $commerceProduction ? 'Live mode' : 'Test mode' ?></span></span><span class="payment-setup-state"><?= $integrationStatus['doku'] ? 'Credentials configured' : 'Setup required' ?><?= ez_admin_icon('chevron-down') ?></span></summary>
+    <div class="payment-setup-details"><p><?= $commerceProduction ? 'This workspace uses the production payment environment.' : 'You are viewing sandbox payments. These transactions do not represent live funds.' ?></p><p>Manage your payments and withdrawals with Ezpay.</p><a href="?page=wallet" data-ui-icon="wallet">View wallet</a></div>
   </details>
   <section class="surface" aria-labelledby="commerce-payment-list-title">
     <header class="surface-header"><div><h2 id="commerce-payment-list-title">Payment history</h2><p>Search all orders, provider references, customers, and payment methods.</p></div><button class="ui-button" type="button" data-payments-refresh data-ui-icon="refresh">Refresh payments</button></header>

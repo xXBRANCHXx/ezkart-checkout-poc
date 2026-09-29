@@ -26,7 +26,7 @@
    throw Error('Your sign-in or store access changed. Reload this page to continue.');
   }
   if(response.status>=500&&retry&&action!=='read')return call(action,payload,false);
-  const data=await response.json();if(!response.ok||!data.ok)throw Error(data.error||'Could not save onboarding details.');state=data.onboarding;window.dispatchEvent(new Event('ezkart:onboarding-changed'));banks=data.banks||banks;render();
+  const data=await response.json();if(!response.ok||!data.ok)throw Error(String(data.error || 'Could not save onboarding details.').replace(/\bDOKU\b/gi, 'Ezpay'));state=data.onboarding;window.dispatchEvent(new Event('ezkart:onboarding-changed'));banks=data.banks||banks;render();
  }
  function channels(){if(!bank)return;const available=banks.find(b=>b.code===bank.elements.code.value)?.channels||[];bank.elements.channel.replaceChildren(...available.map(value=>new Option(value==='BI_FAST'?'BI-FAST':'Online bank transfer',value)));}
  function render(){
@@ -37,7 +37,7 @@
   text('[data-onboarding-addresses]',['pickup','returns'].map(k=>{const a=state.shipping[k];return(k==='pickup'?'Pickup: ':'Return: ')+(a?`${a.address}, ${a.location}. ${a.coordinate?'Map pin saved.':'Map pin missing.'}`:'No address saved.');}).join(' '));
   root.querySelector('[data-onboarding-confirm-pins]').disabled=!state.shipping.pinsPresent||!state.profile||state.shipping.confirmed;
   text('[data-onboarding-age]',state.age.years===null?'Save your date of birth to record your age declaration.':`Saved seller-declared age: ${state.age.years} as of ${state.age.asOfDate}. Minimum seller age: ${state.age.minimumAge}.`);
-  text('[data-onboarding-wallet]',state.wallet?'Existing Wallet setup: '+state.wallet.status+'. Its original registration is preserved.':'Complete your legal details and address pins to prepare your DOKU seller wallet. With two-step enabled, you can save your bank before your first withdrawal.');
+  text('[data-onboarding-wallet]',state.wallet?'Existing Wallet setup: '+state.wallet.status+'. Its original registration is preserved.':'Complete your legal details and address pins to prepare your Ezpay seller wallet. With two-step enabled, you can save your bank before your first withdrawal.');
   status.textContent=t(state.ready?'Your details are saved. Your store is ready.':state.sellingReady?'You’re ready to sell. Add your bank before withdrawing.':'Complete each step to get your store ready.');
   text('[data-onboarding-complete-title]',t(state.ready?"You're all set!":"You're ready to sell!"));
   text('[data-onboarding-complete-bank]',t(state.bankSaved?'Withdrawal bank saved':'Add your bank before your first withdrawal'));
