@@ -50,3 +50,13 @@ The private reconciliation receipt and pre-change configuration backup are under
 `~/.local/share/ezkart/jev-beta/`. No provider key or configuration secret is stored
 in this document. All unrelated runtime variables are verified unchanged. This
 acceptance/reconciliation makes zero new model calls and zero page actions.
+
+## Verified deployment
+
+Beta version `2f8cc924-1428-46b9-990e-67a98c9f2697` is active at 100% traffic.
+Read-only version metadata confirms Jev enabled, temporary archiving enabled,
+`jev-beta-policy-v1` approved, the private model credential binding present,
+500 reviewer calls maximum and the reconciled 4,610,000-microUSD application
+ceiling. Existing imported reservations total 60,000 microUSD. The deployed
+source retains `jev-direct-evidence-v1` and the 80% minimum. Main/production
+storefront deployment is unchanged.
