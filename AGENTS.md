@@ -165,3 +165,5 @@ Use the existing orange-to-pink branded gradient for primary actions, matching
 Wallet’s View payments button. Reuse `ui-button primary` and the shared
 `--ui-action-gradient`, hover and active tokens. Do not replace it with solid
 orange on sign-in, onboarding or messaging buttons.
+
+- Seller setup verification applies only to the bank section. Profile, DOB, phone and address/pin setup must remain accessible with ordinary sign-in. Bank details and changes retain fresh verification; expiry must not discard unrelated setup edits.

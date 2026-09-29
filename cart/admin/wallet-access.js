@@ -6,6 +6,11 @@
   const lock = () => {
     content.hidden = true;
     window.dispatchEvent(new Event('ezkart:wallet-locked'));
+    if (content.closest('[data-onboarding]')) {
+      document.querySelector('[data-onboarding-bank-locked]').hidden = false;
+      content.querySelectorAll('input,select,button').forEach(n => { n.disabled = true; if (n.matches('input')) n.value = ''; });
+      return;
+    }
     location.replace('?page=wallet');
   };
   setTimeout(lock, remaining);

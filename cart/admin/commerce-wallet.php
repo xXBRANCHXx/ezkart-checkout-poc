@@ -11,7 +11,7 @@ function ez_admin_wallet_request(string $action, bool $authenticated, string $au
     if (!$authenticated || $authenticationMethod !== 'supabase') ez_admin_json(['ok' => false, 'error' => 'Sign in again to open Wallet.', 'code' => 'wallet_locked'], 401);
     $allowedQuery = $action === 'history' ? ['wallet', 'before', 'cap'] : ['wallet'];
     $withdrawalActions = ['withdrawal_read', 'withdrawal_lookup', 'withdrawal_list', 'withdrawal_reserve', 'withdrawal_cancel', 'withdrawal_inquire', 'withdrawal_confirm', 'withdrawal_pay', 'withdrawal_status'];
-    $onboardingActions = ['onboarding_read','onboarding_profile','onboarding_bank','onboarding_confirm_pins'];
+    $onboardingActions = ['onboarding_read','onboarding_bank_read','onboarding_profile','onboarding_bank','onboarding_confirm_pins'];
     $isOnboarding = in_array($action, $onboardingActions, true);
     $isWithdrawal = in_array($action, $withdrawalActions, true);
     if (array_diff(array_keys($_GET), $allowedQuery) !== [] || !in_array($action, ['read', 'history', 'enroll', 'refresh', ...$withdrawalActions, ...$onboardingActions], true)) ez_admin_json(['ok' => false, 'error' => 'Wallet request is invalid.'], 400);
@@ -41,7 +41,7 @@ function ez_admin_wallet_request(string $action, bool $authenticated, string $au
                 EzDokuFinancialJson::decode($raw);
                 $input = json_decode($raw, true, 8, JSON_THROW_ON_ERROR);
                 $allowed = match ($action) {
-                    'onboarding_read' => [], 'onboarding_profile' => ['revision','requestKey','legalName','birthDate','ageConfirmed','phone'],
+                    'onboarding_read', 'onboarding_bank_read' => [], 'onboarding_profile' => ['revision','requestKey','legalName','birthDate','ageConfirmed','phone'],
                     'onboarding_bank' => ['revision','requestKey','bank'], 'onboarding_confirm_pins' => ['revision','requestKey','shippingRevision'],
                 };
                 if (!is_array($input) || array_diff(array_keys($input), $allowed) !== []) throw new InvalidArgumentException();
@@ -78,8 +78,13 @@ function ez_admin_wallet_request(string $action, bool $authenticated, string $au
         $sellerId = (string) ($seller['id'] ?? '');
         if ($sellerId === '' || !hash_equals($sellerId, (string) ($_SERVER['HTTP_X_EZKART_WALLET_STORE'] ?? ''))) ez_admin_json(['ok' => false, 'error' => 'Your store changed. Reload Wallet.', 'code' => 'wallet_locked'], 401);
         $access = ez_wallet_access($authenticationMethod, $sellerId, $csrfToken, $isHttps);
-        if (!$access['unlocked']) ez_admin_json(['ok' => false, 'error' => 'Verify your identity to open Wallet again.', 'code' => 'wallet_locked'], 401);
-        $sessionId = session_id(); $grant = $_SESSION['wallet_access']; $signedInAt = $_SESSION['signed_in_at'];
+        if ($access['email'] === '') ez_admin_json(['ok' => false, 'error' => 'Sign in again to continue seller setup.'], 401);
+        $requiresWallet = !$isOnboarding || in_array($action, ['onboarding_bank', 'onboarding_bank_read'], true);
+        if ($requiresWallet && !$access['unlocked']) ez_admin_json(['ok' => false, 'error' => 'Verify your identity to open Wallet again.', 'code' => 'wallet_locked'], 401);
+        // Ordinary setup uses a short-lived assertion from the freshly checked
+        // signed-in owner. It never creates or extends a Wallet unlock grant.
+        $proofExpiry = $requiresWallet ? $access['expires_at'] : min(time() + 60, (int) $_SESSION['authenticated_until']);
+        $sessionId = session_id(); $grant = $_SESSION['wallet_access'] ?? null; $signedInAt = $_SESSION['signed_in_at'];
         session_write_close();
         $enabled = ez_central_commerce_enabled();
         $environment = ez_central_commerce_environment();
@@ -93,10 +98,18 @@ function ez_admin_wallet_request(string $action, bool $authenticated, string $au
         $status = 200;
         if ($enabled) {
             $payload = ['environment' => $environment, 'seller' => $sellerId, 'actor' => ['id' => $account, 'email' => $access['email'],
-                'proofExpiresAt' => gmdate('Y-m-d\TH:i:s', $access['expires_at']) . '.000Z']];
+                'proofExpiresAt' => gmdate('Y-m-d\TH:i:s', $proofExpiry) . '.000Z']];
             if ($isOnboarding) {
-                $response = ez_commerce_request('POST', '/internal/commerce/onboarding', $payload + $input + ['action'=>substr($action, 11)]);
-                $response['banks'] = ez_withdrawal_bank_catalog();
+                $response = ez_commerce_request('POST', '/internal/commerce/onboarding', $payload + $input + ['action'=>$action === 'onboarding_bank_read' ? 'read' : substr($action, 11)]);
+                // Profile/address requests use verified sign-in ownership only.
+                // Never expose banking data through that less privileged path.
+                $response['onboarding']['bankSaved'] = !empty($response['onboarding']['bank']);
+                if (!$requiresWallet) {
+                    $response['onboarding']['bank'] = null;
+                    $response['onboarding']['bankRevision'] = 0;
+                    $response['onboarding']['wallet'] = null;
+                }
+                $response['banks'] = $requiresWallet ? ez_withdrawal_bank_catalog() : [];
             } elseif ($isWithdrawal) {
                 if (in_array($action, ['withdrawal_reserve', 'withdrawal_inquire', 'withdrawal_confirm'], true) && ez_config('commerce_withdrawals') !== 'enabled')
                     throw new EzCommerceStorageException('Bank withdrawals are not available yet.', 503);
@@ -166,8 +179,8 @@ function ez_admin_wallet_request(string $action, bool $authenticated, string $au
         $same = ($_SESSION['authenticated'] ?? false) === true && ($_SESSION['authentication_method'] ?? '') === 'supabase'
             && ($_SESSION['authenticated_until'] ?? 0) > time() && ($_SESSION['admin_user']['id'] ?? '') === $account
             && ($_SESSION['csrf_token'] ?? '') === $csrfToken && ($_SESSION['signed_in_at'] ?? null) === $signedInAt
-            && ($_SESSION['wallet_access'] ?? null) === $grant && ($grant['expires_at'] ?? 0) > time();
-        if ($same) $same = ez_wallet_access('supabase', $sellerId, $csrfToken, $isHttps)['unlocked'];
+            && (!$requiresWallet || (($_SESSION['wallet_access'] ?? null) === $grant && ($grant['expires_at'] ?? 0) > time()));
+        if ($same && $requiresWallet) $same = ez_wallet_access('supabase', $sellerId, $csrfToken, $isHttps)['unlocked'];
         session_write_close();
         if (!$same) { header_remove('Set-Cookie'); ez_admin_json(['ok' => false, 'error' => 'Verify your identity again to check Wallet. Your saved request is preserved.', 'code' => 'wallet_locked'], 401); }
     }
