@@ -64,6 +64,8 @@ async function snapshot(env,input){
 export async function sellerOnboarding(env,input){
  fields(input,['environment','seller','actor','action','revision','requestKey','legalName','birthDate','ageConfirmed','phone','bank','shippingRevision','reason']);
  await walletOwner(env,input);
+ const initialBankOnly=input.action==='bank_initial';
+ if(initialBankOnly)input={...input,action:'bank'};
  if(input.action==='read')return snapshot(env,input);
  if(input.action==='profile'&&input.ageConfirmed!==true)fail('Confirm that you are 18 or older to continue.');
  if(!['profile','bank','confirm_pins'].includes(input.action)||!Number.isSafeInteger(input.revision)||input.revision<0||!/^[a-f0-9]{32}$/.test(input.requestKey||''))fail('Refresh onboarding before saving.');
@@ -76,6 +78,7 @@ export async function sellerOnboarding(env,input){
   if(await read(env,'seller_onboarding_current_bank',input.seller)){
    const initialReplay=await env.DB.prepare('SELECT * FROM seller_onboarding_banks WHERE seller_id=? AND request_key=? AND revision=1').bind(input.seller,input.requestKey).first();
    if(initialReplay){const hash=await commerceHash({action:input.action,revision:input.revision,owner:input.actor.id,values:[input.bank.code,input.bank.accountNumber,input.bank.channel]});if(hash!==initialReplay.request_hash)fail('This save reference was already used for different details.',409);return snapshot(env,input);}
+   if(initialBankOnly)fail('Verify to view or change your saved bank.',401);
    await requestBankChange(env,input);return snapshot(env,input);
   }
   values=[input.bank.code,input.bank.accountNumber,input.bank.channel];table='seller_onboarding_banks';

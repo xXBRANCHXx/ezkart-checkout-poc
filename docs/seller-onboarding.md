@@ -2,13 +2,13 @@
 
 The owner clarified on 28 September 2026 that onboarding must **store seller age**, not introduce a mandatory ID-verification process based on the PSE data declaration. The owner separately approved a minimum seller age of **18**. This implementation records seller-declared information and applies that owner policy; it makes no finding about legal compliance, authentic identity, or independently assured age. Any separately applicable legal or provider verification requirement remains a separate assessment.
 
-The merchant's **Seller onboarding** workspace uses verified Supabase sign-in for profile and addresses, and current-owner Wallet verification only for bank details. It reuses the existing bank catalog and shipping/map editor. It saves legal name, declared DOB, calculated declared age, the WIB date for that age snapshot, phone, immutable bank versions, and explicit confirmation of the current pickup and return address/pin revision. Pickup and return may share an address. The date of birth must be a real calendar date and imply age 18+ on the current Indonesian (WIB/UTC+7) date. A 29 February birthday reaches the next age on 1 March in a non-leap year. SQL readiness independently applies the same calendar comparison to the declared DOB.
+The merchant's **Seller onboarding** workspace uses verified Supabase sign-in for profile and addresses, and current-owner Wallet verification for protected bank access. First-time bank setup without enrolled two-step uses the existing verified sign-in. It reuses the existing bank catalog and shipping/map editor. It saves legal name, declared DOB, calculated declared age, the WIB date for that age snapshot, phone, immutable bank versions, and explicit confirmation of the current pickup and return address/pin revision. Pickup and return may share an address. The date of birth must be a real calendar date and imply age 18+ on the current Indonesian (WIB/UTC+7) date. A 29 February birthday reaches the next age on 1 March in a non-leap year. SQL readiness independently applies the same calendar comparison to the declared DOB.
 
 Age is identified as `seller_declared`; identity status is `not_assessed`. There is no identity-evidence table/view, fabricated verified result, ID upload, or mandatory identity-review step. Stored age is accompanied by its as-of date; current age can be calculated from the declared DOB. No identity documents or ID numbers are collected by this slice.
 
 Migration `0071_seller_onboarding.sql` adds immutable declarations, bank versions, the owner’s 18+ policy, and readiness gates. It does **not** backfill existing merchants as complete. The signed internal API is reached through the existing CSRF/account/store/fresh-proof PHP Wallet proxy. Extra caller identity fields and `verified` flags are rejected. Saved bank numbers are masked on reads and never stored in browser storage. Only the bank section uses the Wallet proof-expiry lock. Ordinary setup reads redact bank and wallet details; bank reads use the protected `onboarding_bank_read` action. Profile/address requests use a short-lived server assertion of the freshly checked signed-in owner and never create or extend a Wallet grant. Expiry clears and locks the bank section without hiding the profile/address steps or losing unsaved profile edits. Saves retry a lost response once using the same intent/key; reload reads the current server revision. Revision conflicts require a refresh.
 
-The 29 September owner clarification changes bank timing: sellers without two-step must save bank details before publishing; sellers with two-step may publish, accept payments and enroll their seller Wallet before saving a withdrawal bank. All withdrawals still require a saved bank. The bank-details workspace keeps the existing authenticator challenge for enrolled owners and email-code protection otherwise.
+The 29 September owner clarification changes bank timing: sellers without two-step must save bank details before publishing; sellers with two-step may publish, accept payments and enroll their seller Wallet before saving a withdrawal bank. All withdrawals still require a saved bank. The bank-details workspace keeps the authenticator challenge for enrolled owners. Following the owner’s 29 September correction, first-time bank setup without enrolled two-step shows the bank form directly and uses the already verified sign-in; it does not request an additional email code. Saved-bank reads and change requests retain fresh verification and independent human review.
 
 Migration `0081_deferred_seller_bank.sql` separates selling readiness from withdrawal readiness. New production orders, SNAP/hosted payment binding and seller-wallet enrollment/provider binding still require legal details, current verified email, 18+ declaration and confirmed pins. A saved current-owner bank or live verified owner TOTP enrollment satisfies the bank-timing rule. The API reads the owner's current Supabase Auth factors, never JWT AAL, user metadata or a team member's factors. A server-only 60-second proof lets SQL recheck eligibility in the write transaction; each new bankless action refreshes Auth first. Disabled factors, changed ownership, expired proofs and Auth failures cannot authorize a new bankless action. Withdrawal reservation/payment gates retain the original bank-required readiness view and frozen bank revisions. Existing provider bindings retain their recovery paths. Completing this declaration flow does not bypass any existing DOKU registration/confirmation, treasury, earnings, beneficiary inquiry, financial reconciliation, deployment flag or provider acceptance control. The Wallet UI directs a ready seller to the existing exactly-one Sub-Account enrollment flow; it does not automatically call DOKU. Existing uncertain registrations keep their original request/binding. Existing receipts, withdrawal lookup, permitted cancellation and started-payment recovery remain available when onboarding later becomes incomplete.
 
@@ -62,3 +62,24 @@ passed; five final browser/flow checks and two entry-gate checks also passed.
 Desktop/mobile screenshots were inspected, PHP syntax checks passed, and the beta
 Worker bundle passed its dry run. Beta Worker `f0e61428-d918-4d50-bfa6-70cbe764dd6f`
 contains the required confirmation and entry status. No production deployment.
+
+## First bank setup correction — 29 September 2026
+
+Login verifies email through a redirect link. The bank step had incorrectly reused
+Wallet’s fallback email-code gate for sellers with no bank and no authenticator.
+The PHP bridge now exposes the initial bank form and catalog using verified owner
+sign-in, while preserving CSRF, current store/owner checks and live factor checks.
+The signed `bank_initial` Worker action accepts only the first bank or its exact
+retry; it cannot submit a saved-bank replacement for review. This path does not
+create or extend a Wallet grant and never returns saved bank details.
+
+Enrolled two-step still protects bank setup. Existing-bank access, human review
+and withdrawal authorization retain their existing controls.
+
+Validation: the focused no-extra-email browser flow, existing unlocked merchant
+flow, eight onboarding API cases and saved-bank review case pass (11 checks).
+Coverage includes live-factor enforcement, rejected replacement attempts, exact
+retry after a lost save response, no implicit Wallet grant, proof expiry and
+desktop/mobile form inspection. PHP/JavaScript syntax and beta bundle checks pass.
+Beta Worker version `fccec56c-ce9a-46ae-ab4e-f57668c636a6` contains the initial-only
+action; deployed with existing runtime variables preserved.

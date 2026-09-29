@@ -79,7 +79,9 @@ function ez_admin_wallet_request(string $action, bool $authenticated, string $au
         if ($sellerId === '' || !hash_equals($sellerId, (string) ($_SERVER['HTTP_X_EZKART_WALLET_STORE'] ?? ''))) ez_admin_json(['ok' => false, 'error' => 'Your store changed. Reload Wallet.', 'code' => 'wallet_locked'], 401);
         $access = ez_wallet_access($authenticationMethod, $sellerId, $csrfToken, $isHttps);
         if ($access['email'] === '') ez_admin_json(['ok' => false, 'error' => 'Sign in again to continue seller setup.'], 401);
-        $requiresWallet = !$isOnboarding || in_array($action, ['onboarding_bank', 'onboarding_bank_read'], true);
+        $bankAction = in_array($action, ['onboarding_bank', 'onboarding_bank_read'], true);
+        $initialBankOnly = $bankAction && $access['method'] === 'email' && !$access['unlocked'];
+        $requiresWallet = !$isOnboarding || ($bankAction && !$initialBankOnly);
         if ($requiresWallet && !$access['unlocked']) ez_admin_json(['ok' => false, 'error' => 'Verify your identity to open Wallet again.', 'code' => 'wallet_locked'], 401);
         // Ordinary setup uses a short-lived assertion from the freshly checked
         // signed-in owner. It never creates or extends a Wallet unlock grant.
@@ -100,7 +102,15 @@ function ez_admin_wallet_request(string $action, bool $authenticated, string $au
             $payload = ['environment' => $environment, 'seller' => $sellerId, 'actor' => ['id' => $account, 'email' => $access['email'],
                 'proofExpiresAt' => gmdate('Y-m-d\TH:i:s', $proofExpiry) . '.000Z']];
             if ($isOnboarding) {
-                $response = ez_commerce_request('POST', '/internal/commerce/onboarding', $payload + $input + ['action'=>$action === 'onboarding_bank_read' ? 'read' : substr($action, 11)]);
+                $onboardingAction = $action === 'onboarding_bank_read' ? 'read' : substr($action, 11);
+                // The Worker permits this action only for the first bank (or its
+                // exact retry), even if another request saves a bank concurrently.
+                if ($initialBankOnly && $action === 'onboarding_bank') $onboardingAction = 'bank_initial';
+                $response = ez_commerce_request('POST', '/internal/commerce/onboarding', $payload + $input + ['action'=>$onboardingAction]);
+                $response['onboarding']['bankSetupAllowed'] = $access['method'] === 'email' && $response['onboarding']['bankRevision'] === 0;
+                if ($initialBankOnly && $action === 'onboarding_bank_read' && !$response['onboarding']['bankSetupAllowed']) {
+                    throw new EzCommerceStorageException('Verify to view or change your saved bank.', 401);
+                }
                 // Profile/address requests use verified sign-in ownership only.
                 // Never expose banking data through that less privileged path.
                 $response['onboarding']['bankSaved'] = !empty($response['onboarding']['bank']);
@@ -110,7 +120,7 @@ function ez_admin_wallet_request(string $action, bool $authenticated, string $au
                     $response['onboarding']['bankRevision'] = 0;
                     $response['onboarding']['wallet'] = null;
                 }
-                $response['banks'] = $requiresWallet ? ez_withdrawal_bank_catalog() : [];
+                $response['banks'] = ($requiresWallet || $response['onboarding']['bankSetupAllowed']) ? ez_withdrawal_bank_catalog() : [];
             } elseif ($isWithdrawal) {
                 if (in_array($action, ['withdrawal_reserve', 'withdrawal_inquire', 'withdrawal_confirm'], true) && ez_config('commerce_withdrawals') !== 'enabled')
                     throw new EzCommerceStorageException('Bank withdrawals are not available yet.', 503);

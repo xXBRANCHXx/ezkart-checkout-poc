@@ -210,3 +210,11 @@ interface mean useful visual content such as actual landing-page covers, not
 playful decoration. Keep campaign dialogs neutral with plain headings and direct
 copy. Avoid pastel header banners, oversized decorative badges, slogans and
 numbered labels. Preserve the existing branded primary action buttons.
+
+## Initial bank entry (owner correction, 29 September 2026)
+
+Login verifies email through a redirect link. Do not require an extra email code
+for first-time bank setup when two-step is not enrolled; show bank/account fields
+and use verified owner sign-in. This supersedes the blanket bank-section gate
+above only for initial setup. Preserve enrolled two-step, protected saved-bank
+access and independent human review for replacement.

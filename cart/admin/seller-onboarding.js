@@ -8,7 +8,7 @@
   root.querySelectorAll('[data-onboarding-step]').forEach(n=>{if(n.dataset.onboardingStep===next)n.setAttribute('aria-current','step');else n.removeAttribute('aria-current');});
   const url=new URL(location.href);url.searchParams.set('step',next);history.replaceState({},'',url);
   if(next==='complete'&&changed)root.querySelector('[data-onboarding-complete-title]').focus({preventScroll:true});
-  if(next==='bank'&&changed&&bank&&!bank.closest('[data-wallet-content]').hidden)setTimeout(()=>void run(()=>call('bank_read')),0);
+  if(next==='bank'&&changed&&bank&&!bank.closest('[data-onboarding-bank-content]').hidden)setTimeout(()=>void run(()=>call('bank_read')),0);
  }
  function stepControls(){const done={profile:!!state.profile&&!state.requirements.includes("refresh_legal_profile"),addresses:state.shipping.confirmed,bank:!!state.bankSaved};root.querySelectorAll("[data-onboarding-step]").forEach(n=>{const id=n.dataset.onboardingStep;n.disabled=busy||(id!=="profile"&&!done.profile)||(id==="bank"&&!done.addresses);root.querySelector(`[data-step-status="${id}"]`).textContent=done[id]?t("Saved"):"";});root.querySelector("[data-onboarding-finish]").hidden=!(state.ready||state.sellingReady);if(!step){const requested=new URLSearchParams(location.search).get('step');const allowed=requested==='profile'||requested==='addresses'&&done.profile||requested==='bank'&&done.profile&&done.addresses||requested==='complete'&&(state.ready||state.sellingReady);showStep(allowed?requested:state.ready?'complete':!done.profile?'profile':!done.addresses?'addresses':'bank');}}
  root.querySelectorAll("[data-onboarding-step]").forEach(n=>n.addEventListener("click",()=>showStep(n.dataset.onboardingStep)));
@@ -18,7 +18,7 @@
   let response;try{response=await fetch('./?wallet=onboarding_'+action,{method:'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json','X-Ezkart-Csrf':document.body.dataset.adminCsrfToken,'X-Ezkart-Wallet-Account':root.dataset.account,'X-Ezkart-Wallet-Store':root.dataset.store},body:JSON.stringify(payload)});}catch(error){if(retry&&action!=='read')return call(action,payload,false);throw Error('Connection interrupted. Refresh saved details to check whether this revision was saved.');}
   if(response.status===401||response.status===403){
    if(action==='bank'||action==='bank_read'){
-    const content=root.querySelector('[data-wallet-content]');if(content)content.hidden=true;
+    const content=root.querySelector('[data-onboarding-bank-content]');if(content)content.hidden=true;root.dataset.bankUnlocked='false';
     const locked=root.querySelector('[data-onboarding-bank-locked]');if(locked)locked.hidden=false;
     if(bank)bank.elements.accountNumber.value='';
     throw Error('Verify again to open bank details. Your profile and addresses are still available.');
@@ -30,6 +30,9 @@
  }
  function channels(){if(!bank)return;const available=banks.find(b=>b.code===bank.elements.code.value)?.channels||[];bank.elements.channel.replaceChildren(...available.map(value=>new Option(value==='BI_FAST'?'BI-FAST':'Online bank transfer',value)));}
  function render(){
+  const bankOpen=root.dataset.bankUnlocked==='true'||state.bankSetupAllowed;
+  root.querySelector('[data-onboarding-bank-content]').hidden=!bankOpen;
+  const verification=root.querySelector('[data-onboarding-bank-verification]');if(verification)verification.hidden=!!bankOpen;
   profile.elements.ageConfirmed.checked=false;
   profile.elements.legalName.value=state.profile?.legalName||'';profile.elements.birthDate.value=state.profile?.birthDate||'';profile.elements.phone.value=state.profile?.phone||'';profile.elements.email.value=state.email;
   if(bank){const choice=bank.elements.code.value;bank.elements.code.replaceChildren(new Option('Choose your bank',''),...banks.map(b=>new Option(b.name,b.code)));bank.elements.code.value=choice;channels();}
@@ -53,7 +56,7 @@
  root.querySelector('[data-onboarding-confirm-pins]').addEventListener('click',()=>run(async()=>{await call('confirm_pins',{revision:state.profile.revision,requestKey:key(),shippingRevision:state.shipping.revision});showStep(state.ready?'complete':'bank');}));
  root.querySelector('[data-onboarding-finish]').addEventListener('click',()=>showStep('complete'));
  root.querySelector('[data-onboarding-review]').addEventListener('click',()=>showStep('profile'));
- root.querySelector('[data-onboarding-refresh]').addEventListener('click',()=>run(()=>call(step==='bank'?'bank_read':'read')));
- window.addEventListener('ezkart:wallet-locked',()=>{if(state){state.bank=null;state.bankChange=null;state.bankRevision=0;}banks=[];if(bank){bank.elements.accountNumber.value='';bank.elements.reason.value='';bank.querySelector('[data-bank-change-status]').textContent='';}text('[data-onboarding-bank-summary]','Verify to view or change bank details.');});
+ root.querySelector('[data-onboarding-refresh]').addEventListener('click',()=>run(()=>call(step==='bank'&&(root.dataset.bankUnlocked==='true'||state?.bankSetupAllowed)?'bank_read':'read')));
+ window.addEventListener('ezkart:wallet-locked',()=>{root.dataset.bankUnlocked='false';if(state){state.bank=null;state.bankChange=null;state.bankRevision=0;}banks=[];if(bank){bank.elements.accountNumber.value='';bank.elements.reason.value='';bank.querySelector('[data-bank-change-status]').textContent='';}text('[data-onboarding-bank-summary]','Verify to view or change bank details.');});
  void run(()=>call('read'));
 })();

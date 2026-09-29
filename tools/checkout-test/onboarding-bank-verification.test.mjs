@@ -7,7 +7,7 @@ import {saveShippingSettings} from '../../cloudflare/ezkart-api/src/shipping-set
 import {setupCentralFixture} from './central-fixture.mjs';
 import {browser,pageFor} from './review-workspace-fixture.mjs';
 const key=()=>randomBytes(16).toString('hex');
-test('profile and address setup work without Wallet verification; bank reads and writes remain protected',async t=>{
+test('first bank setup uses verified sign-in without email codes; saved banks and enabled two-step remain protected',async t=>{
  const f=await setupCentralFixture(t,{}, {declaredOnboarding:false}),b=await browser(t);
  const address={id:'addr_'+'a'.repeat(32),label:'Warehouse',name:'Alice',phone:'081234567890',email:'',organization:'',address:'Jalan Warehouse 18',location:'Jakarta',postalCode:'54321',note:'',coordinate:{latitude:-6.2,longitude:106.8}};
  if(!await f.db.prepare('SELECT revision FROM seller_shipping_settings WHERE seller_id=?').bind('seller_alice').first()) await saveShippingSettings({DB:f.db},{sellerId:'seller_alice',id:'alice',role:'owner'},{revision:0,requestKey:key(),configuration:{addresses:[address],pickupAddressId:address.id,returnAddressId:address.id,couriers:['jne']}});
@@ -25,23 +25,28 @@ test('profile and address setup work without Wallet verification; bank reads and
  await p.getByRole('button',{name:'Save and continue',exact:true}).click();
  await p.getByRole('heading',{name:'Where will orders travel from?'}).waitFor();
  const request=async(action,body={})=>f.app.request('/cart/admin/?wallet='+action,body,{Cookie:(await p.context().cookies()).map(c=>c.name+'='+c.value).join('; '),'X-Ezkart-Csrf':await p.locator('body').getAttribute('data-admin-csrf-token'),'X-Ezkart-Wallet-Account':'alice','X-Ezkart-Wallet-Store':'seller_alice'}).then(r=>({status:r.status,...r.data}));
- let r=await request('onboarding_read');assert.equal(r.status,200,r.error);assert.equal(r.onboarding.profile.legalName,'Alice Seller');assert.equal(r.onboarding.bank,null);assert.deepEqual(r.banks,[]);
+ let r=await request('onboarding_read');assert.equal(r.status,200,r.error);assert.equal(r.onboarding.profile.legalName,'Alice Seller');assert.equal(r.onboarding.bank,null);assert.ok(r.banks.length);assert.equal(r.onboarding.bankSetupAllowed,true);
+ assert.equal((await request('onboarding_bank_read')).status,200);
+ // A currently enrolled authenticator still protects first bank setup.
+ await writeFile(join(f.app.directory,'auth-response.json'),JSON.stringify({user:{id:'alice',email:'alice@example.test',factors:[{id:'11111111-1111-4111-8111-111111111111',factor_type:'totp',status:'verified'}]}}));
  assert.equal((await request('onboarding_bank_read')).status,401);
  assert.equal((await request('onboarding_bank',{revision:0,requestKey:key(),bank:{code:'CENAIDJA',accountNumber:'1234567890',channel:'BI_FAST'}})).status,401);
+ await writeFile(join(f.app.directory,'auth-response.json'),JSON.stringify({user:{id:'alice',email:'alice@example.test'},wallet_tokens:{access_token:token,refresh_token:'fixture-refresh',expires_in:3600}}));
  await p.getByRole('button',{name:'Confirm and continue',exact:true}).click();
- await p.getByRole('heading',{name:'Verify to open bank details'}).waitFor();
+ await p.getByLabel('Account number',{exact:true}).waitFor();
+ assert.equal(await p.getByLabel('Email code',{exact:true}).isVisible(),false);
  assert.equal((await request('onboarding_read')).onboarding.shipping.confirmed,true);
- // Direct step links must still protect banking, while profile stays reachable.
- await p.goto(f.app.base+'/cart/admin/?page=onboarding&step=bank');await p.getByRole('heading',{name:'Verify to open bank details'}).waitFor();
- await p.getByRole('button',{name:'Send email code',exact:true}).click();
- await p.getByLabel('Email code',{exact:true}).fill('654321');
- await p.getByRole('button',{name:'Verify bank details',exact:true}).click();
+ await p.goto(f.app.base+'/cart/admin/?page=onboarding&step=bank');
  await p.locator('[data-onboarding-bank]').waitFor();
  r=await request('onboarding_bank_read');assert.equal(r.status,200,r.error);assert.ok(r.banks.length);
  const bank=r.banks.find(x=>x.channels.includes('BI_FAST'));
  await p.locator('[data-onboarding-bank] select[name=code]').selectOption(bank.code);
  await p.getByLabel('Account number',{exact:true}).fill('1234567890');
  await p.locator('[data-onboarding-bank] select[name=channel]').selectOption('BI_FAST');
+ for(const width of [1360,390]){await p.setViewportSize({width,height:940});assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await p.screenshot({path:'/tmp/ezkart-first-bank-'+width+'.png',fullPage:true,animations:'disabled'});}
+ await p.setViewportSize({width:1360,height:940});
+ // A lost save response must replay the first bank without creating a review.
+ f.control.drop='/internal/commerce/onboarding';
  await p.getByRole('button',{name:'Save bank destination',exact:true}).click();
  await p.getByRole('heading',{name:"You're all set!",exact:true}).waitFor();
  assert.equal(new URL(p.url()).searchParams.get('step'),'complete');
@@ -58,6 +63,14 @@ test('profile and address setup work without Wallet verification; bank reads and
  await p.screenshot({path:'/tmp/ezkart-onboarding-complete-390.png',fullPage:true});
  r=await request('onboarding_read');assert.equal(r.onboarding.bank,null);assert.equal(r.onboarding.bankSaved,true);assert.equal(r.onboarding.bankRevision,0);
  await p.getByRole('button',{name:'Your bank'}).click();
+ await p.getByRole('heading',{name:'Verify to open bank details'}).waitFor();
+ assert.equal((await request('onboarding_bank_read')).status,401);
+ for(const revision of [0,1])assert.equal((await request('onboarding_bank',{revision,requestKey:key(),reason:'Attempt to replace a saved bank without fresh verification.',bank:{code:bank.code,accountNumber:'9995555555',channel:'BI_FAST'}})).status,401);
+ assert.equal(await f.count('seller_bank_change_requests'),0);
+ assert.equal((await request('refresh')).status,401,'Initial bank setup must not unlock Wallet');
+ await p.getByRole('button',{name:'Send email code',exact:true}).click();
+ await p.getByLabel('Email code',{exact:true}).fill('654321');
+ await p.getByRole('button',{name:'Verify bank details',exact:true}).click();
  await p.getByRole('button',{name:'Request bank change',exact:true}).waitFor();
  await p.locator('[data-onboarding-bank] select[name=code]').selectOption(bank.code);
  await p.getByLabel('Account number',{exact:true}).fill('9995555555');

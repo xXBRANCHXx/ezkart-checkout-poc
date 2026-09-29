@@ -3,7 +3,7 @@ if (empty($authenticated)) { http_response_code(404); return; }
 ez_page_header('Welcome to Ezkart', 'Let’s get your store ready, one step at a time.');
 if (($activeSeller['role'] ?? '') !== 'owner') { echo '<p>Only the current store owner can complete onboarding.</p>'; return; }
 ?>
-<div class="onboarding-workspace" data-onboarding aria-busy="true" data-account="<?= ez_admin_escape((string) ($adminUser['id'] ?? '')) ?>" data-store="<?= ez_admin_escape($sellerId) ?>">
+<div class="onboarding-workspace" data-onboarding aria-busy="true" data-bank-unlocked="<?= !empty($walletAccess['unlocked']) ? 'true' : 'false' ?>" data-account="<?= ez_admin_escape((string) ($adminUser['id'] ?? '')) ?>" data-store="<?= ez_admin_escape($sellerId) ?>">
  <nav class="onboarding-steps" aria-label="Seller setup">
  <?php foreach ([['profile','users','About you'],['addresses','map-pin','Your addresses'],['bank','wallet','Your bank']] as $step): ?>
  <button type="button" data-onboarding-step="<?= $step[0] ?>" disabled><?= ez_admin_icon($step[1]) ?><span><?= $step[2] ?></span><small data-step-status="<?= $step[0] ?>"></small></button>
@@ -23,12 +23,11 @@ if (($activeSeller['role'] ?? '') !== 'owner') { echo '<p>Only the current store
  <section class="surface" data-onboarding-panel="addresses" hidden><span class="onboarding-step-label">Step 2 of 3</span><h2>Where will orders travel from?</h2><p>Add pickup and return addresses, then confirm their map pins. You can use the same address for both.</p><a class="ui-button" href="?page=shipping-settings&amp;setup=1"><?= ez_admin_icon('map-pin') ?><span>Edit addresses and map pins</span></a><div data-onboarding-addresses></div><button class="ui-button primary" type="button" data-onboarding-confirm-pins><?= ez_admin_icon('check-circle') ?><span>Confirm and continue</span></button></section>
  <section class="surface" data-onboarding-panel="bank" hidden><span class="onboarding-step-label">Step 3 of 3</span><h2>Where should we send your earnings?</h2><p data-onboarding-bank-summary>Bank details stay protected until you verify.</p><p>Save your withdrawal destination. With two-step enabled, you can add this before your first withdrawal.</p>
  <?php if (empty($walletAccess['unlocked'])): ?>
- <?php require __DIR__ . '/wallet-verification.php'; ?>
- <?php else: ?>
- <div data-wallet-content data-wallet-seconds="<?= max(0, (int) $walletAccess['expires_at'] - time()) ?>">
+ <div data-onboarding-bank-verification hidden><?php require __DIR__ . '/wallet-verification.php'; ?></div>
+ <?php endif; ?>
+ <div data-onboarding-bank-content hidden <?php if (!empty($walletAccess['unlocked'])): ?>data-wallet-content data-wallet-seconds="<?= max(0, (int) $walletAccess['expires_at'] - time()) ?>"<?php endif; ?>>
  <form data-onboarding-bank autocomplete="off"><label>Bank <select name="code" required></select></label><label>Account number <input name="accountNumber" inputmode="numeric" pattern="[0-9]{1,22}" maxlength="22" required></label><label>Transfer method <select name="channel" required></select></label><label data-bank-change-reason hidden>Why are you changing your bank? <textarea name="reason" minlength="20" maxlength="500"></textarea></label><p data-bank-change-status role="status"></p><button class="ui-button primary" type="submit"><?= ez_admin_icon('check-circle') ?><span data-bank-submit-label>Save bank destination</span></button></form>
  </div><p data-onboarding-bank-locked hidden>Bank verification expired. <a class="ui-button" href="?page=onboarding&amp;step=bank"><?= ez_admin_icon('shield') ?><span>Verify bank details</span></a></p>
- <?php endif; ?>
  <p class="onboarding-hint">Once saved, changing your bank requires a reason and human review by Ezkart. We will verify the request and bank ownership before approval. Your current bank stays active during review. Existing withdrawals keep their original destination.</p><button class="ui-button" type="button" data-onboarding-finish hidden><?= ez_admin_icon('check-circle') ?><span>Finish setup</span></button></section>
  <section class="surface onboarding-complete" data-onboarding-panel="complete" hidden aria-labelledby="onboarding-complete-title">
  <span class="onboarding-complete-icon"><?= ez_admin_icon('check-circle') ?></span>
