@@ -176,3 +176,8 @@ adding isolated page patches. Use `--ui-panel-padding`, `--ui-control-gap` and
 compact charts with real data and honest empty states, not paragraphs of metric
 text or invented trends. Annotate action semantics with `data-ui-icon` so icons
 survive loading, translation and export label updates.
+
+Use purple for analytics selections, chart accents and active navigation indicators.
+Keep the orange-to-pink gradient for primary actions. Keep report controls compact
+and place useful charts directly beneath them; do not stack export, metadata and
+empty-state panels above the report data.

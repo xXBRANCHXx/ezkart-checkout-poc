@@ -31,6 +31,31 @@ function ez_analytics_comparison(mixed $current, mixed $previous, string $format
     return ($change > 0 ? '+' : '') . number_format($change, 1) . '% vs previous period';
 }
 
+function ez_analytics_mini_chart(array $analytics, string $key, string $format, string $label): void
+{
+    $values = [];
+    foreach ($analytics['buckets'] as $bucket) {
+        $value = $key === 'aov' ? (($bucket['current']['paid'] ?? 0) > 0 ? $bucket['current']['revenue'] / $bucket['current']['paid'] : null) : ($bucket['current'][$key] ?? null);
+        $values[] = $value;
+    }
+    $valid = array_filter($values, static fn($v) => $v !== null);
+    if ($valid !== []) {
+        $max = $format === 'percent' ? 100 : max(1, ...$valid);
+        $path = ''; $new = true;
+        foreach ($values as $i => $value) {
+            if ($value === null) { $new = true; continue; }
+            $x = count($values) > 1 ? 4 + $i * 272 / (count($values) - 1) : 140;
+            $y = 52 - 44 * max(0, $value) / $max;
+            $path .= ($new ? 'M' : ' L') . round($x, 2) . ' ' . round($y, 2); $new = false;
+        }
+        ?><svg class="an-mini-chart" viewBox="0 0 280 60" preserveAspectRatio="none" role="img" aria-label="<?= ez_admin_escape($label . ' over the selected period') ?>"><path class="an-mini-grid" d="M4 52H276 M4 30H276 M4 8H276"/><path class="an-mini-line" d="<?= $path ?>"/><?php foreach ($values as $i => $value): if ($value === null) continue; ?><circle cx="<?= count($values)>1 ? 4+$i*272/(count($values)-1) : 140 ?>" cy="<?= 52-44*max(0,$value)/$max ?>" r="2"><title><?= ez_admin_escape($analytics['buckets'][$i]['start']->format('j M Y') . ': ' . ez_analytics_value($value,$format)) ?></title></circle><?php endforeach; ?></svg><?php
+    } else {
+        $current = $analytics['current'][$key] ?? null; $previous = $analytics['previous'][$key] ?? null;
+        $maximum = $format === 'percent' ? 100 : max(1, $current ?? 0, $previous ?? 0);
+        ?><span class="an-mini-bars" role="img" aria-label="<?= ez_admin_escape($label . ': selected ' . ez_analytics_value($current,$format) . ', previous ' . ez_analytics_value($previous,$format)) ?>"><?php foreach (['Selected' => $current, 'Previous' => $previous] as $name => $value): ?><span><small><?= $name ?></small><i><em style="width:<?= min(100,max(0,100*($value ?? 0)/$maximum)) ?>%"></em></i><small><?= ez_analytics_value($value,$format) ?></small></span><?php endforeach; ?></span><?php
+    }
+}
+
 function ez_analytics_hidden_fields(array $analytics, array $omit = []): void
 {
     parse_str(ltrim(ez_analytics_url($analytics), '?'), $query);
@@ -63,7 +88,7 @@ function ez_analytics_chart_view(array $analytics, string $metric, string $title
     ?>
     <article class="surface an-chart" data-analytics-chart data-points="<?= ez_admin_escape(json_encode($points, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE)) ?>">
       <header class="an-panel-header"><div><h2><?= ez_admin_escape($title) ?></h2><p><?= ucfirst($analytics['period']['group']) ?> · orders grouped by creation date</p></div><nav class="an-chart-groups" aria-label="Chart grouping"><?php foreach ((!empty($analytics['central']) ? ['daily', 'weekly', 'monthly', 'yearly'] : ['daily', 'weekly', 'monthly']) as $group): if (($group === 'daily' && $analytics['period']['days'] > 90) || ($group === 'weekly' && $analytics['period']['days'] > 730) || (!empty($analytics['central']) && $analytics['period']['days'] > 20 * 366 && $group !== 'yearly')) continue; ?><a href="<?= ez_admin_escape(ez_analytics_url($analytics, ['group' => $group])) ?>" <?= $analytics['period']['group'] === $group ? 'aria-current="true"' : '' ?>><?= ucfirst($group) ?></a><?php endforeach; ?></nav></header>
-      <div class="an-chart-legend"><span><i></i>Selected period</span><?php if ($analytics['previous'] !== null): ?><span><i class="previous"></i>Previous period</span><?php endif; ?></div>
+      <div class="an-chart-legend"><?php if ($analytics['current']['orders'] === 0): ?><span class="an-chart-empty">No orders in this period</span><?php endif; ?><span><i></i>Selected period</span><?php if ($analytics['previous'] !== null): ?><span><i class="previous"></i>Previous period</span><?php endif; ?></div>
       <div class="an-plot"><div class="an-axis"><span><?= ($format === 'money' ? ez_analytics_axis_money($maximum) : ez_analytics_value($maximum, $format)) ?></span><span><?= ($format === 'money' ? ez_analytics_axis_money($maximum / 2) : ez_analytics_value($maximum / 2, $format)) ?></span><span><?= ez_analytics_value(0, $format) ?></span></div><svg viewBox="0 0 900 260" preserveAspectRatio="none" role="img" aria-label="<?= ez_admin_escape($title) ?>; values available in the chart data table">
         <?php foreach ([24, 125, 226] as $lineY): ?><path class="an-grid-line" d="M24 <?= $lineY ?> H876"/><?php endforeach; ?>
         <?php if ($analytics['previous'] !== null): ?><path class="an-series previous" d="<?= $path('previous') ?>"/><?php endif; ?><path class="an-series" d="<?= $path('current') ?>"/>
@@ -91,22 +116,24 @@ ez_page_header($info['title'], $info['description'], ($analyticsAvailable && emp
 ?>
 <nav class="an-navigation" aria-label="Analytics reports"><?php foreach (ez_analytics_reports() as $key => $item): ?><a href="<?= ez_admin_escape(ez_analytics_url($analytics, ['report' => $key])) ?>" <?= $report === $key ? 'aria-current="page"' : '' ?>><?= ez_admin_icon($item['icon']) ?><?= $item['label'] ?></a><?php endforeach; ?></nav>
 <?php if (!$analyticsAvailable): ?><section class="surface an-empty" role="alert"><h2>Analytics could not be loaded</h2><p><?= ez_admin_escape($analyticsError ?: 'We couldn’t confirm your store. Reload to try again.') ?></p><a class="action-button" href="?page=analytics<?= !empty($centralAnalyticsWorkspace) && ez_config('commerce_storage') !== 'd1' ? '&amp;analytics-preview=1' : '' ?>">Reset and reload analytics</a></section><?php return; endif; ?>
-<?php if (!empty($analytics['central'])): ?>
-<div class="surface an-export" data-commerce-analytics data-cohort="<?= ez_admin_escape($analytics['cohort']) ?>" data-report="<?= ez_admin_escape($report) ?>"><button type="button" class="ui-button primary" disabled><?= ez_admin_icon('download') ?> Export CSV</button><span role="status" aria-live="polite">Export the full report, including rows outside the table filters.</span></div>
-<?php if ($analytics['preview'] || !$analytics['enabled']): ?><p class="an-notice">Central analytics preview · checkout has not switched to central storage. Legacy orders are excluded.</p><?php endif; ?>
-<?php endif; ?>
-<form class="surface an-period" method="get"><?php ez_analytics_hidden_fields($analytics, ['range', 'from', 'to', 'cohort']); ?>
+<div class="surface an-toolbar">
+<form class="an-period" method="get"><?php ez_analytics_hidden_fields($analytics, ['range', 'from', 'to', 'cohort']); ?>
   <label>Period<select name="range" aria-label="Analytics date range"><?php foreach (['7' => 'Last 7 days', '30' => 'Last 30 days', '90' => 'Last 90 days', '180' => 'Last 6 months (180 days)', 'all' => 'All time', 'custom' => 'Custom dates'] as $value => $label): ?><option value="<?= $value ?>" <?= $period['range'] === (string) $value ? 'selected' : '' ?>><?= $label ?></option><?php endforeach; ?></select></label>
   <label>From<input type="date" name="from" aria-label="From date" min="1970-01-01" max="<?= $nowJakarta->format('Y-m-d') ?>" value="<?= $period['start']->format('Y-m-d') ?>"></label>
   <label>To<input type="date" name="to" aria-label="To date" min="1970-01-01" max="<?= $nowJakarta->format('Y-m-d') ?>" value="<?= $period['end']->modify('-1 day')->format('Y-m-d') ?>"></label>
   <button type="submit" class="ui-button" data-ui-icon="check">Apply</button>
+<?php if (!empty($analytics['central'])): ?><div class="an-export" data-commerce-analytics data-cohort="<?= ez_admin_escape($analytics['cohort']) ?>" data-report="<?= ez_admin_escape($report) ?>"><button type="button" class="ui-button primary" disabled data-ui-icon="download">Export CSV</button><span role="status" aria-live="polite"></span></div><?php endif; ?>
   <div class="an-period-context"><b><?= $period['start']->format('j M Y') ?> – <?= $period['end']->modify('-1 day')->format('j M Y') ?></b><span><?= $period['previousStart'] !== null ? 'Compared with ' . $period['previousStart']->format('j M') . ' – ' . $period['start']->modify('-1 day')->format('j M Y') : 'All recorded history · no previous period' ?></span></div>
 </form>
-<p class="an-source-note"><?= $commerceProduction ? 'Production' : 'Sandbox' ?> order records · Asia/Jakarta · Updated <?= $nowJakarta->format('H:i') ?> WIB · Current payment and delivery statuses</p>
+<?php if (!empty($analytics['central'])): ?>
+<?php if ($analytics['preview'] || !$analytics['enabled']): ?><p class="an-notice">Central analytics preview · checkout has not switched to central storage. Legacy orders are excluded.</p><?php endif; ?>
+<?php endif; ?>
+</div>
+
 <?php if ($period['error'] !== ''): ?><p class="an-notice" role="alert"><?= ez_admin_escape($period['error']) ?></p><?php endif; ?>
 <?php if ($analytics['undated'] > 0): ?><p class="an-notice"><?= number_format($analytics['undated']) ?> records have no valid order date and are excluded from these reports.</p><?php endif; ?>
 <?php if ($catalogError !== ''): ?><p class="an-notice" role="alert">Catalog details are unavailable. These reports still use your saved order records and product snapshots.</p><?php endif; ?>
-<?php if ($stats['orders'] === 0): ?><div class="an-notice" role="status">No orders were created in this period. Choose another date range to explore your history.</div><?php endif; ?>
+
 <?php
 $cards = match ($report) {
     'revenue' => [['revenue', (!empty($analytics['central']) ? 'Gross verified payments' : 'Confirmed revenue'), 'money', 'Includes shipping', 'revenue'], ['product_revenue', 'Product payments', 'money', 'Saved product subtotals', 'revenue'], ['shipping', 'Shipping collected', 'money', 'From paid orders', 'revenue'], ['aov', 'Average paid order', 'money', 'Confirmed revenue ÷ paid orders', 'revenue']],
@@ -116,7 +143,7 @@ $cards = match ($report) {
     default => [['revenue', (!empty($analytics['central']) ? 'Gross verified payments' : 'Confirmed revenue'), 'money', 'Includes shipping', 'revenue'], ['orders', 'Orders created', 'number', 'All payment statuses', 'orders'], ['payment_rate', 'Payment rate', 'percent', 'Paid orders ÷ all orders', 'payments'], ['units', 'Paid units', 'number', 'Products in confirmed orders', 'products']],
 };
 ?>
-<section class="an-metrics" aria-label="Report summary"><?php foreach ($cards as [$key, $label, $format, $detail, $destination]): ?><a class="surface an-metric" href="<?= ez_admin_escape(ez_analytics_url($analytics, ['report' => $destination])) ?>" data-metric="<?= $key ?>" <?= $format === 'money' && strlen((string) ($stats[$key] ?? '')) > 12 ? 'data-wide-money="true"' : '' ?>><span class="an-metric-top"><span><?= $label ?></span><?= ez_admin_icon(ez_analytics_reports()[$destination]['icon']) ?></span><strong><?= ez_analytics_value($stats[$key], $format) ?></strong><small><?= ez_admin_escape($detail) ?></small><span class="an-comparison"><?= ez_admin_escape(ez_analytics_comparison($stats[$key], $analytics['previous'][$key] ?? null, $format, $analytics['previous'] === null)) ?></span></a><?php endforeach; ?></section>
+<section class="an-metrics" aria-label="Report summary"><?php foreach ($cards as [$key, $label, $format, $detail, $destination]): ?><a class="surface an-metric" title="<?= ez_admin_escape($detail) ?>" href="<?= ez_admin_escape(ez_analytics_url($analytics, ['report' => $destination])) ?>" data-metric="<?= $key ?>" <?= $format === 'money' && strlen((string) ($stats[$key] ?? '')) > 12 ? 'data-wide-money="true"' : '' ?>><span class="an-metric-top"><span><?= $label ?></span><?= ez_admin_icon(ez_analytics_reports()[$destination]['icon']) ?></span><strong><?= ez_analytics_value($stats[$key], $format) ?></strong><?php ez_analytics_mini_chart($analytics,$key,$format,$label); ?><span class="an-comparison"><?= ez_admin_escape(ez_analytics_comparison($stats[$key], $analytics['previous'][$key] ?? null, $format, $analytics['previous'] === null)) ?></span></a><?php endforeach; ?></section>
 
 <?php if ($report === 'overview'): ?>
 <div class="an-main-grid">
@@ -141,4 +168,5 @@ $cards = match ($report) {
 <?php require __DIR__ . '/analytics-table.php'; ?>
 <?php endif; ?>
 <?php if (!empty($analytics['central'])): ?><p class="an-source-note">Additional captures: <?= ez_analytics_money($stats['additional']) ?> · excluded from gross verified payments. <?= (int) $analytics['future'] ?> future-dated records excluded. Time to verified payment is the median interval from order creation to verification, which may include notification delays.</p><p class="an-source-note">Report navigation retains the original set of orders for 24 hours. Payment and delivery states remain current. Apply the period again to include new orders. CSV downloads freeze the full report when the export is created.</p><?php endif; ?>
+<p class="an-source-note an-refresh-note"><?= $commerceProduction ? 'Production' : 'Sandbox' ?> order records · Asia/Jakarta · Updated <?= $nowJakarta->format('H:i') ?> WIB · Current payment and delivery statuses</p>
 <details class="surface an-definitions"><summary>How these numbers are calculated</summary><div><p>Every report selects orders by their creation date in Asia/Jakarta, then uses their current payment status. A payment completed later updates the original order’s period. Previous-period comparisons use the same number of days immediately before the selected period.</p><p><?= !empty($analytics['central']) ? 'Gross verified payments count each order’s primary verified capture once, including shipping. Refunded orders retain their gross capture; additional captures are shown separately. These amounts are not net revenue.' : 'Confirmed revenue sums paid order totals, including shipping.' ?> Average paid order divides that total by paid orders. Payment rate divides paid orders by all orders; periods with no orders show “—”. Product item values use saved prices and quantities, and may differ from order subtotals when adjustments apply.</p><p>These reports do not estimate visits, advertising attribution, provider settlements, refunds, or profit. Open <a href="?page=payments">Payments</a> to inspect payment records or <a href="?page=wallet">Wallet</a> for settlement availability.</p></div></details>

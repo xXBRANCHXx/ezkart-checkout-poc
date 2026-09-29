@@ -1,11 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile,mkdir} from 'node:fs/promises';
+import {seedDeclaredOnboarding} from '../../cloudflare/ezkart-api/test/onboarding-fixture.mjs';
 import {setupCentralFixture} from './central-fixture.mjs';
 
 const api='/v1/commerce/analytics';
 async function fixture(t,overrides){
-  const f=await setupCentralFixture(t,overrides);
+  const f=await setupCentralFixture(t,overrides);await seedDeclaredOnboarding(f.db);
   await f.db.prepare("UPDATE products SET stock_quantity=1000,title='=HYPERLINK(\"unsafe\")' WHERE id='tea'").run();
   const orders=[];
   for(let n=0;n<23;n++){
@@ -89,7 +90,7 @@ test('central preview excludes legacy files, errors stay explicit and export pro
 });
 
 test('large monetary totals remain exact in rendered cards, chart tables and downloadable CSV',async t=>{
-  const f=await setupCentralFixture(t),at=new Date(Date.now()-60000).toISOString(),amount=Number.MAX_SAFE_INTEGER;
+  const f=await setupCentralFixture(t);await seedDeclaredOnboarding(f.db);const at=new Date(Date.now()-60000).toISOString(),amount=Number.MAX_SAFE_INTEGER;
   for(let n=1;n<=2;n++){
     const id='EZK-S-'+String(n).repeat(24),value=amount-(n-1);
     await f.db.batch([
@@ -110,4 +111,26 @@ test('large monetary totals remain exact in rendered cards, chart tables and dow
   const promise=page.waitForEvent('download');await page.getByRole('button',{name:'Export CSV',exact:true}).click();
   assert((await readFile(await (await promise).path(),'utf8')).includes('"'+exact+'"'));
   await page.screenshot({path:'/tmp/ezkart-central-analytics-ui-01a0d643/central-analytics-exact-390.png',fullPage:true});
+});
+
+test('analytics charts start higher, use purple selection and keep empty charts honest',async t=>{
+  const f=await fixture(t);await mkdir('/tmp/ezkart-analytics-refresh',{recursive:true});
+  for(const width of [1360,390]){
+    const page=await browserPage(t,f,width);await page.goto(f.app.base+'/cart/admin/?page=analytics&report=revenue');await loaded(page);
+    assert.equal(await page.locator('.an-metric [role=img]').count(),4);
+    assert.equal(await page.locator('.an-navigation [aria-current]').evaluate(e=>getComputedStyle(e).color),'rgb(112, 68, 189)');
+    const path=await page.locator('[data-metric=revenue] .an-mini-line').getAttribute('d');assert.match(path,/L/);
+    assert.equal(await page.locator('[data-commerce-analytics]').evaluate(e=>!!e.closest('.an-toolbar')),true);
+    if(width===1360){
+      assert.ok((await page.locator('.an-metrics').boundingBox()).y<440);
+      assert.ok((await page.locator('.an-main-grid').boundingBox()).y<660);
+    }
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+    await page.screenshot({path:'/tmp/ezkart-analytics-refresh/revenue-'+width+'.png'});
+    await page.goto(f.app.base+'/cart/admin/?page=analytics&report=revenue&range=custom&from=1970-01-01&to=1970-01-07');await loaded(page);
+    assert.equal(await page.locator('.an-chart-empty').textContent(),'No orders in this period');
+    assert.equal(await page.locator('[data-metric=revenue] .an-mini-chart circle').evaluateAll(es=>es.every(e=>e.getAttribute('cy')==='52')),true);
+    assert.equal(await page.locator('[data-metric=aov] strong').textContent(),'—');
+    await page.screenshot({path:'/tmp/ezkart-analytics-refresh/empty-'+width+'.png'});await page.close();
+  }
 });
