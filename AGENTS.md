@@ -134,3 +134,15 @@ promote Advanced or future announcements without redesigning the sidebar.
   Do not label seller navigation Jev or expose internal moderation controls.
 - Seller onboarding has no sidebar entry. Keep the top-bar setup reminder visible
   to owners until saved onboarding requirements are complete.
+
+## Jev real-use acceptance (owner, 29 September 2026)
+
+- The owner accepted the direct-evidence harness for real reviewer-triggered page
+  moderation on Ezkart workbench/beta, operated from Executive Operations.
+- Automatic temporary archive requires an evidenced breach of a supplied starter
+  rule, all direct-evidence checks, at least 80% confidence and complete coverage.
+  Unproven/ambiguous flags and raw clear answers go to human review. Preserve
+  reversible restore, original results, MFA and one-send spending safeguards.
+- This acceptance does not release main/ezkart.id or connect public visitor report
+  intake. See `docs/jev-real-use-2026-09-29.md` for accepted scope and reconciled
+  remaining allowance within the original $5 provider cap.
