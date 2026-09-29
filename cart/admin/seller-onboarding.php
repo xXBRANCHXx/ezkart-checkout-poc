@@ -14,7 +14,7 @@ if (empty($walletAccess['unlocked'])) { require __DIR__ . '/wallet-verification.
  <section class="surface" data-onboarding-panel="profile"><span class="onboarding-step-label">Step 1 of 3</span><h2>First, a little about you</h2><p>Use your legal name and a phone number where we can reach you.</p>
  <form data-onboarding-profile>
  <label>Full legal name <input name="legalName" autocomplete="name" maxlength="128" required></label>
- <label>Date of birth <input name="birthDate" type="date" autocomplete="bday" required aria-describedby="onboarding-age-help"></label>
+ <label for="seller-birth-date">Date of birth</label><div class="birth-date-field"><input id="seller-birth-date" data-birth-date name="birthDate" type="text" placeholder="YYYY-MM-DD" pattern="[0-9]{4}-[0-9]{2}-[0-9]{2}" autocomplete="bday" required aria-describedby="onboarding-age-help"><button type="button" aria-label="Choose date of birth" aria-haspopup="dialog" aria-expanded="false"><?= ez_admin_icon('calendar') ?></button></div>
  <label class="onboarding-confirm"><input name="ageConfirmed" type="checkbox" required><span>I confirm I am 18 or older.<small>Required to sell on Ezkart.</small></span></label>
  <p class="onboarding-hint" id="onboarding-age-help">We store your declared date of birth and calculated age.</p>
  <label>Verified sign-in email <input name="email" type="email" autocomplete="email" readonly></label>
@@ -27,3 +27,6 @@ if (empty($walletAccess['unlocked'])) { require __DIR__ . '/wallet-verification.
  <p class="onboarding-hint">Changes apply to new withdrawals. Existing requests keep their original destination.</p><a class="ui-button primary" href="?page=dashboard" data-onboarding-finish hidden><?= ez_admin_icon('chevron-right') ?><span>Go to my store</span></a></section>
  <details class="onboarding-details"><summary>Your saved declaration and Wallet</summary><p data-onboarding-age></p><p data-onboarding-wallet></p><a class="ui-button" href="?page=wallet"><?= ez_admin_icon('wallet') ?><span>Open Wallet</span></a></details>
 </div>
+
+<link rel="stylesheet" href="birth-date.css?v=<?= (int) filemtime(__DIR__ . '/birth-date.css') ?>">
+<script src="birth-date.js?v=<?= (int) filemtime(__DIR__ . '/birth-date.js') ?>" defer></script>
