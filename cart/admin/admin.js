@@ -4368,7 +4368,7 @@
         if (labelInput) labelInput.value = action.textContent.trim();
         if (typeInput) typeInput.value = linkType;
         if (linkInput) linkInput.value = link;
-        if (linkWrap) linkWrap.hidden = ["products", "checkout", "none"].includes(linkType);
+        if (linkWrap) linkWrap.hidden = ["products", "checkout", "contact", "none"].includes(linkType);
         if (linkLabel) linkLabel.textContent = ({ section: "Section ID", url: "Web address", email: "Email address", phone: "Phone number" })[linkType] || "Destination";
         if (newTab) { newTab.checked = action.dataset.sqNewTab === "true" || action.target === "_blank"; newTab.closest("label").hidden = linkType !== "url"; }
         const checkoutTest = sqStudio.querySelector("[data-sq-checkout-test]");
@@ -8235,6 +8235,22 @@
     const generateHtml = ({ libraryPreview = false } = {}) => {
       const exportBase = document.body.dataset.adminPublicBase || window.location.href;
       const clone = previewRoot.cloneNode(true);
+      // Product context resolves the seller server-side, including stores whose
+      // catalog storefront is disabled. Published pages require a connected product.
+      const contactProduct = selectedProducts()[0];
+      const contactUrl = new URL('../messages.php', exportBase);
+      if (contactProduct) contactUrl.searchParams.set('product', contactProduct);
+      const contactHref = contactProduct ? contactUrl.href : '';
+      clone.dataset.ezkartContactUrl = contactHref;
+      clone.querySelectorAll('[data-native-action]').forEach(action => {
+        const config = JSON.parse(action.dataset.nativeAction);
+        if (!['contact', 'email'].includes(config.type)) return;
+        const href = config.type === 'email' ? 'mailto:' + config.target : contactHref;
+        if (action.matches('a')) {
+          if (href) { action.href = href; action.target = '_blank'; action.rel = 'noopener'; }
+          else { action.removeAttribute('href'); action.setAttribute('aria-disabled', 'true'); }
+        }
+      });
       globalThis.EzkartSelect?.clean(clone);
       clone.querySelectorAll('[data-sq-background-type]:not([data-sq-background-type="image"])').forEach((section) => {
         section.querySelector(":scope > .sq-section-background")?.remove();
@@ -8325,21 +8341,22 @@
         // Saved default navigation links should still work when the product lives
         // in a differently named section. Explicit existing anchors keep their target.
         if (type === "section" && target === "products" && action.closest('.sq-authored-navigation') && !clone.querySelector('#products,[data-section-id="products"]')) type = "products";
-        if (!["products", "checkout", "none"].includes(type) && !target) type = "none";
+        if (!["products", "checkout", "contact", "none"].includes(type) && !target) type = "none";
         const newTab = action.dataset.sqNewTab === "true";
         let href = "";
         if (type === "products") { href = "#products"; action.dataset.ezkartAction = "products"; }
         if (type === "section") href = `#${target.replace(/^#/, "") || "products"}`;
         if (type === "url") href = target;
+        if (type === "contact") href = contactHref;
         if (type === "email") href = `mailto:${target}`;
         if (type === "phone") href = `tel:${target}`;
         if (action.matches("a")) {
           if (href) action.setAttribute("href", href); else action.removeAttribute("href");
-          if (newTab && type === "url") { action.target = "_blank"; action.rel = "noopener"; }
+          if ((newTab && type === "url") || type === "contact") { action.target = "_blank"; action.rel = "noopener"; }
         } else {
-          action.dataset.ezkartAction = type;
-          action.dataset.ezkartTarget = target;
-          action.dataset.ezkartNewTab = String(newTab);
+          action.dataset.ezkartAction = type === "contact" ? (contactHref ? "url" : "none") : type;
+          action.dataset.ezkartTarget = type === "contact" ? contactHref : target;
+          action.dataset.ezkartNewTab = String(newTab || type === "contact");
         }
         delete action.dataset.sqLinkType; delete action.dataset.sqLink; delete action.dataset.sqNewTab;
       });

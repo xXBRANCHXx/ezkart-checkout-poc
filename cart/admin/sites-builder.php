@@ -275,7 +275,7 @@ $builderCheckoutPaused = !ez_new_checkout_enabled();
           <div class="sq-element-button-role" data-sq-element-button-controls hidden>
             <div class="sq-inspector-heading"><h3>Button action</h3><span>Click behavior</span></div>
             <label><span>Button label</span><input type="text" maxlength="80" data-sq-button-label></label>
-            <label><span>Destination</span><select data-sq-button-link-type><option value="products">First product on this page</option><option value="section">Page section</option><option value="url">Web address</option><option value="checkout">Checkout</option><option value="email">Email</option><option value="phone">Phone</option><option value="none">No action</option></select></label>
+            <label><span>Destination</span><select data-sq-button-link-type><option value="products">First product on this page</option><option value="section">Page section</option><option value="url">Web address</option><option value="checkout">Checkout</option><option value="contact">Seller dashboard messages</option><option value="email">Email</option><option value="phone">Phone</option><option value="none">No action</option></select></label>
             <label data-sq-button-link-wrap><span data-sq-button-link-label>Section ID</span><input type="text" placeholder="products" data-sq-button-link></label>
             <label class="sq-new-tab"><input type="checkbox" data-sq-button-new-tab><span>Open in a new tab</span></label>
             <div class="sq-checkout-test" data-sq-checkout-test hidden><span><?= ez_admin_icon('shield') ?></span><div><b>Connected checkout handoff</b><small>Biteship rates → secure payment</small></div><button type="button" data-sq-test-checkout>Open checkout</button></div>

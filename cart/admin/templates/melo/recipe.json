@@ -6917,8 +6917,7 @@
                 },
                 "tag": "button",
                 "action": {
-                  "type": "dialog",
-                  "target": "policy-help"
+                  "type": "contact"
                 },
                 "marks": [],
                 "children": [
@@ -8374,8 +8373,7 @@
                     "text": "Bantuan & kontak",
                     "tag": "button",
                     "action": {
-                      "type": "dialog",
-                      "target": "policy-help"
+                      "type": "contact"
                     }
                   }
                 ]

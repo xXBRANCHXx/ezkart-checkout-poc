@@ -9302,8 +9302,7 @@
                 "text": "Order help",
                 "tag": "button",
                 "action": {
-                  "type": "dialog",
-                  "target": "policy-contact"
+                  "type": "contact"
                 }
               },
               {

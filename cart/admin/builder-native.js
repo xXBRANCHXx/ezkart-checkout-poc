@@ -503,12 +503,12 @@
     const type = panel.querySelector("[data-native-action-type]").value;
     const target = panel.querySelector("[data-native-action-target]");
     const picker = panel.querySelector("[data-native-action-picker]");
-    const elementTarget = Boolean(type && !["link", "state"].includes(type));
-    target.closest("label").hidden = !type;
+    const elementTarget = Boolean(type && !["link", "email", "contact", "state"].includes(type));
+    target.closest("label").hidden = !type || type === "contact";
     target.hidden = elementTarget;
     picker.hidden = !elementTarget;
-    panel.querySelector("[data-native-action-target-label]").textContent = type === "link" ? "Web address or page section" : type === "state" ? "Version to show" : type.includes("video") ? "Video" : type.includes("dialog") ? "Dialog" : "Element to show or hide";
-    target.placeholder = type === "link" ? "https://example.com or #section" : "e.g. delivery";
+    panel.querySelector("[data-native-action-target-label]").textContent = type === "email" ? "Email address" : type === "link" ? "Web address or page section" : type === "state" ? "Version to show" : type.includes("video") ? "Video" : type.includes("dialog") ? "Dialog" : "Element to show or hide";
+    target.placeholder = type === "email" ? "hello@example.com" : type === "link" ? "https://example.com or #section" : "e.g. delivery";
     const nodes = type ? [...hooks.root.querySelectorAll(".sq-native")] : [];
     const targets = elementTarget ? nodes.filter(node => type.includes("video") ? node.tagName === "VIDEO" : type.includes("dialog") ? node.tagName === "DIALOG" : node !== selected) : [];
     picker.replaceChildren(new Option("Choose an element…", ""), ...targets.map(node => new Option(read(node).name || read(node).text?.slice(0, 45) || typeName(read(node).type), read(node).id)));
@@ -525,7 +525,7 @@
     const button = panel.querySelector("[data-native-action-apply]");
     button.hidden = !type && !read(selected).action;
     button.textContent = !type ? "Remove click action" : "Apply click action";
-    panel.querySelector("[data-native-action-note]").textContent = !type ? "This element has no click action." : "Hold Alt and click the element to try this action.";
+    panel.querySelector("[data-native-action-note]").textContent = !type ? "This element has no click action." : type === "contact" ? "Customers sign in to message you. Messages appear in your seller dashboard. Connect a product before previewing this action." : "Hold Alt and click the element to try this action.";
   }
   const tags = {
     container: [
@@ -892,6 +892,8 @@
       if (
         ![
           "link",
+          "contact",
+          "email",
           "toggle",
           "state",
           "dialog",
@@ -918,7 +920,10 @@
       )
         throw Error("Disable when selected must be on or off.");
       if (config.action.type === "link") safeUrl(config.action.target);
-      else if (!identifier(config.action.target))
+      else if (config.action.type === "email") {
+        if (!/^[^\s@?&#]+@[^\s@?&#]+\.[^\s@?&#]+$/.test(config.action.target || "")) throw Error("Enter a valid email address.");
+      }
+      else if (config.action.type !== "contact" && !identifier(config.action.target))
         throw Error("Choose a target element or state.");
     }
     for (const mark of config.marks || []) {
@@ -1115,6 +1120,7 @@
         node.rel = "noopener noreferrer";
       }
     }
+    if (tag === "a" && ["contact", "email"].includes(config.action?.type)) node.href = config.action.type === "email" ? "mailto:" + config.action.target : "#";
     if (config.type === "button" && tag === "button") node.type = "button";
     if (config.label) node.setAttribute("aria-label", config.label);
     syncScrollRegion(node, config);
@@ -1589,6 +1595,12 @@
       }
       const action = config.action || config;
       if (!action?.type || (editing && !event.altKey)) return;
+      if (action.type === "contact" || action.type === "email") {
+        event.preventDefault();
+        const href = action.type === "email" ? "mailto:" + action.target : root.dataset.ezkartContactUrl;
+        if (href) window.open(href, "_blank", "noopener");
+        return;
+      }
       if (action.type === "link") {
         if (action.revealState)
           setState(find(action.scope), action.revealState, true);
@@ -3353,7 +3365,7 @@
     }
     panel.insertAdjacentHTML(
       "beforeend",
-      '<details><summary>Click action</summary><label>On click<select data-native-action-type><option value="">None</option><option value="link">Open link</option><option value="toggle">Show / hide element</option><option value="state">Switch state</option><option value="dialog">Open dialog</option><option value="close-dialog">Close dialog</option><option value="video-dialog">Open video dialog</option><option value="video-toggle">Play / pause video</option></select></label><label><span data-native-action-target-label>Destination</span><input data-native-action-target><select data-native-action-picker aria-label="Target element"></select></label><label>Interaction group<input type="hidden" data-native-action-scope><select data-native-action-scope-choice aria-label="Interaction group"></select></label><label>Show group version before opening link<input data-native-action-reveal placeholder="Optional: e.g. all"></label><label><input type="checkbox" data-native-action-disable-active> Disable when this state is selected</label><button type="button" data-native-action-apply>Apply action</button><p class="sq-native-help" data-native-action-note></p></details>',
+      '<details><summary>Click action</summary><label>On click<select data-native-action-type><option value="">None</option><option value="contact">Seller dashboard messages</option><option value="email">Email</option><option value="link">Open link</option><option value="toggle">Show / hide element</option><option value="state">Switch state</option><option value="dialog">Open dialog</option><option value="close-dialog">Close dialog</option><option value="video-dialog">Open video dialog</option><option value="video-toggle">Play / pause video</option></select></label><label><span data-native-action-target-label>Destination</span><input data-native-action-target><select data-native-action-picker aria-label="Target element"></select></label><label>Interaction group<input type="hidden" data-native-action-scope><select data-native-action-scope-choice aria-label="Interaction group"></select></label><label>Show group version before opening link<input data-native-action-reveal placeholder="Optional: e.g. all"></label><label><input type="checkbox" data-native-action-disable-active> Disable when this state is selected</label><button type="button" data-native-action-apply>Apply action</button><p class="sq-native-help" data-native-action-note></p></details>',
     );
     panel.append(advanced);
     globalThis.EzkartFonts?.attach(panel);
@@ -4016,6 +4028,8 @@
       });
       if (selected.tagName === "A") {
         if (type === "link") selected.href = target;
+        else if (type === "email") selected.href = "mailto:" + target;
+        else if (type === "contact") selected.href = "#";
         else selected.removeAttribute("href");
       }
       refresh();

@@ -12,6 +12,7 @@
   const eyebrow = value => text(value,{fontSize:'11px',fontWeight:'600',letterSpacing:'2px',textTransform:'uppercase',color:accent});
   const rule = () => group([],{height:'1px',backgroundColor:'#ded8d2',width:'100%'});
   const button = (value,style='solid') => ({type:'button',tag:'a',text:value,action:{type:'link',target:'#'},props:{display:'inline-flex',alignItems:'center',justifyContent:'center',fontSize:'14px',lineHeight:'1.4',fontWeight:'600',textDecoration:'none',width:'fit-content',maxWidth:'100%',overflowWrap:'anywhere',...pad('14px'),paddingLeft:'22px',paddingRight:'22px',borderRadius:style==='link'?'0':'8px',backgroundColor:style==='solid'?ink:'transparent',color:style==='solid'?'#fff':ink,...(style==='outline'?border('#aaa3a0'):{}),...(style==='link'?{paddingLeft:'0',paddingRight:'0',...border(ink,['Bottom'])}:{})}});
+  const contactButton = (value, style) => ({...button(value, style), action:{type:"contact"}});
   const card = (children,props={}) => group(children,{...pad('26px'),backgroundColor:'#fff',...border('#e5dfda'),borderRadius:'16px',...props});
   const columns = children => row(children.map(child=>({...child,props:{...child.props,flexGrow:'1',flexBasis:'180px',minWidth:'0'}})),{flexWrap:'wrap',alignItems:'stretch'});
   const quote = () => text('“Add a real customer quote that captures their experience.”',{fontFamily:'Georgia, serif',fontSize:'29px',lineHeight:'1.4'});
@@ -95,14 +96,14 @@
     {id:'review-spotlight',category:'reviews',name:'Review spotlight',description:'A dark, spacious testimonial with a quiet source line.',section:true,make:()=>group([
       text('CUSTOMER STORY',{fontSize:'11px',letterSpacing:'2px',color:'#d6bdb2'}),quote(),text('— Customer name',{fontSize:'14px',color:'#d6bdb2'})
     ],{...pad('38px'),gap:'32px',color:'#fffaf4',backgroundColor:'#30282b',borderRadius:'24px'})},
-    {id:'contact-letter',category:'contact',name:'Open letter',description:'A personal contact invitation. Set your email on the button.',section:true,make:()=>group([
-      eyebrow('A conversation starts here'),title('Tell us what\nyou have in mind.',{fontFamily:'Georgia, serif',fontSize:'44px',fontWeight:'400',whiteSpace:'pre-line'}),text('Questions, ideas, or a simple hello. We would love to hear from you.',{color:muted}),button('Write to us ↗','link')
+    {id:'contact-letter',category:'contact',name:'Open letter',description:'A contact invitation connected to your seller inbox. Email is optional.',section:true,make:()=>group([
+      eyebrow('A conversation starts here'),title('Tell us what\nyou have in mind.',{fontFamily:'Georgia, serif',fontSize:'44px',fontWeight:'400',whiteSpace:'pre-line'}),text('Questions, ideas, or a simple hello. We would love to hear from you.',{color:muted}),contactButton('Write to us ↗','link')
     ],{...pad('30px'),backgroundColor:paper,gap:'24px'})},
-    {id:'contact-details',category:'contact',name:'Contact directory',description:'Editable email, location, and opening hours in a clean directory.',section:true,make:()=>group([
-      title('Come say hello.',{fontSize:'34px'}),...['Email','Visit','Opening hours'].map((label,i)=>row([text(label,{fontSize:'12px',color:muted,width:'105px',flexShrink:'0'}),text(['Your email address','Your address or location','Your opening hours'][i],{fontSize:'17px'})],{...pad('16px'),paddingLeft:'0',paddingRight:'0',flexWrap:'wrap',...border('#ded8d2',['Bottom'])}))
+    {id:'contact-details',category:'contact',name:'Contact directory',description:'Seller messages, location, and opening hours in a clean directory.',section:true,make:()=>group([
+      title('Come say hello.',{fontSize:'34px'}),contactButton('Message us'),...['Visit','Opening hours'].map((label,i)=>row([text(label,{fontSize:'12px',color:muted,width:'105px',flexShrink:'0'}),text(['Your address or location','Your opening hours'][i],{fontSize:'17px'})],{...pad('16px'),paddingLeft:'0',paddingRight:'0',flexWrap:'wrap',...border('#ded8d2',['Bottom'])}))
     ],{...pad('26px')})},
     {id:'contact-card',category:'contact',name:'Conversation card',description:'A compact contact card with one configurable action.',section:true,make:()=>card([
-      text('↗',{fontSize:'42px',color:accent,lineHeight:'1'}),title('Let’s talk.',{fontSize:'44px',letterSpacing:'-2px'}),text('For the question you could not find an answer to.',{color:muted}),button('Get in touch')
+      text('↗',{fontSize:'42px',color:accent,lineHeight:'1'}),title('Let’s talk.',{fontSize:'44px',letterSpacing:'-2px'}),text('For the question you could not find an answer to.',{color:muted}),contactButton('Get in touch')
     ],{backgroundColor:'#f8ede8',gap:'22px',...pad('34px')})},
     {id:'invitation-poster',category:'invitations',name:'One clear next step',description:'A bold closing invitation with a primary action.',section:true,make:()=>group([
       eyebrow('Your next chapter'),title('Ready when\nyou are.',{fontSize:'62px',letterSpacing:'-3px',whiteSpace:'pre-line'}),text('Start with something that feels right.',{color:muted}),button('Explore the collection ↗')
