@@ -13,11 +13,11 @@ $preview = ($route[3] ?? '') === '/preview';
 $canonical = '/' . $store . '/shop/' . $page . ($preview ? '/preview' : '');
 header('Cache-Control: private, no-store');
 if ($path !== $canonical) {
-    header('Location: ' . $canonical, true, 308);
+    header('Location: ' . $canonical . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SERVER['QUERY_STRING'] : ''), true, 308);
     exit;
 }
 if (!$preview) {
-    $_GET = ['store' => $store, 'page' => $page];
+    $_GET = ['store' => $store, 'page' => $page] + array_intersect_key($_GET, array_flip(['ez_source','tracking_visit','utm_source','utm_medium','utm_campaign']));
     require __DIR__ . '/page.php';
     exit;
 }

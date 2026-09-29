@@ -43,7 +43,7 @@ function ez_orders_table(array $rows, string $tableId, string $csrfToken, string
 ?>
 
 <main class="page-canvas admin-page page-<?= ez_admin_escape($page) ?>">
-<?php switch ($page): case 'onboarding': require __DIR__ . '/seller-onboarding.php'; break; case 'orders': ?>
+<?php switch ($page): case 'campaigns': require __DIR__ . '/campaigns.php'; break; case 'onboarding': require __DIR__ . '/seller-onboarding.php'; break; case 'orders': ?>
   <?php if ($centralOrderWorkspace) { require __DIR__ . '/commerce-orders.php'; break; } ?>
   <?php ez_page_header('Orders', 'Manage orders, payments, and deliveries.', [
       ['label' => 'Returns', 'icon' => 'refund', 'href' => '?page=returns'],

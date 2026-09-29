@@ -65,6 +65,10 @@ function ez_checkout_intent(array $input): array
         }
         ksort($files, SORT_STRING); $intent['expected_file_versions'] = $files;
     }
+    if (array_key_exists('tracking_visit', $input)) {
+        if (!is_string($input['tracking_visit']) || preg_match('/^[a-f0-9]{64}$/D', $input['tracking_visit']) !== 1) throw new InvalidArgumentException('Tracking visit reference is invalid.');
+        $intent['tracking_visit'] = $input['tracking_visit'];
+    }
     if (array_key_exists('campaign_visit', $input)) {
         if (!is_string($input['campaign_visit']) || preg_match('/^[a-f0-9]{64}$/D', $input['campaign_visit']) !== 1) throw new InvalidArgumentException('Campaign visit reference is invalid.');
         $intent['campaign_visit'] = $input['campaign_visit'];
@@ -157,6 +161,7 @@ function ez_central_checkout(array $input, ?array $account): array
                 'environment' => $environment, 'checkoutKey' => $intent['key'], 'sellerId' => $checkout['seller_id'],
                 'checkout' => ['intentHash' => $intent['hash'], 'paymentFlow' => $flow, 'shop' => $intent['input']['shop']]
                     + ($choice !== null ? ['paymentChoice' => $choice] : [])
+                    + (isset($intent['input']['tracking_visit']) ? ['trackingVisit' => $intent['input']['tracking_visit']] : [])
                     + (isset($intent['input']['campaign_visit']) ? ['campaignVisit' => $intent['input']['campaign_visit']] : []),
                 'customer' => ['name' => $customer['name'], 'email' => $customer['email'], 'phone' => $customer['phone'], 'authUserId' => $account['id'] ?? ''],
                 'items' => array_values($checkout['commerce_items']), 'shipping' => $shipping,

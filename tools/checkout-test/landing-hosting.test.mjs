@@ -81,6 +81,11 @@ test('PHP page hosting serves only the current environment publication with an i
   assert.equal((await fetch(publicUrl,{method:'POST'})).status,405);
   assert.equal(requests.length,count,'Invalid paths and writes never reach the Worker');
 
+  const tracked=await fetch(publicUrl+'?tracking_visit='+'a'.repeat(64));
+  assert.match(await tracked.text(), /campaign-tracker\.js/, 'Pretty routes preserve the anonymous tracking reference for instrumentation');
+  const trackedSlash=await fetch(publicUrl+'/?tracking_visit='+'a'.repeat(64),{redirect:'manual'});
+  assert.equal(trackedSlash.headers.get('location'),'/coffee-shop/shop/launch?tracking_visit='+'a'.repeat(64));
+
   const browser=await chromium.launch();t.after(()=>browser.close());
   const context=await browser.newContext(), page=await context.newPage();
   const url=publicUrl;

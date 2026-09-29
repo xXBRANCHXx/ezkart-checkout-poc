@@ -56,6 +56,12 @@ try {
         header('Location: ' . $canonicalPath, true, 302);
         exit;
     }
+    require_once __DIR__ . '/api/campaign-landing.php';
+    ez_campaign_landing_visit($canonicalPath ?: '/' . $store . '/shop/' . $page);
+    if (is_string($_GET['tracking_visit'] ?? null) && preg_match('/^[a-f0-9]{64}$/D', $_GET['tracking_visit']) === 1) {
+        $tracker = '<script src="/cart/campaign-tracker.js" data-phase="landing"></script>';
+        $html = stripos($html, '</body>') !== false ? preg_replace('/<\/body>/i', $tracker . '</body>', $html, 1) : $html . $tracker;
+    }
     echo ez_landing_page_frame($html);
 } catch (Throwable $error) {
     error_log('Ezkart page hosting: ' . $error->getMessage());

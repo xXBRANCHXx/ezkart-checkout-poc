@@ -146,7 +146,7 @@
     const shop = { name, logo, returnUrl: state.returnUrl };
     // Keep the current visit in navigation, but never remember it in branding
     // for later shopping sessions. Checkout recovery retains its original body.
-    try { const remembered = new URL(shop.returnUrl); remembered.searchParams.delete('campaign_visit'); shop.returnUrl = remembered.href; } catch (_) {}
+    try { const remembered = new URL(shop.returnUrl); remembered.searchParams.delete('campaign_visit'); remembered.searchParams.delete('tracking_visit'); remembered.searchParams.delete('ez_source'); shop.returnUrl = remembered.href; } catch (_) {}
     saveShop(shop);
     try { sessionStorage.setItem("ezkart.checkout.brand", JSON.stringify({ ...shop, scope: state.shop })); } catch (_) {}
 
@@ -584,6 +584,7 @@
   function selectShipping(quote) {
     if (!quote) return;
     state.shipping = quote;
+    window.EzkartCampaignTracker?.send('shipping_selected');
     byId("pay-button").disabled = false;
     renderTotals();
   }
@@ -599,6 +600,7 @@
       form.querySelector(".invalid")?.focus();
       return;
     }
+    window.EzkartCampaignTracker?.send('payment_attempt');
     state.customer = result.values;
     const button = byId("pay-button");
     const original = button.textContent;
@@ -612,6 +614,8 @@
         shipping_id: state.shipping?.id || "",
       };
       if (state.durableCheckout) {
+        const trackingVisit = window.EzkartCampaignTracker?.visit;
+        if (trackingVisit) body.tracking_visit = trackingVisit;
         const campaignVisit = window.EzkartStorefront.campaignVisit(hostedStore);
         if (campaignVisit) body.campaign_visit = campaignVisit;
         if (state.paymentChoices.length) {
@@ -708,6 +712,7 @@
       window.EzkartCheckoutAttempt.save(attempt);
       window.location.assign("payment.php?order=" + encodeURIComponent(data.order_id));
     } catch (error) {
+      window.EzkartCampaignTracker?.send('checkout_error', {errorCode: 'payment_setup_unconfirmed'});
       const message = friendlyError(error instanceof Error ? error.message : "", "We couldn’t confirm payment setup. Recover this same attempt.");
       if (!state.pendingCheckout) showToast(message);
       renderRecovery(message);
@@ -776,7 +781,7 @@
     }
   });
   byId("to-checkout").addEventListener("click", () => {
-    if (itemCount()) setStep("checkout");
+    if (itemCount()) { window.EzkartCampaignTracker?.send('checkout_start'); setStep('checkout'); }
   });
   document.querySelectorAll("[data-go]").forEach((button) => {
     button.addEventListener("click", () => setStep(button.dataset.go));

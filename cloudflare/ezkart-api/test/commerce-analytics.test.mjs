@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {seedDeclaredOnboarding} from './onboarding-fixture.mjs';
 import {setupCommerceFixture} from './commerce-fixture.mjs';
 import {cleanupAnalyticsExports} from '../src/commerce-analytics-exports.js';
 
@@ -28,6 +29,8 @@ const create=(f,body)=>f.merchant(path+'/exports',body,{method:'POST'});
 
 test('analytics enforces seller, environment, viewer and strict query boundaries',async t=>{
   const f=await setupCommerceFixture(t);
+  // The isolation fixture includes a production-mode row; satisfy its current onboarding guard.
+  await seedDeclaredOnboarding(f.db);
   await seed(f,1,{paid:true,state:'refunded',additional:true});await seed(f,2,{mode:'production',paid:true});
   await seed(f,3,{seller:'seller_bob',product:'private',paid:true});await seed(f,4,{version:0});await seed(f,5,{state:'paid'});
   assert.equal((await f.mf.dispatchFetch('https://api.fixture.test'+path)).status,401);

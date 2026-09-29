@@ -1,3 +1,4 @@
+import {createTrackingCampaign,addTrackingSource,endTrackingCampaign,trackingReport,listTrackingCampaigns,startTrackingVisit,recordTrackingEvent} from './tracking-campaigns.js';
 import {reviewBankChanges} from './seller-bank-changes.js';
 import {sellerAlerts,sellerAlertRescan,sellerOnboardingStatus} from './seller-alerts.js';
 import {jevEvidenceImage,importJevEvaluation,jevPageHeld,jevPages,jevList,jevDetail,createJevReview,runJevReview,gradeJevReview,restoreJevPage} from './jev-reviews.js';
@@ -1798,6 +1799,11 @@ export default {
         await authenticateCommerceService(request,env);
         return json({ok:true,shipping:await checkoutShippingSettings(env,shippingSettingsService[1],url.searchParams.get('environment'))});
       }
+      if(['/internal/commerce/tracking/visit','/internal/commerce/tracking/event'].includes(url.pathname)){
+        if(request.method!=='POST'||url.search)return json({ok:false,error:'Method not allowed'},405);
+        const input=await authenticateCommerceService(request,env,{strictJSON:true,maxBytes:5000});
+        return json({ok:true,...await(url.pathname.endsWith('/visit')?startTrackingVisit(env,input):recordTrackingEvent(env,input))});
+      }
       if (url.pathname.startsWith('/internal/commerce/')) return json({ok: true, ...await commerceServiceRoute(request, env)});
       const publicLandingMatch = /^\/v1\/public\/landing-pages\/([a-z0-9-]+)\/([a-z0-9-]+)$/.exec(url.pathname);
       if (request.method === "GET" && publicLandingMatch) return await publicLandingPage(env, publicLandingMatch[1], publicLandingMatch[2]);
@@ -2065,6 +2071,22 @@ export default {
         if(returnOrderMatch)return json({ok:true,...await (request.method==='GET'?returnOrder(env,actor,returnOrderMatch[1]):createReturn(env,actor,returnOrderMatch[1],await requestJson(request,16000)))},200,cors);
         if(returnCaseMatch)return request.method==='GET'?json({ok:true,...await returnDetail(env,actor,returnCaseMatch[1],'',url.searchParams.get('before')||'')},200,cors):json({ok:true,receipt:await returnAction(env,actor,returnCaseMatch[1],await requestJson(request,16000))},200,cors);
         if(request.method==='GET')return json({ok:true,...await returnList(env,actor,url)},200,cors);
+        return json({ok:false,error:'Method not allowed'},405,cors);
+      }
+      const trackingMatch=/^\/v1\/commerce\/campaigns(?:\/(trk_[a-f0-9]{32})(?:\/(sources|end))?)?$/.exec(url.pathname);
+      if(trackingMatch){
+        const {seller}=await sellerContext(request,env),[,id,action]=trackingMatch;
+        if(request.headers.has('x-ezkart-campaign-store')&&request.headers.get('x-ezkart-campaign-store')!==seller.id)return json({ok:false,error:'Your store changed. Reload this page.'},409,cors);
+        if(request.method==='GET'&&!action){
+          if(id&&url.search)return json({ok:false,error:'Invalid campaign filters'},422,cors);
+          return json({ok:true,...await(id?trackingReport(env,seller,id):listTrackingCampaigns(env,seller,url))},200,cors);
+        }
+        if(request.method==='POST'&&!url.search){
+          const input=await reviewRequestJson(request,10000,parseMessageJSON);
+          if(!id)return json({ok:true,...await createTrackingCampaign(env,seller,input,async id=>landingPageLinks(await landingPageObject(env,seller.id,id),await sellerPageAddress(env,seller)))},200,cors);
+          if(action==='sources')return json({ok:true,...await addTrackingSource(env,seller,id,input)},200,cors);
+          if(action==='end'&&Object.keys(input).length===0)return json({ok:true,...await endTrackingCampaign(env,seller,id)},200,cors);
+        }
         return json({ok:false,error:'Method not allowed'},405,cors);
       }
       const analyticsExportMatch=/^\/v1\/commerce\/analytics\/exports\/(aex_[a-f0-9]{40})$/.exec(url.pathname);

@@ -1,0 +1,54 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {randomBytes} from 'node:crypto';
+import {setupCommerceFixture} from './commerce-fixture.mjs';
+import {campaignDays} from '../src/tracking-campaigns.js';
+const key=()=>randomBytes(16).toString('hex'),hex=()=>randomBytes(32).toString('hex'),base='/v1/commerce/campaigns';
+async function fixture(t){const f=await setupCommerceFixture(t);const bucket=await f.mf.getR2Bucket('PRIVATE_ASSETS');for(const id of ['first','second'])await bucket.put('sellers/seller_alice/landing-pages/'+id+'.json',JSON.stringify({id,name:id,status:'published'}));return f;}
+const create=(f,extra={})=>f.merchant(base,{requestKey:key(),name:'September Launch',pages:['first','second'],...extra},{method:'POST'});
+const source=(f,id,pageId='first',name='Instagram Main',requestKey=key())=>f.merchant(base+'/'+id+'/sources',{requestKey,pageId,name},{method:'POST'});
+async function visit(f,s,path='/alice/shop/first',visitor=hex()){const v=await f.call('/internal/commerce/tracking/visit',{source:s.id,path,visitor,dimensions:{device:'mobile',email:'must-not-store'}});assert.equal(v.status,200,JSON.stringify(v));return v.visit;}
+const event=(f,visit,kind='page_view',extra={})=>f.call('/internal/commerce/tracking/event',{visit,id:hex(),kind,documentId:hex(),elapsedMs:0,...extra});
+test('campaign ownership, roles, idempotency, custom names and 40 URLs per page',async t=>{
+ const f=await fixture(t),body={requestKey:key(),name:'Launch',pages:['first','second']};
+ const c=await f.merchant(base,body,{method:'POST'});assert.equal(c.status,200,JSON.stringify(c));
+ assert.equal((await f.merchant(base,body,{method:'POST'})).campaign.id,c.campaign.id);
+ assert.equal((await f.merchant(base,{...body,name:'Different'},{method:'POST'})).status,409);
+ assert.equal((await f.merchant(base+'/'+c.campaign.id,undefined,{seller:'bob'})).status,404);
+ assert.equal((await create(f,{requestKey:[key()]})).status,422);
+ assert.equal((await create(f,{pages:['not-owned']})).status,404);assert.equal((await create(f,{pages:[]})).status,422);
+ await f.db.prepare("UPDATE seller_memberships SET role='viewer' WHERE auth_user_id='alice'").run();assert.equal((await create(f)).status,403);
+ await f.db.prepare("UPDATE seller_memberships SET role='owner' WHERE auth_user_id='alice'").run();
+ const id=c.campaign.id,k=key(),s=await source(f,id,'first','Instagram Personal',k);assert.equal(s.status,200,JSON.stringify(s));
+ assert.equal((await source(f,id,'first','Instagram Personal',k)).source.id,s.source.id);assert.equal((await source(f,id,'first','changed',k)).status,409);
+ assert.equal((await source(f,id,'first','Instagram Personal')).status,409);
+ for(let i=1;i<39;i++)assert.equal((await source(f,id,'first','Freeform '+i)).status,200);
+ const races=await Promise.all([source(f,id,'first','QR at Event'),source(f,id,'first','Affiliate Andi')]);assert.deepEqual(races.map(r=>r.status).sort(),[200,409]);
+ assert.equal((await source(f,id,'second','Instagram Personal')).status,200);
+ const report=await f.merchant(base+'/'+id);assert.equal(report.status,200,JSON.stringify(report));assert.equal(report.sources.length,41);
+ const ended=await f.merchant(base+'/'+id+'/end',{}, {method:'POST'});assert.equal(ended.status,200);
+ assert.equal((await source(f,id,'second','After end')).status,409);
+ assert.equal((await f.merchant(base+'/'+id+'/end',{}, {method:'POST'})).campaign.ended_at,ended.campaign.ended_at);assert.equal(await visit(f,s.source),null);
+});
+test('anonymous uniqueness, deduplicated events, verified paid orders and frozen end window',async t=>{
+ const f=await fixture(t),c=(await create(f)).campaign,id=c.id;
+ const s1=(await source(f,id)).source,s2=(await source(f,id,'second','Affiliate Andi')).source;
+ assert.equal((await f.call('/internal/commerce/tracking/visit',{source:s1.id,path:'/alice/shop/first',visitor:[hex()]})).status,404);
+ const browser=hex(),v1=await visit(f,s1,undefined,browser),v2=await visit(f,s1,undefined,browser),v3=await visit(f,s2,'/alice/shop/second',browser);
+ for(const v of [v1,v2,v3])assert.equal((await event(f,v)).status,200);
+ const eid=hex(),doc=hex();await event(f,v1,'checkout_start',{id:eid,documentId:doc});await event(f,v1,'checkout_start',{id:eid,documentId:doc});
+ for(const kind of ['product_interaction','shipping_selected','payment_attempt'])await event(f,v1,kind);
+ const first=await f.create(f.input({checkout:{intentHash:hex(),paymentFlow:'direct_bca',shop:'alice-shop',trackingVisit:v1}}));assert.equal(first.status,200,JSON.stringify(first));
+ const order=first.order;await f.event(order,'checkout.pending',{session:f.session(order)});await f.paid(order);
+ const report=await f.merchant(base+'/'+id);assert.equal(report.status,200,JSON.stringify(report));
+ assert.equal(report.metrics.visitors,3);assert.equal(report.metrics.uniqueVisitors,1);assert.equal(report.metrics.orders,1);assert.equal(report.metrics.totalSales,40000);assert.equal(report.metrics.unitsSold,2);assert.equal(report.metrics.checkoutStarts,1);assert.equal(report.metrics.conversionRate,1/3);assert.equal(report.metrics.checkoutCompletionRate,1);
+ assert.equal(report.pages.find(p=>p.page_id==='first').metrics.orders,1);assert.equal(report.sources.find(s=>s.id===s2.id).metrics.orders,0);assert(!JSON.stringify(report).includes(browser));
+ const raw=await f.db.prepare('SELECT dimensions_json FROM tracking_visits LIMIT 1').first();assert(!raw.dimensions_json.includes('must-not-store'));
+ assert.equal((await f.call('/internal/commerce/tracking/visit',{source:s1.id,path:'/bob/shop/first',visitor:hex()})).status,404);assert.equal((await event(f,v1,'completed_order')).status,422);
+ const late=(await f.create(f.input({checkout:{intentHash:hex(),paymentFlow:'direct_bca',shop:'alice-shop',trackingVisit:v2}}))).order;
+ assert.equal((await f.merchant(base+'/'+id+'/end',{}, {method:'POST'})).status,200);await f.event(late,'checkout.pending',{session:f.session(late)});await f.paid(late);assert.equal((await event(f,v2,'checkout_start')).recorded,false);
+ assert.deepEqual((await f.merchant(base+'/'+id)).metrics,report.metrics);
+ const direct=await f.create(f.input({checkout:{intentHash:hex(),paymentFlow:'direct_bca',shop:'alice-shop',trackingVisit:v2}}));assert.equal(direct.status,200);assert.equal((await f.db.prepare('SELECT COUNT(*) n FROM tracking_orders').first()).n,2);
+ assert.equal((await f.merchant(base,undefined,{seller:'bob'})).campaigns.length,0);
+});
+test('inclusive Jakarta campaign duration',()=>{assert.equal(campaignDays('2026-08-31T17:00:00.000Z','2026-09-18T16:59:59.999Z'),18);assert.equal(campaignDays('2026-09-01T10:00:00.000Z','2026-09-01T10:01:00.000Z'),1);});

@@ -1,3 +1,4 @@
+import {trackingHash} from './tracking-campaigns.js';
 import {requireSellingOnboarding} from './seller-publication.js';
 import {campaignVisitHash} from './campaign-attribution.js';
 import {checkoutContext,paymentSession,paymentSessionStatements,paymentAccountStatement} from './commerce-payments.js';
@@ -236,7 +237,8 @@ export async function createCommerceOrder(env, payload) {
   if(physical)await validateShippingSettings(env,input.sellerId,input.environment,input.shipping);
   const subtotal = integer(items.reduce((total, item) => total + item.price * item.quantity, 0), 100000000000, 'Order subtotal', 1);
   const total = integer(subtotal + input.shipping.amount, 100000000000, 'Order total', 1);
-  const {campaignVisit,...checkout}=input.checkout;
+  const {campaignVisit,trackingVisit,...checkout}=input.checkout;
+  if(trackingVisit)checkout.trackingVisitHash=await trackingHash(trackingVisit,env);
   if(campaignVisit)checkout.campaignVisitHash=await campaignVisitHash(campaignVisit,input.environment);
   const snapshot = {checkout,shipping: input.shipping, fees: {version: 1, plan: seller.plan,
     commissionBasisPoints: seller.plan === 'advanced' ? 600 : 500, adminAmount: 1250,
