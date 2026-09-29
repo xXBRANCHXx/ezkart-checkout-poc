@@ -146,3 +146,10 @@ promote Advanced or future announcements without redesigning the sidebar.
 - This acceptance does not release main/ezkart.id or connect public visitor report
   intake. See `docs/jev-real-use-2026-09-29.md` for accepted scope and reconciled
   remaining allowance within the original $5 provider cap.
+
+## Action icons (owner, 29 September 2026)
+
+Use recognizable icons alongside short labels on seller action buttons and links.
+Do not introduce rows of text-only controls such as Refresh and Preferences.
+Keep icons visible on narrow screens, decorative SVGs hidden from assistive
+technology, and accessible action names intact when controls update dynamically.

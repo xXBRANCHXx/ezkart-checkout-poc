@@ -12,7 +12,7 @@
   let applied = {q:'',category:'',state:'all'}, processState = 'attention';
   const confirmedReads = new Map();
   const text = (selector, value) => {const element=q(selector); if(element){element.textContent=value; element.hidden=!value;}};
-  function node(tag, value = '', className = '') {const element=document.createElement(tag); element.textContent=value; if(className)element.className=className; return element;}
+  function node(tag, value = '', className = '') {const element=document.createElement(tag); element.textContent=value; if(className)element.className=className; if(tag==='button'||tag==='a'){const icon=q('[data-notice-icon="'+(tag==='button'?'check':'arrow')+'"]');if(icon)element.prepend(icon.content.cloneNode(true));} return element;}
   const date = value => config.merchant && window.EzkartAdminFormat ? window.EzkartAdminFormat.date(value) : new Intl.DateTimeFormat(undefined,{dateStyle:'medium',timeStyle:'short'}).format(new Date(value));
   const count = value => Number(value || 0).toLocaleString();
   function emitStats(data) {window.dispatchEvent(new CustomEvent('ezkart:notification-stats',{detail:data}));}
@@ -44,7 +44,7 @@
   function controls() {
     if(stopped)return;
     q('[data-notice-mark]').disabled=!enabled||listBusy||readBusy||Boolean(pendingRead)||!items.some(item=>!item.readAt);
-    q('[data-notice-mark]').textContent=items.filter(item=>!item.readAt).length>50?'Mark first 50 shown as read':'Mark shown as read';
+    q('[data-notice-mark-label]').textContent=items.filter(item=>!item.readAt).length>50?'Mark first 50 shown as read':'Mark shown as read';
     q('[data-notice-read-retry]').hidden=!pendingRead||readBusy;
     q('[data-notice-more]').disabled=listBusy;
     q('[data-notice-process-more]')?.toggleAttribute('disabled',processBusy);
