@@ -153,3 +153,8 @@ Use recognizable icons alongside short labels on seller action buttons and links
 Do not introduce rows of text-only controls such as Refresh and Preferences.
 Keep icons visible on narrow screens, decorative SVGs hidden from assistive
 technology, and accessible action names intact when controls update dynamically.
+
+## Bank setup timing (owner, 29 September 2026)
+
+- Without two-step enabled, sellers must save bank details before publishing a landing page.
+- With two-step enabled, sellers may publish and accept payments before saving bank details; bank details are required before withdrawal. Keep the bank-details page protected by two-step. Other seller declarations and payment/provider controls remain in force.

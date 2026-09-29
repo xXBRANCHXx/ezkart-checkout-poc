@@ -1,3 +1,4 @@
+import {requireSellingOnboarding} from './seller-publication.js';
 import {commerceEnvironment,commerceHash,commerceOrder,applyCommerceEvent} from './commerce-orders.js';
 import {paymentRoute} from './commerce-payment-routing.js';
 import {parseMessageJSON} from './message-json.js';
@@ -44,6 +45,7 @@ export async function bindHostedPayment(env,orderId,input){
  const frozen={environment:order.environment,credentialFingerprint:input.credentialFingerprint,externalId:order.paymentRequestId,orderId,amount:order.total,
  name:order.customer.name,email:order.customer.email,expiresAt:new Date(order.expiresAt).toISOString().replace(/\.\d{3}Z$/,'Z'),paymentDueMinutes:minutes,methods:[...input.methods].sort(),
  returnUrl:origin+'/cart/payment.php?order='+orderId,notificationUrl:origin+'/cart/api/doku-hosted-webhook.php',routing:route.routing};
+ await requireSellingOnboarding(env,order.sellerId,input.environment);
  try{await env.DB.prepare(`INSERT INTO commerce_hosted_payment_bindings(order_id,seller_id,commerce_environment,job_id,attempt_id,credential_fingerprint,client_id,external_id,binding_json,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)`)
  .bind(orderId,order.sellerId,order.environment,row.job_id,row.job_id+':'+row.attempts,input.credentialFingerprint,input.clientId,order.paymentRequestId,JSON.stringify(frozen),now).run();}
  catch(e){if(/commerce_hosted_|payment_route_|UNIQUE/.test(String(e)))fail('Checkout dispatch changed. Reconcile the original request.',409);throw e;}

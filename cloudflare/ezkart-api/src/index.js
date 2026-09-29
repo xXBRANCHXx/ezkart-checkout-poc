@@ -21,6 +21,7 @@ import { validatePublication } from "./landing-publication.js";
 import { merchantStorefront, publicStorefront } from "./storefront.js";
 import { adminProfile } from "./admin-profile.js";
 import {sellerOnboarding,onboardingFailure} from './seller-onboarding.js';
+import {requirePublicationBank} from './seller-publication.js';
 import {customDomainResponse, listCustomDomains, enrollCustomDomain, customDomainAction, recheckCustomDomains} from './custom-domains.js';
 import { advancedMode, AdvancedModeLimitError, sellerPlan } from "./advanced-mode.js";
 import { authenticateCommerceService, commerceServiceRoute, expireCommerceOrders, reservedStockSql } from "./commerce-orders.js";
@@ -701,6 +702,7 @@ async function saveLandingPage(request, env, rawId, context) {
   // Autosaving a draft never republishes its HTML. Every publication or replacement
   // of a published snapshot must use the seller's current authoritative catalog.
   if (status === "published" && (payload.status === "published" || Object.hasOwn(payload, "publishedHtml"))) {
+    await requirePublicationBank(env, seller.id);
     const result = await env.DB.prepare("SELECT * FROM products WHERE seller_id = ? AND status = 'active'").bind(seller.id).all();
     const variants = await env.DB.prepare("SELECT * FROM product_variants WHERE seller_id = ?").bind(seller.id).all();
     const catalogProducts = result.results.map((row) => shapeProduct(row, [], variants.results.filter((v) => v.product_id === row.id)));

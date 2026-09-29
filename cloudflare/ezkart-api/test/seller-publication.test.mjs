@@ -1,0 +1,51 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {setupCommerceFixture} from './commerce-fixture.mjs';
+import {requirePublicationBank} from '../src/seller-publication.js';
+const key=()=>crypto.randomUUID().replaceAll('-','');
+test('bankless two-step sellers can sell and enroll, but cannot withdraw; disabling two-step closes the exception',async t=>{
+ let enabled=false,available=true;
+ const f=await setupCommerceFixture(t,{declaredOnboarding:false,bindings:{APP_ENVIRONMENT:'beta',SUPABASE_SERVICE_ROLE_KEY:'fixture-only'},outbound:()=>available?Response.json({id:'alice',factors:enabled?[{factor_type:'totp',status:'verified'}]:[]}):new Response('',{status:503})});
+ const actor={id:'alice',email:'alice@example.test',proofExpiresAt:new Date(Date.now()+550000).toISOString()};
+ const base={seller:'seller_alice',environment:'production',actor};
+ await f.db.prepare("UPDATE app_users SET email='alice@example.test' WHERE auth_user_id='alice'").run();
+ const call=(action,extra={})=>f.call('/internal/commerce/onboarding',{...base,action,...extra});
+ assert.equal((await call('profile',{revision:0,requestKey:key(),legalName:'Alice Legal',birthDate:'1990-01-01',phone:'081234567890'})).status,200);
+ assert.equal((await call('confirm_pins',{revision:1,requestKey:key(),shippingRevision:1})).status,200);
+ const blocked=await f.create(f.input());assert.equal(blocked.status,409,blocked.error);
+ enabled=true;
+ const ready=await call('read');assert.equal(ready.onboarding.sellingReady,true);assert.equal(ready.onboarding.ready,false);assert.equal(ready.onboarding.bank,null);
+ const order=await f.create(f.input());assert.equal(order.status,200,order.error);
+ const enrollment=await f.call('/internal/commerce/finance/wallet',{...base,action:'enroll',requestKey:key()});assert.equal(enrollment.status,200,enrollment.error);
+ const registration=await f.call('/internal/commerce/finance/wallet/registrations/'+enrollment.enrollment.id+'?environment=production');
+ const claimed=await f.call('/internal/commerce/jobs/claim',{environment:'production',workerId:'wallet_worker',kinds:['wallet.register'],jobId:registration.registration.jobId,mode:'execute',limit:1,leaseSeconds:120});
+ const bound=await f.call('/internal/commerce/finance/wallet/registrations/'+enrollment.enrollment.id+'/bind',{environment:'production',workerId:'wallet_worker',leaseToken:claimed.jobs[0].leaseToken,credentialFingerprint:'a'.repeat(64),clientId:'MCH-fixture',parentProfileId:'BRN-fixture'});
+ assert.equal(bound.status,200,bound.error);
+ await f.db.prepare("UPDATE seller_two_step_checks SET expires_at='2000-01-01T00:00:00.000Z'").run();
+ assert.equal(await f.db.prepare("SELECT * FROM seller_selling_ready WHERE seller_id='seller_alice'").first(),null,'SQL rejects expired Auth proofs');
+ const withdrawal=await f.call('/internal/commerce/finance/withdrawals',{...base,requestKey:key(),amount:'250000'});assert.equal(withdrawal.status,409,withdrawal.error);assert.match(withdrawal.error,/bank/i);
+ enabled=false;
+ assert.equal((await f.create(f.input())).status,409);
+ assert.equal(await f.db.prepare("SELECT * FROM seller_selling_ready WHERE seller_id='seller_alice'").first(),null);
+ enabled=true;available=false;
+ assert.equal((await f.create(f.input())).status,503);
+ available=true;
+ // A prior owner's factor proof must not survive loss of owner membership.
+ await f.db.prepare("UPDATE seller_memberships SET role='editor' WHERE auth_user_id='alice'").run();
+ assert.equal((await f.create(f.input())).status,409);
+});
+
+test('publication requires a current owner bank or live verified TOTP; never trusts metadata or team member factors',async()=>{
+ let bank=null,owner={auth_user_id:'owner'},lookups=0;
+ const env={SUPABASE_URL:'https://auth.example.test',SUPABASE_SERVICE_ROLE_KEY:'fixture',DB:{prepare:sql=>({bind:()=>({first:async()=>sql.includes('current_bank')?bank:owner})})}};
+ let user={id:'owner',factors:[]};
+ const fetcher=async url=>{lookups++;assert.match(url,/admin\/users\/owner$/);return Response.json(user);};
+ const rejected=async status=>assert.rejects(requirePublicationBank(env,'store',fetcher),error=>error instanceof Response&&error.status===status);
+ await rejected(409);
+ user={id:'owner',user_metadata:{twoStep:true},factors:[{factor_type:'totp',status:'unverified'}]};await rejected(409);
+ user={id:'member',factors:[{factor_type:'totp',status:'verified'}]};await rejected(503);
+ user={id:'owner',factors:[{factor_type:'totp',status:'verified'}]};await requirePublicationBank(env,'store',fetcher);
+ user.factors=[];await rejected(409);
+ bank={revision:1};const before=lookups;await requirePublicationBank(env,'store',fetcher);assert.equal(lookups,before);
+ bank=null;owner=null;await rejected(409);
+});

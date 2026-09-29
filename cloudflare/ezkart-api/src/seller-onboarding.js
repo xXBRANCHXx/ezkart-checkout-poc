@@ -1,3 +1,4 @@
+import {requireSellingOnboarding} from './seller-publication.js';
 import {walletOwner} from './commerce-wallet-enrollment.js';
 import {commerceHash} from './commerce-orders.js';
 const fail=(message,status=422)=>{throw new Response(message,{status});};
@@ -45,7 +46,11 @@ async function snapshot(env,input){
  const config=shipping?JSON.parse(shipping.configuration_json):{addresses:[]};
  const pickup=config.addresses.find(a=>a.id===config.pickupAddressId),returns=config.addresses.find(a=>a.id===config.returnAddressId);
  const pins=!!pickup?.coordinate&&!!returns?.coordinate;
- return {seller:input.seller,email,emailVerified:true,profileRevision:storedProfile?.revision||0,bankRevision:storedBank?.revision||0,
+ let sellingReady=!!ready&&ready.owner_auth_id===input.actor.id;
+ if(!sellingReady && profile && ageEligible && pins && profile.confirmed_shipping_revision===shipping?.revision && !emailChanged){
+  try{await requireSellingOnboarding(env,input.seller,input.environment);sellingReady=true;}catch{/* Keep incomplete setup readable when Auth is unavailable. */}
+ }
+ return {sellingReady,seller:input.seller,email,emailVerified:true,profileRevision:storedProfile?.revision||0,bankRevision:storedBank?.revision||0,
   profile:profile?{revision:profile.revision,legalName:profile.legal_name,birthDate:profile.declared_birth_date,phone:profile.phone,confirmedShippingRevision:profile.confirmed_shipping_revision}:null,
   bank:bank?{revision:bank.revision,code:bank.bank_code,accountSuffix:bank.account_number.slice(-4),channel:bank.channel}:null,
   shipping:{revision:shipping?.revision||0,pickup:pickup?{label:pickup.label,address:pickup.address,location:pickup.location,coordinate:pickup.coordinate||null}:null,returns:returns?{label:returns.label,address:returns.address,location:returns.location,coordinate:returns.coordinate||null}:null,pinsPresent:pins,confirmed:!!profile&&profile.confirmed_shipping_revision===shipping?.revision&&pins},

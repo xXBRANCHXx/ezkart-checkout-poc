@@ -1,3 +1,4 @@
+import {applyCommerceSchema} from './commerce-schema.mjs';
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {readFile} from "node:fs/promises";
@@ -228,15 +229,16 @@ test("Authenticated page saves allow empty drafts and reject publish bypasses ag
     format: "esm",
     platform: "neutral",
   });
+  let twoStepEnabled = false;
   const mf = new Miniflare(
     convertV4MiniflareOptions({
       modules: true,
       script: bundle.outputFiles[0].text,
       compatibilityDate: "2026-08-11",
-      bindings: { SUPABASE_URL: "https://auth.example.test" },
+      bindings: { SUPABASE_URL: "https://auth.example.test", SUPABASE_SERVICE_ROLE_KEY: "fixture-service-key" },
       d1Databases: ["DB"],
       r2Buckets: ["PRIVATE_ASSETS"],
-      outboundService: () => Response.json({ keys: [jwk] }),
+      outboundService: (request) => Response.json(new URL(request.url).pathname.includes("/admin/users/") ? {id:"test-user",factors:twoStepEnabled?[{factor_type:"totp",status:"verified"}]:[]} : { keys: [jwk] }),
     }),
   );
   t.after(() => mf.dispose());
@@ -268,6 +270,8 @@ test("Authenticated page saves allow empty drafts and reject publish bypasses ag
     ),
   ]);
   await db.prepare(await readFile(new URL('../migrations/0008_seller_page_addresses.sql', import.meta.url), 'utf8')).run();
+  await db.prepare("CREATE TABLE seller_onboarding_current_bank (seller_id TEXT, owner_auth_id TEXT, revision INTEGER)").run();
+  await applyCommerceSchema(db,78,80);
   const save = async (data, minimal = false, metadataOnly = false) => {
     const r = await mf.dispatchFetch(
       "http://worker.test/v1/landing-pages/my-page",
@@ -329,6 +333,8 @@ test("Authenticated page saves allow empty drafts and reject publish bypasses ag
   assert.equal((await exportPage("<h1>Empty</h1>")).status, 422);
   assert.equal((await exportPage(buy("foreign"))).status, 422);
   assert.equal((await exportPage(buy("owned"))).status, 422);
+  assert.equal((await save(published("owned"))).status, 409, "A bankless owner without two-step cannot publish");
+  twoStepEnabled = true;
   assert.equal((await save(published("foreign"))).status, 422);
   assert.equal((await save(published("owned"))).status, 422);
   assert.equal(

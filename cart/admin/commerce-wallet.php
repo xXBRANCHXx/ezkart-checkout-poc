@@ -144,6 +144,7 @@ function ez_admin_wallet_request(string $action, bool $authenticated, string $au
                 if ($action !== 'history') {
                     $onboarding = ez_commerce_request('POST','/internal/commerce/onboarding',$payload + ['action'=>'read']);
                     $response['onboarding'] = $onboarding['onboarding'];
+                    $response['sellingOnboardingRequired'] = $environment === 'production' && !($response['onboarding']['sellingReady'] ?? $response['onboarding']['ready']);
                     $response['onboardingRequired'] = $environment === 'production' && !$response['onboarding']['ready'];
                 }
                 if ($action !== 'history') $response['withdrawalCapabilities'] = [

@@ -1,6 +1,6 @@
 <?php
 if (empty($authenticated)) { http_response_code(404); return; }
-ez_page_header('Seller onboarding', 'Save your seller details before starting money actions. You can keep exploring your dashboard.');
+ez_page_header('Seller onboarding', 'Without two-step verification, add bank details before publishing. With two-step enabled, you can publish first and add bank details before withdrawing.');
 if (($activeSeller['role'] ?? '') !== 'owner') { echo '<p>Only the current store owner can complete onboarding.</p>'; return; }
 if (empty($walletAccess['unlocked'])) { echo '<p>Verify your identity to protect your personal and bank details while completing setup.</p>'; require __DIR__ . '/wallet-verification.php'; return; }
 ?>

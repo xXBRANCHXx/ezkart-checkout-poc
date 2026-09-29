@@ -77,7 +77,7 @@
   const controls = () => { connect.disabled = busy || !current?.enabled; refresh.disabled = busy; if (more) more.disabled = busy; root.setAttribute('aria-busy', String(busy)); };
   const render = data => {
     current = data;
-    const enrollment = data.enrollment, state = enrollment?.status || 'not_connected', needsOnboarding = !enrollment && data.onboardingRequired === true;
+    const enrollment = data.enrollment, state = enrollment?.status || 'not_connected', needsOnboarding = !enrollment && (data.sellingOnboardingRequired ?? data.onboardingRequired) === true;
     badge.textContent = ({connected: 'Connected', review: 'Needs review', connecting: 'Connecting', queued: 'Setup requested'})[state] || (needsOnboarding ? 'Complete onboarding' : data.enabled ? 'Ready to connect' : 'Not available yet');
     const messages = {
       connected: 'Your seller payment account is connected. Check recorded earnings and any holds below.',

@@ -597,7 +597,7 @@ test('withdrawal history pages retain their original cohort, mask accounts and a
 
 test('merchant bank choices use the published channel catalog and cannot submit unsupported bank methods or caller identities',async t=>{
   const f=await bankInquiryFixture(t),read=await f.request('read');assert.equal(read.data.withdrawalCapabilities.banks.length,125);
-  await f.page.goto(f.app.base+'/cart/admin/?page=onboarding');await f.page.locator('[data-onboarding-topbar]').waitFor({state:'visible'});assert.equal(await f.page.locator('.primary-nav a[href="?page=onboarding"]').count(),0);await f.page.getByLabel('Full legal name',{exact:true}).waitFor();await f.page.waitForFunction(()=>document.querySelector('[name=code]').options.length>1);
+  await f.page.goto(f.app.base+'/cart/admin/?page=onboarding');assert.equal(read.data.onboarding.ready,true);await f.page.locator('[data-onboarding-topbar]').waitFor({state:'hidden'});assert.equal(await f.page.locator('.primary-nav a[href="?page=onboarding"]').count(),0);await f.page.getByLabel('Full legal name',{exact:true}).waitFor();await f.page.waitForFunction(()=>document.querySelector('[name=code]').options.length>1);
   await chooseWithdrawalBank(f,'BANK DANAMON UUS (SYARIAH)');
   assert.deepEqual(await f.page.locator('[name=channel] option').allTextContents(),['BI-FAST']);
   for(const bank of [{code:'SYBDIDJ1',accountNumber:'001234567890',channel:'ONLINE'},{code:'FAKEIDJA',accountNumber:'001234567890',channel:'BI_FAST'}]){
