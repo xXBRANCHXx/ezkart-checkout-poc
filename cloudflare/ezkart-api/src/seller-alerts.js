@@ -1,3 +1,4 @@
+import {requireSellingOnboarding} from './seller-publication.js';
 import {settingsActor} from './merchant-settings.js';
 import {commerceHash} from './commerce-orders.js';
 import {collectJevEvidence} from './jev-evidence.js';
@@ -55,5 +56,8 @@ export async function sellerOnboardingStatus(env,actor){
  const member=await env.DB.prepare("SELECT role FROM seller_memberships WHERE seller_id=? AND auth_user_id=?").bind(actor.sellerId,actor.id).first();
  if(member?.role!=='owner')return {owner:false,complete:false};
  const ready=await env.DB.prepare('SELECT 1 FROM seller_onboarding_ready r JOIN seller_onboarding_current p ON p.seller_id=r.seller_id WHERE r.seller_id=? AND r.owner_auth_id=? AND p.verified_email=?').bind(actor.sellerId,actor.id,String(actor.email||'').toLowerCase()).first();
- await access(env,actor);return {owner:true,complete:!!ready};
+ const ownProfile=await env.DB.prepare('SELECT 1 FROM seller_onboarding_profile_ready r JOIN seller_onboarding_current p ON p.seller_id=r.seller_id WHERE r.seller_id=? AND r.owner_auth_id=? AND p.verified_email=?').bind(actor.sellerId,actor.id,String(actor.email||'').toLowerCase()).first();
+ let setupRequired=!ownProfile;
+ if(ownProfile)try{await requireSellingOnboarding(env,actor.sellerId,'production');}catch(error){if(error instanceof Response&&error.status===409)setupRequired=true;else throw error;}
+ await access(env,actor);return {owner:true,complete:!!ready,setupRequired};
 }

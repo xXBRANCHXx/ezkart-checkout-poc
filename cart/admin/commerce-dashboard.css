@@ -2,3 +2,16 @@
 .commerce-dashboard .kpi-grid article{height:auto;min-height:116px}.commerce-dashboard .kpi-grid p,.commerce-dashboard .kpi-grid small,.commerce-dashboard .kpi-grid strong{white-space:normal;overflow:visible;text-overflow:clip}.commerce-dashboard .kpi-grid p{font-size:11px}.commerce-dashboard .kpi-grid strong{line-height:1.2}.commerce-dashboard-chart .chart-axis{font-size:11px;font-family:inherit}.commerce-dashboard-chart-empty{min-height:180px;display:grid;place-items:center;color:#788192;font-size:13px;text-align:center;line-height:1.7}.commerce-dashboard-ranked img{width:36px;height:36px;object-fit:cover;flex:none;border-radius:7px;background:#f3f5f8}
 @media(max-width:1200px){.commerce-dashboard .order-queue-grid,.commerce-dashboard-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.commerce-dashboard .sales-performance-heading{align-items:flex-start;flex-direction:column}.commerce-dashboard .dashboard-period{justify-content:flex-start}}
 @media(max-width:700px){.commerce-dashboard .kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.commerce-dashboard .kpi-grid article{padding:16px 12px}.commerce-dashboard .kpi-icon{display:none}.commerce-dashboard .kpi-grid strong{font-size:20px}.commerce-dashboard .order-queue-grid{grid-template-columns:1fr}.commerce-dashboard-grid,.commerce-dashboard .commerce-dashboard-store{grid-template-columns:1fr}.commerce-dashboard .dashboard-period{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%}.commerce-dashboard-chart{padding:0 6px}.commerce-dashboard-chart svg{min-height:180px}.commerce-dashboard .order-overview-header{align-items:flex-start;gap:10px}.commerce-dashboard .order-overview-header>a{max-width:100px;line-height:1.6}.commerce-dashboard .panel-header{padding:18px 16px}.commerce-dashboard-table th,.commerce-dashboard-table td{padding:12px}.commerce-dashboard .dashboard-data-note{line-height:1.8;margin-top:12px}.commerce-dashboard .order-queue-card{padding:16px}.commerce-dashboard .order-queue-card strong{font-size:24px}}
+
+/* Compact panels with consistent breathing room and recognizable actions. */
+.commerce-dashboard .panel-header{padding:20px;min-height:0;margin:0;flex-wrap:wrap;align-items:center}
+.commerce-dashboard .panel-header h2{margin:0;line-height:1.5}
+.commerce-dashboard .panel-header a,.commerce-dashboard .order-overview-header>a{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:36px;padding:8px 11px;border:1px solid #e0e4eb;border-radius:8px;background:#fff;color:#414958;text-decoration:none;line-height:1.4;max-width:none}
+.commerce-dashboard .panel-header a:hover,.commerce-dashboard .order-overview-header>a:hover{background:#fff4ef;border-color:#f2b8a7;color:#b83d20}
+.commerce-dashboard .panel-header a .icon{width:15px;height:15px;flex:none}
+.commerce-dashboard-grid{align-items:start}
+.commerce-dashboard .panel{height:auto}
+.commerce-dashboard .commerce-dashboard-statuses a{min-height:28px;align-items:center;gap:12px}
+@media(max-width:700px){.commerce-dashboard .panel-header{padding:16px}.commerce-dashboard .panel-header a{white-space:normal}}
+
+.commerce-dashboard .dashboard-period button{display:inline-flex;align-items:center;justify-content:center;gap:7px}.commerce-dashboard .dashboard-period button .icon{width:16px;height:16px;flex:none}

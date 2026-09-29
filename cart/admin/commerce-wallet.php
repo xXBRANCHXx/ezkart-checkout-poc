@@ -41,7 +41,7 @@ function ez_admin_wallet_request(string $action, bool $authenticated, string $au
                 EzDokuFinancialJson::decode($raw);
                 $input = json_decode($raw, true, 8, JSON_THROW_ON_ERROR);
                 $allowed = match ($action) {
-                    'onboarding_read' => [], 'onboarding_profile' => ['revision','requestKey','legalName','birthDate','phone'],
+                    'onboarding_read' => [], 'onboarding_profile' => ['revision','requestKey','legalName','birthDate','ageConfirmed','phone'],
                     'onboarding_bank' => ['revision','requestKey','bank'], 'onboarding_confirm_pins' => ['revision','requestKey','shippingRevision'],
                 };
                 if (!is_array($input) || array_diff(array_keys($input), $allowed) !== []) throw new InvalidArgumentException();

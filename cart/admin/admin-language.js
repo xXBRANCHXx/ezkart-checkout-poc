@@ -125,20 +125,134 @@
     'Saved':'Tersimpan', 'Saving…':'Menyimpan…', 'Saved just now':'Baru saja tersimpan',
     'Language saved.':'Bahasa tersimpan.', 'Could not save the language. Try again.':'Bahasa belum tersimpan. Coba lagi.',
   });
+  Object.assign(strings, {
+  "Welcome to Ezkart": "Selamat datang di Ezkart",
+  "Let’s get your store ready, one step at a time.": "Mari siapkan tokomu, selangkah demi selangkah.",
+  "Your store starts here.": "Tokomu dimulai di sini.",
+  "Sign in to manage your store. We’ll help you get set up.": "Masuk untuk mengelola tokomu. Kami akan membantumu memulai.",
+  "Continue with Google": "Lanjutkan dengan Google",
+  "Continue with email": "Lanjutkan dengan email",
+  "Email address": "Alamat email",
+  "or": "atau",
+  "Back to checkout": "Kembali ke checkout",
+  "About you": "Tentang kamu",
+  "Your addresses": "Alamatmu",
+  "Your bank": "Rekeningmu",
+  "Step 1 of 3": "Langkah 1 dari 3",
+  "Step 2 of 3": "Langkah 2 dari 3",
+  "Step 3 of 3": "Langkah 3 dari 3",
+  "First, a little about you": "Pertama, tentang kamu",
+  "Use your legal name and a phone number where we can reach you.": "Gunakan nama lengkap sesuai identitas dan nomor telepon yang dapat dihubungi.",
+  "Full legal name": "Nama lengkap sesuai identitas",
+  "Date of birth": "Tanggal lahir",
+  "I confirm I am 18 or older.": "Saya menyatakan bahwa saya berusia 18 tahun atau lebih.",
+  "Required to sell on Ezkart.": "Wajib untuk berjualan di Ezkart.",
+  "We store your declared date of birth and calculated age.": "Kami menyimpan tanggal lahir yang kamu nyatakan dan usia yang dihitung darinya.",
+  "Verified sign-in email": "Email masuk terverifikasi",
+  "Phone number": "Nomor telepon",
+  "Save and continue": "Simpan dan lanjutkan",
+  "Where will orders travel from?": "Dari mana pesanan akan dikirim?",
+  "Add pickup and return addresses, then confirm their map pins. You can use the same address for both.": "Tambahkan alamat penjemputan dan pengembalian, lalu konfirmasikan titik petanya. Kamu bisa memakai alamat yang sama.",
+  "Edit addresses and map pins": "Atur alamat dan titik peta",
+  "Confirm and continue": "Konfirmasi dan lanjutkan",
+  "Where should we send your earnings?": "Ke mana penghasilanmu akan dikirim?",
+  "No bank saved.": "Belum ada rekening tersimpan.",
+  "Save your withdrawal destination. With two-step enabled, you can add this before your first withdrawal.": "Simpan rekening tujuan penarikan. Jika verifikasi dua langkah aktif, kamu bisa menambahkannya sebelum penarikan pertama.",
+  "Bank": "Bank",
+  "Account number": "Nomor rekening",
+  "Transfer method": "Metode transfer",
+  "Save bank destination": "Simpan rekening tujuan",
+  "Choose your bank": "Pilih bankmu",
+  "Online bank transfer": "Transfer bank online",
+  "Changes apply to new withdrawals. Existing requests keep their original destination.": "Perubahan berlaku untuk penarikan baru. Permintaan yang sudah dibuat tetap memakai tujuan semula.",
+  "Go to my store": "Buka tokoku",
+  "Your saved declaration and Wallet": "Pernyataan tersimpan dan Dompetmu",
+  "Open Wallet": "Buka Dompet",
+  "Loading your saved details…": "Memuat data tersimpan…",
+  "Refresh": "Muat ulang",
+  "Complete each step to get your store ready.": "Lengkapi setiap langkah untuk menyiapkan tokomu.",
+  "Your details are saved. Your store is ready.": "Datamu tersimpan. Tokomu siap.",
+  "You’re ready to sell. Add your bank before withdrawing.": "Kamu siap berjualan. Tambahkan rekening sebelum menarik dana.",
+  "Verify to continue seller setup": "Verifikasi untuk melanjutkan pengaturan toko",
+  "Verify and continue setup": "Verifikasi dan lanjutkan",
+  "Enter the current six-digit code from your authenticator app.": "Masukkan kode enam digit dari aplikasi autentikatormu.",
+  "We’ll send a verification code to": "Kami akan mengirim kode verifikasi ke",
+  "Enter the code sent to": "Masukkan kode yang dikirim ke",
+  "Email code": "Kode email",
+  "Authenticator code": "Kode autentikator",
+  "Send email code": "Kirim kode email",
+  "Resend email code": "Kirim ulang kode email",
+  "Wallet stays unlocked for 10 minutes in this browser.": "Dompet tetap terbuka selama 10 menit di browser ini.",
+  "Back to Dashboard": "Kembali ke Dasbor",
+  "Back to seller setup": "Kembali ke pengaturan toko",
+  "Finish seller setup": "Lengkapi pengaturan toko",
+  "Seller setup": "Pengaturan toko",
+  "Two-step verification": "Verifikasi dua langkah",
+  "Confirm it’s you.": "Konfirmasikan identitasmu.",
+  "Verify and continue": "Verifikasi dan lanjutkan",
+  "Use another sign-in method": "Gunakan cara masuk lain",
+  "Verification email sent to:": "Email verifikasi dikirim ke:",
+  "Open the email and select the secure sign-in link. It can only be used once.": "Buka email dan pilih tautan masuk. Tautan hanya bisa digunakan sekali.",
+  "Use another email": "Gunakan email lain",
+  "Verification successful": "Verifikasi berhasil",
+  "You’re signed in.": "Kamu sudah masuk.",
+  "You may safely close this tab.": "Kamu bisa menutup tab ini.",
+  "Dashboard": "Dasbor",
+  "Orders": "Pesanan",
+  "Products": "Produk",
+  "Customers": "Pelanggan",
+  "Analytics": "Analitik",
+  "Marketing": "Pemasaran",
+  "Payments": "Pembayaran",
+  "Messages": "Pesan",
+  "Wallet": "Dompet",
+  "Settings": "Pengaturan",
+  "Log out": "Keluar",
+  "Language": "Bahasa",
+  "Your inbox": "Kotak masukmu",
+  "Inbox": "Kotak masuk",
+  "Needs response": "Perlu dibalas",
+  "Unread": "Belum dibaca",
+  "All conversations": "Semua percakapan",
+  "Resolved": "Selesai",
+  "Blocked": "Diblokir",
+  "Search conversations": "Cari percakapan",
+  "Name, message or order": "Nama, pesan, atau pesanan",
+  "Search": "Cari",
+  "Refresh inbox": "Muat ulang pesan",
+  "Saved replies": "Balasan tersimpan",
+  "New conversation": "Percakapan baru",
+  "Help your customers, from their first question to delivery.": "Bantu pelangganmu, dari pertanyaan pertama hingga pengiriman.",
+  "A little conversation goes a long way": "Percakapan kecil bisa sangat membantu",
+  "Choose a conversation to read and reply.": "Pilih percakapan untuk membaca dan membalas.",
+  "Resolved today": "Selesai hari ini",
+  "Median first response": "Median balasan pertama",
+  "First replies · last 30 days": "Balasan pertama · 30 hari terakhir",
+  "No conversations match this view.": "Tidak ada percakapan yang sesuai."
+});
   let language = document.body.dataset.adminLanguage === 'id' ? 'id' : 'en';
   const t = text => language === 'id' ? strings[text] || text : text;
   function apply(root) {
     if (!root) return;
     const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
     while(walker.nextNode()){
-      const node=walker.currentNode,text=node.textContent.trim();
+      const node=walker.currentNode;if(node.parentElement?.closest('script,style,textarea,[contenteditable],.msg-thread,.msg-timeline,.profile,.store-switcher'))continue;const text=node.textContent.trim();
       if(text&&t(text)!==text)node.textContent=node.textContent.replace(text,t(text));
     }
-    [root,...root.querySelectorAll('[aria-label]')].forEach(node=>{
+    [root,...root.querySelectorAll('[aria-label],[placeholder]')].forEach(node=>{
+      if(node.hasAttribute('placeholder'))node.setAttribute('placeholder',t(node.getAttribute('placeholder')));
       if(node.hasAttribute('aria-label'))node.setAttribute('aria-label',t(node.getAttribute('aria-label')));
     });
   }
   globalThis.EzkartLanguage = {t, apply, get:()=>language};
+  document.documentElement.lang=language;
+  const surfaces=()=>document.querySelectorAll('.login-shell,.login-language,.onboarding-workspace,.wallet-verification,.page-onboarding .page-heading,.topbar,.sidebar,.msg-page-header,.msg-folders,.msg-filters,.msg-list-status,.msg-empty');
+  surfaces().forEach(apply);
+  if(language==='id')new MutationObserver(records=>{const parents=new Set();for(const record of records){const node=record.target.nodeType===3?record.target.parentElement:record.target;if(node?.closest?.('.onboarding-workspace,.wallet-verification,.login-shell,.msg-folders,.msg-list-status'))parents.add(node);}parents.forEach(apply);}).observe(document.body,{subtree:true,childList:true,characterData:true});
+  for(const picker of document.querySelectorAll('[data-entry-language]')){
+    picker.value=language;
+    picker.addEventListener('change',()=>{document.cookie='ezkart_language='+picker.value+'; Path=/; Max-Age=31536000; SameSite=Lax'+(location.protocol==='https:'?'; Secure':'');location.reload();});
+  }
   const select = document.querySelector('[data-admin-language-setting]');
   if (!select) return;
   select.value = language;
@@ -150,7 +264,7 @@
       const response = await fetch('?cloud='+encodeURIComponent('/v1/admin-preferences'), {method:'PUT',credentials:'same-origin',headers:{'Content-Type':'application/json','X-Ezkart-Csrf':document.body.dataset.adminCsrfToken},body:JSON.stringify({language:next})});
       const result = await response.json();
       if (!response.ok || !result.ok) throw Error('Language not saved');
-      language=result.preferences.language;document.body.dataset.adminLanguage=language;
+      language=result.preferences.language;document.body.dataset.adminLanguage=language;document.cookie='ezkart_language='+language+'; Path=/; Max-Age=31536000; SameSite=Lax'+(location.protocol==='https:'?'; Secure':'');
       status.textContent=t('Language saved.');
       document.dispatchEvent(new CustomEvent('ezkart:language-changed'));
     } catch {select.value=previous;status.textContent=t('Could not save the language. Try again.');}

@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import {mkdir,writeFile,readFile} from 'node:fs/promises';
 import {join} from 'node:path';
 import {randomBytes} from 'node:crypto';
-import {setupCentralFixture} from './central-fixture.mjs';
+import {setupCentralFixture as setupBaseFixture} from './central-fixture.mjs';
+import {seedDeclaredOnboarding} from '../../cloudflare/ezkart-api/test/onboarding-fixture.mjs';
+async function setupCentralFixture(...args){const f=await setupBaseFixture(...args);await seedDeclaredOnboarding(f.db);return f;}
 import {browser,pageFor,choose} from './review-workspace-fixture.mjs';
 const buyer='fixture-google-customer',key=()=>randomBytes(16).toString('hex'),screens='/tmp/ezkart-messages-ui-01a0d643';
 const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a8x8AAAAASUVORK5CYII=','base64');
@@ -40,6 +42,14 @@ test('buyer and merchant exchange real messages and photos, use saved replies an
     await send(buyerPage,'Another question '+width);await refresh(storePage);await root(storePage).locator('[data-msg-detail-state]').getByText('Open conversation',{exact:true}).waitFor();
     for(const [label,p] of [['buyer',buyerPage],['merchant',storePage]]){assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await p.evaluate(()=>scrollTo(0,0));await p.screenshot({path:screens+'/'+label+'-'+width+'.png',fullPage:true});assert.equal(await root(p).locator('img[onerror]').count(),0);}
     if(width===390){await root(storePage).getByRole('button',{name:'← Inbox',exact:true}).click();await root(storePage).locator('[data-msg-thread]').waitFor();await storePage.evaluate(()=>scrollTo(0,0));await storePage.screenshot({path:screens+'/merchant-inbox-390.png',fullPage:true});}
+    if(width===1360){
+      await root(storePage).getByRole('button',{name:'Resolved',exact:true}).click();await loaded(storePage);
+      assert.equal(new URL(storePage.url()).searchParams.get('state'),'resolved');assert.equal(await root(storePage).locator('[data-msg-thread]').count(),0);
+      await root(storePage).getByRole('button',{name:'All conversations',exact:true}).click();await loaded(storePage);
+      assert.equal(await root(storePage).locator('[data-msg-thread]').count(),1);
+      await root(storePage).getByRole('button',{name:'Unread',exact:true}).click();await loaded(storePage);
+      assert.equal(new URL(storePage.url()).searchParams.get('unread'),'1');assert.equal(await root(storePage).locator('[data-msg-thread]').count(),0);
+    }
     assert.deepEqual(errors,[]);await buyerPage.context().close();await storePage.context().close();
   }
   assert.equal((await f.providerCalls()).length,0);

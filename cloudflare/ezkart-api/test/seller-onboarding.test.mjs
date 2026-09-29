@@ -20,9 +20,11 @@ test('owner/MFA scope, immutable revisions, pinned address confirmation and decl
  assert.equal((await f.call(path,input('read',{actor:actor('bob')}))).status,403);
  assert.equal((await f.call(path,input('read',{actor:{...actor(),proofExpiresAt:new Date(Date.now()-1).toISOString()}}))).status,401);
  const initial=await f.call(path,input('read'));assert.equal(initial.status,200,initial.error);assert.equal(initial.onboarding.ready,false);assert.equal(initial.onboarding.age.minimumAge,18);
- const profile=input('profile',{revision:0,requestKey:key(),legalName:'Alice Legal',birthDate:'1990-09-28',phone:'+6281234567890'});
+ const profile=input('profile',{revision:0,requestKey:key(),legalName:'Alice Legal',ageConfirmed:true,birthDate:'1990-09-28',phone:'+6281234567890'});
  assert.equal((await f.call(path,{...profile,verified:true})).status,422);
- assert.equal((await f.call(path,{...profile,birthDate:'2015-01-01'})).status,422);
+ for(const ageConfirmed of [undefined,false,'true',1])assert.equal((await f.call(path,{...profile,ageConfirmed})).status,422);
+ assert.equal((await f.call(path,input('read'))).onboarding.profile,null);
+ assert.equal((await f.call(path,{...profile,ageConfirmed:true,birthDate:'2015-01-01'})).status,422);
  const saved=await f.call(path,profile);assert.equal(saved.status,200,saved.error);assert.equal(saved.onboarding.email,'alice@example.test');assert.equal(saved.onboarding.emailVerified,true);
  assert.equal((await f.call(path,profile)).onboarding.profile.revision,1);
  assert.equal((await f.call(path,{...profile,phone:'081111111111'})).status,409);
@@ -48,16 +50,16 @@ test('declared details remain versioned and changed shipping requires renewed pi
  const read=async()=>(await f.call(path,input('read'))).onboarding;
  assert.equal((await read()).ready,true);
  assert.equal((await f.call('/internal/commerce/finance/withdrawals',{environment:'production',seller:'seller_alice',actor:actor(),requestKey:key(),amount:'250000',bank:{code:'CENAIDJA',accountNumber:'99999',channel:'BI_FAST'}})).status,422);
- const phone=await f.call(path,input('profile',{revision:2,requestKey:key(),legalName:'Fixture alice',birthDate:'1990-01-01',phone:'081111111111'}));assert.equal(phone.status,200,phone.error);
+ const phone=await f.call(path,input('profile',{revision:2,requestKey:key(),legalName:'Fixture alice',ageConfirmed:true,birthDate:'1990-01-01',phone:'081111111111'}));assert.equal(phone.status,200,phone.error);
  assert.equal(phone.onboarding.identity.status,'not_assessed');assert.equal(phone.onboarding.profile.revision,3);
  const bank=await f.call(path,input('bank',{revision:1,requestKey:key(),bank:{code:'CENAIDJA',accountNumber:'99900012345',channel:'BI_FAST'}}));assert.equal(bank.status,200,bank.error);assert.equal(bank.onboarding.ready,true);
  const shipping=(await f.merchant('/v1/shipping-settings')).settings.configuration;shipping.addresses[0].address='Jalan Updated Warehouse 19';
  assert.equal((await f.merchant('/v1/shipping-settings',{revision:1,requestKey:key(),configuration:shipping})).status,200);
  const pending=await read();assert.equal(pending.ready,false);assert.equal(pending.identity.status,'not_assessed');assert.deepEqual(pending.requirements,['confirmed_pickup_return_pins']);
  const pinned=await f.call(path,input('confirm_pins',{revision:3,requestKey:key(),shippingRevision:2}));assert.equal(pinned.status,200,pinned.error);assert.equal(pinned.onboarding.ready,true);assert.equal(pinned.onboarding.profile.revision,4);
- const changed=await f.call(path,input('profile',{revision:4,requestKey:key(),legalName:'Alice Changed',birthDate:'1990-01-01',phone:'081234567890'}));assert.equal(changed.status,200,changed.error);assert.equal(changed.onboarding.profile.revision,5);
+ const changed=await f.call(path,input('profile',{revision:4,requestKey:key(),legalName:'Alice Changed',ageConfirmed:true,birthDate:'1990-01-01',phone:'081234567890'}));assert.equal(changed.status,200,changed.error);assert.equal(changed.onboarding.profile.revision,5);
  assert.equal((await read()).ready,true);assert.equal((await read()).identity.status,'not_assessed');
- const before=(await read()).profile.revision;assert.equal((await f.call(path,input('profile',{revision:before,requestKey:key(),legalName:'Alice Changed',birthDate:'2015-01-01',phone:'081234567890'}))).status,422);assert.equal((await read()).profile.revision,before);
+ const before=(await read()).profile.revision;assert.equal((await f.call(path,input('profile',{revision:before,requestKey:key(),legalName:'Alice Changed',ageConfirmed:true,birthDate:'2015-01-01',phone:'081234567890'}))).status,422);assert.equal((await read()).profile.revision,before);
 });
 
 test('original uncertain production wallet remains readable and cannot register again after required profile email becomes stale',async t=>{
@@ -82,7 +84,7 @@ test('email changes require a visible profile refresh without claiming identity 
  assert.equal((await read()).ready,true);
  await f.db.prepare("UPDATE app_users SET email='new@example.test' WHERE auth_user_id='alice'").run();
  const changedActor={...actor(),email:'new@example.test'},changed=await read(changedActor);assert.equal(changed.ready,false);assert.equal(changed.identity.status,'not_assessed');assert.deepEqual(changed.requirements,['refresh_legal_profile']);
- const saved=await f.call(path,input('profile',{actor:changedActor,revision:changed.profileRevision,requestKey:key(),legalName:changed.profile.legalName,birthDate:changed.profile.birthDate,phone:changed.profile.phone}));assert.equal(saved.status,200,saved.error);assert.equal(saved.onboarding.ready,true);assert.equal(saved.onboarding.profile.revision,3);
+ const saved=await f.call(path,input('profile',{actor:changedActor,revision:changed.profileRevision,requestKey:key(),legalName:changed.profile.legalName,ageConfirmed:true,birthDate:changed.profile.birthDate,phone:changed.profile.phone}));assert.equal(saved.status,200,saved.error);assert.equal(saved.onboarding.ready,true);assert.equal(saved.onboarding.profile.revision,3);
 });
 
 test('a newly added owner cannot read or copy prior owner declarations and bank but can save a new revision',async t=>{
@@ -93,7 +95,7 @@ test('a newly added owner cannot read or copy prior owner declarations and bank 
  assert(!JSON.stringify(state).includes('Fixture alice'));assert(!JSON.stringify(state).includes('1990-01-01'));assert(!JSON.stringify(state).includes('7890'));
  assert(state.requirements.includes('legal_name_phone'));assert(state.requirements.includes('saved_bank'));assert.equal(state.identity.status,'not_assessed');
  assert.equal((await f.call(path,other({action:'confirm_pins',revision:2,shippingRevision:1,requestKey:key()}))).status,409);
- const saved=await f.call(path,other({action:'profile',revision:state.profileRevision,requestKey:key(),legalName:'Bob Own Legal Name',birthDate:'1995-05-01',phone:'081111111111'}));assert.equal(saved.status,200,saved.error);assert.equal(saved.onboarding.profile.revision,3);assert.equal(saved.onboarding.profile.legalName,'Bob Own Legal Name');assert.equal(saved.onboarding.shipping.confirmed,false);assert.equal(saved.onboarding.ready,false);
+ const saved=await f.call(path,other({action:'profile',revision:state.profileRevision,requestKey:key(),legalName:'Bob Own Legal Name',ageConfirmed:true,birthDate:'1995-05-01',phone:'081111111111'}));assert.equal(saved.status,200,saved.error);assert.equal(saved.onboarding.profile.revision,3);assert.equal(saved.onboarding.profile.legalName,'Bob Own Legal Name');assert.equal(saved.onboarding.shipping.confirmed,false);assert.equal(saved.onboarding.ready,false);
  const bank=await f.call(path,other({action:'bank',revision:state.bankRevision,requestKey:key(),bank:{code:'CENAIDJA',accountNumber:'000999999999',channel:'BI_FAST'}}));assert.equal(bank.status,200,bank.error);assert.equal(bank.onboarding.bank.revision,2);
  const previous=await f.call(path,input('read'));assert.equal(previous.onboarding.profile,null);assert.equal(previous.onboarding.bank,null);assert.equal(previous.onboarding.ready,false);
 });
@@ -113,12 +115,12 @@ test('topbar completion flag contains no personal details and follows confirmed 
  const f=await setupCommerceFixture(t,{bindings:{APP_ENVIRONMENT:'beta'},declaredOnboarding:false}),route='/v1/commerce/notifications/onboarding';
  await f.db.prepare("UPDATE app_users SET email='alice@example.test' WHERE auth_user_id='alice'").run();
  const status=()=>f.merchant(route,undefined,{email:'alice@example.test'});
- const first=await status();assert.equal(first.status,200,first.error);assert.equal(first.owner,true);assert.equal(first.complete,false);
- assert.deepEqual(Object.keys(first).sort(),['complete','ok','owner','status']);
- await f.call(path,input('profile',{revision:0,requestKey:key(),legalName:'Alice Legal',birthDate:'1990-01-01',phone:'081234567890'}));
+ const first=await status();assert.equal(first.status,200,first.error);assert.equal(first.owner,true);assert.equal(first.complete,false);assert.equal(first.setupRequired,true);
+ assert.deepEqual(Object.keys(first).sort(),['complete','ok','owner','setupRequired','status']);
+ await f.call(path,input('profile',{revision:0,requestKey:key(),legalName:'Alice Legal',ageConfirmed:true,birthDate:'1990-01-01',phone:'081234567890'}));
  await f.call(path,input('bank',{revision:0,requestKey:key(),bank:{code:'CENAIDJA',accountNumber:'0000123456789',channel:'BI_FAST'}}));
  assert.equal((await status()).complete,false);
- await f.call(path,input('confirm_pins',{revision:1,requestKey:key(),shippingRevision:1}));assert.equal((await status()).complete,true);
+ await f.call(path,input('confirm_pins',{revision:1,requestKey:key(),shippingRevision:1}));assert.equal((await status()).complete,true);assert.equal((await status()).setupRequired,false);
  const shipping=(await f.merchant('/v1/shipping-settings')).settings.configuration;shipping.addresses[0].address='Changed pickup address';await f.merchant('/v1/shipping-settings',{revision:1,requestKey:key(),configuration:shipping});assert.equal((await status()).complete,false);
  await f.db.prepare("UPDATE seller_memberships SET role='viewer' WHERE seller_id='seller_alice' AND auth_user_id='alice'").run();assert.equal((await status()).owner,false);
  assert.equal((await f.merchant('/v1/customer/notifications/onboarding')).status,404);

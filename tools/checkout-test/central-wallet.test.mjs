@@ -746,14 +746,18 @@ test('merchant onboarding saves declarations and bank through protected forms, r
  assert.equal((await f.request('onboarding_read',{}, {'X-Ezkart-Csrf':'wrong'})).status,401);
  assert.equal((await f.request('onboarding_profile',{revision:0,requestKey:key(),legalName:'Alice Legal',birthDate:'1990-01-01',phone:'081234567890',verified:true})).status,422);
  await f.page.getByLabel('Full legal name',{exact:true}).fill('Alice Legal');await f.page.getByLabel('Date of birth',{exact:true}).fill('1990-01-01');await f.page.getByLabel('Phone number',{exact:true}).fill('081234567890');
- f.control.drop='/internal/commerce/onboarding';await f.page.getByRole('button',{name:'Save legal details',exact:true}).click();
+ await f.page.getByRole('button',{name:'Save and continue',exact:true}).click();assert.equal(await f.count('seller_onboarding_profiles'),0,'Age confirmation is required');
+ await mkdir(screens,{recursive:true});await f.page.screenshot({path:join(screens,'onboarding-about-1360.png'),fullPage:true});
+ await f.page.getByRole('checkbox',{name:'I confirm I am 18 or older.'}).check();
+ f.control.drop='/internal/commerce/onboarding';await f.page.getByRole('button',{name:'Save and continue',exact:true}).click();
  await f.page.waitForFunction(()=>!document.querySelector('[data-onboarding-confirm-pins]').disabled);
  assert.equal(await f.count('seller_onboarding_profiles'),1);
+ await f.page.getByRole('button',{name:'Confirm and continue',exact:true}).click();
+ await f.page.locator('[data-onboarding-panel=bank]').waitFor();
  await chooseWithdrawalBank(f,'BANK BCA');await f.page.getByLabel('Account number',{exact:true}).fill('001234567890');
  f.control.drop='/internal/commerce/onboarding';await f.page.getByRole('button',{name:'Save bank destination',exact:true}).click();
  await f.page.locator('[data-onboarding-bank-summary]').filter({hasText:'7890'}).waitFor();assert.equal(await f.count('seller_onboarding_banks'),1);
- await f.page.getByRole('button',{name:'I confirm these addresses and map pins',exact:true}).click();
- await f.page.waitForFunction(()=>document.querySelector('[data-onboarding-confirm-pins]').disabled&&document.querySelector('[data-onboarding-status]').textContent.startsWith('Onboarding requirements met.'));
+ await f.page.waitForFunction(()=>document.querySelector('[data-onboarding-confirm-pins]').disabled&&document.querySelector('[data-onboarding-status]').textContent.startsWith('Your details are saved.'));
  await f.page.locator('[data-onboarding-topbar]').waitFor({state:'hidden'});const read=await f.request('onboarding_read',{});assert.equal(read.status,200,JSON.stringify(read.data));assert.equal(read.data.onboarding.ready,true);assert.equal(read.data.onboarding.identity.status,'not_assessed');assert.equal(read.data.onboarding.age.source,'seller_declared');assert.equal(read.data.onboarding.age.meetsPolicy,true);assert.equal(read.data.onboarding.shipping.confirmed,true);
  assert(!JSON.stringify(read.data).includes('001234567890'));assert.equal((await f.registerCalls()).length,0);
  for(const width of [1360,390]){await f.page.setViewportSize({width,height:1000});await f.page.reload();await f.page.waitForFunction(()=>document.querySelector('[name=legalName]')?.value==='Alice Legal');assert.equal(await f.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await mkdir(screens,{recursive:true});await f.page.screenshot({path:join(screens,'onboarding-'+width+'.png'),fullPage:true});}

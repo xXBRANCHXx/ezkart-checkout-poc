@@ -10,10 +10,12 @@ test('bankless two-step sellers can sell and enroll, but cannot withdraw; disabl
  const base={seller:'seller_alice',environment:'production',actor};
  await f.db.prepare("UPDATE app_users SET email='alice@example.test' WHERE auth_user_id='alice'").run();
  const call=(action,extra={})=>f.call('/internal/commerce/onboarding',{...base,action,...extra});
- assert.equal((await call('profile',{revision:0,requestKey:key(),legalName:'Alice Legal',birthDate:'1990-01-01',phone:'081234567890'})).status,200);
+ assert.equal((await call('profile',{revision:0,requestKey:key(),legalName:'Alice Legal',ageConfirmed:true,birthDate:'1990-01-01',phone:'081234567890'})).status,200);
  assert.equal((await call('confirm_pins',{revision:1,requestKey:key(),shippingRevision:1})).status,200);
  const blocked=await f.create(f.input());assert.equal(blocked.status,409,blocked.error);
+ assert.equal((await f.merchant('/v1/commerce/notifications/onboarding',undefined,{email:'alice@example.test'})).setupRequired,true);
  enabled=true;
+ assert.equal((await f.merchant('/v1/commerce/notifications/onboarding',undefined,{email:'alice@example.test'})).setupRequired,false);
  const ready=await call('read');assert.equal(ready.onboarding.sellingReady,true);assert.equal(ready.onboarding.ready,false);assert.equal(ready.onboarding.bank,null);
  const order=await f.create(f.input());assert.equal(order.status,200,order.error);
  const enrollment=await f.call('/internal/commerce/finance/wallet',{...base,action:'enroll',requestKey:key()});assert.equal(enrollment.status,200,enrollment.error);

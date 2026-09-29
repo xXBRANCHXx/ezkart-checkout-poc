@@ -1341,7 +1341,8 @@ $catalogData = [];
 $catalogError = '';
 $sellerId = '';
 $advancedPlan = null;
-$adminLanguage = 'en';
+$preferredLanguage = in_array($_COOKIE['ezkart_language'] ?? '', ['en', 'id'], true) ? $_COOKIE['ezkart_language'] : null;
+$adminLanguage = $preferredLanguage ?? 'en';
 $storeDisplayPreferences = ['timezone' => 'Asia/Jakarta', 'dateFormat' => 'long'];
 $adminProfile = $authenticationMethod === 'supabase' ? null : ['logoId' => '', 'canEdit' => false];
 if ($authenticated && $authenticationMethod === 'supabase') {
@@ -1349,7 +1350,7 @@ if ($authenticated && $authenticationMethod === 'supabase') {
         $apiUrl = rtrim(ez_config('cloudflare_api_url'), '/');
         $headers = ['Accept: application/json', 'Authorization: Bearer ' . $_SESSION['supabase_access_token']];
         $identity = ez_admin_get_json($apiUrl . '/v1/me', $headers, 'Ezkart account');
-        $adminLanguage = preg_match('/^id(?:-|$)/i', (string) ($identity['user']['locale'] ?? 'en')) ? 'id' : 'en';
+        $adminLanguage = $preferredLanguage ?? (preg_match('/^id(?:-|$)/i', (string) ($identity['user']['locale'] ?? 'en')) ? 'id' : 'en');
         $sellerId = (string) ($identity['user']['active_seller']['id'] ?? '');
         $activeSeller = $identity['user']['active_seller'] ?? [];
         foreach ($storeDisplayPreferences as $key => $fallback) $storeDisplayPreferences[$key] = (string) ($activeSeller['businessProfile'][$key] ?? $fallback);
@@ -1454,6 +1455,17 @@ if (in_array($requestedPage, ['support-refunds','treasury'], true)) {
 }
 
 $page = in_array($requestedPage, $allowedPages, true) ? $requestedPage : 'dashboard';
+// Require saved seller details before entering the store workspace. Keep the
+// setup, address and security screens reachable so owners can finish each step.
+if ($authenticated && $authenticationMethod === 'supabase' && ($activeSeller['role'] ?? '') === 'owner'
+    && !in_array($page, ['onboarding', 'shipping-settings', 'settings', 'wallet'], true)) {
+    try {
+        $setupStatus = ez_admin_get_json($apiUrl . '/v1/commerce/notifications/onboarding', $headers, 'Seller setup');
+        if (!empty($setupStatus['setupRequired'])) { header('Location: ?page=onboarding', true, 302); exit; }
+    } catch (Throwable) {
+        header('Location: ?page=onboarding', true, 302); exit;
+    }
+}
 $isDashboard = $page === 'dashboard';
 $centralDashboardWorkspace = $authenticated && $isDashboard && (ez_config('commerce_storage') === 'd1'
     || ($deployment === 'test' && $authenticationMethod === 'supabase' && ($_GET['dashboard-preview'] ?? '') === '1'));
@@ -1698,6 +1710,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
   <?php if ($page === 'product-new'): ?><link rel="stylesheet" href="digital-files.css?v=<?= (int) filemtime(__DIR__ . '/digital-files.css') ?>"><?php endif; ?>
   <link rel="stylesheet" href="advanced.css?v=<?= (int) filemtime(__DIR__ . '/advanced.css') ?>">
   <?php if ($page === 'sites'): ?><link rel="stylesheet" href="builder-choice.css?v=<?= (int) filemtime(__DIR__ . '/builder-choice.css') ?>"><link rel="stylesheet" href="builder-image.css?v=<?= (int) filemtime(__DIR__ . '/builder-image.css') ?>"><?php endif; ?>
+  <link rel="stylesheet" href="language-picker.css?v=<?= (int) filemtime(__DIR__ . '/language-picker.css') ?>">
   <link rel="stylesheet" href="profile-logo.css?v=<?= (int) filemtime(__DIR__ . '/profile-logo.css') ?>">
   <?php if ($page === 'settings'): ?><link rel="stylesheet" href="merchant-settings.css?v=<?= (int) filemtime(__DIR__ . '/merchant-settings.css') ?>"><?php endif; ?>
   <?php if ($page === 'marketing'): ?><link rel="stylesheet" href="marketing.css?v=<?= (int) filemtime(__DIR__ . '/marketing.css') ?>"><?php endif; ?>
@@ -1706,6 +1719,8 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
 </head>
 <body class="<?= $authenticated ? 'dashboard-page page-' . ez_admin_escape($page) . ($page === 'sites' ? ($siteEditor ? ' page-site-editor' : ' page-sites-library') : '') : 'login-page' ?>" data-admin-file-store="<?= ez_admin_escape($sellerId) ?>" data-admin-review-account="<?= ez_admin_escape((string) ($adminUser['id'] ?? '')) ?>" data-admin-date-preferences="<?= ez_admin_escape(json_encode($storeDisplayPreferences)) ?>" data-admin-language="<?= ez_admin_escape($adminLanguage) ?>" data-admin-advanced-mode="<?= !empty($advancedPlan['enabled']) ? 'true' : 'false' ?>" data-admin-landing-limit="<?= !empty($advancedPlan['enabled']) ? 24 : 6 ?>" data-admin-profile="<?= ez_admin_escape(json_encode($adminProfile)) ?>" data-admin-storage-scope="<?= ez_admin_escape($adminStorageScope) ?>" data-admin-checkout-brand="<?= ez_admin_escape($adminDisplayName) ?>" data-admin-migrate-legacy-storage="<?= $legacyDataAccess ? 'true' : 'false' ?>" data-admin-cloud-enabled="<?= $authenticated && $authenticationMethod === 'supabase' ? 'true' : 'false' ?>" data-admin-cloud-media-base="<?= $authenticated && $authenticationMethod === 'supabase' ? ez_admin_escape($cloudMediaBase) : '' ?>" data-admin-csrf-token="<?= ez_admin_escape($csrfToken) ?>">
 <?php if (!$authenticated): ?>
+<script src="admin-language.js?v=<?= (int) filemtime(__DIR__ . '/admin-language.js') ?>" defer></script>
+  <div class="login-language"><?php require __DIR__ . '/language-picker.php'; ?></div>
   <main class="login-shell">
     <?php if ($pendingMfa !== null): ?>
     <section class="login-card mfa-login-card">
@@ -1730,9 +1745,9 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
     <?php else: ?>
     <section class="login-card">
       <a class="admin-brand" href="../../"><img src="../../assets/ezkart-logo.svg" alt="Ezkart"></a>
-      <p class="eyebrow">Internal order monitor</p>
-      <h1><?= $deployment === 'beta' ? 'Beta' : ($commerceProduction ? 'Production' : 'Sandbox') ?> admin.</h1>
-      <p class="login-intro">Sign in with a verified Google account. Store owners can also use their approved email link. Ezkart keeps this device signed in for up to 30 days.</p>
+      <p class="eyebrow">Welcome to Ezkart</p>
+      <h1>Your store starts here.</h1>
+      <p class="login-intro">Sign in to manage your store. We’ll help you get set up.</p>
       <?php if ($supabaseSettings['configured']): ?>
         <form class="oauth-form" id="google-sign-in-form" method="post">
           <input type="hidden" name="action" value="google_oauth_start">
@@ -1750,7 +1765,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
         <form class="email-auth-form" id="email-sign-in-form">
           <label class="email-auth-label" for="email-sign-in">Email address</label>
           <input id="email-sign-in" name="email" type="email" autocomplete="email" placeholder="Email address" required>
-          <button class="email-auth-button" type="submit">Continue with email</button>
+          <button class="email-auth-button" type="submit"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 6 9 7 9-7"/></svg><span>Continue with email</span></button>
         </form>
         <section class="email-sent-panel" id="email-sent-panel" aria-live="polite" hidden>
           <span class="email-sent-icon" aria-hidden="true">
@@ -1790,7 +1805,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
           </form>
         </details>
       <?php endif; ?>
-      <a class="back-link" href="../">← Kembali ke checkout</a>
+      <a class="back-link" href="../"><span aria-hidden="true">←</span> <span>Back to checkout</span></a>
     </section>
     <?php endif; ?>
   </main>
@@ -1888,6 +1903,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
         <label class="global-search"><?= ez_admin_icon('search') ?><input id="global-search" type="search" placeholder="Search anything..." autocomplete="off"><kbd>⌘ K</kbd></label>
         <a class="onboarding-topbar-toast" href="?page=onboarding" data-onboarding-topbar hidden><?= ez_admin_icon('shield') ?><span>Finish seller setup</span><?= ez_admin_icon('chevron-right') ?></a>
         <div class="top-actions">
+          <?php require __DIR__ . '/language-picker.php'; ?>
           <a class="icon-button notification-bell" href="?page=notifications" aria-label="Notifications" data-notification-bell="<?= ez_admin_escape(json_encode(['account' => (string) ($adminUser['id'] ?? ''), 'store' => $sellerId, 'csrf' => $csrfToken, 'enabled' => $authenticationMethod === 'supabase'])) ?>"><?= ez_admin_icon('bell') ?><span data-notification-badge hidden></span></a>
           <a class="icon-button" href="?page=messages" aria-label="Messages"><?= ez_admin_icon('message') ?></a>
           <button class="icon-button" type="button" aria-label="Help"><?= ez_admin_icon('help') ?></button>

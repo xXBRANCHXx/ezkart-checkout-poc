@@ -35,3 +35,30 @@ Financial protocol fixtures use the same profile, bank and pinned-address declar
 - All three focused merchant browser checks pass (bank forms/catalog and withdrawal flows at desktop/mobile widths), plus routed hosted checkout. PHP syntax and the beta bundle pass.
 - The broader SNAP/Wallet/withdrawal run passes 44 of 46 tests. Both failures reproduce on the unchanged baseline: the historical 0056 fixture uses current onboarding code against a pre-onboarding schema; the direct SQL rejection test expects an older trigger error rather than `seller_onboarding_required`. Neither requires weakening a runtime guard.
 - No real provider registration, payment or withdrawal was initiated for verification.
+
+## Seller entry and guided setup (29 September 2026)
+
+Seller owners enter setup before the store workspace when required declarations,
+confirmed address pins or the applicable bank requirement are missing. Setup,
+shipping settings, security settings and Wallet remain reachable to finish setup
+and inspect existing financial requests. The bank exception for owners with live
+verified two-step enrollment remains intact. Readiness failures route to setup;
+this entry routing complements the existing API guards on publishing and money
+actions.
+
+Profile saves now require an explicit boolean `ageConfirmed: true`, submitted by
+an initially unchecked required 18+ checkbox. The server still computes age from
+DOB and rejects underage declarations. Existing saved declarations are preserved;
+new saves require the explicit confirmation and retain the normal immutable
+profile revision. This is a seller declaration, not identity verification.
+
+The interface presents About you, Your addresses and Your bank as separate steps.
+English/Bahasa Indonesia selection is available before sign-in and during setup;
+a browser language preference follows the seller through sign-in. The entry screen
+uses the admin white/cool-gray palette without a cream background or grid.
+
+Validation: 20 focused onboarding, bank-timing, dashboard and messaging checks
+passed; five final browser/flow checks and two entry-gate checks also passed.
+Desktop/mobile screenshots were inspected, PHP syntax checks passed, and the beta
+Worker bundle passed its dry run. Beta Worker `f0e61428-d918-4d50-bfa6-70cbe764dd6f`
+contains the required confirmation and entry status. No production deployment.

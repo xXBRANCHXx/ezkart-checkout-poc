@@ -2,7 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {join} from 'node:path';
 import {readdir} from 'node:fs/promises';
-import {setupCentralFixture} from './central-fixture.mjs';
+import {setupCentralFixture as setupBaseFixture} from './central-fixture.mjs';
+import {seedDeclaredOnboarding} from '../../cloudflare/ezkart-api/test/onboarding-fixture.mjs';
+async function setupCentralFixture(...args){const f=await setupBaseFixture(...args);await seedDeclaredOnboarding(f.db);return f;}
 import {fixtureShipping} from '../../cloudflare/ezkart-api/test/commerce-fixture.mjs';
 
 const api='/v1/commerce/dashboard';

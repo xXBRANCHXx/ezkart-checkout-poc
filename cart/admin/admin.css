@@ -38,10 +38,10 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .environment-pill { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; color: #705600; background: #fff3b7; border: 1px solid #e7d570; border-radius: 999px; font-size: 9px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
 .environment-pill i { width: 7px; height: 7px; background: #d99b00; border-radius: 50%; box-shadow: 0 0 0 4px rgba(217,155,0,.12); }
 .eyebrow { margin: 0; color: var(--orange); font-size: 9px; font-weight: 800; letter-spacing: .15em; text-transform: uppercase; }
-.login-page { min-height: 100vh; display: grid; place-items: center; padding: 32px; background: #f6f3ee; }
-.login-page::before { content: ""; position: fixed; inset: 0; background-image: linear-gradient(rgba(8,20,36,.025) 1px, transparent 1px), linear-gradient(90deg, rgba(8,20,36,.025) 1px, transparent 1px); background-size: 48px 48px; mask-image: linear-gradient(black, transparent 82%); pointer-events: none; }
+.login-page { min-height: 100vh; display: grid; place-items: center; padding: 32px; background: #f6f7fb; }
+.login-page::before { content: none; }
 .login-shell { width: min(100%, 470px); position: relative; }
-.login-card { padding: 42px; background: #fffdf9; border: 1px solid rgba(8,20,36,.13); border-radius: 24px; box-shadow: 0 24px 70px rgba(8,20,36,.1); }
+.login-card { padding: 42px; background: #fff; border: 1px solid rgba(8,20,36,.13); border-radius: 24px; box-shadow: 0 24px 70px rgba(8,20,36,.1); }
 .login-card .admin-brand { margin-bottom: 34px; display: inline-block; }
 .login-card h1 { margin: 8px 0 13px; font-size: 46px; line-height: 1; letter-spacing: -.05em; }
 .login-intro { margin: 0 0 25px; color: var(--muted); font-size: 13px; line-height: 1.65; }
@@ -2477,3 +2477,12 @@ body>.sq-page-preview.sq-has-pinned-navigation:not(.sq-has-announcement-navigati
 
 /* The bell count is private to the signed-in merchant. */
 .notification-bell{position:relative}.notification-bell [data-notification-badge]{position:absolute;top:0;right:-5px;min-width:17px;height:17px;padding:1px 4px;border-radius:10px;background:#6654d9;color:white;font-size:10px;font-weight:700;line-height:15px}.notification-bell [hidden]{display:none!important}
+
+/* Seller sign-in shares the admin palette. */
+.login-card{border-color:#e1e5ee;box-shadow:0 12px 40px #18212f0a;border-radius:20px}
+.login-card h1{font-size:36px;line-height:1.15;letter-spacing:-.035em}
+.login-card .email-auth-button{background:#f45129;gap:10px;font-size:13px}
+.login-card .email-auth-button:hover{background:#d83f1a}
+.login-card .email-auth-button svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.8}
+.login-card .back-link{display:inline-flex;align-items:center;gap:7px;min-height:38px;padding:8px 12px;border:1px solid #e0e4eb;border-radius:8px;background:#fff;color:#566174;text-decoration:none}
+@media(max-width:600px){.login-page{padding:20px}.login-card{padding:30px 24px}.login-card h1{font-size:31px}}
