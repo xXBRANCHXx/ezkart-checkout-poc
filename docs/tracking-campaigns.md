@@ -1,8 +1,10 @@
 # Seller Campaigns
 
 Campaigns is a separate seller workspace at `/cart/admin/?page=campaigns`.
-Analytics and Marketing keep their existing pages and data models. Marketing's
-email publications are separate from these seller-named tracking campaigns.
+Analytics keeps its existing page and data model. The owner deferred the email
+Marketing workspace from beta on 29 September: it is absent from navigation and
+old page links redirect to Campaigns. Its saved email data and implementation
+are retained for later. Campaigns uses a megaphone sidebar icon.
 
 ## Workflow
 

@@ -1446,8 +1446,10 @@ $adminStorageIdentity = $authenticationMethod === 'supabase'
 $adminStorageScope = substr(hash('sha256', $deployment . '|' . $adminStorageIdentity), 0, 24);
 $nowJakarta = new DateTimeImmutable('now', new DateTimeZone('Asia/Jakarta'));
 $dashboardPeriod = ez_dashboard_period($_GET, $nowJakarta);
-$allowedPages = ['dashboard', 'orders', 'returns', 'refunds', 'jev', 'alerts', 'fulfillment', 'shipping-settings', 'products', 'product-new', 'inventory', 'shop', 'sites', 'customers', 'analytics', 'campaigns', 'marketing', 'payments', 'messages', 'notifications', 'wallet', 'onboarding', 'settings', 'advanced'];
+$allowedPages = ['dashboard', 'orders', 'returns', 'refunds', 'jev', 'alerts', 'fulfillment', 'shipping-settings', 'products', 'product-new', 'inventory', 'shop', 'sites', 'customers', 'analytics', 'campaigns', 'payments', 'messages', 'notifications', 'wallet', 'onboarding', 'settings', 'advanced'];
 $requestedPage = strtolower(trim((string) ($_GET['page'] ?? 'dashboard')));
+// The email Marketing workspace is deferred from beta; keep old bookmarks useful.
+if ($requestedPage === 'marketing') { header('Location: ?page=campaigns', true, 302); exit; }
 if (in_array($requestedPage, ['support-refunds','treasury'], true)) {
     if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') { http_response_code(410); exit('Internal operations have moved to Ezkart Executive. Open the original request there before continuing.'); }
     $target = ['operations' => $requestedPage === 'treasury' ? 'treasury' : 'refunds'];
@@ -1621,7 +1623,7 @@ $requestedSite = trim((string) ($_GET['edit'] ?? ''));
 $siteEditor = $page === 'sites' && $requestedSite !== '' && strlen($requestedSite) <= 180;
 $pageTitles = [
     'dashboard' => 'Dashboard', 'orders' => 'Orders', 'returns' => 'Returns', 'refunds' => 'Refunds', 'jev' => 'Alerts', 'alerts' => 'Alerts', 'fulfillment' => 'Fulfillment', 'shipping-settings' => 'Shipping settings', 'products' => 'Products', 'product-new' => 'Create product', 'inventory' => 'Inventory', 'shop' => 'Shop', 'sites' => 'Landing Pages',
-    'customers' => 'Customers', 'analytics' => 'Analytics', 'campaigns' => 'Campaigns', 'marketing' => 'Marketing',
+    'customers' => 'Customers', 'analytics' => 'Analytics', 'campaigns' => 'Campaigns',
     'payments' => 'Payments', 'messages' => 'Messages', 'notifications' => 'Notifications',
     'onboarding' => 'Seller onboarding', 'wallet' => 'Wallet', 'settings' => 'Settings', 'advanced' => 'Advanced Mode',
 ];
@@ -1716,7 +1718,6 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
   <link rel="stylesheet" href="language-picker.css?v=<?= (int) filemtime(__DIR__ . '/language-picker.css') ?>">
   <link rel="stylesheet" href="profile-logo.css?v=<?= (int) filemtime(__DIR__ . '/profile-logo.css') ?>">
   <?php if ($page === 'settings'): ?><link rel="stylesheet" href="merchant-settings.css?v=<?= (int) filemtime(__DIR__ . '/merchant-settings.css') ?>"><?php endif; ?>
-  <?php if ($page === 'marketing'): ?><link rel="stylesheet" href="marketing.css?v=<?= (int) filemtime(__DIR__ . '/marketing.css') ?>"><?php endif; ?>
   <link rel="stylesheet" href="../select.css?v=<?= (int) filemtime(__DIR__ . '/../select.css') ?>">
   <title><?= $authenticated ? ez_admin_escape($pageTitles[$page]) : ($pendingMfa !== null ? 'Two-step verification' : 'Admin Login') ?> · Ezkart</title>
 </head>
@@ -1821,6 +1822,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
     <symbol id="icon-box" viewBox="0 0 24 24"><path d="m4 7 8-4 8 4-8 4-8-4Z"/><path d="M4 7v10l8 4 8-4V7M12 11v10"/></symbol>
     <symbol id="icon-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2M16 5.5a3 3 0 0 1 0 5.5M17 14a5 5 0 0 1 4 5"/></symbol>
     <symbol id="icon-chart" viewBox="0 0 24 24"><path d="M21 12c.552 0 1.005-.449.95-.998a10 10 0 0 0-8.953-8.951c-.55-.055-.998.398-.998.95v8a1 1 0 0 0 1 1z"/><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/></symbol>
+    <symbol id="icon-megaphone" viewBox="0 0 24 24"><path d="M3 10v4a1 1 0 0 0 1 1h4l10 4V5L8 9H4a1 1 0 0 0-1 1ZM8 9v6M6 15l1 5h3l-1-4M21 9v6"/></symbol>
     <symbol id="icon-send" viewBox="0 0 24 24"><path d="m21 3-7 18-4-8-8-4 19-6Z"/><path d="m10 13 11-10"/></symbol>
     <symbol id="icon-wallet" viewBox="0 0 24 24"><path d="M4 6h14a2 2 0 0 1 2 2v10H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h12"/><path d="M15 11h6v4h-6a2 2 0 0 1 0-4Z"/></symbol>
     <symbol id="icon-star" viewBox="0 0 24 24"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9L12 3Z"/></symbol>
@@ -1886,9 +1888,8 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
         <a class="<?= in_array($page, ['products', 'product-new', 'inventory', 'shop'], true) ? 'active' : '' ?>" href="?page=products"><?= ez_admin_icon('box') ?><span>Products</span></a>
         <a class="<?= $page === 'sites' ? 'active' : '' ?>" href="?page=sites"><?= ez_admin_icon('layout') ?><span>Landing Pages</span><b data-site-count>0</b></a>
         <a class="<?= $page === 'customers' ? 'active' : '' ?>" href="?page=customers"><?= ez_admin_icon('users') ?><span>Customers</span></a>
-        <a class="<?= $page === 'campaigns' ? 'active' : '' ?>" href="?page=campaigns"><?= ez_admin_icon('chart') ?><span>Campaigns</span></a>
+        <a class="<?= $page === 'campaigns' ? 'active' : '' ?>" href="?page=campaigns"><?= ez_admin_icon('megaphone') ?><span>Campaigns</span></a>
         <a class="<?= $page === 'analytics' ? 'active' : '' ?>" href="?page=analytics"><?= ez_admin_icon('chart') ?><span>Analytics</span></a>
-        <a class="<?= $page === 'marketing' ? 'active' : '' ?>" href="?page=marketing"><?= ez_admin_icon('send') ?><span>Marketing</span></a>
         <a class="<?= $page === 'payments' ? 'active' : '' ?>" href="?page=payments"><?= ez_admin_icon('credit-card') ?><span>Payments</span></a>
         <a class="<?= $page === 'messages' ? 'active' : '' ?>" href="?page=messages"><?= ez_admin_icon('message') ?><span>Messages</span></a>
         <a class="<?= $page === 'wallet' ? 'active' : '' ?>" href="?page=wallet"><?= ez_admin_icon('wallet') ?><span>Wallet</span></a>
@@ -2032,7 +2033,6 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
   <script src="notification-badge.js?v=<?= (int) filemtime(__DIR__ . '/notification-badge.js') ?>"></script>
   <script src="admin-format.js?v=<?= (int) filemtime(__DIR__ . '/admin-format.js') ?>"></script>
   <?php if ($page === 'settings'): ?><script src="merchant-settings.js?v=<?= (int) filemtime(__DIR__ . '/merchant-settings.js') ?>"></script><?php endif; ?>
-  <?php if ($page === 'marketing'): ?><script src="marketing-reports.js?v=<?= (int) filemtime(__DIR__ . '/marketing-reports.js') ?>"></script><script src="marketing-publication.js?v=<?= (int) filemtime(__DIR__ . '/marketing-publication.js') ?>"></script><script src="marketing-automations.js?v=<?= (int) filemtime(__DIR__ . '/marketing-automations.js') ?>"></script><script src="marketing.js?v=<?= (int) filemtime(__DIR__ . '/marketing.js') ?>"></script><?php endif; ?>
   <?php if (in_array($page, ['inventory','products'], true)): ?><script src="inventory.js?v=<?= (int) filemtime(__DIR__ . '/inventory.js') ?>"></script><?php endif; ?>
   <?php if ($page === 'inventory'): ?><script src="inventory-reviews.js?v=<?= (int) filemtime(__DIR__ . '/inventory-reviews.js') ?>"></script><?php endif; ?>
   <?php if ($page === 'refunds'): ?><script src="../refunds.js?v=<?= (int) filemtime(__DIR__ . '/../refunds.js') ?>"></script><?php endif; ?>

@@ -195,3 +195,10 @@ activation. Preserve the active bank while pending or rejected; require fresh
 verification, a reason, established-contact and bank-ownership checks, and an
 audited staff decision. Never add immediate self-service replacement or automatic
 approval. See `docs/bank-change-review.md`.
+
+## Beta campaign navigation (owner, 29 September 2026)
+
+Use a megaphone icon for Campaigns. The email Marketing page is not part of
+this beta: keep it out of navigation and redirect its old page URL to Campaigns.
+Retain its saved data and code for later; do not reintroduce the page without
+an owner request. Analytics remains a separate page.

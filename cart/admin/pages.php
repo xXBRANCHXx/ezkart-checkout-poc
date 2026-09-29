@@ -299,8 +299,6 @@ function ez_orders_table(array $rows, string $tableId, string $csrfToken, string
 
 <?php break; case 'analytics': require __DIR__ . '/analytics.php'; ?>
 
-<?php break; case 'marketing': require __DIR__ . '/marketing.php'; ?>
-
 <?php break; case 'payments': ?>
   <?php if ($centralPaymentWorkspace) { require __DIR__ . '/commerce-payments.php'; break; } ?>
   <?php ez_page_header('Payments', 'Track incoming payments and review each transaction.', [['label'=>'Refresh', 'icon' => 'refresh','href'=>'?page=payments'],['label'=>'View wallet', 'icon' => 'wallet','href'=>'?page=wallet','style'=>'primary']]); ?>
