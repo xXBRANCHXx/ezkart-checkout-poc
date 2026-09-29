@@ -177,7 +177,9 @@ compact charts with real data and honest empty states, not paragraphs of metric
 text or invented trends. Annotate action semantics with `data-ui-icon` so icons
 survive loading, translation and export label updates.
 
-Use purple for analytics selections, chart accents and active navigation indicators.
+Use purple only for highlighted fills, such as selected tabs and notice/toast
+backgrounds. Preserve the original orange/coral chart, icon and link accents;
+do not recolor the overall accent palette purple.
 Keep the orange-to-pink gradient for primary actions. Keep report controls compact
 and place useful charts directly beneath them; do not stack export, metadata and
 empty-state panels above the report data.

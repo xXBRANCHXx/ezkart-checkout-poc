@@ -46,7 +46,7 @@ button, input, select, textarea { font-family: inherit; }
   color: var(--ui-ink);
   background: var(--ui-field);
 }
-.dashboard-page .primary-nav a.active .icon { color: #8662dc; }
+.dashboard-page .primary-nav a.active .icon { color: #d34331; }
 .dashboard-page :is(.global-search, .store-switcher) {
   background: var(--ui-field);
   border-color: transparent;
