@@ -2481,8 +2481,9 @@ body>.sq-page-preview.sq-has-pinned-navigation:not(.sq-has-announcement-navigati
 /* Seller sign-in shares the admin palette. */
 .login-card{border-color:#e1e5ee;box-shadow:0 12px 40px #18212f0a;border-radius:20px}
 .login-card h1{font-size:36px;line-height:1.15;letter-spacing:-.035em}
-.login-card .email-auth-button{background:#f45129;gap:10px;font-size:13px}
-.login-card .email-auth-button:hover{background:#d83f1a}
+.login-card .email-auth-button{background:var(--ui-action-gradient);gap:10px;font-size:13px}
+.login-card .email-auth-button:hover:not(:disabled){background:var(--ui-action-hover)}
+.login-card .email-auth-button:active:not(:disabled){background:var(--ui-action-active)}
 .login-card .email-auth-button svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.8}
 .login-card .back-link{display:inline-flex;align-items:center;gap:7px;min-height:38px;padding:8px 12px;border:1px solid #e0e4eb;border-radius:8px;background:#fff;color:#566174;text-decoration:none}
 @media(max-width:600px){.login-page{padding:20px}.login-card{padding:30px 24px}.login-card h1{font-size:31px}}

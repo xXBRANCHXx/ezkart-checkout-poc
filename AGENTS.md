@@ -158,3 +158,10 @@ technology, and accessible action names intact when controls update dynamically.
 
 - Without two-step enabled, sellers must save bank details before publishing a landing page.
 - With two-step enabled, sellers may publish and accept payments before saving bank details; bank details are required before withdrawal. Keep the bank-details page protected by two-step. Other seller declarations and payment/provider controls remain in force.
+
+## Primary button branding (owner, 29 September 2026)
+
+Use the existing orange-to-pink branded gradient for primary actions, matching
+Wallet’s View payments button. Reuse `ui-button primary` and the shared
+`--ui-action-gradient`, hover and active tokens. Do not replace it with solid
+orange on sign-in, onboarding or messaging buttons.

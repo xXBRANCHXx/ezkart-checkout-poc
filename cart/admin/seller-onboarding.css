@@ -15,7 +15,6 @@
 .onboarding-status-row p{margin:0;font-size:12px;color:#667085}
 .onboarding-workspace .ui-button{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:42px;padding:11px 16px;border:1px solid #dce1e8;border-radius:9px;background:#fff;color:#344054;font:inherit;text-decoration:none;cursor:pointer}
 .onboarding-workspace .ui-button:disabled{opacity:.5;cursor:default}
-.dashboard-page .onboarding-workspace .ui-button.onboarding-primary{background:#eb4d26!important;color:#fff!important;border-color:#eb4d26!important}
 .onboarding-workspace label{font-size:13px}
 .onboarding-workspace .onboarding-confirm{display:flex;align-items:flex-start;gap:12px;background:#f8f9fc;border:1px solid #e1e5eb;border-radius:10px;padding:16px;cursor:pointer}
 .onboarding-workspace .onboarding-confirm input{width:20px;height:20px;min-height:20px;flex:none;margin:1px 0;accent-color:#eb4d26}
