@@ -10,11 +10,11 @@
 .msg-folders h2{font-size:12px;font-weight:600;padding:0 12px;margin-bottom:16px;color:#687386}
 .msg-folders nav{display:grid;gap:5px}.ez-messages .msg-folders button{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:transparent;border:1px solid transparent;font-size:12px;font-weight:500;min-height:44px;padding:10px;border-radius:9px}
 .msg-folders button span{flex:1}.msg-folders button b{font-variant-numeric:tabular-nums;font-size:11px}
-.ez-messages .msg-folders button[aria-pressed=true]{background:#fff0e9;color:#b7401d;border-color:#f5d3c5;font-weight:600}
+.ez-messages .msg-folders button[aria-pressed=true]{background:#f4effc;color:#7044bd;border-color:#d9cef4;font-weight:600}
 .msg-response-summary{margin:26px 10px 0;padding-top:18px;border-top:1px solid var(--msg-border);display:grid;grid-template-columns:1fr auto;gap:12px;color:#727d8f;font-size:11px}.msg-response-summary strong{font-size:12px;color:#414958}.msg-response-summary p{grid-column:1/-1;font-size:10px;margin:0}
 .ez-messages button.msg-primary:hover:not(:disabled){background:var(--ui-action-hover,linear-gradient(110deg,#f44c0d,#e90960));border-color:transparent;color:#fff}
 .ez-messages button.msg-primary:active:not(:disabled){background:var(--ui-action-active,linear-gradient(110deg,#e94306,#db0758))}
-.msg-merchant-workspace .msg-thread[aria-current=true]{background:#fff3ed;border-left-color:#eb4d26}
+.msg-merchant-workspace .msg-thread[aria-current=true]{background:#f4effc;border-left-color:#8662dc}
 @media(max-width:1250px){.msg-merchant-workspace{grid-template-columns:170px 230px minmax(0,1fr)}.msg-merchant-workspace .msg-filters{padding:14px}.msg-merchant-workspace .msg-conversation-head{padding:16px}.msg-folders{padding:18px 8px}}
 @media(max-width:1050px){.msg-merchant-workspace{grid-template-columns:230px minmax(0,1fr)}.msg-folders{grid-column:1/-1;border-right:0;border-bottom:1px solid var(--msg-border);padding:12px}.msg-folders h2,.msg-response-summary{display:none}.msg-folders nav{display:flex;flex-wrap:wrap;gap:6px}.ez-messages .msg-folders button{width:auto}.msg-folders button span{flex:none}}
 @media(max-width:700px){.msg-merchant-workspace{display:block}.msg-folders nav{display:flex;flex-wrap:nowrap;overflow-x:auto;padding:2px}.ez-messages .msg-folders button{flex:none;white-space:nowrap}.ez-messages.has-conversation .msg-folders{display:none}.msg-merchant-workspace .msg-filters{grid-template-columns:minmax(0,1fr) auto;align-items:end}}
