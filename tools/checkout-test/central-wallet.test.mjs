@@ -756,7 +756,7 @@ test('merchant onboarding saves declarations and bank through protected forms, r
  await f.page.locator('[data-onboarding-panel=bank]').waitFor();
  await chooseWithdrawalBank(f,'BANK BCA');await f.page.getByLabel('Account number',{exact:true}).fill('001234567890');
  f.control.drop='/internal/commerce/onboarding';await f.page.getByRole('button',{name:'Save bank destination',exact:true}).click();
- await f.page.locator('[data-onboarding-bank-summary]').filter({hasText:'7890'}).waitFor();assert.equal(await f.count('seller_onboarding_banks'),1);
+ await f.page.getByRole('heading',{name:"You're all set!",exact:true}).waitFor();assert.equal(await f.count('seller_onboarding_banks'),1);
  await f.page.waitForFunction(()=>document.querySelector('[data-onboarding-confirm-pins]').disabled&&document.querySelector('[data-onboarding-status]').textContent.startsWith('Your details are saved.'));
  await f.page.locator('[data-onboarding-topbar]').waitFor({state:'hidden'});const read=await f.request('onboarding_read',{});assert.equal(read.status,200,JSON.stringify(read.data));assert.equal(read.data.onboarding.ready,true);assert.equal(read.data.onboarding.identity.status,'not_assessed');assert.equal(read.data.onboarding.age.source,'seller_declared');assert.equal(read.data.onboarding.age.meetsPolicy,true);assert.equal(read.data.onboarding.shipping.confirmed,true);
  assert(!JSON.stringify(read.data).includes('001234567890'));assert.equal((await f.registerCalls()).length,0);

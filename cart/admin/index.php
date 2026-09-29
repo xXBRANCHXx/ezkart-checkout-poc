@@ -1710,6 +1710,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
   <?php if ($page === 'product-new'): ?><link rel="stylesheet" href="digital-files.css?v=<?= (int) filemtime(__DIR__ . '/digital-files.css') ?>"><?php endif; ?>
   <link rel="stylesheet" href="advanced.css?v=<?= (int) filemtime(__DIR__ . '/advanced.css') ?>">
   <?php if ($page === 'sites'): ?><link rel="stylesheet" href="builder-choice.css?v=<?= (int) filemtime(__DIR__ . '/builder-choice.css') ?>"><link rel="stylesheet" href="builder-image.css?v=<?= (int) filemtime(__DIR__ . '/builder-image.css') ?>"><?php endif; ?>
+  <?php if ($page === 'onboarding'): ?><link rel="stylesheet" href="seller-onboarding.css?v=<?= (int) filemtime(__DIR__ . '/seller-onboarding.css') ?>"><?php endif; ?>
   <link rel="stylesheet" href="language-picker.css?v=<?= (int) filemtime(__DIR__ . '/language-picker.css') ?>">
   <link rel="stylesheet" href="profile-logo.css?v=<?= (int) filemtime(__DIR__ . '/profile-logo.css') ?>">
   <?php if ($page === 'settings'): ?><link rel="stylesheet" href="merchant-settings.css?v=<?= (int) filemtime(__DIR__ . '/merchant-settings.css') ?>"><?php endif; ?>
@@ -1894,7 +1895,6 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
         <span class="upgrade-icon"><?= ez_admin_icon($sidebarPromo['icon']) ?></span><div><b><?= ez_admin_escape($sidebarPromo['title']) ?></b><p><?= ez_admin_escape($sidebarPromo['description']) ?></p></div>
         <a href="<?= ez_admin_escape($sidebarPromo['href']) ?>"><?= ez_admin_escape($sidebarPromo['label']) ?></a>
       </section>
-      <div class="store-switcher"><span class="store-icon"><?= ez_admin_icon('store') ?></span><div><b data-merchant-store-name title="<?= ez_admin_escape((string) ($activeSeller['name'] ?? 'Ezkart')) ?>"><?= ez_admin_escape((string) ($activeSeller['name'] ?? 'Ezkart')) ?></b><small><?= $commerceProduction ? 'DOKU checkout' : 'DOKU sandbox checkout' ?></small></div></div>
     </aside>
 
     <div class="workspace">
@@ -2045,7 +2045,7 @@ $adminJsVersion = (string) (@filemtime(__DIR__ . '/admin.js') ?: 1);
   <?php if ($page === 'shipping-settings'): ?><script src="../address-picker.js?v=<?= (int) filemtime(__DIR__ . '/../address-picker.js') ?>"></script><script src="shipping-settings.js?v=<?= (int) filemtime(__DIR__ . '/shipping-settings.js') ?>"></script><?php endif; ?>
   <?php if ($page === 'analytics'): ?><script src="analytics.js?v=<?= (int) filemtime(__DIR__ . '/analytics.js') ?>"></script><?php endif; ?>
   <?php if ($centralAnalyticsWorkspace): ?><script src="commerce-analytics.js?v=<?= (int) filemtime(__DIR__ . '/commerce-analytics.js') ?>"></script><?php endif; ?>
-  <?php if ($page === 'onboarding'): ?><script src="wallet-access.js?v=<?= (int) filemtime(__DIR__ . '/wallet-access.js') ?>"></script><link rel="stylesheet" href="seller-onboarding.css?v=<?= (int) filemtime(__DIR__ . '/seller-onboarding.css') ?>"><script src="seller-onboarding.js?v=<?= (int) filemtime(__DIR__ . '/seller-onboarding.js') ?>"></script><?php endif; ?>
+  <?php if ($page === 'onboarding'): ?><script src="wallet-access.js?v=<?= (int) filemtime(__DIR__ . '/wallet-access.js') ?>"></script><script src="seller-onboarding.js?v=<?= (int) filemtime(__DIR__ . '/seller-onboarding.js') ?>"></script><?php endif; ?>
   <?php if ($page === 'wallet'): ?><script src="wallet-access.js?v=<?= (int) filemtime(__DIR__ . '/wallet-access.js') ?>"></script><script src="wallet-withdrawals.js?v=<?= (int) filemtime(__DIR__ . '/wallet-withdrawals.js') ?>"></script><script src="wallet-enrollment.js?v=<?= (int) filemtime(__DIR__ . '/wallet-enrollment.js') ?>"></script><?php endif; ?>
   <script src="admin-language.js?v=<?= (int) filemtime(__DIR__ . '/admin-language.js') ?>"></script>
   <?php if ($page === 'sites'): ?><script src="builder-image.js?v=<?= (int) filemtime(__DIR__ . '/builder-image.js') ?>"></script><script src="builder-choice.js?v=<?= (int) filemtime(__DIR__ . '/builder-choice.js') ?>"></script><?php endif; ?>

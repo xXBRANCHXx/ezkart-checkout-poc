@@ -2,8 +2,15 @@
  const root=document.querySelector('[data-onboarding]');if(!root)return;
  const status=root.querySelector('[data-onboarding-status]'),profile=root.querySelector('[data-onboarding-profile]'),bank=root.querySelector('[data-onboarding-bank]');let state=null,banks=[],busy=false,step=null;
  const t=value=>window.EzkartLanguage?.t(value)||value;
- function showStep(next){step=next;if(next==='bank'&&bank&&!bank.closest('[data-wallet-content]').hidden)setTimeout(()=>void run(()=>call('bank_read')),0); root.querySelectorAll("[data-onboarding-panel]").forEach(n=>n.hidden=n.dataset.onboardingPanel!==next);root.querySelectorAll("[data-onboarding-step]").forEach(n=>{if(n.dataset.onboardingStep===next)n.setAttribute("aria-current","step");else n.removeAttribute("aria-current");});}
- function stepControls(){const done={profile:!!state.profile&&!state.requirements.includes("refresh_legal_profile"),addresses:state.shipping.confirmed,bank:!!state.bankSaved};root.querySelectorAll("[data-onboarding-step]").forEach(n=>{const id=n.dataset.onboardingStep;n.disabled=busy||(id!=="profile"&&!done.profile)||(id==="bank"&&!done.addresses);root.querySelector(`[data-step-status="${id}"]`).textContent=done[id]?t("Saved"):"";});root.querySelector("[data-onboarding-finish]").hidden=!(state.ready||state.sellingReady);if(!step)showStep(new URLSearchParams(location.search).get('step')==='bank'?'bank':!done.profile?"profile":!done.addresses?"addresses":"bank");}
+ function showStep(next){
+  const changed=step!==next;step=next;
+  root.querySelectorAll('[data-onboarding-panel]').forEach(n=>n.hidden=n.dataset.onboardingPanel!==next);
+  root.querySelectorAll('[data-onboarding-step]').forEach(n=>{if(n.dataset.onboardingStep===next)n.setAttribute('aria-current','step');else n.removeAttribute('aria-current');});
+  const url=new URL(location.href);url.searchParams.set('step',next);history.replaceState({},'',url);
+  if(next==='complete'&&changed)root.querySelector('[data-onboarding-complete-title]').focus({preventScroll:true});
+  if(next==='bank'&&changed&&bank&&!bank.closest('[data-wallet-content]').hidden)setTimeout(()=>void run(()=>call('bank_read')),0);
+ }
+ function stepControls(){const done={profile:!!state.profile&&!state.requirements.includes("refresh_legal_profile"),addresses:state.shipping.confirmed,bank:!!state.bankSaved};root.querySelectorAll("[data-onboarding-step]").forEach(n=>{const id=n.dataset.onboardingStep;n.disabled=busy||(id!=="profile"&&!done.profile)||(id==="bank"&&!done.addresses);root.querySelector(`[data-step-status="${id}"]`).textContent=done[id]?t("Saved"):"";});root.querySelector("[data-onboarding-finish]").hidden=!(state.ready||state.sellingReady);if(!step){const requested=new URLSearchParams(location.search).get('step');const allowed=requested==='profile'||requested==='addresses'&&done.profile||requested==='bank'&&done.profile&&done.addresses||requested==='complete'&&(state.ready||state.sellingReady);showStep(allowed?requested:state.ready?'complete':!done.profile?'profile':!done.addresses?'addresses':'bank');}}
  root.querySelectorAll("[data-onboarding-step]").forEach(n=>n.addEventListener("click",()=>showStep(n.dataset.onboardingStep)));
  const key=()=>crypto.randomUUID().replaceAll('-','');
  const text=(selector,value)=>root.querySelector(selector).textContent=value;
@@ -32,14 +39,19 @@
   text('[data-onboarding-age]',state.age.years===null?'Save your date of birth to record your age declaration.':`Saved seller-declared age: ${state.age.years} as of ${state.age.asOfDate}. Minimum seller age: ${state.age.minimumAge}.`);
   text('[data-onboarding-wallet]',state.wallet?'Existing Wallet setup: '+state.wallet.status+'. Its original registration is preserved.':'Complete your legal details and address pins to prepare your DOKU seller wallet. With two-step enabled, you can save your bank before your first withdrawal.');
   status.textContent=t(state.ready?'Your details are saved. Your store is ready.':state.sellingReady?'You’re ready to sell. Add your bank before withdrawing.':'Complete each step to get your store ready.');
+  text('[data-onboarding-complete-title]',t(state.ready?"You're all set!":"You're ready to sell!"));
+  text('[data-onboarding-complete-bank]',t(state.bankSaved?'Withdrawal bank saved':'Add your bank before your first withdrawal'));
+  root.setAttribute('aria-busy','false');
   stepControls();
 
  }
  async function run(fn){if(busy)return;busy=true;root.querySelectorAll('button').forEach(b=>b.disabled=true);try{await fn();}catch(e){status.textContent=e.message;}finally{busy=false;root.querySelectorAll('button').forEach(b=>b.disabled=false);const locked=root.querySelector('[data-wallet-content][hidden]');locked?.querySelectorAll('button').forEach(b=>b.disabled=true);if(state)stepControls();if(state)root.querySelector('[data-onboarding-confirm-pins]').disabled=!state.shipping.pinsPresent||!state.profile||state.shipping.confirmed;}}
- profile.addEventListener('submit',e=>{e.preventDefault();void run(async()=>{await call('profile',{revision:state?.profileRevision||0,requestKey:key(),legalName:profile.elements.legalName.value,birthDate:profile.elements.birthDate.value,ageConfirmed:profile.elements.ageConfirmed.checked,phone:profile.elements.phone.value});showStep("addresses");});});
- bank?.addEventListener('submit',e=>{e.preventDefault();void run(async()=>{await call('bank',{revision:state?.bankRevision||0,requestKey:key(),bank:{code:bank.elements.code.value,accountNumber:bank.elements.accountNumber.value,channel:bank.elements.channel.value}});bank.elements.accountNumber.value='';});});
+ profile.addEventListener('submit',e=>{e.preventDefault();void run(async()=>{await call('profile',{revision:state?.profileRevision||0,requestKey:key(),legalName:profile.elements.legalName.value,birthDate:profile.elements.birthDate.value,ageConfirmed:profile.elements.ageConfirmed.checked,phone:profile.elements.phone.value});showStep(state.ready?"complete":state.shipping.confirmed?"bank":"addresses");});});
+ bank?.addEventListener('submit',e=>{e.preventDefault();void run(async()=>{await call('bank',{revision:state?.bankRevision||0,requestKey:key(),bank:{code:bank.elements.code.value,accountNumber:bank.elements.accountNumber.value,channel:bank.elements.channel.value}});bank.elements.accountNumber.value='';if(state.ready)showStep('complete');});});
  bank?.elements.code.addEventListener('change',channels);
- root.querySelector('[data-onboarding-confirm-pins]').addEventListener('click',()=>run(async()=>{await call('confirm_pins',{revision:state.profile.revision,requestKey:key(),shippingRevision:state.shipping.revision});showStep('bank');}));
+ root.querySelector('[data-onboarding-confirm-pins]').addEventListener('click',()=>run(async()=>{await call('confirm_pins',{revision:state.profile.revision,requestKey:key(),shippingRevision:state.shipping.revision});showStep(state.ready?'complete':'bank');}));
+ root.querySelector('[data-onboarding-finish]').addEventListener('click',()=>showStep('complete'));
+ root.querySelector('[data-onboarding-review]').addEventListener('click',()=>showStep('profile'));
  root.querySelector('[data-onboarding-refresh]').addEventListener('click',()=>run(()=>call('read')));
  window.addEventListener('ezkart:wallet-locked',()=>{if(state){state.bank=null;state.bankRevision=0;}banks=[];text('[data-onboarding-bank-summary]','Verify to view or change bank details.');});
  void run(()=>call('read'));

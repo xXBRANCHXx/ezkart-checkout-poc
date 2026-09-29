@@ -230,6 +230,7 @@
   "First replies · last 30 days": "Balasan pertama · 30 hari terakhir",
   "No conversations match this view.": "Tidak ada percakapan yang sesuai."
 });
+  Object.assign(strings, {"You're all set!":"Semuanya siap!", "You're ready to sell!":"Kamu siap berjualan!", 'Your seller details are saved. Head to your store to take the next step.':'Data penjualmu sudah tersimpan. Buka tokomu untuk langkah berikutnya.', 'Personal details saved':'Data pribadi tersimpan', 'Pickup and return addresses confirmed':'Alamat penjemputan dan pengembalian dikonfirmasi', 'Withdrawal bank saved':'Rekening penarikan tersimpan', 'Add your bank before your first withdrawal':'Tambahkan rekening sebelum penarikan pertama', 'Review my details':'Tinjau dataku', 'Finish setup':'Selesaikan pengaturan'});
   let language = document.body.dataset.adminLanguage === 'id' ? 'id' : 'en';
   const t = text => language === 'id' ? strings[text] || text : text;
   function apply(root) {
