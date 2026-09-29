@@ -204,7 +204,7 @@ button, input, select, textarea { font-family: inherit; }
 }
 
 .dashboard-page :is(.settings-section, .product-creator-dialog, .page-creator-dialog,
-  .shop-settings-panel, .surface-tools) :is(input:not([type="color"]):not([type="range"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]), select, textarea) {
+  .shop-settings-panel, .surface-tools, .preview-share-dialog) :is(input:not([type="color"]):not([type="range"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]), select, textarea) {
   color: var(--ui-ink);
   background-color: var(--ui-field);
   border-color: transparent;
@@ -212,7 +212,7 @@ button, input, select, textarea { font-family: inherit; }
   box-shadow: none;
 }
 .dashboard-page :is(.settings-section, .product-creator-dialog, .page-creator-dialog,
-  .shop-settings-panel, .surface-tools) :is(input, select, textarea):focus-visible {
+  .shop-settings-panel, .surface-tools, .preview-share-dialog) :is(input, select, textarea):focus-visible {
   outline: 2px solid var(--ui-focus);
   outline-offset: 2px;
 }

@@ -92,7 +92,9 @@ business names cannot take ownership of an existing or legacy address.
 The rewrite matches only `/<business>/shop/<page>` and its `/preview` suffix;
 other site, shop, checkout and admin routes keep their existing behavior.
 
-The workbench uses its test Worker and buckets. A future authorized production
+The current workbench uses its beta Worker and buckets. Deploy preview routes to
+that configured API as well as the separate test Worker; a test-only deployment
+does not update workbench key management. A future authorized production
 release must apply migration `0008_seller_page_addresses.sql` before deploying
 the Worker routes and PHP/JS changes with the existing
 production API configuration and buckets. Links derive their hostname from the

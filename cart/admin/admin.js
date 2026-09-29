@@ -611,7 +611,7 @@
         keyField.value = result.previewAccess.key;
         status.textContent = replace ? 'Key replaced. Previous keys and unlock sessions no longer work.' : 'Anyone with this key can view the preview.';
         copyKey.disabled = false;
-      } catch (error) { keyField.value = ''; status.textContent = error.message; }
+      } catch (error) { keyField.value = 'Key unavailable'; status.textContent = 'The preview key could not be loaded. Try again.'; }
       finally { rotate.disabled = false; }
     };
     dialog.querySelectorAll('[data-copy]').forEach(button => button.addEventListener('click', async () => {
