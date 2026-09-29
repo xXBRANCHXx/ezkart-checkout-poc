@@ -206,7 +206,10 @@ test('database payment guards independently bind the owner, latest confirmation,
 test('beta bank changes fence unsent dispatch while original started payment recovery survives incomplete onboarding',async t=>{
  const f=await fixture(t,{bindings:{APP_ENVIRONMENT:'beta'}}),sent=await f.prepare(),unsent=await f.prepare(),g=await f.startPayment(sent);
  assert.equal(g.status,200,g.error);assert.equal(g.mayPay,true);
- const bank=await f.call('/internal/commerce/onboarding',{...f.scope(),action:'bank',revision:1,requestKey:key(),bank:{code:'CENAIDJA',accountNumber:'009999999999',channel:'BI_FAST'}});assert.equal(bank.status,200,bank.error);
+ const bank=await f.call('/internal/commerce/onboarding',{...f.scope(),action:'bank',revision:1,requestKey:key(),reason:'The original account is closing; review the replacement.',bank:{code:'CENAIDJA',accountNumber:'009999999999',channel:'BI_FAST'}});assert.equal(bank.status,200,bank.error);
+ assert.equal(bank.onboarding.bank.revision,1);assert.equal(bank.onboarding.bankChange.status,'pending');
+ assert.equal((await f.call('/internal/commerce/support/access',{environment:'production',authUserId:'bob',role:'reviewer',requestKey:key(),operator:'Fixture operator',reason:'Independent bank review fixture.'})).status,200);
+ const decision=await f.merchant('/v1/support/bank-changes/'+bank.onboarding.bankChange.id,{outcome:'approved',notes:'Verified the established owner contact and bank ownership.',verificationReference:'private-bank-case-123',ownerContactVerified:true,bankOwnershipVerified:true},{seller:'bob',claims:{aal:'aal2',amr:[{method:'totp',timestamp:Math.floor(Date.now()/1000)}]},method:'POST'});assert.equal(decision.status,200,decision.error);
  const denied=await f.startPayment(unsent);assert.equal(denied.status,409,denied.error);assert.match(denied.error,/saved bank changed/);
  assert.equal((await f.readWithdrawal(unsent.w)).withdrawal.bank.accountNumber,'001234567890');
  await f.db.prepare("UPDATE app_users SET email='changed@example.test' WHERE auth_user_id='alice'").run();
