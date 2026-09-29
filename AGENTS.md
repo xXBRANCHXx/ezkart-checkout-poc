@@ -167,3 +167,12 @@ Wallet’s View payments button. Reuse `ui-button primary` and the shared
 orange on sign-in, onboarding or messaging buttons.
 
 - Seller setup verification applies only to the bank section. Profile, DOB, phone and address/pin setup must remain accessible with ordinary sign-in. Bank details and changes retain fresh verification; expiry must not discard unrelated setup edits.
+
+## Merchant spacing and visual summaries (owner, 29 September 2026)
+
+Fix panel, filter and action spacing in the shared admin design system instead of
+adding isolated page patches. Use `--ui-panel-padding`, `--ui-control-gap` and
+`--ui-field-gap`; check desktop and phone widths. Customer summaries should use
+compact charts with real data and honest empty states, not paragraphs of metric
+text or invented trends. Annotate action semantics with `data-ui-icon` so icons
+survive loading, translation and export label updates.

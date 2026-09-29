@@ -45,9 +45,9 @@ ez_page_header('Advanced Mode', 'More room for your store to grow.', [['label' =
   <form data-domain-form>
     <label>Domain <input name="hostname" type="text" placeholder="shop.yourbrand.com" maxlength="253" required autocomplete="off"></label>
     <fieldset data-domain-pages><legend>Published landing page</legend><p>Loading pages…</p></fieldset>
-    <button class="ui-button" type="submit">Connect domain</button>
+    <button class="ui-button" type="submit" data-ui-icon="globe">Connect domain</button>
   </form>
   <p data-domain-status role="status" aria-live="polite">Loading domain connections…</p>
-  <button class="ui-button" type="button" data-domain-refresh>Refresh connections</button>
+  <button class="ui-button" type="button" data-domain-refresh data-ui-icon="refresh">Refresh connections</button>
   <div data-domain-list></div>
 </section>

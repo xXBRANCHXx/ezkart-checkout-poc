@@ -12,7 +12,7 @@ $notificationRows = [
 ];
 ?>
 <p class="merchant-settings-notice" data-settings-status role="status">Loading saved settings…</p>
-<button class="ui-button" type="button" data-settings-load hidden>Try loading settings again</button>
+<button class="ui-button" type="button" data-settings-load hidden data-ui-icon="refresh">Try loading settings again</button>
 <section class="surface settings-section" id="store-profile">
   <header class="surface-header"><div><h2>Store profile</h2><p>Your store identity and customer support details.</p></div></header>
   <?php require __DIR__ . '/profile-logo.php'; ?>
@@ -32,7 +32,7 @@ $notificationRows = [
     </fieldset>
     <p class="settings-form-status" data-settings-form-status role="status"></p>
     <p class="settings-form-error" data-settings-form-error role="alert" hidden></p>
-    <div class="settings-form-actions"><button class="ui-button primary" type="submit" data-settings-save disabled>Save store details</button><button class="ui-button" type="button" data-settings-retry hidden>Retry original save</button><button class="ui-button" type="button" data-settings-refresh disabled>Review saved details</button><button class="ui-button" type="button" data-settings-history disabled>View store history</button></div>
+    <div class="settings-form-actions"><button class="ui-button primary" type="submit" data-settings-save disabled data-ui-icon="save">Save store details</button><button class="ui-button" type="button" data-settings-retry hidden data-ui-icon="refresh">Retry original save</button><button class="ui-button" type="button" data-settings-refresh disabled data-ui-icon="eye">Review saved details</button><button class="ui-button" type="button" data-settings-history disabled data-ui-icon="eye">View store history</button></div>
   </form>
 </section>
 <section class="surface settings-section" id="notifications">
@@ -47,8 +47,8 @@ $notificationRows = [
     </fieldset>
     <p class="settings-form-status" data-settings-form-status role="status"></p>
     <p class="settings-form-error" data-settings-form-error role="alert" hidden></p>
-    <div class="settings-form-actions"><button class="ui-button primary" type="submit" data-settings-save disabled>Save notification preferences</button><button class="ui-button" type="button" data-settings-retry hidden>Retry original save</button><button class="ui-button" type="button" data-settings-refresh disabled>Review saved preferences</button><button class="ui-button" type="button" data-settings-history disabled>View my preference history</button></div>
+    <div class="settings-form-actions"><button class="ui-button primary" type="submit" data-settings-save disabled data-ui-icon="save">Save notification preferences</button><button class="ui-button" type="button" data-settings-retry hidden data-ui-icon="refresh">Retry original save</button><button class="ui-button" type="button" data-settings-refresh disabled data-ui-icon="eye">Review saved preferences</button><button class="ui-button" type="button" data-settings-history disabled data-ui-icon="eye">View my preference history</button></div>
   </form>
 </section>
-<dialog class="settings-dialog" data-settings-compare aria-labelledby="settings-compare-title"><h2 id="settings-compare-title">Compare your changes</h2><p data-settings-compare-description></p><div data-settings-comparison></div><div class="settings-form-actions"><button class="ui-button primary" type="button" data-settings-apply>Use compared changes</button><button class="ui-button" type="button" data-settings-use-saved>Use saved version</button><button class="ui-button" type="button" data-settings-close>Keep editing</button></div></dialog>
-<dialog class="settings-dialog" data-settings-history-dialog aria-labelledby="settings-history-title"><h2 id="settings-history-title">Settings history</h2><p data-settings-history-status role="status"></p><ol data-settings-history-items></ol><div class="settings-form-actions"><button class="ui-button" type="button" data-settings-history-more hidden>Load older changes</button><button class="ui-button" type="button" data-settings-history-retry hidden>Try history again</button><button class="ui-button" type="button" data-settings-close>Close history</button></div></dialog>
+<dialog class="settings-dialog" data-settings-compare aria-labelledby="settings-compare-title"><h2 id="settings-compare-title">Compare your changes</h2><p data-settings-compare-description></p><div data-settings-comparison></div><div class="settings-form-actions"><button class="ui-button primary" type="button" data-settings-apply data-ui-icon="check">Use compared changes</button><button class="ui-button" type="button" data-settings-use-saved data-ui-icon="check">Use saved version</button><button class="ui-button" type="button" data-settings-close data-ui-icon="pencil">Keep editing</button></div></dialog>
+<dialog class="settings-dialog" data-settings-history-dialog aria-labelledby="settings-history-title"><h2 id="settings-history-title">Settings history</h2><p data-settings-history-status role="status"></p><ol data-settings-history-items></ol><div class="settings-form-actions"><button class="ui-button" type="button" data-settings-history-more hidden data-ui-icon="arrow-right">Load older changes</button><button class="ui-button" type="button" data-settings-history-retry hidden data-ui-icon="refresh">Try history again</button><button class="ui-button" type="button" data-settings-close data-ui-icon="x">Close history</button></div></dialog>

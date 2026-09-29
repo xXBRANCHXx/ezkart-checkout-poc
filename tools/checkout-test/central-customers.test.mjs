@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile,mkdir} from 'node:fs/promises';
 import {setupCentralFixture} from './central-fixture.mjs';
+import {seedDeclaredOnboarding} from '../../cloudflare/ezkart-api/test/onboarding-fixture.mjs';
 import {randomBytes} from 'node:crypto';
 
 const base='/v1/commerce/customers',screens='/tmp/ezkart-central-customers-ui-01a0d643';
@@ -10,7 +11,7 @@ const detailLoaded=page=>page.waitForFunction(()=>document.querySelector('[data-
 const saved=page=>page.waitForFunction(()=>document.querySelector('[data-customers-detail-status]')?.textContent.startsWith('Saved.'));
 const ids=page=>page.locator('[data-customer-open]').evaluateAll(es=>es.map(e=>e.dataset.customerOpen));
 async function fixture(t,count=28,overrides={}){
-  const f=await setupCentralFixture(t,overrides);await f.db.prepare("UPDATE products SET stock_quantity=1000 WHERE id='tea'").run();
+  const f=await setupCentralFixture(t,overrides);await seedDeclaredOnboarding(f.db);await f.db.prepare("UPDATE products SET stock_quantity=1000 WHERE id='tea'").run();
   const orders=[];
   for(let n=0;n<count;n++){
     const r=await f.create(f.input({customer:{name:n===0?'Buyer <img src=x onerror=alert(1)>':n===1?'=HYPERLINK("unsafe")':'Buyer '+n,email:'buyer'+n+'@example.test',phone:'081234567890'}}));assert.equal(r.status,200,r.error);orders.push(r.order);
@@ -29,6 +30,12 @@ test('customer directory and profiles page through real records, save notes and 
     const page=await pageFor(b,f,width),errors=[];page.on('pageerror',error=>errors.push(error.message));let failNext=false;
     await page.route('**/cart/admin/?cloud=*',async route=>{const path=new URL(route.request().url()).searchParams.get('cloud');if(failNext&&path?.startsWith(base+'?')&&path.includes('cursor=')){failNext=false;await route.fulfill({status:503,json:{ok:false,error:'Read interrupted'}});return;}await route.continue();});
     await page.goto(f.app.base+'/cart/admin/?page=customers');await loaded(page);assert.equal(await page.locator('[data-customers-total=customers]').textContent(),'28');assert.equal(await page.locator('[data-customers-rows] tr').count(),25);
+    assert.equal(await page.locator('[data-customer-chart]').count(),4);
+    assert.equal(await page.locator('[data-customer-chart=customers] .customer-chart-ring').evaluate(e=>e.style.getPropertyValue('--share')),'7.14%');
+    assert.equal(await page.locator('[data-customer-meter=noPaid]').evaluate(e=>e.style.width),'92.85%');
+    assert.equal(await page.locator('[data-customers-refresh]').evaluate(e=>getComputedStyle(e,'::before').maskImage!=='none'),true);
+    assert.ok(await page.locator('[data-customers-filters]').evaluate(e=>parseFloat(getComputedStyle(e).paddingTop)>=16));
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
     await page.screenshot({path:screens+'/customers-'+width+'.png'});const first=await ids(page);await page.locator('input[name=q]').fill('unapplied');failNext=true;
     await page.locator('[data-customers-next]').click();await page.waitForFunction(()=>document.querySelector('[data-customers-list-status]').textContent.includes('Read interrupted'));assert.deepEqual(await ids(page),first);
     await page.locator('[data-customers-next]').click();await page.waitForFunction(()=>document.querySelectorAll('[data-customers-rows] tr').length===3);const second=await ids(page);assert.equal(new Set([...first,...second]).size,28);
@@ -145,4 +152,24 @@ test('saved segment pages retain earlier results on failure and clear obsolete n
   await page.locator('[data-customers-segments-refresh]').click();await page.waitForFunction(()=>document.querySelectorAll('[data-customer-segment]').length===25);assert.equal(await page.locator('[data-customers-segments-more]').isVisible(),true);
   failState=true;await page.locator('[data-customers-segment-state]').selectOption('archived');await page.waitForFunction(()=>document.querySelector('[data-customers-segments-status]').textContent.includes('Segments interrupted'));assert.equal(await page.locator('[data-customer-segment]').count(),0);assert.equal(await page.locator('[data-customers-segments-more]').isVisible(),false);
   await page.locator('[data-customers-segments-refresh]').click();await page.waitForFunction(()=>document.querySelector('[data-customers-segments-status]').textContent.includes('No archived segments'));
+});
+
+test('empty customer charts and shared panel spacing stay usable at desktop and phone widths',async t=>{
+  const f=await fixture(t,0),b=await browser(t);await mkdir(screens,{recursive:true});
+  for(const width of [1360,390]){
+    const page=await pageFor(b,f,width);await page.goto(f.app.base+'/cart/admin/?page=customers');await loaded(page);
+    assert.equal(await page.locator('[data-customers-total=customers]').textContent(),'0');
+    assert.equal(await page.locator('[data-customer-chart=customers] .customer-chart-ring').evaluate(e=>e.style.getPropertyValue('--share')),'0%');
+    assert.equal(await page.locator('[data-customer-chart=markets]').innerText(),'No customers yet');
+    assert.equal(await page.locator('[data-customer-chart=gross] .customer-chart-track i').first().evaluate(e=>e.style.width),'0%');
+    assert.equal(await page.locator('button.ui-button:visible:not([data-ui-icon])').count(),0);
+    await page.screenshot({path:screens+'/customers-empty-'+width+'.png',fullPage:true});
+    for(const name of ['orders','marketing']){
+      await page.goto(f.app.base+'/cart/admin/?page='+name);await page.locator('.surface-header').first().waitFor();
+      assert.ok(await page.locator('.surface-header').first().evaluate(e=>parseFloat(getComputedStyle(e).paddingTop)>=20));
+      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+      await page.screenshot({path:screens+'/shared-spacing-'+name+'-'+width+'.png'});
+    }
+    await page.context().close();
+  }
 });

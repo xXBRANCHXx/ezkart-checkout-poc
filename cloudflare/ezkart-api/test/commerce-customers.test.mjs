@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomBytes} from 'node:crypto';
+import {seedDeclaredOnboarding} from './onboarding-fixture.mjs';
 import {setupCommerceFixture} from './commerce-fixture.mjs';
 import {cleanupCustomerExports} from '../src/commerce-customer-exports.js';
 import {saveCustomerWorkspace} from '../src/commerce-customer-workspace.js';
@@ -21,11 +22,11 @@ const profile=(revision=0,note='Private customer note',tags=['VIP'])=>({revision
 const segment=(name='Returning buyers',filters={activity:'repeat'},revision=0,archived=false)=>({revision,requestKey:key(),name,filters,archived});
 
 test('customer directory isolates seller, environment and central version, uses saved contacts and permits only authenticated reads',async t=>{
-  const f=await setupCommerceFixture(t),one=await seed(f,1,{paid:true});
+  const f=await setupCommerceFixture(t);await seedDeclaredOnboarding(f.db);const one=await seed(f,1,{paid:true});
   const bob=await seed(f,2,{seller:'seller_bob'}),prod=await seed(f,3,{mode:'production'}),legacy=await seed(f,4,{version:0});
   await seed(f,5,{customer:1,mode:'production',at:'2027-01-01T00:00:00.000Z'});
   assert.equal((await f.mf.dispatchFetch('https://api.fixture.test'+base)).status,401);
-  const list=await f.merchant(base);assert.equal(list.status,200,list.error);assert.equal(list.summary.customers,1);assert.equal(list.summary.gross,'20000');assert.equal(list.items[0].name,'Buyer 1');assert(!JSON.stringify(list).match(/MASTER_PRIVATE|PRIVATE_AUTH|PRIVATE_PIN|consent_json/));
+  const list=await f.merchant(base);assert.equal(list.status,200,list.error);assert.equal(list.summary.customers,1);assert.deepEqual(list.marketBreakdown,[{location:'Jakarta',customers:1}]);assert.equal(list.summary.gross,'20000');assert.equal(list.items[0].name,'Buyer 1');assert(!JSON.stringify(list).match(/MASTER_PRIVATE|PRIVATE_AUTH|PRIVATE_PIN|consent_json/));
   const detail=await f.merchant(base+'/'+one.cid);assert.equal(detail.customer.marketingConsent,'not_recorded');assert.equal(detail.customer.address.address,'Saved street 1');assert.equal(detail.customer.profile.revision,0);
   for(const foreign of [bob,prod,legacy])for(const suffix of ['', '/orders','/changes'])assert.equal((await f.merchant(base+'/'+foreign.cid+suffix)).status,404);
   for(const query of ['seller=seller_bob','q=a&q=b','activity=unknown','minSpend=-1','minSpend=9223372036854775808','minOrders=2&maxOrders=1','lastFrom=2026-02-30','lastFrom=2026-02-02&lastTo=2026-02-01','limit=51','cursor=invalid','q='+('a'.repeat(121))])assert.equal((await f.merchant(base+'?'+query)).status,422,query);
@@ -39,7 +40,7 @@ test('customer pages include full history beyond 200 profiles, preserve their fr
   const f=await setupCommerceFixture(t);for(let n=1;n<=241;n++)await seed(f,n,{paid:n%2===0});
   const first=await f.merchant(base+'?limit=25');assert.equal(first.summary.customers,241);assert.equal(first.summary.payingCustomers,120);assert.equal(first.summary.gross,'2400000');
   await seed(f,500);await seed(f,501,{customer:1,paid:true,at:'2027-01-01T00:00:00.000Z'});
-  const second=await f.merchant(base+'?limit=25&cursor='+first.nextCursor),back=await f.merchant(base+'?limit=25&cursor='+second.previousCursor);assert.deepEqual(back.items,first.items);assert.equal(second.summary.customers,241);
+  const second=await f.merchant(base+'?limit=25&cursor='+first.nextCursor),back=await f.merchant(base+'?limit=25&cursor='+second.previousCursor);assert.deepEqual(back.items,first.items);assert.equal(second.summary.customers,241);assert.deepEqual(second.marketBreakdown,first.marketBreakdown);
   const ids=[];let page=first;
   do{ids.push(...page.items.map(r=>r.id));if(!page.nextCursor)break;page=await f.merchant(base+'?limit=25&cursor='+page.nextCursor);assert.equal(page.status,200,page.error);}while(true);
   assert.equal(ids.length,241);assert.equal(new Set(ids).size,241);

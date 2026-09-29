@@ -4,7 +4,7 @@ if (realpath((string) ($_SERVER['SCRIPT_FILENAME'] ?? '')) === __FILE__) { http_
 if (empty($walletAccess['unlocked']) || empty($walletOwner) || empty($centralWalletWorkspace)) return;
 ?>
 <section class="surface wallet-withdrawals" data-withdrawals aria-labelledby="withdrawal-history-title" aria-busy="true">
-  <header class="surface-header"><div><h2 id="withdrawal-history-title">Withdrawal requests</h2><p>Bank checks, confirmations and cancellations for your saved requests.</p></div><button class="action-button" type="button" data-withdrawal-refresh disabled>Refresh requests</button></header>
+  <header class="surface-header"><div><h2 id="withdrawal-history-title">Withdrawal requests</h2><p>Bank checks, confirmations and cancellations for your saved requests.</p></div><button class="action-button" type="button" data-withdrawal-refresh disabled data-ui-icon="refresh">Refresh requests</button></header>
   <div class="wallet-withdrawal-recovery" data-withdrawal-recovery hidden><p>An earlier withdrawal request needs a status check before you start another.</p><button class="action-button" type="button" data-withdrawal-recover>Check previous request</button></div>
   <p class="wallet-empty" data-withdrawal-history-status role="status" aria-live="polite">Checking withdrawal requests…</p>
   <div class="wallet-table-wrap" data-withdrawal-history-table hidden><table><thead><tr><th scope="col">Request / created</th><th scope="col">Bank account</th><th scope="col">Amount</th><th scope="col">Status</th><th scope="col"><span class="wallet-sr-only">Details</span></th></tr></thead><tbody data-withdrawal-history></tbody></table></div>
@@ -22,7 +22,7 @@ if (empty($walletAccess['unlocked']) || empty($walletOwner) || empty($centralWal
       <a href="?page=onboarding">Review or change saved bank</a>
       <p class="wallet-withdraw-fee">Your withdrawal fee: <strong>Rp0</strong>. Ezkart covers the transfer fee.</p>
       <p>Saving reserves this amount from your available earnings. You will check the bank-returned name before confirming the destination.</p>
-      <button class="action-button primary" type="submit" data-withdrawal-save>Save withdrawal request</button>
+      <button class="action-button primary" type="submit" data-withdrawal-save data-ui-icon="save">Save withdrawal request</button>
     </form>
     <section data-withdrawal-detail hidden aria-label="Saved withdrawal details">
       <dl class="wallet-withdraw-details">
@@ -38,7 +38,7 @@ if (empty($walletAccess['unlocked']) || empty($walletOwner) || empty($centralWal
       </dl>
       <p class="wallet-withdraw-warning" data-withdrawal-warning role="status" hidden></p>
       <p data-withdrawal-status-note role="status" hidden></p>
-      <div class="wallet-withdraw-actions"><button class="action-button" type="button" data-withdrawal-check>Verify bank account</button><button class="action-button" type="button" data-withdrawal-status-check hidden>Check transfer status</button><button class="action-button" type="button" data-withdrawal-detail-refresh>Refresh request</button></div>
+      <div class="wallet-withdraw-actions"><button class="action-button" type="button" data-withdrawal-check>Verify bank account</button><button class="action-button" type="button" data-withdrawal-status-check hidden>Check transfer status</button><button class="action-button" type="button" data-withdrawal-detail-refresh data-ui-icon="refresh">Refresh request</button></div>
       <form class="wallet-withdraw-confirm" data-withdrawal-confirm-form hidden>
         <label><input type="checkbox" name="confirmed" required> I have checked the amount, bank, account number and account-holder name.</label>
         <button class="action-button primary" type="submit" data-withdrawal-confirm>Confirm bank details</button>
@@ -48,7 +48,7 @@ if (empty($walletAccess['unlocked']) || empty($walletOwner) || empty($centralWal
         <label><input type="checkbox" name="confirmed" required> Send the amount above to this confirmed bank account. This transfer cannot be cancelled after sending.</label>
         <button class="action-button primary" type="submit" data-withdrawal-pay>Send bank transfer</button>
       </form>
-      <div class="wallet-withdraw-cancel"><button class="action-button" type="button" data-withdrawal-cancel>Cancel request</button>
+      <div class="wallet-withdraw-cancel"><button class="action-button" type="button" data-withdrawal-cancel data-ui-icon="x">Cancel request</button>
         <div data-withdrawal-cancel-review hidden><p>Cancel this withdrawal request? Other holds on your earnings will remain.</p><div class="wallet-withdraw-actions"><button class="action-button" type="button" data-withdrawal-keep>Keep request</button><button class="action-button" type="button" data-withdrawal-cancel-confirm>Confirm cancellation</button></div></div>
       </div>
     </section>

@@ -8,7 +8,7 @@
     <p>Your store logo, shown in the admin header. Landing-page logos are uploaded separately.</p>
     <div class="profile-logo-actions">
       <label class="profile-logo-upload"><input type="file" accept="image/png,image/jpeg,image/webp,image/avif" data-profile-logo-upload disabled><span data-profile-logo-upload-label>Upload logo</span></label>
-      <button type="button" data-profile-logo-remove hidden disabled>Remove</button>
+      <button type="button" data-profile-logo-remove hidden disabled data-ui-icon="trash">Remove</button>
       <button type="button" data-profile-logo-retry hidden>Try again</button>
     </div>
     <p class="profile-logo-help">PNG, JPG, WebP or AVIF, up to 2 MB. Fits your logo inside a circular badge. Changes save automatically.</p>

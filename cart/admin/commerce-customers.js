@@ -5,7 +5,7 @@
   const date=value=>window.EzkartAdminFormat.date(value);
   const key=()=>Array.from(crypto.getRandomValues(new Uint8Array(16)),n=>n.toString(16).padStart(2,'0')).join('');
   const el=(tag,text,className='')=>{const node=document.createElement(tag);if(text!==undefined)node.textContent=String(text);if(className)node.className=className;return node;};
-  const button=(text,action)=>{const node=el('button',text,'ui-button');node.type='button';node.addEventListener('click',action);return node;};
+  const button=(text,action,icon='eye')=>{const node=el('button',text,'ui-button');node.type='button';node.dataset.uiIcon=icon;node.addEventListener('click',action);return node;};
   const groups={all:'All customers',high_value:'High value',one_order:'One checkout',repeat:'Repeat paid buyers',no_paid:'No paid order'};
   const rules=filters=>fields.flatMap(field=>{
     const value=filters[field];if(!value||(field==='activity'&&value==='all'))return [];
@@ -25,7 +25,7 @@
     let segmentVersion=0,segmentsNext=null,segmentsBusy=false,editor=null,editorVersion=0;
     const message=(selector,text)=>{q(selector).textContent=text;q(selector).hidden=!text;};
     const formFilters=()=>Object.fromEntries(fields.map(field=>[field,form.elements[field].value.trim()]));
-    function setFilters(value={}){for(const field of fields){form.elements[field].value=value[field]||(field==='activity'?'all':'');form.elements[field].dispatchEvent(new Event('change',{bubbles:true}));}if(globalSearch)globalSearch.value=form.elements.q.value;}
+    function setFilters(value={}){for(const node of root.querySelectorAll('[data-customers-group]'))node.setAttribute('aria-pressed',String(node.dataset.customersGroup===value.activity));for(const field of fields){form.elements[field].value=value[field]||(field==='activity'?'all':'');form.elements[field].dispatchEvent(new Event('change',{bubbles:true}));}if(globalSearch)globalSearch.value=form.elements.q.value;}
     function controls(){q('[data-customers-next]').disabled=loading||!next;q('[data-customers-previous]').disabled=loading||!previous;q('[data-customers-export]').disabled=!loaded||loading||exportBusy;q('[data-customers-create-segment]').disabled=!loaded||loading||!canEdit;q('[data-customers-segment-filters]').disabled=!loaded||loading||q('[data-customers-segment-form]').elements.name.disabled;rows.setAttribute('aria-busy',String(loading));}
     function resetExport(){exportVersion++;exportInput=null;exportSnapshot=null;exportBusy=false;q('[data-customers-export]').textContent='Export matching customers';message('[data-customers-export-status]','');}
     function urlUpdate(push=false){
@@ -35,7 +35,24 @@
       if(selected)url.searchParams.set('customer',selected);else url.searchParams.delete('customer');
       history[push?'pushState':'replaceState']({},'',url);
     }
-    function clearList(){rows.replaceChildren();loaded=false;q('[data-customers-count]').textContent='';for(const node of root.querySelectorAll('[data-customers-total]'))node.textContent='—';message('[data-customers-unassigned]','');}
+    function renderCharts(summary,markets=[]){
+      const percent=(value,total)=>total?Math.max(0,Math.min(100,Number(BigInt(value||0)*10000n/BigInt(total))/100)):0;
+      const chart=(key,label)=>{const node=q('[data-customer-chart="'+key+'"]');node.replaceChildren();node.setAttribute('aria-label',label);return node;};
+      const bars=(node,items,total)=>{node.setAttribute('aria-label',node.getAttribute('aria-label')+': '+items.map(([label,value,display])=>label+' '+(display??String(value))).join('; '));for(const [label,value,display] of items){const row=el('div',undefined,'customer-chart-row'),track=el('span',undefined,'customer-chart-track'),fill=el('i');fill.style.width=percent(value,total)+'%';track.append(fill);row.append(el('span',label),el('b',display??String(value)),track);node.append(row);}};
+      for(const node of root.querySelectorAll('[data-customer-meter]')){const value=summary?.[node.dataset.customerMeter]||0,pct=percent(value,summary?.customers);node.style.width=pct+'%';q('[data-customer-share="'+node.dataset.customerMeter+'"]').textContent=summary?.customers?Math.round(pct)+'% of customers':summary?'No customers yet':'Loading…';}
+      if(!summary){for(const key of ['customers','gross','average','markets'])chart(key,'Loading chart').append(el('span','Loading…','customer-chart-empty'));return;}
+      const customerChart=chart('customers',`${summary.payingCustomers} paying customers; ${summary.noPaid} without a paid order`),ring=el('div',undefined,'customer-chart-ring');
+      ring.style.setProperty('--share',percent(summary.payingCustomers,summary.customers)+'%');ring.setAttribute('aria-hidden','true');ring.append(el('b',summary.customers?Math.round(percent(summary.payingCustomers,summary.customers))+'%':'—'));
+      const legend=el('div',undefined,'customer-chart-legend');legend.append(el('span','Paid · '+summary.payingCustomers),el('span','No paid order · '+summary.noPaid));customerChart.classList.add('customer-chart-donut');customerChart.append(ring,legend);
+      const gross=BigInt(summary.gross||0),additional=BigInt(summary.additional||0);
+      bars(chart('gross','Verified payments and additional payments'),[['Verified',gross,money(gross)],['Additional',additional,money(additional)]],gross+additional);
+      const average=BigInt(summary.average||0),payingAverage=summary.payingCustomers?gross/BigInt(summary.payingCustomers):0n;
+      bars(chart('average','Average verified value per customer and per paying customer'),[['All customers',average,money(average)],['Paying customers',payingAverage,money(payingAverage)]],payingAverage>average?payingAverage:average);
+      const marketChart=chart('markets','Customer distribution by latest saved delivery location');
+      if(markets.length)bars(marketChart,markets.slice(0,3).map(m=>[m.location||'No location',m.customers]),summary.customers);
+      else marketChart.append(el('span',summary.customers?'No location data':'No customers yet','customer-chart-empty'));
+    }
+    function clearList(){rows.replaceChildren();loaded=false;q('[data-customers-count]').textContent='';for(const node of root.querySelectorAll('[data-customers-total]'))node.textContent='—';renderCharts(null);message('[data-customers-unassigned]','');}
     function readUrl(){const url=new URL(location.href);setFilters(Object.fromEntries(fields.map(field=>[field,url.searchParams.get(field)])));filters=formFilters();cursor=url.searchParams.get('cursor');next=null;previous=null;clearList();resetExport();return url.searchParams.get('customer');}
     function closeDetail(update=true){detailVersion++;selected='';detail.hidden=true;q('[data-customers-detail-content]').replaceChildren();rows.querySelectorAll('[data-customer-open]').forEach(n=>n.setAttribute('aria-expanded','false'));if(update)urlUpdate();}
     function renderRows(items){
@@ -57,6 +74,7 @@
         const data=await api(base+'?'+query);if(version!==listVersion)return;
         if(!Array.isArray(data.items)||!data.summary||typeof data.pageCursor!=='string'||typeof data.cohort!=='string')throw Error('The customer response was incomplete.');
         for(const node of root.querySelectorAll('[data-customers-total]')){const name=node.dataset.customersTotal,isMoney=['gross','average'].includes(name);node.textContent=isMoney?money(data.summary[name]):data.summary[name].toLocaleString();if(isMoney)node.closest('article').dataset.wideMoney=String(String(data.summary[name]||'').length>12);}
+        renderCharts(data.summary,data.marketBreakdown);
         message('[data-customers-unassigned]',data.summary.unassignedOrders?`${data.summary.unassignedOrders} orders are not linked to a customer profile and are excluded from these customer totals.`:'');
         message('[data-customers-availability]',data.enabled&&root.dataset.preview!=='1'?'':'Order processing is not enabled for this store yet.');
         canEdit=data.canEdit;next=data.nextCursor;previous=data.previousCursor;cursor=data.pageCursor;cohort=data.cohort;renderRows(data.items);loaded=true;
@@ -77,7 +95,7 @@
       }};
       if(data)append(data.items);
       const status=el('p','', 'commerce-customer-muted');status.setAttribute('role','status');
-      const more=button('Load older entries',()=>void load());more.hidden=!!data&&!nextCursor;
+      const more=button('Load older entries',()=>void load());more.dataset.uiIcon='arrow-right';more.hidden=!!data&&!nextCursor;
       async function load(){if(busy||version!==detailVersion||(started&&!nextCursor))return;busy=true;more.disabled=true;status.textContent='Loading history…';
         try{const response=await api(base+'/'+id+'/'+kind+'?'+new URLSearchParams({limit:'20',...(nextCursor?{cursor:nextCursor}:{})}));if(version!==detailVersion)return;if(!Array.isArray(response.items))throw Error('History was incomplete.');append(response.items);nextCursor=response.nextCursor;started=true;more.hidden=!nextCursor;status.textContent=list.children.length?'':'No saved changes yet.';}
         catch(error){if(version===detailVersion)status.textContent=(error.message||'History could not be loaded.')+' Try Load older entries again.';}
@@ -93,7 +111,7 @@
       for(const [name,node] of [['Private note',note],['Tags, one per line',tags]]){const label=el('label');label.append(el('span',name),node);fieldset.append(label);}
       fieldset.append(el('small','Notes are visible to your store team. Use up to 10 tags, 32 characters each.'));
       const status=el('p',draft&&rebase?'Saved version reloaded. Your draft was kept; review it before saving.':'','commerce-customer-muted');status.setAttribute('role','status');status.dataset.customerSaveStatus='';
-      const save=el('button','Save note and tags','ui-button primary');save.type='submit';fieldset.append(save,status);fieldset.disabled=!editable;form.append(el('h3','Store notes and tags'));
+      const save=el('button','Save note and tags','ui-button primary');save.dataset.uiIcon='save';save.type='submit';fieldset.append(save,status);fieldset.disabled=!editable;form.append(el('h3','Store notes and tags'));
       if(draft&&rebase)form.append(card('Current saved version',[customer.profile.note||'No private note','Tags: '+(customer.profile.tags.join(', ')||'None')]));form.append(fieldset);
       if(!editable)form.append(el('p','Your account can view this profile but cannot change it.','commerce-customer-muted'));
       const remember=()=>{current.note=note.value;current.tags=tags.value;current.pending=null;
@@ -134,13 +152,13 @@
     function renderSegment(item,editable){
       const card=el('article');card.dataset.customerSegment=item.id;card.append(el('h3',item.name),el('p',rules(item.filters),'commerce-customer-muted'));
       const actions=el('div',undefined,'commerce-order-buttons');actions.append(button('View customers',()=>{setFilters(item.filters);closeDetail(false);void loadList({reset:true,apply:true,push:true});q('#commerce-customer-list-title').scrollIntoView({block:'center',behavior:'instant'});}));
-      const edit=button('Edit segment',async()=>{const version=++editorVersion;edit.disabled=true;try{const data=await api(base+'/segments/'+item.id);if(version===editorVersion)openSegment(data.segment);}catch(error){status.textContent=error.message||'Segment could not be loaded.';}finally{edit.disabled=!editable;}});edit.disabled=!editable;actions.append(edit);
+      const edit=button('Edit segment',async()=>{const version=++editorVersion;edit.disabled=true;try{const data=await api(base+'/segments/'+item.id);if(version===editorVersion)openSegment(data.segment);}catch(error){status.textContent=error.message||'Segment could not be loaded.';}finally{edit.disabled=!editable;}});edit.dataset.uiIcon='pencil';edit.disabled=!editable;actions.append(edit);
       const status=el('p','','commerce-customer-muted');status.setAttribute('role','status');let pending=null;
       const archive=button(item.archived?'Restore':'Archive',async()=>{
         archive.disabled=true;pending||={requestKey:key(),revision:item.revision,name:item.name,filters:item.filters,archived:!item.archived};status.textContent='Saving segment…';
         try{await write('PUT',base+'/segments/'+item.id,pending);void loadSegments();}
         catch(error){status.textContent=(error.message||'Segment could not be saved.')+' Retry, or reload segments to review a conflict.';archive.disabled=!editable;}
-      });archive.disabled=!editable;actions.append(archive);card.append(actions,status);return card;
+      });archive.dataset.uiIcon=item.archived?'undo':'box';archive.disabled=!editable;actions.append(archive);card.append(actions,status);return card;
     }
     async function loadSegments(more=false){
       if(more&&(segmentsBusy||!segmentsNext))return;

@@ -93,11 +93,12 @@ export async function merchantCustomers(env,seller,url){
     query(`SELECT ${customerColumns} FROM profiles p WHERE ${filter.where} ${before?`AND (p.last_at${comparison}? OR (p.last_at=? AND p.id${comparison}?))`:''}
       ORDER BY p.last_at ${direction},p.id ${direction} LIMIT ?`,[...filter.values,...(before?[before.at,before.at,before.id]:[]),limit+1]),
     query(`SELECT EXISTS(SELECT 1 FROM profiles p WHERE ${filter.where} ${before?`AND (p.last_at${backwards?'<':'>'}? OR (p.last_at=? AND p.id${backwards?'<=':'>='}?))`:'AND 0'}) AS opposite`,[...filter.values,...(before?[before.at,before.at,before.id]:[])]),
+    query('SELECT location,COUNT(*) AS customers FROM profiles GROUP BY location ORDER BY customers DESC,location LIMIT 3'),
   ]);
   const raw=results[2].results,items=raw.slice(0,limit);if(backwards)items.reverse();
   const first=items[0],last=items.at(-1),cursor=(row,d)=>makeReadCursor(seller.id,'customers',hash,cap,{created_at:row.last_at,id:row.id},d),summary=results[0].results[0];
   summary.average=summary.customers?((BigInt(summary.gross)+BigInt(Math.floor(summary.customers/2)))/BigInt(summary.customers)).toString():null;
-  return {enabled:commerceStorageEnabled(env),environment:mode,canEdit:seller.role!=='viewer',filters,summary,matching:results[1].results[0].matching,items:items.map(row=>profileView(row)),
+  return {enabled:commerceStorageEnabled(env),environment:mode,canEdit:seller.role!=='viewer',filters,summary,marketBreakdown:results[4].results,matching:results[1].results[0].matching,items:items.map(row=>profileView(row)),
     cohort:encode({v:1,s:seller.id,e:mode,cap,until:Date.now()+86400000}),
     pageCursor:encoded||cursor({last_at:'9999-12-31T23:59:59.999Z',id:'customer_'+'z'.repeat(85)}),
     previousCursor:first&&(backwards?raw.length>limit:results[3].results[0].opposite)?cursor(first,'after'):null,
