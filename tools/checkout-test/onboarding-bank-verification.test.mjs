@@ -57,6 +57,20 @@ test('profile and address setup work without Wallet verification; bank reads and
  assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
  await p.screenshot({path:'/tmp/ezkart-onboarding-complete-390.png',fullPage:true});
  r=await request('onboarding_read');assert.equal(r.onboarding.bank,null);assert.equal(r.onboarding.bankSaved,true);assert.equal(r.onboarding.bankRevision,0);
+ await p.getByRole('button',{name:'Your bank'}).click();
+ await p.getByRole('button',{name:'Request bank change',exact:true}).waitFor();
+ await p.locator('[data-onboarding-bank] select[name=code]').selectOption(bank.code);
+ await p.getByLabel('Account number',{exact:true}).fill('9995555555');
+ await p.locator('[data-onboarding-bank] select[name=channel]').selectOption('BI_FAST');
+ await p.getByLabel('Why are you changing your bank?').fill('My previous account is closing and I need a replacement.');
+ await p.getByRole('button',{name:'Request bank change',exact:true}).click();
+ await p.waitForFunction(()=>document.querySelector('[data-bank-change-status]').textContent.includes('pending'));
+ assert.equal(await p.getByRole('button',{name:'Request bank change',exact:true}).isDisabled(),true);
+ r=await request('onboarding_bank_read');assert.equal(r.onboarding.bank.revision,1);assert.equal(r.onboarding.bank.accountSuffix,'7890');assert.equal(r.onboarding.bankChange.status,'pending');
+ assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+ await p.screenshot({path:'/tmp/ezkart-bank-review-390.png',fullPage:true});
+ await p.setViewportSize({width:1360,height:940});await p.screenshot({path:'/tmp/ezkart-bank-review-1360.png',fullPage:true});
+ r=await request('onboarding_read');assert.equal(r.onboarding.bankChange,null);
  await p.setViewportSize({width:390,height:940});await p.getByRole('button',{name:'About you'}).click();
  assert.equal(await p.getByLabel('Full legal name',{exact:true}).inputValue(),'Alice Seller');
  // Expiry must affect only the banking section and preserve an unsaved profile.

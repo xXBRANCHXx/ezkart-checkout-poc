@@ -18,10 +18,10 @@ function ez_operations_save(string $path,array $state): void {
 function ez_operations_target(string $path,string $method): void {
  if(strlen($path)>2400||str_contains($path,'#')||!in_array($method,['GET','POST'],true))throw new InvalidArgumentException('Operation is invalid.');
  $patterns=[
-  'GET'=>['~^/v1/support/session$~D','~^/v1/jev/pages\?store=[a-z0-9-]{1,96}$~D','~^/v1/jev/reviews(?:/jev_[a-f0-9]{32}(?:/image/[1-9][0-9]?)?)?$~D',
+  'GET'=>['~^/v1/support/bank-changes(?:/bcr_[a-f0-9]{32})?$~D','~^/v1/support/session$~D','~^/v1/jev/pages\?store=[a-z0-9-]{1,96}$~D','~^/v1/jev/reviews(?:/jev_[a-f0-9]{32}(?:/image/[1-9][0-9]?)?)?$~D',
    '~^/v1/support/refunds(?:\?(?:state=(?:all|open|awaiting_buyer|awaiting_store|closed|processing)|cursor=[A-Za-z0-9_-]{1,1800})(?:&(?:state=(?:all|open|awaiting_buyer|awaiting_store|closed|processing)|cursor=[A-Za-z0-9_-]{1,1800}))?)?$~D',
    '~^/v1/support/refunds/ref_[a-f0-9]{32}(?:/packet|/evidence/rattach_[a-f0-9]{32}|/dispute\?before=[1-9][0-9]{0,14})?$~D','~^/v1/treasury/(?:commissions|intents/try_[a-f0-9]{40})$~D'],
-  'POST'=>['~^/v1/jev/reviews(?:/jev_[a-f0-9]{32}/(?:run|grade|restore|rescan))?$~D','~^/v1/support/refunds/ref_[a-f0-9]{32}/(?:dispute|processing)$~D','~^/v1/treasury/intents(?:/lookup|/try_[a-f0-9]{40}/(?:cancel|confirm))?$~D']
+  'POST'=>['~^/v1/support/bank-changes/bcr_[a-f0-9]{32}$~D','~^/v1/jev/reviews(?:/jev_[a-f0-9]{32}/(?:run|grade|restore|rescan))?$~D','~^/v1/support/refunds/ref_[a-f0-9]{32}/(?:dispute|processing)$~D','~^/v1/treasury/intents(?:/lookup|/try_[a-f0-9]{40}/(?:cancel|confirm))?$~D']
  ];foreach($patterns[$method] as $pattern)if(preg_match($pattern,$path)===1)return;
  throw new InvalidArgumentException('This operation is not available in Executive.');
 }

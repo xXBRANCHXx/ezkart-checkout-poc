@@ -52,7 +52,7 @@ test('declared details remain versioned and changed shipping requires renewed pi
  assert.equal((await f.call('/internal/commerce/finance/withdrawals',{environment:'production',seller:'seller_alice',actor:actor(),requestKey:key(),amount:'250000',bank:{code:'CENAIDJA',accountNumber:'99999',channel:'BI_FAST'}})).status,422);
  const phone=await f.call(path,input('profile',{revision:2,requestKey:key(),legalName:'Fixture alice',ageConfirmed:true,birthDate:'1990-01-01',phone:'081111111111'}));assert.equal(phone.status,200,phone.error);
  assert.equal(phone.onboarding.identity.status,'not_assessed');assert.equal(phone.onboarding.profile.revision,3);
- const bank=await f.call(path,input('bank',{revision:1,requestKey:key(),bank:{code:'CENAIDJA',accountNumber:'99900012345',channel:'BI_FAST'}}));assert.equal(bank.status,200,bank.error);assert.equal(bank.onboarding.ready,true);
+ const bank=await f.call(path,input('bank',{revision:1,requestKey:key(),reason:'Replacing a closed personal bank account.',bank:{code:'CENAIDJA',accountNumber:'99900012345',channel:'BI_FAST'}}));assert.equal(bank.status,200,bank.error);assert.equal(bank.onboarding.ready,true);
  const shipping=(await f.merchant('/v1/shipping-settings')).settings.configuration;shipping.addresses[0].address='Jalan Updated Warehouse 19';
  assert.equal((await f.merchant('/v1/shipping-settings',{revision:1,requestKey:key(),configuration:shipping})).status,200);
  const pending=await read();assert.equal(pending.ready,false);assert.equal(pending.identity.status,'not_assessed');assert.deepEqual(pending.requirements,['confirmed_pickup_return_pins']);
@@ -96,8 +96,8 @@ test('a newly added owner cannot read or copy prior owner declarations and bank 
  assert(state.requirements.includes('legal_name_phone'));assert(state.requirements.includes('saved_bank'));assert.equal(state.identity.status,'not_assessed');
  assert.equal((await f.call(path,other({action:'confirm_pins',revision:2,shippingRevision:1,requestKey:key()}))).status,409);
  const saved=await f.call(path,other({action:'profile',revision:state.profileRevision,requestKey:key(),legalName:'Bob Own Legal Name',ageConfirmed:true,birthDate:'1995-05-01',phone:'081111111111'}));assert.equal(saved.status,200,saved.error);assert.equal(saved.onboarding.profile.revision,3);assert.equal(saved.onboarding.profile.legalName,'Bob Own Legal Name');assert.equal(saved.onboarding.shipping.confirmed,false);assert.equal(saved.onboarding.ready,false);
- const bank=await f.call(path,other({action:'bank',revision:state.bankRevision,requestKey:key(),bank:{code:'CENAIDJA',accountNumber:'000999999999',channel:'BI_FAST'}}));assert.equal(bank.status,200,bank.error);assert.equal(bank.onboarding.bank.revision,2);
- const previous=await f.call(path,input('read'));assert.equal(previous.onboarding.profile,null);assert.equal(previous.onboarding.bank,null);assert.equal(previous.onboarding.ready,false);
+ const bank=await f.call(path,other({action:'bank',revision:state.bankRevision,requestKey:key(),reason:'New owner requests a reviewed payout bank.',bank:{code:'CENAIDJA',accountNumber:'000999999999',channel:'BI_FAST'}}));assert.equal(bank.status,200,bank.error);assert.equal(bank.onboarding.bank,null);assert.equal(bank.onboarding.bankChange.status,'pending');
+ const previous=await f.call(path,input('read'));assert.equal(previous.onboarding.profile,null);assert.equal(previous.onboarding.bank.revision,1);assert.equal(previous.onboarding.ready,false);
 });
 
 

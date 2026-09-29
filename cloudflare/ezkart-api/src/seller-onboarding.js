@@ -1,3 +1,4 @@
+import {requestBankChange, sellerBankChange} from './seller-bank-changes.js';
 import {requireSellingOnboarding} from './seller-publication.js';
 import {walletOwner} from './commerce-wallet-enrollment.js';
 import {commerceHash} from './commerce-orders.js';
@@ -15,6 +16,8 @@ export function declaredSellerAge(value,now=Date.now()){
 }
 export function onboardingFailure(error){
  const text=String(error);
+ if(/bank_change_pending/.test(text))fail('A bank change is already awaiting human review.',409);
+ if(/bank_change_review_required/.test(text))fail('Changing a saved bank requires human review.',409);
  if(/seller_onboarding_required/.test(text))fail('Complete seller onboarding, including your 18+ age declaration, saved bank and confirmed pickup/return pins, before starting new money actions.',409);
  if(/onboarding_bank_changed/.test(text))fail('Your saved bank changed. Cancel this unsent withdrawal and create a request for the current bank.',409);
  if(/onboarding_revision_conflict|onboarding_shipping_changed/.test(text))fail('Your saved details changed. Refresh onboarding before saving again.',409);
@@ -50,7 +53,7 @@ async function snapshot(env,input){
  if(!sellingReady && profile && ageEligible && pins && profile.confirmed_shipping_revision===shipping?.revision && !emailChanged){
   try{await requireSellingOnboarding(env,input.seller,'production');sellingReady=true;}catch{/* Keep incomplete setup readable when Auth is unavailable. */}
  }
- return {sellingReady,seller:input.seller,email,emailVerified:true,profileRevision:storedProfile?.revision||0,bankRevision:storedBank?.revision||0,
+ return {bankChange:await sellerBankChange(env,input),sellingReady,seller:input.seller,email,emailVerified:true,profileRevision:storedProfile?.revision||0,bankRevision:storedBank?.revision||0,
   profile:profile?{revision:profile.revision,legalName:profile.legal_name,birthDate:profile.declared_birth_date,phone:profile.phone,confirmedShippingRevision:profile.confirmed_shipping_revision}:null,
   bank:bank?{revision:bank.revision,code:bank.bank_code,accountSuffix:bank.account_number.slice(-4),channel:bank.channel}:null,
   shipping:{revision:shipping?.revision||0,pickup:pickup?{label:pickup.label,address:pickup.address,location:pickup.location,coordinate:pickup.coordinate||null}:null,returns:returns?{label:returns.label,address:returns.address,location:returns.location,coordinate:returns.coordinate||null}:null,pinsPresent:pins,confirmed:!!profile&&profile.confirmed_shipping_revision===shipping?.revision&&pins},
@@ -59,7 +62,7 @@ async function snapshot(env,input){
   requirements:[...(!profile?['legal_name_phone']:[]),...(emailChanged?['refresh_legal_profile']:[]),...(!bank?['saved_bank']:[]),...(!pins||profile?.confirmed_shipping_revision!==shipping?.revision?['confirmed_pickup_return_pins']:[]),...(!policy.minimum_age?['age_policy']:[]),...(!ageEligible?['age_declaration']:[])],providerCalls:0};
 }
 export async function sellerOnboarding(env,input){
- fields(input,['environment','seller','actor','action','revision','requestKey','legalName','birthDate','ageConfirmed','phone','bank','shippingRevision']);
+ fields(input,['environment','seller','actor','action','revision','requestKey','legalName','birthDate','ageConfirmed','phone','bank','shippingRevision','reason']);
  await walletOwner(env,input);
  if(input.action==='read')return snapshot(env,input);
  if(input.action==='profile'&&input.ageConfirmed!==true)fail('Confirm that you are 18 or older to continue.');
@@ -69,6 +72,12 @@ export async function sellerOnboarding(env,input){
  if(input.action==='bank'){
   fields(input.bank,['code','accountNumber','channel']);
   if(!/^[A-Z0-9]{4,16}$/.test(input.bank.code||'')||!/^[0-9]{1,22}$/.test(input.bank.accountNumber||'')||!['BI_FAST','ONLINE'].includes(input.bank.channel))fail('Choose a valid bank and account number.');
+  // Any existing bank, including a previous owner's bank, requires review.
+  if(await read(env,'seller_onboarding_current_bank',input.seller)){
+   const initialReplay=await env.DB.prepare('SELECT * FROM seller_onboarding_banks WHERE seller_id=? AND request_key=? AND revision=1').bind(input.seller,input.requestKey).first();
+   if(initialReplay){const hash=await commerceHash({action:input.action,revision:input.revision,owner:input.actor.id,values:[input.bank.code,input.bank.accountNumber,input.bank.channel]});if(hash!==initialReplay.request_hash)fail('This save reference was already used for different details.',409);return snapshot(env,input);}
+   await requestBankChange(env,input);return snapshot(env,input);
+  }
   values=[input.bank.code,input.bank.accountNumber,input.bank.channel];table='seller_onboarding_banks';
   sql='INSERT INTO seller_onboarding_banks(seller_id,revision,request_key,request_hash,owner_auth_id,bank_code,account_number,channel,proof_expires_at,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)';
  }else{

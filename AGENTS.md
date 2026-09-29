@@ -187,3 +187,11 @@ empty-state panels above the report data.
 ## Seller payment branding (owner, 29 September 2026)
 
 Use **Ezpay** and the supplied Ezpay logo for seller-facing payment branding. Do not expose DOKU in seller interface copy, statuses, or payment-provider display labels. Keep internal provider identifiers, integration protocols, and financial records unchanged.
+
+## Saved bank changes (owner, 29 September 2026)
+
+Once bank details exist, replacement requires an independent human review before
+activation. Preserve the active bank while pending or rejected; require fresh
+verification, a reason, established-contact and bank-ownership checks, and an
+audited staff decision. Never add immediate self-service replacement or automatic
+approval. See `docs/bank-change-review.md`.

@@ -42,7 +42,7 @@ function ez_admin_wallet_request(string $action, bool $authenticated, string $au
                 $input = json_decode($raw, true, 8, JSON_THROW_ON_ERROR);
                 $allowed = match ($action) {
                     'onboarding_read', 'onboarding_bank_read' => [], 'onboarding_profile' => ['revision','requestKey','legalName','birthDate','ageConfirmed','phone'],
-                    'onboarding_bank' => ['revision','requestKey','bank'], 'onboarding_confirm_pins' => ['revision','requestKey','shippingRevision'],
+                    'onboarding_bank' => ['revision','requestKey','bank','reason'], 'onboarding_confirm_pins' => ['revision','requestKey','shippingRevision'],
                 };
                 if (!is_array($input) || array_diff(array_keys($input), $allowed) !== []) throw new InvalidArgumentException();
                 if ($action === 'onboarding_bank') ez_withdrawal_check_bank_choice($input['bank'] ?? null);
@@ -106,6 +106,7 @@ function ez_admin_wallet_request(string $action, bool $authenticated, string $au
                 $response['onboarding']['bankSaved'] = !empty($response['onboarding']['bank']);
                 if (!$requiresWallet) {
                     $response['onboarding']['bank'] = null;
+                    $response['onboarding']['bankChange'] = null;
                     $response['onboarding']['bankRevision'] = 0;
                     $response['onboarding']['wallet'] = null;
                 }

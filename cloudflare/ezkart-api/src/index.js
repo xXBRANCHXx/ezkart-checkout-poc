@@ -1,3 +1,4 @@
+import {reviewBankChanges} from './seller-bank-changes.js';
 import {sellerAlerts,sellerAlertRescan,sellerOnboardingStatus} from './seller-alerts.js';
 import {jevEvidenceImage,importJevEvaluation,jevPageHeld,jevPages,jevList,jevDetail,createJevReview,runJevReview,gradeJevReview,restoreJevPage} from './jev-reviews.js';
 import {putJevPage,beginJevPageWrite,finishJevPageWrite} from './jev-page-state.js';
@@ -1924,6 +1925,12 @@ export default {
         if(target&&!target[2]&&request.method==='GET')return json({ok:true,...await readTreasury(env,user,target[1])},200,cors);
         if(target&&target[2]&&request.method==='POST')return json({ok:true,...await cancelTreasury(env,user,target[1],await reviewRequestJson(request,2000,parseMessageJSON))},200,cors);
         return json({ok:false,error:'Treasury route or method is unavailable.'},404,cors);
+      }
+      const bankReview=/^\/v1\/support\/bank-changes(?:\/(bcr_[a-f0-9]{32}))?$/.exec(url.pathname);
+      if(bankReview){
+        if(url.search||!['GET','POST'].includes(request.method)||request.method==='POST'&&!bankReview[1])return json({ok:false,error:'Invalid bank review request.'},422,cors);
+        const actor=await supportActor(env,await authenticatedUser(request,env,true));
+        return json({ok:true,...await reviewBankChanges(env,actor,bankReview[1],request.method==='POST'?await requestJson(request,4000):undefined)},200,cors);
       }
       if(url.pathname==='/v1/support/session'){
         const user=await authenticatedUser(request,env,true);
