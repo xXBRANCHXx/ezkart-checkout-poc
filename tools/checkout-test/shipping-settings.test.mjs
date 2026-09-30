@@ -150,6 +150,11 @@ test('shipping address autofill uses the main fields, deduplicates change events
     await page.locator('[data-shipping-edit]').first().click();
     const dialog=page.locator('[data-shipping-address-dialog]');
     assert.equal(await dialog.locator('.address-picker-query, [data-find]').count(),0);
+    assert.equal(await dialog.locator('textarea[name=address]').count(),1);
+    const layout=await dialog.evaluate(e=>({width:e.getBoundingClientRect().width,mapHeight:e.querySelector('.address-picker-map').getBoundingClientRect().height,fieldLeft:e.querySelector('.shipping-fields').getBoundingClientRect().left,mapLeft:e.querySelector('.shipping-location-panel').getBoundingClientRect().left}));
+    assert(layout.width>=Math.min(1100,width-20),'The address editor uses the available screen width.');
+    assert(layout.mapHeight>= (width>980?400:300),'The map has enough height to position an entrance.');
+    if(width>980)assert(layout.mapLeft>layout.fieldLeft,'Fields and map are visible side by side on desktop.');
     await dialog.locator('.address-picker-loading').waitFor({state:'hidden'});
     await page.waitForTimeout(1250);
     assert.equal(payloads.length,0,'Opening a saved address keeps its existing entrance instead of running another search.');
