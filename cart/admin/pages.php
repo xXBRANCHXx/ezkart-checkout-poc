@@ -129,8 +129,10 @@ function ez_orders_table(array $rows, string $tableId, string $csrfToken, string
                 <div class="variant-filter-chips" data-variant-filter-chips></div>
                 <div class="variant-batch-fields"><span data-variant-selected-count>0 selected</span><label><span>Price</span><input type="number" min="1000" step="500" placeholder="No change" data-batch-price></label><label data-batch-physical><span>Stock</span><input type="number" min="0" max="999999" placeholder="No change" data-batch-stock></label><label data-batch-physical><span>Weight (g)</span><input type="number" min="1" max="50000" placeholder="No change" data-batch-weight></label><button class="ui-button" type="button" data-apply-variant-batch data-ui-icon="check">Apply to selected</button><button class="ui-button" type="button" data-clear-variant-selection data-ui-icon="x">Clear</button></div>
               </div>
-              <header><span class="product-variant-group-heading"><input type="checkbox" data-select-all-variants aria-label="Select all variants"><b data-variant-group-heading>Flavor</b></span><span data-variant-column-title>Size</span><span>Price</span><span data-variant-stock-heading>Stock</span><span data-variant-weight-heading>Weight</span><span data-variant-billing-heading hidden>Billing</span><span>SKU</span><span></span></header>
-              <div data-product-variant-rows></div>
+              <div class="product-variant-scroll" tabindex="0" role="region" aria-label="Variant pricing and availability">
+                <header><span class="product-variant-group-heading"><input type="checkbox" data-select-all-variants aria-label="Select all variants"><b data-variant-group-heading>Flavor</b></span><span data-variant-column-title>Size</span><span>Price</span><span data-variant-stock-heading>Stock</span><span data-variant-weight-heading>Weight</span><span data-variant-billing-heading hidden>Billing</span><span>SKU</span><span></span></header>
+                <div data-product-variant-rows></div>
+              </div>
             </div>
             <p class="product-variant-help" data-variant-help>Every row remains part of this product. Physical variants carry their own stock and shipping weight. Images are shared by the first option group.</p>
           </div>
