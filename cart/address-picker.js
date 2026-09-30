@@ -23,6 +23,7 @@
     const query = $("input"), status = $(".address-picker-status"), results = $("ul"), canvas = $(".address-picker-map"), loading = $(".address-picker-loading");
     $(".address-picker-frame").before(results);
     const overview = { latitude: -2.5, longitude: 118 };
+    const pinZoom = 18.5;
     let map, mapReady, ready = false, active = false, coordinate = null, confirmed = false, positioning = false, controller, autoTimer, sequence = 0, generation = 0, searching = false, lookupSource = "fields", manualMove = false;
     const closeEnough = () => ready && loading.hidden && map.getZoom() >= 16;
     function updateHint() {
@@ -44,7 +45,7 @@
       }
       manualMove = false; updateHint();
     }
-    async function showMap(initial, zoom = 17) {
+    async function showMap(initial, zoom = pinZoom) {
       const version = ++generation;
       loading.hidden = false; loading.textContent = "Loading map…"; updateHint();
       try {
@@ -58,10 +59,19 @@
           map.on("movestart", event => { if (/^Arrow/.test(event.originalEvent?.key || "")) { manualMove = true; cancelSearch(); } });
           map.on("moveend", chooseCenter);
           mapReady = new Promise((resolve, reject) => {
-            const failed = event => { if (!ready && !event.tile) { clearTimeout(timeout); reject(new Error("Map data is unavailable")); } };
-            const timeout = setTimeout(() => reject(new Error("Map loading timed out")), 20000);
+            let timeout;
+            const cleanup = () => { clearTimeout(timeout); document.removeEventListener("visibilitychange", visible); };
+            const visible = () => { if (!document.hidden) { document.removeEventListener("visibilitychange", visible); timeout = setTimeout(expire, 20000); } };
+            const expire = () => {
+              // Chrome pauses map rendering in a background tab. Give it time to
+              // render after returning instead of rejecting healthy map data.
+              if (document.hidden) { document.addEventListener("visibilitychange", visible); return; }
+              cleanup(); reject(new Error("Map loading timed out"));
+            };
+            const failed = event => { if (!ready && !event.tile) { cleanup(); reject(new Error("Map data is unavailable")); } };
+            timeout = setTimeout(expire, 20000);
             map.on("error", failed);
-            map.once("load", () => { clearTimeout(timeout); map.off("error", failed); ready = true; resolve(); });
+            map.once("load", () => { cleanup(); map.off("error", failed); ready = true; resolve(); });
           });
         }
         await mapReady;
@@ -73,7 +83,7 @@
         map?.remove(); map = null; mapReady = null; ready = false;
         loading.textContent = "The map is unavailable. You can still save your address.";
         const retry = document.createElement("button"); retry.type = "button"; retry.textContent = "Retry map";
-        retry.addEventListener("click", () => void showMap(coordinate || overview, coordinate ? 17 : 4));
+        retry.addEventListener("click", () => void showMap(coordinate || overview, coordinate ? pinZoom : 4));
         loading.append(retry); updateHint();
       }
     }
@@ -120,7 +130,7 @@
           else {
             credit(places[0]);
             status.textContent = places.some(precise) ? "Choose the matching building below. Several results or an incomplete match need your selection." : "Only approximate locations were found. No delivery pin selected. Search for a building or a more specific address.";
-            void showMap(places[0].coordinate, places[0].precision === "area" ? 11 : places[0].precision === "street" || places[0].precision === "interpolated" ? 14 : 17);
+            void showMap(places[0].coordinate, places[0].precision === "area" ? 11 : places[0].precision === "street" || places[0].precision === "interpolated" ? 14 : pinZoom);
           }
           if (places.length > 1 || automatic.length !== 1) {
             for (const place of places) {
@@ -150,7 +160,7 @@
         generation++; cancelSearch(); active = true; manualMove = false; coordinate = valid(address.coordinate) ? { ...address.coordinate } : null; confirmed = !!coordinate;
         lookupSource = "fields"; query.value = "";
         status.textContent = coordinate ? "Your saved delivery pin. Move the map to adjust the entrance." : "Enter your address and we’ll find it on the map.";
-        void showMap(coordinate || overview, coordinate ? 17 : 4);
+        void showMap(coordinate || overview, coordinate ? pinZoom : 4);
         if (!coordinate && options.addressText().length >= 8) schedule("fields");
       },
       addressChanged({ invalidate = true } = {}) {

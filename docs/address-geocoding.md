@@ -99,3 +99,10 @@ entrances or evidence of complete Indonesian address coverage.
 The private index was activated on Workbench after the hosted record-file size
 and all 4,096 token-shard sizes were checked; eight sampled shard SHA-256 hashes
 matched the local data. Health reported `engine=ezkart` and `index_ready=true`.
+
+
+Matched and saved pins open at zoom 18.5 (maximum 19), with the mapped coordinate
+at the center. Background tabs defer the map-rendering timeout until visible;
+a regression check covers delayed loading and return to the tab. The real hosted
+style, tile metadata and map tiles were also checked in a visible test browser,
+with a rendered building pin and no map errors.

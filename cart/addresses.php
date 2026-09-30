@@ -14,7 +14,7 @@ header('X-Content-Type-Options: nosniff');
   <link rel="stylesheet" href="payment.css?v=2">
   <link rel="stylesheet" href="vendor/maplibre/maplibre-gl.css?v=5.24.0">
   <link rel="stylesheet" href="customer-addresses.css?v=4">
-  <script src="address-picker.js?v=3" defer></script>
+  <script src="address-picker.js?v=4" defer></script>
   <script src="customer-addresses.js?v=5" defer></script>
   <script src="addresses.js?v=1" defer></script>
   <title>Delivery addresses · Ezkart</title>

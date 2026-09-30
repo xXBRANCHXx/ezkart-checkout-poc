@@ -105,3 +105,22 @@ test('desktop and phone address forms expose approximate results without creatin
     assert.deepEqual(book.addresses.find(a=>a.label==='Selected building '+width).coordinate,{latitude:-6.196,longitude:106.823});
   }
 });
+
+test('a hidden tab can finish map loading after returning without a false unavailable state',async t=>{
+  const f=await fixture(t);
+  const {chromium}=await import('../builder-mcp/node_modules/playwright/index.mjs');
+  const browser=await chromium.launch({headless:true});t.after(()=>browser.close());
+  const page=await browser.newPage();await page.context().addCookies([f.customerCookie()]);
+  await page.clock.install();
+  await page.addInitScript(()=>{window.testHidden=true;Object.defineProperty(document,'hidden',{get:()=>window.testHidden});});
+  let mapStyle;let announce;const requested=new Promise(resolve=>announce=resolve);
+  await page.route('**/tracking-map-style.json?*',route=>{mapStyle=route;announce();});
+  await page.goto(f.base+'/cart/addresses.php?new=1');await requested;
+  await page.clock.fastForward(25000);
+  const loading=page.getByRole('dialog').locator('.address-picker-loading');
+  assert.equal(await loading.innerText(),'Loading map…');
+  await page.evaluate(()=>{window.testHidden=false;document.dispatchEvent(new Event('visibilitychange'));});
+  await mapStyle.fulfill({json:{version:8,sources:{},layers:[{id:'background',type:'background',paint:{'background-color':'#eef1f4'}}]}});
+  await loading.waitFor({state:'hidden'});
+  assert.equal(await page.getByRole('button',{name:'Retry map',exact:true}).count(),0);
+});

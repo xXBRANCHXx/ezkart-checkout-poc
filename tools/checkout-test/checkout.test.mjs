@@ -1723,7 +1723,7 @@ test("address maps open immediately, auto-locate pasted details and remain optio
     await editor.getByLabel('Full address', { exact: true }).fill(raw);
     await editor.getByLabel('District / city', { exact: true }).fill('Yogyakarta');
     await editor.getByLabel('Postcode', { exact: true }).fill('55271');
-    await page.waitForFunction(() => Math.abs(deliveryMapUnderTest.getCenter().lat + 7.7892387) < 1e-9 && deliveryMapUnderTest.getZoom() === 17);
+    await page.waitForFunction(() => Math.abs(deliveryMapUnderTest.getCenter().lat + 7.7892387) < 1e-9 && deliveryMapUnderTest.getZoom() === 18.5);
     assert.equal(await editor.getByLabel('Full address', { exact: true }).inputValue(), raw, 'Automatic lookup preserves the customer’s written details.');
     assert.equal(await editor.locator('.address-picker-pin').isVisible(), true);
     await editor.getByRole('button', { name: 'Save address', exact: true }).click();
@@ -1898,7 +1898,7 @@ test("unmatched addresses can be positioned during creation and failed saves ret
   await editor.locator('.address-picker-loading').waitFor({ state: 'hidden' });
   const zoom = await page.evaluate(() => deliveryMapUnderTest.getZoom());
   await editor.getByRole('button', { name: 'Zoom in', exact: true }).click();
-  assert.equal(await page.evaluate(() => deliveryMapUnderTest.getZoom()), zoom + 1);
+  assert.equal(await page.evaluate(() => deliveryMapUnderTest.getZoom()), Math.min(19, zoom + 1));
   await editor.getByLabel('Full address', { exact: true }).fill('Unnamed entrance beside the station');
   await editor.getByLabel('District / city', { exact: true }).fill('Yogyakarta');
   await editor.getByLabel('Postcode', { exact: true }).fill('55271');
