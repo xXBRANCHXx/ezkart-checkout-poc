@@ -52,7 +52,7 @@ function ez_tracking_geocoder_search(string $query, array $components = [], ?str
     // Structured form searches constrain street, house number and locality independently.
     if ($components && $parts['street'] !== '' && ($parts['city'] !== '' || !empty($parts['county']) || $parts['postcode'] !== '')) {
         $path = 'structured';
-        $parameters = array_filter(array_diff_key($parts, ['localities' => true]), static fn($value) => $value !== '') + ['limit' => 5, 'countrycode' => 'ID', 'lang' => 'en'];
+        $parameters = array_filter(array_diff_key($parts, ['localities' => true, 'streets' => true]), static fn($value) => $value !== '') + ['limit' => 5, 'countrycode' => 'ID', 'lang' => 'en'];
     }
     $directory = dirname(ez_order_directory('sandbox')) . '/tracking-addresses';
     if (!is_dir($directory) && !@mkdir($directory, 0700, true) && !is_dir($directory)) throw new RuntimeException('Address cache unavailable.');

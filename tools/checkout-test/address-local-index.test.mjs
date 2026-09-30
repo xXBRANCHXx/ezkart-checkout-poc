@@ -28,6 +28,7 @@ test('self-hosted PHP lookup returns the mapped building and local district with
   assert.deepEqual(response.data.results[0].coordinate,coordinates);
   assert.equal(response.data.results[0].auto_select,true);
   assert.equal(response.data.results[0].provider,'ezkart');
+  const named=await f.search('Delivery building, Jakarta');assert.equal(named.data.results[0].auto_select,true);assert.deepEqual(named.data.results[0].coordinate,coordinates);
   assert.equal(f.cli('require '+JSON.stringify(join(process.cwd(),'cart/api/address-local-index.php'))+'; echo ez_local_geocoder_available() ? "yes" : "no";'),'yes');
   assert(!(await f.calls()).some(c=>/photon|hereapi|googleapis/.test(c.url)));
 });
@@ -57,4 +58,19 @@ test('corrupt active map data does not silently fall back to the public demo',as
   await writeFile(join(f.index,'manifest.json'),'{broken');
   assert.equal((await f.search('Jalan Teluk Betung 12, Jakarta')).status,503);
   assert(!(await f.calls()).some(c=>c.url.includes('photon')));
+});
+
+
+test('street-prefix variants and missing postcodes do not hide another matching building',async t=>{
+  const f=await indexedFixture(t,[record(),record({osm:'N126',coordinate:{latitude:-6.196,longitude:106.822},properties:{...record().properties,street:'Teluk Betung',postcode:''}})]);
+  for(const address of ['Jalan Teluk Betung 12, Jakarta, 10230','Teluk Betung No. 12, Jakarta, 10230']) {
+    const found=await f.search(address);assert.equal(found.status,200);assert.equal(found.data.results.length,2);assert(found.data.results.every(r=>!r.auto_select));
+  }
+});
+
+
+test('structured fields retain mapped block identifiers and commas inside street metadata',async t=>{
+  const examples=[['Jalan Cemerlang, Kp. Tegalwangi RT 04 RW 02 Gang Haji Moch. Zein','13-15'],['Jalan Sinar Mas Land Boulevard','Blok H No. 7'],['Jalan Wonogiri - Ponorogo','Keringan RT01 / RW01']];
+  const f=await indexedFixture(t,examples.map(([street,housenumber],i)=>record({osm:'N'+(200+i),properties:{...record().properties,street,housenumber}})));
+  for(const [street,housenumber] of examples){const components={address:street+' No. '+housenumber,location:'Jakarta',postalCode:'10230'};const found=await f.search(Object.values(components).join(', '),components);assert.equal(found.status,200);assert.equal(found.data.results.length,1);assert.equal(found.data.results[0].auto_select,true);assert.deepEqual(found.data.results[0].coordinate,coordinates);}
 });

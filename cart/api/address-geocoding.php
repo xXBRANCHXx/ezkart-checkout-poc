@@ -24,6 +24,11 @@ function ez_geocode_normalize(string $text): string
     return trim(preg_replace('/[^\p{L}\p{N}]+/u', ' ', $text));
 }
 
+function ez_geocode_street_normalize(string $text): string
+{
+    return preg_replace('/^jalan\s+/u', '', ez_geocode_normalize($text));
+}
+
 /** Parse common Indonesian street/number notation, retaining independent locality constraints. */
 function ez_geocode_parts(string $query, array $components = []): array
 {
@@ -41,6 +46,20 @@ function ez_geocode_parts(string $query, array $components = []): array
         }
         $parts['street'] = 'Jalan ' . trim($line);
         break;
+    }
+    if ($parts['street'] === '' && preg_match('/^(.+?)\s+no(?:mor)?\.?\s*(\d+[a-z]?(?:\s*[-\/]\s*\d+[a-z]?)?)\s*$/iu', $segments[0], $number)) {
+        $parts['street'] = trim($number[1]);
+        $parts['housenumber'] = preg_replace('/\s+/', '', $number[2]);
+    }
+    $parts['streets'] = $parts['street'] !== '' ? [$parts['street']] : [];
+    // Independent form fields let us retain mapped block identifiers and street
+    // metadata containing commas, without mistaking city text for a house number.
+    if (isset($components['address']) && preg_match('/^(.+?)\s+no(?:mor)?\.?\s*(\S.{0,39})$/iu', trim($address), $literal) && !str_contains($literal[2], ',')) {
+        $house = trim($literal[2]);
+        if (preg_match('/^\d/u', $house)) $house = trim(preg_replace('/\s+(?:RT|RW)\.?\s*\d.*$/iu', '', $house));
+        $parts['street'] = preg_replace('/^(?:jl\.?|jln\.?|jalan)\s+/iu', 'Jalan ', trim($literal[1]));
+        $parts['housenumber'] = $house;
+        $parts['streets'] = array_values(array_unique([$parts['street'], ...$parts['streets']]));
     }
     $locality = $components['location'] ?? implode(', ', array_slice($segments, 1));
     $locality = preg_replace('/\b\d{5}\b|\bIndonesia\b/iu', '', $locality);
@@ -75,7 +94,7 @@ function ez_geocode_photon_result(array $feature, array $parts): ?array
         if (!$matches) return null;
         $localityMatch = true;
     }
-    $streetMatch = $parts['street'] !== '' && ez_geocode_normalize($parts['street']) === ez_geocode_normalize($clean('street') ?: $clean('name'));
+    $streetMatch = $parts['street'] !== '' && ez_geocode_street_normalize($parts['street']) === ez_geocode_street_normalize($clean('street') ?: $clean('name'));
     $numberMatch = $parts['housenumber'] !== '' && ez_geocode_normalize($parts['housenumber']) === ez_geocode_normalize($clean('housenumber'));
     $type = $clean('type');
     $precision = $type === 'house' ? ($clean('housenumber') !== '' ? 'address' : 'place') : ($type === 'street' ? 'street' : 'area');
