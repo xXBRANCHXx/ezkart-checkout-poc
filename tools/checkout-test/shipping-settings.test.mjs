@@ -67,7 +67,7 @@ test('merchant shipping saves addresses and courier choices with mobile review a
   await f.open();await page.locator('[data-shipping-add]').click();
   const fields={label:'Returns desk',name:'Return Contact',phone:'081234567899',email:'returns@example.test',organization:'Return Company',address:'Jalan Return Warehouse 21',location:'Jakarta Selatan',postalCode:'12345',note:'Use the rear entrance'};
   for(const [name,value] of Object.entries(fields))await page.locator(`[data-shipping-address-form] [name="${name}"]`).fill(value);
-  await page.locator('.address-picker-query').fill('-6.2, 106.8');await page.locator('[data-find]').click();await page.waitForFunction(()=>document.querySelector('.address-picker-status').textContent.includes('Suggested location')&&document.querySelector('.address-picker-loading').hidden);
+  assert.equal(await page.locator('.address-picker-query, [data-find]').count(),0);await page.waitForFunction(()=>document.querySelector('.address-picker-status').textContent.includes('Suggested location')&&document.querySelector('.address-picker-loading').hidden);
   await page.locator('[data-shipping-confirm-pin]').click();await page.waitForFunction(()=>document.querySelector('.address-picker-status').textContent.includes('Entrance confirmed'));
   await f.shot('shipping-address-1360');await page.setViewportSize({width:390,height:940});await page.waitForFunction(()=>document.querySelector('.sidebar').getBoundingClientRect().right<=1);assert.equal(await page.locator('[data-shipping-address-dialog]').evaluate(e=>e.scrollWidth<=e.clientWidth+1),true);await f.shot('shipping-address-390');await page.setViewportSize({width:1360,height:980});
   await page.getByRole('button',{name:'Use this address',exact:true}).click();assert.equal(await page.locator('[data-shipping-edit]').count(),2);
@@ -114,7 +114,7 @@ test('unavailable map data cannot confirm a suggested pin and still permits a st
   });
   await f.open();await page.locator('[data-shipping-add]').click();
   for(const [name,value] of Object.entries({label:'Standard pickup',name:'Warehouse Contact',phone:'081234567891',address:'Jalan Standard Warehouse 1',location:'Jakarta',postalCode:'12345'}))await page.locator(`[data-shipping-address-form] [name="${name}"]`).fill(value);
-  await page.locator('.address-picker-query').fill('-6.2,106.8');await page.locator('[data-find]').click();
+  await page.locator('.address-picker-status').filter({hasText:'Suggested location'}).waitFor();
   await page.waitForFunction(()=>document.querySelector('.address-picker-loading').textContent.includes('unavailable'));
   await page.locator('[data-shipping-confirm-pin]').click();assert.equal(await page.locator('[data-shipping-address-error]').isVisible(),true);
   await page.getByRole('button',{name:'Use this address',exact:true}).click();await page.locator('[data-shipping-save]').click();await page.locator('[data-shipping-confirm]').click();await page.waitForFunction(()=>!document.querySelector('[data-shipping-review]').open);
@@ -131,4 +131,52 @@ test('pickup checkout excludes drop-off-only rates and held shipping makes no ra
  const held=await setupCentralFixture(t,{EZKART_COMMERCE_FULFILLMENT:'held'});
  assert.equal((await held.app.request('/cart/api/rates.php',{cart:{tea:2},postal_code:'12345'})).status,503);
  assert.equal((await held.app.request('/cart/api/start.php',input())).status,503);assert.equal((await rates(held)).length,0);assert.equal((await held.providerCalls()).length,0);assert.equal(await held.count('orders'),0);
+});
+
+
+test('shipping address autofill uses the main fields, deduplicates change events and preserves a saved pin until the address changes',async t=>{
+  const f=await browserFixture(t),{page}=f,payloads=[];
+  const coordinate={latitude:-6.22,longitude:106.82};
+  await save(f,{...shippingConfiguration,addresses:[{...shippingAddress,coordinate}]});
+  const saved=await read(f);
+  await page.route('**/cart/admin/?cloud=*',async route=>{
+    if(new URL(route.request().url()).searchParams.get('cloud')==='/v1/shipping-address-search'){
+      payloads.push(route.request().postDataJSON());
+      await route.fulfill({json:{ok:true,results:[{precision:'address',auto_select:true,name:'Matched warehouse',provider:'ezkart',coordinate:{latitude:-6.2,longitude:106.8}}]}});
+    }else await route.continue();
+  });
+  for(const width of [1360,390]){
+    await page.setViewportSize({width,height:940});await f.open();
+    await page.locator('[data-shipping-edit]').first().click();
+    const dialog=page.locator('[data-shipping-address-dialog]');
+    assert.equal(await dialog.locator('.address-picker-query, [data-find]').count(),0);
+    await dialog.locator('.address-picker-loading').waitFor({state:'hidden'});
+    await page.waitForTimeout(1250);
+    assert.equal(payloads.length,0,'Opening a saved address keeps its existing entrance instead of running another search.');
+    assert.match(await dialog.locator('.address-picker-status').innerText(),/saved delivery pin/);
+    const fields={address:'Jl. Teluk Betung No. 12',location:'Jakarta',postalCode:'10230'};
+    await page.locator('[data-shipping-address-form]').evaluate((form,fields)=>{
+      for(const [name,value] of Object.entries(fields)){
+        form.elements[name].value=value;
+        form.elements[name].dispatchEvent(new Event('change',{bubbles:true}));
+      }
+    },fields);
+    await dialog.locator('.address-picker-status').filter({hasText:'Suggested location'}).waitFor();
+    await dialog.locator('.address-picker-loading').waitFor({state:'hidden'});
+    assert.equal(payloads.length,1);
+    assert.deepEqual(payloads[0].components,fields);
+    assert.equal(payloads[0].address,Object.values(fields).join(', '));
+    await page.locator('[data-shipping-confirm-pin]').click();
+    // Browsers can send change on blur after already sending input/autofill events.
+    await page.locator('[data-shipping-address-form] [name=address]').dispatchEvent('change');
+    await page.waitForTimeout(1250);
+    assert.equal(payloads.length,1);
+    assert.match(await dialog.locator('.address-picker-status').innerText(),/Entrance confirmed/);
+    assert.equal(await dialog.evaluate(e=>e.scrollWidth<=e.clientWidth+1),true);
+    await f.shot('shipping-autofill-'+width);
+    await dialog.getByRole('button',{name:'Cancel',exact:true}).click();
+    assert.deepEqual(await read(f),saved,'Cancelling a lookup leaves the stored address and entrance unchanged.');
+    payloads.length=0;
+  }
+  assert.deepEqual(f.errors,[]);
 });

@@ -4,6 +4,10 @@ Ezkart's own PHP geocoder searches an index built from free Indonesian
 OpenStreetMap data. It runs inside the existing PHP hosting, with no Java or
 PostgreSQL process, SQLite extension, external geocoding account or subscription.
 The customer address book and seller pickup/return editor share the lookup.
+Both automatically search from the main street address, city and postcode fields
+after typing or autofill settles. There is no separate finder input or search
+button. Opening an existing address preserves its saved entrance; changing its
+address fields starts a new lookup.
 
 The old picker automatically selected Photon's first result, including street
 and district centers, and displayed all of them at building zoom. It discarded

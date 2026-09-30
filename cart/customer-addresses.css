@@ -47,11 +47,6 @@
 .address-picker { margin-top: 22px; }
 .address-picker-heading { display: flex; align-items: center; gap: 9px; margin-bottom: 12px; font-size: 13px; }
 .address-picker-heading span { font-size: 11px; font-weight: 400; color: #65758a; }
-.address-picker-label { display: block; color: #182b45; font-size: 12px; font-weight: 500; }
-.address-picker-query { display: block; box-sizing: border-box; width: 100%; padding: 11px; margin-top: 7px; border: 1px solid #cdd8e5; border-radius: 7px; background: #fff; color: #182b45; font: inherit; font-size: 14px; }
-.address-picker-actions { display: flex; gap: 8px; margin-top: 9px; }
-.address-picker-actions button { border: 1px solid #cdd8e5; border-radius: 7px; background: #fff; padding: 9px 12px; color: #182b45; font: inherit; font-size: 12px; cursor: pointer; }
-.address-picker-actions [data-find] { background: #182b45; color: #fff; border-color: #182b45; }
 .address-picker-results { max-height: 150px; overflow-y: auto; list-style: none; padding: 0; display: grid; gap: 7px; }
 .address-picker-results button { width: 100%; padding: 11px; text-align: left; border: 1px solid #dce4ed; border-radius: 8px; color: #182b45; background: #fff; font: inherit; cursor: pointer; }
 .address-picker-results button:hover { background: #f4f7fa; }
@@ -83,6 +78,6 @@
   .address-book-default { grid-column: 2; }
   .address-picker-map { height: 360px; }
 }
-@media(max-width:600px) { .address-picker-query { font-size: 16px; } .address-picker-map { height: 300px; } }
+@media(max-width:600px) { .address-picker-map { height: 300px; } }
 
 .address-picker-loading button { display: block; margin: 12px auto 0; padding: 9px 12px; border: 1px solid #cdd8e5; border-radius: 7px; background: #fff; color: #182b45; font: inherit; cursor: pointer; }

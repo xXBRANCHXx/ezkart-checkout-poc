@@ -29,13 +29,15 @@
       },
       onPin: () => { pinFields = readFields(); },
     });
-    form.addEventListener("input", event => {
+    const addressChanged = event => {
       const key = event.target.name;
       if (geoFields.includes(key) && event.target.value.trim() !== (pinFields[key] || "")) {
         pickerMap.addressChanged({ invalidate: Boolean(pinFields[key]) });
         pinFields = readFields();
       }
-    });
+    };
+    form.addEventListener("input", addressChanged);
+    form.addEventListener("change", addressChanged);
     form.addEventListener("focusin", event => {
       if (!event.target.matches("input, textarea, select")) return;
       const footer = form.querySelector(".address-book-dialog-actions").getBoundingClientRect();

@@ -72,6 +72,7 @@ test('desktop and phone address forms expose approximate results without creatin
     });
     await page.goto(f.base+'/cart/addresses.php?new=1');
     const editor=page.getByRole('dialog');
+    assert.equal(await editor.locator('.address-picker-query, [data-find]').count(),0);
     await editor.getByLabel('Full address',{exact:true}).fill(components.address);
     await editor.getByLabel('District / city',{exact:true}).fill(components.location);
     await editor.getByLabel('Postcode',{exact:true}).fill(components.postalCode);
@@ -87,7 +88,7 @@ test('desktop and phone address forms expose approximate results without creatin
     assert.equal(await editor.getByLabel('Full address',{exact:true}).inputValue(),components.address);
     await page.unroute('**/api/address-search.php');
     await page.route('**/api/address-search.php',route=>route.fulfill({json:{ok:true,results:[{name:'Building A',address_line:components.address,location:components.location,postalCode:components.postalCode,precision:'address',auto_select:false,coordinate:point},{name:'Building B',precision:'address',auto_select:false,coordinate:{latitude:-6.196,longitude:106.823}}]}}));
-    await editor.getByRole('button',{name:'Find address',exact:true}).click();
+    await editor.getByLabel('Full address',{exact:true}).fill('Jalan Teluk Betung No. 12');
     await editor.getByRole('button',{name:/Building A/}).waitFor();
     assert.equal(await editor.locator('.address-picker-pin').isVisible(),false);
     await editor.getByRole('button',{name:/Building B/}).click();

@@ -18,13 +18,13 @@
   }
   window.ezkartAddressPicker = (container, options) => {
     container.className = "address-picker";
-    container.innerHTML = '<div class="address-picker-heading"><strong>Delivery location</strong><span>Optional</span></div><label class="address-picker-label">Find your address<input type="search" class="address-picker-query" placeholder="Street, city, Plus Code, or coordinates" maxlength="500" autocomplete="off"></label><div class="address-picker-actions"><button type="button" data-find>Find address</button></div><p class="address-picker-status" role="status">Enter your address and we’ll find it on the map.</p><div class="address-picker-frame"><div class="address-picker-map" role="region" aria-label="Position your delivery entrance"></div><div class="address-picker-loading" role="status">Loading map…</div><div class="address-picker-hint">Enter your address to find its location</div><span class="address-picker-pin" aria-hidden="true" hidden>' + pin + '</span><div class="address-picker-zoom"><button type="button" data-zoom="1" aria-label="Zoom in">+</button><button type="button" data-zoom="-1" aria-label="Zoom out">−</button></div></div><ul class="address-picker-results" hidden></ul><p class="address-picker-credit">Address search: Ezkart · <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© OpenStreetMap</a></p>';
+    container.innerHTML = '<div class="address-picker-heading"><strong>Delivery location</strong><span>Optional</span></div><p class="address-picker-status" role="status">Enter your address and we’ll find it on the map.</p><div class="address-picker-frame"><div class="address-picker-map" role="region" aria-label="Position your delivery entrance"></div><div class="address-picker-loading" role="status">Loading map…</div><div class="address-picker-hint">Enter your address to find its location</div><span class="address-picker-pin" aria-hidden="true" hidden>' + pin + '</span><div class="address-picker-zoom"><button type="button" data-zoom="1" aria-label="Zoom in">+</button><button type="button" data-zoom="-1" aria-label="Zoom out">−</button></div></div><ul class="address-picker-results" hidden></ul><p class="address-picker-credit">Address search: Ezkart · <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© OpenStreetMap</a></p>';
     const $ = selector => container.querySelector(selector);
-    const query = $("input"), status = $(".address-picker-status"), results = $("ul"), canvas = $(".address-picker-map"), loading = $(".address-picker-loading");
+    const status = $(".address-picker-status"), results = $("ul"), canvas = $(".address-picker-map"), loading = $(".address-picker-loading");
     $(".address-picker-frame").before(results);
     const overview = { latitude: -2.5, longitude: 118 };
     const pinZoom = 18.5;
-    let map, mapReady, ready = false, active = false, coordinate = null, confirmed = false, positioning = false, controller, autoTimer, sequence = 0, generation = 0, searching = false, lookupSource = "fields", manualMove = false;
+    let map, mapReady, ready = false, active = false, coordinate = null, confirmed = false, positioning = false, controller, autoTimer, sequence = 0, generation = 0, searching = false, addressKey = "", manualMove = false;
     const closeEnough = () => ready && loading.hidden && map.getZoom() >= 16;
     function updateHint() {
       $(".address-picker-pin").hidden = !valid(coordinate) || !closeEnough();
@@ -32,7 +32,7 @@
     }
     function cancelSearch() {
       clearTimeout(autoTimer); sequence++; controller?.abort(); searching = false;
-      results.hidden = true; results.replaceChildren(); $("[data-find]").disabled = false;
+      results.hidden = true; results.replaceChildren();
     }
     function chooseCenter() {
       if (!active || positioning || !ready || !loading.hidden) return;
@@ -92,22 +92,23 @@
       const node = $(".address-picker-credit");
       node.innerHTML = place.provider !== "photon" ? 'Address search: Ezkart · <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© OpenStreetMap</a>' : 'Address search: <a href="https://photon.komoot.io/" target="_blank" rel="noopener noreferrer">Photon</a> · <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© OpenStreetMap</a>';
     }
-    function choose(place, preserveAddress = false) {
+    function choose(place) {
       cancelSearch(); credit(place);
       if (!precise(place)) {
         coordinate = null; confirmed = false;
-        status.textContent = "Only an approximate area was found. No delivery pin selected. Search for the building or position its entrance.";
+        status.textContent = "Only an approximate area was found. No delivery pin selected. Add the building address above or position its entrance.";
         void showMap(place.coordinate, place.precision === "area" ? 11 : 14);
         return;
       }
       coordinate = { ...place.coordinate }; confirmed = false;
-      options.onPlace(place, { preserveAddress }); options.onPin?.();
+      options.onPlace(place, { preserveAddress: true }); addressKey = keyFor(); options.onPin?.();
       status.textContent = "Suggested location. Move the map if the entrance is elsewhere.";
       void showMap(coordinate);
     }
-    const textFor = source => source === "fields" ? options.addressText() : query.value.trim() || options.addressText();
-    async function search({ source = lookupSource } = {}) {
-      const text = textFor(source);
+    const textFor = () => options.addressText().trim();
+    const keyFor = () => JSON.stringify(options.addressFields?.() || textFor());
+    async function search() {
+      const text = textFor();
       cancelSearch();
       if (text.length < 3 || text.length > 500) {
         status.textContent = "Enter a street and city, Plus Code, or coordinates.";
@@ -117,56 +118,55 @@
       controller = new AbortController(); const requestController = controller;
       const timer = setTimeout(() => requestController.abort(), 12000);
       searching = true;
-      $("[data-find]").disabled = true; status.textContent = "Locating your address…";
+      status.textContent = "Locating your address…";
       try {
-        const response = await fetch(options.endpoint || "/cart/api/address-search.php", { method: "POST", cache: "no-store", headers: { "Content-Type": "application/json", "X-Ezkart-CSRF": options.csrf() }, body: JSON.stringify({ address: text, ...(source === "fields" && options.addressFields ? { components: options.addressFields() } : {}) }), signal: requestController.signal });
+        const response = await fetch(options.endpoint || "/cart/api/address-search.php", { method: "POST", cache: "no-store", headers: { "Content-Type": "application/json", "X-Ezkart-CSRF": options.csrf() }, body: JSON.stringify({ address: text, ...(options.addressFields ? { components: options.addressFields() } : {}) }), signal: requestController.signal });
         const data = await response.json();
         if (request !== sequence || !active) return;
         if (!response.ok || !data.ok || !Array.isArray(data.results)) throw new Error(response.status === 401 ? "Please sign in again to search for an address." : data.error || "Address search is unavailable. You can still save your address.");
         const places = data.results.filter(place => valid(place.coordinate));
         if (places.length) {
           const automatic = places.filter(place => place.auto_select === true || (place.auto_select === undefined && place.resolved === true && places.length === 1));
-          if (automatic.length === 1 && precise(automatic[0])) choose(automatic[0], source === "fields");
+          if (automatic.length === 1 && precise(automatic[0])) choose(automatic[0]);
           else {
             credit(places[0]);
-            status.textContent = places.some(precise) ? "Choose the matching building below. Several results or an incomplete match need your selection." : "Only approximate locations were found. No delivery pin selected. Search for a building or a more specific address.";
+            status.textContent = places.some(precise) ? "Choose the matching building below. Several results or an incomplete match need your selection." : "Only approximate locations were found. No delivery pin selected. Add a building name or a more specific address above.";
             void showMap(places[0].coordinate, places[0].precision === "area" ? 11 : places[0].precision === "street" || places[0].precision === "interpolated" ? 14 : pinZoom);
           }
           if (places.length > 1 || automatic.length !== 1) {
             for (const place of places) {
               const row = document.createElement("li"), button = document.createElement("button"), name = document.createElement("strong"), detail = document.createElement("span");
               button.type = "button"; name.textContent = place.name; detail.textContent = [place.kind, place.address].filter(Boolean).join(" · ");
-              button.append(name, detail); button.addEventListener("click", () => choose(place, source === "fields")); row.append(button); results.append(row);
+              button.append(name, detail); button.addEventListener("click", () => choose(place)); row.append(button); results.append(row);
             }
             results.hidden = false;
           }
         } else status.textContent = "No match found. Try a nearby landmark, move the map, or save without a pin.";
       } catch (error) {
         if (request === sequence && active) status.textContent = error.name === "AbortError" ? "The search timed out. You can still save your address or try again." : error.message;
-      } finally { clearTimeout(timer); if (request === sequence) { searching = false; $("[data-find]").disabled = false; } }
+      } finally { clearTimeout(timer); if (request === sequence) { searching = false; } }
     }
-    function schedule(source) {
-      cancelSearch(); lookupSource = source; confirmed = false; coordinate = null; updateHint();
-      status.textContent = textFor(source).length >= 8 ? "Finding the location after you finish entering the address…" : "Enter your address and we’ll find it on the map.";
+    function schedule() {
+      cancelSearch(); addressKey = keyFor(); confirmed = false; coordinate = null; updateHint();
+      status.textContent = textFor().length >= 3 ? "Finding the location after you finish entering the address…" : "Enter your address and we’ll find it on the map.";
       // One lookup after typing/paste/autofill settles, never on every keystroke.
-      autoTimer = setTimeout(() => { if (active && textFor(source).length >= 8) void search({ source }); }, 1100);
+      autoTimer = setTimeout(() => { if (active && textFor().length >= 3) void search(); }, 1100);
     }
-    $("[data-find]").addEventListener("click", () => { lookupSource = query.value.trim() ? "query" : "fields"; void search(); });
-    query.addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); lookupSource = "query"; void search(); } });
-    query.addEventListener("input", () => schedule("query"));
     container.querySelectorAll("[data-zoom]").forEach(button => button.addEventListener("click", () => { if (ready) map.setZoom(Math.max(3, Math.min(19, map.getZoom() + Number(button.dataset.zoom)))); }));
     return {
       reset(address) {
         generation++; cancelSearch(); active = true; manualMove = false; coordinate = valid(address.coordinate) ? { ...address.coordinate } : null; confirmed = !!coordinate;
-        lookupSource = "fields"; query.value = "";
+        addressKey = keyFor();
         status.textContent = coordinate ? "Your saved delivery pin. Move the map to adjust the entrance." : "Enter your address and we’ll find it on the map.";
         void showMap(coordinate || overview, coordinate ? pinZoom : 4);
-        if (!coordinate && options.addressText().length >= 8) schedule("fields");
+        if (!coordinate && textFor().length >= 3) schedule();
       },
       addressChanged({ invalidate = true } = {}) {
+        if (!active || keyFor() === addressKey) return;
+        addressKey = keyFor();
         // Adding a missing postcode/city should not discard an already located entrance.
         if (coordinate && !invalidate) return;
-        schedule("fields");
+        schedule();
       },
       close() { active = false; generation++; cancelSearch(); map?.stop(); },
       confirm() {
