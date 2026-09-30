@@ -23,7 +23,7 @@
     const status = $(".address-picker-status"), results = $("ul"), canvas = $(".address-picker-map"), loading = $(".address-picker-loading");
     $(".address-picker-frame").before(results);
     const overview = { latitude: -2.5, longitude: 118 };
-    const pinZoom = 18.5;
+    const pinZoom = 19;
     let map, mapReady, ready = false, active = false, coordinate = null, confirmed = false, positioning = false, controller, autoTimer, sequence = 0, generation = 0, searching = false, addressKey = "", manualMove = false;
     const closeEnough = () => ready && loading.hidden && map.getZoom() >= 16;
     function updateHint() {
@@ -97,7 +97,7 @@
       if (!precise(place)) {
         coordinate = null; confirmed = false;
         status.textContent = "Only an approximate area was found. No delivery pin selected. Add the building address above or position its entrance.";
-        void showMap(place.coordinate, place.precision === "area" ? 11 : 14);
+        void showMap(place.coordinate);
         return;
       }
       coordinate = { ...place.coordinate }; confirmed = false;
@@ -131,7 +131,7 @@
           else {
             credit(places[0]);
             status.textContent = places.some(precise) ? "Choose the matching building below. Several results or an incomplete match need your selection." : "Only approximate locations were found. No delivery pin selected. Add a building name or a more specific address above.";
-            void showMap(places[0].coordinate, places[0].precision === "area" ? 11 : places[0].precision === "street" || places[0].precision === "interpolated" ? 14 : pinZoom);
+            void showMap(places[0].coordinate);
           }
           if (places.length > 1 || automatic.length !== 1) {
             for (const place of places) {

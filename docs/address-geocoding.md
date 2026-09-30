@@ -10,8 +10,7 @@ button. Opening an existing address preserves its saved entrance; changing its
 address fields starts a new lookup.
 
 The old picker automatically selected Photon's first result, including street
-and district centers, and displayed all of them at building zoom. It discarded
-independent address fields before searching. The new forms preserve street,
+and district centers. It discarded independent address fields before searching. The new forms preserve street,
 house number, district/city and postcode constraints, rank mapped buildings
 first and require a choice for ambiguous buildings. Broad area/street matches
 can orient the map but cannot become a delivery pin merely by zooming in.
@@ -105,7 +104,8 @@ and all 4,096 token-shard sizes were checked; eight sampled shard SHA-256 hashes
 matched the local data. Health reported `engine=ezkart` and `index_ready=true`.
 
 
-Matched and saved pins open at zoom 18.5 (maximum 19), with the mapped coordinate
+All address results, including approximate street/area matches and saved pins,
+open at maximum zoom 19, with the returned coordinate
 at the center. Background tabs defer the map-rendering timeout until visible;
 a regression check covers delayed loading and return to the tab. The real hosted
 style, tile metadata and map tiles were also checked in a visible test browser,

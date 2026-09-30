@@ -65,10 +65,10 @@ test('desktop and phone address forms expose approximate results without creatin
     await page.route('**/vendor/maplibre/maplibre-gl.js?*',async route=>{
       const response=await route.fetch();await route.fulfill({response,body:await response.text()+'\n;const OriginalMap=maplibregl.Map;maplibregl.Map=class extends OriginalMap {constructor(...args){super(...args);window.testAddressMap=this;}};'});
     });
-    const payloads=[];
+    const payloads=[];let approximatePrecision='area';
     await page.route('**/api/address-search.php',async route=>{
       payloads.push(route.request().postDataJSON());
-      await route.fulfill({json:{ok:true,results:[{name:'Area center',address:'Jakarta',precision:'area',kind:'Area match',auto_select:false,coordinate:point}]}});
+      await route.fulfill({json:{ok:true,results:[{name:'Approximate location',address:'Jakarta',precision:approximatePrecision,kind:'Approximate match',auto_select:false,coordinate:point}]}});
     });
     await page.goto(f.base+'/cart/addresses.php?new=1');
     const editor=page.getByRole('dialog');
@@ -79,13 +79,27 @@ test('desktop and phone address forms expose approximate results without creatin
     await editor.locator('.address-picker-status').filter({hasText:'Only approximate locations'}).waitFor();
     await editor.locator('.address-picker-loading').waitFor({state:'hidden'});
     assert.deepEqual(payloads.at(-1).components,components);
+    assert.equal(await page.evaluate(()=>testAddressMap.getZoom()),19);
     assert.equal(await editor.locator('.address-picker-pin').isVisible(),false);
-    await editor.getByRole('button',{name:/Area center/}).click();
+    await editor.getByRole('button',{name:/Approximate location/}).click();
     await editor.locator('.address-picker-loading').waitFor({state:'hidden'});
+    assert.equal(await page.evaluate(()=>testAddressMap.getZoom()),19);
     // Zooming an approximate center is not evidence of a selected entrance.
     await page.evaluate(()=>testAddressMap.setZoom(17));
     assert.equal(await editor.locator('.address-picker-pin').isVisible(),false);
     assert.equal(await editor.getByLabel('Full address',{exact:true}).inputValue(),components.address);
+    for(const [precision,address] of [['street','Jln. Teluk Betung No. 12'],['interpolated','Jl Teluk Betung No. 12']]){
+      approximatePrecision=precision;
+      await editor.getByLabel('Full address',{exact:true}).fill(address);
+      await editor.locator('.address-picker-status').filter({hasText:'Only approximate locations'}).waitFor();
+      await editor.locator('.address-picker-loading').waitFor({state:'hidden'});
+      assert.equal(await page.evaluate(()=>testAddressMap.getZoom()),19,precision+' results open at maximum zoom');
+      assert.equal(await editor.locator('.address-picker-pin').isVisible(),false);
+      await editor.getByRole('button',{name:/Approximate location/}).click();
+      await editor.locator('.address-picker-loading').waitFor({state:'hidden'});
+      assert.equal(await page.evaluate(()=>testAddressMap.getZoom()),19,'Choosing '+precision+' keeps maximum zoom');
+      assert.equal(await editor.locator('.address-picker-pin').isVisible(),false);
+    }
     await page.unroute('**/api/address-search.php');
     await page.route('**/api/address-search.php',route=>route.fulfill({json:{ok:true,results:[{name:'Building A',address_line:components.address,location:components.location,postalCode:components.postalCode,precision:'address',auto_select:false,coordinate:point},{name:'Building B',precision:'address',auto_select:false,coordinate:{latitude:-6.196,longitude:106.823}}]}}));
     await editor.getByLabel('Full address',{exact:true}).fill('Jalan Teluk Betung No. 12');
@@ -94,6 +108,7 @@ test('desktop and phone address forms expose approximate results without creatin
     await editor.getByRole('button',{name:/Building B/}).click();
     await editor.locator('.address-picker-loading').waitFor({state:'hidden'});
     assert.equal(await editor.locator('.address-picker-pin').isVisible(),true);
+    assert.equal(await page.evaluate(()=>testAddressMap.getZoom()),19);
     if(process.env.EZKART_TEST_SCREENSHOTS) {
       await mkdir(process.env.EZKART_TEST_SCREENSHOTS,{recursive:true});
       await page.screenshot({path:join(process.env.EZKART_TEST_SCREENSHOTS,`address-matching-${width}.png`),fullPage:true});

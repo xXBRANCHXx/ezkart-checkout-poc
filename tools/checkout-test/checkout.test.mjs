@@ -1726,7 +1726,7 @@ test("address maps open immediately, auto-locate pasted details and remain optio
     await editor.getByLabel('Full address', { exact: true }).fill(raw);
     await editor.getByLabel('District / city', { exact: true }).fill('Yogyakarta');
     await editor.getByLabel('Postcode', { exact: true }).fill('55271');
-    await page.waitForFunction(() => Math.abs(deliveryMapUnderTest.getCenter().lat + 7.7892387) < 1e-9 && deliveryMapUnderTest.getZoom() === 18.5);
+    await page.waitForFunction(() => Math.abs(deliveryMapUnderTest.getCenter().lat + 7.7892387) < 1e-9 && deliveryMapUnderTest.getZoom() === 19);
     assert.equal(await editor.getByLabel('Full address', { exact: true }).inputValue(), raw, 'Automatic lookup preserves the customer’s written details.');
     assert.equal(await editor.locator('.address-picker-pin').isVisible(), true);
     await editor.getByRole('button', { name: 'Save address', exact: true }).click();
