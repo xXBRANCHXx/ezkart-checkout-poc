@@ -45,10 +45,11 @@ test('owned address index refuses mismatched house/city/postcode, supports neigh
 });
 
 test('named places are discoverable but an address shared by distinct mapped buildings requires a choice',async t=>{
-  const f=await indexedFixture(t,[record(),record({osm:'N124',coordinate:{latitude:-6.196,longitude:106.822}}),record({osm:'N125',precision:'place',properties:{name:'Museum Cerita',street:'',housenumber:'',postcode:'',city:'Jakarta',localities:['Jakarta']}})]);
+  const f=await indexedFixture(t,[record(),record({osm:'N124',coordinate:{latitude:-6.196,longitude:106.822}}),record({osm:'N125',precision:'place',properties:{name:'Museum Cerita',aliases:['Muscer'],street:'',housenumber:'',postcode:'',city:'Jakarta',localities:['Jakarta']}})]);
   const ambiguous=await f.search('Jalan Teluk Betung 12, Jakarta');
   assert.equal(ambiguous.data.results.length,2);assert(ambiguous.data.results.every(p=>!p.auto_select));
   const named=await f.search('Museum Cerita, Jakarta');assert.equal(named.data.results[0].name,'Museum Cerita');assert.equal(named.data.results[0].precision,'place');assert.equal(named.data.results[0].auto_select,true);
+  const alias=await f.search('Muscer, Jakarta');assert.equal(alias.data.results[0].name,'Museum Cerita');assert.equal(alias.data.results[0].auto_select,true);
 });
 
 test('corrupt active map data does not silently fall back to the public demo',async t=>{

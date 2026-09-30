@@ -41,7 +41,7 @@ def write_index(records, destination, source):
                     keys.add("street_number:" + normalize(p["street"]) + ":" + normalize(p["housenumber"]))
             if p.get("postcode"):
                 keys.add("postcode:" + p["postcode"])
-            for word in normalize(" ".join([p.get("name", ""), p.get("street", "")])).split():
+            for word in normalize(" ".join([p.get("name", ""), p.get("street", ""), *p.get("aliases", [])])).split():
                 if len(word) >= 4 and word not in {"jalan", "indonesia", "kecamatan", "kabupaten"} and not word.isdecimal():
                     keys.add("word:" + word)
             for key in keys:
@@ -95,13 +95,14 @@ def osm_records(filename, scratch):
                   .with_filter(osmium.filter.KeyFilter('name', 'addr:housenumber', 'boundary')))
     for entity in processors:
         tags = dict(entity.tags)
+        aliases = list(dict.fromkeys(v.strip()[:160] for k in ('name:en', 'name:id', 'official_name', 'short_name', 'alt_name', 'loc_name') for v in tags.get(k, '').split(';') if v.strip()))[:12]
         try:
             if entity.is_area() and tags.get("boundary") == "administrative" and tags.get("name"):
                 level = tags.get("admin_level", "")
                 if level not in {"2", "4", "5", "6", "7", "8", "9", "10"}:
                     continue
                 polygon = make_valid(shape(json.loads(geo.create_multipolygon(entity))))
-                boundaries.append((polygon, int(level), tags["name"], tags.get("ISO3166-1:alpha2", "")))
+                boundaries.append((polygon, int(level), tags["name"], tags.get("ISO3166-1:alpha2", ""), aliases))
                 continue
             if entity.is_relation() or (entity.is_way() and entity.is_closed() and tags.get("highway") is None):
                 continue
@@ -132,7 +133,7 @@ def osm_records(filename, scratch):
             postcode = tags.get("addr:postcode", "")
             p = {"street": (name if road else street)[:160], "housenumber": number[:40],
                  "postcode": postcode if re.fullmatch(r"\d{5}", postcode) else "",
-                 "name": (name or (street + " " + number).strip())[:160],
+                 "name": (name or (street + " " + number).strip())[:160], "aliases": aliases,
                  "city": tags.get("addr:city", "")[:160], "district": tags.get("addr:district", tags.get("addr:suburb", ""))[:160]}
             database.execute("INSERT OR REPLACE INTO raw VALUES(?,?,?,?,?)", (osm_id, point.x, point.y, precision, json.dumps(p)))
             seen += 1
@@ -153,8 +154,8 @@ def osm_records(filename, scratch):
         countries = [b[3] for b in context if b[1] == 2 and b[3]]
         if countries and "ID" not in countries:
             continue
-        p["localities"] = list(dict.fromkeys([v for v in [p.get("district"), p.get("city"), *(b[2] for b in context if b[1] != 2)] if v]))[:8]
-        for _, level, label, _ in context:
+        p["localities"] = list(dict.fromkeys([v for v in [p.get("district"), p.get("city"), *(b[2] for b in context if b[1] != 2), *(alias for b in context if b[1] != 2 for alias in b[4])] if v]))[:16]
+        for _, level, label, _, _ in context:
             if level in {5, 6, 7} and not p["city"]:
                 p["city"] = label
             if level in {8, 9} and not p["district"]:

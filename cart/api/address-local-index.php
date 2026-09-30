@@ -79,11 +79,12 @@ function ez_local_geocoder_search(string $query, array $components = []): array
             $name = $p['name'] ?? trim(($p['street'] ?? '') . ' ' . ($p['housenumber'] ?? ''));
             if ($name === '') continue;
             $label = ez_geocode_normalize($name);
-            $words = array_filter(explode(' ', $label), static fn($word) => mb_strlen($word) >= 4 && !in_array($word, ['jalan', 'indonesia'], true));
+            $labels = array_map('ez_geocode_normalize', [$name, ...($p['aliases'] ?? [])]);
+            $words = array_unique(array_filter(explode(' ', implode(' ', $labels)), static fn($word) => mb_strlen($word) >= 4 && !in_array($word, ['jalan', 'indonesia'], true)));
             $overlap = count(array_filter($words, static fn($word) => preg_match('/(?:^| )' . preg_quote($word, '/') . '(?: |$)/u', $nameQuery)));
             if (!$streetMatch && $overlap === 0) continue;
             $hasLocality = $localityMatch || ($parts['postcode'] !== '' && $parts['postcode'] === ($p['postcode'] ?? ''));
-            $matched = $hasLocality && (($precision === 'address' && $streetMatch && $numberMatch) || ($precision === 'place' && $label === $placeNameQuery));
+            $matched = $hasLocality && (($precision === 'address' && $streetMatch && $numberMatch) || ($precision === 'place' && in_array($placeNameQuery, $labels, true)));
             $street = trim(($p['street'] ?? '') . ' ' . ($p['housenumber'] ?? ''));
             $address = implode(', ', array_unique(array_filter([$street, ...($p['localities'] ?? []), $p['postcode'] ?? '', 'Indonesia'], static fn($value) => $value !== '' && $value !== $name)));
             $result = ['name' => $name, 'address' => mb_substr($address, 0, 500), 'address_line' => implode(', ', array_unique(array_filter([$name, $street]))),
