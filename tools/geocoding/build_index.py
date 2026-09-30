@@ -14,7 +14,7 @@ import sys
 def normalize(text):
     text = text.lower()
     text = re.sub(r"\b(?:jl|jln|jalan)\b\.?\s*", "jalan ", text)
-    text = re.sub(r"\b(?:kecamatan|kec|kabupaten|kab|kota|provinsi|daerah istimewa)\b\.?\s*", "", text)
+    text = re.sub(r"\b(?:kecamatan|kec|kelurahan|kel|desa|dusun|kabupaten|kab|kota|provinsi|daerah istimewa)\b\.?\s*", "", text)
     return re.sub(r"[^\w]+", " ", text.replace("_", " ")).strip()
 
 
@@ -88,7 +88,11 @@ def osm_records(filename, scratch):
     geo = osmium.geom.GeoJSONFactory()
     boundaries = []
     seen = 0
-    processors = osmium.FileProcessor(str(filename)).with_locations("flex_mem").with_areas()
+    node_cache = scratch.with_suffix('.nodes')
+    processors = (osmium.FileProcessor(str(filename))
+                  .with_locations('sparse_file_array,' + str(node_cache))
+                  .with_areas()
+                  .with_filter(osmium.filter.KeyFilter('name', 'addr:housenumber', 'boundary')))
     for entity in processors:
         tags = dict(entity.tags)
         try:
@@ -139,6 +143,7 @@ def osm_records(filename, scratch):
             # Incomplete geometry is not a license to invent a position.
             continue
     database.commit()
+    node_cache.unlink(missing_ok=True)
     print("Resolving administrative context for", seen, "locations with", len(boundaries), "boundaries", flush=True)
     tree = STRtree([b[0] for b in boundaries])
     for osm_id, lon, lat, precision, raw in database.execute("SELECT * FROM raw ORDER BY osm"):

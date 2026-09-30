@@ -66,9 +66,8 @@ function ez_local_geocoder_search(string $query, array $components = []): array
             if (!$coordinate) continue;
             $recordLocalities = array_map('ez_geocode_normalize', $p['localities'] ?? []);
             $localityMatch = false;
-            foreach (['city', 'county', 'district'] as $field) {
-                if (empty($parts[$field])) continue;
-                if (!in_array(ez_geocode_normalize($parts[$field]), $recordLocalities, true)) continue 2;
+            foreach ($parts['localities'] as $constraint) {
+                if (!in_array(ez_geocode_normalize($constraint), $recordLocalities, true)) continue 2;
                 $localityMatch = true;
             }
             if ($parts['postcode'] !== '' && !empty($p['postcode']) && $parts['postcode'] !== $p['postcode']) continue;

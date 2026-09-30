@@ -20,7 +20,7 @@ function ez_geocode_normalize(string $text): string
 {
     $text = mb_strtolower($text);
     $text = preg_replace('/\b(?:jl|jln|jalan)\b\.?\s*/u', 'jalan ', $text);
-    $text = preg_replace('/\b(?:kecamatan|kec|kabupaten|kab|kota|provinsi|daerah istimewa)\b\.?\s*/u', '', $text);
+    $text = preg_replace('/\b(?:kecamatan|kec|kelurahan|kel|desa|dusun|kabupaten|kab|kota|provinsi|daerah istimewa)\b\.?\s*/u', '', $text);
     return trim(preg_replace('/[^\p{L}\p{N}]+/u', ' ', $text));
 }
 
@@ -28,7 +28,7 @@ function ez_geocode_normalize(string $text): string
 function ez_geocode_parts(string $query, array $components = []): array
 {
     $address = $components['address'] ?? $query;
-    $parts = ['street' => '', 'housenumber' => '', 'city' => '', 'postcode' => $components['postalCode'] ?? ''];
+    $parts = ['street' => '', 'housenumber' => '', 'city' => '', 'postcode' => $components['postalCode'] ?? '', 'localities' => []];
     if ($parts['postcode'] === '' && preg_match('/\b\d{5}\b/u', $query, $postcode)) $parts['postcode'] = $postcode[0];
     $segments = array_map('trim', explode(',', $address));
     foreach ($segments as $segment) {
@@ -45,6 +45,8 @@ function ez_geocode_parts(string $query, array $components = []): array
     $locality = $components['location'] ?? implode(', ', array_slice($segments, 1));
     $locality = preg_replace('/\b\d{5}\b|\bIndonesia\b/iu', '', $locality);
     foreach (array_filter(array_map('trim', explode(',', $locality))) as $segment) {
+        if (preg_match('/^(?:RT|RW)\b/iu', $segment)) continue;
+        $parts['localities'][] = $segment;
         if (preg_match('/^(?:kab(?:upaten)?|kota)\.?\s+(.+)$/iu', $segment, $match)) {
             $parts['county'] = trim($match[1]);
         } elseif (preg_match('/^kec(?:amatan)?\.?\s+(.+)$/iu', $segment, $match)) {
@@ -68,9 +70,8 @@ function ez_geocode_photon_result(array $feature, array $parts): ?array
     if ($parts['postcode'] !== '' && $clean('postcode') !== '' && $parts['postcode'] !== $clean('postcode')) return null;
     $localities = array_filter(array_map($clean, ['locality', 'district', 'city', 'county', 'state']));
     $localityMatch = false;
-    foreach (['city', 'county', 'district'] as $key) {
-        if (empty($parts[$key])) continue;
-        $matches = array_filter($localities, static fn($value) => ez_geocode_normalize($value) === ez_geocode_normalize($parts[$key]));
+    foreach ($parts['localities'] as $constraint) {
+        $matches = array_filter($localities, static fn($value) => ez_geocode_normalize($value) === ez_geocode_normalize($constraint));
         if (!$matches) return null;
         $localityMatch = true;
     }

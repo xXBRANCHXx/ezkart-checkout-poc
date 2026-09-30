@@ -34,7 +34,7 @@ test('self-hosted PHP lookup returns the mapped building and local district with
 
 test('owned address index refuses mismatched house/city/postcode, supports neighborhood lookup and never interpolates a missing house',async t=>{
   const f=await indexedFixture(t,[record(),record({osm:'W999',precision:'street',properties:{name:'Jalan Teluk Betung',street:'Jalan Teluk Betung',housenumber:'',postcode:'',city:'Jakarta',localities:['Tanah Abang','Jakarta']}})]);
-  for(const text of ['Jalan Teluk Betung 12, Surabaya, 10230','Jalan Teluk Betung 12, Jakarta, 60111','Jalan Teluk Betung 120, Jakarta, 10230']){
+  for(const text of ['Jalan Teluk Betung 12, Surabaya, 10230','Jalan Teluk Betung 12, Surabaya, DKI Jakarta, 10230','Jalan Teluk Betung 12, Jakarta, 60111','Jalan Teluk Betung 120, Jakarta, 10230']){
     const result=await f.search(text);assert.equal(result.status,200);
     assert(result.data.results.every(p=>!p.auto_select&&p.precision!=='address'),text+JSON.stringify(result.data));
   }
