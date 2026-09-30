@@ -74,6 +74,8 @@ $builderCheckoutPaused = !ez_new_checkout_enabled();
             <button type="button" data-sq-add-element="native-image" data-search="image photo picture"><?= ez_admin_icon('image') ?><b>Image</b></button>
             <button type="button" data-sq-add-element="native-button" data-search="button link call action"><span class="sq-basic-button" aria-hidden="true">↗</span><b>Button</b></button>
             <button type="button" data-sq-open-products data-search="product card shop catalog buy checkout"><?= ez_admin_icon('box') ?><b>Product</b></button>
+            <button type="button" data-sq-add-element="native-youtube" data-search="youtube embed video shorts media"><?= ez_admin_icon('play') ?><b>YouTube</b></button>
+            <button type="button" data-sq-add-element="native-social" data-search="social media instagram tiktok youtube facebook footer links"><?= ez_admin_icon('link') ?><b>Social links</b></button>
             <button type="button" data-sq-add-element="native-video" data-search="video film media"><?= ez_admin_icon('play') ?><b>Video</b></button>
             <button type="button" data-sq-add-element="native-container" data-search="container layout group row column"><?= ez_admin_icon('layout') ?><b>Layout</b></button>
           </div><details class="sq-library-more"><summary>More tools</summary><div class="sq-block-grid sq-element-library">

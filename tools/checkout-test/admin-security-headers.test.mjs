@@ -18,7 +18,7 @@ test('merchant policy selection preserves preview isolation and ignores forged c
     ['page=shipping-settings',/connect-src 'self' https:\/\/tiles.openfreemap.org; worker-src 'self' blob:/,'DENY'],
     ['page=sites&edit=example.ezkart.site&preview-repair=1',/frame-ancestors 'self'/,'SAMEORIGIN'],
     [cloud('/v1/landing-pages/example/preview'),/script-src 'none'; connect-src 'none'; frame-src 'none'; form-action 'none'; frame-ancestors 'self'/,'SAMEORIGIN'],
-    [cloud('/v1/landing-pages/example/view'),/sandbox allow-scripts allow-forms allow-popups/,'DENY'],
+    [cloud('/v1/landing-pages/example/view'),/frame-src 'self' about: https:; frame-ancestors 'self'; base-uri 'none'/,'DENY'],
     ['page=marketing&preview-repair=1',/frame-ancestors 'none'/,'DENY'],
     [cloud('/v1/landing-pages/example/view')+'&cloud=invalid',/script-src 'self' 'sha256-[^']+';/,'DENY'],
   ];

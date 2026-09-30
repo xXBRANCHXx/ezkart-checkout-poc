@@ -31,6 +31,7 @@ test('Image Stack publishes a durable public link and keeps later draft edits pr
   await page.locator('[data-sq-preview-new-tab]').click();
   const previewTab=await previewTabPromise;
   await previewTab.waitForURL(publicUrl+'/preview');
+  await page.locator('.preview-share-dialog [data-preview-close]').click();
   await page.locator('[data-sq-preview-close]').click();
   await page.locator('[data-sq-publish]').click();
   await page.locator('[data-favicon-publish]').click();

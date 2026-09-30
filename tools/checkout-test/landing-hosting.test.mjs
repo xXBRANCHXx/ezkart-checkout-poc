@@ -8,11 +8,13 @@ import {join} from 'node:path';
 import {once} from 'node:events';
 import {setTimeout as delay} from 'node:timers/promises';
 import {fileURLToPath} from 'node:url';
+import {landingPageFrame} from '../../cloudflare/ezkart-api/src/landing-page-hosting.js';
 import {unlockPreview, validPreviewSession} from '../../cloudflare/ezkart-api/src/landing-preview-access.js';
 import {chromium} from '../builder-mcp/node_modules/playwright/index.mjs';
 
 test('PHP page hosting serves only the current environment publication with an isolated runtime', async t => {
   const requests=[];
+  let wrappedUpstream=false;
   const savePreferences=[];
   const sessions=await mkdtemp(join(tmpdir(),'ezkart-url-sessions-'));
   t.after(()=>rm(sessions,{recursive:true,force:true}));
@@ -52,7 +54,8 @@ test('PHP page hosting serves only the current environment publication with an i
     if(req.url.endsWith('/missing')) {res.writeHead(404);res.end('Internal error details');return;}
     if(req.url.endsWith('/bad-response')) {res.writeHead(200,{'Content-Type':'application/json'});res.end('{"private":"data"}');return;}
     res.writeHead(200,{'Content-Type':'text/html; charset=utf-8'});
-    res.end('<!doctype html><html lang="id"><head><title>Hosted coffee</title><meta name="description" content="Kopi &amp; susu"><link rel="icon" data-ezkart-favicon data-light="data:image/png;base64,aGVsbG8=" data-dark="data:image/png;base64,d29ybGQ="></head><body><h1>Stored publication</h1><button id="checkout">Checkout</button><script>window.ready=true;document.querySelector("button").onclick=()=>{const params=new URLSearchParams({return:location.href});window.open("/checkout?"+params,"_blank","noopener");};</script>');
+    const authored='<!doctype html><html lang="id"><head><title>Hosted coffee</title><meta name="description" content="Kopi &amp; susu"><link rel="icon" data-ezkart-favicon data-light="data:image/png;base64,aGVsbG8=" data-dark="data:image/png;base64,d29ybGQ="></head><body><h1>Stored publication</h1><button id="checkout">Checkout</button><button id="play-video">Play video</button><script>document.querySelector("#play-video").onclick=()=>parent.postMessage({type:"ezkart:youtube-play",channel:"fixture-video",id:"dQw4w9WgXcQ",start:0,controls:true,title:"Hosted video"},"*");window.ready=true;document.querySelector("button").onclick=()=>{const params=new URLSearchParams({return:location.href});window.open("/checkout?"+params,"_blank","noopener");};</script>';
+    res.end(wrappedUpstream?landingPageFrame(authored):authored);
   });
   await new Promise(resolve=>upstream.listen(0,'127.0.0.1',resolve));
   t.after(()=>new Promise(resolve=>upstream.close(resolve)));
@@ -80,8 +83,11 @@ test('PHP page hosting serves only the current environment publication with an i
   const slash=await fetch(publicUrl+'/',{redirect:'manual'});
   assert.equal(slash.status,308);assert.equal(slash.headers.get('location'),'/coffee-shop/shop/launch');
   assert.equal(response.status,200);
-  assert.match(await response.text(),/Stored publication/);
-  assert.match(response.headers.get('content-security-policy'),/sandbox allow-scripts/);
+  const hostedHtml=await response.text();
+  assert.match(hostedHtml,/Stored publication/);
+  assert.match(hostedHtml,/<iframe data-hosted-page[^>]+sandbox="allow-scripts allow-forms allow-popups/);
+  assert.match(hostedHtml,/<script>[^<]*function mountLandingMediaPlayer/);
+  assert.doesNotMatch(response.headers.get('content-security-policy'),/sandbox/);
   assert.doesNotMatch(response.headers.get('content-security-policy'),/allow-same-origin/);
   assert.match(response.headers.get('cache-control'),/no-store/);
   assert.equal(response.headers.get('x-robots-tag'),'noindex, nofollow');
@@ -119,12 +125,46 @@ test('PHP page hosting serves only the current environment publication with an i
     assert.equal(await page.locator('link[rel=icon]').count(),2);
     assert.equal(await frame.evaluate(()=>{try{return Boolean(parent.document);}catch{return false;}}),false,'Markup isolation survives provider header replacement');
     assert.equal(await frame.evaluate(()=>{try{localStorage.setItem('probe','yes');return true;}catch{return false;}}),false);
+    await page.waitForFunction(()=>globalThis.EzkartLandingMediaPlayer);
+    await page.route('https://www.youtube-nocookie.com/embed/**',route=>route.fulfill({contentType:'text/html',body:'<h1>Trusted player fixture</h1>'}));
+    await page.evaluate(()=>postMessage({type:'ezkart:youtube-play',channel:'bad-source',id:'dQw4w9WgXcQ',start:0,controls:true},'*'));
+    await frame.evaluate(()=>parent.postMessage({type:'ezkart:youtube-play',channel:'bad-id',id:'https://attacker.example/',start:0,controls:true},'*'));
+    await page.waitForTimeout(50);
+    assert.equal(await page.locator('[data-youtube-host-player]').count(),0,'Unrelated windows and arbitrary media URLs cannot open the host player');
+    await frame.locator('#play-video').click();
+    const playerDialog=page.getByRole('dialog',{name:'YouTube video player'});
+    await playerDialog.waitFor({state:'visible'});
+    const player=playerDialog.locator('iframe');
+    assert.equal(await player.getAttribute('sandbox'),null,'Only the fixed third-party player uses the trusted host shell');
+    assert.match(await player.getAttribute('src'),/^https:\/\/www\.youtube-nocookie\.com\/embed\/dQw4w9WgXcQ\?/);
+    assert.equal(await frame.evaluate(()=>{try{return Boolean(parent.document);}catch{return false;}}),false,'Playing media never grants authored HTML access to the host');
+    await playerDialog.getByRole('button',{name:'Close video'}).click();
+    assert.equal(await page.locator('[data-youtube-host-player]').count(),0);
+
     const popup=context.waitForEvent('page');
     await frame.locator('#checkout').click();
     const checkout=await popup;await checkout.waitForURL('**/checkout?*');
     assert.equal(new URL(checkout.url()).searchParams.get('return'),url,'Legacy checkout returns to the real hosted URL');
     await checkout.close();
   }
+  // The deployed Worker also supplies a trusted shell. Its opaque intermediate
+  // shell must relay fixed media requests without relaxing either sandbox.
+  wrappedUpstream=true;
+  await page.goto(publicUrl);
+  const intermediate=await page.locator('[data-hosted-page]').elementHandle().then(node=>node.contentFrame());
+  const nested=await intermediate.locator('[data-hosted-page]').elementHandle().then(node=>node.contentFrame());
+  await nested.locator('#play-video').click();
+  await page.getByRole('dialog',{name:'YouTube video player'}).waitFor({state:'visible'});
+  assert.equal(await intermediate.locator('[data-youtube-host-player]').count(),0,'Opaque intermediate shell forwards media to the trusted outer host');
+  assert.equal(await nested.evaluate(()=>{try{return Boolean(parent.parent.document);}catch{return false;}}),false);
+  assert.equal(await nested.evaluate(()=>{try{localStorage.setItem('nested','yes');return true;}catch{return false;}}),false);
+  await page.getByRole('button',{name:'Close video'}).click();
+  const nestedPopup=context.waitForEvent('page');
+  await nested.locator('#checkout').click();
+  const nestedCheckout=await nestedPopup;await nestedCheckout.waitForURL('**/checkout?*');
+  assert.equal(new URL(nestedCheckout.url()).searchParams.get('return'),publicUrl);
+  await nestedCheckout.close();
+  wrappedUpstream=false;
   await page.unrouteAll();
   const previewUrl=publicUrl+'/preview';
   await page.goto(previewUrl);

@@ -7,7 +7,7 @@ import {verifyDomainDNS} from '../src/custom-domain-provider.js';
 async function fixture(t){
  const mf=new Miniflare(convertV4MiniflareOptions({modules:true,script:'export default {fetch(){return new Response("ok")}}',compatibilityDate:'2026-08-11',d1Databases:['DB'],r2Buckets:['PRIVATE_ASSETS']}));t.after(()=>mf.dispose());
  const DB=await mf.getD1Database('DB'),PRIVATE_ASSETS=await mf.getR2Bucket('PRIVATE_ASSETS');
- for(const migration of ['0001_core.sql','0002_cloud_catalog.sql','0003_subscription_plan_billing.sql','0008_seller_page_addresses.sql','0069_custom_domains.sql']){
+ for(const migration of ['0001_core.sql','0002_cloud_catalog.sql','0003_subscription_plan_billing.sql','0008_seller_page_addresses.sql','0069_custom_domains.sql','0079_jev_page_review.sql']){
   const source=(await readFile(new URL('../migrations/'+migration,import.meta.url),'utf8')).replace(/--[^\n]*/g,'');
   const triggers=[...source.matchAll(/CREATE TRIGGER[\s\S]*?END;/g)].map(m=>m[0]);
   for(const sql of [...source.replace(/CREATE TRIGGER[\s\S]*?END;/g,'').split(';').filter(s=>s.trim()),...triggers])await DB.prepare(sql).run();
@@ -49,7 +49,11 @@ test('owner scope, hostile CNAME/Host, pending TLS, isolation, expiry, downgrade
  f.cname=env.CUSTOM_DOMAIN_CNAME_TARGET;
  const pending=await customDomainAction(env,alice,domain.id,'verify',transport);assert.equal(pending.state,'pending');assert.equal(pending.tlsStatus,'pending_validation');assert.equal(pending.dns.at(-1).value,'certificate-code');
  f.tls='active';assert.equal((await customDomainAction(env,alice,domain.id,'verify',transport)).state,'active');assert.equal(f.creates,1);
- assert.equal(await(await customDomainResponse(request(domain.hostname),env)).text(),'<h1>alice</h1>');
+ const hosted=await customDomainResponse(request(domain.hostname),env);
+ assert.match(await hosted.text(),/srcdoc="&lt;h1&gt;alice&lt;\/h1&gt;"/);
+ assert.doesNotMatch(hosted.headers.get('content-security-policy'),/\bsandbox\b/);
+ const head=await customDomainResponse(new Request('https://'+domain.hostname,{method:'HEAD'}),env);
+ assert.equal(await head.text(),'');
  for(const path of ['/bob/shop/home','/v1/catalog','/admin'])assert.equal((await customDomainResponse(request(domain.hostname,path),env)).status,404);
  assert.equal((await customDomainResponse(request('unconnected.brand.com','/',{host:domain.hostname,'x-forwarded-host':domain.hostname}),env)).status,404);
  assert.equal(await customDomainResponse(request('api.ezkart.id','/',{host:domain.hostname}),env),null);

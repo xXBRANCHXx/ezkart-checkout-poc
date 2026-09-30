@@ -4,15 +4,13 @@ import {dirname,resolve,join,extname} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {randomBytes,createHash} from 'node:crypto';
 import {packLandingEditor, landingPageSaveReceipt} from '../../cloudflare/ezkart-api/src/landing-page-transfer.js';
-import {landingPagePolicy, landingPageLinks} from '../../cloudflare/ezkart-api/src/landing-page-hosting.js';
+import {landingPagePolicy, landingPageShellPolicy, landingPageFrame, landingPageLinks} from '../../cloudflare/ezkart-api/src/landing-page-hosting.js';
 import {decodeFontDataUrl} from '../../cloudflare/ezkart-api/src/builder-fonts.js';
 export const repoRoot=resolve(dirname(fileURLToPath(import.meta.url)),'../..');
 const htmlEscape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const hostedFrame=html=>{
- const title=html.match(/<title\b[^>]*>(.*?)<\/title>/is)?.[1]||'Landing page';
- html=html.replaceAll('return:location.href}',"return:(location.href==='about:srcdoc'?document.baseURI:location.href)}");
- return `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>${htmlEscape(title)}</title><style>html,body{margin:0;width:100%;height:100%;overflow:hidden}iframe{display:block;width:100%;height:100%;border:0}</style></head><body><iframe data-hosted-page title="${htmlEscape(title)}" sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation" srcdoc="${htmlEscape(html)}"></iframe></body></html>`;
-};
+// The shared wrapper escapes all merchant HTML into its unchanged opaque
+// iframe. Only that trusted shell receives the host-player policy.
+const hostedFrame=landingPageFrame;
 const slug=value=>{if(!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value)||value.length>48)throw new Error('Use a project ID of up to 48 lowercase letters, numbers, and hyphens.');return value;};
 export class Workspace {
  constructor(directory){this.directory=resolve(directory);this.csrf=randomBytes(24).toString('hex');}
@@ -38,12 +36,12 @@ export class Workspace {
   const index=await readFile(join(repoRoot,'cart/admin/index.php'),'utf8');const icons=(index.match(/<symbol\b[\s\S]*?<\/symbol>/g)||[]).join('');
   const catalog=await this.catalog();
   const startup=await readFile(join(repoRoot,'cart/admin/admin-startup.js'),'utf8');
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="ezkart-builder-style-nonce" content="${htmlEscape(styleNonce)}"><title>Ezkart builder workspace</title><script id="ezkart-admin-startup" data-admin-cloud-enabled="true">${startup}</script><link rel="stylesheet" href="admin.css"><link rel="stylesheet" href="builder-templates.css"><link rel="stylesheet" href="builder-native.css"><link rel="stylesheet" href="builder-help.css"><link rel="stylesheet" href="builder-fonts.css"><link rel="stylesheet" href="builder-components.css"><link rel="stylesheet" href="builder-flow.css"><link rel="stylesheet" href="builder-showcase.css"><link rel="stylesheet" href="builder-chrome.css"><link rel="stylesheet" href="builder-assets.css"><link rel="stylesheet" href="admin-ui.css"><link rel="stylesheet" href="builder-choice.css"><link rel="stylesheet" href="builder-image.css"><link rel="stylesheet" href="../select.css"></head><body class="dashboard-page page-sites ${library ? 'page-sites-library' : 'page-site-editor'}" data-admin-language="${htmlEscape(catalog.language||'en')}" data-admin-cloud-enabled="true" data-admin-local-workspace="true" data-admin-demo-checkout="${catalog.demoCheckout===true}" data-admin-currency="${htmlEscape(catalog.currency||'IDR')}" data-admin-locale="${htmlEscape(catalog.locale||'id-ID')}" data-admin-storage-scope="${htmlEscape(catalog.storageScope||'ezkart-local')}" data-admin-cloud-media-base="${htmlEscape(catalog.mediaBase||'')}" data-admin-public-base="${htmlEscape(catalog.publicBase||'')}" data-admin-csrf-token="${this.csrf}"><svg style="display:none">${icons}</svg>${view}<script src="builder-native-icons.js"></script><script src="builder-commerce.js"></script><script src="builder-help.js"></script><script src="builder-fonts.js"></script><script src="builder-native.js"></script><script src="builder-publish.js"></script><script src="builder-site-settings.js"></script><script src="builder-templates.js"></script><script src="builder-backgrounds.js"></script><script src="builder-components.js"></script><script src="builder-asset-packs.js"></script><script src="builder-assets.js"></script><script src="builder-assets-ui.js"></script><script src="builder-showcase-data.js"></script><script src="builder-showcase.js"></script><script src="admin-language-id.js"></script><script src="admin-language.js"></script><script src="builder-image.js"></script><script src="builder-choice.js"></script><script src="admin.js"></script><script src="../select.js"></script></body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="ezkart-builder-style-nonce" content="${htmlEscape(styleNonce)}"><title>Ezkart builder workspace</title><script id="ezkart-admin-startup" data-admin-cloud-enabled="true">${startup}</script><link rel="stylesheet" href="admin.css"><link rel="stylesheet" href="builder-templates.css"><link rel="stylesheet" href="builder-media.css"><link rel="stylesheet" href="builder-native.css"><link rel="stylesheet" href="builder-help.css"><link rel="stylesheet" href="builder-fonts.css"><link rel="stylesheet" href="builder-components.css"><link rel="stylesheet" href="builder-flow.css"><link rel="stylesheet" href="builder-showcase.css"><link rel="stylesheet" href="builder-chrome.css"><link rel="stylesheet" href="builder-assets.css"><link rel="stylesheet" href="admin-ui.css"><link rel="stylesheet" href="builder-choice.css"><link rel="stylesheet" href="builder-image.css"><link rel="stylesheet" href="../select.css"></head><body class="dashboard-page page-sites ${library ? 'page-sites-library' : 'page-site-editor'}" data-admin-language="${htmlEscape(catalog.language||'en')}" data-admin-cloud-enabled="true" data-admin-local-workspace="true" data-admin-demo-checkout="${catalog.demoCheckout===true}" data-admin-currency="${htmlEscape(catalog.currency||'IDR')}" data-admin-locale="${htmlEscape(catalog.locale||'id-ID')}" data-admin-storage-scope="${htmlEscape(catalog.storageScope||'ezkart-local')}" data-admin-cloud-media-base="${htmlEscape(catalog.mediaBase||'')}" data-admin-public-base="${htmlEscape(catalog.publicBase||'')}" data-admin-csrf-token="${this.csrf}"><svg style="display:none">${icons}</svg>${view}<script src="builder-native-icons.js"></script><script src="builder-commerce.js"></script><script src="builder-help.js"></script><script src="builder-fonts.js"></script><script type="module" src="../landing-media-player.js"></script><script src="builder-media.js"></script><script src="builder-native.js"></script><script src="builder-publish.js"></script><script src="builder-site-settings.js"></script><script src="builder-templates.js"></script><script src="builder-backgrounds.js"></script><script src="builder-components.js"></script><script src="builder-asset-packs.js"></script><script src="builder-assets.js"></script><script src="builder-assets-ui.js"></script><script src="builder-showcase-data.js"></script><script src="builder-showcase.js"></script><script src="admin-language-id.js"></script><script src="admin-language.js"></script><script src="builder-image.js"></script><script src="builder-choice.js"></script><script src="admin.js"></script><script src="../select.js"></script></body></html>`;
  }
- async hostedPolicy(){
+ async hostedPolicy(policy=landingPagePolicy){
   const {mediaBase=''}=await this.catalog();
   const media=mediaBase?new URL(mediaBase,this.url).origin:'';
-  return landingPagePolicy.replaceAll('https:',`https: ${this.url} ${media}`);
+  return policy.replaceAll('https:',`https: ${this.url} ${media}`);
  }
  async start(port=0){
   await this.init();
@@ -63,7 +61,7 @@ export class Workspace {
      }
      const page=await this.read(hosted[2]);
      if(page.status!=='published'||!page.publishedHtml)return send(404,'Page not found.','text/plain');
-     res.setHeader('Content-Security-Policy',await this.hostedPolicy());
+     res.setHeader('Content-Security-Policy',await this.hostedPolicy(landingPageShellPolicy));
      return send(200,hostedFrame(page.publishedHtml),'text/html; charset=utf-8');
     }
     if(path){
@@ -98,7 +96,7 @@ export class Workspace {
        const store=url.searchParams.get('preview-store');
        if(store && store!=='workspace')return send(404,'Page not found.','text/plain');
        if(!store){res.setHeader('Location',`/workspace/shop/${viewMatch[1]}/preview`);return send(302,'','text/plain');}
-       res.setHeader('Content-Security-Policy',await this.hostedPolicy());
+       res.setHeader('Content-Security-Policy',await this.hostedPolicy(landingPageShellPolicy));
        const html=await readFile(join(this.directory,'previews',`${slug(viewMatch[1])}.html`),'utf8');
        return send(200,hostedFrame(html.replace(/<style id="ezkart-library-preview-style">[\s\S]*?<\/style>/g,'')),'text/html; charset=utf-8');
       }
@@ -181,10 +179,10 @@ export class Workspace {
      }catch{/* An absent media base needs no additional source. */}
      // Keep the preview isolated; explicitly allow the configured local media
      // server as well as the HTTPS assets supported by the hosted preview.
-     res.setHeader('Content-Security-Policy',`default-src 'none'; img-src 'self' data: https:${mediaSource}; media-src 'self' data: https:${mediaSource}; style-src 'unsafe-inline' https:; script-src 'unsafe-inline' https:; font-src 'self' data: https:; connect-src 'self' https:; form-action 'self' https:; frame-ancestors 'self'; base-uri 'none'; sandbox allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation`);
+     res.setHeader('Content-Security-Policy',`default-src 'none'; img-src 'self' data: https:${mediaSource}; media-src 'self' data: https:${mediaSource}; style-src 'unsafe-inline' https:; script-src 'unsafe-inline' https:; font-src 'self' data: https:; connect-src 'self' https:; form-action 'self' https:; frame-src 'self' https://www.youtube-nocookie.com; frame-ancestors 'self'; base-uri 'none'; sandbox allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation`);
      return send(200,shell.replace(/<\?[\s\S]*?\?>/g,''),'text/html; charset=utf-8');
     }
-    if(['/cart/select.css','/cart/select.js'].includes(url.pathname))return send(200,await readFile(join(repoRoot,url.pathname.slice(1))),url.pathname.endsWith('.css')?'text/css':'text/javascript');
+    if(['/cart/select.css','/cart/select.js','/cart/landing-media-player.js'].includes(url.pathname))return send(200,await readFile(join(repoRoot,url.pathname.slice(1))),url.pathname.endsWith('.css')?'text/css':'text/javascript');
     if(url.pathname.startsWith('/cart/admin/')){
      const file=resolve(repoRoot,`.${decodeURIComponent(url.pathname)}`);
      const fontMetadata=file===join(repoRoot,'cart/admin/assets/fonts/builder-fonts.json') || (file.startsWith(join(repoRoot,'cart/admin/assets/fonts/')) && /\/(?:[a-z0-9-]+-)?OFL\.txt$/.test(file));

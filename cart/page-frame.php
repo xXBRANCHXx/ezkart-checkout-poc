@@ -27,10 +27,12 @@ function ez_landing_page_frame(string $html): string
             if ($source !== '') $metadata .= '<link rel="icon" type="image/png" sizes="128x128" media="(prefers-color-scheme: ' . $mode . ')" href="' . $escape($source) . '">';
         }
     }
+    // Embed only the trusted player source; opaque nested shells cannot load ESM.
+    $player = str_replace('export function mountLandingMediaPlayer', 'function mountLandingMediaPlayer', (string) file_get_contents(__DIR__ . '/landing-media-player.js'));
     return '<!doctype html><html lang="' . $escape($language) . '"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'
         . $escape($title)
-        . '</title>' . $metadata . '<style>html,body{margin:0;width:100%;height:100%;overflow:hidden}iframe{display:block;width:100%;height:100%;border:0}</style></head><body><iframe data-hosted-page allowfullscreen title="'
+        . '</title>' . $metadata . '<style>html,body{margin:0;width:100%;height:100%;overflow:hidden}iframe[data-hosted-page]{display:block;width:100%;height:100%;border:0}</style></head><body><iframe data-hosted-page allowfullscreen title="'
         . $escape($title)
         . '" sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation" srcdoc="'
-        . $escape($html) . '"></iframe></body></html>';
+        . $escape($html) . '"></iframe><script>' . $player . '</script></body></html>';
 }

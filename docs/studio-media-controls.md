@@ -1,0 +1,19 @@
+# Studio media and social controls — 30 September 2026
+
+This report records implementation and acceptance checks for the Workbench branch. Production remains on hold.
+
+Page Studio Assets now includes native YouTube and Social links elements. YouTube accepts watch, share, Shorts, live and embed URLs, with video title, four aspect ratios, start time and player-control settings. Standard layout, responsive size, spacing and surface controls stay available. YouTube timestamps populate the start-time field. The exported player loads a privacy-enhanced iframe only after Play, with an accessible title and fullscreen support.
+
+Social links use up to eight named HTTP/HTTPS destinations, open with `noopener noreferrer`, and reject script URLs. Native Simple sign-off and Footer directory presets include an editable Social links element; empty links are omitted from exported pages. Existing saved pages retain their data and schema version.
+
+Validation: Studio merchant UI workflow checks add/select, editing, malicious-link rejection, undo/redo, save/reload and standalone output. It verifies editor widths 320/941/1440 and standalone widths 320/390/768/1440/1920. Player requests are fulfilled by a local test stub; this verifies iframe construction, not external YouTube playback availability. Required blank-editor, section-actions and grid-snapping suites plus native and inspector-control regressions pass (14 tests). Node checks, PHP lint and `git diff --check` pass. No live product, order, publication or payment writes are made.
+
+Image Stack provides one optional YouTube URL and title after the artwork, plus an optional footer with brand, text and up to eight labeled social destinations. These settings use the existing history/save model and survive image replacement, sorting, navigation and product changes. Existing pages default to no video and no footer until enabled.
+
+YouTube cannot initialize inside the authored page’s opaque sandbox. A host-owned player dialog handles playback outside that iframe through a channel-specific message bridge. Every hop checks the sending window against known hosted/preview iframes and validates an eleven-character video ID, integer start time and controls flag. Opaque nested preview shells relay to the trusted outer host. The original authored iframe sandbox remains unchanged; tests confirm parent DOM and localStorage access stay blocked. Escape and Close unload the player and restore focus to the card. Standalone exports use the inline player.
+
+The trusted-host browser probe played the official YouTube demo: currentTime 8.519 seconds, readyState 4, paused false, no media error, three successful googlevideo responses and no page errors. It preserved the opaque authored iframe. Local fixture tests cover editor and published playback, referrer, nested forwarding, invalid source messages, malicious URLs and phone layouts. YouTube’s [minimum functionality reference](https://developers.google.com/youtube/terms/required-minimum-functionality) documents its referrer identity requirement and 200px minimum viewport; cards preserve at least 200px height on narrow screens.
+
+Integrated checks: 27 affected builder/merchant browser tests, five PHP/layout/security browser tests and twelve Cloudflare hosting tests pass. The test Worker bundle validates with its existing test bindings. Published custom-domain commerce is checked inside the unchanged authored sandbox, including checkout tenant and durable return URL.
+
+The broader builder run passed 138 of 140 tests. Its custom-domain test used the previous outer-sandbox assumption; after moving its assertions to the authored iframe, the commerce check passes. The remaining `cart-snippet.test.mjs` timeout at the plain cart fixture reproduces at the same line on the unchanged original checkout (257169f). It is not counted as a passing check.

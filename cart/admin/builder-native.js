@@ -568,6 +568,8 @@
     commerce: ["div", "span"],
     icon: ["svg"],
     video: ["video"],
+    youtube: ["div"],
+    social: ["nav"],
     accordion: ["details"],
     summary: ["summary"],
     break: ["br"],
@@ -612,6 +614,8 @@
       flexShrink: "0",
     },
     video: { display: "block", width: "100%" },
+    youtube: { display: "block", width: "100%", maxWidth: "100%", minWidth: "0px", borderRadius: "14px", overflow: "hidden" },
+    social: { display: "flex", flexWrap: "wrap", gap: "16px", alignItems: "center", fontSize: "14px", minWidth: "0px", maxWidth: "100%" },
     accordion: { display: "block" },
     summary: {
       display: "flex",
@@ -633,6 +637,8 @@
       text: "Paragraph",
       product: "Product card",
       commerce: "Product control",
+      youtube: "YouTube video",
+      social: "Social links",
       accordion: "Expandable answer",
       summary: "Answer heading",
     })[type] || label(type);
@@ -885,6 +891,17 @@
           "Choose valid section or element IDs for scroll visibility.",
         );
     }
+    if (config.type === "youtube") {
+      if (config.src && !globalThis.EzkartMedia?.youtube(config.src)) throw Error("Paste a YouTube watch, share, Shorts or embed URL.");
+      if (config.ratio && !["16 / 9", "4 / 3", "1 / 1", "9 / 16"].includes(config.ratio)) throw Error("Choose a listed video shape.");
+      if (config.start != null && (!Number.isInteger(config.start) || config.start < 0 || config.start > 86400)) throw Error("Start time must be 0–86400 seconds.");
+    }
+    if (config.type === "social") {
+      if (!Array.isArray(config.links || []) || (config.links || []).length > 8) throw Error("Use up to eight social links.");
+      for (const link of config.links || []) {
+        if (!String(link.label || '').trim() || String(link.label).length > 80 || !globalThis.EzkartMedia?.webUrl(link.url)) throw Error("Give each social link a name and an http or https web address.");
+      }
+    }
     if (config.src) (config.type === 'image' ? safeMediaUrl : safeUrl)(config.src);
     if (config.poster) safeMediaUrl(config.poster);
     if (config.captions) safeUrl(config.captions);
@@ -1016,6 +1033,27 @@
     }
   }
   function syncMedia(node, config) {
+    if (config.type === "youtube") {
+      const card=globalThis.EzkartMedia.createYoutube({url:config.src || '', title:config.label || config.name || 'YouTube video', ratio:config.ratio || '16 / 9', controls:config.controls !== false});
+      if (config.start != null) card.dataset.youtubeStart=String(config.start);
+      node.replaceChildren(card);
+      return;
+    }
+    if (config.type === "social") {
+      node.setAttribute('aria-label', config.label || 'Social media');
+      node.replaceChildren();
+      for (const link of config.links || []) {
+        const url = globalThis.EzkartMedia?.webUrl(link.url);
+        if (!url) continue;
+        const anchor = document.createElement('a');
+        anchor.href=url; anchor.textContent=String(link.label || 'Social media'); anchor.target='_blank'; anchor.rel='noopener noreferrer';
+        node.append(anchor);
+      }
+      if (!node.children.length) {
+        const hint=document.createElement('span'); hint.className='sq-native-social-empty'; hint.textContent='Add your social links'; node.append(hint);
+      }
+      return;
+    }
     if (node.tagName !== "VIDEO") return;
     node.src = config.src || "";
     node.poster = config.poster || "";
@@ -1113,6 +1151,7 @@
         node.append(track);
       }
     }
+    if (["youtube", "social"].includes(config.type)) syncMedia(node, config);
     if (config.action?.type === "link") {
       node.setAttribute("href", config.action.target);
       if (config.action.newTab) {
@@ -1188,7 +1227,7 @@
       Object.assign(props, {position:'relative',left:'auto',top:'auto',right:'auto',bottom:'auto'});
     }
     if (freeChild) Object.assign(props, {marginLeft:'0px',marginRight:'0px',marginTop:'0px',marginBottom:'0px',gridColumn:'auto',gridRow:'auto'});
-    if (['image','video','icon'].includes(config.type)) {
+    if (['image','video','youtube','icon'].includes(config.type)) {
       props.height = 'auto';
       // A resized frame keeps its proportions and image-fit choice; an upload
       // with an automatic height keeps its intrinsic aspect ratio instead.
@@ -2920,6 +2959,7 @@
     panel.querySelector("[data-native-group=Typography]").hidden = [
       "image",
       "video",
+      "youtube",
       "break",
     ].includes(config.type);
     panel.querySelector("[data-native-group=Typography] > summary").textContent = config.type === "icon" ? "Icon color" : "Font & text alignment";
@@ -3140,6 +3180,21 @@
       );
     panel.querySelector("[data-native-move-parent]").value =
       selected.parentElement.closest(".sq-native")?.dataset.nativeId || "";
+    panel.querySelector('[data-native-youtube]').hidden = config.type !== 'youtube';
+    panel.querySelector('[data-native-social]').hidden = config.type !== 'social';
+    if (config.type === 'youtube') {
+      panel.querySelector('[data-native-youtube-url]').value=config.src || '';
+      panel.querySelector('[data-native-youtube-title]').value=config.label || '';
+      panel.querySelector('[data-native-youtube-ratio]').value=config.ratio || '16 / 9';
+      panel.querySelector('[data-native-youtube-controls]').checked=config.controls !== false;
+      panel.querySelector('[data-native-youtube-start]').value=config.start ?? globalThis.EzkartMedia?.youtube(config.src)?.start ?? 0;
+    }
+    if (config.type === 'social') {
+      for (let i=0;i<8;i++) {
+        panel.querySelector(`[data-native-social-label="${i}"]`).value=config.links?.[i]?.label || '';
+        panel.querySelector(`[data-native-social-url="${i}"]`).value=config.links?.[i]?.url || '';
+      }
+    }
     panel.querySelector("[data-native-media]").hidden = config.type !== "video";
     for (const key of [
       "poster",
@@ -3204,6 +3259,18 @@
       <label>Variant shown here<select data-commerce-setting="variantId"></select></label>
       <div data-native-variant-colors hidden></div>
       <label>Text before value<input data-commerce-setting="prefix"></label><label>Text after value<input data-commerce-setting="suffix"></label><label>Option price suffix<input data-commerce-setting="priceSuffix" placeholder=" / pack"></label><label><input type="checkbox" data-commerce-setting="showPrice"> Show price on the button</label>
+      </details>
+      <details open data-native-youtube hidden><summary>YouTube video</summary>
+        <label>YouTube URL<input type="url" data-native-youtube-url placeholder="https://youtu.be/…"></label>
+        <label>Video title<input data-native-youtube-title placeholder="Describe this video" maxlength="160"></label>
+        <label>Video shape<select data-native-youtube-ratio><option value="16 / 9">Wide · 16:9</option><option value="4 / 3">Classic · 4:3</option><option value="1 / 1">Square · 1:1</option><option value="9 / 16">Portrait · 9:16</option></select></label>
+        <label>Start at (seconds)<input type="number" min="0" max="86400" step="1" data-native-youtube-start></label>
+        <label class="sq-native-check"><input type="checkbox" data-native-youtube-controls>Show player controls</label>
+        <button type="button" class="sq-native-wide" data-native-youtube-apply>Apply video</button><p class="sq-native-help">Loads when your visitor presses play. Use Layout &amp; appearance below to adjust size, corners and spacing.</p>
+      </details>
+      <details open data-native-social hidden><summary>Social links</summary><p class="sq-native-help">Add up to eight named profile links. Empty rows stay hidden. Style and align the links below.</p>
+        ${Array.from({length:8}, (_,i)=>`<div class="sq-native-social-row"><label>Link ${i+1} name<input data-native-social-label="${i}" placeholder="Instagram" maxlength="80"></label><label>Web address<input type="url" data-native-social-url="${i}" placeholder="https://…"></label></div>`).join('')}
+        <button type="button" class="sq-native-wide" data-native-social-apply>Apply social links</button>
       </details>
       <details open data-native-content><summary data-native-content-title>Text</summary>
         <label>Your text<textarea rows="3" data-native-text></textarea></label>
@@ -3277,7 +3344,7 @@
         (node) =>
           node.matches("details") &&
           !node.matches(
-            "[data-native-content], [data-native-fill-section], [data-native-product-controls], [data-native-commerce-controls], [data-native-media], [data-native-icon-options]",
+            "[data-native-youtube], [data-native-social], [data-native-content], [data-native-fill-section], [data-native-product-controls], [data-native-commerce-controls], [data-native-media], [data-native-icon-options]",
           ),
       )
       .forEach((node) => advanced.append(node));
@@ -3610,6 +3677,27 @@
         imageUpload = null;
         select(selected);
       }
+    });
+    listen('[data-native-youtube-url]', 'change', () => {
+      const parsed=globalThis.EzkartMedia?.youtube(panel.querySelector('[data-native-youtube-url]').value);
+      if (parsed) panel.querySelector('[data-native-youtube-start]').value=parsed.start;
+    });
+    listen('[data-native-youtube-apply]', 'click', () => {
+      const value=panel.querySelector('[data-native-youtube-url]').value.trim(), parsed=globalThis.EzkartMedia?.youtube(value);
+      if (value && !parsed) throw Error('Paste a YouTube watch, share, Shorts or embed URL.');
+      const patch={src:parsed?.url || '', label:panel.querySelector('[data-native-youtube-title]').value.trim(), ratio:panel.querySelector('[data-native-youtube-ratio]').value, controls:panel.querySelector('[data-native-youtube-controls]').checked, start:Number(panel.querySelector('[data-native-youtube-start]').value || 0)};
+      validate({...read(selected),...patch}); change(patch); syncMedia(selected, read(selected)); hooks.changed();
+    });
+    listen('[data-native-social-apply]', 'click', () => {
+      const links=[];
+      for (let i=0;i<8;i++) {
+        const label=panel.querySelector(`[data-native-social-label="${i}"]`).value.trim(), value=panel.querySelector(`[data-native-social-url="${i}"]`).value.trim();
+        if (!label && !value) continue;
+        const url=globalThis.EzkartMedia?.webUrl(value);
+        if (!label || !url) throw Error('Give each social link a name and an http or https web address.');
+        links.push({label,url});
+      }
+      change({links}); syncMedia(selected, read(selected)); hooks.changed();
     });
     listen("[data-native-src]", "change", () => {
       const src = (selected.dataset.nativeType === "image" ? safeMediaUrl : safeUrl)(panel.querySelector("[data-native-src]").value);

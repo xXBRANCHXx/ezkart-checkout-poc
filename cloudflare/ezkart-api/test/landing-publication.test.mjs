@@ -2,9 +2,12 @@ import {applyCommerceSchema} from './commerce-schema.mjs';
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {readFile} from "node:fs/promises";
+import {decodeHTML} from 'entities';
 import {sellerPageAddress} from "../src/seller-page-address.js";
 import { build } from "esbuild";
 import { Miniflare, convertV4MiniflareOptions } from "miniflare";
+
+const authoredSource = shell => decodeHTML(shell.match(/\bsrcdoc="([^"]*)"/)?.[1] || '');
 
 test("Worker publication rules parse real purchase elements and require an owned, active, available product", async (t) => {
   const bundle = await build({
@@ -411,12 +414,14 @@ test("Authenticated page saves allow empty drafts and reject publish bypasses ag
   assert.equal(stored.state.preview, "<h1>My next draft</h1>");
   const live = await mf.dispatchFetch(publicUrl);
   assert.equal(live.status, 200, 'Published pages load without authentication');
-  assert.equal(await live.text(), buy('owned'), 'Only the published snapshot is public');
+  const liveHtml = await live.text();
+  assert.equal(authoredSource(liveHtml), buy('owned'), 'Only the published snapshot is public');
+  assert.match(liveHtml, /sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation"/);
   assert.match(live.headers.get('cache-control'), /no-store/);
   const legacyPublic = await mf.dispatchFetch(publicUrl.replace('/store/', '/mine-0123456789/'));
   assert.equal(legacyPublic.status, 200);
   assert.equal(legacyPublic.headers.get('x-ezkart-public-path'), '/store/shop/my-page');
-  assert.match(live.headers.get('content-security-policy'), /sandbox allow-scripts/);
+  assert.doesNotMatch(live.headers.get('content-security-policy'), /\bsandbox\b/);
   assert.doesNotMatch(live.headers.get('content-security-policy'), /allow-same-origin/);
   assert.equal((await mf.dispatchFetch(publicUrl.replace('/store/', '/another-store/'))).status, 404);
   await db.prepare("UPDATE sellers SET status='suspended' WHERE id='mine'").run();
@@ -468,7 +473,8 @@ test("Authenticated page saves allow empty drafts and reject publish bypasses ag
   assert.equal((await mf.dispatchFetch(viewUrl,{headers:{...auth,'x-ezkart-preview-store':'other'}})).status,404);
   assert.equal((await mf.dispatchFetch(viewUrl,{headers:{...auth,'x-ezkart-preview-store':'store'}})).status,200);
   const viewHtml = await view.text();
-  assert.match(viewHtml, /<script>largeUnusedCode/);
+  assert.match(authoredSource(viewHtml), /<script>largeUnusedCode/);
+  assert.match(viewHtml, /sandbox="allow-scripts/);
   assert.doesNotMatch(viewHtml, /ezkart-library-preview-style/);
   // Sharing requires a separately supplied key, even for a published page.
   const accessUrl = 'http://worker.test/v1/landing-pages/my-page/preview-access';
@@ -501,7 +507,7 @@ test("Authenticated page saves allow empty drafts and reject publish bypasses ag
   assert.equal((await unlock(rotated.previewAccess.key)).status,200);
   assert.equal((await mf.dispatchFetch(publicUrl)).status,200,'Publishing remains independent of preview keys');
   assert.match(view.headers.get('cache-control'), /no-store/);
-  assert.match(view.headers.get('content-security-policy'), /sandbox allow-scripts/);
+  assert.doesNotMatch(view.headers.get('content-security-policy'), /\bsandbox\b/);
   assert.doesNotMatch(view.headers.get('content-security-policy'), /allow-same-origin/);
   assert.equal((await mf.dispatchFetch(viewUrl.replace('my-page', 'foreign-page'), {headers:auth})).status, 404);
   await db.batch([

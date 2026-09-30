@@ -8,8 +8,9 @@ header('Cache-Control: private, no-store');
 header('X-Content-Type-Options: nosniff');
 header('Referrer-Policy: no-referrer');
 if (strtolower(ez_config('deployment_environment')) !== 'production') header('X-Robots-Tag: noindex, nofollow');
-// Merchant-authored HTML must never gain the hosting origin's privileges.
-header("Content-Security-Policy: default-src 'none'; img-src 'self' data: https:; media-src 'self' data: blob: https:; style-src 'unsafe-inline' https:; script-src 'unsafe-inline' https:; font-src 'self' data: https:; connect-src 'self' https:; form-action 'self' https:; frame-src 'self' about: https:; frame-ancestors 'self'; base-uri 'none'; sandbox allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation");
+// Only this trusted shell has the hosting origin. Authored HTML stays inside
+// the independently sandboxed iframe created by ez_landing_page_frame().
+header("Content-Security-Policy: default-src 'none'; img-src 'self' data: https:; media-src 'self' data: blob: https:; style-src 'unsafe-inline' https:; script-src 'self' 'unsafe-inline' https:; font-src 'self' data: https:; connect-src 'self' https:; form-action 'self' https:; frame-src 'self' about: https:; frame-ancestors 'self'; base-uri 'none'");
 
 try {
     if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET') {
