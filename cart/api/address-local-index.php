@@ -29,6 +29,7 @@ function ez_local_geocoder_search(string $query, array $components = []): array
     $manifest = json_decode((string) file_get_contents($directory . '/manifest.json'), true, 512, JSON_THROW_ON_ERROR);
     if (($manifest['format'] ?? '') !== 'ezkart-address-index-v1') throw new RuntimeException('Address index is invalid.');
     $parts = ez_geocode_parts($query, $components);
+    $placeNameQuery = ez_geocode_normalize($components['address'] ?? explode(',', $query)[0]);
     $groups = [];
     if ($parts['street'] !== '') {
         $variants = [];
@@ -50,7 +51,7 @@ function ez_local_geocoder_search(string $query, array $components = []): array
         if ($list) { $sets[] = array_values(array_unique($list)); break; }
     }
     if (!$sets) {
-        foreach (array_unique(explode(' ', ez_geocode_normalize($query))) as $word) {
+        foreach (array_unique(explode(' ', $placeNameQuery)) as $word) {
             if (mb_strlen($word) < 4 || in_array($word, ['jalan', 'indonesia', 'kecamatan', 'kabupaten'], true) || ctype_digit($word)) continue;
             $list = ez_local_geocoder_postings($directory, 'word:' . $word);
             if ($list) $sets[] = $list;
@@ -64,7 +65,6 @@ function ez_local_geocoder_search(string $query, array $components = []): array
     $handle = fopen($directory . '/records.jsonl', 'rb');
     if (!$handle) throw new RuntimeException('Address index is unavailable.');
     $results = []; $nameQuery = ez_geocode_normalize($query); $names = [];
-    $placeNameQuery = ez_geocode_normalize($components['address'] ?? explode(',', $query)[0]);
     try {
         foreach ($offsets as $offset) {
             if (!is_int($offset) || $offset < 0 || fseek($handle, $offset) !== 0) continue;
@@ -74,10 +74,10 @@ function ez_local_geocoder_search(string $query, array $components = []): array
             $p = $record['properties'] ?? [];
             $coordinate = ez_tracking_coordinate($record['coordinate'] ?? null);
             if (!$coordinate) continue;
-            $recordLocalities = array_map('ez_geocode_normalize', $p['localities'] ?? []);
+            $recordLocalities = array_map('ez_geocode_locality_normalize', $p['localities'] ?? []);
             $localityMatch = false;
             foreach ($parts['localities'] as $constraint) {
-                if (!in_array(ez_geocode_normalize($constraint), $recordLocalities, true)) continue 2;
+                if (!in_array(ez_geocode_locality_normalize($constraint), $recordLocalities, true)) continue 2;
                 $localityMatch = true;
             }
             if ($parts['postcode'] !== '' && !empty($p['postcode']) && $parts['postcode'] !== $p['postcode']) continue;

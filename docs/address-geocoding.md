@@ -77,3 +77,25 @@ building selection and saving. The checkout address suite covers Plus Codes,
 supplied coordinates, late results, map failure, saved-pin precedence,
 pointer/touch positioning and delivery-coordinate binding. The merchant shipping
 suite covers confirmation and save/reload recovery.
+
+
+## Indonesia import, 30 September 2026
+
+The Geofabrik extract dated 29 September 2026 was verified against its published
+MD5 (`b82fe01e59cfd6737cbcc93d1ffbbfe0`, 1,737,609,162 bytes). The completed
+index contains 1,103,818 records: 48,306 numbered addresses, 401,046 named places,
+530,820 streets and 123,646 areas. Every JSON record was validated before upload.
+The private runtime directory is configured independently of Git deployments.
+
+Twelve sampled mapped addresses spanning Java, Sumatra, Kalimantan, Sulawesi and
+Bali returned their original mapped coordinates through the PHP customer API,
+with no external geocoder calls. Eleven were unique; one returned two buildings
+and required a choice. The sample also exercised block identifiers, street
+metadata containing commas, and non-Jalan street prefixes. This checks index and
+lookup integration against mapped records; it is not independent verification of
+entrances or evidence of complete Indonesian address coverage.
+
+
+The private index was activated on Workbench after the hosted record-file size
+and all 4,096 token-shard sizes were checked; eight sampled shard SHA-256 hashes
+matched the local data. Health reported `engine=ezkart` and `index_ready=true`.

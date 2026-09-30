@@ -29,6 +29,11 @@ function ez_geocode_street_normalize(string $text): string
     return preg_replace('/^jalan\s+/u', '', ez_geocode_normalize($text));
 }
 
+function ez_geocode_locality_normalize(string $text): string
+{
+    return preg_replace('/^(?:daerah khusus(?: ibukota)?|dki|dkj)\s+/u', '', ez_geocode_normalize($text));
+}
+
 /** Parse common Indonesian street/number notation, retaining independent locality constraints. */
 function ez_geocode_parts(string $query, array $components = []): array
 {
@@ -90,7 +95,7 @@ function ez_geocode_photon_result(array $feature, array $parts): ?array
     $localities = array_filter(array_map($clean, ['locality', 'district', 'city', 'county', 'state']));
     $localityMatch = false;
     foreach ($parts['localities'] as $constraint) {
-        $matches = array_filter($localities, static fn($value) => ez_geocode_normalize($value) === ez_geocode_normalize($constraint));
+        $matches = array_filter($localities, static fn($value) => ez_geocode_locality_normalize($value) === ez_geocode_locality_normalize($constraint));
         if (!$matches) return null;
         $localityMatch = true;
     }

@@ -74,3 +74,11 @@ test('structured fields retain mapped block identifiers and commas inside street
   const f=await indexedFixture(t,examples.map(([street,housenumber],i)=>record({osm:'N'+(200+i),properties:{...record().properties,street,housenumber}})));
   for(const [street,housenumber] of examples){const components={address:street+' No. '+housenumber,location:'Jakarta',postalCode:'10230'};const found=await f.search(Object.values(components).join(', '),components);assert.equal(found.status,200);assert.equal(found.data.results.length,1);assert.equal(found.data.results[0].auto_select,true);assert.deepEqual(found.data.results[0].coordinate,coordinates);}
 });
+
+
+test('landmark words drive discovery while locality words only constrain it; Jakarta aliases refer to the mapped capital boundary',async t=>{
+  const f=await indexedFixture(t,[record({osm:'N300',precision:'place',properties:{name:'Candi Cerita',street:'',aliases:[],localities:['Sleman']}}),record({osm:'N301',precision:'place',properties:{name:'Candi Cerita',street:'',localities:['Surabaya']}}),record({osm:'N302',precision:'place',properties:{name:'Sleman Office',street:'',localities:['Sleman']}}),record({osm:'N303',precision:'place',properties:{name:'Monumen Nasional',aliases:['Monas'],street:'',localities:['Daerah Khusus Ibukota Jakarta']}})]);
+  const temple=await f.search('Candi Cerita, Sleman');assert.equal(temple.data.results[0].name,'Candi Cerita');assert.equal(temple.data.results[0].auto_select,true);
+  const capital=await f.search('Monas, Jakarta');assert.equal(capital.data.results[0].name,'Monumen Nasional');assert.equal(capital.data.results[0].auto_select,true);
+  const wrong=await f.search('Monas, Surabaya');assert.deepEqual(wrong.data.results,[]);
+});
