@@ -10,8 +10,9 @@ try {
     $input = json_decode((string) file_get_contents('php://input', false, null, 0, 4096), true);
     $query = is_string($input['address'] ?? null) ? trim(preg_replace('/\s+/u', ' ', $input['address']) ?? '') : '';
     if (mb_strlen($query) < 3 || mb_strlen($query) > 500) throw new InvalidArgumentException('Enter an address between 3 and 500 characters.');
+    $components = ez_geocode_components($input['components'] ?? null);
     session_write_close();
-    ez_api_json(['ok' => true, 'results' => ez_tracking_address_search($query)]);
+    ez_api_json(['ok' => true, 'results' => ez_tracking_address_search($query, $components)]);
 } catch (InvalidArgumentException $error) {
     ez_api_json(['ok' => false, 'error' => $error->getMessage()], 422);
 } catch (Throwable) {

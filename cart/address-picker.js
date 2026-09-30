@@ -21,8 +21,9 @@
     container.innerHTML = '<div class="address-picker-heading"><strong>Delivery location</strong><span>Optional</span></div><label class="address-picker-label">Find your address<input type="search" class="address-picker-query" placeholder="Street, city, Plus Code, or coordinates" maxlength="500" autocomplete="off"></label><div class="address-picker-actions"><button type="button" data-find>Find address</button></div><p class="address-picker-status" role="status">Enter your address and we’ll find it on the map.</p><div class="address-picker-frame"><div class="address-picker-map" role="region" aria-label="Position your delivery entrance"></div><div class="address-picker-loading" role="status">Loading map…</div><div class="address-picker-hint">Enter your address to find its location</div><span class="address-picker-pin" aria-hidden="true" hidden>' + pin + '</span><div class="address-picker-zoom"><button type="button" data-zoom="1" aria-label="Zoom in">+</button><button type="button" data-zoom="-1" aria-label="Zoom out">−</button></div></div><ul class="address-picker-results" hidden></ul><p class="address-picker-credit">Address search: <a href="https://photon.komoot.io/" target="_blank" rel="noopener noreferrer">Photon</a> · <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© OpenStreetMap</a></p>';
     const $ = selector => container.querySelector(selector);
     const query = $("input"), status = $(".address-picker-status"), results = $("ul"), canvas = $(".address-picker-map"), loading = $(".address-picker-loading");
+    $(".address-picker-frame").before(results);
     const overview = { latitude: -2.5, longitude: 118 };
-    let map, mapReady, ready = false, active = false, coordinate = null, confirmed = false, positioning = false, controller, autoTimer, sequence = 0, generation = 0, searching = false, lookupSource = "fields";
+    let map, mapReady, ready = false, active = false, coordinate = null, confirmed = false, positioning = false, controller, autoTimer, sequence = 0, generation = 0, searching = false, lookupSource = "fields", manualMove = false;
     const closeEnough = () => ready && loading.hidden && map.getZoom() >= 16;
     function updateHint() {
       $(".address-picker-pin").hidden = !valid(coordinate) || !closeEnough();
@@ -37,11 +38,11 @@
       const center = map.getCenter(), p = { latitude: center.lat, longitude: center.lng };
       const changed = !coordinate || Math.abs(p.latitude - coordinate.latitude) > 1e-10 || Math.abs(p.longitude - coordinate.longitude) > 1e-10;
       // A country overview is not a delivery pin. Keep an existing pin when zooming out.
-      if (closeEnough() && valid(p) && changed) {
+      if (manualMove && closeEnough() && valid(p) && changed) {
         cancelSearch(); coordinate = p; confirmed = true; options.onPin?.();
         status.textContent = "Pin adjusted. It will be saved with your address.";
       }
-      updateHint();
+      manualMove = false; updateHint();
     }
     async function showMap(initial, zoom = 17) {
       const version = ++generation;
@@ -52,8 +53,9 @@
         if (!map) {
           map = new maplibregl.Map({ container: canvas, style: "/cart/tracking-map-style.json?v=1", center: [initial.longitude, initial.latitude], zoom, minZoom: 3, maxZoom: 19, maxPitch: 0, renderWorldCopies: false, dragRotate: false, touchPitch: false, pitchWithRotate: false, attributionControl: { compact: true, customAttribution: '<a href="/cart/vendor/openfreemap/POSITRON-LICENSE.md" target="_blank" rel="noopener noreferrer">Positron</a>' } });
           map.touchZoomRotate.disableRotation();
-          map.on("dragstart", cancelSearch);
+          map.on("dragstart", () => { manualMove = true; cancelSearch(); });
           map.on("zoomstart", () => { if (!positioning && ready && loading.hidden) cancelSearch(); });
+          map.on("movestart", event => { if (/^Arrow/.test(event.originalEvent?.key || "")) { manualMove = true; cancelSearch(); } });
           map.on("moveend", chooseCenter);
           mapReady = new Promise((resolve, reject) => {
             const failed = event => { if (!ready && !event.tile) { clearTimeout(timeout); reject(new Error("Map data is unavailable")); } };
@@ -75,8 +77,20 @@
         loading.append(retry); updateHint();
       }
     }
+    const precise = place => ["supplied", "address", "place"].includes(place.precision) || place.resolved === true;
+    function credit(place) {
+      const node = $(".address-picker-credit");
+      node.innerHTML = place.provider === "ezkart" ? 'Address search: Ezkart · <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© OpenStreetMap</a>' : 'Address search: <a href="https://photon.komoot.io/" target="_blank" rel="noopener noreferrer">Photon</a> · <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© OpenStreetMap</a>';
+    }
     function choose(place, preserveAddress = false) {
-      cancelSearch(); coordinate = { ...place.coordinate }; confirmed = false;
+      cancelSearch(); credit(place);
+      if (!precise(place)) {
+        coordinate = null; confirmed = false;
+        status.textContent = "Only an approximate area was found. No delivery pin selected. Search for the building or position its entrance.";
+        void showMap(place.coordinate, place.precision === "area" ? 11 : 14);
+        return;
+      }
+      coordinate = { ...place.coordinate }; confirmed = false;
       options.onPlace(place, { preserveAddress }); options.onPin?.();
       status.textContent = "Suggested location. Move the map if the entrance is elsewhere.";
       void showMap(coordinate);
@@ -95,18 +109,23 @@
       searching = true;
       $("[data-find]").disabled = true; status.textContent = "Locating your address…";
       try {
-        const response = await fetch(options.endpoint || "/cart/api/address-search.php", { method: "POST", cache: "no-store", headers: { "Content-Type": "application/json", "X-Ezkart-CSRF": options.csrf() }, body: JSON.stringify({ address: text }), signal: requestController.signal });
+        const response = await fetch(options.endpoint || "/cart/api/address-search.php", { method: "POST", cache: "no-store", headers: { "Content-Type": "application/json", "X-Ezkart-CSRF": options.csrf() }, body: JSON.stringify({ address: text, ...(source === "fields" && options.addressFields ? { components: options.addressFields() } : {}) }), signal: requestController.signal });
         const data = await response.json();
         if (request !== sequence || !active) return;
         if (!response.ok || !data.ok || !Array.isArray(data.results)) throw new Error(response.status === 401 ? "Please sign in again to search for an address." : data.error || "Address search is unavailable. You can still save your address.");
         const places = data.results.filter(place => valid(place.coordinate));
         if (places.length) {
-          // Start at the best match, without making customers choose from a list first.
-          choose(places[0], source === "fields");
-          if (places.length > 1) {
+          const automatic = places.filter(place => place.auto_select === true || (place.auto_select === undefined && place.resolved === true && places.length === 1));
+          if (automatic.length === 1 && precise(automatic[0])) choose(automatic[0], source === "fields");
+          else {
+            credit(places[0]);
+            status.textContent = places.some(precise) ? "Choose the matching building below. Several results or an incomplete match need your selection." : "Only approximate locations were found. No delivery pin selected. Search for a building or a more specific address.";
+            void showMap(places[0].coordinate, places[0].precision === "area" ? 11 : places[0].precision === "street" || places[0].precision === "interpolated" ? 14 : 17);
+          }
+          if (places.length > 1 || automatic.length !== 1) {
             for (const place of places) {
               const row = document.createElement("li"), button = document.createElement("button"), name = document.createElement("strong"), detail = document.createElement("span");
-              button.type = "button"; name.textContent = place.name; detail.textContent = place.address;
+              button.type = "button"; name.textContent = place.name; detail.textContent = [place.kind, place.address].filter(Boolean).join(" · ");
               button.append(name, detail); button.addEventListener("click", () => choose(place, source === "fields")); row.append(button); results.append(row);
             }
             results.hidden = false;
@@ -128,7 +147,7 @@
     container.querySelectorAll("[data-zoom]").forEach(button => button.addEventListener("click", () => { if (ready) map.setZoom(Math.max(3, Math.min(19, map.getZoom() + Number(button.dataset.zoom)))); }));
     return {
       reset(address) {
-        generation++; cancelSearch(); active = true; coordinate = valid(address.coordinate) ? { ...address.coordinate } : null; confirmed = !!coordinate;
+        generation++; cancelSearch(); active = true; manualMove = false; coordinate = valid(address.coordinate) ? { ...address.coordinate } : null; confirmed = !!coordinate;
         lookupSource = "fields"; query.value = "";
         status.textContent = coordinate ? "Your saved delivery pin. Move the map to adjust the entrance." : "Enter your address and we’ll find it on the map.";
         void showMap(coordinate || overview, coordinate ? 17 : 4);

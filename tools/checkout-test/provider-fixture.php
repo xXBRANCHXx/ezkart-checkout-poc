@@ -229,7 +229,7 @@ function curl_exec(object $handle): string|bool {
         }
         return json_encode(['ok' => true, 'book' => $book]);
     }
-    if (str_starts_with($handle->url, 'https://photon.komoot.io/api/?')) {
+    if (str_starts_with($handle->url, 'https://photon.komoot.io/api/?') || str_starts_with($handle->url, 'https://photon.komoot.io/structured?')) {
         $file = dirname(getenv('EZKART_TEST_CAPTURE')) . '/address-response.json';
         if (is_file($file)) return (string) file_get_contents($file);
         return json_encode(['type' => 'FeatureCollection', 'features' => [

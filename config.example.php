@@ -47,6 +47,9 @@ return [
     'admin_session_storage' => '',
     // Customer Google sign-in uses the same provider, with a separate private session.
     'customer_session_storage' => '',
+    // Optional private, self-hosted map index. No geocoding account or API key.
+    // Defaults to ezkart-geocoding beside the public document root.
+    'address_geocoding_directory' => '',
     // The server-side switch selects BOTH providers. Default is sandbox.
     // Beta and production deployments require production provider settings.
     // The test deployment may use either mode, after all provider checks pass.

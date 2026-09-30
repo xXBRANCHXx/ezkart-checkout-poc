@@ -61,7 +61,7 @@ async function browserFixture(t,overrides={}){
 test('merchant shipping saves addresses and courier choices with mobile review and exact recovery after a lost save and reload',async t=>{
   const f=await browserFixture(t),{page}=f,bodies=[];let lose=false,reject=false;
   await page.route('**/cart/admin/?cloud=*',async route=>{const target=new URL(route.request().url()).searchParams.get('cloud');
-    if(target==='/v1/shipping-address-search'){await route.fulfill({json:{ok:true,results:[{name:'Returns desk',address:'Jakarta, Indonesia',coordinate:{latitude:-6.2,longitude:106.8}}]}});return;}
+    if(target==='/v1/shipping-address-search'){await route.fulfill({json:{ok:true,results:[{precision:'supplied',auto_select:true,name:'Returns desk',address:'Jakarta, Indonesia',coordinate:{latitude:-6.2,longitude:106.8}}]}});return;}
     if(target===path&&route.request().method()==='PUT'){bodies.push(route.request().postData());if(lose){lose=false;const response=await route.fetch();assert.equal(response.status(),200,await response.text());await route.abort();return;}if(reject){reject=false;await route.fulfill({status:409,json:{ok:false,error:'Settings could not be confirmed'}});return;}}
     await route.continue();});
   await f.open();await page.locator('[data-shipping-add]').click();
@@ -109,7 +109,7 @@ test('unavailable map data cannot confirm a suggested pin and still permits a st
   const f=await browserFixture(t),{page}=f;
   await page.route('**/tracking-map-style.json?*',route=>route.abort());
   await page.route('**/cart/admin/?cloud=*',async route=>{
-    if(new URL(route.request().url()).searchParams.get('cloud')==='/v1/shipping-address-search')await route.fulfill({json:{ok:true,results:[{name:'Map unavailable',address:'Jakarta',coordinate:{latitude:-6.2,longitude:106.8}}]}});
+    if(new URL(route.request().url()).searchParams.get('cloud')==='/v1/shipping-address-search')await route.fulfill({json:{ok:true,results:[{precision:'supplied',auto_select:true,name:'Map unavailable',address:'Jakarta',coordinate:{latitude:-6.2,longitude:106.8}}]}});
     else await route.continue();
   });
   await f.open();await page.locator('[data-shipping-add]').click();

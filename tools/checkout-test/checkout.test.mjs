@@ -1768,7 +1768,7 @@ test("late automatic address results cannot replace newer text or a customer-pos
   pending.shift()();
   await page.waitForRequest('**/api/address-search.php');
   const desired = { latitude: -7.7894, longitude: 110.3635 };
-  await page.evaluate(p => deliveryMapUnderTest.jumpTo({ center: [p.longitude, p.latitude], zoom: 17 }), desired);
+  await page.evaluate(p => { deliveryMapUnderTest.fire("dragstart"); deliveryMapUnderTest.jumpTo({ center: [p.longitude, p.latitude], zoom: 17 }); }, desired);
   pending.shift()(); await page.unrouteAll({ behavior: 'wait' });
   assert.equal(await editor.getByLabel('Full address', { exact: true }).inputValue(), 'New street 34');
   await editor.locator('.address-picker-status').filter({ hasText: 'Pin adjusted' }).waitFor();
@@ -1902,7 +1902,7 @@ test("unmatched addresses can be positioned during creation and failed saves ret
   await editor.getByLabel('Full address', { exact: true }).fill('Unnamed entrance beside the station');
   await editor.getByLabel('District / city', { exact: true }).fill('Yogyakarta');
   await editor.getByLabel('Postcode', { exact: true }).fill('55271');
-  await page.evaluate(() => deliveryMapUnderTest.jumpTo({ center: [110.3635, -7.7894], zoom: 17 }));
+  await page.evaluate(() => { deliveryMapUnderTest.fire("dragstart"); deliveryMapUnderTest.jumpTo({ center: [110.3635, -7.7894], zoom: 17 }); });
   await page.route('**/admin/customer-addresses.php', route => route.request().method() === 'POST' ? route.fulfill({ status: 503, json: { ok: false, error: 'Please try again.' } }) : route.continue());
   await editor.getByRole('button', { name: 'Save address', exact: true }).click();
   await editor.locator('.address-book-error').filter({ hasText: 'Please try again.' }).waitFor();

@@ -49,7 +49,7 @@ Reloading a saved version asks before discarding unsaved form changes. Browser
 storage failure blocks writes before transmission. The proxy enforces the
 existing session, CSRF and applicable MFA checks.
 
-The map uses the shared address picker. Merchant address search is a bounded,
+The map uses the shared address picker. Address matching and dedicated geocoder configuration are documented in [address geocoding](address-geocoding.md). Merchant address search is a bounded,
 authenticated, CSRF-protected PHP route at `?cloud=/v1/shipping-address-search`.
 It does not borrow the customer's authentication session or expose provider keys.
 Only the shipping page permits the map SDK's blob worker and connections to

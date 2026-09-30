@@ -20,6 +20,7 @@
     form.querySelector(".address-book-fields").before(pinContainer);
     const pickerMap = window.ezkartAddressPicker(pinContainer, {
       csrf: () => csrf,
+      addressFields: () => Object.fromEntries(geoFields.map(key => [key, form.elements[key].value.trim()])),
       addressText: () => [...new Set(geoFields.map(key => form.elements[key].value.trim()).filter(Boolean))].join(", "),
       onPlace: (place, { preserveAddress }) => {
         if (!preserveAddress || !form.elements.address.value.trim()) form.elements.address.value = place.address_line || place.name;

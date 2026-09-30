@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/bootstrap.php';
 require_once __DIR__ . '/database.php';
+require_once __DIR__ . '/address-local-index.php';
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET') {
     ez_api_json(['ok' => false, 'error' => 'Method not allowed.'], 405);
@@ -16,6 +17,7 @@ ez_api_json([
     'environment' => ez_config('deployment_environment') ?: 'unset',
     'commerce_environment' => $commerceEnvironment,
     'database' => $database,
+    'address_search' => ['engine' => ez_local_geocoder_available() ? 'ezkart' : 'photon', 'index_ready' => ez_local_geocoder_available()],
     'doku' => ['configured' => $status['doku'], 'mode' => $commerceEnvironment],
     'biteship' => [
         'configured' => $status['biteship'],

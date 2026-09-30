@@ -730,7 +730,8 @@ function ez_admin_proxy_cloud_request(string $accessToken, string $path, string 
         $input = strlen($body) <= 4096 ? json_decode($body, true) : null;
         $query = is_string($input['address'] ?? null) ? trim(preg_replace('/\s+/u', ' ', $input['address']) ?? '') : '';
         if (mb_strlen($query) < 3 || mb_strlen($query) > 500) ez_admin_json(['ok' => false, 'error' => 'Enter an address between 3 and 500 characters.'], 422);
-        try { ez_admin_json(['ok' => true, 'results' => ez_tracking_address_search($query)]); }
+        try { ez_admin_json(['ok' => true, 'results' => ez_tracking_address_search($query, ez_geocode_components($input['components'] ?? null))]); }
+        catch (InvalidArgumentException $error) { ez_admin_json(['ok' => false, 'error' => $error->getMessage()], 422); }
         catch (Throwable) { ez_admin_json(['ok' => false, 'error' => 'Address search is unavailable. You can still choose a location on the map.'], 503); }
     }
     $inventoryPath = (string) parse_url($path, PHP_URL_PATH);
