@@ -164,6 +164,7 @@ test('the chooser and image editor use the account language while leaving upload
   await page.waitForURL('**edit=halaman-gambar.ezkart.site');await page.locator('[data-image-page-add]').waitFor();
   assert.match(await page.locator('[data-image-page-add]').textContent(),/Unggah gambar/);
   assert.match(await page.locator('.ib-stage').textContent(),/khusus tampilan ponsel/);
+  await page.locator('[data-image-settings=navigation] > summary').click();
   await page.getByRole('checkbox',{name:'Tampilkan bilah navigasi',exact:true}).check();
   assert.equal(await page.getByRole('combobox',{name:'Perilaku saat digulir',exact:true}).count(),1);
   assert.equal(await page.locator('[data-image-nav=ctaLabel]').inputValue(),'Belanja sekarang');

@@ -19,6 +19,7 @@ test('Image Stack navigation settings persist and its menu, product link, surfac
   await page.locator('[data-image-page-product]').selectOption('coffee');
   const field=key=>page.locator(`[data-image-nav="${key}"]`);
   const set=async(key,value)=>{await field(key).fill(String(value));await field(key).blur();};
+  await page.locator('[data-image-settings=navigation] > summary').click();
   await field('enabled').check();await set('title','Kopi Senja');await set('height',72);await set('color','#e7eee9');await set('transparency',35);await set('blur',16);
   for(const label of ['Our coffee','The details']){await page.locator('[data-image-nav-add]').click();await page.locator('.ib-nav-link input').last().fill(label);await page.locator('.ib-nav-link input').last().blur();}
   await set('ctaLabel','Shop coffee');
@@ -27,7 +28,7 @@ test('Image Stack navigation settings persist and its menu, product link, surfac
   // Targets follow the image identity, including after reordering and disabling the bar.
   await page.locator('.ib-row').nth(1).locator('[data-image-drag]').focus();await page.keyboard.press('Space');await page.keyboard.press('ArrowUp');await page.keyboard.press('Space');assert.equal(await page.locator('.ib-nav-link select').nth(1).inputValue(),target);
   await field('enabled').uncheck();await field('enabled').check();assert.equal(await field('title').inputValue(),'Kopi Senja');
-  await page.evaluate(()=>EzkartBuilder.save());await page.reload();await field('enabled').waitFor();assert.equal(await field('enabled').isChecked(),true);assert.equal(await field('height').inputValue(),'72');assert.equal(await page.locator('.ib-nav-link').count(),2);
+  await page.evaluate(()=>EzkartBuilder.save());await page.reload();await page.locator('[data-image-settings=navigation] > summary').click();await field('enabled').waitFor();assert.equal(await field('enabled').isChecked(),true);assert.equal(await field('height').inputValue(),'72');assert.equal(await page.locator('.ib-nav-link').count(),2);
   const frame=page.frameLocator('.ib-phone');await frame.locator('.sq-image-navigation').waitFor();assert.equal(await frame.locator('.ib-nav-title').textContent(),'Kopi Senja');
   const output=await browser.newPage({viewport:{width:390,height:800},reducedMotion:'reduce'});output.on('pageerror',e=>errors.push(e.message));
   const load=async()=>{await output.setContent(await page.evaluate(()=>EzkartBuilder.exportHtml()));await output.locator('.sq-image-navigation').waitFor();};

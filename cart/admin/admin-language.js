@@ -237,6 +237,19 @@
   const normalize = value => String(value).replace(/\s+/g, ' ').trim();
   const dictionary = new Map(Object.entries(strings).map(([key,value])=>[normalize(key),value]));
   const patterns = [
+    [/^(\d+) selected$/, '$1 dipilih'],
+    [/^Added (\d+) new combinations?; existing details were preserved$/, '$1 kombinasi baru ditambahkan; detail yang sudah ada dipertahankan'],
+    [/^These options create more than 100 (plans|variants)\. Reduce the values before continuing\.$/, (_,kind)=>`Pilihan ini menghasilkan lebih dari 100 ${kind==='plans'?'paket':'varian'}. Kurangi nilainya sebelum melanjutkan.`],
+    [/^(\d+)\/30 values$/, '$1/30 pilihan'],
+    [/^Image (\d+)$/, 'Gambar $1'],
+    [/^Link (\d+) name$/, 'Nama tautan $1'],
+    [/^(\d+) matching categor(?:y|ies)$/, '$1 kategori yang cocok'],
+    [/^No category matches “(.+)”$/, 'Tidak ada kategori yang cocok dengan “$1”'],
+    [/^Popular for (physical products|digital products|subscriptions)$/, (_,kind)=>`Populer untuk ${{'physical products':'produk fisik','digital products':'produk digital',subscriptions:'langganan'}[kind]}`],
+    [/^Select all (.+) combinations$/, (_,name)=>`Pilih semua kombinasi ${name}`],
+    [/^(Select|Show|Hide) (.+)$/, (_,action,name)=>`${({Select:'Pilih',Show:'Tampilkan',Hide:'Sembunyikan'})[action]} ${name}`],
+    [/^Delete (.+) and its (\d+) (combinations?|variants?|plans?)$/, (_,name,n)=>`Hapus ${name} dan ${n} variannya`],
+    [/^(Social link name|Social link address|Remove social link|Link text|Jump to image|Remove menu link) (\d+)$/, (_,label,n)=>`${t(label)} ${n}`],
     [/^(\S+) total orders · (\S+) delivered · (\S+) delivery not required$/, '$1 total pesanan · $2 terkirim · $3 tidak memerlukan pengiriman'],
     [/^(.+) · (Sandbox|Production) · Order creation dates in Jakarta · Updated (.+)$/, (_,dates,env,at)=>`${dates} · ${t(env)} · Tanggal pesanan dalam waktu Jakarta · Diperbarui ${at}`],
     [/^(Daily|Weekly|Monthly|Yearly) totals by order date( · Grouped for this history length)?\.$/, (_,group,extra)=>`Total ${t(group).toLowerCase()} berdasarkan tanggal pesanan${extra?' · Dikelompokkan sesuai panjang riwayat':''}.`],
@@ -273,6 +286,9 @@
     if (language !== 'id' || typeof value !== 'string') return value;
     const text=normalize(value),exact=dictionary.get(text);
     if(exact!==undefined)return exact;
+    // Translate structured category breadcrumbs only when every label is known.
+    const parts=text.split(/ (·|>) /);
+    if(parts.length>1&&parts.filter((_,index)=>index%2===0).every(label=>dictionary.has(label)))return parts.map((label,index)=>index%2?` ${label} `:dictionary.get(label)).join('');
     for(const [match,replacement] of patterns)if(match.test(text))return text.replace(match,replacement);
     return value;
   }

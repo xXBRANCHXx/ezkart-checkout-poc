@@ -159,3 +159,12 @@ test('product cards use the universal fallback in the editor and export without 
   await purchase.locator('[data-ezkart-add]').click();assert.match(await output.locator('[data-ezkart-cart-items]').innerText(),/Hazelnut/);assert.match(await output.locator('[data-ezkart-cart-subtotal]').innerText(),/49[.,]000/);
   assert.deepEqual(errors,[]);
 });
+
+test('fallback menus preserve authored canvas option names outside the translated editor canvas', async t => {
+ const browser=await chromium.launch();t.after(()=>browser.close());const page=await browser.newPage({viewport:{width:390,height:700}});
+ await page.setContent(`<body data-admin-language="id"><style>${await readFile(join(repoRoot,'cart/select.css'),'utf8')}</style><div class="sq-page-preview"><label>Product option<select id="authored"><option value="orders">Orders</option><option value="products">Products</option></select></label></div><label>Billing period<select id="interface"><option value="month">Month</option><option value="year">Year</option></select></label></body>`);
+ await page.evaluate(()=>{const supports=CSS.supports.bind(CSS);CSS.supports=(...args)=>args[1]==='base-select'?false:supports(...args);});
+ await page.addScriptTag({path:join(repoRoot,'cart/admin/admin-language-id.js')});await page.addScriptTag({path:join(repoRoot,'cart/admin/admin-language.js')});await page.addScriptTag({path:join(repoRoot,'cart/select.js')});
+ const authored=page.locator('#authored').locator('..').getByRole('combobox');await authored.click();const menu=page.locator('.ezkart-select-menu:not([hidden])');assert.equal(await menu.locator('[role=option]').first().textContent(),'Orders');assert.equal(await menu.locator('[role=option]').last().getAttribute('translate'),'no');await menu.locator('[role=option]').last().click();assert.equal(await authored.locator('span').textContent(),'Products');assert.equal(await page.locator('#authored').inputValue(),'products');
+ const ui=page.locator('#interface').locator('..').getByRole('combobox');await ui.click();assert.equal(await menu.locator('[role=option]').first().textContent(),'Bulan');assert.equal(await menu.locator('[role=option]').last().textContent(),'Tahun');await menu.locator('[role=option]').last().click();assert.equal(await page.locator('#interface').inputValue(),'year');
+});

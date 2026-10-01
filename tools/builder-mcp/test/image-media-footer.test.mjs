@@ -19,11 +19,13 @@ test('Image Stack adds safe YouTube cards and social footers through the UI, per
  await page.locator('[data-image-page-product]').selectOption('coffee');
  const field=key=>page.locator(`[data-image-extra="${key}"]`),set=async(key,value)=>{await field(key).fill(value);await field(key).blur();};
  assert.equal(await page.locator('[data-image-video]').count(),0);assert.equal(await page.locator('[data-image-footer]').count(),0);
+ await page.locator('[data-image-settings=video] > summary').click();
  await set('video-url','https://youtu.be/dQw4w9WgXcQ?t=1m30s');await set('video-title','How we make coffee');
  assert.equal(await page.locator('[data-image-video] [data-ezkart-youtube]').getAttribute('data-youtube-start'),'90');
  await set('video-url','https://youtube.com.evil.example/watch?v=dQw4w9WgXcQ');assert.equal(await field('video-url').getAttribute('aria-invalid'),'true');
  assert.equal(await page.locator('[data-ezkart-youtube]').getAttribute('data-ezkart-youtube'),'dQw4w9WgXcQ');
  await set('video-url','https://youtube.com/shorts/dQw4w9WgXcQ?t=90');
+ await page.locator('[data-image-settings=footer] > summary').click();
  await field('footer-enabled').check();await set('footer-title','Kopi Senja');await set('footer-note','Find us here <img src=x onerror=alert(1)>');
  await page.locator('[data-image-social-add]').click();
  const social=page.locator('.ib-social-link');await social.locator('input').nth(0).fill('Instagram');await social.locator('input').nth(0).blur();await social.locator('input').nth(1).fill('https://instagram.com/kopi_senja');await social.locator('input').nth(1).blur();
@@ -32,8 +34,9 @@ test('Image Stack adds safe YouTube cards and social footers through the UI, per
  await second.locator('input').nth(1).fill('https://tiktok.com/@kopi_senja');await second.locator('input').nth(1).blur();
  await page.locator('[data-sq-undo]').click();assert.equal(await page.locator('[data-image-footer] a').count(),1);await page.locator('[data-sq-redo]').click();assert.equal(await page.locator('[data-image-footer] a').count(),2);
  // Other edits rebuild the image document; the extras must remain intact.
+ await page.locator('[data-image-settings=navigation] > summary').click();
  await page.locator('[data-image-nav=enabled]').check();await page.locator('[data-image-nav=title]').fill('Kopi Senja');await page.locator('[data-image-nav=title]').blur();
- await page.evaluate(()=>EzkartBuilder.save());await page.reload();await field('video-url').waitFor();assert.equal(await field('video-title').inputValue(),'How we make coffee');assert.equal(await field('footer-enabled').isChecked(),true);assert.equal(await social.count(),2);
+ await page.evaluate(()=>EzkartBuilder.save());await page.reload();await page.locator('[data-image-settings=video] > summary').click();await page.locator('[data-image-settings=footer] > summary').click();await field('video-url').waitFor();assert.equal(await field('video-title').inputValue(),'How we make coffee');assert.equal(await field('footer-enabled').isChecked(),true);assert.equal(await social.count(),2);
  await page.frameLocator('.ib-phone').locator('[data-image-footer] a').first().waitFor();
  await page.route('https://www.youtube-nocookie.com/**',route=>route.fulfill({contentType:'text/html',body:'<body>Editor fixture player</body>'}));
  await page.frameLocator('.ib-phone').getByRole('button',{name:'Play How we make coffee'}).click();await page.locator('[data-youtube-host-player]').frameLocator('iframe').getByText('Editor fixture player').waitFor();await page.keyboard.press('Escape');assert.equal(await page.locator('[data-youtube-host-player]').count(),0);

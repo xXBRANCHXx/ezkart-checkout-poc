@@ -54,12 +54,16 @@
       control.trigger.setAttribute('aria-activedescendant', option.id);
       option.scrollIntoView({ block: 'nearest' });
     };
+    const authoredOption = option => Boolean(option?.closest('[translate="no"],.sq-page-preview'));
     const sync = control => {
       const { select, trigger, menu, wrapper } = control;
-      const signature = JSON.stringify([select.selectedIndex, select.matches(':disabled'), select.hidden, [...select.options].map(o => [o.label, o.disabled || o.parentElement.disabled, o.hidden, o.value])]);
+      const signature = JSON.stringify([select.selectedIndex, select.matches(':disabled'), select.hidden, [...select.options].map(o => [o.label, o.disabled || o.parentElement.disabled, o.hidden, o.value, authoredOption(o)])]);
       if (signature === control.signature) return;
       control.signature = signature;
-      trigger.firstElementChild.textContent = select.selectedOptions[0]?.label || 'Choose an option';
+      const selected = select.selectedOptions[0];
+      trigger.firstElementChild.removeAttribute('translate');
+      if (authoredOption(selected)) trigger.firstElementChild.setAttribute('translate', 'no');
+      trigger.firstElementChild.textContent = selected?.label || 'Choose an option';
       trigger.disabled = select.matches(':disabled');
       wrapper.hidden = select.hidden;
       if (current === control && (trigger.disabled || wrapper.hidden)) close();
@@ -71,6 +75,7 @@
         item.setAttribute('role', 'option');
         item.setAttribute('aria-selected', String(option.selected));
         item.setAttribute('aria-disabled', String(Boolean(option.disabled || option.parentElement.disabled)));
+        if (authoredOption(option)) item.setAttribute('translate', 'no');
         item.textContent = option.label;
         return item;
       }));

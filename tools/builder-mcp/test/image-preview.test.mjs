@@ -15,7 +15,7 @@ async function fixture(t){
  await page.goto(ws.url+'/cart/admin/?page=sites');await page.locator('[data-library-create-card]').click();await page.locator('[data-bc-choose=image]').click();await page.locator('[name=page_name]').fill('Fast preview');await page.locator('[data-library-page-form] button[value=default]').click();await page.waitForURL('**edit=fast-preview.ezkart.site');
  await page.locator('[data-image-page-upload]').setInputFiles([1,2,3,4].map(i=>join(repoRoot,`cart/admin/assets/builder-choice/kopi-senja-0${i}.webp`)));
  await page.waitForFunction(()=>document.querySelectorAll('.ib-row').length===4&&!document.querySelector('.ib-controls').disabled);
- await page.locator('[data-image-page-product]').selectOption('coffee');await page.locator('[data-image-nav=enabled]').check();
+ await page.locator('[data-image-page-product]').selectOption('coffee');await page.locator('[data-image-settings=navigation] > summary').click();await page.locator('[data-image-nav=enabled]').check();
  await page.frameLocator('.ib-phone').locator('.sq-image-navigation').waitFor();
  return {ws,browser,page,errors};
 }
@@ -47,7 +47,7 @@ test('navbar colors preview immediately without rebuilding the page; apply, canc
  assert.equal(await page.evaluate(()=>artworkBefore===document.querySelector('[data-image-upload]')&&cardBefore===document.querySelector('[data-product-card]')),true);
  // Returning to the original picker value makes Cancel a no-op in history.
  await color.click();await hex.fill('#00ff00');await page.keyboard.press('Escape');await page.locator('[data-sq-undo]').click();assert.equal(await page.locator('[data-image-nav=ctaLabel]').inputValue(),'Shop now');await page.locator('[data-sq-redo]').click();assert.equal(await page.locator('[data-image-nav=ctaLabel]').inputValue(),'Choose coffee');
- await page.evaluate(()=>EzkartBuilder.save());await page.reload();await page.locator('[data-image-nav=color]').waitFor();assert.equal(await navValue(page,'color'),'#ff0000');assert.equal(await navValue(page,'height'),80);
+ await page.evaluate(()=>EzkartBuilder.save());await page.reload();await page.locator('[data-image-settings=navigation] > summary').click();await page.locator('[data-image-nav=color]').waitFor();assert.equal(await navValue(page,'color'),'#ff0000');assert.equal(await navValue(page,'height'),80);
  const html=await page.evaluate(()=>EzkartBuilder.exportHtml());assert.doesNotMatch(html,/ezkart:image-navigation|ezkart:image-preview-ready/);
  const out=await browser.newPage();await out.setContent(html);assert.equal(await out.locator('.sq-image-navigation').evaluate(n=>n.style.getPropertyValue('--ib-nav-color')),'#ff0000');assert.equal(await out.locator('.sq-image-navigation').evaluate(n=>n.offsetHeight),80);
 });
@@ -97,6 +97,7 @@ test('Image Stack opens while the project list and component library are still p
   assert.equal(await opening.locator('.ib-row').count(),4);
   assert.equal(documentRequests.length,1,'The early request is consumed instead of downloading the page again');
   assert.deepEqual([...started].sort(),['/v1/components','/v1/landing-pages']);
+  await opening.locator('[data-image-settings=navigation] > summary').click();
   await opening.locator('[data-image-nav=title]').fill('Ready before the list');
   await opening.locator('[data-image-nav=title]').blur();
   await opening.evaluate(()=>EzkartBuilder.save());

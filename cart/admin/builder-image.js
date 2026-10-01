@@ -302,12 +302,22 @@
     const add=document.createElement('button');add.type='button';add.className='ib-upload';add.dataset.imagePageAdd='';add.textContent='+ '+t('Upload images');
     const note=document.createElement('p');note.className='ib-note';note.textContent=t('JPG, PNG or WebP · up to 15 MB each');
     const status=document.createElement('p');status.className='ib-status';status.setAttribute('role','status');status.setAttribute('aria-live','polite');
-    const productHeading=document.createElement('h2');productHeading.textContent=t('Ezkart checkout');productHeading.className='ib-product-heading';
+    const groupIcons={product:'<path d="M6 7h12l1 14H5L6 7Zm3 0V5a3 3 0 0 1 6 0v2"/>',navigation:'<path d="M4 6h16M4 12h16M4 18h16"/>',video:'<rect x="3" y="5" width="18" height="14" rx="3"/><path d="m10 9 5 3-5 3Z"/>',footer:'<path d="M4 4h16v16H4ZM4 14h16M8 17h3m3 0h2"/>'};
+    function settingsGroup(key,title,open=false){
+      const group=document.createElement('details');group.className='ib-setting-group';group.dataset.imageSettings=key;group.open=open;
+      const summary=document.createElement('summary');summary.className='ib-setting-summary';
+      const icon=document.createElementNS('http://www.w3.org/2000/svg','svg');icon.setAttribute('viewBox','0 0 24 24');icon.setAttribute('aria-hidden','true');icon.innerHTML=groupIcons[key];
+      const heading=document.createElement('span');heading.textContent=t(title);
+      const state=document.createElement('small');state.dataset.imageSettingState=key;
+      summary.append(icon,heading,state);group.append(summary);return group;
+    }
+    const productSettings=settingsGroup('product','Ezkart checkout',true);
     const label=document.createElement('label');label.className='ib-product-label';label.textContent=t('Choose a product');
     const product=document.createElement('select');product.dataset.imagePageProduct='';label.append(product);
     const help=document.createElement('p');help.textContent=t('Choose the product customers will buy. Its price and options come from your catalog.');
     const manage=document.createElement('a');manage.href='?page=products';manage.textContent=t('Manage products');
-    controls.append(heading,intro,rows,input,add,note,status,productHeading,label,help,manage);
+    productSettings.append(label,help,manage);
+    controls.append(heading,intro,rows,input,add,note,status,productSettings);
     const stage=document.createElement('section');stage.className='ib-stage';stage.setAttribute('aria-label',t('Image page preview'));
     const caption=document.createElement('p');caption.textContent=t('Image-only page, one mobile layout');
     const frame=document.createElement('iframe');frame.className='ib-phone';frame.title=t('Image page preview');frame.setAttribute('sandbox','allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation');
@@ -343,8 +353,7 @@
       'Remove':'<path d="M3 6h18M9 6V4h6v2M5 6l1 14h12l1-14M10 10v6m4-6v6"/>',
     };
     function button(text,action,disabled=false){const node=document.createElement('button');node.type='button';node.title=t(text);node.setAttribute('aria-label',t(text));node.innerHTML=`<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">${actionIcons[text]}</svg>`;node.disabled=disabled;node.addEventListener('click',action);return node;}
-    const navSettings=document.createElement('section');navSettings.className='ib-nav-settings';
-    const navHeading=document.createElement('h2');navHeading.textContent=t('Navigation bar');
+    const navSettings=settingsGroup('navigation','Navigation bar');
     const navBody=document.createElement('div');navBody.className='ib-nav-body';
     const navFields=new Map();
     const appearanceKeys=new Set(['title','height','color','textColor','transparency','blur','ctaLabel']);
@@ -386,7 +395,7 @@
       input.addEventListener('change',()=>updateNavigation({[key]:valueOf()}));
       parent.append(label);navFields.set(key,{input,show});return input;
     }
-    navSettings.append(navHeading);navField(navSettings,'enabled','Show navigation bar','checkbox');navSettings.append(navBody);
+    navField(navSettings,'enabled','Show navigation bar','checkbox');navSettings.append(navBody);
     navField(navBody,'title','Name in the bar','text');
     const navGrid=document.createElement('div');navGrid.className='ib-nav-grid';navBody.append(navGrid);
     navField(navGrid,'height','Height','number',{min:48,max:120,unit:'px'});
@@ -403,9 +412,10 @@
     navField(navBody,'cta','Show product button','checkbox');
     const ctaField=navField(navBody,'ctaLabel','Button text','text');
     const ctaHelp=document.createElement('p');ctaHelp.textContent=t('The button jumps to your connected product.');navBody.append(ctaHelp);
-    controls.insertBefore(navSettings,productHeading);
+    controls.append(navSettings);
     function syncNavigation(images,productId,navigation) {
       navBody.hidden=!navigation.enabled;
+      navSettings.querySelector('[data-image-setting-state]').textContent=t(navigation.enabled?'On':'Off');
       syncingNavigation=true;
       navFields.forEach(({input,show},key)=>{if(input.type==='checkbox')input.checked=navigation[key];else input.value=navigation[key];input.dispatchEvent(new Event('input',{bubbles:true}));show();});
       syncingNavigation=false;
@@ -415,7 +425,7 @@
       navigation.links.forEach((link,index)=>{
         const row=document.createElement('div');row.className='ib-nav-link';
         const name=document.createElement('input');name.type='text';name.maxLength=60;name.value=link.label;name.setAttribute('aria-label',t('Link text')+' '+(index+1));name.placeholder=t('Link text');
-        const target=document.createElement('select');target.setAttribute('aria-label',t('Jump to image')+' '+(index+1));images.forEach((image,i)=>target.add(new Option(`${i+1}. ${image.name}`,image.id)));target.value=link.target;
+        const target=document.createElement('select');target.setAttribute('aria-label',t('Jump to image')+' '+(index+1));images.forEach((image,i)=>{const option=new Option(`${i+1}. ${image.name}`,image.id);option.setAttribute('translate','no');target.add(option);});target.value=link.target;
         const update=()=>{const links=read(root).navigation.links;links[index]={label:name.value,target:target.value};updateNavigation({links});};
         name.onchange=target.onchange=update;
         const remove=button('Remove',()=>{updateNavigation({links:read(root).navigation.links.filter((_,i)=>i!==index)});(navLinks.children[index]?.querySelector('input')||addLink).focus();});remove.setAttribute('aria-label',t('Remove menu link')+' '+(index+1));
@@ -423,8 +433,7 @@
       });
       addLink.disabled=!images.length||navigation.links.length>=8;
     }
-    const mediaSettings=document.createElement('section');mediaSettings.className='ib-nav-settings';
-    const mediaHeading=document.createElement('h2');mediaHeading.textContent=t('YouTube video');
+    const mediaSettings=settingsGroup('video','YouTube video');
     const mediaHelp=document.createElement('p');mediaHelp.textContent=t('Paste a YouTube link to add a video after your images. Leave it empty to remove the card.');
     const extrasFields=new Map();
     function extraField(parent,key,text,type='text',maxLength=200) {
@@ -436,16 +445,15 @@
       parent.append(label);extrasFields.set(key,input);return input;
     }
     const updateExtras=change=>{const current=read(root);commit(current.images,current.productId,current.navigation,{...current.extras,...change});};
-    mediaSettings.append(mediaHeading,mediaHelp);
+    mediaSettings.append(mediaHelp);
     const videoUrl=extraField(mediaSettings,'video-url','YouTube link','url',2048),videoTitle=extraField(mediaSettings,'video-title','Video title');
     videoUrl.placeholder='https://www.youtube.com/watch?v=…';
     videoUrl.onchange=()=>{
       if(videoUrl.value.trim()&&!EzkartMedia.youtube(videoUrl.value)){videoUrl.setAttribute('aria-invalid','true');status.textContent=t('Use a valid YouTube video link (watch, share, Shorts or embed).');return;}
-      videoUrl.removeAttribute('aria-invalid');updateExtras({video:{url:videoUrl.value,title:videoTitle.value}});
+      videoUrl.removeAttribute('aria-invalid');status.textContent='';updateExtras({video:{url:videoUrl.value,title:videoTitle.value}});
     };
     videoTitle.onchange=()=>updateExtras({video:{...readExtras(root).video,title:videoTitle.value}});
-    const footerSettings=document.createElement('section');footerSettings.className='ib-nav-settings';
-    const footerHeading=document.createElement('h2');footerHeading.textContent=t('Footer');footerSettings.append(footerHeading);
+    const footerSettings=settingsGroup('footer','Footer & social links');
     const footerEnabled=extraField(footerSettings,'footer-enabled','Show footer','checkbox');
     const footerBody=document.createElement('div');footerBody.className='ib-nav-body';footerSettings.append(footerBody);
     const footerTitle=extraField(footerBody,'footer-title','Your name or brand','text',100),footerNote=extraField(footerBody,'footer-note','Footer text (optional)','textarea',1000);
@@ -457,8 +465,10 @@
     const updateFooter=change=>updateExtras({footer:{...readExtras(root).footer,...change}});
     footerEnabled.onchange=()=>updateFooter({enabled:footerEnabled.checked});footerTitle.onchange=()=>updateFooter({title:footerTitle.value});footerNote.onchange=()=>updateFooter({note:footerNote.value});
     addSocial.onclick=()=>{const links=readExtras(root).footer.links;if(links.length>=8)return;updateFooter({links:[...links,{label:'',url:''}]});socialRows.lastElementChild?.querySelector('input')?.focus();};
-    controls.insertBefore(mediaSettings,navSettings);controls.insertBefore(footerSettings,productHeading);
+    controls.insertBefore(mediaSettings,navSettings);controls.append(footerSettings);
     function syncExtras(extras) {
+      mediaSettings.querySelector('[data-image-setting-state]').textContent=t(extras.video.url?'Added':'Off');
+      footerSettings.querySelector('[data-image-setting-state]').textContent=t(extras.footer.enabled?'On':'Off');
       videoUrl.value=extras.video.url;videoTitle.value=extras.video.title;videoTitle.closest('label').hidden=!extras.video.url;videoUrl.removeAttribute('aria-invalid');
       footerEnabled.checked=extras.footer.enabled;footerBody.hidden=!extras.footer.enabled;footerTitle.value=extras.footer.title;footerNote.value=extras.footer.note;
       socialRows.replaceChildren();
@@ -468,7 +478,7 @@
         const url=document.createElement('input');url.type='url';url.maxLength=2048;url.value=link.url;url.placeholder='https://';url.setAttribute('aria-label',t('Social link address')+' '+(index+1));
         const update=()=>{
           if(url.value.trim()&&!EzkartMedia.webUrl(url.value)){url.setAttribute('aria-invalid','true');status.textContent=t('Use a full web address beginning with https:// or http://.');return;}
-          const links=readExtras(root).footer.links;links[index]={label:name.value,url:url.value};updateFooter({links});
+          status.textContent='';const links=readExtras(root).footer.links;links[index]={label:name.value,url:url.value};updateFooter({links});
         };
         name.onchange=url.onchange=update;
         const remove=button('Remove',()=>{updateFooter({links:readExtras(root).footer.links.filter((_,i)=>i!==index)});(socialRows.children[index]?.querySelector('input')||addSocial).focus();});remove.setAttribute('aria-label',t('Remove social link')+' '+(index+1));
@@ -496,7 +506,7 @@
         const overlay=document.createElement('span');overlay.textContent=t('Replace');replace.append(thumb,overlay);
         replace.onclick=()=>{replaceId=image.id;input.multiple=false;input.click();};
         const meta=document.createElement('div');meta.className='ib-row-meta';
-        const name=document.createElement('strong');name.textContent=`${index+1}. ${image.name}`;
+        const name=document.createElement('strong');name.setAttribute('translate','no');name.textContent=`${index+1}. ${image.name}`;
         const remove=button('Remove',()=>{const current=read(root);commit(current.images.filter(item=>item.id!==image.id),current.productId);status.textContent=t('Image removed. Use Undo to restore it.');add.focus();});remove.dataset.imageRemove='';remove.setAttribute('aria-label',t('Remove')+': '+image.name);
         remove.className='ib-remove';meta.append(name,remove);
         const description=document.createElement('details');description.className='ib-description';
@@ -506,9 +516,10 @@
         description.append(alt);row.append(handle,replace,meta,description);rows.append(row);
       });
       product.replaceChildren(new Option(t('No product connected'),''));
-      products().filter(item=>[undefined,'active'].includes(item.status)).forEach(item=>product.add(new Option(item.name,item.id)));
+      products().filter(item=>[undefined,'active'].includes(item.status)).forEach(item=>{const option=new Option(item.name,item.id);option.setAttribute('translate','no');product.add(option);});
       if(productId && ![...product.options].some(option=>option.value===productId)){const option=new Option(t('Choose another product'),productId);option.disabled=true;product.add(option);}
       product.value=productId;
+      productSettings.querySelector('[data-image-setting-state]').textContent=t(productId?'Connected':'Not connected');
       frame.hidden=!images.length;empty.hidden=Boolean(images.length);scroll.hidden=!images.length;
       if(images.length){
         previewChannel=crypto.randomUUID();
