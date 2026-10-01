@@ -7254,6 +7254,28 @@
     };
     sqStudio.querySelector("[data-sq-code-input]")?.addEventListener("focus", () => { codeSnapshot = captureState(); });
     sqStudio.querySelector("[data-sq-code-input]")?.addEventListener("change", () => { updateSelectedCode(); if (codeSnapshot) remember(codeSnapshot); codeSnapshot = null; });
+    document.addEventListener('click', async (event) => {
+      const button = event.target.closest('[data-sq-copy-code-ai]');
+      if (!button || !globalThis.EzkartCodeInstructions) return;
+      const component = button.dataset.sqCopyCodeAi === 'component';
+      const host = component ? componentDialog : button.closest('[data-sq-code-controls]');
+      const status = host.querySelector('[data-sq-code-ai-status]');
+      const connected = selectedProducts();
+      const contact = connected[0] ? new URL('../messages.php', document.body.dataset.adminPublicBase || location.href) : null;
+      if (contact) contact.searchParams.set('product', connected[0]);
+      const text = EzkartCodeInstructions.build({
+        products: readCatalogProducts(), connected,
+        sections: [...previewRoot.querySelectorAll('[data-section-id]')].map(node => node.dataset.sectionId),
+        contactUrl: contact?.href || '', component,
+        code: component ? componentCodeInput.value : sqStudio.querySelector('[data-sq-code-input]').value
+      });
+      button.disabled = true;
+      try {
+        const copied = await EzkartCodeInstructions.copy(text, button);
+        const message = copied ? 'AI instructions copied. Paste them into your AI chat and add your design request.' : 'Select and copy the instructions from the dialog.';
+        status.textContent = globalThis.EzkartLanguage?.t(message) || message;
+      } finally { button.disabled = false; }
+    });
     sqStudio.querySelector("[data-sq-run-code]")?.addEventListener("click", updateSelectedCode);
     sqStudio.querySelector("[data-sq-animation]")?.addEventListener("change", (event) => {
       remember();

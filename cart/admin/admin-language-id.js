@@ -2133,3 +2133,11 @@ Object.assign(globalThis.EzkartIndonesian, {
   "The scheduled version has no verified prices. Schedule this version again before publishing.":"Harga pada versi terjadwal belum diverifikasi. Jadwalkan ulang versi ini sebelum diterbitkan.",
   "Product or variant prices changed after scheduling. Review your page and schedule this version again.":"Harga produk atau varian berubah setelah dijadwalkan. Periksa halamanmu dan jadwalkan ulang versi ini."
 });
+Object.assign(globalThis.EzkartIndonesian, {
+  "Copy AI instructions":"Salin instruksi AI", "AI instructions":"Instruksi AI",
+  "AI instructions copied. Paste them into your AI chat and add your design request.":"Instruksi AI disalin. Tempel ke chat AI dan tambahkan permintaan desainmu.",
+  "Select and copy the instructions from the dialog.":"Pilih dan salin instruksi dari dialog.",
+  "Copy the selected instructions, then paste them into your AI chat.":"Salin instruksi yang dipilih, lalu tempel ke chat AI.",
+  "Previous photo":"Foto sebelumnya", "Next photo":"Foto berikutnya", "Zoom in":"Perbesar", "Reset zoom":"Kembalikan ukuran",
+  "Photo":"Foto", "Photo unavailable":"Foto tidak tersedia"
+});
