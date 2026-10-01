@@ -25,6 +25,11 @@ frozen publication goes live.
 
 Scheduling and due publication both validate current seller-owned active
 products, purchase actions, available stock and bank/two-step requirements.
+The schedule records referenced products' base and visible variant prices at
+confirmation. A changed price or missing verified baseline fails the schedule
+visibly instead of publishing an outdated offer; unrelated products and hidden
+variant prices do not invalidate it. Changing only the time retains that price
+baseline. Merchants review the current catalog and schedule a fresh version.
 Moderation holds block due publication. A definite rejection is shown as a
 failed schedule, preserving the existing public page. A transient service or
 storage error keeps it pending for retry. Merchants review and schedule a fresh

@@ -46,8 +46,9 @@ export async function changeLandingSchedule(env, seller, id, payload, validate) 
     const time = checkedScheduleTime(payload.at,payload.timezone);
     if (payload.action === 'create') {
       const html = String(payload.html || '');
-      await validate(seller,html,page.state);
-      next = {...time,id:payload.requestId,status:'pending',html,state:{preview:String(page.state?.preview || '')},sourceUpdatedAt:page.updatedAt};
+      const priceBaseline = await validate(seller,html,page.state);
+      if (!Array.isArray(priceBaseline) || !priceBaseline.length) fail('The scheduled version has no verified prices. Schedule this version again before publishing.',422);
+      next = {...time,id:payload.requestId,status:'pending',html,state:{preview:String(page.state?.preview || '')},priceBaseline,sourceUpdatedAt:page.updatedAt};
     } else next = {...old,...time,id:payload.requestId,status:'pending'};
     // This is a hint, written first. The project is authoritative: orphaned or
     // replaced hints can never publish a different version of a page.
@@ -76,7 +77,9 @@ export async function publishDueLandingPages(env, validate, held, now = Date.now
       let rejection = '';
       try {
         if (await held(env,marker.seller,marker.id)) fail('This page is held. Review its alert before publishing.');
-        await validate(marker.seller,schedule.html,schedule.state);
+        if (!Array.isArray(schedule.priceBaseline) || !schedule.priceBaseline.length) fail('The scheduled version has no verified prices. Schedule this version again before publishing.',422);
+        const currentPrices = await validate(marker.seller,schedule.html,schedule.state);
+        if (JSON.stringify(currentPrices) !== JSON.stringify(schedule.priceBaseline)) fail('Product or variant prices changed after scheduling. Review your page and schedule this version again.',422);
       } catch (error) {
         // Storage/provider outages retry later; confirmed stock/setup/hold
         // failures stay visible and require a fresh merchant decision.

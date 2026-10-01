@@ -21,7 +21,7 @@ import {landingSummaryKey, listLandingObjects, cacheLandingSummary, readLandingS
 import {packLandingEditor, landingPageSaveReceipt} from './landing-page-transfer.js';
 import {readLandingPageJson} from './landing-page-storage.js';
 import { customerAddressBook, changeCustomerAddressBook } from "./customer-addresses.js";
-import { validatePublication } from "./landing-publication.js";
+import { validatePublication, publicationPriceBaseline } from "./landing-publication.js";
 import { merchantStorefront, publicStorefront } from "./storefront.js";
 import { adminProfile } from "./admin-profile.js";
 import {sellerOnboarding,onboardingFailure} from './seller-onboarding.js';
@@ -751,6 +751,7 @@ async function validateScheduledLandingPage(sellerId, html, state, env) {
   const catalogProducts = products.results.map(row => shapeProduct(row,[],variants.results.filter(v => v.product_id === row.id)));
   const error = await validatePublication({html,state,products:catalogProducts});
   if (error) throw new Response(error,{status:422});
+  return publicationPriceBaseline(html,catalogProducts);
 }
 
 async function landingSchedule(request, env, rawId) {

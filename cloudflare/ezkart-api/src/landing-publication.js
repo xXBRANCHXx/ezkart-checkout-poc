@@ -81,3 +81,13 @@ export async function validatePublication({ html, state, products }) {
     products,
   );
 }
+
+// Only referenced commerce products participate. Sorting makes catalog query
+// order irrelevant; visible variant changes also invalidate a frozen offer.
+export async function publicationPriceBaseline(html, products) {
+  const referenced = new Set((await purchaseGroups(html)).flat().map(id => id.split('::')[0]));
+  return products.filter(product => referenced.has(product.id)).map(product => ({
+    id:product.id,price:Number(product.price),
+    variants:(product.variants || []).filter(variant => !variant.hidden).map(variant => ({id:variant.id,price:Number(variant.price)})).sort((a,b)=>a.id.localeCompare(b.id)),
+  })).sort((a,b)=>a.id.localeCompare(b.id));
+}

@@ -7,6 +7,7 @@ import {putJevPage} from '../src/jev-page-state.js';
 
 const seller='seller_alice',id='scheduled',key=`sellers/${seller}/landing-pages/${id}.json`;
 const html='<h1>Chosen version</h1><button data-ezkart-add="tea">Buy</button>';
+const prices=[{id:'tea',price:20000,variants:[]}];
 const future=()=>new Date(Date.now()+3600000).toISOString();
 const read=async env=>JSON.parse(await(await env.PRIVATE_ASSETS.get(key)).text());
 const conflict=error=>error instanceof Response && error.status===409;
@@ -35,7 +36,7 @@ test('authenticated schedule freezes a version, preserves draft edits, supports 
   r=await f.merchant(`/v1/landing-pages/${id}/schedule`,move,{method:'POST'});assert.equal(r.status,200);
   assert.equal((await read(env)).scheduledPublication.state.preview,html);
   assert.equal((await f.merchant(`/v1/landing-pages/${id}/schedule`,{...move,requestId:crypto.randomUUID(),sourceUpdatedAt:'old'},{method:'POST'})).status,409);
-  let due=await publishDueLandingPages(env,async(_seller,snapshot,state)=>{assert.equal(snapshot,html);assert.equal(state.preview,html);},async()=>false,Date.parse(move.at)+1);
+  let due=await publishDueLandingPages(env,async(_seller,snapshot,state)=>{assert.equal(snapshot,html);assert.equal(state.preview,html);return prices;},async()=>false,Date.parse(move.at)+1);
   assert.equal(due.published,1);
   let page=await read(env);assert.equal(page.publishedHtml,html);assert.equal(page.state.preview,'<h1>New private draft</h1>');assert.equal(page.scheduledPublication.status,'published');
   assert.equal((await publishDueLandingPages(env,async()=>assert.fail('duplicate'),async()=>false,Date.parse(move.at)+2)).published,0);
@@ -50,6 +51,45 @@ test('authenticated schedule freezes a version, preserves draft edits, supports 
   assert.equal((await publishDueLandingPages(env,async()=>assert.fail('cancelled version'),async()=>false,Date.parse(second.at)+1)).published,0);
   // Publishing immediately clears a previously scheduled snapshot and keeps receipts.
   saved=await f.merchant(`/v1/landing-pages/${id}`,{name:'Schedule fixture',products:['tea'],customProducts:[],state:{version:6,preview:html},publishedHtml:html,status:'published'});assert.equal(saved.status,200);assert.equal(saved.page.scheduledPublication,null);assert.equal(saved.page.scheduleReceipt.requestId,cancel.requestId);
+  const makeDue = async () => {
+    page=await read(env);page.scheduledPublication.at=new Date(Date.now()-60000).toISOString();
+    const source=await env.PRIVATE_ASSETS.head(key);
+    await putJevPage(env,seller,id,source.etag,JSON.stringify(page),{customMetadata:source.customMetadata});
+    await env.PRIVATE_ASSETS.put(`landing-page-schedules/${page.scheduledPublication.at}/${seller}/${id}/${page.scheduledPublication.id}.json`,JSON.stringify({seller,id,scheduleId:page.scheduledPublication.id,at:page.scheduledPublication.at}));
+  };
+  const scheduleCurrent = async () => {
+    page=await read(env);
+    const response=await f.merchant(`/v1/landing-pages/${id}/schedule`,{...create,requestId:crypto.randomUUID(),sourceUpdatedAt:page.updatedAt,at:future()},{method:'POST'});
+    assert.equal(response.status,200,JSON.stringify(response));return response.page;
+  };
+  await scheduleCurrent();
+  assert.deepEqual((await read(env)).scheduledPublication.priceBaseline,prices);
+  await f.db.prepare("UPDATE products SET price_amount=21000 WHERE id='tea'").run();
+  await makeDue();await (await f.mf.getWorker()).scheduled({cron:'* * * * *'});
+  page=await read(env);assert.equal(page.scheduledPublication.status,'failed');assert.match(page.scheduledPublication.error,/prices changed/);assert.equal(page.publishedHtml,html);
+  await f.db.prepare("UPDATE products SET price_amount=20000 WHERE id='tea'").run();
+  await f.db.prepare("INSERT INTO product_variants(id,seller_id,product_id,name,sku,price_amount,stock_quantity,weight_grams,sort_order,created_at,updated_at) VALUES ('green','seller_alice','tea','Green','GREEN',22000,5,100,1,'now','now')").run();
+  await f.db.prepare("INSERT INTO product_variants(id,seller_id,product_id,name,sku,options_json,price_amount,stock_quantity,weight_grams,sort_order,created_at,updated_at) VALUES ('hidden','seller_alice','tea','Hidden','HIDDEN','{\"hidden\":true}',25000,5,100,2,'now','now')").run();
+  await scheduleCurrent();
+  assert.deepEqual((await read(env)).scheduledPublication.priceBaseline,[{id:'tea',price:20000,variants:[{id:'green',price:22000}]}]);
+  await f.db.prepare("UPDATE product_variants SET price_amount=23000 WHERE id='green'").run();
+  await makeDue();await (await f.mf.getWorker()).scheduled({cron:'* * * * *'});
+  page=await read(env);assert.equal(page.scheduledPublication.status,'failed');assert.match(page.scheduledPublication.error,/prices changed/);assert.equal(page.publishedHtml,html);
+  await scheduleCurrent();
+  // Unrelated catalog entries and hidden variants cannot invalidate this offer.
+  await f.db.prepare("UPDATE products SET price_amount=51000 WHERE id='mug'").run();
+  await f.db.prepare("UPDATE product_variants SET price_amount=26000 WHERE id='hidden'").run();
+  await makeDue();await (await f.mf.getWorker()).scheduled({cron:'* * * * *'});
+  page=await read(env);assert.equal(page.scheduledPublication.status,'published');assert.equal(page.publishedHtml,html);
+  await scheduleCurrent();await makeDue();
+  page=await read(env);delete page.scheduledPublication.priceBaseline;
+  const legacy=await env.PRIVATE_ASSETS.head(key);
+  await putJevPage(env,seller,id,legacy.etag,JSON.stringify(page),{customMetadata:legacy.customMetadata});
+  await (await f.mf.getWorker()).scheduled({cron:'* * * * *'});
+  page=await read(env);assert.equal(page.scheduledPublication.status,'failed');assert.match(page.scheduledPublication.error,/no verified prices/);assert.equal(page.publishedHtml,html);
+  // Leave the original stock rejection check on a product without variants.
+  await f.db.prepare("DELETE FROM product_variants WHERE product_id='tea'").run();
+  saved={page};
   // Exercise the real minute-trigger handler with an isolated due snapshot.
   const cronRequest={...create,requestId:crypto.randomUUID(),sourceUpdatedAt:saved.page.updatedAt,at:future()};
   r=await f.merchant(`/v1/landing-pages/${id}/schedule`,cronRequest,{method:'POST'});assert.equal(r.status,200);
@@ -70,18 +110,18 @@ test('due publication rechecks availability, retries unknown storage writes, and
   await f.merchant(`/v1/landing-pages/${id}`,{name:'Race fixture',state:{preview:html}});
   let page=await read(env);
   const action=()=>({action:'create',requestId:crypto.randomUUID(),sourceUpdatedAt:page.updatedAt,at:future(),timezone:'UTC',html});
-  let payload=action();page=await changeLandingSchedule(env,seller,id,payload,async()=>{});
+  let payload=action();page=await changeLandingSchedule(env,seller,id,payload,async()=>prices);
   let wait,release;const gate=new Promise(resolve=>release=resolve),entered=new Promise(resolve=>wait=resolve);
   const processing=publishDueLandingPages(env,async()=>{wait();await gate;},async()=>false,Date.parse(payload.at)+1);
   await entered;
-  await changeLandingSchedule(env,seller,id,{action:'cancel',requestId:crypto.randomUUID(),sourceUpdatedAt:page.updatedAt,scheduleId:payload.requestId},async()=>{});
+  await changeLandingSchedule(env,seller,id,{action:'cancel',requestId:crypto.randomUUID(),sourceUpdatedAt:page.updatedAt,scheduleId:payload.requestId},async()=>prices);
   release();await processing;assert.equal((await read(env)).status,'draft');
-  page=await read(env);payload=action();page=await changeLandingSchedule(env,seller,id,payload,async()=>{});
+  page=await read(env);payload=action();page=await changeLandingSchedule(env,seller,id,payload,async()=>prices);
   await publishDueLandingPages(env,async()=>{throw new Response('Add stock before publishing.',{status:422});},async()=>false,Date.parse(payload.at)+1);
   page=await read(env);assert.equal(page.status,'draft');assert.equal(page.scheduledPublication.status,'failed');assert.match(page.scheduledPublication.error,/stock/);
   payload=action();const lost={...env,PRIVATE_ASSETS:new Proxy(bucket,{get(target,name){if(name==='put')return async(...args)=>{const result=await target.put(...args);if(args[0]===key)throw Error('lost receipt');return result;};return typeof target[name]==='function'?target[name].bind(target):target[name];}})};
-  await assert.rejects(changeLandingSchedule(lost,seller,id,payload,async()=>{}),/lost receipt/);
+  await assert.rejects(changeLandingSchedule(lost,seller,id,payload,async()=>prices),/lost receipt/);
   page=await changeLandingSchedule(env,seller,id,payload,async()=>assert.fail('must replay'));assert.equal(page.scheduleReceipt.requestId,payload.requestId);
   await publishDueLandingPages(env,async()=>{throw new Response('Storage unavailable',{status:503});},async()=>false,Date.parse(payload.at)+1);assert.equal((await read(env)).scheduledPublication.status,'pending');
-  await publishDueLandingPages(env,async()=>{},async()=>false,Date.parse(payload.at)+2);assert.equal((await read(env)).status,'published');
+  await publishDueLandingPages(env,async()=>prices,async()=>false,Date.parse(payload.at)+2);assert.equal((await read(env)).status,'published');
 });
