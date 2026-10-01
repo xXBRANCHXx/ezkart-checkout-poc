@@ -1195,6 +1195,10 @@ async function saveProduct(request, env, rawId) {
   const { seller, authUserId } = await sellerContext(request, env);
   assertCatalogEditor(seller);
   const payload = await requestJson(request, 500000);
+  const saveId = payload.saveId === undefined ? '' : payload.saveId;
+  if (typeof saveId !== 'string' || saveId && !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(saveId)) {
+    throw new Response('Product save ID is invalid', {status:422});
+  }
   const id = cleanId(rawId || payload.id, "Product ID");
   const existing = await env.DB.prepare("SELECT * FROM products WHERE id = ?").bind(id).first();
   if (existing && existing.seller_id !== seller.id) throw new Response("Product not found", { status: 404 });
@@ -1292,7 +1296,7 @@ async function saveProduct(request, env, rawId) {
       INSERT INTO seller_events (id, seller_id, actor_auth_user_id, event_type, entity_type, entity_id, payload_json, created_at)
       VALUES (?, ?, ?, ?, 'product', ?, ?, ?)
     `).bind(eventId, seller.id, authUserId, existing ? "product.updated" : "product.created", id,
-      JSON.stringify({ title, variants: variants.length, images: imageIds.length, expectedRevision: existing ? payload.revision : null }), now),
+      JSON.stringify({ title, variants: variants.length, images: imageIds.length, expectedRevision: existing ? payload.revision : null, ...(saveId ? {saveId} : {}) }), now),
     ...catalogStockMovements(env, {sellerId: seller.id, actor: authUserId, reason: existing ? 'catalog_edit' : 'catalog_create', reference: eventId, now},
       existing, storedVariants, {id, type, title, sku, stock_quantity: stock}, variants.map(v => ({...v, stock_quantity: v.stock}))),
     env.DB.prepare(`
@@ -1330,10 +1334,27 @@ async function saveProduct(request, env, rawId) {
       image_upload_id = excluded.image_upload_id, updated_at = excluded.updated_at` : ""}
   `).bind(variant.id, seller.id, id, variant.name, JSON.stringify({ values: variant.options, hidden: variant.hidden, position: index + 1 }), variant.sku, variant.price, type === "physical" ? variant.stock : null, type === "physical" ? variant.weightGrams : null, variant.billingUnit, variant.billingInterval, variant.imageSource, variant.imageUploadId, variant.slot, now, now)));
   statements.push(...digitalVersionStatements(env,seller.id,authUserId,id,digitalFile,now));
+  // Variant writes also advance the product revision. Record the final revision
+  // inside the same transaction, after every product/variant change succeeds.
+  if (saveId) statements.push(env.DB.prepare("UPDATE seller_events SET payload_json=json_set(payload_json,'$.savedRevision',(SELECT revision FROM products WHERE seller_id=? AND id=?)) WHERE id=?").bind(seller.id,id,eventId));
   await env.DB.batch(statements);
   await cleanupUnusedMedia(env, seller.id, [...replacedMediaIds, ...requestedMediaIds]);
   const result = await catalog(request, env);
   return result.products.find((product) => product.id === id);
+}
+
+async function productSaveConfirmation(request, env, rawId) {
+  const {seller} = await sellerContext(request, env);
+  const id = cleanId(rawId, 'Product ID');
+  const receipt = await env.DB.prepare(`SELECT e.payload_json FROM seller_events e JOIN products p ON p.id=e.entity_id AND p.seller_id=e.seller_id
+    WHERE e.seller_id=? AND e.entity_type='product' AND e.entity_id=? AND e.event_type IN ('product.created','product.updated')
+      AND json_type(e.payload_json,'$.saveId')='text' AND json_extract(e.payload_json,'$.savedRevision')=p.revision
+    ORDER BY e.created_at DESC,e.id DESC LIMIT 1`).bind(seller.id,id).first();
+  if (!receipt) throw new Response('Product save confirmation not found', {status:404});
+  const {saveId,savedRevision} = JSON.parse(receipt.payload_json);
+  const product = (await catalog(request,env)).products.find(product=>product.id===id);
+  if (!product || product.revision!==savedRevision) throw new Response('Product changed after this save', {status:409,headers:{'x-ezkart-error-code':'catalog_revision_conflict'}});
+  return {saveId,product};
 }
 
 async function deleteProduct(request, env, productId) {
@@ -2297,6 +2318,8 @@ export default {
         }
         throw new Response('File method is not allowed.',{status:405});
       }
+      const productConfirmationMatch = /^\/v1\/products\/([a-zA-Z0-9_-]+)\/confirmation$/.exec(url.pathname);
+      if (request.method === 'GET' && productConfirmationMatch) return json({ok:true,...await productSaveConfirmation(request,env,productConfirmationMatch[1])},200,cors);
       const productMatch = /^\/v1\/products\/([a-zA-Z0-9_-]+)$/.exec(url.pathname);
       if (["PUT", "POST"].includes(request.method) && productMatch) return json({ ok: true, product: await saveProduct(request, env, productMatch[1]) }, 200, cors);
       if (request.method === "DELETE" && productMatch) { await deleteProduct(request, env, productMatch[1]); return json({ ok: true }, 200, cors); }

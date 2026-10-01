@@ -509,7 +509,25 @@
   };
   const saveCloudProduct = async (product) => {
     const payload = await cloudProductPayload(product);
-    const result = await cloudRequest("PUT", `/v1/products/${encodeURIComponent(product.id)}`, payload);
+    const saveId = crypto.randomUUID();
+    const path = `/v1/products/${encodeURIComponent(product.id)}`;
+    let result;
+    try { result = await cloudRequest("PUT", path, {...payload, saveId}, {timeoutMs:20000}); }
+    catch (error) {
+      if (error.status && ![500,502,503,504].includes(error.status)) throw error;
+      // The product transaction can commit before its response is interrupted.
+      // Confirm this exact write; never replay stock or accept an older receipt.
+      for (let attempt = 0; attempt < 3; attempt++) {
+        if (attempt) await new Promise(resolve => setTimeout(resolve, attempt * 500));
+        try {
+          const confirmation = await cloudRequest('GET', `${path}/confirmation`, null, {timeoutMs:4000});
+          if (confirmation.saveId === saveId) { result = confirmation; break; }
+        } catch (confirmationError) {
+          if ([401,403,404].includes(confirmationError.status)) break;
+        }
+      }
+      if (!result) throw error;
+    }
     const saved = replaceCloudProduct(result.product);
     removeLocalProduct(product.id);
     document.dispatchEvent(new CustomEvent("ezkart:cloud-catalog-changed", { detail: { product: saved } }));
@@ -1904,9 +1922,12 @@
           const identity = new TextEncoder().encode(JSON.stringify({kind:'digital-product-v1',store:document.body.dataset.adminFileStore,draft:draftId}));
           publishingProductId = 'custom-' + Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', identity)), byte=>byte.toString(16).padStart(2,'0')).join('').slice(0,32);
         }
+        // An unconfirmed create must retain its identity on a manual retry.
+        // A committed original then hits the revision guard instead of duplicating.
+        if (!editingProduct && !publishingProductId) publishingProductId = `custom-${suffix}`;
         const product = {
           revision: baseRevision,
-          id: editingProduct?.id || publishingProductId || `custom-${suffix}`, sku: editingProduct?.sku || `EZK-${type.slice(0, 3).toUpperCase()}-${suffix.toUpperCase()}`, name: String(productCreateForm.elements.name.value).trim(), category: String(productCreateForm.elements.category.value).trim(), categoryKey: currentCategoryEntry() ? categoryKey(productCreateForm.elements.category.value) : "", description: String(productCreateForm.elements.description.value).trim(), type,
+          id: editingProduct?.id || publishingProductId, sku: editingProduct?.sku || `EZK-${type.slice(0, 3).toUpperCase()}-${publishingProductId.replace(/^custom-/, '').slice(-10).toUpperCase()}`, name: String(productCreateForm.elements.name.value).trim(), category: String(productCreateForm.elements.category.value).trim(), categoryKey: currentCategoryEntry() ? categoryKey(productCreateForm.elements.category.value) : "", description: String(productCreateForm.elements.description.value).trim(), type,
           price: variantToggle.checked ? Math.min(...sellableVariants.map((variant) => variant.price)) : Math.round(Number(productCreateForm.elements.price.value) || 0), images, mediaIds: selectedImages.map((image) => image.cloudId), image: images[0],
           ...(type === "physical" ? { stock: variantToggle.checked ? sellableVariants.reduce((total, variant) => total + variant.stock, 0) : Math.max(0, Math.round(Number(productCreateForm.elements.stock.value) || 0)), weightGrams: variantToggle.checked ? Math.max(...sellableVariants.map((variant) => variant.weightGrams)) : Math.max(1, Math.round(Number(productCreateForm.elements.weight.value) || 0)) } : {}),
           ...(type === "digital" ? { digitalFileName: digitalFile?.filename || String(productCreateForm.elements.digital_name.value || "").trim(), digitalUploadId: digitalFile?.id || null } : {}),
