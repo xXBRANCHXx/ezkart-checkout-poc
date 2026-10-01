@@ -145,6 +145,33 @@ test('product variant columns stay contained and batch edits, preview modes and 
     assert.equal(await page.locator('.product-variant-main-picker[open]').count(),1);
     await page.locator('.product-variant-main-picker summary').last().click();
   }
+  // Minimizing frees the wide editor column; stacked layouts retain a compact header.
+  const measurePreview = () => page.evaluate(() => {
+    const main=document.querySelector('.product-editor-main').getBoundingClientRect(),sidebar=document.querySelector('.product-preview-sidebar').getBoundingClientRect();
+    const controls=[...document.querySelectorAll('.product-preview-tools button')].map(n=>{const r=n.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom};});
+    return {mainWidth:main.width,mainBottom:main.bottom,sidebarWidth:sidebar.width,sidebarLeft:sidebar.left,sidebarRight:sidebar.right,sidebarTop:sidebar.top,sidebarBottom:sidebar.bottom,controls,overflow:document.documentElement.scrollWidth>innerWidth};
+  });
+  for (const width of [320,390,941,1180,1181,1440,1920]) {
+    await page.setViewportSize({width,height:904});
+    const expanded=await measurePreview();
+    for (let cycle=0;cycle<2;cycle++) {
+      await page.locator('[data-product-preview-minimize]').click();
+      assert.equal(await page.locator('[data-product-preview-minimize]').getAttribute('aria-expanded'),'false');
+      const compact=await measurePreview();
+      assert.ok(compact.sidebarWidth<=241,`${width}: compact preview width ${JSON.stringify(compact)}`);
+      assert.equal(compact.overflow,false,`${width}: compact page stays contained`);
+      for (const control of compact.controls)assert.ok(control.left>=compact.sidebarLeft&&control.right<=compact.sidebarRight&&control.top>=compact.sidebarTop&&control.bottom<=compact.sidebarBottom,`${width}: controls remain inside preview`);
+      if(width>1180)assert.ok(compact.mainWidth>expanded.mainWidth+150,`${width}: form gains width ${JSON.stringify({expanded,compact})}`);
+      else assert.ok(compact.sidebarTop>=compact.mainBottom,`${width}: compact preview stays below form`);
+      if (screenDir&&cycle===0&&[390,941,1440,1920].includes(width)) {
+        await page.locator('.product-variant-batch').scrollIntoViewIfNeeded();
+        await page.screenshot({path:join(screenDir,'preview-minimized-'+width+'.png')});
+      }
+      await page.locator('[data-product-preview-minimize]').click();
+      assert.equal(await page.locator('[data-product-preview-content]').isVisible(),true);
+      assert.ok(Math.abs((await measurePreview()).mainWidth-expanded.mainWidth)<1,`${width}: restoring returns the original layout`);
+    }
+  }
   await page.locator('[data-product-preview-close]').click();
   assert.equal(await page.locator('.product-preview-sidebar').isVisible(),false);
   assert.equal(await page.locator('[data-show-product-preview]').isVisible(),true);
@@ -159,6 +186,7 @@ test('product variant columns stay contained and batch edits, preview modes and 
   await page.waitForFunction(()=>document.querySelector('[data-product-draft-status]').textContent.includes('Saved'));
   await page.reload();await page.locator('.product-variant-row').nth(3).waitFor();
   assert.equal(await page.locator('[data-product-preview-content]').isVisible(),false,'Minimized preview survives reopening');
+  assert.ok((await measurePreview()).sidebarWidth<=241,'Compact width survives reopening');
   await page.locator('[data-product-preview-minimize]').click();
   assert.equal(await page.locator('[data-product-preview-content]').isVisible(),true);
   // Interrupted draft saves keep the merchant on the editor and never publish.

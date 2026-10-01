@@ -1767,6 +1767,7 @@
       if (previewContent) previewContent.hidden = minimized;
       q(".product-preview-note")?.toggleAttribute("hidden", minimized);
       productCreateForm.classList.toggle("preview-hidden", hidden);
+      productCreateForm.classList.toggle("preview-minimized", minimized);
       if (showPreviewButton) showPreviewButton.hidden = !hidden;
       if (minimizePreviewButton) {
         minimizePreviewButton.textContent = minimized ? "+" : "−";
