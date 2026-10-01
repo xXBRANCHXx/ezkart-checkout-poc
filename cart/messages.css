@@ -21,3 +21,5 @@
 
 .ez-messages .msg-back{display:none}
 @media(max-width:700px){.ez-messages .msg-back{display:inline-flex}}
+
+.msg-origin{overflow-wrap:anywhere;color:var(--muted,#64748b)}.msg-push-status{margin:0 0 16px;font-size:.9rem;color:var(--muted,#64748b)}

@@ -1,5 +1,6 @@
 import {decodeHTML} from 'entities';
 import {mountLandingMediaPlayer} from '../../../cart/landing-media-player.js';
+import {mountMessageOrigin} from '../../../cart/message-origin.js';
 
 // Only this host-owned shell has a normal origin. Authored code stays inside
 // an opaque iframe, without access to merchant cookies, storage or the shell.
@@ -9,7 +10,7 @@ export const landingPagePolicy = `${landingPageShellPolicy}; sandbox ${landingPa
 
 const escapeHTML = value => String(value).replace(/[&<>"']/g, character => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[character]));
 
-export function landingPageFrame(html) {
+export function landingPageFrame(html, {pageId,contactOrigin} = {}) {
   let source = String(html);
   const title = decodeHTML((source.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1] || 'Landing page').replace(/<[^>]*>/g, ''));
   const language = source.match(/<html\b[^>]*\blang="([a-z0-9-]+)"/i)?.[1] || 'en';
@@ -29,16 +30,18 @@ export function landingPageFrame(html) {
   // Older exports used location.href for checkout return links. srcdoc inherits
   // the durable public/preview URL through document.baseURI instead.
   source = source.replaceAll('return:location.href}', "return:(location.href==='about:srcdoc'?document.baseURI:location.href)}");
+  const originScript = `<script>(${mountMessageOrigin.toString()})(document,${JSON.stringify({pageId,contactOrigin}).replace(/</g,'\\u003c')});</script>`;
+  source = /<\/body>/i.test(source) ? source.replace(/<\/body>/i, originScript + '</body>') : source + originScript;
   return `<!doctype html><html lang="${escapeHTML(language)}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHTML(title)}</title>${metadata}<style>html,body{margin:0;width:100%;height:100%;overflow:hidden}iframe[data-hosted-page]{display:block;width:100%;height:100%;border:0}</style></head><body><iframe data-hosted-page allowfullscreen title="${escapeHTML(title)}" sandbox="${landingPageSandbox}" srcdoc="${escapeHTML(source)}"></iframe><script>(${mountLandingMediaPlayer.toString()})(document);</script></body></html>`;
 }
 
-export function hostedLandingResponse(html, {noindex = true} = {}) {
+export function hostedLandingResponse(html, {noindex = true,pageId,contactOrigin} = {}) {
   // R2 interactive previews arrive as streams. Keep the existing synchronous
   // response API while reading them before escaping into the authored iframe.
-  const body = html === null ? null : typeof html === 'string' ? landingPageFrame(html) : new ReadableStream({
+  const body = html === null ? null : typeof html === 'string' ? landingPageFrame(html,{pageId,contactOrigin}) : new ReadableStream({
     async start(controller) {
       try {
-        controller.enqueue(new TextEncoder().encode(landingPageFrame(await new Response(html).text())));
+        controller.enqueue(new TextEncoder().encode(landingPageFrame(await new Response(html).text(),{pageId,contactOrigin})));
         controller.close();
       } catch (error) {
         controller.error(error);

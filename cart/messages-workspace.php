@@ -5,6 +5,7 @@ $messageEscape = static fn($v): string => htmlspecialchars((string) $v, ENT_QUOT
 <link rel="stylesheet" href="/cart/messages.css?v=<?= (int) filemtime(__DIR__ . '/messages.css') ?>">
 <section class="ez-messages" data-message-workspace data-config="<?= $messageEscape(json_encode($messageConfig, JSON_THROW_ON_ERROR)) ?>" aria-label="Messages">
   <svg width="0" height="0" aria-hidden="true" style="position:absolute"><defs>
+  <symbol id="msg-icon-bell" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></symbol>
   <symbol id="msg-icon-inbox" viewBox="0 0 24 24"><path d="m4 4-2 12v4h20v-4L20 4ZM2 16h6l2 3h4l2-3h6"/></symbol>
   <symbol id="msg-icon-reply" viewBox="0 0 24 24"><path d="m9 4-6 6 6 6M3 10h10a7 7 0 0 1 7 7v3"/></symbol>
   <symbol id="msg-icon-mail" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 6 9 7 9-7"/></symbol>
@@ -18,7 +19,8 @@ $messageEscape = static fn($v): string => htmlspecialchars((string) $v, ENT_QUOT
   <symbol id="msg-icon-send" viewBox="0 0 24 24"><path d="m3 3 19 9-19 9 4-9ZM7 12h15"/></symbol>
   <symbol id="msg-icon-trash" viewBox="0 0 24 24"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></symbol>
   </defs></svg>
-  <header class="msg-page-header"><div><h1>Messages</h1><p><?= $messageConfig['merchant'] ? 'Help your customers, from their first question to delivery.' : 'Your conversations with stores, all in one place.' ?></p></div><div class="msg-actions"><button type="button" data-msg-refresh><svg class="msg-icon" aria-hidden="true"><use href="#msg-icon-refresh"/></svg>Refresh inbox</button><?php if ($messageConfig['merchant']): ?><button type="button" data-msg-replies><svg class="msg-icon" aria-hidden="true"><use href="#msg-icon-messages"/></svg>Saved replies</button><button type="button" class="msg-primary" data-msg-new><svg class="msg-icon" aria-hidden="true"><use href="#msg-icon-plus"/></svg>New conversation</button><?php endif; ?></div></header>
+  <header class="msg-page-header"><div><h1>Messages</h1><p><?= $messageConfig['merchant'] ? 'Help your customers, from their first question to delivery.' : 'Your conversations with stores, all in one place.' ?></p></div><div class="msg-actions"><button type="button" data-msg-refresh><svg class="msg-icon" aria-hidden="true"><use href="#msg-icon-refresh"/></svg>Refresh inbox</button><?php if ($messageConfig['merchant']): ?><button type="button" data-msg-replies><svg class="msg-icon" aria-hidden="true"><use href="#msg-icon-messages"/></svg>Saved replies</button><button type="button" class="msg-primary" data-msg-new><svg class="msg-icon" aria-hidden="true"><use href="#msg-icon-plus"/></svg>New conversation</button><?php else: ?><button type="button" class="msg-primary" data-msg-push disabled><svg class="msg-icon" aria-hidden="true"><use href="#msg-icon-bell"/></svg><span data-msg-push-label>Enable notifications</span></button><?php endif; ?></div></header>
+  <?php if (!$messageConfig['merchant']): ?><p data-msg-push-status class="msg-push-status" role="status">Checking browser notifications…</p><?php endif; ?>
   <p data-msg-notice class="msg-notice" role="status" hidden></p><p data-msg-error class="msg-error" role="alert" hidden></p>
   <a href="" data-msg-signin hidden>Reload sign-in</a>
   <div class="msg-workspace <?= $messageConfig['merchant'] ? 'msg-merchant-workspace' : '' ?>">
@@ -39,3 +41,5 @@ $messageEscape = static fn($v): string => htmlspecialchars((string) $v, ENT_QUOT
   <dialog data-msg-photo-dialog aria-label="Message photo"><button type="button" data-msg-close>Close photo</button><img alt="Photo attached to this conversation"></dialog>
 </section>
 <script src="/cart/messages.js?v=<?= (int) filemtime(__DIR__ . '/messages.js') ?>" defer></script>
+
+<?php if (!$messageConfig['merchant']): ?><script src="/cart/customer-push.js?v=<?= (int) filemtime(__DIR__ . '/customer-push.js') ?>" defer></script><?php endif; ?>

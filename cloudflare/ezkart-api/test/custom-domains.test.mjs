@@ -50,7 +50,10 @@ test('owner scope, hostile CNAME/Host, pending TLS, isolation, expiry, downgrade
  const pending=await customDomainAction(env,alice,domain.id,'verify',transport);assert.equal(pending.state,'pending');assert.equal(pending.tlsStatus,'pending_validation');assert.equal(pending.dns.at(-1).value,'certificate-code');
  f.tls='active';assert.equal((await customDomainAction(env,alice,domain.id,'verify',transport)).state,'active');assert.equal(f.creates,1);
  const hosted=await customDomainResponse(request(domain.hostname),env);
- assert.match(await hosted.text(),/srcdoc="&lt;h1&gt;alice&lt;\/h1&gt;"/);
+ const shell=await hosted.text();
+ assert.match(shell,/srcdoc="&lt;h1&gt;alice&lt;\/h1&gt;&lt;script&gt;\(function mountMessageOrigin/);
+ assert.match(shell,/&quot;pageId&quot;:&quot;home&quot;,&quot;contactOrigin&quot;:&quot;https:\/\/test\.ezkart\.id&quot;/);
+ assert.match(shell,/sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation"/);
  assert.doesNotMatch(hosted.headers.get('content-security-policy'),/\bsandbox\b/);
  const head=await customDomainResponse(new Request('https://'+domain.hostname,{method:'HEAD'}),env);
  assert.equal(await head.text(),'');

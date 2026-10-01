@@ -63,6 +63,9 @@ try {
         $tracker = '<script src="/cart/campaign-tracker.js" data-phase="landing"></script>';
         $html = stripos($html, '</body>') !== false ? preg_replace('/<\/body>/i', $tracker . '</body>', $html, 1) : $html . $tracker;
     }
+    $originSource = file_get_contents(__DIR__ . '/message-origin.js');
+    $originScript = '<script>' . str_replace('export function mountMessageOrigin', 'function mountMessageOrigin', $originSource) . '</script>';
+    $html = stripos($html, '</body>') !== false ? preg_replace('/<\/body>/i', $originScript . '</body>', $html, 1) : $html . $originScript;
     echo ez_landing_page_frame($html);
 } catch (Throwable $error) {
     error_log('Ezkart page hosting: ' . $error->getMessage());

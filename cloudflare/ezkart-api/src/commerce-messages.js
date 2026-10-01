@@ -1,6 +1,7 @@
 import {commerceHash,commerceStorageEnabled} from './commerce-orders.js';
 import {currentCommerceEnvironment as mode,customerOrderSeller} from './commerce-access.js';
 import {reviewCursor,readReviewCursor} from './commerce-reviews.js';
+import {verifiedMessageOrigin} from './message-origin.js';
 
 export const messageFail=(message,status=422)=>{throw new Response(message,{status});};
 export const messageId=id=>typeof id==='string'&&/^conv_[a-f0-9]{32}$/.test(id);
@@ -24,12 +25,12 @@ const actorSql=actor=>actor.kind==='buyer'?'c.buyer_auth_user_id=?':`c.seller_id
 const actorBindings=actor=>actor.kind==='buyer'?[actor.id]:[actor.sellerId,actor.id];
 export async function messageConversation(env,actor,id){
   if(!messageId(id))messageFail('Conversation not found',404);
-  const row=await env.DB.prepare(`SELECT c.*,s.status AS store_status,COALESCE(NULLIF(json_extract(s.settings_json,'$.storefront.name'),''),s.name) AS store_name FROM commerce_conversations c JOIN sellers s ON s.id=c.seller_id
+  const row=await env.DB.prepare(`SELECT c.*,(SELECT origin_json FROM commerce_message_origins WHERE conversation_id=c.id) AS origin_json,s.status AS store_status,COALESCE(NULLIF(json_extract(s.settings_json,'$.storefront.name'),''),s.name) AS store_name FROM commerce_conversations c JOIN sellers s ON s.id=c.seller_id
     WHERE c.id=? AND c.commerce_environment=? AND ${actor.kind==='merchant'?"s.status='active' AND":''} ${actorSql(actor)}`).bind(id,mode(env),...actorBindings(actor)).first();
   if(!row)messageFail('Conversation not found',404);return row;
 }
 function conversationView(row,actor){return {id:row.id,storeId:row.seller_id,name:actor.kind==='buyer'?row.store_name:row.buyer_name,
-  state:row.state,revision:row.revision,lastEventId:row.last_event_id,createdAt:row.created_at,
+  state:row.state,revision:row.revision,lastEventId:row.last_event_id,createdAt:row.created_at,origin:row.origin_json?JSON.parse(row.origin_json):null,
   ...(row.position!==undefined?{unread:Boolean(row.unread),needsResponse:Boolean(row.last_buyer>row.last_merchant),lastMessage:row.last_body||'',updatedAt:row.activity_at||row.created_at}:{})};}
 // Context is re-authorized for every send. Browser-provided seller and buyer IDs
 // are never accepted. A claimed order remains bound to its permanent account.
@@ -55,8 +56,9 @@ async function messageContext(env,actor,input,row=null){
   return {sellerId,buyerId,buyerName,view};
 }
 export async function startConversation(env,actor,input){
-  messageWritable(env,actor);messageFields(input,['context']);
+  messageWritable(env,actor);messageFields(input,['context','origin']);
   const context=await messageContext(env,actor,input.context),id='conv_'+(await commerceHash({mode:mode(env),seller:context.sellerId,buyer:context.buyerId})).slice(0,32);
+  const origin=await verifiedMessageOrigin(env,actor,context.sellerId,input.origin);
   const previous=await env.DB.prepare('SELECT id FROM commerce_conversations WHERE id=?').bind(id).first();
   if(!previous){
     try{await env.DB.prepare(`INSERT INTO commerce_conversations(id,seller_id,commerce_environment,buyer_auth_user_id,buyer_name,created_at,context_kind,context_id,creator_kind,creator_id)
@@ -65,6 +67,8 @@ export async function startConversation(env,actor,input){
       ON CONFLICT(id) DO NOTHING`).bind(id,context.sellerId,mode(env),context.buyerId,context.buyerName,new Date().toISOString(),input.context.kind,input.context.id,actor.kind,actor.id,context.sellerId,
         ...(actor.kind==='merchant'?[actor.sellerId,actor.id]:[])).run();}catch(error){if(!await env.DB.prepare('SELECT id FROM commerce_conversations WHERE id=?').bind(id).first())messageError(error);}
   }
+  await messageConversation(env,actor,id);
+  if(origin)await env.DB.prepare('INSERT INTO commerce_message_origins(conversation_id,origin_json,created_at) VALUES(?,?,?) ON CONFLICT DO NOTHING').bind(id,JSON.stringify(origin),new Date().toISOString()).run();
   return {conversation:conversationView(await messageConversation(env,actor,id),actor),context:context.view};
 }
 const savedEvent=(env,actor,key)=>env.DB.prepare('SELECT * FROM commerce_message_events WHERE actor_kind=? AND actor_id=? AND commerce_environment=? AND request_key=?').bind(actor.kind,actor.id,mode(env),key).first();
@@ -124,7 +128,7 @@ export async function messageInbox(env,actor,url){
   const cap=cursor?.cap??(await env.DB.prepare('SELECT COALESCE(MAX(id),0) AS cap FROM commerce_message_events').first()).cap;
   const at=cursor?.at??new Date().toISOString();
   const search='%'+q.replace(/[\\%_]/g,'\\$&')+'%',opposite=actor.kind==='buyer'?'merchant':'buyer';
-  const rows=await env.DB.prepare(`WITH snapshot AS (SELECT c.*,s.status AS store_status,COALESCE(NULLIF(json_extract(s.settings_json,'$.storefront.name'),''),s.name) AS store_name,
+  const rows=await env.DB.prepare(`WITH snapshot AS (SELECT c.*,(SELECT origin_json FROM commerce_message_origins WHERE conversation_id=c.id) AS origin_json,s.status AS store_status,COALESCE(NULLIF(json_extract(s.settings_json,'$.storefront.name'),''),s.name) AS store_name,
     COALESCE((SELECT MAX(e.id) FROM commerce_message_events e WHERE e.conversation_id=c.id AND e.id<=?),0) AS position,
     COALESCE((SELECT e.state FROM commerce_message_events e WHERE e.conversation_id=c.id AND e.id<=? ORDER BY e.id DESC LIMIT 1),'open') AS snapshot_state,
     COALESCE((SELECT MAX(e.id) FROM commerce_message_events e WHERE e.conversation_id=c.id AND e.id<=? AND e.kind='message' AND e.actor_kind='buyer'),0) AS last_buyer,

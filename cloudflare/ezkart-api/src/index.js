@@ -77,6 +77,7 @@ import {parseMessageJSON} from './message-json.js';
 import {merchantSettings,saveMerchantSettings,settingsHistory,publicStoreProfile} from './merchant-settings.js';
 import {notificationInbox,notificationStats,readNotifications,notificationProcessing} from './commerce-notifications.js';
 import {dispatchNotifications,scheduleNotifications} from './commerce-notification-dispatch.js';
+import {pushStatus,savePushSubscription,dispatchCustomerPush} from './customer-web-push.js';
 import {dispatchEmails,recordEmailWebhook} from './commerce-email-delivery.js';
 import {dispatchCampaignEmails} from './campaign-email-delivery.js';
 import {processMarketingAutomations} from './automation-dispatch.js';
@@ -846,7 +847,7 @@ async function publicLandingPage(env, store, rawId) {
   const page = await landingPageObject(env, seller.id, cleanLandingPageId(rawId));
   if (page.status !== 'published' || !page.publishedHtml || await jevPageHeld(env,seller.id,page.id)) throw new Response("Page not found", {status: 404,headers:{'cache-control':'no-store'}});
   // Never serve editable state or the draft preview from the public route.
-  const response = hostedLandingResponse((await normalizeSocialHtml(page.publishedHtml)).html, {noindex: env.APP_ENVIRONMENT !== 'production'});
+  const response = hostedLandingResponse((await normalizeSocialHtml(page.publishedHtml)).html, {noindex: env.APP_ENVIRONMENT !== 'production',pageId:page.id,contactOrigin:deploymentProfile(env).origin});
   response.headers.set('x-ezkart-public-path', landingPageLinks(page, seller).publicPath);
   return response;
 }
@@ -1964,6 +1965,13 @@ export default {
         if(request.method==='POST'&&!history&&!url.search)return json({ok:true,...await saveMerchantSettings(env,actor,await reviewRequestJson(request,12000,parseMessageJSON))},200,cors);
         return json({ok:false,error:'Method or parameters not allowed'},405,cors);
       }
+      if(url.pathname==='/v1/customer/messages/push'){
+        const user=await authenticatedUser(request,env),actor={kind:'buyer',id:user.id};
+        if(url.search)return json({ok:false,error:'Push parameters are not allowed'},422,cors);
+        if(request.method==='GET')return json({ok:true,...pushStatus(env)},200,cors);
+        if(request.method==='POST')return json({ok:true,...await savePushSubscription(env,actor,await reviewRequestJson(request,5000,parseMessageJSON))},200,cors);
+        return json({ok:false,error:'Push method is not allowed'},405,cors);
+      }
       const messageMatch=/^\/v1\/(customer|commerce)\/messages(?:\/(stats|replies|conv_[a-f0-9]{32})(?:\/(read|media)(?:\/(mphoto_[a-f0-9]{32}))?)?)?$/.exec(url.pathname);
       if(messageMatch){
         const [,audience,id,action,photo]=messageMatch;
@@ -2390,7 +2398,7 @@ export default {
     const betaTask=betaScheduledTask(env,controller);
     if(betaTask){
       context.waitUntil(runBetaScheduledTask(betaTask,controller,{
-        notifications:async()=>({...await scheduleNotifications(env),...await dispatchNotifications(env)}),
+        notifications:async()=>({...await scheduleNotifications(env),...await dispatchNotifications(env),push:await dispatchCustomerPush(env)}),
         email:()=>dispatchEmails(env),campaigns:()=>dispatchCampaignEmails(env),automations:()=>processMarketingAutomations(env),
         housekeeping:()=>Promise.all([recheckCustomDomains(env),earningsHousekeeping(env),payoutSyncHousekeeping(env),cleanupDigitalUploads(env),
           cleanupAbandonedMedia(env),cleanupCampaignVisits(env),cleanupCampaignReportExports(env),cleanupCampaignPerformanceExports(env),
@@ -2415,7 +2423,7 @@ export default {
       context.waitUntil(dispatchEmails(env));return;
     }
     if(controller.cron==='* * * * *'){
-      context.waitUntil((async()=>{await scheduleNotifications(env);await dispatchNotifications(env);})());return;
+      context.waitUntil((async()=>{await scheduleNotifications(env);await dispatchNotifications(env);await dispatchCustomerPush(env);})());return;
     }
     context.waitUntil(recheckCustomDomains(env));
     context.waitUntil(earningsHousekeeping(env));

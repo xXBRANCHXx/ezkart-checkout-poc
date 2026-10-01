@@ -5,8 +5,9 @@ function ez_message_target(string $target, string $method, bool $merchant): arra
 {
     if (str_contains($target, '#')) throw new InvalidArgumentException('Message reference is invalid.');
     $parts = explode('?', $target, 2);
-    if (preg_match('#^(?:/(stats|replies|conv_[a-f0-9]{32})(?:/(read|media)(?:/(mphoto_[a-f0-9]{32}))?)?)?$#D', $parts[0], $match) !== 1) throw new InvalidArgumentException('Message reference is invalid.');
+    if (preg_match('#^(?:/(stats|replies|push|conv_[a-f0-9]{32})(?:/(read|media)(?:/(mphoto_[a-f0-9]{32}))?)?)?$#D', $parts[0], $match) !== 1) throw new InvalidArgumentException('Message reference is invalid.');
     $id = $match[1] ?? ''; $action = $match[2] ?? ''; $photo = $match[3] ?? '';
+    if ($merchant && $id === 'push') throw new InvalidArgumentException('Customer sign-in is required.');
     if (!$merchant && in_array($id, ['stats', 'replies'], true)) throw new InvalidArgumentException('Message reference is invalid.');
     if (($action !== '' && !str_starts_with($id, 'conv_')) || ($photo !== '' && $action !== 'media')
         || ($method === 'GET' && $action !== '' && $photo === '') || ($method === 'POST' && ($photo !== '' || $id === 'stats'))
