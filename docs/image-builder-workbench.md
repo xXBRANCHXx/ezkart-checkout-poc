@@ -157,6 +157,15 @@ and Undo restores both. The optional product button jumps to the connected
 catalog card and stays absent when no product is connected. Settings and default
 labels follow the account language and survive saving, undo and reopening.
 
+The product button appears beside the page name in the header, above the images.
+Enabling it does not turn product artwork into a connected catalog item. If it
+is absent, check the Product selection and the navigation setting's guidance:
+"Choose a product below to show this button." Removing the connected product
+preserves the enabled setting; reconnecting a product restores the button.
+`image-cta.test.mjs` verifies these states, video/footer edits, save/reload,
+320/390/941/1440 px editor previews, scrolling and local publication. This
+fixture evidence does not establish the selected product in a live merchant draft.
+
 The bar uses Page Studio's existing navigation menu, blur and scroll runtime.
 Its width remains capped at 480 px, including on desktop. Jump targets account
 for the selected header height. Disabling the bar preserves its settings.
