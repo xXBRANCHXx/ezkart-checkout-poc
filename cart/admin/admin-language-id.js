@@ -2129,3 +2129,7 @@ Object.assign(globalThis.EzkartIndonesian, {
 });
 
 Object.assign(globalThis.EzkartIndonesian, {"Enlarge product photo":"Perbesar foto produk", "Product photo":"Foto produk", "Close photo":"Tutup foto"});
+Object.assign(globalThis.EzkartIndonesian, {
+  "The scheduled version has no verified prices. Schedule this version again before publishing.":"Harga pada versi terjadwal belum diverifikasi. Jadwalkan ulang versi ini sebelum diterbitkan.",
+  "Product or variant prices changed after scheduling. Review your page and schedule this version again.":"Harga produk atau varian berubah setelah dijadwalkan. Periksa halamanmu dan jadwalkan ulang versi ini."
+});
