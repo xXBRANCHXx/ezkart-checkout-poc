@@ -28,12 +28,13 @@ test('merchant copies accurate AI instructions from both code fields; fallback a
   assert.equal(await page.locator('[data-sq-code-controls] [data-sq-code-ai-status]').innerText(),'AI instructions copied. Paste them into your AI chat and add your design request.');
   await call('save');await page.reload();await page.waitForFunction(()=>globalThis.EzkartBuilder);
   await openAssets(page);await page.locator('[data-sq-library-category=saved]').click();await page.locator('[data-sq-create-component]').click();
-  const component=page.locator('[data-sq-component-dialog]');await component.locator('[name=component_code]').fill('<article>Merchant component</article>');
+  const component=page.locator('[data-sq-component-dialog]');await page.waitForFunction(()=>document.activeElement?.name==='component_name');await component.locator('[name=component_code]').fill('<article>Merchant component</article>');
   await page.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async()=>{throw new Error('permission denied');}}}));
   const componentCopy=component.locator('[data-sq-copy-code-ai=component]');await componentCopy.click();
   const fallback=page.locator('.sq-code-instructions-dialog');await fallback.waitFor();const fallbackField=fallback.locator('textarea');
   assert.match(await fallbackField.inputValue(),/reusable component/);assert.match(await fallbackField.inputValue(),/Merchant component/);assert.equal(await fallbackField.evaluate(n=>n.selectionEnd-n.selectionStart),(await fallbackField.inputValue()).length);
   await page.setViewportSize({width:390,height:850});const bounds=await fallback.boundingBox();assert.ok(bounds.x>=0&&bounds.x+bounds.width<=390);
+  if(process.env.EZKART_TEST_EVIDENCE_DIR)await page.screenshot({path:join(process.env.EZKART_TEST_EVIDENCE_DIR,'code-instructions-390.png')});
   await fallback.getByRole('button',{name:'Close',exact:true}).click();assert.equal(await componentCopy.evaluate(n=>document.activeElement===n),true);await component.getByRole('button',{name:'Close component editor',exact:true}).click();
   // Exercise the exact API and declarative add control in a full exported page.
   await call('addSection',{component:'blank',id:'purchase-section'});
@@ -44,7 +45,6 @@ test('merchant copies accurate AI instructions from both code fields; fallback a
   assert.equal(await preview.evaluate(()=>EzkartCart.add({productId:'coffee',variantId:'small',quantity:1})),true);
   assert.equal(await preview.evaluate(()=>EzkartCart.add({productId:'coffee',variantId:'hidden',quantity:1})),false);
   assert.equal(await preview.evaluate(()=>EzkartCart.add({productId:'coffee',variantId:'small',quantity:100})),false);
-  await page.screenshot({path:join(dir,'code-instructions-editor.png')});
   assert.deepEqual(errors,[]);
  }finally{await browser.close();await ws.stop();await rm(dir,{recursive:true,force:true});}
 });
