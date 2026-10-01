@@ -87,18 +87,21 @@ test('an unconfirmed new physical product keeps its ID and SKU on retry rather t
   const draft={id:'draft-new-retry',baseRevision:null,name:'Retry tea',fields:{type:'physical',category:'Tea',price:'31500',stock:'10',weight:'100'},images:[1,2,3].map(n=>({id:'image-'+n,cloudId:'new_image_'+n})),hasVariants:false,options:[],variants:[]};
   const fixture={store:{sellerId:'seller_fixture'},catalog:[],drafts:[draft],products:[]};
   const persist=()=>writeFile(join(app.directory,'storefront.json'),JSON.stringify(fixture));await persist();
-  const writes=[],errors=[];
+  const writes=[],errors=[];let failDraft=true;
   await context.route('**/*',async route=>{
     const request=route.request(),url=new URL(request.url()),path=url.searchParams.get('cloud');
     if(url.pathname.startsWith('/v1/public/media/')||path?.startsWith('/v1/media/'))return route.fulfill({contentType:'image/webp',body:image});
     if(path==='/v1/catalog')return route.fulfill({json:{ok:true,products:fixture.catalog,drafts:fixture.drafts}});
     if(path==='/v1/admin-profile')return route.fulfill({json:{ok:true,profile:{logoId:'',canEdit:true}}});
     if(path?.startsWith('/v1/drafts/')){
+      if(failDraft)return route.fulfill({status:503,json:{ok:false,error:'Draft unavailable'}});
       const id=path.split('/').at(-1);fixture.drafts=[{...request.postDataJSON().snapshot,id}];await persist();return route.fulfill({json:{ok:true,draft:{id}}});
     }
     if(path?.endsWith('/confirmation'))return route.fulfill({status:404,json:{ok:false,error:'Confirmation temporarily unavailable'}});
     if(path?.startsWith('/v1/products/')){
       const payload=request.postDataJSON();writes.push(payload);
+      assert.equal(fixture.drafts[0].publishingProductId,payload.id,'Identity is saved before the product mutation begins');
+      assert.equal(fixture.drafts[0].fields.price,String(payload.price),'The latest frozen price is saved with the identity');
       if(fixture.catalog.some(product=>product.id===payload.id))return route.fulfill({status:409,json:{ok:false,error:'This product changed.',code:'catalog_revision_conflict'}});
       fixture.catalog.push({...payload,revision:1,status:'active',media:payload.imageUploadIds.map(id=>({id}))});await persist();
       return route.fulfill({status:503,json:{ok:false,error:'Connection interrupted'}});
@@ -110,6 +113,9 @@ test('an unconfirmed new physical product keeps its ID and SKU on retry rather t
   await page.goto(app.base+'/cart/admin/?page=product-new&draft=draft-new-retry');
   await page.waitForFunction(()=>document.querySelector('#product-create-form [name=name]')?.value==='Retry tea');
   const publish=()=>page.locator('[form="product-create-form"][type="submit"]').first().click();
+  await publish();await page.locator('[data-product-create-error]').filter({hasText:'Draft unavailable'}).waitFor();
+  assert.equal(writes.length,0,'A failed durable identity save prevents the product mutation');
+  failDraft=false;
   await publish();await page.locator('[data-product-create-error]').filter({hasText:'Connection interrupted'}).waitFor();
   await page.locator('#product-create-form [name=price]').fill('42500');await publish();
   await page.locator('[data-product-conflict-latest]').waitFor();
@@ -118,5 +124,15 @@ test('an unconfirmed new physical product keeps its ID and SKU on retry rather t
   assert.equal(fixture.catalog.length,1,'An unknown original outcome cannot create a second product');
   assert.equal(fixture.catalog[0].price,31500,'The committed original stays intact until reviewed with its current revision');
   assert.equal(await page.locator('#product-create-form [name=price]').inputValue(),'42500');
+  await page.locator('[data-save-product-draft]').click();
+  await page.waitForFunction(()=>document.querySelector('[data-product-draft-status]').textContent.includes('Saved'));
+  assert.equal(fixture.drafts[0].publishingProductId,writes[0].id,'The draft retains the original create identity');
+  await page.reload();
+  await page.waitForFunction(()=>document.querySelector('#product-create-form [name=name]')?.value==='Retry tea');
+  await publish();await page.locator('[data-product-conflict-latest]').waitFor();
+  assert.equal(writes.length,3);assert.equal(writes[2].id,writes[0].id);assert.equal(writes[2].sku,writes[0].sku);
+  assert.equal(writes[2].revision,null,'Reload does not promote an old draft to the latest catalog revision');
+  assert.equal(fixture.catalog.length,1,'Reopening an uncertain create does not duplicate the committed product');
+  assert.equal(fixture.catalog[0].price,31500);assert.equal(await page.locator('#product-create-form [name=price]').inputValue(),'42500');
   assert.deepEqual(errors,[]);
 });

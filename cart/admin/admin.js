@@ -1194,6 +1194,7 @@
     const digitalFiles = globalThis.EzkartDigitalFiles?.mount({root:q('[data-digital-file-editor]'),enabled:cloudEnabled,draftKey:draftId,product:editingProduct,onChange:markDraftChanged});
     const draftSnapshot = () => ({
       id: draftId,
+      publishingProductId: editingProduct ? null : publishingProductId || null,
       digitalUpload: digitalFiles?.snapshot() || null,
       baseRevision,
       productId: editingProduct && cloudCatalogProducts.some((product) => product.id === editingProduct.id) ? editingProduct.id : null,
@@ -1224,19 +1225,22 @@
         variant.customImage.cloudId = (await uploadCloudImage(source)).id;
       }
     };
+    const persistDraftSnapshot = async (snapshot) => {
+      if (cloudEnabled) await saveCloudDraft(snapshot);
+      else {
+        const drafts = readLocalProductDrafts();
+        const index = drafts.findIndex((draft) => draft.id === snapshot.id);
+        if (index >= 0) drafts[index] = snapshot; else drafts.push(snapshot);
+        if (!writeProductDrafts(drafts)) throw new Error("Draft storage is full.");
+      }
+    };
     let draftSavePromise = Promise.resolve();
     const saveDraft = (announce = true) => {
       window.clearTimeout(draftTimer);
       draftSavePromise = draftSavePromise.then(async () => {
         await ensureEditorMediaCloud();
         const snapshot = draftSnapshot(), snapshotVersion = draftChangeVersion;
-        if (cloudEnabled) await saveCloudDraft(snapshot);
-        else {
-          const drafts = readLocalProductDrafts();
-          const index = drafts.findIndex((draft) => draft.id === draftId);
-          if (index >= 0) drafts[index] = snapshot; else drafts.push(snapshot);
-          if (!writeProductDrafts(drafts)) throw new Error("Draft storage is full.");
-        }
+        await persistDraftSnapshot(snapshot);
         savedDraftVersion = snapshotVersion;
         if (draftStatus && savedDraftVersion === draftChangeVersion) { draftStatus.classList.remove("is-saving"); draftStatus.innerHTML = "<i></i> Saved"; }
         if (announce) showToast("Product draft saved");
@@ -1722,6 +1726,7 @@
       previewDevice: "desktop",
     });
     const restoreSnapshot = (snapshot, label) => {
+      if (!editingProduct && /^custom-[a-z0-9]+$/i.test(snapshot.publishingProductId || "")) publishingProductId = snapshot.publishingProductId;
       // A legacy draft without a revision must be reviewed against a fresh copy.
       // Giving it today's revision would allow its old stock count to erase sales.
       baseRevision = Number.isSafeInteger(snapshot.baseRevision) ? snapshot.baseRevision : null;
@@ -1925,6 +1930,9 @@
         // An unconfirmed create must retain its identity on a manual retry.
         // A committed original then hits the revision guard instead of duplicating.
         if (!editingProduct && !publishingProductId) publishingProductId = `custom-${suffix}`;
+        // Freeze the identity and latest edits durably before an uncertain create.
+        // Reopening the draft then retries the same product with its old revision.
+        if (!editingProduct) await persistDraftSnapshot(draftSnapshot());
         const product = {
           revision: baseRevision,
           id: editingProduct?.id || publishingProductId, sku: editingProduct?.sku || `EZK-${type.slice(0, 3).toUpperCase()}-${publishingProductId.replace(/^custom-/, '').slice(-10).toUpperCase()}`, name: String(productCreateForm.elements.name.value).trim(), category: String(productCreateForm.elements.category.value).trim(), categoryKey: currentCategoryEntry() ? categoryKey(productCreateForm.elements.category.value) : "", description: String(productCreateForm.elements.description.value).trim(), type,
