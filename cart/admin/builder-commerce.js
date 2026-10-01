@@ -6,7 +6,9 @@
     const abort = new AbortController();
     const selections = previous?.selections || new Map();
     const quantities = previous?.quantities || new Map();
-    root.__commerce = { abort, selections, quantities };
+    // Default variants still supply price/stock; photos follow explicit choices.
+    const chosenVariants = previous?.chosenVariants || new Map();
+    root.__commerce = { abort, selections, quantities, chosenVariants };
     const nodes = [...root.querySelectorAll('[data-native-type="commerce"]')];
     const catalog = new Map(products.map((product) => [product.id, product]));
     const config = (node) =>
@@ -176,12 +178,16 @@
           node.textContent = c.part === "price" ? "—" : "Variant unavailable";
         return;
       }
-      if (!fixed) selections.set(key(c), selected.id);
+      if (!fixed) {
+        if (chosenVariants.get(key(c)) !== selected.id) chosenVariants.delete(key(c));
+        selections.set(key(c), selected.id);
+      }
       const available =
         product.type !== "physical" ||
         Number(selected.stock ?? product.stock) > 0;
-      const selectedImage =
-        selected.image || product.images?.[0] || product.image;
+      const coverImage = product.images?.[0] || product.image;
+      const showVariantImage = fixed || chosenVariants.get(key(c)) === selected.id;
+      const selectedImage = (showVariantImage && selected.image) || coverImage || selected.image;
       node.dataset.commerceVariant =
         selected.id === product.id ? "" : selected.id;
       node.dataset.commerceMaximum = String(
@@ -204,7 +210,7 @@
           node.replaceChildren(img);
         }
         if (img.getAttribute("src") !== selectedImage) img.src = selectedImage;
-        img.alt = `${product.name}${selected !== product ? " — " + variantName(selected) : ""}`;
+        img.alt = `${product.name}${selected !== product && ((showVariantImage && selected.image) || !coverImage) ? " — " + variantName(selected) : ""}`;
       } else if (c.part === "quantity") {
         let field = node.querySelector(".sq-native-commerce-quantity");
         if (!field) {
@@ -388,6 +394,8 @@
         const owner = input.closest('[data-native-type="commerce"]'),
           c = config(owner);
         selections.set(key(c), input.value);
+        if (input.value) chosenVariants.set(key(c), input.value);
+        else chosenVariants.delete(key(c));
         const selectionLabel = owner.querySelector(
           ".sq-native-commerce-selection",
         );
@@ -421,6 +429,25 @@
       },
       { signal: abort.signal },
     );
+    root.addEventListener("ezkart:select-choose", event => {
+      const input = event.target.closest("[data-commerce-option]");
+      if (input && chosenVariants.get(key(config(input.closest('[data-native-type="commerce"]')))) !== input.value) input.dispatchEvent(new Event("change", {bubbles:true}));
+    }, {signal:abort.signal});
+    // Editor selection stops bubbling clicks; observe a confirmed radio choice
+    // before that handler, including confirmation of the checked default.
+    root.addEventListener("click", event => {
+      const option = event.target.closest('[data-commerce-option][type="radio"]');
+      if (!option?.checked) return;
+      const choiceKey = key(config(option.closest('[data-native-type="commerce"]')));
+      if (chosenVariants.get(choiceKey) !== option.value) option.dispatchEvent(new Event("change", {bubbles:true}));
+    }, {signal:abort.signal,capture:true});
+    root.addEventListener("keydown", event => {
+      const option = event.target.closest('[data-commerce-option][type="radio"]');
+      if (event.key === " " && option?.checked && !event.repeat) {
+        const choiceKey = key(config(option.closest('[data-native-type="commerce"]')));
+        if (chosenVariants.get(choiceKey) !== option.value) option.dispatchEvent(new Event("change", {bubbles:true}));
+      }
+    }, {signal:abort.signal,capture:true});
     root.addEventListener(
       "click",
       (event) => {

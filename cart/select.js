@@ -2,7 +2,19 @@
    landing-page exporter can include it without an external script dependency. */
 (() => {
   function install() {
-    if (CSS.supports('appearance', 'base-select') || document.documentElement.dataset.ezkartSelects) return;
+    // An explicit repeat choice has no native change event, but commerce
+    // photos still need to distinguish it from an untouched default.
+    if (CSS.supports('appearance', 'base-select')) {
+      if (!document.documentElement.dataset.ezkartNativeChoices) {
+        document.documentElement.dataset.ezkartNativeChoices = 'true';
+        document.addEventListener('click', event => {
+          const option = event.target.closest('option'), select = option?.closest('select');
+          if (select && !option.disabled && !select.disabled) setTimeout(() => select.dispatchEvent(new CustomEvent('ezkart:select-choose', { bubbles: true })), 0);
+        }, true);
+      }
+      return;
+    }
+    if (document.documentElement.dataset.ezkartSelects) return;
     document.documentElement.dataset.ezkartSelects = 'true';
     const controls = new Map();
     let current = null, serial = 0, queued = false;
@@ -76,6 +88,7 @@
         control.select.dispatchEvent(new Event('input', { bubbles: true }));
         control.select.dispatchEvent(new Event('change', { bubbles: true }));
       }
+      control.select.dispatchEvent(new CustomEvent('ezkart:select-choose', { bubbles: true }));
     };
     const open = control => {
       close();

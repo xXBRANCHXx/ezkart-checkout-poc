@@ -5712,7 +5712,14 @@
       if (!card) return;
       const previousVariant = card.dataset.sqSelectedVariant || card.querySelector("[data-sq-variant-picker]")?.value || "";
       card.querySelectorAll(".sq-product-variant, [data-sq-product-options]").forEach((control) => control.remove());
-      if (!variants.length) return;
+      if (!variants.length) {
+        delete card.__sqVariantChosen;
+        delete card.dataset.sqSelectedVariant;
+        const image = card.querySelector(".product-art img");
+        if (image) image.src = fallbackImage;
+        return;
+      }
+      const previousChoice = card.__sqVariantChosen === previousVariant && variants.some(variant => variant.id === previousVariant);
       let groups = storefrontOptionGroups(product, variants);
       if (!groups.length) {
         // Catalogs can provide named variants without separate option groups.
@@ -5722,6 +5729,7 @@
       const controls = document.createElement("div");
       controls.className = "sq-product-options";
       controls.dataset.sqProductOptions = "";
+      controls.dataset.ezkartCoverImage = fallbackImage;
       controls.dataset.ezkartVariants = JSON.stringify(variants.map((variant) => ({
         id: variant.id,
         price: Math.max(1000, Number(variant.price) || fallbackPrice),
@@ -5760,7 +5768,9 @@
         const priceTarget = card.querySelector("footer b");
         const imageTarget = card.querySelector(".product-art img");
         if (priceTarget) priceTarget.textContent = formatRupiah(Math.max(1000, Number(selected.price) || fallbackPrice));
-        if (imageTarget) imageTarget.src = selected.image || fallbackImage;
+        const choseVariant = changedIndex >= 0 || previousChoice;
+        card.__sqVariantChosen = choseVariant ? selected.id : "";
+        if (imageTarget) imageTarget.src = (choseVariant && selected.image) || fallbackImage || selected.image || "";
         optionControls.forEach((field, index) => {
           const select = field.querySelector("select"), value = valueFor(selected, groups[index]);
           if (value) field.dataset.ezkartValue = select.value = value;
@@ -5776,6 +5786,9 @@
       optionControls.forEach((field, index) => field.querySelector("select").addEventListener("change", event => {
         field.dataset.ezkartValue = event.target.value;
         applyVariant(index);
+      }));
+      optionControls.forEach((field, index) => field.querySelector("select").addEventListener("ezkart:select-choose", event => {
+        field.dataset.ezkartValue = event.target.value; applyVariant(index);
       }));
       applyVariant();
     };
@@ -8570,16 +8583,20 @@ document.querySelectorAll('[data-ezkart-variants]').forEach(controls=>{
     }
     select.value=field.dataset.ezkartValue;
   });
+  const coverImage=catalog[card.dataset.productCard]?.image||controls.dataset.ezkartCoverImage||card.querySelector('.product-art img')?.getAttribute('src')||'';
+  let choseVariant=false;
   const sync=(changed=-1)=>{
+    if(changed>=0)choseVariant=true;
     const groups=fields.map(field=>field.dataset.ezkartOption);let selected=variants.find(variant=>groups.every((group,index)=>valueFor(variant,group)===fields[index].dataset.ezkartValue));
     if(!selected&&changed>=0)selected=variants.find(variant=>valueFor(variant,groups[changed])===fields[changed].dataset.ezkartValue);
     selected||=variants[0];if(!selected)return;
     groups.forEach((group,index)=>{const value=valueFor(selected,group);if(value)fields[index].dataset.ezkartValue=fields[index].querySelector('select').value=value});
     card.dataset.ezkartVariant=selected.id||'';const price=card.querySelector('footer b'),image=card.querySelector('.product-art img');
-    if(price)price.textContent=money(Math.max(1000,Number(selected.price)||0));if(image&&selected.image)image.src=selected.image;
+    if(price)price.textContent=money(Math.max(1000,Number(selected.price)||0));if(image)image.src=(choseVariant&&selected.image)||coverImage||selected.image||'';
     fields.forEach((field,index)=>{const select=field.querySelector('select');[...select.options].forEach(option=>{option.disabled=!variants.some(variant=>groups.every((group,groupIndex)=>groupIndex===index?valueFor(variant,group)===option.value:valueFor(variant,group)===fields[groupIndex].dataset.ezkartValue))});select.dispatchEvent(new Event('input',{bubbles:true}))});
   };
   fields.forEach((field,index)=>field.querySelector('select').addEventListener('change',event=>{field.dataset.ezkartValue=event.target.value;sync(index)}));
+  fields.forEach((field,index)=>field.querySelector('select').addEventListener('ezkart:select-choose',event=>{field.dataset.ezkartValue=event.target.value;sync(index)}));
   sync();
 });
 const addProductToCart=({productId,variantId='',quantity=1}={})=>{quantity=Number(quantity);const product=lineProduct(selectionId(productId,variantId));if(!product||!Number.isSafeInteger(quantity)||quantity<1)return false;const id=selectionId(productId,product.variantId),maximum=product.stock==null?Number.MAX_SAFE_INTEGER:Number(product.stock);if(!Number.isFinite(maximum)||maximum<1||(cart[id]||0)+quantity>maximum)return false;changeCart(id,quantity);openCart();return true};
