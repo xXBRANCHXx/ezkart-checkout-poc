@@ -498,3 +498,83 @@
   }
   globalThis.EzkartCommerce = { mount };
 })();
+
+/* The same accessible photo viewer is serialized into ordinary page exports. */
+(() => {
+  function mount(root, editing = false) {
+    if (!root || root.__productImages) return;
+    root.__productImages = true;
+    const localLabels = { 'Enlarge product photo': 'Perbesar foto produk', 'Product photo': 'Foto produk', 'Close photo': 'Tutup foto' };
+    const label = text => globalThis.EzkartLanguage?.t(text) || (/^id\b/.test(document.documentElement.lang) ? localLabels[text] : text);
+    let dialog, trigger, activeHistory = '', historyClosing = false;
+    const prepare = () => root.querySelectorAll('[data-product-card] > .product-art').forEach(art => {
+      if (!art.querySelector('img')) return;
+      art.setAttribute('role', 'button'); art.tabIndex = 0;
+      art.setAttribute('aria-label', label('Enlarge product photo'));
+      art.setAttribute('aria-haspopup', 'dialog');
+    });
+    const finish = () => {
+      if (dialog?.open) dialog.close();
+      if (trigger?.isConnected) trigger.focus({ preventScroll: true });
+    };
+    const close = () => {
+      finish();
+      if (activeHistory && history.state?.ezkartProductPhoto === activeHistory) {
+        historyClosing = true;
+        history.back();
+      }
+      activeHistory = '';
+    };
+    addEventListener('popstate', () => {
+      historyClosing = false;
+      if (activeHistory && history.state?.ezkartProductPhoto !== activeHistory) {
+        activeHistory = ''; finish();
+      }
+    });
+    const open = art => {
+      const photo = art.querySelector('img');
+      if (!photo || historyClosing) return;
+      if (!dialog) {
+        dialog = document.createElement('dialog'); dialog.className = 'sq-product-image-dialog';
+        const button = document.createElement('button'); button.type = 'button'; button.textContent = label('Close photo');
+        button.addEventListener('click', close);
+        dialog.append(button, document.createElement('img')); document.body.append(dialog);
+        dialog.addEventListener('cancel', event => { event.preventDefault(); close(); });
+        dialog.addEventListener('click', event => {
+          if (event.target !== dialog) return;
+          const rect = dialog.getBoundingClientRect();
+          if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) close();
+        });
+      }
+      trigger = art;
+      dialog.setAttribute('aria-label', label('Product photo') + (photo.alt ? ': ' + photo.alt : ''));
+      const full = dialog.querySelector('img'); full.src = photo.currentSrc || photo.src; full.alt = photo.alt;
+      dialog.showModal(); dialog.querySelector('button').focus();
+      activeHistory = 'photo-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+      try { history.pushState({ ...history.state, ezkartProductPhoto: activeHistory }, ''); }
+      catch (_) { activeHistory = ''; }
+    };
+    root.addEventListener('click', event => {
+      let art = event.target.closest('[data-product-card] > .product-art');
+      // Native canvas hit testing can target the product wrapper instead of
+      // its photo. Alt-click still interacts with the visible photo region.
+      if (!art && editing && event.altKey) {
+        art = [...event.target.closest('.sq-product-grid')?.querySelectorAll('[data-product-card] > .product-art') || []].find(photo => {
+          const rect = photo.getBoundingClientRect();
+          return event.clientX >= rect.left && event.clientX <= rect.right && event.clientY >= rect.top && event.clientY <= rect.bottom;
+        });
+      }
+      // Studio keeps its ordinary select/drag behavior; Alt-click interacts.
+      if (!art || !root.contains(art) || !art.querySelector('img') || (editing && !root.querySelector('[data-image-page]') && !event.altKey)) return;
+      event.preventDefault(); event.stopImmediatePropagation(); open(art);
+    }, true);
+    root.addEventListener('keydown', event => {
+      const art = event.target.closest('[data-product-card] > .product-art');
+      if (!art || !['Enter', ' '].includes(event.key)) return;
+      event.preventDefault(); event.stopImmediatePropagation(); open(art);
+    }, true);
+    new MutationObserver(prepare).observe(root, { childList: true, subtree: true });
+    prepare();
+  }
+  globalThis.EzkartProductImages = { mount };
+})();
