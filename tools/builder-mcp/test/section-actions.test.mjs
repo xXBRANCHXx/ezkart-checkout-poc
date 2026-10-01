@@ -1,10 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chromium } from "playwright";
-import { Workspace } from "../workspace.mjs";
+import { Workspace, repoRoot } from "../workspace.mjs";
 
 async function fixture(run) {
   const dir = await mkdtemp(join(tmpdir(), "ezkart-sections-")),
@@ -18,6 +18,14 @@ async function fixture(run) {
     }),
     errors = [];
   page.setDefaultTimeout(5000);
+  // Section geometry must not depend on the production marketing host loading.
+  await page.route("https://ezkart.id/assets/marketing/**", async (route) => {
+    const file = new URL(route.request().url()).pathname.split('/').pop();
+    const fixture = file === 'ezkart-logo.svg' ? ['assets/ezkart-logo.svg', 'image/svg+xml']
+      : file === 'form-bottles.webp' ? ['cart/admin/assets/products/kopi-susu.webp', 'image/webp'] : null;
+    if (!fixture) return route.continue();
+    await route.fulfill({ body: await readFile(join(repoRoot, fixture[0])), contentType: fixture[1] });
+  });
   page.on("pageerror", (e) => errors.push(e.message));
   const invoke = (method, args = {}) =>
     page.evaluate(({ method, args }) => EzkartBuilder[method](args), {
