@@ -2923,8 +2923,10 @@
     const previewRepairMode = new URLSearchParams(window.location.search).get("preview-repair") === "1";
     let activeSiteKey = requestedSiteUrl;
     let activeSiteDocument = null;
+    let pageSchedule = null;
     function syncHostedPageLinks() {
       if (!activeSiteDocument) return;
+      pageSchedule?.refresh();
       const published = activeSiteDocument.status === 'published';
       const url = hostedPageUrl(activeSiteDocument);
       document.querySelectorAll('[data-sq-published-link], [data-sq-open-public]').forEach(link => { link.href = url; link.hidden = !published; });
@@ -8848,6 +8850,19 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
       }
       return {published:true,url:hostedPageUrl(activeSiteDocument)};
     };
+    pageSchedule = globalThis.EzkartPageSchedule?.mount({
+      root:sqStudio,getPage:()=>activeSiteDocument,request:cloudRequest,
+      accept:page=>{activeSiteDocument=replaceCloudLandingPage({...activeSiteDocument,...page});syncHostedPageLinks();},
+      prepare:async()=>{
+        if(siteSettings.busy())throw Error('Wait for your favicon upload to finish, then publish.');
+        await cloudSavePromise;
+        await requireProductForOutput();
+        clearTimeout(saveTimer);
+        const html=generateHtml();
+        if(!await persistCurrentState())throw Error('Your page could not be saved. Please try again.');
+        return {html,sourceUpdatedAt:activeSiteDocument.updatedAt};
+      },
+    });
     const publishedDialog = document.querySelector('[data-sq-published-dialog]');
     const publishingDialog = document.querySelector('[data-sq-publishing-dialog]');
     let publicationPending = false;

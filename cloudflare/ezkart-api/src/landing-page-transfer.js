@@ -1,15 +1,16 @@
+import {scheduleSummary} from './landing-page-schedule.js';
 // A lossless wire format: embedded images occur in native attributes, rendered
 // HTML and catalog snapshots. Send each image once without changing saved data.
 export function landingPageSaveReceipt(page) {
   // The caller already has its submitted state and artwork. Only return the
   // authoritative identity, publication status and save version after storage.
   const {id, name, url, status, products, createdAt, updatedAt, publishedAt, publicPath, previewPath} = page;
-  return {id, name, url, status, products, createdAt, updatedAt, publishedAt, publicPath, previewPath};
+  return {id, name, url, status, products, createdAt, updatedAt, publishedAt, publicPath, previewPath, scheduledPublication:scheduleSummary(page.scheduledPublication), scheduleReceipt:page.scheduleReceipt || null};
 }
 
 export function packLandingEditor(page) {
   const {publishedHtml, ...editable} = page;
-  const source = JSON.stringify(editable);
+  const source = JSON.stringify({...editable,...(Object.hasOwn(page,'scheduledPublication') ? {scheduledPublication:scheduleSummary(page.scheduledPublication)} : {})});
   const images = [], indexes = new Map(), parts = [];
   let offset = 0;
   for (const match of source.matchAll(/data:image\/(?:png|jpeg|webp|gif|avif);base64,[a-zA-Z0-9+/=]{1024,}/g)) {

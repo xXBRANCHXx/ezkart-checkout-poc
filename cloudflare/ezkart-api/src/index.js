@@ -1,3 +1,4 @@
+import {changeLandingSchedule,publishDueLandingPages,scheduleSummary} from './landing-page-schedule.js';
 import {previewAccessPath, readPreviewAccess, managePreviewAccess, unlockPreview, validPreviewSession, previewSessionSeconds} from './landing-preview-access.js';
 import {createTrackingCampaign,addTrackingSource,endTrackingCampaign,trackingReport,listTrackingCampaigns,startTrackingVisit,recordTrackingEvent} from './tracking-campaigns.js';
 import {reviewBankChanges} from './seller-bank-changes.js';
@@ -583,6 +584,7 @@ const landingPageSummary = (page) => ({
   createdAt: page.createdAt,
   updatedAt: page.updatedAt,
   publishedAt: page.publishedAt || null,
+  scheduledPublication: scheduleSummary(page.scheduledPublication),
   previewUpdatedAt: page.previewUpdatedAt || null,
   previewBytes: Math.max(0, Math.round(Number(page.previewBytes) || 0)),
   previewSourceUpdatedAt: page.previewSourceUpdatedAt || null,
@@ -671,7 +673,7 @@ async function saveLandingPage(request, env, rawId, context) {
     && Array.isArray(payload.customProducts) && Object.hasOwn(payload, 'state')
     && Object.hasOwn(payload, 'publishedHtml');
   try {
-    if (completePublication) {
+    if (completePublication && !existingObject?.customMetadata?.hasSchedule) {
       const object = existingObject;
       if (object) existing = object.customMetadata?.createdAt
         ? {createdAt: object.customMetadata.createdAt}
@@ -712,7 +714,7 @@ async function saveLandingPage(request, env, rawId, context) {
     const error = await validatePublication({ html: publishedHtml, state, products: catalogProducts });
     if (error) throw new Response(error, { status: 422 });
   }
-  const now = new Date().toISOString();
+  const now = new Date(Math.max(Date.now(),(Date.parse(existingObject?.customMetadata?.updatedAt || existing?.updatedAt)||0)+1)).toISOString();
   const page = {
     id,
     name,
@@ -722,6 +724,8 @@ async function saveLandingPage(request, env, rawId, context) {
     customProducts,
     state,
     publishedHtml,
+    scheduledPublication: payload.status === "published" ? null : existing?.scheduledPublication || null,
+    scheduleReceipt: existing?.scheduleReceipt || null,
     createdAt: existing?.createdAt || now,
     updatedAt: now,
     publishedAt: payload.status === "published" ? now : existing?.publishedAt || null,
@@ -732,12 +736,30 @@ async function saveLandingPage(request, env, rawId, context) {
   }
   const savedObject = await putJevPage(env, seller.id, id, existingObject?.etag || '', serialized, {
     httpMetadata: { contentType: "application/json; charset=utf-8" },
-    customMetadata: { sellerId: seller.id, landingPageId: id, status, updatedAt: now, saveId, name, createdAt: page.createdAt, publishedAt: page.publishedAt || '' },
+    customMetadata: { sellerId: seller.id, landingPageId: id, status, updatedAt: now, saveId, name, createdAt: page.createdAt, publishedAt: page.publishedAt || '', ...(existingObject?.customMetadata?.hasSchedule ? {hasSchedule:'1'} : {}) },
   });
   // A failed derived cache write must not turn a successful project save into
   // an error. The next list read repairs it against the authoritative version.
   context.waitUntil(cacheLandingSummary(env.PRIVATE_ASSETS, seller.id, savedObject, landingPageSummary(page)).catch(() => {}));
   return landingPageLinks(page, seller);
+}
+
+async function validateScheduledLandingPage(sellerId, html, state, env) {
+  await requirePublicationBank(env,sellerId);
+  const products = await env.DB.prepare("SELECT * FROM products WHERE seller_id = ? AND status = 'active'").bind(sellerId).all();
+  const variants = await env.DB.prepare("SELECT * FROM product_variants WHERE seller_id = ?").bind(sellerId).all();
+  const catalogProducts = products.results.map(row => shapeProduct(row,[],variants.results.filter(v => v.product_id === row.id)));
+  const error = await validatePublication({html,state,products:catalogProducts});
+  if (error) throw new Response(error,{status:422});
+}
+
+async function landingSchedule(request, env, rawId) {
+  const seller = await sellerPageAddress(env,(await sellerContext(request,env)).seller);
+  if (seller.role === 'viewer') throw new Response('You do not have permission to schedule publications.',{status:403});
+  const id = cleanLandingPageId(rawId);
+  const page = await changeLandingSchedule(env,seller.id,id,await requestJson(request,maximumLandingPageBytes),
+    (sellerId,html,state) => validateScheduledLandingPage(sellerId,html,state,env));
+  return landingPageLinks({...page,scheduledPublication:scheduleSummary(page.scheduledPublication)},seller);
 }
 
 async function landingPagePreview(request, env, rawId) {
@@ -2237,6 +2259,8 @@ export default {
         return json({ok: true, receipt: await adjustInventory(env, seller, authUserId, await requestJson(request, 64000))}, 200, cors);
       }
       if (request.method === "GET" && url.pathname === "/v1/landing-pages") return json({ ok: true, pages: await landingPages(request, env) }, 200, cors);
+      const landingScheduleMatch = /^\/v1\/landing-pages\/([a-z0-9-]+)\/schedule$/.exec(url.pathname);
+      if (request.method === 'POST' && landingScheduleMatch) return json({ok:true,page:landingPageSaveReceipt(await landingSchedule(request,env,landingScheduleMatch[1]))},200,{...cors,'cache-control':'private, no-store'});
       const landingExportMatch = /^\/v1\/landing-pages\/([a-z0-9-]+)\/export$/.exec(url.pathname);
       if (request.method === "POST" && landingExportMatch) return json(await authorizeLandingExport(request, env, landingExportMatch[1]), 200, cors);
       const previewAccessMatch = /^\/v1\/landing-pages\/([a-z0-9-]+)\/preview-access$/.exec(url.pathname);
@@ -2355,6 +2379,8 @@ export default {
     }
   },
   async scheduled(controller, env, context) {
+    if (controller.cron === '* * * * *' && env.PRIVATE_ASSETS) context.waitUntil(publishDueLandingPages(env,
+      (sellerId,html,state) => validateScheduledLandingPage(sellerId,html,state,env),jevPageHeld));
     const betaTask=betaScheduledTask(env,controller);
     if(betaTask){
       context.waitUntil(runBetaScheduledTask(betaTask,controller,{

@@ -32,6 +32,7 @@ $builderCheckoutPaused = !ez_new_checkout_enabled();
       <button type="button" data-sq-preview aria-label="Preview page" title="Preview page"><?= ez_admin_icon('eye') ?><span>Preview</span></button>
       <button type="button" data-sq-export aria-label="Export HTML" title="Export HTML"><?= ez_admin_icon('code') ?><span>Export HTML</span></button>
       <a class="ui-button" data-sq-published-link href="#" target="_blank" rel="noopener" aria-label="View published page" title="View published page" hidden><?= ez_admin_icon('link') ?><span>View live</span></a>
+      <button class="ui-button" type="button" data-sq-schedule data-ui-icon="calendar">Schedule</button>
       <button class="ui-button primary" type="button" data-sq-publish data-ui-icon="globe">Publish</button>
     </div>
   </header>
