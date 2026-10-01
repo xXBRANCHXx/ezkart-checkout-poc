@@ -2141,3 +2141,15 @@ Object.assign(globalThis.EzkartIndonesian, {
   "Previous photo":"Foto sebelumnya", "Next photo":"Foto berikutnya", "Zoom in":"Perbesar", "Reset zoom":"Kembalikan ukuran",
   "Photo":"Foto", "Photo unavailable":"Foto tidak tersedia"
 });
+
+// Dedicated social profile controls.
+Object.assign(globalThis.EzkartIndonesian, {
+  "Social network": "Jejaring sosial",
+  "Choose a social network": "Pilih jejaring sosial",
+  "Display text (optional)": "Teks tampilan (opsional)",
+  "@handle or profile URL": "@nama pengguna atau URL profil",
+  "Profile handle or URL": "Nama pengguna atau URL profil",
+  "Choose a social network, then enter your handle or profile URL. Display text is optional.": "Pilih jejaring sosial, lalu masukkan nama pengguna atau URL profil. Teks tampilan boleh dikosongkan.",
+  "Choose up to eight social profiles. Empty rows stay hidden. Websites, WhatsApp and post links are not supported.": "Pilih hingga delapan profil sosial. Baris kosong tetap tersembunyi. Situs web, WhatsApp, dan tautan postingan tidak didukung.",
+  "Choose a supported social network and its profile handle or URL. Websites, WhatsApp, link hubs and post links are not supported.": "Pilih jejaring sosial yang didukung dan nama pengguna atau URL profilnya. Situs web, WhatsApp, kumpulan tautan, dan tautan postingan tidak didukung."
+});

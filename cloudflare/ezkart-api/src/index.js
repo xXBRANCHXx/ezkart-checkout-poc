@@ -1,3 +1,4 @@
+import {normalizeSocialHtml,normalizeSocialState} from './landing-social-profiles.js';
 import {changeLandingSchedule,publishDueLandingPages,scheduleSummary} from './landing-page-schedule.js';
 import {previewAccessPath, readPreviewAccess, managePreviewAccess, unlockPreview, validPreviewSession, previewSessionSeconds} from './landing-preview-access.js';
 import {createTrackingCampaign,addTrackingSource,endTrackingCampaign,trackingReport,listTrackingCampaigns,startTrackingVisit,recordTrackingEvent} from './tracking-campaigns.js';
@@ -697,11 +698,12 @@ async function saveLandingPage(request, env, rawId, context) {
   const customProducts = Array.isArray(payload.customProducts)
     ? payload.customProducts.slice(0, 100)
     : Array.isArray(existing?.customProducts) ? existing.customProducts : [];
-  const state = Object.hasOwn(payload, "state")
+  const rawState = Object.hasOwn(payload, "state")
     ? payload.state && typeof payload.state === "object" && !Array.isArray(payload.state) ? payload.state : null
     : existing?.state || null;
+  const state=await normalizeSocialState(rawState);
   const status = payload.status === "published" ? "published" : payload.status === "draft" ? "draft" : existing?.status || "draft";
-  const publishedHtml = Object.hasOwn(payload, "publishedHtml")
+  let publishedHtml = Object.hasOwn(payload, "publishedHtml")
     ? String(payload.publishedHtml || "")
     : String(existing?.publishedHtml || "");
   // Autosaving a draft never republishes its HTML. Every publication or replacement
@@ -711,8 +713,9 @@ async function saveLandingPage(request, env, rawId, context) {
     const result = await env.DB.prepare("SELECT * FROM products WHERE seller_id = ? AND status = 'active'").bind(seller.id).all();
     const variants = await env.DB.prepare("SELECT * FROM product_variants WHERE seller_id = ?").bind(seller.id).all();
     const catalogProducts = result.results.map((row) => shapeProduct(row, [], variants.results.filter((v) => v.product_id === row.id)));
-    const error = await validatePublication({ html: publishedHtml, state, products: catalogProducts });
+    const error = await validatePublication({ html: publishedHtml, state:rawState, products: catalogProducts });
     if (error) throw new Response(error, { status: 422 });
+    publishedHtml=(await normalizeSocialHtml(publishedHtml)).html;
   }
   const now = new Date(Math.max(Date.now(),(Date.parse(existingObject?.customMetadata?.updatedAt || existing?.updatedAt)||0)+1)).toISOString();
   const page = {
@@ -758,7 +761,9 @@ async function landingSchedule(request, env, rawId) {
   const seller = await sellerPageAddress(env,(await sellerContext(request,env)).seller);
   if (seller.role === 'viewer') throw new Response('You do not have permission to schedule publications.',{status:403});
   const id = cleanLandingPageId(rawId);
-  const page = await changeLandingSchedule(env,seller.id,id,await requestJson(request,maximumLandingPageBytes),
+  const payload=await requestJson(request,maximumLandingPageBytes);
+  if(payload.action==='create'){const social=await normalizeSocialHtml(String(payload.html||''));if(social.error)throw new Response(social.error,{status:422});payload.html=social.html;}
+  const page = await changeLandingSchedule(env,seller.id,id,payload,
     (sellerId,html,state) => validateScheduledLandingPage(sellerId,html,state,env));
   return landingPageLinks({...page,scheduledPublication:scheduleSummary(page.scheduledPublication)},seller);
 }
@@ -800,7 +805,7 @@ async function landingPageView(request, env, rawId) {
   // The stored preview contains the full runtime. Only library thumbnails strip
   // scripts and pause motion; an interactive preview uses the same durable HTML.
   const response = new HTMLRewriter().on('#ezkart-library-preview-style', {element(node) { node.remove(); }})
-    .transform(hostedLandingResponse(object.body));
+    .transform(hostedLandingResponse((await normalizeSocialHtml(await new Response(object.body).text())).html));
   response.headers.set('x-ezkart-preview-path', landingPageLinks({id}, seller).previewPath);
   return response;
 }
@@ -832,7 +837,7 @@ async function sharedLandingPreview(request, env, store, rawId, unlock) {
   const object = await env.PRIVATE_ASSETS.get(landingPagePreviewKey(seller.id, id));
   if (!object) throw new Response('Save a preview in the editor first', {status:404});
   return new HTMLRewriter().on('#ezkart-library-preview-style', {element(node) {node.remove();}})
-    .transform(hostedLandingResponse(object.body));
+    .transform(hostedLandingResponse((await normalizeSocialHtml(await new Response(object.body).text())).html));
 }
 
 async function publicLandingPage(env, store, rawId) {
@@ -841,7 +846,7 @@ async function publicLandingPage(env, store, rawId) {
   const page = await landingPageObject(env, seller.id, cleanLandingPageId(rawId));
   if (page.status !== 'published' || !page.publishedHtml || await jevPageHeld(env,seller.id,page.id)) throw new Response("Page not found", {status: 404,headers:{'cache-control':'no-store'}});
   // Never serve editable state or the draft preview from the public route.
-  const response = hostedLandingResponse(page.publishedHtml, {noindex: env.APP_ENVIRONMENT !== 'production'});
+  const response = hostedLandingResponse((await normalizeSocialHtml(page.publishedHtml)).html, {noindex: env.APP_ENVIRONMENT !== 'production'});
   response.headers.set('x-ezkart-public-path', landingPageLinks(page, seller).publicPath);
   return response;
 }
@@ -857,7 +862,7 @@ async function saveLandingPagePreview(request, env, rawId) {
   if (!sourceUpdatedAt || sourceUpdatedAt !== savedVersion) {
     throw new Response("Landing page changed while its preview was saving", { status: 409 });
   }
-  const html = String(payload.html || "");
+  const html = (await normalizeSocialHtml(String(payload.html || ""))).html;
   const bytes = new TextEncoder().encode(html).byteLength;
   if (!/^<!doctype html>/i.test(html.trimStart()) || !html.includes("sq-page-preview")) {
     throw new Response("Landing page preview HTML is invalid", { status: 400 });

@@ -899,7 +899,7 @@
     if (config.type === "social") {
       if (!Array.isArray(config.links || []) || (config.links || []).length > 8) throw Error("Use up to eight social links.");
       for (const link of config.links || []) {
-        if (!String(link.label || '').trim() || String(link.label).length > 80 || !globalThis.EzkartMedia?.webUrl(link.url)) throw Error("Give each social link a name and an http or https web address.");
+        if (String(link.label||'').length > 80 || !globalThis.EzkartMedia?.socialProfile(link.url,link.provider||'')) throw Error(globalThis.EzkartMedia.socialError);
       }
     }
     if (config.src) (config.type === 'image' ? safeMediaUrl : safeUrl)(config.src);
@@ -1043,10 +1043,10 @@
       node.setAttribute('aria-label', config.label || 'Social media');
       node.replaceChildren();
       for (const link of config.links || []) {
-        const url = globalThis.EzkartMedia?.webUrl(link.url);
-        if (!url) continue;
+        const profile = globalThis.EzkartMedia?.socialProfile(link.url,link.provider||'');
+        if (!profile) continue;
         const anchor = document.createElement('a');
-        anchor.href=url; anchor.textContent=String(link.label || 'Social media'); anchor.target='_blank'; anchor.rel='noopener noreferrer';
+        anchor.href=profile.url; anchor.dataset.socialProfile=profile.provider; anchor.textContent=String(link.label || profile.label); anchor.target='_blank'; anchor.rel='noopener noreferrer';
         node.append(anchor);
       }
       if (!node.children.length) {
@@ -1895,6 +1895,7 @@
     hooks.root.querySelectorAll(".sq-native").forEach((node) => {
       const config = read(node);
       syncScrollRegion(node, config);
+      if(config.type==='social')syncMedia(node,config);
       // Fixed-size empty containers can be swatches, rules or spacers. Editor
       // guidance must not add content or an outline to those authored shapes.
       const appearances = [config, ...Object.values(config.states || {})];
@@ -3192,7 +3193,9 @@
     if (config.type === 'social') {
       for (let i=0;i<8;i++) {
         panel.querySelector(`[data-native-social-label="${i}"]`).value=config.links?.[i]?.label || '';
-        panel.querySelector(`[data-native-social-url="${i}"]`).value=config.links?.[i]?.url || '';
+        const link=config.links?.[i]||{};panel.querySelector(`[data-native-social-provider="${i}"]`).value=link.provider||globalThis.EzkartMedia.socialProvider(link.url);
+        const input=panel.querySelector(`[data-native-social-url="${i}"]`);input.value=link.url||'';
+        const invalid=Boolean(link.url&&!globalThis.EzkartMedia.socialProfile(link.url,link.provider||''));if(invalid)input.setAttribute('aria-invalid','true');else input.removeAttribute('aria-invalid');const reason=panel.querySelector(`[data-native-social-reason="${i}"]`);reason.hidden=!invalid;reason.textContent=invalid?(globalThis.EzkartLanguage?.t(globalThis.EzkartMedia.socialError)||globalThis.EzkartMedia.socialError):'';
       }
     }
     panel.querySelector("[data-native-media]").hidden = config.type !== "video";
@@ -3268,8 +3271,8 @@
         <label class="sq-native-check"><input type="checkbox" data-native-youtube-controls>Show player controls</label>
         <button type="button" class="sq-native-wide" data-native-youtube-apply>Apply video</button><p class="sq-native-help">Loads when your visitor presses play. Use Layout &amp; appearance below to adjust size, corners and spacing.</p>
       </details>
-      <details open data-native-social hidden><summary>Social links</summary><p class="sq-native-help">Add up to eight named profile links. Empty rows stay hidden. Style and align the links below.</p>
-        ${Array.from({length:8}, (_,i)=>`<div class="sq-native-social-row"><label>Link ${i+1} name<input data-native-social-label="${i}" placeholder="Instagram" maxlength="80"></label><label>Web address<input type="url" data-native-social-url="${i}" placeholder="https://…"></label></div>`).join('')}
+      <details open data-native-social hidden><summary>Social links</summary><p class="sq-native-help">Choose up to eight social profiles. Empty rows stay hidden. Websites, WhatsApp and post links are not supported.</p>
+        ${Array.from({length:8}, (_,i)=>`<div class="sq-native-social-row"><label>Social network<select data-native-social-provider="${i}"><option value="">Choose a social network</option>${globalThis.EzkartMedia.socialProviders.map(provider=>`<option value="${provider.id}">${provider.label}</option>`).join('')}</select></label><label>Link ${i+1} name (optional)<input data-native-social-label="${i}" placeholder="Instagram" maxlength="80"></label><label>Profile handle or URL<input type="text" data-native-social-url="${i}" placeholder="@handle or profile URL" aria-describedby="native-social-reason-${i}"></label><p class="sq-native-help sq-native-social-reason" id="native-social-reason-${i}" data-native-social-reason="${i}" role="status" hidden></p></div>`).join('')}
         <button type="button" class="sq-native-wide" data-native-social-apply>Apply social links</button>
       </details>
       <details open data-native-content><summary data-native-content-title>Text</summary>
@@ -3692,10 +3695,11 @@
       const links=[];
       for (let i=0;i<8;i++) {
         const label=panel.querySelector(`[data-native-social-label="${i}"]`).value.trim(), value=panel.querySelector(`[data-native-social-url="${i}"]`).value.trim();
-        if (!label && !value) continue;
-        const url=globalThis.EzkartMedia?.webUrl(value);
-        if (!label || !url) throw Error('Give each social link a name and an http or https web address.');
-        links.push({label,url});
+        if (!value) continue;
+        const provider=panel.querySelector(`[data-native-social-provider="${i}"]`).value,profile=globalThis.EzkartMedia.socialProfile(value,provider);
+        const input=panel.querySelector(`[data-native-social-url="${i}"]`),reason=panel.querySelector(`[data-native-social-reason="${i}"]`);if(!profile)input.setAttribute('aria-invalid','true');else input.removeAttribute('aria-invalid');reason.hidden=Boolean(profile);reason.textContent=profile?'':(globalThis.EzkartLanguage?.t(globalThis.EzkartMedia.socialError)||globalThis.EzkartMedia.socialError);
+        if (!profile) {input.focus();throw Error(globalThis.EzkartMedia.socialError);}
+        links.push({label,url:profile.url,provider:profile.provider});
       }
       change({links}); syncMedia(selected, read(selected)); hooks.changed();
     });

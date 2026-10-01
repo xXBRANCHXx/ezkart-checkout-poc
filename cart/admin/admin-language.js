@@ -243,6 +243,7 @@
     [/^(\d+)\/30 values$/, '$1/30 pilihan'],
     [/^Image (\d+)$/, 'Gambar $1'],
     [/^Link (\d+) name$/, 'Nama tautan $1'],
+    [/^Link (\d+) name \(optional\)$/, 'Nama tautan $1 (opsional)'],
     [/^(\d+) matching categor(?:y|ies)$/, '$1 kategori yang cocok'],
     [/^No category matches “(.+)”$/, 'Tidak ada kategori yang cocok dengan “$1”'],
     [/^Popular for (physical products|digital products|subscriptions)$/, (_,kind)=>`Populer untuk ${{'physical products':'produk fisik','digital products':'produk digital',subscriptions:'langganan'}[kind]}`],

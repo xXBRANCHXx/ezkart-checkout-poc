@@ -1,3 +1,4 @@
+import {validateSocialProfiles} from './landing-social-profiles.js';
 import "../../../cart/admin/builder-publish.js";
 import { decodeHTMLAttribute } from "entities";
 
@@ -69,6 +70,7 @@ export async function purchaseGroups(html, draft = false) {
 }
 
 export async function validatePublication({ html, state, products }) {
+  const socialError=await validateSocialProfiles({html,state});if(socialError)return socialError;
   if (!String(html || "").trim())
     return "Preview your page and add a product before publishing.";
   const groups = await purchaseGroups(html);

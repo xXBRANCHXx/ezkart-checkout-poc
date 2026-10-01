@@ -68,7 +68,7 @@
   function pageExtras(value={}) {
     const video=value.video||{},footer=value.footer||{};
     const parsed=globalThis.EzkartMedia?.youtube(video.url);
-    return {video:{url:parsed?.url||'',title:String(video.title||'YouTube video').slice(0,200)},footer:{enabled:footer.enabled===true,title:String(footer.title||'').slice(0,100),note:String(footer.note||'').slice(0,1000),links:(Array.isArray(footer.links)?footer.links:[]).slice(0,8).map(link=>({label:String(link.label||'').slice(0,60),url:globalThis.EzkartMedia?.webUrl(link.url)||''}))}};
+    return {video:{url:parsed?.url||'',title:String(video.title||'YouTube video').slice(0,200)},footer:{enabled:footer.enabled===true,title:String(footer.title||'').slice(0,100),note:String(footer.note||'').slice(0,1000),links:(Array.isArray(footer.links)?footer.links:[]).slice(0,8).map(link=>({label:String(link.label||'').slice(0,60),provider:EzkartMedia.socialProfile(link.url,link.provider||'')?.provider||link.provider||EzkartMedia.socialProvider(link.url),url:EzkartMedia.socialProfile(link.url,link.provider||'')?.url||String(link.url||'').trim().slice(0,2048)}))}};
   }
   function readExtras(root) {
     let value={};try{value=JSON.parse(root.querySelector('[data-image-page]')?.dataset.imageExtras||'{}')||{};}catch(_){}
@@ -80,7 +80,7 @@
     if(footer.title){const title=document.createElement('strong');title.textContent=footer.title;node.append(title);}
     if(footer.note){const note=document.createElement('p');note.textContent=footer.note;note.style.whiteSpace='pre-wrap';node.append(note);}
     const links=document.createElement('nav');links.className='sq-social-links';links.setAttribute('aria-label',t('Social media'));
-    footer.links.filter(link=>link.label.trim()&&link.url).forEach(link=>{const anchor=document.createElement('a');anchor.href=link.url;anchor.textContent=link.label;anchor.target='_blank';anchor.rel='noopener noreferrer';links.append(anchor);});
+    footer.links.forEach(link=>{const profile=EzkartMedia.socialProfile(link.url,link.provider||'');if(!profile)return;const anchor=document.createElement('a');anchor.href=profile.url;anchor.dataset.socialProfile=profile.provider;anchor.textContent=link.label||profile.label;anchor.target='_blank';anchor.rel='noopener noreferrer';links.append(anchor);});
     if(links.children.length)node.append(links);return node;
   }
   function makeState(images=[], productId='', previous={}, navigation={}, extras={}) {
@@ -458,13 +458,13 @@
     const footerBody=document.createElement('div');footerBody.className='ib-nav-body';footerSettings.append(footerBody);
     const footerTitle=extraField(footerBody,'footer-title','Your name or brand','text',100),footerNote=extraField(footerBody,'footer-note','Footer text (optional)','textarea',1000);
     const socialHeading=document.createElement('h3');socialHeading.textContent=t('Social links');
-    const socialHelp=document.createElement('p');socialHelp.textContent=t('Add your profile name and its full web address.');
+    const socialHelp=document.createElement('p');socialHelp.textContent=t('Choose a social network, then enter your handle or profile URL. Display text is optional.');
     const socialRows=document.createElement('div');socialRows.className='ib-nav-links';
     const addSocial=document.createElement('button');addSocial.type='button';addSocial.className='ib-nav-add';addSocial.dataset.imageSocialAdd='';addSocial.textContent='+ '+t('Add social link');
     footerBody.append(socialHeading,socialHelp,socialRows,addSocial);
     const updateFooter=change=>updateExtras({footer:{...readExtras(root).footer,...change}});
     footerEnabled.onchange=()=>updateFooter({enabled:footerEnabled.checked});footerTitle.onchange=()=>updateFooter({title:footerTitle.value});footerNote.onchange=()=>updateFooter({note:footerNote.value});
-    addSocial.onclick=()=>{const links=readExtras(root).footer.links;if(links.length>=8)return;updateFooter({links:[...links,{label:'',url:''}]});socialRows.lastElementChild?.querySelector('input')?.focus();};
+    addSocial.onclick=()=>{const links=readExtras(root).footer.links;if(links.length>=8)return;updateFooter({links:[...links,{provider:'instagram',label:'',url:''}]});socialRows.lastElementChild?.querySelector('input')?.focus();};
     controls.insertBefore(mediaSettings,navSettings);controls.append(footerSettings);
     function syncExtras(extras) {
       mediaSettings.querySelector('[data-image-setting-state]').textContent=t(extras.video.url?'Added':'Off');
@@ -474,15 +474,18 @@
       socialRows.replaceChildren();
       extras.footer.links.forEach((link,index)=>{
         const row=document.createElement('div');row.className='ib-nav-link ib-social-link';
-        const name=document.createElement('input');name.type='text';name.maxLength=60;name.value=link.label;name.placeholder=t('Instagram, TikTok, YouTube…');name.setAttribute('aria-label',t('Social link name')+' '+(index+1));
-        const url=document.createElement('input');url.type='url';url.maxLength=2048;url.value=link.url;url.placeholder='https://';url.setAttribute('aria-label',t('Social link address')+' '+(index+1));
+        const network=document.createElement('select');network.setAttribute('aria-label',t('Social network')+' '+(index+1));network.add(new Option(t('Choose a social network'),''));EzkartMedia.socialProviders.forEach(provider=>network.add(new Option(provider.label,provider.id)));network.value=link.provider||EzkartMedia.socialProvider(link.url);
+        const reason=document.createElement('small');reason.className='ib-social-reason';reason.id='ib-social-reason-'+index;reason.setAttribute('role','status');
+        const name=document.createElement('input');name.type='text';name.maxLength=60;name.value=link.label;name.placeholder=t('Display text (optional)');name.setAttribute('aria-label',t('Social link name')+' '+(index+1));
+        const url=document.createElement('input');url.type='text';url.maxLength=2048;url.value=link.url;url.placeholder=t('@handle or profile URL');url.setAttribute('aria-label',t('Profile handle or URL')+' '+(index+1));url.setAttribute('aria-describedby',reason.id);
+        const showReason=()=>{const invalid=Boolean(url.value.trim()&&!EzkartMedia.socialProfile(url.value,network.value));if(invalid)url.setAttribute('aria-invalid','true');else url.removeAttribute('aria-invalid');reason.hidden=!invalid;reason.textContent=invalid?t(EzkartMedia.socialError):'';return invalid;};showReason();
         const update=()=>{
-          if(url.value.trim()&&!EzkartMedia.webUrl(url.value)){url.setAttribute('aria-invalid','true');status.textContent=t('Use a full web address beginning with https:// or http://.');return;}
-          status.textContent='';const links=readExtras(root).footer.links;links[index]={label:name.value,url:url.value};updateFooter({links});
+          if(showReason()){status.textContent=t(EzkartMedia.socialError);return;}
+          const profile=EzkartMedia.socialProfile(url.value,network.value);status.textContent='';const links=readExtras(root).footer.links;links[index]={provider:network.value,label:name.value,url:profile?.url||''};updateFooter({links});
         };
-        name.onchange=url.onchange=update;
+        name.onchange=url.onchange=network.onchange=update;
         const remove=button('Remove',()=>{updateFooter({links:readExtras(root).footer.links.filter((_,i)=>i!==index)});(socialRows.children[index]?.querySelector('input')||addSocial).focus();});remove.setAttribute('aria-label',t('Remove social link')+' '+(index+1));
-        row.append(name,remove,url);socialRows.append(row);
+        row.append(network,remove,name,url,reason);socialRows.append(row);
       });addSocial.disabled=extras.footer.links.length>=8;
     }
     function sync() {
@@ -495,6 +498,7 @@
       if(!enabled){frame.onload=null;frame.removeAttribute('src');return;}
       translateChrome();
       const {images,productId,navigation,extras}=read(root);rows.replaceChildren();
+      const savedFooter=root.querySelector('[data-image-footer]');if(savedFooter){const safe=makeFooter(extras.footer);savedFooter.replaceChildren(...safe.childNodes);}
       syncExtras(extras);
       syncNavigation(images,productId,navigation);
       images.forEach((image,index)=>{

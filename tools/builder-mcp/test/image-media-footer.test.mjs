@@ -29,7 +29,7 @@ test('Image Stack adds safe YouTube cards and social footers through the UI, per
  await field('footer-enabled').check();await set('footer-title','Kopi Senja');await set('footer-note','Find us here <img src=x onerror=alert(1)>');
  await page.locator('[data-image-social-add]').click();
  const social=page.locator('.ib-social-link');await social.locator('input').nth(0).fill('Instagram');await social.locator('input').nth(0).blur();await social.locator('input').nth(1).fill('https://instagram.com/kopi_senja');await social.locator('input').nth(1).blur();
- await page.locator('[data-image-social-add]').click();const second=social.nth(1);await second.locator('input').nth(0).fill('TikTok');await second.locator('input').nth(0).blur();await second.locator('input').nth(1).fill('javascript:alert(1)');await second.locator('input').nth(1).blur();
+ await page.locator('[data-image-social-add]').click();const second=social.nth(1);await second.locator('input').nth(0).fill('TikTok');await second.locator('input').nth(0).blur();await second.locator('select').selectOption('tiktok');await second.locator('input').nth(1).fill('javascript:alert(1)');await second.locator('input').nth(1).blur();
  assert.equal(await second.locator('input').nth(1).getAttribute('aria-invalid'),'true');assert.equal(await page.locator('[data-image-footer] a').count(),1);
  await second.locator('input').nth(1).fill('https://tiktok.com/@kopi_senja');await second.locator('input').nth(1).blur();
  await page.locator('[data-sq-undo]').click();assert.equal(await page.locator('[data-image-footer] a').count(),1);await page.locator('[data-sq-redo]').click();assert.equal(await page.locator('[data-image-footer] a').count(),2);

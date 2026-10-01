@@ -37,7 +37,7 @@ test('Studio YouTube and footer links use merchant controls, persist, undo and e
   await panel.locator('[data-native-social-apply]').click();
   assert.equal((await call('nativeInspect',{id:social.id})).links.length,2);
   await panel.locator('[data-native-social-url="0"]').fill('javascript:alert(1)');await panel.locator('[data-native-social-apply]').click();
-  assert.equal((await call('nativeInspect',{id:social.id})).links[0].url,'https://instagram.com/ourshop');
+  assert.equal((await call('nativeInspect',{id:social.id})).links[0].url,'https://www.instagram.com/ourshop');
   await call('save');await page.reload();await page.waitForFunction(()=>globalThis.EzkartBuilder);
   assert.equal((await call('nativeInspect',{id:video.id})).label,'Making our product');
   assert.equal((await call('nativeInspect',{id:social.id})).links.length,2);

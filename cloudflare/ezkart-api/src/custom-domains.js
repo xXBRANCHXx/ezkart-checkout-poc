@@ -1,3 +1,4 @@
+import {normalizeSocialHtml} from './landing-social-profiles.js';
 import {jevPageHeld} from './jev-reviews.js';
 import {sellerPageAddress} from './seller-page-address.js';
 import {hostedLandingResponse} from './landing-page-hosting.js';
@@ -129,7 +130,7 @@ export async function customDomainResponse(request,env) {
     AND d.checked_at>? AND d.zone_id=? AND d.cname_target=? AND s.status='active' AND s.plan='advanced'`).bind(hostname,new Date(Date.now()-86400000).toISOString(),env.CUSTOM_DOMAIN_ZONE_ID,env.CUSTOM_DOMAIN_CNAME_TARGET).first();
   if (!row || !['/',row.public_path].includes(url.pathname) || await jevPageHeld(env,row.seller_id,row.page_id)) return absent();
   let page;try {page=await publishedPage(env,row.seller_id,row.page_id);} catch {return absent();}
-  const response=hostedLandingResponse(request.method==='HEAD'?null:page.publishedHtml,{noindex:env.APP_ENVIRONMENT!=='production'});
+  const response=hostedLandingResponse(request.method==='HEAD'?null:(await normalizeSocialHtml(page.publishedHtml)).html,{noindex:env.APP_ENVIRONMENT!=='production'});
   response.headers.set('x-ezkart-public-path',row.public_path);return response;
 }
 
