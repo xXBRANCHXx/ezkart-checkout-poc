@@ -826,6 +826,10 @@
     let draftTimer = 0;
     let restoringDraft = true;
     let publishingProduct = false;
+    let hasUnpublishedChanges = false;
+    let draftChangeVersion = 0, savedDraftVersion = 0;
+    let previewVisibility = "expanded";
+    let leavingProductEditor = false;
     const draftQuery = new URLSearchParams(window.location.search);
     const requestedProductId = /^custom-[a-z0-9]+$/i.test(draftQuery.get("product") || "") ? draftQuery.get("product") : "";
     const editingProduct = requestedProductId ? readCatalogProducts({ includeArchived: true }).find((product) => product.id === requestedProductId) || null : null;
@@ -1164,6 +1168,7 @@
 
     const markDraftChanged = () => {
       if (restoringDraft || publishingProduct) return;
+      hasUnpublishedChanges = true; draftChangeVersion += 1;
       if (draftStatus) { draftStatus.classList.add("is-saving"); draftStatus.innerHTML = "<i></i> Saving draft…"; }
       window.clearTimeout(draftTimer);
       draftTimer = window.setTimeout(() => saveDraft(false), 550);
@@ -1184,7 +1189,7 @@
       images: selectedImages.map((item) => ({ id: item.id, cloudId: item.cloudId || null, data: item.cloudId ? undefined : item.data || item.url })),
       hasVariants: Boolean(variantToggle?.checked), options: optionSnapshot(),
       variants: variants.map((variant) => ({ ...variant, customImage: variant.customImage ? { cloudId: variant.customImage.cloudId || null, data: variant.customImage.cloudId ? undefined : variant.customImage.data || variant.customImage.url } : null })),
-      previewDevice,
+      previewDevice, previewVisibility,
     });
     const ensureEditorMediaCloud = async () => {
       if (!cloudEnabled) return;
@@ -1206,7 +1211,7 @@
       window.clearTimeout(draftTimer);
       draftSavePromise = draftSavePromise.then(async () => {
         await ensureEditorMediaCloud();
-        const snapshot = draftSnapshot();
+        const snapshot = draftSnapshot(), snapshotVersion = draftChangeVersion;
         if (cloudEnabled) await saveCloudDraft(snapshot);
         else {
           const drafts = readLocalProductDrafts();
@@ -1214,11 +1219,14 @@
           if (index >= 0) drafts[index] = snapshot; else drafts.push(snapshot);
           if (!writeProductDrafts(drafts)) throw new Error("Draft storage is full.");
         }
-        if (draftStatus) { draftStatus.classList.remove("is-saving"); draftStatus.innerHTML = "<i></i> Saved"; }
+        savedDraftVersion = snapshotVersion;
+        if (draftStatus && savedDraftVersion === draftChangeVersion) { draftStatus.classList.remove("is-saving"); draftStatus.innerHTML = "<i></i> Saved"; }
         if (announce) showToast("Product draft saved");
+        return savedDraftVersion === draftChangeVersion;
       }).catch((error) => {
         if (draftStatus) { draftStatus.classList.remove("is-saving"); draftStatus.innerHTML = "<i></i> Save needs attention"; }
         showError(error instanceof Error ? error.message : "The draft could not be saved.");
+        return false;
       });
       return draftSavePromise;
     };
@@ -1397,7 +1405,7 @@
         const billingUnit = ["month", "year"].includes(variant.billingUnit) ? variant.billingUnit : "month";
         const billingMaximum = billingUnit === "year" ? 10 : 120;
         const billingInterval = Math.max(1, Math.min(billingMaximum, Math.round(Number(variant.billingInterval) || 1)));
-        row.innerHTML = `<label class="product-variant-subvariant" title="${escapeHtml(variant.name)}"><input type="checkbox" data-variant-select aria-label="Select ${escapeHtml(variant.name)}"><b>${escapeHtml(compactVariantName(variantChildName(variant)))}</b></label><label><span>Price</span><input type="number" min="1000" step="500" value="${variant.price}" data-variant-price></label><label ${physical ? "" : "hidden"}><span>Stock</span><input type="number" min="0" max="999999" value="${variant.stock}" data-variant-stock></label><label ${physical ? "" : "hidden"}><span>Weight</span><input type="number" min="1" max="50000" value="${variant.weightGrams || 500}" data-variant-weight></label><label class="product-variant-billing" ${subscription ? "" : "hidden"}><span>Billing</span><span><input type="number" min="1" max="${billingMaximum}" value="${billingInterval}" aria-label="Billing interval" data-variant-billing-interval><select aria-label="Billing period" data-variant-billing-unit><option value="month" ${billingUnit === "month" ? "selected" : ""}>Month</option><option value="year" ${billingUnit === "year" ? "selected" : ""}>Year</option></select></span></label><label><span>SKU</span><input type="text" maxlength="48" value="${escapeHtml(variant.sku)}" data-variant-sku></label><button type="button" data-variant-visibility aria-label="${variant.hidden ? "Show" : "Hide"} ${escapeHtml(variant.name)}" title="${variant.hidden ? "Show variant" : "Hide variant"}"><svg class="icon" aria-hidden="true"><use href="#icon-${variant.hidden ? "eye-off" : "eye"}"></use></svg></button>`;
+        row.innerHTML = `<label class="product-variant-subvariant" title="${escapeHtml(variant.name)}"><input type="checkbox" data-variant-select aria-label="Select ${escapeHtml(variant.name)}"><b translate="no">${escapeHtml(compactVariantName(variantChildName(variant)))}</b></label><label><span>Price</span><input type="number" min="0" step="500" value="${variant.price}" data-variant-price></label><label ${physical ? "" : "hidden"}><span>Stock</span><input type="number" min="0" max="999999" value="${variant.stock}" data-variant-stock></label><label ${physical ? "" : "hidden"}><span>Weight (g)</span><input type="number" min="1" max="50000" value="${variant.weightGrams || 500}" data-variant-weight></label><label class="product-variant-billing" ${subscription ? "" : "hidden"}><span>Billing</span><span><input type="number" min="1" max="${billingMaximum}" value="${billingInterval}" aria-label="Billing interval" data-variant-billing-interval><select aria-label="Billing period" data-variant-billing-unit><option value="month" ${billingUnit === "month" ? "selected" : ""}>Month</option><option value="year" ${billingUnit === "year" ? "selected" : ""}>Year</option></select></span></label><label><span>SKU</span><input type="text" maxlength="48" value="${escapeHtml(variant.sku)}" data-variant-sku></label><button type="button" data-variant-visibility aria-label="${variant.hidden ? "Show" : "Hide"} ${escapeHtml(variant.name)}" title="${variant.hidden ? "Show variant" : "Hide variant"}"><svg class="icon" aria-hidden="true"><use href="#icon-${variant.hidden ? "eye-off" : "eye"}"></use></svg></button>`;
         if (variant.hidden) row.querySelectorAll("input, select").forEach((control) => { control.disabled = true; });
         row.querySelector("[data-variant-select]").addEventListener("change", (event) => { activeVariantFilters.clear(); event.target.checked ? selectedVariantIds.add(variant.id) : selectedVariantIds.delete(variant.id); updateVariantSelection(); });
         row.querySelector("[data-variant-price]").addEventListener("input", (event) => { variant.price = Math.max(0, Math.round(Number(event.target.value) || 0)); updatePreview(); markDraftChanged(); });
@@ -1421,7 +1429,7 @@
         const groupCell = document.createElement("div");
         groupCell.className = "product-variant-group-cell";
         const groupItemLabel = currentType() === "subscription" ? "plan" : "variant";
-        groupCell.innerHTML = `<input type="checkbox" data-variant-group-select aria-label="Select all ${escapeHtml(groupValue)} combinations">${firstOptionPhotoMarkup(groupVariants[0])}<span class="product-variant-group-copy"><span class="product-variant-group-name"><b title="${escapeHtml(groupValue)}">${escapeHtml(groupValue)}</b><button type="button" class="product-variant-group-remove" data-variant-group-remove aria-label="Delete ${escapeHtml(groupValue)} and its ${groupVariants.length} ${groupItemLabel}${groupVariants.length === 1 ? "" : "s"}"><svg class="icon" aria-hidden="true"><use href="#icon-trash"></use></svg></button></span></span>`;
+        groupCell.innerHTML = `<input type="checkbox" data-variant-group-select aria-label="Select all ${escapeHtml(groupValue)} combinations">${firstOptionPhotoMarkup(groupVariants[0])}<span class="product-variant-group-copy"><span class="product-variant-group-name"><b translate="no" title="${escapeHtml(groupValue)}">${escapeHtml(groupValue)}</b><button type="button" class="product-variant-group-remove" data-variant-group-remove aria-label="Delete ${escapeHtml(groupValue)} and its ${groupVariants.length} ${groupItemLabel}${groupVariants.length === 1 ? "" : "s"}"><svg class="icon" aria-hidden="true"><use href="#icon-trash"></use></svg></button></span></span>`;
         const groupRows = document.createElement("div");
         groupRows.className = "product-variant-group-rows";
         groupVariants.forEach((variant) => attachVariantRow(variant, groupRows));
@@ -1506,7 +1514,7 @@
         usedSkus.add(candidate.toLowerCase());
         return candidate;
       };
-      const price = Math.max(1000, Math.round(Number(productCreateForm.elements.price?.value) || 75000));
+      const price = Math.max(0, Math.round(Number(productCreateForm.elements.price?.value) || 0));
       const stock = Math.max(0, Math.round(Number(productCreateForm.elements.stock?.value) || 0));
       const weightGrams = Math.max(1, Math.round(Number(productCreateForm.elements.weight?.value) || 500));
       const billingUnit = ["month", "year"].includes(productCreateForm.elements.unit?.value) ? productCreateForm.elements.unit.value : "month";
@@ -1716,14 +1724,81 @@
         return { ...variant, name: options.map((option) => option.value).join(" · ") || variant.name, options, weightGrams: variant.weightGrams || 500, billingInterval: variant.billingInterval || Number(snapshot.fields?.interval) || 1, billingUnit: variant.billingUnit || snapshot.fields?.unit || "month", customImage: variant.customImage?.data ? { cloudId: variant.customImage.cloudId || null, data: variant.customImage.data, url: variant.customImage.data } : null };
       });
       previewDevice = snapshot.previewDevice === "mobile" ? "mobile" : "desktop";
+      previewVisibility = ["hidden", "minimized"].includes(snapshot.previewVisibility) ? snapshot.previewVisibility : "expanded";
       if (draftStatus) draftStatus.innerHTML = `<i></i> ${label}`;
     };
     const restoreDraft = () => {
       const draft = readProductDrafts().find((item) => item.id === draftId);
-      if (draft) { restoreSnapshot(draft, editingProduct ? "Unsaved edits restored" : "Draft restored"); return; }
+      if (draft) { hasUnpublishedChanges = true; restoreSnapshot(draft, editingProduct ? "Unsaved edits restored" : "Draft restored"); return; }
       if (editingProduct) restoreSnapshot(productSnapshot(editingProduct), "Product loaded");
       else void digitalFiles?.restore(null);
     };
+
+    const previewSidebar = q(".product-preview-sidebar");
+    const previewContent = q("[data-product-preview-content]");
+    const showPreviewButton = document.querySelector("[data-show-product-preview]");
+    const minimizePreviewButton = q("[data-product-preview-minimize]");
+    const syncPreviewVisibility = () => {
+      const hidden = previewVisibility === "hidden", minimized = previewVisibility === "minimized";
+      if (previewSidebar) previewSidebar.hidden = hidden;
+      if (previewContent) previewContent.hidden = minimized;
+      q(".product-preview-note")?.toggleAttribute("hidden", minimized);
+      productCreateForm.classList.toggle("preview-hidden", hidden);
+      if (showPreviewButton) showPreviewButton.hidden = !hidden;
+      if (minimizePreviewButton) {
+        minimizePreviewButton.textContent = minimized ? "+" : "−";
+        minimizePreviewButton.setAttribute("aria-expanded", String(!minimized));
+        minimizePreviewButton.setAttribute("aria-label", EzkartLanguage.t(minimized ? "Restore preview" : "Minimize preview"));
+      }
+      if (!hidden && !minimized) syncPreviewDevice();
+    };
+    minimizePreviewButton?.addEventListener("click", () => {
+      previewVisibility = previewVisibility === "minimized" ? "expanded" : "minimized";
+      syncPreviewVisibility(); markDraftChanged();
+    });
+    q("[data-product-preview-close]")?.addEventListener("click", () => {
+      previewVisibility = "hidden"; syncPreviewVisibility(); markDraftChanged(); showPreviewButton?.focus();
+    });
+    showPreviewButton?.addEventListener("click", () => {
+      previewVisibility = "expanded"; syncPreviewVisibility(); markDraftChanged(); minimizePreviewButton?.focus();
+    });
+
+    const leaveDialog = document.querySelector("[data-product-leave-dialog]");
+    const leaveStatus = leaveDialog?.querySelector("[data-product-leave-status]");
+    const leaveDraftButton = leaveDialog?.querySelector("[data-product-leave-draft]");
+    const leavePublishButton = leaveDialog?.querySelector("[data-product-leave-publish]");
+    let pendingDestination = null;
+    const saveBeforeLeaving = async () => {
+      if (leaveStatus) leaveStatus.textContent = EzkartLanguage.t("Saving your draft…");
+      if (leaveDraftButton) leaveDraftButton.disabled = true;
+      if (leavePublishButton) leavePublishButton.disabled = true;
+      const saved = await saveDraft(false);
+      if (leaveStatus) leaveStatus.textContent = EzkartLanguage.t(saved ? "Your changes are saved as a draft." : "Draft could not be saved. Stay here and try again.");
+      if (leaveDraftButton) leaveDraftButton.disabled = !saved;
+      if (leavePublishButton) leavePublishButton.disabled = !saved;
+      return saved;
+    };
+    document.addEventListener("click", event => {
+      const link = event.target.closest("a[href]");
+      if (!leaveDialog || !link || !hasUnpublishedChanges || publishingProduct || leavingProductEditor || event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || link.hasAttribute("download") || (link.target && link.target !== "_self")) return;
+      const target = new URL(link.href, location.href);
+      if (!["http:", "https:"].includes(target.protocol) || (target.pathname === location.pathname && target.search === location.search)) return;
+      event.preventDefault(); pendingDestination = target.href;
+      if (!leaveDialog.open) leaveDialog.showModal();
+      void saveBeforeLeaving();
+    });
+    leaveDialog?.querySelector("[data-product-leave-stay]")?.addEventListener("click", () => { pendingDestination = null; leaveDialog.close(); });
+    leaveDialog?.addEventListener("cancel", () => { pendingDestination = null; });
+    leaveDraftButton?.addEventListener("click", async () => {
+      const target = pendingDestination;
+      if (!target || !await saveBeforeLeaving() || pendingDestination !== target) return;
+      leavingProductEditor = true; leaveDialog.close(); location.href = target;
+    });
+    leavePublishButton?.addEventListener("click", () => { pendingDestination = null; leaveDialog.close(); productCreateForm.requestSubmit(); });
+    window.addEventListener("beforeunload", event => {
+      if (!leavingProductEditor && !publishingProduct && draftChangeVersion !== savedDraftVersion) { event.preventDefault(); event.returnValue = ""; }
+    });
+    window.addEventListener("pageshow", () => { leavingProductEditor = false; });
 
     variantToggle?.addEventListener("change", syncVariantMode);
     addOptionButton?.addEventListener("click", () => { addOptionGroup(); markDraftChanged(); });
@@ -1797,6 +1872,7 @@
       if (publishingProduct) return;
       if (!productCreateForm.reportValidity()) return;
       if (!String(categoryInput?.value || "").trim()) { showError("Choose the product category that best matches what you are selling."); openCategoryDialog(); return; }
+      if (!variantToggle.checked && Number(productCreateForm.elements.price.value) < 1000) { showError("Enter a price of at least Rp1.000."); productCreateForm.elements.price.focus(); return; }
       const type = currentType(); const minimum = type === "physical" ? 3 : 1;
       const overLimit = [...(optionGroups?.children || [])].find((row) => rawOptionValues(row.querySelector("[data-option-values]")).length > 30);
       if (overLimit) { showError("Each option group can have up to 30 unique values."); overLimit.querySelector("[data-option-values]")?.focus(); return; }
@@ -1850,6 +1926,7 @@
         }
         await digitalFiles?.published();
         removeLocalDraft(draftId); sessionStorage.removeItem(activeProductDraftKey);
+        hasUnpublishedChanges = false; leavingProductEditor = true;
         window.opener?.postMessage({ type: editingProduct ? "ezkart:catalog-product-updated" : "ezkart:catalog-product-created", productId: product.id }, window.location.origin); window.location.href = `?page=products&${editingProduct ? "updated" : "created"}=1`;
       } catch (error) {
         if (error?.code === "catalog_revision_conflict") showProductConflict();
@@ -1864,7 +1941,7 @@
       }
     });
 
-    restoreDraft(); syncVariantMode(); syncType(); syncProductTypePicker(); syncCategoryField(); syncPreviewDevice(); renderImages(); restoringDraft = false; updatePreview();
+    restoreDraft(); syncVariantMode(); syncType(); syncProductTypePicker(); syncCategoryField(); syncPreviewDevice(); syncPreviewVisibility(); renderImages(); restoringDraft = false; updatePreview();
     if (cloudEnabled && editingProduct && (baseRevision === null || baseRevision !== editingProduct.revision)) showProductConflict();
   }
 

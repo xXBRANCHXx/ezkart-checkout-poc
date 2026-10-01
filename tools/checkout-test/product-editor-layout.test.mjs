@@ -16,6 +16,7 @@ test('product variant columns stay contained and batch edits, preview modes and 
   const context = await browser.newContext({viewport:{width:941,height:904}});
   await context.addCookies([app.adminCookie()]);
   const productWrites = [], errors = [];
+  let failDraft = false;
   await context.route('**/*', async route => {
     const url = new URL(route.request().url()), cloud = url.searchParams.get('cloud');
     // These checks use fixture data exclusively, including draft persistence.
@@ -23,6 +24,7 @@ test('product variant columns stay contained and batch edits, preview modes and 
     if (cloud === '/v1/admin-profile') return route.fulfill({json:{ok:true,profile:{logoId:'',canEdit:true}}});
     if (cloud === '/v1/catalog') return route.fulfill({json:{ok:true,products:[],drafts:fixture.drafts}});
     if (cloud?.startsWith('/v1/drafts/')) {
+      if (failDraft) return route.fulfill({status:503,json:{ok:false,error:'Fixture draft save interrupted'}});
       const id = cloud.split('/').at(-1), payload = route.request().postDataJSON();
       fixture.drafts = [...fixture.drafts.filter(draft => draft.id !== id), {...payload.snapshot,id}];
       await persist();
@@ -36,6 +38,8 @@ test('product variant columns stay contained and batch edits, preview modes and 
   page.on('pageerror', error => errors.push(error.message));
   page.setDefaultTimeout(7000);
   await page.goto(app.base+'/cart/admin/?page=product-new');
+  assert.equal(await page.locator('[name=price]').inputValue(),'0');
+  assert.equal(await page.locator('[name=stock]').inputValue(),'0');
   await page.locator('.product-variant-switch').click();
   await page.locator('[data-generate-variants]').click();
   await page.locator('.product-variant-row').nth(3).waitFor();
@@ -45,7 +49,7 @@ test('product variant columns stay contained and batch edits, preview modes and 
   await page.locator('[data-batch-price]').fill('81000');
   await page.locator('[data-batch-stock]').fill('12');
   await page.locator('[data-apply-variant-batch]').click();
-  assert.deepEqual(await fields('[data-variant-price]'), ['81000','81000','75000','75000']);
+  assert.deepEqual(await fields('[data-variant-price]'), ['81000','81000','0','0']);
   await page.locator('[data-clear-variant-selection]').click();
   await page.locator('[data-variant-filter-chips] button[data-option-value="250 ml"]').click();
   await page.locator('[data-batch-price]').fill('');
@@ -91,6 +95,11 @@ test('product variant columns stay contained and batch edits, preview modes and 
     await page.locator('[data-product-live-variant] button[data-live-option-value="Original"]').click();
     await page.locator('[data-product-preview-device="desktop"]').click();
     assert.match(await page.locator('[data-product-preview-viewport]').getAttribute('class'), /preview-desktop/);
+    const sticky = await page.locator('.product-variant-scroll').evaluate(el => {
+      el.scrollLeft=el.scrollWidth;const container=el.getBoundingClientRect(),photo=el.querySelector('.product-variant-group-cell').getBoundingClientRect();
+      return {left:photo.left,containerLeft:container.left,right:photo.right,containerRight:container.right,scrollLeft:el.scrollLeft};
+    });
+    if(sticky.scrollLeft>0){assert.ok(Math.abs(sticky.left-sticky.containerLeft)<3, `${width}: sticky variant image ${JSON.stringify(sticky)}`);assert.ok(sticky.right<=sticky.containerRight, `${width}: image remains visible`);}
     await page.locator('.product-variant-scroll').evaluate(el => {el.scrollLeft=0;});
     if (screenDir && [941,390,1440,1920].includes(width)) {
       await page.locator('.product-variant-batch').scrollIntoViewIfNeeded();
@@ -107,7 +116,7 @@ test('product variant columns stay contained and batch edits, preview modes and 
   assert.equal(draft.variants.at(-1).sku,'ORIGINAL-LARGE');
   await page.reload();
   await page.locator('.product-variant-row').nth(3).waitFor();
-  assert.deepEqual(await fields('[data-variant-price]'), ['81000','81000','75000','75000']);
+  assert.deepEqual(await fields('[data-variant-price]'), ['81000','81000','0','0']);
   assert.deepEqual(await fields('[data-variant-weight]'), ['500','725','500','725']);
   assert.match(await page.locator('[data-product-preview-viewport]').getAttribute('class'), /preview-mobile/);
   // A separate editor tab also restores the same saved draft.
@@ -136,6 +145,42 @@ test('product variant columns stay contained and batch edits, preview modes and 
     assert.equal(await page.locator('.product-variant-main-picker[open]').count(),1);
     await page.locator('.product-variant-main-picker summary').last().click();
   }
+  await page.locator('[data-product-preview-close]').click();
+  assert.equal(await page.locator('.product-preview-sidebar').isVisible(),false);
+  assert.equal(await page.locator('[data-show-product-preview]').isVisible(),true);
+  await page.locator('[data-save-product-draft]').click();
+  await page.waitForFunction(()=>document.querySelector('[data-product-draft-status]').textContent.includes('Saved'));
+  await page.reload();await page.locator('.product-variant-row').nth(3).waitFor();
+  assert.equal(await page.locator('.product-preview-sidebar').isVisible(),false,'Hidden preview survives reopening');
+  await page.locator('[data-show-product-preview]').click();
+  await page.locator('[data-product-preview-minimize]').click();
+  assert.equal(await page.locator('[data-product-preview-content]').isVisible(),false);
+  await page.locator('[data-save-product-draft]').click();
+  await page.waitForFunction(()=>document.querySelector('[data-product-draft-status]').textContent.includes('Saved'));
+  await page.reload();await page.locator('.product-variant-row').nth(3).waitFor();
+  assert.equal(await page.locator('[data-product-preview-content]').isVisible(),false,'Minimized preview survives reopening');
+  await page.locator('[data-product-preview-minimize]').click();
+  assert.equal(await page.locator('[data-product-preview-content]').isVisible(),true);
+  // Interrupted draft saves keep the merchant on the editor and never publish.
+  failDraft=true;
+  await page.locator('[name=description]').fill('Changed immediately before leaving');
+  await page.locator('.product-editor-header>div:first-child>a').click();
+  await page.locator('[data-product-leave-status]').filter({hasText:'Draft could not be saved'}).waitFor();
+  assert.equal(await page.locator('[data-product-leave-draft]').isDisabled(),true);
+  assert.equal(await page.locator('[data-product-leave-publish]').isDisabled(),true);
+  assert.match(page.url(),/page=product-new/);
+  await page.locator('[data-product-leave-stay]').click();
+  failDraft=false;
+  await page.locator('.product-editor-header>div:first-child>a').click();
+  await page.locator('[data-product-leave-status]').filter({hasText:'Your changes are saved as a draft'}).waitFor();
+  assert.equal(fixture.drafts.at(-1).fields.description,'Changed immediately before leaving');
+  await page.locator('[data-product-leave-stay]').click();
+  await page.locator('[name=description]').fill('Last edit retained');
+  await page.locator('.product-editor-header>div:first-child>a').click();
+  await page.locator('[data-product-leave-status]').filter({hasText:'Your changes are saved as a draft'}).waitFor();
+  await page.locator('[data-product-leave-draft]').click();
+  await page.waitForURL('**page=products');
+  assert.equal(fixture.drafts.at(-1).fields.description,'Last edit retained');
   assert.deepEqual(productWrites,[]);
   assert.deepEqual(errors,[]);
 });

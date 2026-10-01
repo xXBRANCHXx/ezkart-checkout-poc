@@ -83,6 +83,7 @@ function ez_orders_table(array $rows, string $tableId, string $csrfToken, string
       <div class="product-editor-actions page-actions">
         <span data-product-draft-status><i></i> Draft autosaves</span>
         <a class="action-button" href="?page=products" data-ui-icon="x">Cancel</a>
+        <button class="action-button" type="button" data-show-product-preview hidden>Show preview</button>
         <button class="action-button" type="button" data-save-product-draft data-ui-icon="save">Save draft</button>
         <button data-ui-icon="<?= $editingProduct ? 'globe' : 'plus' ?>" class="action-button primary" type="submit" form="product-create-form"><?= $editingProduct ? 'Publish changes' : 'Create product' ?></button>
       </div>
@@ -127,7 +128,7 @@ function ez_orders_table(array $rows, string $tableId, string $csrfToken, string
               <div class="product-variant-batch" data-product-variant-batch>
                 <div><b>Batch edit</b><p data-variant-batch-description>Select every matching option—such as all 250 ml or all Peach—then update them together.</p></div>
                 <div class="variant-filter-chips" data-variant-filter-chips></div>
-                <div class="variant-batch-fields"><span data-variant-selected-count>0 selected</span><label><span>Price</span><input type="number" min="1000" step="500" placeholder="No change" data-batch-price></label><label data-batch-physical><span>Stock</span><input type="number" min="0" max="999999" placeholder="No change" data-batch-stock></label><label data-batch-physical><span>Weight (g)</span><input type="number" min="1" max="50000" placeholder="No change" data-batch-weight></label><button class="ui-button" type="button" data-apply-variant-batch data-ui-icon="check">Apply to selected</button><button class="ui-button" type="button" data-clear-variant-selection data-ui-icon="x">Clear</button></div>
+                <div class="variant-batch-fields"><span data-variant-selected-count>0 selected</span><label><span>Price</span><input type="number" min="0" step="500" placeholder="No change" data-batch-price></label><label data-batch-physical><span>Stock</span><input type="number" min="0" max="999999" placeholder="No change" data-batch-stock></label><label data-batch-physical><span>Weight (g)</span><input type="number" min="1" max="50000" placeholder="No change" data-batch-weight></label><button class="ui-button" type="button" data-apply-variant-batch data-ui-icon="check">Apply to selected</button><button class="ui-button" type="button" data-clear-variant-selection data-ui-icon="x">Clear</button></div>
               </div>
               <div class="product-variant-scroll" tabindex="0" role="region" aria-label="Variant pricing and availability">
                 <header><span class="product-variant-group-heading"><input type="checkbox" data-select-all-variants aria-label="Select all variants"><b data-variant-group-heading>Flavor</b></span><span data-variant-column-title>Size</span><span>Price</span><span data-variant-stock-heading>Stock</span><span data-variant-weight-heading>Weight</span><span data-variant-billing-heading hidden>Billing</span><span>SKU</span><span></span></header>
@@ -142,8 +143,8 @@ function ez_orders_table(array $rows, string $tableId, string $csrfToken, string
         <section class="product-form-card" data-product-base-pricing>
           <header><span>04</span><div><h2 data-base-pricing-title>Price and availability</h2><p data-base-pricing-description>Used as the default when the product has no variants.</p></div></header>
           <div class="product-form-grid">
-            <label><span>Price (IDR)</span><input name="price" type="number" required min="1000" step="500" value="75000" data-product-preview-price></label>
-            <label data-product-physical><span>Stock</span><input name="stock" type="number" min="0" max="999999" value="10" data-product-preview-stock></label>
+            <label><span>Price (IDR)</span><input name="price" type="number" required min="0" step="500" value="0" data-product-preview-price></label>
+            <label data-product-physical><span>Stock</span><input name="stock" type="number" min="0" max="999999" value="0" data-product-preview-stock></label>
             <label data-product-physical><span>Shipping weight (grams)</span><input name="weight" type="number" min="1" max="50000" value="500"></label>
 
             <div class="product-subscription-settings product-field-wide" data-product-subscription hidden>
@@ -178,7 +179,8 @@ function ez_orders_table(array $rows, string $tableId, string $csrfToken, string
       </div>
 
       <aside class="product-preview-sidebar">
-        <div class="product-preview-label"><span>Storefront preview</span><div class="product-preview-devices" aria-label="Preview size"><button class="active" type="button" data-product-preview-device="desktop"><?= ez_admin_icon('monitor') ?> Desktop</button><button type="button" data-product-preview-device="mobile"><?= ez_admin_icon('smartphone') ?> Mobile</button></div></div>
+        <div class="product-preview-label"><span>Storefront preview</span><div class="product-preview-tools"><button type="button" data-product-preview-minimize aria-label="Minimize preview" aria-expanded="true" aria-controls="product-preview-content">−</button><button type="button" data-product-preview-close aria-label="Hide preview">×</button></div></div>
+        <div id="product-preview-content" data-product-preview-content><div class="product-preview-devices" aria-label="Preview size"><button class="active" type="button" data-product-preview-device="desktop"><?= ez_admin_icon('monitor') ?> Desktop</button><button type="button" data-product-preview-device="mobile"><?= ez_admin_icon('smartphone') ?> Mobile</button></div>
         <div class="product-preview-viewport preview-desktop" data-product-preview-viewport>
           <article class="product-live-card">
             <div class="product-live-commerce">
@@ -188,8 +190,8 @@ function ez_orders_table(array $rows, string $tableId, string $csrfToken, string
                   <h2 data-product-live-name>Your product name</h2>
                   <span class="product-live-rating" data-product-live-rating aria-label="No published reviews"><?= ez_admin_icon('star') ?><b>—</b></span>
                 </div>
-                <strong data-product-live-price>Rp75.000</strong>
-                <em data-product-live-availability>Stock: 10</em>
+                <strong data-product-live-price>Rp0</strong>
+                <em data-product-live-availability>Stock: 0</em>
                 <div class="product-live-options" data-product-live-variant hidden></div>
                 <button type="button" data-product-live-action><span data-product-live-action-icon><?= ez_admin_icon('plus') ?></span><span data-product-live-action-label>Add to cart</span></button>
                 <footer><?= ez_admin_icon('shield') ?> Secure checkout powered by Ezkart</footer>
@@ -198,6 +200,7 @@ function ez_orders_table(array $rows, string $tableId, string $csrfToken, string
             <section class="product-live-reviews" data-product-live-reviews><header><div><span>Product reviews</span><b>No reviews yet</b></div><div><button type="button" data-review-prev aria-label="Previous review" disabled>←</button><button type="button" data-review-next aria-label="Next review" disabled>→</button></div></header><div class="product-review-track" data-review-track><article class="product-review-empty"><?= ez_admin_icon('star') ?><p>Reviews will appear here automatically after verified customers leave feedback.</p></article></div></section>
             <section class="product-live-details"><h3>Product information</h3><dl><div><dt>Product type</dt><dd data-product-live-type>Physical product</dd></div><div><dt>Category</dt><dd data-product-live-category>Product category</dd></div></dl><div><h4>Product description</h4><p data-product-live-description>Add a clear description so customers immediately understand what they are buying.</p></div></section>
           </article>
+        </div>
         </div>
         <p class="product-preview-note"><?= ez_admin_icon('eye') ?><span><b>This is a preview, not a published page.</b> The product becomes available to your landing-page builder after you create it.</span></p>
       </aside>
@@ -218,6 +221,11 @@ function ez_orders_table(array $rows, string $tableId, string $csrfToken, string
         </section>
       </div>
     </form>
+    <dialog class="product-leave-dialog" data-product-leave-dialog aria-labelledby="product-leave-title">
+      <h2 id="product-leave-title">Publish before leaving?</h2>
+      <p data-product-leave-status role="status" aria-live="polite">Saving your draft…</p>
+      <div><button class="action-button" type="button" data-product-leave-stay>Keep editing</button><button class="action-button" type="button" data-product-leave-draft disabled>Leave with draft</button><button class="action-button primary" type="button" data-product-leave-publish disabled>Publish now</button></div>
+    </dialog>
   </section>
 
 <?php break; case 'returns': require __DIR__ . '/returns.php'; ?>

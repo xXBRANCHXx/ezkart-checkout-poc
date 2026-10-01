@@ -2497,3 +2497,13 @@ body>.sq-page-preview.sq-has-pinned-navigation:not(.sq-has-announcement-navigati
 .login-card .email-auth-button svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.8}
 .login-card .back-link{display:inline-flex;align-items:center;gap:7px;min-height:38px;padding:8px 12px;border:1px solid #e0e4eb;border-radius:8px;background:#fff;color:#566174;text-decoration:none}
 @media(max-width:600px){.login-page{padding:20px}.login-card{padding:30px 24px}.login-card h1{font-size:31px}}
+
+/* Keep the option photo and name visible while editing wide variant rows. */
+.product-variant-group-cell{position:sticky;left:0;z-index:2;box-shadow:4px 0 6px -5px rgba(24,31,42,.22)}
+.product-variant-group-heading{position:sticky;left:0;z-index:3;background:#f8f9fa}
+.product-editor-layout.preview-hidden{grid-template-columns:minmax(0,1fr)}
+.product-preview-sidebar[hidden],.product-preview-content[hidden],[data-product-preview-content][hidden]{display:none}
+.product-preview-tools{display:flex;gap:5px}.product-preview-tools button{width:30px;height:30px;padding:0;display:grid;place-items:center;color:#59616d;background:#f2f3f5;border:0;border-radius:7px;font:600 18px Poppins,sans-serif;cursor:pointer}
+.product-preview-devices{width:max-content;margin:0 0 12px auto}
+.product-leave-dialog{width:min(470px,calc(100% - 32px));padding:24px;color:#303640;background:#fff;border:1px solid #dfe3e8;border-radius:16px;box-shadow:0 18px 60px rgba(24,31,42,.2)}
+.product-leave-dialog::backdrop{background:rgba(24,31,42,.4)}.product-leave-dialog h2{margin:0 0 12px;font-size:20px}.product-leave-dialog p{font-size:12px;line-height:1.6}.product-leave-dialog>div{margin-top:20px;display:flex;justify-content:flex-end;flex-wrap:wrap;gap:8px}.product-leave-dialog button{min-height:40px;font-size:11px}
