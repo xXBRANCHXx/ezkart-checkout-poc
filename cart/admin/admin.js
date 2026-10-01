@@ -5943,6 +5943,7 @@
           card.innerHTML = `<span class="product-art">${imageUrl ? `<img src="${escapeHtml(imageUrl)}" alt="${safeName}">` : `<span class="sq-product-image-placeholder">No product photo</span>`}${images.length > 1 ? `<em class="sq-media-count">+${images.length - 1} photos</em>` : ""}</span><div><small>${typeName}${escapeHtml(schedule)}</small><h3>${safeName}</h3><p>${escapeHtml(detail)}</p><footer><b>${safePrice}</b><button type="button">${type === "subscription" ? "Subscribe" : "Add to cart"}</button></footer></div>`;
           grid.append(card);
         }
+        card.dataset.ezkartProductImages = JSON.stringify(images);
         const descriptionNode = card.querySelector(':scope > div > p');
         if(type === 'physical' && /^Ships at \d+ g\.$/.test(descriptionNode?.textContent || '')) descriptionNode.textContent=detail;
         installStorefrontVariantControls(card, product, variants, price, imageUrl);
@@ -8419,6 +8420,9 @@
     const generateHtml = ({ libraryPreview = false } = {}) => {
       const exportBase = document.body.dataset.adminPublicBase || window.location.href;
       const clone = previewRoot.cloneNode(true);
+      clone.querySelectorAll('[data-ezkart-product-images]').forEach(node => {
+        try { node.dataset.ezkartProductImages = JSON.stringify(JSON.parse(node.dataset.ezkartProductImages).map(src => new URL(src, exportBase).href)); } catch (_) {}
+      });
       // Product context resolves the seller server-side, including stores whose
       // catalog storefront is disabled. Published pages require a connected product.
       const contactProduct = selectedProducts()[0];
@@ -8774,7 +8778,7 @@ addEventListener('resize',schedule);document.addEventListener('toggle',schedule,
       if (!clone.matches('main,[role="main"]') && !clone.querySelector('main,[role="main"]')) clone.setAttribute('role','main');
       const boundProducts = readCatalogProducts().filter(product=>selectedProducts().includes(product.id)).map(product=>({id:product.id,name:product.name,description:product.description,type:product.type,price:product.price,currency:product.currency||'IDR',stock:product.stock,images:product.images,variants:(product.variants||[]).filter(variant=>!variant.hidden).map(variant=>({id:variant.id,name:variant.name,description:variant.description,price:variant.price,stock:variant.stock,image:variant.image,options:variant.options}))}));
       const selectScript = globalThis.EzkartSelect ? `<script>(${EzkartSelect.install.toString()})();<\/script>` : '';
-      const productImageScript = globalThis.EzkartProductImages && clone.querySelector('[data-product-card] .product-art img') ? `<script>(${EzkartProductImages.mount.toString()})(document.querySelector('.sq-page-preview'));<\/script>` : '';
+      const productImageScript = globalThis.EzkartProductImages && clone.querySelector('[data-product-card] .product-art img,[data-commerce-part="image"] img') ? `<script>(${EzkartProductImages.mount.toString()})(document.querySelector('.sq-page-preview'));<\/script>` : '';
       const boundScript = clone.querySelector('[data-native-type="commerce"]') ? `<script>(${EzkartCommerce.mount.toString()})(document.querySelector('.sq-page-preview'),${JSON.stringify(boundProducts).replace(/</g,"\\u003c")});<\/script>` : '';
       const extraFontCss = isImagePage ? '' : globalThis.EzkartFonts?.exportCss(previewRoot) || '';
       const nativeScript = clone.querySelector('.sq-native') ? `<script>(${EzkartNative.mount.toString()})(document.querySelector('.sq-page-preview'));<\/script>` : '';

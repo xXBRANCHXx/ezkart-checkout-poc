@@ -1934,22 +1934,37 @@ button, a { -webkit-tap-highlight-color: transparent; }
   .sq-page-preview .sq-product-grid > article[data-product-card] footer { grid-column: 1 / -1; margin-top: 7px; }
   .sq-page-preview .sq-product-grid > article[data-product-card] footer { padding-top: 12px; }
 }
+/* A borderless gallery fits the complete image until the visitor chooses zoom. */
 .sq-product-image-dialog {
-  max-width: calc(100vw - 24px); max-height: calc(100dvh - 24px); margin: auto;
-  padding: 8px; color: #24262b; background: #fff; border: 0; border-radius: 14px;
+  position: fixed; inset: 0; width: 100vw; height: 100dvh; max-width: none; max-height: none;
+  margin: 0; padding: 0; overflow: hidden; color: #fff; background: #161719;
+  border: 0; border-radius: 0; overscroll-behavior: contain;
 }
-.sq-product-image-dialog::backdrop { background: rgba(15, 18, 24, .8); }
-.sq-product-image-dialog > button {
-  display: block; min-width: 44px; min-height: 44px; margin-left: auto;
-  padding: 8px 14px; color: #24262b; background: #f2f3f5; border: 0; border-radius: 8px;
+.sq-product-image-dialog::backdrop { background: rgba(15, 18, 24, .92); }
+.sq-product-image-dialog[open] { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }
+.sq-product-image-dialog > header,.sq-product-image-dialog > footer {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 16px;
+}
+.sq-product-image-dialog > header { padding-top: max(8px, env(safe-area-inset-top)); }
+.sq-product-image-dialog > footer { padding-bottom: max(8px, env(safe-area-inset-bottom)); }
+.sq-product-image-dialog button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-width: 44px; min-height: 44px;
+  padding: 10px; color: inherit; background: transparent; border: 0; border-radius: 6px;
   font: 600 14px/1.4 Arial, sans-serif; cursor: pointer;
 }
-.sq-product-image-dialog > button:focus-visible { outline: 2px solid #24262b; outline-offset: 2px; }
-.sq-product-image-dialog > img {
-  display: block; width: min(900px, calc(100vw - 40px), calc(100dvh - 100px));
-  height: auto; aspect-ratio: 1 / 1; object-fit: contain;
+.sq-product-image-dialog button:hover { background: #ffffff18; }
+.sq-product-image-dialog button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.sq-product-image-dialog button[hidden] { display: none; }
+.sq-product-image-dialog button svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.sq-product-image-stage { min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; touch-action: none; user-select: none; }
+.sq-product-image-stage > img {
+  display: block; flex: none; width: min(1000px, calc(100vw - 32px), calc(100dvh - 144px));
+  height: auto; aspect-ratio: 1 / 1; object-fit: contain; border-radius: 0;
+  cursor: zoom-in; transform-origin: center;
 }
-.sq-product-image-dialog[open] { display: block; }
+.sq-product-image-stage > img[hidden] { display: none; }
+.sq-product-image-dialog:not([data-photo-zoom="1"]) .sq-product-image-stage > img { cursor: grab; }
+.sq-product-image-count { font: 500 13px/1.5 Arial, sans-serif; font-variant-numeric: tabular-nums; }
 
 /* Consistent storefront dropdowns without browser-default chrome. */
 .sq-page-preview select {

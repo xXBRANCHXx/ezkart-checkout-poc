@@ -45,14 +45,14 @@ async function viewer(page, card, expected, modifiers=[]){
  const art=card.locator('.product-art');await art.click({modifiers});const dialog=page.getByRole('dialog',{name:/Product photo|Foto produk/});
  await dialog.waitFor();assert.equal(await dialog.locator('img').getAttribute('src'),expected);
  assert.equal(await dialog.locator('img').evaluate(img=>getComputedStyle(img).objectFit),'contain');
- assert.ok(await dialog.locator('button').evaluate(b=>b===document.activeElement));
+ assert.ok(await dialog.locator('[data-photo-close]').evaluate(b=>b===document.activeElement));
  await page.keyboard.press('Escape');await dialog.waitFor({state:'hidden'});
  assert.ok(await art.evaluate(node=>node===document.activeElement));
  await page.waitForFunction(()=>!history.state?.ezkartProductPhoto);
  await art.focus();await page.keyboard.press('Enter');await dialog.waitFor();
  const current=page.url();await page.evaluate(()=>history.back());await dialog.waitFor({state:'hidden'});assert.equal(page.url(),current);
  assert.ok(await art.evaluate(node=>node===document.activeElement));
- await art.click({modifiers});await dialog.waitFor();await dialog.locator('button').click();await dialog.waitFor({state:'hidden'});
+ await art.click({modifiers});await dialog.waitFor();await dialog.locator('[data-photo-close]').click();await dialog.waitFor({state:'hidden'});
  await page.waitForFunction(()=>!history.state?.ezkartProductPhoto);
 }
 test('split mobile product cards keep full square photos and an accessible viewer through save, preview, export and publication',async t=>{
@@ -76,7 +76,7 @@ test('split mobile product cards keep full square photos and an accessible viewe
  const frame=output.frameLocator('[data-hosted-page]'),hosted=frame.locator('[data-product-card=coffee]');await hosted.locator('img').waitFor();await geometry(hosted,true);
  await hosted.locator('.product-art').click();await frame.getByRole('dialog').waitFor();assert.equal(await frame.getByRole('dialog').locator('img').getAttribute('src'),cover);
  await hosted.evaluate(()=>history.back());await frame.getByRole('dialog').waitFor({state:'hidden'});assert.equal(output.url(),published.url,'Back closes the photo inside the hosted page');
- await hosted.locator('.product-art').click();await frame.getByRole('dialog').waitFor();await frame.getByRole('dialog').locator('button').click();await frame.getByRole('dialog').waitFor({state:'hidden'});
+ await hosted.locator('.product-art').click();await frame.getByRole('dialog').waitFor();await frame.getByRole('dialog').locator('[data-photo-close]').click();await frame.getByRole('dialog').waitFor({state:'hidden'});
  await output.reload();assert.equal(await hosted.locator('img').getAttribute('src'),cover);
 });
 test('Image Stack phone preview uses the same square split card and viewer after save/reload',async t=>{
